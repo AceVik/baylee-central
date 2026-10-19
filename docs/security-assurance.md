@@ -147,3 +147,10 @@ policy/compiler probes, dev smoke and deliberate fixture-failure cleanup passed.
 RustSec and cargo-deny passed on the unchanged 346-package lockfile. Gitleaks
 found no leaks in the working tree or complete local Git history; CI fetches full
 history for this check. Native-platform results must be verified on this commit.
+
+Platform validation found one test portability issue: Windows Server reported
+the intentionally dropped overload socket as ConnectionAborted/WSAECONNABORTED
+(10053), while the test only accepted EOF/ConnectionReset. The transport fixture
+now recognizes both closed-connection outcomes; read/write timeouts and unexpected
+responses still fail. This changes test interpretation, not server behavior.
+Reference: https://learn.microsoft.com/en-us/windows/win32/winsock/windows-sockets-error-codes-2

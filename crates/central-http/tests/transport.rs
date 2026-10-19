@@ -55,6 +55,8 @@ impl Drop for Fixture {
     }
 }
 
+// Windows may report a hard close as WSAECONNABORTED (10053), rather than reset.
+// Only closed-connection errors count as closure; timeouts still fail the test.
 fn exchange(address: SocketAddr, bytes: &str) -> String {
     let mut socket = TcpStream::connect_timeout(&address, Duration::from_secs(2)).unwrap();
     socket
@@ -66,7 +68,9 @@ fn exchange(address: SocketAddr, bytes: &str) -> String {
     if let Err(error) = socket.write_all(bytes.as_bytes()) {
         assert!(matches!(
             error.kind(),
-            std::io::ErrorKind::ConnectionReset | std::io::ErrorKind::BrokenPipe
+            std::io::ErrorKind::ConnectionReset
+                | std::io::ErrorKind::ConnectionAborted
+                | std::io::ErrorKind::BrokenPipe
         ));
         return String::new();
     }
@@ -76,7 +80,14 @@ fn exchange(address: SocketAddr, bytes: &str) -> String {
         match socket.read(&mut buffer) {
             Ok(0) => break,
             Ok(count) => response.extend_from_slice(&buffer[..count]),
-            Err(error) if error.kind() == std::io::ErrorKind::ConnectionReset => break,
+            Err(error)
+                if matches!(
+                    error.kind(),
+                    std::io::ErrorKind::ConnectionReset | std::io::ErrorKind::ConnectionAborted
+                ) =>
+            {
+                break;
+            }
             Err(error) => panic!("bounded HTTP read failed: {error}"),
         }
         assert!(response.len() < 8192);
@@ -146,7 +157,11 @@ async fn overload_drops_excess_socket_and_cancellation_closes_active_socket() {
         let mut byte = [0];
         match held.read(&mut byte) {
             Ok(0) => {}
-            Err(error) if error.kind() == std::io::ErrorKind::ConnectionReset => {}
+            Err(error)
+                if matches!(
+                    error.kind(),
+                    std::io::ErrorKind::ConnectionReset | std::io::ErrorKind::ConnectionAborted
+                ) => {}
             result => panic!("cancelled socket was not closed: {result:?}"),
         }
     })
