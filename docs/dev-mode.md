@@ -35,3 +35,11 @@ to crates.io until license/API/security gates pass.
 Use scripts/test.ps1 and scripts/smoke-dev.ps1. Smoke tests launch their own server
 on an ephemeral loopback port and always stop that exact process, checking port
 closure. Agent-started interactive clients must likewise be closed after testing.
+
+Supported native platforms: Linux x86-64, Windows x86-64, macOS ARM64 and x86-64.
+CI uses ubuntu-24.04, windows-2025, macos-15 and macos-15-intel. Device keychain
+integration remains a platform adapter; no desktop keychain is implemented yet.
+central-crypto is a reusable native-client library with an optional server feature,
+no HTTP/database dependency and no production integration yet. See crypto-protocol.md.
+Database adapters use PostgreSQL 18+ and SeaORM 2 with explicit migrations;
+client/policy libraries must not import the database implementation.

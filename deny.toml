@@ -8,6 +8,15 @@ unsound = "all"
 [bans]
 multiple-versions = "deny"
 wildcards = "deny"
+# Only these exact reviewed versions are excluded from duplicate detection.
+# OPAQUE/Argon2 and current AEAD use different RustCrypto trait generations.
+skip = [
+  { name = "block-buffer", version = "=0.10.4", reason = "OPAQUE digest 0.10 vs cipher 0.5 API generations" },
+  { name = "crypto-common", version = "=0.1.7", reason = "OPAQUE digest 0.10 vs AEAD 0.6 API generations" },
+  { name = "cpufeatures", version = "=0.2.17", reason = "OPAQUE/Dalek/SHA2 vs ChaCha20/Poly1305 generation" },
+  { name = "getrandom", version = "=0.2.17", reason = "OPAQUE rand 0.8 trait compatibility; application uses 0.4" },
+  { name = "syn", version = "=2.0.119", reason = "Dalek/zeroize proc macros still require syn 2" },
+]
 
 [licenses]
 confidence-threshold = 0.95

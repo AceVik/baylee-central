@@ -3,7 +3,7 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 Push-Location (Split-Path $PSScriptRoot)
 try {
-    $raw = & cargo metadata --locked --offline --format-version 1 --no-deps
+    $raw = & cargo metadata --all-features --locked --offline --format-version 1 --no-deps
     if ($LASTEXITCODE -ne 0) { throw 'Cargo metadata failed' }
     $meta = $raw | ConvertFrom-Json
     $workspaceManifest = Get-Content Cargo.toml -Raw
@@ -36,7 +36,7 @@ try {
             }
         }
     }
-    $raw = & cargo metadata --locked --offline --format-version 1
+    $raw = & cargo metadata --all-features --locked --offline --format-version 1
     if ($LASTEXITCODE -ne 0) { throw 'Full Cargo metadata failed' }
     $graph = $raw | ConvertFrom-Json
     $approved = Get-Content docs/dependency-proposal/approved-packages.json -Raw | ConvertFrom-Json

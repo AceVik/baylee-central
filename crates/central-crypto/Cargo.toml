@@ -1,0 +1,24 @@
+[package]
+name = "central-crypto"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+description = "Experimental native-client OPAQUE and master-key wrapping; not a deployed protocol"
+
+[features]
+default = []
+server = []
+
+[lints]
+workspace = true
+
+[dependencies]
+opaque-ke = { version = "=4.0.1", default-features = false, features = ["ristretto255", "argon2"] }
+sha2 = { version = "=0.10.9", default-features = false }
+rand = { version = "=0.8.8", default-features = false, features = ["getrandom"] }
+chacha20poly1305 = { version = "=0.11.0", default-features = false, features = ["alloc", "zeroize"] }
+hkdf = { version = "=0.12.4", default-features = false }
+zeroize = { version = "=1.9.1", features = ["alloc", "derive"] }
+secrecy = "=0.10.3"
+getrandom = "=0.4.3"

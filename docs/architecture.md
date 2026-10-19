@@ -21,7 +21,8 @@ must not share unrestricted credentials or file access.
 | Website | Public pages, directory, account and operator management | Private vault keys by default |
 | Game gateway | Games, engine, tables, local moderation | Unrelated account data |
 
-Proposed infrastructure: PostgreSQL for transactional metadata; object storage
+Selected infrastructure: PostgreSQL 18+ with server-generated UUIDv7 and SeaORM 2
+with versioned migrations (see postgresql.md); object storage
 for ciphertext and separately permissioned training datasets. Exact libraries,
 versions, hosting and service accounts are selected in M1 after review. Personal
 content is encrypted client-side; TLS and storage encryption still apply.

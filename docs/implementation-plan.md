@@ -59,5 +59,5 @@ No unsafe/assembly optimizations. Compare measured safe alternatives only.
 5. Select measured SLOs and operational scale; configure private reporting,
    branch protection and reviewer responsibilities before collaborative rollout.
 
-Implementation may begin after the owner's next instruction, resolving M1/M2
-design gates in sequence. "Ready for implementation" does not mean release-ready.
+Implementation is authorized and underway; resolve the remaining M1/M2 design
+gates in sequence. "Ready for implementation" does not mean release-ready.

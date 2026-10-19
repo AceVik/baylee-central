@@ -39,8 +39,11 @@ performance policy. Do not import its permission to write unsafe or assembly.
   docs/security-assurance.md. Higher model effort is not a security approval.
 - Keep reusable libraries separate from the executable and server internals;
   provide isolated dev mode without authorization bypasses.
-- The owner accepted the pinned HTTP graph in docs/dependency-proposal via safe
-  APIs. Crypto/database dependencies are not included in that acceptance.
+- The owner accepted the pinned HTTP and crypto graphs via safe APIs (see
+  docs/dependency-proposal and docs/crypto-proposal). Database graph acceptance
+  is separate; use the owner's choice of SeaORM 2 and versioned migrations.
+- Support native Linux, Windows and macOS, including Apple Silicon and Intel.
+  Keep platform integration behind adapters; verify the shared libraries in CI.
 - Implement small milestones with tests and a commit per working milestone.
   Use `codex/` branches and rebase feature branches. Never bypass required checks.
 - No real users, production credentials or data in tests. Bind local test
@@ -49,8 +52,10 @@ performance policy. Do not import its permission to write unsafe or assembly.
   failures. Track owned PIDs, verify exit and port closure, never kill unrelated
   processes. Baylee client tests use its dev-control skill, virtual input and
   the user's additional left monitor; do not capture the user's pointer.
-- Use UUIDv7 for generated object IDs; security tokens require independent
-  cryptographic randomness. IDs are not authorization or secrets.
+- PostgreSQL 18+ is required. Generate central IDs with DEFAULT uuidv7() and
+  INSERT ... RETURNING; reserve account IDs before cryptographic enrollment.
+  Explicit offline-client UUIDv7 exceptions are documented in docs/postgresql.md.
+  Security tokens use independent randomness; IDs are not authorization/secrets.
 - Run scripts/test.ps1, scripts/smoke-dev.ps1, scripts/scan-secrets.ps1,
   cargo audit --deny warnings and cargo deny check. Pin checker versions as in CI.
 - Keep protocol specs, migrations, threat model and operator runbooks in sync.

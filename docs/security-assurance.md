@@ -38,3 +38,23 @@ so the server explicitly bounds connections and header-read time.
 
 Validation results and remaining gaps are recorded in status.md. Code review is
 not proof that anonymization, SSO, migration or production security is complete.
+
+## Cryptographic spike review
+
+Design pass: fixed OPAQUE suite and KDF, authenticated deployment/account/epoch,
+client export-key wrapping instead of shared-session-key wrapping, immutable
+database-allocated account ID, fail-closed parsing and no public auth endpoints.
+
+Implementation pass: reviewed upstream state zeroization and local secret ownership,
+fixed wire lengths, randomness, nonce generation, purpose separation and server
+feature boundary. Removed a Default constructor that could encourage accidental
+deployment-key regeneration. Found Argon2's internally allocated scratch memory
+was not wiped; now use its safe caller-owned-memory API with an unwind-safe wipe
+guard and compare the result with the upstream KSF.
+
+Adversarial pass: published RFC registration vector; real serialized exchanges;
+wrong password/missing account/account or issuer substitution; invalid and
+cross-attempt final proof; malformed sizes; mutation at all wrapper byte positions;
+wrong context/key; password rewrapping; redacted Debug; work-buffer interruption.
+The application still needs full fuzzing, full vectors, constrained execution,
+server-secret lifecycle and independent review before any production auth.
