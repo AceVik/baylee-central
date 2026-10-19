@@ -41,5 +41,6 @@ CI uses ubuntu-24.04, windows-2025, macos-15 and macos-15-intel. Device keychain
 integration remains a platform adapter; no desktop keychain is implemented yet.
 central-crypto is a reusable native-client library with an optional server feature,
 no HTTP/database dependency and no production integration yet. See crypto-protocol.md.
-Database adapters use PostgreSQL 18+ and SeaORM 2 with explicit migrations;
+central-postgres and central-migration use PostgreSQL 18+ and SeaORM 2 with explicit migrations;
+see database-development.md and scripts/test-postgres.ps1 for the disposable fixture;
 client/policy libraries must not import the database implementation.

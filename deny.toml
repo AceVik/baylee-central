@@ -11,6 +11,16 @@ wildcards = "deny"
 # Only these exact reviewed versions are excluded from duplicate detection.
 # OPAQUE/Argon2 and current AEAD use different RustCrypto trait generations.
 skip = [
+  # OPAQUE and SQLx use incompatible maintained crypto/RNG API generations.
+  { name = "digest", version = "=0.10.7", reason = "OPAQUE digest API vs SQLx 0.9" },
+  { name = "hkdf", version = "=0.12.4", reason = "OPAQUE HKDF API vs SQLx 0.9" },
+  { name = "hmac", version = "=0.12.1", reason = "OPAQUE HMAC API vs SQLx 0.9" },
+  { name = "sha2", version = "=0.10.9", reason = "OPAQUE SHA2 API vs SQLx 0.9" },
+  { name = "rand", version = "=0.8.8", reason = "OPAQUE RNG traits vs SQLx 0.9" },
+  { name = "rand_core", version = "=0.6.4", reason = "OPAQUE RNG traits vs SQLx 0.9" },
+  { name = "hashbrown", version = "=0.16.1", reason = "SQLx hashlink vs SeaORM indexmap" },
+  { name = "heck", version = "=0.4.1", reason = "SeaQuery derive vs SeaORM macro generation" },
+  { name = "windows-sys", version = "=0.52.0", reason = "ring native adapter vs current Tokio" },
   { name = "block-buffer", version = "=0.10.4", reason = "OPAQUE digest 0.10 vs cipher 0.5 API generations" },
   { name = "crypto-common", version = "=0.1.7", reason = "OPAQUE digest 0.10 vs AEAD 0.6 API generations" },
   { name = "cpufeatures", version = "=0.2.17", reason = "OPAQUE/Dalek/SHA2 vs ChaCha20/Poly1305 generation" },
@@ -20,7 +30,7 @@ skip = [
 
 [licenses]
 confidence-threshold = 0.95
-allow = ["MIT", "Apache-2.0", "BSD-3-Clause", "Unicode-3.0"]
+allow = ["MIT", "Apache-2.0", "BSD-3-Clause", "Unicode-3.0", "ISC", "Zlib", "CDLA-Permissive-2.0"]
 
 [licenses.private]
 ignore = true

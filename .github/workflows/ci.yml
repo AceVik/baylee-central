@@ -57,3 +57,25 @@ jobs:
       - name: Scan source with pinned Gitleaks
         shell: pwsh
         run: ./scripts/scan-secrets.ps1
+
+  postgres:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - run: rustup toolchain install 1.99.0 --profile minimal
+      - name: Real PostgreSQL migrations, roles and UUIDv7
+        shell: pwsh
+        run: ./scripts/test-postgres.ps1
+      - name: Verify fixture cleanup after failure
+        shell: pwsh
+        run: |
+          try {
+            ./scripts/test-postgres.ps1 -ExerciseFailure
+            throw 'Expected fixture failure did not occur'
+          } catch {
+            if ($_.Exception.Message -ne 'Synthetic fixture failure') { throw }
+          }
+          exit 0

@@ -40,8 +40,9 @@ performance policy. Do not import its permission to write unsafe or assembly.
 - Keep reusable libraries separate from the executable and server internals;
   provide isolated dev mode without authorization bypasses.
 - The owner accepted the pinned HTTP and crypto graphs via safe APIs (see
-  docs/dependency-proposal and docs/crypto-proposal). Database graph acceptance
-  is separate; use the owner's choice of SeaORM 2 and versioned migrations.
+  docs/dependency-proposal and docs/crypto-proposal). The SeaORM 2 / SQLx /
+  Rustls / ring graph in docs/storage-proposal is also accepted subject to QA.
+  First-party unsafe/assembly remains forbidden; pin and review future changes.
 - Support native Linux, Windows and macOS, including Apple Silicon and Intel.
   Keep platform integration behind adapters; verify the shared libraries in CI.
 - Implement small milestones with tests and a commit per working milestone.
@@ -56,7 +57,8 @@ performance policy. Do not import its permission to write unsafe or assembly.
   INSERT ... RETURNING; reserve account IDs before cryptographic enrollment.
   Explicit offline-client UUIDv7 exceptions are documented in docs/postgresql.md.
   Security tokens use independent randomness; IDs are not authorization/secrets.
-- Run scripts/test.ps1, scripts/smoke-dev.ps1, scripts/scan-secrets.ps1,
+- Run scripts/test.ps1, scripts/test-postgres.ps1, scripts/smoke-dev.ps1,
+  scripts/scan-secrets.ps1,
   cargo audit --deny warnings and cargo deny check. Pin checker versions as in CI.
 - Keep protocol specs, migrations, threat model and operator runbooks in sync.
   Do not assert anonymity, audit completion or legal compliance without evidence.

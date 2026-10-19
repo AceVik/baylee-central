@@ -58,3 +58,33 @@ cross-attempt final proof; malformed sizes; mutation at all wrapper byte positio
 wrong context/key; password rewrapping; redacted Debug; work-buffer interruption.
 The application still needs full fuzzing, full vectors, constrained execution,
 server-secret lifecycle and independent review before any production auth.
+
+## PostgreSQL / SeaORM foundation review
+
+Owner selected PostgreSQL 18+, server-generated UUIDv7 and SeaORM 2 migrations;
+the inventoried SQLx/Rustls/ring internals were accepted subject to checks.
+
+Design pass: separate server-only adapter and migration registry; UUID allocation
+precedes enrollment but grants no session; runtime credentials do not own schema.
+Normal development connections are fixed to loopback and synthetic fixtures.
+
+Implementation pass: bounded pool/timeouts, escaped credentials without ambient
+DATABASE_URL, no SQL logging, generic errors, UUID version/variant constraints,
+explicit migration transaction/advisory lock and no automatic down/reset.
+A direct role-attribute check missed potential SET ROLE paths through NOINHERIT
+membership; runtime roles now reject memberships as well, with an adversarial test.
+Cleanup now attempts container removal even if child-process cleanup fails and
+requires a successful Docker inventory response to confirm removal.
+
+Adversarial pass: PostgreSQL 18.6 fixture covers failed/repeated/locked migrations,
+unknown history, forbidden runtime DDL, migration-owner and inherited-role rejection,
+invalid UUID version/variant, rollback and dropped transactions, 64 concurrent
+ORM allocations with database-generated UUIDv7, expiry/default catalog checks.
+Normal and deliberately failed fixtures both verify owned-process/container/port
+cleanup. No unrelated client or service was stopped.
+
+Source/advisory/license and secret scanners pass on the combined graph. Repeated
+crypto generations have exact, documented duplicate exceptions; no advisory
+ignores. Full native platform CI is required for this new milestone.
+Production TLS identity validation, account isolation and credential-change
+transactions are still unimplemented and are not claimed by these tests.

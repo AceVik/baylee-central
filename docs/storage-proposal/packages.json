@@ -1,0 +1,1396 @@
+{
+  "packages": [
+    "ahash@0.8.12",
+    "aho-corasick@1.1.5",
+    "aliasable@0.1.3",
+    "allocator-api2@0.2.21",
+    "android_system_properties@0.1.6",
+    "arrayvec@0.7.8",
+    "arrow@60.0.0",
+    "arrow-arith@60.0.0",
+    "arrow-array@60.0.0",
+    "arrow-buffer@60.0.0",
+    "arrow-cast@60.0.0",
+    "arrow-cmp@60.0.0",
+    "arrow-data@60.0.0",
+    "arrow-ord@60.0.0",
+    "arrow-row@60.0.0",
+    "arrow-schema@60.0.0",
+    "arrow-select@60.0.0",
+    "arrow-string@60.0.0",
+    "async-stream@0.3.6",
+    "async-stream-impl@0.3.6",
+    "async-trait@0.1.92",
+    "atoi@2.0.0",
+    "atoi@3.1.1",
+    "autocfg@1.5.1",
+    "base64@0.22.1",
+    "base64@0.23.1",
+    "bigdecimal@0.4.11",
+    "bitflags@2.13.2",
+    "block-buffer@0.10.4",
+    "block-buffer@0.12.1",
+    "borsh@1.8.1",
+    "borsh-derive@1.8.1",
+    "bumpalo@3.20.3",
+    "byteorder@1.5.0",
+    "bytes@1.12.1",
+    "cc@1.9.0",
+    "cfg_aliases@0.2.2",
+    "cfg-if@1.0.5",
+    "chacha20@0.10.2",
+    "chrono@0.4.45",
+    "cmov@0.5.4",
+    "const-random@0.1.18",
+    "const-random-macro@0.1.16",
+    "core-foundation-sys@0.8.7",
+    "cpufeatures@0.2.17",
+    "cpufeatures@0.3.1",
+    "crc@3.4.0",
+    "crc-catalog@2.5.0",
+    "crossbeam-queue@0.3.14",
+    "crossbeam-utils@0.8.23",
+    "crunchy@0.2.4",
+    "crypto-common@0.1.6",
+    "crypto-common@0.2.2",
+    "ctutils@0.4.3",
+    "darling@0.20.11",
+    "darling_core@0.20.11",
+    "darling_macro@0.20.11",
+    "deranged@0.5.9",
+    "derive_more@2.1.1",
+    "derive_more-impl@2.1.1",
+    "derive-where@1.7.0",
+    "digest@0.10.7",
+    "digest@0.11.3",
+    "displaydoc@0.2.7",
+    "dotenvy@0.15.7",
+    "either@1.19.0",
+    "equivalent@1.0.3",
+    "etcetera@0.11.0",
+    "event-listener@5.4.2",
+    "find-msvc-tools@0.1.15",
+    "flume@0.12.0",
+    "fnv@1.0.7",
+    "foldhash@0.2.0",
+    "form_urlencoded@1.2.2",
+    "futures-channel@0.3.34",
+    "futures-core@0.3.34",
+    "futures-executor@0.3.34",
+    "futures-intrusive@0.5.0",
+    "futures-io@0.3.34",
+    "futures-sink@0.3.34",
+    "futures-task@0.3.34",
+    "futures-util@0.3.34",
+    "generic-array@0.14.9",
+    "getrandom@0.2.17",
+    "getrandom@0.3.4",
+    "getrandom@0.4.3",
+    "glob@0.3.4",
+    "half@2.7.1",
+    "hashbrown@0.16.1",
+    "hashbrown@0.17.1",
+    "hashlink@0.11.1",
+    "heck@0.4.1",
+    "heck@0.5.0",
+    "hex@0.4.3",
+    "hkdf@0.13.0",
+    "hmac@0.13.0",
+    "hybrid-array@0.4.15",
+    "iana-time-zone@0.1.65",
+    "iana-time-zone-haiku@0.1.2",
+    "icu_collections@2.3.0",
+    "icu_locale_core@2.3.0",
+    "icu_normalizer@2.3.0",
+    "icu_normalizer_data@2.3.0",
+    "icu_properties@2.3.0",
+    "icu_properties_data@2.3.0",
+    "icu_provider@2.3.1",
+    "ident_case@1.0.1",
+    "idna@1.1.0",
+    "idna_adapter@1.2.2",
+    "indexmap@2.14.2",
+    "indoc@2.0.8",
+    "itertools@0.14.0",
+    "itoa@1.0.18",
+    "js-sys@0.3.106",
+    "lazy_static@1.5.1",
+    "lexical-core@1.0.6",
+    "lexical-parse-float@1.0.6",
+    "lexical-parse-integer@1.0.6",
+    "lexical-util@1.0.7",
+    "lexical-write-float@1.0.6",
+    "lexical-write-integer@1.0.6",
+    "libc@0.2.191",
+    "libm@0.2.16",
+    "libsqlite3-sys@0.37.0",
+    "litemap@0.8.3",
+    "lock_api@0.4.14",
+    "log@0.4.34",
+    "mac_address@1.2.1",
+    "matchers@0.2.0",
+    "md-5@0.11.0",
+    "memchr@2.8.3",
+    "memoffset@0.9.1",
+    "mio@1.2.4",
+    "nix@0.31.3",
+    "num-bigint@0.4.8",
+    "num-bigint@0.5.1",
+    "num-complex@0.4.6",
+    "num-conv@0.2.2",
+    "num-integer@0.1.47",
+    "num-traits@0.2.19",
+    "once_cell@1.21.4",
+    "ordered-float@4.6.0",
+    "ouroboros@0.18.5",
+    "ouroboros_macro@0.18.5",
+    "parking@2.2.1",
+    "parking_lot@0.12.5",
+    "parking_lot_core@0.9.12",
+    "percent-encoding@2.3.2",
+    "pgvector@0.4.2",
+    "pin-project-lite@0.2.17",
+    "pkg-config@0.3.34",
+    "pluralizer@0.5.0",
+    "potential_utf@0.1.6",
+    "powerfmt@0.2.1",
+    "ppv-lite86@0.2.21",
+    "proc-macro-crate@3.5.0",
+    "proc-macro2@1.0.107",
+    "proc-macro2-diagnostics@0.10.1",
+    "quote@1.0.47",
+    "r-efi@5.3.0",
+    "r-efi@6.0.0",
+    "rand@0.10.3",
+    "rand@0.8.8",
+    "rand@0.9.5",
+    "rand_chacha@0.3.1",
+    "rand_chacha@0.9.0",
+    "rand_core@0.10.1",
+    "rand_core@0.6.4",
+    "rand_core@0.9.5",
+    "redox_syscall@0.5.18",
+    "regex@1.13.1",
+    "regex-automata@0.4.18",
+    "regex-syntax@0.8.11",
+    "ring@0.17.14",
+    "rust_decimal@1.43.0",
+    "rustc_version@0.4.1",
+    "rustls@0.23.46",
+    "rustls-pki-types@1.15.1",
+    "rustls-webpki@0.103.15",
+    "rustversion@1.0.23",
+    "ryu@1.0.23",
+    "scopeguard@1.2.0",
+    "sea-bae@0.2.2",
+    "sea-orm@2.0.4",
+    "sea-orm-arrow@2.0.0-rc.5",
+    "sea-orm-cli@2.0.4",
+    "sea-orm-macros@2.0.4",
+    "sea-orm-migration@2.0.4",
+    "sea-query@1.0.2",
+    "sea-query-derive@1.0.0",
+    "sea-query-sqlx@0.9.1",
+    "sea-schema@0.18.1",
+    "sea-schema-derive@0.3.0",
+    "semver@1.0.28",
+    "serde@1.0.229",
+    "serde_core@1.0.229",
+    "serde_derive@1.0.229",
+    "serde_json@1.0.154",
+    "sha1@0.11.0",
+    "sha2@0.10.9",
+    "sha2@0.11.1",
+    "sharded-slab@0.1.7",
+    "shlex@2.0.1",
+    "slab@0.4.12",
+    "smallvec@1.16.3",
+    "socket2@0.6.5",
+    "spin@0.9.9",
+    "sqlx@0.9.0",
+    "sqlx-core@0.9.0",
+    "sqlx-macros@0.9.0",
+    "sqlx-macros-core@0.9.0",
+    "sqlx-mysql@0.9.0",
+    "sqlx-postgres@0.9.0",
+    "sqlx-sqlite@0.9.0",
+    "stable_deref_trait@1.2.1",
+    "static_assertions@1.1.0",
+    "stringprep@0.1.5",
+    "strum@0.28.0",
+    "subtle@2.6.1",
+    "syn@2.0.119",
+    "syn@3.0.9",
+    "synstructure@0.14.0",
+    "thiserror@2.0.21",
+    "thiserror-impl@2.0.21",
+    "thread_local@1.1.10",
+    "time@0.3.55",
+    "time-core@0.1.9",
+    "time-macros@0.2.32",
+    "tiny-keccak@2.0.2",
+    "tinystr@0.8.4",
+    "tinyvec@1.13.3",
+    "tokio@1.53.3",
+    "tokio-macros@2.7.2",
+    "tokio-stream@0.1.19",
+    "toml_datetime@1.1.2+spec-1.1.0",
+    "toml_edit@0.25.17+spec-1.1.0",
+    "toml_parser@1.1.5+spec-1.1.0",
+    "tracing@0.1.44",
+    "tracing-attributes@0.1.31",
+    "tracing-core@0.1.36",
+    "tracing-subscriber@0.3.23",
+    "typenum@1.20.1",
+    "unicode-bidi@0.3.18",
+    "unicode-ident@1.0.27",
+    "unicode-normalization@0.1.26",
+    "unicode-properties@0.1.4",
+    "unicode-xid@0.2.6",
+    "untrusted@0.9.0",
+    "url@2.5.8",
+    "utf8_iter@1.0.4",
+    "uuid@1.28.0",
+    "vcpkg@0.2.15",
+    "version_check@0.9.5",
+    "wasi@0.11.1+wasi-snapshot-preview1",
+    "wasip2@1.0.4+wasi-0.2.12",
+    "wasm-bindgen@0.2.129",
+    "wasm-bindgen-macro@0.2.129",
+    "wasm-bindgen-macro-support@0.2.129",
+    "wasm-bindgen-shared@0.2.129",
+    "web-time@1.1.0",
+    "webpki-roots@1.0.9",
+    "whoami@2.1.3",
+    "windows_aarch64_gnullvm@0.52.6",
+    "windows_aarch64_msvc@0.52.6",
+    "windows_i686_gnu@0.52.6",
+    "windows_i686_gnullvm@0.52.6",
+    "windows_i686_msvc@0.52.6",
+    "windows_x86_64_gnu@0.52.6",
+    "windows_x86_64_gnullvm@0.52.6",
+    "windows_x86_64_msvc@0.52.6",
+    "windows-core@0.62.2",
+    "windows-implement@0.60.2",
+    "windows-interface@0.59.3",
+    "windows-link@0.2.1",
+    "windows-result@0.4.1",
+    "windows-strings@0.5.1",
+    "windows-sys@0.52.0",
+    "windows-sys@0.61.2",
+    "windows-targets@0.52.6",
+    "winnow@1.0.4",
+    "wit-bindgen@0.57.1",
+    "writeable@0.6.4",
+    "yansi@1.0.1",
+    "yoke@0.8.3",
+    "yoke-derive@0.8.4",
+    "zerocopy@0.8.63",
+    "zerocopy-derive@0.8.63",
+    "zerofrom@0.1.8",
+    "zerofrom-derive@0.1.8",
+    "zeroize@1.9.1",
+    "zerotrie@0.2.5",
+    "zerovec@0.11.8",
+    "zerovec-derive@0.11.6",
+    "zmij@1.0.23"
+  ],
+  "features": {
+    "lock_api@0.4.14": [
+      "atomic_usize",
+      "default"
+    ],
+    "indexmap@2.14.2": [
+      "default",
+      "std"
+    ],
+    "mio@1.2.4": [
+      "net",
+      "os-ext",
+      "os-poll"
+    ],
+    "chacha20@0.10.2": [
+      "rng"
+    ],
+    "futures-util@0.3.34": [
+      "alloc",
+      "futures-io",
+      "futures-sink",
+      "io",
+      "memchr",
+      "sink",
+      "slab",
+      "std"
+    ],
+    "crypto-common@0.2.2": [],
+    "time-macros@0.2.32": [
+      "formatting",
+      "parsing",
+      "serde"
+    ],
+    "ordered-float@4.6.0": [],
+    "rustversion@1.0.23": [],
+    "lexical-write-integer@1.0.6": [],
+    "aliasable@0.1.3": [
+      "alloc",
+      "default"
+    ],
+    "hashbrown@0.16.1": [
+      "allocator-api2",
+      "default",
+      "default-hasher",
+      "equivalent",
+      "inline-more",
+      "raw-entry"
+    ],
+    "borsh-derive@1.8.1": [
+      "default",
+      "schema"
+    ],
+    "zmij@1.0.23": [],
+    "async-stream-impl@0.3.6": [],
+    "rand@0.10.3": [
+      "alloc",
+      "std",
+      "std_rng",
+      "sys_rng",
+      "thread_rng"
+    ],
+    "zerofrom@0.1.8": [
+      "derive"
+    ],
+    "sqlx-macros@0.9.0": [
+      "_rt-tokio",
+      "_tls-rustls-ring-webpki",
+      "chrono",
+      "default",
+      "json",
+      "postgres",
+      "rust_decimal",
+      "time",
+      "uuid"
+    ],
+    "potential_utf@0.1.6": [
+      "zerovec"
+    ],
+    "cpufeatures@0.3.1": [],
+    "wasip2@1.0.4+wasi-0.2.12": [],
+    "hybrid-array@0.4.15": [],
+    "unicode-bidi@0.3.18": [
+      "default",
+      "hardcoded-data",
+      "std"
+    ],
+    "windows_x86_64_gnu@0.52.6": [],
+    "stable_deref_trait@1.2.1": [],
+    "ppv-lite86@0.2.21": [
+      "simd",
+      "std"
+    ],
+    "futures-intrusive@0.5.0": [
+      "alloc",
+      "default",
+      "parking_lot",
+      "std"
+    ],
+    "windows-interface@0.59.3": [],
+    "num-complex@0.4.6": [
+      "std"
+    ],
+    "aho-corasick@1.1.5": [
+      "perf-literal",
+      "std"
+    ],
+    "synstructure@0.14.0": [
+      "default",
+      "proc-macro"
+    ],
+    "dotenvy@0.15.7": [],
+    "stringprep@0.1.5": [],
+    "base64@0.23.1": [
+      "alloc",
+      "default",
+      "simd-unsafe",
+      "std"
+    ],
+    "hashlink@0.11.1": [],
+    "autocfg@1.5.1": [],
+    "futures-core@0.3.34": [
+      "alloc",
+      "default",
+      "std"
+    ],
+    "icu_normalizer@2.3.0": [
+      "compiled_data"
+    ],
+    "version_check@0.9.5": [],
+    "find-msvc-tools@0.1.15": [],
+    "sea-schema@0.18.1": [
+      "def",
+      "discovery",
+      "parser",
+      "postgres",
+      "probe",
+      "query",
+      "runtime-tokio-rustls",
+      "sea-query-sqlx",
+      "sqlx",
+      "sqlx-dep",
+      "sqlx-postgres",
+      "writer"
+    ],
+    "hkdf@0.13.0": [],
+    "atoi@3.1.1": [
+      "default",
+      "std"
+    ],
+    "futures-sink@0.3.34": [],
+    "generic-array@0.14.9": [
+      "more_lengths"
+    ],
+    "arrow-ord@60.0.0": [],
+    "serde_core@1.0.229": [
+      "alloc",
+      "rc",
+      "result",
+      "std"
+    ],
+    "half@2.7.1": [
+      "num-traits"
+    ],
+    "digest@0.11.3": [
+      "alloc",
+      "block-api",
+      "default",
+      "mac"
+    ],
+    "arrow-arith@60.0.0": [],
+    "proc-macro2-diagnostics@0.10.1": [
+      "colors",
+      "default",
+      "yansi"
+    ],
+    "mac_address@1.2.1": [
+      "serde"
+    ],
+    "arrow@60.0.0": [],
+    "windows-core@0.62.2": [
+      "default",
+      "std"
+    ],
+    "sqlx-postgres@0.9.0": [
+      "chrono",
+      "json",
+      "migrate",
+      "offline",
+      "rust_decimal",
+      "time",
+      "uuid"
+    ],
+    "parking_lot_core@0.9.12": [],
+    "windows-link@0.2.1": [],
+    "cfg-if@1.0.5": [],
+    "core-foundation-sys@0.8.7": [
+      "default",
+      "link"
+    ],
+    "regex-syntax@0.8.11": [
+      "default",
+      "std",
+      "unicode",
+      "unicode-age",
+      "unicode-bool",
+      "unicode-case",
+      "unicode-gencat",
+      "unicode-perl",
+      "unicode-script",
+      "unicode-segment"
+    ],
+    "sqlx@0.9.0": [
+      "_rt-tokio",
+      "chrono",
+      "json",
+      "postgres",
+      "runtime-tokio",
+      "rust_decimal",
+      "sqlx-postgres",
+      "time",
+      "tls-rustls",
+      "tls-rustls-ring",
+      "tls-rustls-ring-webpki",
+      "uuid"
+    ],
+    "ryu@1.0.23": [],
+    "const-random-macro@0.1.16": [],
+    "md-5@0.11.0": [],
+    "windows_i686_gnullvm@0.52.6": [],
+    "windows-implement@0.60.2": [],
+    "icu_normalizer_data@2.3.0": [],
+    "derive_more@2.1.1": [
+      "debug",
+      "default",
+      "std"
+    ],
+    "num-integer@0.1.47": [
+      "i128",
+      "std"
+    ],
+    "itertools@0.14.0": [
+      "default",
+      "use_alloc",
+      "use_std"
+    ],
+    "async-trait@0.1.92": [],
+    "vcpkg@0.2.15": [],
+    "semver@1.0.28": [
+      "default",
+      "std"
+    ],
+    "parking_lot@0.12.5": [
+      "default"
+    ],
+    "lexical-util@1.0.7": [
+      "parse-floats",
+      "parse-integers",
+      "write-floats",
+      "write-integers"
+    ],
+    "yoke@0.8.3": [
+      "derive",
+      "zerofrom"
+    ],
+    "windows_aarch64_gnullvm@0.52.6": [],
+    "powerfmt@0.2.1": [],
+    "pgvector@0.4.2": [
+      "serde"
+    ],
+    "cpufeatures@0.2.17": [],
+    "static_assertions@1.1.0": [],
+    "smallvec@1.16.3": [
+      "const_generics",
+      "serde"
+    ],
+    "sea-schema-derive@0.3.0": [],
+    "ouroboros_macro@0.18.5": [],
+    "num-bigint@0.4.8": [
+      "std"
+    ],
+    "typenum@1.20.1": [
+      "const-generics"
+    ],
+    "tokio@1.53.3": [
+      "bytes",
+      "default",
+      "fs",
+      "io-util",
+      "libc",
+      "macros",
+      "mio",
+      "net",
+      "rt",
+      "rt-multi-thread",
+      "socket2",
+      "sync",
+      "time",
+      "tokio-macros",
+      "windows-sys"
+    ],
+    "lexical-parse-integer@1.0.6": [],
+    "icu_provider@2.3.1": [
+      "baked"
+    ],
+    "wasi@0.11.1+wasi-snapshot-preview1": [
+      "default",
+      "std"
+    ],
+    "strum@0.28.0": [],
+    "rand_chacha@0.3.1": [
+      "std"
+    ],
+    "sea-orm-macros@2.0.4": [
+      "async",
+      "bae",
+      "derive",
+      "postgres-array",
+      "sqlx-postgres",
+      "strum",
+      "with-json"
+    ],
+    "toml_parser@1.1.5+spec-1.1.0": [
+      "alloc",
+      "default",
+      "std"
+    ],
+    "rand_core@0.6.4": [
+      "alloc",
+      "getrandom",
+      "std"
+    ],
+    "darling_core@0.20.11": [],
+    "lexical-parse-float@1.0.6": [],
+    "tiny-keccak@2.0.2": [
+      "default",
+      "shake"
+    ],
+    "crossbeam-utils@0.8.23": [
+      "std"
+    ],
+    "num-conv@0.2.2": [],
+    "derive_more-impl@2.1.1": [
+      "debug",
+      "default"
+    ],
+    "crypto-common@0.1.6": [
+      "std"
+    ],
+    "itoa@1.0.18": [],
+    "regex-automata@0.4.18": [
+      "alloc",
+      "dfa-build",
+      "dfa-onepass",
+      "dfa-search",
+      "hybrid",
+      "meta",
+      "nfa-backtrack",
+      "nfa-pikevm",
+      "nfa-thompson",
+      "perf-inline",
+      "perf-literal",
+      "perf-literal-multisubstring",
+      "perf-literal-substring",
+      "std",
+      "syntax",
+      "unicode",
+      "unicode-age",
+      "unicode-bool",
+      "unicode-case",
+      "unicode-gencat",
+      "unicode-perl",
+      "unicode-script",
+      "unicode-segment",
+      "unicode-word-boundary"
+    ],
+    "wasm-bindgen@0.2.129": [
+      "default",
+      "serde",
+      "std"
+    ],
+    "deranged@0.5.9": [
+      "default",
+      "serde"
+    ],
+    "once_cell@1.21.4": [
+      "alloc",
+      "default",
+      "race",
+      "std"
+    ],
+    "toml_edit@0.25.17+spec-1.1.0": [
+      "parse"
+    ],
+    "thiserror-impl@2.0.21": [],
+    "flume@0.12.0": [
+      "async",
+      "futures-core",
+      "futures-sink"
+    ],
+    "android_system_properties@0.1.6": [],
+    "sqlx-macros-core@0.9.0": [
+      "_rt-tokio",
+      "_tls-rustls-ring-webpki",
+      "chrono",
+      "default",
+      "json",
+      "postgres",
+      "rust_decimal",
+      "sqlx-postgres",
+      "time",
+      "tokio",
+      "uuid"
+    ],
+    "cmov@0.5.4": [],
+    "windows_i686_gnu@0.52.6": [],
+    "getrandom@0.2.17": [
+      "std"
+    ],
+    "arrow-row@60.0.0": [],
+    "heck@0.4.1": [
+      "default"
+    ],
+    "icu_locale_core@2.3.0": [
+      "zerovec"
+    ],
+    "tokio-macros@2.7.2": [],
+    "crc@3.4.0": [],
+    "tracing-subscriber@0.3.23": [
+      "alloc",
+      "env-filter",
+      "fmt",
+      "matchers",
+      "once_cell",
+      "registry",
+      "sharded-slab",
+      "std",
+      "thread_local",
+      "tracing"
+    ],
+    "idna_adapter@1.2.2": [
+      "compiled_data"
+    ],
+    "arrow-select@60.0.0": [],
+    "block-buffer@0.12.1": [],
+    "proc-macro2@1.0.107": [
+      "default",
+      "proc-macro"
+    ],
+    "shlex@2.0.1": [
+      "default",
+      "std"
+    ],
+    "ctutils@0.4.3": [],
+    "futures-io@0.3.34": [
+      "default",
+      "std"
+    ],
+    "indoc@2.0.8": [],
+    "windows-targets@0.52.6": [],
+    "utf8_iter@1.0.4": [],
+    "bigdecimal@0.4.11": [
+      "serde",
+      "std"
+    ],
+    "icu_properties_data@2.3.0": [],
+    "const-random@0.1.18": [],
+    "sha1@0.11.0": [],
+    "sea-bae@0.2.2": [],
+    "zerovec-derive@0.11.6": [],
+    "icu_collections@2.3.0": [],
+    "equivalent@1.0.3": [],
+    "redox_syscall@0.5.18": [
+      "default",
+      "userspace"
+    ],
+    "windows-sys@0.61.2": [
+      "Wdk",
+      "Wdk_Foundation",
+      "Wdk_Storage",
+      "Wdk_Storage_FileSystem",
+      "Wdk_System",
+      "Wdk_System_IO",
+      "Win32",
+      "Win32_Foundation",
+      "Win32_NetworkManagement",
+      "Win32_NetworkManagement_IpHelper",
+      "Win32_NetworkManagement_Ndis",
+      "Win32_Networking",
+      "Win32_Networking_WinSock",
+      "Win32_Security",
+      "Win32_Storage",
+      "Win32_Storage_FileSystem",
+      "Win32_System",
+      "Win32_System_Com",
+      "Win32_System_IO",
+      "Win32_System_Pipes",
+      "Win32_System_SystemServices",
+      "Win32_System_Threading",
+      "Win32_System_WindowsProgramming",
+      "Win32_UI",
+      "Win32_UI_Shell",
+      "default"
+    ],
+    "windows_x86_64_gnullvm@0.52.6": [],
+    "r-efi@5.3.0": [],
+    "regex@1.13.1": [
+      "default",
+      "perf",
+      "perf-backtrack",
+      "perf-cache",
+      "perf-dfa",
+      "perf-inline",
+      "perf-literal",
+      "perf-onepass",
+      "std",
+      "unicode",
+      "unicode-age",
+      "unicode-bool",
+      "unicode-case",
+      "unicode-gencat",
+      "unicode-perl",
+      "unicode-script",
+      "unicode-segment"
+    ],
+    "futures-task@0.3.34": [
+      "alloc",
+      "std"
+    ],
+    "whoami@2.1.3": [],
+    "subtle@2.6.1": [],
+    "proc-macro-crate@3.5.0": [],
+    "arrow-cmp@60.0.0": [],
+    "sharded-slab@0.1.7": [],
+    "getrandom@0.4.3": [
+      "std",
+      "sys_rng"
+    ],
+    "sea-orm@2.0.4": [
+      "chrono",
+      "default",
+      "macros",
+      "postgres-array",
+      "runtime-tokio",
+      "runtime-tokio-rustls",
+      "rust_decimal",
+      "schema-sync",
+      "sea-query-sqlx",
+      "sea-schema",
+      "serde_json",
+      "sqlite-use-returning-for-3_35",
+      "sqlx",
+      "sqlx-core",
+      "sqlx-dep",
+      "sqlx-postgres",
+      "stream",
+      "time",
+      "uuid",
+      "with-chrono",
+      "with-json",
+      "with-rust_decimal",
+      "with-time",
+      "with-uuid"
+    ],
+    "hmac@0.13.0": [],
+    "pkg-config@0.3.34": [],
+    "slab@0.4.12": [
+      "std"
+    ],
+    "num-bigint@0.5.1": [
+      "std"
+    ],
+    "rand@0.9.5": [
+      "alloc",
+      "std"
+    ],
+    "rustc_version@0.4.1": [],
+    "idna@1.1.0": [
+      "alloc",
+      "compiled_data",
+      "std"
+    ],
+    "crunchy@0.2.4": [
+      "default",
+      "limit_128"
+    ],
+    "lexical-core@1.0.6": [
+      "lexical-parse-float",
+      "lexical-parse-integer",
+      "lexical-write-float",
+      "lexical-write-integer",
+      "parse-floats",
+      "parse-integers",
+      "write-floats",
+      "write-integers"
+    ],
+    "allocator-api2@0.2.21": [
+      "alloc"
+    ],
+    "icu_properties@2.3.0": [
+      "compiled_data"
+    ],
+    "pin-project-lite@0.2.17": [],
+    "either@1.19.0": [
+      "default",
+      "serde",
+      "std",
+      "use_std"
+    ],
+    "num-traits@0.2.19": [
+      "i128",
+      "libm",
+      "std"
+    ],
+    "spin@0.9.9": [
+      "barrier",
+      "default",
+      "lazy",
+      "lock_api",
+      "lock_api_crate",
+      "mutex",
+      "once",
+      "rwlock",
+      "spin_mutex"
+    ],
+    "parking@2.2.1": [],
+    "windows_i686_msvc@0.52.6": [],
+    "iana-time-zone@0.1.65": [
+      "fallback"
+    ],
+    "sqlx-core@0.9.0": [
+      "_rt-tokio",
+      "_tls-rustls",
+      "_tls-rustls-ring-webpki",
+      "any",
+      "chrono",
+      "crc",
+      "default",
+      "json",
+      "migrate",
+      "offline",
+      "rust_decimal",
+      "rustls",
+      "serde",
+      "serde_json",
+      "sha2",
+      "time",
+      "tokio",
+      "tokio-stream",
+      "uuid",
+      "webpki-roots"
+    ],
+    "crc-catalog@2.5.0": [],
+    "sea-query-derive@1.0.0": [
+      "darling",
+      "default",
+      "heck",
+      "sea-query",
+      "thiserror"
+    ],
+    "sea-query@1.0.2": [
+      "backend-mysql",
+      "backend-postgres",
+      "backend-sqlite",
+      "chrono",
+      "derive",
+      "hashable-value",
+      "ordered-float",
+      "postgres-array",
+      "rust_decimal",
+      "sea-orm",
+      "sea-query-derive",
+      "serde_json",
+      "thread-safe",
+      "time",
+      "uuid",
+      "with-chrono",
+      "with-json",
+      "with-rust_decimal",
+      "with-time",
+      "with-uuid"
+    ],
+    "rand_core@0.10.1": [],
+    "wasm-bindgen-shared@0.2.129": [],
+    "time@0.3.55": [
+      "alloc",
+      "default",
+      "formatting",
+      "macros",
+      "parsing",
+      "serde",
+      "std"
+    ],
+    "glob@0.3.4": [],
+    "fnv@1.0.7": [
+      "default",
+      "std"
+    ],
+    "arrow-string@60.0.0": [],
+    "unicode-properties@0.1.4": [
+      "default",
+      "emoji",
+      "general-category"
+    ],
+    "sqlx-sqlite@0.9.0": [
+      "chrono",
+      "json",
+      "migrate",
+      "offline",
+      "serde",
+      "time",
+      "uuid"
+    ],
+    "windows-sys@0.52.0": [
+      "Win32",
+      "Win32_Foundation",
+      "Win32_System",
+      "Win32_System_Threading",
+      "default"
+    ],
+    "scopeguard@1.2.0": [],
+    "block-buffer@0.10.4": [],
+    "uuid@1.28.0": [
+      "default",
+      "serde",
+      "std"
+    ],
+    "tracing-attributes@0.1.31": [],
+    "syn@2.0.119": [
+      "clone-impls",
+      "default",
+      "derive",
+      "extra-traits",
+      "full",
+      "parsing",
+      "printing",
+      "proc-macro",
+      "visit-mut"
+    ],
+    "async-stream@0.3.6": [],
+    "arrow-cast@60.0.0": [],
+    "futures-executor@0.3.34": [
+      "default",
+      "std"
+    ],
+    "sea-orm-migration@2.0.4": [
+      "runtime-tokio-rustls",
+      "sqlx-dep",
+      "sqlx-postgres"
+    ],
+    "percent-encoding@2.3.2": [
+      "alloc",
+      "default",
+      "std"
+    ],
+    "bitflags@2.13.2": [
+      "serde",
+      "serde_core"
+    ],
+    "thiserror@2.0.21": [
+      "std"
+    ],
+    "yansi@1.0.1": [
+      "alloc",
+      "default",
+      "std"
+    ],
+    "serde@1.0.229": [
+      "alloc",
+      "default",
+      "derive",
+      "rc",
+      "serde_derive",
+      "std"
+    ],
+    "windows_aarch64_msvc@0.52.6": [],
+    "heck@0.5.0": [],
+    "arrow-buffer@60.0.0": [],
+    "time-core@0.1.9": [],
+    "hashbrown@0.17.1": [],
+    "bumpalo@3.20.3": [
+      "default"
+    ],
+    "unicode-normalization@0.1.26": [
+      "default",
+      "std"
+    ],
+    "event-listener@5.4.2": [
+      "default",
+      "parking",
+      "std"
+    ],
+    "rand_chacha@0.9.0": [
+      "std"
+    ],
+    "ident_case@1.0.1": [],
+    "arrow-array@60.0.0": [],
+    "displaydoc@0.2.7": [],
+    "crossbeam-queue@0.3.14": [
+      "alloc",
+      "default",
+      "std"
+    ],
+    "foldhash@0.2.0": [],
+    "bytes@1.12.1": [
+      "default",
+      "std"
+    ],
+    "url@2.5.8": [
+      "default",
+      "std"
+    ],
+    "serde_json@1.0.154": [
+      "default",
+      "raw_value",
+      "std"
+    ],
+    "tracing@0.1.44": [
+      "attributes",
+      "default",
+      "log",
+      "std",
+      "tracing-attributes"
+    ],
+    "nix@0.31.3": [
+      "default",
+      "memoffset",
+      "net",
+      "socket"
+    ],
+    "tokio-stream@0.1.19": [
+      "default",
+      "fs",
+      "time"
+    ],
+    "windows-result@0.4.1": [
+      "std"
+    ],
+    "sha2@0.11.1": [],
+    "thread_local@1.1.10": [],
+    "futures-channel@0.3.34": [
+      "alloc",
+      "futures-sink",
+      "sink",
+      "std"
+    ],
+    "sea-query-sqlx@0.9.1": [
+      "postgres-array",
+      "runtime-tokio",
+      "runtime-tokio-rustls",
+      "sqlx",
+      "sqlx-postgres",
+      "tls-rustls",
+      "with-chrono",
+      "with-json",
+      "with-rust_decimal",
+      "with-time",
+      "with-uuid"
+    ],
+    "rand@0.8.8": [
+      "alloc",
+      "getrandom",
+      "libc",
+      "rand_chacha",
+      "std"
+    ],
+    "getrandom@0.3.4": [
+      "std"
+    ],
+    "libc@0.2.191": [
+      "default",
+      "extra_traits",
+      "std"
+    ],
+    "cc@1.9.0": [],
+    "darling_macro@0.20.11": [],
+    "zerovec@0.11.8": [
+      "derive",
+      "yoke"
+    ],
+    "zerocopy@0.8.63": [
+      "derive",
+      "simd",
+      "zerocopy-derive"
+    ],
+    "zerofrom-derive@0.1.8": [],
+    "libsqlite3-sys@0.37.0": [
+      "pkg-config",
+      "vcpkg"
+    ],
+    "unicode-ident@1.0.27": [],
+    "windows-strings@0.5.1": [
+      "std"
+    ],
+    "matchers@0.2.0": [],
+    "etcetera@0.11.0": [],
+    "ahash@0.8.12": [
+      "compile-time-rng",
+      "const-random",
+      "getrandom",
+      "runtime-rng"
+    ],
+    "winnow@1.0.4": [
+      "alloc",
+      "ascii",
+      "binary",
+      "default",
+      "parser",
+      "std"
+    ],
+    "wit-bindgen@0.57.1": [],
+    "byteorder@1.5.0": [
+      "std"
+    ],
+    "sea-orm-arrow@2.0.0-rc.5": [
+      "with-chrono",
+      "with-rust_decimal",
+      "with-time"
+    ],
+    "toml_datetime@1.1.2+spec-1.1.0": [
+      "alloc",
+      "default",
+      "std"
+    ],
+    "memoffset@0.9.1": [
+      "default"
+    ],
+    "borsh@1.8.1": [
+      "borsh-derive",
+      "derive",
+      "std",
+      "unstable__schema"
+    ],
+    "rustls@0.23.46": [
+      "ring",
+      "std",
+      "tls12"
+    ],
+    "zerocopy-derive@0.8.63": [],
+    "rust_decimal@1.43.0": [
+      "maths",
+      "serde",
+      "std"
+    ],
+    "wasm-bindgen-macro@0.2.129": [],
+    "derive-where@1.7.0": [],
+    "writeable@0.6.4": [],
+    "untrusted@0.9.0": [],
+    "sea-orm-cli@2.0.4": [
+      "runtime-tokio-rustls",
+      "sqlx-postgres",
+      "tokio"
+    ],
+    "log@0.4.34": [],
+    "tinystr@0.8.4": [
+      "zerovec"
+    ],
+    "base64@0.22.1": [
+      "alloc"
+    ],
+    "cfg_aliases@0.2.2": [],
+    "ring@0.17.14": [
+      "alloc",
+      "default",
+      "dev_urandom_fallback"
+    ],
+    "rand_core@0.9.5": [
+      "std"
+    ],
+    "web-time@1.1.0": [],
+    "zerotrie@0.2.5": [
+      "yoke",
+      "zerofrom"
+    ],
+    "js-sys@0.3.106": [
+      "default",
+      "std",
+      "unsafe-eval"
+    ],
+    "unicode-xid@0.2.6": [
+      "default"
+    ],
+    "zeroize@1.9.1": [
+      "alloc",
+      "default"
+    ],
+    "windows_x86_64_msvc@0.52.6": [],
+    "litemap@0.8.3": [],
+    "tinyvec@1.13.3": [
+      "alloc",
+      "default"
+    ],
+    "darling@0.20.11": [],
+    "syn@3.0.9": [
+      "clone-impls",
+      "default",
+      "derive",
+      "extra-traits",
+      "fold",
+      "full",
+      "parsing",
+      "printing",
+      "proc-macro",
+      "visit",
+      "visit-mut"
+    ],
+    "arrow-schema@60.0.0": [],
+    "sha2@0.10.9": [
+      "default",
+      "std"
+    ],
+    "memchr@2.8.3": [
+      "alloc",
+      "default",
+      "std"
+    ],
+    "hex@0.4.3": [
+      "alloc",
+      "default",
+      "std"
+    ],
+    "iana-time-zone-haiku@0.1.2": [],
+    "yoke-derive@0.8.4": [],
+    "libm@0.2.16": [
+      "arch",
+      "default"
+    ],
+    "sqlx-mysql@0.9.0": [
+      "chrono",
+      "json",
+      "migrate",
+      "offline",
+      "rust_decimal",
+      "serde",
+      "time",
+      "uuid"
+    ],
+    "atoi@2.0.0": [
+      "default",
+      "std"
+    ],
+    "rustls-pki-types@1.15.1": [
+      "alloc",
+      "default",
+      "std"
+    ],
+    "arrow-data@60.0.0": [],
+    "chrono@0.4.45": [
+      "alloc",
+      "clock",
+      "iana-time-zone",
+      "now",
+      "serde",
+      "std",
+      "winapi",
+      "windows-link"
+    ],
+    "lexical-write-float@1.0.6": [],
+    "webpki-roots@1.0.9": [],
+    "quote@1.0.47": [
+      "default",
+      "proc-macro"
+    ],
+    "r-efi@6.0.0": [],
+    "wasm-bindgen-macro-support@0.2.129": [],
+    "socket2@0.6.5": [
+      "all"
+    ],
+    "lazy_static@1.5.1": [],
+    "rustls-webpki@0.103.15": [
+      "alloc",
+      "ring",
+      "std"
+    ],
+    "digest@0.10.7": [
+      "alloc",
+      "block-buffer",
+      "core-api",
+      "default",
+      "std"
+    ],
+    "tracing-core@0.1.36": [
+      "once_cell",
+      "std"
+    ],
+    "arrayvec@0.7.8": [
+      "std"
+    ],
+    "form_urlencoded@1.2.2": [
+      "alloc",
+      "default",
+      "std"
+    ],
+    "pluralizer@0.5.0": [],
+    "ouroboros@0.18.5": [],
+    "serde_derive@1.0.229": [
+      "default"
+    ]
+  }
+}

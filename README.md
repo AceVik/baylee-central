@@ -16,6 +16,7 @@ and assembly are forbidden. See [AGENTS.md](AGENTS.md) for binding development r
 - [Architecture and decisions](docs/architecture.md)
 - [Cryptographic integration](docs/crypto-protocol.md)
 - [PostgreSQL and UUID policy](docs/postgresql.md)
+- [SeaORM adapter and migration tests](docs/database-development.md)
 - [Threat model](docs/threat-model.md)
 - [Privacy and training](docs/privacy-training.md)
 - [Implementation plan and acceptance gates](docs/implementation-plan.md)

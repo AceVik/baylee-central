@@ -1,0 +1,79 @@
+# Database adapter and migration development
+
+The server-side libraries use SeaORM 2.0.4 and sea-orm-migration 2.0.4.
+PostgreSQL 18 is the minimum; the pinned local fixture reports 18.6.
+Client, policy and crypto crates remain independent of database implementation.
+
+## Current API and deliberately limited scope
+
+- central-postgres::DevConfig accepts a port, bounded database/user identifiers
+  and a password. It always targets 127.0.0.1, builds an escaped URL, disables SQL
+  logging and bounds pool/connections/statements. It never reads DATABASE_URL.
+- connect_dev is a low-level local fixture/operator connection; it does not grant
+  authority or silently migrate anything. PendingAccountStore checks the runtime
+  role before use, rejecting elevated attributes, direct role memberships,
+  schema CREATE and owned identity tables.
+- central-migration::apply is an explicit operator API, separate from the normal
+  service. It validates PostgreSQL 18+, takes a transaction-scoped advisory lock
+  and runs the versioned registry under an outer transaction and timeouts.
+  Unknown migration history is rejected. Failed DDL rolls back history too.
+- The first migration creates central_identity.pending_accounts. PostgreSQL
+  generates the primary UUID with uuidv7(); UUIDv7/variant and expiry constraints
+  also apply to direct SQL. Reservations expire after 15 minutes.
+- reserve uses SeaORM INSERT DEFAULT VALUES RETURNING. Public output contains
+  only UUID bytes and expiry, not an ORM model. No caller chooses the ID.
+
+This is an enrollment allocation primitive, not a registration API. Tickets,
+quotas, expiry cleanup, activation, ownership and credential/wrapper transactions
+are still required before exposing it. There is no production connector, remote
+TLS configuration, automatic schema-sync or HTTP integration. The migration
+library takes a caller-owned SeaORM connection; that caller must establish
+verified TLS outside explicit disposable fixtures.
+
+## Running real database checks
+
+Install Docker with Linux-container support and PowerShell 7. Run:
+
+```powershell
+./scripts/test.ps1
+./scripts/test-postgres.ps1
+```
+
+The latter creates a fresh pinned official PostgreSQL image with ephemeral data,
+a loopback-only random published port, memory/CPU/process limits and random
+synthetic credentials. DDL and runtime logins are distinct. No production
+configuration is read. The fixture runs the explicitly ignored Rust integration
+test and asserts that it actually executed successfully.
+
+The exact owned child process, container and listener are cleaned and checked in
+finally blocks, including failures. Its generated container name is printed so an
+agent can identify that exact fixture after an external hard interruption. Docker
+daemon failure is reported as unverified cleanup, never a successful removal.
+To exercise failure cleanup, invoke test-postgres.ps1 -ExerciseFailure and expect
+the deliberate Synthetic fixture failure error after cleanup; CI checks that path.
+
+Coverage: failed migration leaves no history; repeat migration is idempotent;
+parallel migration lock conflicts; unknown history; restricted and NOINHERIT
+privilege paths; DDL denial; invalid UUID version/variant; explicit rollback and
+dropped transaction; concurrent ORM allocations with unique DB UUIDv7 and expiry.
+The fixture does not prove production TLS, reset/recovery, credential atomicity,
+row-level account ownership or PostgreSQL 19 compatibility.
+
+## Migration rules
+
+Append a new named migration; never edit an applied one. Keep database-specific
+static SQL next to its SeaORM MigrationTrait implementation when it makes security
+constraints clearer. User values go through bound parameters; user input never
+becomes DDL. Production upgrades must have backup/restore evidence and explicit
+operator execution under separate credentials.
+
+The current migration's down operation deliberately rejects deletion; do not use
+SeaORM fresh/reset on real databases. Prefer reviewed forward corrections.
+Provision deployment roles/grants separately; fixture bootstrap is not a production
+installer. New schema versions must pass fresh-install and prior-version upgrade,
+partial-failure, lock, compatibility and privilege tests.
+
+Cross-platform native compilation/unit tests run on Linux, Windows and both macOS
+architectures. The Docker integration job runs on Linux CI and has also been
+validated locally from Windows. macOS live-database/TLS integration and production
+secret loading remain explicit follow-up validation.

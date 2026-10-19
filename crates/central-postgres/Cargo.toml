@@ -1,0 +1,19 @@
+[package]
+name = "central-postgres"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+description = "PostgreSQL 18 development adapter for Baylee Central"
+
+[lints]
+workspace = true
+
+[dependencies]
+sea-orm = { version = "=2.0.4", default-features = false, features = ["macros", "sqlx-postgres", "runtime-tokio-rustls", "with-uuid"] }
+url = "=2.5.8"
+secrecy = "=0.10.3"
+
+[dev-dependencies]
+central-migration = { path = "../central-migration", version = "=0.1.0" }
+tokio = { version = "=1.53.3", default-features = false, features = ["macros", "rt-multi-thread", "time"] }

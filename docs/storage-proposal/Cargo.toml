@@ -1,0 +1,15 @@
+[workspace]
+resolver = "3"
+
+[package]
+name = "central-storage-proposal"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[lib]
+path = "placeholder.rs"
+
+[dependencies]
+sea-orm = { version = "=2.0.4", default-features = false, features = ["macros", "sqlx-postgres", "runtime-tokio-rustls", "with-uuid"] }
+sea-orm-migration = { version = "=2.0.4", default-features = false, features = ["sqlx-postgres", "runtime-tokio-rustls"] }

@@ -76,9 +76,9 @@ runs in the service. Pending migrations fail readiness; an explicit operator
 command applies them under a migration lock and separate DDL credentials.
 Every migration needs forward/rollback policy, failure-atomicity and upgrade tests.
 
-The Rust PostgreSQL/TLS adapter dependency graph is not yet accepted or installed
-in application crates. Prepare its exact versions/features, unsafe/native inventory
-and advisory/license evidence before adoption. Keep the adapter in its own library;
+The owner accepted the reviewed PostgreSQL/TLS dependency graph after its
+inventory and checks. The local adapter and versioned migration are implemented;
+see database-development.md for executed checks and remaining production gates. Keep the adapter in its own library;
 shared policy, crypto and client APIs must not depend on database implementation.
 
 Use disposable PostgreSQL 18+ fixtures with exact owned-container cleanup.
