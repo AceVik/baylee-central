@@ -1,13 +1,19 @@
-//! Published registration vector from RFC 9807, Appendix C.1.1.
+//! Published registration and login vector from RFC 9807, Appendix C.1.1.
 //! <https://www.rfc-editor.org/rfc/rfc9807.html#appendix-C.1.1>
 //! Hex values are public test data, never credentials. Identity KSF is TEST ONLY.
 #![forbid(unsafe_code)]
 
 use opaque_ke::{
-    ClientRegistration, ClientRegistrationFinishParameters, RegistrationResponse, Ristretto255,
-    TripleDh, ksf::Identity,
+    ClientLogin, ClientLoginFinishParameters, ClientRegistration,
+    ClientRegistrationFinishParameters, CredentialFinalization, CredentialRequest,
+    CredentialResponse, Identifiers, RegistrationResponse, Ristretto255, ServerLogin,
+    ServerLoginParameters, ServerRegistration, ServerSetup, TripleDh, generic_array::GenericArray,
+    key_exchange::group::Group, ksf::Identity,
 };
 use rand::{CryptoRng, RngCore};
+
+#[path = "rfc9807/vector.rs"]
+mod vector;
 
 struct ReferenceSuite;
 impl opaque_ke::CipherSuite for ReferenceSuite {
@@ -90,4 +96,109 @@ fn published_ristretto255_sha512_registration_vector() {
              16"),
     );
     assert_eq!(rng.0.len(), 0);
+}
+
+fn login_state() -> ClientLogin<ReferenceSuite> {
+    // Restore the published blinding scalar, KE1 and ephemeral seed. Production
+    // uses fresh OS entropy; deterministic state injection is test-only.
+    let mut state = hex(vector::BLIND_LOGIN);
+    state.extend(hex(vector::KE1));
+    let secret = Ristretto255::derive_scalar(GenericArray::clone_from_slice(&hex(
+        vector::CLIENT_KEYSHARE_SEED,
+    )))
+    .unwrap();
+    state.extend(Ristretto255::serialize_sk(&secret));
+    state.extend(hex(vector::CLIENT_NONCE));
+    ClientLogin::deserialize(&state).unwrap()
+}
+
+#[test]
+fn published_ristretto255_sha512_login_vector() {
+    let mut rng = VectorRng(Vec::new().into_iter());
+    let client = login_state()
+        .finish(
+            &mut rng,
+            b"CorrectHorseBatteryStaple",
+            CredentialResponse::deserialize(&hex(vector::KE2)).unwrap(),
+            ClientLoginFinishParameters::new(Some(b"OPAQUE-POC"), Identifiers::default(), None),
+        )
+        .unwrap();
+    assert_eq!(client.message.serialize().as_slice(), hex(vector::KE3));
+    assert_eq!(client.export_key.as_slice(), hex(vector::EXPORT_KEY));
+    assert_eq!(client.session_key.as_slice(), hex(vector::SESSION_KEY));
+
+    // A matching client implementation alone cannot prove server interoperability.
+    // Reproduce KE2 and verify KE3 using the separately published server inputs.
+    let mut setup = hex(vector::OPRF_SEED);
+    setup.extend(hex(vector::SERVER_PRIVATE_KEY));
+    // The dummy-record public key is irrelevant for this real-account vector.
+    setup.extend(hex(vector::SERVER_PUBLIC_KEY));
+    let server = ServerSetup::<ReferenceSuite>::deserialize(&setup).unwrap();
+    let record = ServerRegistration::deserialize(&hex(vector::REGISTRATION_UPLOAD)).unwrap();
+    // opaque-ke always generates a discarded 64-byte dummy masking key first.
+    let mut entropy = vec![0; 64];
+    entropy.extend(hex(vector::MASKING_NONCE));
+    entropy.extend(hex(vector::SERVER_KEYSHARE_SEED));
+    entropy.extend(hex(vector::SERVER_NONCE));
+    let mut rng = VectorRng(entropy.into_iter());
+    let parameters = ServerLoginParameters {
+        context: Some(b"OPAQUE-POC"),
+        identifiers: Identifiers::default(),
+    };
+    let server = ServerLogin::start(
+        &mut rng,
+        &server,
+        Some(record),
+        CredentialRequest::deserialize(&hex(vector::KE1)).unwrap(),
+        b"1234",
+        parameters.clone(),
+    )
+    .unwrap();
+    assert_eq!(server.message.serialize().as_slice(), hex(vector::KE2));
+    assert_eq!(rng.0.len(), 0);
+    for index in 0..client.message.serialize().len() {
+        let mut proof = client.message.serialize();
+        proof[index] ^= 1;
+        let restored =
+            ServerLogin::<ReferenceSuite>::deserialize(&server.state.serialize()).unwrap();
+        assert!(
+            restored
+                .finish(
+                    CredentialFinalization::deserialize(&proof).unwrap(),
+                    parameters.clone(),
+                )
+                .is_err(),
+            "mutated finalization byte {index}"
+        );
+    }
+    let server = server.state.finish(client.message, parameters).unwrap();
+    assert_eq!(server.session_key.as_slice(), hex(vector::SESSION_KEY));
+}
+
+#[test]
+fn published_login_rejects_each_changed_server_message_byte() {
+    // Identity KSF makes exhaustive protocol mutation cheap while remaining
+    // isolated from the private, fixed-Argon2 application suite.
+    let response = hex(vector::KE2);
+    for index in 0..response.len() {
+        let mut changed = response.clone();
+        changed[index] ^= 1;
+        if let Ok(response) = CredentialResponse::deserialize(&changed) {
+            assert!(
+                login_state()
+                    .finish(
+                        &mut VectorRng(Vec::new().into_iter()),
+                        b"CorrectHorseBatteryStaple",
+                        response,
+                        ClientLoginFinishParameters::new(
+                            Some(b"OPAQUE-POC"),
+                            Identifiers::default(),
+                            None
+                        ),
+                    )
+                    .is_err(),
+                "mutated server message byte {index}"
+            );
+        }
+    }
 }

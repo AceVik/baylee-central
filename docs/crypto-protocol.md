@@ -46,6 +46,9 @@ used for the vault. XChaCha20-Poly1305 wraps the master key using a fresh random
 192-bit nonce. Wire format is exactly 73 bytes: version 1 + 24-byte nonce +
 48-byte ciphertext/tag. No plaintext key serialization API exists.
 A parse/authentication error never creates a replacement vault.
+Wrapping and unwrapping use fixed zeroized buffers instead of temporary AEAD heap
+buffers. A compatibility test compares the detached operation with the upstream
+allocating API; the version-1 ciphertext/tag layout is unchanged.
 
 Password changes re-enroll the new password and re-wrap the SAME master key.
 The spike tests this cryptographic operation only. A real change still needs
@@ -63,18 +66,24 @@ addresses that specific gap without replacing the algorithm.
 
 ## Evidence and remaining gates
 
-- RFC 9807 Appendix C.1.1 registration upload and export key match published bytes.
+- RFC 9807 Appendix C.1.1 registration upload, KE2/KE3, export key and both peers'
+  session keys match published bytes. Login checks both client and server.
   The reference vector uses Identity KSF only in its separate test executable.
   The application suite is private and always uses the fixed Argon2 profile.
+  Mutations at all 320 KE2 byte positions and 64 KE3 byte positions are rejected.
 - Real serialized enrollment/login, wrong password, missing account, substituted
   account/issuer/epoch, corrupted final proof and replay to another attempt are tested.
 - All six OPAQUE message types reject an otherwise valid message with a suffix.
   Both framing and epoch disagreement tests failed before their respective fixes.
 - Password change and restoration succeed; old wrapping key cannot open the new
-  wrapper. Every byte of the 73-byte wrapper is mutation-tested, as are foreign
+  wrapper. All 584 individual bits of the 73-byte wrapper are mutation-tested, as are foreign
   account/issuer/epoch/key contexts, invalid versions, sizes and redacted Debug.
-- This is not a full published login-vector suite, fuzz campaign, constant-time
-  audit or independent review. None is claimed.
+- This covers one complete published registration/login vector, not every RFC
+  suite/vector, a fuzz campaign, constant-time audit or independent review.
+- The upstream OPAQUE API uses rand::OsRng's infallible interface: an OS entropy
+  failure can panic. No fallback entropy or custom RNG was introduced. Future
+  service integration must handle worker failure without issuing a session or
+  replacing keys; this spike does not claim that lifecycle is implemented.
 - Keep untrusted work off async I/O workers with bounded KDF concurrency. Capacity,
   client-device latency and cancellation behavior still need integration evidence.
 - Registration tickets, enumeration-safe account discovery, rate limits, TLS,

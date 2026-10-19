@@ -2,8 +2,8 @@
 
 use crate::{Context, CryptoError};
 use chacha20poly1305::{
-    XChaCha20Poly1305, XNonce,
-    aead::{Aead, KeyInit, Payload},
+    Tag, XChaCha20Poly1305, XNonce,
+    aead::{AeadInOut, KeyInit},
 };
 use hkdf::Hkdf;
 use sha2::Sha512;
@@ -84,16 +84,15 @@ impl WrappingKey {
         let nonce = XNonce::try_from(&wire[1..25]).map_err(|_| CryptoError::Invalid)?;
         let cipher = XChaCha20Poly1305::new_from_slice(self.key.as_ref())
             .map_err(|_| CryptoError::Invalid)?;
-        let ciphertext = cipher
-            .encrypt(
-                &nonce,
-                Payload {
-                    msg: master.0.as_ref(),
-                    aad: &self.context.aad(),
-                },
-            )
+        // Fixed buffers avoid a plaintext heap allocation and are wiped even if
+        // encryption fails or unwinds. The public wire buffer receives ciphertext only.
+        let mut ciphertext = Zeroizing::new([0; 32]);
+        ciphertext.copy_from_slice(master.0.as_ref());
+        let tag = cipher
+            .encrypt_inout_detached(&nonce, &self.context.aad(), ciphertext.as_mut().into())
             .map_err(|_| CryptoError::Invalid)?;
-        wire[25..].copy_from_slice(&ciphertext);
+        wire[25..57].copy_from_slice(ciphertext.as_ref());
+        wire[57..].copy_from_slice(&tag);
         Ok(WrappedMasterKey(wire))
     }
 
@@ -109,22 +108,12 @@ impl WrappingKey {
         let nonce = XNonce::try_from(&wrapped.0[1..25]).map_err(|_| CryptoError::Invalid)?;
         let cipher = XChaCha20Poly1305::new_from_slice(self.key.as_ref())
             .map_err(|_| CryptoError::Invalid)?;
-        let plaintext = Zeroizing::new(
-            cipher
-                .decrypt(
-                    &nonce,
-                    Payload {
-                        msg: &wrapped.0[25..],
-                        aad: &self.context.aad(),
-                    },
-                )
-                .map_err(|_| CryptoError::Invalid)?,
-        );
         let mut key = Zeroizing::new([0; 32]);
-        if plaintext.len() != key.len() {
-            return Err(CryptoError::Invalid);
-        }
-        key.copy_from_slice(&plaintext);
+        key.copy_from_slice(&wrapped.0[25..57]);
+        let tag = Tag::try_from(&wrapped.0[57..]).map_err(|_| CryptoError::Invalid)?;
+        cipher
+            .decrypt_inout_detached(&nonce, &self.context.aad(), key.as_mut().into(), &tag)
+            .map_err(|_| CryptoError::Invalid)?;
         Ok(MasterKey(key))
     }
 }
@@ -153,6 +142,7 @@ impl WrappedMasterKey {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chacha20poly1305::aead::{Aead, Payload};
 
     fn context() -> Context {
         let mut account = [2; 16];
@@ -169,12 +159,39 @@ mod tests {
         assert_eq!(key.unwrap(&wrapped).unwrap().0.as_ref(), master.0.as_ref());
         assert_ne!(wrapped, key.wrap(&master).unwrap());
         for index in 0..73 {
-            let mut changed = wrapped.0;
-            changed[index] ^= 1;
-            if let Ok(parsed) = WrappedMasterKey::from_bytes(&changed) {
-                assert!(key.unwrap(&parsed).is_err(), "tampering at byte {index}");
+            for bit in 0..8 {
+                let mut changed = wrapped.0;
+                changed[index] ^= 1 << bit;
+                if let Ok(parsed) = WrappedMasterKey::from_bytes(&changed) {
+                    assert!(
+                        key.unwrap(&parsed).is_err(),
+                        "tampering at byte {index}, bit {bit}"
+                    );
+                }
             }
         }
+    }
+
+    #[test]
+    fn fixed_buffers_preserve_the_version_one_wire_format() {
+        let key = WrappingKey::from_export(&[42; 64], context()).unwrap();
+        let master = MasterKey(Zeroizing::new([91; 32]));
+        let wrapped = key.wrap(&master).unwrap();
+        // Compare the new detached operation with the upstream allocating AEAD
+        // interface, including the tag location consumed by existing wrappers.
+        let cipher = XChaCha20Poly1305::new_from_slice(key.key.as_ref()).unwrap();
+        let nonce = XNonce::try_from(&wrapped.0[1..25]).unwrap();
+        let reference = cipher
+            .encrypt(
+                &nonce,
+                Payload {
+                    msg: master.0.as_ref(),
+                    aad: &key.context.aad(),
+                },
+            )
+            .unwrap();
+        assert_eq!(&wrapped.0[25..], reference);
+        assert_eq!(key.unwrap(&wrapped).unwrap().0.as_ref(), master.0.as_ref());
     }
 
     #[test]
