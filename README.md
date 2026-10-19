@@ -1,6 +1,6 @@
 # Baylee Central
 
-Private preparation repository for Baylee's central accounts, encrypted personal
+Public development repository for Baylee's central accounts, encrypted personal
 storage, gateway directory, scoped administration, website and training intake.
 
 **Implementation started on 2026-10-19 with owner authorization.** A local-only
@@ -24,8 +24,9 @@ and assembly are forbidden. See [AGENTS.md](AGENTS.md) for binding development r
 - [Security reporting](SECURITY.md)
 
 Initial operator: one official central deployment; federation is deferred.
-Repository visibility: private, explicitly selected by the owner. Publication
-is a separate decision. AGPL-3.0-only is proposed to match Baylee, but license
-selection must be confirmed before publishing or distributing this new project.
+Repository visibility: public, authorized by the owner on 2026-10-19.
+Licensed under [AGPL-3.0-only](LICENSE), as selected by the owner.
+The official live service address is `https://central.baylee.app`;
+source publication does not indicate that this service has been deployed.
 No Wizards assets, user data, replay corpus, production secrets or credentials
 belong in this repository. This is an unofficial, non-commercial project.

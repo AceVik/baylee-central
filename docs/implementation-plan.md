@@ -49,7 +49,7 @@ No unsafe/assembly optimizations. Compare measured safe alternatives only.
 
 ## Decisions still required (not reasons to skip preparatory work)
 
-1. Confirm license before external distribution (proposed AGPL-3.0-only).
+1. License selected: AGPL-3.0-only; owner authorized public source on 2026-10-19.
 2. Approve exact dependency inventory, especially unsafe/assembly internals; a
    whole-stack prohibition may rule out the Rust runtime and mainstream crypto.
 3. Select reviewed native authentication and website/SSO integration in M2;

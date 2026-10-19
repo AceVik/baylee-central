@@ -6,6 +6,7 @@ members = ["crates/*"]
 edition = "2024"
 rust-version = "1.99"
 publish = false
+license = "AGPL-3.0-only"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
