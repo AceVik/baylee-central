@@ -7,6 +7,33 @@ impl IdentityService {
         bearer: Option<&Token>,
     ) -> Result<Response, Error> {
         match request {
+            request @ (Request::CreateObject
+            | Request::ReadObject { .. }
+            | Request::ListObjects { .. }
+            | Request::WriteObject { .. }
+            | Request::DeleteObject { .. }) => self.object_request(request, bearer).await,
+            Request::SessionStatus => {
+                let (identity, expires_at, migration_closed) = self
+                    .store
+                    .session_status(bearer.ok_or(Error::Rejected)?)
+                    .await?;
+                Ok(Response::SessionStatus {
+                    identity,
+                    expires_at,
+                    migration_closed,
+                })
+            }
+            request @ (Request::LegacyInvalidate { .. } | Request::LegacyClose { .. }) => {
+                self.legacy_mutation(request, bearer).await
+            }
+            request @ (Request::RegisterGateway { .. }
+            | Request::GatewayDirectory { .. }
+            | Request::GatewayHeartbeat { .. }
+            | Request::SetGatewayAdmins { .. }
+            | Request::CheckGatewayAdmin { .. }
+            | Request::GatewaySession { .. }
+            | Request::GatewayTicket { .. }
+            | Request::RedeemGateway { .. }) => self.gateway_request(request, bearer).await,
             Request::Discover { username } => {
                 let discovery = if let Some(identity) = self.store.discover(&username).await? {
                     Discovery::Central { identity }
@@ -70,32 +97,30 @@ impl IdentityService {
                 let (identity, state) = self.store.legacy_status(&legacy_id).await?;
                 Ok(Response::LegacyStatus { identity, state })
             }
-            Request::GatewayTicket { gateway, purpose } => {
-                if gateway != self.gateway {
-                    return Err(Error::Rejected);
-                }
-                let ticket = Token::generate()?;
-                self.store
-                    .gateway_ticket(bearer.ok_or(Error::Rejected)?, &gateway, &ticket, purpose)
-                    .await?;
-                Ok(Response::GatewayTicket { ticket })
-            }
-            Request::RedeemGateway { ticket, purpose } => {
-                self.bridge(bearer)?;
-                let (identity, legacy_id) = self
-                    .store
-                    .redeem_gateway(&ticket, &self.gateway, purpose)
-                    .await?;
-                Ok(Response::GatewayIdentity {
-                    identity,
-                    legacy_id,
-                })
-            }
             Request::Logout => {
                 self.store.logout(bearer.ok_or(Error::Rejected)?).await?;
                 Ok(Response::Done)
             }
         }
+    }
+
+    async fn legacy_mutation(
+        &self,
+        request: Request,
+        bearer: Option<&Token>,
+    ) -> Result<Response, Error> {
+        self.bridge(bearer)?;
+        match request {
+            Request::LegacyInvalidate { legacy_id } => {
+                self.store.invalidate_legacy(&legacy_id).await?;
+            }
+            Request::LegacyClose {
+                legacy_id,
+                identity,
+            } => self.store.close_legacy(&legacy_id, identity).await?,
+            _ => return Err(Error::Rejected),
+        }
+        Ok(Response::Done)
     }
 
     async fn enrollment_challenge(

@@ -27,9 +27,13 @@ for ciphertext and separately permissioned training datasets. Exact libraries,
 versions, hosting and service accounts are selected in M1 after review. Personal
 content is encrypted client-side; TLS and storage encryption still apply.
 
-Existing games should continue during a central outage. Fresh sensitive actions
-fail closed. Specify token lifetimes, revocation freshness and outage behavior
-per action before implementation; availability must not silently extend admin rights.
+The owner's exclusive-session requirement takes priority over continuing
+authenticated play during a Central outage. Gateway HTTP requests and game input
+perform live lease checks and fail closed when Central is unavailable. Idle
+authenticated sockets recheck within five seconds and close on failure. This
+trades availability for prompt revocation; no cached success extends permission.
+Already authorized work may finish before a replacement login commits. See
+gateway-registry.md for the concrete lease contract and current development bounds.
 
 ## Authentication and vault decision gate
 

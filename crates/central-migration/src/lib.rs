@@ -11,6 +11,8 @@
 mod m20261019_000001_pending_accounts;
 mod m20261019_000002_native_accounts;
 mod m20261019_000003_ticket_purpose;
+mod m20261019_000004_gateway_registry;
+mod m20261019_000005_private_objects;
 
 use sea_orm_migration::{
     MigrationTrait, MigratorTrait,
@@ -27,6 +29,8 @@ impl MigratorTrait for Migrator {
             Box::new(m20261019_000001_pending_accounts::Migration),
             Box::new(m20261019_000002_native_accounts::Migration),
             Box::new(m20261019_000003_ticket_purpose::Migration),
+            Box::new(m20261019_000004_gateway_registry::Migration),
+            Box::new(m20261019_000005_private_objects::Migration),
         ]
     }
 }

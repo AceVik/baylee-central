@@ -7,9 +7,10 @@ use sea_orm::{ConnectionTrait, TransactionTrait};
 
 impl AccountStore {
     /// Issue after OPAQUE verification, conditional on the unchanged credential revision.
+    /// Atomically replace every earlier session and its tickets/leases for this account.
     ///
     /// # Errors
-    /// Rejects stale credentials, session capacity exhaustion or database failure.
+    /// Rejects stale credentials or database failure without revoking the current session.
     pub async fn issue_session(
         &self,
         credential: &Credential,
@@ -21,14 +22,16 @@ impl AccountStore {
              AND credential_revision = $3 AND credential IS NOT NULL FOR UPDATE",
             vec![uuid(credential.identity.account).into(), number(credential.identity.epoch)?.into(), credential.revision.into()],
         )).await.map_err(|_| Error::Unavailable)?.ok_or(Error::Rejected)?;
-        transaction.execute_raw(statement(
-            "DELETE FROM central_identity.sessions WHERE account_id = $1 AND expires_at <= pg_catalog.clock_timestamp()",
-            vec![uuid(credential.identity.account).into()],
-        )).await.map_err(|_| Error::Unavailable)?;
+        transaction
+            .execute_raw(statement(
+                "DELETE FROM central_identity.sessions WHERE account_id = $1",
+                vec![uuid(credential.identity.account).into()],
+            ))
+            .await
+            .map_err(|_| Error::Unavailable)?;
         let inserted = transaction.execute_raw(statement(
             "INSERT INTO central_identity.sessions (digest, account_id, credential_revision, created_at, expires_at)
-             SELECT $1, $2, $3, t, t + interval '30 minutes' FROM (SELECT pg_catalog.clock_timestamp() AS t) clock
-             WHERE (SELECT count(*) FROM central_identity.sessions WHERE account_id = $2) < 32",
+             SELECT $1, $2, $3, t, t + interval '30 minutes' FROM (SELECT pg_catalog.clock_timestamp() AS t) clock",
             vec![token.digest().to_vec().into(), uuid(credential.identity.account).into(), credential.revision.into()],
         )).await.map_err(|_| Error::Unavailable)?;
         if inserted.rows_affected() != 1 {
@@ -77,7 +80,9 @@ impl AccountStore {
         if expected < 1 || expected == i64::MAX {
             return Err(Error::Rejected);
         }
-        let result = self.db.execute_raw(statement(
+        let tx = self.db.begin().await.map_err(|_| Error::Unavailable)?;
+        super::objects::locked_owner(&tx, session, false).await?;
+        let result = tx.execute_raw(statement(
             "UPDATE central_identity.accounts a SET document = $2, document_revision = document_revision + 1
              FROM central_identity.sessions s WHERE s.account_id = a.id AND s.credential_revision = a.credential_revision
              AND s.digest = $1 AND s.expires_at > pg_catalog.clock_timestamp() AND a.document_revision = $3",
@@ -86,7 +91,7 @@ impl AccountStore {
         if result.rows_affected() != 1 {
             return Err(Error::Conflict);
         }
-        Ok(())
+        tx.commit().await.map_err(|_| Error::Unavailable)
     }
 
     /// Record successful authenticated restore of the currently stored revision.
@@ -94,7 +99,9 @@ impl AccountStore {
     /// # Errors
     /// Rejects invalid sessions, a changed revision or database failure.
     pub async fn confirm_restore(&self, session: &Token, revision: u64) -> Result<(), Error> {
-        let result = self.db.execute_raw(statement(
+        let tx = self.db.begin().await.map_err(|_| Error::Unavailable)?;
+        super::objects::locked_owner(&tx, session, false).await?;
+        let result = tx.execute_raw(statement(
             "UPDATE central_identity.accounts a SET restored = true FROM central_identity.sessions s
              WHERE s.account_id = a.id AND s.credential_revision = a.credential_revision AND s.digest = $1
              AND s.expires_at > pg_catalog.clock_timestamp() AND a.document_revision = $2",
@@ -103,7 +110,7 @@ impl AccountStore {
         if result.rows_affected() != 1 {
             return Err(Error::Conflict);
         }
-        Ok(())
+        tx.commit().await.map_err(|_| Error::Unavailable)
     }
 
     /// Issue one short-lived capability for an already-authorized gateway audience.

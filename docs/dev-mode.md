@@ -5,7 +5,7 @@ required. Defaults: http://127.0.0.1:28780, 64 KiB request bodies, 32 concurrent
 connections. Environment settings:
 
 - BAYLEE_CENTRAL_LISTEN: numeric loopback socket address; port 0 selects a free port.
-- BAYLEE_CENTRAL_REQUEST_BYTES: 1024..1048576.
+- BAYLEE_CENTRAL_REQUEST_BYTES: 1024..1056768 (native mode requires the upper bound).
 - BAYLEE_CENTRAL_CONCURRENT_REQUESTS: 1..128.
 
 Reserved names must use the documented uppercase spelling on every platform.

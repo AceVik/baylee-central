@@ -43,10 +43,18 @@ limitation is not solved by encryption or an HTTP success code.
    A repeated reserve cannot replace a committed credential or data.
 4. The client performs a fresh central OPAQUE login, downloads the committed
    ciphertext, authenticates/decrypts it and confirms restoration.
-5. The gateway verifies durable restored state over its authenticated bridge
-   before disabling legacy login and revoking the old sessions. Original data
+5. The gateway verifies durable restored state and the unchanged source/credential
+   generation under its exclusive mutation barrier. It calls idempotent
+   `LegacyClose` before disabling legacy login and revoking the old sessions. Original data
    is retained. Cutover is retried after lost responses, never assumed from a
    client-supplied success boolean.
+
+An already linked legacy account also repeats this idempotent close step during
+login repair, so an upgrade cannot leave its private-object storage permanently
+blocked. Legacy password changes invalidate unfinished enrollment before changing
+the source credential; archived ciphertext and advanced vault epochs prevent
+stale proofs from becoming the current migrated credential. Closed accounts cannot
+be reopened by the bridge. See [private objects](private-objects.md).
 
 The two databases have no distributed transaction. Pending/enrolled/restored
 states, immutable legacy links, source retention and authenticated reconciliation

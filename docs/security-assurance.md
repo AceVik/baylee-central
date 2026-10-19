@@ -266,3 +266,34 @@ Remaining bounds: the upstream OPAQUE OsRng interface can panic on entropy failu
 no fallback randomness was added. Fuzz campaigns, all RFC vectors, constant-time
 analysis, production TLS/session integration and external review remain release
 gates. A clean finite review pass cannot establish the absence of every bug.
+
+## Native integration review, 2026-10-19
+
+Design pass: one active session per account, including on the same device; no
+implicit gateway-admin permission from registry ownership; separate heartbeat,
+redemption and migration authorities. Every gateway action requires a live,
+purpose-bound lease. Private-history chunks remain account-encrypted and old
+devices' secrets are retained for restoration. No operator receives vault keys.
+
+Implementation pass: account locking followed by a fresh session query prevents
+an UPDATE waiting behind a login from using a revoked snapshot. A unique session
+index backs the application rule. UUID constraints use IS NOT DISTINCT FROM 7
+to reject PostgreSQL's NULL version result for invalid UUID variants. Runtime
+permissions reject grant options and column-level approval/archive writes.
+Migration invalidation preserves old ciphertext, advances epochs and revokes
+sessions; permanent close blocks subsequent legacy resets. Session status lets
+fully migrated clients avoid depending on the old gateway during later logins.
+
+Adversarial pass: real PostgreSQL tests force the row-lock race before revocation,
+compete concurrent logins/writes, remove admins with live/pending capabilities,
+try foreign accounts/gateways/purposes and replay, and exercise lost replies,
+tampered content, bounded quota reclamation and dangerous role grants. The native
+SDK restores a private chunk after a new-device login has revoked its source
+session. Separate login/data/control budgets prevent bulk transfers from
+consuming the session-check budget; adding a fake bearer cannot bypass the login
+budget. Wire tests include worst-case JSON expansion, not only random ciphertext.
+
+This review does not replace independent cryptographic review, production
+capacity tests or an external audit. Content confidentiality does not imply
+hidden metadata, guaranteed availability or detection of a complete old snapshot
+on a device without a trusted revision checkpoint.

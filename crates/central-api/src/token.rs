@@ -16,6 +16,21 @@ impl std::fmt::Debug for Token {
 }
 
 impl Token {
+    /// Import a capability from a privileged transport or secret store.
+    /// This does not validate authority; the receiving service still checks its digest and scope.
+    #[must_use]
+    pub fn from_secret_bytes(bytes: Zeroizing<[u8; 32]>) -> Self {
+        let token = Self(*bytes);
+        drop(bytes);
+        token
+    }
+
+    /// Export to a privileged secret store in a zeroizing buffer. Never log or expose this value.
+    #[must_use]
+    pub fn to_secret_bytes(&self) -> Zeroizing<[u8; 32]> {
+        Zeroizing::new(self.0)
+    }
+
     /// Generate an independent 256-bit operating-system random capability.
     ///
     /// # Errors
@@ -78,6 +93,10 @@ mod tests {
             token.digest()
         );
         assert_ne!(Token::generate().unwrap().digest(), token.digest());
+        assert_eq!(
+            Token::from_secret_bytes(token.to_secret_bytes()).digest(),
+            token.digest()
+        );
         assert_eq!(format!("{token:?}"), "Token([REDACTED])");
         for text in [
             "bearer ",

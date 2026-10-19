@@ -6,10 +6,10 @@ use zeroize::Zeroizing;
 
 /// An authenticated native account. Tokens and keys stay private and cannot be cloned or printed.
 pub struct Session {
-    endpoint: Endpoint,
-    identity: Identity,
-    token: Token,
-    master: MasterKey,
+    pub(crate) endpoint: Endpoint,
+    pub(crate) identity: Identity,
+    pub(crate) token: Token,
+    pub(crate) master: MasterKey,
     revision: u64,
     document: Document,
     confirmed: bool,
@@ -32,7 +32,7 @@ impl Session {
             confirmed: false,
         }
     }
-    fn same_endpoint(&self, transport: &impl Transport) -> Result<(), Error> {
+    pub(crate) fn same_endpoint(&self, transport: &impl Transport) -> Result<(), Error> {
         if transport.endpoint() != &self.endpoint {
             return Err(Error::Rejected);
         }
@@ -51,6 +51,36 @@ impl Session {
     #[must_use]
     pub const fn identity(&self) -> Identity {
         self.identity
+    }
+
+    /// Check whether this is still the account's single active session. Never renews expiry.
+    ///
+    /// # Errors
+    /// Rejects superseded/revoked sessions, identity substitution and transport failure.
+    pub fn check_active(&self, transport: &impl Transport) -> Result<(), Error> {
+        self.migration_closed(transport).map(|_| ())
+    }
+
+    /// Check live session status and whether legacy authorization has been permanently retired.
+    /// Completed accounts no longer need the legacy gateway online during ordinary login.
+    ///
+    /// # Errors
+    /// Rejects revoked sessions, wrong identity and unavailable transport; never authorizes fallback.
+    pub fn migration_closed(&self, transport: &impl Transport) -> Result<bool, Error> {
+        self.same_endpoint(transport)?;
+        match transport.exchange(&Request::SessionStatus, Some(&self.token))? {
+            Response::SessionStatus {
+                identity,
+                expires_at,
+                migration_closed,
+            } if identity.account == self.identity.account
+                && identity.epoch == self.identity.epoch
+                && expires_at > 0 =>
+            {
+                Ok(migration_closed)
+            }
+            _ => Err(Error::Rejected),
+        }
     }
 
     /// Successfully decrypted document. The application must validate its own version/schema.

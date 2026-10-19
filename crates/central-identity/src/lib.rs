@@ -19,7 +19,9 @@ use subtle::ConstantTimeEq;
 use tokio::sync::Semaphore;
 
 mod dispatch;
+mod gateways;
 mod limits;
+mod objects;
 
 struct Pending {
     expires: Instant,
@@ -191,7 +193,7 @@ impl IdentityService {
         self.limits
             .lock()
             .map_err(|_| Error::Unavailable)?
-            .global(Instant::now())?;
+            .request(&request, bearer, Instant::now())?;
         self.dispatch(request, bearer).await
     }
 }
