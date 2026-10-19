@@ -12,6 +12,9 @@ OPAQUE registration/login, a random client master key and encrypted personal
 objects use central-crypto. The protocol/endpoint rules are reusable in
 central-api. Central sessions never go to a game gateway. Admission uses a
 separate one-use 30-second ticket, bound to the gateway that redeems it.
+Tickets also bind the operation: admission, migration export or final linking.
+The gateway route supplies the expected operation; a client cannot promote an
+admission ticket into permission to export or finalize migration.
 Neither a central transport error nor a failed OPAQUE proof is permission to
 send a plaintext password elsewhere. HTTP redirects must be disabled on both
 the central and the legacy credential transports.
@@ -63,3 +66,16 @@ it is not a claim of account-enumeration resistance. This requires further revie
 before enabling the live migration discovery endpoint. Development does not
 offer legacy discovery and cannot send a password to the live gateway.
 The existing release gates and synthetic-data-only testing rules still apply.
+
+## Development process
+
+`central-service --dev-accounts-stdin` starts the real account protocol on an
+explicit numeric loopback address. It takes one bounded JSON configuration from
+standard input: `endpoint`, `gateway`, `database_port`, `database_user`,
+`database_name`, `database_password`, `opaque_setup` and `bridge`. The last two
+are byte arrays: the persisted versioned server setup and a random 32-byte bridge
+credential. Keep this configuration outside source control with owner-only file
+permissions; never pass credentials on the command line. A restart must reuse
+the setup. The service does not create keys or run migrations implicitly.
+This command only accepts loopback development endpoints and the restricted
+development database connector. Production TLS/provisioning remains separate.

@@ -2,6 +2,30 @@
 use crate::Token;
 use serde::{Deserialize, Serialize};
 
+/// A gateway capability authorizes exactly one action, never a general account session.
+#[derive(Clone, Copy, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TicketPurpose {
+    /// Admit to gameplay using an already-linked account.
+    Admit,
+    /// Read a source snapshot to resume interrupted migration.
+    Export,
+    /// Finalize the immutable account link after successful restore.
+    Link,
+}
+
+impl TicketPurpose {
+    /// Stable database representation.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Admit => "admit",
+            Self::Export => "export",
+            Self::Link => "link",
+        }
+    }
+}
+
 /// Immutable identity metadata authenticated by the configured central HTTPS endpoint.
 #[derive(Clone, Copy, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -83,11 +107,15 @@ pub enum Request {
     GatewayTicket {
         /// Exact canonical gateway origin.
         gateway: String,
+        /// Single action authorized by this ticket.
+        purpose: TicketPurpose,
     },
     /// Configured gateway redeems its own audience-bound ticket.
     RedeemGateway {
         /// One-use, short-lived ticket delivered by the native client.
         ticket: Token,
+        /// Action enforced by the receiving gateway route.
+        purpose: TicketPurpose,
     },
     /// Revoke the presented central session immediately.
     Logout,

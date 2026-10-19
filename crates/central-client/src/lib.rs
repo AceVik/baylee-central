@@ -86,16 +86,28 @@ pub fn login(
     else {
         return Err(Error::Rejected);
     };
-    if answered.account != identity.account || answered.epoch != identity.epoch {
-        return Err(Error::Rejected);
-    }
-    let wrapped = WrappedMasterKey::from_bytes(&wrapped_master).map_err(|_| Error::Rejected)?;
-    let master = result
-        .wrapping_key
-        .unwrap(&wrapped)
-        .map_err(|_| Error::Rejected)?;
+    let master = (|| {
+        if answered.account != identity.account || answered.epoch != identity.epoch {
+            return Err(Error::Rejected);
+        }
+        let wrapped = WrappedMasterKey::from_bytes(&wrapped_master).map_err(|_| Error::Rejected)?;
+        result
+            .wrapping_key
+            .unwrap(&wrapped)
+            .map_err(|_| Error::Rejected)
+    })();
+    let master = match master {
+        Ok(master) => master,
+        Err(error) => {
+            let _ = transport.exchange(&Request::Logout, Some(&token));
+            return Err(error);
+        }
+    };
     let mut session = Session::new(transport.endpoint().clone(), identity, token, master);
-    session.refresh(transport)?;
+    if let Err(error) = session.refresh(transport) {
+        let _ = session.logout(transport);
+        return Err(error);
+    }
     Ok(session)
 }
 

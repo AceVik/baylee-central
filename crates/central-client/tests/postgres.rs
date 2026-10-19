@@ -3,7 +3,7 @@
 
 use central_api::{
     Endpoint, Error, Token,
-    wire::{Discovery, Identity, Request, Response},
+    wire::{Discovery, Identity, Request, Response, TicketPurpose},
 };
 use central_client::{Session, Transport};
 use central_crypto::opaque::{Login, server::ServerKeys};
@@ -162,7 +162,10 @@ fn run(http: &Http, bridge: &Token, runtime: &Runtime, operator: &DatabaseConnec
     let ticket = first
         .gateway_ticket(http, "http://127.0.0.1:28766".into())
         .unwrap();
-    let redeem = Request::RedeemGateway { ticket };
+    let redeem = Request::RedeemGateway {
+        ticket,
+        purpose: TicketPurpose::Admit,
+    };
     assert!(http.exchange(&redeem, None).is_err());
     assert!(matches!(
         http.exchange(&redeem, Some(bridge)).unwrap(),
@@ -179,9 +182,27 @@ fn run(http: &Http, bridge: &Token, runtime: &Runtime, operator: &DatabaseConnec
     let last_good = first.document().to_vec();
     assert!(first.refresh(http).is_err());
     assert_eq!(first.document(), last_good);
+    let before = session_count(runtime, operator);
     assert!(central_client::login(http, identity, "synthetic secure password".into()).is_err());
+    assert_eq!(
+        session_count(runtime, operator),
+        before,
+        "failed restoration revokes its newly issued session"
+    );
     first.logout(http).unwrap();
     assert!(first.refresh(http).is_err());
+}
+
+fn session_count(runtime: &Runtime, operator: &DatabaseConnection) -> i64 {
+    runtime
+        .block_on(operator.query_one_raw(sea_orm::Statement::from_string(
+            sea_orm::DbBackend::Postgres,
+            "SELECT count(*) AS count FROM central_identity.sessions",
+        )))
+        .unwrap()
+        .unwrap()
+        .try_get("", "count")
+        .unwrap()
 }
 
 fn failed_proof_is_consumed(http: &Http, identity: Identity) {

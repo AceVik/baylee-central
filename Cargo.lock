@@ -578,9 +578,16 @@ dependencies = [
 name = "central-service"
 version = "0.1.0"
 dependencies = [
+ "central-api",
+ "central-crypto",
  "central-http",
+ "central-identity",
  "central-policy",
+ "central-postgres",
+ "serde",
+ "serde_json",
  "tokio",
+ "zeroize",
 ]
 
 [[package]]

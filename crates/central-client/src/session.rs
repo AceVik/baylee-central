@@ -145,11 +145,27 @@ impl Session {
         transport: &impl Transport,
         gateway: String,
     ) -> Result<Token, Error> {
+        self.gateway_capability(transport, gateway, central_api::wire::TicketPurpose::Admit)
+    }
+
+    /// Issue a one-use, audience- and action-bound gateway capability after restoration.
+    ///
+    /// # Errors
+    /// Rejects unsupported gateways, unconfirmed restoration, expiry or transport failure.
+    pub fn gateway_capability(
+        &self,
+        transport: &impl Transport,
+        gateway: String,
+        purpose: central_api::wire::TicketPurpose,
+    ) -> Result<Token, Error> {
         self.same_endpoint(transport)?;
         if !self.confirmed {
             return Err(Error::Rejected);
         }
-        match transport.exchange(&Request::GatewayTicket { gateway }, Some(&self.token))? {
+        match transport.exchange(
+            &Request::GatewayTicket { gateway, purpose },
+            Some(&self.token),
+        )? {
             Response::GatewayTicket { ticket } => Ok(ticket),
             _ => Err(Error::Rejected),
         }

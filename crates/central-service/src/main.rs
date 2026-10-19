@@ -5,12 +5,20 @@ use central_http::DevelopmentServer;
 use central_policy::config::{Config, is_reserved_setting};
 use std::process::ExitCode;
 
+mod accounts;
+
 #[tokio::main]
 async fn main() -> ExitCode {
     // Do not let a future dependency panic print potentially sensitive payloads.
     std::panic::set_hook(Box::new(|_| eprintln!("central: internal failure")));
     let mut args = std::env::args_os().skip(1);
-    if args.next().as_deref() != Some(std::ffi::OsStr::new("--dev")) || args.next().is_some() {
+    let command = args.next();
+    if command.as_deref() == Some(std::ffi::OsStr::new("--dev-accounts-stdin"))
+        && args.next().is_none()
+    {
+        return accounts::run().await;
+    }
+    if command.as_deref() != Some(std::ffi::OsStr::new("--dev")) || args.next().is_some() {
         eprintln!("usage: central-service --dev (local foundation only)");
         return ExitCode::FAILURE;
     }

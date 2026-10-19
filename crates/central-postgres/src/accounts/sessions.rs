@@ -2,6 +2,7 @@ use super::{
     AccountStore, Credential, Error, Identity, Token, identity, number, statement, uuid,
     validate_document,
 };
+use central_api::wire::TicketPurpose;
 use sea_orm::{ConnectionTrait, TransactionTrait};
 
 impl AccountStore {
@@ -114,6 +115,7 @@ impl AccountStore {
         session: &Token,
         audience: &str,
         ticket: &Token,
+        purpose: TicketPurpose,
     ) -> Result<(), Error> {
         let transaction = self.db.begin().await.map_err(|_| Error::Unavailable)?;
         let valid = transaction.query_one_raw(statement(
@@ -130,10 +132,10 @@ impl AccountStore {
             vec![session.digest().to_vec().into()],
         )).await.map_err(|_| Error::Unavailable)?;
         let issued = transaction.execute_raw(statement(
-            "INSERT INTO central_identity.gateway_tickets (digest, session_digest, audience, created_at, expires_at)
-             SELECT $1, $2, $3, t, t + interval '30 seconds' FROM (SELECT pg_catalog.clock_timestamp() AS t) clock
+            "INSERT INTO central_identity.gateway_tickets (digest, session_digest, audience, purpose, created_at, expires_at)
+             SELECT $1, $2, $3, $4, t, t + interval '30 seconds' FROM (SELECT pg_catalog.clock_timestamp() AS t) clock
              WHERE (SELECT count(*) FROM central_identity.gateway_tickets WHERE session_digest = $2) < 8",
-            vec![ticket.digest().to_vec().into(), session.digest().to_vec().into(), audience.into()],
+            vec![ticket.digest().to_vec().into(), session.digest().to_vec().into(), audience.into(), purpose.as_str().into()],
         )).await.map_err(|_| Error::Unavailable)?;
         if issued.rows_affected() != 1 {
             return Err(Error::Busy);
@@ -149,15 +151,16 @@ impl AccountStore {
         &self,
         ticket: &Token,
         audience: &str,
+        purpose: TicketPurpose,
     ) -> Result<(Identity, String), Error> {
         let row = self.db.query_one_raw(statement(
-            "WITH spent AS (DELETE FROM central_identity.gateway_tickets WHERE digest = $1 AND audience = $2
+            "WITH spent AS (DELETE FROM central_identity.gateway_tickets WHERE digest = $1 AND audience = $2 AND purpose = $3
              AND expires_at > pg_catalog.clock_timestamp() RETURNING session_digest)
              SELECT a.id, a.vault_epoch, a.legacy_id FROM spent
              JOIN central_identity.sessions s ON s.digest = spent.session_digest
              JOIN central_identity.accounts a ON a.id = s.account_id AND a.credential_revision = s.credential_revision
              WHERE s.expires_at > pg_catalog.clock_timestamp() AND a.restored",
-            vec![ticket.digest().to_vec().into(), audience.into()],
+            vec![ticket.digest().to_vec().into(), audience.into(), purpose.as_str().into()],
         )).await.map_err(|_| Error::Unavailable)?.ok_or(Error::Rejected)?;
         Ok((
             identity(&row)?,

@@ -23,6 +23,7 @@ fn run_invalid(arguments: &[&str], setting: Option<(&str, &str)>) -> Output {
     let mut command = Command::new(env!("CARGO_BIN_EXE_central-service"));
     command
         .args(arguments)
+        .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
     #[cfg(windows)]
@@ -95,4 +96,20 @@ fn explicit_dev_flag_is_required_and_extra_arguments_are_rejected() {
             "usage: central-service --dev (local foundation only)"
         );
     }
+}
+
+#[test]
+fn account_service_rejects_missing_secret_input_and_extra_arguments() {
+    let output = run_invalid(&["--dev-accounts-stdin"], None);
+    assert_eq!(output.stdout, b"");
+    assert_eq!(
+        String::from_utf8(output.stderr).unwrap().trim(),
+        "central: development account service rejected configuration or failed"
+    );
+    let output = run_invalid(&["--dev-accounts-stdin", "PRIVATE_ARG_CANARY"], None);
+    assert!(
+        !String::from_utf8(output.stderr)
+            .unwrap()
+            .contains("PRIVATE_ARG_CANARY")
+    );
 }

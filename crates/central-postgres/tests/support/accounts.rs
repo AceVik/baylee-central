@@ -1,7 +1,7 @@
 use super::config;
 use central_api::{
     Endpoint, Error, Token,
-    wire::{Identity, MigrationState},
+    wire::{Identity, MigrationState, TicketPurpose},
 };
 use central_crypto::{
     Context,
@@ -159,7 +159,7 @@ async fn sessions(store: &AccountStore, alice: &Token, bob: &Token, first: Ident
     let ticket = Token::generate().unwrap();
     assert!(
         store
-            .gateway_ticket(alice, "synthetic-gateway", &ticket)
+            .gateway_ticket(alice, "synthetic-gateway", &ticket, TicketPurpose::Admit)
             .await
             .is_err()
     );
@@ -167,18 +167,26 @@ async fn sessions(store: &AccountStore, alice: &Token, bob: &Token, first: Ident
     store.confirm_restore(alice, 1).await.unwrap();
     assert!(store.legacy_status("synthetic-a").await.unwrap().1 == MigrationState::Restored);
     store
-        .gateway_ticket(alice, "synthetic-gateway", &ticket)
+        .gateway_ticket(alice, "synthetic-gateway", &ticket, TicketPurpose::Admit)
         .await
         .unwrap();
+    for purpose in [TicketPurpose::Export, TicketPurpose::Link] {
+        assert!(
+            store
+                .redeem_gateway(&ticket, "synthetic-gateway", purpose)
+                .await
+                .is_err()
+        );
+    }
     assert!(
         store
-            .redeem_gateway(&ticket, "wrong-audience")
+            .redeem_gateway(&ticket, "wrong-audience", TicketPurpose::Admit)
             .await
             .is_err()
     );
     assert_eq!(
         store
-            .redeem_gateway(&ticket, "synthetic-gateway")
+            .redeem_gateway(&ticket, "synthetic-gateway", TicketPurpose::Admit)
             .await
             .unwrap()
             .0
@@ -187,7 +195,7 @@ async fn sessions(store: &AccountStore, alice: &Token, bob: &Token, first: Ident
     );
     assert!(
         store
-            .redeem_gateway(&ticket, "synthetic-gateway")
+            .redeem_gateway(&ticket, "synthetic-gateway", TicketPurpose::Admit)
             .await
             .is_err()
     );
@@ -203,14 +211,14 @@ async fn sessions(store: &AccountStore, alice: &Token, bob: &Token, first: Ident
     assert_eq!(store.document(bob).await.unwrap(), (1, bob_original));
     let ticket = Token::generate().unwrap();
     store
-        .gateway_ticket(alice, "synthetic-gateway", &ticket)
+        .gateway_ticket(alice, "synthetic-gateway", &ticket, TicketPurpose::Admit)
         .await
         .unwrap();
     store.logout(alice).await.unwrap();
     assert!(store.document(alice).await.is_err());
     assert!(
         store
-            .redeem_gateway(&ticket, "synthetic-gateway")
+            .redeem_gateway(&ticket, "synthetic-gateway", TicketPurpose::Admit)
             .await
             .is_err()
     );

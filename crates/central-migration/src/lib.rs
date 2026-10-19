@@ -10,6 +10,7 @@
 
 mod m20261019_000001_pending_accounts;
 mod m20261019_000002_native_accounts;
+mod m20261019_000003_ticket_purpose;
 
 use sea_orm_migration::{
     MigrationTrait, MigratorTrait,
@@ -25,6 +26,7 @@ impl MigratorTrait for Migrator {
         vec![
             Box::new(m20261019_000001_pending_accounts::Migration),
             Box::new(m20261019_000002_native_accounts::Migration),
+            Box::new(m20261019_000003_ticket_purpose::Migration),
         ]
     }
 }

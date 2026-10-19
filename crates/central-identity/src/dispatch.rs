@@ -70,20 +70,22 @@ impl IdentityService {
                 let (identity, state) = self.store.legacy_status(&legacy_id).await?;
                 Ok(Response::LegacyStatus { identity, state })
             }
-            Request::GatewayTicket { gateway } => {
+            Request::GatewayTicket { gateway, purpose } => {
                 if gateway != self.gateway {
                     return Err(Error::Rejected);
                 }
                 let ticket = Token::generate()?;
                 self.store
-                    .gateway_ticket(bearer.ok_or(Error::Rejected)?, &gateway, &ticket)
+                    .gateway_ticket(bearer.ok_or(Error::Rejected)?, &gateway, &ticket, purpose)
                     .await?;
                 Ok(Response::GatewayTicket { ticket })
             }
-            Request::RedeemGateway { ticket } => {
+            Request::RedeemGateway { ticket, purpose } => {
                 self.bridge(bearer)?;
-                let (identity, legacy_id) =
-                    self.store.redeem_gateway(&ticket, &self.gateway).await?;
+                let (identity, legacy_id) = self
+                    .store
+                    .redeem_gateway(&ticket, &self.gateway, purpose)
+                    .await?;
                 Ok(Response::GatewayIdentity {
                     identity,
                     legacy_id,
