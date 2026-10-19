@@ -2,13 +2,17 @@
 #![forbid(unsafe_code)]
 
 mod endpoint;
+pub mod gateway;
+pub mod object;
 mod token;
 pub mod wire;
 pub use endpoint::{Endpoint, LEGACY_ORIGIN, LIVE_ORIGIN};
 pub use token::Token;
 
 /// Maximum serialized native request or response, independently enforced by both transports.
-pub const MAX_WIRE_BYTES: usize = 1_048_576;
+// A 256 KiB ciphertext may require four JSON bytes per byte, plus its AEAD
+// overhead, OPAQUE enrollment record, wrapper, capability and field names.
+pub const MAX_WIRE_BYTES: usize = 1_056_768;
 
 /// Generic error without remote diagnostics, secrets or supplied input.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

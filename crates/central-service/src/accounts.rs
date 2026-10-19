@@ -48,7 +48,7 @@ async fn serve() -> Result<(), ()> {
     let listen = endpoint.origin().strip_prefix("http://").ok_or(())?;
     let config = Config::from_pairs([
         ("BAYLEE_CENTRAL_LISTEN", listen),
-        ("BAYLEE_CENTRAL_REQUEST_BYTES", "1048576"),
+        ("BAYLEE_CENTRAL_REQUEST_BYTES", "1056768"),
     ])
     .map_err(|_| ())?;
     let keys = ServerKeys::from_secret_bytes(&settings.opaque_setup).map_err(|_| ())?;

@@ -11,6 +11,12 @@ use central_crypto::{
 use central_postgres::{AccountStore, Credential};
 use sea_orm::{ConnectionTrait, DatabaseConnection};
 
+mod gateways;
+mod migration;
+mod objects;
+mod revocation_race;
+mod single_session;
+
 fn context(identity: Identity) -> Context {
     Context::new(
         Endpoint::development("http://127.0.0.1:28780")
@@ -32,7 +38,11 @@ pub(crate) async fn run(operator: &DatabaseConnection) {
     operator
         .execute_unprepared(
             "GRANT SELECT, INSERT, UPDATE, DELETE ON central_identity.accounts,
-        central_identity.sessions, central_identity.gateway_tickets TO central_runtime",
+        central_identity.sessions, central_identity.gateway_tickets, central_identity.private_objects TO central_runtime;
+        GRANT SELECT, INSERT ON central_identity.migration_archives TO central_runtime;
+        GRANT SELECT, INSERT, UPDATE ON central_identity.gateways TO central_runtime;
+        GRANT SELECT ON central_identity.gateway_approvals TO central_runtime;
+        GRANT SELECT, INSERT, DELETE ON central_identity.gateway_admins, central_identity.gateway_leases TO central_runtime",
         )
         .await
         .unwrap();
@@ -75,6 +85,11 @@ pub(crate) async fn run(operator: &DatabaseConnection) {
     assert!(store.discover("nobody").await.unwrap().is_none());
     sessions(&store, &alice, &bob, first).await;
     expiry_and_revision(&store, operator, &keys, first).await;
+    gateways::run(&store, operator, &keys).await;
+    single_session::run(&store, &keys).await;
+    revocation_race::run(&store, operator, &keys).await;
+    objects::run(&store, operator, &keys).await;
+    migration::run(&store, operator, &keys).await;
     store.close().await.unwrap();
 }
 

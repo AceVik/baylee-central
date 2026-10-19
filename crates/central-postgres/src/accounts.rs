@@ -9,6 +9,11 @@ use sea_orm::{
     ConnectionTrait, DatabaseConnection, DbBackend, QueryResult, Statement, Value, prelude::Uuid,
 };
 
+mod gateways;
+mod grants;
+mod leases;
+mod migration;
+mod objects;
 mod sessions;
 
 /// An OPAQUE credential snapshot. It cannot issue sessions without proof verification.
@@ -79,18 +84,7 @@ impl AccountStore {
             .map_err(|_| Error::Unavailable)?;
         let db = pending.into_connection();
         let store = Self { db };
-        let valid = store.db.query_one_raw(statement(
-            "SELECT count(*) = 3 AND bool_and(NOT pg_catalog.pg_has_role(c.relowner, 'USAGE')
-             AND pg_catalog.has_table_privilege(c.oid, 'SELECT')
-             AND pg_catalog.has_table_privilege(c.oid, 'INSERT')
-             AND pg_catalog.has_table_privilege(c.oid, 'UPDATE')
-             AND pg_catalog.has_table_privilege(c.oid, 'DELETE')
-             AND NOT pg_catalog.has_table_privilege(c.oid, 'TRUNCATE, REFERENCES, TRIGGER, MAINTAIN')) AS allowed
-             FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
-             WHERE n.nspname = 'central_identity' AND c.relname IN ('accounts','sessions','gateway_tickets')",
-            vec![],
-        )).await.ok().flatten().and_then(|row| row.try_get::<bool>("", "allowed").ok()) == Some(true);
-        if !valid {
+        if !store.valid_grants().await {
             let _ = store.db.close().await;
             return Err(Error::Unavailable);
         }
@@ -130,8 +124,8 @@ impl AccountStore {
             "INSERT INTO central_identity.accounts (legacy_id, username_key, enrollment_digest, enrollment_expires)
              VALUES ($1, $2, $3, pg_catalog.clock_timestamp() + interval '10 minutes')
              ON CONFLICT (legacy_id) DO UPDATE SET enrollment_digest = EXCLUDED.enrollment_digest,
-                enrollment_expires = EXCLUDED.enrollment_expires
-             WHERE central_identity.accounts.credential IS NULL AND central_identity.accounts.username_key = EXCLUDED.username_key
+                enrollment_expires = EXCLUDED.enrollment_expires, username_key = EXCLUDED.username_key
+             WHERE central_identity.accounts.credential IS NULL AND NOT central_identity.accounts.legacy_closed
              RETURNING id, vault_epoch",
             vec![legacy.into(), username(name)?.into(), ticket.digest().to_vec().into()],
         )).await.map_err(|_| Error::Conflict)?.ok_or(Error::Conflict)?;

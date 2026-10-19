@@ -95,7 +95,7 @@ impl Config {
                     }
                     result.listen = address;
                 }
-                1 => result.request_bytes = bounded_integer(value, 1_024, 1_048_576)?,
+                1 => result.request_bytes = bounded_integer(value, 1_024, 1_056_768)?,
                 _ => result.concurrent_requests = bounded_integer(value, 1, 128)?,
             }
         }
@@ -184,7 +184,8 @@ mod tests {
             ("1023", false),
             ("1024", true),
             ("1048576", true),
-            ("1048577", false),
+            ("1056768", true),
+            ("1056769", false),
             ("", false),
             ("+32", false),
             ("-1", false),

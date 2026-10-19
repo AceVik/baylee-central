@@ -10,6 +10,7 @@ use std::{
     sync::atomic::{AtomicBool, Ordering},
     time::Duration,
 };
+pub(super) mod gateways;
 
 pub(super) fn config(user: &str, password: &str) -> DevConfig {
     assert_eq!(

@@ -2,6 +2,35 @@
 
 2026-10-19. No production deployment or real-user processing.
 
+## Integration hardening milestone
+
+The current implementation adds a gateway registry with separate redemption and
+heartbeat capabilities, operator-only origin approval, scoped administrators and
+revocable gateway leases. A successful login now replaces all prior sessions for
+the account, including on the same device. A database uniqueness constraint and
+post-lock authorization recheck enforce this under concurrency. Encrypted private
+objects support client-side chat archives across devices; migrations 000004 and
+000005 add these tables and close the legacy bridge's reset authority at cutover.
+See [gateway registry](gateway-registry.md) and [private objects](private-objects.md)
+for APIs, exact runtime grants, quotas and confidentiality limitations.
+
+Local evidence includes repeated real PostgreSQL/native-HTTP test passes (latest
+27.20 seconds native SDK and 78.69 seconds database suite), deterministic
+revocation-versus-mutation races, registry authorization, encrypted object restore,
+quota rollback and bounded tombstone reclamation. The full local policy, Clippy,
+unit/integration/doc and release suite passed; later transport-size and independent
+request-budget changes received focused tests and workspace Clippy. RustSec,
+cargo-deny, working-tree/history secret scans and owned-service smoke passed.
+These are local results; the final revision still requires all protected CI checks.
+
+Request budgets separate unauthenticated/login traffic (32 per second, with the
+existing eight login starts per account/minute), data operations (256 per second,
+64 per bearer), and session/revocation control (512 per second, 128 per bearer).
+All buckets remain bounded and dispatch still authenticates every capability.
+These development limits are not a production capacity benchmark. The native
+wire limit includes worst-case JSON expansion of a maximum ciphertext and its
+enrollment envelope. No first-party unsafe or new external dependency was added.
+
 ## Implemented foundation
 
 Native-login integration is in progress (2026-10-19): central-api now defines

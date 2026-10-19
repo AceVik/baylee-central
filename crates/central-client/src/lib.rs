@@ -12,7 +12,11 @@ use central_crypto::{
 };
 use zeroize::Zeroizing;
 
+mod gateways;
+mod objects;
 mod session;
+pub use gateways::{GatewayRegistration, gateway_directory};
+pub use objects::ObjectDocument;
 pub use session::Session;
 
 /// Transport contract: verified HTTPS in live mode, no redirects, bounded bodies/timeouts,

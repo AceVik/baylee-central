@@ -90,7 +90,7 @@ fn real_native_login_restore_migration_and_adversarial_paths() {
 fn central_policy_config() -> central_policy::config::Config {
     central_policy::config::Config::from_pairs([
         ("BAYLEE_CENTRAL_LISTEN", "127.0.0.1:0"),
-        ("BAYLEE_CENTRAL_REQUEST_BYTES", "1048576"),
+        ("BAYLEE_CENTRAL_REQUEST_BYTES", "1056768"),
     ])
     .unwrap()
 }
@@ -103,7 +103,11 @@ async fn prepare() -> DatabaseConnection {
     db.execute_unprepared("GRANT USAGE ON SCHEMA central_identity TO central_runtime;
         GRANT SELECT, INSERT ON central_identity.pending_accounts TO central_runtime;
         GRANT SELECT, INSERT, UPDATE, DELETE ON central_identity.accounts, central_identity.sessions,
-        central_identity.gateway_tickets TO central_runtime").await.unwrap();
+        central_identity.gateway_tickets, central_identity.private_objects TO central_runtime;
+        GRANT SELECT, INSERT ON central_identity.migration_archives TO central_runtime;
+        GRANT SELECT, INSERT, UPDATE ON central_identity.gateways TO central_runtime;
+        GRANT SELECT ON central_identity.gateway_approvals TO central_runtime;
+        GRANT SELECT, INSERT, DELETE ON central_identity.gateway_admins, central_identity.gateway_leases TO central_runtime").await.unwrap();
     db
 }
 
@@ -147,12 +151,15 @@ fn run(http: &Http, bridge: &Token, runtime: &Runtime, operator: &DatabaseConnec
     assert_eq!(found.account, identity.account);
     assert!(central_client::login(http, identity, "wrong synthetic password".into()).is_err());
     failed_proof_is_consumed(http, identity);
+    let mut revoked =
+        central_client::login(http, identity, "synthetic secure password".into()).unwrap();
     let mut first =
         central_client::login(http, identity, "synthetic secure password".into()).unwrap();
-    let mut second =
-        central_client::login(http, identity, "synthetic secure password".into()).unwrap();
+    assert!(revoked.refresh(http).is_err());
+    assert!(central_client::login(http, identity, "wrong password".into()).is_err());
+    first.check_active(http).unwrap();
+    assert!(!first.migration_closed(http).unwrap());
     assert_eq!(first.document(), original);
-    assert_eq!(second.document(), original);
     assert!(
         first
             .gateway_ticket(http, "http://127.0.0.1:28766".into())
@@ -177,16 +184,30 @@ fn run(http: &Http, bridge: &Token, runtime: &Runtime, operator: &DatabaseConnec
             .gateway_ticket(http, "https://attacker.invalid".into())
             .is_err()
     );
-    lost_responses_and_conflicts(http, &mut first, &mut second);
+    http.exchange(
+        &Request::LegacyClose {
+            legacy_id: "synthetic-legacy".into(),
+            identity,
+        },
+        Some(bridge),
+    )
+    .unwrap();
+    support::gateways::run(http, &first, runtime, operator);
+    assert!(first.migration_closed(http).unwrap());
+    object_round_trip(http, identity, &first);
+    // A different device restored the chunk and replaced this session.
+    let mut first =
+        central_client::login(http, identity, "synthetic secure password".into()).unwrap();
+    lost_responses_and_conflicts(http, &mut first);
     runtime.block_on(operator.execute_unprepared("UPDATE central_identity.accounts SET document = set_byte(document, 25, get_byte(document,25) # 1) WHERE legacy_id = 'synthetic-legacy'")).unwrap();
     let last_good = first.document().to_vec();
     assert!(first.refresh(http).is_err());
     assert_eq!(first.document(), last_good);
-    let before = session_count(runtime, operator);
+    assert_eq!(session_count(runtime, operator), 1);
     assert!(central_client::login(http, identity, "synthetic secure password".into()).is_err());
     assert_eq!(
         session_count(runtime, operator),
-        before,
+        0,
         "failed restoration revokes its newly issued session"
     );
     first.logout(http).unwrap();
@@ -234,15 +255,42 @@ fn failed_proof_is_consumed(http: &Http, identity: Identity) {
     );
 }
 
-fn lost_responses_and_conflicts(http: &Http, first: &mut Session, second: &mut Session) {
+fn lost_responses_and_conflicts(http: &Http, first: &mut Session) {
     let replacement = br#"{"version":1,"gateways":[],"settings":{"changed":true}}"#;
     http.lose_write_reply.store(true, Ordering::Release);
     assert_eq!(first.save(http, replacement), Err(Error::Unavailable));
     assert_eq!(first.revision(), 1);
+    assert_eq!(first.save(http, b"stale overwrite"), Err(Error::Conflict));
     first.refresh(http).unwrap();
     assert_eq!(first.revision(), 2);
     assert_eq!(first.document(), replacement);
-    assert_eq!(second.save(http, b"stale overwrite"), Err(Error::Conflict));
-    second.refresh(http).unwrap();
-    assert_eq!(second.document(), replacement);
+}
+
+fn object_round_trip(http: &Http, identity: Identity, first: &Session) {
+    let chunk = first.create_object(http).unwrap();
+    assert!(first.read_object(http, chunk.id, 0).is_err());
+    let history = b"synthetic complete private chat history";
+    assert_eq!(first.write_object(http, chunk.id, 0, history).unwrap(), 1);
+    assert_eq!(
+        first.write_object(http, chunk.id, 0, b"stale"),
+        Err(Error::Conflict)
+    );
+    assert!(first.read_object(http, chunk.id, 2).is_err());
+    let another_device =
+        central_client::login(http, identity, "synthetic secure password".into()).unwrap();
+    assert!(first.check_active(http).is_err());
+    assert!(first.read_object(http, chunk.id, 1).is_err());
+    let restored = another_device.read_object(http, chunk.id, 1).unwrap();
+    assert_eq!(&*restored.plaintext, history);
+    assert_eq!(
+        another_device.list_objects(http, None).unwrap()[0].id,
+        chunk.id
+    );
+    assert_eq!(another_device.delete_object(http, chunk.id, 1).unwrap(), 2);
+    assert!(another_device.read_object(http, chunk.id, 1).is_err());
+    assert_eq!(
+        another_device.write_object(http, chunk.id, 2, history),
+        Err(Error::Conflict)
+    );
+    another_device.logout(http).unwrap();
 }
