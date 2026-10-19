@@ -10,17 +10,30 @@ try {
     if ($workspaceManifest -notmatch '(?m)^unsafe_code\s*=\s*"forbid"\s*$') {
         throw 'Workspace unsafe prohibition is missing'
     }
+    $workspaceRoot = [IO.Path]::GetFullPath($meta.workspace_root).TrimEnd([IO.Path]::DirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
+    $excludedRoots = @('.git', 'target', 'node_modules') | ForEach-Object {
+        $workspaceRoot + $_ + [IO.Path]::DirectorySeparatorChar
+    }
     foreach ($package in $meta.packages) {
         $manifest = Get-Content -LiteralPath $package.manifest_path -Raw
         if ($manifest -notmatch '(?ms)\[lints\]\s*workspace\s*=\s*true') {
             throw "Missing inherited lints: $($package.name)"
         }
         if ($package.publish.Count -ne 0) { throw "Package publication must be disabled: $($package.name)" }
-        $workspaceRoot = [IO.Path]::GetFullPath($meta.workspace_root).TrimEnd([IO.Path]::DirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
         if (-not [IO.Path]::GetFullPath($package.manifest_path).StartsWith($workspaceRoot, [StringComparison]::Ordinal)) {
             throw "Workspace member outside reviewed root: $($package.name)"
         }
+        foreach ($excluded in $excludedRoots) {
+            if ([IO.Path]::GetFullPath($package.manifest_path).StartsWith($excluded, [StringComparison]::OrdinalIgnoreCase)) {
+                throw "Workspace member inside excluded output directory: $($package.name)"
+            }
+        }
         foreach ($target in $package.targets) {
+            foreach ($excluded in $excludedRoots) {
+                if ([IO.Path]::GetFullPath($target.src_path).StartsWith($excluded, [StringComparison]::OrdinalIgnoreCase)) {
+                    throw "Source target inside excluded output directory: $($target.name)"
+                }
+            }
             if (-not [IO.Path]::GetFullPath($target.src_path).StartsWith($workspaceRoot, [StringComparison]::Ordinal)) {
                 throw "Source target outside reviewed root: $($target.name)"
             }
@@ -30,8 +43,24 @@ try {
             }
         }
     }
-    foreach ($file in Get-ChildItem crates -Recurse -File) {
-        if ($file.Extension -in @('.s', '.asm', '.c', '.cpp', '.cc', '.h')) {
+    # Targets/build scripts may live outside crates/. Scan the whole reviewed
+    # tree, skipping only tool/output directories that cannot contain targets.
+    $pending = [Collections.Generic.Stack[string]]::new()
+    $pending.Push($meta.workspace_root)
+    $reviewedFiles = [Collections.Generic.List[IO.FileInfo]]::new()
+    while ($pending.Count -gt 0) {
+        $directory = $pending.Pop()
+        foreach ($entry in Get-ChildItem -LiteralPath $directory -Force) {
+            if ($directory -eq $meta.workspace_root -and $entry.Name -in @('.git', 'target', 'node_modules')) { continue }
+            if (($entry.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+                throw "Linked source outside the review boundary: $($entry.Name)"
+            }
+            if ($entry.PSIsContainer) { $pending.Push($entry.FullName) }
+            else { $reviewedFiles.Add($entry) }
+        }
+    }
+    foreach ($file in $reviewedFiles) {
+        if ($file.Extension -in @('.s', '.asm', '.c', '.cpp', '.cc', '.cxx', '.h', '.hh', '.hpp', '.hxx')) {
             throw "Native/assembly source forbidden: $($file.Name)"
         }
         if ($file.Extension -eq '.rs') {
@@ -47,6 +76,10 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Full Cargo metadata failed' }
     $graph = $raw | ConvertFrom-Json
     $approved = Get-Content docs/dependency-proposal/approved-packages.json -Raw | ConvertFrom-Json
+    $approvedPackages = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    foreach ($identity in $approved.packages) { [void]$approvedPackages.Add($identity) }
+    $nodesById = [Collections.Generic.Dictionary[string,object]]::new([StringComparer]::Ordinal)
+    foreach ($node in $graph.resolve.nodes) { $nodesById.Add($node.id, $node) }
     # Path dependencies are first-party code too. Never let a helper outside the
     # checked workspace bypass lint/root/native-source checks or the inventory.
     foreach ($package in $graph.packages | Where-Object { -not $_.source }) {
@@ -56,11 +89,11 @@ try {
     }
     foreach ($package in $graph.packages | Where-Object source) {
         $identity = "$($package.name)@$($package.version)"
-        if ($identity -notin $approved.packages) { throw "Dependency not approved: $identity" }
-        $node = $graph.resolve.nodes | Where-Object id -eq $package.id
+        if (-not $approvedPackages.Contains($identity)) { throw "Dependency not approved: $identity" }
+        $node = $nodesById[$package.id]
         $allowedFeatures = $approved.features.$identity
         foreach ($feature in $node.features) {
-            if ($feature -notin $allowedFeatures) { throw "Unapproved dependency feature: $identity/$feature" }
+            if ($feature -cnotin $allowedFeatures) { throw "Unapproved dependency feature: $identity/$feature" }
         }
         if ($package.source -ne 'registry+https://github.com/rust-lang/crates.io-index') {
             throw "Non-registry dependency forbidden: $identity"

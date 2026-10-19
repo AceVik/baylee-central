@@ -36,6 +36,17 @@ to crates.io until license/API/security gates pass.
 Use scripts/test.ps1 and scripts/smoke-dev.ps1. Smoke tests launch their own server
 on an ephemeral loopback port and always stop that exact process, checking port
 closure. Agent-started interactive clients must likewise be closed after testing.
+Use scripts/smoke-dev.ps1 -ExerciseFailure to deliberately fail immediately after
+startup and verify the same cleanup path. It must report Synthetic development
+failure only after cleanup; a cleanup error is a failure, not an expected result.
+CI exercises both paths on every supported native platform. Cleanup probes have
+deadlines and require a refused connection; a probe timeout is not proof of closure.
+
+The policy checker scans all first-party source trees, including hidden paths.
+Targets and workspace members cannot live under excluded .git/target/node_modules
+directories or import sources through filesystem links. Dependency versions and
+Cargo feature names must match the reviewed inventory exactly. Synthetic fixtures
+test these boundaries, while compiler probes cover expanded/generated Rust.
 
 Supported native platforms: Linux x86-64, Windows x86-64, macOS ARM64 and x86-64.
 CI uses ubuntu-24.04, windows-2025, macos-15 and macos-15-intel. Device keychain

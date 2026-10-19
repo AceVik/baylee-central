@@ -1,7 +1,9 @@
+param([switch]$ExerciseFailure)
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 Push-Location (Split-Path $PSScriptRoot)
 $process = $null
+$processStarted = $false
 $client = $null
 $address = $null
 try {
@@ -24,7 +26,8 @@ try {
     $start.Environment['BAYLEE_CENTRAL_CONCURRENT_REQUESTS'] = '2'
     $process = [Diagnostics.Process]::new()
     $process.StartInfo = $start
-    if (-not $process.Start()) { throw 'Cannot start owned development process' }
+    $processStarted = $process.Start()
+    if (-not $processStarted) { throw 'Cannot start owned development process' }
     $stderr = $process.StandardError.ReadToEndAsync()
     $lineTask = $process.StandardOutput.ReadLineAsync()
     if (-not $lineTask.Wait(15000)) { throw 'Development startup timed out' }
@@ -33,6 +36,7 @@ try {
         throw 'Unexpected development startup result'
     }
     $address = [Uri]$Matches[1]
+    if ($ExerciseFailure) { throw 'Synthetic development failure' }
     $client = [Net.Http.HttpClient]::new()
     $client.Timeout = [TimeSpan]::FromSeconds(5)
     foreach ($case in @(
@@ -79,31 +83,47 @@ try {
                 throw 'Stalled headers received an unexpected response'
             }
         } catch [IO.IOException] {
-            # A reset is a valid close; a read timeout is not.
-            if ($_.Exception.InnerException -is [Net.Sockets.SocketException] -and
-                $_.Exception.InnerException.SocketErrorCode -eq [Net.Sockets.SocketError]::TimedOut) { throw }
+            # Accept only an explicit peer reset/abort. Other I/O failures are not
+            # evidence that the server enforced its header deadline.
+            $cause = $_.Exception.GetBaseException()
+            if ($cause -isnot [Net.Sockets.SocketException] -or
+                $cause.SocketErrorCode -notin @([Net.Sockets.SocketError]::ConnectionReset, [Net.Sockets.SocketError]::ConnectionAborted)) { throw }
             $read = -1
         }
         if ($read -ne -1 -or $watch.Elapsed.TotalSeconds -gt 4.5 -or $watch.Elapsed.TotalSeconds -lt 2) { throw 'Header deadline did not close stalled connection' }
     } finally { $socket.Dispose() }
-    Write-Output 'Development smoke passed: real HTTP boundaries, readiness, and header deadline.'
 } finally {
-    if ($null -ne $client) { $client.Dispose() }
-    if ($null -ne $process) {
-        if (-not $process.HasExited) { $process.Kill() }
-        if (-not $process.WaitForExit(10000)) { throw 'Owned process failed to exit' }
-        $process.Dispose()
-    }
-    if ($null -ne $address) {
-        $probe = [Net.Sockets.TcpClient]::new()
-        try {
-            $connected = $false
+    # One failed cleanup operation must not skip the remaining owned resources.
+    $cleanupErrors = [Collections.Generic.List[string]]::new()
+    try { if ($null -ne $client) { $client.Dispose() } }
+    catch { $cleanupErrors.Add('Owned HTTP client cleanup failed') }
+    try {
+        if ($null -ne $process) {
             try {
-                $task = $probe.ConnectAsync($address.Host, $address.Port)
-                if ($task.Wait(1000)) { $connected = $probe.Connected }
-            } catch [AggregateException] { }
-            if ($connected) { throw 'Development listener remained open after cleanup' }
-        } finally { $probe.Dispose() }
-    }
+                if ($processStarted) {
+                    if (-not $process.HasExited) { $process.Kill($true) }
+                    if (-not $process.WaitForExit(10000)) { throw 'process remains' }
+                }
+            } finally { $process.Dispose() }
+        }
+    } catch { $cleanupErrors.Add('Owned development process cleanup could not be verified') }
+    try {
+        if ($null -ne $address) {
+            $probe = [Net.Sockets.TcpClient]::new()
+            try {
+                try {
+                    $task = $probe.ConnectAsync($address.Host, $address.Port)
+                    if (-not $task.Wait(5000)) { throw 'listener probe timed out' }
+                    throw 'listener remains'
+                } catch [AggregateException] {
+                    $cause = $_.Exception.GetBaseException()
+                    if ($cause -isnot [Net.Sockets.SocketException] -or
+                        $cause.SocketErrorCode -ne [Net.Sockets.SocketError]::ConnectionRefused) { throw }
+                }
+            } finally { $probe.Dispose() }
+        }
+    } catch { $cleanupErrors.Add('Owned development listener closure could not be verified') }
     Pop-Location
+    if ($cleanupErrors.Count -gt 0) { throw ($cleanupErrors -join '; ') }
 }
+Write-Output 'Development smoke passed: HTTP boundaries, header deadline and verified process/listener cleanup.'

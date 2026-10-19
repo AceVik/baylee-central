@@ -34,8 +34,17 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Policy, tests, lint and release build
         run: ./scripts/test.ps1
-      - name: Verify development lifecycle
-        run: ./scripts/smoke-dev.ps1
+      - name: Verify development lifecycle and failure cleanup
+        run: |
+          ./scripts/smoke-dev.ps1
+          $before = Get-Location
+          try {
+            ./scripts/smoke-dev.ps1 -ExerciseFailure
+            throw 'Expected development failure did not occur'
+          } catch {
+            if ($_.Exception.Message -ne 'Synthetic development failure') { throw }
+          }
+          if ((Get-Location).Path -ne $before.Path) { throw 'Smoke cleanup changed caller location' }
   dependencies:
     runs-on: ubuntu-24.04
     timeout-minutes: 25

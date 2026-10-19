@@ -28,13 +28,68 @@ workspace = true
     $manifestPath = Join-Path $reviewed 'crates/fixture/Cargo.toml'
     [IO.File]::WriteAllText($manifestPath, $manifest)
     [IO.File]::WriteAllText((Join-Path $reviewed 'crates/fixture/src/lib.rs'), "#![forbid(unsafe_code)]" + [Environment]::NewLine)
-    # A valid workspace must pass before the unreviewed path dependency is introduced.
-    Push-Location $reviewed
-    try {
-        & cargo generate-lockfile --offline
-        if ($LASTEXITCODE -ne 0) { throw 'Synthetic workspace fixture failed' }
-    } finally { Pop-Location }
+    function Update-FixtureLock {
+        Push-Location $reviewed
+        try {
+            & cargo generate-lockfile --offline
+            if ($LASTEXITCODE -ne 0) { throw 'Synthetic workspace fixture failed' }
+        } finally { Pop-Location }
+    }
+    function Assert-PolicyRejects([string]$Expected) {
+        try {
+            & $checker
+            throw 'Policy accepted a forbidden fixture'
+        } catch {
+            if ($_.Exception.Message -ne $Expected) { throw }
+        }
+    }
+    Update-FixtureLock
     & $checker
+    # Root/build-support files and hidden trees are as much first-party code as crates/.
+    foreach ($case in @(
+        @{ Path='escape.c'; Source='int native_escape(void) { return 0; }'; Error='Native/assembly source forbidden: escape.c' },
+        @{ Path='tools/native/escape.hpp'; Source='void native_escape();'; Error='Native/assembly source forbidden: escape.hpp' },
+        @{ Path='.hidden/escape.S'; Source='ret'; Error='Native/assembly source forbidden: escape.S' },
+        @{ Path='tools/escape.rs'; Source='fn escape() { unsafe {} }'; Error='Forbidden unsafe/assembly marker: escape.rs' },
+        @{ Path='crates/fixture/build.rs'; Source='fn main() {}'; Error='Missing crate-root unsafe prohibition: build-script-build' }
+    )) {
+        $path = Join-Path $reviewed $case.Path
+        [IO.Directory]::CreateDirectory((Split-Path $path)) | Out-Null
+        try {
+            [IO.File]::WriteAllText($path, $case.Source)
+            Assert-PolicyRejects $case.Error
+        } finally { Remove-Item -LiteralPath $path -Force }
+    }
+    # A target cannot evade scanning by pointing into an excluded output directory.
+    [IO.Directory]::CreateDirectory((Join-Path $reviewed 'target')) | Out-Null
+    [IO.File]::WriteAllText((Join-Path $reviewed 'target/fixture.rs'), '#![forbid(unsafe_code)]')
+    [IO.File]::WriteAllText($manifestPath, $manifest + [Environment]::NewLine + @'
+[lib]
+path = "../../target/fixture.rs"
+'@)
+    Assert-PolicyRejects 'Source target inside excluded output directory: policy_fixture'
+    [IO.File]::WriteAllText($manifestPath, $manifest)
+    # Directory junctions/symlinks must not import unchecked sources into the tree.
+    $linked = Join-Path $fixtureRoot 'linked-source'
+    [IO.Directory]::CreateDirectory($linked) | Out-Null
+    $link = Join-Path $reviewed 'linked'
+    $linkKind = if ($IsWindows) { 'Junction' } else { 'SymbolicLink' }
+    New-Item -ItemType $linkKind -Path $link -Target $linked | Out-Null
+    try { Assert-PolicyRejects 'Linked source outside the review boundary: linked' }
+    finally { Remove-Item -LiteralPath $link -Force }
+    # Cargo features are case-sensitive; PowerShell's default -in operator is not.
+    # Use an already approved/cached crate to exercise the real registry graph.
+    [IO.File]::WriteAllText($manifestPath, $manifest + [Environment]::NewLine + @'
+[dependencies]
+zeroize = { version = "=1.9.1", default-features = false, features = ["alloc"] }
+'@)
+    $inventory = Join-Path $reviewed 'docs/dependency-proposal/approved-packages.json'
+    [IO.File]::WriteAllText($inventory, '{"packages":["zeroize@1.9.1"],"features":{"zeroize@1.9.1":["ALLOC"]}}')
+    Update-FixtureLock
+    Assert-PolicyRejects 'Unapproved dependency feature: zeroize@1.9.1/alloc'
+    [IO.File]::WriteAllText($inventory, '{"packages":["zeroize@1.9.1"],"features":{"zeroize@1.9.1":["alloc"]}}')
+    & $checker
+    [IO.File]::WriteAllText($inventory, '{"packages":[],"features":{}}')
     $helper = Join-Path $fixtureRoot 'unreviewed-helper'
     [IO.Directory]::CreateDirectory((Join-Path $helper 'src')) | Out-Null
     [IO.File]::WriteAllText((Join-Path $helper 'Cargo.toml'), @'
@@ -48,19 +103,10 @@ edition = "2024"
 [dependencies]
 unreviewed-helper = { path = "../../../unreviewed-helper" }
 '@)
-    # Resolve the synthetic local-only graph so --locked itself is not the rejection.
-    Push-Location $reviewed
-    try {
-        & cargo generate-lockfile --offline
-        if ($LASTEXITCODE -ne 0) { throw 'Synthetic dependency fixture failed' }
-    } finally { Pop-Location }
-    try {
-        & $checker
-        throw 'Policy accepted an unreviewed local dependency'
-    } catch {
-        if ($_.Exception.Message -ne 'Local dependency outside reviewed workspace: unreviewed-helper') { throw }
-    }
-    Write-Output 'Policy bypass regression passed.'
+    # Resolve the local-only graph so --locked itself is not the rejection.
+    Update-FixtureLock
+    Assert-PolicyRejects 'Local dependency outside reviewed workspace: unreviewed-helper'
+    Write-Output 'Policy regressions passed: root/hidden/native sources, build scripts, excluded targets, links, exact feature names and local dependencies.'
 } finally {
     $tempRoot = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd([IO.Path]::DirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
     if (-not $fixtureRoot.StartsWith($tempRoot, [StringComparison]::OrdinalIgnoreCase)) { throw 'Unsafe policy-fixture cleanup path' }

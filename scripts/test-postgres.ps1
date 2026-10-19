@@ -86,9 +86,10 @@ REVOKE CREATE ON SCHEMA public FROM PUBLIC;
     $cleanupErrors = [Collections.Generic.List[string]]::new()
     try {
         if ($null -ne $testProcess) {
-            if (-not $testProcess.HasExited) { $testProcess.Kill($true); $testProcess.WaitForExit() }
-            if (-not $testProcess.HasExited) { throw 'process remains' }
-            $testProcess.Dispose()
+            try {
+                if (-not $testProcess.HasExited) { $testProcess.Kill($true) }
+                if (-not $testProcess.WaitForExit(10000)) { throw 'process remains' }
+            } finally { $testProcess.Dispose() }
         }
     } catch { $cleanupErrors.Add('Owned integration process cleanup could not be verified') }
     try { [Environment]::SetEnvironmentVariable('POSTGRES_PASSWORD', $previousPassword) }
@@ -114,8 +115,15 @@ REVOKE CREATE ON SCHEMA public FROM PUBLIC;
         if ($null -ne $port) {
             $socket = [Net.Sockets.TcpClient]::new()
             try {
-                try { $socket.Connect('127.0.0.1', $port) } catch { }
-                if ($socket.Connected) { throw 'listener remains' }
+                try {
+                    $task = $socket.ConnectAsync('127.0.0.1', $port)
+                    if (-not $task.Wait(5000)) { throw 'listener probe timed out' }
+                    throw 'listener remains'
+                } catch [AggregateException] {
+                    $cause = $_.Exception.GetBaseException()
+                    if ($cause -isnot [Net.Sockets.SocketException] -or
+                        $cause.SocketErrorCode -ne [Net.Sockets.SocketError]::ConnectionRefused) { throw }
+                }
             } finally { $socket.Dispose() }
         }
     } catch { $cleanupErrors.Add('Owned PostgreSQL listener closure could not be verified') }
