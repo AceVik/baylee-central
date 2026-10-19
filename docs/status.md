@@ -9,9 +9,12 @@ the fixed live/dev endpoint policy and wire messages; central-client provides
 transport-independent OPAQUE login and authenticated encrypted-document restore;
 central-identity composes bounded one-use challenges with PostgreSQL accounts,
 sessions, enrollment and gateway tickets. An optional HTTP library route serves
-this protocol. The existing CLI still launches the health-only foundation.
-The Baylee UI, actual legacy gateway bridge, complete data export/cutover and
-production deployment are not yet connected. This is not a completed migration.
+this protocol. The CLI's explicit `--dev-accounts-stdin` mode serves accounts
+using persisted operator-supplied setup and bridge keys. The sibling Baylee
+integration has a real synthetic gateway/Central/PostgreSQL migration test:
+preferences and bounded deck/history export, restored-digest cutover, old-session
+revocation, fresh-device restore and action-scoped admission. Client UI validation
+is in progress. Full data migration and production deployment remain incomplete.
 
 New local evidence: real HTTP + PostgreSQL 18.6 + client SDK covers enrollment,
 second-device restore, wrong passwords, consumed failed proofs, wrong gateway
@@ -19,16 +22,16 @@ audiences, replay, session revocation, concurrent writes, lost commit responses
 and corrupt ciphertext. The isolated PostgreSQL script runs both the prior
 database suite and this new end-to-end suite and verifies owned-resource cleanup.
 The full local format/policy/Clippy/test/doc/release suite passed this milestone.
-The native schema is append-only migration 000002; no real data was migrated.
+The native schema uses append-only migrations 000002/000003; no real data was migrated.
 
 - central-policy: dependency-free configuration and versioned training preferences.
 - central-http: local-only bounded HTTP library; liveness and deliberately negative
-  readiness endpoints. No login, vault, admin or training endpoint pretends to work.
-- central-service: explicit --dev launcher with generic diagnostics.
+  readiness endpoints, plus the optional native account protocol.
+- central-service: explicit --dev / --dev-accounts-stdin launchers with generic diagnostics.
 - central-postgres / central-migration: SeaORM 2.0.4 development adapter, explicit
   transactional migrations, restricted runtime role and database-generated UUIDv7.
-- central-crypto: isolated native-client OPAQUE/master-key wrapping prototype;
-  optional server primitives, no HTTP/persistence/session integration.
+- central-crypto: native OPAQUE/master-key wrapping and encrypted objects,
+  composed with persistence/session/HTTP libraries through safe APIs.
 - Pinned Rust toolchain and dependency inventories, compiler unsafe rejection
   probe, lint/format/tests, vulnerability/license/source and secret checks.
 - Native HTTP, malformed boundary and cancellation/shutdown tests.
@@ -44,9 +47,9 @@ local development only, with no production database connector.
 
 Windows local: full foundation/crypto format, Clippy, unit/integration/doc tests,
 release build, compiler guard, RustSec, cargo-deny and secret checks are required.
-Current suite has 44 ordinary Rust tests: 15 crypto, 25 HTTP/policy, two PostgreSQL
-configuration and two process-level CLI tests, plus three compile-fail API contracts
-and a separate real-database integration test. A published registration/login
+The suite includes crypto, HTTP/policy, SDK/API, PostgreSQL configuration and
+process-level CLI tests, compile-fail API contracts, and real-database/native
+account integration tests. A published registration/login
 vector is checked on both peers. Password change, identity substitution,
 corrupted/replayed proof, malformed messages, all wrapper bits and KDF work-buffer
 wiping are covered.
@@ -82,6 +85,11 @@ credentials. Current native CI evidence is linked from draft PR #1; a previous
 revision's green run does not certify later changes.
 
 ## Remaining M1/M2 and release gates
+
+Native account revision `5bb53ba` passed all seven CI jobs (Linux, Windows,
+macOS ARM64/Intel, PostgreSQL, dependency and secret checks):
+https://github.com/AceVik/baylee-central/actions/runs/39272471661
+This is test evidence, not independent security review or production readiness.
 
 M1 is not entirely complete: the PostgreSQL fixture exists; object-store fixtures,
 production connector/TLS validation and capacity SLO measurements remain. M2 has an isolated crypto spike, but browser SSO,
