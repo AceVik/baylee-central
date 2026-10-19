@@ -27,10 +27,12 @@ local development only, with no production database connector.
 
 Windows local: full foundation/crypto format, Clippy, unit/integration/doc tests,
 release build, compiler guard, RustSec, cargo-deny and secret checks are required.
-Current crypto suite has 12 tests, plus 22 HTTP/policy tests, two PostgreSQL
-configuration tests and a separate real-database integration test. Published registration
-vector, password change, identity substitution, corrupted/replayed proof, malformed
-messages, all wrapper bytes and KDF work-buffer wiping are covered.
+Current suite has 44 ordinary Rust tests: 15 crypto, 25 HTTP/policy, two PostgreSQL
+configuration and two process-level CLI tests, plus three compile-fail API contracts
+and a separate real-database integration test. A published registration/login
+vector is checked on both peers. Password change, identity substitution,
+corrupted/replayed proof, malformed messages, all wrapper bits and KDF work-buffer
+wiping are covered.
 Real TCP smoke verifies endpoint state, Host/Origin rejection and pre-header
 timeout, then checks exact owned-process exit and listener closure.
 
@@ -48,6 +50,19 @@ compiler probes and a path-dependency policy regression. Details and limitations
 are recorded in security-assurance.md. CI now tests PR revisions and main pushes
 without duplicate feature-branch push runs; manual workflow dispatch remains available.
 All-feature documentation and release builds are checked on all four native targets.
+The preceding hardening revision b747895 passed all seven jobs:
+https://github.com/AceVik/baylee-central/actions/runs/39254827503
+
+The iterative review adds fixed zeroized AEAD buffers, complete C.1.1 login
+interoperability checks, guarded migration history selection, closed raw migrator
+APIs, strict environment-name handling, malformed-body classification and bounded
+test cleanup. Policy fixtures cover hidden/root sources, linked sources, excluded
+targets and case-sensitive dependency features. See security-assurance.md for
+reproduced findings, repeated review scope and exact validation limits.
+Secret history has its own configuration without working-tree path exceptions;
+its scanner self-test verifies forced commits and subsequent deletions of synthetic
+credentials. Current native CI evidence is linked from draft PR #1; a previous
+revision's green run does not certify later changes.
 
 ## Remaining M1/M2 and release gates
 

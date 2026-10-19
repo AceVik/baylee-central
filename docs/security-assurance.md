@@ -16,8 +16,9 @@ need a written rationale. Source: https://github.com/OWASP/ASVS/tree/v5.0.0
 3. Adversarial validation: attack assumptions with negative tests, real transport
    checks and failure injection; fix findings and repeat affected checks.
 
-These are distinct passes by the implementing agent, not independent audits.
-Release still needs independent review and operational/legal gates.
+These are engineering passes, not independent external audits. Separate agent
+reviews and their scope are recorded below. Release still needs independent review
+and operational/legal gates.
 
 ## Foundation review
 
@@ -154,3 +155,114 @@ the intentionally dropped overload socket as ConnectionAborted/WSAECONNABORTED
 now recognizes both closed-connection outcomes; read/write timeouts and unexpected
 responses still fail. This changes test interpretation, not server behavior.
 Reference: https://learn.microsoft.com/en-us/windows/win32/winsock/windows-sockets-error-codes-2
+
+## Iterative review, 2026-10-19
+
+The owner requested repeated review until a complete additional pass found no new
+actionable defects. This review is limited to the implemented foundation. Planned
+authentication, recovery, storage isolation and production services are not implied
+to exist. Separate agents reviewed crypto, persistence and QA; the primary agent
+reviewed HTTP/configuration and integration, then reviewers exchanged areas.
+These are AI-assisted engineering reviews, not an independent external audit.
+
+First iteration findings, fixed with regression coverage:
+
+- Noncanonical reserved environment names silently selected default configuration.
+  Windows environment names are case-insensitive; all platforms now detect the
+  reserved namespace without regard to case and require its documented uppercase
+  spelling. Unknown variants fail closed without echoing names/values. Process
+  tests check configuration and argument redaction and own/reap their children.
+  Source: https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_environment_variables
+- Malformed chunked bodies were mislabeled as size violations. The body boundary
+  now distinguishes the upstream length-limit error (413) from decode errors (400).
+  Raw TCP tests reproduced the old result. A stalled-body test also verifies 408,
+  security headers and capacity reuse after the five-second body deadline.
+  Source: https://docs.rs/axum/0.8.9/axum/body/fn.to_bytes.html
+- The public SeaORM Migrator allowed consumers to bypass the version/lock/atomic
+  entry point and invoke destructive convenience operations. The registry is now
+  private and a compile-fail API contract protects that boundary.
+- A caller-controlled search path could select a forged migration history and
+  report success without the identity schema. This failed in a real PostgreSQL
+  fixture before the fix. History now uses the trusted public schema with local
+  search-path settings and catalog-qualified gate functions. Tests cover alternate
+  history, TEMP shadowing, setting restoration and actual migration cancellation
+  with backend reuse and advisory-lock release.
+- Policy scans covered crates/ while Cargo targets could live elsewhere under the
+  workspace. Root native code was demonstrably accepted. The scan now covers the
+  first-party tree including hidden files and additional native-source suffixes;
+  targets cannot point into excluded tool/output directories or linked sources.
+- PowerShell compared Cargo feature names without case sensitivity. A synthetic
+  approval of ALLOC wrongly accepted alloc. Exact feature matching and a fixture
+  now reject it. Indexed graph lookups reduced one local policy-check measurement
+  from 3.04 to 1.37 seconds despite the wider scan; this is not a portable benchmark.
+- Test helpers could accept arbitrary I/O/probe failures as proof of closure or
+  skip later cleanup after an earlier cleanup error. Smoke tests accept only
+  explicit socket reset/abort for header shutdown; cleanup requires refused
+  connections, has bounded waits and attempts owned resources independently.
+  Deliberate development-server failure cleanup now runs on every CI platform.
+
+Cryptographic QA and memory improvements: RFC 9807 C.1.1 now checks KE2, KE3,
+export and session keys on both peers, with mutations at all 320 KE2 and 64 KE3
+byte positions. The test-only Identity KSF is separate from the fixed application
+suite. All 584 individual wrapper bits are tested. Fixed zeroized AEAD buffers
+replace temporary heap buffers and match the previous upstream allocating API's
+wire bytes. No algorithm, wire version, parameter or dependency graph was changed.
+Source: https://www.rfc-editor.org/rfc/rfc9807.html#appendix-C.1.1
+
+The exchanged-review iteration found one additional migration boundary: PostgreSQL
+ignores missing/inaccessible schemas in search_path. With public missing and a
+forged TEMP history, the initial search-path fix could still report success without
+installing the application schema. The real fixture reproduced that result before
+the second fix. apply now checks pg_catalog.current_schema() against public and
+fails closed otherwise. Regression coverage includes TEMP history before first
+installation with public present, and rejection with public absent or without USAGE.
+Source: https://www.postgresql.org/docs/18/runtime-config-client.html#GUC-SEARCH-PATH
+
+A later policy consistency pass also made local Cargo package-ID membership
+case-sensitive. A Linux-specific disposable Cargo graph checks distinct paths and
+package names differing only in case before testing rejection of the external
+package. Windows cannot exercise that filesystem case; its execution is checked
+in Linux CI rather than reported as a local reproduction.
+
+The closing scan review reproduced another QA gap in an isolated Git repository:
+working-tree exclusions for local settings/build outputs also suppressed secrets in
+committed history. Ordinary source was detected while synthetic config.local.json
+and target/config.json credentials were not. History scanning now uses a separate
+configuration without path exceptions. An obligatory scanner regression uses fresh
+synthetic values and includes both committed and subsequently deleted secrets.
+No real credential or unredacted finding is used in that fixture.
+Fixture environment restoration distinguishes a missing variable from an empty
+one: PowerShell's plain null argument did not delete POSTGRES_PASSWORD under the
+current runtime. Both restoration sites now use NullString for absence and verify
+the exact prior value. Scanner snapshots use ordinal name matching for Linux's
+case-sensitive environment; repository cleanup remains independent of restoration.
+
+The final scanner cross-review reproduced a false green result when GIT_DIR routed
+Git to a different synthetic repository. The scanner now rejects repository-routing
+environment overrides before any Git/tool/fixture operation, verifies the checkout
+root and requires full history. Regression tests mock Git and require all ten
+scope overrides to be rejected before the mock is reached; they do not redirect a
+real scan. Source: https://git-scm.com/docs/git#_environment_variables
+
+Closing read-only passes over the corrected crypto, HTTP/configuration, database
+and QA boundaries found no further actionable defects in this implemented scope.
+Local validation passed: 44 ordinary Rust tests, three compile-fail API contracts,
+real PostgreSQL 18.6 integration, all-feature Clippy/release, policy/compiler probes,
+normal/injected-failure development smoke, RustSec and cargo-deny on the unchanged
+346-package lockfile, and working-tree/full-history secret scans. Database fixture
+restoration also passed all four absent/present environment × success/failure cases.
+An additional 40 Windows overload/cancellation repetitions and a real IPv6 listener
+check passed. Native CI must still pass on the final revision; its evidence is
+linked in the PR rather than borrowed from an earlier commit.
+
+Cleanup limitation: automatic tool approval rejected deletion of one extra
+synthetic two-repository probe directory without a specific reason. No processes,
+listeners or containers belong to that retained directory. Its exact local path
+is recorded in target/review-cleanup.txt and reported to the owner. The normal
+owned server/database/scanner fixtures were cleaned and verified; this extra
+directory is not claimed removed.
+
+Remaining bounds: the upstream OPAQUE OsRng interface can panic on entropy failure;
+no fallback randomness was added. Fuzz campaigns, all RFC vectors, constant-time
+analysis, production TLS/session integration and external review remain release
+gates. A clean finite review pass cannot establish the absence of every bug.
