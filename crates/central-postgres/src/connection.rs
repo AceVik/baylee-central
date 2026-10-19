@@ -95,6 +95,14 @@ pub async fn connect_dev(config: DevConfig) -> Result<DatabaseConnection, StoreE
     let db = Database::connect(options)
         .await
         .map_err(|_| StoreError::Unavailable)?;
+    if let Err(error) = verify_version(&db).await {
+        let _ = db.close().await;
+        return Err(error);
+    }
+    Ok(db)
+}
+
+async fn verify_version(db: &DatabaseConnection) -> Result<(), StoreError> {
     let version = db
         .query_one_raw(Statement::from_string(
             DbBackend::Postgres,
@@ -106,10 +114,9 @@ pub async fn connect_dev(config: DevConfig) -> Result<DatabaseConnection, StoreE
         .try_get::<i32>("", "version")
         .map_err(|_| StoreError::Unavailable)?;
     if !supports_version(version) {
-        let _ = db.close().await;
         return Err(StoreError::UnsupportedVersion);
     }
-    Ok(db)
+    Ok(())
 }
 
 #[cfg(test)]

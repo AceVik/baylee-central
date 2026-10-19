@@ -1,6 +1,6 @@
 //! Server-side OPAQUE primitive only. No password or vault key API is exposed.
 
-use super::{Suite, TRANSCRIPT, identifiers};
+use super::{Suite, exact_length, identifiers, transcript};
 use crate::{Context, CryptoError};
 use opaque_ke::{
     CredentialFinalization, CredentialRequest, RegistrationRequest, RegistrationUpload,
@@ -40,6 +40,7 @@ impl ServerKeys {
         context: Context,
         request: &[u8],
     ) -> Result<Vec<u8>, CryptoError> {
+        exact_length::<opaque_ke::RegistrationRequestLen<Suite>>(request)?;
         let request =
             RegistrationRequest::<Suite>::deserialize(request).map_err(|_| CryptoError::Invalid)?;
         let result = ServerRegistration::<Suite>::start(&self.0, request, &context.account)
@@ -54,6 +55,7 @@ impl ServerKeys {
     ///
     /// Rejects malformed or oversized registration uploads.
     pub fn enrollment_record(upload: &[u8]) -> Result<Record, CryptoError> {
+        exact_length::<opaque_ke::RegistrationUploadLen<Suite>>(upload)?;
         let message =
             RegistrationUpload::<Suite>::deserialize(upload).map_err(|_| CryptoError::Invalid)?;
         Ok(Record(ServerRegistration::finish(message)))
@@ -71,10 +73,12 @@ impl ServerKeys {
         record: Option<&Record>,
         request: &[u8],
     ) -> Result<(Attempt, Vec<u8>), CryptoError> {
+        exact_length::<opaque_ke::CredentialRequestLen<Suite>>(request)?;
         let request =
             CredentialRequest::<Suite>::deserialize(request).map_err(|_| CryptoError::Invalid)?;
+        let transcript = transcript(&context);
         let parameters = ServerLoginParameters {
-            context: Some(TRANSCRIPT),
+            context: Some(&transcript),
             identifiers: identifiers(&context),
         };
         let result = ServerLogin::<Suite>::start(
@@ -104,6 +108,7 @@ impl Attempt {
     ///
     /// Rejects invalid or mismatched proof. No success for an incomplete exchange.
     pub fn finish(self, proof: &[u8]) -> Result<(), CryptoError> {
+        exact_length::<opaque_ke::CredentialFinalizationLen<Suite>>(proof)?;
         let message = CredentialFinalization::<Suite>::deserialize(proof)
             .map_err(|_| CryptoError::Invalid)?;
         let mut result = self
@@ -111,7 +116,7 @@ impl Attempt {
             .finish(
                 message,
                 ServerLoginParameters {
-                    context: Some(TRANSCRIPT),
+                    context: Some(&transcript(&self.context)),
                     identifiers: identifiers(&self.context),
                 },
             )

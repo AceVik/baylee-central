@@ -5,6 +5,7 @@
 //! atomic persistence and final session issuance must be enforced by the service.
 
 use crate::{Context, CryptoError, vault::WrappingKey};
+use opaque_ke::generic_array::typenum::Unsigned;
 use opaque_ke::{
     ClientLogin, ClientLoginFinishParameters, ClientRegistration,
     ClientRegistrationFinishParameters, CredentialResponse, Identifiers, RegistrationResponse,
@@ -13,7 +14,22 @@ use rand::rngs::OsRng;
 use secrecy::{ExposeSecret, SecretString};
 use zeroize::Zeroize;
 
-const TRANSCRIPT: &[u8] = b"baylee-central/opaque-3dh/ristretto255-sha512/argon2id-64m-t3-p4/v1";
+const TRANSCRIPT: &[u8] = b"baylee-central/opaque-3dh/ristretto255-sha512/argon2id-64m-t3-p4/v2";
+
+// The fixed suite determines every wire size. Upstream parsers may accept prefixes.
+fn exact_length<L: Unsigned>(bytes: &[u8]) -> Result<(), CryptoError> {
+    if bytes.len() != L::USIZE {
+        return Err(CryptoError::Invalid);
+    }
+    Ok(())
+}
+
+fn transcript(context: &Context) -> [u8; TRANSCRIPT.len() + 8] {
+    let mut bytes = [0; TRANSCRIPT.len() + 8];
+    bytes[..TRANSCRIPT.len()].copy_from_slice(TRANSCRIPT);
+    bytes[TRANSCRIPT.len()..].copy_from_slice(&context.epoch.to_be_bytes());
+    bytes
+}
 
 struct Suite;
 impl opaque_ke::CipherSuite for Suite {
@@ -83,6 +99,7 @@ impl Enrollment {
     ///
     /// Rejects malformed/reflected messages or authentication/KDF failures.
     pub fn finish(self, response: &[u8]) -> Result<EnrollmentResult, CryptoError> {
+        exact_length::<opaque_ke::RegistrationResponseLen<Suite>>(response)?;
         let response = RegistrationResponse::<Suite>::deserialize(response)
             .map_err(|_| CryptoError::Invalid)?;
         let ksf = stretch::FixedKsf;
@@ -105,6 +122,17 @@ impl Enrollment {
 }
 
 /// Single-use login state with a fixed expected issuer/account.
+///
+/// Finishing consumes the state even on failure; retry requires a new exchange:
+///
+/// ```compile_fail,E0382
+/// # #![forbid(unsafe_code)]
+/// use central_crypto::opaque::Login;
+/// fn reuse(login: Login, response: &[u8]) {
+///     let _ = login.finish(response);
+///     let _ = login.finish(response);
+/// }
+/// ```
 pub struct Login {
     state: ClientLogin<Suite>,
     password: SecretString,
@@ -146,6 +174,7 @@ impl Login {
     ///
     /// Rejects wrong password, changed identity/context and malformed server input.
     pub fn finish(self, response: &[u8]) -> Result<LoginResult, CryptoError> {
+        exact_length::<opaque_ke::CredentialResponseLen<Suite>>(response)?;
         let response =
             CredentialResponse::<Suite>::deserialize(response).map_err(|_| CryptoError::Invalid)?;
         let ksf = stretch::FixedKsf;
@@ -156,7 +185,7 @@ impl Login {
                 self.password.expose_secret().as_bytes(),
                 response,
                 ClientLoginFinishParameters::new(
-                    Some(TRANSCRIPT),
+                    Some(&transcript(&self.context)),
                     identifiers(&self.context),
                     Some(&ksf),
                 ),

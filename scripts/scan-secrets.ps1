@@ -27,5 +27,9 @@ try {
     }
     & $binary dir . --config .gitleaks.toml --redact --no-banner
     if ($LASTEXITCODE -ne 0) { throw 'Secret scan failed' }
+    $shallow = & git rev-parse --is-shallow-repository
+    if ($LASTEXITCODE -ne 0 -or $shallow -ne 'false') { throw 'Secret history scan requires full Git history' }
+    & $binary git . --log-opts=--all --config .gitleaks.toml --redact --no-banner
+    if ($LASTEXITCODE -ne 0) { throw 'Secret history scan failed' }
 } finally { Pop-Location }
 exit 0

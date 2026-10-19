@@ -5,6 +5,8 @@ use central_postgres::{DevConfig, PendingAccountStore, StoreError, connect_dev};
 use sea_orm::{ConnectionTrait, DbBackend, Statement, TransactionTrait};
 use std::collections::HashSet;
 
+mod support;
+
 fn config(user: &str, password_variable: &str) -> DevConfig {
     assert_eq!(
         std::env::var("CENTRAL_TEST_FIXTURE").unwrap(),
@@ -64,6 +66,8 @@ async fn migrations_ids_roles_rollback_and_locking() {
     );
     assert!(central_migration::apply(&runtime).await.is_err());
     verify_constraints_and_rollback(&runtime).await;
+    support::privileges(&operator, &runtime).await;
+    support::cancellation(&runtime).await;
 
     let store = PendingAccountStore::connect_dev(config(
         "central_runtime",

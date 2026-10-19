@@ -12,7 +12,11 @@ Client, policy and crypto crates remain independent of database implementation.
 - connect_dev is a low-level local fixture/operator connection; it does not grant
   authority or silently migrate anything. PendingAccountStore checks the runtime
   role before use, rejecting elevated attributes, direct role memberships,
-  schema CREATE and owned identity tables.
+  any schema CREATE, database CREATE/TEMP and owned identity tables. It requires
+  SELECT/INSERT and denies mutation, maintenance, reference/trigger and grant-option
+  privileges, including column grants. This is a startup check of this adapter's
+  narrow role contract, not a complete audit of arbitrary database objects or
+  security-definer functions. Only trusted operators may change roles/grants.
 - central-migration::apply is an explicit operator API, separate from the normal
   service. It validates PostgreSQL 18+, takes a transaction-scoped advisory lock
   and runs the versioned registry under an outer transaction and timeouts.
@@ -41,7 +45,9 @@ Install Docker with Linux-container support and PowerShell 7. Run:
 
 The latter creates a fresh pinned official PostgreSQL image with ephemeral data,
 a loopback-only random published port, memory/CPU/process limits and random
-synthetic credentials. DDL and runtime logins are distinct. No production
+synthetic credentials. DDL and runtime logins are distinct. PUBLIC database TEMP
+is revoked; the test subprocess does not inherit the bootstrap administrator
+password, PGPASSWORD or DATABASE_URL. No production
 configuration is read. The fixture runs the explicitly ignored Rust integration
 test and asserts that it actually executed successfully.
 
@@ -56,6 +62,10 @@ Coverage: failed migration leaves no history; repeat migration is idempotent;
 parallel migration lock conflicts; unknown history; restricted and NOINHERIT
 privilege paths; DDL denial; invalid UUID version/variant; explicit rollback and
 dropped transaction; concurrent ORM allocations with unique DB UUIDv7 and expiry.
+An actual task abort occupies the other three pool connections, forces reuse of
+the cancelled connection's backend PID, checks rolled-back data/session settings
+and verifies advisory-lock release from a separate connection. Privilege tests
+include column UPDATE/REFERENCES, TEMP/CREATE, grant delegation and missing SELECT.
 The fixture does not prove production TLS, reset/recovery, credential atomicity,
 row-level account ownership or PostgreSQL 19 compatibility.
 

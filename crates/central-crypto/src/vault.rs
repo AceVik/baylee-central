@@ -11,6 +11,16 @@ use std::fmt;
 use zeroize::Zeroizing;
 
 /// Random 256-bit master key, kept client-side. Not clonable or serializable.
+///
+/// Secret ownership cannot be duplicated through the public API:
+///
+/// ```compile_fail,E0599
+/// # #![forbid(unsafe_code)]
+/// use central_crypto::vault::MasterKey;
+/// fn duplicate(key: &MasterKey) -> MasterKey {
+///     MasterKey::clone(key)
+/// }
+/// ```
 pub struct MasterKey(Zeroizing<[u8; 32]>);
 
 /// Password wrapping key derived ONLY from an OPAQUE client export key.

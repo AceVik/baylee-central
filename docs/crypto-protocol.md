@@ -1,4 +1,4 @@
-# Native cryptographic integration spike, version 1
+# Native cryptographic integration spike, transcript version 2
 
 Status: isolated reusable library, not a deployed login service. The owner accepted
 the inventoried crypto dependencies on 2026-10-19 subject to review and tests.
@@ -21,6 +21,9 @@ Argon2 parameter reference: https://www.rfc-editor.org/rfc/rfc9106.html#section-
 Passwords are bounded to 1..1024 UTF-8 bytes and are not normalized here. New
 password policy belongs in the enrollment service; old migration passwords may
 not meet the new policy. OPAQUE proofs/records must also never be logged.
+Every received OPAQUE message must match the fixed suite's exact serialized length
+before parsing or running the KDF. This rejects trailing-byte aliases accepted by
+some upstream parsers. Lengths come from opaque-ke's suite-associated types.
 The public client library does not link HTTP or database crates. Server APIs
 require an explicit Cargo feature and cannot construct a client wrapping key.
 
@@ -29,7 +32,11 @@ require an explicit Cargo feature and cannot construct a client wrapping key.
 The client supplies a trusted immutable deployment identifier (32 bytes), account
 UUIDv7 (16 bytes) and nonzero vault epoch. These values do not authenticate
 themselves. OPAQUE binds deployment/account identifiers and a fixed versioned
-protocol transcript. The wrapper binds deployment/account/epoch and version.
+protocol transcript plus the vault epoch encoded as eight big-endian bytes.
+Both peers must agree on that epoch. Transcript v2 replaces the undeployed v1
+spike without a downgrade/fallback path; wrapper wire version remains 1.
+The wrapper binds deployment/account/epoch and version. Fixed-width transcript
+and wrapper context buffers require no heap allocations.
 Normal central IDs are allocated by PostgreSQL before enrollment; see postgresql.md.
 
 Generate a random 256-bit master key on the client. Derive its wrapping key with
@@ -60,7 +67,9 @@ addresses that specific gap without replacing the algorithm.
   The reference vector uses Identity KSF only in its separate test executable.
   The application suite is private and always uses the fixed Argon2 profile.
 - Real serialized enrollment/login, wrong password, missing account, substituted
-  account/issuer, corrupted final proof and replay to another attempt are tested.
+  account/issuer/epoch, corrupted final proof and replay to another attempt are tested.
+- All six OPAQUE message types reject an otherwise valid message with a suffix.
+  Both framing and epoch disagreement tests failed before their respective fixes.
 - Password change and restoration succeed; old wrapping key cannot open the new
   wrapper. Every byte of the 73-byte wrapper is mutation-tested, as are foreign
   account/issuer/epoch/key contexts, invalid versions, sizes and redacted Debug.

@@ -1,3 +1,5 @@
+const WRAP_DOMAIN: &[u8] = b"baylee-central/master-wrap/v1\0";
+
 /// Fixed-width domain context supplied by the trusted client configuration and
 /// authenticated account mapping. These bytes do not authenticate themselves.
 /// The issuer is an agreed 32-byte deployment identifier, not a gateway-provided URL.
@@ -30,11 +32,12 @@ impl Context {
         })
     }
 
-    pub(crate) fn aad(self) -> Vec<u8> {
-        let mut result = b"baylee-central/master-wrap/v1\0".to_vec();
-        result.extend_from_slice(&self.issuer);
-        result.extend_from_slice(&self.account);
-        result.extend_from_slice(&self.epoch.to_be_bytes());
+    pub(crate) fn aad(self) -> [u8; WRAP_DOMAIN.len() + 56] {
+        let mut result = [0; WRAP_DOMAIN.len() + 56];
+        result[..WRAP_DOMAIN.len()].copy_from_slice(WRAP_DOMAIN);
+        result[WRAP_DOMAIN.len()..WRAP_DOMAIN.len() + 32].copy_from_slice(&self.issuer);
+        result[WRAP_DOMAIN.len() + 32..WRAP_DOMAIN.len() + 48].copy_from_slice(&self.account);
+        result[WRAP_DOMAIN.len() + 48..].copy_from_slice(&self.epoch.to_be_bytes());
         result
     }
 }

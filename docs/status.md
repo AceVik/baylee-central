@@ -27,7 +27,7 @@ local development only, with no production database connector.
 
 Windows local: full foundation/crypto format, Clippy, unit/integration/doc tests,
 release build, compiler guard, RustSec, cargo-deny and secret checks are required.
-Current crypto suite has 10 tests, plus 19 HTTP/policy tests, two PostgreSQL
+Current crypto suite has 12 tests, plus 22 HTTP/policy tests, two PostgreSQL
 configuration tests and a separate real-database integration test. Published registration
 vector, password change, identity substitution, corrupted/replayed proof, malformed
 messages, all wrapper bytes and KDF work-buffer wiping are covered.
@@ -39,7 +39,15 @@ https://github.com/AceVik/baylee-central/actions/runs/39244714058
 Crypto commit 73fa00c passed Linux, Windows and macOS ARM64/Intel CI:
 https://github.com/AceVik/baylee-central/actions/runs/39247411399
 The database milestone additionally has a dedicated Linux PostgreSQL job; its
-latest commit results must be checked separately.
+latest commit results must be checked separately. The prior database commit c77df87
+passed all seven jobs: https://github.com/AceVik/baylee-central/actions/runs/39249498079
+
+The subsequent hardening pass adds canonical OPAQUE framing/epoch binding, strict
+runtime grants, real transaction cancellation, raw HTTP attack tests, generated-code
+compiler probes and a path-dependency policy regression. Details and limitations
+are recorded in security-assurance.md. CI now tests PR revisions and main pushes
+without duplicate feature-branch push runs; manual workflow dispatch remains available.
+All-feature documentation and release builds are checked on all four native targets.
 
 ## Remaining M1/M2 and release gates
 

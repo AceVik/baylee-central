@@ -23,6 +23,7 @@ try {
     [Environment]::SetEnvironmentVariable('POSTGRES_PASSWORD', $adminSecret)
     $created = & docker create --name $name --label baylee.central.test=owned --memory 512m --cpus 2 --pids-limit 128 --read-only --tmpfs /var/lib/postgresql:rw,nosuid,nodev,size=268435456 --tmpfs /var/run/postgresql:rw,nosuid,nodev --tmpfs /tmp:rw,nosuid,nodev --publish 127.0.0.1::5432 --env POSTGRES_PASSWORD --env PGDATA=/var/lib/postgresql/test $image 2>&1
     if ($LASTEXITCODE -ne 0) { throw 'Creating isolated PostgreSQL fixture failed' }
+    [Environment]::SetEnvironmentVariable('POSTGRES_PASSWORD', $previousPassword)
     $candidateId = ($created | Out-String).Trim()
     if ($candidateId -notmatch '^[0-9a-f]{64}$') { throw 'Invalid owned container identity' }
     $containerId = $candidateId
@@ -49,6 +50,7 @@ CREATE ROLE central_inherited LOGIN NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROL
 GRANT central_migrator TO central_inherited;
 CREATE DATABASE central_test OWNER central_migrator;
 \connect central_test
+REVOKE CREATE, TEMP ON DATABASE central_test FROM PUBLIC;
 REVOKE CREATE ON SCHEMA public FROM PUBLIC;
 "@
     $bootstrapOutput = $bootstrap | & docker exec -i $containerId psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres 2>&1
@@ -59,8 +61,11 @@ REVOKE CREATE ON SCHEMA public FROM PUBLIC;
     $start.FileName = 'cargo'
     $start.UseShellExecute = $false
     $start.CreateNoWindow = $true
-$start.RedirectStandardOutput = $true
-$start.RedirectStandardError = $true
+    $start.RedirectStandardOutput = $true
+    $start.RedirectStandardError = $true
+    [void]$start.Environment.Remove('POSTGRES_PASSWORD')
+    [void]$start.Environment.Remove('PGPASSWORD')
+    [void]$start.Environment.Remove('DATABASE_URL')
     foreach ($argument in @('test', '--locked', '-p', 'central-postgres', '--test', 'postgres', '--', '--ignored', '--test-threads=1')) {
         $start.ArgumentList.Add($argument)
     }

@@ -53,6 +53,21 @@ async fn inspect(State(state): State<Arc<Boundary>>, request: Request, next: Nex
     {
         return (StatusCode::FORBIDDEN, "request not permitted\n").into_response();
     }
+    // Reject declared oversize before waiting for an attacker to send a body.
+    // Streaming/chunked bodies are still bounded independently below.
+    if request
+        .headers()
+        .get(header::CONTENT_LENGTH)
+        .is_some_and(|value| {
+            value
+                .to_str()
+                .ok()
+                .and_then(|value| value.parse::<u64>().ok())
+                .is_none_or(|length| length > state.request_bytes as u64)
+        })
+    {
+        return (StatusCode::PAYLOAD_TOO_LARGE, "request rejected\n").into_response();
+    }
     let (parts, body) = request.into_parts();
     let Ok(bytes) = to_bytes(body, state.request_bytes).await else {
         return (StatusCode::PAYLOAD_TOO_LARGE, "request rejected\n").into_response();

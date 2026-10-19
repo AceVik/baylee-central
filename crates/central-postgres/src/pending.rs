@@ -51,19 +51,12 @@ impl PendingAccountStore {
     /// Rejects excessive privileges, missing schema, unsupported version or failed I/O.
     pub async fn connect_dev(config: DevConfig) -> Result<Self, StoreError> {
         let db = connect_dev(config).await?;
-        let allowed = db.query_one_raw(Statement::from_string(
-            DbBackend::Postgres,
-            "SELECT NOT (rolsuper OR rolcreatedb OR rolcreaterole OR rolreplication OR rolbypassrls)
-              AND NOT EXISTS (SELECT 1 FROM pg_auth_members WHERE member = (SELECT oid FROM pg_roles WHERE rolname = current_user))
-              AND NOT has_schema_privilege(current_user, 'central_identity', 'CREATE')
-              AND NOT has_schema_privilege(current_user, 'public', 'CREATE')
-              AND NOT EXISTS (
-                SELECT 1 FROM pg_class c JOIN pg_namespace n ON c.relnamespace = n.oid
-                WHERE n.nspname = 'central_identity' AND c.relowner =
-                  (SELECT oid FROM pg_roles WHERE rolname = current_user)
-              ) AS allowed
-             FROM pg_roles WHERE rolname = current_user",
-        )).await;
+        let allowed = db
+            .query_one_raw(Statement::from_string(
+                DbBackend::Postgres,
+                include_str!("pending-role.sql"),
+            ))
+            .await;
         let accepted = allowed
             .ok()
             .flatten()

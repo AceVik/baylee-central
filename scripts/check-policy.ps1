@@ -16,7 +16,14 @@ try {
             throw "Missing inherited lints: $($package.name)"
         }
         if ($package.publish.Count -ne 0) { throw "Package publication must be disabled: $($package.name)" }
+        $workspaceRoot = [IO.Path]::GetFullPath($meta.workspace_root).TrimEnd([IO.Path]::DirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
+        if (-not [IO.Path]::GetFullPath($package.manifest_path).StartsWith($workspaceRoot, [StringComparison]::Ordinal)) {
+            throw "Workspace member outside reviewed root: $($package.name)"
+        }
         foreach ($target in $package.targets) {
+            if (-not [IO.Path]::GetFullPath($target.src_path).StartsWith($workspaceRoot, [StringComparison]::Ordinal)) {
+                throw "Source target outside reviewed root: $($target.name)"
+            }
             $source = Get-Content -LiteralPath $target.src_path -Raw
             if ($source -notmatch '(?m)^#!\[forbid\(unsafe_code\)\]\s*$') {
                 throw "Missing crate-root unsafe prohibition: $($target.name)"
@@ -40,6 +47,13 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Full Cargo metadata failed' }
     $graph = $raw | ConvertFrom-Json
     $approved = Get-Content docs/dependency-proposal/approved-packages.json -Raw | ConvertFrom-Json
+    # Path dependencies are first-party code too. Never let a helper outside the
+    # checked workspace bypass lint/root/native-source checks or the inventory.
+    foreach ($package in $graph.packages | Where-Object { -not $_.source }) {
+        if ($package.id -notin $graph.workspace_members) {
+            throw "Local dependency outside reviewed workspace: $($package.name)"
+        }
+    }
     foreach ($package in $graph.packages | Where-Object source) {
         $identity = "$($package.name)@$($package.version)"
         if ($identity -notin $approved.packages) { throw "Dependency not approved: $identity" }
@@ -57,10 +71,18 @@ try {
         [IO.Directory]::CreateDirectory($probeRoot) | Out-Null
         try {
             $probeSource = Join-Path $probeRoot 'probe.rs'
-            [IO.File]::WriteAllText($probeSource, "#![forbid(unsafe_code)]\nfn main() { unsafe {} }".Replace('\n', [Environment]::NewLine))
-            $diagnostic = (& rustc $probeSource --out-dir $probeRoot 2>&1 | Out-String)
-            if ($LASTEXITCODE -eq 0 -or $diagnostic -notmatch 'usage of an.*unsafe') {
-                throw 'Compiler did not reject the deliberate unsafe probe'
+            $probes = @(
+                '#![forbid(unsafe_code)]\nfn main() { unsafe {} }',
+                '#![forbid(unsafe_code)]\nmacro_rules! generated { () => { unsafe {} } }\nfn main() { generated!(); }',
+                '#![forbid(unsafe_code)]\ninclude!("generated.rs");\nfn main() { generated(); }'
+            )
+            [IO.File]::WriteAllText((Join-Path $probeRoot 'generated.rs'), 'fn generated() { unsafe {} }')
+            foreach ($probe in $probes) {
+                [IO.File]::WriteAllText($probeSource, $probe.Replace('\n', [Environment]::NewLine))
+                $diagnostic = (& rustc $probeSource --out-dir $probeRoot 2>&1 | Out-String)
+                if ($LASTEXITCODE -eq 0 -or $diagnostic -notmatch 'usage of an.*unsafe') {
+                    throw 'Compiler did not reject the direct/generated unsafe probe'
+                }
             }
         } finally {
             $tempRoot = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd([IO.Path]::DirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
