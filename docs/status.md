@@ -2,6 +2,15 @@
 
 2026-10-19. No production deployment or real-user processing.
 
+Current reviewed integration: public `main` at
+`43d89eed8cc89cd6ebc992e6de0f5e5610d54c0f`. The sibling native client/gateway
+integration is tracked in [Baylee PR #390](https://github.com/AceVik/baylee/pull/390);
+its current revision and merge state must be checked separately. The owner will
+continue production provisioning from the MacBook. See [the handoff](handoff.md)
+for that decision, the unfinished production launcher/database connector and
+the required staging sequence. Existing development launchers are not production
+entry points.
+
 ## Integration hardening milestone
 
 The current implementation adds a gateway registry with separate redemption and
@@ -14,14 +23,15 @@ objects support client-side chat archives across devices; migrations 000004 and
 See [gateway registry](gateway-registry.md) and [private objects](private-objects.md)
 for APIs, exact runtime grants, quotas and confidentiality limitations.
 
-Local evidence includes repeated real PostgreSQL/native-HTTP test passes (latest
+Local evidence includes repeated real PostgreSQL/native-HTTP test passes (recorded
 27.20 seconds native SDK and 78.69 seconds database suite), deterministic
 revocation-versus-mutation races, registry authorization, encrypted object restore,
 quota rollback and bounded tombstone reclamation. The full local policy, Clippy,
 unit/integration/doc and release suite passed; later transport-size and independent
 request-budget changes received focused tests and workspace Clippy. RustSec,
 cargo-deny, working-tree/history secret scans and owned-service smoke passed.
-These are local results; the final revision still requires all protected CI checks.
+These are recorded local results. Protected CI evidence must match the exact
+revision under review; the older runs listed below do not certify a later change.
 
 Request budgets separate unauthenticated/login traffic (32 per second, with the
 existing eight login starts per account/minute), data operations (256 per second,
@@ -33,7 +43,7 @@ enrollment envelope. No first-party unsafe or new external dependency was added.
 
 ## Implemented foundation
 
-Native-login integration is in progress (2026-10-19): central-api now defines
+The native-login libraries are implemented for isolated development: central-api defines
 the fixed live/dev endpoint policy and wire messages; central-client provides
 transport-independent OPAQUE login and authenticated encrypted-document restore;
 central-identity composes bounded one-use challenges with PostgreSQL accounts,
@@ -42,16 +52,18 @@ this protocol. The CLI's explicit `--dev-accounts-stdin` mode serves accounts
 using persisted operator-supplied setup and bridge keys. The sibling Baylee
 integration has a real synthetic gateway/Central/PostgreSQL migration test:
 preferences and bounded deck/history export, restored-digest cutover, old-session
-revocation, fresh-device restore and action-scoped admission. Client UI validation
-is in progress. Full data migration and production deployment remain incomplete.
+revocation, fresh-device restore and action-scoped admission. Baylee records native
+client UI and integration validation in its `docs/central-login.md` and PR #390.
+Full data migration and production deployment remain incomplete.
 
-New local evidence: real HTTP + PostgreSQL 18.6 + client SDK covers enrollment,
+Recorded native-login milestone evidence: real HTTP + PostgreSQL 18.6 + client SDK covers enrollment,
 second-device restore, wrong passwords, consumed failed proofs, wrong gateway
 audiences, replay, session revocation, concurrent writes, lost commit responses
 and corrupt ciphertext. The isolated PostgreSQL script runs both the prior
 database suite and this new end-to-end suite and verifies owned-resource cleanup.
 The full local format/policy/Clippy/test/doc/release suite passed this milestone.
-The native schema uses append-only migrations 000002/000003; no real data was migrated.
+That milestone added migrations 000002/000003; the current registry also includes
+000004/000005 described above. No real data was migrated.
 
 - central-policy: dependency-free configuration and versioned training preferences.
 - central-http: local-only bounded HTTP library; liveness and deliberately negative
@@ -72,7 +84,7 @@ choice is PostgreSQL 18+ with database-generated UUIDv7 and SeaORM 2 migrations.
 Its separate inventory is recorded in storage-proposal; current use remains
 local development only, with no production database connector.
 
-## Validation
+## Validation and historical milestone evidence
 
 Windows local: full foundation/crypto format, Clippy, unit/integration/doc tests,
 release build, compiler guard, RustSec, cargo-deny and secret checks are required.
@@ -110,21 +122,39 @@ targets and case-sensitive dependency features. See security-assurance.md for
 reproduced findings, repeated review scope and exact validation limits.
 Secret history has its own configuration without working-tree path exceptions;
 its scanner self-test verifies forced commits and subsequent deletions of synthetic
-credentials. Current native CI evidence is linked from draft PR #1; a previous
+credentials. That hardening milestone's CI evidence is linked from PR #1; a previous
 revision's green run does not certify later changes.
 
-## Remaining M1/M2 and release gates
-
-Native account revision `5bb53ba` passed all seven CI jobs (Linux, Windows,
+The earlier native account revision `5bb53ba` passed all seven CI jobs (Linux, Windows,
 macOS ARM64/Intel, PostgreSQL, dependency and secret checks):
 https://github.com/AceVik/baylee-central/actions/runs/39272471661
 This is test evidence, not independent security review or production readiness.
 
-M1 is not entirely complete: the PostgreSQL fixture exists; object-store fixtures,
-production connector/TLS validation and capacity SLO measurements remain. M2 has an isolated crypto spike, but browser SSO,
-complete protocol state machines, schemas, recovery and independent review remain.
-The current service is usable for local development, not production.
+## Remaining implementation and release gates
 
-No deployed authentication/MFA/recovery, vault sync, legacy account migration,
-production database connector, website UI, gateway registration/admin or human training pipeline
-exists yet. Legal, independent security and operational release gates remain.
+The service is usable for local development, not production. Its account launcher
+is `--dev-accounts-stdin`; the only account-store connector is `connect_dev`,
+fixed to IPv4 loopback without TLS. A production launcher, verified remote-database
+TLS/configuration, persisted secret loading, backup/restore drills, deployment
+isolation and capacity SLO measurements remain. The development request budgets
+above are bounds, not evidence of production capacity.
+
+Native OPAQUE login, account persistence, gateway registration/admin APIs,
+exclusive sessions, guarded legacy migration and encrypted private-object/chat
+storage are implemented and tested with synthetic data. They have not been
+deployed for real users. Browser SSO, complete new-account registration,
+password change/reset/recovery service and UI flows, MFA, session renewal and
+the central website remain unfinished. Live discovery exposes enrollment state
+and requires its documented review before public use.
+
+Private deck CRUD/history and the durable replay archive are not implemented in
+the sibling client: its encrypted legacy deck snapshot is not an operational
+library, replays are not exported, and the 192-KiB / 2,048-row source limit still
+blocks larger migrations. Baylee's `docs/central-private-library-plan.md` defines
+the remaining typed storage, gameplay handoff and acceptance tests. The generic
+encrypted-object API does not close those product requirements by itself.
+
+Human training ingestion remains disabled pending legal basis, rights,
+anonymization and preference-enforcement review. Independent security and
+operational release gates remain; local tests or a green CI run are not a
+production launch approval.
