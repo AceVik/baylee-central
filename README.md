@@ -3,9 +3,10 @@
 Private preparation repository for Baylee's central accounts, encrypted personal
 storage, gateway directory, scoped administration, website and training intake.
 
-**Planning only. No service, authentication protocol or privacy guarantee is
-implemented.** Owner decisions recorded on 2026-10-19. Implementation starts only
-after the owner explicitly resumes with the desired reasoning effort.
+**Implementation started on 2026-10-19 with owner authorization.** A local-only
+HTTP foundation and reusable policy library exist. Authentication, storage and
+production privacy guarantees are not implemented. See [status](docs/status.md)
+and [development commands](docs/dev-mode.md).
 
 Priority: **security > QA > performance > clean code**. First-party unsafe Rust
 and assembly are forbidden. See [AGENTS.md](AGENTS.md) for binding development rules.

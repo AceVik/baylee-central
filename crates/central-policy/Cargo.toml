@@ -1,0 +1,10 @@
+[package]
+name = "central-policy"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+description = "Fail-closed policy primitives for Baylee Central; no authentication implementation"
+
+[lints]
+workspace = true

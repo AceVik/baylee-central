@@ -1,11 +1,11 @@
 # Next implementation session
 
-Read AGENTS.md and all linked README design documents first. Repository is
-planning-only, prepared on 2026-10-19 at the owner's request. No service code,
-crypto implementation, live user processing or deployment has been started.
+Read AGENTS.md and all linked README design documents first. Implementation began on 2026-10-19 with owner authorization. Read status.md
+for completed checks and remaining gates; no production deployment or live-user
+processing has begun.
 
-Owner will increase reasoning effort before authorizing implementation. Start at
-M1, then resolve M2 protocol gates; do not attempt all milestones in one change.
+Continue M1/M2 gates in order. Keep reusable libraries and isolated dev mode;
+do not attempt all milestones in one change.
 Higher effort is not a substitute for QA or independent security review.
 
 Existing Baylee checkout: `C:/Users/vikto/Projects/baylee`.

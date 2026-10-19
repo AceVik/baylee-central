@@ -1,0 +1,10 @@
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Generated local build outputs and machine-specific metadata; not release source"
+paths = [
+  '''(^|/)target/''',
+  '''(^|/)\.git/''',
+  '''\.local\.json$''',
+]

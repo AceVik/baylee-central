@@ -1,0 +1,59 @@
+name: foundation
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+concurrency:
+  group: foundation-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2025]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Install pinned toolchain
+        run: |
+          rustup toolchain install 1.99.0 --profile minimal --component clippy --component rustfmt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Fetch locked dependencies
+        run: |
+          cargo fetch --locked
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Policy, tests, lint and release build
+        run: ./scripts/test.ps1
+      - name: Verify development lifecycle
+        run: ./scripts/smoke-dev.ps1
+  dependencies:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - run: rustup toolchain install 1.99.0 --profile minimal
+      - run: cargo install cargo-audit --version 0.22.2 --locked
+      - run: cargo install cargo-deny --version 0.20.2 --locked
+      - run: cargo audit --deny warnings
+      - run: cargo deny check
+
+  secrets:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Scan source with pinned Gitleaks
+        shell: pwsh
+        run: ./scripts/scan-secrets.ps1

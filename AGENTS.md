@@ -35,8 +35,12 @@ performance policy. Do not import its permission to write unsafe or assembly.
 
 ## Workflow
 
-- Current state is planning only. Do not start implementation until the owner
-  authorizes that stage. Higher model effort is not a security approval.
+- Implementation was authorized on 2026-10-19. Use the three-pass method in
+  docs/security-assurance.md. Higher model effort is not a security approval.
+- Keep reusable libraries separate from the executable and server internals;
+  provide isolated dev mode without authorization bypasses.
+- The owner accepted the pinned HTTP graph in docs/dependency-proposal via safe
+  APIs. Crypto/database dependencies are not included in that acceptance.
 - Implement small milestones with tests and a commit per working milestone.
   Use `codex/` branches and rebase feature branches. Never bypass required checks.
 - No real users, production credentials or data in tests. Bind local test
@@ -47,8 +51,8 @@ performance policy. Do not import its permission to write unsafe or assembly.
   the user's additional left monitor; do not capture the user's pointer.
 - Use UUIDv7 for generated object IDs; security tokens require independent
   cryptographic randomness. IDs are not authorization or secrets.
-- Establish format, lint, test, dependency and security checks in milestone M1;
-  this documentation repository currently has no build/test command.
+- Run scripts/test.ps1, scripts/smoke-dev.ps1, scripts/scan-secrets.ps1,
+  cargo audit --deny warnings and cargo deny check. Pin checker versions as in CI.
 - Keep protocol specs, migrations, threat model and operator runbooks in sync.
   Do not assert anonymity, audit completion or legal compliance without evidence.
 - External release, production migration and processing human training replays

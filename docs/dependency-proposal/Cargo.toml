@@ -1,0 +1,20 @@
+[workspace]
+resolver = "3"
+
+[package]
+name = "central-transport-proposal"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[lib]
+path = "placeholder.rs"
+
+[dependencies]
+axum = { version = "=0.8.9", default-features = false, features = ["http1", "tokio"] }
+tokio = { version = "=1.53.3", default-features = false, features = ["macros", "rt-multi-thread", "net", "signal", "time", "sync"] }
+tower = { version = "=0.5.3", default-features = false, features = ["limit", "load-shed", "timeout", "util"] }
+tower-http = { version = "=0.6.8", default-features = false, features = ["limit", "set-header", "timeout"] }
+
+[dev-dependencies]
+http-body-util = "=0.1.5"

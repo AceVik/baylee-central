@@ -13,3 +13,4 @@
 *.pfx
 *.dump
 *.log
+*.local.json
