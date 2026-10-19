@@ -148,7 +148,7 @@ async fn verify_migrations(operator: &sea_orm::DatabaseConnection) {
         .await
         .unwrap();
 
-    central_migration::apply(operator).await.unwrap();
+    support::migration_search_path(operator).await;
     central_migration::apply(operator).await.unwrap();
     assert_eq!(
         scalar(

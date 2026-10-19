@@ -21,6 +21,9 @@ Client, policy and crypto crates remain independent of database implementation.
   service. It validates PostgreSQL 18+, takes a transaction-scoped advisory lock
   and runs the versioned registry under an outer transaction and timeouts.
   Unknown migration history is rejected. Failed DDL rolls back history too.
+  History is fixed to the trusted public schema with a transaction-local search
+  path and catalog-qualified gate functions. The raw SeaORM migrator is private;
+  consumers cannot call its destructive or unguarded convenience methods.
 - The first migration creates central_identity.pending_accounts. PostgreSQL
   generates the primary UUID with uuidv7(); UUIDv7/variant and expiry constraints
   also apply to direct SQL. Reservations expire after 15 minutes.
@@ -66,6 +69,10 @@ An actual task abort occupies the other three pool connections, forces reuse of
 the cancelled connection's backend PID, checks rolled-back data/session settings
 and verifies advisory-lock release from a separate connection. Privilege tests
 include column UPDATE/REFERENCES, TEMP/CREATE, grant delegation and missing SELECT.
+Migration checks also cover forged history in an alternate schema, temporary-table
+shadowing, restored caller settings after success/failure and an actual abort
+while migration history is locked. The aborted migration's backend is reused and
+its advisory lock must be available from a distinct connection.
 The fixture does not prove production TLS, reset/recovery, credential atomicity,
 row-level account ownership or PostgreSQL 19 compatibility.
 
@@ -77,8 +84,9 @@ constraints clearer. User values go through bound parameters; user input never
 becomes DDL. Production upgrades must have backup/restore evidence and explicit
 operator execution under separate credentials.
 
-The current migration's down operation deliberately rejects deletion; do not use
-SeaORM fresh/reset on real databases. Prefer reviewed forward corrections.
+The current migration's down operation deliberately rejects deletion. Its registry
+is private, so SeaORM fresh/reset is not available through this library. Prefer
+reviewed forward corrections.
 Provision deployment roles/grants separately; fixture bootstrap is not a production
 installer. New schema versions must pass fresh-install and prior-version upgrade,
 partial-failure, lock, compatibility and privilege tests.

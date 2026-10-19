@@ -1,5 +1,11 @@
 //! Explicit versioned migrations. Never run automatically from the HTTP service.
 //! The caller supplies a dedicated DDL connection, with trusted TLS outside fixtures.
+//! The raw `SeaORM` migrator is private: callers cannot bypass [`apply`] or invoke
+//! destructive convenience operations through this library.
+//!
+//! ```compile_fail
+//! use central_migration::Migrator;
+//! ```
 #![forbid(unsafe_code)]
 
 mod m20261019_000001_pending_accounts;
@@ -9,8 +15,8 @@ use sea_orm_migration::{
     sea_orm::{ConnectionTrait, DatabaseConnection, DbBackend, Statement, TransactionTrait},
 };
 
-/// Ordered, append-only migration registry. Never edit an applied migration.
-pub struct Migrator;
+// Ordered, append-only registry; never expose SeaORM's destructive convenience API.
+struct Migrator;
 
 #[sea_orm_migration::async_trait::async_trait]
 impl MigratorTrait for Migrator {
@@ -32,6 +38,7 @@ impl std::error::Error for MigrationError {}
 /// Apply all pending migrations atomically under a transaction-scoped advisory lock.
 /// PostgreSQL 18+ is required. A failed attempt rolls back DDL and migration history.
 /// Destructive down/fresh/reset operations are not exposed by this entry point.
+/// History lives in the trusted `public` schema, independently of caller settings.
 ///
 /// # Errors
 ///
@@ -44,7 +51,10 @@ pub async fn apply(db: &DatabaseConnection) -> Result<(), MigrationError> {
     let result = async {
         transaction
             .execute_unprepared(
-                "SET LOCAL statement_timeout = '30s';
+                // Explicit pg_temp placement prevents its implicit precedence;
+                // leaving pg_catalog implicit keeps system functions first.
+                "SET LOCAL search_path = public, pg_temp;
+             SET LOCAL statement_timeout = '30s';
              SET LOCAL lock_timeout = '3s';
              SET LOCAL idle_in_transaction_session_timeout = '15s';",
             )
@@ -52,8 +62,8 @@ pub async fn apply(db: &DatabaseConnection) -> Result<(), MigrationError> {
         let row = transaction
             .query_one_raw(Statement::from_string(
                 DbBackend::Postgres,
-                "SELECT current_setting('server_version_num')::integer >= 180000
-             AND pg_try_advisory_xact_lock(1862384219, 1) AS allowed",
+                "SELECT pg_catalog.current_setting('server_version_num')::integer >= 180000
+             AND pg_catalog.pg_try_advisory_xact_lock(1862384219, 1) AS allowed",
             ))
             .await?
             .ok_or_else(|| sea_orm_migration::DbErr::Custom("gate".into()))?;
