@@ -12,6 +12,19 @@ $adminSecret = [Convert]::ToHexString([Security.Cryptography.RandomNumberGenerat
 $migratorSecret = [Convert]::ToHexString([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
 $runtimeSecret = [Convert]::ToHexString([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
 $previousPassword = [Environment]::GetEnvironmentVariable('POSTGRES_PASSWORD')
+function Restore-FixturePassword {
+    # PowerShell passes plain $null as an empty string to this .NET overload.
+    # NullString is required to preserve an originally absent variable.
+    if ($null -eq $previousPassword) {
+        [Environment]::SetEnvironmentVariable('POSTGRES_PASSWORD', [NullString]::Value)
+    } else {
+        [Environment]::SetEnvironmentVariable('POSTGRES_PASSWORD', $previousPassword)
+    }
+    if ([Environment]::GetEnvironmentVariable('POSTGRES_PASSWORD') -cne $previousPassword) {
+        throw 'Temporary fixture environment was not restored exactly'
+    }
+}
+
 try {
     Write-Output "Owned PostgreSQL fixture: $name"
     & docker image inspect $image *> $null
@@ -23,7 +36,7 @@ try {
     [Environment]::SetEnvironmentVariable('POSTGRES_PASSWORD', $adminSecret)
     $created = & docker create --name $name --label baylee.central.test=owned --memory 512m --cpus 2 --pids-limit 128 --read-only --tmpfs /var/lib/postgresql:rw,nosuid,nodev,size=268435456 --tmpfs /var/run/postgresql:rw,nosuid,nodev --tmpfs /tmp:rw,nosuid,nodev --publish 127.0.0.1::5432 --env POSTGRES_PASSWORD --env PGDATA=/var/lib/postgresql/test $image 2>&1
     if ($LASTEXITCODE -ne 0) { throw 'Creating isolated PostgreSQL fixture failed' }
-    [Environment]::SetEnvironmentVariable('POSTGRES_PASSWORD', $previousPassword)
+    Restore-FixturePassword
     $candidateId = ($created | Out-String).Trim()
     if ($candidateId -notmatch '^[0-9a-f]{64}$') { throw 'Invalid owned container identity' }
     $containerId = $candidateId
@@ -92,7 +105,7 @@ REVOKE CREATE ON SCHEMA public FROM PUBLIC;
             } finally { $testProcess.Dispose() }
         }
     } catch { $cleanupErrors.Add('Owned integration process cleanup could not be verified') }
-    try { [Environment]::SetEnvironmentVariable('POSTGRES_PASSWORD', $previousPassword) }
+    try { Restore-FixturePassword }
     catch { $cleanupErrors.Add('Temporary fixture environment could not be restored') }
     try {
         # The preallocated random name also handles an interruption during create.
