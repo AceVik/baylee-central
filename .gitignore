@@ -1,0 +1,15 @@
+/target/
+/node_modules/
+/.env
+/.env.*
+!/.env.example
+/secrets/
+/data/
+/backups/
+/artifacts/
+*.key
+*.pem
+*.p12
+*.pfx
+*.dump
+*.log
