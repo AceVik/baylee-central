@@ -4,6 +4,14 @@ use std::{fmt, net::SocketAddr, num::NonZeroUsize};
 
 const PREFIX: &str = "BAYLEE_CENTRAL_";
 
+/// Recognize the reserved namespace regardless of ASCII casing on every platform.
+/// Parsing still requires canonical uppercase names, so casing mistakes fail closed.
+#[must_use]
+pub fn is_reserved_setting(key: &str) -> bool {
+    key.get(..PREFIX.len())
+        .is_some_and(|prefix| prefix.eq_ignore_ascii_case(PREFIX))
+}
+
 /// Validated local-development settings. Production listeners are not supported.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Config {
@@ -63,9 +71,12 @@ impl Config {
         let mut result = Self::default();
         let mut seen = [false; 3];
         for (key, value) in pairs {
-            let Some(name) = key.strip_prefix(PREFIX) else {
+            if !is_reserved_setting(key) {
                 continue;
-            };
+            }
+            let name = key
+                .strip_prefix(PREFIX)
+                .ok_or(ConfigError::UnknownSetting)?;
             let index = match name {
                 "LISTEN" => 0,
                 "REQUEST_BYTES" => 1,
@@ -210,5 +221,19 @@ mod tests {
         let error = Config::from_pairs([("BAYLEE_CENTRAL_LISTEN", secret)]).unwrap_err();
         assert!(!format!("{error:?}: {error}").contains("canary"));
         assert!(!error.to_string().contains(['\r', '\n']));
+    }
+
+    #[test]
+    fn noncanonical_reserved_names_cannot_silently_select_defaults() {
+        for key in [
+            "baylee_central_listen",
+            "Baylee_Central_REQUEST_BYTES",
+            "baylee_central_UNKNOWN",
+        ] {
+            assert_eq!(
+                Config::from_pairs([(key, "invalid-canary")]),
+                Err(ConfigError::UnknownSetting)
+            );
+        }
     }
 }

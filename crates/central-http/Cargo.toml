@@ -18,5 +18,4 @@ hyper-util = { version = "=0.1.21", default-features = false, features = ["servi
 tower = { version = "=0.5.3", default-features = false, features = ["util"] }
 tower-http = { version = "=0.6.8", default-features = false, features = ["timeout"] }
 
-[dev-dependencies]
 http-body-util = "=0.1.5"

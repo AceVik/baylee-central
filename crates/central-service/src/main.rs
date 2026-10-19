@@ -2,20 +2,21 @@
 #![forbid(unsafe_code)]
 
 use central_http::DevelopmentServer;
-use central_policy::config::Config;
+use central_policy::config::{Config, is_reserved_setting};
 use std::process::ExitCode;
 
 #[tokio::main]
 async fn main() -> ExitCode {
     // Do not let a future dependency panic print potentially sensitive payloads.
     std::panic::set_hook(Box::new(|_| eprintln!("central: internal failure")));
-    if std::env::args_os().skip(1).collect::<Vec<_>>() != ["--dev"] {
+    let mut args = std::env::args_os().skip(1);
+    if args.next().as_deref() != Some(std::ffi::OsStr::new("--dev")) || args.next().is_some() {
         eprintln!("usage: central-service --dev (local foundation only)");
         return ExitCode::FAILURE;
     }
     let mut values = Vec::new();
     for (key, value) in std::env::vars_os() {
-        if key.to_string_lossy().starts_with("BAYLEE_CENTRAL_") {
+        if is_reserved_setting(&key.to_string_lossy()) {
             let (Some(key), Some(value)) = (key.to_str(), value.to_str()) else {
                 eprintln!("central: invalid configuration");
                 return ExitCode::FAILURE;

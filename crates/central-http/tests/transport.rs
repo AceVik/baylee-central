@@ -58,10 +58,12 @@ impl Drop for Fixture {
 // Windows may report a hard close as WSAECONNABORTED (10053), rather than reset.
 // Only closed-connection errors count as closure; timeouts still fail the test.
 fn exchange(address: SocketAddr, bytes: &str) -> String {
+    exchange_with_deadline(address, bytes, Duration::from_secs(2))
+}
+
+fn exchange_with_deadline(address: SocketAddr, bytes: &str, timeout: Duration) -> String {
     let mut socket = TcpStream::connect_timeout(&address, Duration::from_secs(2)).unwrap();
-    socket
-        .set_read_timeout(Some(Duration::from_secs(2)))
-        .unwrap();
+    socket.set_read_timeout(Some(timeout)).unwrap();
     socket
         .set_write_timeout(Some(Duration::from_secs(2)))
         .unwrap();
@@ -167,4 +169,37 @@ async fn overload_drops_excess_socket_and_cancellation_closes_active_socket() {
     })
     .await
     .unwrap();
+}
+
+#[tokio::test]
+async fn malformed_chunks_are_bad_requests_not_size_errors() {
+    let server = Fixture::start().await;
+    let response = server
+        .request("Transfer-Encoding: chunked\r\n\r\nPRIVATE_INVALID_CHUNK_CANARY\r\n")
+        .await;
+    assert!(response.starts_with("HTTP/1.1 400"), "{response}");
+    assert!(response.contains("cache-control: no-store"));
+    assert!(!response.contains("CANARY"));
+    server.stop().await;
+}
+
+#[tokio::test]
+async fn unfinished_body_times_out_and_releases_connection_capacity() {
+    let server = Fixture::start().await;
+    let address = server.address;
+    let started = std::time::Instant::now();
+    let response = tokio::task::spawn_blocking(move || {
+        exchange_with_deadline(
+            address,
+            &format!("GET /health/live HTTP/1.1\r\nHost: {address}\r\nContent-Length: 1\r\n\r\n"),
+            Duration::from_secs(8),
+        )
+    })
+    .await
+    .unwrap();
+    assert!(response.starts_with("HTTP/1.1 408"), "{response}");
+    assert!(response.contains("cache-control: no-store"));
+    assert!(started.elapsed() >= Duration::from_secs(4));
+    assert!(server.request("\r\n").await.starts_with("HTTP/1.1 200"));
+    server.stop().await;
 }

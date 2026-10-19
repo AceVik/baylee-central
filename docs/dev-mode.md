@@ -8,7 +8,8 @@ connections. Environment settings:
 - BAYLEE_CENTRAL_REQUEST_BYTES: 1024..1048576.
 - BAYLEE_CENTRAL_CONCURRENT_REQUESTS: 1..128.
 
-Unknown reserved settings fail closed. There is no production flag, auth bypass,
+Reserved names must use the documented uppercase spelling on every platform.
+Case variants and unknown reserved settings fail closed instead of silently using defaults. There is no production flag, auth bypass,
 hardcoded account, master password or training activation flag. /health/live
 reports the process; /health/ready deliberately returns 503 until real dependencies
 and release requirements are implemented. Future storage fixtures must use isolated

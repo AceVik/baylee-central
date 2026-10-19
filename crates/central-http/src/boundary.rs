@@ -1,4 +1,4 @@
-use std::{sync::Arc, time::Duration};
+use std::{error::Error, sync::Arc, time::Duration};
 
 use axum::{
     Router,
@@ -69,8 +69,19 @@ async fn inspect(State(state): State<Arc<Boundary>>, request: Request, next: Nex
         return (StatusCode::PAYLOAD_TOO_LARGE, "request rejected\n").into_response();
     }
     let (parts, body) = request.into_parts();
-    let Ok(bytes) = to_bytes(body, state.request_bytes).await else {
-        return (StatusCode::PAYLOAD_TOO_LARGE, "request rejected\n").into_response();
+    let bytes = match to_bytes(body, state.request_bytes).await {
+        Ok(bytes) => bytes,
+        Err(error) => {
+            let status = if error
+                .source()
+                .is_some_and(<dyn Error>::is::<http_body_util::LengthLimitError>)
+            {
+                StatusCode::PAYLOAD_TOO_LARGE
+            } else {
+                StatusCode::BAD_REQUEST
+            };
+            return (status, "request rejected\n").into_response();
+        }
     };
     next.run(Request::from_parts(parts, Body::from(bytes)))
         .await
