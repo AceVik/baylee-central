@@ -1,6 +1,26 @@
 $ErrorActionPreference = 'Stop'
+# Git environment variables can override an explicit repository path. Reject
+# ambient routing before invoking Git, downloading tools or running fixtures.
+$routingKeys = @(
+    'GIT_DIR', 'GIT_WORK_TREE', 'GIT_COMMON_DIR', 'GIT_INDEX_FILE',
+    'GIT_OBJECT_DIRECTORY', 'GIT_ALTERNATE_OBJECT_DIRECTORIES', 'GIT_SHALLOW_FILE',
+    'GIT_REPLACE_REF_BASE', 'GIT_NAMESPACE', 'GIT_REFERENCE_BACKEND'
+)
+foreach ($entry in Get-ChildItem Env:) {
+    if ($entry.Name -in $routingKeys) {
+        throw 'Secret history scan rejects overridden Git repository scope'
+    }
+}
 Push-Location (Split-Path $PSScriptRoot)
 try {
+    $actualRoot = & git rev-parse --show-toplevel
+    if ($LASTEXITCODE -ne 0) { throw 'Secret history repository identity could not be verified' }
+    $comparison = if ($IsWindows) { [StringComparison]::OrdinalIgnoreCase } else { [StringComparison]::Ordinal }
+    if (-not [string]::Equals([IO.Path]::GetFullPath($actualRoot), [IO.Path]::GetFullPath((Get-Location).Path), $comparison)) {
+        throw 'Secret history scan resolved a different repository'
+    }
+    $shallow = & git rev-parse --is-shallow-repository
+    if ($LASTEXITCODE -ne 0 -or $shallow -ne 'false') { throw 'Secret history scan requires full Git history' }
     $version = '8.30.1'
     $toolPath = Join-Path (Get-Location) 'target/gitleaks'
     [IO.Directory]::CreateDirectory($toolPath) | Out-Null
@@ -25,11 +45,32 @@ try {
         & tar -xzf $archive -C $toolPath
         if ($LASTEXITCODE -ne 0) { throw 'Secret scanner extraction failed' }
     }
+    # The Linux job also exercises two distinct environment names that differ
+    # only by case. Windows has a case-insensitive environment and uses one.
+    $canaryName = 'GIT_CENTRAL_SCANNER_' + [IO.Path]::GetRandomFileName().Replace('.', '').ToUpperInvariant()
+    $canaryNames = @($canaryName)
+    if (-not $IsWindows) { $canaryNames += $canaryName.ToLowerInvariant() }
+    foreach ($name in $canaryNames) {
+        if ($null -ne [Environment]::GetEnvironmentVariable($name)) { throw 'Scanner environment canary collision' }
+    }
+    try {
+        for ($index = 0; $index -lt $canaryNames.Count; $index++) {
+            [Environment]::SetEnvironmentVariable($canaryNames[$index], "synthetic-$index")
+        }
+        & $PSScriptRoot/test-secret-scanner.ps1 -Binary $binary
+        for ($index = 0; $index -lt $canaryNames.Count; $index++) {
+            if ([Environment]::GetEnvironmentVariable($canaryNames[$index]) -cne "synthetic-$index") {
+                throw 'Scanner fixture did not restore the caller environment exactly'
+            }
+        }
+    } finally {
+        foreach ($name in $canaryNames) {
+            [Environment]::SetEnvironmentVariable($name, [NullString]::Value)
+        }
+    }
     & $binary dir . --config .gitleaks.toml --redact --no-banner
     if ($LASTEXITCODE -ne 0) { throw 'Secret scan failed' }
-    $shallow = & git rev-parse --is-shallow-repository
-    if ($LASTEXITCODE -ne 0 -or $shallow -ne 'false') { throw 'Secret history scan requires full Git history' }
-    & $binary git . --log-opts=--all --config .gitleaks.toml --redact --no-banner
+    & $binary git . --log-opts=--all --config .gitleaks-history.toml --redact --no-banner
     if ($LASTEXITCODE -ne 0) { throw 'Secret history scan failed' }
 } finally { Pop-Location }
 exit 0

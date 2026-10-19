@@ -1,0 +1,4 @@
+# History has no working-tree path exclusions: forced commits and later deletions
+# of local metadata or build outputs must still be scanned.
+[extend]
+useDefault = true

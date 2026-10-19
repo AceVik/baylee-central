@@ -2,7 +2,7 @@
 useDefault = true
 
 [[allowlists]]
-description = "Generated local build outputs and machine-specific metadata; not release source"
+description = "Working tree only: local outputs and machine metadata; Git history uses no path exclusions"
 paths = [
   '''(^|/)target/''',
   '''(^|/)\.git/''',
