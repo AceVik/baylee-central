@@ -4,6 +4,23 @@
 
 ## Implemented foundation
 
+Native-login integration is in progress (2026-10-19): central-api now defines
+the fixed live/dev endpoint policy and wire messages; central-client provides
+transport-independent OPAQUE login and authenticated encrypted-document restore;
+central-identity composes bounded one-use challenges with PostgreSQL accounts,
+sessions, enrollment and gateway tickets. An optional HTTP library route serves
+this protocol. The existing CLI still launches the health-only foundation.
+The Baylee UI, actual legacy gateway bridge, complete data export/cutover and
+production deployment are not yet connected. This is not a completed migration.
+
+New local evidence: real HTTP + PostgreSQL 18.6 + client SDK covers enrollment,
+second-device restore, wrong passwords, consumed failed proofs, wrong gateway
+audiences, replay, session revocation, concurrent writes, lost commit responses
+and corrupt ciphertext. The isolated PostgreSQL script runs both the prior
+database suite and this new end-to-end suite and verifies owned-resource cleanup.
+The full local format/policy/Clippy/test/doc/release suite passed this milestone.
+The native schema is append-only migration 000002; no real data was migrated.
+
 - central-policy: dependency-free configuration and versioned training preferences.
 - central-http: local-only bounded HTTP library; liveness and deliberately negative
   readiness endpoints. No login, vault, admin or training endpoint pretends to work.

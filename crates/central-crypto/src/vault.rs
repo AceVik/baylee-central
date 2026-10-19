@@ -1,4 +1,7 @@
-//! Versioned master-key wrappers. No payload encryption or recovery flow yet.
+//! Versioned master-key wrappers and bounded encrypted personal objects.
+
+mod object;
+pub use object::{MAX_OBJECT_BYTES, ObjectContext};
 
 use crate::{Context, CryptoError};
 use chacha20poly1305::{

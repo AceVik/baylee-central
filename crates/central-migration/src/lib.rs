@@ -9,6 +9,7 @@
 #![forbid(unsafe_code)]
 
 mod m20261019_000001_pending_accounts;
+mod m20261019_000002_native_accounts;
 
 use sea_orm_migration::{
     MigrationTrait, MigratorTrait,
@@ -21,7 +22,10 @@ struct Migrator;
 #[sea_orm_migration::async_trait::async_trait]
 impl MigratorTrait for Migrator {
     fn migrations() -> Vec<Box<dyn MigrationTrait>> {
-        vec![Box::new(m20261019_000001_pending_accounts::Migration)]
+        vec![
+            Box::new(m20261019_000001_pending_accounts::Migration),
+            Box::new(m20261019_000002_native_accounts::Migration),
+        ]
     }
 }
 

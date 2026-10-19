@@ -1,0 +1,183 @@
+use super::{
+    AccountStore, Credential, Error, Identity, Token, identity, number, statement, uuid,
+    validate_document,
+};
+use sea_orm::{ConnectionTrait, TransactionTrait};
+
+impl AccountStore {
+    /// Issue after OPAQUE verification, conditional on the unchanged credential revision.
+    ///
+    /// # Errors
+    /// Rejects stale credentials, session capacity exhaustion or database failure.
+    pub async fn issue_session(
+        &self,
+        credential: &Credential,
+        token: &Token,
+    ) -> Result<Vec<u8>, Error> {
+        let transaction = self.db.begin().await.map_err(|_| Error::Unavailable)?;
+        let row = transaction.query_one_raw(statement(
+            "SELECT wrapped_master FROM central_identity.accounts WHERE id = $1 AND vault_epoch = $2
+             AND credential_revision = $3 AND credential IS NOT NULL FOR UPDATE",
+            vec![uuid(credential.identity.account).into(), number(credential.identity.epoch)?.into(), credential.revision.into()],
+        )).await.map_err(|_| Error::Unavailable)?.ok_or(Error::Rejected)?;
+        transaction.execute_raw(statement(
+            "DELETE FROM central_identity.sessions WHERE account_id = $1 AND expires_at <= pg_catalog.clock_timestamp()",
+            vec![uuid(credential.identity.account).into()],
+        )).await.map_err(|_| Error::Unavailable)?;
+        let inserted = transaction.execute_raw(statement(
+            "INSERT INTO central_identity.sessions (digest, account_id, credential_revision, created_at, expires_at)
+             SELECT $1, $2, $3, t, t + interval '30 minutes' FROM (SELECT pg_catalog.clock_timestamp() AS t) clock
+             WHERE (SELECT count(*) FROM central_identity.sessions WHERE account_id = $2) < 32",
+            vec![token.digest().to_vec().into(), uuid(credential.identity.account).into(), credential.revision.into()],
+        )).await.map_err(|_| Error::Unavailable)?;
+        if inserted.rows_affected() != 1 {
+            return Err(Error::Busy);
+        }
+        let wrapped = row
+            .try_get("", "wrapped_master")
+            .map_err(|_| Error::Unavailable)?;
+        transaction.commit().await.map_err(|_| Error::Unavailable)?;
+        Ok(wrapped)
+    }
+
+    /// Read only the authenticated account's ciphertext and current revision.
+    ///
+    /// # Errors
+    /// Expired/revoked sessions are rejected, never treated as empty accounts.
+    pub async fn document(&self, session: &Token) -> Result<(u64, Vec<u8>), Error> {
+        let row = self.db.query_one_raw(statement(
+            "SELECT a.document_revision, a.document FROM central_identity.accounts a
+             JOIN central_identity.sessions s ON s.account_id = a.id AND s.credential_revision = a.credential_revision
+             WHERE s.digest = $1 AND s.expires_at > pg_catalog.clock_timestamp()",
+            vec![session.digest().to_vec().into()],
+        )).await.map_err(|_| Error::Unavailable)?.ok_or(Error::Rejected)?;
+        let revision: i64 = row
+            .try_get("", "document_revision")
+            .map_err(|_| Error::Unavailable)?;
+        Ok((
+            u64::try_from(revision).map_err(|_| Error::Unavailable)?,
+            row.try_get("", "document")
+                .map_err(|_| Error::Unavailable)?,
+        ))
+    }
+
+    /// Store ciphertext with a compare-and-swap; the caller cannot supply a target account.
+    ///
+    /// # Errors
+    /// Rejects invalid sessions, malformed size, stale revision or unavailable storage.
+    pub async fn write_document(
+        &self,
+        session: &Token,
+        expected: u64,
+        document: &[u8],
+    ) -> Result<(), Error> {
+        validate_document(document)?;
+        let expected = number(expected)?;
+        if expected < 1 || expected == i64::MAX {
+            return Err(Error::Rejected);
+        }
+        let result = self.db.execute_raw(statement(
+            "UPDATE central_identity.accounts a SET document = $2, document_revision = document_revision + 1
+             FROM central_identity.sessions s WHERE s.account_id = a.id AND s.credential_revision = a.credential_revision
+             AND s.digest = $1 AND s.expires_at > pg_catalog.clock_timestamp() AND a.document_revision = $3",
+            vec![session.digest().to_vec().into(), document.to_vec().into(), expected.into()],
+        )).await.map_err(|_| Error::Unavailable)?;
+        if result.rows_affected() != 1 {
+            return Err(Error::Conflict);
+        }
+        Ok(())
+    }
+
+    /// Record successful authenticated restore of the currently stored revision.
+    ///
+    /// # Errors
+    /// Rejects invalid sessions, a changed revision or database failure.
+    pub async fn confirm_restore(&self, session: &Token, revision: u64) -> Result<(), Error> {
+        let result = self.db.execute_raw(statement(
+            "UPDATE central_identity.accounts a SET restored = true FROM central_identity.sessions s
+             WHERE s.account_id = a.id AND s.credential_revision = a.credential_revision AND s.digest = $1
+             AND s.expires_at > pg_catalog.clock_timestamp() AND a.document_revision = $2",
+            vec![session.digest().to_vec().into(), number(revision)?.into()],
+        )).await.map_err(|_| Error::Unavailable)?;
+        if result.rows_affected() != 1 {
+            return Err(Error::Conflict);
+        }
+        Ok(())
+    }
+
+    /// Issue one short-lived capability for an already-authorized gateway audience.
+    ///
+    /// # Errors
+    /// Rejects unconfirmed migration, expired/revoked sessions and ticket capacity exhaustion.
+    pub async fn gateway_ticket(
+        &self,
+        session: &Token,
+        audience: &str,
+        ticket: &Token,
+    ) -> Result<(), Error> {
+        let transaction = self.db.begin().await.map_err(|_| Error::Unavailable)?;
+        let valid = transaction.query_one_raw(statement(
+            "SELECT a.id FROM central_identity.accounts a JOIN central_identity.sessions s
+             ON s.account_id = a.id AND s.credential_revision = a.credential_revision WHERE s.digest = $1
+             AND s.expires_at > pg_catalog.clock_timestamp() AND a.restored FOR UPDATE OF s",
+            vec![session.digest().to_vec().into()],
+        )).await.map_err(|_| Error::Unavailable)?.is_some();
+        if !valid {
+            return Err(Error::Rejected);
+        }
+        transaction.execute_raw(statement(
+            "DELETE FROM central_identity.gateway_tickets WHERE session_digest = $1 AND expires_at <= pg_catalog.clock_timestamp()",
+            vec![session.digest().to_vec().into()],
+        )).await.map_err(|_| Error::Unavailable)?;
+        let issued = transaction.execute_raw(statement(
+            "INSERT INTO central_identity.gateway_tickets (digest, session_digest, audience, created_at, expires_at)
+             SELECT $1, $2, $3, t, t + interval '30 seconds' FROM (SELECT pg_catalog.clock_timestamp() AS t) clock
+             WHERE (SELECT count(*) FROM central_identity.gateway_tickets WHERE session_digest = $2) < 8",
+            vec![ticket.digest().to_vec().into(), session.digest().to_vec().into(), audience.into()],
+        )).await.map_err(|_| Error::Unavailable)?;
+        if issued.rows_affected() != 1 {
+            return Err(Error::Busy);
+        }
+        transaction.commit().await.map_err(|_| Error::Unavailable)
+    }
+
+    /// Redeem once for the bridge's configured audience, with fresh session/revision checks.
+    ///
+    /// # Errors
+    /// Rejects expiry, replay, wrong audience, revocation or storage failure.
+    pub async fn redeem_gateway(
+        &self,
+        ticket: &Token,
+        audience: &str,
+    ) -> Result<(Identity, String), Error> {
+        let row = self.db.query_one_raw(statement(
+            "WITH spent AS (DELETE FROM central_identity.gateway_tickets WHERE digest = $1 AND audience = $2
+             AND expires_at > pg_catalog.clock_timestamp() RETURNING session_digest)
+             SELECT a.id, a.vault_epoch, a.legacy_id FROM spent
+             JOIN central_identity.sessions s ON s.digest = spent.session_digest
+             JOIN central_identity.accounts a ON a.id = s.account_id AND a.credential_revision = s.credential_revision
+             WHERE s.expires_at > pg_catalog.clock_timestamp() AND a.restored",
+            vec![ticket.digest().to_vec().into(), audience.into()],
+        )).await.map_err(|_| Error::Unavailable)?.ok_or(Error::Rejected)?;
+        Ok((
+            identity(&row)?,
+            row.try_get("", "legacy_id")
+                .map_err(|_| Error::Unavailable)?,
+        ))
+    }
+
+    /// Revoke the central session and its outstanding gateway tickets; idempotent after expiry.
+    ///
+    /// # Errors
+    /// Reports unavailable storage; does not claim success until the deletion commits.
+    pub async fn logout(&self, session: &Token) -> Result<(), Error> {
+        self.db
+            .execute_raw(statement(
+                "DELETE FROM central_identity.sessions WHERE digest = $1",
+                vec![session.digest().to_vec().into()],
+            ))
+            .await
+            .map_err(|_| Error::Unavailable)?;
+        Ok(())
+    }
+}

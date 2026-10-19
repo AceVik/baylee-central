@@ -44,6 +44,10 @@ impl PendingAccount {
 pub struct PendingAccountStore(DatabaseConnection);
 
 impl PendingAccountStore {
+    pub(crate) fn into_connection(self) -> DatabaseConnection {
+        self.0
+    }
+
     /// Connect using a non-owner, non-superuser, non-BYPASSRLS runtime role.
     ///
     /// # Errors

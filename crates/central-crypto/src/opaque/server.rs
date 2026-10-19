@@ -7,9 +7,9 @@ use opaque_ke::{
     ServerLogin, ServerLoginParameters, ServerRegistration, ServerSetup,
 };
 use rand::rngs::OsRng;
-use zeroize::Zeroize;
+use zeroize::{Zeroize, Zeroizing};
 
-/// OPAQUE deployment secrets. No Debug/Clone/serialization API in this spike.
+/// OPAQUE deployment secrets. Explicit persistence returns a zeroizing buffer.
 pub struct ServerKeys(ServerSetup<Suite>);
 
 /// Stored OPAQUE credential record, not a plaintext password or vault key.
@@ -28,6 +28,37 @@ impl ServerKeys {
     #[must_use]
     pub fn generate() -> Self {
         Self(ServerSetup::new(&mut OsRng))
+    }
+
+    /// Serialize deployment secrets for operator-managed secret storage, never an HTTP response.
+    /// Losing or replacing these bytes prevents existing accounts from authenticating.
+    #[must_use]
+    pub fn to_secret_bytes(&self) -> Zeroizing<Vec<u8>> {
+        let mut encoded = Zeroizing::new(self.0.serialize());
+        let mut wire = Zeroizing::new(Vec::with_capacity(encoded.len() + 1));
+        wire.push(1);
+        wire.extend_from_slice(&encoded);
+        encoded.zeroize();
+        wire
+    }
+
+    /// Restore exactly one versioned deployment setup. Never auto-regenerate after failure.
+    ///
+    /// # Errors
+    /// Rejects invalid version, noncanonical size or invalid cryptographic setup.
+    pub fn from_secret_bytes(wire: &[u8]) -> Result<Self, CryptoError> {
+        let (version, body) = wire.split_first().ok_or(CryptoError::Invalid)?;
+        if *version != 1 {
+            return Err(CryptoError::Invalid);
+        }
+        // Pinned Ristretto255/SHA-512 setup: 64-byte OPRF seed, private key and dummy public key (32 each).
+        // Upstream does not export ServerSetupLen; the persistence regression locks this size.
+        if body.len() != 128 {
+            return Err(CryptoError::Invalid);
+        }
+        ServerSetup::deserialize(body)
+            .map(Self)
+            .map_err(|_| CryptoError::Invalid)
     }
 
     /// Return an enrollment response. Caller must own a valid registration ticket.

@@ -5,6 +5,7 @@
 #![forbid(unsafe_code)]
 
 mod boundary;
+mod native;
 mod server;
 
 pub use server::DevelopmentServer;

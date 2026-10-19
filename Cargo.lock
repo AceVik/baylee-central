@@ -482,6 +482,34 @@ dependencies = [
 ]
 
 [[package]]
+name = "central-api"
+version = "0.1.0"
+dependencies = [
+ "getrandom 0.4.3",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "url",
+ "zeroize",
+]
+
+[[package]]
+name = "central-client"
+version = "0.1.0"
+dependencies = [
+ "central-api",
+ "central-crypto",
+ "central-http",
+ "central-identity",
+ "central-migration",
+ "central-policy",
+ "central-postgres",
+ "sea-orm",
+ "tokio",
+ "zeroize",
+]
+
+[[package]]
 name = "central-crypto"
 version = "0.1.0"
 dependencies = [
@@ -500,6 +528,8 @@ name = "central-http"
 version = "0.1.0"
 dependencies = [
  "axum",
+ "central-api",
+ "central-identity",
  "central-policy",
  "http-body-util",
  "hyper",
@@ -507,6 +537,17 @@ dependencies = [
  "tokio",
  "tower",
  "tower-http",
+]
+
+[[package]]
+name = "central-identity"
+version = "0.1.0"
+dependencies = [
+ "central-api",
+ "central-crypto",
+ "central-postgres",
+ "subtle",
+ "tokio",
 ]
 
 [[package]]
@@ -524,6 +565,8 @@ version = "0.1.0"
 name = "central-postgres"
 version = "0.1.0"
 dependencies = [
+ "central-api",
+ "central-crypto",
  "central-migration",
  "sea-orm",
  "secrecy",

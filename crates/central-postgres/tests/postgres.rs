@@ -121,6 +121,7 @@ async fn migrations_ids_roles_rollback_and_locking() {
             .contains("uuidv7()")
     );
 
+    support::accounts(&operator).await;
     store.close().await.unwrap();
     runtime.close().await.unwrap();
     operator.close().await.unwrap();
@@ -156,7 +157,7 @@ async fn verify_migrations(operator: &sea_orm::DatabaseConnection) {
             "SELECT count(*)::bigint AS value FROM seaql_migrations"
         )
         .await,
-        1
+        2
     );
 
     operator.execute_unprepared(

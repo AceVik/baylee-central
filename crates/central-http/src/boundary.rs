@@ -18,11 +18,16 @@ struct Boundary {
 }
 
 pub(crate) fn router(authority: HeaderValue, request_bytes: usize) -> Router {
+    with_routes(authority, request_bytes, Router::new())
+}
+
+pub(crate) fn with_routes(authority: HeaderValue, request_bytes: usize, routes: Router) -> Router {
     let boundary = Arc::new(Boundary {
         authority,
         request_bytes,
     });
     Router::new()
+        .merge(routes)
         .route("/health/live", get(|| async { "alive\n" }))
         .route(
             "/health/ready",

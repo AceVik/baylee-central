@@ -3,7 +3,9 @@ use central_postgres::{PendingAccountStore, StoreError};
 use sea_orm::{ConnectionTrait, DatabaseConnection, TransactionTrait};
 use std::time::Duration;
 
+mod accounts;
 mod migration;
+pub(super) use accounts::run as accounts;
 pub(super) use migration::search_path as migration_search_path;
 
 pub(super) async fn privileges(operator: &DatabaseConnection, runtime: &DatabaseConnection) {

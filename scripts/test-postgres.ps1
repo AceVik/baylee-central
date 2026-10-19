@@ -62,6 +62,10 @@ CREATE ROLE central_runtime LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICAT
 CREATE ROLE central_inherited LOGIN NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS PASSWORD '$runtimeSecret';
 GRANT central_migrator TO central_inherited;
 CREATE DATABASE central_test OWNER central_migrator;
+CREATE DATABASE central_native_test OWNER central_migrator;
+\connect central_native_test
+REVOKE CREATE, TEMP ON DATABASE central_native_test FROM PUBLIC;
+REVOKE CREATE ON SCHEMA public FROM PUBLIC;
 \connect central_test
 REVOKE CREATE, TEMP ON DATABASE central_test FROM PUBLIC;
 REVOKE CREATE ON SCHEMA public FROM PUBLIC;
@@ -79,7 +83,7 @@ REVOKE CREATE ON SCHEMA public FROM PUBLIC;
     [void]$start.Environment.Remove('POSTGRES_PASSWORD')
     [void]$start.Environment.Remove('PGPASSWORD')
     [void]$start.Environment.Remove('DATABASE_URL')
-    foreach ($argument in @('test', '--locked', '-p', 'central-postgres', '--test', 'postgres', '--', '--ignored', '--test-threads=1')) {
+    foreach ($argument in @('test', '--locked', '-p', 'central-postgres', '-p', 'central-client', '--test', 'postgres', '--', '--ignored', '--test-threads=1')) {
         $start.ArgumentList.Add($argument)
     }
     $start.Environment['CENTRAL_TEST_FIXTURE'] = 'isolated-v1'
@@ -94,7 +98,7 @@ REVOKE CREATE ON SCHEMA public FROM PUBLIC;
     $errorText = $testErrors.GetAwaiter().GetResult()
     Write-Output $resultText
     if ($testProcess.ExitCode -ne 0) { Write-Output $errorText; throw 'PostgreSQL integration tests failed' }
-    if ($resultText -notmatch 'test result: ok\. 1 passed; 0 failed') { throw 'Expected database test did not run' }
+    if ([regex]::Matches($resultText, 'test result: ok\. 1 passed; 0 failed').Count -ne 2) { throw 'Expected database and native integration tests did not run' }
 } finally {
     $cleanupErrors = [Collections.Generic.List[string]]::new()
     try {

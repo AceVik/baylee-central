@@ -50,6 +50,50 @@ impl DevelopmentServer {
         let authority = HeaderValue::from_str(&self.address.to_string())
             .map_err(|_| io::Error::other("invalid local authority"))?;
         let app = super::boundary::router(authority, self.config.request_bytes().get());
+        self.run_router(app, shutdown).await
+    }
+
+    /// Serve the native account API through the same bounded loopback transport.
+    /// Live mode requires an external TLS reverse proxy preserving the canonical Host.
+    /// No forwarded headers confer identity or change credential destinations.
+    ///
+    /// # Errors
+    /// Rejects mismatched development endpoints, inadequate body capacity or listener failures.
+    pub async fn run_with_identity(
+        self,
+        endpoint: &central_api::Endpoint,
+        identity: std::sync::Arc<central_identity::IdentityService>,
+        shutdown: impl Future<Output = ()>,
+    ) -> io::Result<()> {
+        let authority = if endpoint.legacy_origin().is_some() {
+            HeaderValue::from_static("central.baylee.app")
+        } else {
+            if endpoint.origin() != format!("http://{}", self.address) {
+                return Err(io::Error::other(
+                    "development endpoint does not match listener",
+                ));
+            }
+            HeaderValue::from_str(&self.address.to_string())
+                .map_err(|_| io::Error::other("invalid authority"))?
+        };
+        if self.config.request_bytes().get() != central_api::MAX_WIRE_BYTES {
+            return Err(io::Error::other(
+                "native API requires its fixed body capacity",
+            ));
+        }
+        let app = super::boundary::with_routes(
+            authority,
+            self.config.request_bytes().get(),
+            super::native::router(identity),
+        );
+        self.run_router(app, shutdown).await
+    }
+
+    async fn run_router(
+        self,
+        app: axum::Router,
+        shutdown: impl Future<Output = ()>,
+    ) -> io::Result<()> {
         let mut connections = JoinSet::new();
         tokio::pin!(shutdown);
         loop {

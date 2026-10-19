@@ -11,7 +11,9 @@ description = "PostgreSQL 18 development adapter for Baylee Central"
 workspace = true
 
 [dependencies]
-sea-orm = { version = "=2.0.4", default-features = false, features = ["macros", "sqlx-postgres", "runtime-tokio-rustls", "with-uuid"] }
+central-api = { path = "../central-api", version = "=0.1.0" }
+central-crypto = { path = "../central-crypto", version = "=0.1.0", features = ["server"] }
+sea-orm = { version = "=2.0.4", default-features = false, features = ["macros", "sqlx-postgres", "runtime-tokio-rustls", "with-uuid", "with-chrono"] }
 url = "=2.5.8"
 secrecy = "=0.10.3"
 

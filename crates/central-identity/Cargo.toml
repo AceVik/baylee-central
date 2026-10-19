@@ -1,0 +1,19 @@
+[package]
+name = "central-identity"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+license.workspace = true
+description = "Bounded native authentication and migration orchestration"
+
+[lints]
+workspace = true
+
+[dependencies]
+central-api = { path = "../central-api", version = "=0.1.0" }
+central-crypto = { path = "../central-crypto", version = "=0.1.0", features = ["server"] }
+central-postgres = { path = "../central-postgres", version = "=0.1.0" }
+subtle = { version = "=2.6.1", default-features = false }
+tokio = { version = "=1.53.3", default-features = false, features = ["rt", "sync"] }
+

@@ -3,8 +3,10 @@
 //! Client/policy/crypto libraries do not depend on this server-side crate.
 #![forbid(unsafe_code)]
 
+mod accounts;
 mod connection;
 mod pending;
+pub use accounts::{AccountStore, Credential};
 
 pub use connection::{DevConfig, connect_dev, supports_version};
 pub use pending::{PendingAccount, PendingAccountStore};
