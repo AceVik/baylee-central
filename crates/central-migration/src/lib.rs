@@ -39,6 +39,7 @@ impl std::error::Error for MigrationError {}
 /// PostgreSQL 18+ is required. A failed attempt rolls back DDL and migration history.
 /// Destructive down/fresh/reset operations are not exposed by this entry point.
 /// History lives in the trusted `public` schema, independently of caller settings.
+/// A missing or inaccessible `public` schema is rejected instead of selecting TEMP.
 ///
 /// # Errors
 ///
@@ -63,6 +64,7 @@ pub async fn apply(db: &DatabaseConnection) -> Result<(), MigrationError> {
             .query_one_raw(Statement::from_string(
                 DbBackend::Postgres,
                 "SELECT pg_catalog.current_setting('server_version_num')::integer >= 180000
+             AND (pg_catalog.current_schema() IS NOT DISTINCT FROM 'public')
              AND pg_catalog.pg_try_advisory_xact_lock(1862384219, 1) AS allowed",
             ))
             .await?

@@ -1,4 +1,4 @@
-use super::scalar;
+use super::{config, scalar};
 use sea_orm::{ConnectionTrait, DatabaseConnection, TransactionTrait};
 use std::time::Duration;
 
@@ -9,18 +9,9 @@ pub(crate) async fn search_path(operator: &DatabaseConnection) {
     for _ in 0..3 {
         held.push(operator.begin().await.unwrap());
     }
-    operator
-        .execute_unprepared(
-            "CREATE SCHEMA migration_shadow;
-             CREATE TABLE migration_shadow.seaql_migrations (
-               version varchar PRIMARY KEY, applied_at bigint NOT NULL
-             );
-             INSERT INTO migration_shadow.seaql_migrations VALUES
-               ('m20261019_000001_pending_accounts', 0);
-             SET search_path = migration_shadow, public",
-        )
-        .await
-        .unwrap();
+    missing_public(operator).await;
+    inaccessible_public(operator).await;
+    shadow_histories(operator).await;
     central_migration::apply(operator).await.unwrap();
     assert_eq!(
         scalar(operator,
@@ -39,9 +30,7 @@ pub(crate) async fn search_path(operator: &DatabaseConnection) {
 
     operator
         .execute_unprepared(
-            "CREATE TEMP TABLE seaql_migrations (
-               version varchar PRIMARY KEY, applied_at bigint NOT NULL
-             );
+            "DELETE FROM pg_temp.seaql_migrations;
              INSERT INTO pg_temp.seaql_migrations VALUES ('unknown_shadow_version', 0);
              SET search_path = pg_temp, migration_shadow",
         )
@@ -155,4 +144,107 @@ async fn cancellation(operator: &DatabaseConnection) {
         transaction.rollback().await.unwrap();
     }
     central_migration::apply(operator).await.unwrap();
+}
+
+async fn shadow_histories(operator: &DatabaseConnection) {
+    // Both shadows exist before the real history has ever been installed.
+    operator
+        .execute_unprepared(
+            "CREATE SCHEMA migration_shadow;
+             CREATE TABLE migration_shadow.seaql_migrations (
+               version varchar PRIMARY KEY, applied_at bigint NOT NULL
+             );
+             INSERT INTO migration_shadow.seaql_migrations VALUES
+               ('m20261019_000001_pending_accounts', 0);
+             CREATE TEMP TABLE seaql_migrations (
+               version varchar PRIMARY KEY, applied_at bigint NOT NULL
+             );
+             INSERT INTO pg_temp.seaql_migrations VALUES
+               ('m20261019_000001_pending_accounts', 0);
+             SET search_path = migration_shadow, public",
+        )
+        .await
+        .unwrap();
+}
+
+async fn missing_public(operator: &DatabaseConnection) {
+    // PostgreSQL silently skips nonexistent schemas in search_path. Without a
+    // trusted-schema gate, SeaORM's CREATE IF NOT EXISTS can accept this TEMP
+    // history and report success while installing none of the real schema.
+    operator
+        .execute_unprepared(
+            "ALTER SCHEMA public RENAME TO migration_public_saved;
+             CREATE TEMP TABLE seaql_migrations (
+               version varchar PRIMARY KEY, applied_at bigint NOT NULL
+             );
+             INSERT INTO pg_temp.seaql_migrations VALUES
+               ('m20261019_000001_pending_accounts', 0)",
+        )
+        .await
+        .unwrap();
+    let result = central_migration::apply(operator).await;
+    operator
+        .execute_unprepared(
+            "ALTER SCHEMA migration_public_saved RENAME TO public;
+             DROP TABLE pg_temp.seaql_migrations",
+        )
+        .await
+        .unwrap();
+    assert!(
+        result.is_err(),
+        "missing public must not select TEMP history"
+    );
+}
+
+async fn inaccessible_public(operator: &DatabaseConnection) {
+    operator
+        .execute_unprepared(
+            "GRANT TEMP ON DATABASE central_test TO central_runtime;
+             REVOKE USAGE ON SCHEMA public FROM PUBLIC",
+        )
+        .await
+        .unwrap();
+    let runtime =
+        central_postgres::connect_dev(config("central_runtime", "CENTRAL_TEST_RUNTIME_PASSWORD"))
+            .await
+            .unwrap();
+    let mut held = Vec::new();
+    for _ in 0..3 {
+        held.push(runtime.begin().await.unwrap());
+    }
+    runtime
+        .execute_unprepared(
+            "CREATE TEMP TABLE seaql_migrations (
+               version varchar PRIMARY KEY, applied_at bigint NOT NULL
+             );
+             INSERT INTO pg_temp.seaql_migrations VALUES
+               ('m20261019_000001_pending_accounts', 0);
+             SET search_path = public, pg_temp",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        scalar(
+            &runtime,
+            "SELECT (pg_catalog.current_schema() LIKE 'pg_temp_%')::integer::bigint AS value"
+        )
+        .await,
+        1
+    );
+    let result = central_migration::apply(&runtime).await;
+    for transaction in held {
+        transaction.rollback().await.unwrap();
+    }
+    runtime.close().await.unwrap();
+    operator
+        .execute_unprepared(
+            "GRANT USAGE ON SCHEMA public TO PUBLIC;
+             REVOKE TEMP ON DATABASE central_test FROM central_runtime",
+        )
+        .await
+        .unwrap();
+    assert!(
+        result.is_err(),
+        "inaccessible public must not select TEMP history"
+    );
 }

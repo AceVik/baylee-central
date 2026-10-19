@@ -24,6 +24,7 @@ Client, policy and crypto crates remain independent of database implementation.
   History is fixed to the trusted public schema with a transaction-local search
   path and catalog-qualified gate functions. The raw SeaORM migrator is private;
   consumers cannot call its destructive or unguarded convenience methods.
+  Missing/inaccessible public is an error, even if a temporary history table exists.
 - The first migration creates central_identity.pending_accounts. PostgreSQL
   generates the primary UUID with uuidv7(); UUIDv7/variant and expiry constraints
   also apply to direct SQL. Reservations expire after 15 minutes.
@@ -70,7 +71,8 @@ the cancelled connection's backend PID, checks rolled-back data/session settings
 and verifies advisory-lock release from a separate connection. Privilege tests
 include column UPDATE/REFERENCES, TEMP/CREATE, grant delegation and missing SELECT.
 Migration checks also cover forged history in an alternate schema, temporary-table
-shadowing, restored caller settings after success/failure and an actual abort
+shadowing before first installation, missing/inaccessible public, restored caller
+settings after success/failure and an actual abort
 while migration history is locked. The aborted migration's backend is reused and
 its advisory lock must be available from a distinct connection.
 The fixture does not prove production TLS, reset/recovery, credential atomicity,
