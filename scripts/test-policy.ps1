@@ -106,6 +106,38 @@ unreviewed-helper = { path = "../../../unreviewed-helper" }
     # Resolve the local-only graph so --locked itself is not the rejection.
     Update-FixtureLock
     Assert-PolicyRejects 'Local dependency outside reviewed workspace: unreviewed-helper'
+    if ($IsLinux) {
+        # Linux supports two distinct package paths whose IDs differ only by
+        # casing. PowerShell's default membership operator conflates those IDs.
+        # macOS/Windows checkouts commonly use case-insensitive filesystems.
+        $caseHelper = Join-Path $fixtureRoot 'REVIEWED/crates/fixture'
+        [IO.Directory]::CreateDirectory((Join-Path $caseHelper 'src')) | Out-Null
+        [IO.File]::WriteAllText((Join-Path $caseHelper 'Cargo.toml'), @'
+[package]
+name = "POLICY-FIXTURE"
+version = "0.1.0"
+edition = "2024"
+'@)
+        [IO.File]::WriteAllText((Join-Path $caseHelper 'src/lib.rs'), 'pub fn unreviewed() {}')
+        [IO.File]::WriteAllText($manifestPath, $manifest + [Environment]::NewLine + @'
+[dependencies]
+unreviewed-case-helper = { package = "POLICY-FIXTURE", path = "../../../REVIEWED/crates/fixture" }
+'@)
+        Update-FixtureLock
+        Push-Location $reviewed
+        try {
+            $caseMetadata = & cargo metadata --offline --locked --format-version 1
+            if ($LASTEXITCODE -ne 0) { throw 'Synthetic case-collision graph failed' }
+        } finally { Pop-Location }
+        $caseGraph = $caseMetadata | ConvertFrom-Json
+        $reviewedId = $caseGraph.workspace_members[0]
+        $foreignId = ($caseGraph.packages | Where-Object { $_.name -ceq 'POLICY-FIXTURE' }).id
+        if ($foreignId -ceq $reviewedId -or
+            -not [string]::Equals($foreignId, $reviewedId, [StringComparison]::OrdinalIgnoreCase)) {
+            throw 'Synthetic package IDs did not exercise a case collision'
+        }
+        Assert-PolicyRejects 'Local dependency outside reviewed workspace: POLICY-FIXTURE'
+    }
     Write-Output 'Policy regressions passed: root/hidden/native sources, build scripts, excluded targets, links, exact feature names and local dependencies.'
 } finally {
     $tempRoot = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd([IO.Path]::DirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar

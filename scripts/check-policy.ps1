@@ -83,7 +83,7 @@ try {
     # Path dependencies are first-party code too. Never let a helper outside the
     # checked workspace bypass lint/root/native-source checks or the inventory.
     foreach ($package in $graph.packages | Where-Object { -not $_.source }) {
-        if ($package.id -notin $graph.workspace_members) {
+        if ($package.id -cnotin $graph.workspace_members) {
             throw "Local dependency outside reviewed workspace: $($package.name)"
         }
     }
