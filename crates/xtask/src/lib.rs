@@ -3,8 +3,8 @@
 //! and development smoke fixtures, and the secret scan.
 //!
 //! Every task fails closed with a fixed sentence and never prints a secret it
-//! handled. The PowerShell scripts under `scripts/` state the same checks and
-//! remain for Windows development; their messages are kept identical.
+//! handled. They replaced the PowerShell scripts under `scripts/` (removed
+//! 2026-10-20) with the same checks and the same messages.
 #![forbid(unsafe_code)]
 
 pub mod cli;

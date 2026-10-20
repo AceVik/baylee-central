@@ -1,5 +1,5 @@
-//! The repository's code policy (AGENTS.md, "Safety and dependencies"), the
-//! same rules and the same messages as `scripts/check-policy.ps1`:
+//! The repository's code policy (AGENTS.md, "Safety and dependencies"), with
+//! the rules and messages the former `scripts/check-policy.ps1` had:
 //!
 //! - the workspace forbids `unsafe`; every member inherits the workspace
 //!   lints, is not published, lives in the reviewed tree and outside the
@@ -32,7 +32,7 @@ pub const PASSED: &str = "Policy checks passed (first-party code and approved pa
 /// compiler rejects unsafe code under the forbid lint.
 ///
 /// # Errors
-/// The first rule the tree breaks, as `scripts/check-policy.ps1` words it.
+/// The first rule the tree breaks, in that rule's fixed sentence.
 pub fn check(root: &Path, compiler_probe: bool) -> Result<()> {
     let members = metadata::read(root, false)?;
     let manifest = fs::read_to_string(root.join("Cargo.toml"))

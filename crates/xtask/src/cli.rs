@@ -7,24 +7,24 @@ use crate::{gate, policy, postgres, secrets, smoke, workspace};
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Task {
     /// fmt, the policy with its compiler probe, clippy, the tests, the doc
-    /// tests and the release build (`scripts/test.ps1`).
+    /// tests and the release build.
     Gate,
-    /// The code policy (`scripts/check-policy.ps1`).
+    /// The code policy.
     Policy {
         /// Also check that rustc rejects unsafe code under the forbid lint.
         compiler_probe: bool,
     },
-    /// The `PostgreSQL` integration fixture (`scripts/test-postgres.ps1`).
+    /// The `PostgreSQL` integration fixture.
     Postgres {
         /// Fail on purpose once the fixture is up, to prove its cleanup.
         exercise_failure: bool,
     },
-    /// The development listener smoke test (`scripts/smoke-dev.ps1`).
+    /// The development listener smoke test.
     Smoke {
         /// Fail on purpose once the listener is up, to prove its cleanup.
         exercise_failure: bool,
     },
-    /// The secret scan of the tree and its history (`scripts/scan-secrets.ps1`).
+    /// The secret scan of the tree and its history.
     Secrets,
 }
 

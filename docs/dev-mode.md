@@ -35,12 +35,11 @@ Public Rust APIs are documented; no pre-1.0 stability guarantee yet. Library use
 must preserve trusted input and transactional persistence requirements. No release
 to crates.io until license/API/security gates pass.
 
-Use `cargo xtask gate` and `cargo xtask smoke` on any platform, or
-scripts/test.ps1 and scripts/smoke-dev.ps1 under PowerShell ([xtask](xtask.md)
-states the same checks with the same messages). Smoke tests launch their own server
+Use `cargo xtask gate` and `cargo xtask smoke` on any platform
+([xtask](xtask.md)). Smoke tests launch their own server
 on an ephemeral loopback port and always stop that exact process, checking port
 closure. Agent-started interactive clients must likewise be closed after testing.
-Use `cargo xtask smoke --exercise-failure` (or scripts/smoke-dev.ps1 -ExerciseFailure) to deliberately fail immediately after
+Use `cargo xtask smoke --exercise-failure` to deliberately fail immediately after
 startup and verify the same cleanup path. It must report Synthetic development
 failure only after cleanup; a cleanup error is a failure, not an expected result.
 CI exercises both paths on every supported native platform. Cleanup probes have
@@ -58,5 +57,5 @@ integration remains a platform adapter; no desktop keychain is implemented yet.
 central-crypto is a reusable native-client library with an optional server feature,
 no HTTP/database dependency and no production integration yet. See crypto-protocol.md.
 central-postgres and central-migration use PostgreSQL 18+ and SeaORM 2 with explicit migrations;
-see database-development.md and scripts/test-postgres.ps1 for the disposable fixture;
+see database-development.md and `cargo xtask postgres` for the disposable fixture;
 client/policy libraries must not import the database implementation.

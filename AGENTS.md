@@ -57,9 +57,9 @@ performance policy. Do not import its permission to write unsafe or assembly.
   INSERT ... RETURNING; reserve account IDs before cryptographic enrollment.
   Explicit offline-client UUIDv7 exceptions are documented in docs/postgresql.md.
   Security tokens use independent randomness; IDs are not authorization/secrets.
-- Run scripts/test.ps1, scripts/test-postgres.ps1, scripts/smoke-dev.ps1,
-  scripts/scan-secrets.ps1,
-  cargo audit --deny warnings and cargo deny check. Pin checker versions as in CI.
+- Run `cargo xtask gate`, `cargo xtask postgres`, `cargo xtask smoke` and
+  `cargo xtask secrets` (docs/xtask.md), plus cargo audit --deny warnings and
+  cargo deny check. Pin checker versions as in CI.
 - Keep protocol specs, migrations, threat model and operator runbooks in sync.
   Do not assert anonymity, audit completion or legal compliance without evidence.
 - External release, production migration and processing human training replays

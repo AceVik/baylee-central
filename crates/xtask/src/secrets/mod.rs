@@ -1,4 +1,4 @@
-//! The secret scan (`scripts/scan-secrets.ps1`): the working tree and the
+//! The secret scan: the working tree and the
 //! full history of this repository, with a pinned gitleaks (`gitleaks.rs`)
 //! whose configuration is first proved on synthetic credentials
 //! (`regression.rs`). Git variables that would point Git at another

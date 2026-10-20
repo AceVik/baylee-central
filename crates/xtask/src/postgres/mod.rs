@@ -1,4 +1,4 @@
-//! The `PostgreSQL` integration fixture (`scripts/test-postgres.ps1`): a
+//! The `PostgreSQL` integration fixture: a
 //! pinned `PostgreSQL` 18 in an owned, read-only container on a loopback port,
 //! serving TLS from a synthetic authority (`tls.rs`), with migration and
 //! runtime roles under random passwords (`container.rs`); then the ignored
