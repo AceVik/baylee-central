@@ -48,6 +48,7 @@ pub(super) fn check(root: &Path) -> Result<()> {
             }
         }
     }
+    // every link is refused before any file is read, as the PowerShell walk does
     for (path, name) in files {
         if rules::is_native(&name) {
             return Err(Fail::new(format!(

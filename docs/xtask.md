@@ -60,6 +60,13 @@ and the gate run them; `scripts/test-policy.ps1` is their PowerShell twin.
   PowerShell script's; the others are from the release's checksum file, whose
   entries for those two match the pinned ones.
 
+## Tools it calls
+
+`cargo`, `rustc`, `git`, and for the tasks that need them `docker` and
+`openssl` (postgres), `curl` and `tar` (secrets: Windows 10 1803 and later
+ship both, as do macOS and the CI runners). A missing tool fails its step
+with that step's sentence.
+
 ## Dependencies
 
 Only crates the inventory already approves, with their approved features:
