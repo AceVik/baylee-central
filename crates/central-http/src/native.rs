@@ -29,6 +29,7 @@ async fn call(
                 Error::Unavailable => StatusCode::SERVICE_UNAVAILABLE,
                 Error::Conflict => StatusCode::CONFLICT,
                 Error::Busy => StatusCode::TOO_MANY_REQUESTS,
+                Error::TermsRequired => StatusCode::FORBIDDEN,
             };
             // Fixed public vocabulary; no parser/database/crypto diagnostics reach the peer.
             (status, "account request rejected\n").into_response()

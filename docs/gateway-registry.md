@@ -117,3 +117,12 @@ audience/purpose/replay isolation, absence of foreign legacy IDs, and central
 single-session replacement including concurrent logins. No production accounts
 or credentials are used. CI must also validate the shared Rust implementation
 on Windows, Linux and macOS before release.
+
+## Terms of use
+
+A gateway publishes its terms with `PublishGatewayTerms` under its redemption
+credential (the bridge for the official origin), and checks its players with
+`GatewayAuthorize`, which is `GatewaySession` plus their acceptance of
+Central's and its own current terms. Published versions are immutable. See
+[terms](terms.md).
+

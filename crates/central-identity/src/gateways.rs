@@ -2,7 +2,7 @@ use super::{Error, IdentityService, Request, Response, Token};
 use central_api::wire::TicketPurpose;
 
 impl IdentityService {
-    async fn gateway_authority(
+    pub(super) async fn gateway_authority(
         &self,
         bearer: Option<&Token>,
     ) -> Result<(Option<[u8; 16]>, String), Error> {

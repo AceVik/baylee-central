@@ -16,6 +16,7 @@ mod migration;
 mod objects;
 mod revocation_race;
 mod single_session;
+mod terms;
 
 fn context(identity: Identity) -> Context {
     Context::new(
@@ -42,7 +43,9 @@ pub(crate) async fn run(operator: &DatabaseConnection) {
         GRANT SELECT, INSERT ON central_identity.migration_archives TO central_runtime;
         GRANT SELECT, INSERT, UPDATE ON central_identity.gateways TO central_runtime;
         GRANT SELECT ON central_identity.gateway_approvals TO central_runtime;
-        GRANT SELECT, INSERT, DELETE ON central_identity.gateway_admins, central_identity.gateway_leases TO central_runtime",
+        GRANT SELECT, INSERT, DELETE ON central_identity.gateway_admins, central_identity.gateway_leases TO central_runtime;
+        GRANT SELECT, INSERT ON central_identity.gateway_terms, central_identity.gateway_terms_texts,
+        central_identity.terms_acceptances TO central_runtime",
         )
         .await
         .unwrap();
@@ -90,6 +93,7 @@ pub(crate) async fn run(operator: &DatabaseConnection) {
     revocation_race::run(&store, operator, &keys).await;
     objects::run(&store, operator, &keys).await;
     migration::run(&store, operator, &keys).await;
+    terms::run(&store, operator, &keys).await;
     store.close().await.unwrap();
 }
 

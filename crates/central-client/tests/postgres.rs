@@ -51,7 +51,8 @@ fn real_native_login_restore_migration_and_adversarial_paths() {
             &bridge,
             "http://127.0.0.1:28766",
         )
-        .unwrap(),
+        .unwrap()
+        .with_terms(Some(support::terms::central_document())),
     );
     let (stop, stopped) = oneshot::channel();
     let serving_endpoint = endpoint.clone();
@@ -107,7 +108,9 @@ async fn prepare() -> DatabaseConnection {
         GRANT SELECT, INSERT ON central_identity.migration_archives TO central_runtime;
         GRANT SELECT, INSERT, UPDATE ON central_identity.gateways TO central_runtime;
         GRANT SELECT ON central_identity.gateway_approvals TO central_runtime;
-        GRANT SELECT, INSERT, DELETE ON central_identity.gateway_admins, central_identity.gateway_leases TO central_runtime").await.unwrap();
+        GRANT SELECT, INSERT, DELETE ON central_identity.gateway_admins, central_identity.gateway_leases TO central_runtime;
+        GRANT SELECT, INSERT ON central_identity.gateway_terms, central_identity.gateway_terms_texts,
+        central_identity.terms_acceptances TO central_runtime").await.unwrap();
     db
 }
 
@@ -166,19 +169,8 @@ fn run(http: &Http, bridge: &Token, runtime: &Runtime, operator: &DatabaseConnec
             .is_err()
     );
     first.confirm_restored(http).unwrap();
-    let ticket = first
-        .gateway_ticket(http, "http://127.0.0.1:28766".into())
-        .unwrap();
-    let redeem = Request::RedeemGateway {
-        ticket,
-        purpose: TicketPurpose::Admit,
-    };
-    assert!(http.exchange(&redeem, None).is_err());
-    assert!(matches!(
-        http.exchange(&redeem, Some(bridge)).unwrap(),
-        Response::GatewayIdentity { .. }
-    ));
-    assert!(http.exchange(&redeem, Some(bridge)).is_err());
+    support::terms::central(http, &first, "http://127.0.0.1:28766");
+    official_admission(http, &first, bridge);
     assert!(
         first
             .gateway_ticket(http, "https://attacker.invalid".into())
@@ -193,6 +185,7 @@ fn run(http: &Http, bridge: &Token, runtime: &Runtime, operator: &DatabaseConnec
     )
     .unwrap();
     support::gateways::run(http, &first, runtime, operator);
+    support::terms::gateway(http, &first, bridge, "http://127.0.0.1:28766");
     assert!(first.migration_closed(http).unwrap());
     object_round_trip(http, identity, &first);
     // A different device restored the chunk and replaced this session.
@@ -212,6 +205,23 @@ fn run(http: &Http, bridge: &Token, runtime: &Runtime, operator: &DatabaseConnec
     );
     first.logout(http).unwrap();
     assert!(first.refresh(http).is_err());
+}
+
+/// Only the bridge redeems an official ticket, and only once.
+fn official_admission(http: &Http, session: &Session, bridge: &Token) {
+    let ticket = session
+        .gateway_ticket(http, "http://127.0.0.1:28766".into())
+        .unwrap();
+    let redeem = Request::RedeemGateway {
+        ticket,
+        purpose: TicketPurpose::Admit,
+    };
+    assert!(http.exchange(&redeem, None).is_err());
+    assert!(matches!(
+        http.exchange(&redeem, Some(bridge)).unwrap(),
+        Response::GatewayIdentity { .. }
+    ));
+    assert!(http.exchange(&redeem, Some(bridge)).is_err());
 }
 
 fn session_count(runtime: &Runtime, operator: &DatabaseConnection) -> i64 {

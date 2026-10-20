@@ -376,3 +376,45 @@ skip, matching it in any case, dropping it from the excluded roots, accepting
 a null `publish`, removing the link check, dropping the `asm!` marker, and a
 probe that compiles. Windows and Linux runs are CI's (the verify, postgres and
 secrets jobs run both implementations). Engineering review, not an audit.
+
+## Terms of use and their acceptance, 2026-10-20
+
+Design pass ([terms](terms.md)): assets are acceptance records (who agreed to
+which text, when), gateways' published texts and the refusal of sessions that
+have not accepted. Callers are a central session, a gateway credential or the
+bridge, and nobody for the public reads. Invariants: a gateway cannot accept
+for a player (acceptance needs the player's central session); a published
+version never changes and acceptances name its digest; currentness is version
+and digest; enforcement lives in Central and the gateway, never in the client;
+drafts (`<!-- version: draft -->`) are never in force; responses refuse
+unknown fields, so new operations are new variants and the old lease check
+stays for gateways not yet updated. A reviewer found before code that the
+legal drafts would have been in force once compiled in, that a terms verdict
+on every socket recheck would end running games, that migration needed
+`ConfirmRestore` while unaccepted, and that currentness must include the
+digest; each is in the design.
+
+Implementation pass: three tables with `SELECT, INSERT` only for the runtime
+role, checked at startup with the existing grant contract; every check and
+write is one statement with bound values; a dead session is `Rejected`
+before any terms answer; the gateway's verdict is computed in the lease
+statement itself; served texts are re-validated and re-hashed against their
+stored digest; bounds keep the largest document within the wire limit with
+worst-case escaping; public reads fall under the global limit, lease checks
+under the control limit. Central's own texts are compiled in, both languages
+must name one version, and a parse failure stops the service from starting.
+
+Adversarial pass: over real HTTP and `PostgreSQL` the e2e run keeps a fresh
+account from tickets and object writes (403) until it accepts exactly the
+current version and digest (a flipped digest bit and a renamed version are
+`Conflict`, accepting again is `Done`), while reading its own data stays
+possible and a random bearer is `Rejected`; a gateway's publish is refused
+without its credential, for `draft`, for an invalid version and for unordered
+texts, idempotent when repeated, `Conflict` when changed; acceptance of a
+forged digest, of an origin that published nothing and of a superseded version
+is `Conflict`; `GatewayAuthorize` turns true only for the exact accepted
+version and digest. At the store the runtime role cannot update or delete any
+terms record, tampered texts are not served, the 257th version is refused and
+acceptances go with their account. Injected faults each fail a test: lifting
+the ticket gate, and skipping the digest check when serving. Engineering
+review, not an audit.

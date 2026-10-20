@@ -1,5 +1,6 @@
 //! Closed version-one request/response vocabulary. No secret-bearing type implements Debug.
 use crate::Token;
+use crate::terms::{TermsDocument, TermsSubject, TermsText, TermsVersion};
 use serde::{Deserialize, Serialize};
 
 /// A gateway capability authorizes exactly one action, never a general account session.
@@ -202,6 +203,42 @@ pub enum Request {
     },
     /// Revoke the presented central session immediately.
     Logout,
+    /// Central's terms in force, or none. Needs no credential.
+    Terms,
+    /// A gateway's current terms, or none. Needs no credential.
+    GatewayTerms {
+        /// The gateway's canonical origin.
+        origin: String,
+    },
+    /// Central's current terms version and whether this session's account accepted it.
+    TermsStatus,
+    /// Record that this session's account accepted exactly this version; only
+    /// the subject's current version and digest are accepted.
+    AcceptTerms {
+        /// Central or a gateway origin.
+        subject: TermsSubject,
+        /// The version shown.
+        version: String,
+        /// Digest of the texts shown.
+        digest: [u8; 32],
+    },
+    /// The authenticated gateway publishes a version of its own terms; a
+    /// published version never changes.
+    PublishGatewayTerms {
+        /// New version; never `draft`.
+        version: String,
+        /// Its languages in ascending tag order.
+        texts: Vec<TermsText>,
+    },
+    /// [`Request::GatewaySession`] plus the account's terms state.
+    GatewayAuthorize {
+        /// Lease returned only to the redeeming gateway, never its client.
+        lease: Token,
+        /// Exactly Admit or Admin; purposes cannot be promoted.
+        purpose: TicketPurpose,
+        /// The gateway's own current terms, or none when it has none.
+        terms: Option<TermsVersion>,
+    },
 }
 
 /// Account credential destination decision; transport errors are never legacy eligibility.
@@ -355,6 +392,34 @@ pub enum Response {
     },
     /// Mutation committed. Lost replies require an authenticated read before retry.
     Done,
+    /// A terms document in force, or none.
+    Terms {
+        /// The current version with its texts.
+        terms: Option<TermsDocument>,
+    },
+    /// Central's terms for this session.
+    TermsStatus {
+        /// Central's version in force, or none.
+        current: Option<TermsVersion>,
+        /// True when the account accepted `current`, or when none is in force.
+        accepted: bool,
+    },
+    /// A gateway's terms version was published (or already was, identically).
+    TermsPublished {
+        /// Central's digest of the published texts.
+        digest: [u8; 32],
+    },
+    /// A live lease, as [`Response::GatewaySession`], with the account's terms state.
+    GatewayAuthorization {
+        /// Account authenticated by this lease.
+        identity: Identity,
+        /// Absolute Unix-seconds expiry, never later than the parent central session.
+        expires_at: i64,
+        /// The account accepted Central's terms in force, or none are in force.
+        central_terms: bool,
+        /// The account accepted the gateway's named terms, or it named none.
+        gateway_terms: bool,
+    },
 }
 
 #[cfg(test)]

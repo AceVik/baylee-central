@@ -77,6 +77,11 @@ That milestone added migrations 000002/000003; the current registry also include
   probe, lint/format/tests, vulnerability/license/source and secret checks.
 - Native HTTP, malformed boundary and cancellation/shutdown tests.
 - Developer commands and library boundaries documented in dev-mode.md.
+- Terms of use ([terms](terms.md), migration 000006): Central's compiled-in
+  terms (in force only once `legal/terms.*.md` name a version other than
+  `draft`), gateways' immutable published versions, append-only acceptances,
+  the 403 refusal of unaccepted sessions and `GatewayAuthorize` for gateways.
+  Deploy: stop, migrate, grant the three tables (operations.md), start.
 
 The owner accepted HTTP, crypto and SeaORM/SQLx/TLS dependency internals through safe APIs.
 Crypto details, exact limitations and tests are in crypto-protocol.md. Database

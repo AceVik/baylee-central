@@ -4,6 +4,7 @@
 mod endpoint;
 pub mod gateway;
 pub mod object;
+pub mod terms;
 mod token;
 pub mod wire;
 pub use endpoint::{Endpoint, LEGACY_ORIGIN, LIVE_ORIGIN};
@@ -25,6 +26,9 @@ pub enum Error {
     Conflict,
     /// Bounded resource or rate capacity was reached.
     Busy,
+    /// The account has not accepted the terms in force; only reading and
+    /// accepting them, exporting and signing out remain (`docs/terms.md`).
+    TermsRequired,
 }
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -33,6 +37,7 @@ impl std::fmt::Display for Error {
             Self::Unavailable => "account service unavailable",
             Self::Conflict => "account data changed; reload required",
             Self::Busy => "account service busy; retry later",
+            Self::TermsRequired => "terms of use must be accepted first",
         })
     }
 }

@@ -15,9 +15,11 @@ use zeroize::Zeroizing;
 mod gateways;
 mod objects;
 mod session;
+mod terms;
 pub use gateways::{GatewayRegistration, gateway_directory};
 pub use objects::ObjectDocument;
 pub use session::Session;
+pub use terms::{TermsStatus, central_terms, gateway_terms};
 
 /// Transport contract: verified HTTPS in live mode, no redirects, bounded bodies/timeouts,
 /// no ambient proxy credentials and no logging of headers, bodies or remote diagnostics.

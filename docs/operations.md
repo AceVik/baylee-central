@@ -85,10 +85,18 @@ GRANT SELECT, INSERT ON central_identity.migration_archives TO central_runtime;
 GRANT SELECT, INSERT, UPDATE ON central_identity.gateways TO central_runtime;
 GRANT SELECT ON central_identity.gateway_approvals TO central_runtime;
 GRANT SELECT, INSERT, DELETE ON central_identity.gateway_admins, central_identity.gateway_leases TO central_runtime;
+GRANT SELECT, INSERT ON central_identity.gateway_terms, central_identity.gateway_terms_texts,
+  central_identity.terms_acceptances TO central_runtime;
 ```
 
 A later migration that adds a table also adds its grant here; the runtime
-store's startup check names every table and privilege it needs.
+store's startup check names every table and privilege it needs. Upgrading a
+running service across such a migration: stop it, migrate, grant, start it;
+started before the grant, it refuses to run (the check fails closed).
+
+The terms tables (`docs/terms.md`) get `SELECT, INSERT` only: published
+gateway versions and acceptances are immutable records, and an account's
+acceptances go with the account by cascade.
 
 ## Secrets
 
