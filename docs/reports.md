@@ -110,12 +110,22 @@ columns its reworked UI adds, so a move is a copy:
   record_origin gateway|client, issue_number, assignee, priority, labels,
   duplicate_of, signature, revision, done_at, deleted_at)`.
 - `report_notes(id, report_id, at, author, text)`: internal notes, their own
-  table.
+  table, going with their report.
 - `report_audit(report_id, at, actor, action, detail)`: every change of a
   report's state, kept after the report goes, without its text.
-- Runtime role: `SELECT, INSERT` on all three, `UPDATE (status, done_at,
-  finished_at)` on `reports` by column grant, `DELETE` on `reports` for the
-  sweep. No `UPDATE` of a body or a record.
+- `report_views(id, admin, name, query, created_at)` and
+  `report_seen(admin, report_id, at)`: an admin's saved lists and which
+  reports they opened, theirs alone.
+- Runtime role: `SELECT, INSERT` on all five; `UPDATE (status, issue_number,
+  assignee, priority, labels, duplicate_of, revision, done_at, deleted_at,
+  updated_at)` on `reports` by column grant; `DELETE` on `reports` (the
+  trash's purge and its 30-day sweep), `report_notes`, `report_views` and
+  `report_seen`. No `UPDATE` of a body, a client object or a record, and
+  none of `report_audit`.
+- The migration copies an open report's triage as it is; an open report is
+  nobody's duplicate (leaving `duplicate` clears `duplicate_of`), so no link
+  points at a report left behind. Notes and audit rows of the reports left
+  behind stay in the feedback service until it is retired.
 
 ## Dependencies
 
