@@ -13,8 +13,9 @@ ships from `main` until M1 and M6 below are done.
 
 - **Login name.** Accounts sign in with their username, as today. E-mail is
   optional; once verified it may also be used to sign in and to reset. The
-  initial Central administrator is an account with the operator's verified
-  administrative address, bootstrapped by an operator command (M1).
+  initial Central administrator is the owner's existing account, migrated from
+  the legacy gateway, given the operator's administrative address and the admin
+  role by an operator command (M1). It also administers the primary gateway.
 - **Forgotten passwords.** Registration offers a recovery code that keeps the
   encrypted account data. A reset by e-mail or by an administrator restores the
   login only: encrypted data (deck backups, chat history) survives only with the
@@ -32,6 +33,12 @@ ships from `main` until M1 and M6 below are done.
   lazily, not separate sites under `/admin`.
 - **Gateways are configured through their admin UI**, as completely as possible.
   Secrets and bootstrap values stay in operator files.
+- **Primary gateway addresses.** The official gateway moves to
+  `https://gateway.baylee.app`; its administration is served at
+  `admin.gateway.baylee.app` and accepts only Central SSO (no local password or
+  token sign-in there). `central-api` compiles `LEGACY_ORIGIN =
+  https://baylee.acevik.de`, so that name keeps serving the same gateway until
+  the legacy migration code is removed (M8).
 - **Self-service gateways.** Every signed-in user may register their own gateways
   and choose who administers them. Central administrators see and manage all of
   them; ordinary users only their own.
@@ -64,11 +71,13 @@ ships from `main` until M1 and M6 below are done.
 
 Dependencies are marked with →. Repository in brackets.
 
-**M0 — Central in production** [central, ops]. PR #4 (deployed launcher, TLS
-database connector), then: one shared PostgreSQL with TLS and `hostnossl …
-reject` for Central, roles and database per [operations](operations.md),
-systemd unit, staging check with a synthetic account, `central.baylee.app`.
-Review live discovery's enrollment disclosure before exposing it.
+**M0 — Central in production** [central, ops]. Done 2026-10-20 from `ff0aac2`:
+one shared PostgreSQL with TLS 1.3 and `hostnossl … reject` for Central, roles,
+database, migrations and grants per [operations](operations.md), hardened systemd
+unit, loopback staging checks, then `central.baylee.app`; backup and a restore
+drill. No account is enrolled: registration does not exist yet and legacy
+migration needs the gateway bridge (M5). Live discovery's enrollment disclosure
+is still to be reviewed before accounts exist.
 
 **M1 — account lifecycle** [central] → M0. Registration with Central beta keys
 (single or multi-use, expiry, notes), username rules, recovery code, password
@@ -100,7 +109,9 @@ moves here; the public part can start now.
 environment into the database where safe (environment and files stay for secrets
 and bootstrap), applied live where possible, audited. Gateway-local bans. Guest
 accounts removed (sign-in route, `BAYLEE_GUESTS`, cap, purge, the guest key path),
-existing guests left to lapse. The admin API reachable as described above.
+existing guests left to lapse. The admin API reachable as described above, the
+admin area at `admin.gateway.baylee.app` with Central SSO only, and the move of
+the primary gateway to `gateway.baylee.app` (old name kept as an alias, M8).
 
 **M6 — client front door** [baylee] → M1 SDK, M4 for deep links. Sign in,
 register (with beta key), offline play, gateway choice from the directory or by
@@ -109,6 +120,12 @@ address, the `baylee://` handler with PKCE, and account settings in the client
 
 **M7 — beta.8** → M1, M5 (guest removal), M6. Release gates as `docs/status.md`
 and Baylee's `docs/releasing.md` list them.
+
+**M8 — legacy cleanup** [both] → every legacy account migrated, or 2026-12-20,
+whichever comes first. Remove the legacy migration code (discovery's `legacy`
+answer, the bridge, migration routes and archives, the password verifier
+columns), the old account and password handling in the gateway and client, and
+the `baylee.acevik.de` alias; a database migration retires the leftovers.
 
 M1 → M2 → M3 run one after another in this repository. M4's public part and
 M5's settings work can run beside them.
