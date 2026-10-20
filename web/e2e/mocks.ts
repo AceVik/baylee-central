@@ -5,8 +5,8 @@
 
 import { expect, type Page } from "@playwright/test";
 
-import { page as directoryPage } from "../src/central/fixture.ts";
-import { SYNTHETIC, encode } from "../src/impressum/testing.ts";
+import { page as directoryPage } from "../test/fixtures/directory.ts";
+import { SYNTHETIC, encode } from "../test/fixtures/impressum.ts";
 
 const GH = "https://api.github.com/repos/AceVik/baylee";
 const DL = "https://github.com/AceVik/baylee/releases/download/v0.1.0-beta.8";

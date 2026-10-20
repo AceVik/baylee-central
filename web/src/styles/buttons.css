@@ -1,0 +1,43 @@
+/* Buttons: the gold one, the ghost, the round one, the chips. */
+
+/* ---------------------------------------------------------------- buttons */
+.button {
+  position: relative; overflow: hidden; isolation: isolate;
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.55em;
+  min-height: 44px; padding: 0.5em 1.25em; border-radius: 999px;
+  font-family: var(--sans); font-weight: 700; font-size: 1rem; line-height: 1.2; text-decoration: none; cursor: pointer;
+  background: var(--gold); color: var(--gold-ink); border: 1px solid transparent;
+  box-shadow: 0 10px 24px -14px rgba(224, 190, 124, 0.7);
+  transition: background-color var(--fast) ease, color var(--fast) ease, box-shadow var(--fast) ease, transform var(--fast) var(--ease);
+}
+.button::after {
+  content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background: linear-gradient(105deg, transparent 30%, rgba(255, 255, 255, 0.35) 50%, transparent 70%);
+  transform: translateX(-110%);
+}
+.button:hover { color: var(--gold-ink); background: var(--gold-2); box-shadow: 0 14px 30px -14px rgba(224, 190, 124, 0.85); }
+.button:hover::after, .button:focus-visible::after { transform: translateX(110%); transition: transform 520ms var(--ease); }
+.button:active { transform: scale(0.98); }
+.button[disabled], .button[aria-disabled="true"] { cursor: default; opacity: 0.7; }
+.button-ghost { background: transparent; color: var(--ink); border-color: var(--edge); box-shadow: none; font-weight: 500; }
+.button-ghost:hover { background: var(--panel-2); color: var(--title); border-color: var(--gold); box-shadow: none; }
+.button-ghost::after { background: linear-gradient(105deg, transparent 30%, rgba(224, 190, 124, 0.18) 50%, transparent 70%); }
+.button-big { min-height: 56px; padding: 0.7em 1.8em; font-size: 1.12rem; }
+.button-icon { width: 1.2em; height: 1.2em; flex: none; }
+.round-btn {
+  appearance: none; display: inline-flex; align-items: center; justify-content: center;
+  width: 44px; height: 44px; border-radius: 50%; cursor: pointer;
+  background: var(--panel-solid); color: var(--ink); border: 1px solid var(--edge);
+  transition: background-color var(--fast) ease, transform var(--fast) var(--ease);
+}
+.round-btn:hover { background: var(--panel-2); }
+.round-btn:active { transform: scale(0.94); }
+.links-row, .hero-actions, .link-card-actions, .gw-actions { display: flex; flex-wrap: wrap; gap: 0.6rem; }
+.chip-btn {
+  appearance: none; display: inline-flex; align-items: center; gap: 0.45em; min-height: 44px; padding: 0 1em;
+  border-radius: 999px; border: 1px solid var(--edge-soft); background: transparent; color: var(--ink-soft);
+  font: 500 0.92rem var(--sans); cursor: pointer; transition: background-color var(--fast) ease, color var(--fast) ease, border-color var(--fast) ease;
+}
+.chip-btn:hover { border-color: var(--edge); color: var(--title); }
+.chip-btn[aria-pressed="true"] { background: var(--gold); border-color: var(--gold); color: var(--gold-ink); font-weight: 700; }
+.chip-n { font-size: 0.85em; opacity: 0.8; }

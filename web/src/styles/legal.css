@@ -1,0 +1,12 @@
+/* The legal notice and the privacy notice: one reading column. */
+
+/* ---------------------------------------------------------------- legal pages */
+.legal .section-inner { max-width: 46rem; }
+.legal h2 { font-size: clamp(1.3rem, 1.1rem + 0.8vw, 1.7rem); margin-top: 2rem; }
+.legal-part { scroll-margin-top: calc(var(--top-h) + 1rem); }
+.toc { margin: 0 0 2rem; padding: 1rem 1.2rem; border: 1px solid var(--edge-soft); border-radius: 14px; font-family: var(--sans); }
+.toc ol { margin: 0; padding-left: 1.3rem; columns: 2; column-gap: 2rem; }
+.toc li { break-inside: avoid; padding: 0.1rem 0; }
+.toc a { display: inline-block; padding: 0.25rem 0; }
+@media (max-width: 600px) { .toc ol { columns: 1; } }
+.legal-date { margin-top: 2.5rem; }

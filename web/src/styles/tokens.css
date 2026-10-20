@@ -1,0 +1,143 @@
+/* baylee.app — the blue hour of the old landing page (our own painting,
+   wisteria petals past the moon), tidied: centred section heads, grids that
+   divide evenly at every width, and motion that is short and quiet.
+   Transform and opacity only; `prefers-reduced-motion` stills all of it.
+   The CSP allows no inline style, so everything lives in files. */
+
+@font-face { font-family: "Faustina"; src: url("/fonts/Faustina.woff2") format("woff2"); font-weight: 300 800; font-style: normal; font-display: swap; }
+@font-face { font-family: "Faustina"; src: url("/fonts/Faustina-Italic.woff2") format("woff2"); font-weight: 300 800; font-style: italic; font-display: swap; }
+@font-face { font-family: "Alegreya Sans"; src: url("/fonts/AlegreyaSans-Regular.woff2") format("woff2"); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: "Alegreya Sans"; src: url("/fonts/AlegreyaSans-Medium.woff2") format("woff2"); font-weight: 500; font-style: normal; font-display: swap; }
+@font-face { font-family: "Alegreya Sans"; src: url("/fonts/AlegreyaSans-Bold.woff2") format("woff2"); font-weight: 700; font-style: normal; font-display: swap; }
+
+/* ---------------------------------------------------------------- tokens */
+:root {
+  --serif: "Faustina", Georgia, "Times New Roman", serif;
+  --sans: "Alegreya Sans", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --fast: 160ms;
+  --top-h: 3.9rem;
+  --wrap: 72rem;
+  --gutter: 16px;
+  --radius: 18px;
+
+  --bg: #0b1322;
+  --bg-alt: #0e1729;
+  --panel: rgba(20, 31, 52, 0.78);
+  --panel-solid: #121c30;
+  --panel-2: #1a2740;
+  --edge: rgba(222, 190, 128, 0.26);
+  --edge-soft: rgba(170, 190, 220, 0.14);
+  --ink: #e9edf5;
+  --ink-soft: #c3ccdc;
+  --ink-faint: #9aa6bc;
+  --title: #f8f2e5;
+  --gold: #e0be7c;
+  --gold-2: #f6dfa6;
+  --gold-ink: #1b1407;
+  --violet: #b9a2ff;
+  --violet-soft: rgba(170, 140, 255, 0.16);
+  --link: #e8cb8c;
+  --link-hover: #f8e6b9;
+  --focus: #ffe8a8;
+  --ok: #7fd3a1;
+  --warn: #f0c076;
+  --untested: #86c9c4;
+  --bad: #f09a8f;
+  --off: #8b96aa;
+  --veil-top: rgba(8, 14, 28, 0.30);
+  --veil-mid: rgba(11, 19, 34, 0.55);
+  --hero-shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 2px 22px rgba(0, 0, 0, 0.45);
+  --moon: rgba(200, 222, 255, 0.42);
+  --mist: rgba(190, 210, 240, 0.10);
+  --shadow: 0 24px 50px -30px rgba(0, 0, 0, 0.75);
+  --shadow-lift: 0 30px 60px -28px rgba(0, 0, 0, 0.85), 0 0 0 1px var(--edge);
+  --top-bg: rgba(10, 17, 31, 0.82);
+  --code-bg: #0a1120;
+  --code-ink: #e6ebf5;
+  --kbd-bg: #1b2740;
+  --field-bg: rgba(9, 15, 28, 0.65);
+  --field-edge: rgba(170, 190, 220, 0.55);
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg: #eef2f8;
+    --bg-alt: #e3e9f3;
+    --panel: rgba(253, 252, 248, 0.88);
+    --panel-solid: #fbfaf6;
+    --panel-2: #f0eee7;
+    --edge: rgba(140, 104, 40, 0.30);
+    --edge-soft: rgba(40, 60, 100, 0.15);
+    --ink: #1b2233;
+    --ink-soft: #3b465a;
+    --ink-faint: #536075;
+    --title: #151d31;
+    --gold: #1f2a44;
+    --gold-2: #34446a;
+    --gold-ink: #f7f1e4;
+    --violet: #5b3fb0;
+    --violet-soft: rgba(91, 63, 176, 0.10);
+    --link: #7a5516;
+    --link-hover: #4f370b;
+    --focus: #1f2a44;
+    --ok: #1e7a4a;
+    --warn: #8a5a05;
+    --untested: #1f6f6a;
+    --bad: #a1332a;
+    --off: #5d6779;
+    --veil-top: rgba(222, 231, 244, 0.40);
+    --veil-mid: rgba(232, 238, 247, 0.74);
+    --hero-shadow: 0 1px 2px rgba(255, 255, 255, 0.6), 0 2px 18px rgba(255, 255, 255, 0.55);
+    --moon: rgba(255, 255, 255, 0.55);
+    --mist: rgba(255, 255, 255, 0.22);
+    --shadow: 0 24px 50px -30px rgba(20, 30, 60, 0.38);
+    --shadow-lift: 0 30px 60px -28px rgba(20, 30, 60, 0.45), 0 0 0 1px var(--edge);
+    --top-bg: rgba(238, 242, 248, 0.88);
+    --code-bg: #1b2233;
+    --kbd-bg: #e3e8f1;
+    --field-bg: rgba(255, 255, 255, 0.9);
+    --field-edge: rgba(40, 60, 100, 0.6);
+    color-scheme: light;
+  }
+}
+:root[data-theme="light"] {
+  --bg: #eef2f8;
+  --bg-alt: #e3e9f3;
+  --panel: rgba(253, 252, 248, 0.88);
+  --panel-solid: #fbfaf6;
+  --panel-2: #f0eee7;
+  --edge: rgba(140, 104, 40, 0.30);
+  --edge-soft: rgba(40, 60, 100, 0.15);
+  --ink: #1b2233;
+  --ink-soft: #3b465a;
+  --ink-faint: #536075;
+  --title: #151d31;
+  --gold: #1f2a44;
+  --gold-2: #34446a;
+  --gold-ink: #f7f1e4;
+  --violet: #5b3fb0;
+  --violet-soft: rgba(91, 63, 176, 0.10);
+  --link: #7a5516;
+  --link-hover: #4f370b;
+  --focus: #1f2a44;
+  --ok: #1e7a4a;
+  --warn: #8a5a05;
+  --untested: #1f6f6a;
+  --bad: #a1332a;
+  --off: #5d6779;
+  --veil-top: rgba(222, 231, 244, 0.40);
+  --veil-mid: rgba(232, 238, 247, 0.74);
+  --hero-shadow: 0 1px 2px rgba(255, 255, 255, 0.6), 0 2px 18px rgba(255, 255, 255, 0.55);
+  --moon: rgba(255, 255, 255, 0.55);
+  --mist: rgba(255, 255, 255, 0.22);
+  --shadow: 0 24px 50px -30px rgba(20, 30, 60, 0.38);
+  --shadow-lift: 0 30px 60px -28px rgba(20, 30, 60, 0.45), 0 0 0 1px var(--edge);
+  --top-bg: rgba(238, 242, 248, 0.88);
+  --code-bg: #1b2233;
+  --kbd-bg: #e3e8f1;
+  --field-bg: rgba(255, 255, 255, 0.9);
+  --field-edge: rgba(40, 60, 100, 0.6);
+  color-scheme: light;
+}
