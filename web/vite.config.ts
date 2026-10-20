@@ -21,6 +21,11 @@ export default defineConfig({
   worker: {
     format: "es",
   },
+  // The legal texts live beside the app (`../legal`), where the service
+  // compiles them in too; the page reads the same files at build time.
+  server: {
+    fs: { allow: [".", "../legal"] },
+  },
   test: {
     environment: "jsdom",
     include: ["test/**/*.test.{ts,tsx}"],

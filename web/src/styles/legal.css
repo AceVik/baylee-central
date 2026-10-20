@@ -10,3 +10,12 @@
 .toc a { display: inline-block; padding: 0.25rem 0; }
 @media (max-width: 600px) { .toc ol { columns: 1; } }
 .legal-date { margin-top: 2.5rem; }
+
+/* ---------------------------------------------------------------- legal texts (legal/*.md) */
+.legal-text h2 { margin-top: 2rem; }
+.legal-text h3 { font-size: 1.08rem; margin-top: 1.6rem; }
+.legal-text ol, .legal-text ul { padding-left: 1.4rem; }
+.legal-text li { margin: 0.3rem 0; }
+.legal-text hr { border: 0; border-top: 1px solid var(--edge-soft); margin: 1.5rem 0; }
+.legal-draft { margin: 0 0 1.5rem; padding: 0.8rem 1rem; border: 1px solid var(--edge-soft); border-radius: 12px; font-family: var(--sans); }
+

@@ -1,11 +1,11 @@
 // A handful of pages need no router library: the start page, the download,
-// the cards, the gateway directory, contact, and the two legal pages. Links
+// the cards, the gateway directory, contact, and the legal pages. Links
 // change the address with the History API; the server answers every one of
 // these paths with index.html (README.md §"Serving it").
 
 import { useEffect, useState, type AnchorHTMLAttributes, type MouseEvent } from "react";
 
-export const PAGES = ["home", "download", "cards", "gateways", "contact", "impressum", "privacy"] as const;
+export const PAGES = ["home", "download", "cards", "gateways", "contact", "impressum", "privacy", "terms"] as const;
 export type Page = (typeof PAGES)[number];
 
 export const PATHS: Record<Page, string> = {
@@ -16,6 +16,7 @@ export const PATHS: Record<Page, string> = {
   contact: "/contact",
   impressum: "/impressum",
   privacy: "/privacy",
+  terms: "/terms",
 };
 
 /** The page at `pathname`, or null for one this site does not have. */
