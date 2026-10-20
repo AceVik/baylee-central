@@ -24,6 +24,7 @@ and assembly are forbidden. See [AGENTS.md](AGENTS.md) for binding development r
 - [Privacy and training](docs/privacy-training.md)
 - [Implementation plan and acceptance gates](docs/implementation-plan.md)
 - [Implementation handoff](docs/handoff.md)
+- [Development tasks: `cargo xtask`](docs/xtask.md)
 - [Security reporting](SECURITY.md)
 
 Initial operator: one official central deployment; federation is deferred.

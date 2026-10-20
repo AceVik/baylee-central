@@ -1,0 +1,11 @@
+unsafe {}
+unsafe{ }
+fn f() { UNSAFE { } }
+pub unsafe fn f() {}
+unsafe impl Send for X {}
+unsafe trait T {}
+unsafe extern "C" {}
+core::arch::asm!("nop");
+global_asm!("");
+llvm_asm !("")
+#![allow(unsafe_code)]

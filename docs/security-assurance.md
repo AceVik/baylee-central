@@ -334,3 +334,45 @@ arguments, empty and malformed input without echoing canaries, and confirm that
 generated secrets restore and differ. Unit tests reject development-shaped,
 extended and plaintext documents, public addresses, DNS names and URL injection.
 This is engineering review, not independent audit or production approval.
+
+## Development task runner (`cargo xtask`), 2026-10-20
+
+Owner request: the PowerShell checks in Rust, one implementation for every
+platform, the scripts kept for Windows development ([xtask](xtask.md)).
+
+Design pass: the asset is the gate itself; a weaker port would pass forbidden
+code silently, so every rule and message is the PowerShell one and each has a
+regression that breaks exactly that rule. Inputs are untrusted (a pull request's
+tree, `cargo metadata`, Git variables): unreadable or unexpected input fails
+closed with a fixed sentence. Fixture secrets stay out of arguments and output.
+Cleanup must be proved, not assumed: owned names, labels, process groups,
+refused ports, temporary paths checked before removal. Dependencies are only
+already-approved crates with approved features; no HTTP client or shell.
+
+Implementation pass: programs run from argument lists; passwords reach Docker
+and the tests through child environments and `psql` through standard input;
+the task never alters its own environment. Randomness is `getrandom`. A test
+process runs in its own process group and is stopped with its tree on timeout.
+Container removal requires the run's random name, the ownership label and the
+created id, and a second inventory. Temporary directories are removed only
+under the temporary directory, never through a link. The gitleaks archive is
+checked against a pinned SHA-256 on every run; the added macOS and Linux ARM64
+pins come from the release's checksum file, whose Linux and Windows x64 entries
+equal the already pinned values. The compiler probes are text files, since the
+tree scan reads every `.rs` file for exactly that code.
+
+Findings addressed: the PowerShell check accepted a member with no `publish`
+setting (cargo reports null, whose count is zero), which allows crates.io;
+both checks now refuse it, with a regression each. The tree scan flagged the
+port's own probe sources and documentation, which led to keeping marker-bearing
+probes and test cases in data files rather than weakening the scan.
+
+Adversarial pass: on macOS the policy (with compiler probe), the secret scan
+with its positive controls, the development smoke and the `PostgreSQL` fixture
+pass, and the smoke and fixture failure paths report only their synthetic
+failure after proved cleanup (no container, listener or temporary directory
+left). Injected weakenings each fail a test: dropping the `web/node_modules`
+skip, matching it in any case, dropping it from the excluded roots, accepting
+a null `publish`, removing the link check, dropping the `asm!` marker, and a
+probe that compiles. Windows and Linux runs are CI's (the verify, postgres and
+secrets jobs run both implementations). Engineering review, not an audit.

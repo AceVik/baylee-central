@@ -1,0 +1,3 @@
+#![forbid(unsafe_code)]
+macro_rules! generated { () => { unsafe {} } }
+fn main() { generated!(); }
