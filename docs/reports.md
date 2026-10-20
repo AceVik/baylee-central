@@ -1,9 +1,11 @@
 # Bug and crash reports in Central (design, pass 1)
 
-**Status: proposal for the owner.** Owner decision, 2026-10-20: reports go to
+**Status: design, decided.** Owner decisions, 2026-10-20: reports go to
 Central; clients report through their gateway, which forwards; a client signed
-in nowhere reports directly; Central absorbs Baylee's feedback service. This
-page is the design pass (security assurance pass 1). Nothing here is built.
+in nowhere reports directly; Central absorbs Baylee's feedback service. Later
+the same day: the open reports move to Central, resolved ones are not
+migrated, and the triage UI is reworked with quality-of-life features and
+more. This page is the design pass (security assurance pass 1).
 
 ## Today (Baylee `docs/feedback.md`)
 
@@ -63,7 +65,13 @@ page is the design pass (security assurance pass 1). Nothing here is built.
    - **(b) all at once**: reports keep going to the feedback service until
      M2 to M4 exist, then intake, storage and triage move together.
 
-   **This choice is the owner's.**
+   The owner's answer (2026-10-20) moves the open reports now and reworks the
+   UI, so the path is **(a)**: Central stores and serves reports at once, the
+   feedback service keeps only its admin sign-in and serves the reworked UI,
+   reading and changing reports at Central under a triage credential of its
+   own (loopback only, digest in Central's settings, no account session), and
+   the UI moves into the website's admin area with M4. A one-time migration
+   copies every report that is not done, with its record, and nothing else.
 
 ## Data
 
