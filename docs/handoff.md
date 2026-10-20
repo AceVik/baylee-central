@@ -1,5 +1,8 @@
 # Next implementation session
 
+The next work after deployment is ordered in [the accounts and web roadmap](roadmap-accounts-web.md)
+(owner decisions of 2026-10-20).
+
 Read AGENTS.md and the linked README design documents first. Implementation began
 on 2026-10-19 with owner authorization. Read [status](status.md) for completed
 milestones and remaining gates; no production deployment or live-user processing
