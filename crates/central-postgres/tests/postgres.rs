@@ -1,4 +1,4 @@
-//! Real isolated PostgreSQL fixture; invoke through scripts/test-postgres.ps1.
+//! Real isolated PostgreSQL fixture; invoke through `cargo xtask postgres`.
 #![forbid(unsafe_code)]
 
 use central_postgres::{DevConfig, PendingAccountStore, StoreError, connect_dev};
@@ -32,7 +32,7 @@ async fn scalar(db: &impl ConnectionTrait, query: &str) -> i64 {
 }
 
 #[tokio::test]
-#[ignore = "requires the owned PostgreSQL container from scripts/test-postgres.ps1"]
+#[ignore = "requires the owned PostgreSQL container from `cargo xtask postgres`"]
 async fn migrations_ids_roles_rollback_and_locking() {
     let operator = connect_dev(config("central_migrator", "CENTRAL_TEST_MIGRATOR_PASSWORD"))
         .await

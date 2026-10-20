@@ -17,47 +17,34 @@ jobs:
         os: [ubuntu-24.04, windows-2025, macos-15, macos-15-intel]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 25
+    # bash on every runner, Windows' Git Bash included: the checks are
+    # `cargo xtask` tasks (crates/xtask, docs/xtask.md), not shell scripts.
     defaults:
       run:
-        shell: pwsh
+        shell: bash
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Install pinned toolchain
-        run: |
-          rustup toolchain install 1.99.0 --profile minimal --component clippy --component rustfmt
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        run: rustup toolchain install 1.99.0 --profile minimal --component clippy --component rustfmt
       - name: Fetch locked dependencies
-        run: |
-          cargo fetch --locked
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        run: cargo fetch --locked
       - name: Policy, tests, lint and release build
-        run: ./scripts/test.ps1
-      - name: Policy in Rust (cargo xtask)
-        run: |
-          cargo xtask policy --compiler-probe
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        run: cargo xtask gate
       - name: Verify development lifecycle and failure cleanup
         run: |
-          ./scripts/smoke-dev.ps1
-          $before = Get-Location
-          try {
-            ./scripts/smoke-dev.ps1 -ExerciseFailure
-            throw 'Expected development failure did not occur'
-          } catch {
-            if ($_.Exception.Message -ne 'Synthetic development failure') { throw }
-          }
-          if ((Get-Location).Path -ne $before.Path) { throw 'Smoke cleanup changed caller location' }
-      - name: Development smoke in Rust (cargo xtask)
-        run: |
           cargo xtask smoke
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          # each stderr line arrives as an ErrorRecord; "$_" is its text
-          $failure = ((cargo xtask smoke --exercise-failure 2>&1) | ForEach-Object { "$_" }) -join "`n"
-          if ($LASTEXITCODE -eq 0 -or $failure -cne 'Synthetic development failure') {
-            throw 'Expected development failure did not occur'
-          }
+          # The deliberate failure must fail, and only for its own reason,
+          # after its cleanup.
+          set +e
+          failure=$(cargo xtask smoke --exercise-failure 2>&1 >/dev/null)
+          status=$?
+          set -e
+          if [ "$status" -eq 0 ] || [ "$failure" != "Synthetic development failure" ]; then
+            echo "Expected development failure did not occur: $failure"
+            exit 1
+          fi
   dependencies:
     runs-on: ubuntu-24.04
     timeout-minutes: 25
@@ -79,11 +66,8 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
-      - name: Scan source with pinned Gitleaks
-        shell: pwsh
-        run: ./scripts/scan-secrets.ps1
       - run: rustup toolchain install 1.99.0 --profile minimal
-      - name: Scan source in Rust (cargo xtask)
+      - name: Scan source and history with pinned Gitleaks, and its self-test
         run: cargo xtask secrets
 
   postgres:
@@ -94,22 +78,9 @@ jobs:
         with:
           persist-credentials: false
       - run: rustup toolchain install 1.99.0 --profile minimal
-      - name: Real PostgreSQL migrations, roles and UUIDv7
-        shell: pwsh
-        run: ./scripts/test-postgres.ps1
-      - name: Verify fixture cleanup after failure
-        shell: pwsh
-        run: |
-          try {
-            ./scripts/test-postgres.ps1 -ExerciseFailure
-            throw 'Expected fixture failure did not occur'
-          } catch {
-            if ($_.Exception.Message -ne 'Synthetic fixture failure') { throw }
-          }
-          exit 0
-      - name: Real PostgreSQL in Rust (cargo xtask)
+      - name: Real PostgreSQL migrations, roles, TLS and UUIDv7
         run: cargo xtask postgres
-      - name: Fixture cleanup after failure in Rust (cargo xtask)
+      - name: Fixture cleanup after failure
         run: |
           set +e
           failure=$(cargo xtask postgres --exercise-failure 2>&1 >/dev/null)

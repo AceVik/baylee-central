@@ -52,10 +52,7 @@ cargo xtask gate
 cargo xtask postgres
 ```
 
-or, with PowerShell 7, `./scripts/test.ps1` and `./scripts/test-postgres.ps1`:
-the same fixture and checks ([xtask](xtask.md)).
-
-The latter creates a fresh pinned official PostgreSQL image with ephemeral data,
+([xtask](xtask.md)). The latter creates a fresh pinned official PostgreSQL image with ephemeral data,
 a loopback-only random published port, memory/CPU/process limits and random
 synthetic credentials. DDL and runtime logins are distinct. PUBLIC database TEMP
 is revoked; the test subprocess does not inherit the bootstrap administrator
@@ -67,9 +64,9 @@ The exact owned child process, container and listener are cleaned and checked in
 finally blocks, including failures. Its generated container name is printed so an
 agent can identify that exact fixture after an external hard interruption. Docker
 daemon failure is reported as unverified cleanup, never a successful removal.
-To exercise failure cleanup, invoke `cargo xtask postgres --exercise-failure` (or
-test-postgres.ps1 -ExerciseFailure) and expect
-the deliberate Synthetic fixture failure error after cleanup; CI checks that path.
+To exercise failure cleanup, invoke `cargo xtask postgres --exercise-failure` and
+expect the deliberate Synthetic fixture failure error after cleanup; CI checks
+that path.
 
 Coverage: failed migration leaves no history; repeat migration is idempotent;
 parallel migration lock conflicts; unknown history; restricted and NOINHERIT

@@ -1,4 +1,4 @@
-//! The gate (`scripts/test.ps1`): formatting, the policy with its compiler
+//! The gate: formatting, the policy with its compiler
 //! probe, clippy, every test (this crate's policy regressions among them),
 //! the doc tests and the release build, in that order, stopping at the
 //! first that fails.

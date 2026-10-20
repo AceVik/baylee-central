@@ -1,4 +1,4 @@
-//! Comparing paths as `scripts/check-policy.ps1` does with
+//! Comparing paths as the former PowerShell check did with
 //! `GetFullPath(...).StartsWith(...)`: lexically, `..` resolved, never by
 //! following a link.
 

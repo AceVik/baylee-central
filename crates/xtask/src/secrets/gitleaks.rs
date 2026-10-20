@@ -1,7 +1,7 @@
 //! gitleaks 8.30.1, downloaded once into `target/gitleaks` and checked
 //! against a pinned SHA-256 on every run. The Linux and Windows x64 pins are
-//! the ones `scripts/scan-secrets.ps1` carries; the others are from the
-//! release's own checksum file, whose entries for those two match them.
+//! the ones the former `scripts/scan-secrets.ps1` carried; the others are from
+//! the release's own checksum file, whose entries for those two match them.
 
 use std::fs;
 use std::path::{Path, PathBuf};

@@ -1,4 +1,4 @@
-//! The development listener's smoke test (`scripts/smoke-dev.ps1`): start
+//! The development listener's smoke test: start
 //! the release `central-service --dev` on a free loopback port, check its
 //! HTTP boundary (`http.rs`), then stop it and prove the process and the
 //! listener are gone, also when a check failed.

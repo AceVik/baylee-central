@@ -1,4 +1,4 @@
-//! Real HTTP + PostgreSQL + SDK fixture; exclusively synthetic, through scripts/test-postgres.ps1.
+//! Real HTTP + PostgreSQL + SDK fixture; exclusively synthetic, through `cargo xtask postgres`.
 #![forbid(unsafe_code)]
 
 use central_api::{
@@ -25,7 +25,7 @@ mod support;
 use support::{Http, config};
 
 #[test]
-#[ignore = "requires owned PostgreSQL fixture from scripts/test-postgres.ps1"]
+#[ignore = "requires the owned PostgreSQL fixture from `cargo xtask postgres`"]
 fn real_native_login_restore_migration_and_adversarial_paths() {
     let runtime = Runtime::new().unwrap();
     let operator = runtime.block_on(prepare());

@@ -110,7 +110,7 @@ login replacement or logout.
 ## Verification
 
 `central-api` unit tests cover canonical origin and metadata restrictions.
-The owned PostgreSQL fixture in `scripts/test-postgres.ps1` exercises pending
+The owned PostgreSQL fixture of `cargo xtask postgres` exercises pending
 registration, credential separation, approval privilege rejection, directory
 and heartbeat behavior, owner isolation, administrator CAS and revocation,
 audience/purpose/replay isolation, absence of foreign legacy IDs, and central

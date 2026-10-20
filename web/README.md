@@ -274,7 +274,7 @@ opacity, 160–360 ms, and `prefers-reduced-motion` stills all of it.
 
 ## Known gaps
 
-The policy check (`cargo xtask policy`, `scripts/check-policy.ps1`) skips
+The policy check (`cargo xtask policy`) skips
 `web/node_modules` (npm's install, whose `.bin` holds symbolic links) and
 nothing else under `web/`; a Cargo target inside it is refused, and the
 policy regressions prove both.

@@ -1,11 +1,11 @@
 # Development tasks: `cargo xtask`
 
 `crates/xtask` runs the repository's checks in Rust, one implementation for
-Linux, macOS and Windows (owner, 2026-10-20). The PowerShell scripts under
-`scripts/` state the same checks and remain for Windows development; both
-fail with the same sentences, so a message means the same thing either way.
+Linux, macOS and Windows (owner, 2026-10-20). It replaced the PowerShell
+scripts under `scripts/` (removed the same day), keeping their checks and their
+sentences, so a message means what it meant before.
 
-| task | does | PowerShell |
+| task | does | replaced |
 | --- | --- | --- |
 | `cargo xtask gate` | `cargo fmt --check`, the policy with its compiler probe, clippy `-D warnings`, every test, the doc tests, the release build | `scripts/test.ps1` |
 | `cargo xtask policy [--compiler-probe]` | the code policy (below) | `scripts/check-policy.ps1` |
@@ -16,7 +16,8 @@ fail with the same sentences, so a message means the same thing either way.
 `cargo xtask` is an alias (`.cargo/config.toml`) for
 `cargo run --locked --quiet -p xtask --`. The policy's regressions are
 ordinary tests of the crate (`crates/xtask/tests/policy/`), so `cargo test`
-and the gate run them; `scripts/test-policy.ps1` is their PowerShell twin.
+and the gate run them (they replaced `scripts/test-policy.ps1`). CI runs
+every task under bash on all four runners.
 
 ## The code policy
 
@@ -74,9 +75,9 @@ Only crates the inventory already approves, with their approved features:
 HTTP client: the smoke test speaks HTTP over a socket, and the download runs
 `curl` (Linux, macOS and Windows 10+ ship it) with HTTPS only.
 
-## Differences from the PowerShell scripts
+## What changed against the PowerShell scripts
 
-- An unset `publish` is refused (the PowerShell check now refuses it too).
+- An unset `publish` is refused (the PowerShell check had accepted it).
 - gitleaks has pins for macOS and Linux ARM64 besides the CI platforms.
-- The PowerShell scripts restore environment variables they changed; the Rust
+- The PowerShell scripts set and restored environment variables; the Rust
   tasks never change their own environment, only their children's.

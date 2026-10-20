@@ -1,5 +1,5 @@
 //! Proof that the scanner's configuration still finds what it must
-//! (`scripts/test-secret-scanner.ps1`): in a synthetic repository, three
+//! (formerly `scripts/test-secret-scanner.ps1`): in a synthetic repository, three
 //! random credentials, one in an ordinary file, one in a `*.local.json` and
 //! one under `target/`. The working-tree configuration must report the
 //! ordinary one and only that (its path exclusions hold); after the three are

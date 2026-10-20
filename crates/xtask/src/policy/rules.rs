@@ -1,6 +1,5 @@
-//! The policy's text rules, each the regular expression of
-//! `scripts/check-policy.ps1` (PowerShell's `-match` ignores case, so these
-//! do too).
+//! The policy's text rules, each the regular expression the former
+//! PowerShell check used (its `-match` ignored case, so these do too).
 
 use std::sync::LazyLock;
 
