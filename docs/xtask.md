@@ -3,7 +3,9 @@
 `crates/xtask` runs the repository's checks in Rust, one implementation for
 Linux, macOS and Windows (owner, 2026-10-20). It replaced the PowerShell
 scripts under `scripts/` (removed the same day), keeping their checks and their
-sentences, so a message means what it meant before.
+sentences, so a message means what it meant before. The alias builds it
+under its own profile (`xtask`, in `target/xtask`), so the workspace builds
+the gate starts never replace the running executable, which Windows refuses.
 
 | task | does | replaced |
 | --- | --- | --- |
