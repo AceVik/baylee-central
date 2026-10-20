@@ -1,0 +1,31 @@
+import { defineConfig } from "vitest/config";
+
+// No plugin: Vite's own transform (oxc) compiles TSX with React's automatic
+// runtime. The build writes hashed files under `assets/`, which Caddy may
+// serve as immutable, and an `index.html` without inline script or style, so
+// the site's CSP (`script-src 'self'; style-src 'self'`) holds. `public/`
+// (fonts, our own pictures, boot.js, robots.txt) is copied as it is.
+export default defineConfig({
+  oxc: {
+    jsx: { runtime: "automatic" },
+  },
+  build: {
+    outDir: "dist",
+    assetsDir: "assets",
+    sourcemap: false,
+    // The modulepreload polyfill is injected inline in some setups; this app
+    // targets current browsers only, and the CSP forbids inline script.
+    modulePreload: { polyfill: false },
+    target: "es2023",
+  },
+  worker: {
+    format: "es",
+  },
+  test: {
+    environment: "jsdom",
+    include: ["src/**/*.test.{ts,tsx}"],
+    setupFiles: ["src/test-setup.ts"],
+    restoreMocks: true,
+    unstubGlobals: true,
+  },
+});

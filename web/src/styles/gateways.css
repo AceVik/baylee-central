@@ -1,0 +1,24 @@
+/* The gateway directory (src/pages/Gateways.tsx). */
+.directory { margin-top: 2rem; }
+.dir-count { text-align: center; margin: 0 0 1rem; }
+.gateways { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; }
+.gw { padding: 1.2rem 1.3rem; display: flex; flex-direction: column; transition: transform 200ms var(--ease), box-shadow 200ms ease, border-color 200ms ease; }
+.gw:hover { transform: translateY(-2px); border-color: var(--edge); }
+.gw-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0.3rem 1rem; margin-bottom: 0.8rem; }
+.gw-name { margin: 0; overflow-wrap: anywhere; }
+.gw-state { font-family: var(--sans); font-size: 0.9rem; color: var(--ink-faint); white-space: nowrap; }
+.gw-state.on { color: var(--ok); }
+.gw-kv { margin-bottom: 0.8rem; }
+.gw-actions { margin: auto 0 0; }
+.gw-said { font-family: var(--sans); font-size: 0.88rem; color: var(--ink-soft); min-height: 1.3em; margin-top: 0.4rem; }
+.gw-skeleton { min-height: 13rem; position: relative; overflow: hidden; }
+.gw-skeleton::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(100deg, transparent 20%, color-mix(in srgb, var(--ink) 6%, transparent) 50%, transparent 80%);
+  transform: translateX(-100%); animation: shimmer 1.4s ease-in-out infinite;
+}
+@keyframes shimmer { to { transform: translateX(100%); } }
+.dir-failure { padding: 1.3rem; text-align: center; max-width: 36rem; margin: 1rem auto 0; }
+.dir-failure output { margin: 0 0 0.9rem; color: var(--ink-soft); }
+.dir-more { text-align: center; margin: 1.4rem 0 0; }
+@media (max-width: 760px) { .gateways { grid-template-columns: 1fr; } }
