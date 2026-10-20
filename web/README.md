@@ -141,6 +141,18 @@ Build-time, through Vite's environment (`VITE_…`), each with a default:
 Nothing in the build is a secret; everything in it is downloaded by every
 visitor.
 
+## Legal texts
+
+`/terms` draws Baylee Central's terms of use from `../legal/terms.{de,en}.md`,
+the same files the service compiles in, read at build time (`vite.config.ts`
+lets the build reach `../legal`). While their version is `draft` the page
+says above the text that they are not in force. `src/legal/markdown.ts` reads
+the Markdown subset exactly as the Baylee client does (`legal/README.md`),
+except that a link to an `https:` or `mailto:` address is drawn as a link
+(`rel="noopener noreferrer nofollow"`); no HTML is ever interpreted. A
+gateway's own terms come from Central's public `GatewayTerms`, which, like the
+directory below, waits for the browser API of M3.
+
 ## The gateway directory
 
 `src/central/directory.ts` is a typed client for Central's public

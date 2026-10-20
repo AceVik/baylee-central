@@ -1,9 +1,10 @@
-// The bar every page shares: the brand, the sections (a menu on narrow
-// screens), and the language switch. Over the start page's hero it is
+// The bar every page shares: the brand, the sections and the Discord
+// community (a menu on narrow screens), and the language switch. Over the start page's hero it is
 // clear; once the page moves, or on any other page, it frosts.
 
 import { useEffect, useRef, useState } from "react";
 
+import { DISCORD } from "../config";
 import { tt, useChooseLang, useLang, type Lang } from "../i18n";
 import { Link, PATHS, type Page } from "../router";
 import { Logo } from "./Logo";
@@ -85,6 +86,10 @@ export function Header({ page }: { page: Page | null }) {
               {tt(lang, item.en, item.de)}
             </Link>
           ))}
+          {/* The community, in sight on every page (owner, 20.10.2026). */}
+          <a className="nav-discord" href={DISCORD} rel="noopener">
+            Discord
+          </a>
         </nav>
         <LangSwitch />
       </div>

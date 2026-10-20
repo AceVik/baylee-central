@@ -19,6 +19,7 @@ const Gateways = lazy(() => import("./gateways/GatewaysPage"));
 const Contact = lazy(() => import("./contact/ContactPage"));
 const Impressum = lazy(() => import("./impressum/ImpressumPage"));
 const Privacy = lazy(() => import("./privacy/PrivacyPage"));
+const Terms = lazy(() => import("./legal/TermsPage"));
 
 function Loading() {
   return (
@@ -46,6 +47,8 @@ function PageView({ page }: { page: Page | null }) {
       return <Impressum />;
     case "privacy":
       return <Privacy />;
+    case "terms":
+      return <Terms />;
     case null:
       return <NotFound />;
   }

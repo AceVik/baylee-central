@@ -2,7 +2,7 @@
 // word for word as on the old site (Baylee's docs/legal.md §1 and §3), and
 // the links every page carries.
 
-import { DISCORD, GITHUB, ISSUES, RELEASES_PAGE, SITE_SOURCE } from "../config";
+import { CENTRAL_SOURCE, DISCORD, GITHUB, ISSUES, RELEASES_PAGE, SITE_SOURCE } from "../config";
 import { T, tt, useLang } from "../i18n";
 import { Link, PATHS } from "../router";
 import { Logo } from "./Logo";
@@ -50,6 +50,9 @@ export function Footer() {
           <a href={GITHUB} rel="noopener">
             <T en="Source code (AGPL-3.0)" de="Quellcode (AGPL-3.0)" />
           </a>
+          <a href={CENTRAL_SOURCE} rel="noopener">
+            <T en="Baylee Central (source-available)" de="Baylee Central (Quellcode einsehbar)" />
+          </a>
           <a href={SITE_SOURCE} rel="noopener">
             <T en="This site's source" de="Quellcode dieser Seite" />
           </a>
@@ -71,6 +74,9 @@ export function Footer() {
           <a href={`${GITHUB}/blob/main/NOTICE`} rel="noopener">
             NOTICE
           </a>
+          <Link to={PATHS.terms}>
+            <T en="Terms of use" de="Nutzungsbedingungen" />
+          </Link>
           <Link to={PATHS.privacy}>
             <T en="Privacy" de="Datenschutz" />
           </Link>

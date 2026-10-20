@@ -9,6 +9,8 @@ export const ISSUES = `${GITHUB}/issues`;
 export const DISCORD = "https://discord.gg/4pP3uAwgY";
 /** This web app's own source (AGPL-3.0, §13). */
 export const SITE_SOURCE = "https://github.com/AceVik/baylee-central/tree/main/web";
+/** Baylee Central's repository: public so anyone can check how it handles their data. */
+export const CENTRAL_SOURCE = "https://github.com/AceVik/baylee-central";
 
 /** A page served from this machine for a try talks to services on this machine. */
 export function onLoopback(hostname: string = window.location.hostname): boolean {

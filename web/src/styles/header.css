@@ -95,3 +95,5 @@
 @media (max-width: 380px) {
   .lang-btn { padding: 0 0.6em; font-size: 0.82rem; }
 }
+.nav-discord { font-weight: 600; }
+
