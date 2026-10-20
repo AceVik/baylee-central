@@ -43,6 +43,26 @@ ships from `main` until M1 and M6 below are done.
   and choose who administers them. Central administrators see and manage all of
   them; ordinary users only their own.
 
+- **Two kinds of terms of use** (owner, 2026-10-20, later the same day).
+  Central's terms (account, website, cookies, privacy) are accepted at
+  registration; each gateway's terms are accepted before playing there. Both
+  are versioned, German binding with an English translation. Acceptance is an
+  account fact stored on Central, per document and version. A new version
+  offers *accept*, *later* (signed out of Central, or of that gateway) and
+  *delete* (the account, or one's data on that gateway); nobody continues
+  under an older version. A gateway's terms are edited in its admin area and
+  readable on the website; the project ships a default text any operator may
+  adapt. The client shows how chat encryption works together with a
+  gateway's terms, not in a separate window.
+- **Bug reports go to Central.** Clients report through their gateway, which
+  forwards to Central; a client signed in nowhere reports to Central
+  directly. Central absorbs Baylee's feedback service.
+- **Licence.** Central's server code becomes source-available (readable so
+  anyone can check how data is handled; copying and changing it need the
+  owner's permission); `central-api`, `central-client` and `central-crypto`,
+  which the Baylee client links, stay AGPL-3.0-only. The owner reviews the
+  licence text before it lands.
+
 ## Target shape
 
 - `baylee.app` serves the web app (static files behind Caddy) and a same-origin
@@ -138,4 +158,6 @@ M5's settings work can run beside them.
 - Profile pictures: moderation and reporting, or picture choice from a fixed set
   first?
 - Minimum age and parental consent (GDPR Art. 8; 16 in Germany) at registration.
-- Legal pages for `baylee.app` (deferred in Baylee #316) before public sign-up.
+- Legal pages for `baylee.app` (deferred in Baylee #316) before public sign-up;
+  drafts of Central's terms and privacy policy and of the gateway texts are
+  for the owner (and ideally a lawyer) to review.
