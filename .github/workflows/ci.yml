@@ -34,6 +34,10 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Policy, tests, lint and release build
         run: ./scripts/test.ps1
+      - name: Policy in Rust (cargo xtask)
+        run: |
+          cargo xtask policy --compiler-probe
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Verify development lifecycle and failure cleanup
         run: |
           ./scripts/smoke-dev.ps1
@@ -45,6 +49,15 @@ jobs:
             if ($_.Exception.Message -ne 'Synthetic development failure') { throw }
           }
           if ((Get-Location).Path -ne $before.Path) { throw 'Smoke cleanup changed caller location' }
+      - name: Development smoke in Rust (cargo xtask)
+        run: |
+          cargo xtask smoke
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          # each stderr line arrives as an ErrorRecord; "$_" is its text
+          $failure = ((cargo xtask smoke --exercise-failure 2>&1) | ForEach-Object { "$_" }) -join "`n"
+          if ($LASTEXITCODE -eq 0 -or $failure -cne 'Synthetic development failure') {
+            throw 'Expected development failure did not occur'
+          }
   dependencies:
     runs-on: ubuntu-24.04
     timeout-minutes: 25
@@ -69,6 +82,9 @@ jobs:
       - name: Scan source with pinned Gitleaks
         shell: pwsh
         run: ./scripts/scan-secrets.ps1
+      - run: rustup toolchain install 1.99.0 --profile minimal
+      - name: Scan source in Rust (cargo xtask)
+        run: cargo xtask secrets
 
   postgres:
     runs-on: ubuntu-24.04
@@ -91,6 +107,18 @@ jobs:
             if ($_.Exception.Message -ne 'Synthetic fixture failure') { throw }
           }
           exit 0
+      - name: Real PostgreSQL in Rust (cargo xtask)
+        run: cargo xtask postgres
+      - name: Fixture cleanup after failure in Rust (cargo xtask)
+        run: |
+          set +e
+          failure=$(cargo xtask postgres --exercise-failure 2>&1 >/dev/null)
+          status=$?
+          set -e
+          if [ "$status" -eq 0 ] || [ "$failure" != "Synthetic fixture failure" ]; then
+            echo "Expected fixture failure did not occur"
+            exit 1
+          fi
 
   # The web app (web/README.md): typecheck, lint, unit tests, build, then the
   # Playwright smoke tests against the build at a phone's and a desktop's
