@@ -1,5 +1,6 @@
-//! PostgreSQL 18+ adapter. Development transport is explicitly loopback-only.
-//! No production TLS configuration or public account registration endpoint yet.
+//! PostgreSQL 18+ adapter. Development transport is explicitly loopback-only;
+//! deployed servers are reached only over verified TLS. No public account
+//! registration endpoint yet.
 //! Client/policy/crypto libraries do not depend on this server-side crate.
 #![forbid(unsafe_code)]
 
@@ -8,13 +9,13 @@ mod connection;
 mod pending;
 pub use accounts::{AccountStore, Credential};
 
-pub use connection::{DevConfig, connect_dev, supports_version};
+pub use connection::{DevConfig, ServerConfig, connect_dev, connect_server, supports_version};
 pub use pending::{PendingAccount, PendingAccountStore};
 
 /// Generic diagnostics: database errors and connection strings never cross this boundary.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum StoreError {
-    /// Invalid development configuration.
+    /// Invalid development or server configuration.
     InvalidConfig,
     /// Connection/query/constraint failure, without values or database diagnostics.
     Unavailable,

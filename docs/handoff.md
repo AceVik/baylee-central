@@ -17,11 +17,10 @@ centralization or a production deployment.
 
 The owner chose to continue production provisioning from the MacBook, where the
 SSH identity for `viktor@acevik.de` is configured. This Windows review makes no
-SSH connection, deployment or live-account migration. Before deployment, build
-and review a production account launcher and database connector: the existing
-`--dev-accounts-stdin` launcher accepts only numeric-loopback development endpoints
-and uses the local-only, non-TLS database adapter. Putting it behind a public
-reverse proxy does not make it a production configuration.
+SSH connection, deployment or live-account migration. The deployed launcher and
+verified-TLS database connector were added afterwards (2026-10-20, branch
+`codex/production-launcher`); [operations](operations.md) is their runbook. The
+`--dev-accounts-stdin` launcher remains development-only.
 
 Provision verified database TLS, separate runtime/migration/operator roles,
 persisted OPAQUE and bridge secrets, backup/restore evidence and bounded abuse

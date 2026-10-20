@@ -1,5 +1,5 @@
 //! Atomic native account persistence. SQL identifiers are fixed; every supplied value is bound.
-use crate::{DevConfig, PendingAccountStore};
+use crate::{DevConfig, PendingAccountStore, ServerConfig};
 use central_api::{
     Error, Token,
     wire::{Identity, MigrationState},
@@ -79,10 +79,23 @@ impl AccountStore {
     /// # Errors
     /// Rejects an unsafe role, wrong schema/version or inaccessible database.
     pub async fn connect_dev(config: DevConfig) -> Result<Self, Error> {
-        let pending = PendingAccountStore::connect_dev(config)
-            .await
-            .map_err(|_| Error::Unavailable)?;
-        let db = pending.into_connection();
+        Self::checked(PendingAccountStore::connect_dev(config).await).await
+    }
+
+    /// Open a restricted pool to a deployed server over verified TLS, with the same
+    /// role and grant contract as [`Self::connect_dev`].
+    ///
+    /// # Errors
+    /// Rejects an unsafe role, wrong schema/version, an unverified session or an
+    /// inaccessible database.
+    pub async fn connect(config: ServerConfig) -> Result<Self, Error> {
+        Self::checked(PendingAccountStore::connect(config).await).await
+    }
+
+    async fn checked(
+        pending: Result<PendingAccountStore, crate::StoreError>,
+    ) -> Result<Self, Error> {
+        let db = pending.map_err(|_| Error::Unavailable)?.into_connection();
         let store = Self { db };
         if !store.valid_grants().await {
             let _ = store.db.close().await;

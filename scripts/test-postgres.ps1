@@ -11,6 +11,7 @@ $port = $null
 $adminSecret = [Convert]::ToHexString([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
 $migratorSecret = [Convert]::ToHexString([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
 $runtimeSecret = [Convert]::ToHexString([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
+$tlsDir = $null
 $previousPassword = [Environment]::GetEnvironmentVariable('POSTGRES_PASSWORD')
 function Restore-FixturePassword {
     # PowerShell passes plain $null as an empty string to this .NET overload.
@@ -32,9 +33,27 @@ try {
         & docker pull $image
         if ($LASTEXITCODE -ne 0) { throw 'Pinned PostgreSQL image unavailable' }
     }
+    # Synthetic test authority, a server certificate naming only 127.0.0.1 and an
+    # unrelated authority, so the deployed connector's verified TLS is exercised.
+    $tlsDir = Join-Path ([IO.Path]::GetTempPath()) ('central-tls-' + [IO.Path]::GetRandomFileName().Replace('.', ''))
+    [void](New-Item -ItemType Directory -Path $tlsDir)
+    $ext = Join-Path $tlsDir 'server.ext'
+    [IO.File]::WriteAllText($ext, "subjectAltName=IP:127.0.0.1`nbasicConstraints=critical,CA:FALSE`nkeyUsage=critical,digitalSignature`nextendedKeyUsage=serverAuth`n")
+    foreach ($arguments in @(
+        @('req', '-x509', '-newkey', 'ec', '-pkeyopt', 'ec_paramgen_curve:P-256', '-nodes', '-days', '2', '-subj', '/CN=central-test-ca', '-keyout', (Join-Path $tlsDir 'ca.key'), '-out', (Join-Path $tlsDir 'ca.pem')),
+        @('req', '-x509', '-newkey', 'ec', '-pkeyopt', 'ec_paramgen_curve:P-256', '-nodes', '-days', '2', '-subj', '/CN=central-wrong-ca', '-keyout', (Join-Path $tlsDir 'wrong.key'), '-out', (Join-Path $tlsDir 'wrong.pem')),
+        @('req', '-newkey', 'ec', '-pkeyopt', 'ec_paramgen_curve:P-256', '-nodes', '-subj', '/CN=127.0.0.1', '-keyout', (Join-Path $tlsDir 'server.key'), '-out', (Join-Path $tlsDir 'server.csr')),
+        @('x509', '-req', '-in', (Join-Path $tlsDir 'server.csr'), '-CA', (Join-Path $tlsDir 'ca.pem'), '-CAkey', (Join-Path $tlsDir 'ca.key'), '-CAcreateserial', '-days', '2', '-extfile', $ext, '-out', (Join-Path $tlsDir 'server.crt'))
+    )) {
+        & openssl @arguments *> $null
+        if ($LASTEXITCODE -ne 0) { throw 'Synthetic TLS certificate generation failed' }
+    }
+    foreach ($authorityKey in @('ca.key', 'wrong.key')) { Remove-Item -LiteralPath (Join-Path $tlsDir $authorityKey) -Force }
+    # PostgreSQL refuses a key it does not own; the entrypoint copies it into tmpfs as postgres.
+    $entry = 'install -o postgres -g postgres -m 600 /etc/central-tls/server.key /var/run/postgresql/server.key && exec docker-entrypoint.sh postgres -c ssl=on -c ssl_cert_file=/etc/central-tls/server.crt -c ssl_key_file=/var/run/postgresql/server.key'
     # Only this child shell gets the synthetic admin credential; no value in argv.
     [Environment]::SetEnvironmentVariable('POSTGRES_PASSWORD', $adminSecret)
-    $created = & docker create --name $name --label baylee.central.test=owned --memory 512m --cpus 2 --pids-limit 128 --read-only --tmpfs /var/lib/postgresql:rw,nosuid,nodev,size=268435456 --tmpfs /var/run/postgresql:rw,nosuid,nodev --tmpfs /tmp:rw,nosuid,nodev --publish 127.0.0.1::5432 --env POSTGRES_PASSWORD --env PGDATA=/var/lib/postgresql/test $image 2>&1
+    $created = & docker create --name $name --label baylee.central.test=owned --memory 512m --cpus 2 --pids-limit 128 --read-only --tmpfs /var/lib/postgresql:rw,nosuid,nodev,size=268435456 --tmpfs /var/run/postgresql:rw,nosuid,nodev --tmpfs /tmp:rw,nosuid,nodev --mount "type=bind,src=$tlsDir,dst=/etc/central-tls,readonly" --publish 127.0.0.1::5432 --env POSTGRES_PASSWORD --env PGDATA=/var/lib/postgresql/test --entrypoint sh $image -c $entry 2>&1
     if ($LASTEXITCODE -ne 0) { throw 'Creating isolated PostgreSQL fixture failed' }
     Restore-FixturePassword
     $candidateId = ($created | Out-String).Trim()
@@ -90,6 +109,8 @@ REVOKE CREATE ON SCHEMA public FROM PUBLIC;
     $start.Environment['CENTRAL_TEST_PORT'] = "$port"
     $start.Environment['CENTRAL_TEST_MIGRATOR_PASSWORD'] = $migratorSecret
     $start.Environment['CENTRAL_TEST_RUNTIME_PASSWORD'] = $runtimeSecret
+    $start.Environment['CENTRAL_TEST_CA_PEM'] = Join-Path $tlsDir 'ca.pem'
+    $start.Environment['CENTRAL_TEST_WRONG_CA_PEM'] = Join-Path $tlsDir 'wrong.pem'
     $testProcess = [Diagnostics.Process]::Start($start)
     $testOutput = $testProcess.StandardOutput.ReadToEndAsync()
     $testErrors = $testProcess.StandardError.ReadToEndAsync()
@@ -144,6 +165,9 @@ REVOKE CREATE ON SCHEMA public FROM PUBLIC;
             } finally { $socket.Dispose() }
         }
     } catch { $cleanupErrors.Add('Owned PostgreSQL listener closure could not be verified') }
+    try {
+        if ($null -ne $tlsDir -and (Test-Path -LiteralPath $tlsDir)) { Remove-Item -LiteralPath $tlsDir -Recurse -Force }
+    } catch { $cleanupErrors.Add('Synthetic TLS material cleanup could not be verified') }
     Pop-Location
     if ($cleanupErrors.Count -gt 0) { throw ($cleanupErrors -join '; ') }
 }
