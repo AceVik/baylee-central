@@ -1,4 +1,4 @@
-use crate::{DevConfig, StoreError, connect_dev};
+use crate::{DevConfig, ServerConfig, StoreError, connect_dev, connect_server};
 use sea_orm::{ConnectionTrait, DatabaseConnection, DbBackend, EntityTrait, Statement};
 
 mod entity {
@@ -39,7 +39,7 @@ impl PendingAccount {
     }
 }
 
-/// Restricted development adapter, deliberately separate from migrations.
+/// Restricted runtime adapter, deliberately separate from migrations.
 /// A future enrollment service must enforce tickets, rate limits and atomic activation.
 pub struct PendingAccountStore(DatabaseConnection);
 
@@ -54,7 +54,22 @@ impl PendingAccountStore {
     ///
     /// Rejects excessive privileges, missing schema, unsupported version or failed I/O.
     pub async fn connect_dev(config: DevConfig) -> Result<Self, StoreError> {
-        let db = connect_dev(config).await?;
+        Self::checked(connect_dev(config).await?).await
+    }
+
+    /// Connect to a deployed server over verified TLS, with the same runtime-role
+    /// contract as [`Self::connect_dev`].
+    ///
+    /// # Errors
+    ///
+    /// Rejects excessive privileges, missing schema, unsupported version, an
+    /// unverified session or failed I/O.
+    pub async fn connect(config: ServerConfig) -> Result<Self, StoreError> {
+        Self::checked(connect_server(config).await?).await
+    }
+
+    /// The role contract runs on every connection path before any use.
+    async fn checked(db: DatabaseConnection) -> Result<Self, StoreError> {
         let allowed = db
             .query_one_raw(Statement::from_string(
                 DbBackend::Postgres,

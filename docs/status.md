@@ -7,9 +7,9 @@ Current reviewed integration: public `main` at
 integration is tracked in [Baylee PR #390](https://github.com/AceVik/baylee/pull/390);
 its current revision and merge state must be checked separately. The owner will
 continue production provisioning from the MacBook. See [the handoff](handoff.md)
-for that decision, the unfinished production launcher/database connector and
-the required staging sequence. Existing development launchers are not production
-entry points.
+for that decision and the required staging sequence, and [operations](operations.md)
+for the deployed launcher and verified-TLS connector. The development launchers
+are not production entry points.
 
 ## Integration hardening milestone
 
@@ -82,7 +82,7 @@ The owner accepted HTTP, crypto and SeaORM/SQLx/TLS dependency internals through
 Crypto details, exact limitations and tests are in crypto-protocol.md. Database
 choice is PostgreSQL 18+ with database-generated UUIDv7 and SeaORM 2 migrations.
 Its separate inventory is recorded in storage-proposal; current use remains
-local development only, with no production database connector.
+local development plus the verified-TLS deployed connector.
 
 ## Validation and historical milestone evidence
 
@@ -132,12 +132,14 @@ This is test evidence, not independent security review or production readiness.
 
 ## Remaining implementation and release gates
 
-The service is usable for local development, not production. Its account launcher
-is `--dev-accounts-stdin`; the only account-store connector is `connect_dev`,
-fixed to IPv4 loopback without TLS. A production launcher, verified remote-database
-TLS/configuration, persisted secret loading, backup/restore drills, deployment
-isolation and capacity SLO measurements remain. The development request budgets
-above are bounds, not evidence of production capacity.
+A deployed launcher (`--accounts-stdin`, `--migrate-stdin`, `--generate-secrets`)
+and a verified-TLS database connector now exist; see [operations](operations.md).
+The live endpoint and legacy gateway are compiled in, secrets arrive on standard
+input from a supervisor-opened root-owned file, and the database must present a
+certificate from the configured authority for a loopback or private address.
+Backup/restore drills, deployment isolation, per-client abuse controls and
+capacity SLO measurements remain. The request budgets above are bounds, not
+evidence of production capacity.
 
 Native OPAQUE login, account persistence, gateway registration/admin APIs,
 exclusive sessions, guarded legacy migration and encrypted private-object/chat

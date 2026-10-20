@@ -9,8 +9,9 @@ connections. Environment settings:
 - BAYLEE_CENTRAL_CONCURRENT_REQUESTS: 1..128.
 
 Reserved names must use the documented uppercase spelling on every platform.
-Case variants and unknown reserved settings fail closed instead of silently using defaults. There is no production flag, auth bypass,
-hardcoded account, master password or training activation flag. /health/live
+Case variants and unknown reserved settings fail closed instead of silently using defaults. Development modes have no auth bypass,
+hardcoded account, master password or training activation flag. The deployed
+modes are separate and documented in [operations](operations.md). /health/live
 reports the process; /health/ready deliberately returns 503 until real dependencies
 and release requirements are implemented. Future storage fixtures must use isolated
 synthetic databases/objects and must not read production configuration.
@@ -24,7 +25,8 @@ Crate boundaries:
 - central-policy: portable, synchronous policy/configuration types, no external
   dependencies, network, database or secrets. Can be used from client/gateway code.
 - central-http: bounded local server library, independent of the CLI.
-- central-service: thin executable for lifecycle/configuration only.
+- central-service: thin executable for lifecycle/configuration only: the
+  development modes here and the deployed modes in operations.md.
 - Planned central-protocol: versioned public wire types, not storage records.
 - Planned central-client: native client SDK after authentication protocol review;
   no dependency on server stores, admin internals or signing keys.

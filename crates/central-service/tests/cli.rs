@@ -87,15 +87,81 @@ fn bad_reserved_environment_is_rejected_without_echoing_values() {
 }
 
 #[test]
-fn explicit_dev_flag_is_required_and_extra_arguments_are_rejected() {
-    for arguments in [&[][..], &["--dev", "PRIVATE_ARG_CANARY"], &["--production"]] {
+fn an_explicit_mode_is_required_and_extra_arguments_are_rejected() {
+    for arguments in [
+        &[][..],
+        &["--dev", "PRIVATE_ARG_CANARY"],
+        &["--production"],
+        &["--accounts-stdin", "PRIVATE_ARG_CANARY"],
+        &["--migrate-stdin", "--dev"],
+        &["--generate-secrets", "PRIVATE_ARG_CANARY"],
+        &["--DEV"],
+    ] {
         let output = run_invalid(arguments, None);
         assert_eq!(output.stdout, b"");
+        let stderr = String::from_utf8(output.stderr).unwrap();
+        assert!(!stderr.contains("PRIVATE_ARG_CANARY"));
         assert_eq!(
-            String::from_utf8(output.stderr).unwrap().trim(),
-            "usage: central-service --dev (local foundation only)"
+            stderr.trim(),
+            "usage: central-service --dev | --dev-accounts-stdin | --accounts-stdin | --migrate-stdin | --generate-secrets"
         );
     }
+}
+
+#[test]
+fn production_modes_reject_missing_or_invalid_input_without_echoing_it() {
+    for (mode, message) in [
+        (
+            "--accounts-stdin",
+            "central: account service rejected configuration or failed",
+        ),
+        (
+            "--migrate-stdin",
+            "central: migration rejected configuration or failed",
+        ),
+    ] {
+        let output = run_invalid(&[mode], None);
+        assert_eq!(output.stdout, b"");
+        assert_eq!(String::from_utf8(output.stderr).unwrap().trim(), message);
+        let output = run_with_stdin(mode, br#"{"database":{"password":"PRIVATE_DB_CANARY"}}"#);
+        assert!(!output.status.success());
+        assert_eq!(output.stdout, b"");
+        let stderr = String::from_utf8(output.stderr).unwrap();
+        assert!(!stderr.contains("PRIVATE_DB_CANARY"));
+        assert_eq!(stderr.trim(), message);
+    }
+}
+
+#[test]
+fn generated_secrets_go_to_a_pipe_and_never_to_the_terminal_check_output() {
+    let output = Command::new(env!("CARGO_BIN_EXE_central-service"))
+        .arg("--generate-secrets")
+        .stdin(Stdio::null())
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    assert_eq!(output.stderr, b"");
+    let text = String::from_utf8(output.stdout).unwrap();
+    assert!(text.starts_with("{\"opaque_setup\":[1,"));
+    assert!(text.contains(",\"bridge\":["));
+}
+
+fn run_with_stdin(mode: &str, input: &[u8]) -> Output {
+    use std::io::Write;
+    let mut child = OwnedChild(Some(
+        Command::new(env!("CARGO_BIN_EXE_central-service"))
+            .arg(mode)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap(),
+    ));
+    let process = child.0.as_mut().unwrap();
+    let mut stdin = process.stdin.take().unwrap();
+    stdin.write_all(input).unwrap();
+    drop(stdin);
+    child.0.take().unwrap().wait_with_output().unwrap()
 }
 
 #[test]

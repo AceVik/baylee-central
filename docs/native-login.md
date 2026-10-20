@@ -86,4 +86,6 @@ credential. Keep this configuration outside source control with owner-only file
 permissions; never pass credentials on the command line. A restart must reuse
 the setup. The service does not create keys or run migrations implicitly.
 This command only accepts loopback development endpoints and the restricted
-development database connector. Production TLS/provisioning remains separate.
+development database connector. The deployed `--accounts-stdin` mode, with the
+live endpoint and the verified-TLS connector, is described in
+[operations](operations.md).

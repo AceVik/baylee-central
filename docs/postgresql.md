@@ -77,7 +77,8 @@ command applies them under a migration lock and separate DDL credentials.
 Every migration needs forward/rollback policy, failure-atomicity and upgrade tests.
 
 The owner accepted the reviewed PostgreSQL/TLS dependency graph after its
-inventory and checks. The local adapter and versioned migration are implemented;
+inventory and checks. The local adapter, the verified-TLS deployed connector and
+versioned migration are implemented (deployed transport: [operations](operations.md));
 see database-development.md for executed checks and remaining production gates. Keep the adapter in its own library;
 shared policy, crypto and client APIs must not depend on database implementation.
 

@@ -582,6 +582,7 @@ dependencies = [
  "central-crypto",
  "central-http",
  "central-identity",
+ "central-migration",
  "central-policy",
  "central-postgres",
  "serde",

@@ -33,10 +33,15 @@ Client, policy and crypto crates remain independent of database implementation.
 
 This is an enrollment allocation primitive, not a registration API. Tickets,
 quotas, expiry cleanup, activation, ownership and credential/wrapper transactions
-are still required before exposing it. There is no production connector, remote
-TLS configuration, automatic schema-sync or HTTP integration. The migration
-library takes a caller-owned SeaORM connection; that caller must establish
-verified TLS outside explicit disposable fixtures.
+are still required before exposing it. There is no automatic schema-sync.
+The migration library takes a caller-owned SeaORM connection; that caller must
+establish verified TLS outside explicit disposable fixtures.
+- central-postgres::ServerConfig is the deployed connector: a loopback or private
+  IP literal, bounded identifiers, a password and a PEM authority bundle, always
+  `sslmode=verify-full`, the password and authority passed as typed driver options
+  rather than in the URL, and a `pg_stat_ssl` check of the session. Both stores
+  offer `connect` beside `connect_dev` and run the same role and grant checks on
+  either path. See [operations](operations.md) for provisioning and limits.
 
 ## Running real database checks
 
@@ -75,8 +80,16 @@ shadowing before first installation, missing/inaccessible public, restored calle
 settings after success/failure and an actual abort
 while migration history is locked. The aborted migration's backend is reused and
 its advisory lock must be available from a distinct connection.
-The fixture does not prove production TLS, reset/recovery, credential atomicity,
-row-level account ownership or PostgreSQL 19 compatibility.
+The fixture serves TLS from a synthetic authority with a certificate for
+127.0.0.1 only (openssl on the host; the key is copied into tmpfs as the database
+user). The suite runs both stores, the migrator and an idempotent re-migration over
+`connect_server`, and refuses a certificate from an unrelated authority and a wrong
+password. `tests/tls_refusal.rs` needs no database: a listener answers the TLS
+request with `N` and asserts that no plaintext startup follows; downgrading the
+connector to `prefer` fails it. A certificate naming another address is refused
+by the driver's verify-full mode but is not separately exercised here.
+The fixture does not prove reset/recovery, credential atomicity, row-level
+account ownership or PostgreSQL 19 compatibility.
 
 ## Migration rules
 
@@ -89,8 +102,8 @@ operator execution under separate credentials.
 The current migration's down operation deliberately rejects deletion. Its registry
 is private, so SeaORM fresh/reset is not available through this library. Prefer
 reviewed forward corrections.
-Provision deployment roles/grants separately; fixture bootstrap is not a production
-installer. New schema versions must pass fresh-install and prior-version upgrade,
+Provision deployment roles/grants by the operations runbook; fixture bootstrap is
+not an installer. New schema versions must pass fresh-install and prior-version upgrade,
 partial-failure, lock, compatibility and privilege tests.
 
 Cross-platform native compilation/unit tests run on Linux, Windows and both macOS

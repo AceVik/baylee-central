@@ -5,8 +5,10 @@ use std::time::Duration;
 
 mod accounts;
 mod migration;
+mod tls;
 pub(super) use accounts::run as accounts;
 pub(super) use migration::search_path as migration_search_path;
+pub(super) use tls::run as tls;
 
 pub(super) async fn privileges(operator: &DatabaseConnection, runtime: &DatabaseConnection) {
     for sql in [

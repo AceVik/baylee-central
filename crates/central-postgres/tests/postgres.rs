@@ -122,6 +122,7 @@ async fn migrations_ids_roles_rollback_and_locking() {
     );
 
     support::accounts(&operator).await;
+    support::tls().await;
     store.close().await.unwrap();
     runtime.close().await.unwrap();
     operator.close().await.unwrap();

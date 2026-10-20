@@ -297,3 +297,40 @@ This review does not replace independent cryptographic review, production
 capacity tests or an external audit. Content confidentiality does not imply
 hidden metadata, guaranteed availability or detection of a complete old snapshot
 on a device without a trusted revision checkpoint.
+
+## Deployed launcher and database connector review, 2026-10-20
+
+Design pass: assets are the OPAQUE server setup, the bridge credential, database
+logins and the account tables. The deployed mode must not be steerable to another
+endpoint, gateway or plaintext database. So the endpoint and legacy gateway are
+compiled (`Endpoint::live`, `LEGACY_ORIGIN`), the input schema has no field that
+could name them, secrets come only from standard input, and the database
+transport is verify-full TLS to a loopback or private IP literal. Migration is a
+separate mode and login; the service still never migrates. Secret generation
+refuses a terminal so secrets are not left in scrollback.
+
+Implementation pass: `ServerConfig` keeps the password and authority out of the
+URL (typed sqlx options through SeaORM's options hook), validates every field
+before use, rejects a pasted private key, and has no Debug or Clone. Both stores
+share one checked constructor, so `pending-role.sql` and the grant contract run
+on the deployed path exactly as on the development one. The pool additionally
+checks `pg_stat_ssl` for its own session. Configuration types derive Zeroize; the
+password and authority are moved, not copied, into the connector. The service
+binds before connecting, handles SIGTERM for supervised stops and closes the pool
+on every exit path. Errors stay generic; no value is echoed.
+
+Finding recorded rather than fixed: the driver's rustls trust store is the public
+web roots plus the configured authority. Restricting hosts to loopback/private IP
+literals makes the configured authority the only one that can certify the server;
+DNS names are refused until a CA-only verifier exists. A certificate naming a
+different address is refused by verify-full but is not separately exercised.
+
+Adversarial pass: a listener that declines TLS receives no plaintext startup
+(injecting `sslmode=prefer` fails that test); the real fixture now serves TLS and
+refuses an unrelated authority and a wrong password while the runtime, inherited
+and migrator roles behave as before over TLS (injecting a success expectation for
+the unrelated authority fails the suite). Process tests reject extra or unknown
+arguments, empty and malformed input without echoing canaries, and confirm that
+generated secrets restore and differ. Unit tests reject development-shaped,
+extended and plaintext documents, public addresses, DNS names and URL injection.
+This is engineering review, not independent audit or production approval.
