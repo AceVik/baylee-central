@@ -91,3 +91,26 @@ jobs:
             if ($_.Exception.Message -ne 'Synthetic fixture failure') { throw }
           }
           exit 0
+
+  # The web app (web/README.md): typecheck, lint, unit tests, build, then the
+  # Playwright smoke tests against the build at a phone's and a desktop's
+  # width. Every outside service is mocked in the browser (web/e2e/mocks.ts).
+  web:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24.21.0
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npm run check
+      - run: npx playwright install --with-deps chromium
+      - run: npm run e2e

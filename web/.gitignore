@@ -6,3 +6,5 @@ playwright-report/
 # card status and the screenshots carry card names and card text (README.md).
 public/data/
 public/media/
+# `npm run screens` writes here
+screens/
