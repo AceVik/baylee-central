@@ -1,6 +1,6 @@
 use super::{AccountStore, Error, Identity, Token, identity, statement, uuid};
 use central_api::wire::TicketPurpose;
-use sea_orm::{ConnectionTrait, TransactionTrait, prelude::Uuid};
+use sea_orm::{ConnectionTrait, TransactionTrait};
 
 /// Successful redemption metadata; the caller sends the separately generated lease only to a gateway.
 pub type Admission = (Identity, Option<String>, Option<i64>);
@@ -112,27 +112,9 @@ impl AccountStore {
         gateway: Option<[u8; 16]>,
         purpose: TicketPurpose,
     ) -> Result<(Identity, i64), Error> {
-        if !matches!(purpose, TicketPurpose::Admit | TicketPurpose::Admin)
-            || (gateway.is_none() && matches!(purpose, TicketPurpose::Admin))
-        {
-            return Err(Error::Rejected);
-        }
-        let row=self.db.query_one_raw(statement(
-            "SELECT a.id,a.vault_epoch,floor(extract(epoch FROM LEAST(l.expires_at,s.expires_at)))::bigint AS expires_at
-             FROM central_identity.gateway_leases l JOIN central_identity.sessions s ON s.digest=l.session_digest
-             JOIN central_identity.accounts a ON a.id=s.account_id AND a.credential_revision=s.credential_revision
-             WHERE l.digest=$1 AND l.audience=$2 AND l.gateway_id IS NOT DISTINCT FROM $3::uuid AND l.purpose=$4
-             AND l.expires_at>pg_catalog.clock_timestamp() AND s.expires_at>pg_catalog.clock_timestamp() AND a.restored
-             AND ($3::uuid IS NULL OR EXISTS(SELECT 1 FROM central_identity.gateways g
-                 JOIN central_identity.gateway_approvals p ON p.gateway_id=g.id AND p.enabled
-                 WHERE g.id=$3 AND g.origin=$2 AND ($4='admit' OR EXISTS
-                     (SELECT 1 FROM central_identity.gateway_admins m WHERE m.gateway_id=g.id AND m.account_id=a.id))))",
-            vec![lease.digest().to_vec().into(),audience.into(),gateway.map(Uuid::from_bytes).into(),purpose.as_str().into()]
-        )).await.map_err(|_|Error::Unavailable)?.ok_or(Error::Rejected)?;
-        Ok((
-            identity(&row)?,
-            row.try_get("", "expires_at")
-                .map_err(|_| Error::Unavailable)?,
-        ))
+        let (identity, expires_at, _, _) = self
+            .gateway_authorize(lease, audience, gateway, purpose, None, None)
+            .await?;
+        Ok((identity, expires_at))
     }
 }

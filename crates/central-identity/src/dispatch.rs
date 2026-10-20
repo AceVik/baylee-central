@@ -6,7 +6,16 @@ impl IdentityService {
         request: Request,
         bearer: Option<&Token>,
     ) -> Result<Response, Error> {
+        if super::terms::needs_acceptance(&request) {
+            self.require_terms(bearer).await?;
+        }
         match request {
+            request @ (Request::Terms
+            | Request::GatewayTerms { .. }
+            | Request::TermsStatus
+            | Request::AcceptTerms { .. }
+            | Request::PublishGatewayTerms { .. }
+            | Request::GatewayAuthorize { .. }) => self.terms_request(request, bearer).await,
             request @ (Request::CreateObject
             | Request::ReadObject { .. }
             | Request::ListObjects { .. }
@@ -72,26 +81,9 @@ impl IdentityService {
                     .await?;
                 Ok(Response::Done)
             }
-            Request::ReadDocument => {
-                let (revision, document) =
-                    self.store.document(bearer.ok_or(Error::Rejected)?).await?;
-                Ok(Response::Document { revision, document })
-            }
-            Request::WriteDocument {
-                expected_revision,
-                document,
-            } => {
-                self.store
-                    .write_document(bearer.ok_or(Error::Rejected)?, expected_revision, &document)
-                    .await?;
-                Ok(Response::Done)
-            }
-            Request::ConfirmRestore { revision } => {
-                self.store
-                    .confirm_restore(bearer.ok_or(Error::Rejected)?, revision)
-                    .await?;
-                Ok(Response::Done)
-            }
+            request @ (Request::ReadDocument
+            | Request::WriteDocument { .. }
+            | Request::ConfirmRestore { .. }) => self.document_request(request, bearer).await,
             Request::LegacyStatus { legacy_id } => {
                 self.bridge(bearer)?;
                 let (identity, state) = self.store.legacy_status(&legacy_id).await?;
@@ -101,6 +93,34 @@ impl IdentityService {
                 self.store.logout(bearer.ok_or(Error::Rejected)?).await?;
                 Ok(Response::Done)
             }
+        }
+    }
+
+    async fn document_request(
+        &self,
+        request: Request,
+        bearer: Option<&Token>,
+    ) -> Result<Response, Error> {
+        let session = bearer.ok_or(Error::Rejected)?;
+        match request {
+            Request::ReadDocument => {
+                let (revision, document) = self.store.document(session).await?;
+                Ok(Response::Document { revision, document })
+            }
+            Request::WriteDocument {
+                expected_revision,
+                document,
+            } => {
+                self.store
+                    .write_document(session, expected_revision, &document)
+                    .await?;
+                Ok(Response::Done)
+            }
+            Request::ConfirmRestore { revision } => {
+                self.store.confirm_restore(session, revision).await?;
+                Ok(Response::Done)
+            }
+            _ => Err(Error::Rejected),
         }
     }
 

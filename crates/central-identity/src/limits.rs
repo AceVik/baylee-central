@@ -44,6 +44,8 @@ impl Limits {
                 | Request::EnrollmentStart { .. }
                 | Request::EnrollmentFinish { .. }
                 | Request::GatewayDirectory { .. }
+                | Request::Terms
+                | Request::GatewayTerms { .. }
         ) {
             return self.global(now);
         }
@@ -57,6 +59,8 @@ impl Limits {
             request,
             Request::SessionStatus
                 | Request::GatewaySession { .. }
+                | Request::GatewayAuthorize { .. }
+                | Request::TermsStatus
                 | Request::Logout
                 | Request::SetGatewayAdmins { .. }
         );

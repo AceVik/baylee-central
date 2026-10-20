@@ -7,7 +7,7 @@
 mod accounts;
 mod connection;
 mod pending;
-pub use accounts::{AccountStore, Credential};
+pub use accounts::{AccountStore, Credential, MAX_GATEWAY_VERSIONS};
 
 pub use connection::{DevConfig, ServerConfig, connect_dev, connect_server, supports_version};
 pub use pending::{PendingAccount, PendingAccountStore};

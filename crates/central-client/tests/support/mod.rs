@@ -11,6 +11,7 @@ use std::{
     time::Duration,
 };
 pub(super) mod gateways;
+pub(super) mod terms;
 
 pub(super) fn config(user: &str, password: &str) -> DevConfig {
     assert_eq!(
@@ -66,6 +67,7 @@ impl Transport for Http {
         let status = head.split_whitespace().nth(1).ok_or(Error::Rejected)?;
         match status {
             "200" => {}
+            "403" => return Err(Error::TermsRequired),
             "409" => return Err(Error::Conflict),
             "429" => return Err(Error::Busy),
             "503" => return Err(Error::Unavailable),

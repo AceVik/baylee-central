@@ -22,6 +22,7 @@ mod dispatch;
 mod gateways;
 mod limits;
 mod objects;
+mod terms;
 
 struct Pending {
     expires: Instant,
@@ -40,6 +41,7 @@ pub struct IdentityService {
     pending: Mutex<BTreeMap<[u8; 32], Pending>>,
     limits: Mutex<limits::Limits>,
     workers: Arc<Semaphore>,
+    terms: Option<central_api::terms::TermsDocument>,
 }
 
 impl IdentityService {
@@ -48,7 +50,8 @@ impl IdentityService {
     /// Development deliberately does not advertise the live migration fallback.
     ///
     /// # Errors
-    /// Rejects an invalid development gateway or live gateway other than the official bridge.
+    /// Rejects an invalid development gateway or live gateway other than the official bridge,
+    /// and compiled-in terms of use that do not parse (`docs/terms.md`).
     pub fn new(
         store: AccountStore,
         endpoint: &Endpoint,
@@ -73,7 +76,17 @@ impl IdentityService {
             pending: Mutex::default(),
             limits: Mutex::default(),
             workers: Arc::new(Semaphore::new(4)),
+            terms: terms::central()?,
         })
+    }
+
+    /// Put `terms` in force instead of the compiled-in `legal/` texts, for an
+    /// integration test or a staging run. A live service keeps the committed
+    /// texts: only a reviewed commit changes what is in force (`docs/terms.md`).
+    #[must_use]
+    pub fn with_terms(mut self, terms: Option<central_api::terms::TermsDocument>) -> Self {
+        self.terms = terms;
+        self
     }
 
     fn context(&self, identity: Identity) -> Result<Context, Error> {

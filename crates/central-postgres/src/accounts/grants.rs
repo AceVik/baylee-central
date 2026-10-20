@@ -14,8 +14,11 @@ impl AccountStore {
              ('gateway_admins', ARRAY['SELECT','INSERT','DELETE']),
              ('gateway_leases', ARRAY['SELECT','INSERT','DELETE']),
              ('gateway_approvals', ARRAY['SELECT']),
-             ('migration_archives', ARRAY['SELECT','INSERT']))
-             SELECT count(*) = 9 AND bool_and(
+             ('migration_archives', ARRAY['SELECT','INSERT']),
+             ('gateway_terms', ARRAY['SELECT','INSERT']),
+             ('gateway_terms_texts', ARRAY['SELECT','INSERT']),
+             ('terms_acceptances', ARRAY['SELECT','INSERT']))
+             SELECT count(*) = 12 AND bool_and(
                NOT pg_catalog.pg_has_role(c.relowner, 'USAGE')
                AND (SELECT bool_and(pg_catalog.has_table_privilege(c.oid, p)) FROM unnest(r.privileges) p)
                AND NOT pg_catalog.has_table_privilege(c.oid, 'TRUNCATE, REFERENCES, TRIGGER, MAINTAIN, SELECT WITH GRANT OPTION, INSERT WITH GRANT OPTION, UPDATE WITH GRANT OPTION, DELETE WITH GRANT OPTION')
