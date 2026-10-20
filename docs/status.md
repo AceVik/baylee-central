@@ -1,6 +1,8 @@
 # Implementation status
 
-2026-10-19. No production deployment or real-user processing.
+2026-10-20. Deployed at `https://central.baylee.app` from `ff0aac2` (see
+[operations](operations.md)); no account is enrolled and no real-user data is
+processed yet.
 
 Current reviewed integration: public `main` at
 `43d89eed8cc89cd6ebc992e6de0f5e5610d54c0f`. The sibling native client/gateway
