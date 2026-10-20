@@ -1,6 +1,7 @@
 # web/ — the web app at https://baylee.app
 
-The public part of milestone M4 in [the accounts and web roadmap](../docs/roadmap-accounts-web.md):
+The public part of milestone M4 in the accounts and web roadmap
+(`docs/roadmap-accounts-web.md`, PR #5):
 what Baylee is, the download, the card status, the gateway directory,
 contact, the legal notice and the privacy notice. It replaces Baylee's static
 `web/site` (served at baylee.acevik.de), whose words it keeps and whose
