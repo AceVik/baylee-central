@@ -95,7 +95,7 @@
 .cgrid-hint { margin: -0.3rem 0 0.8rem; }
 @media (hover: none) { .cgrid-hint { display: none; } }
 .cgrid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(8.2rem, 1fr)); gap: 0.9rem 0.7rem; }
-@media (max-width: 420px) { .cgrid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 520px) { .cgrid { grid-template-columns: repeat(3, 1fr); gap: 0.8rem 0.5rem; } .ctile-name { font-size: 0.78rem; } }
 .ctile { display: flex; flex-direction: column; gap: 0.35rem; min-width: 0; animation: tile-in 280ms var(--ease) backwards; }
 @keyframes tile-in { from { opacity: 0; transform: translateY(6px); } }
 .ctile-link { display: flex; flex-direction: column; gap: 0.35rem; color: inherit; text-decoration: none; border-radius: 8px; }

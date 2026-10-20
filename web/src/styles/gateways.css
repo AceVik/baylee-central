@@ -9,6 +9,7 @@
 .gw-state { font-family: var(--sans); font-size: 0.9rem; color: var(--ink-faint); white-space: nowrap; }
 .gw-state.on { color: var(--ok); }
 .gw-kv { margin-bottom: 0.8rem; }
+.gw-kv > div { grid-template-columns: 6.5rem 1fr; }
 .gw-actions { margin: auto 0 0; }
 .gw-said { font-family: var(--sans); font-size: 0.88rem; color: var(--ink-soft); min-height: 1.3em; margin-top: 0.4rem; }
 .gw-skeleton { min-height: 13rem; position: relative; overflow: hidden; }

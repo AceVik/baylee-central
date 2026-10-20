@@ -90,10 +90,16 @@ function developmentOrigin(value: string): boolean {
   );
 }
 
-/** central-api's `validate_origin`: canonical HTTPS, no credentials, path, query or fragment. */
+/**
+ * central-api's `validate_origin`: canonical HTTPS, no credentials, path,
+ * query or fragment. A page on loopback (a local try against an isolated
+ * Central) also takes Central's development origins; unlike central-client,
+ * which knows its endpoint, it cannot tell which Central answers, so it
+ * takes either kind there and only HTTPS anywhere else.
+ */
 export function validOrigin(value: string, development = false): boolean {
   if (value.length > 256) return false;
-  if (development) return developmentOrigin(value);
+  if (development && developmentOrigin(value)) return true;
   let url: URL;
   try {
     url = new URL(value);

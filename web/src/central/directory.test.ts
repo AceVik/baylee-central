@@ -45,12 +45,15 @@ describe("origins and metadata", () => {
     }
   });
 
-  it("takes numeric loopback only in development", () => {
+  it("takes numeric loopback only on a page on loopback", () => {
     expect(validOrigin("http://127.0.0.1:9876")).toBe(false);
     expect(validOrigin("http://127.0.0.1:9876", true)).toBe(true);
+    expect(validOrigin("http://[::1]:9876", true)).toBe(true);
     expect(validOrigin("http://localhost:9876", true)).toBe(false);
     expect(validOrigin("http://127.0.0.1", true)).toBe(false);
-    expect(validOrigin("https://gateway.invalid", true)).toBe(false);
+    expect(validOrigin("http://127.0.0.1:0", true)).toBe(false);
+    expect(validOrigin("http://10.0.0.1:9876", true)).toBe(false);
+    expect(validOrigin("https://gateway.invalid", true)).toBe(true);
   });
 
   it("keeps a website on its gateway's origin, without query or credentials", () => {
