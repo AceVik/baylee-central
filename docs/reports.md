@@ -5,7 +5,8 @@ Central; clients report through their gateway, which forwards; a client signed
 in nowhere reports directly; Central absorbs Baylee's feedback service. Later
 the same day: the open reports move to Central, resolved ones are not
 migrated, and the triage UI is reworked with quality-of-life features and
-more. This page is the design pass (security assurance pass 1).
+more. The owner chose transport (i), raw-body routes in `central-http`, on
+the same day. This page is the design pass (security assurance pass 1).
 
 ## Today (Baylee `docs/feedback.md`)
 
@@ -34,7 +35,7 @@ more. This page is the design pass (security assurance pass 1).
    embedded screenshot), a gateway's record 64 MiB; the native wire carries
    1 MiB and writes bytes as JSON numbers. Two transports fit, neither is
    the native wire:
-   - **(i) raw-body routes in `central-http`** (recommended):
+   - **(i) raw-body routes in `central-http`** (chosen, owner 2026-10-20):
      `POST /v1/reports` (metadata and `client` JSON, bounded),
      `PUT /v1/reports/{id}/record` (the gzip as a raw body, streamed with
      its own limit and checked against its declared length and SHA-256),
@@ -47,8 +48,8 @@ more. This page is the design pass (security assurance pass 1).
      TLS role. No new network surface, but a cross-repository schema
      contract without a version, and Central's runtime would not use the
      reports until M4.
-   **Which one is the owner's to choose.** Until then no Central code is
-   written for reports.
+   The owner chose **(i)**. The routes go through the three passes of
+   `docs/security-assurance.md` before their code; (ii) is not built.
 3. **Central stores the gzip as it came** and never unpacks it: no new
    dependency (`flate2` stays out), no decompression bomb on the server. The
    triage UI unpacks in the browser (`DecompressionStream`) or an operator
