@@ -322,6 +322,8 @@ output { display: block; }
 .page-head .section-inner > .section-lead,
 .page-head .section-inner > .section-lead + .small { text-align: center; margin-left: auto; margin-right: auto; max-width: 46rem; }
 .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(1.5rem, 4vw, 3.5rem); align-items: start; }
+/* a grid item may shrink below its content (a long code line scrolls inside its own box) */
+.two-col > * { min-width: 0; }
 @media (max-width: 860px) { .two-col { grid-template-columns: 1fr; } }
 .glass {
   background: var(--panel); border: 1px solid var(--edge-soft); border-radius: var(--radius);
@@ -440,6 +442,7 @@ output { display: block; }
 }
 :root[data-theme="light"] .kicker { background: rgba(255, 255, 255, 0.5); }
 @media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) .kicker { background: rgba(255, 255, 255, 0.5); } }
+@media (max-width: 480px) { .kicker { font-size: 0.7rem; letter-spacing: 0.08em; } }
 .hero h1 { max-width: 14em; margin: 0 0 0.35em; text-shadow: var(--hero-shadow); font-size: clamp(2.3rem, 1.3rem + 4.4vw, 4.6rem); }
 .glow {
   background: linear-gradient(100deg, var(--title) 0%, var(--gold-2) 40%, var(--violet) 60%, var(--title) 85%);
