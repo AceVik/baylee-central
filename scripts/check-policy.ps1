@@ -23,7 +23,10 @@ try {
         if ($manifest -notmatch '(?ms)\[lints\]\s*workspace\s*=\s*true') {
             throw "Missing inherited lints: $($package.name)"
         }
-        if ($package.publish.Count -ne 0) { throw "Package publication must be disabled: $($package.name)" }
+        # `publish = false` is an empty list; an absent `publish` (null) allows crates.io.
+        if ($null -eq $package.publish -or $package.publish.Count -ne 0) {
+            throw "Package publication must be disabled: $($package.name)"
+        }
         if (-not [IO.Path]::GetFullPath($package.manifest_path).StartsWith($workspaceRoot, [StringComparison]::Ordinal)) {
             throw "Workspace member outside reviewed root: $($package.name)"
         }

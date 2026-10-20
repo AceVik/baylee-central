@@ -116,6 +116,10 @@ path = "../../web/node_modules/fixture.rs"
         Remove-Item -LiteralPath $modulesLink -Force
         Remove-Item -LiteralPath $web -Recurse -Force
     }
+    # An absent `publish` allows crates.io; cargo metadata reports it as null.
+    [IO.File]::WriteAllText($manifestPath, ($manifest -replace '(?m)^publish = false\r?\n', ''))
+    try { Assert-PolicyRejects 'Package publication must be disabled: policy-fixture' }
+    finally { [IO.File]::WriteAllText($manifestPath, $manifest) }
     # Cargo features are case-sensitive; PowerShell's default -in operator is not.
     # Use an already approved/cached crate to exercise the real registry graph.
     [IO.File]::WriteAllText($manifestPath, $manifest + [Environment]::NewLine + @'
@@ -177,7 +181,7 @@ unreviewed-case-helper = { package = "POLICY-FIXTURE", path = "../../../REVIEWED
         }
         Assert-PolicyRejects 'Local dependency outside reviewed workspace: POLICY-FIXTURE'
     }
-    Write-Output 'Policy regressions passed: root/hidden/native sources, build scripts, excluded targets, links, web/node_modules, exact feature names and local dependencies.'
+    Write-Output 'Policy regressions passed: root/hidden/native sources, build scripts, excluded targets, links, web/node_modules, publication, exact feature names and local dependencies.'
 } finally {
     $tempRoot = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd([IO.Path]::DirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
     if (-not $fixtureRoot.StartsWith($tempRoot, [StringComparison]::OrdinalIgnoreCase)) { throw 'Unsafe policy-fixture cleanup path' }
