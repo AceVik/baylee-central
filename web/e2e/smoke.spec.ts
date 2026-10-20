@@ -4,7 +4,7 @@
 
 import { expect, test } from "@playwright/test";
 
-import { SYNTHETIC } from "../src/impressum/testing.ts";
+import { SYNTHETIC } from "../test/fixtures/impressum.ts";
 import { expectNoSideScroll, mock, watchErrors } from "./mocks.ts";
 
 test.describe("smoke", () => {

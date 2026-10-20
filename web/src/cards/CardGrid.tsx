@@ -2,129 +2,20 @@
 // move in it (a roving tabindex), Space shows the card large, Enter opens
 // its page on Scryfall. With a mouse, resting on a card shows it large
 // beside the pointer after a moment (focus does the same beside the card);
-// on a touch screen the first tap shows it in a dialog, with the link. The
-// large picture is Scryfall's "normal" image, fetched only then, unaltered:
-// nothing is ever drawn on a picture, the status sits under it.
+// on a touch screen the first tap shows it in a dialog, with the link.
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type FocusEvent, type KeyboardEvent, type MouseEvent, type PointerEvent } from "react";
-import { createPortal } from "react-dom";
+import { useCallback, useEffect, useMemo, useRef, useState, type FocusEvent, type KeyboardEvent, type MouseEvent, type PointerEvent } from "react";
 
-import { T, num, tt, useLang } from "../i18n";
+import { T, tt, useLang } from "../i18n";
 import { Icon } from "../components/icons";
 import { Modal } from "../components/Modal";
-import { CARD_CREDIT, STATUS, imgOf, pageOf, why, type Card, type Counts, type Group } from "./model";
-
-type Filter = "all" | Group;
+import { imgOf, pageOf, why } from "./card";
+import { Badge, BigPicture, CardText, Credit, Preview, type Shown } from "./CardView";
+import { FilterBar, type Filter } from "./FilterBar";
+import { STATUS, type Card, type Counts } from "./model";
 
 function hoverable(): boolean {
   return typeof window.matchMedia === "function" && window.matchMedia("(hover: hover) and (pointer: fine)").matches;
-}
-
-function Badge({ card }: { card: Card }) {
-  const lang = useLang();
-  const st = STATUS[card.status];
-  return <span className={`badge b-${st.group}`}>{tt(lang, st.en, st.de)}</span>;
-}
-
-function Credit() {
-  const lang = useLang();
-  return <p className="cp-credit">{tt(lang, CARD_CREDIT.en, CARD_CREDIT.de)}</p>;
-}
-
-function CardText({ card, nameId }: { card: Card; nameId?: string }) {
-  const lang = useLang();
-  return (
-    <div className="cp-cap">
-      <strong className="cp-name" id={nameId}>
-        {card.name}
-      </strong>
-      <Badge card={card} />
-      <span className="cp-why">{why(card, lang)}</span>
-      {card.artist !== null && (
-        <span className="cp-artist">
-          {tt(lang, "Illustrated by ", "Illustriert von ")}
-          {card.artist}
-        </span>
-      )}
-    </div>
-  );
-}
-
-function BigPicture({ card }: { card: Card }) {
-  const src = imgOf(card, "normal");
-  if (src === null) return null;
-  return (
-    <div className="cp-pic">
-      <img src={src} alt="" width={488} height={680} decoding="async" referrerPolicy="no-referrer" />
-    </div>
-  );
-}
-
-interface Shown {
-  card: Card;
-  tile: HTMLElement;
-  x: number | null;
-  y: number | null;
-}
-
-/** The card large beside the pointer or the focused card; for the eye only (the tile says the same in words). */
-function Preview({ shown }: { shown: Shown }) {
-  const lang = useLang();
-  const box = useRef<HTMLDivElement>(null);
-  useLayoutEffect(() => {
-    const el = box.current;
-    if (!el) return;
-    const w = el.offsetWidth;
-    const h = el.offsetHeight;
-    const W = window.innerWidth;
-    const H = window.innerHeight;
-    let { x, y } = shown;
-    let gap = 18;
-    if (x === null || y === null) {
-      const r = shown.tile.getBoundingClientRect();
-      x = r.right;
-      y = r.top + r.height / 2;
-      gap = 12;
-    }
-    let left = x + gap + w > W - 8 ? x - gap - w : x + gap;
-    if (left < 8) left = 8;
-    const top = Math.max(8, Math.min(H - h - 8, y - h / 2));
-    // CSSOM, which the CSP allows (a style attribute it would not)
-    el.style.transform = `translate3d(${Math.round(left)}px, ${Math.round(top)}px, 0)`;
-  }, [shown]);
-  return createPortal(
-    <div className="cpreview" ref={box} aria-hidden="true">
-      <BigPicture card={shown.card} />
-      <CardText card={shown.card} />
-      <p className="cp-go">{tt(lang, "Click for the artist and printing on Scryfall.", "Klick: Künstler und Druck bei Scryfall.")}</p>
-      <Credit />
-    </div>,
-    document.body,
-  );
-}
-
-function FilterBar({ counts, filter, onFilter }: { counts: Counts; filter: Filter; onFilter: (f: Filter) => void }) {
-  const lang = useLang();
-  const groups: [Filter, string, string, number][] = [
-    ["all", "All", "Alle", counts.total],
-    ["implemented", "Full", "Voll", counts.implemented],
-    ["generated", "Untested", "Ungetestet", counts.generated],
-    ["partial", "Partial", "Teilweise", counts.partial],
-    ["none", "Not yet", "Noch nicht", counts.unimplemented + counts.absent],
-    ["never", "Never", "Nie", counts.never],
-  ];
-  return (
-    <fieldset className="cfilter">
-      <legend className="vh">{tt(lang, "Show cards", "Karten zeigen")}</legend>
-      {groups
-        .filter(([g, , , n]) => g === "all" || n > 0)
-        .map(([g, en, de, n]) => (
-          <button key={g} type="button" className="chip-btn" aria-pressed={filter === g} onClick={() => onFilter(g)}>
-            {tt(lang, en, de)} <span className="chip-n">{num(lang, n)}</span>
-          </button>
-        ))}
-    </fieldset>
-  );
 }
 
 export function CardGrid({ cards, counts, setName }: { cards: Card[]; counts: Counts; setName: string }) {

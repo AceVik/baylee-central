@@ -1,0 +1,11 @@
+/* The footer (src/components/Footer.tsx). */
+
+/* ---------------------------------------------------------------- footer */
+.foot { background: var(--bg-alt); border-top: 1px solid var(--edge-soft); padding: 3rem 0 2.5rem; }
+.foot-inner { max-width: 52rem; margin: 0 auto; padding: 0 var(--gutter); text-align: center; }
+.foot-logo { width: 7rem; margin: 0 auto 1.4rem; opacity: 0.9; }
+.notice { font-size: 0.85rem; color: var(--ink-faint); margin: 0 auto 0.8em; max-width: 46rem; }
+.foot-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.2rem 0.4rem; margin: 1.6rem 0; font-family: var(--sans); font-size: 0.95rem; }
+.foot-links a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 0.6em; text-decoration: none; color: var(--ink-soft); border-radius: 999px; }
+.foot-links a:hover { color: var(--title); background: var(--panel-2); }
+.colophon { font-size: 0.8rem; color: var(--ink-faint); margin: 0; }

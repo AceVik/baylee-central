@@ -33,6 +33,28 @@ router, i18n or CSS library: a handful of pages need none (`src/router.tsx`,
 `src/i18n.tsx`), and both languages stand side by side in the components
 (`<T en={…} de={…} />`) so a sentence and its translation change together.
 
+## Layout
+
+One folder per part of the site, each file one component or one concern,
+none much past 200 lines:
+
+| folder | what |
+| --- | --- |
+| `src/` | `main.tsx`, `App.tsx` (the frame and the page the address names), `router.tsx`, `i18n.tsx`, `motion.ts`, `github.ts`, `config.ts` |
+| `src/components/` | the bar, the footer, sections, the logo, icons, the modal |
+| `src/home/` | the start page, one file per section |
+| `src/download/` | the release and the machine (`release.ts`, `machine.ts`), the button, the platform cards, the page |
+| `src/cards/` | the card status: data and parsing (`model.ts`, `numbers.ts`, `card.ts`, `data.ts`), the rows, the summary, the full list, the card grid |
+| `src/central/` | Central's directory client (`directory.ts`) and its checks (`validate.ts`) |
+| `src/gateways/` | the directory page |
+| `src/contact/` | the contact form and the reporting help |
+| `src/impressum/` | the blob, the proof of work and its worker, the scrambled drawing, the page |
+| `src/privacy/` | the privacy notice, its sections in two files |
+| `src/styles/` | the stylesheets by area; the global ones are imported by `main.tsx`, the others by their feature |
+| `test/` | the unit and component tests, mirroring `src/`, one file per unit; `test/fixtures/` (synthetic data, also used by `e2e/`) and `test/support/` (the stand-in network) |
+| `e2e/` | the Playwright smoke tests and their mocks |
+| `scripts/` | the local server, the CSP, the content copy |
+
 ## Commands
 
 Node 22.18 or newer (CI uses 24.21.0), in this folder:
@@ -141,7 +163,7 @@ a link only after those checks, with `rel="noopener noreferrer nofollow"`.
 browser always sends both on a POST. The directory therefore needs the
 reviewed same-origin browser API of M3 at `/api` (the roadmap's "Target
 shape"); until it exists the page says that Central did not answer, and
-offers to try again. The tests use `src/central/fixture.ts` and never call a
+offers to try again. The tests use `test/fixtures/directory.ts` and never call a
 real Central.
 
 ## The Impressum
@@ -173,7 +195,7 @@ As on the old site (Baylee's `web/site/README.md` §"The Impressum" and
   content="noindex, noarchive, nosnippet">`, and Caddy sends the same
   `X-Robots-Tag`.
 
-Tests encode made-up details (`src/impressum/testing.ts`), never real ones.
+Tests encode made-up details (`test/fixtures/impressum.ts`), never real ones.
 
 ## Serving it
 
@@ -234,7 +256,7 @@ in the visitor's browser: the language chosen (localStorage) and GitHub's
 answers for ten minutes (sessionStorage). It talks to GitHub's API, to
 Scryfall's image host for an opened set, to the feedback service for the
 contact form and the Impressum, and (through this origin) to Central for the
-directory. `src/pages/Privacy.tsx` says all of that; a new host in the CSP, a
+directory. `src/privacy/` says all of that; a new host in the CSP, a
 cookie, a log or a new form means a new sentence there. Its hosting paragraph
 (netcup, no access log) is the old site's and must be confirmed for
 `baylee.app` before the page is published; the notice is a draft for the

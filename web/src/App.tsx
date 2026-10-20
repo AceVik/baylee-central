@@ -4,37 +4,21 @@
 
 import { Suspense, lazy, useEffect, useRef } from "react";
 
-import { Footer, Header, SkipLink } from "./components/Layout";
-import { T, useTitle } from "./i18n";
+import { Footer } from "./components/Footer";
+import { Header } from "./components/Header";
+import { NotFound } from "./components/NotFound";
+import { SkipLink } from "./components/Section";
+import Home from "./home/Home";
+import { T } from "./i18n";
 import { reducedMotion, useReveal } from "./motion";
-import Home from "./pages/Home";
-import { Link, navigate, pageAt, useLocation, type Page } from "./router";
+import { navigate, pageAt, useLocation, type Page } from "./router";
 
-const Download = lazy(() => import("./pages/DownloadPage"));
-const Cards = lazy(() => import("./pages/Cards"));
-const Gateways = lazy(() => import("./pages/Gateways"));
-const Contact = lazy(() => import("./pages/Contact"));
-const Impressum = lazy(() => import("./pages/Impressum"));
-const Privacy = lazy(() => import("./pages/Privacy"));
-
-function Missing() {
-  useTitle("Not found – Baylee", "Nicht gefunden – Baylee");
-  return (
-    <header className="page-head">
-      <div className="section-inner">
-        <p className="eyebrow">404</p>
-        <h1>
-          <T en="There is no such page" de="Diese Seite gibt es nicht" />
-        </h1>
-        <p>
-          <Link to="/">
-            <T en="Back to the start page" de="Zurück zur Startseite" />
-          </Link>
-        </p>
-      </div>
-    </header>
-  );
-}
+const Download = lazy(() => import("./download/DownloadPage"));
+const Cards = lazy(() => import("./cards/CardsPage"));
+const Gateways = lazy(() => import("./gateways/GatewaysPage"));
+const Contact = lazy(() => import("./contact/ContactPage"));
+const Impressum = lazy(() => import("./impressum/ImpressumPage"));
+const Privacy = lazy(() => import("./privacy/PrivacyPage"));
 
 function Loading() {
   return (
@@ -63,7 +47,7 @@ function PageView({ page }: { page: Page | null }) {
     case "privacy":
       return <Privacy />;
     case null:
-      return <Missing />;
+      return <NotFound />;
   }
 }
 

@@ -139,3 +139,10 @@
 .cardview .cp-name { font-size: 1.1rem; }
 .cardview .cp-go { text-align: center; margin: 0.8rem 0 0.4rem; }
 .cardview-close { position: absolute; top: 0; right: 0; }
+
+/* ---------------------------------------------------------------- cards page numbers */
+.numbers { margin: clamp(2rem, 4vw, 3rem) 0 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+.number { padding: 1.3rem; text-align: center; }
+.number dt { font-family: var(--serif); font-size: clamp(2rem, 1.4rem + 2vw, 2.9rem); font-weight: 600; color: var(--title); line-height: 1.1; font-variant-numeric: lining-nums tabular-nums; }
+.number dd { margin: 0.4rem 0 0; color: var(--ink-soft); font-size: 0.95rem; }
+@media (max-width: 700px) { .numbers { grid-template-columns: 1fr; } }
