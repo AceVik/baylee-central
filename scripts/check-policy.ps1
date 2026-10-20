@@ -11,8 +11,12 @@ try {
         throw 'Workspace unsafe prohibition is missing'
     }
     $workspaceRoot = [IO.Path]::GetFullPath($meta.workspace_root).TrimEnd([IO.Path]::DirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
-    $excludedRoots = @('.git', 'target', 'node_modules') | ForEach-Object {
-        $workspaceRoot + $_ + [IO.Path]::DirectorySeparatorChar
+    # Tool output, never reviewed source: Git's store, Cargo's target, and the
+    # npm installs at the root and in web/ (`npm ci` fills web/node_modules from
+    # the reviewed web/package-lock.json; its .bin holds symbolic links). No
+    # Cargo target may live in any of them.
+    $excludedRoots = @('.git', 'target', 'node_modules', 'web/node_modules') | ForEach-Object {
+        $workspaceRoot + $_.Replace('/', [string][IO.Path]::DirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
     }
     foreach ($package in $meta.packages) {
         $manifest = Get-Content -LiteralPath $package.manifest_path -Raw
@@ -45,6 +49,7 @@ try {
     }
     # Targets/build scripts may live outside crates/. Scan the whole reviewed
     # tree, skipping only tool/output directories that cannot contain targets.
+    $webRoot = Join-Path $meta.workspace_root 'web'
     $pending = [Collections.Generic.Stack[string]]::new()
     $pending.Push($meta.workspace_root)
     $reviewedFiles = [Collections.Generic.List[IO.FileInfo]]::new()
@@ -55,6 +60,10 @@ try {
             if (($entry.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
                 throw "Linked source outside the review boundary: $($entry.Name)"
             }
+            # Only web/node_modules itself, only as a real directory (a link of
+            # that name is refused above), exactly cased; node_modules anywhere
+            # else under web/ is walked like any other directory.
+            if ($directory -eq $webRoot -and $entry.Name -ceq 'node_modules' -and $entry.PSIsContainer) { continue }
             if ($entry.PSIsContainer) { $pending.Push($entry.FullName) }
             else { $reviewedFiles.Add($entry) }
         }

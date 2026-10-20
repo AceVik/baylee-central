@@ -77,6 +77,45 @@ path = "../../target/fixture.rs"
     New-Item -ItemType $linkKind -Path $link -Target $linked | Out-Null
     try { Assert-PolicyRejects 'Linked source outside the review boundary: linked' }
     finally { Remove-Item -LiteralPath $link -Force }
+    # npm's install in web/ is skipped, links and all, but only there: a link
+    # elsewhere under web/, a deeper node_modules, a link named
+    # web/node_modules and a Cargo target inside it are all still refused.
+    $web = Join-Path $reviewed 'web'
+    $npmBin = Join-Path $web 'node_modules/.bin'
+    [IO.Directory]::CreateDirectory($npmBin) | Out-Null
+    $npmLink = Join-Path $npmBin 'tool'
+    New-Item -ItemType $linkKind -Path $npmLink -Target $linked | Out-Null
+    try {
+        & $checker
+        $webLink = Join-Path $web 'linked'
+        New-Item -ItemType $linkKind -Path $webLink -Target $linked | Out-Null
+        try { Assert-PolicyRejects 'Linked source outside the review boundary: linked' }
+        finally { Remove-Item -LiteralPath $webLink -Force }
+        $nested = Join-Path $web 'tools/node_modules'
+        [IO.Directory]::CreateDirectory($nested) | Out-Null
+        $nestedLink = Join-Path $nested 'linked'
+        New-Item -ItemType $linkKind -Path $nestedLink -Target $linked | Out-Null
+        try { Assert-PolicyRejects 'Linked source outside the review boundary: linked' }
+        finally { Remove-Item -LiteralPath $nestedLink -Force }
+        [IO.File]::WriteAllText((Join-Path $web 'node_modules/fixture.rs'), '#![forbid(unsafe_code)]')
+        [IO.File]::WriteAllText($manifestPath, $manifest + [Environment]::NewLine + @'
+[lib]
+path = "../../web/node_modules/fixture.rs"
+'@)
+        try { Assert-PolicyRejects 'Source target inside excluded output directory: policy_fixture' }
+        finally { [IO.File]::WriteAllText($manifestPath, $manifest) }
+    } finally {
+        Remove-Item -LiteralPath $npmLink -Force
+        Remove-Item -LiteralPath $web -Recurse -Force
+    }
+    [IO.Directory]::CreateDirectory($web) | Out-Null
+    $modulesLink = Join-Path $web 'node_modules'
+    New-Item -ItemType $linkKind -Path $modulesLink -Target $linked | Out-Null
+    try { Assert-PolicyRejects 'Linked source outside the review boundary: node_modules' }
+    finally {
+        Remove-Item -LiteralPath $modulesLink -Force
+        Remove-Item -LiteralPath $web -Recurse -Force
+    }
     # Cargo features are case-sensitive; PowerShell's default -in operator is not.
     # Use an already approved/cached crate to exercise the real registry graph.
     [IO.File]::WriteAllText($manifestPath, $manifest + [Environment]::NewLine + @'
@@ -138,7 +177,7 @@ unreviewed-case-helper = { package = "POLICY-FIXTURE", path = "../../../REVIEWED
         }
         Assert-PolicyRejects 'Local dependency outside reviewed workspace: POLICY-FIXTURE'
     }
-    Write-Output 'Policy regressions passed: root/hidden/native sources, build scripts, excluded targets, links, exact feature names and local dependencies.'
+    Write-Output 'Policy regressions passed: root/hidden/native sources, build scripts, excluded targets, links, web/node_modules, exact feature names and local dependencies.'
 } finally {
     $tempRoot = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd([IO.Path]::DirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
     if (-not $fixtureRoot.StartsWith($tempRoot, [StringComparison]::OrdinalIgnoreCase)) { throw 'Unsafe policy-fixture cleanup path' }
