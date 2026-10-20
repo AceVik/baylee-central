@@ -1,3 +1,6 @@
 # `cargo xtask <task>`: the development tasks in crates/xtask (docs/xtask.md).
+# Under its own profile the task's binary lives in target/xtask, so the
+# `cargo test --workspace` it starts never rebuilds the executable that is
+# running (Windows refuses to replace a running .exe).
 [alias]
-xtask = "run --locked --quiet -p xtask --"
+xtask = "run --locked --quiet --profile xtask -p xtask --"

@@ -22,3 +22,7 @@ strip = "debuginfo"
 
 [profile.dev]
 overflow-checks = true
+
+# `cargo xtask` (.cargo/config.toml): its own directory under target.
+[profile.xtask]
+inherits = "dev"
