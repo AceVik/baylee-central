@@ -18,11 +18,13 @@ reports in Central. Until those exist, these texts are not served.
 
 - German is binding; the English file is a translation and says so.
 - Each file starts with `<!-- version: … -->` and `<!-- updated: … -->`.
-  Both languages of one document carry the same version. A new version of
-  the terms needs every account's acceptance again (accept, later = signed
-  out, or delete the account); nobody continues under an older one. The
-  privacy policy is information, not a contract: a new version is shown, not
-  accepted. The version `2026-10-1` is a placeholder until publication.
+  Both languages of one document carry the same version. The version `draft`
+  means not in force, and it is the only thing that holds a text out of
+  force (`docs/terms.md`): publishing replaces it by a real version in a
+  reviewed commit. A new version of the terms needs every account's
+  acceptance again (accept, later = signed out, or delete the account);
+  nobody continues under an older one. The privacy policy is information,
+  not a contract: a new version is shown, not accepted.
 - The text uses only the Markdown subset the Baylee client renders: `#`/`##`
   headings, paragraphs, `**bold**`, `*italic*`, lists, rules and links. No
   tables, no HTML, no images.

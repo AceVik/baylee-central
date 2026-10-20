@@ -1,4 +1,4 @@
-<!-- version: 2026-10-1 -->
+<!-- version: draft -->
 <!-- updated: 2026-10-20 -->
 
 # Nutzungsbedingungen für Baylee-Konten
