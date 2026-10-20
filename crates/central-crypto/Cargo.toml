@@ -4,7 +4,8 @@ version = "0.1.0"
 edition.workspace = true
 rust-version.workspace = true
 publish.workspace = true
-license.workspace = true
+# AGPL, not the workspace licence: the Baylee client links this crate (LICENSE.md § 6).
+license = "AGPL-3.0-only"
 description = "Experimental native-client OPAQUE and master-key wrapping; not a deployed protocol"
 
 [features]

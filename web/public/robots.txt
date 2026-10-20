@@ -1,3 +1,19 @@
+# Text and data mining, AI training included, is reserved under section 44b(3)
+# UrhG and Art. 4(3) of Directive (EU) 2019/790; see /.well-known/tdmrep.json.
+# The crawlers below collect training data; search and user-initiated fetches
+# stay welcome.
+User-agent: GPTBot
+User-agent: ClaudeBot
+User-agent: anthropic-ai
+User-agent: Google-Extended
+User-agent: Applebot-Extended
+User-agent: CCBot
+User-agent: Bytespider
+User-agent: meta-externalagent
+User-agent: cohere-ai
+User-agent: Amazonbot
+Disallow: /
+
 User-agent: *
 Disallow: /impressum
 Disallow: /site/impressum/

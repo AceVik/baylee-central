@@ -85,6 +85,13 @@ pub(super) fn check_members(meta: &Metadata) -> Result<()> {
                 "Package publication must be disabled: {name}"
             )));
         }
+        if !rules::known_licence(package["license"].as_str()) {
+            return Err(Fail::new(format!(
+                "Package licence must be {} or {}: {name}",
+                rules::AGPL,
+                rules::SOURCE_AVAILABLE
+            )));
+        }
         if !inside(manifest_path, root, false) {
             return Err(Fail::new(format!(
                 "Workspace member outside reviewed root: {name}"
@@ -97,6 +104,35 @@ pub(super) fn check_members(meta: &Metadata) -> Result<()> {
         }
         for target in list(package, "targets") {
             check_target(target, root, &excluded)?;
+        }
+    }
+    check_agpl_closure(meta)
+}
+
+/// An AGPL member builds only on AGPL members: the Baylee client links
+/// those crates, so none may pull source-available code into it. Dev
+/// dependencies build only this repository's own tests and are exempt.
+fn check_agpl_closure(meta: &Metadata) -> Result<()> {
+    let packages = list(&meta.json, "packages");
+    let licences: BTreeMap<&str, Option<&str>> = packages
+        .iter()
+        .filter_map(|package| Some((package["name"].as_str()?, package["license"].as_str())))
+        .collect();
+    for package in packages {
+        if package["license"].as_str() != Some(rules::AGPL) {
+            continue;
+        }
+        let name = text(package, "name")?;
+        for dependency in list(package, "dependencies") {
+            if dependency["path"].is_null() || dependency["kind"].as_str() == Some("dev") {
+                continue;
+            }
+            let dependency = text(dependency, "name")?;
+            if licences.get(dependency).copied().flatten() != Some(rules::AGPL) {
+                return Err(Fail::new(format!(
+                    "AGPL package depends on source-available code: {name} -> {dependency}"
+                )));
+            }
         }
     }
     Ok(())
