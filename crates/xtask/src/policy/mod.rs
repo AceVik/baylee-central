@@ -2,8 +2,10 @@
 //! the rules and messages the former `scripts/check-policy.ps1` had:
 //!
 //! - the workspace forbids `unsafe`; every member inherits the workspace
-//!   lints, is not published, lives in the reviewed tree and outside the
-//!   tool output, and every target's root says `#![forbid(unsafe_code)]`;
+//!   lints, is not published, declares one of the repository's two licences
+//!   (an AGPL member building only on AGPL members), lives in the reviewed
+//!   tree and outside the tool output, and every target's root says
+//!   `#![forbid(unsafe_code)]`;
 //! - the whole tree holds no link, no C/C++ or assembly source, and no
 //!   unsafe block, inline assembly or unsafe allowance in a Rust file; skipped are only
 //!   tool output: `.git`, `target` and `node_modules` at the root, and
