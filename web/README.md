@@ -274,9 +274,9 @@ opacity, 160–360 ms, and `prefers-reduced-motion` stills all of it.
 
 ## Known gaps
 
+`scripts/check-policy.ps1` skips `web/node_modules` (npm's install, whose
+`.bin` holds symbolic links) and nothing else under `web/`; a Cargo target
+inside it is refused, and `scripts/test-policy.ps1` proves both.
+
 - The directory waits for M3's browser route (above).
-- `scripts/check-policy.ps1` walks the whole tree and refuses symbolic links,
-  and `web/node_modules/.bin` holds some: run the policy before `npm ci`, or
-  without `web/node_modules`. CI's policy job checks out a clean tree. A
-  reviewed exclusion is a follow-up.
 - No automated accessibility audit (axe) yet: it would be a new dependency.
