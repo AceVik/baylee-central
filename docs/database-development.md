@@ -45,12 +45,15 @@ establish verified TLS outside explicit disposable fixtures.
 
 ## Running real database checks
 
-Install Docker with Linux-container support and PowerShell 7. Run:
+Install Docker with Linux-container support and OpenSSL. Run:
 
-```powershell
-./scripts/test.ps1
-./scripts/test-postgres.ps1
+```sh
+cargo xtask gate
+cargo xtask postgres
 ```
+
+or, with PowerShell 7, `./scripts/test.ps1` and `./scripts/test-postgres.ps1`:
+the same fixture and checks ([xtask](xtask.md)).
 
 The latter creates a fresh pinned official PostgreSQL image with ephemeral data,
 a loopback-only random published port, memory/CPU/process limits and random
@@ -64,7 +67,8 @@ The exact owned child process, container and listener are cleaned and checked in
 finally blocks, including failures. Its generated container name is printed so an
 agent can identify that exact fixture after an external hard interruption. Docker
 daemon failure is reported as unverified cleanup, never a successful removal.
-To exercise failure cleanup, invoke test-postgres.ps1 -ExerciseFailure and expect
+To exercise failure cleanup, invoke `cargo xtask postgres --exercise-failure` (or
+test-postgres.ps1 -ExerciseFailure) and expect
 the deliberate Synthetic fixture failure error after cleanup; CI checks that path.
 
 Coverage: failed migration leaves no history; repeat migration is idempotent;

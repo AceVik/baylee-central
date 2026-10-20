@@ -35,10 +35,12 @@ Public Rust APIs are documented; no pre-1.0 stability guarantee yet. Library use
 must preserve trusted input and transactional persistence requirements. No release
 to crates.io until license/API/security gates pass.
 
-Use scripts/test.ps1 and scripts/smoke-dev.ps1. Smoke tests launch their own server
+Use `cargo xtask gate` and `cargo xtask smoke` on any platform, or
+scripts/test.ps1 and scripts/smoke-dev.ps1 under PowerShell ([xtask](xtask.md)
+states the same checks with the same messages). Smoke tests launch their own server
 on an ephemeral loopback port and always stop that exact process, checking port
 closure. Agent-started interactive clients must likewise be closed after testing.
-Use scripts/smoke-dev.ps1 -ExerciseFailure to deliberately fail immediately after
+Use `cargo xtask smoke --exercise-failure` (or scripts/smoke-dev.ps1 -ExerciseFailure) to deliberately fail immediately after
 startup and verify the same cleanup path. It must report Synthetic development
 failure only after cleanup; a cleanup error is a failure, not an expected result.
 CI exercises both paths on every supported native platform. Cleanup probes have

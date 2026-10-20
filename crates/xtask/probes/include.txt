@@ -1,0 +1,3 @@
+#![forbid(unsafe_code)]
+include!("generated.rs");
+fn main() { generated(); }

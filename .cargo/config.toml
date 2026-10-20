@@ -1,0 +1,3 @@
+# `cargo xtask <task>`: the development tasks in crates/xtask (docs/xtask.md).
+[alias]
+xtask = "run --locked --quiet -p xtask --"

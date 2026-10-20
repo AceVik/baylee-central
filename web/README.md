@@ -274,9 +274,10 @@ opacity, 160–360 ms, and `prefers-reduced-motion` stills all of it.
 
 ## Known gaps
 
-`scripts/check-policy.ps1` skips `web/node_modules` (npm's install, whose
-`.bin` holds symbolic links) and nothing else under `web/`; a Cargo target
-inside it is refused, and `scripts/test-policy.ps1` proves both.
+The policy check (`cargo xtask policy`, `scripts/check-policy.ps1`) skips
+`web/node_modules` (npm's install, whose `.bin` holds symbolic links) and
+nothing else under `web/`; a Cargo target inside it is refused, and the
+policy regressions prove both.
 
 - The directory waits for M3's browser route (above).
 - No automated accessibility audit (axe) yet: it would be a new dependency.

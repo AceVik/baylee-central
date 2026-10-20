@@ -1,0 +1,6 @@
+#![forbid(unsafe_code)]
+let unsafety = 1;
+// the word unsafe alone, in prose
+fn unsafe_free() {}
+let plasm = 2;
+let x = "asm";
