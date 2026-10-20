@@ -1,0 +1,8 @@
+node_modules/
+dist/
+test-results/
+playwright-report/
+# Filled by `npm run content` from a Baylee checkout, never committed: the
+# card status and the screenshots carry card names and card text (README.md).
+public/data/
+public/media/

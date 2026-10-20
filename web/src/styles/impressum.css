@@ -1,0 +1,34 @@
+/* The Impressum (src/pages/Impressum.tsx): the details drawn character by
+   character. Each real character carries its position as an order class,
+   the decoys (.scr-x) take no room on screen, and the flexbox puts the
+   characters back in order for the eye while the DOM stays a jumble. */
+.imp-box { padding: 1.3rem 1.4rem; margin: 0 0 1.4rem; }
+.imp-box > :last-child { margin-bottom: 0; }
+.imp-why { font-family: var(--sans); color: var(--ink-soft); font-size: 0.95rem; }
+.imp-progress { display: block; width: min(18rem, 100%); height: 6px; margin: 0.9rem 0 0; accent-color: var(--gold); }
+.imp-status { font-family: var(--sans); font-size: 0.92rem; color: var(--ink-soft); margin: 0.6rem 0 0; min-height: 0; }
+.imp-status:empty { margin: 0; }
+.imp-failed { margin: 0.8rem 0 0; color: var(--ink-soft); }
+.imp-address { font-size: 1.1rem; line-height: 1.7; margin: 0.4rem 0 0; }
+.imp-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.8rem; }
+.imp-dl { display: grid; grid-template-columns: max-content 1fr; gap: 0.7rem 1.2rem; align-items: center; margin: 0 0 0.5rem; font-family: var(--sans); }
+.imp-dl dt { font-weight: 700; color: var(--ink); }
+.imp-dl dd { margin: 0; min-height: 46px; display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1.2rem; }
+.imp-dl .imp-actions { margin-top: 0; }
+.imp-box h2 { font-size: 1.3rem; margin-top: 1.6rem; }
+@media (max-width: 560px) {
+  .imp-dl { grid-template-columns: 1fr; gap: 0.2rem; }
+  .imp-dl dd + dt { margin-top: 0.8rem; }
+}
+.scr-block { user-select: none; -webkit-user-select: none; }
+.scr { display: inline-flex; flex-wrap: nowrap; position: relative; white-space: pre; user-select: none; -webkit-user-select: none; }
+.scr > span { white-space: pre; }
+.scr > .scr-x { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: hidden; opacity: 0; pointer-events: none; }
+.o0 { order: 0; } .o1 { order: 1; } .o2 { order: 2; } .o3 { order: 3; } .o4 { order: 4; } .o5 { order: 5; } .o6 { order: 6; } .o7 { order: 7; }
+.o8 { order: 8; } .o9 { order: 9; } .o10 { order: 10; } .o11 { order: 11; } .o12 { order: 12; } .o13 { order: 13; } .o14 { order: 14; } .o15 { order: 15; }
+.o16 { order: 16; } .o17 { order: 17; } .o18 { order: 18; } .o19 { order: 19; } .o20 { order: 20; } .o21 { order: 21; } .o22 { order: 22; } .o23 { order: 23; }
+.o24 { order: 24; } .o25 { order: 25; } .o26 { order: 26; } .o27 { order: 27; } .o28 { order: 28; } .o29 { order: 29; } .o30 { order: 30; } .o31 { order: 31; }
+.o32 { order: 32; } .o33 { order: 33; } .o34 { order: 34; } .o35 { order: 35; } .o36 { order: 36; } .o37 { order: 37; } .o38 { order: 38; } .o39 { order: 39; }
+.o40 { order: 40; } .o41 { order: 41; } .o42 { order: 42; } .o43 { order: 43; } .o44 { order: 44; } .o45 { order: 45; } .o46 { order: 46; } .o47 { order: 47; }
+.o48 { order: 48; } .o49 { order: 49; } .o50 { order: 50; } .o51 { order: 51; } .o52 { order: 52; } .o53 { order: 53; } .o54 { order: 54; } .o55 { order: 55; }
+.o56 { order: 56; } .o57 { order: 57; } .o58 { order: 58; } .o59 { order: 59; } .o60 { order: 60; } .o61 { order: 61; } .o62 { order: 62; } .o63 { order: 63; }

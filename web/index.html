@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="referrer" content="no-referrer" />
+    <meta name="color-scheme" content="dark light" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0b1322" />
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#eef2f8" />
+    <meta name="description" content="Baylee is a free, open-source rules engine and 3D table for playing Magic: The Gathering with friends or against the house AI. Closed beta. Unofficial fan content." />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Baylee – a table that knows the rules" />
+    <meta property="og:description" content="A free, open-source rules engine and 3D table for playing Magic: The Gathering with friends or against the house AI. Closed beta." />
+    <meta property="og:url" content="https://baylee.app/" />
+    <meta property="og:image" content="https://baylee.app/img/og.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <title>Baylee – a table that knows the rules</title>
+    <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
+    <script src="/boot.js"></script>
+    <link rel="preload" href="/fonts/Faustina.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/AlegreyaSans-Medium.woff2" as="font" type="font/woff2" crossorigin />
+    <script type="module" src="/src/main.tsx"></script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <!-- Without JavaScript the app cannot draw; this says where everything is.
+         The honeypot (.hp, hidden from people, disallowed in robots.txt) is the
+         Impressum's (README.md §"The Impressum"): an address that follows it
+         is answered invented details by the feedback service. -->
+    <noscript>
+      <main class="nojs">
+        <img src="/img/baylee-logo.webp" width="800" height="336" alt="Baylee" />
+        <p>Baylee is a free, open-source rules engine and 3D table for playing Magic: The Gathering with friends or against the house AI. This site needs JavaScript.</p>
+        <p lang="de">Baylee ist eine freie, quelloffene Regel-Engine mit 3D-Spieltisch für Magic: The Gathering. Diese Seite braucht JavaScript.</p>
+        <ul>
+          <li><a href="https://github.com/AceVik/baylee/releases">Download (GitHub releases)</a></li>
+          <li><a href="https://github.com/AceVik/baylee">Source code (AGPL-3.0)</a></li>
+          <li><a href="https://discord.gg/4pP3uAwgY">Discord</a></li>
+          <li><a href="https://github.com/AceVik/baylee/issues">Issues</a></li>
+        </ul>
+        <a class="hp" href="/site/impressum/kontakt" tabindex="-1" aria-hidden="true" rel="nofollow">Kontakt</a>
+      </main>
+    </noscript>
+  </body>
+</html>
