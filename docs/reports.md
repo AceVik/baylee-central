@@ -30,13 +30,25 @@ more. This page is the design pass (security assurance pass 1).
    `client`. Central's native boundary stays credential-only, and the per-
    address limits a public write needs already exist on the gateway; Central
    has only global budgets today (roadmap M3).
-2. **Records are uploaded in chunks.** A record is up to 64 MiB, the native
-   wire carries 1 MiB. `StartReport { kind, body, record_bytes,
-   record_sha256, record_origin }` (body: the report's JSON, at most 256 KiB)
-   answers a report id and a one-use upload capability;
-   `ReportChunk { report, index, bytes }` (at most 512 KiB each, in order)
-   and `FinishReport { report }` complete it, which checks the total length
-   and the SHA-256. An unfinished report expires after an hour.
+2. **Not the native wire.** A report's `client` part reaches 2 MiB (an
+   embedded screenshot), a gateway's record 64 MiB; the native wire carries
+   1 MiB and writes bytes as JSON numbers. Two transports fit, neither is
+   the native wire:
+   - **(i) raw-body routes in `central-http`** (recommended):
+     `POST /v1/reports` (metadata and `client` JSON, bounded),
+     `PUT /v1/reports/{id}/record` (the gzip as a raw body, streamed with
+     its own limit and checked against its declared length and SHA-256),
+     and for triage the matching reads, under a gateway's credential or a
+     triage credential. New HTTP surface, so the three passes and the
+     owner's review; M4's admin area needs the same routes to download a
+     record, so they are not throwaway.
+   - **(ii) a `central_reports` schema** in `baylee_central`, owned by
+     Central's migrator and used by the feedback service under a narrow
+     TLS role. No new network surface, but a cross-repository schema
+     contract without a version, and Central's runtime would not use the
+     reports until M4.
+   **Which one is the owner's to choose.** Until then no Central code is
+   written for reports.
 3. **Central stores the gzip as it came** and never unpacks it: no new
    dependency (`flate2` stays out), no decompression bomb on the server. The
    triage UI unpacks in the browser (`DecompressionStream`) or an operator
@@ -65,26 +77,47 @@ more. This page is the design pass (security assurance pass 1).
    - **(b) all at once**: reports keep going to the feedback service until
      M2 to M4 exist, then intake, storage and triage move together.
 
-   The owner's answer (2026-10-20) moves the open reports now and reworks the
-   UI, so the path is **(a)**: Central stores and serves reports at once, the
-   feedback service keeps only its admin sign-in and serves the reworked UI,
-   reading and changing reports at Central under a triage credential of its
-   own (loopback only, digest in Central's settings, no account session), and
-   the UI moves into the website's admin area with M4. A one-time migration
-   copies every report that is not done, with its record, and nothing else.
+   The owner's answer (2026-10-20) moves the open reports and reworks the
+   UI, so the path is **(a)**. Order: the UI and its new triage features
+   come first, in Baylee's feedback service, against its own database, with
+   the new columns shaped as the Central schema below, so that the later
+   move is a copy; then reports move to Central over the chosen transport
+   (2), and the UI reads them there until M4 moves it into the website.
+   A one-time migration copies every open report (`new`, `triaged`,
+   `in_progress`) with its record and audit rows; `resolved`, `wont_fix` and
+   `duplicate` are not migrated.
+
+## Privacy invariants
+
+- The reporter is the gateway's pseudonym (an HMAC under
+  `BAYLEE_FEEDBACK_KEY`, which stays on the gateway) or a direct reporter's
+  device HMAC. Neither key, nor any HMAC of an account id, ever reaches
+  Central: "we cannot know who wrote this" depends on it, and Central holds
+  account ids.
+- A direct client report comes through the official gateway, which keeps
+  checking a client record's shape (it links the decompressor); Central never
+  decompresses.
 
 ## Data
 
-- `reports(id uuidv7, gateway_audience, kind bug|crash, body bytea ≤ 256 KiB,
-  record_origin gateway|client|none, record_bytes, record_sha256, status
-  open|done|wontfix, created_at, done_at, finished_at)`.
-- `report_chunks(report_id, index, bytes ≤ 512 KiB)`, `ON DELETE CASCADE`.
-- `report_audit(report_id, at, admin_id, status)`, kept after the report
-  goes, without its text.
+As the feedback service's `feedback_report` has it today, plus the triage
+columns its reworked UI adds, so a move is a copy:
+
+- `reports(id uuidv7, created_at, updated_at, gateway, gateway_name,
+  gateway_url, gateway_version, channel gateway|direct, reporter, kind,
+  status new|triaged|in_progress|resolved|wont_fix|duplicate, text, game_id,
+  client jsonb ≤ 2 MiB, record bytea ≤ 64 MiB, record_complete,
+  record_origin gateway|client, issue_number, assignee, priority, labels,
+  duplicate_of, signature, revision, done_at, deleted_at)`.
+- `report_notes(id, report_id, at, author, text)`: internal notes, their own
+  table.
+- `report_audit(report_id, at, actor, action, detail)`: every change of a
+  report's state, kept after the report goes, without its text.
 - Runtime role: `SELECT, INSERT` on all three, `UPDATE (status, done_at,
   finished_at)` on `reports` by column grant, `DELETE` on `reports` for the
   sweep. No `UPDATE` of a body or a record.
 
 ## Dependencies
 
-None new: `serde_json`, `sha2`, SeaORM and the existing HTTP stack suffice.
+None new for (i) or (ii): `serde_json`, `sha2`, SeaORM and the existing HTTP
+stack suffice; the gzip stays opaque.
