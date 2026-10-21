@@ -1,7 +1,7 @@
 //! The command line: `cargo xtask <task> [flag]`, nothing else.
 
 use crate::fail::{Fail, Result};
-use crate::{gate, policy, postgres, secrets, smoke, workspace};
+use crate::{gate, policy, postgres, secrets, smoke, wasm, workspace};
 
 /// What to run.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -26,6 +26,11 @@ pub enum Task {
     },
     /// The secret scan of the tree and its history.
     Secrets,
+    /// `central-web-crypto`'s WebAssembly module and glue for the website.
+    Wasm {
+        /// Compare a fresh build with the committed files instead of writing them.
+        check: bool,
+    },
 }
 
 /// How to call it.
@@ -36,7 +41,8 @@ tasks:
   policy [--compiler-probe]     the code policy: unsafe, native sources, links, dependencies
   postgres [--exercise-failure] the PostgreSQL integration fixture (needs Docker and OpenSSL)
   smoke [--exercise-failure]    the development listener smoke test (build --release first)
-  secrets                       the secret scan of the tree and the full history (pinned gitleaks)";
+  secrets                       the secret scan of the tree and the full history (pinned gitleaks)
+  wasm [--check]                the website's WebAssembly crypto and glue (web/src/central-wasm)";
 
 /// The task `args` name.
 ///
@@ -71,6 +77,8 @@ pub fn parse(args: &[String]) -> Result<Task> {
             exercise_failure: true,
         }),
         ("secrets", None) => Ok(Task::Secrets),
+        ("wasm", None) => Ok(Task::Wasm { check: false }),
+        ("wasm", Some("--check")) => Ok(Task::Wasm { check: true }),
         _ => Err(usage()),
     }
 }
@@ -92,5 +100,6 @@ pub fn run(args: &[String]) -> Result<()> {
         Task::Postgres { exercise_failure } => postgres::run(&root, exercise_failure),
         Task::Smoke { exercise_failure } => smoke::run(&root, exercise_failure),
         Task::Secrets => secrets::run(&root),
+        Task::Wasm { check } => wasm::run(&root, check),
     }
 }

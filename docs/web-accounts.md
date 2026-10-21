@@ -73,7 +73,9 @@ exact bytes.
 20 random bytes, shown as 32 Crockford base32 characters in eight groups of four
 (`XXXX-XXXX-…`), read back case-insensitively with `O`→`0`, `I`/`L`→`1`. The
 recovery wrapping key is HKDF-SHA512 over the 20 bytes with salt
-`baylee-central/recovery/v1` and the context's AAD as info; the wrapper is the
+`baylee-central/recovery/v1` and the context's AAD as info (the password
+wrapper's 86 bytes; [crypto protocol](crypto-protocol.md) §"Recovery code"
+spells out every byte); the wrapper is the
 same 73-byte XChaCha20-Poly1305 format as `wrapped_master` with the AAD domain
 `baylee-central/recovery-wrap/v1\0`. No password stretching: the code carries 160
 bits. `central-crypto` gains `RecoveryCode` (generate, parse, wrap, unwrap) with
@@ -165,20 +167,37 @@ The global budgets of the native surface apply as well. The native surface
 ## Browser crypto (`central-web-crypto`)
 
 A `cdylib`, `#![forbid(unsafe_code)]`, linking `central-crypto` (client side),
-`central-api` (the live issuer) and `wasm-bindgen`. Its exports take and return
-bytes and plain objects; every network call is the page's.
+`central-api` (the live issuer) and `wasm-bindgen`. Its exports take bytes and
+strings and return opaque state objects and objects of bytes; every network
+call is the page's.
 
-- `enrollment_start(password, account, epoch)` → `{ state, message }`
-- `enrollment_finish(state, response)` → `{ record, wrapped_master,
-  recovery_code, recovery, document }`
-- `login_start(password, account, epoch)` → `{ state, message }`
-- `login_finish(state, response, wrapped_master)` → `{ message }`, which fails
-  when the master key does not unwrap
+- `enrollment_start(password, account, epoch)` → an `Enrollment` state whose
+  `message` is the registration request (32 bytes)
+- `enrollment_finish(state, response)` → `Enrolled { record, wrapped_master,
+  recovery_code, recovery, document }`; freeing it wipes the code
+- `login_start(password, account, epoch)` → a `Login` state whose `message`
+  is KE1 (96 bytes)
+- `login_finish(state, response)` → a `LoginKey` state whose `message` is KE3
+  (64 bytes); a wrong password fails here, before anything is sent
+- `login_confirm(key, wrapped_master)`, which fails when the master key does
+  not unwrap
+- `central_origin()`, the Central the module is bound to (the live one)
 
-`state` is an opaque handle that the crate zeroizes on use. Argon2id (64 MiB)
-runs in a module Worker. The JS glue is made by `wasm-bindgen` (CLI, the same
-version) at build time and is committed under `web/src/central-wasm/` with its
-hash, so `npm run build` needs no Rust toolchain.
+*Changed 21.10.2026 while building it:* `login_finish` first took
+`wrapped_master` too, but that only arrives in the answer to the KE3
+`login_finish` makes, so the check is a step of its own. The states are
+exported objects rather than fields of plain objects, which would have needed
+`js-sys` as a direct dependency; a step that takes a state empties its
+JavaScript object, and an error is `rejected` or `unavailable`.
+
+A state is opaque, consumed by the step that takes it and wiped when dropped,
+also when the page frees it unused. Argon2id (64 MiB) runs in a module
+Worker, one per flow, terminated at the flow's end. The JS glue is made by
+`wasm-bindgen` (CLI, the same version) and committed under
+`web/src/central-wasm/` with its SHA-256 sums, so `npm run build` needs no
+Rust toolchain; `cargo xtask wasm` rebuilds it on x86-64 Linux (other machines use the
+pinned container), and `cargo xtask wasm --check` (a CI job) proves the
+committed bytes are what the source builds ([xtask](xtask.md)).
 
 ## Web pages (`web/`)
 

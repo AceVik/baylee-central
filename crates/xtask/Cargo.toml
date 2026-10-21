@@ -5,7 +5,7 @@ edition.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 license.workspace = true
-description = "Development tasks for Baylee Central: the gate, the policy check, the PostgreSQL and development smoke fixtures and the secret scan"
+description = "Development tasks for Baylee Central: the gate, the policy check, the PostgreSQL and development smoke fixtures, the secret scan and the website's WebAssembly build"
 
 [dependencies]
 getrandom = "=0.4.3"
