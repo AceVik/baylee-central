@@ -91,6 +91,24 @@ choice is PostgreSQL 18+ with database-generated UUIDv7 and SeaORM 2 migrations.
 Its separate inventory is recorded in storage-proposal; current use remains
 local development plus the verified-TLS deployed connector.
 
+## Registration and browser sign-in (in progress)
+
+The server side of [web accounts](web-accounts.md) lands in three PRs.
+
+- **Migration 000007 and the store.** Accounts carry a `source` (`legacy` or
+  `registered`) paired with `legacy_id`; legacy rules hold legacy accounts only,
+  so a registered account uses private objects after `ConfirmRestore` and the
+  bridge's redemption answers `legacy_id: None` for it. The recovery wrapper is
+  stored for registered accounts. Beta keys (`beta_keys`, digests only) are
+  issued with `--issue-beta-keys-stdin` ([operations](operations.md)); the
+  runtime role may only spend their uses. Sessions have a kind, one per account
+  and kind, and a browser session lives in its own digest domain. Tests: a
+  prior-version upgrade of the exact migration SQL with legacy data, the schema
+  constraints, the grant contract and both session kinds over PostgreSQL 18.
+  Deploy: stop, migrate, grant (`ops/grants.sql`), start.
+- **Next:** `Register`, the recovery wrapper in `EnrollmentFinish`, and the
+  browser listener with its cookie and per-address budgets.
+
 ## Validation and historical milestone evidence
 
 Windows local: full foundation/crypto format, Clippy, unit/integration/doc tests,
@@ -151,9 +169,9 @@ evidence of production capacity.
 Native OPAQUE login, account persistence, gateway registration/admin APIs,
 exclusive sessions, guarded legacy migration and encrypted private-object/chat
 storage are implemented and tested with synthetic data. They have not been
-deployed for real users. Browser SSO, complete new-account registration,
-password change/reset/recovery service and UI flows, MFA, session renewal and
-the central website remain unfinished. Live discovery exposes enrollment state
+deployed for real users. Browser SSO, password change/reset/recovery service
+and UI flows, MFA and session renewal remain unfinished; registration and
+browser sign-in are in progress (above). Live discovery exposes enrollment state
 and requires its documented review before public use.
 
 Private deck CRUD/history and the durable replay archive are not implemented in

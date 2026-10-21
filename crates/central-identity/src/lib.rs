@@ -186,7 +186,11 @@ impl IdentityService {
         .await
         .map_err(|_| Error::Unavailable)??;
         let token = Token::generate()?;
-        let wrapped_master = self.store.issue_session(&credential, &token).await?;
+        let wrapped_master = self
+            .store
+            .issue_session(&credential, &token)
+            .await?
+            .wrapped_master;
         Ok(Response::Session {
             token,
             identity: credential.identity,

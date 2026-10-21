@@ -463,3 +463,81 @@ Kelvin sign, a full-width letter, 31 or 33 symbols and 129 bytes are refused.
 Injected faults each failed a test: deriving with the recovery domain as info
 (the known answer), and dropping the `L` mapping (the read-back test).
 Engineering review, not an audit.
+||||||| parent of c0dd0a7 (Registration schema: account source, beta keys, session kinds (migration 000007))
+## Registration and browser sign-in, 2026-10-21
+
+Owner decisions and the contract: [web accounts](web-accounts.md). Built in
+three PRs (migration and store, wire and identity, browser listener); each
+records its own implementation and adversarial findings below.
+
+Design pass. Assets: the beta keys (who may register), the username namespace,
+OPAQUE records, the wrapped master key and its recovery wrapper, the browser
+session cookie and the per-address counters (memory only). Callers: anyone on
+the Internet through `baylee.app`'s Caddy for the browser listener, native
+clients and the bridge on `/v1/native`, and the operator (migrator login) for
+issuing keys. Invariants and the choices made before code:
+
+- A bad, used-up, expired or revoked key is `Rejected` before the name is
+  looked at; only a valid key learns `Conflict` for a taken name. Keys are 80
+  random bits, stored as SHA-256 digests only, so neither guessing nor a copy
+  of the table yields one.
+- A reservation counts against its key only while its enrollment ticket lives:
+  a key admits a registration while `uses_left` exceeds its live reservations,
+  and a use is spent in the enrollment commit. An expired reservation so gives
+  its use back without any clean-up job, and two registrations racing for a key's
+  last use are serialized by the key's row lock. The link between key and
+  account is cleared at enrollment: the privacy notice lists no such record.
+- Legacy rules (`legacy_closed`, the bridge's operations) apply to legacy
+  accounts only, in the schema too: `source` pairs with `legacy_id` by CHECK,
+  `legacy_closed` is legacy-only, an enrolled registered account must have a
+  recovery wrapper and a legacy one must not. Every `legacy_closed` predicate
+  in the store gains its registered counterpart, otherwise a registered account
+  could never use private objects; the bridge's redemption answers
+  `legacy_id: None` for it instead of failing.
+- One session per account and kind. A browser session is looked up by a digest
+  in its own domain (SHA-256 over a fixed label and the token), not by the
+  native bearer digest, so a cookie value presented as a native bearer finds no
+  session and a native bearer is no browser session. Binding the kind in every
+  session query would have touched fifteen statements, any one of which could
+  have been missed open; separate digest domains fail closed by construction and
+  cost no query.
+- `Register` is served on the browser listener only this round: its
+  per-address budget is the design's control against key guessing and name
+  probing, and the native surface has none (native registration is M6).
+- The browser listener is default-deny: one route, the listed operations, exact
+  `Host`, `Origin`, content type and `X-Baylee-Central`, no `Authorization`, no
+  CORS answer. Every refusal happens before the identity service is called and
+  is tested without a database. The token travels only in the `__Host-` cookie
+  and never in a body. `X-Forwarded-For` counts only from a loopback peer.
+- Migration 000007 keeps defaults for `source` (`legacy`) and `kind`
+  (`native`), so the previous binary, which the deploy hook restarts when a new
+  one fails to start, still serves legacy migration; it fails closed on every
+  registered account (CHECKs and NOT NULL reads), which the new code names
+  explicitly in every write.
+
+**Migration 000007 and the store.** Implementation pass: every `legacy_closed`
+predicate (object writes and reads, `SessionStatus`) and the bridge's
+redemption read of `legacy_id` were found holding registered accounts back;
+the redemption read a NULL into a string and would have answered 503 at the
+official gateway. Each now names the registered case. The fixtures granted
+hand-copied lists; they now run `ops/grants.sql` itself, so the startup check
+is tested against what the deploy hook grants. `beta_keys` grants a column,
+which the generic check did not model: it now requires `UPDATE` on exactly
+`uses_left` and refuses it on any other column or the table. The fixture found
+that issuing read the clock twice (`created_at` after `expires_at`), so a
+30-day key lasted microseconds less than 30 days; one timestamp now serves
+both.
+
+Adversarial pass: a prior-version upgrade runs the exact SQL of 000001 to
+000006 in a scratch schema, writes legacy accounts, a session and a ticket as
+the previous binary did, applies 000007, and checks the data, the defaults and
+the previous binary's own statements, all in one rolled-back transaction. The
+schema refuses each broken pairing of source, legacy ID, key link, ticket and
+recovery wrapper. Seven injected faults each failed the PostgreSQL fixture at
+the assertion written for it, after a clean baseline run on the same commit: a
+browser digest equal to the native one (a cookie accepted as a bearer), a
+sign-in replacing sessions of any kind (a website sign-in ending the client's
+session), the legacy-only object and `migration_closed` predicates, a grant
+check accepting `UPDATE (note)`, a migration without the recovery rule, and
+key issuing outside one transaction (a run repeating a digest left its other
+key behind). Engineering review, not an audit.

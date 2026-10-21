@@ -66,11 +66,10 @@ impl AccountStore {
             return Err(Error::Rejected);
         }
         let identity = identity(&row)?;
+        // Only the bridge learns a legacy ID; a registered account has none.
         let legacy = if gateway.is_none() {
-            Some(
-                row.try_get("", "legacy_id")
-                    .map_err(|_| Error::Unavailable)?,
-            )
+            row.try_get("", "legacy_id")
+                .map_err(|_| Error::Unavailable)?
         } else {
             None
         };

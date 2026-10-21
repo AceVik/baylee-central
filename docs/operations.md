@@ -17,6 +17,9 @@ never in argv or the environment. Unknown fields fail closed.
   `listen`, `database`, `opaque_setup`, `bridge`.
 - `--migrate-stdin` applies pending migrations once under the migration login
   and exits. Input: `database` only. The service never migrates by itself.
+- `--issue-beta-keys-stdin` issues beta keys under the migration login (see
+  [beta keys](#beta-keys)) and prints each once. Input: `database`, `count`,
+  `uses`, `note` and optionally `expires_days`.
 - `--generate-secrets` writes a fresh `{"opaque_setup": [...], "bridge": [...]}`
   document to standard output and refuses when standard output is a terminal.
 - `--dev` and `--dev-accounts-stdin` are the local development modes described
@@ -86,6 +89,44 @@ started before the grant, it refuses to run (the check fails closed).
 The terms tables (`docs/terms.md`) get `SELECT, INSERT` only: published
 gateway versions and acceptances are immutable records, and an account's
 acceptances go with the account by cascade.
+
+## Beta keys
+
+Registration on `baylee.app` needs a beta key ([web accounts](web-accounts.md)).
+Issue them with the migrator login, from a file the operator keeps, as for
+`--migrate-stdin`:
+
+```sh
+central-service --issue-beta-keys-stdin < issue.json
+```
+
+```json
+{"database": {"host": "…", "port": 5432, "name": "baylee_central", "user": "central_migrator",
+  "password": "…", "ca_certificate": "…"},
+ "count": 10, "uses": 1, "expires_days": 30, "note": "October playtest"}
+```
+
+`count` is 1 to 100 keys, `uses` 1 to 1000 registrations per key,
+`expires_days` (optional) 1 to 3650 days, `note` at most 200 characters without
+control characters. Everything is checked before the database is reached; the
+keys of one run are written in one transaction, all or none. Each key is printed
+once, one per line, as `CENTRAL-XXXX-XXXX-XXXX-XXXX` (80 random bits in
+Crockford base32); a count goes to standard error. Central keeps only the
+SHA-256 digest: a lost key cannot be printed again, only replaced.
+
+Keys are read back case-insensitively, with or without the `CENTRAL` prefix and
+the hyphens, `O` read as `0` and `I` or `L` as `1`. A registration reserves one
+use while its enrollment ticket lives (10 minutes) and spends it when the
+enrollment commits; an expired reservation gives its use back. Revoke a key as
+an operator, which ends its pending registrations too:
+
+```sql
+UPDATE central_identity.beta_keys SET revoked_at = clock_timestamp() WHERE note = 'October playtest';
+```
+
+The runtime role may only `SELECT` keys and `UPDATE` their `uses_left`; it can
+neither issue, revoke, re-date nor delete one, and the store refuses to start
+with any wider or narrower grant.
 
 ## Secrets
 

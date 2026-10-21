@@ -14,6 +14,7 @@ mod m20261019_000003_ticket_purpose;
 mod m20261019_000004_gateway_registry;
 mod m20261019_000005_private_objects;
 mod m20261020_000006_terms;
+mod m20261021_000007_registration;
 
 use sea_orm_migration::{
     MigrationTrait, MigratorTrait,
@@ -33,6 +34,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261019_000004_gateway_registry::Migration),
             Box::new(m20261019_000005_private_objects::Migration),
             Box::new(m20261020_000006_terms::Migration),
+            Box::new(m20261021_000007_registration::Migration),
         ]
     }
 }

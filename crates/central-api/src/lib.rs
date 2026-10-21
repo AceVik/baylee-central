@@ -1,6 +1,7 @@
 //! Native account protocol. Passwords and decrypted personal content have no server wire type.
 #![forbid(unsafe_code)]
 
+pub mod beta_key;
 mod endpoint;
 pub mod gateway;
 pub mod object;

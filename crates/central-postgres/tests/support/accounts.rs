@@ -12,8 +12,10 @@ use central_postgres::{AccountStore, Credential};
 use sea_orm::{ConnectionTrait, DatabaseConnection};
 
 mod gateways;
+mod kinds;
 mod migration;
 mod objects;
+mod registration;
 mod revocation_race;
 mod single_session;
 mod terms;
@@ -29,6 +31,9 @@ fn context(identity: Identity) -> Context {
     .unwrap()
 }
 
+/// The runtime role's grants as the deploy hook applies them.
+const GRANTS: &str = include_str!("../../../../ops/grants.sql");
+
 pub(crate) async fn run(operator: &DatabaseConnection) {
     // Default grants are insufficient. Grant only the runtime CRUD operations.
     assert!(
@@ -36,19 +41,8 @@ pub(crate) async fn run(operator: &DatabaseConnection) {
             .await
             .is_err()
     );
-    operator
-        .execute_unprepared(
-            "GRANT SELECT, INSERT, UPDATE, DELETE ON central_identity.accounts,
-        central_identity.sessions, central_identity.gateway_tickets, central_identity.private_objects TO central_runtime;
-        GRANT SELECT, INSERT ON central_identity.migration_archives TO central_runtime;
-        GRANT SELECT, INSERT, UPDATE ON central_identity.gateways TO central_runtime;
-        GRANT SELECT ON central_identity.gateway_approvals TO central_runtime;
-        GRANT SELECT, INSERT, DELETE ON central_identity.gateway_admins, central_identity.gateway_leases TO central_runtime;
-        GRANT SELECT, INSERT ON central_identity.gateway_terms, central_identity.gateway_terms_texts,
-        central_identity.terms_acceptances TO central_runtime",
-        )
-        .await
-        .unwrap();
+    // The deployed grants, exactly: the store's startup check must accept them.
+    operator.execute_unprepared(GRANTS).await.unwrap();
     let store =
         AccountStore::connect_dev(config("central_runtime", "CENTRAL_TEST_RUNTIME_PASSWORD"))
             .await
@@ -94,6 +88,8 @@ pub(crate) async fn run(operator: &DatabaseConnection) {
     objects::run(&store, operator, &keys).await;
     migration::run(&store, operator, &keys).await;
     terms::run(&store, operator, &keys).await;
+    kinds::run(&store, operator, &keys).await;
+    registration::run(&store, operator, &keys).await;
     store.close().await.unwrap();
 }
 
@@ -155,7 +151,11 @@ async fn login(store: &AccountStore, keys: &ServerKeys, identity: Identity) -> T
     let result = login.finish(&response).unwrap();
     attempt.finish(&result.finalization).unwrap();
     let token = Token::generate().unwrap();
-    let wrapped = store.issue_session(&credential, &token).await.unwrap();
+    let wrapped = store
+        .issue_session(&credential, &token)
+        .await
+        .unwrap()
+        .wrapped_master;
     let master = result
         .wrapping_key
         .unwrap(&WrappedMasterKey::from_bytes(&wrapped).unwrap())

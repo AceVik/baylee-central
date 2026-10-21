@@ -5,17 +5,71 @@ use super::{
 use central_api::wire::TicketPurpose;
 use sea_orm::{ConnectionTrait, TransactionTrait};
 
+/// A session token and the surface it belongs to. An account holds at most one
+/// session of each kind. A browser session is stored under a digest in its own
+/// domain, so a cookie value presented as a native bearer finds no session, and
+/// a native bearer is no browser session. A plain `&Token` is a native session.
+#[derive(Clone, Copy)]
+pub enum Session<'a> {
+    /// The native client's bearer on `/v1/native`.
+    Native(&'a Token),
+    /// The website's `__Host-` cookie on the browser listener.
+    Browser(&'a Token),
+}
+
+impl<'a> From<&'a Token> for Session<'a> {
+    fn from(token: &'a Token) -> Self {
+        Self::Native(token)
+    }
+}
+
+impl Session<'_> {
+    /// Prefix of a browser session's digest input. With it the input is longer
+    /// than any token, so no bearer hashes to a browser session's digest.
+    const BROWSER_DOMAIN: &'static [u8] = b"baylee-central/browser-session/v1\0";
+
+    pub(super) const fn kind(self) -> &'static str {
+        match self {
+            Self::Native(_) => "native",
+            Self::Browser(_) => "browser",
+        }
+    }
+
+    /// The digest the session is stored under.
+    pub(super) fn digest(self) -> [u8; 32] {
+        use sha2::{Digest, Sha256};
+        match self {
+            Self::Native(token) => token.digest(),
+            Self::Browser(token) => Sha256::new()
+                .chain_update(Self::BROWSER_DOMAIN)
+                .chain_update(token.to_secret_bytes().as_slice())
+                .finalize()
+                .into(),
+        }
+    }
+}
+
+/// A session just issued.
+pub struct Issued {
+    /// The account's stored client-encrypted master key.
+    pub wrapped_master: Vec<u8>,
+    /// Absolute Unix-seconds expiry, 30 minutes after issue; never renewed.
+    pub expires_at: i64,
+}
+
 impl AccountStore {
     /// Issue after OPAQUE verification, conditional on the unchanged credential revision.
-    /// Atomically replace every earlier session and its tickets/leases for this account.
+    /// Atomically replace the account's earlier session of the same kind, with its
+    /// tickets and leases; a session of the other kind stays.
     ///
     /// # Errors
     /// Rejects stale credentials or database failure without revoking the current session.
-    pub async fn issue_session(
+    pub async fn issue_session<'a>(
         &self,
         credential: &Credential,
-        token: &Token,
-    ) -> Result<Vec<u8>, Error> {
+        session: impl Into<Session<'a>>,
+    ) -> Result<Issued, Error> {
+        let session = session.into();
         let transaction = self.db.begin().await.map_err(|_| Error::Unavailable)?;
         let row = transaction.query_one_raw(statement(
             "SELECT wrapped_master FROM central_identity.accounts WHERE id = $1 AND vault_epoch = $2
@@ -24,24 +78,31 @@ impl AccountStore {
         )).await.map_err(|_| Error::Unavailable)?.ok_or(Error::Rejected)?;
         transaction
             .execute_raw(statement(
-                "DELETE FROM central_identity.sessions WHERE account_id = $1",
-                vec![uuid(credential.identity.account).into()],
+                "DELETE FROM central_identity.sessions WHERE account_id = $1 AND kind = $2",
+                vec![
+                    uuid(credential.identity.account).into(),
+                    session.kind().into(),
+                ],
             ))
             .await
             .map_err(|_| Error::Unavailable)?;
-        let inserted = transaction.execute_raw(statement(
-            "INSERT INTO central_identity.sessions (digest, account_id, credential_revision, created_at, expires_at)
-             SELECT $1, $2, $3, t, t + interval '30 minutes' FROM (SELECT pg_catalog.clock_timestamp() AS t) clock",
-            vec![token.digest().to_vec().into(), uuid(credential.identity.account).into(), credential.revision.into()],
-        )).await.map_err(|_| Error::Unavailable)?;
-        if inserted.rows_affected() != 1 {
-            return Err(Error::Busy);
-        }
-        let wrapped = row
-            .try_get("", "wrapped_master")
-            .map_err(|_| Error::Unavailable)?;
+        let inserted = transaction.query_one_raw(statement(
+            "INSERT INTO central_identity.sessions (digest, account_id, credential_revision, kind, created_at, expires_at)
+             SELECT $1, $2, $3, $4, t, t + interval '30 minutes' FROM (SELECT pg_catalog.clock_timestamp() AS t) clock
+             RETURNING floor(extract(epoch FROM expires_at))::bigint AS expires_at",
+            vec![session.digest().to_vec().into(), uuid(credential.identity.account).into(),
+                credential.revision.into(), session.kind().into()],
+        )).await.map_err(|_| Error::Unavailable)?.ok_or(Error::Busy)?;
+        let issued = Issued {
+            wrapped_master: row
+                .try_get("", "wrapped_master")
+                .map_err(|_| Error::Unavailable)?,
+            expires_at: inserted
+                .try_get("", "expires_at")
+                .map_err(|_| Error::Unavailable)?,
+        };
         transaction.commit().await.map_err(|_| Error::Unavailable)?;
-        Ok(wrapped)
+        Ok(issued)
     }
 
     /// Read only the authenticated account's ciphertext and current revision.
@@ -151,6 +212,7 @@ impl AccountStore {
     }
 
     /// Redeem once for the bridge's configured audience, with fresh session/revision checks.
+    /// A registered account has no legacy ID.
     ///
     /// # Errors
     /// Rejects expiry, replay, wrong audience, revocation or storage failure.
@@ -159,7 +221,7 @@ impl AccountStore {
         ticket: &Token,
         audience: &str,
         purpose: TicketPurpose,
-    ) -> Result<(Identity, String), Error> {
+    ) -> Result<(Identity, Option<String>), Error> {
         let row = self.db.query_one_raw(statement(
             "WITH spent AS (DELETE FROM central_identity.gateway_tickets WHERE digest = $1 AND audience = $2 AND purpose = $3
              AND expires_at > pg_catalog.clock_timestamp() RETURNING session_digest)
@@ -180,11 +242,11 @@ impl AccountStore {
     ///
     /// # Errors
     /// Reports unavailable storage; does not claim success until the deletion commits.
-    pub async fn logout(&self, session: &Token) -> Result<(), Error> {
+    pub async fn logout<'a>(&self, session: impl Into<Session<'a>>) -> Result<(), Error> {
         self.db
             .execute_raw(statement(
                 "DELETE FROM central_identity.sessions WHERE digest = $1",
-                vec![session.digest().to_vec().into()],
+                vec![session.into().digest().to_vec().into()],
             ))
             .await
             .map_err(|_| Error::Unavailable)?;

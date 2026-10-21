@@ -94,6 +94,7 @@ fn an_explicit_mode_is_required_and_extra_arguments_are_rejected() {
         &["--production"],
         &["--accounts-stdin", "PRIVATE_ARG_CANARY"],
         &["--migrate-stdin", "--dev"],
+        &["--issue-beta-keys-stdin", "PRIVATE_ARG_CANARY"],
         &["--generate-secrets", "PRIVATE_ARG_CANARY"],
         &["--DEV"],
     ] {
@@ -103,7 +104,7 @@ fn an_explicit_mode_is_required_and_extra_arguments_are_rejected() {
         assert!(!stderr.contains("PRIVATE_ARG_CANARY"));
         assert_eq!(
             stderr.trim(),
-            "usage: central-service --dev | --dev-accounts-stdin | --accounts-stdin | --migrate-stdin | --generate-secrets"
+            "usage: central-service --dev | --dev-accounts-stdin | --accounts-stdin | --migrate-stdin | --issue-beta-keys-stdin | --generate-secrets"
         );
     }
 }
@@ -118,6 +119,10 @@ fn production_modes_reject_missing_or_invalid_input_without_echoing_it() {
         (
             "--migrate-stdin",
             "central: migration rejected configuration or failed",
+        ),
+        (
+            "--issue-beta-keys-stdin",
+            "central: beta keys rejected configuration or failed; none were issued",
         ),
     ] {
         let output = run_invalid(&[mode], None);
