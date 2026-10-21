@@ -73,23 +73,12 @@ REVOKE CREATE ON SCHEMA public FROM PUBLIC;
 ```
 
 Then run `--migrate-stdin` with the migrator login, and grant the runtime role
-exactly the privileges its startup checks require (as `central_migrator`, which
-owns the tables):
+exactly the privileges its startup checks require: `ops/grants.sql`, as
+`central_migrator`, which owns the tables, or as a superuser, whose grant
+PostgreSQL records as the owner's. It is idempotent; the deploy hook runs it
+after every migration.
 
-```sql
-GRANT USAGE ON SCHEMA central_identity TO central_runtime;
-GRANT SELECT, INSERT ON central_identity.pending_accounts TO central_runtime;
-GRANT SELECT, INSERT, UPDATE, DELETE ON central_identity.accounts, central_identity.sessions,
-  central_identity.gateway_tickets, central_identity.private_objects TO central_runtime;
-GRANT SELECT, INSERT ON central_identity.migration_archives TO central_runtime;
-GRANT SELECT, INSERT, UPDATE ON central_identity.gateways TO central_runtime;
-GRANT SELECT ON central_identity.gateway_approvals TO central_runtime;
-GRANT SELECT, INSERT, DELETE ON central_identity.gateway_admins, central_identity.gateway_leases TO central_runtime;
-GRANT SELECT, INSERT ON central_identity.gateway_terms, central_identity.gateway_terms_texts,
-  central_identity.terms_acceptances TO central_runtime;
-```
-
-A later migration that adds a table also adds its grant here; the runtime
+A later migration that adds a table also adds its grant to `ops/grants.sql`; the runtime
 store's startup check names every table and privilege it needs. Upgrading a
 running service across such a migration: stop it, migrate, grant, start it;
 started before the grant, it refuses to run (the check fails closed).
@@ -130,6 +119,41 @@ RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
 MemoryDenyWriteExecute=yes
 SystemCallFilter=@system-service
 ```
+
+## Deploying with the gateway
+
+`ops/deploy-hook` keeps Central and the website (`web/`) in lockstep with the
+official gateway on the same machine. It is a Baylee deploy hook (Baylee's
+`docs/deploy-hooks.md`): installed root-owned, `0755`, as
+`/etc/baylee/deploy-hooks.d/10-central`, it runs in every gateway deploy,
+including the one the gateway's timer starts for a new release tag.
+
+- **Which revision.** The one the gateway being deployed links
+  (`central-api`'s `rev` in its `Cargo.toml`), so the service speaks that
+  gateway's protocol. Central never goes back: when the installed revision
+  (`/opt/baylee-central/state/deployed`) already contains it, the hook does
+  nothing, so a newer Central deployed by hand stays.
+- **`prepare`.** As the build user it fetches, checks the revision out in
+  `/opt/baylee-central/src`, builds `central-service` and the website (`npm
+  ci`, `npm run content` from the gateway's checkout, `npm run build`), and
+  stages both with `ops/grants.sql` in `/opt/baylee-central/staged`. A failed
+  fetch answers "not ready" (75), so the next timer run tries again.
+- **`before-switch`** (no game is running, admission is held): stops the
+  unit, installs the binary (the old one kept as `central-service.previous`),
+  migrates (`--migrate-stdin` from `/etc/baylee-central/migrate.json` under
+  `systemd-run` as `central`), grants, starts it and waits up to 30 s for
+  `/health/live`; then swaps the website into `/opt/baylee-app/web`. A failed
+  migration, grant or start puts the previous binary back, starts it and
+  fails the hook, which stops the deploy (migrations are transactional).
+- **By hand,** for a Central or website change between gateway releases:
+  `sudo /etc/baylee/deploy-hooks.d/10-central manual <central revision>`
+  stages and switches that revision at once; nothing holds games for it.
+
+Settings, all optional, in `/etc/baylee-central/deploy-hook.env` (root's,
+not writable by others): `BUILD_USER`, `BAYLEE_SRC`, `CENTRAL_ROOT`,
+`WEB_ROOT`, `UNIT`, `LISTEN`, `DB_CONTAINER`, `DB_SUPERUSER`, `DB_NAME`; the
+defaults are this deployment's. The website's site block is the one in
+`web/README.md` §"Serving it", with `root` on `WEB_ROOT`.
 
 ## Known limits of this deployment
 

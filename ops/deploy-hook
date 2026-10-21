@@ -1,0 +1,174 @@
+#!/bin/bash
+# Keeps Central and the website in lockstep with the gateway beside them.
+#
+# A Baylee deploy hook (Baylee's docs/deploy-hooks.md): installed root-owned
+# as /etc/baylee/deploy-hooks.d/10-central, run by root with a cleared
+# environment as `10-central PHASE BAYLEE_COMMIT`. The Central revision is
+# the one the gateway at BAYLEE_COMMIT links (`central-api`'s `rev` in its
+# Cargo.toml), so the service always speaks the gateway's protocol. Central
+# never goes back: when the installed revision already contains that one,
+# the hook does nothing, so a newer Central deployed by hand stays.
+#
+#   prepare        fetch and build the revision (as the build user), stage it
+#   before-switch  stop Central, install, migrate, grant, start; the website
+#   after-switch   nothing
+#
+# By hand, for a Central or website change between gateway releases:
+#
+#   10-central manual CENTRAL_REVISION    prepare and switch that revision
+#
+# Settings: /etc/baylee-central/deploy-hook.env (root's, optional), the
+# variables below. docs/operations.md §"Deploying with the gateway".
+set -euo pipefail
+umask 022
+
+SETTINGS=/etc/baylee-central/deploy-hook.env
+BUILD_USER=viktor
+BAYLEE_SRC=/opt/baylee/src
+CENTRAL_ROOT=/opt/baylee-central
+WEB_ROOT=/opt/baylee-app/web
+UNIT=baylee-central
+LISTEN=127.0.0.1:28790
+DB_CONTAINER=baylee-postgres-1
+DB_SUPERUSER=baylee
+DB_NAME=baylee_central
+if [[ -e $SETTINGS ]]; then
+    [[ $(stat -c '%U %a' "$SETTINGS") =~ ^root\ [0-7][0-5][0-5]$ ]] \
+        || { echo "central: $SETTINGS is not root's alone" >&2; exit 1; }
+    # shellcheck source=/dev/null
+    . "$SETTINGS"
+fi
+SRC=$CENTRAL_ROOT/src
+STATE=$CENTRAL_ROOT/state
+STAGED=$CENTRAL_ROOT/staged
+BIN=$CENTRAL_ROOT/bin
+
+say() { echo "central: $*"; }
+die() { echo "central: $*" >&2; exit 1; }
+
+# A command as the build user, with only what a build needs.
+as_builder() {
+    local home
+    home=$(getent passwd "$BUILD_USER" | cut -d: -f6)
+    runuser -u "$BUILD_USER" -- env -i HOME="$home" LANG=C.UTF-8 \
+        PATH="$home/.cargo/bin:/usr/local/bin:/usr/bin:/bin" "$@"
+}
+
+is_rev() { [[ $1 =~ ^[0-9a-f]{40}$ ]]; }
+
+# The Central revision the gateway at baylee commit $1 links, or nothing.
+pinned() {
+    as_builder git -C "$BAYLEE_SRC" show "$1:Cargo.toml" \
+        | sed -n 's/^central-api = {.*rev = "\([0-9a-f]\{40\}\)".*/\1/p' | head -n1
+}
+
+# Whether the installed Central already contains revision $1.
+contains() {
+    local deployed
+    deployed=$(cat "$STATE/deployed" 2>/dev/null || true)
+    is_rev "$deployed" && as_builder git -C "$SRC" merge-base --is-ancestor "$1" "$deployed"
+}
+
+# Builds revision $1 and stages the service, the grants and the website.
+stage() {
+    local rev=$1
+    if [[ $(cat "$STATE/staged" 2>/dev/null || true) == "$rev" && -x $STAGED/central-service ]]; then
+        say "$rev is staged already"
+        return
+    fi
+    rm -f "$STATE/staged"
+    # GitHub not answering is "not ready": the next timer run asks again.
+    as_builder git -C "$SRC" fetch -q origin || { say "fetch failed"; exit 75; }
+    as_builder git -C "$SRC" cat-file -e "$rev^{commit}" || die "no commit $rev in $SRC"
+    as_builder git -C "$SRC" checkout -q --detach "$rev"
+    say "building $rev"
+    as_builder bash -c "cd '$SRC' && cargo build -q --release --locked -p central-service"
+    as_builder bash -c "cd '$SRC/web' && npm ci --no-audit --no-fund --silent \
+        && npm run -s content -- '$BAYLEE_SRC' && npm run -s build"
+    rm -rf "$STAGED"
+    install -d -m755 -o root -g root "$STAGED"
+    install -m755 -o root -g root "$SRC/target/release/central-service" "$STAGED/central-service"
+    install -m644 -o root -g root "$SRC/ops/grants.sql" "$STAGED/grants.sql"
+    cp -R "$SRC/web/dist" "$STAGED/web"
+    chown -R root:root "$STAGED/web"
+    echo "$rev" > "$STATE/staged"
+    say "staged $rev"
+}
+
+# Installs what is staged: the service with its migrations and grants, then
+# the website. Back to the previous binary when the new one does not start.
+switch() {
+    local rev
+    rev=$(cat "$STATE/staged" 2>/dev/null || true)
+    if ! is_rev "$rev"; then
+        say "nothing staged"
+        return
+    fi
+    systemctl stop "$UNIT"
+    [[ -x $BIN/central-service ]] && install -m755 -o root -g root "$BIN/central-service" "$BIN/central-service.previous"
+    install -m755 -o root -g root "$STAGED/central-service" "$BIN/central-service.new"
+    mv -f "$BIN/central-service.new" "$BIN/central-service"
+    if ! systemd-run --wait --collect --quiet -p User=central -p Group=central \
+        -p StandardInput=file:/etc/baylee-central/migrate.json \
+        "$BIN/central-service" --migrate-stdin; then
+        back "the migration failed"
+    fi
+    docker exec -i "$DB_CONTAINER" psql -q -v ON_ERROR_STOP=1 -U "$DB_SUPERUSER" -d "$DB_NAME" \
+        < "$STAGED/grants.sql" || back "the grants failed"
+    systemctl start "$UNIT"
+    live || back "$rev does not answer /health/live"
+    rm -rf "$WEB_ROOT.new" "$WEB_ROOT.old"
+    install -d -m755 -o root -g root "$(dirname "$WEB_ROOT")"
+    cp -R "$STAGED/web" "$WEB_ROOT.new"
+    [[ -d $WEB_ROOT ]] && mv "$WEB_ROOT" "$WEB_ROOT.old"
+    mv "$WEB_ROOT.new" "$WEB_ROOT"
+    rm -rf "$WEB_ROOT.old"
+    echo "$rev" > "$STATE/deployed"
+    rm -f "$STATE/staged"
+    say "deployed $rev"
+}
+
+# Whether Central answers its liveness probe within 30 seconds.
+live() {
+    local _
+    for _ in $(seq 30); do
+        curl -fsS -o /dev/null -H 'Host: central.baylee.app' "http://$LISTEN/health/live" && return 0
+        sleep 1
+    done
+    return 1
+}
+
+back() {
+    say "$1; starting the previous binary"
+    systemctl stop "$UNIT" || true
+    [[ -x $BIN/central-service.previous ]] && mv -f "$BIN/central-service.previous" "$BIN/central-service"
+    systemctl start "$UNIT" || true
+    exit 1
+}
+
+[[ $(id -u) == 0 ]] || die "run as root"
+install -d -m755 -o root -g root "$STATE"
+phase=${1:-}
+rev=${2:-}
+is_rev "$rev" || die "usage: $0 prepare|before-switch|after-switch BAYLEE_COMMIT | manual CENTRAL_REVISION"
+case $phase in
+    prepare)
+        central=$(pinned "$rev")
+        if ! is_rev "$central"; then
+            say "the gateway at $rev links no Central revision; nothing to do"
+            rm -f "$STATE/staged"
+        elif contains "$central"; then
+            say "installed Central contains $central; nothing to do"
+            rm -f "$STATE/staged"
+        else
+            stage "$central"
+        fi
+        ;;
+    before-switch) switch ;;
+    after-switch) ;;
+    manual)
+        stage "$rev"
+        switch
+        ;;
+    *) die "unknown phase $phase" ;;
+esac
