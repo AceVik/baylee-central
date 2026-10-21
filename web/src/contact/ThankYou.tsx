@@ -15,20 +15,17 @@ export function ThankYou({ onAgain }: { onAgain: () => void }) {
         <path d="M15 27l7 7 15-16" />
       </svg>
       <h3>
-        <T en="Thank you, it is on its way." de="Danke, sie ist unterwegs." />
+        <T id="thanks.title" />
       </h3>
       <p className="small">
-        <T
-          en="If you left an address, the answer comes from a person, by mail."
-          de="Wenn du eine Adresse dagelassen hast, kommt die Antwort von einem Menschen, per Mail."
-        />
+        <T id="thanks.answer" />
       </p>
       <button
         type="button"
         className="button button-ghost"
         onClick={onAgain}
       >
-        <T en="Write another" de="Noch eine schreiben" />
+        <T id="thanks.again" />
       </button>
     </div>
   );
