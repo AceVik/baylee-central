@@ -1,3 +1,7 @@
 * text=auto eol=lf
 *.png binary
 *.jpg binary
+# The browser crypto is committed built and checked by its SHA-256 sums
+# (web/src/central-wasm/README.md): its bytes must never be converted.
+*.wasm binary
+web/src/central-wasm/** -text

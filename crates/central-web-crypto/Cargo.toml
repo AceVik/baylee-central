@@ -1,0 +1,32 @@
+[package]
+name = "central-web-crypto"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+license.workspace = true
+description = "Registration and sign-in crypto for baylee.app, built to WebAssembly"
+
+# The cdylib is the WebAssembly module (docs/web-accounts.md §"Browser
+# crypto"); the rlib lets the host's tests drive the same steps.
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[lints]
+workspace = true
+
+[dependencies]
+central-api = { path = "../central-api", version = "=0.1.0" }
+central-crypto = { path = "../central-crypto", version = "=0.1.0" }
+wasm-bindgen = { version = "=0.2.129", default-features = false, features = ["std"] }
+zeroize = { version = "=1.9.1", features = ["alloc", "derive"] }
+
+# Randomness in the browser is the Web Crypto API's: getrandom 0.4 (the
+# crates' own) and 0.2 (under opaque-ke's rand 0.8) each need their backend
+# for wasm32-unknown-unknown (owner approved 21.10.2026).
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom = { version = "=0.4.3", features = ["wasm_js"] }
+getrandom-legacy = { package = "getrandom", version = "=0.2.17", features = ["js"] }
+
+[dev-dependencies]
+central-crypto = { path = "../central-crypto", version = "=0.1.0", features = ["server"] }

@@ -23,6 +23,22 @@ strip = "debuginfo"
 [profile.dev]
 overflow-checks = true
 
+# Argon2 (64 MiB, three passes) unoptimised makes every OPAQUE test take
+# seconds; its hashing optimised keeps the suite short. Checks stay on.
+[profile.dev.package.argon2]
+opt-level = 3
+[profile.dev.package.blake2]
+opt-level = 3
+
 # `cargo xtask` (.cargo/config.toml): its own directory under target.
 [profile.xtask]
 inherits = "dev"
+
+# `cargo xtask wasm` (docs/xtask.md): central-web-crypto's WebAssembly module,
+# one codegen unit and link-time optimisation, so the build is small and the
+# same on every machine.
+[profile.wasm]
+inherits = "release"
+lto = true
+codegen-units = 1
+panic = "abort"

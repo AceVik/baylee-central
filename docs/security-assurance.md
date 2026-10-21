@@ -463,7 +463,6 @@ Kelvin sign, a full-width letter, 31 or 33 symbols and 129 bytes are refused.
 Injected faults each failed a test: deriving with the recovery domain as info
 (the known answer), and dropping the `L` mapping (the read-back test).
 Engineering review, not an audit.
-||||||| parent of c0dd0a7 (Registration schema: account source, beta keys, session kinds (migration 000007))
 ## Registration and browser sign-in, 2026-10-21
 
 Owner decisions and the contract: [web accounts](web-accounts.md). Built in
@@ -541,3 +540,85 @@ session), the legacy-only object and `migration_closed` predicates, a grant
 check accepting `UPDATE (note)`, a migration without the recovery rule, and
 key issuing outside one transaction (a run repeating a digest left its other
 key behind). Engineering review, not an audit.
+
+## Browser crypto (`central-web-crypto`), 2026-10-21
+
+Owner decisions: browser crypto is a WebAssembly crate built from
+`central-crypto`; `wasm-bindgen` 0.2.129 as a direct dependency, getrandom
+0.4.3 `wasm_js` and 0.2.17 `js` ([web accounts](web-accounts.md)).
+
+Design pass: the assets are the password, the OPAQUE export key, the master
+key, the recovery code and the states between two messages. The page is
+trusted code from this origin under the site's CSP; Central's answers are
+not, so the module checks every server message (exact OPAQUE sizes, the
+KE2 MAC) and the returned wrapper. The module makes no network call, binds
+the live issuer at compile time (no parameter can name another Central) and
+keeps no key: the master key exists only inside a step and is wiped when it
+ends. A state is an opaque exported object, consumed by the step that takes
+it (wasm-bindgen empties the JavaScript object) and wiped on drop, also when
+the page frees it unused. Findings before code: the design's
+`login_finish(state, response, wrapped_master)` cannot exist, since
+`wrapped_master` arrives in the answer to the KE3 that `login_finish` makes;
+the step is split into `login_finish` and `login_confirm` and the design
+says so. A `development` feature for a local Central's issuer would have
+broken every flow test under the gate's `--all-features`; it is left out
+until the run against a real local Central, and the committed module is
+bound to the live Central by construction (`central_origin()` is tested).
+Exported classes instead of plain objects keep `js-sys` out of the direct
+dependencies, which the owner's approval did not name.
+
+Implementation pass: `#![forbid(unsafe_code)]` holds on the crate with the
+`#[wasm_bindgen]` expansions; the policy, its compiler probe and the textual
+scan pass. The graph gains no package: wasm-bindgen 0.2.129 and js-sys
+0.3.106 were already in the lockfile; the inventory gains `getrandom@0.4.3`
+`wasm_js` and `getrandom@0.2.17` `js`, plus `js-sys` and `wasm-bindgen`, the
+names cargo gives the two optional dependencies 0.2's `js` turns on (recorded
+under `approvals` in `approved-packages.json`). Both backends call
+`crypto.getRandomValues`; the glue holds no `eval` or `Function`
+constructor, and the `module.require` and `process` it references belong to
+getrandom 0.2's Node path, which a browser with Web Crypto never takes. The
+password crosses into the module as an owned string and goes straight into
+`SecretString`; the recovery code leaves it read from its zeroizing buffer
+(`JsValue::from_str`), not as a buffer handed to the glue and freed unwiped.
+Not wipeable, recorded: the page's JavaScript strings (password, code), and
+the bytes wasm-bindgen's string passing may leave in freed module memory
+when it grows a buffer for non-ASCII input; the pages therefore run one
+module instance per flow in a Worker and terminate it, which discards its
+whole memory. Panics abort (profile `wasm`); a trapped instance is never
+reused. The build is reproducible on x86-64 Linux, CI's host: repository and
+Cargo home are remapped out of the module (a module still naming either
+fails the task), wasm-bindgen strips the name and producers sections, and
+`cargo xtask wasm --check` compares a fresh build byte for byte. Finding,
+from CI: a module built on macOS differed from CI's although no path or flag
+did; cargo folds the build host into every crate's `-C metadata`, which
+renames the symbols and changes the layout under link-time optimisation.
+The committed module is therefore the x86-64 Linux build, the task refuses
+other hosts, and other machines use the pinned container (`docs/xtask.md`);
+a rustc-argument rewriter that would have forced the metadata was rejected
+as first-party code editing compiler arguments. CI's native Ubuntu build and
+the documented container run on macOS both equal the committed module. That
+container run also found the local-path check matching `/central` inside
+`https://central.baylee.app` when the repository sits at `/central`; the
+check now looks for a directory followed by its separator, with a test.
+Git never converts the committed files' line ends (`.gitattributes`), so a
+Windows checkout keeps the bytes the sums name.
+
+Adversarial pass: on the host, against `central-crypto`'s server side with
+real messages and the fixed Argon2 profile, a registration then a sign-in
+then `login_confirm` succeed, and the sealed document opens to exactly the
+design's bytes under the password's master key and under the recovery
+code's, typed back in lower case; two registrations differ in code, wrappers
+and document, and one's code does not open the other's wrapper; a wrong
+password fails at `login_finish`, before KE3 exists; another epoch and an
+unknown account fail; `login_confirm` refuses the recovery wrapper, another
+registration's wrapper, flipped bytes across the wrapper and lengths 0, 72
+and 74; short, long and non-v7 accounts, epoch zero, an empty or 1025-byte
+password and a response with a suffix are refused. In JavaScript the real
+module (vitest) is bound to the live Central, makes 32-byte registration
+requests and 96-byte KE1s, different each time, refuses the same malformed
+input with `rejected`, and a consumed state cannot be used again. Injected
+faults each failed a test: `login_confirm` ignoring the unwrap result, and
+in `--check` one changed byte, a wrong sum and an extra file, and the macOS
+build itself, which CI's Linux check refused. Engineering
+review, not an audit; the full round trip against Central's browser surface
+is the account pages' run against a real local Central.

@@ -49,6 +49,7 @@ none much past 200 lines:
 | `src/download/` | the release and the machine (`release.ts`, `machine.ts`), the button, the platform cards, the page |
 | `src/cards/` | the card status: data and parsing (`model.ts`, `numbers.ts`, `card.ts`, `data.ts`), the rows, the summary, the full list, the card grid |
 | `src/central/` | Central's directory client (`directory.ts`) and its checks (`validate.ts`) |
+| `src/central-wasm/` | the browser crypto, `central-web-crypto` built to WebAssembly with its glue: generated and committed, rebuilt with `cargo xtask wasm` (its `README.md`) |
 | `src/gateways/` | the directory page |
 | `src/contact/` | the contact form and the reporting help |
 | `src/impressum/` | the blob, the proof of work and its worker, the scrambled drawing, the page |
@@ -141,7 +142,9 @@ npm run check
 ```
 
 `check` is typecheck, lint (`oxlint --deny-warnings`), unit tests (vitest) and
-the production build, in that order. The smoke tests need a Chromium once:
+the production build, in that order. The browser crypto in
+`src/central-wasm/` is committed, built, so none of it needs Rust; the unit
+tests check its sums and run it. The smoke tests need a Chromium once:
 
 ```bash
 npx playwright install chromium

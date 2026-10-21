@@ -1,0 +1,29 @@
+/* tslint:disable */
+/* eslint-disable */
+export const memory: WebAssembly.Memory;
+export const __wbg_enrolled_free: (a: number, b: number) => void;
+export const __wbg_enrollment_free: (a: number, b: number) => void;
+export const __wbg_login_free: (a: number, b: number) => void;
+export const __wbg_loginkey_free: (a: number, b: number) => void;
+export const central_origin: () => [number, number];
+export const enrolled_document: (a: number) => [number, number];
+export const enrolled_record: (a: number) => [number, number];
+export const enrolled_recovery: (a: number) => [number, number];
+export const enrolled_recovery_code: (a: number) => any;
+export const enrolled_wrapped_master: (a: number) => [number, number];
+export const enrollment_finish: (a: number, b: number, c: number) => [number, number, number];
+export const enrollment_message: (a: number) => [number, number];
+export const enrollment_start: (a: number, b: number, c: number, d: number, e: bigint) => [number, number, number];
+export const login_confirm: (a: number, b: number, c: number) => [number, number];
+export const login_finish: (a: number, b: number, c: number) => [number, number, number];
+export const login_message: (a: number) => [number, number];
+export const login_start: (a: number, b: number, c: number, d: number, e: bigint) => [number, number, number];
+export const loginkey_message: (a: number) => [number, number];
+export const __wbindgen_exn_store: (a: number) => void;
+export const __externref_table_alloc: () => number;
+export const __wbindgen_externrefs: WebAssembly.Table;
+export const __wbindgen_free: (a: number, b: number, c: number) => void;
+export const __wbindgen_malloc: (a: number, b: number) => number;
+export const __externref_table_dealloc: (a: number) => void;
+export const __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
+export const __wbindgen_start: () => void;

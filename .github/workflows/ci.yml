@@ -91,6 +91,20 @@ jobs:
             exit 1
           fi
 
+  # The website's browser crypto (web/src/central-wasm/README.md): the
+  # committed WebAssembly module and glue must be what the source builds,
+  # byte for byte, here on Linux whatever machine built them.
+  wasm:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: rustup toolchain install 1.99.0 --profile minimal --target wasm32-unknown-unknown
+      - name: Rebuild central-web-crypto and compare with web/src/central-wasm
+        run: cargo xtask wasm --check
+
   # The web app (web/README.md): typecheck, lint, unit tests, build, then the
   # Playwright smoke tests against the build at a phone's and a desktop's
   # width. Every outside service is mocked in the browser (web/e2e/mocks.ts).

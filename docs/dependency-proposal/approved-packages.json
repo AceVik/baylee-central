@@ -665,11 +665,15 @@
       "zeroize"
     ],
     "getrandom@0.2.17": [
-      "std"
+      "js",
+      "js-sys",
+      "std",
+      "wasm-bindgen"
     ],
     "getrandom@0.4.3": [
       "std",
-      "sys_rng"
+      "sys_rng",
+      "wasm_js"
     ],
     "group@0.13.0": [],
     "hkdf@0.12.4": [],
@@ -1620,5 +1624,18 @@
     ],
     "zerovec-derive@0.11.6": [],
     "zmij@1.0.23": []
-  }
+  },
+  "approvals": [
+    {
+      "approved_on": "2026-10-21",
+      "reason": "owner approved 21.10.2026",
+      "for": "central-web-crypto, the browser crypto of docs/web-accounts.md",
+      "entries": [
+        "wasm-bindgen@0.2.129 as a direct dependency",
+        "getrandom@0.4.3/wasm_js",
+        "getrandom@0.2.17/js"
+      ],
+      "implied": "getrandom@0.2.17/js-sys and getrandom@0.2.17/wasm-bindgen are the names cargo gives the two optional dependencies that getrandom 0.2's js feature turns on (js = [\"wasm-bindgen\", \"js-sys\"]); both packages were already approved. No other package or feature."
+    }
+  ]
 }

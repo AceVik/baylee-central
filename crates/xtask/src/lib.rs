@@ -1,6 +1,7 @@
 //! Development tasks for Baylee Central, one implementation for Linux, macOS
 //! and Windows (`docs/xtask.md`): the gate, the code policy, the `PostgreSQL`
-//! and development smoke fixtures, and the secret scan.
+//! and development smoke fixtures, the secret scan, and the website's
+//! WebAssembly build.
 //!
 //! Every task fails closed with a fixed sentence and never prints a secret it
 //! handled. They replaced the PowerShell scripts under `scripts/` (removed
@@ -19,6 +20,7 @@ mod postgres;
 mod process;
 mod smoke;
 mod socket;
+mod wasm;
 mod workspace;
 
 pub use cli::run;
