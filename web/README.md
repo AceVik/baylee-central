@@ -402,7 +402,9 @@ The unit tests use stand-ins for Central and the crypto
 (`test/support/central.ts`); `e2e/account.spec.ts` runs the pages against a
 strict mock of the browser surface (`e2e/central.ts`), with a stand-in
 Worker for the flows and the real WebAssembly for its own checks, and shows
-that without `'wasm-unsafe-eval'` the crypto cannot start.
+that without `'wasm-unsafe-eval'` the crypto cannot start. `e2e-real/`
+runs the same pages against a real Central set up by hand (its `README.md`);
+it is not part of `npm run e2e`.
 
 ## Accessibility and motion
 
@@ -423,6 +425,4 @@ policy regressions prove both.
 
 - The directory waits for M3's browser route (above): the browser surface
   takes only the account operations, not `GatewayDirectory`.
-- The account pages have run against the mock only; the run against a real
-  local Central waits for the server's browser surface on `main`.
 - No automated accessibility audit (axe) yet: it would be a new dependency.

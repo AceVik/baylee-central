@@ -736,5 +736,51 @@ registration response and KE2; with `'wasm-unsafe-eval'` removed from the
 Worker's CSP the module cannot start and the page says so. Injected faults
 each failed a test: no `X-Baylee-Central` header, `credentials: "include"`,
 no digest check, no identity check, extra fields accepted. Engineering
-review, not an audit; the run against a real local Central waits for the
-server's browser surface.
+review, not an audit.
+
+Adversarial pass against a real Central, 21.10.2026 (`web/e2e-real/`): main
+with the browser listener of PR #25 at its head `7bc7df7` (merged unchanged
+as `7bada2c`), in the deployed
+mode (`--accounts-stdin` with `browser.listen`) over verify-full TLS to
+PostgreSQL 18, provisioned, migrated, granted and keyed as
+`docs/operations.md` says, behind a stand-in for the site's Caddy; Chromium
+at `https://baylee.app` (mapped to the stand-in), at a phone's and a
+desktop's width. The deployed mode compiles in the live issuer, so the
+committed module ran unchanged; the planned development build was not
+needed. Results:
+
+- Registration ran real OPAQUE and Argon2 in the Worker (0.2 to 0.4 s from
+  the click to the code) and showed a well-formed code; the account then
+  signed in at once. The cookie was `__Host-central`, 64 hex digits,
+  HttpOnly, Secure, SameSite=Strict, Path=/, and absent from
+  `document.cookie`; a reload was confirmed by `SessionStatus`; signing out
+  removed it; a wrong password sent nothing past `LoginStart`; the name in
+  capitals signed in; a taken name with a valid key was 409 and a bad key
+  401, and neither spent a use.
+- The rows: `source = registered`, no legacy id, a UUIDv7, epoch 1, a
+  192-byte credential record, 73-byte password and recovery wrappers, the
+  166-byte document (125 + 41) at revision 1, the reservation and enrollment
+  digest cleared, the key's uses down by exactly the two registrations, and
+  only browser sessions.
+- The native client's SDK, through the native listener, signed in to both
+  accounts (a wrong password refused), decrypted the document the browser
+  had sealed to exactly the design's bytes and confirmed the restore; the
+  account's browser session survived it. The recovery code the page showed
+  opened the stored recovery wrapper and the same document, and did not
+  under another account.
+- With Central's terms in force (a test build naming a version, never
+  committed): the page's digest of the served texts equalled Central's, so
+  `AcceptTerms` was recorded (one row, that version, a 32-byte digest) and
+  not asked again; the German text was shown in German; declining signed
+  out and recorded nothing.
+- Per-address budget: five registrations from one address, then 429, which
+  the page names as too many attempts.
+
+Finding fixed: after "Not now (sign out)" on `/signin` or `/register`, the
+terms step stayed with its accept button, which would then fail as if
+Central had not answered. The step now says the person is signed out, with a
+link to sign in; a session that ended before accepting says the same. Unit
+tests for both, and the German decline re-run against the real Central.
+Everything the run started was stopped and checked: the stand-in and Central
+by SIGTERM with their ports refusing, the container by its label, and the
+passwords, keys and configuration documents deleted.

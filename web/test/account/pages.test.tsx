@@ -166,6 +166,27 @@ describe("the terms", () => {
     expect(api.accepted).toEqual(api.current?.version);
   });
 
+  it("say so when declined: signed out, with the way back, and no dead button", async () => {
+    const api = fakeCentral({ terms: await terms() });
+    const user = await registerAndContinue(api);
+    await user.click(await screen.findByRole("button", { name: "Not now (sign out)" }));
+    expect(await screen.findByText(/You are signed out\./)).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Sign in again" }).getAttribute("href")).toBe("/signin");
+    expect(screen.queryByRole("button", { name: "I accept" })).toBeNull();
+    expect(api.session).toBeNull();
+    expect(api.calls).not.toContain("accept_terms");
+  });
+
+  it("say so when the session ended before accepting", async () => {
+    const api = fakeCentral({ terms: await terms() });
+    const user = await registerAndContinue(api);
+    await screen.findByRole("button", { name: "I accept" });
+    api.session = null;
+    await user.click(screen.getByRole("button", { name: "I accept" }));
+    expect(await screen.findByText(/Your session has ended\./)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "I accept" })).toBeNull();
+  });
+
   it("are not accepted when their texts do not hash to their digest", async () => {
     const doc = await terms();
     const [de, en] = doc.texts;
