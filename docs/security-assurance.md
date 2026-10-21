@@ -418,3 +418,48 @@ terms record, tampered texts are not served, the 257th version is refused and
 acceptances go with their account. Injected faults each fail a test: lifting
 the ticket gate, and skipping the digest check when serving. Engineering
 review, not an audit.
+
+## Recovery code, 2026-10-21
+
+Owner decision: registration on the website hands out a recovery code, shown
+once ([web accounts](web-accounts.md)). This pass covers the code and its
+wrapper in `central-crypto` ([crypto protocol](crypto-protocol.md)
+§"Recovery code"); storing it is the server's work, reset by it is M1's.
+
+Design pass: the asset is the master key, which the code opens without the
+password, so the code must carry full strength on its own (160 random bits,
+no stretching needed or added) and its wrapper must never be mistaken for
+the password one. The key derivation and the wrapper each take their own
+domain label (salt `baylee-central/recovery/v1`, associated data
+`baylee-central/recovery-wrap/v1\0`) and bind the issuer, account and epoch
+as the password wrapper does. The design's "the context's AAD as info" could
+be read two ways; the exact bytes (the password wrapper's 86) are now spelled
+out in the protocol document and pinned by a known-answer test, since M1's
+reset has to reproduce them. `WrappingKey` keeps having no raw-key
+constructor: the code derives its own key privately and shares only the
+sealing routine.
+
+Implementation pass: the code, its symbols, the 40-bit work values and the
+written text live in zeroizing buffers; the text's buffer is allocated at its
+final length so it never moves and leaves a copy. Input is bounded (128 bytes)
+before it is read; only 32 symbols of the alphabet are accepted, and the
+confusable letters are mapped as Crockford's base32 says. No Clone,
+Serialize or Display; Debug is redacted. The refactor of the password wrapper
+into a shared seal and open routine keeps its bytes (the existing
+compatibility test with the upstream allocating API still passes). Not
+addressed, and recorded: parsing and writing look symbols up by their value
+(a 32-byte table), which is not constant-time; the code is typed and shown in
+the owner's own browser, where an observer of that timing could read the
+page anyway.
+
+Adversarial pass: two vectors computed apart from the crate (Python's base32
+in Crockford's alphabet, pyca/cryptography's HKDF, libsodium's
+XChaCha20-Poly1305; `crates/central-crypto/tests/recovery-vectors.py`) pin the
+text, key and wrapper; all 584 wrapper bits, a changed issuer, account, epoch
+or code bit, the same key under the other wrapper's domain, and a password
+wrapping key are refused; 32 symbols in lower case, with `O`, `I`, `L`,
+spaces, line ends and doubled hyphens read back, while `U`, `_`, `.`, a NUL, a
+Kelvin sign, a full-width letter, 31 or 33 symbols and 129 bytes are refused.
+Injected faults each failed a test: deriving with the recovery domain as info
+(the known answer), and dropping the `L` mapping (the read-back test).
+Engineering review, not an audit.
