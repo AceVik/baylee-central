@@ -45,7 +45,9 @@ function block(hash = "") {
 describe("the card status", () => {
   it("summarises the corpus, the finished sets and the next ones", async () => {
     block();
-    expect(await screen.findByText(/3 sets, 380 cards: 290 full \(77 %\)/)).toBeTruthy();
+    // playable (full + untested) of the cards that will ever be built, then the parts
+    expect(await screen.findByText(/310 of 376 cards playable \(82 %\): 290 full, 20 untested/)).toBeTruthy();
+    expect(screen.getByText(/3 sets, 380 cards/)).toBeTruthy();
     expect(screen.getByRole("link", { name: "Limited Edition Alpha" }).getAttribute("href")).toBe("#set-lea");
     expect(screen.getByText("Arabian Nights")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Show all 3 sets" })).toBeTruthy();

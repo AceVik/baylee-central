@@ -5,7 +5,7 @@ import { T } from "../i18n";
 export function SkipLink() {
   return (
     <a className="skip" href="#main">
-      <T en="Skip to content" de="Zum Inhalt springen" />
+      <T id="app.skip" />
     </a>
   );
 }

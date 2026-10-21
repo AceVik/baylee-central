@@ -1,9 +1,9 @@
 // A set's progress: its percentage, one bar in three parts (full, untested,
 // partial; the rest is the track) and its counts by status.
 
-import { num, tt, useLang } from "../i18n";
+import { t, useLang, type Key } from "../i18n";
 import type { Counts } from "./model";
-import { buildable, pct } from "./numbers";
+import { buildable, pct, playable } from "./numbers";
 
 /** Full, untested and partial as three parts of one bar; the rest is the track. */
 export function Bar({ counts }: { counts: Counts }) {
@@ -21,31 +21,28 @@ export function Bar({ counts }: { counts: Counts }) {
 
 export function CountsLine({ counts }: { counts: Counts }) {
   const lang = useLang();
-  const part = (cls: string, n: number, en: string, de: string) => (
-    <span className={`c c-${cls}`}>
-      {num(lang, n)} {tt(lang, en, de)}
-    </span>
-  );
+  const part = (cls: string, n: number, key: Key) => <span className={`c c-${cls}`}>{t(lang, key, { n })}</span>;
   return (
     <span className="set-counts">
-      {part("implemented", counts.implemented, "full", "voll")}
-      {part("generated", counts.generated, "untested", "ungetestet")}
-      {part("partial", counts.partial, "partial", "teilweise")}
-      {part("none", counts.unimplemented + counts.absent, "not yet", "noch nicht")}
-      {counts.never > 0 && part("never", counts.never, "never", "nie")}
+      {part("playable", playable(counts), "count.playable")}
+      {part("implemented", counts.implemented, "count.full")}
+      {part("generated", counts.generated, "count.untested")}
+      {part("partial", counts.partial, "count.partial")}
+      {part("none", counts.unimplemented + counts.absent, "count.none")}
+      {counts.never > 0 && part("never", counts.never, "count.never")}
     </span>
   );
 }
 
 export function Progress({ counts }: { counts: Counts }) {
   const lang = useLang();
-  const p = pct(counts.implemented, buildable(counts));
+  const p = pct(playable(counts), buildable(counts));
   return (
     <span className="set-progress">
       <span className={`set-pct${p === 100 ? " done" : ""}`} aria-hidden="true">
-        {p} %
+        {t(lang, "sets.pct", { pct: p })}
       </span>
-      <span className="vh">{tt(lang, `${p} percent full`, `${p} Prozent voll`)}</span>
+      <span className="vh">{t(lang, "sets.pctPlayable", { pct: p })}</span>
       <Bar counts={counts} />
     </span>
   );

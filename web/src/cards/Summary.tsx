@@ -1,9 +1,9 @@
 // The summary above the full list: the whole corpus in one bar, the finished
 // sets as links, and the next sets in release order.
 
-import { T, num, tt, useLang } from "../i18n";
+import { T, t, useLang } from "../i18n";
 import type { SetsDoc } from "./model";
-import { buildable, finished, pct } from "./numbers";
+import { buildable, finished, pct, playable } from "./numbers";
 import { Bar } from "./Progress";
 import { SetRow, useOpenSet } from "./SetRow";
 
@@ -14,26 +14,37 @@ export function Summary({ doc }: { doc: SetsDoc }) {
   const [open, toggle] = useOpenSet();
   const tot = doc.totals;
   const all = doc.corpus - tot.never;
-  const p = pct(tot.implemented, all);
+  const play = playable(tot);
+  const p = pct(play, all);
   const done = doc.sets.filter(finished);
   const next = doc.sets.filter((s) => buildable(s) > 0 && !finished(s)).slice(0, NEXT_UP);
-  const n = (x: number) => num(lang, x);
   return (
     <div className="sets-summary">
       <div className="sets-overall glass">
         <p className="sets-total">
-          {tt(
-            lang,
-            `${n(doc.sets.length)} sets, ${n(doc.corpus)} cards: ${n(tot.implemented)} full (${p} %), ${n(tot.generated)} untested, ${n(tot.partial)} partial, ${n(tot.unimplemented + tot.absent)} not yet, ${n(tot.never)} never. Measured at commit ${doc.rev.slice(0, 9)}.`,
-            `${n(doc.sets.length)} Sets, ${n(doc.corpus)} Karten: ${n(tot.implemented)} voll (${p} %), ${n(tot.generated)} ungetestet, ${n(tot.partial)} teilweise, ${n(tot.unimplemented + tot.absent)} noch nicht, ${n(tot.never)} nie. Gemessen an Commit ${doc.rev.slice(0, 9)}.`,
-          )}
+          {`${t(lang, "sets.total", {
+            play,
+            all,
+            pct: p,
+            full: tot.implemented,
+            untested: tot.generated,
+            partial: tot.partial,
+            none: tot.unimplemented + tot.absent,
+            never: tot.never,
+            sets: doc.sets.length,
+            corpus: doc.corpus,
+          })} ${
+            doc.release
+              ? t(lang, "sets.atRelease", { release: doc.release, rev: doc.rev.slice(0, 9) })
+              : t(lang, "sets.atCommit", { rev: doc.rev.slice(0, 9) })
+          }`}
         </p>
         <Bar counts={{ ...tot, total: doc.corpus }} />
       </div>
       {done.length > 0 && (
         <>
           <h4 className="sets-sub">
-            <T en="Finished" de="Fertig" />
+            <T id="sets.finished" />
           </h4>
           <ul className="set-chips">
             {done.map((s) => (
@@ -49,7 +60,7 @@ export function Summary({ doc }: { doc: SetsDoc }) {
       {next.length > 0 && (
         <>
           <h4 className="sets-sub">
-            <T en="Next, in release order" de="Als Nächstes, in Erscheinungsreihenfolge" />
+            <T id="sets.next" />
           </h4>
           <div className="sets">
             {next.map((s) => (

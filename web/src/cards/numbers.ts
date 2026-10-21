@@ -14,13 +14,18 @@ export function buildable(s: Counts): number {
   return s.total - s.never;
 }
 
+/** What a player can play: full and untested (owner, 21.10.2026). */
+export function playable(s: Counts): number {
+  return s.implemented + s.generated;
+}
+
 export function begun(s: Counts): boolean {
   return s.implemented + s.generated + s.partial > 0;
 }
 
 export function finished(s: Counts): boolean {
   const of = buildable(s);
-  return of > 0 && s.implemented === of;
+  return of > 0 && playable(s) === of;
 }
 
 export function sum(list: readonly Counts[]): Counts {

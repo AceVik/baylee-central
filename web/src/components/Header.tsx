@@ -1,34 +1,34 @@
 // The bar every page shares: the brand, the sections and the Discord
-// community (a menu on narrow screens), and the language switch. Over the start page's hero it is
-// clear; once the page moves, or on any other page, it frosts.
+// community (a menu on narrow screens), and the language switch: one button
+// per language with a file, each in its own name. Over the start page's hero
+// it is clear; once the page moves, or on any other page, it frosts.
 
 import { useEffect, useRef, useState } from "react";
 
 import { DISCORD } from "../config";
-import { tt, useChooseLang, useLang, type Lang } from "../i18n";
+import { OFFERED, nameOf, t, tagOf, useChooseLang, useLang, wordOf, type Key } from "../i18n";
 import { Link, PATHS, type Page } from "../router";
 import { Logo } from "./Logo";
 
-const NAV: { page: Page; en: string; de: string }[] = [
-  { page: "cards", en: "Cards", de: "Karten" },
-  { page: "download", en: "Download", de: "Download" },
-  { page: "gateways", en: "Gateways", de: "Gateways" },
-  { page: "contact", en: "Contact", de: "Kontakt" },
+const NAV: { page: Page; label: Key }[] = [
+  { page: "cards", label: "nav.cards" },
+  { page: "download", label: "nav.download" },
+  { page: "gateways", label: "nav.gateways" },
+  { page: "contact", label: "nav.contact" },
 ];
 
 function LangSwitch() {
   const lang = useLang();
   const choose = useChooseLang();
-  const button = (l: Lang, label: string) => (
-    <button type="button" className="lang-btn" lang={l} aria-pressed={lang === l} onClick={() => choose(l)}>
-      {label}
-    </button>
-  );
   return (
     <fieldset className="lang">
-      <legend className="vh">Language / Sprache</legend>
-      {button("en", "English")}
-      {button("de", "Deutsch")}
+      {/* the word in every offered language, for a visitor who reads none of the page's */}
+      <legend className="vh">{OFFERED.map(wordOf).join(" / ")}</legend>
+      {OFFERED.map((l) => (
+        <button key={l} type="button" className="lang-btn" lang={tagOf(l)} aria-pressed={lang === l} onClick={() => choose(l)}>
+          {nameOf(l)}
+        </button>
+      ))}
     </fieldset>
   );
 }
@@ -78,12 +78,12 @@ export function Header({ page }: { page: Page | null }) {
           onClick={() => setOpenOn(open ? null : here)}
         >
           <span className="bars" aria-hidden="true" />
-          <span className="vh">{tt(lang, "Menu", "Menü")}</span>
+          <span className="vh">{t(lang, "nav.menu")}</span>
         </button>
-        <nav className={`nav${open ? " open" : ""}`} id="nav" aria-label={tt(lang, "Sections", "Bereiche")}>
+        <nav className={`nav${open ? " open" : ""}`} id="nav" aria-label={t(lang, "nav.label")}>
           {NAV.map((item) => (
             <Link key={item.page} to={PATHS[item.page]} aria-current={page === item.page ? "page" : undefined}>
-              {tt(lang, item.en, item.de)}
+              {t(lang, item.label)}
             </Link>
           ))}
           {/* The community, in sight on every page (owner, 20.10.2026). */}

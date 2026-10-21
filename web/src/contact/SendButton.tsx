@@ -15,22 +15,22 @@ export function SendButton({ state }: { state: SendState }) {
           <svg className="button-icon i-spin" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
             <circle cx="12" cy="12" r="8.5" />
           </svg>
-          <T en="Sending…" de="Wird gesendet …" />
+          <T id="form.sending" />
         </>
       ) : state === "sent" ? (
         <>
           <Icon name="check" className="button-icon" />
-          <T en="Sent" de="Gesendet" />
+          <T id="send.sent" />
         </>
       ) : state === "error" ? (
         <>
           <Icon name="retry" className="button-icon" />
-          <T en="Try again" de="Erneut senden" />
+          <T id="send.retry" />
         </>
       ) : (
         <>
           <Icon name="send" className="button-icon" />
-          <T en="Send" de="Senden" />
+          <T id="send.send" />
         </>
       )}
     </button>

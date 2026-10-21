@@ -14,7 +14,7 @@ import { Source } from "./Source";
 import { StatusStrip } from "./StatusStrip";
 
 export default function Home() {
-  useTitle("Baylee – a table that knows the rules", "Baylee – ein Tisch, der die Regeln kennt");
+  useTitle("title.home");
   const ci = useGitHub(CI_PATH, "ci", parseCi);
   const commit = useGitHub(COMMIT_PATH, "commit", parseCommit);
   return (

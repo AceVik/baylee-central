@@ -3,6 +3,7 @@
 // carries them, the archives the updater uses otherwise. Only GitHub's own
 // download links are taken.
 
+import type { Key } from "../i18n";
 import type { Arch, Os } from "./machine";
 
 export interface Asset {
@@ -24,38 +25,39 @@ export interface Platform {
   id: string;
   os: Os;
   arch: Arch;
-  name: [string, string];
-  sub: [string, string];
+  name: Key;
+  /** What it is for, where the name does not say. */
+  sub: Key | null;
 }
 
 /** The six platforms the project builds for, and the one it does not (yet). */
 export const PLATFORMS: Platform[] = [
-  { id: "windows-x64", os: "windows", arch: "x64", name: ["Windows", "Windows"], sub: ["most PCs: 64-bit Intel or AMD", "die meisten PCs: 64-Bit Intel oder AMD"] },
-  { id: "windows-arm64", os: "windows", arch: "arm64", name: ["Windows on ARM", "Windows auf ARM"], sub: ["Snapdragon laptops and the like", "Snapdragon-Laptops und ähnliche"] },
-  { id: "mac-arm64", os: "mac", arch: "arm64", name: ["macOS", "macOS"], sub: ["Apple silicon: M1 and later", "Apple Silicon: M1 und neuer"] },
-  { id: "mac-x64", os: "mac", arch: "x64", name: ["macOS on Intel", "macOS auf Intel"], sub: ["", ""] },
-  { id: "linux-x64", os: "linux", arch: "x64", name: ["Linux", "Linux"], sub: ["x86-64", "x86-64"] },
-  { id: "linux-arm64", os: "linux", arch: "arm64", name: ["Linux on ARM", "Linux auf ARM"], sub: ["ARM64 / aarch64", "ARM64 / aarch64"] },
+  { id: "windows-x64", os: "windows", arch: "x64", name: "plat.windows", sub: "plat.windowsSub" },
+  { id: "windows-arm64", os: "windows", arch: "arm64", name: "plat.windowsArm", sub: "plat.windowsArmSub" },
+  { id: "mac-arm64", os: "mac", arch: "arm64", name: "plat.mac", sub: "plat.macSub" },
+  { id: "mac-x64", os: "mac", arch: "x64", name: "plat.macIntel", sub: null },
+  { id: "linux-x64", os: "linux", arch: "x64", name: "plat.linux", sub: "plat.linuxSub" },
+  { id: "linux-arm64", os: "linux", arch: "arm64", name: "plat.linuxArm", sub: "plat.linuxArmSub" },
 ];
 
 export type Kind = "installer" | "deb" | "archive";
 
 /** File name → platform and kind. Two families: the installers (beta.6 on) and the archives the updater uses. */
-export const FILE_RULES: [RegExp, string, Kind, [string, string]][] = [
-  [/^Baylee-Setup-.*-x64\.exe$/, "windows-x64", "installer", ["Setup", "Setup"]],
-  [/^Baylee-Setup-.*-arm64\.exe$/, "windows-arm64", "installer", ["Setup", "Setup"]],
-  [/^Baylee-.*-aarch64\.dmg$/, "mac-arm64", "installer", ["Disk image", "Disk-Image"]],
-  [/^Baylee-.*-x86_64\.dmg$/, "mac-x64", "installer", ["Disk image", "Disk-Image"]],
-  [/^Baylee-.*-x86_64\.AppImage$/, "linux-x64", "installer", ["AppImage", "AppImage"]],
-  [/^Baylee-.*-aarch64\.AppImage$/, "linux-arm64", "installer", ["AppImage", "AppImage"]],
-  [/^baylee_.*_amd64\.deb$/, "linux-x64", "deb", ["Debian / Ubuntu package", "Debian-/Ubuntu-Paket"]],
-  [/^baylee_.*_arm64\.deb$/, "linux-arm64", "deb", ["Debian / Ubuntu package", "Debian-/Ubuntu-Paket"]],
-  [/^baylee-client-.*-x86_64-pc-windows-msvc\.zip$/, "windows-x64", "archive", ["Archive (zip)", "Archiv (zip)"]],
-  [/^baylee-client-.*-aarch64-pc-windows-msvc\.zip$/, "windows-arm64", "archive", ["Archive (zip)", "Archiv (zip)"]],
-  [/^baylee-client-.*-aarch64-apple-darwin\.zip$/, "mac-arm64", "archive", ["Archive (zip)", "Archiv (zip)"]],
-  [/^baylee-client-.*-x86_64-apple-darwin\.zip$/, "mac-x64", "archive", ["Archive (zip)", "Archiv (zip)"]],
-  [/^baylee-client-.*-x86_64-unknown-linux-gnu\.tar\.gz$/, "linux-x64", "archive", ["Archive (tar.gz)", "Archiv (tar.gz)"]],
-  [/^baylee-client-.*-aarch64-unknown-linux-gnu\.tar\.gz$/, "linux-arm64", "archive", ["Archive (tar.gz)", "Archiv (tar.gz)"]],
+export const FILE_RULES: [RegExp, string, Kind, Key][] = [
+  [/^Baylee-Setup-.*-x64\.exe$/, "windows-x64", "installer", "file.setup"],
+  [/^Baylee-Setup-.*-arm64\.exe$/, "windows-arm64", "installer", "file.setup"],
+  [/^Baylee-.*-aarch64\.dmg$/, "mac-arm64", "installer", "file.diskImage"],
+  [/^Baylee-.*-x86_64\.dmg$/, "mac-x64", "installer", "file.diskImage"],
+  [/^Baylee-.*-x86_64\.AppImage$/, "linux-x64", "installer", "file.appImage"],
+  [/^Baylee-.*-aarch64\.AppImage$/, "linux-arm64", "installer", "file.appImage"],
+  [/^baylee_.*_amd64\.deb$/, "linux-x64", "deb", "file.deb"],
+  [/^baylee_.*_arm64\.deb$/, "linux-arm64", "deb", "file.deb"],
+  [/^baylee-client-.*-x86_64-pc-windows-msvc\.zip$/, "windows-x64", "archive", "file.zip"],
+  [/^baylee-client-.*-aarch64-pc-windows-msvc\.zip$/, "windows-arm64", "archive", "file.zip"],
+  [/^baylee-client-.*-aarch64-apple-darwin\.zip$/, "mac-arm64", "archive", "file.zip"],
+  [/^baylee-client-.*-x86_64-apple-darwin\.zip$/, "mac-x64", "archive", "file.zip"],
+  [/^baylee-client-.*-x86_64-unknown-linux-gnu\.tar\.gz$/, "linux-x64", "archive", "file.tarGz"],
+  [/^baylee-client-.*-aarch64-unknown-linux-gnu\.tar\.gz$/, "linux-arm64", "archive", "file.tarGz"],
 ];
 
 const KIND_ORDER: Record<Kind, number> = { installer: 0, deb: 1, archive: 2 };
@@ -63,7 +65,7 @@ const KIND_ORDER: Record<Kind, number> = { installer: 0, deb: 1, archive: 2 };
 export interface ReleaseFile {
   asset: Asset;
   kind: Kind;
-  label: [string, string];
+  label: Key;
   sha: Asset | null;
   sig: Asset | null;
 }

@@ -6,19 +6,19 @@
 import { useLayoutEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 
-import { tt, useLang } from "../i18n";
+import { t, useLang } from "../i18n";
 import { CARD_CREDIT, imgOf, why } from "./card";
-import { STATUS, type Card } from "./model";
+import { GROUP_LABEL, STATUS, type Card } from "./model";
 
 export function Badge({ card }: { card: Card }) {
   const lang = useLang();
   const st = STATUS[card.status];
-  return <span className={`badge b-${st.group}`}>{tt(lang, st.en, st.de)}</span>;
+  return <span className={`badge b-${st.group}`}>{t(lang, GROUP_LABEL[st.group])}</span>;
 }
 
 export function Credit() {
   const lang = useLang();
-  return <p className="cp-credit">{tt(lang, CARD_CREDIT.en, CARD_CREDIT.de)}</p>;
+  return <p className="cp-credit">{t(lang, CARD_CREDIT)}</p>;
 }
 
 export function CardText({ card, nameId }: { card: Card; nameId?: string }) {
@@ -31,10 +31,7 @@ export function CardText({ card, nameId }: { card: Card; nameId?: string }) {
       <Badge card={card} />
       <span className="cp-why">{why(card, lang)}</span>
       {card.artist !== null && (
-        <span className="cp-artist">
-          {tt(lang, "Illustrated by ", "Illustriert von ")}
-          {card.artist}
-        </span>
+        <span className="cp-artist">{t(lang, "card.illustrated", { artist: card.artist })}</span>
       )}
     </div>
   );
@@ -86,7 +83,7 @@ export function Preview({ shown }: { shown: Shown }) {
     <div className="cpreview" ref={box} aria-hidden="true">
       <BigPicture card={shown.card} />
       <CardText card={shown.card} />
-      <p className="cp-go">{tt(lang, "Click for the artist and printing on Scryfall.", "Klick: Künstler und Druck bei Scryfall.")}</p>
+      <p className="cp-go">{t(lang, "card.clickHint")}</p>
       <Credit />
     </div>,
     document.body,

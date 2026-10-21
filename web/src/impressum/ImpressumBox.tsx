@@ -6,7 +6,7 @@
 import { useMemo, useState } from "react";
 
 import { impressumEndpoint } from "../config";
-import { T, tt, useLang } from "../i18n";
+import { T, t, useLang, type Elems } from "../i18n";
 import { Link, PATHS } from "../router";
 import { decode, type Fields } from "./blob";
 import { Details, draw } from "./Details";
@@ -24,9 +24,8 @@ function ready(): boolean {
   );
 }
 
-export function ContactLink({ children }: { children: string }) {
-  return <Link to={PATHS.contact}>{children}</Link>;
-}
+/** The contact form, as a message's `<contact>…</contact>` names it. */
+export const CONTACT: Elems = { contact: (words) => <Link to={PATHS.contact}>{words}</Link> };
 
 export function ImpressumBox({ solver }: { solver?: Solver }) {
   const lang = useLang();
@@ -53,38 +52,22 @@ export function ImpressumBox({ solver }: { solver?: Solver }) {
     <div className="imp-box glass">
       {state !== "shown" && (
         <p className="imp-why">
-          <T
-            en="To keep address harvesters away, the details load only when you ask for them; your browser works out a small puzzle for it, which takes a moment."
-            de="Damit Adresssammler leer ausgehen, werden die Angaben erst auf deinen Wunsch geladen; dein Browser löst dafür ein kleines Rätsel, das einen Moment dauert."
-          />
+          <T id="imp.why" />
         </p>
       )}
       {capable && (state === "idle" || state === "working" || state === "failed") && (
         <button type="button" className="button" onClick={show} aria-busy={state === "working"} aria-describedby="imp-show-status">
-          <T en="Show the details" de="Impressum anzeigen" />
+          <T id="imp.show" />
         </button>
       )}
-      {state === "working" && <progress className="imp-progress" max={1} value={progress} aria-label={tt(lang, "Puzzle", "Rätsel")} />}
+      {state === "working" && <progress className="imp-progress" max={1} value={progress} aria-label={t(lang, "imp.puzzle")} />}
       <output className="imp-status" id="imp-show-status">
         {state === "working" &&
-          tt(lang, "One moment, your browser is working out a small puzzle …", "Einen Moment, dein Browser löst ein kleines Rätsel …")}
+          t(lang, "imp.working")}
       </output>
       {(state === "failed" || !capable) && (
         <p className="imp-failed">
-          <T
-            en={
-              <>
-                The details could not be loaded. Please reload the page or use the{" "}
-                <ContactLink>contact form</ContactLink>.
-              </>
-            }
-            de={
-              <>
-                Die Angaben konnten nicht geladen werden. Bitte lade die Seite neu oder nutze das{" "}
-                <ContactLink>Kontaktformular</ContactLink>.
-              </>
-            }
-          />
+          <T id="imp.failed" elems={CONTACT} />
         </p>
       )}
       {/* the honeypot: hidden from people, disallowed in robots.txt; an address that follows it gets invented details */}

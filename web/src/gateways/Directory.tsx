@@ -3,31 +3,26 @@
 
 import { PAGE_SIZE, type DirectoryClient, type DirectoryFailure } from "../central/directory";
 import { Icon } from "../components/icons";
-import { T, num, tt, useLang } from "../i18n";
+import { T, t, useLang, type Key } from "../i18n";
 import { GatewayCard } from "./GatewayCard";
 import { useDirectory } from "./useDirectory";
 
+const FAILURE: Record<DirectoryFailure, Key> = {
+  unavailable: "gw.unavailable",
+  busy: "gw.busy",
+  refused: "gw.refused",
+  malformed: "gw.malformed",
+  network: "gw.network",
+};
+
 function Failure({ kind, onRetry }: { kind: DirectoryFailure; onRetry: () => void }) {
   const lang = useLang();
-  const words: Record<DirectoryFailure, [string, string]> = {
-    unavailable: ["Baylee Central cannot list gateways just now.", "Baylee Central kann die Gateways gerade nicht auflisten."],
-    busy: ["Baylee Central is busy; please try again in a moment.", "Baylee Central ist ausgelastet; bitte versuch es gleich noch einmal."],
-    refused: [
-      "Baylee Central did not answer this page's request. The directory may not be open to browsers yet.",
-      "Baylee Central hat die Anfrage dieser Seite nicht beantwortet. Vielleicht ist das Verzeichnis für Browser noch nicht offen.",
-    ],
-    malformed: [
-      "Baylee Central's answer did not pass this page's checks, so nothing of it is shown.",
-      "Die Antwort von Baylee Central hat die Prüfungen dieser Seite nicht bestanden, deshalb wird nichts davon gezeigt.",
-    ],
-    network: ["Baylee Central could not be reached.", "Baylee Central war nicht erreichbar."],
-  };
   return (
     <div className="dir-failure glass">
-      <output>{tt(lang, words[kind][0], words[kind][1])}</output>
+      <output>{t(lang, FAILURE[kind])}</output>
       <button type="button" className="button button-ghost" onClick={onRetry}>
         <Icon name="retry" className="button-icon" />
-        <T en="Try again" de="Erneut versuchen" />
+        <T id="gw.tryAgain" />
       </button>
     </div>
   );
@@ -40,13 +35,8 @@ export function Directory({ client }: { client: DirectoryClient }) {
   return (
     <div className="directory" aria-busy={loading}>
       <output className="small dir-count">
-        {gateways.length > 0 &&
-          tt(
-            lang,
-            `${num(lang, gateways.length)} ${gateways.length === 1 ? "gateway" : "gateways"} listed, ${num(lang, online)} online.`,
-            `${num(lang, gateways.length)} ${gateways.length === 1 ? "Gateway" : "Gateways"} gelistet, ${num(lang, online)} online.`,
-          )}
-        {!loading && failure === null && gateways.length === 0 && tt(lang, "No gateway is listed yet.", "Noch ist kein Gateway gelistet.")}
+        {gateways.length > 0 && t(lang, "gw.count", { n: gateways.length, online })}
+        {!loading && failure === null && gateways.length === 0 && t(lang, "gw.none")}
       </output>
       {gateways.length > 0 && (
         <ul className="gateways">
@@ -66,7 +56,7 @@ export function Directory({ client }: { client: DirectoryClient }) {
       {more && failure === null && (
         <p className="dir-more">
           <button type="button" className="button button-ghost" onClick={next} disabled={loading}>
-            <T en={`Show the next ${PAGE_SIZE}`} de={`Die nächsten ${PAGE_SIZE} zeigen`} />
+            <T id="gw.next" args={{ n: PAGE_SIZE }} />
           </button>
         </p>
       )}

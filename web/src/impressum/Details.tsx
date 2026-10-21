@@ -4,7 +4,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import { T, tt, useLang } from "../i18n";
+import { T, t, useLang } from "../i18n";
 import type { Fields } from "./blob";
 import { Scrambled, readLines, readRun, scatter, type Glyph } from "./Scrambled";
 
@@ -50,28 +50,19 @@ export function Details({ drawn }: { drawn: Drawn }) {
 
   const copy = (say: (s: string) => void, read: () => string) => {
     if (!navigator.clipboard?.writeText) {
-      say(
-        tt(
-          lang,
-          "Copying is not possible in this browser; please use the contact form.",
-          "Kopieren geht in diesem Browser nicht; bitte nutze das Kontaktformular.",
-        ),
-      );
+      say(t(lang, "imp.copyImpossible"));
       return;
     }
     navigator.clipboard.writeText(read()).then(
-      () => say(tt(lang, "Copied.", "Kopiert.")),
-      () => say(tt(lang, "Copying did not work; please use the contact form.", "Kopieren hat nicht geklappt; bitte nutze das Kontaktformular.")),
+      () => say(t(lang, "imp.copied")),
+      () => say(t(lang, "imp.copyFailed")),
     );
   };
 
   return (
     <>
       <p className="vh">
-        <T
-          en="The address is drawn so that address harvesters cannot read it, and a screen reader cannot either. The button below copies it to the clipboard; or write to me with the contact form."
-          de="Die Anschrift ist so gezeichnet, dass Adresssammler sie nicht lesen können, und deshalb auch kein Screenreader. Der Knopf darunter kopiert sie in die Zwischenablage; oder schreib mir über das Kontaktformular."
-        />
+        <T id="imp.drawn" />
       </p>
       <div className="imp-address scr-block" aria-hidden="true" ref={address}>
         <div className="imp-line">
@@ -84,6 +75,7 @@ export function Details({ drawn }: { drawn: Drawn }) {
           <Scrambled glyphs={drawn.postcode} /> <Scrambled glyphs={drawn.city} />
         </div>
         <div className="imp-line">
+          {/* the blob names the country in German and English; any other language reads the English */}
           <Scrambled glyphs={lang === "de" ? drawn.country_de : drawn.country_en} />
         </div>
       </div>
@@ -94,17 +86,17 @@ export function Details({ drawn }: { drawn: Drawn }) {
           className="button button-ghost"
           onClick={() => copy(setAddressSaid, () => (address.current ? readLines(address.current) : ""))}
         >
-          <T en="Copy address" de="Anschrift kopieren" />
+          <T id="imp.copyAddress" />
         </button>
       </div>
       <output className="imp-status">{addressSaid}</output>
 
       <h2>
-        <T en="Contact" de="Kontakt" />
+        <T id="imp.contact" />
       </h2>
       <dl className="imp-dl">
         <dt>
-          <T en="E-mail" de="E-Mail" />
+          <T id="imp.email" />
         </dt>
         <dd>
           <span className="scr-block" aria-hidden="true" ref={mail}>
@@ -118,15 +110,15 @@ export function Details({ drawn }: { drawn: Drawn }) {
                 window.location.href = `mailto:${run(mail.current)}`;
               }}
             >
-              <T en="Write an e-mail" de="E-Mail schreiben" />
+              <T id="imp.writeEmail" />
             </button>
             <button type="button" className="button button-ghost" onClick={() => copy(setContactSaid, () => run(mail.current))}>
-              <T en="Copy e-mail address" de="E-Mail-Adresse kopieren" />
+              <T id="imp.copyEmail" />
             </button>
           </span>
         </dd>
         <dt>
-          <T en="Telephone" de="Telefon" />
+          <T id="imp.phone" />
         </dt>
         <dd>
           <span className="scr-block" aria-hidden="true" ref={phone}>
@@ -140,10 +132,10 @@ export function Details({ drawn }: { drawn: Drawn }) {
                 window.location.href = `tel:${run(phone.current).replace(/[^+\d]/g, "")}`;
               }}
             >
-              <T en="Call" de="Anrufen" />
+              <T id="imp.call" />
             </button>
             <button type="button" className="button button-ghost" onClick={() => copy(setContactSaid, () => run(phone.current))}>
-              <T en="Copy number" de="Nummer kopieren" />
+              <T id="imp.copyNumber" />
             </button>
           </span>
         </dd>

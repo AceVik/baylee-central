@@ -6,7 +6,7 @@
 import { useState } from "react";
 
 import { MEDIA_BASE } from "../config";
-import { T, tt, useLang } from "../i18n";
+import { T, t, useLang } from "../i18n";
 import { Icon } from "../components/icons";
 import { Modal } from "../components/Modal";
 import { Section } from "../components/Section";
@@ -47,14 +47,11 @@ export function Screens() {
     <Section
       id="screens"
       alt
-      eyebrow={<T en="At the table" de="Am Tisch" />}
-      title={<T en="What it looks like" de="So sieht es aus" />}
+      eyebrow={<T id="shots.eyebrow" />}
+      title={<T id="shots.title" />}
     >
       <p className="section-lead reveal">
-        <T
-          en="These pictures show the text view, which draws each card from its rules text rather than the printed card image, because we do not redistribute Scryfall's scans. In the game you see the real card images. The screenshots were taken with 0.1.0-beta.2 on a local test gateway with made-up players; the current build looks a little different."
-          de="Die Bilder zeigen die Textansicht, die jede Karte aus ihrem Regeltext zeichnet statt aus dem gedruckten Kartenbild, weil wir Scryfalls Scans nicht weiterverbreiten. Im Spiel siehst du die echten Kartenbilder. Die Aufnahmen entstanden mit 0.1.0-beta.2 auf einem lokalen Test-Gateway mit erfundenen Spielern; die aktuelle Version sieht etwas anders aus."
-        />
+        <T id="shots.lead" />
       </p>
       <ul className="shots">
         {SHOTS.map((s, i) => (
@@ -64,30 +61,30 @@ export function Screens() {
                 type="button"
                 className="shot-open"
                 onClick={() => setAt(i)}
-                aria-label={tt(lang, `Show large: ${s.title[0]}`, `Groß zeigen: ${s.title[1]}`)}
+                aria-label={t(lang, "shots.showLarge", { title: t(lang, s.title) })}
               >
-                <Picture shot={s} alt={tt(lang, s.alt[0], s.alt[1])} />
+                <Picture shot={s} alt={t(lang, s.alt)} />
               </button>
               <figcaption>
-                <b>{tt(lang, s.title[0], s.title[1])}</b> {tt(lang, s.caption[0], s.caption[1])}
+                <b>{t(lang, s.title)}</b> {t(lang, s.caption)}
               </figcaption>
             </figure>
           </li>
         ))}
       </ul>
       {shot && (
-        <Modal className="lightbox" label={tt(lang, "Screenshot", "Bildschirmfoto")} onClose={() => setAt(null)} onKey={onKey}>
-          <Picture shot={shot} large alt={tt(lang, shot.alt[0], shot.alt[1])} />
+        <Modal className="lightbox" label={t(lang, "shots.dialog")} onClose={() => setAt(null)} onKey={onKey}>
+          <Picture shot={shot} large alt={t(lang, shot.alt)} />
           <p className="lightbox-cap">
-            <b>{tt(lang, shot.title[0], shot.title[1])}</b> {tt(lang, shot.caption[0], shot.caption[1])}
+            <b>{t(lang, shot.title)}</b> {t(lang, shot.caption)}
           </p>
-          <button type="button" className="round-btn lightbox-prev" onClick={() => step(-1)} aria-label={tt(lang, "Previous", "Zurück")}>
+          <button type="button" className="round-btn lightbox-prev" onClick={() => step(-1)} aria-label={t(lang, "shots.previous")}>
             <Icon name="prev" />
           </button>
-          <button type="button" className="round-btn lightbox-next" onClick={() => step(1)} aria-label={tt(lang, "Next", "Weiter")}>
+          <button type="button" className="round-btn lightbox-next" onClick={() => step(1)} aria-label={t(lang, "shots.next")}>
             <Icon name="next" />
           </button>
-          <button type="button" className="round-btn lightbox-close" onClick={() => setAt(null)} aria-label={tt(lang, "Close", "Schließen")}>
+          <button type="button" className="round-btn lightbox-close" onClick={() => setAt(null)} aria-label={t(lang, "app.close")}>
             <Icon name="close" />
           </button>
         </Modal>
