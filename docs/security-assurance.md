@@ -514,3 +514,30 @@ issuing keys. Invariants and the choices made before code:
   one fails to start, still serves legacy migration; it fails closed on every
   registered account (CHECKs and NOT NULL reads), which the new code names
   explicitly in every write.
+
+**Migration 000007 and the store.** Implementation pass: every `legacy_closed`
+predicate (object writes and reads, `SessionStatus`) and the bridge's
+redemption read of `legacy_id` were found holding registered accounts back;
+the redemption read a NULL into a string and would have answered 503 at the
+official gateway. Each now names the registered case. The fixtures granted
+hand-copied lists; they now run `ops/grants.sql` itself, so the startup check
+is tested against what the deploy hook grants. `beta_keys` grants a column,
+which the generic check did not model: it now requires `UPDATE` on exactly
+`uses_left` and refuses it on any other column or the table. The fixture found
+that issuing read the clock twice (`created_at` after `expires_at`), so a
+30-day key lasted microseconds less than 30 days; one timestamp now serves
+both.
+
+Adversarial pass: a prior-version upgrade runs the exact SQL of 000001 to
+000006 in a scratch schema, writes legacy accounts, a session and a ticket as
+the previous binary did, applies 000007, and checks the data, the defaults and
+the previous binary's own statements, all in one rolled-back transaction. The
+schema refuses each broken pairing of source, legacy ID, key link, ticket and
+recovery wrapper. Seven injected faults each failed the PostgreSQL fixture at
+the assertion written for it, after a clean baseline run on the same commit: a
+browser digest equal to the native one (a cookie accepted as a bearer), a
+sign-in replacing sessions of any kind (a website sign-in ending the client's
+session), the legacy-only object and `migration_closed` predicates, a grant
+check accepting `UPDATE (note)`, a migration without the recovery rule, and
+key issuing outside one transaction (a run repeating a digest left its other
+key behind). Engineering review, not an audit.
