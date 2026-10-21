@@ -1,5 +1,5 @@
-<!-- version: draft -->
-<!-- updated: 2026-10-20 -->
+<!-- version: 2026-10-22 -->
+<!-- updated: 2026-10-21 -->
 
 # Nutzungsbedingungen für Baylee-Konten
 
@@ -32,9 +32,8 @@ Anspruch auf eine bestimmte Verfügbarkeit gibt es nicht.
 ## 2. Dein Konto
 
 1. **Pseudonym genügt.** Für ein Konto brauchst du nur einen frei gewählten
-   Benutzernamen und ein Passwort. Eine E-Mail-Adresse ist freiwillig; du
-   brauchst sie nur, wenn du dein Passwort per E-Mail zurücksetzen oder
-   Benachrichtigungen erhalten möchtest. Du kannst Baylee damit pseudonym
+   Benutzernamen und ein Passwort. Eine E-Mail-Adresse brauchst du nicht;
+   hinterlegen kannst du noch keine. Du kannst Baylee damit pseudonym
    nutzen (§ 19 Abs. 2 TDDDG). Offline gegen den Computer spielen kannst du
    ganz ohne Konto.
 2. **Alter.** Du musst mindestens 16 Jahre alt sein. Bist du noch nicht
@@ -55,9 +54,9 @@ Deine Einstellungen, Deck-Sicherungen und dein Chat-Verlauf werden auf
 deinem Gerät verschlüsselt, bevor sie uns erreichen. Wir können sie nicht
 lesen. Daraus folgt:
 
-- Vergisst du dein Passwort, kannst du den Zugang über deine E-Mail-Adresse
-  oder durch uns wiederherstellen lassen. **Deine verschlüsselten Daten
-  bleiben dann nur erhalten, wenn du deinen Wiederherstellungscode hast oder
+- Vergisst du dein Passwort, kannst du es noch nicht zurücksetzen; das
+  Zurücksetzen per E-Mail oder durch uns folgt. **Deine verschlüsselten Daten
+  bleiben dabei nur erhalten, wenn du deinen Wiederherstellungscode hast oder
   noch auf einem Gerät angemeldet bist.** Sonst sind sie verloren, und
   niemand, auch wir nicht, kann sie zurückholen.
 - Bewahre deinen Wiederherstellungscode sicher auf.
@@ -111,8 +110,10 @@ wir dir die Gründe mit und sagen dir, wie du widersprechen kannst.
 
 ## 7. Sperrung und Löschung
 
-1. Du kannst dein Konto jederzeit in den Einstellungen des Clients oder auf
-   der Website löschen.
+1. Du kannst dein Konto jederzeit löschen lassen: Schreib uns über die im
+   [Impressum](https://baylee.app/impressum) genannten Kontaktdaten, dann
+   löschen wir es unverzüglich. Das Löschen in den Einstellungen des Clients
+   und auf der Website folgt.
 2. Wir können ein Konto vorübergehend sperren oder löschen, wenn es gegen
    diese Bedingungen oder geltendes Recht verstößt, und zwar in einem
    Umfang, der dem Verstoß angemessen ist. Wir begründen das und hören dich,
@@ -143,7 +144,7 @@ Anmelden im Client oder auf der Website. Du kannst dann
 - die neue Fassung **annehmen** und weiter spielen,
 - **später** entscheiden; du wirst dann abgemeldet und kannst den Dienst
   bis zur Annahme nicht nutzen, oder
-- dein **Konto löschen**.
+- dein **Konto löschen** (Abschnitt 7).
 
 Mit einer älteren Fassung kann der Dienst nicht weiter genutzt werden. Ohne
 deine ausdrückliche Annahme gelten Änderungen nicht.
