@@ -50,6 +50,35 @@ Wrapping and unwrapping use fixed zeroized buffers instead of temporary AEAD hea
 buffers. A compatibility test compares the detached operation with the upstream
 allocating API; the version-1 ciphertext/tag layout is unchanged.
 
+## Recovery code
+
+Registration on the website ([web accounts](web-accounts.md)) also wraps the
+master key under a recovery code, shown to the person once.
+`vault::RecoveryCode` is that code:
+
+- 20 bytes of operating-system randomness, written as 32 symbols of
+  Crockford's base32 (`0123456789ABCDEFGHJKMNPQRSTVWXYZ`), most significant
+  bit first, in eight groups of four joined by hyphens:
+  `XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX`. Read back in any case, with `O`
+  as 0, `I` and `L` as 1, hyphens and ASCII whitespace anywhere ignored, at
+  most 128 input bytes and exactly 32 symbols; anything else is refused.
+- Its wrapping key is HKDF-SHA-512 with the 20 bytes as input, the salt
+  `baylee-central/recovery/v1` and as info the password wrapper's 86 bytes:
+  `baylee-central/master-wrap/v1\0`, the 32-byte issuer, the 16-byte account,
+  the epoch as eight big-endian bytes. No stretching: the code carries 160
+  bits.
+- The wrapper is the 73-byte version-1 format above (XChaCha20-Poly1305, a
+  fresh random nonce) with the associated data
+  `baylee-central/recovery-wrap/v1\0` followed by the same issuer, account
+  and epoch (88 bytes), so neither wrapper opens as the other.
+
+Known-answer tests pin the written form, the key and the wrapper for two
+vectors computed apart from the crate (`tests/recovery-vectors.py`: Python's
+base32 translated to Crockford's alphabet, pyca/cryptography's HKDF and
+libsodium's XChaCha20-Poly1305); all 584 wrapper bits, a changed issuer,
+account, epoch or code, and each wrapper under the other's domain are refused.
+Reset by the code, which uses this wrapper, is later work (M1).
+
 Password changes re-enroll the new password and re-wrap the SAME master key.
 The spike tests this cryptographic operation only. A real change still needs
 fresh authorization, atomic database commit, revision conflict handling, session
@@ -90,5 +119,5 @@ addresses that specific gap without replacing the algorithm.
   challenge expiry, final session/MFA issuance, persistent server secrets and their
   rotation are unresolved service gates. ServerKeys::generate is explicit and
   ephemeral for tests; no Default constructor silently replaces deployment keys.
-- Recovery codes, pairing, encrypted object formats, rollback/fresh-device limits,
+- Reset by recovery code, pairing, encrypted object formats, rollback/fresh-device limits,
   browser SSO, legacy migration and production deployment remain separate work.

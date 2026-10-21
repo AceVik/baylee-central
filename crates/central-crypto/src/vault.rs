@@ -1,7 +1,10 @@
-//! Versioned master-key wrappers and bounded encrypted personal objects.
+//! Versioned master-key wrappers (password and recovery code) and bounded
+//! encrypted personal objects.
 
 mod object;
+mod recovery;
 pub use object::{MAX_OBJECT_BYTES, ObjectContext};
+pub use recovery::RecoveryCode;
 
 use crate::{Context, CryptoError};
 use chacha20poly1305::{
@@ -81,22 +84,7 @@ impl WrappingKey {
     ///
     /// Fails on randomness failure or encryption failure.
     pub fn wrap(&self, master: &MasterKey) -> Result<WrappedMasterKey, CryptoError> {
-        let mut wire = [0; 73];
-        wire[0] = 1;
-        getrandom::fill(&mut wire[1..25]).map_err(|_| CryptoError::RandomnessUnavailable)?;
-        let nonce = XNonce::try_from(&wire[1..25]).map_err(|_| CryptoError::Invalid)?;
-        let cipher = XChaCha20Poly1305::new_from_slice(self.key.as_ref())
-            .map_err(|_| CryptoError::Invalid)?;
-        // Fixed buffers avoid a plaintext heap allocation and are wiped even if
-        // encryption fails or unwinds. The public wire buffer receives ciphertext only.
-        let mut ciphertext = Zeroizing::new([0; 32]);
-        ciphertext.copy_from_slice(master.0.as_ref());
-        let tag = cipher
-            .encrypt_inout_detached(&nonce, &self.context.aad(), ciphertext.as_mut().into())
-            .map_err(|_| CryptoError::Invalid)?;
-        wire[25..57].copy_from_slice(ciphertext.as_ref());
-        wire[57..].copy_from_slice(&tag);
-        Ok(WrappedMasterKey(wire))
+        seal(&self.key, &self.context.aad(), master, random_nonce()?)
     }
 
     /// Authenticate and decrypt; never initialize a new key on failure.
@@ -105,20 +93,53 @@ impl WrappingKey {
     ///
     /// Rejects wrong keys, changed context, corruption and unsupported versions.
     pub fn unwrap(&self, wrapped: &WrappedMasterKey) -> Result<MasterKey, CryptoError> {
-        if wrapped.0[0] != 1 {
-            return Err(CryptoError::Invalid);
-        }
-        let nonce = XNonce::try_from(&wrapped.0[1..25]).map_err(|_| CryptoError::Invalid)?;
-        let cipher = XChaCha20Poly1305::new_from_slice(self.key.as_ref())
-            .map_err(|_| CryptoError::Invalid)?;
-        let mut key = Zeroizing::new([0; 32]);
-        key.copy_from_slice(&wrapped.0[25..57]);
-        let tag = Tag::try_from(&wrapped.0[57..]).map_err(|_| CryptoError::Invalid)?;
-        cipher
-            .decrypt_inout_detached(&nonce, &self.context.aad(), key.as_mut().into(), &tag)
-            .map_err(|_| CryptoError::Invalid)?;
-        Ok(MasterKey(key))
+        open(&self.key, &self.context.aad(), wrapped)
     }
+}
+
+fn random_nonce() -> Result<[u8; 24], CryptoError> {
+    let mut nonce = [0; 24];
+    getrandom::fill(&mut nonce).map_err(|_| CryptoError::RandomnessUnavailable)?;
+    Ok(nonce)
+}
+
+/// The version-1 wrapper of `master` under `key`: version, nonce, ciphertext, tag.
+fn seal(
+    key: &[u8; 32],
+    aad: &[u8],
+    master: &MasterKey,
+    nonce: [u8; 24],
+) -> Result<WrappedMasterKey, CryptoError> {
+    let mut wire = [0; 73];
+    wire[0] = 1;
+    wire[1..25].copy_from_slice(&nonce);
+    let cipher = XChaCha20Poly1305::new_from_slice(key).map_err(|_| CryptoError::Invalid)?;
+    // Fixed buffers avoid a plaintext heap allocation and are wiped even if
+    // encryption fails or unwinds. The public wire buffer receives ciphertext only.
+    let mut ciphertext = Zeroizing::new([0; 32]);
+    ciphertext.copy_from_slice(master.0.as_ref());
+    let tag = cipher
+        .encrypt_inout_detached(&XNonce::from(nonce), aad, ciphertext.as_mut().into())
+        .map_err(|_| CryptoError::Invalid)?;
+    wire[25..57].copy_from_slice(ciphertext.as_ref());
+    wire[57..].copy_from_slice(&tag);
+    Ok(WrappedMasterKey(wire))
+}
+
+/// Authenticate and decrypt a version-1 wrapper under `key`.
+fn open(key: &[u8; 32], aad: &[u8], wrapped: &WrappedMasterKey) -> Result<MasterKey, CryptoError> {
+    if wrapped.0[0] != 1 {
+        return Err(CryptoError::Invalid);
+    }
+    let nonce = XNonce::try_from(&wrapped.0[1..25]).map_err(|_| CryptoError::Invalid)?;
+    let cipher = XChaCha20Poly1305::new_from_slice(key).map_err(|_| CryptoError::Invalid)?;
+    let mut master = Zeroizing::new([0; 32]);
+    master.copy_from_slice(&wrapped.0[25..57]);
+    let tag = Tag::try_from(&wrapped.0[57..]).map_err(|_| CryptoError::Invalid)?;
+    cipher
+        .decrypt_inout_detached(&nonce, aad, master.as_mut().into(), &tag)
+        .map_err(|_| CryptoError::Invalid)?;
+    Ok(MasterKey(master))
 }
 
 impl WrappedMasterKey {
