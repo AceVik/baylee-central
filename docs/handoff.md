@@ -39,8 +39,10 @@ Private deck CRUD/history and the durable replay archive remain unimplemented.
 The encrypted legacy deck snapshot is only a backup, and source migration is
 still bounded to 192 KiB / 2,048 rows. The next implementation contract is in
 Baylee's `docs/central-private-library-plan.md`; its `docs/central-login.md`
-records the matching MacBook handoff. Registration, password change/recovery UI,
-browser SSO, website and human-training release gates remain separate work.
+records the matching MacBook handoff. Registration and sign-in on the website
+are served by the browser listener ([web accounts](web-accounts.md)); password
+change/recovery UI, browser SSO for gateways and human-training release gates
+remain separate work.
 
 Keep reusable libraries and isolated dev mode; finish the remaining milestone
 gates in small reviewed changes rather than treating the integration as release approval.

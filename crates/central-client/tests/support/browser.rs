@@ -1,8 +1,8 @@
-//! The website's flow through `IdentityService::handle_browser`, as the web
-//! pages and their WebAssembly crypto run it: register with a beta key, enroll
-//! with a recovery wrapper, sign in to a browser session, accept Central's
-//! terms, sign out. Then the same account plays natively, and the official
-//! gateway's bridge admits it without a legacy ID.
+//! The website's flow over the real browser listener, as the web pages and
+//! their WebAssembly crypto run it: register with a beta key, enroll with a
+//! recovery wrapper, sign in to a browser session held in the cookie, accept
+//! Central's terms, sign out. Then the same account plays natively, and the
+//! official gateway's bridge admits it without a legacy ID.
 use super::Http;
 use central_api::{
     Error, Token,
@@ -16,29 +16,133 @@ use central_crypto::{
     opaque::{Enrollment, Login},
     vault::{MasterKey, ObjectContext, RecoveryCode, WrappedMasterKey},
 };
-use central_identity::{BrowserReply, IdentityService};
+use central_identity::BrowserReply;
 use central_postgres::BetaKeyBatch;
 use sea_orm::{ConnectionTrait, DatabaseConnection};
+use std::{
+    io::{Read, Write},
+    net::{SocketAddr, TcpStream},
+    time::Duration,
+};
 use tokio::runtime::Runtime;
 
 const PASSWORD: &str = "synthetic browser password";
 const GATEWAY: &str = "http://127.0.0.1:28766";
 /// The initial account document of `docs/web-accounts.md`, with this fixture's gateway.
 const DOCUMENT: &[u8] = br#"{"version":1,"gateways":["http://127.0.0.1:28766"],"preferences":{},"legacy":null,"chat":{"devices":[],"installations":[]}}"#;
+const SET: &str = "; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=1800";
+const CLEARED: &str = "__Host-central=; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=0";
 
-struct Browser<'a> {
-    identity: &'a IdentityService,
-    runtime: &'a Runtime,
+/// The page's `fetch`, as `baylee.app`'s Caddy passes it to the listener.
+pub(crate) struct Browser {
+    pub(crate) address: SocketAddr,
+    /// The client address the proxy appends to `X-Forwarded-For`.
+    pub(crate) client: &'static str,
 }
 
-impl Browser<'_> {
-    fn call(&self, request: Request, cookie: Option<&Token>) -> Result<BrowserReply, Error> {
-        self.runtime
-            .block_on(self.identity.handle_browser(request, cookie))
+/// A raw answer: status, `Set-Cookie` and body.
+struct Answer {
+    status: u16,
+    cookie: Option<String>,
+    body: Vec<u8>,
+}
+
+impl Browser {
+    fn post(&self, origin: &str, body: &[u8], cookie: Option<&Token>) -> Answer {
+        let mut stream = TcpStream::connect_timeout(&self.address, Duration::from_secs(3)).unwrap();
+        stream
+            .set_read_timeout(Some(Duration::from_secs(10)))
+            .unwrap();
+        write!(
+            stream,
+            "POST /api/v1 HTTP/1.1\r\nHost: baylee.app\r\nOrigin: {origin}\r\nSec-Fetch-Site: same-origin\r\n\
+             Content-Type: application/json\r\nX-Baylee-Central: 1\r\nX-Forwarded-For: {}\r\nContent-Length: {}\r\n",
+            self.client,
+            body.len()
+        )
+        .unwrap();
+        if let Some(token) = cookie {
+            write!(
+                stream,
+                "Cookie: theme=dark; __Host-central={}\r\n",
+                token.hex().as_str()
+            )
+            .unwrap();
+        }
+        stream.write_all(b"\r\n").unwrap();
+        stream.write_all(body).unwrap();
+        let mut response = Vec::new();
+        stream.take(1 << 20).read_to_end(&mut response).unwrap();
+        let split = response.windows(4).position(|w| w == b"\r\n\r\n").unwrap();
+        let head = std::str::from_utf8(&response[..split]).unwrap().to_owned();
+        assert!(head.to_lowercase().contains("cache-control: no-store"));
+        assert!(!head.to_lowercase().contains("access-control-"));
+        let status = head.split_whitespace().nth(1).unwrap().parse().unwrap();
+        let cookies: Vec<&str> = head
+            .lines()
+            .filter_map(|line| line.split_once(':'))
+            .filter(|(name, _)| name.eq_ignore_ascii_case("set-cookie"))
+            .map(|(_, value)| value.trim())
+            .collect();
+        assert!(cookies.len() <= 1);
+        Answer {
+            status,
+            cookie: cookies.first().map(|value| (*value).to_owned()),
+            body: response[split + 4..].to_vec(),
+        }
+    }
+
+    fn call(&self, request: &Request, cookie: Option<&Token>) -> Result<BrowserReply, Error> {
+        let logout = matches!(request, Request::Logout);
+        let answer = self.post(
+            "https://baylee.app",
+            &central_api::encode(&request)?,
+            cookie,
+        );
+        if logout {
+            assert_eq!(
+                answer.cookie.as_deref(),
+                Some(CLEARED),
+                "signing out clears the cookie"
+            );
+        }
+        match answer.status {
+            200 => {}
+            403 => return Err(Error::TermsRequired),
+            409 => return Err(Error::Conflict),
+            429 => return Err(Error::Busy),
+            503 => return Err(Error::Unavailable),
+            _ => return Err(Error::Rejected),
+        }
+        let response = central_api::decode(&answer.body)?;
+        let session = match answer.cookie {
+            Some(cookie) if !logout => {
+                let value = cookie.strip_prefix("__Host-central=").unwrap();
+                let value = value
+                    .strip_suffix(SET)
+                    .expect("the cookie's exact attributes");
+                let token = Token::from_hex(value).unwrap();
+                // The token is in the cookie and nowhere in the body.
+                assert!(!String::from_utf8_lossy(&answer.body).contains(value));
+                Some(token)
+            }
+            _ => None,
+        };
+        Ok(BrowserReply { response, session })
+    }
+
+    /// The listener's own refusal: 403 before any account operation.
+    fn refused(&self, request: &Request, cookie: Option<&Token>) -> bool {
+        let answer = self.post(
+            "https://baylee.app",
+            &central_api::encode(request).unwrap(),
+            cookie,
+        );
+        answer.status == 403 && answer.body == b"request not permitted\n" && answer.cookie.is_none()
     }
 
     /// An answer that issues no session.
-    fn answer(&self, request: Request, cookie: Option<&Token>) -> Result<Response, Error> {
+    fn answer(&self, request: &Request, cookie: Option<&Token>) -> Result<Response, Error> {
         let reply = self.call(request, cookie)?;
         assert!(reply.session.is_none());
         Ok(reply.response)
@@ -50,13 +154,12 @@ fn copy(token: &Token) -> Token {
 }
 
 pub(crate) fn run(
-    identity: &IdentityService,
+    browser: &Browser,
     http: &Http,
     bridge: &Token,
     runtime: &Runtime,
     operator: &DatabaseConnection,
 ) {
-    let browser = Browser { identity, runtime };
     let key = BetaKey::generate().unwrap();
     runtime
         .block_on(
@@ -75,14 +178,14 @@ pub(crate) fn run(
         Some(Error::Rejected)
     );
     assert_eq!(
-        browser.answer(register("synthetic"), None).err(),
+        browser.answer(&register("synthetic"), None).err(),
         Some(Error::Conflict),
         "a valid key learns that the name is taken"
     );
     let Response::Enrollment {
         identity: account,
         ticket,
-    } = browser.answer(register("web-player"), None).unwrap()
+    } = browser.answer(&register("web-player"), None).unwrap()
     else {
         panic!("an enrollment");
     };
@@ -90,7 +193,7 @@ pub(crate) fn run(
     let (enrollment, message) = Enrollment::start(PASSWORD.into(), context).unwrap();
     let Response::EnrollmentChallenge { message } = browser
         .answer(
-            Request::EnrollmentStart {
+            &Request::EnrollmentStart {
                 ticket: copy(&ticket),
                 message,
             },
@@ -115,11 +218,11 @@ pub(crate) fn run(
         recovery: recovery.map(|r| r.as_bytes().to_vec()),
     };
     assert_eq!(
-        browser.answer(finish(None), None).err(),
+        browser.answer(&finish(None), None).err(),
         Some(Error::Rejected)
     );
     assert!(matches!(
-        browser.answer(finish(Some(&recovery)), None).unwrap(),
+        browser.answer(&finish(Some(&recovery)), None).unwrap(),
         Response::Done
     ));
     // Central stores the recovery wrapper as sent: the code opens it to the same key.
@@ -137,18 +240,62 @@ pub(crate) fn run(
         .unwrap();
     let first = ObjectContext::new(context, account.account, 1).unwrap();
     assert_eq!(&opened.open_object(first, &document).unwrap()[..], DOCUMENT);
-    let cookie = sign_in(&browser, http, context);
-    session(&browser, http, bridge, &cookie);
-    play(&browser, http, bridge, &cookie);
+    budgets(browser, &key);
+    let cookie = sign_in(browser, http, context);
+    session(browser, http, bridge, &cookie);
+    play(browser, http, bridge, &cookie);
+}
+
+/// Registration is budgeted per client address, five an hour; a page from
+/// another origin is refused before any of that.
+fn budgets(browser: &Browser, key: &BetaKey) {
+    let discover = central_api::encode(&Request::Discover {
+        username: "web-player".into(),
+    })
+    .unwrap();
+    for origin in ["https://evil.example", "null", "https://central.baylee.app"] {
+        assert_eq!(
+            browser.post(origin, &discover, None).status,
+            403,
+            "{origin}"
+        );
+    }
+    // Two registrations so far from this address; three more with a wrong key.
+    let wrong = |name: &str| Request::Register {
+        username: name.into(),
+        beta_key: "CENTRAL-0000-0000-0000-0000".into(),
+    };
+    for _ in 0..3 {
+        assert_eq!(
+            browser.answer(&wrong("budget-probe"), None).err(),
+            Some(Error::Rejected)
+        );
+    }
+    let right = |name: &str| Request::Register {
+        username: name.into(),
+        beta_key: key.display().as_str().into(),
+    };
+    assert_eq!(
+        browser.answer(&right("budget-probe"), None).err(),
+        Some(Error::Busy)
+    );
+    let neighbour = Browser {
+        address: browser.address,
+        client: "198.51.100.77",
+    };
+    assert_eq!(
+        neighbour.answer(&wrong("budget-probe"), None).err(),
+        Some(Error::Rejected)
+    );
 }
 
 /// Sign-in on the website: the session goes to the cookie, never into the body.
-fn sign_in(browser: &Browser<'_>, http: &Http, context: Context) -> Token {
+fn sign_in(browser: &Browser, http: &Http, context: Context) -> Token {
     let Response::Discovery {
         discovery: Discovery::Central { identity },
     } = browser
         .answer(
-            Request::Discover {
+            &Request::Discover {
                 username: "Web-Player".into(),
             },
             None,
@@ -170,10 +317,10 @@ fn sign_in(browser: &Browser<'_>, http: &Http, context: Context) -> Token {
         attempt,
         message: result.finalization,
     };
-    assert_eq!(browser.call(finish, None).err(), Some(Error::Rejected));
+    assert_eq!(browser.call(&finish, None).err(), Some(Error::Rejected));
     let (login, message) = Login::start(PASSWORD.into(), context).unwrap();
     let Response::LoginChallenge { attempt, message } = browser
-        .answer(Request::LoginStart { identity, message }, None)
+        .answer(&Request::LoginStart { identity, message }, None)
         .unwrap()
     else {
         panic!("a challenge");
@@ -181,7 +328,7 @@ fn sign_in(browser: &Browser<'_>, http: &Http, context: Context) -> Token {
     let result = login.finish(&message).unwrap();
     let reply = browser
         .call(
-            Request::LoginFinish {
+            &Request::LoginFinish {
                 attempt,
                 message: result.finalization,
             },
@@ -206,7 +353,7 @@ fn sign_in(browser: &Browser<'_>, http: &Http, context: Context) -> Token {
     reply.session.expect("a session for the cookie")
 }
 
-fn session(browser: &Browser<'_>, http: &Http, bridge: &Token, cookie: &Token) {
+fn session(browser: &Browser, http: &Http, bridge: &Token, cookie: &Token) {
     // The cookie is a browser session only: as a native bearer it is nothing.
     assert!(
         http.exchange(&Request::SessionStatus, Some(cookie))
@@ -215,14 +362,14 @@ fn session(browser: &Browser<'_>, http: &Http, bridge: &Token, cookie: &Token) {
     let Response::SessionStatus {
         migration_closed, ..
     } = browser
-        .answer(Request::SessionStatus, Some(cookie))
+        .answer(&Request::SessionStatus, Some(cookie))
         .unwrap()
     else {
         panic!("a status");
     };
     assert!(migration_closed, "a registered account has no legacy reset");
     assert_eq!(
-        browser.answer(Request::SessionStatus, None).err(),
+        browser.answer(&Request::SessionStatus, None).err(),
         Some(Error::Rejected)
     );
     // Operations outside the browser listener's list are refused, with any token.
@@ -253,23 +400,20 @@ fn session(browser: &Browser<'_>, http: &Http, bridge: &Token, cookie: &Token) {
             bridge,
         ),
     ] {
-        assert_eq!(
-            browser.answer(request, Some(token)).err(),
-            Some(Error::Rejected)
-        );
+        assert!(browser.refused(&request, Some(token)));
     }
     // Central's terms are read and accepted on the website.
     let Response::TermsStatus {
         current: Some(current),
         accepted: false,
-    } = browser.answer(Request::TermsStatus, Some(cookie)).unwrap()
+    } = browser.answer(&Request::TermsStatus, Some(cookie)).unwrap()
     else {
         panic!("terms to accept");
     };
     assert!(matches!(
         browser
             .answer(
-                Request::AcceptTerms {
+                &Request::AcceptTerms {
                     subject: TermsSubject::Central,
                     version: current.version.clone(),
                     digest: current.digest,
@@ -280,14 +424,14 @@ fn session(browser: &Browser<'_>, http: &Http, bridge: &Token, cookie: &Token) {
         Response::Done
     ));
     assert!(matches!(
-        browser.answer(Request::TermsStatus, Some(cookie)).unwrap(),
+        browser.answer(&Request::TermsStatus, Some(cookie)).unwrap(),
         Response::TermsStatus { accepted: true, .. }
     ));
 }
 
 /// The same account plays natively beside its browser session; signing out of
 /// the website ends only the browser session.
-fn play(browser: &Browser<'_>, http: &Http, bridge: &Token, cookie: &Token) {
+fn play(browser: &Browser, http: &Http, bridge: &Token, cookie: &Token) {
     let Discovery::Central { identity } =
         central_client::discover(http, "web-player".into()).unwrap()
     else {
@@ -297,7 +441,7 @@ fn play(browser: &Browser<'_>, http: &Http, bridge: &Token, cookie: &Token) {
     assert_eq!(session.document(), DOCUMENT);
     assert!(session.migration_closed(http).unwrap());
     browser
-        .answer(Request::SessionStatus, Some(cookie))
+        .answer(&Request::SessionStatus, Some(cookie))
         .unwrap();
     session.confirm_restored(http).unwrap();
     let ticket = session.gateway_ticket(http, GATEWAY.into()).unwrap();
@@ -321,16 +465,16 @@ fn play(browser: &Browser<'_>, http: &Http, bridge: &Token, cookie: &Token) {
     assert_eq!((admitted.account, legacy_id), (identity.account, None));
     assert!(lease.is_some());
     assert!(matches!(
-        browser.answer(Request::Logout, Some(cookie)).unwrap(),
+        browser.answer(&Request::Logout, Some(cookie)).unwrap(),
         Response::Done
     ));
     assert!(
         browser
-            .answer(Request::SessionStatus, Some(cookie))
+            .answer(&Request::SessionStatus, Some(cookie))
             .is_err()
     );
     assert_eq!(
-        browser.answer(Request::Logout, None).err(),
+        browser.answer(&Request::Logout, None).err(),
         Some(Error::Rejected)
     );
     session.check_active(http).unwrap();

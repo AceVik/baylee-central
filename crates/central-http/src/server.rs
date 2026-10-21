@@ -8,6 +8,7 @@ use hyper_util::{
     service::TowerToHyperService,
 };
 use tokio::{net::TcpListener, task::JoinSet};
+use tower::ServiceExt;
 
 /// A bound local-only server. Drop before running to release the listener.
 /// Runtime connections are owned by a join set and aborted when the run future drops.
@@ -89,6 +90,27 @@ impl DevelopmentServer {
         self.run_router(app, shutdown).await
     }
 
+    /// Serve the website's browser listener (`docs/web-accounts.md`): one
+    /// route, `POST /api/v1`, for `Host: baylee.app` behind the site's TLS
+    /// proxy on loopback, which must pass the `Host` unchanged and append the
+    /// client to `X-Forwarded-For`. Only the browser operations are served.
+    ///
+    /// # Errors
+    /// Rejects a body capacity other than the browser listener's, or listener failures.
+    pub async fn run_browser(
+        self,
+        identity: std::sync::Arc<central_identity::IdentityService>,
+        shutdown: impl Future<Output = ()>,
+    ) -> io::Result<()> {
+        if self.config.request_bytes().get() != super::browser::REQUEST_BYTES {
+            return Err(io::Error::other(
+                "browser listener requires its fixed body capacity",
+            ));
+        }
+        self.run_router(super::browser::router(identity), shutdown)
+            .await
+    }
+
     async fn run_router(
         self,
         app: axum::Router,
@@ -106,13 +128,21 @@ impl DevelopmentServer {
                     }
                 }
                 result = self.listener.accept() => {
-                    let (stream, _) = result?;
+                    let (stream, peer) = result?;
                     if connections.len() >= self.config.concurrent_requests().get() {
                         // Drop immediately: no unbounded queue of accepted sockets/tasks.
                         drop(stream);
                         continue;
                     }
-                    let app = app.clone();
+                    // Each request learns its connection's peer; only the
+                    // browser listener reads it (its forwarded address counts
+                    // only from the loopback proxy).
+                    let app = app.clone().map_request(
+                        move |mut request: axum::http::Request<hyper::body::Incoming>| {
+                            request.extensions_mut().insert(super::browser::Peer(peer));
+                            request
+                        },
+                    );
                     connections.spawn(async move {
                         let mut builder = http1::Builder::new();
                         builder
