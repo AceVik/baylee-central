@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, test } from "vitest";
 
 import { KEYS, type Key } from "../src/i18n-keys";
-import { LANG_LIST, OFFERED, isLang, langOfTag, localeOf, pickLang, rich, t, tagOf } from "../src/i18n";
+import { LANG_LIST, OFFERED, isLang, langOfTag, localeOf, pickLang, rich, t, tagOf, type Lang } from "../src/i18n";
 
 // Every language's file, found on disk rather than through `OFFERED`, so a
 // file nobody wired in is noticed too.
@@ -91,10 +91,11 @@ function parse(lang: string): Map<string, Message> {
 const english = parse("en");
 
 describe("the language files", () => {
-  test("each file is one of Magic's languages, and English and German have one", () => {
+  test("each file is one of Magic's languages and offered, English first, German among them", () => {
     expect([...sources.keys()].filter((code) => !isLang(code))).toEqual([]);
     expect([...sources.keys()].sort()).toEqual([...OFFERED].sort());
-    expect(OFFERED).toEqual(["en", "de"]);
+    expect(OFFERED[0]).toBe("en");
+    expect(OFFERED).toContain("de");
   });
 
   test("the call sites' keys are the English ids, in the file's order", () => {
@@ -237,18 +238,25 @@ describe("rich", () => {
 });
 
 describe("the language", () => {
+  // the languages offered are given, so the cases hold whichever files exist
+  const today: Lang[] = ["en", "de"];
+
   it("is ?lang=, then the remembered choice, then the browser's", () => {
-    expect(pickLang("?lang=de", "en", ["en-GB"])).toBe("de");
-    expect(pickLang("?lang=fr", "de", ["en-GB"])).toBe("de");
-    expect(pickLang("", null, ["fr-FR", "de-AT", "en"])).toBe("de");
-    expect(pickLang("", null, ["fr-FR"])).toBe("en");
+    expect(pickLang("?lang=de", "en", ["en-GB"], today)).toBe("de");
+    expect(pickLang("?lang=fr", "de", ["en-GB"], today)).toBe("de");
+    expect(pickLang("", null, ["fr-FR", "de-AT", "en"], today)).toBe("de");
+    expect(pickLang("", null, ["fr-FR"], today)).toBe("en");
   });
 
   it("takes only a language that has a file", () => {
-    expect(pickLang("?lang=fr", null, ["fr-FR"])).toBe("en");
+    expect(pickLang("?lang=fr", null, ["fr-FR"], today)).toBe("en");
     expect(pickLang("?lang=fr", null, ["fr-FR"], ["en", "de", "fr"])).toBe("fr");
     expect(pickLang("", "zht", [], ["en", "zht"])).toBe("zht");
     expect(pickLang("?lang=xx", "constructor", ["xx"])).toBe("en");
+  });
+
+  it("offers what has a file", () => {
+    expect(pickLang("?lang=de", null, [])).toBe("de");
   });
 
   it("knows Chinese by its script or region", () => {

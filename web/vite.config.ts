@@ -59,5 +59,9 @@ export default defineConfig({
     setupFiles: ["test/setup.ts"],
     restoreMocks: true,
     unstubGlobals: true,
+    // A cached transform keeps the glob over locales/ it was made with, so a
+    // new language file would go unseen (unchecked by the parity test)
+    // until the cache is cleared; the suite takes seconds without it.
+    fsModuleCache: false,
   },
 });
