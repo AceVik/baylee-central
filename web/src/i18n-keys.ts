@@ -6,7 +6,7 @@
 export const KEYS = [
   "app.loading",
   "app.skip",
-  "lang.word",
+  "app.close",
   "nav.cards",
   "nav.download",
   "nav.gateways",
@@ -260,7 +260,6 @@ export const KEYS = [
   "grid.label",
   "grid.tile",
   "grid.scryfall",
-  "grid.close",
   "card.credit",
   "card.illustrated",
   "card.clickHint",

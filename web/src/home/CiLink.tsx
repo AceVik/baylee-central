@@ -9,9 +9,9 @@ export function CiLink({ run }: { run: CiRun }) {
     <a href={run.url} rel="noopener">
       <span className={`dot ${cls}`} aria-hidden="true" />
       {ok ? (
-        <T en="passing" de="grün" />
+        <T id="ci.passing" />
       ) : run.conclusion === "failure" ? (
-        <T en="failing" de="rot" />
+        <T id="ci.failing" />
       ) : (
         run.conclusion
       )}

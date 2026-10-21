@@ -25,7 +25,7 @@ function Loading() {
   return (
     <output className="page-loading">
       <span className="vh">
-        <T en="Loading…" de="Lädt …" />
+        <T id="app.loading" />
       </span>
     </output>
   );

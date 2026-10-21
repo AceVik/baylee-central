@@ -3,7 +3,7 @@
 
 import { GITHUB } from "../config";
 import { dateText, relTime, type CiRun, type Commit } from "../github";
-import { T, tt, useLang } from "../i18n";
+import { T, t, useLang } from "../i18n";
 import { useRelease } from "../download/useRelease";
 import { Link, PATHS } from "../router";
 import { CiLink } from "./CiLink";
@@ -12,11 +12,11 @@ export function StatusStrip({ ci, commit }: { ci: CiRun | null | undefined; comm
   const lang = useLang();
   const { release } = useRelease();
   return (
-    <section className="strip" aria-label={tt(lang, "Project status", "Projektstand")}>
+    <section className="strip" aria-label={t(lang, "status.label")}>
       <dl className="strip-inner">
         <div className="stat">
           <dt>
-            <T en="Latest build" de="Neueste Version" />
+            <T id="status.build" />
           </dt>
           <dd>
             {release ? (
@@ -28,28 +28,28 @@ export function StatusStrip({ ci, commit }: { ci: CiRun | null | undefined; comm
               </>
             ) : (
               <a href={`${GITHUB}/releases`} rel="noopener">
-                <T en="see releases" de="siehe Releases" />
+                <T id="status.releases" />
               </a>
             )}
           </dd>
         </div>
         <div className="stat">
           <dt>
-            <T en="CI on main" de="CI auf main" />
+            <T id="status.ci" />
           </dt>
           <dd>
             {ci ? (
               <CiLink run={ci} />
             ) : (
               <a href={`${GITHUB}/actions/workflows/ci.yml`} rel="noopener">
-                <T en="see on GitHub" de="auf GitHub ansehen" />
+                <T id="status.onGitHub" />
               </a>
             )}
           </dd>
         </div>
         <div className="stat">
           <dt>
-            <T en="Last commit" de="Letzter Commit" />
+            <T id="status.commit" />
           </dt>
           <dd>
             {commit ? (
@@ -61,18 +61,18 @@ export function StatusStrip({ ci, commit }: { ci: CiRun | null | undefined; comm
               </>
             ) : (
               <a href={`${GITHUB}/commits/main`} rel="noopener">
-                <T en="see on GitHub" de="auf GitHub ansehen" />
+                <T id="status.onGitHub" />
               </a>
             )}
           </dd>
         </div>
         <div className="stat">
           <dt>
-            <T en="Gateways" de="Gateways" />
+            <T id="status.gateways" />
           </dt>
           <dd>
             <Link to={PATHS.gateways}>
-              <T en="the directory" de="das Verzeichnis" />
+              <T id="status.directory" />
             </Link>
           </dd>
         </div>

@@ -10,7 +10,7 @@
 
 app-loading = Loading…
 app-skip = Skip to content
-lang-word = Language
+app-close = Close
 nav-cards = Cards
 nav-download = Download
 nav-gateways = Gateways
@@ -339,7 +339,6 @@ grid-hint = Arrow keys move between cards; Space shows one large, Enter opens it
 grid-label = Cards of { $set }
 grid-tile = { $status }. { $why }
 grid-scryfall = Artist and printing on Scryfall
-grid-close = Close
 
 card-credit = Card image provided by Scryfall, unaltered. Baylee is not affiliated with Scryfall or Wizards of the Coast.
 card-illustrated = Illustrated by { $artist }

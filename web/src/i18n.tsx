@@ -12,15 +12,15 @@
 
 import { FluentBundle, FluentResource } from "@fluent/bundle";
 import {
-  cloneElement,
+  Fragment,
   createContext,
+  createElement,
   useCallback,
   useContext,
   useEffect,
   useMemo,
   useRef,
   useState,
-  type ReactElement,
   type ReactNode,
 } from "react";
 
@@ -32,22 +32,22 @@ export type { Key } from "./i18n-keys";
 /**
  * Every language Magic is printed in, by Scryfall's code for it: its BCP 47
  * tag (the page's `lang`), the locale its numbers, dates and plural forms
- * follow, and its own name for the language buttons. Magic's Portuguese is
- * Brazil's. A language is offered once `locales/<code>/site.ftl` exists; the
+ * follow, and, for the language buttons, its own name and its word for
+ * "language". Magic's Portuguese is Brazil's. A language is offered once `locales/<code>/site.ftl` exists; the
  * table and that file are all a new one needs (README.md §"The words").
  */
 const LANGS = {
-  en: { tag: "en", locale: "en-GB", name: "English" },
-  de: { tag: "de", locale: "de-DE", name: "Deutsch" },
-  fr: { tag: "fr", locale: "fr-FR", name: "Français" },
-  it: { tag: "it", locale: "it-IT", name: "Italiano" },
-  es: { tag: "es", locale: "es-ES", name: "Español" },
-  pt: { tag: "pt-BR", locale: "pt-BR", name: "Português" },
-  ja: { tag: "ja", locale: "ja-JP", name: "日本語" },
-  ko: { tag: "ko", locale: "ko-KR", name: "한국어" },
-  ru: { tag: "ru", locale: "ru-RU", name: "Русский" },
-  zhs: { tag: "zh-Hans", locale: "zh-Hans-CN", name: "简体中文" },
-  zht: { tag: "zh-Hant", locale: "zh-Hant-TW", name: "繁體中文" },
+  en: { tag: "en", locale: "en-GB", name: "English", word: "Language" },
+  de: { tag: "de", locale: "de-DE", name: "Deutsch", word: "Sprache" },
+  fr: { tag: "fr", locale: "fr-FR", name: "Français", word: "Langue" },
+  it: { tag: "it", locale: "it-IT", name: "Italiano", word: "Lingua" },
+  es: { tag: "es", locale: "es-ES", name: "Español", word: "Idioma" },
+  pt: { tag: "pt-BR", locale: "pt-BR", name: "Português", word: "Idioma" },
+  ja: { tag: "ja", locale: "ja-JP", name: "日本語", word: "言語" },
+  ko: { tag: "ko", locale: "ko-KR", name: "한국어", word: "언어" },
+  ru: { tag: "ru", locale: "ru-RU", name: "Русский", word: "Язык" },
+  zhs: { tag: "zh-Hans", locale: "zh-Hans-CN", name: "简体中文", word: "语言" },
+  zht: { tag: "zh-Hant", locale: "zh-Hant-TW", name: "繁體中文", word: "語言" },
 } as const;
 
 export type Lang = keyof typeof LANGS;
@@ -100,6 +100,11 @@ export function localeOf(lang: Lang): string {
 /** The language's name in itself. */
 export function nameOf(lang: Lang): string {
   return LANGS[lang].name;
+}
+
+/** The language's own word for "language". */
+export function wordOf(lang: Lang): string {
+  return LANGS[lang].word;
 }
 
 /** Ours for a browser's language tag: its base language, Chinese by its script or region. */
@@ -189,32 +194,39 @@ export function t(lang: Lang, key: Key, args: Args = {}): string {
   return key;
 }
 
-/** The elements a message's markup names: `<code>…</code>` takes `elems.code`. */
-export type Elems = Readonly<Record<string, ReactElement<{ children?: ReactNode }>>>;
+/**
+ * What a message's markup draws, by tag: each takes the words between its
+ * tags and gives back what stands there, a link for `<notice>…</notice>`.
+ * `b`, `i`, `code` and `kbd` need none: they are drawn as themselves.
+ */
+export type Elems = Readonly<Record<string, (words: string) => ReactNode>>;
 
-const MARKUP = /<([a-z][a-zA-Z]*)>([^<]*)<\/\1>/g;
-// An argument's `<` while the markup is read, so that no argument (a name, an
-// address) can ever open an element; given back as `<` in the text.
-const HELD = "";
-const restore = (text: string) => text.replaceAll(HELD, "<");
+const PLAIN: ReadonlySet<string> = new Set(["b", "i", "code", "kbd"]);
+const MARKUP = /<([a-z][a-zA-Z]*)>([^<>]*)<\/\1>/g;
+// An argument's `<` and `>` while the markup is read, so that no argument (a
+// name, an address) can ever open or break an element; given back in the text.
+const hold = (text: string) => text.replaceAll("<", "\u{E000}").replaceAll(">", "\u{E001}");
+const restore = (text: string) => text.replaceAll("\u{E000}", "<").replaceAll("\u{E001}", ">");
 
 /**
  * `key` in `lang` with its markup drawn: each `<name>words</name>` becomes
- * `elems[name]` holding the words as text. Nothing in a message or an
- * argument is ever read as HTML; a tag `elems` does not name stays text.
+ * `b`, `i`, `code` or `kbd` holding the words, or what `elems[name]` makes of
+ * them. Nothing in a message or an argument is ever read as HTML, and a tag
+ * neither names stays text.
  */
-export function rich(lang: Lang, key: Key, elems: Elems, args: Args = {}): ReactNode[] {
+export function rich(lang: Lang, key: Key, elems: Elems = {}, args: Args = {}): ReactNode[] {
   const held: Record<string, string | number> = {};
-  for (const [name, value] of Object.entries(args)) held[name] = typeof value === "string" ? value.replaceAll("<", HELD) : value;
+  for (const [name, value] of Object.entries(args)) held[name] = typeof value === "string" ? hold(value) : value;
   const text = t(lang, key, held);
   const out: ReactNode[] = [];
   let at = 0;
   for (const m of text.matchAll(MARKUP)) {
     const [whole, name = "", inner = ""] = m;
-    const elem = elems[name];
-    if (elem === undefined) continue;
+    const draw = Object.hasOwn(elems, name) ? elems[name] : undefined;
+    if (draw === undefined && !PLAIN.has(name)) continue;
     if (m.index > at) out.push(restore(text.slice(at, m.index)));
-    out.push(cloneElement(elem, { key: out.length }, restore(inner)));
+    const words = restore(inner);
+    out.push(draw === undefined ? createElement(name, { key: out.length }, words) : <Fragment key={out.length}>{draw(words)}</Fragment>);
     at = m.index + whole.length;
   }
   if (at < text.length) out.push(restore(text.slice(at)));
@@ -264,12 +276,12 @@ export function useChooseLang(): (lang: Lang) => void {
 type Message = { id: Key; args?: Args; elems?: Elems };
 type Both = { en: ReactNode; de: ReactNode };
 
-/** One message in the page's language; with `elems`, its markup drawn as those elements. */
+/** One message in the page's language, its markup drawn (`rich`). */
 export function T(props: Message | Both) {
   const lang = useLang();
   if ("en" in props) return <>{lang === "de" ? props.de : props.en}</>;
   const { id, args, elems } = props;
-  return <>{elems === undefined ? t(lang, id, args) : rich(lang, id, elems, args)}</>;
+  return <>{rich(lang, id, elems, args)}</>;
 }
 
 /** Until every component names its messages (removed once none says both). */

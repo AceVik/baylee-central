@@ -8,7 +8,7 @@
 
 app-loading = Lädt …
 app-skip = Zum Inhalt springen
-lang-word = Sprache
+app-close = Schließen
 nav-cards = Karten
 nav-download = Download
 nav-gateways = Gateways
@@ -336,7 +336,6 @@ grid-hint = Pfeiltasten wechseln die Karte; die Leertaste zeigt sie groß, Enter
 grid-label = Karten aus { $set }
 grid-tile = { $status }. { $why }
 grid-scryfall = Künstler und Druck bei Scryfall
-grid-close = Schließen
 
 card-credit = Kartenbild bereitgestellt von Scryfall, unverändert. Baylee ist weder mit Scryfall noch mit Wizards of the Coast verbunden.
 card-illustrated = Illustriert von { $artist }

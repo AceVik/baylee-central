@@ -1,5 +1,6 @@
 import { FluentBundle, FluentResource, type Message } from "@fluent/bundle";
-import { isValidElement } from "react";
+import { isValidElement, type ReactNode } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, test } from "vitest";
 
 import { KEYS, type Key } from "../src/i18n-keys";
@@ -206,8 +207,8 @@ describe("t", () => {
 });
 
 describe("rich", () => {
-  it("draws each tag as the element it names, its words as text", () => {
-    const out = rich("en", "contact.f8", { kbd: <kbd /> });
+  it("draws b, i, code and kbd as themselves, its words as text", () => {
+    const out = rich("en", "contact.f8");
     expect(out[0]).toBe("A card that resolved wrongly is best reported from the game with ");
     const key = out[1];
     expect(isValidElement(key) && key.type).toBe("kbd");
@@ -215,15 +216,23 @@ describe("rich", () => {
     expect(out[2]).toBe(", because the report can carry the whole game.");
   });
 
+  it("draws any other tag as its call site says", () => {
+    const out = rich("en", "imp.write", { contact: (words) => <a href="/contact">{words}</a> });
+    expect(out[0]).toBe("You can also write to me with the ");
+    const link = out[1];
+    expect(isValidElement<{ children: ReactNode }>(link) && renderToStaticMarkup(link)).toBe('<a href="/contact">contact form</a>');
+    expect(out[2]).toBe(".");
+  });
+
   it("never lets an argument open an element", () => {
-    const out = rich("en", "privacy.contact", { code: <code /> }, { host: "<code>x</code>" });
+    const out = rich("en", "privacy.contact", {}, { host: "<code>x</code>" });
     const code = out[1];
     expect(isValidElement<{ children: string }>(code) && code.props.children).toBe("<code>x</code>");
     expect(out.filter((node) => isValidElement(node))).toHaveLength(1);
   });
 
   it("leaves a tag the call site does not name as text", () => {
-    expect(rich("en", "contact.f8", {}).join("")).toContain("<kbd>F8</kbd>");
+    expect(rich("en", "imp.write").join("")).toBe("You can also write to me with the <contact>contact form</contact>.");
   });
 });
 
