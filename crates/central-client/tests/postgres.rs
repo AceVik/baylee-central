@@ -39,6 +39,16 @@ fn real_native_login_restore_migration_and_adversarial_paths() {
         .block_on(DevelopmentServer::bind(central_policy_config()))
         .unwrap();
     let address = server.local_addr();
+    let browser = runtime
+        .block_on(DevelopmentServer::bind(
+            central_policy::config::Config::from_pairs([
+                ("BAYLEE_CENTRAL_LISTEN", "127.0.0.1:0"),
+                ("BAYLEE_CENTRAL_REQUEST_BYTES", "65536"),
+            ])
+            .unwrap(),
+        ))
+        .unwrap();
+    let browser_address = browser.local_addr();
     let endpoint = Endpoint::development(&format!("http://{address}")).unwrap();
     let bridge = Token::generate().unwrap();
     let keys = ServerKeys::generate();
@@ -54,7 +64,10 @@ fn real_native_login_restore_migration_and_adversarial_paths() {
         .unwrap()
         .with_terms(Some(support::terms::central_document())),
     );
-    let service = identity.clone();
+    let (stop_browser, browser_stopped) = oneshot::channel();
+    let browser_task = runtime.spawn(browser.run_browser(identity.clone(), async {
+        let _ = browser_stopped.await;
+    }));
     let (stop, stopped) = oneshot::channel();
     let serving_endpoint = endpoint.clone();
     let task = runtime.spawn(async move {
@@ -71,12 +84,22 @@ fn real_native_login_restore_migration_and_adversarial_paths() {
     };
     let tested = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         run(&http, &bridge, &runtime, &operator);
-        support::browser::run(&service, &http, &bridge, &runtime, &operator);
+        let browser = support::browser::Browser {
+            address: browser_address,
+            client: "198.51.100.7",
+        };
+        support::browser::run(&browser, &http, &bridge, &runtime, &operator);
     }));
     // Cleanup runs even if an assertion panics; listeners and pools belong to this fixture only.
     let _ = stop.send(());
+    let _ = stop_browser.send(());
     runtime.block_on(async {
         tokio::time::timeout(Duration::from_secs(5), task)
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap();
+        tokio::time::timeout(Duration::from_secs(5), browser_task)
             .await
             .unwrap()
             .unwrap()
@@ -85,6 +108,7 @@ fn real_native_login_restore_migration_and_adversarial_paths() {
         operator.close().await.unwrap();
     });
     assert!(TcpStream::connect_timeout(&address, Duration::from_millis(200)).is_err());
+    assert!(TcpStream::connect_timeout(&browser_address, Duration::from_millis(200)).is_err());
     if let Err(panic) = tested {
         std::panic::resume_unwind(panic);
     }

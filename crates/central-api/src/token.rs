@@ -50,9 +50,18 @@ impl Token {
     /// Encode the bearer header into a zeroizing buffer; never log it.
     #[must_use]
     pub fn bearer(&self) -> Zeroizing<String> {
-        use std::fmt::Write;
         let mut out = Zeroizing::new(String::with_capacity(71));
         out.push_str("Bearer ");
+        out.push_str(&self.hex());
+        out
+    }
+
+    /// The 64 lowercase hexadecimal digits, as a cookie carries them, in a
+    /// zeroizing buffer; never log it.
+    #[must_use]
+    pub fn hex(&self) -> Zeroizing<String> {
+        use std::fmt::Write;
+        let mut out = Zeroizing::new(String::with_capacity(64));
         for byte in self.0 {
             let _ = write!(out, "{byte:02x}");
         }
@@ -64,7 +73,14 @@ impl Token {
     /// # Errors
     /// Rejects noncanonical, malformed or wrong-sized credentials.
     pub fn from_bearer(value: &str) -> Result<Self, Error> {
-        let text = value.strip_prefix("Bearer ").ok_or(Error::Rejected)?;
+        Self::from_hex(value.strip_prefix("Bearer ").ok_or(Error::Rejected)?)
+    }
+
+    /// Decode exactly 64 lowercase hexadecimal digits, as [`Token::hex`] writes them.
+    ///
+    /// # Errors
+    /// Rejects any other length, case or character.
+    pub fn from_hex(text: &str) -> Result<Self, Error> {
         if text.len() != 64
             || !text
                 .bytes()
@@ -110,5 +126,18 @@ mod tests {
         }
         assert!(Token::from_bearer(&format!("{} ", encoded.as_str())).is_err());
         assert!(Token::from_bearer(&encoded.to_uppercase()).is_err());
+        let hex = token.hex();
+        assert_eq!(hex.len(), 64);
+        assert_eq!(Token::from_hex(&hex).unwrap().digest(), token.digest());
+        assert_eq!(encoded.as_str(), format!("Bearer {}", hex.as_str()));
+        for text in [
+            &hex[1..],
+            &format!("{}0", hex.as_str()),
+            &hex.to_uppercase(),
+            &format!(" {}", &hex[1..]),
+            &format!("{}g", &hex[1..]),
+        ] {
+            assert!(Token::from_hex(text).is_err());
+        }
     }
 }

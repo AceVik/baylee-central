@@ -51,13 +51,18 @@ async fn inspect(State(state): State<Arc<Boundary>>, request: Request, next: Nex
     if request.uri().scheme().is_some() || request.uri().authority().is_some() {
         return (StatusCode::BAD_REQUEST, "invalid request\n").into_response();
     }
-    // Native development API only; no CORS, cookies, forwarded identity or browser origins.
-    // Same-origin website integration requires an explicit reviewed policy later.
+    // Native API only; no CORS, cookies, forwarded identity or browser origins.
+    // The website has its own listener and reviewed policy (`browser.rs`).
     if request.headers().contains_key(header::ORIGIN)
         || request.headers().contains_key("sec-fetch-site")
     {
         return (StatusCode::FORBIDDEN, "request not permitted\n").into_response();
     }
+    bounded(request, state.request_bytes, next).await
+}
+
+/// Read the whole body, at most `limit` bytes, before `next` runs.
+pub(crate) async fn bounded(request: Request, limit: usize, next: Next) -> Response {
     // Reject declared oversize before waiting for an attacker to send a body.
     // Streaming/chunked bodies are still bounded independently below.
     if request
@@ -68,13 +73,13 @@ async fn inspect(State(state): State<Arc<Boundary>>, request: Request, next: Nex
                 .to_str()
                 .ok()
                 .and_then(|value| value.parse::<u64>().ok())
-                .is_none_or(|length| length > state.request_bytes as u64)
+                .is_none_or(|length| length > limit as u64)
         })
     {
         return (StatusCode::PAYLOAD_TOO_LARGE, "request rejected\n").into_response();
     }
     let (parts, body) = request.into_parts();
-    let bytes = match to_bytes(body, state.request_bytes).await {
+    let bytes = match to_bytes(body, limit).await {
         Ok(bytes) => bytes,
         Err(error) => {
             let status = if error
@@ -92,7 +97,7 @@ async fn inspect(State(state): State<Arc<Boundary>>, request: Request, next: Nex
         .await
 }
 
-async fn headers(request: Request, next: Next) -> Response {
+pub(crate) async fn headers(request: Request, next: Next) -> Response {
     let mut response = next.run(request).await;
     let headers = response.headers_mut();
     for (name, value) in [
