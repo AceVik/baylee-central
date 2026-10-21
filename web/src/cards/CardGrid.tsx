@@ -6,13 +6,13 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type FocusEvent, type KeyboardEvent, type MouseEvent, type PointerEvent } from "react";
 
-import { T, tt, useLang } from "../i18n";
+import { T, t, useLang } from "../i18n";
 import { Icon } from "../components/icons";
 import { Modal } from "../components/Modal";
 import { imgOf, pageOf, why } from "./card";
 import { Badge, BigPicture, CardText, Credit, Preview, type Shown } from "./CardView";
 import { FilterBar, type Filter } from "./FilterBar";
-import { STATUS, type Card, type Counts } from "./model";
+import { GROUP_LABEL, STATUS, type Card, type Counts } from "./model";
 
 function hoverable(): boolean {
   return typeof window.matchMedia === "function" && window.matchMedia("(hover: hover) and (pointer: fine)").matches;
@@ -125,12 +125,9 @@ export function CardGrid({ cards, counts, setName }: { cards: Card[]; counts: Co
         }}
       />
       <p className="small cgrid-hint">
-        <T
-          en="Arrow keys move between cards; Space shows one large, Enter opens it on Scryfall."
-          de="Pfeiltasten wechseln die Karte; die Leertaste zeigt sie groß, Enter öffnet sie bei Scryfall."
-        />
+        <T id="grid.hint" />
       </p>
-      <ul className="cgrid" ref={grid} aria-label={tt(lang, `Cards of ${setName}`, `Karten aus ${setName}`)}>
+      <ul className="cgrid" ref={grid} aria-label={t(lang, "grid.label", { set: setName })}>
         {visible.map((card, i) => {
           const src = imgOf(card, "small");
           const st = STATUS[card.status];
@@ -164,7 +161,7 @@ export function CardGrid({ cards, counts, setName }: { cards: Card[]; counts: Co
                 <span className="ctile-name">{card.name}</span>
                 <span className="vh">
                   {" "}
-                  {tt(lang, st.en, st.de)}. {why(card, lang)}
+                  {t(lang, "grid.tile", { status: t(lang, GROUP_LABEL[st.group]), why: why(card, lang) })}
                 </span>
               </a>
               <div className="ctile-cap" aria-hidden="true">
@@ -186,11 +183,11 @@ export function CardGrid({ cards, counts, setName }: { cards: Card[]; counts: Co
             <CardText card={opened.card} nameId="cardview-name" />
             <p className="cp-go">
               <a className="button button-ghost" href={pageOf(opened.card)} target="_blank" rel="noopener">
-                <T en="Artist and printing on Scryfall" de="Künstler und Druck bei Scryfall" />
+                <T id="grid.scryfall" />
               </a>
             </p>
             <Credit />
-            <button type="button" className="round-btn cardview-close" aria-label={tt(lang, "Close", "Schließen")} onClick={() => setOpened(null)}>
+            <button type="button" className="round-btn cardview-close" aria-label={t(lang, "app.close")} onClick={() => setOpened(null)}>
               <Icon name="close" />
             </button>
           </div>

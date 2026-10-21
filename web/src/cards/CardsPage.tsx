@@ -1,11 +1,25 @@
 import type { ReactNode } from "react";
 
 import { GITHUB } from "../config";
-import { T, num, useLang, useTitle } from "../i18n";
+import { T, num, t, useLang, useTitle, type Elems, type Lang } from "../i18n";
 import { useCountUp } from "../motion";
 import { useLocation } from "../router";
 import { SetsBlock } from "./SetsBlock";
 import { useSetsDoc } from "./useSetsDoc";
+
+/** Where the counts come from: the pool list, and the README of `lang`'s language. */
+const sources = (lang: Lang): Elems => ({
+  pool: (words) => (
+    <a href={`${GITHUB}/blob/main/data/card-pool.txt`} rel="noopener">
+      {words}
+    </a>
+  ),
+  readme: (words) => (
+    <a href={`${GITHUB}${t(lang, "link.readmeWhat")}`} rel="noopener">
+      {words}
+    </a>
+  ),
+});
 
 function NumberTile({ value, label }: { value: number | null; label: ReactNode }) {
   const lang = useLang();
@@ -24,94 +38,57 @@ function NumberTile({ value, label }: { value: number | null; label: ReactNode }
 /** The three numbers of the card status, counted up once they are loaded. */
 export function CardNumbers() {
   const doc = useSetsDoc();
-  const t = doc?.totals;
+  const totals = doc?.totals;
   return (
     <dl className="numbers">
       <NumberTile
-        value={t ? t.implemented : null}
-        label={<T en="cards that play exactly as printed" de="Karten, die genau wie gedruckt spielen" />}
+        value={totals ? totals.implemented : null}
+        label={<T id="cards.implemented" />}
       />
       <NumberTile
-        value={t ? t.partial : null}
-        label={<T en="more that are partly implemented and marked as such" de="weitere, teilweise umgesetzt und so markiert" />}
+        value={totals ? totals.partial : null}
+        label={<T id="cards.partial" />}
       />
       <NumberTile
-        value={doc && t ? doc.corpus - t.never : null}
-        label={<T en="cards in the whole corpus we are working towards" de="Karten im gesamten Korpus, auf den wir hinarbeiten" />}
+        value={doc && totals ? doc.corpus - totals.never : null}
+        label={<T id="cards.corpus" />}
       />
     </dl>
   );
 }
 
 export default function Cards() {
-  useTitle("Cards – Baylee", "Karten – Baylee");
+  useTitle("title.cards");
+  const lang = useLang();
   const { hash } = useLocation();
   return (
     <>
       <header className="page-head">
         <div className="section-inner">
           <p className="eyebrow">
-            <T en="Cards" de="Karten" />
+            <T id="cards.eyebrow" />
           </p>
           <h1>
-            <T en="The cards, honestly" de="Die Karten, ehrlich" />
+            <T id="cards.title" />
           </h1>
           <div className="two-col">
             <div>
               <p>
-                <T
-                  en='Every card in Baylee is code: one file per card, written in a small rules language and played in a test. There is no "close enough" interpreter guessing at card text. That is why the pool grows batch by batch instead of all at once.'
-                  de="Jede Karte in Baylee ist Code: eine Datei pro Karte, in einer kleinen Regelsprache geschrieben und in einem Test gespielt. Es gibt keinen Interpreter, der Kartentext ungefähr errät. Deshalb wächst der Pool Stapel für Stapel statt auf einmal."
-                />
+                <T id="cards.intro" />
               </p>
               <p className="small">
-                <T
-                  en={
-                    <>
-                      Counted from the repository by Baylee&apos;s own tools (
-                      <a href={`${GITHUB}/blob/main/data/card-pool.txt`} rel="noopener">
-                        the pool list
-                      </a>
-                      ,{" "}
-                      <a href={`${GITHUB}#what-baylee-is`} rel="noopener">
-                        the README
-                      </a>
-                      ). The deck builder can show only playable cards, and it warns when a deck holds cards that will not
-                      play as printed.
-                    </>
-                  }
-                  de={
-                    <>
-                      Gezählt im Repository von Baylees eigenen Werkzeugen (
-                      <a href={`${GITHUB}/blob/main/data/card-pool.txt`} rel="noopener">
-                        die Pool-Liste
-                      </a>
-                      ,{" "}
-                      <a href={`${GITHUB}/blob/main/README.de.md#was-baylee-ist`} rel="noopener">
-                        die README
-                      </a>
-                      ). Der Deckbauer kann nur spielbare Karten zeigen und warnt, wenn ein Deck Karten enthält, die nicht
-                      wie gedruckt spielen.
-                    </>
-                  }
-                />
+                <T id="cards.counted" elems={sources(lang)} />
               </p>
             </div>
             <div>
               <h2 className="h3">
-                <T en="The plan" de="Der Plan" />
+                <T id="cards.planTitle" />
               </h2>
               <p>
-                <T
-                  en="Sets go in release order, starting with Alpha, because every set introduces its mechanics on top of the older ones. Alpha is complete: every playable card of it plays as printed. Arabian Nights and Antiquities come next, and the rest follows set by set. Bugs found at the table come before new cards, every time."
-                  de="Die Sets kommen in Erscheinungsreihenfolge, beginnend mit Alpha, weil jedes Set seine Mechaniken auf die älteren setzt. Alpha ist vollständig: Jede spielbare Karte daraus spielt wie gedruckt. Als Nächstes kommen Arabian Nights und Antiquities, der Rest folgt Set für Set. Fehler, die am Tisch auffallen, gehen immer vor neuen Karten."
-                />
+                <T id="cards.plan" />
               </p>
               <p>
-                <T
-                  en="That means a modern deck will often hold cards Baylee does not know yet. We would rather tell you that in the deck builder than let a card resolve wrongly. Cards that cannot be played at all (ante, dexterity, subgames) are on a named skip list and never silently dropped."
-                  de="Das heißt: Ein modernes Deck enthält oft Karten, die Baylee noch nicht kennt. Wir sagen dir das lieber im Deckbauer, als eine Karte falsch verrechnen zu lassen. Karten, die gar nicht spielbar sind (Ante, Geschicklichkeit, Teilspiele), stehen auf einer benannten Auslassungsliste und fallen nie stillschweigend weg."
-                />
+                <T id="cards.modern" />
               </p>
             </div>
           </div>
