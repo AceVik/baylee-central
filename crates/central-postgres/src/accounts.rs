@@ -16,6 +16,7 @@ mod migration;
 mod objects;
 mod sessions;
 mod terms;
+pub use sessions::{Issued, Session};
 pub use terms::MAX_GATEWAY_VERSIONS;
 
 /// An OPAQUE credential snapshot. It cannot issue sessions without proof verification.

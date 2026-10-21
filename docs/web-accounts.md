@@ -90,15 +90,24 @@ reset, which uses it, comes with M1.
 - `accounts.recovery_wrapped_master bytea NULL`, 73 bytes when present, required
   for `source = registered` once enrolled.
 - `beta_keys (id uuid v7, digest bytea(32) UNIQUE, uses_left int CHECK >= 0,
-  expires_at timestamptz NULL, note text CHECK length <= 200, created_at,
-  revoked_at NULL)`. Only SHA-256 digests are stored.
+  expires_at timestamptz NULL, note text NOT NULL CHECK length <= 200,
+  created_at, revoked_at NULL)`. Only SHA-256 digests are stored.
 - A reservation holds one use until the enrollment completes or expires
-  (`account_beta_key` link on the pending row). An expired reservation gives the
-  use back.
+  (`accounts.beta_key_id` on the pending row): a key admits a registration
+  while `uses_left` exceeds its live reservations, and the enrollment commit
+  spends the use and clears the link. An expired reservation so gives the use
+  back without a clean-up job.
 - `sessions.kind` (`native` | `browser`). `sessions_one_per_account` becomes
   one per account **and kind**, so a browser sign-in never ends the client's
-  session. Lifetime stays 30 minutes for both.
-- `ops/grants.sql` and `grants.rs` gain the new table and privileges.
+  session. Lifetime stays 30 minutes for both. A browser session is stored
+  under SHA-256 over a fixed domain label and the token, not the native
+  bearer's digest: a cookie value presented as a bearer on `/v1/native` finds
+  no session, and a native bearer is no browser session. (Changed in the
+  server PR: the first draft left the kinds interchangeable, so a stolen
+  cookie would have been a full native session.)
+- `ops/grants.sql` and `grants.rs` gain the new table and privileges: the
+  runtime role gets `SELECT` and `UPDATE (uses_left)` on `beta_keys`, nothing
+  more; issuing and revoking keys stay with the operator.
 
 **Beta keys.** A launcher mode `--issue-beta-keys-stdin` reads `{ "database":
 …, "count": n ≤ 100, "uses": n ≤ 1000, "expires_days": n?, "note": "…" }`

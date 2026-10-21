@@ -12,3 +12,5 @@ GRANT SELECT ON central_identity.gateway_approvals TO central_runtime;
 GRANT SELECT, INSERT, DELETE ON central_identity.gateway_admins, central_identity.gateway_leases TO central_runtime;
 GRANT SELECT, INSERT ON central_identity.gateway_terms, central_identity.gateway_terms_texts,
   central_identity.terms_acceptances TO central_runtime;
+-- A key's uses are spent by enrollment; issuing and revoking keys stay with the operator.
+GRANT SELECT, UPDATE (uses_left) ON central_identity.beta_keys TO central_runtime;

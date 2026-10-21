@@ -39,6 +39,7 @@ async fn migrations_ids_roles_rollback_and_locking() {
         .unwrap();
 
     verify_migrations(&operator).await;
+    support::upgrade(&operator).await;
 
     assert!(matches!(
         PendingAccountStore::connect_dev(config(
@@ -158,7 +159,7 @@ async fn verify_migrations(operator: &sea_orm::DatabaseConnection) {
             "SELECT count(*)::bigint AS value FROM seaql_migrations"
         )
         .await,
-        6
+        7
     );
 
     operator.execute_unprepared(

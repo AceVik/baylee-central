@@ -1,14 +1,17 @@
 //! PostgreSQL 18+ adapter. Development transport is explicitly loopback-only;
-//! deployed servers are reached only over verified TLS. No public account
-//! registration endpoint yet.
+//! deployed servers are reached only over verified TLS.
 //! Client/policy/crypto libraries do not depend on this server-side crate.
 #![forbid(unsafe_code)]
 
 mod accounts;
+mod beta_keys;
 mod connection;
 mod pending;
-pub use accounts::{AccountStore, Credential, MAX_GATEWAY_VERSIONS};
+pub use accounts::{AccountStore, Credential, Issued, MAX_GATEWAY_VERSIONS, Session};
 
+pub use beta_keys::{
+    BetaKeyBatch, MAX_BETA_KEY_DAYS, MAX_BETA_KEY_NOTE, MAX_BETA_KEY_USES, MAX_BETA_KEYS,
+};
 pub use connection::{DevConfig, ServerConfig, connect_dev, connect_server, supports_version};
 pub use pending::{PendingAccount, PendingAccountStore};
 

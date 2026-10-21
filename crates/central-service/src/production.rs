@@ -1,16 +1,17 @@
-//! Deployed operation: the live account service, explicit migrations and secret
-//! generation. Configuration arrives over stdin, never argv or the environment.
+//! Deployed operation: the live account service, explicit migrations, issuing
+//! beta keys and secret generation. Configuration arrives over stdin, never argv
+//! or the environment.
 //!
 //! The endpoint is always [`Endpoint::live`] and the database is reached only over
 //! verified TLS ([`ServerConfig`]). A supervisor such as systemd opens the
 //! operator's root-owned configuration file and hands it over as standard input,
 //! so the service identity itself never needs read access to that file.
-use central_api::{Endpoint, LEGACY_ORIGIN, MAX_WIRE_BYTES, Token};
+use central_api::{Endpoint, LEGACY_ORIGIN, MAX_WIRE_BYTES, Token, beta_key::BetaKey};
 use central_crypto::opaque::server::ServerKeys;
 use central_http::DevelopmentServer;
 use central_identity::IdentityService;
 use central_policy::config::Config;
-use central_postgres::{AccountStore, ServerConfig, connect_server};
+use central_postgres::{AccountStore, BetaKeyBatch, MAX_BETA_KEYS, ServerConfig, connect_server};
 use serde::Deserialize;
 use std::{
     io::{IsTerminal, Read, Write},
@@ -65,6 +66,18 @@ struct Service {
 #[serde(deny_unknown_fields)]
 struct Migration {
     database: Database,
+}
+
+/// Beta keys to issue under the migrator login (`docs/operations.md`).
+#[derive(Deserialize, Zeroize, ZeroizeOnDrop)]
+#[serde(deny_unknown_fields)]
+struct Issue {
+    database: Database,
+    count: u32,
+    uses: u32,
+    #[serde(default)]
+    expires_days: Option<u32>,
+    note: String,
 }
 
 fn read_settings() -> Result<Zeroizing<Vec<u8>>, ()> {
@@ -156,6 +169,61 @@ async fn migrate() -> Result<(), ()> {
     let applied = central_migration::apply(&db).await.map_err(|_| ());
     let closed = db.close().await.map_err(|_| ());
     applied.and(closed)
+}
+
+/// Issue beta keys and print each once, one per line, after they are committed.
+pub(super) async fn run_issue_beta_keys() -> ExitCode {
+    let Ok(keys) = issue_beta_keys().await else {
+        eprintln!("central: beta keys rejected configuration or failed; none were issued");
+        return ExitCode::FAILURE;
+    };
+    let mut stdout = std::io::stdout().lock();
+    for key in &keys {
+        let line = key.display();
+        if stdout
+            .write_all(line.as_bytes())
+            .and_then(|()| stdout.write_all(b"\n"))
+            .is_err()
+        {
+            eprintln!("central: beta keys were issued but not all printed; revoke this run's keys");
+            return ExitCode::FAILURE;
+        }
+    }
+    if stdout.flush().is_err() {
+        eprintln!("central: beta keys were issued but not all printed; revoke this run's keys");
+        return ExitCode::FAILURE;
+    }
+    eprintln!("central: {} beta keys issued", keys.len());
+    ExitCode::SUCCESS
+}
+
+async fn issue_beta_keys() -> Result<Vec<BetaKey>, ()> {
+    let bytes = read_settings()?;
+    let mut settings: Issue = parse(&bytes)?;
+    drop(bytes);
+    let count = usize::try_from(settings.count).map_err(|_| ())?;
+    if !(1..=MAX_BETA_KEYS).contains(&count) {
+        return Err(());
+    }
+    let keys = (0..count)
+        .map(|_| BetaKey::generate())
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|_| ())?;
+    let digests: Vec<[u8; 32]> = keys.iter().map(BetaKey::digest).collect();
+    // Every bound is checked before the database is reached.
+    let batch = BetaKeyBatch::new(
+        &digests,
+        settings.uses,
+        settings.expires_days,
+        &settings.note,
+    )
+    .map_err(|_| ())?;
+    let database = settings.database.server()?;
+    let db = connect_server(database).await.map_err(|_| ())?;
+    let issued = batch.issue(&db).await.map_err(|_| ());
+    let closed = db.close().await.map_err(|_| ());
+    issued.and(closed)?;
+    Ok(keys)
 }
 
 /// Write a fresh OPAQUE setup and bridge credential as one JSON document.
@@ -288,6 +356,34 @@ mod tests {
         assert!(settings.database.server().is_ok());
         let extended = format!(r#"{{"database":{},"opaque_setup":[1]}}"#, database());
         assert!(parse::<Migration>(extended.as_bytes()).is_err());
+    }
+
+    #[test]
+    fn an_issue_document_takes_bounds_a_note_and_its_database() {
+        let issue = |extra: &str| {
+            format!(
+                r#"{{"database":{},"count":10,"uses":5,"note":"October playtest"{extra}}}"#,
+                database()
+            )
+        };
+        let mut settings: Issue = parse(issue("").as_bytes()).unwrap();
+        assert_eq!(
+            (settings.count, settings.uses, settings.expires_days),
+            (10, 5, None)
+        );
+        assert!(settings.database.server().is_ok());
+        let settings: Issue = parse(issue(r#","expires_days":30"#).as_bytes()).unwrap();
+        assert_eq!(settings.expires_days, Some(30));
+        for extra in [
+            r#","opaque_setup":[1]"#,
+            r#","listen":"127.0.0.1:28790""#,
+            r#","expires_days":-1"#,
+            r#","key":"CENTRAL-0000-0000-0000-0000""#,
+        ] {
+            assert!(parse::<Issue>(issue(extra).as_bytes()).is_err(), "{extra}");
+        }
+        let without_note = issue("").replace(r#","note":"October playtest""#, "");
+        assert!(parse::<Issue>(without_note.as_bytes()).is_err());
     }
 
     #[test]

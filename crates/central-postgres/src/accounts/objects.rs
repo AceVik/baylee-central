@@ -17,6 +17,8 @@ fn state(row: &QueryResult) -> Result<ObjectState, Error> {
 
 // The same account lock serializes login replacement, quota changes and object
 // mutations. Recheck the session after acquiring it to reject a concurrent logout.
+// `require_closed`: the account no longer depends on the legacy gateway, being a
+// closed legacy migration or a restored registered account.
 pub(super) async fn locked_owner(
     db: &impl ConnectionTrait,
     session: &Token,
@@ -27,7 +29,7 @@ pub(super) async fn locked_owner(
             "SELECT a.id FROM central_identity.accounts a JOIN central_identity.sessions s
          ON s.account_id = a.id AND s.credential_revision = a.credential_revision
          WHERE s.digest = $1 AND s.expires_at > pg_catalog.clock_timestamp()
-         AND (NOT $2 OR (a.legacy_closed AND a.restored)) FOR UPDATE OF a",
+         AND (NOT $2 OR (a.restored AND (a.legacy_closed OR a.source = 'registered'))) FOR UPDATE OF a",
             vec![session.digest().to_vec().into(), require_closed.into()],
         ))
         .await
@@ -93,7 +95,7 @@ impl AccountStore {
              JOIN central_identity.accounts a ON a.id = o.account_id
              JOIN central_identity.sessions s ON s.account_id = a.id AND s.credential_revision = a.credential_revision
              WHERE s.digest = $1 AND s.expires_at > pg_catalog.clock_timestamp()
-             AND a.legacy_closed AND o.id = $2",
+             AND a.restored AND (a.legacy_closed OR a.source = 'registered') AND o.id = $2",
             vec![session.digest().to_vec().into(), uuid(id).into()],
         )).await.map_err(|_| Error::Unavailable)?.ok_or(Error::Rejected)?;
         Ok((

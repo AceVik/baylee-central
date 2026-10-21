@@ -1,6 +1,6 @@
 //! Terms of use (`docs/terms.md`): published gateway versions and acceptances,
 //! both immutable records. The caller validates texts and computes digests.
-use super::{AccountStore, Error, Identity, Token, identity, statement};
+use super::{AccountStore, Error, Identity, Session, Token, identity, statement};
 use central_api::{
     terms::{TermsDocument, TermsText, TermsVersion},
     wire::TicketPurpose,
@@ -35,9 +35,9 @@ impl AccountStore {
     ///
     /// # Errors
     /// Rejects a dead session; database failures are `Unavailable`, never "accepted".
-    pub async fn terms_status(
+    pub async fn terms_status<'a>(
         &self,
-        session: &Token,
+        session: impl Into<Session<'a>>,
         current: Option<&TermsVersion>,
     ) -> Result<bool, Error> {
         let [version, digest] = version_values(current);
@@ -52,7 +52,7 @@ impl AccountStore {
                  FROM live"
                 ),
                 vec![
-                    session.digest().to_vec().into(),
+                    session.into().digest().to_vec().into(),
                     version,
                     digest,
                     CENTRAL.into(),
@@ -70,9 +70,9 @@ impl AccountStore {
     ///
     /// # Errors
     /// Rejects a dead session.
-    pub async fn accept_central_terms(
+    pub async fn accept_central_terms<'a>(
         &self,
-        session: &Token,
+        session: impl Into<Session<'a>>,
         current: &TermsVersion,
     ) -> Result<(), Error> {
         let row = self
@@ -85,7 +85,7 @@ impl AccountStore {
                  SELECT (SELECT count(*) FROM live) AS live"
                 ),
                 vec![
-                    session.digest().to_vec().into(),
+                    session.into().digest().to_vec().into(),
                     current.version.clone().into(),
                     current.digest.to_vec().into(),
                     CENTRAL.into(),
