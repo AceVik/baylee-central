@@ -1,5 +1,5 @@
-<!-- version: draft -->
-<!-- updated: 2026-10-20 -->
+<!-- version: 2026-10-22 -->
+<!-- updated: 2026-10-21 -->
 
 # Baylee Central privacy policy
 
@@ -31,10 +31,10 @@ data protection officer, as none is required.
 
 ## 3. What we process, why, and on what basis
 
-- **Username, display name, profile picture, account ID, creation time, roles** – running and showing your account. *Art. 6(1)(b) GDPR (contract)*
+- **Username, account ID, creation time** (display name, profile picture and roles will follow) – running and showing your account. *Art. 6(1)(b) GDPR (contract)*
 - **OPAQUE sign-in record, encrypted key container, credential state** – sign-in, protecting your encrypted data. *Art. 6(1)(b) GDPR*
-- **E-mail address (optional) and its confirmation** – password reset, account notices. *Art. 6(1)(b) GDPR*
-- **Second sign-in factor (optional), recovery codes (as check values only)** – protecting your account. *Art. 6(1)(b) GDPR*
+- *Not available yet:* **e-mail address (optional) and its confirmation** – password reset, account notices. *Art. 6(1)(b) GDPR*
+- **Your key container, encrypted under your recovery code** (we never learn the code); a second sign-in factor (optional) will follow – protecting your account and your encrypted data. *Art. 6(1)(b) GDPR*
 - **Sessions, sign-in tickets for gateways, gateway access** – keeping you signed in and signing you in to gateways. *Art. 6(1)(b) GDPR*
 - **Encrypted objects (settings, gateway list, deck backups, chat history) with size, revision and time** – backup across devices. *Art. 6(1)(b) GDPR*
 - **The versions of our terms and of the terms of the gateways you play on that you accepted, with the time** – proof of acceptance, showing new versions. *Art. 6(1)(b) and (c) GDPR*
@@ -70,9 +70,9 @@ These providers learn your IP address, but nothing about your account.
 
 ## 5. Cookies and browser storage
 
-The website sets only technically necessary cookies: a session cookie while
-you are signed in, and protection against forged requests. These need no
-consent (section 25(2) no. 2 TDDDG). Your choice of language and display is
+The website sets only one technically necessary cookie: a session cookie
+while you are signed in, for at most 30 minutes. It protects itself against
+forged requests without a cookie. This needs no consent (section 25(2) no. 2 TDDDG). Your choice of language and display is
 stored locally by your browser. There are no tracking cookies and no embedded
 third-party services that collect data about you.
 
@@ -80,11 +80,11 @@ third-party services that collect data about you.
 
 - **Hosting:** our servers are with a hosting provider in Germany acting as a
   processor (Art. 28 GDPR) on our instructions only.
-- **E-mail:** if you add an e-mail address, we send confirmations and reset
+- **E-mail** (once it exists): if you add an e-mail address, we send confirmations and reset
   links through a mail provider in the European Economic Area acting as a
   processor.
 - **Gateways:** when you sign in to a gateway, it receives your account ID and
-  display name and the confirmation that you are signed in, but not your
+  the confirmation that you are signed in, but not your
   password or your encrypted data.
 - **Authorities** receive data only where we are legally obliged.
 

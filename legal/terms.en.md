@@ -1,5 +1,5 @@
-<!-- version: draft -->
-<!-- updated: 2026-10-20 -->
+<!-- version: 2026-10-22 -->
+<!-- updated: 2026-10-21 -->
 
 # Terms of use for Baylee accounts
 
@@ -29,8 +29,8 @@ no entitlement to any particular availability.
 ## 2. Your account
 
 1. **A pseudonym is enough.** An account needs only a username of your
-   choice and a password. An e-mail address is optional; you only need it to
-   reset your password by e-mail or to receive notices. You can therefore use
+   choice and a password. You need no e-mail address; adding one is not
+   possible yet. You can therefore use
    Baylee pseudonymously (section 19(2) TDDDG). Playing offline against the
    computer needs no account at all.
 2. **Age.** You must be at least 16. If you are not yet of age, you need the
@@ -47,8 +47,8 @@ no entitlement to any particular availability.
 Your settings, deck backups and chat history are encrypted on your device
 before they reach us. We cannot read them. As a result:
 
-- If you forget your password, you can regain access through your e-mail
-  address or with our help. **Your encrypted data survives only if you have
+- If you forget your password, you cannot reset it yet; a reset by e-mail or
+  with our help will follow. **Your encrypted data survives it only if you have
   your recovery code or are still signed in on a device.** Otherwise it is
   lost, and nobody, including us, can bring it back.
 - Keep your recovery code safe.
@@ -96,8 +96,10 @@ restrict content or an account, we tell you why and how you can object.
 
 ## 7. Suspension and deletion
 
-1. You can delete your account at any time in the client's settings or on the
-   website.
+1. You can have your account deleted at any time: write to us at the contact
+   details in the [legal notice](https://baylee.app/impressum) and we delete it
+   without delay. Deleting it in the client's settings and on the website will
+   follow.
 2. We may suspend or delete an account that breaks these terms or the law, to
    an extent proportionate to the breach. We give reasons and, where
    possible, hear you first. For serious breaches we may act immediately.
@@ -126,7 +128,7 @@ in to the client or the website. You can then
 - **accept** the new version and keep playing,
 - decide **later**; you are then signed out and cannot use the service until
   you accept, or
-- **delete your account**.
+- **delete your account** (section 7).
 
 The service cannot be used under an older version. Changes do not apply
 without your express acceptance.

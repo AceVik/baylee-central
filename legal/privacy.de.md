@@ -1,5 +1,5 @@
-<!-- version: draft -->
-<!-- updated: 2026-10-20 -->
+<!-- version: 2026-10-22 -->
+<!-- updated: 2026-10-21 -->
 
 # Datenschutzerklärung von Baylee Central
 
@@ -32,10 +32,10 @@ Datenschutzbeauftragten gibt es nicht, weil keine Pflicht dazu besteht.
 
 ## 3. Was wir verarbeiten, wozu und auf welcher Grundlage
 
-- **Benutzername, Anzeigename, Profilbild, Konto-ID, Erstellungszeitpunkt, Rollen** – dein Konto führen und anzeigen. *Art. 6 Abs. 1 lit. b DSGVO (Vertrag)*
+- **Benutzername, Konto-ID, Erstellungszeitpunkt** (Anzeigename, Profilbild und Rollen folgen) – dein Konto führen und anzeigen. *Art. 6 Abs. 1 lit. b DSGVO (Vertrag)*
 - **OPAQUE-Anmeldedatensatz, verschlüsselter Schlüsselcontainer, Stand der Zugangsdaten** – Anmeldung, Schutz deiner verschlüsselten Daten. *Art. 6 Abs. 1 lit. b DSGVO*
-- **E-Mail-Adresse (freiwillig) und ihre Bestätigung** – Passwort zurücksetzen, Kontohinweise. *Art. 6 Abs. 1 lit. b DSGVO*
-- **zweite Anmeldestufe (freiwillig), Wiederherstellungscodes (nur als Prüfwerte)** – Schutz deines Kontos. *Art. 6 Abs. 1 lit. b DSGVO*
+- *Noch nicht verfügbar:* **E-Mail-Adresse (freiwillig) und ihre Bestätigung** – Passwort zurücksetzen, Kontohinweise. *Art. 6 Abs. 1 lit. b DSGVO*
+- **dein Schlüsselcontainer, mit deinem Wiederherstellungscode verschlüsselt** (den Code selbst kennen wir nicht); eine zweite Anmeldestufe (freiwillig) folgt – Schutz deines Kontos und deiner verschlüsselten Daten. *Art. 6 Abs. 1 lit. b DSGVO*
 - **Sitzungen, Anmeldetickets für Gateways, Gateway-Zugänge** – dich angemeldet halten und an Gateways anmelden. *Art. 6 Abs. 1 lit. b DSGVO*
 - **verschlüsselte Objekte (Einstellungen, Gateway-Liste, Deck-Sicherungen, Chat-Verlauf) mit Größe, Stand und Zeitpunkt** – geräteübergreifende Sicherung. *Art. 6 Abs. 1 lit. b DSGVO*
 - **angenommene Fassungen unserer Bedingungen und der Bedingungen der Gateways, auf denen du spielst, mit Zeitpunkt** – Nachweis der Annahme, Anzeige neuer Fassungen. *Art. 6 Abs. 1 lit. b und c DSGVO*
@@ -73,9 +73,9 @@ Dabei erfahren diese Anbieter deine IP-Adresse, aber nichts über dein Konto.
 
 ## 5. Cookies und Speicher im Browser
 
-Die Website setzt nur technisch notwendige Cookies: ein Sitzungscookie,
-solange du angemeldet bist, und einen Schutz gegen gefälschte Anfragen.
-Dafür braucht es keine Einwilligung (§ 25 Abs. 2 Nr. 2 TDDDG). Deine
+Die Website setzt nur ein technisch notwendiges Cookie: ein Sitzungscookie,
+solange du angemeldet bist, höchstens 30 Minuten. Gegen gefälschte Anfragen
+schützt sie sich ohne Cookie. Dafür braucht es keine Einwilligung (§ 25 Abs. 2 Nr. 2 TDDDG). Deine
 Sprach- und Darstellungswahl speichert der Browser lokal. Es gibt keine
 Tracking-Cookies und keine eingebundenen Dienste Dritter, die Daten über
 dich sammeln.
@@ -85,11 +85,11 @@ dich sammeln.
 - **Hosting:** Unsere Server stehen bei einem Hostinganbieter in Deutschland,
   der als Auftragsverarbeiter (Art. 28 DSGVO) nur nach unserer Weisung
   handelt.
-- **E-Mail-Versand:** Wenn du eine E-Mail-Adresse hinterlegst, versenden wir
+- **E-Mail-Versand** (sobald es ihn gibt): Wenn du eine E-Mail-Adresse hinterlegst, versenden wir
   Bestätigungen und Rücksetz-Links über einen Versanddienstleister im
   Europäischen Wirtschaftsraum als Auftragsverarbeiter.
 - **Gateways:** Meldest du dich an einem Gateway an, erhält es deine Konto-ID
-  und deinen Anzeigenamen sowie die Bestätigung, dass du angemeldet bist,
+  sowie die Bestätigung, dass du angemeldet bist,
   nicht aber dein Passwort oder deine verschlüsselten Daten.
 - **Behörden** erhalten Daten nur, wenn wir gesetzlich dazu verpflichtet sind.
 

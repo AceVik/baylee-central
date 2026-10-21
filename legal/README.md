@@ -1,11 +1,14 @@
 # Legal texts of Baylee Central
 
-**Status: drafts for the owner's review, not in force.** A lawyer's review is
-recommended before publication. They describe the service as it will be at
-public sign-up (milestones M1 to M7 of the
-[roadmap](../docs/roadmap-accounts-web.md)): registration, recovery code,
-optional e-mail, 2FA, encrypted backups, the gateway directory and bug
-reports in Central. Until those exist, these texts are not served.
+**Status: version 2026-10-22 is in force.** The owner published the drafts on
+21.10.2026 with registration on `baylee.app`, after only the statements the
+deployed service did not yet bear out were corrected: deletion is on request
+until it is in the settings, there is no password reset or e-mail yet, and the
+recovery code wraps the key container. What the
+[roadmap](../docs/roadmap-accounts-web.md) still adds (e-mail, 2FA, display
+name, profile picture, bug reports in Central) is marked as to follow. The
+owner's full review, and ideally a lawyer's, are still to come; each change is
+a new version.
 
 | file | what |
 | --- | --- |
