@@ -9,7 +9,7 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p . && tsc --noEmit -p e2e",
-    "lint": "oxlint --deny-warnings src test e2e scripts",
+    "lint": "oxlint --deny-warnings src test e2e e2e-real scripts",
     "test": "vitest run",
     "build": "vite build",
     "check": "npm run typecheck && npm run lint && npm run test && npm run build",

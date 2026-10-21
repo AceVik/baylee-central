@@ -457,6 +457,7 @@ export const KEYS = [
   "accept.retry",
   "accept.mismatch",
   "accept.signedOut",
+  "accept.declined",
   "signin.title",
   "signin.submit",
   "signin.submitting",

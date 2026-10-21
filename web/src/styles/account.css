@@ -5,7 +5,7 @@
 .account-page .section-lead { text-align: center; margin-left: auto; margin-right: auto; }
 .account-card { padding: clamp(1.2rem, 3vw, 1.8rem); margin: 0 0 1.5rem; }
 .account-card > p:last-child { margin-bottom: 0; }
-.account-note { font-family: var(--sans); text-align: center; }
+.account-note { display: block; font-family: var(--sans); text-align: center; }
 .account-form { margin: 0 0 1.2rem; }
 .account-form .check-label, .recovery .check-label { align-items: center; font-weight: 400; }
 .account-form .check-label input, .recovery .check-label input { flex: none; }

@@ -113,6 +113,7 @@ export function fakeCentral(opts: { terms?: TermsDocument | null; foreignIdentit
     },
     async acceptTerms(v: TermsVersion) {
       step("accept_terms");
+      if (c.session === null) throw new ApiError("rejected");
       if (c.current === null || v.version !== c.current.version.version || v.digest.join() !== c.current.version.digest.join()) throw new ApiError("conflict");
       c.accepted = v;
     },

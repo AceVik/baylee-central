@@ -3,17 +3,27 @@
 // (`Terms`) in its language, and accepts only when those texts hash to the
 // digest of the version in force: an acceptance names exactly what was
 // shown. While no version is in force (today: `draft`) there is nothing to
-// accept and the step ends at once.
+// accept and the step ends at once. Declining signs out, and so does a
+// session that ended meanwhile: the step then says so, with the way back.
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { T, useLang, type Key } from "../i18n";
+import { T, useLang, type Elems, type Key } from "../i18n";
 import { LegalText } from "../legal/LegalText";
+import { Link, PATHS } from "../router";
 import { ApiError, type TermsDocument } from "./api";
 import { equalBytes, termsDigest } from "./digest";
 import { useAccount } from "./session";
 
-type Stage = { at: "checking" } | { at: "shown"; terms: TermsDocument } | { at: "failed"; key: Key } | { at: "done" };
+type Stage =
+  | { at: "checking" }
+  | { at: "shown"; terms: TermsDocument }
+  | { at: "failed"; key: Key }
+  /** Signed out: declined, or the session ended. */
+  | { at: "out"; key: Key }
+  | { at: "done" };
+
+const SIGN_IN: Elems = { signin: (words) => <Link to={PATHS.signIn}>{words}</Link> };
 
 export function TermsStep({ onDone }: { onDone(): void }) {
   const lang = useLang();
@@ -64,7 +74,7 @@ export function TermsStep({ onDone }: { onDone(): void }) {
           if (error instanceof ApiError && error.kind === "rejected") {
             // the session ended meanwhile
             void signOut();
-            setStage({ at: "failed", key: "accept.signedOut" });
+            setStage({ at: "out", key: "accept.signedOut" });
           } else setStage({ at: "failed", key: error instanceof ApiError && error.kind === "busy" ? "acct.errBusy" : "acct.errUnreachable" });
         },
       ),
@@ -92,6 +102,13 @@ export function TermsStep({ onDone }: { onDone(): void }) {
       </output>
     );
   }
+  if (stage.at === "out") {
+    return (
+      <output className="account-note">
+        <T id={stage.key} elems={SIGN_IN} />
+      </output>
+    );
+  }
   if (stage.at === "failed") {
     return (
       <div className="account-note">
@@ -107,6 +124,11 @@ export function TermsStep({ onDone }: { onDone(): void }) {
 
   const { terms } = stage;
   const text = terms.texts.find((x) => x.lang === lang) ?? terms.texts.find((x) => x.lang === "en") ?? terms.texts[0];
+  const decline = () => {
+    void signOut().then(() => {
+      if (live.current) setStage({ at: "out", key: "accept.declined" });
+    });
+  };
   const accept = () => {
     if (accepting) return;
     setAccepting(true);
@@ -114,7 +136,10 @@ export function TermsStep({ onDone }: { onDone(): void }) {
       setAccepting(false);
       // another version came into force meanwhile: show that one
       if (error instanceof ApiError && error.kind === "conflict") again();
-      else setStage({ at: "failed", key: "acct.errUnreachable" });
+      else if (error instanceof ApiError && error.kind === "rejected") {
+        void signOut();
+        setStage({ at: "out", key: "accept.signedOut" });
+      } else setStage({ at: "failed", key: "acct.errUnreachable" });
     });
   };
   return (
@@ -132,7 +157,7 @@ export function TermsStep({ onDone }: { onDone(): void }) {
         <button type="button" className="button" aria-disabled={accepting ? true : undefined} onClick={accept}>
           <T id="accept.accept" />
         </button>
-        <button type="button" className="button button-ghost" onClick={() => void signOut()}>
+        <button type="button" className="button button-ghost" onClick={decline}>
           <T id="accept.later" />
         </button>
       </div>
