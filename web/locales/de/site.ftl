@@ -1,0 +1,499 @@
+### The website's words in German. English (locales/en/site.ftl) decides
+### which messages exist and which arguments and markup each takes; this file
+### translates them by Baylee's glossary (docs/translations.md): Magic's terms
+### as German cards print them, the words German players say in English stay
+### English (Account, Deck, Gateway, Release, Screenshot …), du, „…“ and – .
+
+## The frame
+
+app-loading = Lädt …
+app-skip = Zum Inhalt springen
+lang-word = Sprache
+nav-cards = Karten
+nav-download = Download
+nav-gateways = Gateways
+nav-contact = Kontakt
+nav-menu = Menü
+nav-label = Bereiche
+notFound-title = Diese Seite gibt es nicht
+notFound-back = Zurück zur Startseite
+
+## The tab's title, per page
+
+title-home = Baylee – ein Tisch, der die Regeln kennt
+title-download = Download – Baylee
+title-cards = Karten – Baylee
+title-gateways = Gateways – Baylee
+title-contact = Kontakt – Baylee
+title-impressum = Impressum – Baylee
+title-privacy = Datenschutz – Baylee
+title-terms = Nutzungsbedingungen – Baylee
+title-notFound = Nicht gefunden – Baylee
+
+## The footer. foot-fanContent is Wizards' official German notice, word for
+## word; it stands beside the English one.
+
+foot-fanContent = Baylee ist ein inoffizieller Fan-Inhalt im Rahmen der <policy>Richtlinie für Fan-Inhalte</policy>. Nicht von Wizards gefördert/gesponsert. Bestandteile des enthaltenen Materials sind Eigentum von Wizards of the Coast. ©Wizards of the Coast LLC. Baylee ist nicht mit Wizards of the Coast verbunden.
+foot-fanContentUrl = https://company.wizards.com/de/legal/fancontentpolicy
+foot-wotc = Magic: The Gathering sowie Kartennamen, Setnamen, Kartenbilder und Manasymbole sind Eigentum von Wizards of the Coast LLC. Jedes Kartenbild nennt seine Künstlerin oder seinen Künstler; ein Klick auf eine Karte zeigt Künstler und Druck bei Scryfall.
+foot-scryfall = Kartendaten und -bilder bereitgestellt von Scryfall. Baylee ist nicht mit Scryfall verbunden.
+foot-label = Fußzeile
+foot-source = Quellcode (AGPL-3.0)
+foot-central = Baylee Central (Quellcode einsehbar)
+foot-siteSource = Quellcode dieser Seite
+foot-releases = Releases
+foot-issues = Issues
+foot-contact = Kontakt
+foot-legal = Rechtliches
+foot-terms = Nutzungsbedingungen
+foot-privacy = Datenschutz
+foot-impressum = Impressum
+foot-colophon = Schriften: Faustina und Alegreya Sans, SIL Open Font License 1.1, von dieser Seite ausgeliefert. Das Gemälde und das Logo sind unsere eigenen.
+
+## Paths in Baylee's repository: the German README's sections
+
+link-readmeWhat = /blob/main/README.de.md#was-baylee-ist
+link-readmeInstall = /blob/main/README.de.md#installation
+link-readmeGateway = /blob/main/README.de.md#ein-eigenes-gateway-betreiben
+link-readmeModel = /blob/main/README.de.md#gegen-ein-sprachmodell-spielen
+
+## Times, sizes and the state of CI
+
+time-minutesAgo = vor { $n } Min.
+time-hoursAgo = vor { $n } Std.
+time-daysAgo =
+    { $n ->
+        [one] vor { $n } Tag
+       *[other] vor { $n } Tagen
+    }
+size-mb = { $size } MB
+ci-passing = grün
+ci-failing = rot
+
+## The start page
+
+hero-kicker = Geschlossene Beta · kostenlos · quelloffen · inoffizieller Fan-Inhalt
+hero-title = Ein Tisch, der <glow>die Regeln kennt.</glow>
+hero-lead = Baylee ist eine Regel-Engine und ein 3D-Spieltisch für Magic: The Gathering – mit Freunden oder gegen die Haus-KI. Die Engine setzt die Comprehensive Rules durch, damit es niemand am Tisch tun muss. Kostenlos, quelloffen unter der AGPL, und das bleibt so.
+hero-note = Offline gegen die Haus-KI geht ohne Account. Online auf dem Sanctuary-Gateway ist eine geschlossene Beta und braucht einen Schlüssel.
+hero-what = Was Baylee ist
+hero-cards = Stand der Karten
+hero-scroll = Nach unten
+
+status-label = Projektstand
+status-build = Neuester Build
+status-releases = siehe Releases
+status-ci = CI auf main
+status-onGitHub = auf GitHub ansehen
+status-commit = Letzter Commit
+status-gateways = Gateways
+status-directory = das Verzeichnis
+
+about-eyebrow = Was es ist
+about-title = Zwei Hälften, ein Spiel
+about-engineTitle = Eine Engine, die das Spiel durchsetzt
+about-engine = Priorität und Stapel, das Schichtensystem, Ersetzungseffekte, Trigger, zustandsbasierte Aktionen und Kampf: Die Engine wendet die Comprehensive Rules an und zählt bei jedem Schritt genau die Entscheidungen auf, die ein Spieler hat. Der Client bietet genau diese an und sonst nichts. Er entscheidet nie, was erlaubt ist.
+about-deterministic = Sie ist deterministisch: ein geseedeter Zufallsgenerator, keine Uhr und keine Hash-Map-Reihenfolge in den Regeln. Dasselbe Spiel mit denselben Antworten endet immer gleich. Jedes gehostete Spiel wird Zug für Zug aufgezeichnet und lässt sich auf denselben Zustand zurückspielen – das ist auch, was ein Bericht mitbringt.
+about-tableTitle = Ein 3D-Tisch auf Bevy
+about-table = Spielfeld, Hände, Stapel und Friedhöfe auf einem Tisch, den man auf einen Blick lesen kann, dazu eine Lobby für Accounts, Decks und Räume. Die Kartenbilder kommen beim Spielen von Scryfall; eine Textansicht zeichnet jede Karte stattdessen aus ihrem Regeltext, und <kbd>T</kbd> schaltet um.
+about-keys = Mit der Maus oder ganz über die Tastatur: <kbd>Leertaste</kbd> passt, <kbd>Tab</kbd> spult zur nächsten Phase vor, wobei jede Entscheidung bei dir bleibt, <kbd>L</kbd> öffnet ein Protokoll, das sich wie ein Chat liest. Jede Taste lässt sich umbelegen.
+
+feature-hiddenTitle = Verdeckte Information bleibt verdeckt
+feature-hidden = Dein Client bekommt nur, was du sehen darfst. Bibliotheken und fremde Hände kommen als Zahlen an, eine verdeckte Karte trägt keine Identität. Ein manipulierter Client kann nicht spicken, weil die Daten ihn nie erreichen.
+feature-seatsTitle = Zwei bis acht Plätze
+feature-seats = Duelle, Jeder-gegen-jeden und Teamtische. Der Gastgeber verteilt die Plätze auf Seiten, und die Seiten müssen nicht gleich groß sein. Teams haben eigene Züge und Lebenspunkte; Teamkollegen können sich gegenseitig die Hand zeigen.
+feature-commanderTitle = Commander und Freiform
+feature-commander = Ein Deck mit Commander spielt Commander, jedes andere spielt frei. Banlisten und Formatprüfungen gibt es noch nicht. Das ist eine Lücke, kein Feature.
+feature-aiTitle = Eine Haus-KI in fünf Stufen
+feature-ai = Anfänger, Locker, Solide, Scharf und Experte. Sie spielt aus derselben Sicht wie ein Mensch und sieht deine Hand genauso wenig.
+feature-processTitle = Ein Prozess pro Spiel
+feature-process = Jedes Spiel läuft in einem eigenen Engine-Prozess. Das Gateway für Accounts und Räume kennt keine Regeln, also ist ein kaputtes Spiel genau ein kaputtes Spiel.
+feature-languagesTitle = Kartentext in 19 Sprachen
+feature-languages = Hat das Gateway den Kartenkatalog, lesen sich Karten in deiner Sprache, sonst auf Englisch. Die Oberfläche selbst gibt es auf Englisch und Deutsch.
+feature-watchTitle = Einem laufenden Tisch zuschauen
+feature-watch = Der Button „Zuschauen“ in der Lobby setzt dich als Zuschauer an den Tisch. Du siehst, was der ganze Tisch sieht, und keine Hand. Ein Gastgeber kann Zuschauer für seinen Raum abschalten.
+feature-connectionTitle = Verbindung weg, Spiel nicht verloren
+feature-connection = Fällt ein Spieler heraus, zeigt der Tisch einen Countdown, solange sein Platz auf ihn wartet. Läuft die Zeit ab, spielt die Haus-KI für ihn, bis er zurück ist; sitzt sonst niemand am Tisch, pausiert das Spiel einfach.
+feature-tablesTitle = Tische nach deinen Regeln
+feature-tables = Ein Tisch „Gemischt“ setzt Decks jedes Formats zusammen, und vierzehn Entscheidungsuhren reichen von 15 Sekunden bis ohne Uhr. Startleben und Mulligans legt der Gastgeber fest.
+
+shots-eyebrow = Am Tisch
+shots-title = So sieht es aus
+shots-lead = Die Bilder zeigen die Textansicht, die jede Karte aus ihrem Regeltext zeichnet statt aus dem gedruckten Kartenbild, weil wir Scryfalls Scans nicht weiterverbreiten. Im Spiel siehst du die echten Kartenbilder. Die Screenshots entstanden mit 0.1.0-beta.2 auf einem lokalen Test-Gateway mit erfundenen Spielern; der aktuelle Build sieht etwas anders aus.
+shots-showLarge = Groß zeigen: { $title }
+shots-dialog = Screenshot
+shots-previous = Zurück
+shots-next = Weiter
+shot-duelAlt = Ein Duell gegen die Haus-KI; eine Karte unter dem Zeiger groß in der Textansicht
+shot-duelTitle = Ein Duell
+shot-duelCaption = gegen die Haus-KI. Eine Karte unter dem Zeiger wird groß gezeigt.
+shot-logAlt = Das Protokoll neben dem Tisch, jeder Kartenname ein Link
+shot-logTitle = Das Protokoll
+shot-logCaption = (L) liest sich wie ein Chat; jeder Kartenname öffnet die Vorschau.
+shot-ringAlt = Ein Tisch mit vier Plätzen im Ring um den Filz
+shot-ringTitle = Vier Plätze.
+shot-ringCaption = Größere Tische sitzen im Ring um den Filz.
+shot-lobbyAlt = Die Lobby: Decks links, offene Tische rechts
+shot-lobbyTitle = Die Lobby.
+shot-lobbyCaption = Deine Decks, die offenen Tische und „Gegen das Haus“ für ein schnelles Spiel.
+shot-roomAlt = Ein Raum wird eingerichtet: Plätze, KI-Stufen, Startleben
+shot-roomTitle = Einen Tisch einrichten.
+shot-roomCaption = Plätze, Startleben, Mulligans und eine Stufe für jeden KI-Platz.
+shot-builderAlt = Der Deckbauer mit Statistik und einer Suche über den Pool
+shot-builderTitle = Der Deckbauer.
+shot-builderCaption = Manakurve, Länderstatistik, eine Suche über den ganzen Pool und eine Warnung für Karten, die nicht wie gedruckt spielen.
+
+ai-eyebrow = Gegner
+ai-title = Gegner: das Haus, oder ein Sprachmodell
+ai-houseTitle = Die Haus-KI
+ai-house = Fünf Stufen von Anfänger bis Experte, offline und an jedem Online-Tisch. Sie spielt aus derselben Sicht wie ein Mensch, verdeckte Information bleibt also auch vor ihr verdeckt. Sie spielt heuristisch, nicht trainiert: gut genug, um ein Deck dagegen zu lernen, kein Turniergegner.
+ai-modelTitle = Ein Platz für ein Sprachmodell
+ai-model = Eine Seat-Bridge lässt ein Modell als gewöhnlichen Spieler am Tisch sitzen: ein lokales Modell in LM Studio, eines hinter einer OpenAI-kompatiblen oder Anthropic-API oder ein Agent-CLI mit deinem eigenen Login. API-Schlüssel stehen nie in einer Datei; die Einstellungsdatei nennt die Umgebungsvariable, aus der sie kommen, und Tages- und Monatslimits gelten über alle Spiele. Wenn das Modell nicht antwortet oder etwas Unerlaubtes versucht, antwortet das Haus für diese Frage, und das Protokoll sagt es.
+ai-gateway = An einem Gateway-Tisch setzt der Gastgeber es im Raum hin: Jeder freie Platz bietet im Desktop-Client <i>Sprachmodell</i> an, und der Client startet die Seat-Bridge (sie liegt dem Spiel bei) mit deinen eigenen Einstellungen und deinem Schlüssel. Wo der Betreiber des Gateways gehostete Modelle anbietet, kann ein registrierter Gastgeber stattdessen eines davon wählen; es spielt auf dem Rechner des Betreibers, auf deinem braucht es dann weder Schlüssel noch Seat-Bridge.
+ai-setup = So richtest du es ein
+
+beta-eyebrow = Online
+beta-title = Die geschlossene Beta
+beta-sanctuary = Das öffentliche Gateway <b>Baylee Sanctuary</b> ist der Ort für Online-Tische. Es ist eine geschlossene Beta: Ein neuer Account und ein neuer Gast brauchen je einen Schlüssel der Form <code>BAYLEE-XXXX-XXXX-XXXX-XXXX</code>, den der Projektinhaber vergibt. Ein öffentliches Anmeldeformular gibt es nicht, und wir tun auch nicht so.
+beta-signup = Die Anmeldung fragt nach keiner E-Mail-Adresse: Ein Account ist ein Benutzername und ein Passwort. Andere Spieler sehen nur deinen Anzeigenamen und ein kurzes Kürzel. Ein Gast braucht nur einen Anzeigenamen und wird beim Abmelden oder nach 30 Tagen ohne Nutzung gelöscht. Deinen Account kannst du jederzeit aus dem Client löschen.
+beta-keys = Schlüssel kommen vom Projektinhaber, <owner>@AceVik</owner> auf GitHub. Ohne Schlüssel spielt Baylee trotzdem offline gegen die Haus-KI, mit Deckbauer und eigenen Decks, und du kannst für deine Runde ein eigenes Gateway betreiben.
+beta-listTitle = Jedes Gateway in einer Liste
+beta-list = Sanctuary und die Gateways, die andere für ihre Runde betreiben: Das Verzeichnis zeigt von jedem Adresse, Version und ob es gerade online ist.
+beta-open = Verzeichnis öffnen
+beta-own = Selbst betreiben
+
+source-eyebrow = Quellcode
+source-title = Quelloffen, und das bleibt so
+source-promise = Baylee bleibt immer quelloffen und kostenlos. Keine Bezahlschranke, keine kostenpflichtigen Funktionen, keine Werbung. Nicht jetzt, nicht später. Der Code steht unter der GNU Affero General Public License: Wer ein verändertes Gateway für andere betreibt, muss auch ihnen den Quellcode anbieten.
+source-rust = Geschrieben in Rust, das Projekt einer Person mit viel Hilfe von Coding-Agenten, und jede Änderung geht durch dasselbe Gate: Formatierung, Lints, die Testsuite und eine Prüfung jeder Karte gegen ihren gedruckten Text. Issues und Pull Requests sind willkommen; <agents>AGENTS.md</agents> und <claude>CLAUDE.md</claude> sind die Arbeitsregeln für Menschen und Agenten.
+source-discord = Community auf Discord
+source-architecture = Architektur
+source-repoTitle = Das Repository gerade jetzt
+source-stars = Sterne
+source-issues = Offene Issues und Pull Requests
+source-note = Beim Laden aus GitHubs öffentlicher API gelesen und in diesem Tab eine Weile gemerkt. Über dich geht nichts irgendwohin außer zu GitHub.
+
+## Download
+
+dl-button = Baylee herunterladen
+dl-fallbackMeta = Windows · macOS (Apple Silicon) · Linux. Das neueste Release liegt auf GitHub.
+dl-for = Download für { $system }
+dl-signature = Signatur
+dl-notes = Release-Notizen
+dl-others = andere Systeme
+dl-archive = Dieses Release kommt als Archiv: entpacken und Baylee starten. Installer kommen mit dem nächsten Release.
+dl-noteUnknown = Dein System ließ sich aus diesem Browser nicht erkennen; unter Download sind alle Dateien aufgeführt.
+dl-noteMobile = Für Handy und Tablet gibt es noch keine Builds. Der Button führt zum Release für deinen Rechner.
+dl-noteMacUnsure = Dieser Browser verrät nicht, ob dein Mac einen Apple- oder einen Intel-Chip hat. Die Datei oben ist für Apple Silicon (M1 und neuer); einen Intel-Build gibt es noch nicht.
+dl-noteMacIntel = Dein Mac meldet einen Intel-Chip, und einen Intel-Build gibt es noch nicht. Der Button führt zur Release-Seite.
+dl-noteWindowsUnsure = Wenn das ein Windows-auf-ARM-PC ist (etwa ein Snapdragon-Laptop), nimm stattdessen die ARM-Datei unter Download.
+dl-noteLinuxUnsure = Dein Browser sagt nicht, welche CPU das ist; x86-64 ist angenommen. Die ARM-Datei steht unter Download.
+
+dlPage-eyebrow = Hol es dir
+dlPage-title = Download
+dlPage-lead = Jeder Download geht direkt zur Datei auf GitHub, nichts dazwischen. Wo ein Release Installer hat, sind sie der einfache Weg; die Archive enthalten dasselbe Spiel zum Entpacken an beliebiger Stelle. Ein installiertes Baylee aktualisiert sich selbst aus den signierten Archiven, wo es seinen eigenen Ordner beschreiben darf. Jedes Paket enthält neben dem Spiel die Seat-Bridge für Sprachmodelle.
+dlPage-filesEyebrow = Jede Datei
+dlPage-filesTitle = Alle Systeme
+
+release-loading = Lade das neueste Release von GitHub …
+release-noAnswer = GitHub hat gerade nicht geantwortet; einer Seite wie dieser erlaubt es 60 Anfragen pro Stunde. <releases>Die Releases-Seite hat jede Datei.</releases>
+release-pre = Vorabversion
+release-notes = Release-Notizen und Prüfsummen
+release-all = Alle Releases
+
+plat-empty = Ein Installer und ein Archiv für Windows (x64 und ARM64), macOS (Apple Silicon) und Linux (x86-64 und ARM64), jeweils mit einer .sha256 daneben, auf der <releases>Releases-Seite</releases>.
+plat-asking = Frage GitHub nach den Dateien … Sie liegen auch auf der <releases>Releases-Seite</releases>.
+plat-yours = dein System
+plat-noIntel = Noch kein Build für Intel-Macs. Baylee braucht einen Mac mit Apple-Chip (M1 oder neuer).
+plat-missing = Dieses Release hat keine Datei für: { $systems }. Ältere Releases liegen auf der Releases-Seite.
+plat-windows = Windows
+plat-windowsSub = die meisten PCs: 64-Bit Intel oder AMD
+plat-windowsArm = Windows auf ARM
+plat-windowsArmSub = Snapdragon-Laptops und ähnliche
+plat-mac = macOS
+plat-macSub = Apple Silicon: M1 und neuer
+plat-macIntel = macOS auf Intel
+plat-linux = Linux
+plat-linuxSub = x86-64
+plat-linuxArm = Linux auf ARM
+plat-linuxArmSub = ARM64 / aarch64
+file-setup = Setup
+file-diskImage = Disk-Image
+file-appImage = AppImage
+file-deb = Debian-/Ubuntu-Paket
+file-zip = Archiv (zip)
+file-tarGz = Archiv (tar.gz)
+
+install-eyebrow = Installieren
+install-title = Erster Start und was es braucht
+install-firstTitle = Erster Start
+install-first = Die Builds sind nicht signiert, weil Signieren Geld kostet. Windows und macOS warnen deshalb beim ersten Mal. Unter Windows: <i>Weitere Informationen</i> und <i>Trotzdem ausführen</i>. Unter macOS: <i>Systemeinstellungen → Datenschutz & Sicherheit</i> und <i>Dennoch öffnen</i>. Die <notes>Installationshinweise</notes> haben jeden Schritt und die Linux-Pakete.
+install-checkTitle = Einen Download prüfen
+install-check = Neben jeder Datei liegt eine <code>.sha256</code>; die Archive tragen zusätzlich eine <code>.sig</code>, die Ed25519-Signatur, die der Client prüft, bevor er ein Update selbst installiert. <code>sha256sum -c</code> unter Linux, <code>shasum -a 256 -c</code> unter macOS, <code>certutil -hashfile … SHA256</code> unter Windows.
+install-needsTitle = Was es braucht
+install-windows = <b>Windows</b> 10 oder 11, x64 oder ARM64. Der x64-Build braucht eine CPU mit x86-64-v2 (SSE4.2), wie Windows 11 24H2 auch.
+install-mac = <b>macOS</b> 11 oder neuer auf Apple Silicon (M1 und neuer). Einen Intel-Build gibt es noch nicht.
+install-linux = <b>Linux</b> mit glibc 2.35 oder neuer (ab Ubuntu 22.04), einem Vulkan-Treiber sowie ALSA, udev, X11/Wayland und xkbcommon; das <code>.deb</code> zieht sie mit.
+install-browser = <b>Browser:</b> Die Browser-Version pausiert in dieser Beta und kommt später wieder; bis dahin nimm den Desktop-Client oben.
+install-phones = <b>Handy und Tablet:</b> noch keine Builds zum Herunterladen. Android läuft, ist aber per Touch nicht bedienbar; iOS läuft nur im Simulator.
+install-releases = Jedes Release auf GitHub
+
+## The card status
+
+cards-eyebrow = Karten
+cards-title = Die Karten, ehrlich
+cards-intro = Jede Karte in Baylee ist Code: eine Datei pro Karte, in einer kleinen Regelsprache geschrieben und in einem Test gespielt. Es gibt keinen Interpreter, der Kartentext ungefähr errät. Deshalb wächst der Pool in Schüben statt auf einmal.
+cards-counted = Gezählt im Repository von Baylees eigenen Werkzeugen (<pool>die Pool-Liste</pool>, <readme>die README</readme>). Der Deckbauer kann nur spielbare Karten zeigen und warnt, wenn ein Deck Karten enthält, die nicht wie gedruckt spielen.
+cards-planTitle = Der Plan
+cards-plan = Die Sets kommen in Erscheinungsreihenfolge, beginnend mit Alpha, weil jedes Set seine Mechaniken auf die älteren setzt. Alpha ist vollständig: Jede spielbare Karte daraus spielt wie gedruckt. Als Nächstes kommen Arabian Nights und Antiquities, der Rest folgt Set für Set. Fehler, die am Tisch auffallen, gehen immer vor neuen Karten.
+cards-modern = Das heißt: Ein modernes Deck enthält oft Karten, die Baylee noch nicht kennt. Wir sagen dir das lieber im Deckbauer, als eine Karte falsch verrechnen zu lassen. Karten, die gar nicht spielbar sind (Ante, Geschicklichkeit, Teilspiele), stehen auf einer benannten Auslassungsliste und fallen nie stillschweigend weg.
+cards-implemented = Karten, die genau wie gedruckt spielen
+cards-partial = weitere, teilweise umgesetzt und so markiert
+cards-corpus = Karten im gesamten Korpus, auf den wir hinarbeiten
+
+sets-title = Sets und Kartenstatus
+sets-lead = Jedes Set in Erscheinungsreihenfolge, jede Karte unter dem Set gezählt, in dem sie zuerst erschien. Öffne ein Set, um seine Karten zu sehen: ob jede wie gedruckt spielt, spielt, aber noch ungetestet ist, teilweise spielt, noch nicht spielbar ist oder nie gebaut wird. Lass den Zeiger auf einer Karte ruhen oder fokussiere sie, um sie groß mit dem Grund zu sehen; ein Klick öffnet ihre Seite bei Scryfall, mit Künstler und Druck. Auf einem Touchscreen zeigt ein Tippen sie zuerst groß.
+sets-legend = Legende
+sets-legendFull = Voll: spielt wie gedruckt
+sets-legendUntested = Ungetestet: spielbar, jeder Satz wird von der Regel-Engine gelesen, aber noch kein Test spielt sie
+sets-legendPartial = Teilweise: spielt, ein Teil fehlt (der Grund steht bei der Karte)
+sets-legendNone = Noch nicht: noch nicht spielbar
+sets-legendNever = Nie: Ante, Geschicklichkeit oder ein Teilspiel; ein Set gilt ohne sie als vollständig
+sets-percent = Der Prozentwert ist der Anteil voller Karten an allen Karten des Sets, die je gebaut werden. Ungetestete und teilweise umgesetzte Karten sind die übrigen Teile des Balkens und zählen nicht als fertig.
+sets-loading = Lade die Set-Liste …
+sets-failed = Die Set-Liste wurde gerade nicht geladen. Lade die Seite neu, um es noch einmal zu versuchen.
+sets-hide = Vollständige Liste ausblenden
+sets-showAll =
+    { $n ->
+        [one] Das { $n } Set anzeigen
+       *[other] Alle { $n } Sets anzeigen
+    }
+sets-imagesNote = Kartenbilder werden erst beim Öffnen eines Sets oder beim Großzeigen einer Karte und unverändert von Scryfall geladen. Kartendaten und -bilder bereitgestellt von Scryfall; Baylee ist nicht mit Scryfall verbunden. Die Zahlen misst <code>baylee-tools site card-status</code> im Repository.
+sets-ub = Kartenbilder © Wizards of the Coast, unverändert von Scryfall geladen. Karten, die noch nicht in Baylees Pool sind, und Universes-Beyond-Karten stehen nur mit Namen hier.
+sets-total =
+    { $play } von { $all ->
+        [one] { $all } Karte
+       *[other] { $all } Karten
+    } spielbar ({ $pct } %): { $full } voll, { $untested } ungetestet. Außerdem: { $partial } teilweise, { $none } noch nicht, { $never } nie; { $sets ->
+        [one] { $sets } Set
+       *[other] { $sets } Sets
+    }, { $corpus ->
+        [one] { $corpus } Karte
+       *[other] { $corpus } Karten
+    }.
+sets-atRelease = Release { $release }, Commit { $rev }.
+sets-atCommit = Gemessen an Commit { $rev }.
+sets-finished = Fertig
+sets-next = Als Nächstes, in Erscheinungsreihenfolge
+sets-find = Set suchen
+sets-onlyBegun = nur begonnene Sets
+sets-foundNone = Kein Set passt.
+sets-foundMany =
+    { $n ->
+        [one] { $n } Set passt; die ersten { $max } stehen hier. Tippe mehr, um einzugrenzen.
+       *[other] { $n } Sets passen; die ersten { $max } stehen hier. Tippe mehr, um einzugrenzen.
+    }
+sets-found =
+    { $n ->
+        [one] { $n } Set passt.
+       *[other] { $n } Sets passen.
+    }
+sets-eraMeta =
+    { $sets ->
+        [one] { $sets } Set
+       *[other] { $sets } Sets
+    } · { $cards ->
+        [one] { $cards } Karte
+       *[other] { $cards } Karten
+    }
+sets-cards =
+    { $n ->
+        [one] { $n } Karte
+       *[other] { $n } Karten
+    }
+sets-cardsFailed = Die Kartenliste wurde nicht geladen. Schließe das Set und öffne es erneut.
+sets-onScryfall = Dieses Set bei Scryfall
+sets-images = Bilder: Scryfall · © Wizards of the Coast
+sets-pct = { $pct } %
+sets-pctPlayable = { $pct } Prozent spielbar
+
+count-playable = { $n } spielbar:
+count-full = { $n } voll
+count-untested = { $n } ungetestet
+count-partial = { $n } teilweise
+count-none = { $n } noch nicht
+count-never = { $n } nie
+
+filter-label = Karten zeigen
+filter-all = Alle
+status-full = Voll
+status-untested = Ungetestet
+status-partial = Teilweise
+status-none = Noch nicht
+status-never = Nie
+
+grid-hint = Pfeiltasten wechseln die Karte; die Leertaste zeigt sie groß, Enter öffnet sie bei Scryfall.
+grid-label = Karten aus { $set }
+grid-tile = { $status }. { $why }
+grid-scryfall = Künstler und Druck bei Scryfall
+grid-close = Schließen
+
+card-credit = Kartenbild bereitgestellt von Scryfall, unverändert. Baylee ist weder mit Scryfall noch mit Wizards of the Coast verbunden.
+card-illustrated = Illustriert von { $artist }
+card-clickHint = Klick: Künstler und Druck bei Scryfall.
+card-implemented = Spielt wie gedruckt.
+card-generated = Spielbar: jeder Satz wird von der Regel-Engine gelesen, aber noch kein Test spielt sie.
+card-partial = Teilweise umgesetzt. Es fehlt (Notiz auf Englisch): { $note }
+card-unimplemented = Im Kartenpool, aber ihre Fähigkeiten sind noch nicht geschrieben: nicht spielbar.
+card-absent = Noch nicht im Kartenpool.
+card-never = Wird nie gebaut: { $reason }
+card-neverAnte = sie spielt um Ante (CR 407), und kein Tisch hier spielt um Ante
+card-neverDexterity = sie verlangt eine körperliche Handlung, die kein Spielzustand beschreibt
+card-neverSubgame = sie startet ein Spiel im Spiel (CR 728), das die Engine nicht ausrichtet
+
+## The gateway directory
+
+gw-eyebrow = Online
+gw-title = Gateways
+gw-lead = Ein Gateway ist ein Server für Online-Tische: Accounts, Decks, Räume und ein Engine-Prozess pro Spiel. Hier stehen die bei Baylee Central registrierten; dessen Betreiber hat bei jedem geprüft, wer es betreibt, bevor er es aufgenommen hat. Baylee betreibt Sanctuary; die anderen betreiben andere für ihre Runde, und dort gelten deren eigene Regeln.
+gw-howTo = Um auf einem zu spielen, kopiere seine Adresse in die Eingangstür des Clients. Online heißt, Central hat in den letzten anderthalb Minuten von dem Gateway gehört; ein Versprechen, dass es antwortet, ist das nicht. Namen und Versionen sind die Angaben der Betreiber.
+gw-count =
+    { $n ->
+        [one] { $n } Gateway gelistet, { $online } online.
+       *[other] { $n } Gateways gelistet, { $online } online.
+    }
+gw-none = Noch ist kein Gateway gelistet.
+gw-next = Die nächsten { $n } zeigen
+gw-tryAgain = Erneut versuchen
+gw-unavailable = Baylee Central kann die Gateways gerade nicht auflisten.
+gw-busy = Baylee Central ist ausgelastet; bitte versuch es gleich noch einmal.
+gw-refused = Baylee Central hat die Anfrage dieser Seite nicht beantwortet. Vielleicht ist das Verzeichnis für Browser noch nicht offen.
+gw-malformed = Die Antwort von Baylee Central hat die Prüfungen dieser Seite nicht bestanden, deshalb wird nichts davon gezeigt.
+gw-network = Baylee Central war nicht erreichbar.
+gw-online = online
+gw-notSeen = zuletzt nicht gesehen
+gw-address = Adresse
+gw-version = Version
+gw-copy = Adresse kopieren
+gw-website = Website
+gw-copyImpossible = Kopieren geht in diesem Browser nicht.
+gw-copied = Adresse kopiert.
+gw-copyFailed = Kopieren hat nicht geklappt.
+
+selfhost-eyebrow = Selbst hosten
+selfhost-title = Ein eigenes Gateway betreiben
+selfhost-processes = Du brauchst unseren Server nicht. Ein Gateway sind drei Arten von Prozessen: <code>baylee-gateway</code> verwaltet Accounts, Decks, Räume und das Routing und braucht PostgreSQL; <code>baylee-agent</code> startet pro Spiel einen Engine-Prozess; <code>baylee-engine-server</code> ist ein Spiel. Die ersten beiden kennen keine Regeln.
+selfhost-proxy = Setz einen TLS-Proxy davor, setz <code>BAYLEE_REGISTRATION=invite</code>, wenn du einen eigenen geschlossenen Kreis willst, erzeuge Schlüssel mit <code>baylee-gateway invite create</code>, und die Eingangstür des Clients nimmt deine Adresse wie jede andere. Kartentext in 19 Sprachen ist ein optionaler Import von Scryfalls Bulk-Daten in dieselbe Datenbank.
+selfhost-guide = <guide>Die Anleitung</guide> geht alles durch; <protocol>docs/protocol.md</protocol> ist die Referenz.
+selfhost-source = Jedes Gateway beantwortet <code>GET /source</code> mit Lizenz, Version und Commit, ohne Anmeldung. Die AGPL verlangt, dass du den Leuten, die deinen Server nutzen, den Quellcode anbietest; diese Route erledigt das für dich.
+
+## Contact
+
+contact-eyebrow = Kontakt
+contact-title = Schreib uns
+contact-intro = Eine Frage, eine Idee, ein Spiel, das du gern sehen würdest, oder etwas, das du lieber nicht öffentlich schreibst: Dieses Formular geht direkt an die Leute hinter Baylee. Lass eine E-Mail-Adresse da, wenn du eine Antwort willst; ohne können wir es nur lesen.
+contact-f8 = Eine Karte, die falsch verrechnet wurde, meldest du am besten im Spiel mit <kbd>F8</kbd>, weil der Bericht das ganze Spiel mitnehmen kann.
+contact-discord = reden, Gegner finden, von Builds hören
+contact-issues = GitHub-Issues
+contact-issuesSub = Fehler und Ideen, öffentlich
+contact-operator = Wer diese Seite betreibt, mit Postanschrift: das <impressum>Impressum</impressum>.
+
+form-name = Name
+form-optional = freiwillig
+form-email = E-Mail
+form-emailOptional = freiwillig, nur wenn du eine Antwort willst
+form-message = Nachricht
+form-privacy = Ich speichere deine Nachricht, und Namen und E-Mail-Adresse nur, wenn du sie angibst, um sie zu lesen und zu beantworten: keine IP-Adresse, kein Cookie, kein Tracker. Sie wird 90 Tage, nachdem ich sie erledigt habe, gelöscht, spätestens nach einem Jahr. <more>Mehr in der Datenschutzerklärung</more>.
+form-unreachable = Das Formular hat uns gerade nicht erreicht. Bitte versuch es später noch einmal, oder schreib auf Discord oder GitHub.
+form-empty = Bitte schreib zuerst eine Nachricht.
+form-badEmail = Diese E-Mail-Adresse sieht nicht richtig aus. Lass sie leer, wenn du keine Antwort willst.
+form-sending = Wird gesendet …
+form-sent = Gesendet.
+form-tooMany = Zu viele Nachrichten von hier in der letzten Stunde. Bitte versuch es später noch einmal.
+form-refused = Die Nachricht wurde nicht angenommen. Ist sie kürzer als { $max } Zeichen und die Adresse eine echte?
+send-send = Senden
+send-sent = Gesendet
+send-retry = Erneut senden
+thanks-title = Danke, sie ist unterwegs.
+thanks-answer = Wenn du eine Adresse dagelassen hast, kommt die Antwort von einem Menschen, per Mail.
+thanks-again = Noch eine schreiben
+
+reports-eyebrow = Berichte
+reports-title = Etwas gefunden? Sag es uns
+reports-f8 = Drück <kbd>F8</kbd> am Tisch oder in der Lobby. Ein Bericht enthält seine Art, deinen Text, die Client-Version und am Tisch die Spiel-ID. Alles Weitere hat ein eigenes Kästchen, und jedes Kästchen ist anfangs angehakt; nimm vor dem Senden das Häkchen weg, wo du etwas lieber behältst: System und Hardware, der Tisch wie du ihn siehst, dein Protokoll (andere Spieler als „Player A“, „Player B“, …), deine Einstellungen, ein Bild nur des Baylee-Fensters und am Tisch die ganze Aufzeichnung des Spiels (jeder Zug und die Karten jedes Platzes, keine Namen). <i>Zeigen, was gesendet wird</i> zeigt jedes Byte. Sitzungs-Tokens werden nie gesendet.
+reports-usage = Beim Offline-Spielen sagt der Client einmal pro Minute, dass ein Spiel läuft: kein Account, keine Geräte-ID, nichts über das Spiel. <i>Anonyme Nutzungszahl senden</i> unter Einstellungen › Datenschutz & Daten schaltet das ab.
+reports-discord = Lust zu reden, Gegner zu finden oder als Erstes von neuen Builds zu erfahren? Komm in die <discord>Baylee-Community auf Discord</discord>.
+reports-issues = Regelfragen, falsches Kartenverhalten, Ideen: <issues>eröffne ein Issue auf GitHub</issues>. Eine Karte, die falsch verrechnet wurde, ist der nützlichste Bericht, den wir bekommen können, denn jede Karte hat einen Test, und deine wird einer.
+reports-privacy = <docs>docs/privacy.md</docs> listet alles, was Client, Gateway und Feedback-Dienst speichern. Diese Seite speichert nichts über dich: keine Cookies, keine Analyse, keine Schriften von fremden Servern. <notice>Die Datenschutzerklärung</notice> nennt jeden anderen Host, mit dem sie spricht, und wann.
+
+## The legal notice (Impressum)
+
+imp-eyebrow = Impressum
+imp-title = Impressum
+imp-ddg = Angaben gemäß § 5 DDG
+imp-private = Diese Website ist ein privates, nicht kommerzielles Projekt einer Privatperson. Baylee ist kostenlos und quelloffen; es gibt keine Werbung und nichts zu kaufen.
+imp-write = Du erreichst mich außerdem über das <contact>Kontaktformular</contact>.
+imp-disputeTitle = Streitbeilegung
+imp-dispute = Dies ist ein kostenloses, nicht kommerzielles Angebot einer Privatperson. Ich bin weder verpflichtet noch bereit, an Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle teilzunehmen.
+imp-data = Wie diese Seite mit deinen Daten umgeht: <notice>die Datenschutzerklärung</notice>. Was Client, Gateway und Feedback-Dienst über dich speichern: <docs>docs/privacy.md</docs>.
+imp-why = Damit Adresssammler leer ausgehen, werden die Angaben erst auf deinen Wunsch geladen; dein Browser löst dafür ein kleines Rätsel, das einen Moment dauert.
+imp-show = Impressum anzeigen
+imp-puzzle = Rätsel
+imp-working = Einen Moment, dein Browser löst ein kleines Rätsel …
+imp-failed = Die Angaben konnten nicht geladen werden. Bitte lade die Seite neu oder nutze das <contact>Kontaktformular</contact>.
+imp-drawn = Die Anschrift ist so gezeichnet, dass Adresssammler sie nicht lesen können, und deshalb auch kein Screenreader. Der Button darunter kopiert sie in die Zwischenablage; oder schreib mir über das Kontaktformular.
+imp-copyAddress = Anschrift kopieren
+imp-contact = Kontakt
+imp-email = E-Mail
+imp-writeEmail = E-Mail schreiben
+imp-copyEmail = E-Mail-Adresse kopieren
+imp-phone = Telefon
+imp-call = Anrufen
+imp-copyNumber = Nummer kopieren
+imp-copyImpossible = Kopieren geht in diesem Browser nicht; bitte nutze das Kontaktformular.
+imp-copied = Kopiert.
+imp-copyFailed = Kopieren hat nicht geklappt; bitte nutze das Kontaktformular.
+
+## The terms of use (their text is legal/terms.de.md)
+
+terms-eyebrow = Nutzungsbedingungen
+terms-draft = Entwurf: Diese Bedingungen gelten noch nicht. Sie treten erst mit ihrer Veröffentlichung in Kraft, und du wirst gefragt, ob du sie annimmst.
+terms-version = Fassung { $version }.
+terms-updated = Stand: { $date }.
+
+## The privacy notice: a draft for the owner's lawyer (src/privacy/)
+
+privacy-eyebrow = Datenschutz
+privacy-title = Datenschutzerklärung dieser Website
+privacy-lead = Diese Seite sagt, was mit deinen Daten geschieht, wenn du diese Website besuchst. Das Spiel selbst (Client und Online-Gateway) führt eigene Aufzeichnungen; die vollständige Liste steht in <docs>docs/privacy.md</docs>.
+privacy-contents = Inhalt
+privacy-date = Stand: 20. Oktober 2026.
+privacy-controllerTitle = Verantwortlich
+privacy-controller = Verantwortlich ist die im <impressum>Impressum</impressum> genannte Privatperson. Du erreichst mich dort oder über das <contact>Kontaktformular</contact>.
+privacy-hostingTitle = Hosting und Server
+privacy-hosting = Die Website läuft auf einem bei der netcup GmbH gemieteten Server in Deutschland. Wenn du eine Seite öffnest, schickt dein Browser dem Server, was jede Anfrage mitbringt: deine IP-Adresse, die angefragte Adresse, die Uhrzeit und was dein Browser über sich sagt. Der Server braucht das, um zu antworten. Der Webserver führt für diese Website <b>kein Zugriffsprotokoll</b>; diese Anfragen werden also nicht aufgeschrieben. Die Betriebsmeldungen des Servers (sein Systemjournal) können in seltenen Fehlerfällen technische Verbindungsdaten wie eine IP-Adresse enthalten; sie bleiben nur so lange, wie das Journal sie aufbewahrt.
+privacy-hostingBasis = Rechtsgrundlage: Art. 6 Abs. 1 lit. f DSGVO, mein berechtigtes Interesse an einer sicheren Auslieferung der Website.
+privacy-storageTitle = Keine Cookies, kein Tracking
+privacy-storage = Diese Website setzt keine Cookies und nutzt keine Analyse, kein Tracking und keine Werbung. Die Schriften kommen von diesem Server; kein Schriftendienst wird gefragt. Dein Browser speichert zwei Dinge auf deinem Gerät, die es nie verlassen: die gewählte Sprache (bis du sie löschst) und, zehn Minuten lang in diesem Tab, GitHubs Antworten zum neuesten Release, damit die Seite nicht bei jedem Besuch neu fragt.
+privacy-storageBasis = Rechtsgrundlage für diese Speicherung: § 25 Abs. 2 Nr. 2 TDDDG; sie ist für das, was du von der Seite willst, unbedingt erforderlich.
+privacy-githubTitle = GitHub: Releases und Projektstand
+privacy-github = Um das neueste Release, seine Dateien und den Stand des Projekts zu zeigen, fragt dein Browser beim Laden der Startseite oder der Download-Seite GitHubs öffentliche API (<code>api.github.com</code>), und ein Download kommt direkt von GitHub. Dein Browser schickt dabei deine IP-Adresse und die Anfrage an GitHub, Inc. in den USA. Siehe <statement>GitHubs Datenschutzerklärung</statement>.
+privacy-githubBasis = Rechtsgrundlage: Art. 6 Abs. 1 lit. f DSGVO, mein berechtigtes Interesse, aktuelle Downloads zu zeigen, ohne sie selbst zu hosten.
+privacy-scryfallTitle = Kartenbilder von Scryfall
+privacy-scryfall = Kartenbilder liegen nicht hier. Erst wenn du im Kartenstatus ein Set öffnest oder eine Karte groß zeigst, lädt dein Browser ihre Bilder direkt von Scryfalls Bildserver (<code>cards.scryfall.io</code>) und schickt dabei deine IP-Adresse und die Anfrage an Scryfall, LLC in den USA. Ein Referrer wird nicht mitgeschickt. Siehe <policy>Scryfalls Datenschutzerklärung</policy>.
+privacy-scryfallBasis = Rechtsgrundlage: Art. 6 Abs. 1 lit. f DSGVO, mein berechtigtes Interesse, die Karten zu zeigen, von denen der Status spricht.
+privacy-centralTitle = Das Gateway-Verzeichnis
+privacy-central = Wenn du das <directory>Gateway-Verzeichnis</directory> öffnest, fragt dein Browser Baylee Central, den Account-Dienst des Projekts, über die eigene Adresse dieser Website nach der öffentlichen Liste der Gateways. Die Anfrage trägt kein Cookie, keinen Account und keine Kennung von dir; Central antwortet allen mit derselben Liste. Sonst spricht nichts auf dieser Website mit Central.
+privacy-centralBasis = Rechtsgrundlage: Art. 6 Abs. 1 lit. f DSGVO, mein berechtigtes Interesse, zu zeigen, wo man Baylee online spielen kann.
+privacy-contactTitle = Das Kontaktformular
+privacy-contact = Was du sendest, geht an Baylees Feedback-Dienst (<code>{ $host }</code>) und wird dort gespeichert: deine Nachricht, Name und E-Mail-Adresse nur, wenn du sie angibst, die Sprache der Seite, die Uhrzeit und ob ich sie erledigt habe. Deine IP-Adresse wird nicht gespeichert; eine Stunde lang wird sie nur im Arbeitsspeicher gezählt, um eine Flut von Nachrichten zu verhindern. Nur ich lese die Nachrichten; nichts wird weitergegeben. Eine Nachricht wird 90 Tage, nachdem ich sie erledigt habe, gelöscht, spätestens ein Jahr nach ihrem Eingang, oder früher, wenn du darum bittest.
+privacy-contactBasis = Rechtsgrundlage: Art. 6 Abs. 1 lit. f DSGVO, mein berechtigtes Interesse, Nachrichten zu beantworten; zielt deine Nachricht auf einen Vertrag mit mir, Art. 6 Abs. 1 lit. b DSGVO.
+privacy-impressumTitle = Wie das Impressum geschützt ist
+privacy-impressum = Damit Adresssammler meine Angaben nicht einsammeln, zeigt das Impressum sie, nachdem dein Browser ein kleines Rechenrätsel gelöst hat. Dafür hält der Feedback-Dienst nur im Arbeitsspeicher, nie auf der Festplatte und nie in einem Protokoll: wie viele Rätsel deine IP-Adresse angefragt hat (eine Stunde lang; eine IPv6-Adresse nach ihrer ersten Hälfte), ob sie einem für Menschen versteckten Link gefolgt ist (24 Stunden), und welche Rätsel gelöst wurden (fünf Minuten, ohne Adresse). Drei Ja/Nein-Antworten über deinen Browser bestimmen die Schwierigkeit und werden nicht aufbewahrt. Niemand wird gesperrt: Im ungünstigsten Fall dauert das Rätsel länger.
+privacy-impressumBasis = Rechtsgrundlage: Art. 6 Abs. 1 lit. f DSGVO, mein berechtigtes Interesse, meine Angaben vor Missbrauch zu schützen.
+privacy-linksTitle = Links zu anderen Seiten
+privacy-links = Discord, GitHub, Scryfall, Wizards of the Coast und die Websites gelisteter Gateways sind verlinkt, nicht eingebettet: An sie geht nichts, bis du einem Link folgst; dann gelten deren eigene Datenschutzbestimmungen.
+privacy-rightsTitle = Deine Rechte
+privacy-rights = Du hast das Recht auf Auskunft (Art. 15 DSGVO), Berichtigung (Art. 16), Löschung (Art. 17), Einschränkung der Verarbeitung (Art. 18) und Datenübertragbarkeit (Art. 20), und du kannst einer Verarbeitung nach Art. 6 Abs. 1 lit. f jederzeit widersprechen (Art. 21). Schreib mir dafür über das Kontaktformular oder an die Anschrift im Impressum.
+privacy-complain = Außerdem kannst du dich bei einer Datenschutz-Aufsichtsbehörde beschweren (Art. 77 DSGVO), etwa bei der an deinem Wohnort oder bei der für mich zuständigen: der <ldi>Landesbeauftragten für Datenschutz und Informationsfreiheit Nordrhein-Westfalen (LDI NRW)</ldi>.
+privacy-automated = Eine automatisierte Entscheidungsfindung im Sinne von Art. 22 DSGVO findet nicht statt: Die Schwierigkeit des Rätsels passt sich selbst an, entscheidet aber nichts über dich.
