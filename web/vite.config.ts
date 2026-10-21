@@ -1,4 +1,30 @@
+import { existsSync, readdirSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+
+import type { Plugin } from "vite";
 import { defineConfig } from "vitest/config";
+
+/**
+ * The languages with a file, `locales/<code>/site.ftl`: the ones the app
+ * offers (src/i18n.tsx finds the same files).
+ */
+export function languagesOnDisk(dir: string = fileURLToPath(new URL("./locales/", import.meta.url))): string[] {
+  return readdirSync(dir)
+    .filter((code) => /^[a-z]{2,3}$/.test(code) && existsSync(`${dir}/${code}/site.ftl`))
+    .sort();
+}
+
+/** Writes them into `<html data-langs>` for public/boot.js, which chooses before the app runs. */
+function languagesForBoot(): Plugin {
+  return {
+    name: "baylee-site-languages",
+    transformIndexHtml(html) {
+      const tag = '<html lang="en">';
+      if (!html.includes(tag)) throw new Error(`index.html has no ${tag} to name the languages on`);
+      return html.replace(tag, `<html lang="en" data-langs="${languagesOnDisk().join(" ")}">`);
+    },
+  };
+}
 
 // No plugin: Vite's own transform (oxc) compiles TSX with React's automatic
 // runtime. The build writes hashed files under `assets/`, which Caddy may
@@ -6,6 +32,7 @@ import { defineConfig } from "vitest/config";
 // the site's CSP (`script-src 'self'; style-src 'self'`) holds. `public/`
 // (fonts, our own pictures, boot.js, robots.txt) is copied as it is.
 export default defineConfig({
+  plugins: [languagesForBoot()],
   oxc: {
     jsx: { runtime: "automatic" },
   },
