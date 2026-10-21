@@ -53,7 +53,7 @@ export default function SignInPage() {
         setPassword("");
         setBusy(false);
         setStatus(null);
-        signedIn({ name, expiresAt: session.expiresAt });
+        signedIn({ name: session.username ?? name, expiresAt: session.expiresAt });
         setTerms(true);
       },
       (error: unknown) => {

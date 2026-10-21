@@ -1,6 +1,7 @@
 // Who is signed in, for the header and the account page. The session itself
 // is Central's `__Host-central` cookie, which the page cannot read; the page
-// remembers only the name it signed in with and when the session ends
+// remembers only the name (Central's, where its answers carry it, else the
+// one signed in with) and when the session ends
 // (localStorage, `baylee-central-account`), so the header can say so after
 // a reload, and asks Central (`SessionStatus`) once per load whether that
 // session still lives. Signing out, an expired session or Central's "no"
@@ -87,7 +88,7 @@ export function AccountProvider({ api = CENTRAL, crypto = WORKER, children }: { 
     let live = true;
     api.sessionStatus().then(
       (status) => {
-        if (live) change({ name: known.name, expiresAt: status.expiresAt });
+        if (live) change({ name: status.username ?? known.name, expiresAt: status.expiresAt });
       },
       (error: unknown) => {
         // no live session: forget it; Central unreachable: keep it until it ends

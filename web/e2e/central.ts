@@ -89,6 +89,8 @@ interface Options {
   accounts?: string[];
   /** Answer the crypto's first message with bytes the real module refuses. */
   refuseCrypto?: boolean;
+  /** Answer with the named shapes the browser surface is gaining (`username`, `browser_status`). */
+  named?: boolean;
 }
 
 function bad(m: CentralMock, why: string, route: Route) {
@@ -180,10 +182,17 @@ export async function mockCentral(page: Page, origin: string, opts: Options = {}
         if (attempt === null || name === undefined) return refuse(route, 401);
         attempt = null;
         m.signedIn = name;
-        return json(route, { result: "browser_session", identity, wrapped_master: m.accounts.get(name)?.wrapped, expires_at: Math.floor(Date.now() / 1000) + 1800 });
+        return json(route, {
+          result: "browser_session",
+          identity,
+          ...(opts.named ? { username: name } : {}),
+          wrapped_master: m.accounts.get(name)?.wrapped,
+          expires_at: Math.floor(Date.now() / 1000) + 1800,
+        });
       }
       case "session_status":
         if (m.signedIn === null) return refuse(route, 401);
+        if (opts.named) return json(route, { result: "browser_status", identity, username: m.signedIn, expires_at: Math.floor(Date.now() / 1000) + 1800 });
         return json(route, { result: "session_status", identity, expires_at: Math.floor(Date.now() / 1000) + 1800, migration_closed: false });
       case "logout":
         if (m.signedIn === null) return refuse(route, 401);

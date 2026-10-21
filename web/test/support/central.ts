@@ -25,7 +25,11 @@ export interface FakeCentral extends Api {
   fail(operation: string, failure: ApiError["kind"]): void;
 }
 
-export function fakeCentral(opts: { terms?: TermsDocument | null; foreignIdentity?: boolean; wrapped?: Uint8Array } = {}): FakeCentral {
+/**
+ * `serverName`: answer with the browser surface's named shapes, the name
+ * being the account's own, or this one when a string.
+ */
+export function fakeCentral(opts: { terms?: TermsDocument | null; foreignIdentity?: boolean; wrapped?: Uint8Array; serverName?: boolean | string } = {}): FakeCentral {
   const failures = new Map<string, ApiError["kind"]>();
   const tickets = new Map<string, { name: string; identity: Identity }>();
   let attempt: string | null = null;
@@ -39,6 +43,7 @@ export function fakeCentral(opts: { terms?: TermsDocument | null; foreignIdentit
       failures.set(op, kind);
     },
   } as unknown as FakeCentral;
+  const said = (name: string) => (opts.serverName === undefined || opts.serverName === false ? null : opts.serverName === true ? name : opts.serverName);
   const step = (op: string) => {
     c.calls.push(op);
     const f = failures.get(op);
@@ -87,13 +92,13 @@ export function fakeCentral(opts: { terms?: TermsDocument | null; foreignIdentit
       if (name === undefined || account === undefined) throw new ApiError("rejected");
       c.session = { name, expiresAt: 4_000_000_000 };
       const identity = opts.foreignIdentity ? { account: fill(16, 0x77), epoch: 1 } : account.identity;
-      return { identity, wrappedMaster: opts.wrapped ?? account.wrapped, expiresAt: c.session.expiresAt };
+      return { identity, username: said(name), wrappedMaster: opts.wrapped ?? account.wrapped, expiresAt: c.session.expiresAt };
     },
     async sessionStatus() {
       step("session_status");
-      const [, account] = [...c.accounts.entries()][0] ?? [];
-      if (c.session === null || account === undefined) throw new ApiError("rejected");
-      return { identity: account.identity, expiresAt: c.session.expiresAt };
+      const [name, account] = [...c.accounts.entries()][0] ?? [];
+      if (c.session === null || account === undefined || name === undefined) throw new ApiError("rejected");
+      return { identity: account.identity, username: said(name), expiresAt: c.session.expiresAt };
     },
     async logout() {
       step("logout");

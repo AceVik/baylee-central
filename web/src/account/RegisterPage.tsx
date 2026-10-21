@@ -48,7 +48,7 @@ export default function RegisterPage() {
         // sign in now, so the password is let go while the code is read
         const session = signIn({ username: r.username, password: r.password }, { api, crypto }).then(
           (s) => {
-            signedIn({ name: r.username, expiresAt: s.expiresAt });
+            signedIn({ name: s.username ?? r.username, expiresAt: s.expiresAt });
             return true;
           },
           () => false,
