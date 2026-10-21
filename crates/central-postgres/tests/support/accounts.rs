@@ -123,7 +123,7 @@ async fn enroll(store: &AccountStore, keys: &ServerKeys, legacy: &str, name: &st
             .await
             .is_err()
     );
-    assert!(
+    assert_eq!(
         store
             .enroll(
                 &ticket,
@@ -132,9 +132,9 @@ async fn enroll(store: &AccountStore, keys: &ServerKeys, legacy: &str, name: &st
                 &document,
                 Some(wrapped.as_bytes())
             )
-            .await
-            .is_err(),
-        "a legacy account takes no recovery wrapper"
+            .await,
+        Err(Error::Rejected),
+        "a legacy account takes no recovery wrapper, refused before the schema's rule"
     );
     assert!(
         store.credential(identity).await.unwrap().is_none(),
