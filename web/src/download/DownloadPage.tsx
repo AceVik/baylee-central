@@ -10,23 +10,20 @@ import { ReleaseHead } from "./ReleaseHead";
 import { useRelease } from "./useRelease";
 
 export default function DownloadPage() {
-  useTitle("Download – Baylee", "Herunterladen – Baylee");
+  useTitle("title.download");
   const state = useRelease();
   return (
     <>
       <header className="page-head">
         <div className="section-inner">
           <p className="eyebrow">
-            <T en="Get it" de="Holen" />
+            <T id="dlPage.eyebrow" />
           </p>
           <h1>
-            <T en="Download" de="Herunterladen" />
+            <T id="dlPage.title" />
           </h1>
           <p className="section-lead">
-            <T
-              en="Every download goes straight to the file on GitHub, nothing in between. Where a release has installers, they are the easy way; the archives hold the same game to unpack anywhere. An installed Baylee updates itself from the signed archives wherever it may write its own folder. Every package carries the seat bridge for language models beside the game."
-              de="Jeder Download geht direkt zur Datei auf GitHub, nichts dazwischen. Wo eine Version Installer hat, sind sie der einfache Weg; die Archive enthalten dasselbe Spiel zum Entpacken an beliebiger Stelle. Ein installiertes Baylee aktualisiert sich selbst aus den signierten Archiven, wo es seinen eigenen Ordner beschreiben darf. Jedes Paket enthält neben dem Spiel die Sitzbrücke für Sprachmodelle."
-            />
+            <T id="dlPage.lead" />
           </p>
           <div className="page-dl">
             <DownloadButton state={state} onDownloadPage />
@@ -36,8 +33,8 @@ export default function DownloadPage() {
 
       <Section
         id="platforms"
-        eyebrow={<T en="Every file" de="Jede Datei" />}
-        title={<T en="All systems" de="Alle Systeme" />}
+        eyebrow={<T id="dlPage.filesEyebrow" />}
+        title={<T id="dlPage.filesTitle" />}
       >
         <ReleaseHead release={state.release} />
         <Platforms state={state} />

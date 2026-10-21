@@ -4,10 +4,10 @@
 
 import { RELEASES_PAGE } from "../config";
 import { dateText, mb } from "../github";
-import { T, tt, useLang } from "../i18n";
+import { T, t, useLang, type Key } from "../i18n";
 import { Icon } from "../components/icons";
 import { Link } from "../router";
-import { archNote } from "./machine";
+import { archNote, type ArchNote } from "./machine";
 import type { ReleaseFile } from "./release";
 import type { ReleaseState } from "./useRelease";
 import "../styles/download.css";
@@ -20,32 +20,14 @@ function Sep() {
   );
 }
 
-const NOTES = {
-  unknown: [
-    "We could not tell your system from this browser; every file is listed under Download.",
-    "Dein System ließ sich aus diesem Browser nicht erkennen; unter Download sind alle Dateien aufgeführt.",
-  ],
-  mobile: [
-    "There are no builds for phones and tablets yet. The button takes you to the release for your computer.",
-    "Für Handy und Tablet gibt es noch keine Builds. Der Knopf führt zum Release für deinen Rechner.",
-  ],
-  "mac-unsure": [
-    "This browser does not say whether your Mac has an Apple chip or an Intel one. The file above is for Apple silicon (M1 and later); there is no Intel build yet.",
-    "Dieser Browser verrät nicht, ob dein Mac einen Apple- oder einen Intel-Chip hat. Die Datei oben ist für Apple Silicon (M1 und neuer); einen Intel-Build gibt es noch nicht.",
-  ],
-  "mac-intel": [
-    "Your Mac reports an Intel chip, and there is no Intel build yet. The button takes you to the release page.",
-    "Dein Mac meldet einen Intel-Chip, und einen Intel-Build gibt es noch nicht. Der Knopf führt zur Release-Seite.",
-  ],
-  "windows-unsure": [
-    "If this is a Windows on ARM PC (a Snapdragon laptop, say), take the ARM file under Download instead.",
-    "Wenn das ein Windows-auf-ARM-PC ist (etwa ein Snapdragon-Laptop), nimm stattdessen die ARM-Datei unter Download.",
-  ],
-  "linux-unsure": [
-    "Your browser does not say which CPU this is; x86-64 is assumed. The ARM file is under Download.",
-    "Dein Browser sagt nicht, welche CPU das ist; x86-64 ist angenommen. Die ARM-Datei steht unter Download.",
-  ],
-} as const;
+const NOTES: Record<NonNullable<ArchNote>, Key> = {
+  unknown: "dl.noteUnknown",
+  mobile: "dl.noteMobile",
+  "mac-unsure": "dl.noteMacUnsure",
+  "mac-intel": "dl.noteMacIntel",
+  "windows-unsure": "dl.noteWindowsUnsure",
+  "linux-unsure": "dl.noteLinuxUnsure",
+};
 
 /** The big button: the file for this machine when there is one, else the release. */
 export function DownloadButton({ state, onDownloadPage }: { state: ReleaseState; onDownloadPage?: boolean }) {
@@ -58,13 +40,10 @@ export function DownloadButton({ state, onDownloadPage }: { state: ReleaseState;
       <div className="dl" aria-live="polite" aria-busy={release === undefined}>
         <a className="button button-big" href={RELEASES_PAGE} rel="noopener">
           <Icon name="download" className="button-icon" />
-          <T en="Download Baylee" de="Baylee herunterladen" />
+          <T id="dl.button" />
         </a>
         <p className="dl-meta">
-          <T
-            en="Windows · macOS (Apple silicon) · Linux. The latest release is on GitHub."
-            de="Windows · macOS (Apple Silicon) · Linux. Die neueste Version liegt auf GitHub."
-          />
+          <T id="dl.fallbackMeta" />
         </p>
       </div>
     );
@@ -76,15 +55,15 @@ export function DownloadButton({ state, onDownloadPage }: { state: ReleaseState;
       <a className="button button-big" href={best ? best.asset.browser_download_url : release.html_url} rel="noopener">
         <Icon name="download" className="button-icon" />
         {best && mine
-          ? tt(lang, `Download for ${mine.name[0]}`, `Download für ${mine.name[1]}`)
-          : tt(lang, "Download Baylee", "Baylee herunterladen")}
+          ? t(lang, "dl.for", { system: t(lang, mine.name) })
+          : t(lang, "dl.button")}
       </a>
       <p className="dl-meta">
         {release.tag_name}
         {best && (
           <>
             <Sep />
-            {tt(lang, best.label[0], best.label[1])}
+            {t(lang, best.label)}
             <Sep />
             {mb(best.asset.size, lang)}
           </>
@@ -104,28 +83,25 @@ export function DownloadButton({ state, onDownloadPage }: { state: ReleaseState;
         {best?.sig && (
           <>
             <a href={best.sig.browser_download_url} rel="noopener">
-              {tt(lang, "signature", "Signatur")}
+              {t(lang, "dl.signature")}
             </a>
             <Sep />
           </>
         )}
         <a href={release.html_url} rel="noopener">
-          {tt(lang, "release notes", "Release-Notizen")}
+          {t(lang, "dl.notes")}
         </a>
         <Sep />
         {onDownloadPage === true ? (
-          <a href={others}>{tt(lang, "other systems", "andere Systeme")}</a>
+          <a href={others}>{t(lang, "dl.others")}</a>
         ) : (
-          <Link to={others}>{tt(lang, "other systems", "andere Systeme")}</Link>
+          <Link to={others}>{t(lang, "dl.others")}</Link>
         )}
       </p>
-      {note !== null && <p className="dl-arch">{tt(lang, NOTES[note][0], NOTES[note][1])}</p>}
+      {note !== null && <p className="dl-arch">{t(lang, NOTES[note])}</p>}
       {best?.kind === "archive" && (
         <p className="dl-arch">
-          <T
-            en="This release ships as an archive: unpack it and start Baylee. Installers come with the next release."
-            de="Diese Version kommt als Archiv: entpacken und Baylee starten. Installer kommen mit der nächsten Version."
-          />
+          <T id="dl.archive" />
         </p>
       )}
     </div>
