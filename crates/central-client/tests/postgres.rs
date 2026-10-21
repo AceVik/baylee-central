@@ -54,6 +54,7 @@ fn real_native_login_restore_migration_and_adversarial_paths() {
         .unwrap()
         .with_terms(Some(support::terms::central_document())),
     );
+    let service = identity.clone();
     let (stop, stopped) = oneshot::channel();
     let serving_endpoint = endpoint.clone();
     let task = runtime.spawn(async move {
@@ -70,6 +71,7 @@ fn real_native_login_restore_migration_and_adversarial_paths() {
     };
     let tested = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         run(&http, &bridge, &runtime, &operator);
+        support::browser::run(&service, &http, &bridge, &runtime, &operator);
     }));
     // Cleanup runs even if an assertion panics; listeners and pools belong to this fixture only.
     let _ = stop.send(());

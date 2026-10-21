@@ -541,6 +541,32 @@ check accepting `UPDATE (note)`, a migration without the recovery rule, and
 key issuing outside one transaction (a run repeating a digest left its other
 key behind). Engineering review, not an audit.
 
+**`Register`, the recovery wrapper and the identity service.** Implementation
+pass: registration and enrollment both lock the key's row before an account's,
+so the two cannot deadlock; the sweep of abandoned registrations runs as a
+statement of its own with `SKIP LOCKED`, holding no account row while waiting
+for a key. A malformed name is refused before the database is reached, then the
+key, then the name: a bad key and a malformed name both answer `Rejected`, so
+neither tells anything about the name. A legacy migration takes a name back
+from an abandoned registration and never the reverse. `recovery` is skipped on
+the wire when absent, so a legacy enrollment from a new client still reaches a
+server built before it. The browser operations are an exhaustive match rather
+than a list (a positive list says nothing about an operation added later); a
+gateway's terms cannot be accepted from the browser surface; a sign-in attempt
+is bound to its surface. A legacy enrollment carrying a recovery wrapper was
+refused only by the schema (as `Unavailable`); the test now pins the store's own
+`Rejected`, so the schema stays a second line.
+
+Adversarial pass: nine injected faults each failed the PostgreSQL fixture at
+the assertion written for it, after a clean gate and baseline on the same
+commit: `Register` accepted on `/v1/native`, the name looked at before the key,
+reservations not counted, enrollment not spending the use, revocation ignored at
+enrollment, a legacy enrollment taking a recovery wrapper, a sign-in attempt
+finishing on the other surface, no sweep, and the name reclaim taking a legacy
+name. One run (revocation) first hit the fixture's 300-second limit under a
+concurrent workspace build; alone it failed at its assertion in 96 seconds.
+Engineering review, not an audit.
+
 ## Browser crypto (`central-web-crypto`), 2026-10-21
 
 Owner decisions: browser crypto is a WebAssembly crate built from

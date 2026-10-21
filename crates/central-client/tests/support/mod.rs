@@ -10,6 +10,7 @@ use std::{
     sync::atomic::{AtomicBool, Ordering},
     time::Duration,
 };
+pub(super) mod browser;
 pub(super) mod gateways;
 pub(super) mod terms;
 

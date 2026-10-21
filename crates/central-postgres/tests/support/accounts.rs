@@ -15,6 +15,7 @@ mod gateways;
 mod kinds;
 mod migration;
 mod objects;
+mod register;
 mod registration;
 mod revocation_race;
 mod single_session;
@@ -90,6 +91,7 @@ pub(crate) async fn run(operator: &DatabaseConnection) {
     terms::run(&store, operator, &keys).await;
     kinds::run(&store, operator, &keys).await;
     registration::run(&store, operator, &keys).await;
+    register::run(&store, operator, &keys).await;
     store.close().await.unwrap();
 }
 
@@ -117,21 +119,46 @@ async fn enroll(store: &AccountStore, keys: &ServerKeys, legacy: &str, name: &st
     let document = master.seal_object(object, name.as_bytes()).unwrap();
     assert!(
         store
-            .enroll(&ticket, &enrolled.upload, &[1; 72], &document)
+            .enroll(&ticket, &enrolled.upload, &[1; 72], &document, None)
             .await
             .is_err()
+    );
+    assert_eq!(
+        store
+            .enroll(
+                &ticket,
+                &enrolled.upload,
+                wrapped.as_bytes(),
+                &document,
+                Some(wrapped.as_bytes())
+            )
+            .await,
+        Err(Error::Rejected),
+        "a legacy account takes no recovery wrapper, refused before the schema's rule"
     );
     assert!(
         store.credential(identity).await.unwrap().is_none(),
         "a failed enrollment creates no partial credential"
     );
     store
-        .enroll(&ticket, &enrolled.upload, wrapped.as_bytes(), &document)
+        .enroll(
+            &ticket,
+            &enrolled.upload,
+            wrapped.as_bytes(),
+            &document,
+            None,
+        )
         .await
         .unwrap();
     assert!(
         store
-            .enroll(&ticket, &enrolled.upload, wrapped.as_bytes(), &document)
+            .enroll(
+                &ticket,
+                &enrolled.upload,
+                wrapped.as_bytes(),
+                &document,
+                None
+            )
             .await
             .is_err()
     );

@@ -1,6 +1,6 @@
 //! Central's own terms of use, compiled in from `legal/` (`docs/terms.md`),
 //! and the operations on terms.
-use super::{Error, IdentityService, Request, Response, Token};
+use super::{Error, IdentityService, Request, Response, Session, Surface, Token};
 use central_api::{
     gateway::validate_origin,
     terms::{self, DRAFT, TermsDocument, TermsSubject, TermsText, TermsVersion},
@@ -119,6 +119,7 @@ impl IdentityService {
         &self,
         request: Request,
         bearer: Option<&Token>,
+        surface: Surface,
     ) -> Result<Response, Error> {
         match request {
             Request::Terms => Ok(Response::Terms {
@@ -133,7 +134,7 @@ impl IdentityService {
             Request::TermsStatus => Ok(Response::TermsStatus {
                 accepted: self
                     .store
-                    .terms_status(bearer.ok_or(Error::Rejected)?, self.current())
+                    .terms_status(surface.session(bearer)?, self.current())
                     .await?,
                 current: self.current().cloned(),
             }),
@@ -142,7 +143,7 @@ impl IdentityService {
                 version,
                 digest,
             } => {
-                let session = bearer.ok_or(Error::Rejected)?;
+                let session = surface.session(bearer)?;
                 let accepted = TermsVersion { version, digest };
                 match subject {
                     TermsSubject::Central => {
@@ -152,6 +153,10 @@ impl IdentityService {
                         self.store.accept_central_terms(session, &accepted).await?;
                     }
                     TermsSubject::Gateway { origin } => {
+                        // A gateway's terms are accepted from the client only.
+                        let Session::Native(session) = session else {
+                            return Err(Error::Rejected);
+                        };
                         self.origin(&origin)?;
                         if !terms::valid_version(&accepted.version) {
                             return Err(Error::Rejected);
