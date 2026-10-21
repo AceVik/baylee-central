@@ -116,7 +116,18 @@ The server side of [web accounts](web-accounts.md) lands in three PRs.
   that give their use back, revocation, reclaimed names, races for a key's last
   use and for one name, the sweep of abandoned registrations, and the website's
   flow ending in a native admission at the official gateway with no legacy ID.
-- **Next:** the browser listener with its cookie and per-address budgets.
+- **The browser listener.** `browser.listen` in `central.json` starts
+  `POST /api/v1` for `baylee.app` ([operations](operations.md)): exact `Host`
+  and `Origin`, same-origin fetch metadata, JSON, `X-Baylee-Central: 1`, no
+  `Authorization`, loopback peers only, the browser operations only, no CORS
+  answer; the `__Host-central` cookie carries the session; per-address budgets
+  from the proxy's last `X-Forwarded-For` hop. Tests: every refusal without a
+  database (each before the service is called), the cookie's exact attributes
+  and parsing, budgets per address and per IPv6 /64, and the website's whole
+  flow over the real listener and PostgreSQL, ending in a native admission.
+- **Not yet deployed.** Deploy: migrate, grant, add `browser.listen`, pass
+  `/api/*` in the `baylee.app` site block, issue beta keys. Central's own terms
+  are still `draft`, so none are in force.
 
 ## Validation and historical milestone evidence
 

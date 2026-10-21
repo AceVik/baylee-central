@@ -567,6 +567,38 @@ name. One run (revocation) first hit the fixture's 300-second limit under a
 concurrent workspace build; alone it failed at its assertion in 96 seconds.
 Engineering review, not an audit.
 
+**The browser listener.** Implementation pass: the listener's own refusals
+come before decoding, the allowlist before the budgets, the budgets before the
+identity service; the service never sees a refused request. The budget lock's
+poison error held its guard across the service call, which made the handler's
+future not `Send`; the compiler refused it, and the guard now ends before
+anything is awaited. The cookie value is written and read through `Token::hex`
+and `Token::from_hex` (the bearer's parser, zeroizing buffers), never through
+`format!`; the header copy itself is marked sensitive. Caddy's documentation was
+checked for `X-Forwarded-For`: without `trusted_proxies` it ignores a client's
+own value and sets the peer it saw, so the last hop is the client; the runbook
+says not to set `trusted_proxies` for the site. The first budget test built a
+fresh listener, with fresh budgets, per request and so could never fail; it
+now shares one listener, and its assertions failed before that change.
+
+Adversarial pass: every header condition, a non-loopback or missing peer, an
+absolute URI, other methods and paths, oversized and malformed bodies, unknown
+and non-browser operations and malformed forwarded addresses are each tested,
+without a database, to be refused before the service is called. Fourteen
+injected faults each failed those tests: an `Origin` compared as a prefix,
+fetch metadata ignored, the custom header or the `Authorization` refusal
+dropped, any peer accepted, the first hop or the first `X-Forwarded-For` line
+counted, the allowlist skipped, `Logout` not clearing the cookie, the cookie
+without `HttpOnly`, IPv6 counted by its host half, discovery and sign-in sharing
+one budget, a duplicate cookie accepted, and a full budget table refusing new
+addresses. Over real HTTP and PostgreSQL the website's whole flow passes:
+registration with a beta key, enrollment with a real recovery wrapper that the
+code opens to the stored document's key, sign-in into the cookie only (exact
+attributes, no token in the body), the cookie refused as a native bearer, terms,
+sign-out clearing the cookie, the fifth registration of an address refused
+while a neighbour's is not, and the same account admitted at the official
+gateway without a legacy ID. Engineering review, not an audit.
+
 ## Browser crypto (`central-web-crypto`), 2026-10-21
 
 Owner decisions: browser crypto is a WebAssembly crate built from

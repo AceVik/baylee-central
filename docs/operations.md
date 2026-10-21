@@ -2,8 +2,9 @@
 
 This runbook covers the deployed launcher and its database connector. It is an
 operator procedure, not a release approval: the gates in [status](status.md)
-still apply, and nothing here enables registration, password reset, session
-renewal or browser SSO.
+still apply. Registration and sign-in on `baylee.app` are served by the browser
+listener ([below](#the-browser-listener)) once it is configured; nothing here
+enables password reset, session renewal or browser SSO for gateways.
 
 ## Launcher modes
 
@@ -14,7 +15,8 @@ never in argv or the environment. Unknown fields fail closed.
 - `--accounts-stdin` serves the live native account protocol. The endpoint is
   always `https://central.baylee.app` and the sole legacy gateway is the compiled
   `https://baylee.acevik.de`; neither is configurable. Input:
-  `listen`, `database`, `opaque_setup`, `bridge`.
+  `listen`, `database`, `opaque_setup`, `bridge`, and optionally
+  `browser: {"listen": …}` for the browser listener (absent means off).
 - `--migrate-stdin` applies pending migrations once under the migration login
   and exits. Input: `database` only. The service never migrates by itself.
 - `--issue-beta-keys-stdin` issues beta keys under the migration login (see
@@ -32,6 +34,48 @@ does). Every other Host, an `Origin` or Fetch-Metadata header is refused.
 Forwarded headers confer nothing. `/health/live` answers; `/health/ready`
 deliberately answers 503, so no proxy or supervisor health check may use it.
 SIGTERM or Ctrl-C closes the listener, drains briefly and closes the pool.
+
+## The browser listener
+
+`browser.listen` in `central.json` (`{"browser": {"listen": "127.0.0.1:28791"}}`)
+starts a second listener in the same process, for the website's registration
+and sign-in ([web accounts](web-accounts.md)). It must be a numeric loopback
+address and differ from `listen`; both are bound before the database is
+reached. One signal stops both, and either one stopping stops the other.
+
+It serves one route, `POST /api/v1`, with the operations of
+`central_identity::browser_operation`, and answers 403 (`request not
+permitted`) to anything that is not the site's own page: a `Host` other than
+exactly `baylee.app`, an `Origin` other than exactly `https://baylee.app`,
+`Sec-Fetch-Site` other than `same-origin`, a content type other than
+`application/json`, no `X-Baylee-Central: 1`, any `Authorization`, a peer that
+is not loopback, or an operation outside the list. No CORS header is ever sent.
+Bodies are at most 64 KiB. Errors keep the native route's statuses and fixed
+text. The browser session is the cookie `__Host-central` (`Secure`, `HttpOnly`,
+`SameSite=Strict`, `Path=/`, `Max-Age=1800`), never in a body; signing out
+clears it.
+
+Per-address budgets read the last `X-Forwarded-For` hop, which Caddy sets to
+the client it saw: 5 registrations an hour, 30 discoveries and 30 sign-in starts
+a minute. IPv6 addresses count by their /64. The counters live in memory only,
+at most 4096 addresses per budget, and forget an address when its window has
+passed. A request without a well-formed last hop is refused (400). Do not set
+Caddy's `trusted_proxies` for this site unless a CDN in front of it appends its
+own hop: without it Caddy ignores a client's own `X-Forwarded-For`.
+
+The `baylee.app` site block (`web/README.md` §"Serving it") passes `/api/*`
+to it instead of answering 404, with the `Host` unchanged (Caddy's default for
+a plain-HTTP upstream):
+
+```caddyfile
+	# Central's browser listener (docs/web-accounts.md).
+	handle /api/* {
+		request_body {
+			max_size 64KiB
+		}
+		reverse_proxy 127.0.0.1:28791
+	}
+```
 
 ## Database transport
 
@@ -198,9 +242,11 @@ defaults are this deployment's. The website's site block is the one in
 
 ## Known limits of this deployment
 
-Request budgets are global and per account or bearer, not per client address:
-behind the proxy every client shares one address, so a flood can exhaust the
-shared login budget for everyone (service denial, not account takeover). Central
-sessions expire after 30 minutes without renewal. Registration, password change
-and recovery are not served. Live discovery reveals enrollment state for a
-supplied username (see [native login](native-login.md)).
+Request budgets on the native listener are global and per account or bearer,
+not per client address: behind the proxy every client shares one address, so a
+flood can exhaust the shared login budget for everyone (service denial, not
+account takeover). The browser listener adds per-address budgets in front of the
+same global ones; a client with many addresses still shares the global budget.
+Central sessions expire after 30 minutes without renewal. Password change and
+recovery are not served. Discovery reveals enrollment state for a supplied
+username (see [native login](native-login.md)), on both listeners.

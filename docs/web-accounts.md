@@ -158,31 +158,48 @@ in `central-identity` (`browser_operation`), so a new operation does not
 compile until it is decided there. The cookie's token is used only by
 `SessionStatus`, `Logout`, `TermsStatus` and `AcceptTerms`.
 
-A request is refused (403) unless all of these hold:
+A request is refused (403, `request not permitted`) unless all of these hold.
+Each header is compared byte for byte and must appear exactly once.
 
 - `Host` is `baylee.app`.
 - `Origin` is present and is exactly `https://baylee.app`.
 - `Sec-Fetch-Site`, when sent, is `same-origin`.
-- `Content-Type` is `application/json`.
+- `Content-Type` is `application/json` (no parameters).
 - The header `X-Baylee-Central: 1` is present. A custom header forces a
   preflight cross-origin, and no CORS header is ever sent.
 - No `Authorization` header is present: the session travels only in the
   cookie.
+- The connection comes from loopback (the proxy), and the operation is one of
+  the list above.
+
+Other paths answer 404 and other methods 405. A body is at most 64 KiB (413).
+A malformed or unknown request is `Rejected` (401), as on `/v1/native`; the
+other answers keep the native statuses too (409 `Conflict`, 429 `Busy`, 503
+`Unavailable`, 403 `TermsRequired`) with the same fixed text.
 
 The cookie is
 `__Host-central=<64 hex>; Path=/; Secure; HttpOnly; SameSite=Strict;
-Max-Age=1800`. The session is the native session with `kind = browser`.
+Max-Age=1800`. The session is the native session with `kind = browser`. Only
+exactly one well-formed `__Host-central` counts; anything else in `Cookie` is
+no session. `Logout` clears the cookie (`Max-Age=0`) in every answer, also when
+the session was already gone.
 
 Per-address budgets read the last `X-Forwarded-For` hop, and only from the
-loopback proxy:
+loopback proxy. Without a well-formed last hop a request is refused (400).
+IPv6 addresses count by their /64; an IPv4 address mapped into IPv6 is that
+IPv4 address. Each budget remembers at most 4096 addresses, in memory only, and
+forgets one when its window has passed; when full, the oldest window makes
+room, so a crowd of addresses cannot lock new ones out.
 
 | Operation | Budget per address |
 | --- | --- |
 | `Register` | 5 an hour |
-| `Discover`, `LoginStart` | 30 a minute |
+| `Discover` | 30 a minute |
+| `LoginStart` | 30 a minute, apart from `Discover` |
 
 The global budgets of the native surface apply as well. The native surface
-(`/v1/native`) is unchanged.
+(`/v1/native`) is unchanged, except that it refuses `Register` and a browser
+session.
 
 ## Browser crypto (`central-web-crypto`)
 
