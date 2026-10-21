@@ -10,7 +10,7 @@ import { platformFor, type Machine } from "../../src/download/machine";
 import { sortFiles, type Release } from "../../src/download/release";
 import type { ReleaseState } from "../../src/download/useRelease";
 import { LangProvider } from "../../src/i18n";
-import { release } from "../fixtures/release";
+import { asset, release } from "../fixtures/release";
 
 function state(machine: Machine | null, r: Release | null | undefined = release): ReleaseState {
   return { release: r, files: r ? sortFiles(r) : {}, machine, mine: platformFor(machine) };
@@ -45,6 +45,18 @@ describe("the download button", () => {
     show(state({ os: "mac", arch: null, sure: false, mobile: false }), "de");
     expect(screen.getByRole("link", { name: "Download für macOS" }).getAttribute("href")).toMatch(/aarch64\.dmg$/);
     expect(screen.getByText(/verrät nicht, ob dein Mac/)).toBeTruthy();
+  });
+
+  it("gives an Intel Mac its build, and says so only when the release has none", () => {
+    const INTEL: Machine = { os: "mac", arch: "x64", sure: true, mobile: false };
+    const withIntel = { ...release, assets: [...release.assets, asset("Baylee-0.1.0-x86_64.dmg")] };
+    const { unmount } = show(state(INTEL, withIntel));
+    expect(screen.getByRole("link", { name: "Download for macOS on Intel" }).getAttribute("href")).toMatch(/x86_64\.dmg$/);
+    expect(screen.queryByText(/has no Intel build/)).toBeNull();
+    unmount();
+    show(state(INTEL));
+    expect(screen.getByRole("link", { name: "Download Baylee" }).getAttribute("href")).toBe(release.html_url);
+    expect(screen.getByText(/has no Intel build/)).toBeTruthy();
   });
 
   it("points to the releases page while GitHub has not answered", () => {

@@ -49,7 +49,8 @@ export function DownloadButton({ state, onDownloadPage }: { state: ReleaseState;
     );
   }
   const best: ReleaseFile | null = mine ? (files[mine.id]?.[0] ?? null) : null;
-  const note = archNote(machine);
+  // An Intel Mac's note says the release lacks its build; with the file at hand there is nothing to say.
+  const note = archNote(machine) === "mac-intel" && best ? null : archNote(machine);
   return (
     <div className="dl" aria-live="polite">
       <a className="button button-big" href={best ? best.asset.browser_download_url : release.html_url} rel="noopener">
