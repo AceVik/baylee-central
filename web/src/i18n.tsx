@@ -273,20 +273,9 @@ export function useChooseLang(): (lang: Lang) => void {
   return useContext(LangContext).choose;
 }
 
-type Message = { id: Key; args?: Args; elems?: Elems };
-type Both = { en: ReactNode; de: ReactNode };
-
 /** One message in the page's language, its markup drawn (`rich`). */
-export function T(props: Message | Both) {
-  const lang = useLang();
-  if ("en" in props) return <>{lang === "de" ? props.de : props.en}</>;
-  const { id, args, elems } = props;
-  return <>{rich(lang, id, elems, args)}</>;
-}
-
-/** Until every component names its messages (removed once none says both). */
-export function tt(lang: Lang, en: string, de: string): string {
-  return lang === "de" ? de : en;
+export function T({ id, args, elems }: { id: Key; args?: Args; elems?: Elems }) {
+  return <>{rich(useLang(), id, elems, args)}</>;
 }
 
 export function num(lang: Lang, n: number): string {
@@ -294,12 +283,9 @@ export function num(lang: Lang, n: number): string {
 }
 
 /** The tab's title for the page that is shown. */
-export function useTitle(key: Key | string, de?: string): void {
+export function useTitle(key: Key): void {
   const lang = useLang();
   useEffect(() => {
-    document.title = de === undefined ? t(lang, key as Key) : tt(lang, key, de);
-  }, [lang, key, de]);
+    document.title = t(lang, key);
+  }, [lang, key]);
 }
-
-/** @deprecated the locale of `localeOf`, until github.ts names its words. */
-export const LOCALE: Record<Lang, string> = Object.fromEntries(LANG_LIST.map((l) => [l, LANGS[l].locale])) as Record<Lang, string>;
