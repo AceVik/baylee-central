@@ -1,0 +1,44 @@
+/* The account pages (src/account/): registration, sign-in, the account. */
+
+/* ---------------------------------------------------------------- frame */
+.account-page .section-inner { max-width: 40rem; }
+.account-page .section-lead { text-align: center; margin-left: auto; margin-right: auto; }
+.account-card { padding: clamp(1.2rem, 3vw, 1.8rem); margin: 0 0 1.5rem; }
+.account-card > p:last-child { margin-bottom: 0; }
+.account-note { font-family: var(--sans); text-align: center; }
+.account-form { margin: 0 0 1.2rem; }
+.account-form .check-label, .recovery .check-label { align-items: center; font-weight: 400; }
+.account-form .check-label input, .recovery .check-label input { flex: none; }
+.field-hint { margin: 0; font-family: var(--sans); font-size: 0.88rem; color: var(--ink-faint); }
+.account-name { font-family: var(--sans); font-size: 1.3rem; font-weight: 700; color: var(--title); overflow-wrap: anywhere; }
+
+/* ---------------------------------------------------------------- the strength hint */
+.strength { display: flex; align-items: center; gap: 0.6rem; min-height: 1.4em; font-family: var(--sans); font-size: 0.88rem; }
+.strength-bar { flex: 0 0 6rem; height: 6px; border-radius: 3px; background: var(--edge-soft); position: relative; overflow: hidden; }
+.strength-bar::after { content: ""; position: absolute; inset: 0; transform-origin: left; transform: scaleX(0); transition: transform var(--fast) var(--ease), background-color var(--fast) ease; }
+.strength[data-level="short"] .strength-bar::after { transform: scaleX(0.15); background: var(--bad); }
+.strength[data-level="weak"] .strength-bar::after { transform: scaleX(0.35); background: var(--bad); }
+.strength[data-level="fair"] .strength-bar::after { transform: scaleX(0.65); background: var(--warn); }
+.strength[data-level="strong"] .strength-bar::after { transform: scaleX(1); background: var(--ok); }
+.strength-text { color: var(--ink-soft); }
+.strength[data-level="none"] .strength-bar { visibility: hidden; }
+
+/* ---------------------------------------------------------------- the recovery code */
+.recovery { padding: clamp(1.2rem, 3vw, 1.8rem); margin: 0 0 1rem; }
+.recovery h2 { margin-top: 0; outline: none; }
+.recovery-code { margin: 1.2rem 0; text-align: center; }
+.recovery-code code {
+  display: inline-block; max-width: 100%; padding: 0.8rem 1rem; border-radius: 12px;
+  background: var(--code-bg); color: var(--code-ink); border: 1px solid var(--edge);
+  font: 700 clamp(1rem, 0.85rem + 1.1vw, 1.35rem) / 1.6 var(--mono); letter-spacing: 0.06em;
+  overflow-wrap: anywhere; user-select: all;
+}
+
+/* ---------------------------------------------------------------- the terms */
+.accept h2 { outline: none; }
+.accept-text { padding: 0 1rem; margin: 0 0 1.2rem; border-left: 3px solid var(--edge); }
+
+@media (prefers-reduced-motion: reduce) {
+  .strength-bar::after { transition: none; }
+}
+.account-note.bad { color: var(--bad); }

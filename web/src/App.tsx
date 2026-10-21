@@ -4,6 +4,7 @@
 
 import { Suspense, lazy, useEffect, useRef } from "react";
 
+import { AccountProvider } from "./account/session";
 import { Footer } from "./components/Footer";
 import { Header } from "./components/Header";
 import { NotFound } from "./components/NotFound";
@@ -20,6 +21,9 @@ const Contact = lazy(() => import("./contact/ContactPage"));
 const Impressum = lazy(() => import("./impressum/ImpressumPage"));
 const Privacy = lazy(() => import("./privacy/PrivacyPage"));
 const Terms = lazy(() => import("./legal/TermsPage"));
+const Register = lazy(() => import("./account/RegisterPage"));
+const SignIn = lazy(() => import("./account/SignInPage"));
+const Account = lazy(() => import("./account/AccountPage"));
 
 function Loading() {
   return (
@@ -49,6 +53,12 @@ function PageView({ page }: { page: Page | null }) {
       return <Privacy />;
     case "terms":
       return <Terms />;
+    case "register":
+      return <Register />;
+    case "signIn":
+      return <SignIn />;
+    case "account":
+      return <Account />;
     case null:
       return <NotFound />;
   }
@@ -100,7 +110,7 @@ export function App() {
   useReveal(main);
 
   return (
-    <>
+    <AccountProvider>
       <SkipLink />
       <Header page={page} />
       <main id="main" tabIndex={-1} ref={main}>
@@ -109,6 +119,6 @@ export function App() {
         </Suspense>
       </main>
       <Footer />
-    </>
+    </AccountProvider>
   );
 }

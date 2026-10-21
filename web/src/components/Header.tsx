@@ -1,10 +1,12 @@
-// The bar every page shares: the brand, the sections and the Discord
-// community (a menu on narrow screens), and the language switch: one button
+// The bar every page shares: the brand, the sections, the Discord community
+// and the account (Sign in, or the signed-in name; a menu on narrow
+// screens), and the language switch: one button
 // per language with a file, each in its own name. Over the start page's hero
 // it is clear; once the page moves, or on any other page, it frosts.
 
 import { useEffect, useRef, useState } from "react";
 
+import { useAccount } from "../account/session";
 import { DISCORD } from "../config";
 import { OFFERED, nameOf, t, tagOf, useChooseLang, useLang, wordOf, type Key } from "../i18n";
 import { Link, PATHS, type Page } from "../router";
@@ -35,6 +37,7 @@ function LangSwitch() {
 
 export function Header({ page }: { page: Page | null }) {
   const lang = useLang();
+  const { account } = useAccount();
   const here = page ?? "missing";
   // the menu is open on the page it was opened on, and closes with a new page
   const [openOn, setOpenOn] = useState<string | null>(null);
@@ -90,6 +93,20 @@ export function Header({ page }: { page: Page | null }) {
           <a className="nav-discord" href={DISCORD} rel="noopener">
             Discord
           </a>
+          {account === null ? (
+            <Link className="nav-account" to={PATHS.signIn} aria-current={page === "signIn" || page === "register" ? "page" : undefined}>
+              {t(lang, "nav.signIn")}
+            </Link>
+          ) : (
+            <Link
+              className="nav-account"
+              to={PATHS.account}
+              aria-label={t(lang, "nav.account", { name: account.name })}
+              aria-current={page === "account" ? "page" : undefined}
+            >
+              <bdi>{account.name}</bdi>
+            </Link>
+          )}
         </nav>
         <LangSwitch />
       </div>

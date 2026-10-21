@@ -225,6 +225,24 @@ The privacy notice gains:
 
 The CSP gains `'wasm-unsafe-eval'` in `script-src`.
 
+*As built (21.10.2026, `web/README.md` §"Accounts"):*
+
+- The password needs eight characters at least (OWASP ASVS 6.2.1) and at most
+  1024 bytes (the crypto's bound); the strength hint is advice only.
+- After `EnrollmentFinish` the page signs in at once, so the password is let
+  go while the code is read; if that sign-in fails, the account still exists
+  and the page sends the person to `/signin` after the code.
+- A terms version is accepted only when the texts `Terms` serves hash to the
+  digest `TermsStatus` names (central-api's `terms::digest`, recomputed in
+  the page), so an acceptance names exactly what was shown.
+- `BrowserSession` and `SessionStatus` carry no username, so the page
+  remembers the name it signed in with and the session's end in
+  localStorage (`baylee-central-account`) for the header, confirms that
+  session with `SessionStatus` once per load, and forgets it on signing out,
+  at its end or on Central's 401. The privacy notice says so. Should the
+  browser surface's answers gain the canonical username, the page reads it
+  from there and keeps only the end.
+
 ## Baylee (the gateway, G1)
 
 In bridge mode `login_for` admits a redeemed identity without `legacy_id` as a

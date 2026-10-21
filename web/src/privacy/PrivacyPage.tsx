@@ -4,17 +4,19 @@
 // messages. A draft for the owner's lawyer to check before it is relied on
 // (Baylee's docs/legal.md §4). It must change with the site: a new host in
 // the CSP, a cookie, an access log or a new form means a new sentence here
-// (README.md §"Privacy"). Never put the operator's private details here: the
+// (README.md §"Privacy"); the account pages brought the session cookie,
+// the account data and the counters (accounts.tsx). Never put the operator's private details here: the
 // Impressum names the controller.
 
 import { FEEDBACK_ORIGIN, GITHUB } from "../config";
 import { T, t, useLang, useTitle, type Elems } from "../i18n";
 import { Link, PATHS } from "../router";
 import "../styles/legal.css";
+import { ACCOUNTS } from "./accounts";
 import { PERSONAL } from "./rights";
 import { SERVING } from "./serving";
 
-const PARTS = [...SERVING, ...PERSONAL];
+const PARTS = [...SERVING, ...ACCOUNTS, ...PERSONAL];
 
 /** What the feedback service is called in the contact form's part. */
 const ARGS = { host: new URL(FEEDBACK_ORIGIN).host };
