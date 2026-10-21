@@ -4,7 +4,9 @@
 // client's screenshots (web/site/img/shot-*) into public/media/. Both carry
 // card names and card text, Wizards' material, which stays out of this
 // repository (README.md §"Content from Baylee"); both directories are
-// gitignored. `npm run build` then copies them into dist/.
+// gitignored. `npm run build` then copies them into dist/. Plain JavaScript,
+// not TypeScript: a deployment runs it on the server's Node, and a
+// distribution's build (Ubuntu's `+dfsg`) has no type stripping.
 
 import { cpSync, existsSync, mkdirSync, readdirSync, rmSync } from "node:fs";
 import { join, resolve } from "node:path";
