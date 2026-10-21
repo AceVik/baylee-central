@@ -102,6 +102,30 @@ describe("the answers", () => {
     expect(() => parse.browserSession({ ...session(IDENTITY), wrapped_master: n(72) })).toThrow(ApiError);
   });
 
+  it("take the session's two shapes each, with the canonical name or without", () => {
+    const named = { result: "browser_session", identity: IDENTITY, username: "synthetic_name", wrapped_master: n(73), expires_at: 4_000_000_000 };
+    expect(parse.browserSession(named).username).toBe("synthetic_name");
+    expect(parse.browserSession(session(IDENTITY)).username).toBeNull();
+    for (const name of ["Synthetic_Name", "ab", "a..b", "_abc", 7, null, ""]) {
+      expect(() => parse.browserSession({ ...named, username: name })).toThrow(ApiError);
+    }
+    expect(() => parse.browserSession({ ...named, token: n(32) })).toThrow(ApiError);
+
+    const status = { result: "browser_status", identity: IDENTITY, username: "synthetic_name", expires_at: 4_000_000_000 };
+    expect(parse.sessionStatus(status)).toMatchObject({ username: "synthetic_name", expiresAt: 4_000_000_000 });
+    const native = { result: "session_status", identity: IDENTITY, expires_at: 4_000_000_000, migration_closed: false };
+    expect(parse.sessionStatus(native).username).toBeNull();
+    for (const bad of [
+      { ...status, migration_closed: false },
+      { result: "browser_status", identity: IDENTITY, expires_at: 4_000_000_000 },
+      { ...status, username: "SYNTHETIC" },
+      { ...native, username: "synthetic_name" },
+      { ...status, result: "session_status" },
+    ]) {
+      expect(() => parse.sessionStatus(bad)).toThrow(ApiError);
+    }
+  });
+
   it("read discovery's two kinds and nothing else", () => {
     expect(parse.discovery({ result: "discovery", discovery: { kind: "legacy" } })).toBeNull();
     expect(parse.discovery({ result: "discovery", discovery: { kind: "central", identity: IDENTITY } })?.epoch).toBe(1);

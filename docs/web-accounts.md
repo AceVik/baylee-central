@@ -272,13 +272,18 @@ The CSP gains `'wasm-unsafe-eval'` in `script-src`.
 - A terms version is accepted only when the texts `Terms` serves hash to the
   digest `TermsStatus` names (central-api's `terms::digest`, recomputed in
   the page), so an acceptance names exactly what was shown.
-- `BrowserSession` and `SessionStatus` carry no username, so the page
-  remembers the name it signed in with and the session's end in
-  localStorage (`baylee-central-account`) for the header, confirms that
-  session with `SessionStatus` once per load, and forgets it on signing out,
-  at its end or on Central's 401. The privacy notice says so. Should the
-  browser surface's answers gain the canonical username, the page reads it
-  from there and keeps only the end.
+- The page remembers the name and the session's end in localStorage
+  (`baylee-central-account`) for the header, confirms that session with
+  `SessionStatus` once per load, and forgets it on signing out, at its end
+  or on Central's 401. The privacy notice says so.
+- The browser surface is gaining the canonical name (agreed with the server
+  work on 21.10.2026): `BrowserSession { identity, username, wrapped_master,
+  expires_at }`, and `SessionStatus` answered there as `browser_status {
+  identity, username, expires_at }`. The page takes exactly these and,
+  until that change is on main, the two shapes without a name; where Central
+  names the account, its name is the one shown and remembered. Once only the
+  named shapes remain, the page keeps just the end and the privacy notice
+  loses the remembered name.
 
 ## Baylee (the gateway, G1)
 

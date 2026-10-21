@@ -212,6 +212,19 @@ describe("sign-in", () => {
     expect(window.localStorage.getItem(ACCOUNT_KEY)).toBeNull();
   });
 
+  it("names the account as Central does, where its answer says", async () => {
+    const api = fakeCentral({ serverName: "central_name" });
+    const { register } = await import("../../src/account/flows");
+    await register({ username: "synthetic_name", betaKey: KEY, password: PASSWORD }, { api, crypto: fakeCrypto(PASSWORD).factory });
+    const user = userEvent.setup();
+    show(<SignInPage />, api);
+    await user.type(screen.getByLabelText("Username"), "Synthetic_Name");
+    await user.type(screen.getByLabelText("Password"), PASSWORD);
+    await user.click(screen.getByRole("button", { name: "Sign in" }));
+    await waitFor(() => expect(window.location.pathname).toBe("/account"));
+    expect(JSON.parse(window.localStorage.getItem(ACCOUNT_KEY) ?? "{}")).toMatchObject({ name: "central_name" });
+  });
+
   it("signs in and goes to the account, where signing out forgets it", async () => {
     const api = await account();
     const user = userEvent.setup();

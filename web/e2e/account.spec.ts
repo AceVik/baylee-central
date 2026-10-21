@@ -160,6 +160,26 @@ test.describe("accounts", () => {
     expect(errors).toEqual([]);
   });
 
+  test("with the browser surface's named answers, the header and the account name Central's account", async ({ page, baseURL }, info) => {
+    const errors = watchErrors(page);
+    const m = await mock(page);
+    const central = await mockCentral(page, new URL(baseURL ?? "").origin, { accounts: ["synthetic_name"], named: true });
+    await stubCrypto(page);
+    await page.goto("/signin?lang=en");
+    await page.getByLabel("Username").fill("Synthetic_Name");
+    await page.getByLabel("Password").fill(PASSWORD);
+    await page.getByRole("button", { name: "Sign in" }).click();
+    await expect(page).toHaveURL(/\/account$/);
+    await expect(page.locator(".account-name bdi")).toHaveText("synthetic_name");
+    await page.reload();
+    await openMenu(page, info.project.name === "phone");
+    await expect(page.getByRole("link", { name: "Your account, synthetic_name" })).toBeVisible();
+    expect(central.operations).toContain("session_status");
+    expect(central.violations).toEqual([]);
+    expect(m.stray).toEqual([]);
+    expect(errors).toEqual([]);
+  });
+
   test("the real browser crypto starts both exchanges in its Worker and refuses forged answers", async ({ page, baseURL }) => {
     const errors = watchErrors(page);
     const m = await mock(page);

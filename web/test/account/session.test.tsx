@@ -71,6 +71,22 @@ describe("the remembered account", () => {
     expect(window.localStorage.getItem(ACCOUNT_KEY)).toBeNull();
   });
 
+  it("takes the name Central says, where its answer carries one", async () => {
+    const api = fakeCentral({ serverName: "central_name" });
+    const crypto = fakeCrypto("synthetic passphrase");
+    const { register, signIn } = await import("../../src/account/flows");
+    await register({ username: "synthetic_name", betaKey: KEY, password: "synthetic passphrase" }, { api, crypto: crypto.factory });
+    await signIn({ username: "synthetic_name", password: "synthetic passphrase" }, { api, crypto: crypto.factory });
+    store({ name: "synthetic_name", expiresAt: LATER });
+    render(
+      <AccountProvider api={api} crypto={crypto.factory}>
+        <Probe />
+      </AccountProvider>,
+    );
+    await waitFor(() => expect(screen.getByRole("button").textContent).toBe("central_name until 4000000000"));
+    expect(remembered()?.name).toBe("central_name");
+  });
+
   it("is kept while Central cannot be reached, and forgotten on signing out even then", async () => {
     const api = fakeCentral();
     api.fail("session_status", "network");

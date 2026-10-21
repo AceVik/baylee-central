@@ -397,6 +397,8 @@ Registration, sign-in and the account page follow `docs/web-accounts.md`:
 - **Who is signed in** (`src/account/session.tsx`): the name and the
   session's end, remembered for the header, confirmed once per load with
   `SessionStatus`, forgotten on signing out, at the end, or on Central's no.
+  Where Central's answers carry the canonical name (`docs/web-accounts.md`
+  §"As built"), that name is the one shown.
 
 The unit tests use stand-ins for Central and the crypto
 (`test/support/central.ts`); `e2e/account.spec.ts` runs the pages against a
