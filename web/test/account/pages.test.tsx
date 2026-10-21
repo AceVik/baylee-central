@@ -13,7 +13,7 @@ import type { TermsDocument } from "../../src/account/api";
 import { termsDigest } from "../../src/account/digest";
 import AccountPage from "../../src/account/AccountPage";
 import RegisterPage from "../../src/account/RegisterPage";
-import { ACCOUNT_KEY, AccountProvider } from "../../src/account/session";
+import { AccountProvider, SESSION_KEY } from "../../src/account/session";
 import SignInPage from "../../src/account/SignInPage";
 import { Header } from "../../src/components/Header";
 import { LangProvider, type Lang } from "../../src/i18n";
@@ -98,7 +98,8 @@ describe("registration", () => {
     await user.click(within(step).getByLabelText("I have kept my recovery code in a safe place."));
     await user.click(go);
     await waitFor(() => expect(window.location.pathname).toBe("/account"));
-    expect(JSON.parse(window.localStorage.getItem(ACCOUNT_KEY) ?? "{}")).toMatchObject({ name: "synthetic_name" });
+    // only the end is kept; the name is Central's, in memory
+    expect(JSON.parse(window.localStorage.getItem(SESSION_KEY) ?? "{}")).toEqual({ expiresAt: 4_000_000_000 });
     expect(api.calls).toEqual(["register", "enrollment_start", "enrollment_finish", "discover", "login_start", "login_finish", "terms_status"]);
   });
 
@@ -209,10 +210,10 @@ describe("sign-in", () => {
     await user.click(screen.getByRole("button", { name: "Sign in" }));
     expect(await screen.findByText("The username or the password is wrong.")).toBeTruthy();
     expect(api.session).toBeNull();
-    expect(window.localStorage.getItem(ACCOUNT_KEY)).toBeNull();
+    expect(window.localStorage.getItem(SESSION_KEY)).toBeNull();
   });
 
-  it("names the account as Central does, where its answer says", async () => {
+  it("names the account as Central does, not as typed", async () => {
     const api = fakeCentral({ serverName: "central_name" });
     const { register } = await import("../../src/account/flows");
     await register({ username: "synthetic_name", betaKey: KEY, password: PASSWORD }, { api, crypto: fakeCrypto(PASSWORD).factory });
@@ -222,7 +223,8 @@ describe("sign-in", () => {
     await user.type(screen.getByLabelText("Password"), PASSWORD);
     await user.click(screen.getByRole("button", { name: "Sign in" }));
     await waitFor(() => expect(window.location.pathname).toBe("/account"));
-    expect(JSON.parse(window.localStorage.getItem(ACCOUNT_KEY) ?? "{}")).toMatchObject({ name: "central_name" });
+    expect(screen.queryByText(/central_name/)).toBeNull();
+    expect(window.localStorage.getItem(SESSION_KEY)).not.toContain("name");
   });
 
   it("signs in and goes to the account, where signing out forgets it", async () => {
@@ -244,13 +246,13 @@ describe("sign-in", () => {
     await user.click(screen.getByRole("button", { name: "Sign out" }));
     expect(await screen.findByText(/You are not signed in/)).toBeTruthy();
     expect(api.session).toBeNull();
-    expect(window.localStorage.getItem(ACCOUNT_KEY)).toBeNull();
+    expect(window.localStorage.getItem(SESSION_KEY)).toBeNull();
   });
 });
 
 describe("signing out", () => {
   it("says so when Central could not end the session, and when it ends by itself", async () => {
-    window.localStorage.setItem(ACCOUNT_KEY, JSON.stringify({ name: "synthetic_name", expiresAt: Math.floor(Date.now() / 1000) + 600 }));
+    window.localStorage.setItem(SESSION_KEY, JSON.stringify({ expiresAt: Math.floor(Date.now() / 1000) + 600 }));
     const api = fakeCentral();
     api.session = { name: "synthetic_name", expiresAt: 4_000_000_000 };
     api.fail("session_status", "network");
@@ -259,7 +261,7 @@ describe("signing out", () => {
     show(<AccountPage />, api);
     await user.click(await screen.findByRole("button", { name: "Sign out" }));
     expect(await screen.findByRole("alert")).toHaveProperty("textContent", expect.stringMatching(/could not be reached .* until \d\d:\d\d/));
-    expect(window.localStorage.getItem(ACCOUNT_KEY)).toBeNull();
+    expect(window.localStorage.getItem(SESSION_KEY)).toBeNull();
   });
 });
 
@@ -269,13 +271,24 @@ describe("the header", () => {
     expect(screen.getByRole("link", { name: "Sign in" }).getAttribute("href")).toBe("/signin");
   });
 
-  it("names a signed-in account and links to it", () => {
-    window.localStorage.setItem(ACCOUNT_KEY, JSON.stringify({ name: "synthetic_name", expiresAt: Math.floor(Date.now() / 1000) + 600 }));
-    const api = fakeCentral();
-    api.fail("session_status", "network");
+  it("names a remembered session as Central does, and links to it", async () => {
+    window.localStorage.setItem(SESSION_KEY, JSON.stringify({ expiresAt: Math.floor(Date.now() / 1000) + 600 }));
+    const api = await account();
+    api.session = { name: "synthetic_name", expiresAt: 4_000_000_000 };
     show(<Header page="account" />, api);
-    const link = screen.getByRole("link", { name: "Your account, synthetic_name" });
+    // until Central answers, it is just "your account"
+    expect(screen.getByRole("link", { name: "Your account" }).getAttribute("href")).toBe("/account");
+    const link = await screen.findByRole("link", { name: "Your account, synthetic_name" });
     expect(link.getAttribute("href")).toBe("/account");
     expect(link.getAttribute("aria-current")).toBe("page");
+  });
+
+  it("stays unnamed while Central cannot be reached", async () => {
+    window.localStorage.setItem(SESSION_KEY, JSON.stringify({ expiresAt: Math.floor(Date.now() / 1000) + 600 }));
+    const api = fakeCentral();
+    api.fail("session_status", "network");
+    show(<Header page="home" />, api);
+    await waitFor(() => expect(api.calls).toEqual(["session_status"]));
+    expect(screen.getByRole("link", { name: "Your account" }).getAttribute("href")).toBe("/account");
   });
 });

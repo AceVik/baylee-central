@@ -160,10 +160,10 @@ test.describe("accounts", () => {
     expect(errors).toEqual([]);
   });
 
-  test("with the browser surface's named answers, the header and the account name Central's account", async ({ page, baseURL }, info) => {
+  test("the header and the account page name the account as Central does", async ({ page, baseURL }, info) => {
     const errors = watchErrors(page);
     const m = await mock(page);
-    const central = await mockCentral(page, new URL(baseURL ?? "").origin, { accounts: ["synthetic_name"], named: true });
+    const central = await mockCentral(page, new URL(baseURL ?? "").origin, { accounts: ["synthetic_name"] });
     await stubCrypto(page);
     await page.goto("/signin?lang=en");
     await page.getByLabel("Username").fill("Synthetic_Name");

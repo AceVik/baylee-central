@@ -51,10 +51,16 @@ export default function AccountPage() {
         ) : (
           <div className="account-card glass">
             <p className="account-name">
-              <span className="small">
-                <T id="account.signedInAs" />
-              </span>{" "}
-              <bdi>{account.name}</bdi>
+              {account.name === null ? (
+                <T id="account.signedIn" />
+              ) : (
+                <>
+                  <span className="small">
+                    <T id="account.signedInAs" />
+                  </span>{" "}
+                  <bdi>{account.name}</bdi>
+                </>
+              )}
             </p>
             <p>
               <T id="account.session" args={{ time: until }} />

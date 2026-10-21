@@ -101,10 +101,11 @@ export function Header({ page }: { page: Page | null }) {
             <Link
               className="nav-account"
               to={PATHS.account}
-              aria-label={t(lang, "nav.account", { name: account.name })}
+              aria-label={account.name === null ? undefined : t(lang, "nav.account", { name: account.name })}
               aria-current={page === "account" ? "page" : undefined}
             >
-              <bdi>{account.name}</bdi>
+              {/* until Central names a remembered session, it is just "your account" */}
+              {account.name === null ? t(lang, "nav.accountUnnamed") : <bdi>{account.name}</bdi>}
             </Link>
           )}
         </nav>

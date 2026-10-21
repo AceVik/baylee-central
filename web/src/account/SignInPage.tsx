@@ -53,7 +53,7 @@ export default function SignInPage() {
         setPassword("");
         setBusy(false);
         setStatus(null);
-        signedIn({ name: session.username ?? name, expiresAt: session.expiresAt });
+        signedIn({ name: session.username, expiresAt: session.expiresAt });
         setTerms(true);
       },
       (error: unknown) => {
@@ -77,7 +77,11 @@ export default function SignInPage() {
           <TermsStep onDone={() => navigate(PATHS.account)} />
         ) : account !== null && !busy ? (
           <p className="account-note">
-            <T id="signin.already" args={{ name: account.name }} elems={LINKS} />
+            {account.name === null ? (
+              <T id="signin.alreadyUnnamed" elems={LINKS} />
+            ) : (
+              <T id="signin.already" args={{ name: account.name }} elems={LINKS} />
+            )}
           </p>
         ) : (
           <div className="account-card glass">

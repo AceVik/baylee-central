@@ -66,16 +66,16 @@ export interface TermsDocument {
 /** What a sign-in leaves the page: who, until when; the cookie holds the rest. */
 export interface BrowserSession {
   identity: Identity;
-  /** The canonical name, where Central sends it (see `parse`), else null. */
-  username: string | null;
+  /** The account's canonical name, as Central keeps it. */
+  username: string;
   wrappedMaster: Uint8Array;
   expiresAt: number;
 }
 
 export interface SessionStatus {
   identity: Identity;
-  /** The canonical name, where Central sends it (see `parse`), else null. */
-  username: string | null;
+  /** The account's canonical name, as Central keeps it. */
+  username: string;
   expiresAt: number;
 }
 
@@ -189,28 +189,20 @@ export const parse = {
     const o = answer(raw, "login_challenge", ["attempt", "message"]);
     return { attempt: bytes(o["attempt"], 32), message: bytes(o["message"], 320) };
   },
-  // Two exact shapes each, while Central's browser surface gains the
-  // canonical name (agreed 21.10.2026): with `username` it is Central's to
-  // say who is signed in; without, the page keeps the name it signed in
-  // with. Once the server's change is on main, only the first shapes stay.
+  // The browser surface names the account (docs/web-accounts.md): it is
+  // Central's to say who is signed in, never the page's.
   browserSession(raw: unknown): BrowserSession {
-    const named = isObject(raw) && Object.hasOwn(raw, "username");
-    const o = answer(raw, "browser_session", named ? ["identity", "username", "wrapped_master", "expires_at"] : ["identity", "wrapped_master", "expires_at"]);
+    const o = answer(raw, "browser_session", ["identity", "username", "wrapped_master", "expires_at"]);
     return {
       identity: identity(o["identity"]),
-      username: named ? canonicalUsername(o["username"]) : null,
+      username: canonicalUsername(o["username"]),
       wrappedMaster: bytes(o["wrapped_master"], 73),
       expiresAt: safeInteger(o["expires_at"], 1),
     };
   },
   sessionStatus(raw: unknown): SessionStatus {
-    if (isObject(raw) && raw["result"] === "browser_status") {
-      const o = answer(raw, "browser_status", ["identity", "username", "expires_at"]);
-      return { identity: identity(o["identity"]), username: canonicalUsername(o["username"]), expiresAt: safeInteger(o["expires_at"], 1) };
-    }
-    const o = answer(raw, "session_status", ["identity", "expires_at", "migration_closed"]);
-    if (typeof o["migration_closed"] !== "boolean") throw malformed();
-    return { identity: identity(o["identity"]), username: null, expiresAt: safeInteger(o["expires_at"], 1) };
+    const o = answer(raw, "browser_status", ["identity", "username", "expires_at"]);
+    return { identity: identity(o["identity"]), username: canonicalUsername(o["username"]), expiresAt: safeInteger(o["expires_at"], 1) };
   },
   terms(raw: unknown): TermsDocument | null {
     const t = answer(raw, "terms", ["terms"])["terms"];

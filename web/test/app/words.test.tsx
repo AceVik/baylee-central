@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 
 import { App } from "../../src/App";
 import { KEYS } from "../../src/i18n-keys";
-import { ACCOUNT_KEY } from "../../src/account/session";
+import { SESSION_KEY } from "../../src/account/session";
 import { LangProvider, OFFERED } from "../../src/i18n";
 import { serve } from "../support/network";
 
@@ -29,7 +29,7 @@ describe("the words on every page", () => {
     ...OFFERED.flatMap((lang) => SIGNED_IN.map((path) => [lang, path, true] as const)),
   ])("%s %s (signed in: %s)", async (lang, path, signedIn) => {
     serve(() => undefined);
-    if (signedIn) window.localStorage.setItem(ACCOUNT_KEY, JSON.stringify({ name: "synthetic_name", expiresAt: Math.floor(Date.now() / 1000) + 600 }));
+    if (signedIn) window.localStorage.setItem(SESSION_KEY, JSON.stringify({ expiresAt: Math.floor(Date.now() / 1000) + 600 }));
     window.history.replaceState(null, "", path);
     render(
       <LangProvider initial={lang}>

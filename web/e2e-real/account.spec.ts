@@ -39,7 +39,11 @@ test("register, keep the code, sign out, sign in again", async ({ page, context 
   const errors = watch(page);
   expect(KEY).toMatch(/^CENTRAL-/);
 
+  // a name an earlier version of the page kept is deleted on sight
+  await page.goto("/?lang=en");
+  await page.evaluate(() => window.localStorage.setItem("baylee-central-account", JSON.stringify({ name: "stale_name", expiresAt: 4_000_000_000 })));
   await page.goto("/register?lang=en");
+  expect(await page.evaluate(() => window.localStorage.getItem("baylee-central-account"))).toBeNull();
   await page.getByLabel("Beta key").fill(KEY.toLowerCase());
   await page.getByLabel("Username").fill(name.toUpperCase());
   await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
@@ -66,6 +70,10 @@ test("register, keep the code, sign out, sign in again", async ({ page, context 
   expect(cookie).toMatchObject({ httpOnly: true, secure: true, sameSite: "Strict", path: "/" });
   expect(cookie?.value).toMatch(/^[0-9a-f]{64}$/);
   expect(await page.evaluate(() => document.cookie)).not.toContain("central");
+  // the browser keeps only the session's end; the name is Central's
+  const kept = await page.evaluate(() => ({ ...window.localStorage }));
+  expect(Object.keys(kept).filter((k) => k.startsWith("baylee-central"))).toEqual(["baylee-central-session"]);
+  expect(Object.keys(JSON.parse(kept["baylee-central-session"] ?? "{}") as object)).toEqual(["expiresAt"]);
 
   // a reload: the header names the account once Central confirms the session
   await page.reload();
