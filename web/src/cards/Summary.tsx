@@ -3,7 +3,7 @@
 
 import { T, num, tt, useLang } from "../i18n";
 import type { SetsDoc } from "./model";
-import { buildable, finished, pct } from "./numbers";
+import { buildable, finished, pct, playable } from "./numbers";
 import { Bar } from "./Progress";
 import { SetRow, useOpenSet } from "./SetRow";
 
@@ -14,7 +14,8 @@ export function Summary({ doc }: { doc: SetsDoc }) {
   const [open, toggle] = useOpenSet();
   const tot = doc.totals;
   const all = doc.corpus - tot.never;
-  const p = pct(tot.implemented, all);
+  const play = playable(tot);
+  const p = pct(play, all);
   const done = doc.sets.filter(finished);
   const next = doc.sets.filter((s) => buildable(s) > 0 && !finished(s)).slice(0, NEXT_UP);
   const n = (x: number) => num(lang, x);
@@ -24,8 +25,8 @@ export function Summary({ doc }: { doc: SetsDoc }) {
         <p className="sets-total">
           {tt(
             lang,
-            `${n(doc.sets.length)} sets, ${n(doc.corpus)} cards: ${n(tot.implemented)} full (${p} %), ${n(tot.generated)} untested, ${n(tot.partial)} partial, ${n(tot.unimplemented + tot.absent)} not yet, ${n(tot.never)} never. Measured at commit ${doc.rev.slice(0, 9)}.`,
-            `${n(doc.sets.length)} Sets, ${n(doc.corpus)} Karten: ${n(tot.implemented)} voll (${p} %), ${n(tot.generated)} ungetestet, ${n(tot.partial)} teilweise, ${n(tot.unimplemented + tot.absent)} noch nicht, ${n(tot.never)} nie. Gemessen an Commit ${doc.rev.slice(0, 9)}.`,
+            `${n(play)} of ${n(all)} cards playable (${p} %): ${n(tot.implemented)} full, ${n(tot.generated)} untested. Besides: ${n(tot.partial)} partial, ${n(tot.unimplemented + tot.absent)} not yet, ${n(tot.never)} never; ${n(doc.sets.length)} sets, ${n(doc.corpus)} cards. ${doc.release ? `Release ${doc.release}, commit` : "Measured at commit"} ${doc.rev.slice(0, 9)}.`,
+            `${n(play)} von ${n(all)} Karten spielbar (${p} %): ${n(tot.implemented)} voll, ${n(tot.generated)} ungetestet. Außerdem: ${n(tot.partial)} teilweise, ${n(tot.unimplemented + tot.absent)} noch nicht, ${n(tot.never)} nie; ${n(doc.sets.length)} Sets, ${n(doc.corpus)} Karten. ${doc.release ? `Release ${doc.release}, Commit` : "Gemessen an Commit"} ${doc.rev.slice(0, 9)}.`,
           )}
         </p>
         <Bar counts={{ ...tot, total: doc.corpus }} />

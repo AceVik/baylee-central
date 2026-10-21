@@ -29,6 +29,8 @@ export interface SetSummary extends Counts {
 export interface SetsDoc {
   corpus: number;
   rev: string;
+  /** The release whose tag the status was read at; absent for the bundled copy. */
+  release?: string;
   generatedAt: string;
   totals: Counts;
   sets: SetSummary[];

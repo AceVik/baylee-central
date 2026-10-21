@@ -3,7 +3,7 @@
 
 import { num, tt, useLang } from "../i18n";
 import type { Counts } from "./model";
-import { buildable, pct } from "./numbers";
+import { buildable, pct, playable } from "./numbers";
 
 /** Full, untested and partial as three parts of one bar; the rest is the track. */
 export function Bar({ counts }: { counts: Counts }) {
@@ -28,6 +28,7 @@ export function CountsLine({ counts }: { counts: Counts }) {
   );
   return (
     <span className="set-counts">
+      {part("playable", playable(counts), "playable:", "spielbar:")}
       {part("implemented", counts.implemented, "full", "voll")}
       {part("generated", counts.generated, "untested", "ungetestet")}
       {part("partial", counts.partial, "partial", "teilweise")}
@@ -39,13 +40,13 @@ export function CountsLine({ counts }: { counts: Counts }) {
 
 export function Progress({ counts }: { counts: Counts }) {
   const lang = useLang();
-  const p = pct(counts.implemented, buildable(counts));
+  const p = pct(playable(counts), buildable(counts));
   return (
     <span className="set-progress">
       <span className={`set-pct${p === 100 ? " done" : ""}`} aria-hidden="true">
         {p} %
       </span>
-      <span className="vh">{tt(lang, `${p} percent full`, `${p} Prozent voll`)}</span>
+      <span className="vh">{tt(lang, `${p} percent playable`, `${p} Prozent spielbar`)}</span>
       <Bar counts={counts} />
     </span>
   );

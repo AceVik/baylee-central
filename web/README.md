@@ -112,7 +112,13 @@ assets here):
 
 - the card status, `data/sets.json` and `data/sets/set-<code>.json`, written
   by Baylee's `baylee-tools site card-status` from one git revision
-  (Baylee's `web/site/README.md` §"The card status");
+  (Baylee's `web/site/README.md` §"The card status"). The page reads the
+  newest release's status at that release's tag
+  (`raw.githubusercontent.com/AceVik/baylee/<tag>/web/site/data/`), which
+  Baylee's release workflow requires to match the released pool, so the
+  numbers are those of the client the download button offers; the copy
+  below is only its fallback when GitHub does not answer or a tag carries
+  no status;
 - the client's screenshots (`shot-*.avif|webp`), which show its text view.
 
 ```bash
@@ -253,7 +259,7 @@ baylee.app {
 The CSP is `csp()` in `scripts/csp.ts`, which the local server and the tests
 send too: `script-src 'self'; style-src 'self'` (no inline script or style;
 React sets styles through the CSSOM, which the CSP allows),
-`connect-src 'self' https://api.github.com <feedback service>`,
+`connect-src 'self' https://api.github.com https://raw.githubusercontent.com <feedback service>`,
 `img-src 'self' data: https://cards.scryfall.io`, `worker-src 'self'`.
 
 The feedback service needs `https://baylee.app` in `FEEDBACK_CONTACT_ORIGINS`
@@ -266,6 +272,7 @@ in `FEEDBACK_TRUSTED_PROXIES` for the Impressum's allowance (Baylee's
 The app sets no cookie and has no analytics or tracker. It keeps two things
 in the visitor's browser: the language chosen (localStorage) and GitHub's
 answers for ten minutes (sessionStorage). It talks to GitHub's API, to
+raw.githubusercontent.com for the newest release's card status, to
 Scryfall's image host for an opened set, to the feedback service for the
 contact form and the Impressum, and (through this origin) to Central for the
 directory. `src/privacy/` says all of that; a new host in the CSP, a
