@@ -33,7 +33,7 @@ DB_CONTAINER=baylee-postgres-1
 DB_SUPERUSER=baylee
 DB_NAME=baylee_central
 if [[ -e $SETTINGS ]]; then
-    [[ $(stat -c '%U %a' "$SETTINGS") =~ ^root\ [0-7][0-5][0-5]$ ]] \
+    [[ $(stat -c '%U %a' "$SETTINGS") =~ ^root\ [0-7][0145][0145]$ ]] \
         || { echo "central: $SETTINGS is not root's alone" >&2; exit 1; }
     # shellcheck source=/dev/null
     . "$SETTINGS"
