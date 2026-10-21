@@ -6,19 +6,19 @@ import { useState } from "react";
 
 import type { GatewayListing } from "../central/directory";
 import { Icon } from "../components/icons";
-import { T, tt, useLang } from "../i18n";
+import { T, t, useLang } from "../i18n";
 
 export function GatewayCard({ g }: { g: GatewayListing }) {
   const lang = useLang();
   const [said, setSaid] = useState("");
   const copy = () => {
     if (!navigator.clipboard?.writeText) {
-      setSaid(tt(lang, "Copying is not possible in this browser.", "Kopieren geht in diesem Browser nicht."));
+      setSaid(t(lang, "gw.copyImpossible"));
       return;
     }
     navigator.clipboard.writeText(g.origin).then(
-      () => setSaid(tt(lang, "Address copied.", "Adresse kopiert.")),
-      () => setSaid(tt(lang, "Copying did not work.", "Kopieren hat nicht geklappt.")),
+      () => setSaid(t(lang, "gw.copied")),
+      () => setSaid(t(lang, "gw.copyFailed")),
     );
   };
   return (
@@ -29,13 +29,13 @@ export function GatewayCard({ g }: { g: GatewayListing }) {
         </h3>
         <span className={`gw-state${g.online ? " on" : ""}`}>
           <span className={`dot ${g.online ? "ok" : "off"}`} aria-hidden="true" />
-          {g.online ? <T en="online" de="online" /> : <T en="not seen lately" de="zuletzt nicht gesehen" />}
+          {g.online ? <T id="gw.online" /> : <T id="gw.notSeen" />}
         </span>
       </div>
       <dl className="kv gw-kv">
         <div>
           <dt>
-            <T en="Address" de="Adresse" />
+            <T id="gw.address" />
           </dt>
           <dd>
             <code>{g.origin}</code>
@@ -43,7 +43,7 @@ export function GatewayCard({ g }: { g: GatewayListing }) {
         </div>
         <div>
           <dt>
-            <T en="Version" de="Version" />
+            <T id="gw.version" />
           </dt>
           <dd>
             <code>{g.metadata.version}</code>
@@ -53,10 +53,10 @@ export function GatewayCard({ g }: { g: GatewayListing }) {
       <p className="gw-actions">
         <button type="button" className="button button-ghost" onClick={copy}>
           <Icon name="copy" className="button-icon" />
-          <T en="Copy address" de="Adresse kopieren" />
+          <T id="gw.copy" />
         </button>
         <a className="button button-ghost" href={g.metadata.website} rel="noopener noreferrer nofollow" target="_blank">
-          <T en="Website" de="Website" />
+          <T id="gw.website" />
         </a>
       </p>
       <output className="gw-said">{said}</output>
