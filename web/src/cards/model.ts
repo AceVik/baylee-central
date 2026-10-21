@@ -5,6 +5,8 @@
 // reserved Windows file. Data written before `generated` existed lacks the
 // field; it counts as 0.
 
+import type { Key } from "../i18n";
+
 export type Status = "implemented" | "generated" | "partial" | "unimplemented" | "absent" | "never";
 
 export type Group = "implemented" | "generated" | "partial" | "none" | "never";
@@ -29,6 +31,8 @@ export interface SetSummary extends Counts {
 export interface SetsDoc {
   corpus: number;
   rev: string;
+  /** The release whose tag the status was read at; absent for the bundled copy. */
+  release?: string;
   generatedAt: string;
   totals: Counts;
   sets: SetSummary[];
@@ -44,13 +48,22 @@ export interface Card {
   artist: string | null;
 }
 
-export const STATUS: Record<Status, { group: Group; en: string; de: string }> = {
-  implemented: { group: "implemented", en: "Full", de: "Voll" },
-  generated: { group: "generated", en: "Untested", de: "Ungetestet" },
-  partial: { group: "partial", en: "Partial", de: "Teilweise" },
-  unimplemented: { group: "none", en: "Not yet", de: "Noch nicht" },
-  absent: { group: "none", en: "Not yet", de: "Noch nicht" },
-  never: { group: "never", en: "Never", de: "Nie" },
+/** A group's name, on its filter and its cards' badges. */
+export const GROUP_LABEL: Record<Group, Key> = {
+  implemented: "status.full",
+  generated: "status.untested",
+  partial: "status.partial",
+  none: "status.none",
+  never: "status.never",
+};
+
+export const STATUS: Record<Status, { group: Group }> = {
+  implemented: { group: "implemented" },
+  generated: { group: "generated" },
+  partial: { group: "partial" },
+  unimplemented: { group: "none" },
+  absent: { group: "none" },
+  never: { group: "never" },
 };
 
 const CODE = /^[a-z0-9]{2,8}$/;

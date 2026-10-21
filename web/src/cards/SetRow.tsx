@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useState, useTransition, type ReactNode } from "react";
 
-import { T, num, tt, useLang } from "../i18n";
+import { T, t, useLang } from "../i18n";
 import { CardGrid } from "./CardGrid";
 import { loadCards } from "./data";
 import type { Card, Counts, SetSummary } from "./model";
@@ -26,17 +26,14 @@ function SetCards({ set }: { set: SetSummary }) {
   if (cards === undefined) {
     return (
       <output className="small block">
-        <T en="Loading…" de="Lädt …" />
+        <T id="app.loading" />
       </output>
     );
   }
   if (cards === null) {
     return (
       <output className="small block">
-        <T
-          en="The card list did not load. Close and open the set to try again."
-          de="Die Kartenliste wurde nicht geladen. Schließe das Set und öffne es erneut."
-        />
+        <T id="sets.cardsFailed" />
       </output>
     );
   }
@@ -45,10 +42,10 @@ function SetCards({ set }: { set: SetSummary }) {
       <CardGrid cards={cards} counts={set} setName={set.name} />
       <p className="small set-foot">
         <a href={`https://scryfall.com/sets/${encodeURIComponent(set.code)}`} rel="noopener">
-          {tt(lang, "This set on Scryfall", "Dieses Set bei Scryfall")}
+          {t(lang, "sets.onScryfall")}
         </a>
         {" · "}
-        {tt(lang, "Images: Scryfall · © Wizards of the Coast", "Bilder: Scryfall · © Wizards of the Coast")}
+        {t(lang, "sets.images")}
       </p>
     </>
   );
@@ -99,7 +96,7 @@ export function SetRow({ set, withId, open, onOpen }: { set: SetSummary; withId?
       open={open}
       onOpen={(o) => onOpen(set.code, o)}
       title={set.name}
-      meta={`${set.code.toUpperCase()}${year ? ` · ${year}` : ""} · ${num(lang, set.total)} ${set.total === 1 ? tt(lang, "card", "Karte") : tt(lang, "cards", "Karten")}`}
+      meta={`${set.code.toUpperCase()}${year ? ` · ${year}` : ""} · ${t(lang, "sets.cards", { n: set.total })}`}
       counts={set}
     >
       {() => <SetCards set={set} />}

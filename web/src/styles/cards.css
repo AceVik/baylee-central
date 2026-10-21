@@ -71,6 +71,8 @@
 .set-counts { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0.15rem 0.8rem; font-size: 0.85rem; color: var(--ink-soft); font-variant-numeric: lining-nums tabular-nums; }
 .set-counts .c { white-space: nowrap; }
 .set-counts .c::before { content: ""; display: inline-block; width: 0.55em; height: 0.55em; border-radius: 2px; margin-right: 0.35em; vertical-align: 0.05em; }
+.c-playable { font-weight: 700; color: var(--ink); }
+.c-playable::before { display: none !important; }
 .c-implemented::before { background: var(--ok); }
 .c-generated::before { background: var(--untested); }
 .c-partial::before { background: var(--warn); }

@@ -18,20 +18,23 @@ loaded inside this same app, once Central has its browser sign-in (M3).
 | `/impressum` | the legal notice (§ 5 DDG), details behind a proof of work |
 | `/privacy` | the privacy notice (Art. 13 GDPR) |
 
-English and German, one at a time: `?lang=de|en` wins, then the choice made
-with the buttons (localStorage `baylee-site-lang`, the old site's key), then
-the browser's languages. `?theme=dark|light` forces a colour scheme (for
-screenshots); otherwise `prefers-color-scheme` decides. `public/boot.js` makes
-both choices before the first paint.
+English and German today, one at a time, and ready for every language Magic
+is printed in (§"The words"): `?lang=<code>` wins, then the choice made with
+the buttons (localStorage `baylee-site-lang`, the old site's key), then the
+browser's languages; only a language with a file counts, else English.
+`?theme=dark|light` forces a colour scheme (for screenshots); otherwise
+`prefers-color-scheme` decides. `public/boot.js` makes both choices before
+the first paint.
 
 ## The stack
 
 The one of Baylee's `web/feedback`, at its versions: React 19.3, TypeScript
 7.0, Vite 8, oxlint, vitest with Testing Library and jsdom, Playwright. Every
-version in `package.json` is exact and `package-lock.json` is committed. No
-router, i18n or CSS library: a handful of pages need none (`src/router.tsx`,
-`src/i18n.tsx`), and both languages stand side by side in the components
-(`<T en={…} de={…} />`) so a sentence and its translation change together.
+version in `package.json` is exact and `package-lock.json` is committed. The
+words are Project Fluent's, as in `web/feedback` and the client:
+`@fluent/bundle` 0.19.1 (Apache-2.0, no dependencies of its own; the owner
+approved it on 21.10.2026). No router or CSS library: a handful of pages need
+none (`src/router.tsx`).
 
 ## Layout
 
@@ -40,7 +43,7 @@ none much past 200 lines:
 
 | folder | what |
 | --- | --- |
-| `src/` | `main.tsx`, `App.tsx` (the frame and the page the address names), `router.tsx`, `i18n.tsx`, `motion.ts`, `github.ts`, `config.ts` |
+| `src/` | `main.tsx`, `App.tsx` (the frame and the page the address names), `router.tsx`, `i18n.tsx` and `i18n-keys.ts` (the words, §"The words"), `motion.ts`, `github.ts`, `config.ts` |
 | `src/components/` | the bar, the footer, sections, the logo, icons, the modal |
 | `src/home/` | the start page, one file per section |
 | `src/download/` | the release and the machine (`release.ts`, `machine.ts`), the button, the platform cards, the page |
@@ -52,8 +55,78 @@ none much past 200 lines:
 | `src/privacy/` | the privacy notice, its sections in two files |
 | `src/styles/` | the stylesheets by area; the global ones are imported by `main.tsx`, the others by their feature |
 | `test/` | the unit and component tests, mirroring `src/`, one file per unit; `test/fixtures/` (synthetic data, also used by `e2e/`) and `test/support/` (the stand-in network) |
+| `locales/` | the words, `<lang>/site.ftl`, one file per language |
 | `e2e/` | the Playwright smoke tests and their mocks |
 | `scripts/` | the local server, the CSP, the content copy |
+
+## The words
+
+Every word the pages say is a message in `locales/<lang>/site.ftl`, Project
+Fluent's format, in which English decides which messages exist and which
+arguments and markup each takes (Baylee's `docs/translations.md`). A
+component names a message, `<T id="cards.title" />` or `t(lang,
+"grid.label", { set })` for an attribute; the file spells the id with a dash
+(`cards-title`), because a Fluent id takes no dot. `src/i18n-keys.ts` lists
+every id, so a misspelt one does not compile.
+
+- **Arguments** are named, `{ $set }`. A count is passed as a number: it is
+  written as the language writes numbers (1,234 or 1.234) and picks the
+  plural form, a selector by CLDR's rules (`{ $n -> [one] … *[other] … }`),
+  never a bracket. An identifier (a year, a version, a commit) is passed as
+  a string.
+- **Markup** is a pair of tags: `b`, `i`, `code` and `kbd` are drawn as
+  themselves; any other tag (`<notice>the privacy notice</notice>`) is drawn
+  by a function the call site gives in `elems`, a link around the words.
+  Nothing in a message or an argument is read as HTML, and no argument can
+  open a tag.
+- **Links** whose target differs by language, such as the README's sections,
+  are `link-…` messages: a path in Baylee's repository.
+- **The Fan Content Policy's notice** is Wizards' own wording: the English
+  one stands on every page, and another language shows Wizards' official
+  translation of it beside it (`foot-fanContent`, `foot-fanContentUrl`).
+- English comes with the page and stands in for any message a language
+  lacks; any other language is a chunk of its own, fetched only by a
+  visitor who reads it (`main.tsx` fetches it before the first render).
+
+`test/i18n.test.tsx` holds every file to English: each parses with nothing
+skipped, holds every English id once and no other, reads the same
+arguments, keeps the same markup, names only the plural forms its language
+has, and formats without an error. `test/app/words.test.tsx` draws every
+page in every language and finds no id, unfilled argument or markup shown as
+text; `test/boot.test.ts` holds `public/boot.js` to the app's choice.
+
+German follows Baylee's glossary (`docs/translations.md`): the words German
+players say in English stay English (Account, Deck, Gateway, Release,
+Screenshot, Button …), Magic's terms are those of German cards, the reader
+is *du*, quotes are „…“ and a pause is ` – `.
+
+### Adding a language
+
+The table in `src/i18n.tsx` already names all eleven of Magic's languages
+(en, de, fr, it, es, pt, ja, ko, ru, zhs, zht) with their BCP 47 tags
+(zh-Hans for zhs, zh-Hant for zht, pt-BR for Magic's Portuguese), their
+locales, and their names for the language buttons. A language is offered
+once its file exists:
+
+1. Copy `locales/en/site.ftl` to `locales/<code>/site.ftl` and translate the
+   values. Keep every id, every `{ $name }`, every tag pair and each
+   selector's `*[other]`; add the plural forms the language has (Russian
+   `one`, `few`, `many`; Japanese, Korean and Chinese only `other`). Put
+   Wizards' official translation of the Fan Content Policy notice in
+   `foot-fanContent` and its address in `foot-fanContentUrl`, and point the
+   `link-…` messages at that language's README where there is one.
+2. `npm run check`. The build writes the new code into `index.html` for
+   `boot.js`, and the language buttons offer it.
+
+Before it goes live, check three things outside this folder: that the
+shipped fonts (Faustina and Alegreya Sans, `public/fonts/`) draw the
+language's script, else it needs a font of its own and its licence (Japanese,
+Korean and Chinese certainly do; Russian is unchecked); the contact
+form sends the page's language, and Baylee's feedback service accepts only
+`en` and `de` there today (Baylee's `docs/feedback.md`), so it must learn
+the new code first; and the terms of use exist in German and English only
+(`../legal/`), which another language reads in English, as it does the
+country in the Impressum's details.
 
 ## Commands
 
@@ -112,7 +185,13 @@ assets here):
 
 - the card status, `data/sets.json` and `data/sets/set-<code>.json`, written
   by Baylee's `baylee-tools site card-status` from one git revision
-  (Baylee's `web/site/README.md` §"The card status");
+  (Baylee's `web/site/README.md` §"The card status"). The page reads the
+  newest release's status at that release's tag
+  (`raw.githubusercontent.com/AceVik/baylee/<tag>/web/site/data/`), which
+  Baylee's release workflow requires to match the released pool, so the
+  numbers are those of the client the download button offers; the copy
+  below is only its fallback when GitHub does not answer or a tag carries
+  no status;
 - the client's screenshots (`shot-*.avif|webp`), which show its text view.
 
 ```bash
@@ -253,7 +332,7 @@ baylee.app {
 The CSP is `csp()` in `scripts/csp.ts`, which the local server and the tests
 send too: `script-src 'self'; style-src 'self'` (no inline script or style;
 React sets styles through the CSSOM, which the CSP allows),
-`connect-src 'self' https://api.github.com <feedback service>`,
+`connect-src 'self' https://api.github.com https://raw.githubusercontent.com <feedback service>`,
 `img-src 'self' data: https://cards.scryfall.io`, `worker-src 'self'`.
 
 The feedback service needs `https://baylee.app` in `FEEDBACK_CONTACT_ORIGINS`
@@ -266,6 +345,7 @@ in `FEEDBACK_TRUSTED_PROXIES` for the Impressum's allowance (Baylee's
 The app sets no cookie and has no analytics or tracker. It keeps two things
 in the visitor's browser: the language chosen (localStorage) and GitHub's
 answers for ten minutes (sessionStorage). It talks to GitHub's API, to
+raw.githubusercontent.com for the newest release's card status, to
 Scryfall's image host for an opened set, to the feedback service for the
 contact form and the Impressum, and (through this origin) to Central for the
 directory. `src/privacy/` says all of that; a new host in the CSP, a

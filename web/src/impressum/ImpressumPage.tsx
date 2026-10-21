@@ -5,11 +5,20 @@
 
 import { useEffect } from "react";
 
-import { T, useTitle } from "../i18n";
+import { T, useTitle, type Elems } from "../i18n";
 import { Link, PATHS } from "../router";
 import "../styles/impressum.css";
 import "../styles/legal.css";
-import { ContactLink, ImpressumBox } from "./ImpressumBox";
+import { CONTACT, ImpressumBox } from "./ImpressumBox";
+
+const DATA: Elems = {
+  notice: (words) => <Link to={PATHS.privacy}>{words}</Link>,
+  docs: (words) => (
+    <a href="https://github.com/AceVik/baylee/blob/main/docs/privacy.md" rel="noopener">
+      {words}
+    </a>
+  ),
+};
 
 function useNoIndex(): void {
   useEffect(() => {
@@ -22,61 +31,35 @@ function useNoIndex(): void {
 }
 
 export default function Impressum() {
-  useTitle("Legal notice – Baylee", "Impressum – Baylee");
+  useTitle("title.impressum");
   useNoIndex();
   return (
     <header className="page-head legal">
       <div className="section-inner">
         <p className="eyebrow">
-          <T en="Legal notice" de="Impressum" />
+          <T id="imp.eyebrow" />
         </p>
         <h1>
-          <T en="Legal notice" de="Impressum" />
+          <T id="imp.title" />
         </h1>
         <h2>
-          <T en="Information pursuant to § 5 DDG" de="Angaben gemäß § 5 DDG" />
+          <T id="imp.ddg" />
         </h2>
         <p>
-          <T
-            en="This website is a private, non-commercial project of a private individual. Baylee is free and open source; there is no advertising and nothing to buy."
-            de="Diese Website ist ein privates, nicht kommerzielles Projekt einer Privatperson. Baylee ist kostenlos und quelloffen; es gibt keine Werbung und nichts zu kaufen."
-          />
+          <T id="imp.private" />
         </p>
         <ImpressumBox />
         <p>
-          <T
-            en={
-              <>
-                You can also write to me with the <ContactLink>contact form</ContactLink>.
-              </>
-            }
-            de={
-              <>
-                Du erreichst mich außerdem über das <ContactLink>Kontaktformular</ContactLink>.
-              </>
-            }
-          />
+          <T id="imp.write" elems={CONTACT} />
         </p>
         <h2>
-          <T en="Dispute resolution" de="Streitbeilegung" />
+          <T id="imp.disputeTitle" />
         </h2>
         <p>
-          <T
-            en="This is a free, non-commercial offer of a private individual. I am neither obliged nor willing to take part in dispute resolution proceedings before a consumer arbitration board."
-            de="Dies ist ein kostenloses, nicht kommerzielles Angebot einer Privatperson. Ich bin weder verpflichtet noch bereit, an Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle teilzunehmen."
-          />
+          <T id="imp.dispute" />
         </p>
         <p className="small">
-          <T en="How this site handles your data: " de="Wie diese Seite mit deinen Daten umgeht: " />
-          <Link to={PATHS.privacy}>
-            <T en="the privacy notice" de="die Datenschutzerklärung" />
-          </Link>
-          .{" "}
-          <T en="What the client, the gateway and the feedback service keep about you: " de="Was Client, Gateway und Feedback-Dienst über dich speichern: " />
-          <a href="https://github.com/AceVik/baylee/blob/main/docs/privacy.md" rel="noopener">
-            docs/privacy.md
-          </a>
-          .
+          <T id="imp.data" elems={DATA} />
         </p>
       </div>
     </header>

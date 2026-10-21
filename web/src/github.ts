@@ -8,8 +8,7 @@
 import { useEffect, useState } from "react";
 
 import { GITHUB_API } from "./config";
-import type { Lang } from "./i18n";
-import { LOCALE } from "./i18n";
+import { localeOf, t, type Lang } from "./i18n";
 
 export const CACHE_TTL_MS = 10 * 60 * 1000;
 const PREFIX = "baylee-site:";
@@ -146,22 +145,27 @@ export const RELEASES_PATH = "/releases?per_page=6";
 export function dateText(iso: string, lang: Lang): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleDateString(LOCALE[lang], { year: "numeric", month: "long", day: "numeric" });
+  return d.toLocaleDateString(localeOf(lang), { year: "numeric", month: "long", day: "numeric" });
 }
 
 export function relTime(iso: string, lang: Lang, now: number = Date.now()): string {
   const ms = now - new Date(iso).getTime();
   if (Number.isNaN(ms)) return "";
   const mins = Math.max(0, Math.round(ms / 60000));
-  if (mins < 60) return lang === "de" ? `vor ${mins} Min.` : `${mins} min ago`;
+  if (mins < 60) return t(lang, "time.minutesAgo", { n: mins });
   const h = Math.round(mins / 60);
-  if (h < 48) return lang === "de" ? `vor ${h} Std.` : `${h} h ago`;
-  const days = Math.round(h / 24);
-  return lang === "de" ? `vor ${days} Tagen` : `${days} days ago`;
+  if (h < 48) return t(lang, "time.hoursAgo", { n: h });
+  return t(lang, "time.daysAgo", { n: Math.round(h / 24) });
 }
 
+/** A file's size in MiB, as `lang` writes the number: one decimal below 100, no grouping. */
 export function mb(bytes: number, lang: Lang): string {
   const m = bytes / 1048576;
-  const s = m >= 100 ? Math.round(m).toString() : m.toFixed(1);
-  return `${lang === "de" ? s.replace(".", ",") : s} MB`;
+  const digits = m >= 100 ? 0 : 1;
+  const size = new Intl.NumberFormat(localeOf(lang), {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+    useGrouping: false,
+  }).format(m);
+  return t(lang, "size.mb", { size });
 }

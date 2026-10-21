@@ -39,5 +39,14 @@ export const CENTRAL_API = import.meta.env.VITE_CENTRAL_API ?? "/api";
 
 /** The card status (`npm run content`), fetched lazily. */
 export const DATA_BASE = "/data/";
+
+/**
+ * The card status of a release: `web/site/data/` at its tag in Baylee's
+ * repository, which every release carries for its own pool (Baylee's
+ * `docs/releasing.md`). Read from raw.githubusercontent.com, which answers
+ * any origin; a release's assets do not.
+ */
+export const RELEASE_DATA = (tag: string): string =>
+  `https://raw.githubusercontent.com/${REPO}/${encodeURIComponent(tag)}/web/site/data/`;
 /** The screenshots (`npm run content`). */
 export const MEDIA_BASE = "/media/";

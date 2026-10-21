@@ -1,74 +1,92 @@
 // The website's own privacy notice (Art. 13 GDPR), drawn from the old
 // site's (Baylee's web/site/datenschutz.html, written from the code on
-// 13.10.2026) and from what this app does. A draft for the owner's lawyer to
-// check before it is relied on (Baylee's docs/legal.md §4). It must change
-// with the site: a new host in the CSP, a cookie, an access log or a new form
-// means a new sentence here (README.md §"Privacy"). Never put the operator's
-// private details here: the Impressum names the controller.
+// 13.10.2026) and from what this app does; its words are the `privacy-…`
+// messages. A draft for the owner's lawyer to check before it is relied on
+// (Baylee's docs/legal.md §4). It must change with the site: a new host in
+// the CSP, a cookie, an access log or a new form means a new sentence here
+// (README.md §"Privacy"). Never put the operator's private details here: the
+// Impressum names the controller.
 
-import { GITHUB } from "../config";
-import { T, useLang, useTitle } from "../i18n";
+import { FEEDBACK_ORIGIN, GITHUB } from "../config";
+import { T, t, useLang, useTitle, type Elems } from "../i18n";
+import { Link, PATHS } from "../router";
 import "../styles/legal.css";
 import { PERSONAL } from "./rights";
 import { SERVING } from "./serving";
 
 const PARTS = [...SERVING, ...PERSONAL];
 
+/** What the feedback service is called in the contact form's part. */
+const ARGS = { host: new URL(FEEDBACK_ORIGIN).host };
+
+/** The links the notice's markup names. */
+const LINKS: Elems = {
+  docs: (words) => (
+    <a href={`${GITHUB}/blob/main/docs/privacy.md`} rel="noopener">
+      {words}
+    </a>
+  ),
+  impressum: (words) => <Link to={PATHS.impressum}>{words}</Link>,
+  contact: (words) => <Link to={PATHS.contact}>{words}</Link>,
+  directory: (words) => <Link to={PATHS.gateways}>{words}</Link>,
+  statement: (words) => (
+    <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement" rel="noopener">
+      {words}
+    </a>
+  ),
+  policy: (words) => (
+    <a href="https://scryfall.com/docs/privacy" rel="noopener">
+      {words}
+    </a>
+  ),
+  ldi: (words) => (
+    <a href="https://www.ldi.nrw.de/" rel="noopener">
+      {words}
+    </a>
+  ),
+};
+
 export default function Privacy() {
   const lang = useLang();
-  const de = lang === "de";
-  useTitle("Privacy – Baylee", "Datenschutz – Baylee");
+  useTitle("title.privacy");
   return (
     <header className="page-head legal">
       <div className="section-inner">
         <p className="eyebrow">
-          <T en="Privacy" de="Datenschutz" />
+          <T id="privacy.eyebrow" />
         </p>
         <h1>
-          <T en="Privacy notice for this website" de="Datenschutzerklärung dieser Website" />
+          <T id="privacy.title" />
         </h1>
         <p className="section-lead">
-          <T
-            en={
-              <>
-                This page says what happens with your data when you visit this website. The game itself (the client and the
-                online gateway) keeps its own records, listed in full in{" "}
-                <a href={`${GITHUB}/blob/main/docs/privacy.md`} rel="noopener">
-                  docs/privacy.md
-                </a>
-                .
-              </>
-            }
-            de={
-              <>
-                Diese Seite sagt, was mit deinen Daten geschieht, wenn du diese Website besuchst. Das Spiel selbst (Client und
-                Online-Gateway) führt eigene Aufzeichnungen; die vollständige Liste steht in{" "}
-                <a href={`${GITHUB}/blob/main/docs/privacy.md`} rel="noopener">
-                  docs/privacy.md
-                </a>
-                .
-              </>
-            }
-          />
+          <T id="privacy.lead" elems={LINKS} />
         </p>
-        <nav className="toc" aria-label={de ? "Inhalt" : "Contents"}>
+        <nav className="toc" aria-label={t(lang, "privacy.contents")}>
           <ol>
             {PARTS.map((p) => (
               <li key={p.id}>
-                <a href={`#${p.id}`}>{de ? p.title[1] : p.title[0]}</a>
+                <a href={`#${p.id}`}>{t(lang, p.title)}</a>
               </li>
             ))}
           </ol>
         </nav>
         {PARTS.map((p) => (
           <section key={p.id} id={p.id} className="legal-part" aria-labelledby={`${p.id}-title`}>
-            <h2 id={`${p.id}-title`}>{de ? p.title[1] : p.title[0]}</h2>
-            {p.id === "rights" ? de ? p.body[1] : p.body[0] : <p>{de ? p.body[1] : p.body[0]}</p>}
-            {p.basis && <p className="small">{de ? p.basis[1] : p.basis[0]}</p>}
+            <h2 id={`${p.id}-title`}>{t(lang, p.title)}</h2>
+            {p.body.map((key) => (
+              <p key={key}>
+                <T id={key} elems={LINKS} args={ARGS} />
+              </p>
+            ))}
+            {p.basis && (
+              <p className="small">
+                <T id={p.basis} />
+              </p>
+            )}
           </section>
         ))}
         <p className="small legal-date">
-          <T en="As of 20 October 2026." de="Stand: 20. Oktober 2026." />
+          <T id="privacy.date" />
         </p>
       </div>
     </header>

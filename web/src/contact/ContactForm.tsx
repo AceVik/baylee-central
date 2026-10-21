@@ -6,7 +6,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
 import { contactEndpoint } from "../config";
-import { T, num, tt, useLang } from "../i18n";
+import { T, num, t, useLang, type Args, type Key } from "../i18n";
 import { reducedMotion } from "../motion";
 import { PrivacyNote } from "./PrivacyNote";
 import { SendButton, type SendState } from "./SendButton";
@@ -23,7 +23,7 @@ export function ContactForm({ endpoint }: { endpoint?: string }) {
   const [message, setMessage] = useState("");
   const [website, setWebsite] = useState("");
   const [state, setState] = useState<SendState>("idle");
-  const [status, setStatus] = useState<{ bad: boolean; en: string; de: string } | null>(null);
+  const [status, setStatus] = useState<{ bad: boolean; key: Key; args?: Args } | null>(null);
   const [problem, setProblem] = useState<Problem>(null);
   const [done, setDone] = useState(false);
   const messageRef = useRef<HTMLTextAreaElement>(null);
@@ -32,13 +32,8 @@ export function ContactForm({ endpoint }: { endpoint?: string }) {
 
   useEffect(() => () => window.clearTimeout(timer.current), []);
 
-  const say = (bad: boolean, en: string, de: string) => setStatus({ bad, en, de });
-  const unreachable = () =>
-    say(
-      true,
-      "The form could not reach us just now. Please try again later, or write on Discord or GitHub.",
-      "Das Formular hat uns gerade nicht erreicht. Bitte versuch es später noch einmal, oder schreib auf Discord oder GitHub.",
-    );
+  const say = (bad: boolean, key: Key, args?: Args) => setStatus(args === undefined ? { bad, key } : { bad, key, args });
+  const unreachable = () => say(true, "form.unreachable");
 
   const submit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -48,23 +43,19 @@ export function ContactForm({ endpoint }: { endpoint?: string }) {
     const mail = email.trim();
     if (!text) {
       setProblem("message");
-      say(true, "Please write a message first.", "Bitte schreib zuerst eine Nachricht.");
+      say(true, "form.empty");
       messageRef.current?.focus();
       return;
     }
     if (mail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mail)) {
       setProblem("email");
-      say(
-        true,
-        "That e-mail address does not look right. Leave it empty if you want no answer.",
-        "Diese E-Mail-Adresse sieht nicht richtig aus. Lass sie leer, wenn du keine Antwort willst.",
-      );
+      say(true, "form.badEmail");
       emailRef.current?.focus();
       return;
     }
     setProblem(null);
     setState("sending");
-    say(false, "Sending…", "Wird gesendet …");
+    say(false, "form.sending");
     fetch(endpoint ?? contactEndpoint(), {
       method: "POST",
       credentials: "omit",
@@ -76,7 +67,7 @@ export function ContactForm({ endpoint }: { endpoint?: string }) {
       (r) => {
         if (r.status === 201) {
           setState("sent");
-          say(false, "Sent.", "Gesendet.");
+          say(false, "form.sent");
           // a moment for the button's tick, then the thank-you
           timer.current = window.setTimeout(
             () => {
@@ -93,18 +84,8 @@ export function ContactForm({ endpoint }: { endpoint?: string }) {
           return;
         }
         setState("error");
-        if (r.status === 429)
-          say(
-            true,
-            "Too many messages from here in the last hour. Please try again later.",
-            "Zu viele Nachrichten von hier in der letzten Stunde. Bitte versuch es später noch einmal.",
-          );
-        else if (r.status === 400 || r.status === 413)
-          say(
-            true,
-            "The message was not accepted. Is it shorter than 5,000 characters, and the address a real one?",
-            "Die Nachricht wurde nicht angenommen. Ist sie kürzer als 5.000 Zeichen und die Adresse eine echte?",
-          );
+        if (r.status === 429) say(true, "form.tooMany");
+        else if (r.status === 400 || r.status === 413) say(true, "form.refused", { max: MAX });
         else unreachable();
       },
       () => {
@@ -130,18 +111,18 @@ export function ContactForm({ endpoint }: { endpoint?: string }) {
     <form className="contact-form" noValidate onSubmit={submit}>
       <div className="field">
         <label htmlFor="c-name">
-          <T en="Name" de="Name" />{" "}
+          <T id="form.name" />{" "}
           <span className="opt">
-            <T en="optional" de="freiwillig" />
+            <T id="form.optional" />
           </span>
         </label>
         <input id="c-name" type="text" maxLength={100} autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} />
       </div>
       <div className="field">
         <label htmlFor="c-email">
-          <T en="E-mail" de="E-Mail" />{" "}
+          <T id="form.email" />{" "}
           <span className="opt">
-            <T en="optional, only if you want an answer" de="freiwillig, nur wenn du eine Antwort willst" />
+            <T id="form.emailOptional" />
           </span>
         </label>
         <input
@@ -163,7 +144,7 @@ export function ContactForm({ endpoint }: { endpoint?: string }) {
       </div>
       <div className="field">
         <label htmlFor="c-message">
-          <T en="Message" de="Nachricht" />
+          <T id="form.message" />
         </label>
         <textarea
           ref={messageRef}
@@ -193,7 +174,7 @@ export function ContactForm({ endpoint }: { endpoint?: string }) {
       <div className="form-row">
         <SendButton state={state} />
         <output className={`form-status${status?.bad === true ? " bad" : ""}`} id="c-status">
-          {status ? tt(lang, status.en, status.de) : ""}
+          {status ? t(lang, status.key, status.args) : ""}
         </output>
       </div>
     </form>

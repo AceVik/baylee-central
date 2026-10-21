@@ -4,7 +4,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-import { T, num, tt, useLang } from "../i18n";
+import { T, t, useLang } from "../i18n";
 import { reducedMotion } from "../motion";
 import type { SetsDoc } from "./model";
 import { begun, eraOf, eras, matches, sum } from "./numbers";
@@ -21,8 +21,8 @@ export function AllSets({ doc, target, onTargetShown }: { doc: SetsDoc; target: 
   const [openSets, toggleSet, addSets] = useOpenSet();
 
   useEffect(() => {
-    const t = window.setTimeout(() => setNeedle(query), 150);
-    return () => window.clearTimeout(t);
+    const wait = window.setTimeout(() => setNeedle(query), 150);
+    return () => window.clearTimeout(wait);
   }, [query]);
 
   // a link to one set: its era open, then its row (set while rendering, so
@@ -58,14 +58,9 @@ export function AllSets({ doc, target, onTargetShown }: { doc: SetsDoc; target: 
   let found = "";
   if (hits) {
     const n = hits.length;
-    if (n === 0) found = tt(lang, "No set matches.", "Kein Set passt.");
-    else if (n > FOUND_MAX)
-      found = tt(
-        lang,
-        `${n} sets match; the first ${FOUND_MAX} are shown. Type more to narrow it.`,
-        `${n} Sets passen; die ersten ${FOUND_MAX} stehen hier. Tippe mehr, um einzugrenzen.`,
-      );
-    else found = n === 1 ? tt(lang, "1 set matches.", "1 Set passt.") : tt(lang, `${n} sets match.`, `${n} Sets passen.`);
+    if (n === 0) found = t(lang, "sets.foundNone");
+    else if (n > FOUND_MAX) found = t(lang, "sets.foundMany", { n, max: FOUND_MAX });
+    else found = t(lang, "sets.found", { n });
   }
 
   return (
@@ -73,7 +68,7 @@ export function AllSets({ doc, target, onTargetShown }: { doc: SetsDoc; target: 
       <div className="sets-tools">
         <label className="field sets-search">
           <span>
-            <T en="Find a set" de="Set suchen" />
+            <T id="sets.find" />
           </span>
           <input
             type="search"
@@ -86,7 +81,7 @@ export function AllSets({ doc, target, onTargetShown }: { doc: SetsDoc; target: 
         </label>
         <label className="check-label">
           <input type="checkbox" checked={onlyBegun} onChange={(e) => setOnlyBegun(e.target.checked)} />{" "}
-          <T en="only sets that have begun" de="nur begonnene Sets" />
+          <T id="sets.onlyBegun" />
         </label>
       </div>
       <output className="small sets-found" id="sets-found">
@@ -112,7 +107,7 @@ export function AllSets({ doc, target, onTargetShown }: { doc: SetsDoc; target: 
                     })
                   }
                   title={era.from === era.to ? String(era.from) : `${era.from}–${era.to}`}
-                  meta={`${num(lang, era.sets.length)} ${era.sets.length === 1 ? tt(lang, "set", "Set") : "Sets"} · ${num(lang, counts.total)} ${tt(lang, "cards", "Karten")}`}
+                  meta={t(lang, "sets.eraMeta", { sets: era.sets.length, cards: counts.total })}
                   counts={counts}
                 >
                   {() => (

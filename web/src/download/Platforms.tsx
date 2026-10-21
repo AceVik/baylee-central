@@ -3,9 +3,17 @@
 
 import { RELEASES_PAGE } from "../config";
 import { mb } from "../github";
-import { T, tt, useLang } from "../i18n";
+import { T, t, useLang, type Elems } from "../i18n";
 import { PLATFORMS, type ReleaseFile } from "./release";
 import type { ReleaseState } from "./useRelease";
+
+const RELEASES: Elems = {
+  releases: (words) => (
+    <a href={RELEASES_PAGE} rel="noopener">
+      {words}
+    </a>
+  ),
+};
 
 function FileRow({ file }: { file: ReleaseFile }) {
   const lang = useLang();
@@ -14,7 +22,7 @@ function FileRow({ file }: { file: ReleaseFile }) {
       <a className="file" href={file.asset.browser_download_url} rel="noopener">
         {file.asset.name}
       </a>
-      <span className="kind">{tt(lang, file.label[0], file.label[1])}</span>
+      <span className="kind">{t(lang, file.label)}</span>
       <span className="size">{mb(file.asset.size, lang)}</span>
       {(file.sha ?? file.sig) && (
         <span className="aux">
@@ -43,18 +51,7 @@ export function Platforms({ state }: { state: ReleaseState }) {
     return (
       <div className="platforms-empty">
         <p>
-          {release === null ? (
-            <T
-              en="An installer and an archive for Windows (x64 and ARM64), macOS (Apple silicon) and Linux (x86-64 and ARM64), each with a .sha256 beside it, on the "
-              de="Ein Installer und ein Archiv für Windows (x64 und ARM64), macOS (Apple Silicon) und Linux (x86-64 und ARM64), jeweils mit einer .sha256 daneben, auf der "
-            />
-          ) : (
-            <T en="Asking GitHub for the files … They are also on the " de="Frage GitHub nach den Dateien … Sie liegen auch auf der " />
-          )}
-          <a href={RELEASES_PAGE} rel="noopener">
-            <T en="releases page" de="Releases-Seite" />
-          </a>
-          .
+          <T id={release === null ? "plat.empty" : "plat.asking"} elems={RELEASES} />
         </p>
       </div>
     );
@@ -71,20 +68,17 @@ export function Platforms({ state }: { state: ReleaseState }) {
           return (
             <li key={p.id} className={`plat glass${isMine ? " mine" : ""}`}>
               <h3 className="plat-name">
-                {tt(lang, p.name[0], p.name[1])}
+                {t(lang, p.name)}
                 {isMine && (
                   <span className="mine-tag">
-                    <T en="your system" de="dein System" />
+                    <T id="plat.yours" />
                   </span>
                 )}
               </h3>
-              {p.sub[0] !== "" && <p className="plat-sub">{tt(lang, p.sub[0], p.sub[1])}</p>}
+              {p.sub !== null && <p className="plat-sub">{t(lang, p.sub)}</p>}
               {list.length === 0 ? (
                 <p className="plat-none">
-                  <T
-                    en="No build for Intel Macs yet. Baylee needs a Mac with an Apple chip (M1 or later)."
-                    de="Noch kein Build für Intel-Macs. Baylee braucht einen Mac mit Apple-Chip (M1 oder neuer)."
-                  />
+                  <T id="plat.noIntel" />
                 </p>
               ) : (
                 <ul className="plat-files">
@@ -99,11 +93,7 @@ export function Platforms({ state }: { state: ReleaseState }) {
       </ul>
       {missing.length > 0 && (
         <p className="dl-fallback">
-          {tt(
-            lang,
-            `This release has no file for: ${missing.map((p) => p.name[0]).join(", ")}. Older releases are on the releases page.`,
-            `Diese Version hat keine Datei für: ${missing.map((p) => p.name[1]).join(", ")}. Ältere Versionen liegen auf der Releases-Seite.`,
-          )}
+          {t(lang, "plat.missing", { systems: missing.map((p) => t(lang, p.name)).join(", ") })}
         </p>
       )}
     </>
