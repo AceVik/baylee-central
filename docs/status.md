@@ -125,6 +125,11 @@ The server side of [web accounts](web-accounts.md) lands in three PRs.
   database (each before the service is called), the cookie's exact attributes
   and parsing, budgets per address and per IPv6 /64, and the website's whole
   flow over the real listener and PostgreSQL, ending in a native admission.
+- **The username, and local runs.** `BrowserSession` and the browser
+  surface's `BrowserStatus` carry the account's canonical username (the native
+  `SessionStatus` is unchanged). `--dev-accounts-stdin` can start the browser
+  listener for a numeric loopback page origin, every other check unchanged;
+  the deployed launcher keeps `baylee.app` fixed.
 - **Not yet deployed.** Deploy: migrate, grant, add `browser.listen`, pass
   `/api/*` in the `baylee.app` site block, issue beta keys. Central's own terms
   are still `draft`, so none are in force.
