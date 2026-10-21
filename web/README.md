@@ -357,8 +357,8 @@ in `FEEDBACK_TRUSTED_PROXIES` for the Impressum's allowance (Baylee's
 The app has no analytics or tracker, and no cookie but Central's session
 cookie, `__Host-central`, which only signing in sets. It keeps three things
 in the visitor's browser: the language chosen (localStorage), GitHub's
-answers for ten minutes (sessionStorage), and while signed in the name and
-the session's end (localStorage, `baylee-central-account`). It talks to
+answers for ten minutes (sessionStorage), and while signed in the
+session's end (localStorage, `baylee-central-session`). It talks to
 GitHub's API, to raw.githubusercontent.com for the newest release's card
 status, to Scryfall's image host for an opened set, to the feedback service
 for the contact form and the Impressum, and (through this origin) to Central
@@ -394,11 +394,10 @@ Registration, sign-in and the account page follow `docs/web-accounts.md`:
   and accepts only when they hash to the version's digest
   (`src/account/digest.ts`), so an acceptance names exactly what was shown.
   While the texts are `draft`, nothing is in force and there is no step.
-- **Who is signed in** (`src/account/session.tsx`): the name and the
-  session's end, remembered for the header, confirmed once per load with
-  `SessionStatus`, forgotten on signing out, at the end, or on Central's no.
-  Where Central's answers carry the canonical name (`docs/web-accounts.md`
-  §"As built"), that name is the one shown.
+- **Who is signed in** (`src/account/session.tsx`): only the session's end
+  is remembered; after a reload `SessionStatus` says whose session it is
+  (the name is always Central's, in memory), and the session is forgotten
+  on signing out, at the end, or on Central's no.
 
 The unit tests use stand-ins for Central and the crypto
 (`test/support/central.ts`); `e2e/account.spec.ts` runs the pages against a

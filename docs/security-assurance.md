@@ -804,3 +804,16 @@ tests for both, and the German decline re-run against the real Central.
 Everything the run started was stopped and checked: the stand-in and Central
 by SIGTERM with their ports refusing, the container by its label, and the
 passwords, keys and configuration documents deleted.
+
+The account's name, since the browser surface sends it (server PR #27): the
+page takes only the named answers and shows Central's canonical name, held
+in memory; the browser keeps nothing but the session's end, and the key
+that also held the name is deleted on sight. Tests refuse the unnamed
+shapes, keep the name out of storage, and show "Your account" while a
+remembered session is unconfirmed. Run again with `web/e2e-real/` against a
+real Central at main `8af36f4` (with #27) in the deployed mode, at both
+widths: the account and the header named the account as Central does, after
+the sign-in and after a reload, the browser kept only
+`baylee-central-session` with `expiresAt`, and a planted
+`baylee-central-account` was deleted on the next page; everything started
+was stopped and checked, and the synthetic secrets deleted.

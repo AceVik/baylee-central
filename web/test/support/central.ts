@@ -25,11 +25,8 @@ export interface FakeCentral extends Api {
   fail(operation: string, failure: ApiError["kind"]): void;
 }
 
-/**
- * `serverName`: answer with the browser surface's named shapes, the name
- * being the account's own, or this one when a string.
- */
-export function fakeCentral(opts: { terms?: TermsDocument | null; foreignIdentity?: boolean; wrapped?: Uint8Array; serverName?: boolean | string } = {}): FakeCentral {
+/** `serverName`: the name Central gives the account, if not its own. */
+export function fakeCentral(opts: { terms?: TermsDocument | null; foreignIdentity?: boolean; wrapped?: Uint8Array; serverName?: string } = {}): FakeCentral {
   const failures = new Map<string, ApiError["kind"]>();
   const tickets = new Map<string, { name: string; identity: Identity }>();
   let attempt: string | null = null;
@@ -43,7 +40,7 @@ export function fakeCentral(opts: { terms?: TermsDocument | null; foreignIdentit
       failures.set(op, kind);
     },
   } as unknown as FakeCentral;
-  const said = (name: string) => (opts.serverName === undefined || opts.serverName === false ? null : opts.serverName === true ? name : opts.serverName);
+  const said = (name: string) => opts.serverName ?? name;
   const step = (op: string) => {
     c.calls.push(op);
     const f = failures.get(op);

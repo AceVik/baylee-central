@@ -10,7 +10,7 @@ const ACCOUNT = [0x01, 0x92, 0xd0, 0xc5, 0x7b, 0x3e, 0x7a, 0x1f, 0x8c, 0x2d, 0x3
 const IDENTITY = { account: ACCOUNT, epoch: 1 };
 const n = (length: number, byte = 1) => Array.from({ length }, () => byte);
 
-const session = (identity: unknown) => ({ result: "browser_session", identity, wrapped_master: n(73), expires_at: 4_000_000_000 });
+const session = (identity: unknown) => ({ result: "browser_session", identity, username: "synthetic_name", wrapped_master: n(73), expires_at: 4_000_000_000 });
 const doc = (texts: unknown, version: unknown = { version: "2026-10-21", digest: n(32) }) => ({ result: "terms", terms: { version, texts } });
 const text = (lang: string) => ({ lang, updated: "2026-10-21", markdown: "# Terms" });
 
@@ -102,10 +102,11 @@ describe("the answers", () => {
     expect(() => parse.browserSession({ ...session(IDENTITY), wrapped_master: n(72) })).toThrow(ApiError);
   });
 
-  it("take the session's two shapes each, with the canonical name or without", () => {
+  it("take the session's named shapes only, the name canonical", () => {
     const named = { result: "browser_session", identity: IDENTITY, username: "synthetic_name", wrapped_master: n(73), expires_at: 4_000_000_000 };
     expect(parse.browserSession(named).username).toBe("synthetic_name");
-    expect(parse.browserSession(session(IDENTITY)).username).toBeNull();
+    // the unnamed shape of the transition (#28) is gone
+    expect(() => parse.browserSession({ result: "browser_session", identity: IDENTITY, wrapped_master: n(73), expires_at: 4_000_000_000 })).toThrow(ApiError);
     for (const name of ["Synthetic_Name", "ab", "a..b", "_abc", 7, null, ""]) {
       expect(() => parse.browserSession({ ...named, username: name })).toThrow(ApiError);
     }
@@ -114,8 +115,8 @@ describe("the answers", () => {
     const status = { result: "browser_status", identity: IDENTITY, username: "synthetic_name", expires_at: 4_000_000_000 };
     expect(parse.sessionStatus(status)).toMatchObject({ username: "synthetic_name", expiresAt: 4_000_000_000 });
     const native = { result: "session_status", identity: IDENTITY, expires_at: 4_000_000_000, migration_closed: false };
-    expect(parse.sessionStatus(native).username).toBeNull();
     for (const bad of [
+      native,
       { ...status, migration_closed: false },
       { result: "browser_status", identity: IDENTITY, expires_at: 4_000_000_000 },
       { ...status, username: "SYNTHETIC" },

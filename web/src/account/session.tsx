@@ -1,11 +1,10 @@
 // Who is signed in, for the header and the account page. The session itself
-// is Central's `__Host-central` cookie, which the page cannot read; the page
-// remembers only the name (Central's, where its answers carry it, else the
-// one signed in with) and when the session ends
-// (localStorage, `baylee-central-account`), so the header can say so after
-// a reload, and asks Central (`SessionStatus`) once per load whether that
-// session still lives. Signing out, an expired session or Central's "no"
-// forget it. Nothing else about the account stays in the browser.
+// is Central's `__Host-central` cookie, which the page cannot read. The page
+// keeps only when that session ends (localStorage, `baylee-central-session`),
+// so that after a reload it knows to ask Central (`SessionStatus`) whose
+// session it is; the name is always Central's, held in memory only. Signing
+// out, an expired session or Central's "no" forget it. Nothing else about the
+// account stays in the browser.
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
@@ -13,30 +12,32 @@ import { ApiError, api as defaultApi, type Api } from "./api";
 import { workerCrypto, type CryptoFactory } from "./crypto";
 
 export interface Account {
-  /** The name as Central keeps it (lower case). */
-  name: string;
+  /** The name as Central keeps it; null until Central has said it, after a reload. */
+  name: string | null;
   /** When the session ends, in Unix seconds. */
   expiresAt: number;
 }
 
-export const ACCOUNT_KEY = "baylee-central-account";
+export const SESSION_KEY = "baylee-central-session";
+/** Where the page kept the name too, until 21.10.2026; deleted on sight. */
+export const OLD_ACCOUNT_KEY = "baylee-central-account";
 
-/** The remembered account, unless it is missing, malformed or expired. */
+/** The remembered session, unless it is missing, malformed or over; its name is unknown. */
 export function remembered(now = Date.now()): Account | null {
   let raw: string | null;
   try {
-    raw = window.localStorage.getItem(ACCOUNT_KEY);
+    window.localStorage.removeItem(OLD_ACCOUNT_KEY);
+    raw = window.localStorage.getItem(SESSION_KEY);
   } catch {
     return null;
   }
   if (raw === null) return null;
   try {
     const v: unknown = JSON.parse(raw);
-    if (typeof v !== "object" || v === null) return null;
-    const { name, expiresAt } = v as Record<string, unknown>;
-    if (typeof name !== "string" || !/^[a-z0-9_.-]{3,24}$/.test(name)) return null;
+    if (typeof v !== "object" || v === null || Array.isArray(v) || Object.keys(v).join() !== "expiresAt") return null;
+    const { expiresAt } = v as Record<string, unknown>;
     if (typeof expiresAt !== "number" || !Number.isSafeInteger(expiresAt) || expiresAt * 1000 <= now) return null;
-    return { name, expiresAt };
+    return { name: null, expiresAt };
   } catch {
     return null;
   }
@@ -44,8 +45,8 @@ export function remembered(now = Date.now()): Account | null {
 
 function remember(account: Account | null): void {
   try {
-    if (account === null) window.localStorage.removeItem(ACCOUNT_KEY);
-    else window.localStorage.setItem(ACCOUNT_KEY, JSON.stringify({ name: account.name, expiresAt: account.expiresAt }));
+    if (account === null) window.localStorage.removeItem(SESSION_KEY);
+    else window.localStorage.setItem(SESSION_KEY, JSON.stringify({ expiresAt: account.expiresAt }));
   } catch {
     /* blocked storage: the header knows only for this page's life */
   }
@@ -56,7 +57,8 @@ interface AccountState {
   api: Api;
   /** A new flow's crypto: one Worker each. */
   crypto: CryptoFactory;
-  signedIn(account: Account): void;
+  /** A sign-in's answer: Central's name for the account and the session's end. */
+  signedIn(account: { name: string; expiresAt: number }): void;
   /**
    * Ends the session at Central and forgets it here, also when Central
    * cannot be reached: `false` then, since the cookie lives until its end.
@@ -81,24 +83,24 @@ export function AccountProvider({ api = CENTRAL, crypto = WORKER, children }: { 
     setAccount(next);
   }, []);
 
-  // a remembered session is Central's to confirm, once per load
+  // a session known only by its end is Central's to name, or to end
+  const unnamed = account !== null && account.name === null;
   useEffect(() => {
-    const known = remembered();
-    if (known === null) return;
+    if (!unnamed) return;
     let live = true;
     api.sessionStatus().then(
       (status) => {
-        if (live) change({ name: status.username ?? known.name, expiresAt: status.expiresAt });
+        if (live) change({ name: status.username, expiresAt: status.expiresAt });
       },
       (error: unknown) => {
-        // no live session: forget it; Central unreachable: keep it until it ends
+        // no live session: forget it; Central unreachable: keep it, unnamed, until it ends
         if (live && error instanceof ApiError && error.kind === "rejected") change(null);
       },
     );
     return () => {
       live = false;
     };
-  }, [api, change]);
+  }, [api, change, unnamed]);
 
   // the session ends at its time without a word from Central
   useEffect(() => {
@@ -111,7 +113,10 @@ export function AccountProvider({ api = CENTRAL, crypto = WORKER, children }: { 
   // another tab signed in or out
   useEffect(() => {
     const other = (e: StorageEvent) => {
-      if (e.key === ACCOUNT_KEY || e.key === null) setAccount(remembered());
+      if (e.key !== SESSION_KEY && e.key !== null) return;
+      const next = remembered();
+      // the same session keeps its name; another is Central's to name
+      setAccount((now) => (next !== null && now !== null && now.expiresAt === next.expiresAt ? now : next));
     };
     window.addEventListener("storage", other);
     return () => window.removeEventListener("storage", other);
