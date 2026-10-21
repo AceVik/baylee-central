@@ -58,8 +58,9 @@ information, not a contract, and is never "accepted".
   or `DELETE`): account, subject, version, digest, time. They go with the
   account (`ON DELETE CASCADE`). The latest record per subject is the account's
   accepted version.
-- Registration (M1) will carry the Central terms version and digest the client
-  showed and write the first record in the same transaction.
+- Registration on the website (`docs/web-accounts.md`) shows Central's terms
+  and records the acceptance with `AcceptTerms` on the browser surface after
+  the first sign-in, before the account can do anything that needs it.
 - A migrating legacy account accepts in the migration flow: after its first
   central login the client shows the sheet before it asks for the export and
   link tickets. Restoring (`ConfirmRestore`) stays allowed meanwhile, so an

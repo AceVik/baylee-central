@@ -1,6 +1,8 @@
-//! Native identity orchestration; no transport, logging or plaintext password handling.
+//! Identity orchestration for the native API and the website's browser listener;
+//! no transport, logging or plaintext password handling.
 #![forbid(unsafe_code)]
 
+use central_api::terms::TermsSubject;
 use central_api::{
     Endpoint, Error, Token,
     wire::{Discovery, Identity, Request, Response},
@@ -9,7 +11,7 @@ use central_crypto::{
     Context,
     opaque::server::{Attempt, ServerKeys},
 };
-use central_postgres::{AccountStore, Credential};
+use central_postgres::{AccountStore, Credential, Session};
 use std::{
     collections::BTreeMap,
     sync::{Arc, Mutex},
@@ -28,6 +30,91 @@ struct Pending {
     expires: Instant,
     attempt: Attempt,
     credential: Option<Credential>,
+    surface: Surface,
+}
+
+/// The listener a request arrived on.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Surface {
+    /// `/v1/native`: bearer sessions, every operation.
+    Native,
+    /// The website's `/api/v1`: cookie sessions, [`browser_operation`] only.
+    Browser,
+}
+
+impl Surface {
+    /// The presented token as a session of this surface's kind.
+    fn session(self, bearer: Option<&Token>) -> Result<Session<'_>, Error> {
+        let token = bearer.ok_or(Error::Rejected)?;
+        Ok(match self {
+            Self::Native => Session::Native(token),
+            Self::Browser => Session::Browser(token),
+        })
+    }
+}
+
+/// What a request on the browser listener produced.
+pub struct BrowserReply {
+    /// The answer. It never carries a session token.
+    pub response: Response,
+    /// A browser session just issued, to be set as the `__Host-central` cookie
+    /// and nowhere else.
+    pub session: Option<Token>,
+}
+
+/// The operations the browser listener serves (`docs/web-accounts.md`); every
+/// other one is refused before anything else happens. Terms are accepted there
+/// for Central only. The match names every operation, so a new one does not
+/// compile until it is decided here.
+#[must_use]
+pub fn browser_operation(request: &Request) -> bool {
+    match request {
+        Request::Discover { .. }
+        | Request::LoginStart { .. }
+        | Request::LoginFinish { .. }
+        | Request::Register { .. }
+        | Request::EnrollmentStart { .. }
+        | Request::EnrollmentFinish { .. }
+        | Request::SessionStatus
+        | Request::Logout
+        | Request::Terms
+        | Request::TermsStatus => true,
+        Request::AcceptTerms { subject, .. } => matches!(subject, TermsSubject::Central),
+        Request::CreateObject
+        | Request::ReadObject { .. }
+        | Request::ListObjects { .. }
+        | Request::WriteObject { .. }
+        | Request::DeleteObject { .. }
+        | Request::LegacyInvalidate { .. }
+        | Request::LegacyClose { .. }
+        | Request::RegisterGateway { .. }
+        | Request::GatewayDirectory { .. }
+        | Request::GatewayHeartbeat { .. }
+        | Request::SetGatewayAdmins { .. }
+        | Request::CheckGatewayAdmin { .. }
+        | Request::GatewaySession { .. }
+        | Request::LegacyReserve { .. }
+        | Request::ReadDocument
+        | Request::WriteDocument { .. }
+        | Request::ConfirmRestore { .. }
+        | Request::LegacyStatus { .. }
+        | Request::GatewayTicket { .. }
+        | Request::RedeemGateway { .. }
+        | Request::GatewayTerms { .. }
+        | Request::PublishGatewayTerms { .. }
+        | Request::GatewayAuthorize { .. } => false,
+    }
+}
+
+/// Browser operations that act on the cookie's session; the others ignore it.
+fn uses_session(request: &Request) -> bool {
+    matches!(
+        request,
+        Request::SessionStatus
+            | Request::Logout
+            | Request::TermsStatus
+            | Request::AcceptTerms { .. }
+    )
 }
 
 /// Shared service state. Pending challenges are bounded, expiring and single-use.
@@ -101,7 +188,12 @@ impl IdentityService {
         Ok(())
     }
 
-    async fn start(&self, identity: Identity, message: Vec<u8>) -> Result<Response, Error> {
+    async fn start(
+        &self,
+        identity: Identity,
+        message: Vec<u8>,
+        surface: Surface,
+    ) -> Result<Response, Error> {
         let context = self.context(identity)?;
         self.limits
             .lock()
@@ -141,6 +233,7 @@ impl IdentityService {
                 expires: Instant::now() + Duration::from_secs(60),
                 attempt,
                 credential,
+                surface,
             },
         );
         Ok(Response::LoginChallenge {
@@ -159,7 +252,12 @@ impl IdentityService {
         Ok(())
     }
 
-    async fn finish(&self, ticket: &Token, message: Vec<u8>) -> Result<Response, Error> {
+    async fn finish(
+        &self,
+        ticket: &Token,
+        message: Vec<u8>,
+        surface: Surface,
+    ) -> Result<BrowserReply, Error> {
         // Consumption precedes validation, including invalid message size/proofs.
         let pending = self
             .pending
@@ -167,7 +265,8 @@ impl IdentityService {
             .map_err(|_| Error::Unavailable)?
             .remove(&ticket.digest())
             .ok_or(Error::Rejected)?;
-        if pending.expires <= Instant::now() {
+        // An attempt finishes on the listener that started it.
+        if pending.expires <= Instant::now() || pending.surface != surface {
             return Err(Error::Rejected);
         }
         let permit = self
@@ -186,15 +285,34 @@ impl IdentityService {
         .await
         .map_err(|_| Error::Unavailable)??;
         let token = Token::generate()?;
-        let wrapped_master = self
-            .store
-            .issue_session(&credential, &token)
-            .await?
-            .wrapped_master;
-        Ok(Response::Session {
-            token,
-            identity: credential.identity,
-            wrapped_master,
+        let identity = credential.identity;
+        Ok(match surface {
+            Surface::Native => BrowserReply {
+                response: Response::Session {
+                    wrapped_master: self
+                        .store
+                        .issue_session(&credential, &token)
+                        .await?
+                        .wrapped_master,
+                    token,
+                    identity,
+                },
+                session: None,
+            },
+            Surface::Browser => {
+                let issued = self
+                    .store
+                    .issue_session(&credential, Session::Browser(&token))
+                    .await?;
+                BrowserReply {
+                    response: Response::BrowserSession {
+                        identity,
+                        wrapped_master: issued.wrapped_master,
+                        expires_at: issued.expires_at,
+                    },
+                    session: Some(token),
+                }
+            }
         })
     }
 
@@ -211,6 +329,215 @@ impl IdentityService {
             .lock()
             .map_err(|_| Error::Unavailable)?
             .request(&request, bearer, Instant::now())?;
-        self.dispatch(request, bearer).await
+        Ok(self
+            .dispatch(request, bearer, Surface::Native)
+            .await?
+            .response)
+    }
+
+    /// Process a command from the website's browser listener. Only
+    /// [`browser_operation`]s are served; the cookie's token is a browser
+    /// session, used only by the operations that act on one, and a sign-in
+    /// returns the new session apart from the response.
+    ///
+    /// # Errors
+    /// Returns generic authorization, capacity, conflict or availability errors only.
+    pub async fn handle_browser(
+        &self,
+        request: Request,
+        cookie: Option<&Token>,
+    ) -> Result<BrowserReply, Error> {
+        if !browser_operation(&request) {
+            return Err(Error::Rejected);
+        }
+        let session = if uses_session(&request) { cookie } else { None };
+        self.limits
+            .lock()
+            .map_err(|_| Error::Unavailable)?
+            .request(&request, session, Instant::now())?;
+        self.dispatch(request, session, Surface::Browser).await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use central_api::{
+        gateway::GatewayMetadata,
+        terms::TermsVersion,
+        wire::{Identity, TicketPurpose},
+    };
+
+    fn token() -> Token {
+        Token::generate().unwrap()
+    }
+
+    const IDENTITY: Identity = Identity {
+        account: [0; 16],
+        epoch: 1,
+    };
+
+    fn served() -> Vec<Request> {
+        let identity = IDENTITY;
+        vec![
+            Request::Discover {
+                username: "synthetic".into(),
+            },
+            Request::LoginStart {
+                identity,
+                message: vec![],
+            },
+            Request::LoginFinish {
+                attempt: token(),
+                message: vec![],
+            },
+            Request::Register {
+                username: "synthetic".into(),
+                beta_key: String::new(),
+            },
+            Request::EnrollmentStart {
+                ticket: token(),
+                message: vec![],
+            },
+            Request::EnrollmentFinish {
+                ticket: token(),
+                record: vec![],
+                wrapped_master: vec![],
+                document: vec![],
+                recovery: None,
+            },
+            Request::SessionStatus,
+            Request::Logout,
+            Request::Terms,
+            Request::TermsStatus,
+            Request::AcceptTerms {
+                subject: TermsSubject::Central,
+                version: "1".into(),
+                digest: [0; 32],
+            },
+        ]
+    }
+
+    fn refused() -> Vec<Request> {
+        let identity = IDENTITY;
+        let metadata = || GatewayMetadata {
+            name: "Synthetic".into(),
+            version: "1".into(),
+            website: "https://gateway.invalid".into(),
+        };
+        vec![
+            Request::CreateObject,
+            Request::ReadObject { id: [0; 16] },
+            Request::ListObjects { after: None },
+            Request::WriteObject {
+                id: [0; 16],
+                expected_revision: 0,
+                document: vec![],
+            },
+            Request::DeleteObject {
+                id: [0; 16],
+                expected_revision: 1,
+            },
+            Request::LegacyInvalidate {
+                legacy_id: "x".into(),
+            },
+            Request::LegacyClose {
+                legacy_id: "x".into(),
+                identity,
+            },
+            Request::RegisterGateway {
+                origin: "https://gateway.invalid".into(),
+                metadata: metadata(),
+            },
+            Request::GatewayDirectory { after: None },
+            Request::GatewayHeartbeat {
+                metadata: metadata(),
+            },
+            Request::SetGatewayAdmins {
+                gateway: [0; 16],
+                expected_revision: 1,
+                accounts: vec![],
+            },
+            Request::CheckGatewayAdmin { account: [0; 16] },
+            Request::GatewaySession {
+                lease: token(),
+                purpose: TicketPurpose::Admit,
+            },
+            Request::LegacyReserve {
+                legacy_id: "x".into(),
+                username: "synthetic".into(),
+            },
+            Request::ReadDocument,
+            Request::WriteDocument {
+                expected_revision: 1,
+                document: vec![],
+            },
+            Request::ConfirmRestore { revision: 1 },
+            Request::LegacyStatus {
+                legacy_id: "x".into(),
+            },
+            Request::GatewayTicket {
+                gateway: "https://gateway.invalid".into(),
+                purpose: TicketPurpose::Admit,
+            },
+            Request::RedeemGateway {
+                ticket: token(),
+                purpose: TicketPurpose::Admit,
+            },
+            Request::GatewayTerms {
+                origin: "https://gateway.invalid".into(),
+            },
+            Request::AcceptTerms {
+                subject: TermsSubject::Gateway {
+                    origin: "https://gateway.invalid".into(),
+                },
+                version: "1".into(),
+                digest: [0; 32],
+            },
+            Request::PublishGatewayTerms {
+                version: "1".into(),
+                texts: vec![],
+            },
+            Request::GatewayAuthorize {
+                lease: token(),
+                purpose: TicketPurpose::Admit,
+                terms: Some(TermsVersion {
+                    version: "1".into(),
+                    digest: [0; 32],
+                }),
+            },
+        ]
+    }
+
+    #[test]
+    fn the_browser_listener_serves_exactly_its_operations() {
+        let (served, refused) = (served(), refused());
+        assert!(served.iter().all(browser_operation));
+        assert!(!refused.iter().any(browser_operation));
+        let named: std::collections::BTreeSet<String> = served
+            .iter()
+            .chain(&refused)
+            .map(|request| {
+                let text = String::from_utf8(central_api::encode(request).unwrap()).unwrap();
+                let start = text.find(r#""operation":""#).unwrap() + 13;
+                text[start..].split('"').next().unwrap().to_owned()
+            })
+            .collect();
+        assert_eq!(named.len(), 34, "every operation is in one of the lists");
+    }
+
+    #[test]
+    fn only_session_operations_take_the_cookie() {
+        assert!(uses_session(&Request::SessionStatus));
+        assert!(uses_session(&Request::Logout));
+        assert!(uses_session(&Request::TermsStatus));
+        assert!(!uses_session(&Request::Terms));
+        assert!(!uses_session(&Request::Discover {
+            username: "synthetic".into()
+        }));
+        assert!(!uses_session(&Request::Register {
+            username: "synthetic".into(),
+            beta_key: String::new(),
+        }));
     }
 }

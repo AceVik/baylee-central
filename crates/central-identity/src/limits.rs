@@ -41,6 +41,7 @@ impl Limits {
             Request::Discover { .. }
                 | Request::LoginStart { .. }
                 | Request::LoginFinish { .. }
+                | Request::Register { .. }
                 | Request::EnrollmentStart { .. }
                 | Request::EnrollmentFinish { .. }
                 | Request::GatewayDirectory { .. }

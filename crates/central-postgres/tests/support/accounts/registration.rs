@@ -1,13 +1,9 @@
 //! Migration 000007: beta keys, the account's source, and the legacy rules
 //! that apply to legacy accounts only.
-use super::{AccountStore, ServerKeys, TicketPurpose, Token, config, context, enroll, login};
+use super::{AccountStore, ServerKeys, TicketPurpose, Token, config, enroll, login};
 use central_api::beta_key::BetaKey;
-use central_crypto::{
-    opaque::Enrollment,
-    vault::{MasterKey, ObjectContext},
-};
 use central_postgres::{BetaKeyBatch, connect_dev};
-use sea_orm::{ConnectionTrait, DatabaseConnection, DbBackend, Statement, prelude::Uuid};
+use sea_orm::{ConnectionTrait, DatabaseConnection, DbBackend, Statement};
 
 pub(super) async fn run(store: &AccountStore, operator: &DatabaseConnection, keys: &ServerKeys) {
     issuing(operator).await;
@@ -224,52 +220,28 @@ async fn constraints(store: &AccountStore, operator: &DatabaseConnection, keys: 
         .unwrap();
 }
 
-/// A registered account, enrolled the way the next change's `Register` and
-/// enrollment will write it: legacy rules do not hold it back.
+/// A registered account, through registration and enrollment: legacy rules
+/// do not hold it back.
 async fn registered(store: &AccountStore, operator: &DatabaseConnection, keys: &ServerKeys) {
+    let key = super::register::issue(operator, 1, "registered-one").await;
     let ticket = Token::generate().unwrap();
-    operator
-        .execute_raw(Statement::from_sql_and_values(
-            DbBackend::Postgres,
-            format!(
-                "INSERT INTO central_identity.accounts (source, username_key, enrollment_digest, enrollment_expires, beta_key_id)
-                 VALUES ('registered', 'registered-one', $1, clock_timestamp() + interval '10 minutes', {KEY})"
-            ),
-            [ticket.digest().to_vec().into()],
-        ))
+    let identity = store
+        .register("Registered-One", &key.digest(), &ticket)
         .await
         .unwrap();
-    let identity = store.enrollment(&ticket).await.unwrap();
-    let context = context(identity);
-    let (enrollment, request) =
-        Enrollment::start("synthetic strong password".into(), context).unwrap();
-    let response = keys.enrollment_response(context, &request).unwrap();
-    let enrolled = enrollment.finish(&response).unwrap();
-    let master = MasterKey::generate().unwrap();
-    let wrapped = enrolled.wrapping_key.wrap(&master).unwrap();
-    let object = ObjectContext::new(context, identity.account, 1).unwrap();
-    let document = master.seal_object(object, b"registered").unwrap();
-    // Enrollment without a recovery wrapper, keeping the key link, is refused by the schema.
-    assert!(
-        store
-            .enroll(&ticket, &enrolled.upload, wrapped.as_bytes(), &document)
-            .await
-            .is_err()
+    assert_eq!(
+        store.enrollment(&ticket).await.unwrap().account,
+        identity.account
     );
-    assert!(store.credential(identity).await.unwrap().is_none());
-    operator
-        .execute_raw(Statement::from_sql_and_values(
-            DbBackend::Postgres,
-            "UPDATE central_identity.accounts SET credential = $2, wrapped_master = $3,
-             recovery_wrapped_master = $3, document = $4, document_revision = 1,
-             enrollment_digest = NULL, enrollment_expires = NULL, beta_key_id = NULL WHERE id = $1",
-            [
-                Uuid::from_bytes(identity.account).into(),
-                enrolled.upload.clone().into(),
-                wrapped.as_bytes().to_vec().into(),
-                document.into(),
-            ],
-        ))
+    let enrolled = super::register::credentials(keys, identity);
+    store
+        .enroll(
+            &ticket,
+            &enrolled.upload,
+            &enrolled.wrapped,
+            &enrolled.document,
+            Some(&enrolled.recovery),
+        )
         .await
         .unwrap();
     assert_eq!(

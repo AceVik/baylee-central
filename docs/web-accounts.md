@@ -121,14 +121,30 @@ the recovery code. The admin UI (M2) comes later.
 
 - `Request::Register { username, beta_key }` → `Response::Enrollment`. It needs
   no credential, shares the unauthenticated budget and takes a per-address
-  budget on the browser surface.
+  budget on the browser surface. It is served **on the browser surface only**;
+  `/v1/native` answers `Rejected`. (Changed in the server PR: the per-address
+  budget is the control against key guessing and name probing, and the native
+  surface has none; registration in the native client is M6.)
 - `EnrollmentFinish` gains `recovery: Option<Vec<u8>>` with
-  `#[serde(default)]`, so native clients pinned before the change still decode.
-  It is required for registered accounts and refused for legacy ones.
-- A bad, used-up or expired key is `Rejected`, before the name is looked at.
-  Only with a valid key does a taken name answer `Conflict`, so the page can
-  say so: the key is what stops enumeration, and its holder may learn whether
-  a name is free.
+  `#[serde(default)]` and `skip_serializing_if = "Option::is_none"`, so native
+  clients pinned before the change still decode, and a legacy enrollment is sent
+  exactly as before. It is required for registered accounts and refused for
+  legacy ones; the schema holds the same rule.
+- A bad, used-up, expired or revoked key is `Rejected`, before the name is
+  looked at. Only with a valid key does a taken name answer `Conflict`, so the
+  page can say so: the key is what stops enumeration, and its holder may learn
+  whether a name is free. A malformed name is `Rejected`.
+- A name is taken by any enrolled account, any legacy account (also one whose
+  migration is unfinished) and any registration whose ticket still lives. An
+  abandoned registration (its ticket expired) gives its name back to the next
+  registration and to a legacy migration; each registration also removes up to
+  16 abandoned ones, oldest first. A legacy name is never given to a
+  registration.
+- The enrollment of a registered account fails when its key was revoked after
+  the reservation; it spends the reserved use otherwise, even if the key has
+  expired since.
+- `LoginStart` and `LoginFinish` belong to one surface: an attempt started on
+  `/v1/native` cannot finish on the browser surface, nor the reverse.
 
 **The browser surface.** It is a second listener, `browser.listen` in
 `central.json` (absent means off), behind `baylee.app`'s Caddy as `/api/*`
@@ -136,7 +152,11 @@ with the `Host` header unchanged. It has one route, `POST /api/v1`, which
 takes the same tagged `Request` JSON. Only these operations are allowed:
 `Discover`, `LoginStart`, `LoginFinish`, `Register`, `EnrollmentStart`,
 `EnrollmentFinish`, `SessionStatus`, `Logout`, `Terms`, `TermsStatus` and
-`AcceptTerms`. Every other operation is refused.
+`AcceptTerms` for Central's terms (a gateway's terms are accepted from the
+client). Every other operation is refused. The list is one exhaustive match
+in `central-identity` (`browser_operation`), so a new operation does not
+compile until it is decided there. The cookie's token is used only by
+`SessionStatus`, `Logout`, `TermsStatus` and `AcceptTerms`.
 
 A request is refused (403) unless all of these hold:
 

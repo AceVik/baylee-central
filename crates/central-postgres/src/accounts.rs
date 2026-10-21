@@ -6,7 +6,8 @@ use central_api::{
 };
 use central_crypto::{opaque::server::ServerKeys, vault::WrappedMasterKey};
 use sea_orm::{
-    ConnectionTrait, DatabaseConnection, DbBackend, QueryResult, Statement, Value, prelude::Uuid,
+    ConnectionTrait, DatabaseConnection, DbBackend, QueryResult, Statement, TransactionTrait,
+    Value, prelude::Uuid,
 };
 
 mod gateways;
@@ -14,6 +15,7 @@ mod grants;
 mod leases;
 mod migration;
 mod objects;
+mod registration;
 mod sessions;
 mod terms;
 pub use sessions::{Issued, Session};
@@ -119,6 +121,7 @@ impl AccountStore {
     }
 
     /// Reserve after the bridge has freshly verified legacy ownership. Existing credentials stay intact.
+    /// An abandoned registration holding the name gives it up; a live one keeps it.
     ///
     /// # Errors
     /// Rejects conflicting links/names, committed accounts or inaccessible storage.
@@ -136,16 +139,27 @@ impl AccountStore {
         {
             return Err(Error::Rejected);
         }
-        let row = self.db.query_one_raw(statement(
-            "INSERT INTO central_identity.accounts (legacy_id, username_key, enrollment_digest, enrollment_expires)
-             VALUES ($1, $2, $3, pg_catalog.clock_timestamp() + interval '10 minutes')
+        let name = username(name)?;
+        let tx = self.db.begin().await.map_err(|_| Error::Unavailable)?;
+        tx.execute_raw(statement(
+            "DELETE FROM central_identity.accounts WHERE username_key = $1 AND source = 'registered'
+             AND credential IS NULL AND enrollment_expires <= pg_catalog.clock_timestamp()",
+            vec![name.clone().into()],
+        ))
+        .await
+        .map_err(|_| Error::Unavailable)?;
+        let row = tx.query_one_raw(statement(
+            "INSERT INTO central_identity.accounts (source, legacy_id, username_key, enrollment_digest, enrollment_expires)
+             VALUES ('legacy', $1, $2, $3, pg_catalog.clock_timestamp() + interval '10 minutes')
              ON CONFLICT (legacy_id) DO UPDATE SET enrollment_digest = EXCLUDED.enrollment_digest,
                 enrollment_expires = EXCLUDED.enrollment_expires, username_key = EXCLUDED.username_key
              WHERE central_identity.accounts.credential IS NULL AND NOT central_identity.accounts.legacy_closed
              RETURNING id, vault_epoch",
-            vec![legacy.into(), username(name)?.into(), ticket.digest().to_vec().into()],
+            vec![legacy.into(), name.into(), ticket.digest().to_vec().into()],
         )).await.map_err(|_| Error::Conflict)?.ok_or(Error::Conflict)?;
-        identity(&row)
+        let identity = identity(&row)?;
+        tx.commit().await.map_err(|_| Error::Unavailable)?;
+        Ok(identity)
     }
 
     /// Read the account bound to a still-valid enrollment capability.
@@ -167,29 +181,75 @@ impl AccountStore {
     }
 
     /// Commit credential, wrapper and document together, consuming a valid ticket atomically.
+    /// A registered account also commits its recovery wrapper and spends its key's
+    /// reserved use; a legacy account takes no recovery wrapper.
     ///
     /// # Errors
-    /// Rejects malformed cryptography, invalid/expired capabilities or concurrent completion.
+    /// Rejects malformed cryptography, a recovery wrapper missing for a registered
+    /// or present for a legacy account, invalid/expired capabilities, a key revoked
+    /// since the reservation, or concurrent completion.
     pub async fn enroll(
         &self,
         ticket: &Token,
         record: &[u8],
         wrapped: &[u8],
         document: &[u8],
+        recovery: Option<&[u8]>,
     ) -> Result<(), Error> {
         ServerKeys::enrollment_record(record).map_err(|_| Error::Rejected)?;
         WrappedMasterKey::from_bytes(wrapped).map_err(|_| Error::Rejected)?;
+        if let Some(recovery) = recovery {
+            WrappedMasterKey::from_bytes(recovery).map_err(|_| Error::Rejected)?;
+        }
         validate_document(document)?;
-        let result = self.db.execute_raw(statement(
+        let digest = ticket.digest().to_vec();
+        let tx = self.db.begin().await.map_err(|_| Error::Unavailable)?;
+        let pending = tx
+            .query_one_raw(statement(
+                "SELECT source, beta_key_id FROM central_identity.accounts WHERE enrollment_digest = $1
+                 AND enrollment_expires > pg_catalog.clock_timestamp() AND credential IS NULL",
+                vec![digest.clone().into()],
+            ))
+            .await
+            .map_err(|_| Error::Unavailable)?
+            .ok_or(Error::Rejected)?;
+        let source: String = pending
+            .try_get("", "source")
+            .map_err(|_| Error::Unavailable)?;
+        let key: Option<Uuid> = pending
+            .try_get("", "beta_key_id")
+            .map_err(|_| Error::Unavailable)?;
+        match (source.as_str(), recovery, key) {
+            ("registered", Some(_), Some(key)) => {
+                // The key's row before the account's, the order registration takes.
+                let spent = tx
+                    .execute_raw(statement(
+                        "UPDATE central_identity.beta_keys SET uses_left = uses_left - 1
+                         WHERE id = $1 AND uses_left > 0 AND revoked_at IS NULL",
+                        vec![key.into()],
+                    ))
+                    .await
+                    .map_err(|_| Error::Unavailable)?;
+                if spent.rows_affected() != 1 {
+                    return Err(Error::Rejected);
+                }
+            }
+            ("legacy", None, None) => {}
+            _ => return Err(Error::Rejected),
+        }
+        let result = tx.execute_raw(statement(
             "UPDATE central_identity.accounts SET credential = $2, wrapped_master = $3, document = $4,
-             document_revision = 1, enrollment_digest = NULL, enrollment_expires = NULL
-             WHERE enrollment_digest = $1 AND enrollment_expires > pg_catalog.clock_timestamp() AND credential IS NULL",
-            vec![ticket.digest().to_vec().into(), record.to_vec().into(), wrapped.to_vec().into(), document.to_vec().into()],
+             recovery_wrapped_master = $5, document_revision = 1, enrollment_digest = NULL,
+             enrollment_expires = NULL, beta_key_id = NULL
+             WHERE enrollment_digest = $1 AND enrollment_expires > pg_catalog.clock_timestamp() AND credential IS NULL
+             AND source = $6 AND beta_key_id IS NOT DISTINCT FROM $7",
+            vec![digest.into(), record.to_vec().into(), wrapped.to_vec().into(), document.to_vec().into(),
+                recovery.map(<[u8]>::to_vec).into(), source.into(), key.into()],
         )).await.map_err(|_| Error::Unavailable)?;
         if result.rows_affected() != 1 {
             return Err(Error::Rejected);
         }
-        Ok(())
+        tx.commit().await.map_err(|_| Error::Unavailable)
     }
 
     /// Read a credential for an OPAQUE exchange; the context is checked independently.

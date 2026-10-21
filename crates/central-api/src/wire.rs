@@ -150,6 +150,16 @@ pub enum Request {
         /// Canonical username vouched for by the authenticated migration bridge.
         username: String,
     },
+    /// Reserve a new registered account with a beta key, on the browser listener
+    /// only (`docs/web-accounts.md`). A bad, used-up, expired or revoked key is
+    /// `Rejected` before the name is looked at; with a valid key a taken name is
+    /// `Conflict`.
+    Register {
+        /// Wanted username, canonicalized by the service's versioned name policy.
+        username: String,
+        /// The beta key as typed, read like the recovery code.
+        beta_key: String,
+    },
     /// An enrollment capability authorizes a response, not replacement of an existing record.
     EnrollmentStart {
         /// Short-lived capability returned through the authenticated legacy login.
@@ -167,6 +177,12 @@ pub enum Request {
         wrapped_master: Vec<u8>,
         /// Initial encrypted account document. Central never receives its plaintext.
         document: Vec<u8>,
+        /// The same master key wrapped under the recovery code, exactly 73 bytes:
+        /// required for a registered account, refused for a legacy one. Absent on
+        /// the wire when `None`, so clients built before it still decode and are
+        /// still decoded.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        recovery: Option<Vec<u8>>,
     },
     /// Restore the account document after final OPAQUE authentication.
     ReadDocument,
@@ -348,7 +364,17 @@ pub enum Response {
         /// Stored client-encrypted master key.
         wrapped_master: Vec<u8>,
     },
-    /// Newly reserved or resumable legacy enrollment operation.
+    /// The browser listener's answer to a successful `LoginFinish`. The session
+    /// token travels only in the `__Host-central` cookie, never in a body.
+    BrowserSession {
+        /// Account and epoch bound into the completed OPAQUE exchange.
+        identity: Identity,
+        /// Stored client-encrypted master key, to check the password worked.
+        wrapped_master: Vec<u8>,
+        /// Absolute Unix-seconds expiry of the browser session; never renewed.
+        expires_at: i64,
+    },
+    /// Newly reserved registration, or newly reserved or resumable legacy enrollment.
     Enrollment {
         /// Central identity reserved by PostgreSQL before client key derivation.
         identity: Identity,
@@ -432,11 +458,37 @@ mod tests {
             record: vec![255; 1024],
             wrapped_master: vec![255; 73],
             document: vec![255; 262_185],
+            recovery: Some(vec![255; 73]),
         };
         let bytes = crate::encode(&request).unwrap();
         assert!(bytes.len() <= crate::MAX_WIRE_BYTES);
         assert!(crate::decode::<Request>(&bytes).is_ok());
     }
+    #[test]
+    fn enrollment_without_recovery_keeps_the_earlier_wire() {
+        // A client built before the recovery wrapper sends no such field.
+        let earlier = br#"{"operation":"enrollment_finish","ticket":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"record":[1],"wrapped_master":[2],"document":[3]}"#;
+        let Request::EnrollmentFinish { recovery, .. } = crate::decode(earlier).unwrap() else {
+            panic!("an enrollment");
+        };
+        assert!(recovery.is_none());
+        // And a legacy enrollment is sent exactly as before, without the field.
+        let encoded = crate::encode(&Request::EnrollmentFinish {
+            ticket: Token::generate().unwrap(),
+            record: vec![1],
+            wrapped_master: vec![2],
+            document: vec![3],
+            recovery: None,
+        })
+        .unwrap();
+        assert!(!String::from_utf8(encoded).unwrap().contains("recovery"));
+        let with = br#"{"operation":"enrollment_finish","ticket":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"record":[1],"wrapped_master":[2],"document":[3],"recovery":[4]}"#;
+        let Request::EnrollmentFinish { recovery, .. } = crate::decode(with).unwrap() else {
+            panic!("an enrollment");
+        };
+        assert_eq!(recovery, Some(vec![4]));
+    }
+
     #[test]
     fn wire_rejects_passwords_unknown_operations_and_unbounded_messages() {
         for bytes in [

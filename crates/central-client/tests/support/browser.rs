@@ -1,0 +1,338 @@
+//! The website's flow through `IdentityService::handle_browser`, as the web
+//! pages and their WebAssembly crypto run it: register with a beta key, enroll
+//! with a recovery wrapper, sign in to a browser session, accept Central's
+//! terms, sign out. Then the same account plays natively, and the official
+//! gateway's bridge admits it without a legacy ID.
+use super::Http;
+use central_api::{
+    Error, Token,
+    beta_key::BetaKey,
+    terms::TermsSubject,
+    wire::{Discovery, Request, Response, TicketPurpose},
+};
+use central_client::Transport;
+use central_crypto::{
+    Context,
+    opaque::{Enrollment, Login},
+    vault::{MasterKey, ObjectContext, RecoveryCode, WrappedMasterKey},
+};
+use central_identity::{BrowserReply, IdentityService};
+use central_postgres::BetaKeyBatch;
+use sea_orm::{ConnectionTrait, DatabaseConnection};
+use tokio::runtime::Runtime;
+
+const PASSWORD: &str = "synthetic browser password";
+const GATEWAY: &str = "http://127.0.0.1:28766";
+/// The initial account document of `docs/web-accounts.md`, with this fixture's gateway.
+const DOCUMENT: &[u8] = br#"{"version":1,"gateways":["http://127.0.0.1:28766"],"preferences":{},"legacy":null,"chat":{"devices":[],"installations":[]}}"#;
+
+struct Browser<'a> {
+    identity: &'a IdentityService,
+    runtime: &'a Runtime,
+}
+
+impl Browser<'_> {
+    fn call(&self, request: Request, cookie: Option<&Token>) -> Result<BrowserReply, Error> {
+        self.runtime
+            .block_on(self.identity.handle_browser(request, cookie))
+    }
+
+    /// An answer that issues no session.
+    fn answer(&self, request: Request, cookie: Option<&Token>) -> Result<Response, Error> {
+        let reply = self.call(request, cookie)?;
+        assert!(reply.session.is_none());
+        Ok(reply.response)
+    }
+}
+
+fn copy(token: &Token) -> Token {
+    Token::from_secret_bytes(token.to_secret_bytes())
+}
+
+pub(crate) fn run(
+    identity: &IdentityService,
+    http: &Http,
+    bridge: &Token,
+    runtime: &Runtime,
+    operator: &DatabaseConnection,
+) {
+    let browser = Browser { identity, runtime };
+    let key = BetaKey::generate().unwrap();
+    runtime
+        .block_on(
+            BetaKeyBatch::new(&[key.digest()], 1, None, "browser fixture")
+                .unwrap()
+                .issue(operator),
+        )
+        .unwrap();
+    let register = |name: &str| Request::Register {
+        username: name.into(),
+        beta_key: key.display().as_str().to_lowercase(),
+    };
+    // Registration is the browser listener's; the native surface refuses it.
+    assert_eq!(
+        http.exchange(&register("web-player"), None).err(),
+        Some(Error::Rejected)
+    );
+    assert_eq!(
+        browser.answer(register("synthetic"), None).err(),
+        Some(Error::Conflict),
+        "a valid key learns that the name is taken"
+    );
+    let Response::Enrollment {
+        identity: account,
+        ticket,
+    } = browser.answer(register("web-player"), None).unwrap()
+    else {
+        panic!("an enrollment");
+    };
+    let context = Context::new(http.endpoint.issuer(), account.account, account.epoch).unwrap();
+    let (enrollment, message) = Enrollment::start(PASSWORD.into(), context).unwrap();
+    let Response::EnrollmentChallenge { message } = browser
+        .answer(
+            Request::EnrollmentStart {
+                ticket: copy(&ticket),
+                message,
+            },
+            None,
+        )
+        .unwrap()
+    else {
+        panic!("a challenge");
+    };
+    let result = enrollment.finish(&message).unwrap();
+    let master = MasterKey::generate().unwrap();
+    let wrapped = result.wrapping_key.wrap(&master).unwrap();
+    let code = RecoveryCode::generate().unwrap();
+    let recovery = code.wrap(context, &master).unwrap();
+    let object = ObjectContext::new(context, account.account, 1).unwrap();
+    let document = master.seal_object(object, DOCUMENT).unwrap();
+    let finish = |recovery: Option<&WrappedMasterKey>| Request::EnrollmentFinish {
+        ticket: copy(&ticket),
+        record: result.upload.clone(),
+        wrapped_master: wrapped.as_bytes().to_vec(),
+        document: document.clone(),
+        recovery: recovery.map(|r| r.as_bytes().to_vec()),
+    };
+    assert_eq!(
+        browser.answer(finish(None), None).err(),
+        Some(Error::Rejected)
+    );
+    assert!(matches!(
+        browser.answer(finish(Some(&recovery)), None).unwrap(),
+        Response::Done
+    ));
+    // Central stores the recovery wrapper as sent: the code opens it to the same key.
+    let stored: Vec<u8> = runtime
+        .block_on(operator.query_one_raw(sea_orm::Statement::from_string(
+            sea_orm::DbBackend::Postgres,
+            "SELECT recovery_wrapped_master FROM central_identity.accounts WHERE username_key = 'web-player'",
+        )))
+        .unwrap()
+        .unwrap()
+        .try_get("", "recovery_wrapped_master")
+        .unwrap();
+    let opened = code
+        .unwrap(context, &WrappedMasterKey::from_bytes(&stored).unwrap())
+        .unwrap();
+    let first = ObjectContext::new(context, account.account, 1).unwrap();
+    assert_eq!(&opened.open_object(first, &document).unwrap()[..], DOCUMENT);
+    let cookie = sign_in(&browser, http, context);
+    session(&browser, http, bridge, &cookie);
+    play(&browser, http, bridge, &cookie);
+}
+
+/// Sign-in on the website: the session goes to the cookie, never into the body.
+fn sign_in(browser: &Browser<'_>, http: &Http, context: Context) -> Token {
+    let Response::Discovery {
+        discovery: Discovery::Central { identity },
+    } = browser
+        .answer(
+            Request::Discover {
+                username: "Web-Player".into(),
+            },
+            None,
+        )
+        .unwrap()
+    else {
+        panic!("a central account");
+    };
+    // An attempt started on the native surface does not finish on the website.
+    let (login, message) = Login::start(PASSWORD.into(), context).unwrap();
+    let Response::LoginChallenge { attempt, message } = http
+        .exchange(&Request::LoginStart { identity, message }, None)
+        .unwrap()
+    else {
+        panic!("a challenge");
+    };
+    let result = login.finish(&message).unwrap();
+    let finish = Request::LoginFinish {
+        attempt,
+        message: result.finalization,
+    };
+    assert_eq!(browser.call(finish, None).err(), Some(Error::Rejected));
+    let (login, message) = Login::start(PASSWORD.into(), context).unwrap();
+    let Response::LoginChallenge { attempt, message } = browser
+        .answer(Request::LoginStart { identity, message }, None)
+        .unwrap()
+    else {
+        panic!("a challenge");
+    };
+    let result = login.finish(&message).unwrap();
+    let reply = browser
+        .call(
+            Request::LoginFinish {
+                attempt,
+                message: result.finalization,
+            },
+            None,
+        )
+        .unwrap();
+    let Response::BrowserSession {
+        identity: signed_in,
+        wrapped_master,
+        expires_at,
+    } = reply.response
+    else {
+        panic!("a browser session");
+    };
+    assert_eq!(signed_in.account, identity.account);
+    assert!(expires_at > 0);
+    // The page unwraps the master key only to see that the password worked.
+    result
+        .wrapping_key
+        .unwrap(&WrappedMasterKey::from_bytes(&wrapped_master).unwrap())
+        .unwrap();
+    reply.session.expect("a session for the cookie")
+}
+
+fn session(browser: &Browser<'_>, http: &Http, bridge: &Token, cookie: &Token) {
+    // The cookie is a browser session only: as a native bearer it is nothing.
+    assert!(
+        http.exchange(&Request::SessionStatus, Some(cookie))
+            .is_err()
+    );
+    let Response::SessionStatus {
+        migration_closed, ..
+    } = browser
+        .answer(Request::SessionStatus, Some(cookie))
+        .unwrap()
+    else {
+        panic!("a status");
+    };
+    assert!(migration_closed, "a registered account has no legacy reset");
+    assert_eq!(
+        browser.answer(Request::SessionStatus, None).err(),
+        Some(Error::Rejected)
+    );
+    // Operations outside the browser listener's list are refused, with any token.
+    for (request, token) in [
+        (Request::ReadDocument, cookie),
+        (Request::CreateObject, cookie),
+        (
+            Request::GatewayTicket {
+                gateway: GATEWAY.into(),
+                purpose: TicketPurpose::Admit,
+            },
+            cookie,
+        ),
+        (
+            Request::AcceptTerms {
+                subject: TermsSubject::Gateway {
+                    origin: GATEWAY.into(),
+                },
+                version: "1".into(),
+                digest: [0; 32],
+            },
+            cookie,
+        ),
+        (
+            Request::LegacyStatus {
+                legacy_id: "synthetic-legacy".into(),
+            },
+            bridge,
+        ),
+    ] {
+        assert_eq!(
+            browser.answer(request, Some(token)).err(),
+            Some(Error::Rejected)
+        );
+    }
+    // Central's terms are read and accepted on the website.
+    let Response::TermsStatus {
+        current: Some(current),
+        accepted: false,
+    } = browser.answer(Request::TermsStatus, Some(cookie)).unwrap()
+    else {
+        panic!("terms to accept");
+    };
+    assert!(matches!(
+        browser
+            .answer(
+                Request::AcceptTerms {
+                    subject: TermsSubject::Central,
+                    version: current.version.clone(),
+                    digest: current.digest,
+                },
+                Some(cookie),
+            )
+            .unwrap(),
+        Response::Done
+    ));
+    assert!(matches!(
+        browser.answer(Request::TermsStatus, Some(cookie)).unwrap(),
+        Response::TermsStatus { accepted: true, .. }
+    ));
+}
+
+/// The same account plays natively beside its browser session; signing out of
+/// the website ends only the browser session.
+fn play(browser: &Browser<'_>, http: &Http, bridge: &Token, cookie: &Token) {
+    let Discovery::Central { identity } =
+        central_client::discover(http, "web-player".into()).unwrap()
+    else {
+        panic!("a central account");
+    };
+    let mut session = central_client::login(http, identity, PASSWORD.into()).unwrap();
+    assert_eq!(session.document(), DOCUMENT);
+    assert!(session.migration_closed(http).unwrap());
+    browser
+        .answer(Request::SessionStatus, Some(cookie))
+        .unwrap();
+    session.confirm_restored(http).unwrap();
+    let ticket = session.gateway_ticket(http, GATEWAY.into()).unwrap();
+    let Response::GatewayIdentity {
+        identity: admitted,
+        legacy_id,
+        lease,
+        ..
+    } = http
+        .exchange(
+            &Request::RedeemGateway {
+                ticket,
+                purpose: TicketPurpose::Admit,
+            },
+            Some(bridge),
+        )
+        .unwrap()
+    else {
+        panic!("an admission");
+    };
+    assert_eq!((admitted.account, legacy_id), (identity.account, None));
+    assert!(lease.is_some());
+    assert!(matches!(
+        browser.answer(Request::Logout, Some(cookie)).unwrap(),
+        Response::Done
+    ));
+    assert!(
+        browser
+            .answer(Request::SessionStatus, Some(cookie))
+            .is_err()
+    );
+    assert_eq!(
+        browser.answer(Request::Logout, None).err(),
+        Some(Error::Rejected)
+    );
+    session.check_active(http).unwrap();
+    session.logout(http).unwrap();
+}

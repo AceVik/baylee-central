@@ -106,8 +106,17 @@ The server side of [web accounts](web-accounts.md) lands in three PRs.
   prior-version upgrade of the exact migration SQL with legacy data, the schema
   constraints, the grant contract and both session kinds over PostgreSQL 18.
   Deploy: stop, migrate, grant (`ops/grants.sql`), start.
-- **Next:** `Register`, the recovery wrapper in `EnrollmentFinish`, and the
-  browser listener with its cookie and per-address budgets.
+- **Wire and identity.** `Register { username, beta_key }` reserves a
+  registered account (key before name, `Conflict` only with a valid key);
+  `EnrollmentFinish.recovery` carries the recovery wrapper, required for
+  registered and refused for legacy accounts, and old clients still decode.
+  `IdentityService::handle_browser` serves the browser operations only, issues
+  browser sessions apart from the response (`Response::BrowserSession`) and
+  keeps sign-in attempts on their surface. Tests: every key refusal, reservations
+  that give their use back, revocation, reclaimed names, races for a key's last
+  use and for one name, the sweep of abandoned registrations, and the website's
+  flow ending in a native admission at the official gateway with no legacy ID.
+- **Next:** the browser listener with its cookie and per-address budgets.
 
 ## Validation and historical milestone evidence
 

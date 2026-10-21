@@ -154,6 +154,7 @@ pub fn enroll(
         record: result.upload,
         wrapped_master: wrapped.as_bytes().to_vec(),
         document,
+        recovery: None,
     };
     match transport.exchange(&request, None)? {
         Response::Done => Ok(()),
