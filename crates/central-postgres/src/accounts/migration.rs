@@ -1,33 +1,49 @@
 //! Restart only unfinished legacy enrollment; closed accounts can never downgrade.
 use super::{AccountStore, Error, Identity, Session, identity, number, statement, uuid};
+
+/// A live session's state, as `SessionStatus` reports it.
+pub struct Status {
+    /// The account and epoch the session belongs to.
+    pub identity: Identity,
+    /// The account's canonical username.
+    pub username: String,
+    /// Absolute Unix-seconds expiry; never renewed.
+    pub expires_at: i64,
+    /// No legacy reset authority exists any more: a closed legacy migration,
+    /// or a registered account, which never had one.
+    pub migration_closed: bool,
+}
 use sea_orm::{ConnectionTrait, TransactionTrait};
 
 impl AccountStore {
     /// Validate the exclusive live session without loading its ciphertext or renewing expiry.
-    /// The flag is true once no legacy reset authority exists: a closed legacy
-    /// migration, or a registered account, which never had one.
     ///
     /// # Errors
     /// Rejects revoked, expired or stale-credential sessions and database failure.
     pub async fn session_status<'a>(
         &self,
         session: impl Into<Session<'a>>,
-    ) -> Result<(Identity, i64, bool), Error> {
+    ) -> Result<Status, Error> {
         let row = self.db.query_one_raw(statement(
-            "SELECT a.id, a.vault_epoch, a.legacy_closed OR a.source = 'registered' AS migration_closed,
+            "SELECT a.id, a.vault_epoch, a.username_key, a.legacy_closed OR a.source = 'registered' AS migration_closed,
              floor(extract(epoch FROM s.expires_at))::bigint AS expires_at
              FROM central_identity.accounts a JOIN central_identity.sessions s
              ON s.account_id = a.id AND s.credential_revision = a.credential_revision
              WHERE s.digest = $1 AND s.expires_at > pg_catalog.clock_timestamp()",
             vec![session.into().digest().to_vec().into()],
         )).await.map_err(|_| Error::Unavailable)?.ok_or(Error::Rejected)?;
-        Ok((
-            identity(&row)?,
-            row.try_get("", "expires_at")
+        Ok(Status {
+            identity: identity(&row)?,
+            username: row
+                .try_get("", "username_key")
                 .map_err(|_| Error::Unavailable)?,
-            row.try_get("", "migration_closed")
+            expires_at: row
+                .try_get("", "expires_at")
                 .map_err(|_| Error::Unavailable)?,
-        ))
+            migration_closed: row
+                .try_get("", "migration_closed")
+                .map_err(|_| Error::Unavailable)?,
+        })
     }
 
     /// Invalidate a pending migration before changing its legacy password. Already closed

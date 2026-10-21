@@ -254,8 +254,12 @@ async fn registered(store: &AccountStore, operator: &DatabaseConnection, keys: &
         identity.account
     );
     let session = login(store, keys, identity).await;
-    let (_, _, closed) = store.session_status(&session).await.unwrap();
-    assert!(closed, "a registered account has no legacy reset authority");
+    let status = store.session_status(&session).await.unwrap();
+    assert!(
+        status.migration_closed,
+        "a registered account has no legacy reset authority"
+    );
+    assert_eq!(status.username, "registered-one", "the canonical name");
     // Private objects wait for the restore confirmation, not for a legacy close.
     assert!(store.create_object(&session).await.is_err());
     store.confirm_restore(&session, 1).await.unwrap();

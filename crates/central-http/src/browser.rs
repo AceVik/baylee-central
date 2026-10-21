@@ -24,10 +24,48 @@ use std::{
 use tower_http::timeout::TimeoutLayer;
 use zeroize::Zeroizing;
 
-/// The only `Host` served, as Caddy passes it on.
-pub(crate) const HOST: &str = "baylee.app";
-/// The only `Origin` served.
-const ORIGIN: &str = "https://baylee.app";
+/// The one site a browser listener serves: the `Host` its proxy passes on and
+/// the page's exact `Origin`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct BrowserOrigin {
+    host: String,
+    origin: String,
+}
+
+impl BrowserOrigin {
+    /// `https://baylee.app`, the deployed service's only site.
+    #[must_use]
+    pub fn live() -> Self {
+        Self {
+            host: "baylee.app".into(),
+            origin: "https://baylee.app".into(),
+        }
+    }
+
+    /// A page served from an explicit numeric loopback `http` origin with a
+    /// port, for local runs of the development launcher. Every other check of
+    /// the listener stays as it is.
+    ///
+    /// # Errors
+    /// Rejects what [`central_api::Endpoint::development`] rejects: another
+    /// scheme, a DNS name, a remote address, a missing port, credentials, a
+    /// path, a query or a fragment.
+    pub fn development(value: &str) -> Result<Self, Error> {
+        let endpoint = central_api::Endpoint::development(value)?;
+        let origin = endpoint.origin().to_owned();
+        let host = origin
+            .strip_prefix("http://")
+            .ok_or(Error::Rejected)?
+            .to_owned();
+        Ok(Self { host, origin })
+    }
+
+    /// The exact `Origin` served.
+    #[must_use]
+    pub fn origin(&self) -> &str {
+        &self.origin
+    }
+}
 /// The session cookie's name; `__Host-` makes the browser refuse it unless it
 /// is `Secure`, has `Path=/` and no `Domain`, so no other site sets it.
 const COOKIE: &str = "__Host-central";
@@ -62,12 +100,14 @@ impl Accounts for IdentityService {
 
 struct Browser<A> {
     accounts: Arc<A>,
+    site: BrowserOrigin,
     budgets: Mutex<Budgets>,
 }
 
-pub(crate) fn router<A: Accounts>(accounts: Arc<A>) -> Router {
+pub(crate) fn router<A: Accounts>(accounts: Arc<A>, site: BrowserOrigin) -> Router {
     let state = Arc::new(Browser {
         accounts,
+        site,
         budgets: Mutex::default(),
     });
     Router::new()
@@ -99,7 +139,7 @@ async fn call<A: Accounts>(State(state): State<Arc<Browser<A>>>, request: HttpRe
         .extensions
         .get::<Peer>()
         .is_some_and(|Peer(peer)| peer.ip().is_loopback());
-    if !local || !permitted(&parts.uri, headers) {
+    if !local || !permitted(&parts.uri, headers, &state.site) {
         return refused();
     }
     // Already read whole, within the bound, by `bounded`.
@@ -173,19 +213,19 @@ fn exactly(headers: &HeaderMap, name: impl header::AsHeaderName + Copy, expected
 /// page can produce: the exact `Host` and `Origin`, same-origin fetch metadata
 /// when sent, JSON, the custom header that forces a cross-origin preflight
 /// (which no CORS answer ever grants), and no bearer.
-fn permitted(uri: &Uri, headers: &HeaderMap) -> bool {
+fn permitted(uri: &Uri, headers: &HeaderMap, site: &BrowserOrigin) -> bool {
     let fetch_site = HeaderName::from_static("sec-fetch-site");
     let mut sites = headers.get_all(&fetch_site).iter();
-    let site = match (sites.next(), sites.next()) {
+    let same_origin = match (sites.next(), sites.next()) {
         (None, _) => true,
         (Some(value), None) => value.as_bytes() == b"same-origin",
         (Some(_), Some(_)) => false,
     };
     uri.scheme().is_none()
         && uri.authority().is_none()
-        && exactly(headers, &header::HOST, HOST)
-        && exactly(headers, &header::ORIGIN, ORIGIN)
-        && site
+        && exactly(headers, &header::HOST, &site.host)
+        && exactly(headers, &header::ORIGIN, &site.origin)
+        && same_origin
         && exactly(headers, &header::CONTENT_TYPE, "application/json")
         && exactly(headers, &HeaderName::from_static("x-baylee-central"), "1")
         && !headers.contains_key(header::AUTHORIZATION)
@@ -349,6 +389,7 @@ mod tests {
                             account: [7; 16],
                             epoch: 1,
                         },
+                        username: "synthetic".into(),
                         wrapped_master: vec![1; 73],
                         expires_at: 1,
                     },
@@ -450,7 +491,7 @@ mod tests {
     /// One listener with its budgets, and the stand-in behind it.
     fn listener() -> (Router, Arc<Mock>) {
         let mock = Arc::new(Mock::default());
-        (router(mock.clone()), mock)
+        (router(mock.clone(), BrowserOrigin::live()), mock)
     }
 
     async fn send(app: &Router, headers: &[(&'static str, String)], body: String) -> Sent {
@@ -528,7 +569,7 @@ mod tests {
             assert_eq!(sent.status, StatusCode::FORBIDDEN, "{peer:?}");
         }
         let absolute = send_to(
-            router(mock.clone()),
+            router(mock.clone(), BrowserOrigin::live()),
             "POST",
             "https://baylee.app/api/v1",
             &base(),
@@ -727,7 +768,7 @@ mod tests {
             fail: Some(Error::Rejected),
             ..Mock::default()
         });
-        let app = router(mock.clone());
+        let app = router(mock.clone(), BrowserOrigin::live());
         let sent = send(&app, &base(), body(&Request::Logout)).await;
         assert_eq!(sent.status, StatusCode::UNAUTHORIZED);
         assert_eq!(sent.headers[header::SET_COOKIE], cleared);
@@ -739,10 +780,13 @@ mod tests {
             (Error::Busy, StatusCode::TOO_MANY_REQUESTS),
             (Error::TermsRequired, StatusCode::FORBIDDEN),
         ] {
-            let app = router(Arc::new(Mock {
-                fail: Some(error),
-                ..Mock::default()
-            }));
+            let app = router(
+                Arc::new(Mock {
+                    fail: Some(error),
+                    ..Mock::default()
+                }),
+                BrowserOrigin::live(),
+            );
             let finish = body(&Request::LoginFinish {
                 attempt: Token::generate().unwrap(),
                 message: vec![],
@@ -866,5 +910,86 @@ mod tests {
         // The oldest window made room; the newest are kept.
         let oldest = Client::from(IpAddr::from(std::net::Ipv4Addr::from(0x0a00_0000)));
         assert!(!book.0.contains_key(&oldest));
+    }
+
+    fn site(host: &str, origin: &str) -> Vec<(&'static str, String)> {
+        let mut headers: Vec<_> = base()
+            .into_iter()
+            .filter(|(name, _)| *name != "host" && *name != "origin")
+            .collect();
+        headers.push(("host", host.to_owned()));
+        headers.push(("origin", origin.to_owned()));
+        headers
+    }
+
+    #[tokio::test]
+    async fn a_development_listener_serves_its_own_loopback_page_only() {
+        let mock = Arc::new(Mock::default());
+        let development = BrowserOrigin::development("http://127.0.0.1:5173/").unwrap();
+        assert_eq!(development.origin(), "http://127.0.0.1:5173");
+        let app = router(mock.clone(), development);
+        let sent = send(
+            &app,
+            &site("127.0.0.1:5173", "http://127.0.0.1:5173"),
+            discover(),
+        )
+        .await;
+        assert_eq!(sent.status, StatusCode::OK);
+        for (host, origin) in [
+            ("baylee.app", "https://baylee.app"),
+            ("127.0.0.1:5173", "https://baylee.app"),
+            ("baylee.app", "http://127.0.0.1:5173"),
+            ("127.0.0.1:5174", "http://127.0.0.1:5174"),
+            ("localhost:5173", "http://localhost:5173"),
+            ("127.0.0.1:5173", "http://127.0.0.1:5173/"),
+        ] {
+            let sent = send(&app, &site(host, origin), discover()).await;
+            assert_eq!(sent.status, StatusCode::FORBIDDEN, "{host} {origin}");
+        }
+        // Every other condition still holds on a development listener.
+        let mut unmarked = site("127.0.0.1:5173", "http://127.0.0.1:5173");
+        unmarked.retain(|(name, _)| *name != "x-baylee-central");
+        assert_eq!(
+            send(&app, &unmarked, discover()).await.status,
+            StatusCode::FORBIDDEN
+        );
+        assert_eq!(calls(&mock), 1);
+        // The deployed listener does not serve the development page.
+        let (live, live_mock) = listener();
+        let sent = send(
+            &live,
+            &site("127.0.0.1:5173", "http://127.0.0.1:5173"),
+            discover(),
+        )
+        .await;
+        assert_eq!(sent.status, StatusCode::FORBIDDEN);
+        assert_eq!(calls(&live_mock), 0);
+        assert_eq!(BrowserOrigin::live().origin(), "https://baylee.app");
+    }
+
+    #[test]
+    fn a_development_origin_is_numeric_loopback_http_with_a_port() {
+        for origin in [
+            "https://127.0.0.1:5173",
+            "http://localhost:5173",
+            "http://127.0.0.1",
+            "http://127.0.0.1:0",
+            "http://192.168.1.2:5173",
+            "http://203.0.113.9:5173",
+            "http://127.0.0.1:5173/app",
+            "http://127.0.0.1:5173/?x=1",
+            "http://user@127.0.0.1:5173",
+            "https://baylee.app",
+            "baylee.app",
+            "",
+        ] {
+            assert!(BrowserOrigin::development(origin).is_err(), "{origin}");
+        }
+        assert_eq!(
+            BrowserOrigin::development("http://[::1]:5173")
+                .unwrap()
+                .origin(),
+            "http://[::1]:5173"
+        );
     }
 }

@@ -307,6 +307,7 @@ impl IdentityService {
                 BrowserReply {
                     response: Response::BrowserSession {
                         identity,
+                        username: issued.username,
                         wrapped_master: issued.wrapped_master,
                         expires_at: issued.expires_at,
                     },

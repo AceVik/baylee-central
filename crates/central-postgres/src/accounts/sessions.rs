@@ -51,6 +51,8 @@ impl Session<'_> {
 
 /// A session just issued.
 pub struct Issued {
+    /// The account's canonical username.
+    pub username: String,
     /// The account's stored client-encrypted master key.
     pub wrapped_master: Vec<u8>,
     /// Absolute Unix-seconds expiry, 30 minutes after issue; never renewed.
@@ -72,8 +74,8 @@ impl AccountStore {
         let session = session.into();
         let transaction = self.db.begin().await.map_err(|_| Error::Unavailable)?;
         let row = transaction.query_one_raw(statement(
-            "SELECT wrapped_master FROM central_identity.accounts WHERE id = $1 AND vault_epoch = $2
-             AND credential_revision = $3 AND credential IS NOT NULL FOR UPDATE",
+            "SELECT wrapped_master, username_key FROM central_identity.accounts WHERE id = $1
+             AND vault_epoch = $2 AND credential_revision = $3 AND credential IS NOT NULL FOR UPDATE",
             vec![uuid(credential.identity.account).into(), number(credential.identity.epoch)?.into(), credential.revision.into()],
         )).await.map_err(|_| Error::Unavailable)?.ok_or(Error::Rejected)?;
         transaction
@@ -94,6 +96,9 @@ impl AccountStore {
                 credential.revision.into(), session.kind().into()],
         )).await.map_err(|_| Error::Unavailable)?.ok_or(Error::Busy)?;
         let issued = Issued {
+            username: row
+                .try_get("", "username_key")
+                .map_err(|_| Error::Unavailable)?,
             wrapped_master: row
                 .try_get("", "wrapped_master")
                 .map_err(|_| Error::Unavailable)?,

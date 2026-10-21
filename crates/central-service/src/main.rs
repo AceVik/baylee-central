@@ -7,6 +7,7 @@ use central_policy::config::{Config, is_reserved_setting};
 use std::process::ExitCode;
 
 mod accounts;
+mod listeners;
 mod production;
 
 const USAGE: &str = "usage: central-service --dev | --dev-accounts-stdin | --accounts-stdin | --migrate-stdin | --issue-beta-keys-stdin | --generate-secrets";

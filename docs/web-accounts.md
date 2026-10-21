@@ -44,8 +44,11 @@ first. Every piece goes through the three passes of
 
 **Sign-in** (website): `Discover` → `LoginStart` → `LoginFinish`, as native.
 On the browser surface `LoginFinish` answers `BrowserSession { identity,
-wrapped_master, expires_at }` and sets the cookie; the token never reaches the
-page. The page unwraps the master key only to check the password worked and
+username, wrapped_master, expires_at }` and sets the cookie; the token never
+reaches the page. `SessionStatus` there answers `BrowserStatus { identity,
+username, expires_at }`; `username` is the account's canonical (lowercase)
+name. The native `SessionStatus` answer is unchanged: clients built before
+these refuse unknown fields. The page unwraps the master key only to check the password worked and
 keeps nothing. Then `TermsStatus`, and `AcceptTerms` where Central's terms in
 force are not accepted. `Logout` ends the session and clears the cookie.
 
@@ -200,6 +203,18 @@ room, so a crowd of addresses cannot lock new ones out.
 The global budgets of the native surface apply as well. The native surface
 (`/v1/native`) is unchanged, except that it refuses `Register` and a browser
 session.
+
+**Local runs.** `central-service --dev-accounts-stdin` takes an optional
+`"browser": {"listen": "127.0.0.1:<port>", "origin": "http://127.0.0.1:<page
+port>"}`. The origin is a numeric loopback `http` origin with a port (as
+`Endpoint::development`; `localhost` is refused), and that listener expects
+`Host` to be the origin's authority and `Origin` the origin exactly, in place
+of `baylee.app`; every other condition above holds, so the page's development
+proxy must keep `Host` and add `X-Forwarded-For`. The issuer is the
+development `endpoint`'s, the native listener's origin, so a WebAssembly build
+for such a run uses `Endpoint::development(<endpoint>)`, never the committed
+live issuer. The deployed `--accounts-stdin` has no origin field: `baylee.app`
+is fixed there.
 
 ## Browser crypto (`central-web-crypto`)
 

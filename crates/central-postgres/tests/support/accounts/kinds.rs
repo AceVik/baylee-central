@@ -13,13 +13,20 @@ pub(super) async fn run(store: &AccountStore, operator: &DatabaseConnection, key
         .issue_session(&credential, Session::Browser(&browser))
         .await
         .unwrap();
-    let (status, expires_at, closed) = store
+    let status = store
         .session_status(Session::Browser(&browser))
         .await
         .unwrap();
-    assert_eq!(status.account, identity.account);
-    assert_eq!(expires_at, issued.expires_at);
-    assert!(!closed, "an open legacy migration stays open");
+    assert_eq!(status.identity.account, identity.account);
+    assert_eq!(status.expires_at, issued.expires_at);
+    assert_eq!(
+        (status.username.as_str(), issued.username.as_str()),
+        ("session-kinds", "session-kinds")
+    );
+    assert!(
+        !status.migration_closed,
+        "an open legacy migration stays open"
+    );
     assert_eq!(issued.wrapped_master.len(), 73);
     store.document(&native).await.unwrap();
 

@@ -599,6 +599,26 @@ sign-out clearing the cookie, the fifth registration of an address refused
 while a neighbour's is not, and the same account admitted at the official
 gateway without a legacy ID. Engineering review, not an audit.
 
+**The username in the browser answers, and a development origin.** Design
+pass: the page asked for the account's name so it need not keep it in
+`localStorage`; the session's own account name is no new disclosure to the
+holder of its cookie. `Response` refuses unknown fields, so the native
+`SessionStatus` could not gain one without breaking clients pinned before:
+the browser surface answers a variant of its own, `BrowserStatus`. A local run
+of the pages needs the listener on an origin other than `baylee.app`; the
+site became a value (`BrowserOrigin`), and only the development launcher can
+name another one, a numeric loopback `http` origin validated as
+`Endpoint::development` validates the development endpoint. No check is
+skipped for it, and the deployed launcher's input has no field for it.
+Implementation pass: the two-listener runner moved to a module both launchers
+share. Adversarial pass: four injected faults each failed their test (the
+fixture ran clean first): the native and browser status answers swapped (a
+native client could no longer read its status), the sign-in or the status
+answering another column than the canonical name, and a development origin
+taken without validation. In this round an injection dry run restored files
+with `git checkout -- crates` over uncommitted work and so undid it; the work
+was re-applied from its scripts and committed before any further injection.
+
 ## Browser crypto (`central-web-crypto`), 2026-10-21
 
 Owner decisions: browser crypto is a WebAssembly crate built from

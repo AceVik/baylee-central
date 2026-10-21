@@ -7,7 +7,7 @@ use central_api::{
 };
 use central_client::{Session, Transport};
 use central_crypto::opaque::{Login, server::ServerKeys};
-use central_http::DevelopmentServer;
+use central_http::{BrowserOrigin, DevelopmentServer};
 use central_identity::IdentityService;
 use central_postgres::{AccountStore, connect_dev};
 use sea_orm::{ConnectionTrait, DatabaseConnection};
@@ -65,9 +65,12 @@ fn real_native_login_restore_migration_and_adversarial_paths() {
         .with_terms(Some(support::terms::central_document())),
     );
     let (stop_browser, browser_stopped) = oneshot::channel();
-    let browser_task = runtime.spawn(browser.run_browser(identity.clone(), async {
-        let _ = browser_stopped.await;
-    }));
+    let browser_task =
+        runtime.spawn(
+            browser.run_browser(identity.clone(), BrowserOrigin::live(), async {
+                let _ = browser_stopped.await;
+            }),
+        );
     let (stop, stopped) = oneshot::channel();
     let serving_endpoint = endpoint.clone();
     let task = runtime.spawn(async move {

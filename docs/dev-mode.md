@@ -16,10 +16,12 @@ reports the process; /health/ready deliberately returns 503 until real dependenc
 and release requirements are implemented. Future storage fixtures must use isolated
 synthetic databases/objects and must not read production configuration.
 
-Current HTTP scope: native local tooling only; exact Host, no browser Origin or
-Fetch-Metadata, no CORS, no keep-alive. Host and Origin filtering is defense in
-depth, not authentication. No sensitive endpoints are implemented. Future website
-integration needs its own explicit origin and CSRF policy.
+Current HTTP scope of `--dev`: native local tooling only; exact Host, no browser
+Origin or Fetch-Metadata, no CORS, no keep-alive. Host and Origin filtering is
+defense in depth, not authentication. The website's browser listener has its
+own origin and CSRF policy ([web accounts](web-accounts.md)); for local runs
+`--dev-accounts-stdin` can serve it for a numeric loopback page origin with
+every other check unchanged ([native login](native-login.md)).
 
 Crate boundaries:
 - central-policy: portable, synchronous policy/configuration types, no external
