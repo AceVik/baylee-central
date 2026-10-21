@@ -11,7 +11,7 @@ import { test } from "@playwright/test";
 
 import { mock } from "./mocks.ts";
 
-const PAGES = ["/", "/download", "/cards", "/gateways", "/contact", "/impressum", "/privacy"];
+const PAGES = ["/", "/download", "/cards", "/gateways", "/contact", "/impressum", "/privacy", "/register", "/signin", "/account"];
 const OWN = existsSync("dist/data/sets.json") && existsSync("dist/media");
 
 test.skip(process.env["SCREENS"] !== "1", "pictures only on request");

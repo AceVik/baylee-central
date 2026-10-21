@@ -5,8 +5,9 @@ The public part of milestone M4 in the accounts and web roadmap
 what Baylee is, the download, the card status, the gateway directory,
 contact, the legal notice and the privacy notice. It replaces Baylee's static
 `web/site` (served at baylee.acevik.de), whose words it keeps and whose
-layout it redraws. Account, sign-in and administration come later, lazily
-loaded inside this same app, once Central has its browser sign-in (M3).
+layout it redraws. Registration, sign-in and the account page
+(`docs/web-accounts.md`, for 0.1.0-beta.8a) are lazily loaded pages of this
+same app; administration comes later.
 
 | path | page |
 | --- | --- |
@@ -17,6 +18,10 @@ loaded inside this same app, once Central has its browser sign-in (M3).
 | `/contact` | the contact form and how to report a bug |
 | `/impressum` | the legal notice (§ 5 DDG), details behind a proof of work |
 | `/privacy` | the privacy notice (Art. 13 GDPR) |
+| `/terms` | Baylee Central's terms of use |
+| `/register` | a new account: beta key, name, password, age, consent; then the recovery code, shown once |
+| `/signin` | signing in at Baylee Central |
+| `/account` | who is signed in, until when; signing out |
 
 English and German today, one at a time, and ready for every language Magic
 is printed in (§"The words"): `?lang=<code>` wins, then the choice made with
@@ -49,6 +54,7 @@ none much past 200 lines:
 | `src/download/` | the release and the machine (`release.ts`, `machine.ts`), the button, the platform cards, the page |
 | `src/cards/` | the card status: data and parsing (`model.ts`, `numbers.ts`, `card.ts`, `data.ts`), the rows, the summary, the full list, the card grid |
 | `src/central/` | Central's directory client (`directory.ts`) and its checks (`validate.ts`) |
+| `src/account/` | the account pages (§"Accounts"): Central's browser surface (`api.ts`), the crypto Worker and its client (`crypto-worker.ts`, `crypto.ts`), the flows (`flows.ts`), who is signed in (`session.tsx`), the pages and their steps |
 | `src/central-wasm/` | the browser crypto, `central-web-crypto` built to WebAssembly with its glue: generated and committed, rebuilt with `cargo xtask wasm` (its `README.md`) |
 | `src/gateways/` | the directory page |
 | `src/contact/` | the contact form and the reporting help |
@@ -307,9 +313,10 @@ baylee.app {
 		}
 		reverse_proxy <feedback service>
 	}
-	# Central's reviewed browser routes (M3). Until they exist, nothing here.
+	# Central's browser surface (docs/web-accounts.md): POST /api/v1,
+	# the Host header unchanged, the client's address in X-Forwarded-For.
 	handle /api/* {
-		respond 404
+		reverse_proxy 127.0.0.1:28791
 	}
 	handle {
 		root * /opt/baylee-app/web
@@ -333,8 +340,10 @@ baylee.app {
 ```
 
 The CSP is `csp()` in `scripts/csp.ts`, which the local server and the tests
-send too: `script-src 'self'; style-src 'self'` (no inline script or style;
-React sets styles through the CSSOM, which the CSP allows),
+send too: `script-src 'self' 'wasm-unsafe-eval'; style-src 'self'` (no inline
+script or style; React sets styles through the CSSOM, which the CSP allows;
+`'wasm-unsafe-eval'` lets the account pages' Worker compile the browser
+crypto, and allows no `eval` of JavaScript; owner, 21.10.2026),
 `connect-src 'self' https://api.github.com https://raw.githubusercontent.com <feedback service>`,
 `img-src 'self' data: https://cards.scryfall.io`, `worker-src 'self'`.
 
@@ -345,17 +354,55 @@ in `FEEDBACK_TRUSTED_PROXIES` for the Impressum's allowance (Baylee's
 
 ## Privacy
 
-The app sets no cookie and has no analytics or tracker. It keeps two things
-in the visitor's browser: the language chosen (localStorage) and GitHub's
-answers for ten minutes (sessionStorage). It talks to GitHub's API, to
-raw.githubusercontent.com for the newest release's card status, to
-Scryfall's image host for an opened set, to the feedback service for the
-contact form and the Impressum, and (through this origin) to Central for the
-directory. `src/privacy/` says all of that; a new host in the CSP, a
+The app has no analytics or tracker, and no cookie but Central's session
+cookie, `__Host-central`, which only signing in sets. It keeps three things
+in the visitor's browser: the language chosen (localStorage), GitHub's
+answers for ten minutes (sessionStorage), and while signed in the name and
+the session's end (localStorage, `baylee-central-account`). It talks to
+GitHub's API, to raw.githubusercontent.com for the newest release's card
+status, to Scryfall's image host for an opened set, to the feedback service
+for the contact form and the Impressum, and (through this origin) to Central
+for the directory and the accounts. `src/privacy/` says all of that; a new host in the CSP, a
 cookie, a log or a new form means a new sentence there. Its hosting paragraph
 (netcup, no access log) is the old site's and must be confirmed for
 `baylee.app` before the page is published; the notice is a draft for the
 owner's lawyer, as the old one was.
+
+## Accounts
+
+Registration, sign-in and the account page follow `docs/web-accounts.md`:
+
+- **Central's browser surface** (`src/account/api.ts`): `POST /api/v1` on
+  this origin with `Content-Type: application/json` and
+  `X-Baylee-Central: 1`, `credentials: same-origin` so the `__Host-central`
+  cookie travels, and never an Authorization header; the page never sees the
+  session token. Every answer is checked against its exact shape (the
+  expected `result`, no other field, every byte array its exact length) and
+  a refusal is read by its status only.
+- **The crypto** runs in a module Worker (`src/account/crypto-worker.ts`),
+  one per registration or sign-in, terminated at the end, which discards the
+  WebAssembly module's memory; the page hands it the password and bytes and
+  never holds a state or a key. Argon2 (64 MiB) never blocks the page.
+- **Registration**: the form says early what Central would refuse (the
+  name's rules, eight characters, the two passwords, the age of 16, the
+  consent, linked to `/terms` and `/privacy` in a new tab); then `Register`,
+  the enrollment, the recovery code (copy, download as a text file, and a
+  confirmation before going on; leaving earlier asks first), a sign-in
+  started at once so the password is let go, and the terms.
+- **Terms**: after a sign-in, `TermsStatus`; where Central's terms in force
+  are not accepted, the page shows the texts Central serves in its language
+  and accepts only when they hash to the version's digest
+  (`src/account/digest.ts`), so an acceptance names exactly what was shown.
+  While the texts are `draft`, nothing is in force and there is no step.
+- **Who is signed in** (`src/account/session.tsx`): the name and the
+  session's end, remembered for the header, confirmed once per load with
+  `SessionStatus`, forgotten on signing out, at the end, or on Central's no.
+
+The unit tests use stand-ins for Central and the crypto
+(`test/support/central.ts`); `e2e/account.spec.ts` runs the pages against a
+strict mock of the browser surface (`e2e/central.ts`), with a stand-in
+Worker for the flows and the real WebAssembly for its own checks, and shows
+that without `'wasm-unsafe-eval'` the crypto cannot start.
 
 ## Accessibility and motion
 
@@ -374,5 +421,8 @@ The policy check (`cargo xtask policy`) skips
 nothing else under `web/`; a Cargo target inside it is refused, and the
 policy regressions prove both.
 
-- The directory waits for M3's browser route (above).
+- The directory waits for M3's browser route (above): the browser surface
+  takes only the account operations, not `GatewayDirectory`.
+- The account pages have run against the mock only; the run against a real
+  local Central waits for the server's browser surface on `main`.
 - No automated accessibility audit (axe) yet: it would be a new dependency.

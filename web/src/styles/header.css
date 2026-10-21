@@ -97,3 +97,5 @@
 }
 .nav-discord { font-weight: 600; }
 
+.nav-account { font-weight: 700; }
+.nav-account bdi { max-width: 12ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

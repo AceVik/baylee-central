@@ -36,6 +36,7 @@ const TYPES: Record<string, string> = {
   ".avif": "image/avif",
   ".ico": "image/x-icon",
   ".svg": "image/svg+xml",
+  ".wasm": "application/wasm",
 };
 
 const policy = csp(["http://127.0.0.1:28780"]);

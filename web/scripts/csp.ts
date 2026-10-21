@@ -5,6 +5,9 @@
 // the newest release's card status, Scryfall's image host for card
 // pictures, and the feedback service for the contact form. Central's
 // directory and the Impressum are this origin (`/api`, `/site/impressum`).
+// `'wasm-unsafe-eval'` lets the account pages' Worker compile the browser
+// crypto's WebAssembly (owner, 21.10.2026); it allows no `eval` of
+// JavaScript and no inline script.
 
 export const FEEDBACK_ORIGIN = "https://feedback.baylee.acevik.de";
 
@@ -19,7 +22,7 @@ export function csp(extraConnect: readonly string[] = []): string {
   ].join(" ");
   return [
     "default-src 'self'",
-    "script-src 'self'",
+    "script-src 'self' 'wasm-unsafe-eval'",
     "style-src 'self'",
     "img-src 'self' data: https://cards.scryfall.io",
     "font-src 'self'",

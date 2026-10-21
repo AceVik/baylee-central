@@ -7,10 +7,13 @@ import { describe, expect, it } from "vitest";
 
 import { App } from "../../src/App";
 import { KEYS } from "../../src/i18n-keys";
+import { ACCOUNT_KEY } from "../../src/account/session";
 import { LangProvider, OFFERED } from "../../src/i18n";
 import { serve } from "../support/network";
 
-const PAGES = ["/", "/download", "/cards", "/gateways", "/contact", "/impressum", "/privacy", "/terms", "/nowhere"];
+const PAGES = ["/", "/download", "/cards", "/gateways", "/contact", "/impressum", "/privacy", "/terms", "/register", "/signin", "/account", "/nowhere"];
+/** The pages that change when an account is signed in (the header on every one). */
+const SIGNED_IN = ["/", "/signin", "/account"];
 
 /** The words a visitor meets: the text, and what labels, alternatives and titles say. */
 function words(): string {
@@ -21,8 +24,12 @@ function words(): string {
 }
 
 describe("the words on every page", () => {
-  it.each(OFFERED.flatMap((lang) => PAGES.map((path) => [lang, path] as const)))("%s %s", async (lang, path) => {
+  it.each([
+    ...OFFERED.flatMap((lang) => PAGES.map((path) => [lang, path, false] as const)),
+    ...OFFERED.flatMap((lang) => SIGNED_IN.map((path) => [lang, path, true] as const)),
+  ])("%s %s (signed in: %s)", async (lang, path, signedIn) => {
     serve(() => undefined);
+    if (signedIn) window.localStorage.setItem(ACCOUNT_KEY, JSON.stringify({ name: "synthetic_name", expiresAt: Math.floor(Date.now() / 1000) + 600 }));
     window.history.replaceState(null, "", path);
     render(
       <LangProvider initial={lang}>

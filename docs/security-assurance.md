@@ -622,3 +622,61 @@ in `--check` one changed byte, a wrong sum and an extra file, and the macOS
 build itself, which CI's Linux check refused. Engineering
 review, not an audit; the full round trip against Central's browser surface
 is the account pages' run against a real local Central.
+
+## Account pages on baylee.app, 2026-10-21
+
+Owner decisions: registration and sign-in on the website, a recovery code
+shown once, a strictly necessary `__Host-` session cookie, and
+`'wasm-unsafe-eval'` in the site's CSP ([web accounts](web-accounts.md),
+`web/README.md` §"Accounts").
+
+Design pass: the assets are the password and the recovery code while the
+page holds them, the session (Central's HttpOnly cookie, never seen by the
+page) and the person's consent to the terms. Callers: the page is trusted
+code from this origin; Central's answers are checked, not trusted. Every
+request carries `X-Baylee-Central: 1` and JSON, goes `credentials:
+same-origin` with `redirect: "error"`, and never an Authorization header;
+an answer must be exactly its shape. The crypto runs in a Worker per flow
+that is terminated at the flow's end. An unknown name and a wrong password
+read the same; only a valid key learns that a name is taken (the server's
+rule). A terms version is accepted only when the served texts hash to the
+digest in force, so a forged or stale text can never be accepted in the
+person's name. The page remembers only the name and the session's end, to
+show them; Central decides whether the session lives. Not addressed,
+recorded: ASVS 5.0 V6.2.4 (checking a new password against the 3000 most
+common) needs a list in the page, whose source and licence are the owner's
+to choose; the strength hint lowers a few common words and the name only.
+
+Implementation pass: no HTML is ever interpreted (React text, Fluent
+messages through `rich`, terms through `LegalText`, names in `<bdi>`);
+the CSP still forbids inline script and `eval` of JavaScript, and frames.
+The password lives in the form's state and one closure until the sign-in
+after registration has handed it to its Worker; the recovery code lives in
+the page's state until the person confirms it was kept, its file through a
+Blob URL revoked at once; leaving earlier asks first. Findings fixed: the
+provider's default client was a new object on every render, which would
+have asked Central for the session in a loop; the terms step restarted on
+every parent render; a focus effect keyed on a fresh object moved the focus
+from "Password again" back to "Password" on every keystroke (a component
+test caught it); a scrolling terms box needed a focus stop the lint rules
+forbid, so the terms now flow in the page. Signing out while Central cannot
+be reached forgets the session here, but the HttpOnly cookie lives until its
+end: the account page now says so, with the time, instead of claiming the
+session ended.
+
+Adversarial pass: unit tests hold every answer to its shape (an extra
+field, a 63-byte or 256-valued byte array, a non-v7 account, epoch 0 or
+2^53, a terms version `draft`, unordered or unknown languages) and every
+status to its meaning; the digest equals a value computed with Python's
+hashlib; a foreign identity or a wrapper that does not open ends the new
+session with `Logout`; every flow's Worker is closed on every path. Against
+the build under its CSP, at a phone's and a desktop's width, a strict mock
+of the browser surface refuses any request with wrong headers, origin,
+fields or byte lengths and none occurs; the real WebAssembly starts both
+exchanges in its Worker with 32- and 96-byte messages and refuses a forged
+registration response and KE2; with `'wasm-unsafe-eval'` removed from the
+Worker's CSP the module cannot start and the page says so. Injected faults
+each failed a test: no `X-Baylee-Central` header, `credentials: "include"`,
+no digest check, no identity check, extra fields accepted. Engineering
+review, not an audit; the run against a real local Central waits for the
+server's browser surface.
