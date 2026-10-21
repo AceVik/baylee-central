@@ -337,6 +337,7 @@ fn sign_in(browser: &Browser, http: &Http, context: Context) -> Token {
         .unwrap();
     let Response::BrowserSession {
         identity: signed_in,
+        username,
         wrapped_master,
         expires_at,
     } = reply.response
@@ -344,6 +345,10 @@ fn sign_in(browser: &Browser, http: &Http, context: Context) -> Token {
         panic!("a browser session");
     };
     assert_eq!(signed_in.account, identity.account);
+    assert_eq!(
+        username, "web-player",
+        "the canonical name, though typed Web-Player"
+    );
     assert!(expires_at > 0);
     // The page unwraps the master key only to see that the password worked.
     result
@@ -359,15 +364,19 @@ fn session(browser: &Browser, http: &Http, bridge: &Token, cookie: &Token) {
         http.exchange(&Request::SessionStatus, Some(cookie))
             .is_err()
     );
-    let Response::SessionStatus {
-        migration_closed, ..
+    // The browser's status names the account, which the native one does not.
+    let Response::BrowserStatus {
+        username,
+        expires_at,
+        ..
     } = browser
         .answer(&Request::SessionStatus, Some(cookie))
         .unwrap()
     else {
-        panic!("a status");
+        panic!("a browser status");
     };
-    assert!(migration_closed, "a registered account has no legacy reset");
+    assert_eq!(username, "web-player");
+    assert!(expires_at > 0);
     assert_eq!(
         browser.answer(&Request::SessionStatus, None).err(),
         Some(Error::Rejected)

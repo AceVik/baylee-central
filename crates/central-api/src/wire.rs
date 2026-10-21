@@ -369,9 +369,22 @@ pub enum Response {
     BrowserSession {
         /// Account and epoch bound into the completed OPAQUE exchange.
         identity: Identity,
+        /// The account's canonical username, for the page to show.
+        username: String,
         /// Stored client-encrypted master key, to check the password worked.
         wrapped_master: Vec<u8>,
         /// Absolute Unix-seconds expiry of the browser session; never renewed.
+        expires_at: i64,
+    },
+    /// The browser listener's answer to `SessionStatus`: the live browser
+    /// session's account and expiry. The native answer stays
+    /// [`Response::SessionStatus`], unchanged for clients built before this one.
+    BrowserStatus {
+        /// Identity bound to this session.
+        identity: Identity,
+        /// The account's canonical username, for the page to show.
+        username: String,
+        /// Absolute Unix-seconds expiry; this query does not renew it.
         expires_at: i64,
     },
     /// Newly reserved registration, or newly reserved or resumable legacy enrollment.

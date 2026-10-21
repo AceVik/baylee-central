@@ -1,5 +1,6 @@
 use std::{future::Future, io, net::SocketAddr, time::Duration};
 
+use super::browser::BrowserOrigin;
 use axum::http::HeaderValue;
 use central_policy::config::Config;
 use hyper::server::conn::http1;
@@ -91,15 +92,18 @@ impl DevelopmentServer {
     }
 
     /// Serve the website's browser listener (`docs/web-accounts.md`): one
-    /// route, `POST /api/v1`, for `Host: baylee.app` behind the site's TLS
-    /// proxy on loopback, which must pass the `Host` unchanged and append the
-    /// client to `X-Forwarded-For`. Only the browser operations are served.
+    /// route, `POST /api/v1`, for the page at `site` behind its proxy on
+    /// loopback, which must pass the `Host` unchanged and append the client to
+    /// `X-Forwarded-For`. Only the browser operations are served. The deployed
+    /// service passes [`BrowserOrigin::live`]; a numeric loopback
+    /// [`BrowserOrigin::development`] is for local runs only.
     ///
     /// # Errors
     /// Rejects a body capacity other than the browser listener's, or listener failures.
     pub async fn run_browser(
         self,
         identity: std::sync::Arc<central_identity::IdentityService>,
+        site: BrowserOrigin,
         shutdown: impl Future<Output = ()>,
     ) -> io::Result<()> {
         if self.config.request_bytes().get() != super::browser::REQUEST_BYTES {
@@ -107,7 +111,7 @@ impl DevelopmentServer {
                 "browser listener requires its fixed body capacity",
             ));
         }
-        self.run_router(super::browser::router(identity), shutdown)
+        self.run_router(super::browser::router(identity, site), shutdown)
             .await
     }
 

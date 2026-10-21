@@ -11,5 +11,5 @@ mod browser;
 mod native;
 mod server;
 
-pub use browser::REQUEST_BYTES as BROWSER_REQUEST_BYTES;
+pub use browser::{BrowserOrigin, REQUEST_BYTES as BROWSER_REQUEST_BYTES};
 pub use server::DevelopmentServer;

@@ -47,12 +47,20 @@ impl IdentityService {
             | Request::WriteObject { .. }
             | Request::DeleteObject { .. }) => self.object_request(request, bearer).await,
             Request::SessionStatus => {
-                let (identity, expires_at, migration_closed) =
-                    self.store.session_status(surface.session(bearer)?).await?;
-                Ok(Response::SessionStatus {
-                    identity,
-                    expires_at,
-                    migration_closed,
+                let status = self.store.session_status(surface.session(bearer)?).await?;
+                Ok(match surface {
+                    Surface::Native => Response::SessionStatus {
+                        identity: status.identity,
+                        expires_at: status.expires_at,
+                        migration_closed: status.migration_closed,
+                    },
+                    // The page shows the name; the native answer stays as old
+                    // clients decode it.
+                    Surface::Browser => Response::BrowserStatus {
+                        identity: status.identity,
+                        username: status.username,
+                        expires_at: status.expires_at,
+                    },
                 })
             }
             request @ (Request::LegacyInvalidate { .. } | Request::LegacyClose { .. }) => {

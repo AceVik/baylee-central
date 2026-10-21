@@ -18,6 +18,7 @@ mod objects;
 mod registration;
 mod sessions;
 mod terms;
+pub use migration::Status;
 pub use sessions::{Issued, Session};
 pub use terms::MAX_GATEWAY_VERSIONS;
 

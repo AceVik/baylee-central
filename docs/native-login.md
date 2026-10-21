@@ -82,7 +82,9 @@ explicit numeric loopback address. It takes one bounded JSON configuration from
 standard input: `endpoint`, `gateway`, `database_port`, `database_user`,
 `database_name`, `database_password`, `opaque_setup` and `bridge`. The last two
 are byte arrays: the persisted versioned server setup and a random 32-byte bridge
-credential. Keep this configuration outside source control with owner-only file
+credential. An optional `browser` (`listen`, `origin`) starts the website's
+browser listener for a page served on a loopback origin ([web
+accounts](web-accounts.md) §"Local runs"). Keep this configuration outside source control with owner-only file
 permissions; never pass credentials on the command line. A restart must reuse
 the setup. The service does not create keys or run migrations implicitly.
 This command only accepts loopback development endpoints and the restricted

@@ -53,7 +53,9 @@ is not loopback, or an operation outside the list. No CORS header is ever sent.
 Bodies are at most 64 KiB. Errors keep the native route's statuses and fixed
 text. The browser session is the cookie `__Host-central` (`Secure`, `HttpOnly`,
 `SameSite=Strict`, `Path=/`, `Max-Age=1800`), never in a body; signing out
-clears it.
+clears it. Sign-in and session status answer there with the account's
+canonical username (`BrowserSession`, `BrowserStatus`). The site is fixed to
+`baylee.app` in this mode; only the development launcher takes another.
 
 Per-address budgets read the last `X-Forwarded-For` hop, which Caddy sets to
 the client it saw: 5 registrations an hour, 30 discoveries and 30 sign-in starts
