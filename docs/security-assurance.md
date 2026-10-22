@@ -952,3 +952,24 @@ again, no 10-minute rule, `invalidate_legacy` keeping the wrapper,
 `recovery_create` wrapping a fresh key, and one opening any wrapper, a
 sign-in that never makes a code, no identity check of the summary, and a
 retry with other bytes. Engineering review, not an audit.
+
+Against a real Central, 23.10.2026 (`web/e2e-real/moved.spec.ts`): this
+branch's release build in the deployed mode (`--accounts-stdin` with
+`browser.listen`, the committed terms in force) over verify-full TLS to
+PostgreSQL 18.6, provisioned, migrated (000001 to 000008 and 000010) and
+granted as `docs/operations.md` says, behind the stand-in for the site's
+Caddy; Chromium at `https://baylee.app`, at a phone's and a desktop's width.
+Per width, one synthetic account was moved as Baylee's client and the bridge
+move one (`LegacyReserve` with the bridge credential, enrollment without a
+recovery wrapper, sign-in, `ConfirmRestore`, `LegacyClose`, over the native
+listener with the committed WebAssembly); then the page signed in with real
+OPAQUE and Argon2 in its Worker, asked `AccountSummary`, showed the terms,
+accepted them, showed the code the sign-in made, sent `SetRecovery` once
+after "I kept it", and the account page said the account has a code, also
+after a reload. The rows: `source = legacy`, the move closed and restored,
+73-byte password and recovery wrappers, epoch 1, only browser sessions left;
+Central's log named no token, password or key. Everything started was
+stopped and checked (both listeners and the stand-in refusing connections,
+the container removed by its label), and the passwords, secrets document and
+certificates, which lived only in that run's shell and its owned directory,
+are gone.
