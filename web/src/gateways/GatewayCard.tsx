@@ -1,7 +1,8 @@
 // One listed gateway. Its name and version are the operator's words, shown
 // as text; its website is a link only because the directory's checks put it
 // on the gateway's own origin. The official gateway carries a mark, which
-// this page sets by the origin it knows, never by anything Central sends.
+// this page sets by comparing the listed origin with the one it knows
+// (`OFFICIAL_GATEWAY`), never by a name or anything else an operator sends.
 
 import { useState } from "react";
 

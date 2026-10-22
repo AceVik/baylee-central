@@ -265,8 +265,8 @@ a link only after those checks, with `rel="noopener noreferrer nofollow"`.
 
 The official gateway comes first with an "Official" mark, the rest in
 Central's order. The page knows it by its origin, `OFFICIAL_GATEWAY` in
-`src/config.ts` (the bridge's, `https://baylee.acevik.de`), never by anything
-in the answer; only what is drawn moves, so the next page still starts after
+`src/config.ts` (the bridge's, `https://baylee.acevik.de`), never by a name
+or anything else an operator sends; only what is drawn moves, so the next page still starts after
 Central's last id. Central lists it once the operator has
 (`docs/operations.md` §"The official gateway"); it shows online once the
 official gateway sends its heartbeat. The tests use
