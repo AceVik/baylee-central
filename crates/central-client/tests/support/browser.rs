@@ -30,7 +30,7 @@ const PASSWORD: &str = "synthetic browser password";
 const GATEWAY: &str = "http://127.0.0.1:28766";
 /// The initial account document of `docs/web-accounts.md`, with this fixture's gateway.
 const DOCUMENT: &[u8] = br#"{"version":1,"gateways":["http://127.0.0.1:28766"],"preferences":{},"legacy":null,"chat":{"devices":[],"installations":[]}}"#;
-const SET: &str = "; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=1800";
+const SET: &str = "; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=43200";
 const CLEARED: &str = "__Host-central=; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=0";
 
 /// The page's `fetch`, as `baylee.app`'s Caddy passes it to the listener.
@@ -379,6 +379,22 @@ fn session(browser: &Browser, http: &Http, bridge: &Token, cookie: &Token) {
     assert!(expires_at > 0);
     assert_eq!(
         browser.answer(&Request::SessionStatus, None).err(),
+        Some(Error::Rejected)
+    );
+    // The page renews its session with the cookie, never as a native bearer.
+    let Response::Renewed { expires_at: renewed } = browser
+        .answer(&Request::RenewSession, Some(cookie))
+        .unwrap()
+    else {
+        panic!("a renewal");
+    };
+    assert!(renewed >= expires_at, "a renewal never shortens the session");
+    assert!(
+        http.exchange(&Request::RenewSession, Some(cookie))
+            .is_err()
+    );
+    assert_eq!(
+        browser.answer(&Request::RenewSession, None).err(),
         Some(Error::Rejected)
     );
     // Operations outside the browser listener's list are refused, with any token.

@@ -53,7 +53,8 @@ impl Session {
         self.identity
     }
 
-    /// Check whether this is still the account's single active session. Never renews expiry.
+    /// Check whether this is still the account's single active session. Never
+    /// renews expiry ([`Session::renew`] does).
     ///
     /// # Errors
     /// Rejects superseded/revoked sessions, identity substitution and transport failure.
@@ -79,6 +80,23 @@ impl Session {
             {
                 Ok(migration_closed)
             }
+            _ => Err(Error::Rejected),
+        }
+    }
+
+    /// Renew this session: it expires 30 minutes from now, never later than 12
+    /// hours after the password sign-in, and the gateway leases delegated from
+    /// it follow. Returns the new absolute Unix-seconds expiry. Renew well
+    /// before it; [`Session::check_active`] still says whether it lives.
+    ///
+    /// # Errors
+    /// Rejects an expired, superseded or revoked session (and a Central that
+    /// does not renew yet) and reports transport failure; a failed renewal
+    /// ends nothing by itself.
+    pub fn renew(&self, transport: &impl Transport) -> Result<i64, Error> {
+        self.same_endpoint(transport)?;
+        match transport.exchange(&Request::RenewSession, Some(&self.token))? {
+            Response::Renewed { expires_at } if expires_at > 0 => Ok(expires_at),
             _ => Err(Error::Rejected),
         }
     }

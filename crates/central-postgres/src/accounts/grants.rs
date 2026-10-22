@@ -1,5 +1,6 @@
 //! Exact runtime privileges: approving origins, rewriting archives and issuing or
-//! revoking beta keys remain operator-only; the runtime only spends a key's uses.
+//! revoking beta keys remain operator-only; the runtime only spends a key's uses
+//! and moves a lease's expiry with its renewed session.
 use super::{AccountStore, statement};
 use sea_orm::ConnectionTrait;
 
@@ -13,7 +14,7 @@ impl AccountStore {
              ('private_objects', ARRAY['SELECT','INSERT','UPDATE','DELETE'], NULL),
              ('gateways', ARRAY['SELECT','INSERT','UPDATE'], NULL),
              ('gateway_admins', ARRAY['SELECT','INSERT','DELETE'], NULL),
-             ('gateway_leases', ARRAY['SELECT','INSERT','DELETE'], NULL),
+             ('gateway_leases', ARRAY['SELECT','INSERT','DELETE'], 'expires_at'),
              ('gateway_approvals', ARRAY['SELECT'], NULL),
              ('migration_archives', ARRAY['SELECT','INSERT'], NULL),
              ('gateway_terms', ARRAY['SELECT','INSERT'], NULL),

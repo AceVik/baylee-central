@@ -69,8 +69,11 @@ impl BrowserOrigin {
 /// The session cookie's name; `__Host-` makes the browser refuse it unless it
 /// is `Secure`, has `Path=/` and no `Domain`, so no other site sets it.
 const COOKIE: &str = "__Host-central";
-/// The cookie's lifetime, the session's 30 minutes.
-const COOKIE_SECONDS: u32 = 1_800;
+/// The cookie's lifetime: the session's cap, 12 hours after the sign-in that
+/// set it. The session itself expires sooner unless it is renewed
+/// (`RenewSession`), and an expired session's cookie finds no session, so a
+/// renewal never has to set the cookie again.
+const COOKIE_SECONDS: u32 = 43_200;
 /// Largest body: the browser operations are small (the initial document is a
 /// few hundred bytes sealed).
 pub const REQUEST_BYTES: usize = 65_536;
@@ -712,7 +715,7 @@ mod tests {
         assert_eq!(
             sent.headers[header::SET_COOKIE],
             format!(
-                "__Host-central={}; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=1800",
+                "__Host-central={}; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=43200",
                 hex(0xab)
             )
         );

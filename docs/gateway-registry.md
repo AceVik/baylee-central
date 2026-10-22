@@ -101,8 +101,11 @@ Exactly **one** central session is active per account, even on the same device. 
 new login atomically deletes earlier sessions and their tickets/leases before
 inserting the new session under an account row lock. Concurrent successful
 logins leave the last committed session active. Incorrect password proofs or
-stale credential revisions do not revoke the current session. Sessions last at
-most 30 minutes. Explicit logout also cascades to all delegated leases. There
+stale credential revisions do not revoke the current session. A session lasts
+30 minutes and renews to 30 minutes from each renewal, at most 12 hours after its
+sign-in; its leases expire with it, renewed in the same transaction. A gateway
+therefore learns a later expiry on its next check and must accept it (no earlier
+one). Explicit logout also cascades to all delegated leases. There
 are at most eight outstanding tickets and 32 leases per session. These caps bound
 capability storage; account ciphertext and device metadata are not deleted by
 login replacement or logout.

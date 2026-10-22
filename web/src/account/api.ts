@@ -204,6 +204,10 @@ export const parse = {
     const o = answer(raw, "browser_status", ["identity", "username", "expires_at"]);
     return { identity: identity(o["identity"]), username: canonicalUsername(o["username"]), expiresAt: safeInteger(o["expires_at"], 1) };
   },
+  /** A renewed session's new end, in Unix seconds. */
+  renewed(raw: unknown): number {
+    return safeInteger(answer(raw, "renewed", ["expires_at"])["expires_at"], 1);
+  },
   terms(raw: unknown): TermsDocument | null {
     const t = answer(raw, "terms", ["terms"])["terms"];
     if (t === null) return null;
@@ -242,6 +246,8 @@ export interface Api {
   loginStart(identity: Identity, message: Uint8Array): Promise<{ attempt: Uint8Array; message: Uint8Array }>;
   loginFinish(attempt: Uint8Array, message: Uint8Array): Promise<BrowserSession>;
   sessionStatus(): Promise<SessionStatus>;
+  /** Renews the cookie's session: its new end, at most 12 hours after the sign-in. */
+  renewSession(): Promise<number>;
   logout(): Promise<void>;
   terms(): Promise<TermsDocument | null>;
   termsStatus(): Promise<{ current: TermsVersion | null; accepted: boolean }>;
@@ -302,6 +308,7 @@ export function api({ base = CENTRAL_API, fetch: doFetch = (...a) => fetch(...a)
     loginStart: (id, message) => post({ operation: "login_start", identity: wireIdentity(id), message: array(message) }, parse.loginChallenge),
     loginFinish: (attempt, message) => post({ operation: "login_finish", attempt: array(attempt), message: array(message) }, parse.browserSession),
     sessionStatus: () => post({ operation: "session_status" }, parse.sessionStatus),
+    renewSession: () => post({ operation: "renew_session" }, parse.renewed),
     logout: () => post({ operation: "logout" }, parse.done),
     terms: () => post({ operation: "terms" }, parse.terms),
     termsStatus: () => post({ operation: "terms_status" }, parse.termsStatus),

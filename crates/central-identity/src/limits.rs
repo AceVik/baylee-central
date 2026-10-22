@@ -59,6 +59,7 @@ impl Limits {
         let control = matches!(
             request,
             Request::SessionStatus
+                | Request::RenewSession
                 | Request::GatewaySession { .. }
                 | Request::GatewayAuthorize { .. }
                 | Request::TermsStatus

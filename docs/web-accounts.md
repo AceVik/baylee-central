@@ -104,7 +104,8 @@ reset, which uses it, comes with M1.
   back without a clean-up job.
 - `sessions.kind` (`native` | `browser`). `sessions_one_per_account` becomes
   one per account **and kind**, so a browser sign-in never ends the client's
-  session. Lifetime stays 30 minutes for both. A browser session is stored
+  session. Lifetime is 30 minutes for both, renewed while in use up to 12 hours
+  after the sign-in ([operations](operations.md#sessions)). A browser session is stored
   under SHA-256 over a fixed domain label and the token, not the native
   bearer's digest: a cookie value presented as a bearer on `/v1/native` finds
   no session, and a native bearer is no browser session. (Changed in the

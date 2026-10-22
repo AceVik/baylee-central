@@ -76,6 +76,7 @@ pub fn browser_operation(request: &Request) -> bool {
         | Request::EnrollmentStart { .. }
         | Request::EnrollmentFinish { .. }
         | Request::SessionStatus
+        | Request::RenewSession
         | Request::Logout
         | Request::Terms
         | Request::TermsStatus => true,
@@ -111,6 +112,7 @@ fn uses_session(request: &Request) -> bool {
     matches!(
         request,
         Request::SessionStatus
+            | Request::RenewSession
             | Request::Logout
             | Request::TermsStatus
             | Request::AcceptTerms { .. }
@@ -408,6 +410,7 @@ mod tests {
                 recovery: None,
             },
             Request::SessionStatus,
+            Request::RenewSession,
             Request::Logout,
             Request::Terms,
             Request::TermsStatus,
@@ -524,12 +527,13 @@ mod tests {
                 text[start..].split('"').next().unwrap().to_owned()
             })
             .collect();
-        assert_eq!(named.len(), 34, "every operation is in one of the lists");
+        assert_eq!(named.len(), 35, "every operation is in one of the lists");
     }
 
     #[test]
     fn only_session_operations_take_the_cookie() {
         assert!(uses_session(&Request::SessionStatus));
+        assert!(uses_session(&Request::RenewSession));
         assert!(uses_session(&Request::Logout));
         assert!(uses_session(&Request::TermsStatus));
         assert!(!uses_session(&Request::Terms));

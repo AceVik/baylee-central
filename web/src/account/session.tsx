@@ -4,7 +4,9 @@
 // so that after a reload it knows to ask Central (`SessionStatus`) whose
 // session it is; the name is always Central's, held in memory only. Signing
 // out, an expired session or Central's "no" forget it. Nothing else about the
-// account stays in the browser.
+// account stays in the browser. While a page is open and in view, it renews
+// the session (`RenewSession`), which Central caps at 12 hours after the
+// sign-in.
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
@@ -70,12 +72,29 @@ const AccountContext = createContext<AccountState | null>(null);
 
 /** The longest a timer may wait (setTimeout's limit). */
 const MAX_WAIT = 2 ** 31 - 1;
+/**
+ * How often a page in view renews its session: well inside the 30 minutes one
+ * renewal grants. A page shown again renews at once, unless it renewed (or
+ * signed in) within a tenth of that.
+ */
+export const RENEW_EVERY = 10 * 60 * 1000;
 
 /** The one client of the page, so that a render never makes another. */
 const CENTRAL = defaultApi();
 const WORKER: CryptoFactory = () => workerCrypto();
 
-export function AccountProvider({ api = CENTRAL, crypto = WORKER, children }: { api?: Api; crypto?: CryptoFactory; children: ReactNode }) {
+export function AccountProvider({
+  api = CENTRAL,
+  crypto = WORKER,
+  renewEvery = RENEW_EVERY,
+  children,
+}: {
+  api?: Api;
+  crypto?: CryptoFactory;
+  /** Milliseconds between renewals; shorter in tests. */
+  renewEvery?: number;
+  children: ReactNode;
+}) {
   const [account, setAccount] = useState<Account | null>(() => remembered());
 
   const change = useCallback((next: Account | null) => {
@@ -101,6 +120,43 @@ export function AccountProvider({ api = CENTRAL, crypto = WORKER, children }: { 
       live = false;
     };
   }, [api, change, unnamed]);
+
+  // a named session renews while the page is in view: on a timer, and when the
+  // page is shown again; Central's "no" means it is over, anything else waits
+  const named = account !== null && account.name !== null;
+  useEffect(() => {
+    if (!named) return;
+    let live = true;
+    let last = Date.now();
+    const renew = () => {
+      if (document.visibilityState !== "visible") return;
+      last = Date.now();
+      api.renewSession().then(
+        (expiresAt) => {
+          if (!live) return;
+          setAccount((now) => {
+            if (now === null) return now;
+            const next = { ...now, expiresAt };
+            remember(next);
+            return next;
+          });
+        },
+        (error: unknown) => {
+          if (live && error instanceof ApiError && error.kind === "rejected") change(null);
+        },
+      );
+    };
+    const shown = () => {
+      if (Date.now() - last >= renewEvery / 10) renew();
+    };
+    const timer = window.setInterval(renew, renewEvery);
+    document.addEventListener("visibilitychange", shown);
+    return () => {
+      live = false;
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", shown);
+    };
+  }, [api, change, named, renewEvery]);
 
   // the session ends at its time without a word from Central
   useEffect(() => {

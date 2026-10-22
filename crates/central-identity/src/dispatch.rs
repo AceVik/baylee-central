@@ -63,6 +63,9 @@ impl IdentityService {
                     },
                 })
             }
+            Request::RenewSession => Ok(Response::Renewed {
+                expires_at: self.store.renew_session(surface.session(bearer)?).await?,
+            }),
             request @ (Request::LegacyInvalidate { .. } | Request::LegacyClose { .. }) => {
                 self.legacy_mutation(request, bearer).await
             }

@@ -97,6 +97,12 @@ export function fakeCentral(opts: { terms?: TermsDocument | null; foreignIdentit
       if (c.session === null || account === undefined || name === undefined) throw new ApiError("rejected");
       return { identity: account.identity, username: said(name), expiresAt: c.session.expiresAt };
     },
+    async renewSession() {
+      step("renew_session");
+      if (c.session === null) throw new ApiError("rejected");
+      c.session = { ...c.session, expiresAt: c.session.expiresAt + 1_800 };
+      return c.session.expiresAt;
+    },
     async logout() {
       step("logout");
       if (c.session === null) throw new ApiError("rejected");

@@ -265,6 +265,7 @@ mod tests {
         }));
         for free in [
             Request::SessionStatus,
+            Request::RenewSession,
             Request::Logout,
             Request::Terms,
             Request::TermsStatus,

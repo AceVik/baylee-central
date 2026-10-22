@@ -10,6 +10,8 @@ GRANT SELECT, INSERT ON central_identity.migration_archives TO central_runtime;
 GRANT SELECT, INSERT, UPDATE ON central_identity.gateways TO central_runtime;
 GRANT SELECT ON central_identity.gateway_approvals TO central_runtime;
 GRANT SELECT, INSERT, DELETE ON central_identity.gateway_admins, central_identity.gateway_leases TO central_runtime;
+-- A renewed session moves its leases' expiry with it, and nothing else of them.
+GRANT UPDATE (expires_at) ON central_identity.gateway_leases TO central_runtime;
 GRANT SELECT, INSERT ON central_identity.gateway_terms, central_identity.gateway_terms_texts,
   central_identity.terms_acceptances TO central_runtime;
 -- A key's uses are spent by enrollment; issuing and revoking keys stay with the operator.
