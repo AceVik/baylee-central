@@ -72,6 +72,13 @@ master key under a recovery code, shown to the person once.
   `baylee-central/recovery-wrap/v1\0` followed by the same issuer, account
   and epoch (88 bytes), so neither wrapper opens as the other.
 
+A code may also be made after enrollment, for an account that has none (one
+moved from the official gateway, whose client enrolls without it): right
+after a sign-in the browser opens the master key with the password's
+wrapping key and wraps the same key under a new code, byte for byte as above
+([web accounts](web-accounts.md) §"A recovery code after a sign-in"). Nothing
+in the code, the key derivation or the wrapper changes.
+
 Known-answer tests pin the written form, the key and the wrapper for two
 vectors computed apart from the crate (`tests/recovery-vectors.py`: Python's
 base32 translated to Crockford's alphabet, pyca/cryptography's HKDF and

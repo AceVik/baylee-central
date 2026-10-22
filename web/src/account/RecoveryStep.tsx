@@ -1,12 +1,14 @@
 // The recovery code, shown once (docs/web-accounts.md §"Flows"): copy it,
 // download it as a text file, and confirm it was kept before going on.
 // Leaving the page before that asks first. Nothing keeps the code: once the
-// step ends it is gone from the page too.
+// step ends it is gone from the page too. A code made after a sign-in, for
+// an account moved here without one, can also be put off ("Not now"), which
+// throws it away, and is stored only after the confirmation (NewCodeStep).
 
 import { useEffect, useRef, useState } from "react";
 
 import { Icon } from "../components/icons";
-import { T, t, useLang } from "../i18n";
+import { T, t, useLang, type Key } from "../i18n";
 
 /** Saves `text` as a file named `name` (a download, never a navigation). */
 function save(name: string, text: string): void {
@@ -21,7 +23,27 @@ function save(name: string, text: string): void {
   window.setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
-export function RecoveryStep({ code, name, onKept }: { code: string; name: string; onKept(): void }) {
+export function RecoveryStep({
+  code,
+  name,
+  onKept,
+  lead = "recovery.lead",
+  onLater,
+  busy = false,
+  status = null,
+}: {
+  code: string;
+  name: string;
+  onKept(): void;
+  /** What the step says first: the registration's words, or a moved account's. */
+  lead?: Key;
+  /** "Not now": the code is thrown away. */
+  onLater?: (() => void) | undefined;
+  /** While the code is being stored: Continue ignores a second press. */
+  busy?: boolean;
+  /** What storing it came to, when it did not work. */
+  status?: { bad: boolean; key: Key } | null;
+}) {
   const lang = useLang();
   const [kept, setKept] = useState(false);
   const [copied, setCopied] = useState<"yes" | "no" | null>(null);
@@ -47,7 +69,7 @@ export function RecoveryStep({ code, name, onKept }: { code: string; name: strin
         <T id="recovery.title" />
       </h2>
       <p>
-        <T id="recovery.lead" />
+        <T id={lead} />
       </p>
       <p className="recovery-code" id="recovery-code" aria-label={t(lang, "recovery.label")}>
         <code translate="no">{code}</code>
@@ -76,9 +98,18 @@ export function RecoveryStep({ code, name, onKept }: { code: string; name: strin
           </span>
         </label>
       </p>
-      <button type="button" className="button" disabled={!kept} onClick={onKept}>
-        <T id="recovery.continue" />
-      </button>
+      <div className="form-row">
+        {/* while storing, never `disabled`, which would drop the focus; a second press is ignored */}
+        <button type="button" className="button" disabled={!kept} aria-disabled={busy ? true : undefined} onClick={busy ? undefined : onKept}>
+          <T id="recovery.continue" />
+        </button>
+        {onLater !== undefined && (
+          <button type="button" className="button button-ghost" onClick={onLater}>
+            <T id="recovery.later" />
+          </button>
+        )}
+        <output className={`form-status${status?.bad ? " bad" : ""}`}>{status !== null && <T id={status.key} />}</output>
+      </div>
     </section>
   );
 }

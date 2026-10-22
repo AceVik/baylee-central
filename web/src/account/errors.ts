@@ -11,4 +11,6 @@ export const FAILURE: Readonly<Record<FlowFailure, Key>> = {
   unreachable: "acct.errUnreachable",
   crypto: "acct.errCrypto",
   mismatch: "acct.errMismatch",
+  codeRefused: "recovery.errRefused",
+  codeTaken: "recovery.errTaken",
 };

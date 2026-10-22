@@ -1,8 +1,11 @@
 // Registration and sign-in, step by step (docs/web-accounts.md §"Flows"):
 // the page carries each message between the crypto Worker and Central. A
-// flow's Worker is closed when the flow ends, however it ends.
+// flow's Worker is closed when the flow ends, however it ends. A sign-in to
+// an account without a recovery code (one moved from the official gateway)
+// makes one in its Worker; the page shows it, and stores it only once the
+// person says they kept it (§"A recovery code after a sign-in").
 
-import { ApiError, sameIdentity, type Api, type BrowserSession } from "./api";
+import { ApiError, sameIdentity, type AccountSummary, type Api, type BrowserSession } from "./api";
 import { CryptoError, type CryptoFactory } from "./crypto";
 
 /** What the page says when a flow stops. */
@@ -20,7 +23,11 @@ export type FlowFailure =
   /** The browser crypto did not run (no Worker, no WebAssembly, no randomness). */
   | "crypto"
   /** Central answered what it must not: a foreign identity, a wrapper that does not open. */
-  | "mismatch";
+  | "mismatch"
+  /** A new recovery code: Central did not take it (the sign-in is too old, or the session over). */
+  | "codeRefused"
+  /** A new recovery code: the account has another one already. */
+  | "codeTaken";
 
 export class FlowError extends Error {
   readonly kind: FlowFailure;
@@ -93,16 +100,37 @@ export async function register(
   }
 }
 
+/** A recovery code made after a sign-in, held by the page until the person decides. */
+export interface NewCode {
+  /** Shown once, never kept. */
+  code: string;
+  /** The master key under it, 73 bytes: what `SetRecovery` sends, again on a retry. */
+  wrapper: Uint8Array;
+}
+
+/** What a sign-in leaves the page. */
+export interface SignedIn {
+  session: BrowserSession;
+  /** What Central says of the account; null when it did not answer. */
+  summary: AccountSummary | null;
+  /** For an account without a recovery code, a new one; null otherwise. */
+  code: NewCode | null;
+}
+
 /**
- * Signs in: discovery, OPAQUE, then a check that the master key Central
- * hands back opens under this password. On a mismatch the new session is
- * ended at once. The cookie is Central's to set; the page keeps nothing.
+ * Signs in: discovery, OPAQUE, then, while the Worker still holds the
+ * sign-in, `AccountSummary`. For an account without a recovery code the
+ * Worker opens the master key Central hands back and wraps it under a new
+ * code (`recoveryCreate`); for any other, or when Central does not say, it
+ * only checks that the key opens (`loginConfirm`). Either proves the
+ * password; nothing reaches Central of the code yet. On a mismatch the new
+ * session is ended at once. The cookie is Central's to set.
  */
 export async function signIn(
   input: { username: string; password: string },
   { api, crypto }: Deps,
   progress: (p: Progress) => void = () => {},
-): Promise<BrowserSession> {
+): Promise<SignedIn> {
   progress("signingIn");
   let identity;
   try {
@@ -127,15 +155,42 @@ export async function signIn(
     const session = await api.loginFinish(challenge.attempt, ke3);
     try {
       if (!sameIdentity(session.identity, identity)) throw new FlowError("mismatch");
+      let summary: AccountSummary | null = null;
+      try {
+        summary = await api.accountSummary();
+      } catch {
+        // Central did not say: the sign-in still proves the password, without a code
+      }
+      if (summary !== null && !sameIdentity(summary.identity, identity)) throw new FlowError("mismatch");
+      if (summary !== null && !summary.recovery) {
+        const made = await flow.recoveryCreate(session.wrappedMaster);
+        return { session, summary, code: { code: made.recoveryCode, wrapper: made.recovery } };
+      }
       await flow.loginConfirm(session.wrappedMaster);
+      return { session, summary, code: null };
     } catch (error) {
       await api.logout().catch(() => {});
       throw error;
     }
-    return session;
   } catch (error) {
     throw fromApi(error, "wrongLogin");
   } finally {
     flow.close();
+  }
+}
+
+/**
+ * Stores a code the person kept (`SetRecovery`). Its bytes are kept until
+ * Central answers, so a lost answer is retried with the same bytes, which
+ * Central takes again. `codeRefused`: the sign-in is 10 minutes old or the
+ * session is over; `codeTaken`: the account has another code; anything else
+ * may be tried again.
+ */
+export async function storeCode(code: NewCode, { api }: Pick<Deps, "api">): Promise<void> {
+  try {
+    await api.setRecovery(code.wrapper);
+  } catch (error) {
+    if (error instanceof ApiError && error.kind === "conflict") throw new FlowError("codeTaken");
+    throw fromApi(error, "codeRefused");
   }
 }

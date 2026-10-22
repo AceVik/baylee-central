@@ -79,6 +79,27 @@ export interface SessionStatus {
   expiresAt: number;
 }
 
+/** Where an account came from: moved from the official gateway, or registered here. */
+export type AccountSource = "legacy" | "registered";
+
+/** The browser session's account, for the account page (`AccountSummary`). */
+export interface AccountSummary {
+  identity: Identity;
+  /** The private sign-in name, canonical. */
+  username: string;
+  /** The name other players see; none until Central keeps one. */
+  displayName: string | null;
+  /** The tag beside it; none until Central keeps one. */
+  tag: number | null;
+  source: AccountSource;
+  /** The account has a recovery code. */
+  recovery: boolean;
+  admin: boolean;
+  /** The session's password sign-in, in Unix seconds; renewal never moves it. */
+  signedInAt: number;
+  expiresAt: number;
+}
+
 // ---------------------------------------------------------------- shapes
 
 type Json = Record<string, unknown>;
@@ -161,6 +182,11 @@ function termsText(v: unknown): TermsText {
   return { lang, updated, markdown };
 }
 
+/** The gateway's display-name rule: 3 to 16 ASCII letters and digits, `_` and `-` inside. */
+const DISPLAY_NAME = /^[A-Za-z0-9][A-Za-z0-9_-]{1,14}[A-Za-z0-9]$/;
+/** A tag is positive and fits a gateway's column (`i32`). */
+const MAX_TAG = 2 ** 31 - 1;
+
 // ---------------------------------------------------------------- answers
 
 export const parse = {
@@ -203,6 +229,44 @@ export const parse = {
   sessionStatus(raw: unknown): SessionStatus {
     const o = answer(raw, "browser_status", ["identity", "username", "expires_at"]);
     return { identity: identity(o["identity"]), username: canonicalUsername(o["username"]), expiresAt: safeInteger(o["expires_at"], 1) };
+  },
+  /**
+   * Every account Central registers holds a recovery code from its
+   * registration (its schema says so), so a registered account without
+   * one is no answer Central gives.
+   */
+  accountSummary(raw: unknown): AccountSummary {
+    const o = answer(raw, "account_summary", [
+      "identity",
+      "username",
+      "display_name",
+      "tag",
+      "source",
+      "recovery",
+      "admin",
+      "signed_in_at",
+      "expires_at",
+    ]);
+    const { display_name: displayName, tag, source, recovery, admin } = o;
+    if (displayName !== null && (typeof displayName !== "string" || !DISPLAY_NAME.test(displayName))) throw malformed();
+    if (tag !== null && (typeof tag !== "number" || !Number.isInteger(tag) || tag < 1 || tag > MAX_TAG)) throw malformed();
+    if (source !== "legacy" && source !== "registered") throw malformed();
+    if (typeof recovery !== "boolean" || typeof admin !== "boolean") throw malformed();
+    if (source === "registered" && !recovery) throw malformed();
+    const signedInAt = safeInteger(o["signed_in_at"], 1);
+    const expiresAt = safeInteger(o["expires_at"], 1);
+    if (expiresAt <= signedInAt) throw malformed();
+    return {
+      identity: identity(o["identity"]),
+      username: canonicalUsername(o["username"]),
+      displayName,
+      tag,
+      source,
+      recovery,
+      admin,
+      signedInAt,
+      expiresAt,
+    };
   },
   /** A renewed session's new end, in Unix seconds. */
   renewed(raw: unknown): number {
@@ -248,6 +312,10 @@ export interface Api {
   sessionStatus(): Promise<SessionStatus>;
   /** Renews the cookie's session: its new end, at most 12 hours after the sign-in. */
   renewSession(): Promise<number>;
+  /** The cookie's account: where it came from, whether it has a recovery code. */
+  accountSummary(): Promise<AccountSummary>;
+  /** Stores the recovery wrapper (73 bytes) made after a sign-in; the same bytes again are `Done`. */
+  setRecovery(recovery: Uint8Array): Promise<void>;
   logout(): Promise<void>;
   terms(): Promise<TermsDocument | null>;
   termsStatus(): Promise<{ current: TermsVersion | null; accepted: boolean }>;
@@ -309,6 +377,8 @@ export function api({ base = CENTRAL_API, fetch: doFetch = (...a) => fetch(...a)
     loginFinish: (attempt, message) => post({ operation: "login_finish", attempt: array(attempt), message: array(message) }, parse.browserSession),
     sessionStatus: () => post({ operation: "session_status" }, parse.sessionStatus),
     renewSession: () => post({ operation: "renew_session" }, parse.renewed),
+    accountSummary: () => post({ operation: "account_summary" }, parse.accountSummary),
+    setRecovery: (recovery) => post({ operation: "set_recovery", recovery: array(recovery) }, parse.done),
     logout: () => post({ operation: "logout" }, parse.done),
     terms: () => post({ operation: "terms" }, parse.terms),
     termsStatus: () => post({ operation: "terms_status" }, parse.termsStatus),

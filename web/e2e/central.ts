@@ -20,6 +20,8 @@ import { csp } from "../scripts/csp.ts";
 export const KEY = "CENTRAL-TEST-0000-0000-0001";
 export const PASSWORD = "violet lantern harbour quietly";
 export const CODE = "Y06Z-NKPA-ZTZE-Y093-8NKR-KAYD-XZZD-SEMR";
+/** The code the stand-in Worker makes after a sign-in, for an account without one. */
+export const NEW_CODE = "7Q3K-AXWD-0P4N-9RTB-5MHE-ZC2G-8VFJ-1YS6";
 export const ACCOUNT = [0x01, 0x92, 0xd0, 0xc5, 0x7b, 0x3e, 0x7a, 0x1f, 0x8c, 0x2d, 0x3e, 0x4f, 0x5a, 0x6b, 0x7c, 0x8d];
 /** The initial document's 125 bytes, sealed: 1 + 24 + 125 + 16. */
 export const SEALED_DOCUMENT = 166;
@@ -40,6 +42,8 @@ const FIELDS: Readonly<Record<string, readonly string[]>> = {
   terms_status: [],
   accept_terms: ["subject", "version", "digest"],
   gateway_directory: ["after"],
+  account_summary: [],
+  set_recovery: ["recovery"],
 };
 
 /** Exact byte lengths, by operation and field. */
@@ -49,6 +53,7 @@ const LENGTHS: Readonly<Record<string, Readonly<Record<string, number>>>> = {
   login_start: { message: 96 },
   login_finish: { attempt: 32, message: 64 },
   accept_terms: { digest: 32 },
+  set_recovery: { recovery: 73 },
 };
 
 export interface TermsText {
@@ -78,7 +83,8 @@ export interface CentralMock {
   violations: string[];
   /** The bodies, by operation, last first. */
   bodies: Map<string, Record<string, unknown>>;
-  accounts: Map<string, { wrapped: number[]; recovery: number[] }>;
+  /** An account moved from the official gateway has no recovery wrapper until it stores one. */
+  accounts: Map<string, { wrapped: number[]; recovery: number[] | null }>;
   signedIn: string | null;
   accepted: { version: string; digest: number[] } | null;
 }
@@ -88,6 +94,8 @@ interface Options {
   terms?: { version: string; texts: TermsText[]; digest?: number[] } | null;
   /** Accounts that exist already: name → password stand-in. */
   accounts?: string[];
+  /** Accounts moved from the official gateway, without a recovery code. */
+  moved?: string[];
   /** Answer the crypto's first message with bytes the real module refuses. */
   refuseCrypto?: boolean;
 }
@@ -126,6 +134,8 @@ const refuse = (route: Route, status: number) => route.fulfill({ status, content
 export async function mockCentral(page: Page, origin: string, opts: Options = {}): Promise<CentralMock> {
   const m: CentralMock = { operations: [], violations: [], bodies: new Map(), accounts: new Map(), signedIn: null, accepted: null };
   for (const name of opts.accounts ?? []) m.accounts.set(name, { wrapped: n(73, 2), recovery: n(73, 4) });
+  for (const name of opts.moved ?? []) m.accounts.set(name, { wrapped: n(73, 2), recovery: null });
+  let signedInAt = 0;
   const tickets = new Map<string, string>();
   let attempt: string | null = null;
   const terms = opts.terms ?? null;
@@ -181,6 +191,7 @@ export async function mockCentral(page: Page, origin: string, opts: Options = {}
         if (attempt === null || name === undefined) return refuse(route, 401);
         attempt = null;
         m.signedIn = name;
+        signedInAt = Math.floor(Date.now() / 1000);
         return json(route, {
           result: "browser_session",
           identity,
@@ -202,6 +213,30 @@ export async function mockCentral(page: Page, origin: string, opts: Options = {}
         if (m.signedIn === null) return refuse(route, 401);
         const accepted = version === null || (m.accepted?.version === version.version && m.accepted.digest.join() === version.digest.join());
         return json(route, { result: "terms_status", current: version, accepted });
+      }
+      case "account_summary": {
+        const account = m.signedIn === null ? undefined : m.accounts.get(m.signedIn);
+        if (m.signedIn === null || account === undefined) return refuse(route, 401);
+        return json(route, {
+          result: "account_summary",
+          identity,
+          username: m.signedIn,
+          display_name: null,
+          tag: null,
+          source: account.recovery === null || opts.moved?.includes(m.signedIn) ? "legacy" : "registered",
+          recovery: account.recovery !== null,
+          admin: false,
+          signed_in_at: signedInAt,
+          expires_at: signedInAt + 1800,
+        });
+      }
+      case "set_recovery": {
+        const account = m.signedIn === null ? undefined : m.accounts.get(m.signedIn);
+        if (m.signedIn === null || account === undefined) return refuse(route, 401);
+        const recovery = body["recovery"] as number[];
+        if (account.recovery !== null) return account.recovery.join() === recovery.join() ? json(route, { result: "done" }) : refuse(route, 409);
+        account.recovery = recovery;
+        return json(route, { result: "done" });
       }
       case "accept_terms": {
         if (m.signedIn === null) return refuse(route, 401);
@@ -232,6 +267,7 @@ self.addEventListener("message", (e) => {
   else if (m.op === "login_start") { password = m.password; reply({ op: m.op, message: fill(96, 8) }); }
   else if (m.op === "login_finish") reply(password === ${JSON.stringify(PASSWORD)} ? { op: m.op, message: fill(64, 10) } : { op: "error", error: "rejected" });
   else if (m.op === "login_confirm") reply(m.wrappedMaster.every((b) => b === 2) ? { op: m.op } : { op: "error", error: "rejected" });
+  else if (m.op === "recovery_create") reply(m.wrappedMaster.every((b) => b === 2) ? { op: m.op, recovery: fill(73, 11), recoveryCode: ${JSON.stringify(NEW_CODE)} } : { op: "error", error: "rejected" });
 });
 `;
 

@@ -1,7 +1,9 @@
 // `/signin` (docs/web-accounts.md §"Flows"): the name and the password,
 // then OPAQUE in the crypto Worker; Central sets its session cookie, the
 // page remembers only the name and the end. Then the terms, where Central's
-// terms in force are not yet accepted, and the account page.
+// terms in force are not yet accepted; for an account moved here without a
+// recovery code, the code the sign-in made (shown, then stored once kept,
+// which needs the terms accepted); and the account page.
 
 import { useRef, useState, type FormEvent } from "react";
 
@@ -10,10 +12,14 @@ import { Link, PATHS, navigate, useLocation } from "../router";
 import "../styles/account.css";
 import { SubmitButton } from "./Busy";
 import { FAILURE } from "./errors";
-import { FlowError, signIn } from "./flows";
+import { FlowError, signIn, type NewCode } from "./flows";
 import { canonicalName } from "./names";
+import { NewCodeStep } from "./NewCodeStep";
 import { useAccount } from "./session";
 import { TermsStep } from "./TermsStep";
+
+/** After the sign-in: the terms, then the new code when the sign-in made one. */
+type After = { at: "terms" | "code"; name: string; code: NewCode | null };
 
 const LINKS: Elems = {
   register: (words) => <Link to={PATHS.register}>{words}</Link>,
@@ -27,7 +33,7 @@ export default function SignInPage() {
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<{ bad: boolean; key: Key } | null>(null);
-  const [terms, setTerms] = useState(false);
+  const [after, setAfter] = useState<After | null>(null);
   const registered = new URLSearchParams(useLocation().search).get("registered") === "1";
   const nameRef = useRef<HTMLInputElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
@@ -49,12 +55,12 @@ export default function SignInPage() {
     setBusy(true);
     setStatus({ bad: false, key: "signin.progress" });
     signIn({ username: name, password }, { api, crypto }).then(
-      (session) => {
+      ({ session, code }) => {
         setPassword("");
         setBusy(false);
         setStatus(null);
         signedIn({ name: session.username, expiresAt: session.expiresAt });
-        setTerms(true);
+        setAfter({ at: "terms", name: session.username, code });
       },
       (error: unknown) => {
         setBusy(false);
@@ -73,8 +79,10 @@ export default function SignInPage() {
         <h1>
           <T id="signin.title" />
         </h1>
-        {terms ? (
-          <TermsStep onDone={() => navigate(PATHS.account)} />
+        {after?.at === "terms" ? (
+          <TermsStep onDone={() => (after.code === null ? navigate(PATHS.account) : setAfter({ ...after, at: "code" }))} />
+        ) : after?.at === "code" && after.code !== null ? (
+          <NewCodeStep code={after.code} name={after.name} onDone={() => navigate(PATHS.account)} />
         ) : account !== null && !busy ? (
           <p className="account-note">
             {account.name === null ? (

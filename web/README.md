@@ -404,9 +404,21 @@ Registration, sign-in and the account page follow `docs/web-accounts.md`:
   is remembered; after a reload `SessionStatus` says whose session it is
   (the name is always Central's, in memory), and the session is forgotten
   on signing out, at the end, or on Central's no.
+- **The account page** asks `AccountSummary`: where the account came from
+  and whether it has a recovery code, in the design's two wordings. An
+  account moved from the official gateway has none; after every sign-in the
+  page asks the summary while the sign-in's Worker holds its state, and for
+  such an account the Worker makes a code (`recovery_create`) in place of
+  the password check (`login_confirm`). The code is shown after the terms
+  (`src/account/NewCodeStep.tsx`, with the registration's
+  `RecoveryStep.tsx`) and stored (`SetRecovery`) only once kept; "Not now"
+  throws it away, and a lost answer is retried with the same 73 bytes. The
+  account page's "Make a recovery code" signs in again for it
+  (`docs/web-accounts.md` §"A recovery code after a sign-in").
 
 The unit tests use stand-ins for Central and the crypto
-(`test/support/central.ts`); `e2e/account.spec.ts` runs the pages against a
+(`test/support/central.ts`, with an account moved here without a code;
+`test/account/recovery.test.tsx` for its code); `e2e/account.spec.ts` runs the pages against a
 strict mock of the browser surface (`e2e/central.ts`), with a stand-in
 Worker for the flows and the real WebAssembly for its own checks, and shows
 that without `'wasm-unsafe-eval'` the crypto cannot start. `e2e-real/`

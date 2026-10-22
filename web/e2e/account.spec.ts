@@ -11,7 +11,7 @@ import { readFile } from "node:fs/promises";
 import { expect, test, type Page } from "@playwright/test";
 
 import { csp } from "../scripts/csp.ts";
-import { CODE, KEY, PASSWORD, SEALED_DOCUMENT, mockCentral, stubCrypto } from "./central.ts";
+import { CODE, KEY, NEW_CODE, PASSWORD, SEALED_DOCUMENT, mockCentral, stubCrypto } from "./central.ts";
 import { expectNoSideScroll, mock, watchErrors } from "./mocks.ts";
 
 const TERMS = {
@@ -100,14 +100,16 @@ test.describe("accounts", () => {
       "discover",
       "login_start",
       "login_finish",
+      "account_summary",
       "terms_status",
       "terms",
       "accept_terms",
-      "terms_status",
     ]);
-    // after the reload, the provider and the account page each ask once, in either order
-    expect(central.operations.slice(10, 12).sort()).toEqual(["session_status", "terms_status"]);
-    expect(central.operations.slice(12)).toEqual(["logout"]);
+    // on the account page, its terms step and its summary each ask once, in either order
+    expect(central.operations.slice(10, 12).sort()).toEqual(["account_summary", "terms_status"]);
+    // after the reload, the provider, the terms step and the summary each ask once, in any order
+    expect(central.operations.slice(12, 15).sort()).toEqual(["account_summary", "session_status", "terms_status"]);
+    expect(central.operations.slice(15)).toEqual(["logout"]);
     expect(central.bodies.get("register")).toEqual({ operation: "register", username: "synthetic_name", beta_key: KEY });
     expect(central.bodies.get("enrollment_finish")?.["document"]).toHaveLength(SEALED_DOCUMENT);
     expect(central.violations).toEqual([]);
@@ -155,6 +157,45 @@ test.describe("accounts", () => {
     await expect(page).toHaveURL(/\/account$/);
     await expect(page.locator(".account-name bdi")).toHaveText("synthetic_name");
     await expectNoSideScroll(page);
+    expect(central.violations).toEqual([]);
+    expect(m.stray).toEqual([]);
+    expect(errors).toEqual([]);
+  });
+
+  test("an account moved here without a recovery code makes one after a sign-in or on the account page", async ({ page, baseURL }) => {
+    const errors = watchErrors(page);
+    const m = await mock(page);
+    const central = await mockCentral(page, new URL(baseURL ?? "").origin, { moved: ["moved_player"] });
+    await stubCrypto(page);
+    await page.goto("/signin?lang=en");
+    await page.getByLabel("Username").fill("moved_player");
+    await page.getByLabel("Password").fill(PASSWORD);
+    await page.getByRole("button", { name: "Sign in" }).click();
+
+    // right after the sign-in: the code, put off this time
+    const step = page.getByRole("region", { name: "Your recovery code" });
+    await expect(step.getByLabel("Recovery code", { exact: true })).toHaveText(NEW_CODE);
+    await expect(step.getByText(/which has none yet/)).toBeVisible();
+    await expectNoSideScroll(page);
+    await step.getByRole("button", { name: "Not now" }).click();
+    await expect(page).toHaveURL(/\/account$/);
+    expect(central.operations).not.toContain("set_recovery");
+    await expect(page.getByText(/Your account has no recovery code yet\. It moved here from the official gateway/)).toBeVisible();
+
+    // on the account page: the password again, then the code, stored once kept
+    await page.getByRole("button", { name: "Make a recovery code" }).click();
+    await expect(page.getByText("To make the code, sign in again")).toBeVisible();
+    await page.getByLabel("Password").fill(PASSWORD);
+    await page.getByRole("button", { name: "Sign in" }).click();
+    await expect(step.getByLabel("Recovery code", { exact: true })).toHaveText(NEW_CODE);
+    await expectNoSideScroll(page);
+    await step.getByLabel("I have kept my recovery code in a safe place.").check();
+    await step.getByRole("button", { name: "Continue" }).click();
+    await expect(page.getByText(/^You have a recovery code\./)).toBeVisible();
+    await expect(page.getByText("This account moved here from the official gateway.")).toBeVisible();
+    expect(central.operations.filter((op) => op === "set_recovery")).toHaveLength(1);
+    expect(central.bodies.get("set_recovery")).toEqual({ operation: "set_recovery", recovery: Array.from({ length: 73 }, () => 11) });
+    expect(central.accounts.get("moved_player")?.recovery).toHaveLength(73);
     expect(central.violations).toEqual([]);
     expect(m.stray).toEqual([]);
     expect(errors).toEqual([]);

@@ -1,7 +1,8 @@
 // The page's side of the crypto Worker (crypto-worker.ts): one Worker per
 // registration or sign-in, one request at a time, terminated when the flow
 // ends however it ends. The page never holds a state, a key or the module;
-// it hands the Worker the password and bytes, and gets bytes back.
+// it hands the Worker the password and bytes, and gets bytes back (and a
+// recovery code to show once).
 
 import type { Identity } from "./api";
 
@@ -10,7 +11,8 @@ export type WorkerRequest =
   | { op: "enrollment_finish"; response: Uint8Array }
   | { op: "login_start"; password: string; account: Uint8Array; epoch: number }
   | { op: "login_finish"; response: Uint8Array }
-  | { op: "login_confirm"; wrappedMaster: Uint8Array };
+  | { op: "login_confirm"; wrappedMaster: Uint8Array }
+  | { op: "recovery_create"; wrappedMaster: Uint8Array };
 
 export interface Enrolled {
   record: Uint8Array;
@@ -21,10 +23,19 @@ export interface Enrolled {
   recoveryCode: string;
 }
 
+/** A recovery code made after a sign-in, in place of `login_confirm`. */
+export interface Recovered {
+  /** The master key under the code (73 bytes), for `SetRecovery`. */
+  recovery: Uint8Array;
+  /** Shown once, never kept. */
+  recoveryCode: string;
+}
+
 export type WorkerReply =
   | { op: "enrollment_start" | "login_start" | "login_finish"; message: Uint8Array }
   | ({ op: "enrollment_finish" } & Enrolled)
   | { op: "login_confirm" }
+  | ({ op: "recovery_create" } & Recovered)
   | { op: "error"; error: CryptoFailure };
 
 /**
@@ -49,6 +60,11 @@ export interface Crypto {
   loginStart(password: string, identity: Identity): Promise<Uint8Array>;
   loginFinish(response: Uint8Array): Promise<Uint8Array>;
   loginConfirm(wrappedMaster: Uint8Array): Promise<void>;
+  /**
+   * In place of `loginConfirm`, for an account without a recovery code:
+   * opens the master key the same way, and wraps it under a new code.
+   */
+  recoveryCreate(wrappedMaster: Uint8Array): Promise<Recovered>;
   close(): void;
 }
 
@@ -108,6 +124,11 @@ export function workerCrypto(make: () => Worker = () => new Worker(new URL("./cr
     loginFinish: async (response) => message(await ask({ op: "login_finish", response }, "login_finish")),
     loginConfirm: async (wrappedMaster) => {
       await ask({ op: "login_confirm", wrappedMaster }, "login_confirm");
+    },
+    recoveryCreate: async (wrappedMaster) => {
+      const reply = await ask({ op: "recovery_create", wrappedMaster }, "recovery_create");
+      if (reply.op !== "recovery_create") throw new CryptoError("failed");
+      return { recovery: reply.recovery, recoveryCode: reply.recoveryCode };
     },
     close: () => {
       worker?.terminate();

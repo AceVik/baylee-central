@@ -136,6 +136,25 @@ The server side of [web accounts](web-accounts.md) lands in three PRs.
   gateway's row, without owner or credential; the operator lists it, and the
   bridge's heartbeat moves it alone ([gateway registry](gateway-registry.md),
   [operations](operations.md#the-official-gateway)).
+- **The account page and recovery codes for moved accounts** (22.10.2026,
+  the accounts and administration design's step 2). `AccountSummary` (browser
+  listener, the cookie, no terms needed) names the session's account, where it
+  came from, whether it has a recovery code and when the session's password
+  sign-in was; display name, tag and the admin role stay empty until later
+  steps. `SetRecovery` (browser listener, terms accepted) stores a recovery
+  wrapper made in the browser right after a sign-in (`recovery_create` in
+  `central-web-crypto`) for an account that has none: enrolled, its move
+  closed, within 10 minutes of the sign-in; the same bytes again are `Done`,
+  others `Conflict`. Migration 000010 lets an enrolled legacy account hold the
+  wrapper, and `invalidate_legacy` clears it. The website asks for the summary
+  after every sign-in, shows the code after the terms, stores it once kept and
+  retries a lost answer with the same bytes; the account page has both
+  wordings and "Make a recovery code", which signs in again. Tests: the
+  upgrade over legacy and registered rows, every `SetRecovery` condition and
+  race over PostgreSQL 18, the website's flow over the real browser listener
+  with a moved account, the browser crypto against `central-crypto`'s server,
+  and the pages with stand-ins and the strict mock. Deploy: the deploy hook
+  migrates; no grant changes.
 - **Not yet deployed.** Deploy: migrate, grant, add `browser.listen`, pass
   `/api/*` in the `baylee.app` site block, issue beta keys. Central's own terms
   are still `draft`, so none are in force.

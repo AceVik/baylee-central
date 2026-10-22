@@ -53,6 +53,19 @@ needs Central's terms in force: a service built from a checkout whose
 account accepts, the other declines in German.
 
 ```bash
+REAL_SECRETS="$(<the secrets document>)" REAL_OUT=<that folder> npx playwright test -c e2e-real/playwright.config.ts e2e-real/moved.spec.ts
+```
+
+moves one synthetic account per width from the official gateway as Baylee's
+client and the bridge do (`LegacyReserve` with the bridge credential of the
+secrets document, which it takes from the environment and never prints,
+enrollment without a recovery wrapper, restore,
+`LegacyClose`, over the native listener at `REAL_NATIVE`, default
+`127.0.0.1:47920`), then signs in on the page, accepts the terms where they
+are in force, keeps the code the sign-in made in `REAL_OUT` and sees the
+account page say the account has one.
+
+```bash
 npx playwright test -c e2e-real/playwright.config.ts e2e-real/budget.spec.ts --project desktop
 ```
 
