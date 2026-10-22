@@ -17,6 +17,7 @@ mod m20261020_000006_terms;
 mod m20261021_000007_registration;
 mod m20261022_000008_session_renewal;
 mod m20261022_000009_official_gateway;
+mod m20261022_000010_legacy_recovery;
 
 use sea_orm_migration::{
     MigrationTrait, MigratorTrait,
@@ -39,6 +40,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261021_000007_registration::Migration),
             Box::new(m20261022_000008_session_renewal::Migration),
             Box::new(m20261022_000009_official_gateway::Migration),
+            Box::new(m20261022_000010_legacy_recovery::Migration),
         ]
     }
 }

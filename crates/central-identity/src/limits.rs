@@ -63,6 +63,7 @@ impl Limits {
                 | Request::GatewaySession { .. }
                 | Request::GatewayAuthorize { .. }
                 | Request::TermsStatus
+                | Request::AccountSummary
                 | Request::Logout
                 | Request::SetGatewayAdmins { .. }
         );

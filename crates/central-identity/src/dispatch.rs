@@ -1,6 +1,6 @@
 use super::{
     BrowserReply, Discovery, Error, IdentityService, Request, Response, Surface, Token,
-    browser_operation,
+    browser_only, browser_operation,
 };
 use central_api::beta_key::BetaKey;
 
@@ -12,6 +12,10 @@ impl IdentityService {
         surface: Surface,
     ) -> Result<BrowserReply, Error> {
         if surface == Surface::Browser && !browser_operation(&request) {
+            return Err(Error::Rejected);
+        }
+        // Before the terms are looked at: the native listener has no such operation.
+        if surface == Surface::Native && browser_only(&request) {
             return Err(Error::Rejected);
         }
         if let Request::LoginFinish { attempt, message } = request {
@@ -30,7 +34,7 @@ impl IdentityService {
         surface: Surface,
     ) -> Result<Response, Error> {
         if super::terms::needs_acceptance(&request) {
-            self.require_terms(bearer).await?;
+            self.require_terms(bearer, surface).await?;
         }
         match request {
             request @ (Request::Terms
@@ -48,6 +52,9 @@ impl IdentityService {
             | Request::DeleteObject { .. }) => self.object_request(request, bearer).await,
             request @ (Request::SessionStatus | Request::RenewSession | Request::Logout) => {
                 self.session_request(&request, bearer, surface).await
+            }
+            request @ (Request::AccountSummary | Request::SetRecovery { .. }) => {
+                self.account_request(request, bearer, surface).await
             }
             request @ (Request::LegacyInvalidate { .. } | Request::LegacyClose { .. }) => {
                 self.legacy_mutation(request, bearer).await
@@ -145,6 +152,43 @@ impl IdentityService {
                         expires_at: status.expires_at,
                     },
                 })
+            }
+            _ => Err(Error::Rejected),
+        }
+    }
+
+    /// The account page's requests, on the browser listener only
+    /// ([`browser_only`]): the session's account, and a recovery wrapper for
+    /// an account without one (`docs/web-accounts.md`).
+    async fn account_request(
+        &self,
+        request: Request,
+        bearer: Option<&Token>,
+        surface: Surface,
+    ) -> Result<Response, Error> {
+        let (Surface::Browser, Some(cookie)) = (surface, bearer) else {
+            return Err(Error::Rejected);
+        };
+        match request {
+            Request::AccountSummary => {
+                let summary = self.store.account_summary(cookie).await?;
+                Ok(Response::AccountSummary {
+                    identity: summary.identity,
+                    username: summary.username,
+                    // Display names, tags and roles come with later steps
+                    // (docs/accounts-admin-proposal.md, steps 3 and 5).
+                    display_name: None,
+                    tag: None,
+                    source: summary.source,
+                    recovery: summary.recovery,
+                    admin: false,
+                    signed_in_at: summary.signed_in_at,
+                    expires_at: summary.expires_at,
+                })
+            }
+            Request::SetRecovery { recovery } => {
+                self.store.set_recovery(cookie, &recovery).await?;
+                Ok(Response::Done)
             }
             _ => Err(Error::Rejected),
         }
