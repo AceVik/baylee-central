@@ -25,6 +25,18 @@ needs a new dependency, in Rust or in `web/`.
    and the website tells them to keep one safe; the website's gateway list
    does not work and would not list the official gateway.
 
+Answers to this proposal's first draft, the same day (22.10.2026):
+
+4. **The runtime login writes what an administrator decides**, with wider
+   grants; there is no separate admin login. Every other guard stays: the
+   browser-only `Admin` request, the role checked in the acting transaction,
+   a recent password for changes, the audit, exact grants checked at
+   startup.
+5. **A lock carries a reason too**, like a ban: short and plain (such as
+   "suspected takeover"), shown to the person, beside the internal note.
+6. **Locks and bans wait for a client release** that explains a locked or
+   banned account (step 6).
+
 ## What exists today
 
 - `browser_operation` (`crates/central-identity/src/lib.rs`) refuses
@@ -92,9 +104,17 @@ key, which may name a person, as the gateway's audit line does not
 (`docs/protocol.md` in Baylee, §"Acting on an account"). Reads are not
 audited.
 
-**Who writes what an administrator decides** is owner question 1. This
-proposal recommends a separate database login, `central_admin`, used only by
-the admin requests (step 5). Every grant below is written for that choice.
+**The runtime writes what an administrator decides** (decision 4). Each step
+widens `ops/grants.sql` and the startup check in
+`crates/central-postgres/src/accounts/grants.rs` by exactly the privileges it
+names, and the check keeps refusing anything wider: other columns, `DELETE`
+or `TRUNCATE` where none is named, grant options, ownership. What this gives
+up is said under step 5.
+
+**The moderation record is append-only for the runtime.** It may insert
+audit events, restrictions and reports and move a restriction or report to
+its end, but never delete or rewrite one. Deleting after the three years the
+privacy notice allows is an operator mode under the migrator login (step 5).
 
 ## 1. The gateway directory on the website (S, plus S in Baylee)
 
@@ -149,8 +169,8 @@ compiled audience; listing the new name earlier would hand clients an origin
 Central issues no tickets for.
 
 **Grants.** None new. The runtime keeps `SELECT, INSERT, UPDATE` on
-`gateways` and `SELECT` on `gateway_approvals`. It could insert an official
-row, but not approve one.
+`gateways` and `SELECT` on `gateway_approvals`. Until step 7 it could insert
+an official row, but not approve one.
 
 **Baylee (G1).** `Settings::validate` in `crates/baylee-gateway/src/central.rs`
 accepts `metadata` beside `bridge` (still never `origin`, `credential` or
@@ -436,7 +456,7 @@ test of `forget`.
 **Docs.** Baylee's `docs/central-login.md` (projections),
 `docs/protocol.md` (handles of Central accounts), the namebook comment.
 
-## 5. Administration: roles, the admin login, audit, the account list (M)
+## 5. Administration: roles, the first administrator, audit, the account list (M)
 
 **What people see.**
 
@@ -450,7 +470,9 @@ test of `forget`.
 - `/admin/accounts/<id>`: the same facts, whether a recovery code exists, the
   gateways it owns, its audit events; "Make administrator", "Remove
   administrator". Steps 6 and 8 add restrictions and reports. Nothing
-  encrypted is shown, because Central holds nothing it could read.
+  encrypted is shown, because Central holds nothing it could read. The admin
+  queries name their columns and never read a credential record, a wrapper or
+  a document; the answer types have no field that could carry one.
 - `/admin/audit`: newest first, filtered by account if wanted.
 - A change older than 30 minutes after the sign-in opens a password prompt
   in the dialog first.
@@ -507,11 +529,6 @@ CREATE TABLE central_identity.audit_events (
 CREATE INDEX audit_events_account ON central_identity.audit_events(account_id, id)
     WHERE account_id IS NOT NULL;
 ALTER TABLE central_identity.accounts ADD COLUMN last_sign_in_at timestamptz;
-CREATE VIEW central_identity.account_overview AS
-    SELECT id, username_key, display_name, tag, source, created_at, last_sign_in_at,
-           credential_revision, credential IS NOT NULL AS enrolled, restored,
-           recovery_wrapped_master IS NOT NULL AS recovery
-    FROM central_identity.accounts;
 ```
 
 The closed list of actions lives in Rust, so later steps add actions without
@@ -520,33 +537,36 @@ and a deleted account leaves an id that no longer resolves. `issue_session`
 sets `last_sign_in_at` for both kinds; renewal does not. Only the time is kept,
 no address.
 
-**Grants: the admin login** (recommended; owner question 1). A new role,
-`central_admin` (`LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION
-NOBYPASSRLS`), with exactly:
+**Grants.** The runtime gains `SELECT, INSERT, DELETE` on `account_roles` and
+`SELECT, INSERT` on `audit_events`; the startup check refuses `UPDATE`,
+`DELETE` and `TRUNCATE` on `audit_events`.
 
-- `SELECT` on the view `account_overview`, never on `accounts` itself, so it
-  cannot read a credential record, a wrapper or a document
-- `SELECT` on `sessions` (for its own actor check) and `gateways`
-- `SELECT, INSERT, DELETE` on `account_roles`; `SELECT, INSERT` on
-  `audit_events`
+**What the runtime login gives up** (decision 4). Until now the database kept
+approving gateways, issuing and revoking beta keys and appointing out of the
+runtime's reach. From steps 5 to 8 on, a taken-over service, or a statement
+run as the runtime by mistake, can approve and disable gateways, issue and
+revoke beta keys, appoint and remove administrators, and lock and ban
+accounts. It could already mint a session for any account and read every
+ciphertext (`threat-model.md`: Central compromise exposes metadata and can
+attack authentication, never vault plaintext); these rights add to that. What
+still holds: only the browser listener serves `Admin`; the role is checked in
+the transaction that acts; changes need a password sign-in less than 30
+minutes old; every change through the admin requests writes its audit event
+in the same transaction, and the runtime cannot delete or rewrite one, though
+a taken-over service could act without writing one; the startup check names
+every privilege exactly, so a wider grant stops the service.
+`gateway-registry.md` and `architecture.md` say today that approval is
+operator-only; both change with step 7.
 
-The runtime gains only `SELECT` on `account_roles` (for `AccountSummary`).
-`central.json` gains an optional `"admin": {"database": {…}}`, a full database
-block for that login; without it, admin requests answer `Unavailable` and
-everything else runs. The startup check verifies both logins exactly, and it
-still refuses the runtime any write on approvals, roles or restrictions and
-any issuing of beta keys. `pg_hba.conf`'s `hostssl` line names
-`central_admin`. In the code only `admin.rs` holds the second pool.
+**The sweep.** A launcher mode, `central-service --sweep-stdin`, reads the
+migrator login (as `--migrate-stdin`, from `/etc/baylee-central/migrate.json`)
+and deletes audit events, and from steps 6 and 8 ended restrictions and
+decided reports, older than three years. A daily systemd timer runs it.
 
-The limit, said plainly: one process holds both logins. A mistake in an
-ordinary code path, or any statement run as the runtime, cannot approve,
-appoint or ban. Someone who controls the process can. Central compromise is
-already outside what these rights protect (`threat-model.md`).
-
-**Tests.** The grant contract for `central_admin`, including that `SELECT
-credential FROM central_identity.accounts` fails as it; the runtime's
-refusals unchanged; the launcher mode (parsing, appointing, again, unknown
-and pending usernames, a process test as for beta keys); the role rules (last
+**Tests.** The grant contract: exactly the new privileges, and a refusal to
+start with `UPDATE` or `DELETE` on `audit_events`; the launcher modes
+(parsing, appointing, again, unknown and pending usernames, the sweep's
+cut-off, a process test as for beta keys); the role rules (last
 administrator, oneself, an unenrolled target, a non-administrator, the native
 listener, a stale sign-in refused for a change and accepted for a list, a
 renewal that does not freshen it); one audit event per change, without words;
@@ -554,35 +574,48 @@ renewal that does not freshen it); one audit event per change, without words;
 `web/`: the lazy chunk, the guard, the pages, the password prompt; in
 `web/e2e-real`: appoint, then appoint a second administrator from the website.
 
-**Docs.** `operations.md` (the role, `pg_hba.conf`, the `admin` block, the
-mode, `ops/grants.sql`), `threat-model.md` (the "Admin escalation" row),
+**Docs.** `operations.md` (both modes, the timer, `ops/grants.sql`),
+`threat-model.md` (the "Admin escalation" row: administrators act through the
+runtime, guarded by the browser-only request, the role check, the recent
+password, the audit and the grant check, with what a takeover gains),
 `architecture.md` §"Gateways and administration", `gateway-registry.md`,
-`web-accounts.md`, `security-assurance.md`, `status.md`, the roadmap's M1 and M2.
-`reports.md` gives bug-report triage writes to the runtime; once built, they
-belong under the same login.
+`web-accounts.md`, `security-assurance.md`, `status.md`, the roadmap's M1 and
+M2. This matches `reports.md`, which gives bug-report triage to the runtime
+too.
 
 ## 6. Locking and banning (M)
 
-**Lock and ban.** Both have the same mechanics. A **lock** holds an account
-for its own protection or while something is looked into (a suspected
-takeover, its owner's request). The person is told that the account is locked
-and how to reach us, not why. A **ban** is a sanction under Central's terms
-(§7.2), and the person is told its reason. Both may have an end.
+**Lock and ban.** Both have the same mechanics, and both tell the person a
+reason (decision 5). A **lock** holds an account for its own protection or
+while something is looked into; its reason is short and plain ("suspected
+takeover", "at your request"). A **ban** is a sanction under Central's terms
+(§7.2), with the reason for it. Both may have an end.
+
+**This step waits for a client release** (decision 6). A client from before
+it reads the new answer as a plain sign-in failure, so a locked or banned
+player would not learn why. The client part (S, Baylee): `baylee-account`,
+pinned to the `central-api` revision that has `Response::Restricted`, maps
+that answer of `LoginFinish` to its own error carrying kind, end and reason,
+and the client's Central sign-in form says the sentences below in English and
+German, as `client_core::lobby::ban_sentence` does for a gateway's ban. The
+`central-api` type lands first, so Baylee can pin it and release; the server
+side and the admin pages go live after that release.
 
 **What people see.**
 
 - The administrator, on an account: "Lock", "Ban", "Lift", "Reset display
-  name". The dialog takes an end (a date and time, or none), for a ban a
-  reason (1 to 500 characters, one line, shown to the person), an internal
-  note (at most 500, administrators only), and optionally the report it
-  answers (step 8).
-- The person, signing in on the website with the right password:
+  name". The dialog takes an end (a date and time, or none), a reason (1 to
+  500 characters, one line, shown to the person; the field suggests short,
+  plain words), an internal note (at most 500, administrators only), and
+  optionally the report it answers (step 8).
+- The person, signing in with the right password, on the website and in the
+  client of the release above:
   - ban: "This account is banned until 1 November 2026, 18:00 (or: for good).
     Reason: … If you think this is wrong, write to us: [contact]."
-  - lock: "This account is locked for its protection (until …). Write to us:
-    [contact]."
-- In a client released before this step: a plain sign-in failure (owner
-  question 3). A client that knows the new answer says the same sentences.
+  - lock: "This account is locked until … (or: until we lift it). Reason:
+    suspected takeover. Write to us: [contact]."
+- A client older than that release still shows a plain sign-in failure; the
+  updater moves players on to the release.
 - On a gateway: the next lease check fails, at the latest five seconds later.
   Lobby, chat, watch and game sockets close and the session ends. A running
   game plays on, and the house takes the chair when the reconnect window runs
@@ -615,16 +648,15 @@ and gateways show `Player` from the next admission.
 **Wire.**
 
 - `Response::Restricted { restriction: { kind: lock | ban, until:
-  Option<i64>, reason: Option<String> } }` answers `LoginFinish` on both
-  listeners; `reason` only for a ban. It is a typed answer rather than an
-  error, because the error vocabulary is fixed status text and carries no
-  reason. A native client from before decodes it as `Rejected`; a 403 is not
-  used, because clients read 403 as `TermsRequired`.
+  Option<i64>, reason: String } }` answers `LoginFinish` on both listeners.
+  It is a typed answer rather than an error, because the error vocabulary is
+  fixed status text and carries no reason. A native client from before
+  decodes it as `Rejected`; a 403 is not used, because clients read 403 as
+  `TermsRequired`.
 - `AdminRequest` gains `Restrict { account, kind, until: Option<i64>, reason:
-  Option<String>, note: Option<String>, report: Option<[u8; 16]> }`, `Lift {
-  account }` and `ResetDisplayName { account }`. Each answers `Done`. `until`
-  is in the future and at most ten years ahead. A ban needs a reason; a lock
-  takes none.
+  String, note: Option<String>, report: Option<[u8; 16]> }`, `Lift { account
+  }` and `ResetDisplayName { account }`. Each answers `Done`. `until` is in
+  the future and at most ten years ahead. Every restriction needs a reason.
 
 **Schema: migration 000013 `restrictions`.**
 
@@ -634,7 +666,7 @@ CREATE TABLE central_identity.account_restrictions (
         CHECK (pg_catalog.uuid_extract_version(id) IS NOT DISTINCT FROM 7),
     account_id uuid NOT NULL REFERENCES central_identity.accounts(id) ON DELETE CASCADE,
     kind text NOT NULL CHECK (kind IN ('lock', 'ban')),
-    reason text CHECK (length(reason) BETWEEN 1 AND 500),
+    reason text NOT NULL CHECK (length(reason) BETWEEN 1 AND 500),
     note text CHECK (length(note) <= 500),
     created_at timestamptz NOT NULL DEFAULT pg_catalog.clock_timestamp(),
     created_by uuid NOT NULL,
@@ -642,7 +674,6 @@ CREATE TABLE central_identity.account_restrictions (
     report_id uuid,
     lifted_at timestamptz,
     lifted_by uuid,
-    CHECK ((kind = 'ban') = (reason IS NOT NULL)),
     CHECK (until IS NULL OR until > created_at),
     CHECK ((lifted_at IS NULL) = (lifted_by IS NULL))
 );
@@ -650,22 +681,22 @@ CREATE UNIQUE INDEX account_restrictions_current
     ON central_identity.account_restrictions(account_id) WHERE lifted_at IS NULL;
 ```
 
-**Grants.** The runtime: `SELECT` on `account_restrictions`. The admin login:
-`SELECT, INSERT, UPDATE (lifted_at, lifted_by)` on it; `DELETE` on `sessions`;
-on `accounts` `SELECT (id)` (to take the row lock) and `UPDATE (display_name,
-display_name_at)`, nothing more.
+**Grants.** The runtime gains `SELECT, INSERT, UPDATE (lifted_at, lifted_by)`
+on `account_restrictions`, and no `DELETE` (the sweep's). Deleting sessions
+and updating `accounts` it can already.
 
 **Tests.** Sessions, tickets and leases gone; `GatewayAuthorize` refused;
 `Restricted` after a correct proof only; a past end signs in; lift and
 replace; the race between a sign-in and a restriction; the refused targets;
-the reason rules; the name reset. `central-http`: the answer on both
-listeners. `web/`: both sentences on the sign-in page, the dialogs. Baylee
-`cargo dev central integration`: a seated player's sockets close within five
-seconds of a Central ban.
+the reason rules for both kinds; the name reset. `central-http`: the answer
+on both listeners. `web/`: both sentences on the sign-in page, the dialogs.
+Baylee: `baylee-account` maps the answer (a fake Central answering it), the
+client's sentences in both languages, and in `cargo dev central integration`
+a seated player's sockets close within five seconds of a Central ban.
 
 **Docs.** `web-accounts.md` (sign-in answers), `gateway-registry.md`
 §"SSO and revocation", `threat-model.md`, Baylee's `docs/central-login.md`
-(what a Central ban does at a gateway).
+(what a Central ban does at a gateway and what the client says).
 
 ## 7. Beta keys and gateway approval on the website (M)
 
@@ -700,13 +731,16 @@ stored through `BetaKeyBatch`, with the operator mode's bounds and checks.
 
 **Schema.** None.
 
-**Grants.** The admin login: `SELECT, INSERT, UPDATE (revoked_at)` on
-`beta_keys`; `SELECT, INSERT, UPDATE (enabled)` on `gateway_approvals`;
-`INSERT` on `gateways` (the official row only, checked in code); `DELETE` on
-`gateway_leases`. The runtime is unchanged. `--issue-beta-keys-stdin` and the
-SQL stay as the fallback.
+**Grants.** The runtime gains `INSERT` and `UPDATE (revoked_at)` on
+`beta_keys`, beside today's `SELECT` and `UPDATE (uses_left)`, and `INSERT`
+and `UPDATE (enabled)` on `gateway_approvals`, beside `SELECT`. Neither table
+gets `DELETE`. The startup check's single updatable column per table becomes
+a list. Inserting the official row and deleting leases it can already.
+`--issue-beta-keys-stdin` and the SQL stay as the fallback.
 
-**Tests.** The grant contracts; issuing within bounds, digests only, shown
+**Tests.** The grant contract (exactly these columns; `UPDATE` of
+`gateway_approvals.approved_at` or `beta_keys.digest` refused at startup);
+the existing approval-privilege test turns into this one; issuing within bounds, digests only, shown
 once; revoking ends reservations; approve, disable and enable as seen by the
 directory, `authenticate_gateway`, leases and admin tickets; the official
 listing; one audit event each; the pages.
@@ -728,7 +762,9 @@ and operator approval".
 - In Central's `/admin/reports`: open reports first, with received, gateway
   (name and origin), account (handle), category, note (as text) and state.
   "Lock" or "Ban" opens step 6's dialog with the report linked; "Dismiss"
-  takes a note. An account's page lists its reports.
+  takes a note. An account's page lists its reports. Because step 6 waits
+  for a client release, this step can go live before it with "Dismiss"
+  alone; "Lock" and "Ban" appear with step 6.
 - The reported person is not told of a report, only of a restriction.
 
 **Wire.**
@@ -770,14 +806,11 @@ These are kept apart from bug reports (`reports.md`) and from reported chat
 messages, which stay with the gateway, the host of what is said there.
 
 **Retention.** The privacy notice keeps reports and moderation decisions at
-most three years (§7). Before each admin list, a sweep deletes decided
-reports, lifted or ended restrictions and audit events older than that. The
-admin login therefore also holds `DELETE` on those three tables: the audit
-is append-only for every other purpose.
+most three years (§7). Step 5's sweep deletes decided reports older than
+that, under the migrator login.
 
-**Grants.** The runtime: `SELECT, INSERT` on `account_reports`. The admin
-login: `SELECT, UPDATE (state, decided_at, decided_by, decision_note)` on it,
-and the sweep's `DELETE`.
+**Grants.** The runtime gains `SELECT, INSERT, UPDATE (state, decided_at,
+decided_by, decision_note)` on `account_reports`, and no `DELETE`.
 
 **Baylee (G3).** A console route `POST /admin/accounts/{id}/central-report
 {"category", "note"}` answers `204`, `404` for no account, `409` for an
@@ -841,50 +874,42 @@ decision is ours, and a gateway's own ban is the gateway's.
 | 2 | Account summary, recovery codes for moved accounts | M | — |
 | 3 | Display name and tag at Central | M | 2 |
 | 4 | Central's names on gateways | M (Baylee) | 3 deployed |
-| 5 | Admin login, roles, the first administrator, audit, account list | M | owner question 1; 3 for names |
-| 6 | Locks and bans, name reset | M | 5 |
+| 5 | Roles, the first administrator, audit and sweep, account list | M | 3 for names |
+| 6a | `Response::Restricted` in `central-api`, unused | S | 5 |
+| 6b | The client explains a locked or banned account (Baylee) | S | 6a pinned |
+| 6 | Locks and bans, name reset, live | M | 5, a client release with 6b |
 | 7 | Beta keys and gateway approval on the website | M | 5, 1 |
-| 8 | Reports from gateways | M (Central), S (Baylee) | 6, 1 |
+| 8 | Reports from gateways | M (Central), S (Baylee) | 1, 5; Lock and Ban with 6 |
 | 9 | Renaming | S | 3, 4 |
 
 S is about a day, M a few days, L a week or more. Steps 1 and 2 can be built
-side by side. Migration numbers are taken in merge order, because the registry
-in `central-migration` is append-only; the numbers above assume this order.
+side by side; so can 6b and 7 once 6a is merged. Migration numbers are taken
+in merge order, because the registry in `central-migration` is append-only;
+the numbers above assume this order (with 8 before 6, 8 takes 000013).
 
 ## What ships without a client release
 
-All of it.
+Everything except step 6.
 
 - Central and the website ship through the deploy hook, with a gateway
   deploy or by hand (`10-central manual <revision>`, `operations.md`).
-  Steps 2, 3, 5, 6 and 7 need nothing else.
-- The Baylee parts (step 1's heartbeat, step 4, step 8's route) ship with a
-  gateway deploy of a commit (`cargo dev deploy`, Baylee
+  Steps 2, 3, 5 and 7 need nothing else.
+- The Baylee gateway parts (step 1's heartbeat, step 4, step 8's route) ship
+  with a gateway deploy of a commit (`cargo dev deploy`, Baylee
   `docs/releasing.md` §"Server deploys"), after Baylee pins the new
   `central-api` revision. The hook installs that Central revision first.
 - No answer that exists changes shape, so clients and gateways already out
-  keep working. A client release only adds the sentence for a restricted
-  sign-in (step 6) and, with M6, the recovery code and display name in the
-  client.
+  keep working.
+- **Step 6 needs a client release** (decision 6): the release that carries
+  6b, in which `baylee-account` decodes `Response::Restricted` from
+  `LoginFinish` and the Central sign-in form says why the account is locked
+  or banned. Only after that release does step 6 go live. With M6, a later
+  release adds the recovery code and the display name to the client.
 - Before steps go live: the privacy notice's new version (3, 5, 6, 8); the
-  tag floor check (3); `central_admin` provisioned and in `central.json`, and
-  the owner's account moved and appointed (5); the official row listed
-  (1).
+  tag floor check (3); the owner's account moved and appointed, and the
+  sweep's timer installed (5); the official row listed (1).
 
 ## Questions for the owner
 
-1. **Who writes what an administrator decides?** (a) A separate
-   `central_admin` login used only by the admin requests (recommended: the
-   runtime still cannot approve gateways, issue keys, appoint or ban, and the
-   database refuses the admin login every encrypted column; it costs one more
-   role and password on the server). (b) The runtime login with wider grants
-   (simplest; drops today's "the runtime cannot approve" guarantee). (c) The
-   website proposes and the operator confirms by command (keeps today's
-   guarantee, but every approval and key needs the shell).
-2. **Does a lock need a reason?** As proposed, a lock tells the person only
-   that the account is locked and how to reach us, and a ban gives its
-   reason. Does that fit your reading of terms §7.2 ("we give reasons"), or
-   should a lock carry a reason too?
-3. **Ship step 6 before a client release?** Clients released before it show a
-   locked or banned account only a plain sign-in failure; the website says
-   why. Ship it anyway, or wait for the next client release?
+None open. The owner answered the first draft's three questions on
+22.10.2026; the answers are decisions 4 to 6 above.
