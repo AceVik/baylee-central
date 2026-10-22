@@ -12,7 +12,10 @@ OPAQUE password material.
 session. The response contains a PostgreSQL-generated UUIDv7, a redemption
 `credential`, and a separate `heartbeat` token. Store both tokens privately.
 Registration reserves the origin but does **not** authorize SSO or publish the
-gateway. Each owner can reserve at most eight origins. Before the first approval,
+gateway. Each owner can reserve at most eight origins. The official gateway's
+origin (the bridge's, `LEGACY_ORIGIN` in a live service) is never registered:
+`RegisterGateway` for it answers `Conflict`, since a registered credential for
+that audience could redeem the bridge's tickets a second time. Before the first approval,
 the same authenticated owner may repeat registration to recover a lost response;
 this rotates both pending credentials. An approved or disabled origin cannot be
 rotated this way, nor can another account claim an existing origin.
@@ -61,9 +64,29 @@ production deployment.
 UUID order. Pass the last returned UUID as `after` for the next page. Each entry
 contains origin, public metadata and `online`. Online means Central accepted a
 heartbeat within 90 seconds; it is not an independent availability guarantee.
+It is served on the native route and on the website's browser listener, where it
+uses no session and has a per-address budget of 60 a minute
+([web accounts](web-accounts.md)); `baylee.app/gateways` reads it there.
 `GatewayHeartbeat { metadata }` requires only the heartbeat token, is limited to
 one update per five seconds, and cannot alter owner, origin, administrator list,
 approval, or SSO credentials.
+
+**The official gateway** is the migration bridge's, and the directory lists it
+like any other approved gateway (the website marks it and shows it first). Its
+row (migration 000009) has `official = true`, no owner and no credential: a
+CHECK pairs `official` with a NULL `owner_id`, `credential_digest` and
+`heartbeat_digest`, and a partial unique index allows one such row. No
+registered credential therefore authenticates it, and the bridge stays the only
+authority for its origin. The operator lists and approves it under the migrator
+login ([operations](operations.md#the-official-gateway)); the runtime role could
+insert such a row but, as for every gateway, not approve it.
+`GatewayHeartbeat { metadata }` with the bridge credential updates that row and
+no other, under the same five-second limit, after `metadata.validate` against
+the bridge's origin. The row is the official gateway only while its origin is
+the bridge's: `LEGACY_ORIGIN` in a live service (the store refuses any other
+there), the configured development gateway in a development one. Without a
+listed, approved and enabled row the bridge's heartbeat is `Rejected`; a
+disabled row is hidden like any other.
 
 `SetGatewayAdmins { gateway, expected_revision, accounts }` requires the owner's
 central session and replaces at most 32 explicit administrator UUIDs with a
@@ -115,7 +138,10 @@ login replacement or logout.
 `central-api` unit tests cover canonical origin and metadata restrictions.
 The owned PostgreSQL fixture of `cargo xtask postgres` exercises pending
 registration, credential separation, approval privilege rejection, directory
-and heartbeat behavior, owner isolation, administrator CAS and revocation,
+and heartbeat behavior, the official row (one at most, without owner or
+credentials; the bridge's heartbeat moves it alone; no registered credential
+or ticket reaches it; listed when approved, hidden when disabled; the upgrade
+over registered gateways), owner isolation, administrator CAS and revocation,
 audience/purpose/replay isolation, absence of foreign legacy IDs, and central
 single-session replacement including concurrent logins. No production accounts
 or credentials are used. CI must also validate the shared Rust implementation

@@ -243,6 +243,7 @@ pub(crate) fn run(
     budgets(browser, &key);
     let cookie = sign_in(browser, http, context);
     session(browser, http, bridge, &cookie);
+    directory(browser, http);
     play(browser, http, bridge, &cookie);
 }
 
@@ -426,6 +427,16 @@ fn session(browser: &Browser, http: &Http, bridge: &Token, cookie: &Token) {
             },
             bridge,
         ),
+        (
+            Request::GatewayHeartbeat {
+                metadata: central_api::gateway::GatewayMetadata {
+                    name: "Synthetic official gateway".into(),
+                    version: "test-1".into(),
+                    website: format!("{GATEWAY}/"),
+                },
+            },
+            bridge,
+        ),
     ] {
         assert!(browser.refused(&request, Some(token)));
     }
@@ -454,6 +465,23 @@ fn session(browser: &Browser, http: &Http, bridge: &Token, cookie: &Token) {
         browser.answer(&Request::TermsStatus, Some(cookie)).unwrap(),
         Response::TermsStatus { accepted: true, .. }
     ));
+}
+
+/// The public directory is read on the browser listener without a session,
+/// as on the native route, and lists the same gateways.
+fn directory(browser: &Browser, http: &Http) {
+    let Response::GatewayDirectory { gateways } = browser
+        .answer(&Request::GatewayDirectory { after: None }, None)
+        .unwrap()
+    else {
+        panic!("the directory");
+    };
+    let native = central_client::gateway_directory(http, None).unwrap();
+    assert!(!gateways.is_empty());
+    assert_eq!(
+        gateways.iter().map(|entry| entry.id).collect::<Vec<_>>(),
+        native.iter().map(|entry| entry.id).collect::<Vec<_>>()
+    );
 }
 
 /// The same account plays natively beside its browser session; signing out of

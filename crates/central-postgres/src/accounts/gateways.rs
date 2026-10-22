@@ -1,5 +1,6 @@
 use super::{AccountStore, Error, Token, number, statement, uuid};
 use central_api::{
+    LEGACY_ORIGIN,
     gateway::{GatewayListing, GatewayMetadata, validate_origin},
     wire::TicketPurpose,
 };
@@ -35,6 +36,9 @@ impl AccountStore {
     /// An owned, never-approved reservation can be retried to recover a lost credential response.
     ///
     /// Rejects invalid metadata/session, foreign or approved origins and the owner quota.
+    /// The official gateway's origin is the bridge's alone ([`LEGACY_ORIGIN`]): a
+    /// registered credential for it would redeem that audience's tickets a second
+    /// time, so it is a conflict before anything else is looked at.
     pub async fn register_gateway(
         &self,
         session: &Token,
@@ -44,6 +48,9 @@ impl AccountStore {
         heartbeat: &Token,
         development: bool,
     ) -> Result<[u8; 16], Error> {
+        if origin == LEGACY_ORIGIN {
+            return Err(Error::Conflict);
+        }
         validate_origin(origin, development)?;
         metadata.validate(origin)?;
         if credential.digest() == heartbeat.digest() {
@@ -103,6 +110,7 @@ impl AccountStore {
     }
 
     /// Authenticate only a gateway's redemption credential, never its heartbeat credential.
+    /// The official gateway holds none (migration 000009); the bridge is its authority.
     ///
     /// # Errors
     /// Rejects unapproved/disabled gateways and incorrect credentials.
@@ -112,7 +120,7 @@ impl AccountStore {
     ) -> Result<([u8; 16], String), Error> {
         let row=self.db.query_one_raw(statement(
             "SELECT g.id,g.origin FROM central_identity.gateways g JOIN central_identity.gateway_approvals p
-             ON p.gateway_id=g.id AND p.enabled WHERE g.credential_digest=$1", vec![credential.digest().to_vec().into()]
+             ON p.gateway_id=g.id AND p.enabled WHERE g.credential_digest=$1 AND NOT g.official", vec![credential.digest().to_vec().into()]
         )).await.map_err(|_| Error::Unavailable)?.ok_or(Error::Rejected)?;
         let id: Uuid = row.try_get("", "id").map_err(|_| Error::Unavailable)?;
         Ok((
@@ -132,15 +140,53 @@ impl AccountStore {
     ) -> Result<(), Error> {
         let row=self.db.query_one_raw(statement(
             "SELECT g.origin FROM central_identity.gateways g JOIN central_identity.gateway_approvals p
-             ON p.gateway_id=g.id AND p.enabled WHERE g.heartbeat_digest=$1",vec![token.digest().to_vec().into()]
+             ON p.gateway_id=g.id AND p.enabled WHERE g.heartbeat_digest=$1 AND NOT g.official",vec![token.digest().to_vec().into()]
         )).await.map_err(|_|Error::Unavailable)?.ok_or(Error::Rejected)?;
         let origin: String = row.try_get("", "origin").map_err(|_| Error::Unavailable)?;
         metadata.validate(&origin)?;
         let updated=self.db.execute_raw(statement(
             "UPDATE central_identity.gateways g SET name=$2,version=$3,website=$4,last_seen=pg_catalog.clock_timestamp()
-             WHERE heartbeat_digest=$1 AND (last_seen IS NULL OR last_seen<=pg_catalog.clock_timestamp()-interval '5 seconds')
+             WHERE heartbeat_digest=$1 AND NOT official
+             AND (last_seen IS NULL OR last_seen<=pg_catalog.clock_timestamp()-interval '5 seconds')
              AND EXISTS(SELECT 1 FROM central_identity.gateway_approvals p WHERE p.gateway_id=g.id AND p.enabled)",
             vec![token.digest().to_vec().into(),metadata.name.clone().into(),metadata.version.clone().into(),metadata.website.clone().into()]
+        )).await.map_err(|_|Error::Unavailable)?;
+        if updated.rows_affected() != 1 {
+            return Err(Error::Busy);
+        }
+        Ok(())
+    }
+
+    /// The official gateway's heartbeat, which its caller authenticated with the
+    /// bridge credential: the public metadata and liveness of the official row
+    /// and of no other, at most once per five seconds. The row is the official
+    /// gateway only while its origin is the bridge's, which a live service
+    /// (`development` false) holds to [`LEGACY_ORIGIN`].
+    ///
+    /// # Errors
+    /// Rejects another origin, metadata not on it, an unlisted, unapproved or
+    /// disabled official row, and an excessive heartbeat rate (`Busy`).
+    pub async fn official_heartbeat(
+        &self,
+        origin: &str,
+        metadata: &GatewayMetadata,
+        development: bool,
+    ) -> Result<(), Error> {
+        if !development && origin != LEGACY_ORIGIN {
+            return Err(Error::Rejected);
+        }
+        validate_origin(origin, development)?;
+        metadata.validate(origin)?;
+        self.db.query_one_raw(statement(
+            "SELECT g.id FROM central_identity.gateways g JOIN central_identity.gateway_approvals p
+             ON p.gateway_id=g.id AND p.enabled WHERE g.official AND g.origin=$1",vec![origin.into()]
+        )).await.map_err(|_|Error::Unavailable)?.ok_or(Error::Rejected)?;
+        let updated=self.db.execute_raw(statement(
+            "UPDATE central_identity.gateways g SET name=$2,version=$3,website=$4,last_seen=pg_catalog.clock_timestamp()
+             WHERE official AND origin=$1
+             AND (last_seen IS NULL OR last_seen<=pg_catalog.clock_timestamp()-interval '5 seconds')
+             AND EXISTS(SELECT 1 FROM central_identity.gateway_approvals p WHERE p.gateway_id=g.id AND p.enabled)",
+            vec![origin.into(),metadata.name.clone().into(),metadata.version.clone().into(),metadata.website.clone().into()]
         )).await.map_err(|_|Error::Unavailable)?;
         if updated.rows_affected() != 1 {
             return Err(Error::Busy);
@@ -221,7 +267,8 @@ impl AccountStore {
         row.try_get("", "allowed").map_err(|_| Error::Unavailable)
     }
 
-    /// Resolve an approved audience and check Admin membership before issuing a ticket.
+    /// Resolve an approved registered audience and check Admin membership before issuing a
+    /// ticket. The official gateway's tickets are the bridge's ([`Self::gateway_ticket`]).
     ///
     /// # Errors
     /// Rejects unknown/disabled origins, invalid sessions and foreign admin membership.
@@ -239,7 +286,7 @@ impl AccountStore {
             "SELECT g.id FROM central_identity.gateways g JOIN central_identity.gateway_approvals p
              ON p.gateway_id=g.id AND p.enabled JOIN central_identity.sessions s ON s.digest=$2
              JOIN central_identity.accounts a ON a.id=s.account_id AND a.credential_revision=s.credential_revision
-             WHERE g.origin=$1 AND s.expires_at>pg_catalog.clock_timestamp() AND a.restored
+             WHERE g.origin=$1 AND NOT g.official AND s.expires_at>pg_catalog.clock_timestamp() AND a.restored
              AND ($3='admit' OR EXISTS(SELECT 1 FROM central_identity.gateway_admins m
                  WHERE m.gateway_id=g.id AND m.account_id=a.id))",
             vec![origin.into(),session.digest().to_vec().into(),purpose.as_str().into()]

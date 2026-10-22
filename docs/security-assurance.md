@@ -817,3 +817,46 @@ the sign-in and after a reload, the browser kept only
 `baylee-central-session` with `expiresAt`, and a planted
 `baylee-central-account` was deleted on the next page; everything started
 was stopped and checked, and the synthetic secrets deleted.
+
+## The gateway directory on the website, 2026-10-22
+
+Owner decision of 22.10.2026: the website's gateway list works and lists the
+official gateway (`docs/accounts-admin-proposal.md` on its design branch, step 1).
+
+Design pass: the assets are the bridge's authority over the official origin
+(its tickets must stay redeemable once, by the bridge) and the directory's
+truth (what is listed and whether it is online). Callers: anyone on the
+internet for the directory, which is public and holds only approved metadata;
+the bridge credential for the official heartbeat. Invariants: the official row
+holds no owner and no credential (a CHECK) and is unique (a partial index), so
+no registered credential authenticates it and no registered ticket names its
+audience; registration of the bridge's origin is a `Conflict`; the bridge's
+heartbeat touches that row alone, under the five-second limit, with metadata
+on that origin; approval stays the operator's, the runtime gains no grant. The
+directory on the browser listener uses no session and keeps every check of
+that listener; its per-address budget is 60 a minute.
+
+Implementation pass: the official row is chosen by `official` and the bridge's
+origin together, which a live store holds to `LEGACY_ORIGIN`; the registered
+heartbeat, gateway authentication and registered tickets add `NOT official`
+beside the NULL digests that already exclude it. The bridge is checked in
+constant time before the heartbeat token is looked up; a wrong token is
+`Rejected` as before. The page posts with `credentials: "omit"`, `redirect:
+"error"` and `X-Baylee-Central: 1`, keeps every check of the answer, and marks
+the official gateway by the origin it knows, never by the answer. Not
+addressed, recorded: the directory shares the unauthenticated global budget
+with sign-in on both listeners, as on the native route before.
+
+Adversarial pass: the upgrade over 000008's registered gateways (they keep
+owner and credentials; the prior binary's registration still works; a second
+official row, an owner or a credential on it, a registered row without them
+are each refused); the store (registration of the bridge's origin at a full
+quota is `Conflict`; a bridge heartbeat before listing, before approval, after
+disabling, for another origin or with metadata elsewhere is refused; it moves
+the official row and leaves the registered one unchanged; a registered
+token and registered tickets do not reach it; moved to another origin it is
+no longer official in a live store); the SDK over HTTP (the bridge's heartbeat,
+`Conflict` on registration, the directory equal on both listeners, the
+heartbeat refused on the browser listener); the listener's budget per address
+apart from the others; the page's request, the mark and paging after
+Central's last id. Engineering review, not an audit.

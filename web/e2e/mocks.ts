@@ -74,10 +74,12 @@ export interface Mocks {
   contact: unknown[];
   /** The directory's request bodies. */
   directory: unknown[];
+  /** Why a directory request would not pass Central's browser listener: must stay empty. */
+  refused: string[];
 }
 
 export async function mock(page: Page, opts: { gateways?: number; ownContent?: boolean } = {}): Promise<Mocks> {
-  const m: Mocks = { stray: [], contact: [], directory: [] };
+  const m: Mocks = { stray: [], contact: [], directory: [], refused: [] };
   const blob = await encode(SYNTHETIC);
   const total = opts.gateways ?? 130;
 
@@ -109,8 +111,17 @@ export async function mock(page: Page, opts: { gateways?: number; ownContent?: b
     await page.route("**/data/sets/set-*.json", (route) => route.fulfill({ json: cards(36) }));
     await page.route("**/media/**", (route) => route.fulfill({ body: PIXEL, contentType: "image/png" }));
   }
-  await page.route("**/api/v1/native", async (route) => {
-    const body = route.request().postDataJSON() as { after: number[] | null };
+  // Central's browser listener (docs/web-accounts.md): the directory with the
+  // page's own marks and no credential; every other operation is the account
+  // mock's (e2e/central.ts) or nobody's.
+  await page.route("**/api/v1", async (route) => {
+    const request = route.request();
+    const body = request.postDataJSON() as { operation?: string; after: number[] | null };
+    if (body.operation !== "gateway_directory") return route.fallback();
+    const headers = await request.allHeaders();
+    if (headers["x-baylee-central"] !== "1") m.refused.push("no X-Baylee-Central: 1");
+    if (headers["content-type"] !== "application/json") m.refused.push("Content-Type is not application/json");
+    if (headers["authorization"] !== undefined || headers["cookie"] !== undefined) m.refused.push("a credential");
     m.directory.push(body);
     // the second page starts after the first page's last id (gateway 100)
     return route.fulfill({ json: directoryPage(body.after === null ? 0 : 1, total) });

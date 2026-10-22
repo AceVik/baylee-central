@@ -316,6 +316,7 @@ struct Budgets {
     register: Book,
     discover: Book,
     login: Book,
+    directory: Book,
 }
 
 impl Budgets {
@@ -324,6 +325,9 @@ impl Budgets {
             Request::Register { .. } => self.register.charge(client, now, 5, HOUR),
             Request::Discover { .. } => self.discover.charge(client, now, 30, MINUTE),
             Request::LoginStart { .. } => self.login.charge(client, now, 30, MINUTE),
+            // The public directory needs no session; a page reads it a few
+            // times, so a minute's budget leaves room for paging.
+            Request::GatewayDirectory { .. } => self.directory.charge(client, now, 60, MINUTE),
             _ => true,
         }
     }
@@ -879,6 +883,65 @@ mod tests {
         }
         // Refused requests reach no service; the others did.
         assert_eq!(calls(&mock), 5 + 1 + 5 + 1 + 30 + 1 + 30 + 1);
+    }
+
+    #[tokio::test]
+    async fn the_directory_is_served_without_a_session_and_budgeted_per_address() {
+        let (app, mock) = listener();
+        let from = |address: &str| with("x-forwarded-for", &[address]);
+        let directory = body(&Request::GatewayDirectory { after: None });
+        assert_eq!(
+            directory,
+            r#"{"operation":"gateway_directory","after":null}"#
+        );
+        // The page's own request, with no cookie, as `credentials: "omit"` sends it.
+        let sent = send(&app, &from("198.51.100.40"), directory.clone()).await;
+        assert_eq!(sent.status, StatusCode::OK);
+        assert_eq!(sent.body, r#"{"result":"done"}"#);
+        assert!(sent.headers.get(header::SET_COOKIE).is_none());
+        assert_eq!(
+            mock.calls.lock().unwrap()[0],
+            ("gateway_directory".to_owned(), None)
+        );
+        // Without the page's marks it is refused like every other operation.
+        let mut unmarked = from("198.51.100.40");
+        unmarked.retain(|(name, _)| *name != "x-baylee-central");
+        assert_eq!(
+            send(&app, &unmarked, directory.clone()).await.status,
+            StatusCode::FORBIDDEN
+        );
+        // 60 a minute from one address, then 429; the other budgets and the
+        // other addresses are untouched.
+        for _ in 1..60 {
+            assert_eq!(
+                send(&app, &from("198.51.100.40"), directory.clone())
+                    .await
+                    .status,
+                StatusCode::OK
+            );
+        }
+        let sent = send(&app, &from("198.51.100.40"), directory.clone()).await;
+        assert_eq!(sent.status, StatusCode::TOO_MANY_REQUESTS);
+        assert_eq!(sent.body, "account request rejected\n");
+        assert_eq!(
+            send(&app, &from("198.51.100.40"), discover()).await.status,
+            StatusCode::OK
+        );
+        assert_eq!(
+            send(&app, &from("198.51.100.41"), directory).await.status,
+            StatusCode::OK
+        );
+        assert_eq!(calls(&mock), 60 + 1 + 1);
+        // The window ends after a minute.
+        let mut budgets = Budgets::default();
+        let client = Client::from("198.51.100.42".parse::<IpAddr>().unwrap());
+        let request = Request::GatewayDirectory { after: None };
+        let now = Instant::now();
+        for _ in 0..60 {
+            assert!(budgets.charge(&request, client, now));
+        }
+        assert!(!budgets.charge(&request, client, now + Duration::from_secs(59)));
+        assert!(budgets.charge(&request, client, now + MINUTE));
     }
 
     #[test]

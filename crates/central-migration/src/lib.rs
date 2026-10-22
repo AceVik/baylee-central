@@ -16,6 +16,7 @@ mod m20261019_000005_private_objects;
 mod m20261020_000006_terms;
 mod m20261021_000007_registration;
 mod m20261022_000008_session_renewal;
+mod m20261022_000009_official_gateway;
 
 use sea_orm_migration::{
     MigrationTrait, MigratorTrait,
@@ -37,6 +38,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261020_000006_terms::Migration),
             Box::new(m20261021_000007_registration::Migration),
             Box::new(m20261022_000008_session_renewal::Migration),
+            Box::new(m20261022_000009_official_gateway::Migration),
         ]
     }
 }

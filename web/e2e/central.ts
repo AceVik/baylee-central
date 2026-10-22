@@ -39,6 +39,7 @@ const FIELDS: Readonly<Record<string, readonly string[]>> = {
   terms: [],
   terms_status: [],
   accept_terms: ["subject", "version", "digest"],
+  gateway_directory: ["after"],
 };
 
 /** Exact byte lengths, by operation and field. */
@@ -210,6 +211,9 @@ export async function mockCentral(page: Page, origin: string, opts: Options = {}
         m.accepted = { version: version.version, digest: body["digest"] as number[] };
         return json(route, { result: "done" });
       }
+      case "gateway_directory":
+        // Checked like every request here, then answered by `mock`'s directory.
+        return route.fallback();
     }
     return bad(m, `unhandled ${op}`, route);
   });

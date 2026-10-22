@@ -1,7 +1,7 @@
 //! A prior-version upgrade: the exact migration SQL of 000001 to 000006 in a
 //! scratch schema, legacy accounts and sessions written as those versions wrote
-//! them, then 000007, then 000008 over a live session and its lease. All inside
-//! one transaction that is rolled back.
+//! them, then 000007, then 000008 over a live session and its lease, then 000009
+//! over registered gateways. All inside one transaction that is rolled back.
 use super::scalar;
 use sea_orm::{ConnectionTrait, DatabaseConnection, TransactionTrait};
 
@@ -20,6 +20,8 @@ const REGISTRATION: &str =
     include_str!("../../../central-migration/src/m20261021_000007_registration.sql");
 const RENEWAL: &str =
     include_str!("../../../central-migration/src/m20261022_000008_session_renewal.sql");
+const OFFICIAL: &str =
+    include_str!("../../../central-migration/src/m20261022_000009_official_gateway.sql");
 
 fn scratch(sql: &str) -> String {
     sql.replace("central_identity", "upgrade_probe")
@@ -100,6 +102,7 @@ pub(crate) async fn run(operator: &DatabaseConnection) {
         2
     );
     renewal(&tx).await;
+    official(&tx).await;
     tx.rollback().await.unwrap();
     assert_eq!(
         scalar(
@@ -161,4 +164,111 @@ async fn renewal(tx: &sea_orm::DatabaseTransaction) {
             .await
             .unwrap();
     }
+}
+
+/// `sql` fails, and the transaction goes on as before it.
+async fn refused(tx: &sea_orm::DatabaseTransaction, sql: &str) {
+    tx.execute_unprepared("SAVEPOINT refused").await.unwrap();
+    assert!(tx.execute_unprepared(sql).await.is_err(), "{sql}");
+    tx.execute_unprepared("ROLLBACK TO SAVEPOINT refused")
+        .await
+        .unwrap();
+}
+
+/// 000009 over what 000008 left: registered gateways, one approved and seen,
+/// keep their owner and credentials and are not official; the prior binary's
+/// registration still works; one official row at most, with no owner and no
+/// credential, and no other row without them.
+async fn official(tx: &sea_orm::DatabaseTransaction) {
+    let owner = "(SELECT id FROM upgrade_probe.accounts WHERE legacy_id = 'legacy-1')";
+    tx.execute_unprepared(&format!(
+        "INSERT INTO upgrade_probe.gateways (owner_id, origin, name, version, website,
+             credential_digest, heartbeat_digest, last_seen)
+         VALUES ({owner}, 'https://approved.invalid', 'Approved', '1', 'https://approved.invalid/',
+             decode(repeat('11', 32), 'hex'), decode(repeat('12', 32), 'hex'), clock_timestamp()),
+             ({owner}, 'https://pending.invalid', 'Pending', '1', 'https://pending.invalid/',
+             decode(repeat('13', 32), 'hex'), decode(repeat('14', 32), 'hex'), NULL);
+         INSERT INTO upgrade_probe.gateway_approvals (gateway_id)
+         SELECT id FROM upgrade_probe.gateways WHERE origin = 'https://approved.invalid';"
+    ))
+    .await
+    .unwrap();
+    tx.execute_unprepared(&scratch(OFFICIAL)).await.unwrap();
+    for (expected, sql) in [
+        (
+            2,
+            "SELECT count(*)::bigint AS value FROM upgrade_probe.gateways WHERE NOT official
+             AND owner_id IS NOT NULL AND credential_digest IS NOT NULL AND heartbeat_digest IS NOT NULL",
+        ),
+        (
+            1,
+            "SELECT count(*)::bigint AS value FROM upgrade_probe.gateway_approvals p
+             JOIN upgrade_probe.gateways g ON g.id = p.gateway_id
+             WHERE p.enabled AND g.origin = 'https://approved.invalid' AND g.last_seen IS NOT NULL",
+        ),
+    ] {
+        assert_eq!(scalar(tx, sql).await, expected, "{sql}");
+    }
+    // The prior binary registers without naming the column; the row is not official.
+    tx.execute_unprepared(&format!(
+        "INSERT INTO upgrade_probe.gateways (owner_id, origin, name, version, website,
+             credential_digest, heartbeat_digest)
+         VALUES ({owner}, 'https://later.invalid', 'Later', '1', 'https://later.invalid/',
+             decode(repeat('15', 32), 'hex'), decode(repeat('16', 32), 'hex'))"
+    ))
+    .await
+    .unwrap();
+    // The operator's row (docs/operations.md §"The official gateway"), and its approval.
+    let listed = "INSERT INTO upgrade_probe.gateways (official, origin, name, version, website)
+        VALUES (true, 'https://baylee.acevik.de', 'Baylee', '0', 'https://baylee.acevik.de/')";
+    tx.execute_unprepared(listed).await.unwrap();
+    tx.execute_unprepared(
+        "INSERT INTO upgrade_probe.gateway_approvals (gateway_id)
+         SELECT id FROM upgrade_probe.gateways WHERE official",
+    )
+    .await
+    .unwrap();
+    refused(
+        tx,
+        "INSERT INTO upgrade_probe.gateways (official, origin, name, version, website)
+         VALUES (true, 'https://second.invalid', 'Second', '0', 'https://second.invalid/')",
+    )
+    .await;
+    for (column, value) in [
+        ("owner_id", owner.to_owned()),
+        (
+            "credential_digest",
+            "decode(repeat('17', 32), 'hex')".into(),
+        ),
+        ("heartbeat_digest", "decode(repeat('18', 32), 'hex')".into()),
+    ] {
+        refused(
+            tx,
+            &format!("UPDATE upgrade_probe.gateways SET {column} = {value} WHERE official"),
+        )
+        .await;
+        refused(
+            tx,
+            &format!(
+                "UPDATE upgrade_probe.gateways SET {column} = NULL WHERE origin = 'https://later.invalid'"
+            ),
+        )
+        .await;
+    }
+    refused(
+        tx,
+        "UPDATE upgrade_probe.gateways SET official = true WHERE origin = 'https://later.invalid'",
+    )
+    .await;
+    assert_eq!(
+        scalar(
+            tx,
+            "SELECT count(*)::bigint AS value FROM upgrade_probe.gateways g
+             JOIN upgrade_probe.gateway_approvals p ON p.gateway_id = g.id
+             WHERE g.official AND g.owner_id IS NULL AND g.credential_digest IS NULL
+             AND g.heartbeat_digest IS NULL AND g.last_seen IS NULL"
+        )
+        .await,
+        1
+    );
 }

@@ -293,6 +293,7 @@ export const KEYS = [
   "gw.network",
   "gw.online",
   "gw.notSeen",
+  "gw.official",
   "gw.address",
   "gw.version",
   "gw.copy",
