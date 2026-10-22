@@ -55,7 +55,8 @@ pub struct Issued {
     pub username: String,
     /// The account's stored client-encrypted master key.
     pub wrapped_master: Vec<u8>,
-    /// Absolute Unix-seconds expiry, 30 minutes after issue; never renewed.
+    /// Absolute Unix-seconds expiry, 30 minutes after issue; renewed by
+    /// [`AccountStore::renew_session`] up to 12 hours after it.
     pub expires_at: i64,
 }
 
@@ -241,6 +242,45 @@ impl AccountStore {
             row.try_get("", "legacy_id")
                 .map_err(|_| Error::Unavailable)?,
         ))
+    }
+
+    /// Renew a live session: it expires 30 minutes from now, never later than
+    /// 12 hours after the password sign-in that issued it, and the gateway
+    /// leases delegated from it follow, in the same transaction. An expiry
+    /// only moves forward: each renewal is later than the one before, up to the
+    /// cap. Returns the new absolute Unix-seconds expiry.
+    ///
+    /// # Errors
+    /// Rejects an expired, replaced or revoked session (also after a credential
+    /// change) without touching anything, and reports unavailable storage.
+    pub async fn renew_session<'a>(&self, session: impl Into<Session<'a>>) -> Result<i64, Error> {
+        let session = session.into();
+        let digest = session.digest().to_vec();
+        let tx = self.db.begin().await.map_err(|_| Error::Unavailable)?;
+        let row = tx.query_one_raw(statement(
+            "UPDATE central_identity.sessions s SET expires_at = LEAST(
+                 pg_catalog.clock_timestamp() + interval '30 minutes', s.created_at + interval '12 hours')
+             FROM central_identity.accounts a
+             WHERE s.digest = $1 AND s.kind = $2 AND a.id = s.account_id
+             AND a.credential_revision = s.credential_revision AND a.credential IS NOT NULL
+             AND s.expires_at > pg_catalog.clock_timestamp()
+             RETURNING floor(extract(epoch FROM s.expires_at))::bigint AS expires_at",
+            vec![digest.clone().into(), session.kind().into()],
+        )).await.map_err(|_| Error::Unavailable)?.ok_or(Error::Rejected)?;
+        let expires_at: i64 = row
+            .try_get("", "expires_at")
+            .map_err(|_| Error::Unavailable)?;
+        // A lease never outlives its session, and now lives as long as it.
+        tx.execute_raw(statement(
+            "UPDATE central_identity.gateway_leases l SET expires_at = s.expires_at
+             FROM central_identity.sessions s WHERE s.digest = $1 AND l.session_digest = s.digest
+             AND l.expires_at > pg_catalog.clock_timestamp()",
+            vec![digest.into()],
+        ))
+        .await
+        .map_err(|_| Error::Unavailable)?;
+        tx.commit().await.map_err(|_| Error::Unavailable)?;
+        Ok(expires_at)
     }
 
     /// Revoke the central session and its outstanding gateway tickets; idempotent after expiry.

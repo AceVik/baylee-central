@@ -103,3 +103,48 @@ describe("the remembered session", () => {
     expect(window.localStorage.getItem(SESSION_KEY)).toBeNull();
   });
 });
+
+function visibility(state: DocumentVisibilityState) {
+  Object.defineProperty(document, "visibilityState", { value: state, configurable: true });
+  document.dispatchEvent(new Event("visibilitychange"));
+}
+
+describe("renewal", () => {
+  it("renews a named session while the page is in view, keeps it when Central cannot be reached, forgets it on Central's no", async () => {
+    visibility("visible");
+    const { api, crypto } = await signedInCentral("central_name");
+    store({ expiresAt: LATER });
+    render(
+      <AccountProvider api={api} crypto={crypto.factory} renewEvery={40}>
+        <Probe />
+      </AccountProvider>,
+    );
+    await waitFor(() => expect(screen.getByRole("button").textContent).toBe("central_name until 4000001800"));
+    expect(api.calls.slice(0, 2)).toEqual(["session_status", "renew_session"]);
+    expect(JSON.parse(window.localStorage.getItem(SESSION_KEY) ?? "{}")).toEqual({ expiresAt: 4_000_001_800 });
+    api.fail("renew_session", "network");
+    const tried = api.calls.length;
+    await waitFor(() => expect(api.calls.length).toBeGreaterThan(tried + 1));
+    expect(screen.getByRole("button").textContent).not.toBe("nobody");
+    api.session = null;
+    await waitFor(() => expect(screen.getByRole("button").textContent).toBe("nobody"));
+    expect(window.localStorage.getItem(SESSION_KEY)).toBeNull();
+  });
+
+  it("asks nothing while the page is hidden, and renews once it is shown again", async () => {
+    const { api, crypto } = await signedInCentral("central_name");
+    store({ expiresAt: LATER });
+    visibility("hidden");
+    render(
+      <AccountProvider api={api} crypto={crypto.factory} renewEvery={1_000}>
+        <Probe />
+      </AccountProvider>,
+    );
+    await waitFor(() => expect(screen.getByRole("button").textContent).toBe("central_name until 4000000000"));
+    await act(() => new Promise((done) => window.setTimeout(done, 1_200)));
+    expect(api.calls).toEqual(["session_status"]);
+    act(() => visibility("visible"));
+    await waitFor(() => expect(api.calls).toEqual(["session_status", "renew_session"]));
+    await waitFor(() => expect(screen.getByRole("button").textContent).toBe("central_name until 4000001800"));
+  });
+});

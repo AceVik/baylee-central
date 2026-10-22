@@ -184,6 +184,9 @@ fn run(http: &Http, bridge: &Token, runtime: &Runtime, operator: &DatabaseConnec
     assert!(revoked.refresh(http).is_err());
     assert!(central_client::login(http, identity, "wrong password".into()).is_err());
     first.check_active(http).unwrap();
+    // Renewal needs no accepted terms, and a replaced session gets none.
+    assert!(first.renew(http).unwrap() > 0);
+    assert!(revoked.renew(http).is_err());
     assert!(!first.migration_closed(http).unwrap());
     assert_eq!(first.document(), original);
     assert!(

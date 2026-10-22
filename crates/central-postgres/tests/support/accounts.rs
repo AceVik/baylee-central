@@ -17,6 +17,7 @@ mod migration;
 mod objects;
 mod register;
 mod registration;
+mod renewal;
 mod revocation_race;
 mod single_session;
 mod terms;
@@ -92,6 +93,7 @@ pub(crate) async fn run(operator: &DatabaseConnection) {
     kinds::run(&store, operator, &keys).await;
     registration::run(&store, operator, &keys).await;
     register::run(&store, operator, &keys).await;
+    renewal::run(&store, operator, &keys).await;
     store.close().await.unwrap();
 }
 

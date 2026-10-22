@@ -4,7 +4,8 @@ This runbook covers the deployed launcher and its database connector. It is an
 operator procedure, not a release approval: the gates in [status](status.md)
 still apply. Registration and sign-in on `baylee.app` are served by the browser
 listener ([below](#the-browser-listener)) once it is configured; nothing here
-enables password reset, session renewal or browser SSO for gateways.
+enables password reset or browser SSO for gateways. Sessions renew
+([below](#sessions)).
 
 ## Launcher modes
 
@@ -242,6 +243,21 @@ not writable by others): `BUILD_USER`, `BAYLEE_SRC`, `CENTRAL_ROOT`,
 defaults are this deployment's. The website's site block is the one in
 `web/README.md` §"Serving it", with `root` on `WEB_ROOT`.
 
+## Sessions
+
+A sign-in issues a session for 30 minutes. A live session renews
+(`RenewSession`, on both listeners) to 30 minutes from the renewal, but never
+past 12 hours after the password sign-in that issued it (`created_at`); its
+gateway leases move with it in the same transaction, so a game on a gateway
+lasts as long as the session (migration 000008). The game client renews every
+ten minutes while it runs, the website while a page is open and in view; after
+the 12 hours the password is needed again. An expired, replaced or revoked
+session renews nothing, and a renewal needs no accepted terms. The browser
+cookie lives the 12 hours of the cap: an expired session's cookie finds no
+session, so a renewal never sets the cookie again. The runtime role may update a
+lease's `expires_at` and no other column of it (`ops/grants.sql`, checked at
+startup).
+
 ## Known limits of this deployment
 
 Request budgets on the native listener are global and per account or bearer,
@@ -249,6 +265,6 @@ not per client address: behind the proxy every client shares one address, so a
 flood can exhaust the shared login budget for everyone (service denial, not
 account takeover). The browser listener adds per-address budgets in front of the
 same global ones; a client with many addresses still shares the global budget.
-Central sessions expire after 30 minutes without renewal. Password change and
+Central sessions last 30 minutes unless renewed, and at most 12 hours. Password change and
 recovery are not served. Discovery reveals enrollment state for a supplied
 username (see [native login](native-login.md)), on both listeners.

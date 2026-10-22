@@ -1,6 +1,7 @@
 //! A prior-version upgrade: the exact migration SQL of 000001 to 000006 in a
 //! scratch schema, legacy accounts and sessions written as those versions wrote
-//! them, then 000007. All inside one transaction that is rolled back.
+//! them, then 000007, then 000008 over a live session and its lease. All inside
+//! one transaction that is rolled back.
 use super::scalar;
 use sea_orm::{ConnectionTrait, DatabaseConnection, TransactionTrait};
 
@@ -17,6 +18,8 @@ const PRIOR: [&str; 6] = [
 ];
 const REGISTRATION: &str =
     include_str!("../../../central-migration/src/m20261021_000007_registration.sql");
+const RENEWAL: &str =
+    include_str!("../../../central-migration/src/m20261022_000008_session_renewal.sql");
 
 fn scratch(sql: &str) -> String {
     sql.replace("central_identity", "upgrade_probe")
@@ -96,6 +99,7 @@ pub(crate) async fn run(operator: &DatabaseConnection) {
         .await,
         2
     );
+    renewal(&tx).await;
     tx.rollback().await.unwrap();
     assert_eq!(
         scalar(
@@ -105,4 +109,56 @@ pub(crate) async fn run(operator: &DatabaseConnection) {
         .await,
         0
     );
+}
+
+/// 000008 over what 000007 left: the live session and its lease stay, both may
+/// now live up to 12 hours after they were made, and no further.
+async fn renewal(tx: &sea_orm::DatabaseTransaction) {
+    tx.execute_unprepared(
+        "INSERT INTO upgrade_probe.gateway_leases (digest, session_digest, audience, purpose, expires_at)
+         VALUES (decode(repeat('08', 32), 'hex'), decode(repeat('06', 32), 'hex'), 'official', 'admit',
+             clock_timestamp() + interval '29 minutes');",
+    )
+    .await
+    .unwrap();
+    tx.execute_unprepared(&scratch(RENEWAL)).await.unwrap();
+    for (expected, sql) in [
+        (
+            2,
+            "SELECT count(*)::bigint AS value FROM upgrade_probe.sessions",
+        ),
+        (
+            1,
+            "SELECT count(*)::bigint AS value FROM upgrade_probe.gateway_leases",
+        ),
+        (
+            0,
+            "SELECT count(*)::bigint AS value FROM pg_catalog.pg_constraint
+             WHERE conrelid IN ('upgrade_probe.sessions'::regclass, 'upgrade_probe.gateway_leases'::regclass)
+             AND pg_catalog.pg_get_constraintdef(oid) LIKE '%00:30:00%'",
+        ),
+    ] {
+        assert_eq!(scalar(tx, sql).await, expected, "{sql}");
+    }
+    for table in ["sessions", "gateway_leases"] {
+        tx.execute_unprepared(&format!(
+            "UPDATE upgrade_probe.{table} SET expires_at = created_at + interval '11 hours 59 minutes'"
+        ))
+        .await
+        .unwrap();
+        tx.execute_unprepared("SAVEPOINT past_the_cap")
+            .await
+            .unwrap();
+        assert!(
+            tx.execute_unprepared(&format!(
+                "UPDATE upgrade_probe.{table} SET expires_at = created_at + interval '12 hours 1 second'"
+            ))
+            .await
+            .is_err(),
+            "{table} outlives its 12 hours"
+        );
+        tx.execute_unprepared("ROLLBACK TO SAVEPOINT past_the_cap")
+            .await
+            .unwrap();
+    }
 }

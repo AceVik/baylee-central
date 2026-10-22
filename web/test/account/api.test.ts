@@ -127,6 +127,19 @@ describe("the answers", () => {
     }
   });
 
+  it("read a renewal as its new end and nothing else", () => {
+    expect(parse.renewed({ result: "renewed", expires_at: 4_000_001_800 })).toBe(4_000_001_800);
+    for (const bad of [
+      { result: "renewed" },
+      { result: "renewed", expires_at: 0 },
+      { result: "renewed", expires_at: "4000001800" },
+      { result: "renewed", expires_at: 4_000_001_800, username: "synthetic_name" },
+      { result: "browser_status", expires_at: 4_000_001_800 },
+    ]) {
+      expect(() => parse.renewed(bad)).toThrow(ApiError);
+    }
+  });
+
   it("read discovery's two kinds and nothing else", () => {
     expect(parse.discovery({ result: "discovery", discovery: { kind: "legacy" } })).toBeNull();
     expect(parse.discovery({ result: "discovery", discovery: { kind: "central", identity: IDENTITY } })?.epoch).toBe(1);

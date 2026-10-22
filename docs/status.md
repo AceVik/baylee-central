@@ -195,7 +195,7 @@ Native OPAQUE login, account persistence, gateway registration/admin APIs,
 exclusive sessions, guarded legacy migration and encrypted private-object/chat
 storage are implemented and tested with synthetic data. They have not been
 deployed for real users. Browser SSO, password change/reset/recovery service
-and UI flows, MFA and session renewal remain unfinished; registration and
+and UI flows and MFA remain unfinished (sessions renew, up to 12 hours); registration and
 browser sign-in are in progress (above). Live discovery exposes enrollment state
 and requires its documented review before public use.
 

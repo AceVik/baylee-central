@@ -46,22 +46,8 @@ impl IdentityService {
             | Request::ListObjects { .. }
             | Request::WriteObject { .. }
             | Request::DeleteObject { .. }) => self.object_request(request, bearer).await,
-            Request::SessionStatus => {
-                let status = self.store.session_status(surface.session(bearer)?).await?;
-                Ok(match surface {
-                    Surface::Native => Response::SessionStatus {
-                        identity: status.identity,
-                        expires_at: status.expires_at,
-                        migration_closed: status.migration_closed,
-                    },
-                    // The page shows the name; the native answer stays as old
-                    // clients decode it.
-                    Surface::Browser => Response::BrowserStatus {
-                        identity: status.identity,
-                        username: status.username,
-                        expires_at: status.expires_at,
-                    },
-                })
+            request @ (Request::SessionStatus | Request::RenewSession | Request::Logout) => {
+                self.session_request(&request, bearer, surface).await
             }
             request @ (Request::LegacyInvalidate { .. } | Request::LegacyClose { .. }) => {
                 self.legacy_mutation(request, bearer).await
@@ -123,10 +109,44 @@ impl IdentityService {
                 let (identity, state) = self.store.legacy_status(&legacy_id).await?;
                 Ok(Response::LegacyStatus { identity, state })
             }
+        }
+    }
+
+    /// The session's own requests, on either listener: its status, its
+    /// renewal (up to 12 hours after the sign-in) and its end.
+    async fn session_request(
+        &self,
+        request: &Request,
+        bearer: Option<&Token>,
+        surface: Surface,
+    ) -> Result<Response, Error> {
+        let session = surface.session(bearer)?;
+        match request {
+            Request::RenewSession => Ok(Response::Renewed {
+                expires_at: self.store.renew_session(session).await?,
+            }),
             Request::Logout => {
-                self.store.logout(surface.session(bearer)?).await?;
+                self.store.logout(session).await?;
                 Ok(Response::Done)
             }
+            Request::SessionStatus => {
+                let status = self.store.session_status(session).await?;
+                Ok(match surface {
+                    Surface::Native => Response::SessionStatus {
+                        identity: status.identity,
+                        expires_at: status.expires_at,
+                        migration_closed: status.migration_closed,
+                    },
+                    // The page shows the name; the native answer stays as old
+                    // clients decode it.
+                    Surface::Browser => Response::BrowserStatus {
+                        identity: status.identity,
+                        username: status.username,
+                        expires_at: status.expires_at,
+                    },
+                })
+            }
+            _ => Err(Error::Rejected),
         }
     }
 
