@@ -382,17 +382,19 @@ fn session(browser: &Browser, http: &Http, bridge: &Token, cookie: &Token) {
         Some(Error::Rejected)
     );
     // The page renews its session with the cookie, never as a native bearer.
-    let Response::Renewed { expires_at: renewed } = browser
+    let Response::Renewed {
+        expires_at: renewed,
+    } = browser
         .answer(&Request::RenewSession, Some(cookie))
         .unwrap()
     else {
         panic!("a renewal");
     };
-    assert!(renewed >= expires_at, "a renewal never shortens the session");
     assert!(
-        http.exchange(&Request::RenewSession, Some(cookie))
-            .is_err()
+        renewed >= expires_at,
+        "a renewal never shortens the session"
     );
+    assert!(http.exchange(&Request::RenewSession, Some(cookie)).is_err());
     assert_eq!(
         browser.answer(&Request::RenewSession, None).err(),
         Some(Error::Rejected)
