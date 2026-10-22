@@ -175,6 +175,49 @@ export class LoginKey {
 if (Symbol.dispose) LoginKey.prototype[Symbol.dispose] = LoginKey.prototype.free;
 
 /**
+ * A recovery code made after a sign-in: what `SetRecovery` sends, and the
+ * code to show once. Free it once read; that wipes the code.
+ */
+export class Recovered {
+    static __wrap(ptr) {
+        const obj = Object.create(Recovered.prototype);
+        obj.__wbg_ptr = ptr;
+        RecoveredFinalization.register(obj, obj.__wbg_ptr, obj);
+        return obj;
+    }
+    __destroy_into_raw() {
+        const ptr = this.__wbg_ptr;
+        this.__wbg_ptr = 0;
+        RecoveredFinalization.unregister(this);
+        return ptr;
+    }
+    free() {
+        const ptr = this.__destroy_into_raw();
+        wasm.__wbg_recovered_free(ptr, 0);
+    }
+    /**
+     * The master key under the recovery code (73 bytes).
+     * @returns {Uint8Array}
+     */
+    get recovery() {
+        const ret = wasm.recovered_recovery(this.__wbg_ptr);
+        var v1 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
+        wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
+        return v1;
+    }
+    /**
+     * The recovery code's written form. Read from the wiped buffer rather
+     * than handed over, so no copy stays behind in the module's memory.
+     * @returns {string}
+     */
+    get recovery_code() {
+        const ret = wasm.recovered_recovery_code(this.__wbg_ptr);
+        return ret;
+    }
+}
+if (Symbol.dispose) Recovered.prototype[Symbol.dispose] = Recovered.prototype.free;
+
+/**
  * The origin of the Central this module is bound to: the live one.
  * @returns {string}
  */
@@ -300,6 +343,31 @@ export function login_start(password, account, epoch) {
         throw takeFromExternrefTable0(ret[1]);
     }
     return Login.__wrap(ret[0]);
+}
+
+/**
+ * In place of [`login_confirm`], for an account without a recovery code:
+ * open `BrowserSession`'s `wrapped_master` and wrap the same master key
+ * under a new recovery code, keeping no key.
+ *
+ * # Errors
+ *
+ * `rejected` when the wrapper is malformed or does not open, `unavailable`
+ * without randomness.
+ * @param {LoginKey} state
+ * @param {Uint8Array} wrapped_master
+ * @returns {Recovered}
+ */
+export function recovery_create(state, wrapped_master) {
+    _assertClass(state, LoginKey);
+    var ptr0 = state.__destroy_into_raw();
+    const ptr1 = passArray8ToWasm0(wrapped_master, wasm.__wbindgen_malloc);
+    const len1 = WASM_VECTOR_LEN;
+    const ret = wasm.recovery_create(ptr0, ptr1, len1);
+    if (ret[2]) {
+        throw takeFromExternrefTable0(ret[1]);
+    }
+    return Recovered.__wrap(ret[0]);
 }
 function __wbg_get_imports() {
     const import0 = {
@@ -434,6 +502,9 @@ const LoginFinalization = (typeof FinalizationRegistry === 'undefined')
 const LoginKeyFinalization = (typeof FinalizationRegistry === 'undefined')
     ? { register: () => {}, unregister: () => {} }
     : new FinalizationRegistry(ptr => wasm.__wbg_loginkey_free(ptr, 1));
+const RecoveredFinalization = (typeof FinalizationRegistry === 'undefined')
+    ? { register: () => {}, unregister: () => {} }
+    : new FinalizationRegistry(ptr => wasm.__wbg_recovered_free(ptr, 1));
 
 function addToExternrefTable0(obj) {
     const idx = wasm.__externref_table_alloc();

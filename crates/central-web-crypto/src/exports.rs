@@ -7,7 +7,7 @@
 //! Only the module calls these: the conversions they use exist in
 //! WebAssembly alone, so the host's tests drive `flow` instead.
 
-use crate::flow::{self, Registered, Registering, SignedIn, SigningIn};
+use crate::flow::{self, Recovery, Registered, Registering, SignedIn, SigningIn};
 use central_crypto::CryptoError;
 use wasm_bindgen::prelude::{JsError, JsValue, wasm_bindgen};
 
@@ -115,6 +115,29 @@ impl LoginKey {
     }
 }
 
+/// A recovery code made after a sign-in: what `SetRecovery` sends, and the
+/// code to show once. Free it once read; that wipes the code.
+#[wasm_bindgen]
+pub struct Recovered(Recovery);
+
+#[wasm_bindgen]
+impl Recovered {
+    /// The recovery code's written form. Read from the wiped buffer rather
+    /// than handed over, so no copy stays behind in the module's memory.
+    #[wasm_bindgen(getter, unchecked_return_type = "string")]
+    #[must_use]
+    pub fn recovery_code(&self) -> JsValue {
+        JsValue::from_str(&self.0.recovery_code)
+    }
+
+    /// The master key under the recovery code (73 bytes).
+    #[wasm_bindgen(getter)]
+    #[must_use]
+    pub fn recovery(&self) -> Vec<u8> {
+        self.0.recovery.as_bytes().to_vec()
+    }
+}
+
 /// The origin of the Central this module is bound to: the live one.
 #[wasm_bindgen]
 #[must_use]
@@ -180,4 +203,19 @@ pub fn login_finish(state: Login, response: &[u8]) -> Result<LoginKey, JsError> 
 #[wasm_bindgen]
 pub fn login_confirm(state: LoginKey, wrapped_master: &[u8]) -> Result<(), JsError> {
     flow::login_confirm(state.state, wrapped_master).map_err(refused)
+}
+
+/// In place of [`login_confirm`], for an account without a recovery code:
+/// open `BrowserSession`'s `wrapped_master` and wrap the same master key
+/// under a new recovery code, keeping no key.
+///
+/// # Errors
+///
+/// `rejected` when the wrapper is malformed or does not open, `unavailable`
+/// without randomness.
+#[wasm_bindgen]
+pub fn recovery_create(state: LoginKey, wrapped_master: &[u8]) -> Result<Recovered, JsError> {
+    flow::recovery_create(state.state, wrapped_master)
+        .map(Recovered)
+        .map_err(refused)
 }

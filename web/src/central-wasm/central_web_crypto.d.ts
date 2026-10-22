@@ -74,6 +74,25 @@ export class LoginKey {
 }
 
 /**
+ * A recovery code made after a sign-in: what `SetRecovery` sends, and the
+ * code to show once. Free it once read; that wipes the code.
+ */
+export class Recovered {
+    private constructor();
+    free(): void;
+    [Symbol.dispose](): void;
+    /**
+     * The master key under the recovery code (73 bytes).
+     */
+    readonly recovery: Uint8Array;
+    /**
+     * The recovery code's written form. Read from the wiped buffer rather
+     * than handed over, so no copy stays behind in the module's memory.
+     */
+    readonly recovery_code: string;
+}
+
+/**
  * The origin of the Central this module is bound to: the live one.
  */
 export function central_origin(): string;
@@ -124,6 +143,18 @@ export function login_finish(state: Login, response: Uint8Array): LoginKey;
  */
 export function login_start(password: string, account: Uint8Array, epoch: bigint): Login;
 
+/**
+ * In place of [`login_confirm`], for an account without a recovery code:
+ * open `BrowserSession`'s `wrapped_master` and wrap the same master key
+ * under a new recovery code, keeping no key.
+ *
+ * # Errors
+ *
+ * `rejected` when the wrapper is malformed or does not open, `unavailable`
+ * without randomness.
+ */
+export function recovery_create(state: LoginKey, wrapped_master: Uint8Array): Recovered;
+
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
 
 export interface InitOutput {
@@ -132,6 +163,7 @@ export interface InitOutput {
     readonly __wbg_enrollment_free: (a: number, b: number) => void;
     readonly __wbg_login_free: (a: number, b: number) => void;
     readonly __wbg_loginkey_free: (a: number, b: number) => void;
+    readonly __wbg_recovered_free: (a: number, b: number) => void;
     readonly central_origin: () => [number, number];
     readonly enrolled_document: (a: number) => [number, number];
     readonly enrolled_record: (a: number) => [number, number];
@@ -146,6 +178,9 @@ export interface InitOutput {
     readonly login_message: (a: number) => [number, number];
     readonly login_start: (a: number, b: number, c: number, d: number, e: bigint) => [number, number, number];
     readonly loginkey_message: (a: number) => [number, number];
+    readonly recovered_recovery: (a: number) => [number, number];
+    readonly recovered_recovery_code: (a: number) => any;
+    readonly recovery_create: (a: number, b: number, c: number) => [number, number, number];
     readonly __wbindgen_exn_store: (a: number) => void;
     readonly __externref_table_alloc: () => number;
     readonly __wbindgen_externrefs: WebAssembly.Table;

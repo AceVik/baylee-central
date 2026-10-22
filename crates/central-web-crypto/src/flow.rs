@@ -1,6 +1,7 @@
-//! Registration and sign-in in plain Rust: what the WebAssembly exports
-//! (`exports.rs`) call, and what the host's tests drive against
-//! `central-crypto`'s server side. Every network call is the page's.
+//! Registration, sign-in and a recovery code made after a sign-in, in plain
+//! Rust: what the WebAssembly exports (`exports.rs`) call, and what the
+//! host's tests drive against `central-crypto`'s server side. Every network
+//! call is the page's.
 
 use central_api::Endpoint;
 use central_crypto::{
@@ -100,12 +101,28 @@ pub fn enrollment_finish(state: Registering, response: &[u8]) -> Result<Register
     })
 }
 
-/// A sign-in between KE1 and KE2: the OPAQUE state, which holds the password.
-pub struct SigningIn(Login);
+/// A sign-in between KE1 and KE2: the OPAQUE state, which holds the
+/// password, and the account it signs in to.
+pub struct SigningIn {
+    login: Login,
+    context: Context,
+}
 
 /// A sign-in after KE3 was made: the password's wrapping key, kept only to
-/// check the master key Central hands back.
-pub struct SignedIn(WrappingKey);
+/// open the master key Central hands back, and the account it signed in to.
+pub struct SignedIn {
+    key: WrappingKey,
+    context: Context,
+}
+
+/// A recovery code made after a sign-in: the code to show once, and the
+/// master key wrapped under it for `SetRecovery`.
+pub struct Recovery {
+    /// The recovery code's written form.
+    pub recovery_code: Zeroizing<String>,
+    /// The master key under the recovery code (73 bytes).
+    pub recovery: WrappedMasterKey,
+}
 
 /// Start signing in to `account` at `epoch` (from `Discover`). Returns the
 /// state and KE1.
@@ -120,7 +137,7 @@ pub fn login_start(
 ) -> Result<(SigningIn, Vec<u8>), CryptoError> {
     let (_, context) = context(account, epoch)?;
     let (login, message) = Login::start(password, context)?;
-    Ok((SigningIn(login), message))
+    Ok((SigningIn { login, context }, message))
 }
 
 /// Answer Central's KE2 with KE3. A wrong password fails here, before
@@ -131,8 +148,15 @@ pub fn login_start(
 /// Rejects a wrong password, another account, issuer or epoch, and a
 /// malformed response.
 pub fn login_finish(state: SigningIn, response: &[u8]) -> Result<(SignedIn, Vec<u8>), CryptoError> {
-    let result = state.0.finish(response)?;
-    Ok((SignedIn(result.wrapping_key), result.finalization))
+    let SigningIn { login, context } = state;
+    let result = login.finish(response)?;
+    Ok((
+        SignedIn {
+            key: result.wrapping_key,
+            context,
+        },
+        result.finalization,
+    ))
 }
 
 /// Check that the master key Central answered `LoginFinish` with opens under
@@ -142,7 +166,31 @@ pub fn login_finish(state: SigningIn, response: &[u8]) -> Result<(SignedIn, Vec<
 ///
 /// Rejects a wrapper that is malformed or does not open.
 pub fn login_confirm(state: SignedIn, wrapped_master: &[u8]) -> Result<(), CryptoError> {
-    let SignedIn(key) = state;
+    let SignedIn { key, .. } = state;
     let wrapped = WrappedMasterKey::from_bytes(wrapped_master)?;
     key.unwrap(&wrapped).map(drop)
+}
+
+/// In place of [`login_confirm`], for an account that has no recovery code
+/// (one moved from the official gateway): open the master key Central
+/// answered `LoginFinish` with, failing as `login_confirm` does, then make a
+/// new recovery code and wrap the same master key under it with the
+/// account's context (`docs/crypto-protocol.md` §"Recovery code"). The
+/// master key is wiped when the step ends; only the code and the wrapper
+/// leave it. The state is consumed, also on failure.
+///
+/// # Errors
+///
+/// Rejects a wrapper that is malformed or does not open, and fails without
+/// randomness.
+pub fn recovery_create(state: SignedIn, wrapped_master: &[u8]) -> Result<Recovery, CryptoError> {
+    let SignedIn { key, context } = state;
+    let wrapped = WrappedMasterKey::from_bytes(wrapped_master)?;
+    let master = key.unwrap(&wrapped)?;
+    let code = RecoveryCode::generate()?;
+    let recovery = code.wrap(context, &master)?;
+    Ok(Recovery {
+        recovery_code: code.to_text(),
+        recovery,
+    })
 }
