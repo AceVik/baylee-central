@@ -72,9 +72,11 @@ answers change only together with `web/`, which ships from the same revision.
 **Administration is one request.** `Request::Admin { request: AdminRequest }`
 answers `Response::Admin { answer: AdminAnswer }` or `Done`. It is served on
 the browser listener only, with a browser session whose account holds the
-admin role. `browser_operation` names it once; an exhaustive match over
-`AdminRequest` in a new `crates/central-identity/src/admin.rs` decides which
-actions are changes. The native listener refuses it.
+admin role, and like every account action it needs Central's terms accepted
+(`needs_acceptance` in `crates/central-identity/src/terms.rs`).
+`browser_operation` names it once; an exhaustive match over `AdminRequest` in
+a new `crates/central-identity/src/admin.rs` decides which actions are
+changes. The native listener refuses it.
 
 **A change needs a recent password.** An administrator's change needs a
 browser session whose `created_at` (the password sign-in) is less than 30
@@ -128,7 +130,9 @@ authority for its origin. A row registered with `RegisterGateway` for that
 origin would hold a second redemption credential for the audience the bridge
 already serves, so tickets for the official gateway could be redeemed twice
 over; the official row avoids that. The store treats the official row as the
-official gateway only while its origin is `LEGACY_ORIGIN`. Until step 7 the
+official gateway only while its origin is `LEGACY_ORIGIN`, and
+`register_gateway` refuses that origin outright (`Conflict`), where today's
+`ON CONFLICT` path would answer an unexplained `Busy`. Until step 7 the
 operator lists it, under the migrator login:
 
 ```sql
@@ -198,14 +202,18 @@ account came from, and its recovery state.
     offiziellen Gateway hierher umgezogen, das keinen kannte. Vergisst du
     ohne ihn dein Passwort, sind deine verschlüsselten Daten verloren."
 
-The code is made in two places. Right after a sign-in, the sign-in page asks
-`AccountSummary` before it ends the crypto worker; without a code it offers one
-at once, and "Not now" ends the worker. Later, on the account page, the button
-asks for the password again ("To make the code, sign in again") and signs in
-anew. Either way the page shows the code with `RecoveryStep.tsx` (copy,
-download, "I kept it"), and only after that confirmation sends it. The page
-keeps the 73 bytes until Central answers, so a lost answer is retried with
-the same bytes.
+The code is made in two places. Right after a sign-in: once `LoginFinish` has
+answered, the sign-in page asks `AccountSummary` while the worker still holds
+the sign-in's state. `recovery_create` (below) stands in for `login_confirm`:
+it proves the password the same way, by unwrapping, so the page calls exactly
+one of the two. For an account without a code it calls `recovery_create` at
+once and keeps only the code and the 73-byte wrapper, never the key, until the
+person decides; "Not now" discards both and nothing reaches Central. Later, on
+the account page, the button asks for the password again ("To make the code,
+sign in again") and signs in anew the same way. Either way the page shows the
+code with `RecoveryStep.tsx` (copy, download, "I kept it"), and only after
+that confirmation sends it. The page keeps the 73 bytes until Central
+answers, so a lost answer is retried with the same bytes.
 
 **Wire.**
 
@@ -218,9 +226,10 @@ the same bytes.
   `recovery` is 73 bytes. Central stores it when the account is enrolled, has
   finished moving (`legacy_closed` or registered), has no wrapper, and the
   browser session's sign-in is less than 10 minutes old. The same bytes
-  again are `Done`; other bytes while one exists are `Conflict`. A stolen
-  cookie can therefore not put a wrapper on an account long after its owner
-  signed in. Replacing a code comes with password reset (M1).
+  again are `Done` at any time, so a slow retry after a lost answer still
+  succeeds; other bytes while one exists are `Conflict`. A stolen cookie can
+  therefore not put a wrapper on an account long after its owner signed in.
+  Replacing a code comes with password reset (M1).
 
 **Browser crypto.** `central-web-crypto` gains `recovery_create(state:
 LoginKey, wrapped_master) -> Recovered`, with the getters `recovery_code`
