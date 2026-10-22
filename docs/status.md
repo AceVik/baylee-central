@@ -130,6 +130,12 @@ The server side of [web accounts](web-accounts.md) lands in three PRs.
   `SessionStatus` is unchanged). `--dev-accounts-stdin` can start the browser
   listener for a numeric loopback page origin, every other check unchanged;
   the deployed launcher keeps `baylee.app` fixed.
+- **The gateway directory on the website.** `GatewayDirectory` is served on
+  the browser listener without a session (60 a minute per address), and
+  `baylee.app/gateways` reads it there. Migration 000009 adds the official
+  gateway's row, without owner or credential; the operator lists it, and the
+  bridge's heartbeat moves it alone ([gateway registry](gateway-registry.md),
+  [operations](operations.md#the-official-gateway)).
 - **Not yet deployed.** Deploy: migrate, grant, add `browser.listen`, pass
   `/api/*` in the `baylee.app` site block, issue beta keys. Central's own terms
   are still `draft`, so none are in force.

@@ -6,6 +6,11 @@
 .gw:hover { transform: translateY(-2px); border-color: var(--edge); }
 .gw-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0.3rem 1rem; margin-bottom: 0.8rem; }
 .gw-name { margin: 0; overflow-wrap: anywhere; }
+.gw-official {
+  display: inline-block; margin-inline-start: 0.3rem; vertical-align: 0.2em;
+  font-family: var(--sans); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.02em;
+  padding: 0.08em 0.6em; border-radius: 999px; background: var(--gold); color: var(--gold-ink);
+}
 .gw-state { font-family: var(--sans); font-size: 0.9rem; color: var(--ink-faint); white-space: nowrap; }
 .gw-state.on { color: var(--ok); }
 .gw-kv { margin-bottom: 0.8rem; }

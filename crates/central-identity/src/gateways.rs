@@ -1,5 +1,5 @@
 use super::{Error, IdentityService, Request, Response, Token};
-use central_api::wire::TicketPurpose;
+use central_api::{gateway::GatewayMetadata, wire::TicketPurpose};
 
 impl IdentityService {
     pub(super) async fn gateway_authority(
@@ -16,6 +16,56 @@ impl IdentityService {
         Ok((Some(id), origin))
     }
 
+    /// Reserve an origin for the session's account. The bridge's origin is the
+    /// official gateway's: no registered credential may redeem its tickets
+    /// (docs/gateway-registry.md), so it is a conflict.
+    async fn register_gateway(
+        &self,
+        origin: &str,
+        metadata: &GatewayMetadata,
+        bearer: Option<&Token>,
+    ) -> Result<Response, Error> {
+        if origin == self.gateway {
+            return Err(Error::Conflict);
+        }
+        let credential = Token::generate()?;
+        let heartbeat = Token::generate()?;
+        let gateway = self
+            .store
+            .register_gateway(
+                bearer.ok_or(Error::Rejected)?,
+                origin,
+                metadata,
+                &credential,
+                &heartbeat,
+                !self.legacy_discovery,
+            )
+            .await?;
+        Ok(Response::GatewayRegistered {
+            gateway,
+            credential,
+            heartbeat,
+        })
+    }
+
+    /// The bridge beats for the official gateway's row and no other; every
+    /// other credential is a registered gateway's heartbeat token.
+    async fn heartbeat(
+        &self,
+        metadata: &GatewayMetadata,
+        bearer: Option<&Token>,
+    ) -> Result<(), Error> {
+        if self.bridge(bearer).is_ok() {
+            return self
+                .store
+                .official_heartbeat(&self.gateway, metadata, !self.legacy_discovery)
+                .await;
+        }
+        self.store
+            .gateway_heartbeat(bearer.ok_or(Error::Rejected)?, metadata)
+            .await
+    }
+
     pub(super) async fn gateway_request(
         &self,
         request: Request,
@@ -23,32 +73,13 @@ impl IdentityService {
     ) -> Result<Response, Error> {
         match request {
             Request::RegisterGateway { origin, metadata } => {
-                let credential = Token::generate()?;
-                let heartbeat = Token::generate()?;
-                let gateway = self
-                    .store
-                    .register_gateway(
-                        bearer.ok_or(Error::Rejected)?,
-                        &origin,
-                        &metadata,
-                        &credential,
-                        &heartbeat,
-                        !self.legacy_discovery,
-                    )
-                    .await?;
-                Ok(Response::GatewayRegistered {
-                    gateway,
-                    credential,
-                    heartbeat,
-                })
+                self.register_gateway(&origin, &metadata, bearer).await
             }
             Request::GatewayDirectory { after } => Ok(Response::GatewayDirectory {
                 gateways: self.store.gateway_directory(after).await?,
             }),
             Request::GatewayHeartbeat { metadata } => {
-                self.store
-                    .gateway_heartbeat(bearer.ok_or(Error::Rejected)?, &metadata)
-                    .await?;
+                self.heartbeat(&metadata, bearer).await?;
                 Ok(Response::Done)
             }
             Request::SetGatewayAdmins {

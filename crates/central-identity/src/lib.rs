@@ -64,8 +64,9 @@ pub struct BrowserReply {
 
 /// The operations the browser listener serves (`docs/web-accounts.md`); every
 /// other one is refused before anything else happens. Terms are accepted there
-/// for Central only. The match names every operation, so a new one does not
-/// compile until it is decided here.
+/// for Central only; the public gateway directory is read there without a
+/// session. The match names every operation, so a new one does not compile
+/// until it is decided here.
 #[must_use]
 pub fn browser_operation(request: &Request) -> bool {
     match request {
@@ -79,7 +80,8 @@ pub fn browser_operation(request: &Request) -> bool {
         | Request::RenewSession
         | Request::Logout
         | Request::Terms
-        | Request::TermsStatus => true,
+        | Request::TermsStatus
+        | Request::GatewayDirectory { .. } => true,
         Request::AcceptTerms { subject, .. } => matches!(subject, TermsSubject::Central),
         Request::CreateObject
         | Request::ReadObject { .. }
@@ -89,7 +91,6 @@ pub fn browser_operation(request: &Request) -> bool {
         | Request::LegacyInvalidate { .. }
         | Request::LegacyClose { .. }
         | Request::RegisterGateway { .. }
-        | Request::GatewayDirectory { .. }
         | Request::GatewayHeartbeat { .. }
         | Request::SetGatewayAdmins { .. }
         | Request::CheckGatewayAdmin { .. }
@@ -419,6 +420,7 @@ mod tests {
                 version: "1".into(),
                 digest: [0; 32],
             },
+            Request::GatewayDirectory { after: None },
         ]
     }
 
@@ -453,7 +455,6 @@ mod tests {
                 origin: "https://gateway.invalid".into(),
                 metadata: metadata(),
             },
-            Request::GatewayDirectory { after: None },
             Request::GatewayHeartbeat {
                 metadata: metadata(),
             },
@@ -537,6 +538,7 @@ mod tests {
         assert!(uses_session(&Request::Logout));
         assert!(uses_session(&Request::TermsStatus));
         assert!(!uses_session(&Request::Terms));
+        assert!(!uses_session(&Request::GatewayDirectory { after: None }));
         assert!(!uses_session(&Request::Discover {
             username: "synthetic".into()
         }));

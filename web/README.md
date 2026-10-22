@@ -240,33 +240,37 @@ says above the text that they are not in force. `src/legal/markdown.ts` reads
 the Markdown subset exactly as the Baylee client does (`legal/README.md`),
 except that a link to an `https:` or `mailto:` address is drawn as a link
 (`rel="noopener noreferrer nofollow"`); no HTML is ever interpreted. A
-gateway's own terms come from Central's public `GatewayTerms`, which, like the
-directory below, waits for the browser API of M3.
+gateway's own terms come from Central's public `GatewayTerms`, which waits for
+the browser API of M3; the browser listener does not take it yet.
 
 ## The gateway directory
 
 `src/central/directory.ts` is a typed client for Central's public
 `GatewayDirectory { after }` ([gateway registry](../docs/gateway-registry.md)),
-on the native wire vocabulary of `central-api`: it posts
+on Central's browser listener ([web accounts](../docs/web-accounts.md)), with
+the wire vocabulary of `central-api`: it posts
 `{"operation": "gateway_directory", "after": null | [16 bytes]}` to
-`${VITE_CENTRAL_API}/v1/native` with one `Content-Type: application/json`, no
-credential and no cookie, and reads `{"result": "gateway_directory",
-"gateways": [...]}`: at most 100 approved gateways in UUID order, the last
-id the next page's `after`. A refusal is Central's plain text and status,
-never parsed. Each answer is checked as `central-client`'s
+`${VITE_CENTRAL_API}/v1` with one `Content-Type: application/json` and
+`X-Baylee-Central: 1`, `credentials: "omit"` (the directory needs no session,
+so the cookie is not sent) and `redirect: "error"`, and reads
+`{"result": "gateway_directory", "gateways": [...]}`: at most 100 approved
+gateways in UUID order, the last id the next page's `after`. Central counts
+60 of these a minute per address. A refusal is Central's plain text and
+status, never parsed. Each answer is checked as `central-client`'s
 `gateway_directory` checks it (UUIDv7 ids in strictly ascending order after
 the cursor, canonical HTTPS origins, bounded metadata whose website is on its
 own origin, no unknown field) and an answer that fails shows nothing of it.
 Names and versions are rendered as text (`<bdi>`, never HTML); a website is
 a link only after those checks, with `rel="noopener noreferrer nofollow"`.
 
-**Not live yet.** Central's native boundary refuses every request carrying
-`Origin` or `Sec-Fetch-Site` (`crates/central-http/src/boundary.rs`), and a
-browser always sends both on a POST. The directory therefore needs the
-reviewed same-origin browser API of M3 at `/api` (the roadmap's "Target
-shape"); until it exists the page says that Central did not answer, and
-offers to try again. The tests use `test/fixtures/directory.ts` and never call a
-real Central.
+The official gateway comes first with an "Official" mark, the rest in
+Central's order. The page knows it by its origin, `OFFICIAL_GATEWAY` in
+`src/config.ts` (the bridge's, `https://baylee.acevik.de`), never by a name
+or anything else an operator sends; only what is drawn moves, so the next page still starts after
+Central's last id. Central lists it once the operator has
+(`docs/operations.md` §"The official gateway"); it shows online once the
+official gateway sends its heartbeat. The tests use
+`test/fixtures/directory.ts` and never call a real Central.
 
 ## The Impressum
 
@@ -426,6 +430,4 @@ The policy check (`cargo xtask policy`) skips
 nothing else under `web/`; a Cargo target inside it is refused, and the
 policy regressions prove both.
 
-- The directory waits for M3's browser route (above): the browser surface
-  takes only the account operations, not `GatewayDirectory`.
 - No automated accessibility audit (axe) yet: it would be a new dependency.

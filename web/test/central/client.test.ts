@@ -8,16 +8,19 @@ function answer(status: number, body: unknown, json = true): Response {
 }
 
 describe("directoryClient", () => {
-  it("posts the exact native request, without credentials, and follows the cursor", async () => {
+  it("posts the exact request to the browser surface, without credentials, and follows the cursor", async () => {
     const fetch = vi.fn<(url: string, init?: RequestInit) => Promise<Response>>(async () => answer(200, page(0, 2)));
     const client = directoryClient({ api: "/api", fetch: fetch as unknown as typeof globalThis.fetch });
     const first = await client.page(null);
     expect(first).toHaveLength(2);
     const [url, init] = fetch.mock.calls[0] ?? [];
-    expect(url).toBe("/api/v1/native");
+    // Central's browser listener has the one route; `/api/v1/native` is a 404 there.
+    expect(url).toBe("/api/v1");
     expect(init?.method).toBe("POST");
+    // No session: the cookie is not sent, and there is no Authorization header.
     expect(init?.credentials).toBe("omit");
-    expect(init?.headers).toEqual({ "Content-Type": "application/json", Accept: "application/json" });
+    expect(init?.redirect).toBe("error");
+    expect(init?.headers).toEqual({ "Content-Type": "application/json", "X-Baylee-Central": "1", Accept: "application/json" });
     expect(JSON.parse(String(init?.body))).toEqual({ operation: "gateway_directory", after: null });
 
     fetch.mockResolvedValueOnce(answer(200, { result: "gateway_directory", gateways: [] }));

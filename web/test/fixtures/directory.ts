@@ -4,6 +4,9 @@
 
 import { PAGE_SIZE } from "../../src/central/directory";
 
+/** `OFFICIAL_GATEWAY` of src/config.ts, spelt out: e2e/ reads this file without Vite's types. */
+const OFFICIAL_GATEWAY = "https://baylee.acevik.de";
+
 /** A UUIDv7 as Central's wire carries it: 16 integers. */
 export function idBytes(n: number): number[] {
   const b = [0x01, 0x9a, 0x2b, 0x3c, 0x4d, 0x5e, 0x70, 0x00, 0x80, 0x00, 0, 0, 0, 0, 0, 0];
@@ -22,6 +25,11 @@ export function listing(n: number, over: { name?: string; online?: boolean } = {
     metadata: { name: over.name ?? `Synthetic table ${n}`, version: `0.1.0-beta.${n % 9}`, website: `${origin}/` },
     online: over.online ?? n % 3 !== 0,
   };
+}
+
+/** The official gateway's entry, as the n-th id: Central lists it like any other. */
+export function officialListing(n: number, over: { name?: string; online?: boolean } = {}) {
+  return { ...listing(n, over), origin: OFFICIAL_GATEWAY, metadata: { ...listing(n, over).metadata, website: `${OFFICIAL_GATEWAY}/` } };
 }
 
 /** Page `index` (from 0) of a directory of `total` gateways, numbered from 1. */

@@ -211,6 +211,14 @@ fn run(http: &Http, bridge: &Token, runtime: &Runtime, operator: &DatabaseConnec
     )
     .unwrap();
     support::gateways::run(http, &first, runtime, operator);
+    support::gateways::official(
+        http,
+        &first,
+        bridge,
+        "http://127.0.0.1:28766",
+        runtime,
+        operator,
+    );
     support::terms::gateway(http, &first, bridge, "http://127.0.0.1:28766");
     assert!(first.migration_closed(http).unwrap());
     object_round_trip(http, identity, &first);

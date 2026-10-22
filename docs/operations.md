@@ -60,7 +60,8 @@ canonical username (`BrowserSession`, `BrowserStatus`). The site is fixed to
 
 Per-address budgets read the last `X-Forwarded-For` hop, which Caddy sets to
 the client it saw: 5 registrations an hour, 30 discoveries and 30 sign-in starts
-a minute. IPv6 addresses count by their /64. The counters live in memory only,
+a minute, and 60 reads of the gateway directory a minute (`GatewayDirectory`,
+which needs no session; the website's `/gateways` page). IPv6 addresses count by their /64. The counters live in memory only,
 at most 4096 addresses per budget, and forget an address when its window has
 passed. A request without a well-formed last hop is refused (400). Do not set
 Caddy's `trusted_proxies` for this site unless a CDN in front of it appends its
@@ -174,6 +175,43 @@ UPDATE central_identity.beta_keys SET revoked_at = clock_timestamp() WHERE note 
 The runtime role may only `SELECT` keys and `UPDATE` their `uses_left`; it can
 neither issue, revoke, re-date nor delete one, and the store refuses to start
 with any wider or narrower grant.
+
+## The official gateway
+
+The directory lists the official gateway (the migration bridge's,
+`https://baylee.acevik.de`) from a row of its own: no owner, no credential, so
+the bridge stays the only authority for that origin ([gateway
+registry](gateway-registry.md#discovery-heartbeats-and-administrators)).
+Migration 000009 makes room for it; listing it is the operator's, under the
+migrator login (`central_migrator`, which owns the tables), once:
+
+```sql
+INSERT INTO central_identity.gateways (official, origin, name, version, website)
+    VALUES (true, 'https://baylee.acevik.de', 'Baylee', '0', 'https://baylee.acevik.de/');
+INSERT INTO central_identity.gateway_approvals (gateway_id)
+    SELECT id FROM central_identity.gateways WHERE official;
+```
+
+Until its first heartbeat the entry shows these values and offline. The
+official gateway's `BAYLEE_CENTRAL_CONFIG_FILE` gains `metadata` beside its
+`bridge` (Baylee `docs/central-login.md`), for example `"metadata": {"name":
+"Baylee", "version": "0", "website": "https://baylee.acevik.de/"}`; the website
+must be on that origin, and the gateway sends its own binary's version in place
+of `version`. It then sends `GatewayHeartbeat` with the bridge credential every
+30 seconds, which replaces the name, version and website and marks it online.
+Without `metadata` the entry stays listed and offline. A second official row is
+refused, as is an owner or a credential on it; `RegisterGateway` for the
+origin answers `Conflict`.
+
+The entry stays `https://baylee.acevik.de` until the official gateway moves to
+`https://gateway.baylee.app` (roadmap M5), which also moves the bridge's
+compiled audience: listing the new name earlier would hand clients an origin
+Central issues no tickets for. To hide the entry, disable its approval:
+
+```sql
+UPDATE central_identity.gateway_approvals SET enabled = false
+    WHERE gateway_id = (SELECT id FROM central_identity.gateways WHERE official);
+```
 
 ## Secrets
 

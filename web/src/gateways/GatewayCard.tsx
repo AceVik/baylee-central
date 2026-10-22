@@ -1,6 +1,8 @@
 // One listed gateway. Its name and version are the operator's words, shown
 // as text; its website is a link only because the directory's checks put it
-// on the gateway's own origin.
+// on the gateway's own origin. The official gateway carries a mark, which
+// this page sets by comparing the listed origin with the one it knows
+// (`OFFICIAL_GATEWAY`), never by a name or anything else an operator sends.
 
 import { useState } from "react";
 
@@ -8,7 +10,7 @@ import type { GatewayListing } from "../central/directory";
 import { Icon } from "../components/icons";
 import { T, t, useLang } from "../i18n";
 
-export function GatewayCard({ g }: { g: GatewayListing }) {
+export function GatewayCard({ g, official = false }: { g: GatewayListing; official?: boolean }) {
   const lang = useLang();
   const [said, setSaid] = useState("");
   const copy = () => {
@@ -26,6 +28,14 @@ export function GatewayCard({ g }: { g: GatewayListing }) {
       <div className="gw-head">
         <h3 className="gw-name">
           <bdi>{g.metadata.name}</bdi>
+          {official && (
+            <>
+              {" "}
+              <span className="gw-official">
+                <T id="gw.official" />
+              </span>
+            </>
+          )}
         </h3>
         <span className={`gw-state${g.online ? " on" : ""}`}>
           <span className={`dot ${g.online ? "ok" : "off"}`} aria-hidden="true" />

@@ -1,5 +1,6 @@
 use super::Http;
 use central_api::{
+    Error, Token,
     gateway::GatewayMetadata,
     wire::{Request, Response, TicketPurpose},
 };
@@ -99,4 +100,76 @@ pub(crate) fn run(
         .unwrap(),
         Response::GatewaySession { .. }
     ));
+}
+
+/// The official gateway over HTTP: its origin is the bridge's, so nobody
+/// registers it; the operator lists it, and the bridge's heartbeat moves it
+/// online with the metadata it sends.
+pub(crate) fn official(
+    http: &Http,
+    session: &Session,
+    bridge: &Token,
+    origin: &str,
+    runtime: &Runtime,
+    operator: &DatabaseConnection,
+) {
+    let metadata = GatewayMetadata {
+        name: "Synthetic official gateway".into(),
+        version: "test-1".into(),
+        website: format!("{origin}/"),
+    };
+    assert_eq!(
+        session
+            .register_gateway(http, origin.into(), metadata.clone())
+            .err(),
+        Some(Error::Conflict)
+    );
+    let heartbeat = Request::GatewayHeartbeat { metadata };
+    assert_eq!(
+        http.exchange(&heartbeat, Some(bridge)).err(),
+        Some(Error::Rejected),
+        "nothing is listed for the bridge to beat for"
+    );
+    runtime
+        .block_on(operator.execute_raw(Statement::from_sql_and_values(
+            DbBackend::Postgres,
+            "INSERT INTO central_identity.gateways (official, origin, name, version, website)
+             VALUES (true, $1, 'Baylee', '0', $2)",
+            vec![origin.into(), format!("{origin}/").into()],
+        )))
+        .unwrap();
+    runtime
+        .block_on(operator.execute_unprepared(
+            "INSERT INTO central_identity.gateway_approvals (gateway_id)
+             SELECT id FROM central_identity.gateways WHERE official",
+        ))
+        .unwrap();
+    let entry = |http: &Http| {
+        central_client::gateway_directory(http, None)
+            .unwrap()
+            .into_iter()
+            .find(|entry| entry.origin == origin)
+            .unwrap()
+    };
+    assert!(!entry(http).online);
+    assert!(
+        http.exchange(&heartbeat, Some(&Token::generate().unwrap()))
+            .is_err()
+    );
+    assert!(matches!(
+        http.exchange(&heartbeat, Some(bridge)).unwrap(),
+        Response::Done
+    ));
+    let listed = entry(http);
+    assert!(listed.online);
+    assert_eq!(listed.metadata.name, "Synthetic official gateway");
+    assert_eq!(
+        http.exchange(&heartbeat, Some(bridge)).err(),
+        Some(Error::Busy)
+    );
+    runtime
+        .block_on(
+            operator.execute_unprepared("DELETE FROM central_identity.gateways WHERE official"),
+        )
+        .unwrap();
 }

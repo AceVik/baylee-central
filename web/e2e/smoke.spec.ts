@@ -75,6 +75,7 @@ test.describe("smoke", () => {
     await expect(page.locator(".gateways > li")).toHaveCount(130);
     expect(m.directory).toHaveLength(2);
     expect(m.directory[0]).toEqual({ operation: "gateway_directory", after: null });
+    expect(m.refused).toEqual([]);
     await expectNoSideScroll(page);
     expect(m.stray).toEqual([]);
     expect(errors).toEqual([]);

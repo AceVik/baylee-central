@@ -1,10 +1,14 @@
-// Central's public gateway directory (docs/gateway-registry.md), typed. The
-// wire vocabulary is central-api's: a tagged JSON request
-// `{"operation": "gateway_directory", "after": null | [16 bytes]}` posted with
-// exactly one `Content-Type: application/json` and no credential, answered
-// `{"result": "gateway_directory", "gateways": [...]}`, at most 100 approved
-// gateways in ascending UUID order; the last id is the next page's `after`.
-// A refusal is plain text with a status (401, 409, 429, 503), never JSON.
+// Central's public gateway directory (docs/gateway-registry.md), typed, on
+// its browser surface (docs/web-accounts.md): one route, `POST /api/v1` on
+// this origin, with central-api's tagged JSON request
+// `{"operation": "gateway_directory", "after": null | [16 bytes]}`, exactly
+// one `Content-Type: application/json`, `X-Baylee-Central: 1` (which forces a
+// preflight cross-origin, and Central sends no CORS header) and no credential
+// (`credentials: "omit"`: the directory needs no session, so the cookie stays
+// home). It is answered `{"result": "gateway_directory", "gateways": [...]}`,
+// at most 100 approved gateways in ascending UUID order; the last id is the
+// next page's `after`. A refusal is plain text with a status (401, 403, 429,
+// 503), never JSON.
 //
 // Every answer is checked as central-client's `gateway_directory` checks it
 // (ids are UUIDv7 and strictly ascending, origins canonical HTTPS, metadata
@@ -95,12 +99,13 @@ export function directoryClient({ api, development = false, fetch: doFetch = (..
       if (after !== null && (cursor === null || !isUuidV7(cursor))) throw new DirectoryError("malformed");
       let r: Response;
       try {
-        r = await doFetch(`${api}/v1/native`, {
+        r = await doFetch(`${api}/v1`, {
           method: "POST",
           credentials: "omit",
           referrerPolicy: "no-referrer",
           cache: "no-store",
-          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          redirect: "error",
+          headers: { "Content-Type": "application/json", "X-Baylee-Central": "1", Accept: "application/json" },
           body: JSON.stringify({ operation: "gateway_directory", after: cursor }),
         });
       } catch {

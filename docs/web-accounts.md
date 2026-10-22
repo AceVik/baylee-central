@@ -155,12 +155,15 @@ the recovery code. The admin UI (M2) comes later.
 with the `Host` header unchanged. It has one route, `POST /api/v1`, which
 takes the same tagged `Request` JSON. Only these operations are allowed:
 `Discover`, `LoginStart`, `LoginFinish`, `Register`, `EnrollmentStart`,
-`EnrollmentFinish`, `SessionStatus`, `Logout`, `Terms`, `TermsStatus` and
-`AcceptTerms` for Central's terms (a gateway's terms are accepted from the
-client). Every other operation is refused. The list is one exhaustive match
-in `central-identity` (`browser_operation`), so a new operation does not
-compile until it is decided there. The cookie's token is used only by
-`SessionStatus`, `Logout`, `TermsStatus` and `AcceptTerms`.
+`EnrollmentFinish`, `SessionStatus`, `RenewSession`, `Logout`, `Terms`,
+`TermsStatus`, `AcceptTerms` for Central's terms (a gateway's terms are
+accepted from the client) and `GatewayDirectory`, the public gateway directory
+of the `/gateways` page ([gateway registry](gateway-registry.md)). Every other
+operation is refused. The list is one exhaustive match in `central-identity`
+(`browser_operation`), so a new operation does not compile until it is decided
+there. The cookie's token is used only by `SessionStatus`, `RenewSession`,
+`Logout`, `TermsStatus` and `AcceptTerms`; the directory uses none, and the
+page sends it with `credentials: "omit"`.
 
 A request is refused (403, `request not permitted`) unless all of these hold.
 Each header is compared byte for byte and must appear exactly once.
@@ -200,6 +203,7 @@ room, so a crowd of addresses cannot lock new ones out.
 | `Register` | 5 an hour |
 | `Discover` | 30 a minute |
 | `LoginStart` | 30 a minute, apart from `Discover` |
+| `GatewayDirectory` | 60 a minute, apart from the others |
 
 The global budgets of the native surface apply as well. The native surface
 (`/v1/native`) is unchanged, except that it refuses `Register` and a browser

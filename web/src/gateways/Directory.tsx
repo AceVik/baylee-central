@@ -1,8 +1,9 @@
 // Central's gateway directory, page by page, with what to say when Central
 // does not answer or answers something this page does not take.
 
-import { PAGE_SIZE, type DirectoryClient, type DirectoryFailure } from "../central/directory";
+import { PAGE_SIZE, type DirectoryClient, type DirectoryFailure, type GatewayListing } from "../central/directory";
 import { Icon } from "../components/icons";
+import { OFFICIAL_GATEWAY } from "../config";
 import { T, t, useLang, type Key } from "../i18n";
 import { GatewayCard } from "./GatewayCard";
 import { useDirectory } from "./useDirectory";
@@ -28,6 +29,15 @@ function Failure({ kind, onRetry }: { kind: DirectoryFailure; onRetry: () => voi
   );
 }
 
+/**
+ * The official gateway first, the rest in Central's order. Only what is
+ * drawn moves: the pages keep Central's order, whose last id is the next
+ * page's cursor.
+ */
+function officialFirst(gateways: readonly GatewayListing[]): GatewayListing[] {
+  return [...gateways.filter((g) => g.origin === OFFICIAL_GATEWAY), ...gateways.filter((g) => g.origin !== OFFICIAL_GATEWAY)];
+}
+
 export function Directory({ client }: { client: DirectoryClient }) {
   const lang = useLang();
   const { gateways, more, loading, failure, next, retry } = useDirectory(client);
@@ -40,8 +50,8 @@ export function Directory({ client }: { client: DirectoryClient }) {
       </output>
       {gateways.length > 0 && (
         <ul className="gateways">
-          {gateways.map((g) => (
-            <GatewayCard key={g.id} g={g} />
+          {officialFirst(gateways).map((g) => (
+            <GatewayCard key={g.id} g={g} official={g.origin === OFFICIAL_GATEWAY} />
           ))}
         </ul>
       )}

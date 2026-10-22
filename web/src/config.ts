@@ -37,6 +37,13 @@ export function impressumEndpoint(hostname?: string): string {
 /** Central's API, same origin (README.md §"The gateway directory"). */
 export const CENTRAL_API = import.meta.env.VITE_CENTRAL_API ?? "/api";
 
+/**
+ * The official gateway's origin, which the directory marks and lists first:
+ * the bridge's, compiled into Central as `central_api::LEGACY_ORIGIN`. It
+ * moves only together with that (to `https://gateway.baylee.app`, roadmap M5).
+ */
+export const OFFICIAL_GATEWAY = "https://baylee.acevik.de";
+
 /** The card status (`npm run content`), fetched lazily. */
 export const DATA_BASE = "/data/";
 

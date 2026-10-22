@@ -6,6 +6,7 @@ use central_api::gateway::GatewayMetadata;
 use sea_orm::{ConnectionTrait, DbBackend, Statement, prelude::Uuid};
 
 mod limits;
+mod official;
 
 fn metadata(origin: &str) -> GatewayMetadata {
     GatewayMetadata {
@@ -112,6 +113,7 @@ pub(super) async fn run(store: &AccountStore, operator: &DatabaseConnection, key
     )
     .await;
     limits::run(store, operator, &owner_session, gateway, origin).await;
+    official::run(store, operator, &owner_session, gateway).await;
 }
 
 async fn delegation(
