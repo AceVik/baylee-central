@@ -1,6 +1,8 @@
 // The screenshots, in a grid, each opening large in a dialog with the
 // arrow keys to step. They show the client's text view (card text, no card
-// image) and live outside this repository: `npm run content` copies them
+// image): each AVIF is a short recording that loops, each WebP a still of it,
+// which `prefers-reduced-motion` gets (WCAG 2.3.3) and a browser without AVIF
+// shows. They live outside this repository: `npm run content` copies them
 // from a Baylee checkout (README.md §"Content from Baylee").
 
 import { useState } from "react";
@@ -13,12 +15,15 @@ import { Section } from "../components/Section";
 import { SHOTS, type Shot } from "./shots";
 
 const SIZES = "(max-width: 600px) 92vw, (max-width: 1000px) 46vw, 380px";
+// A browser takes the first <source> that matches, so the still stands first.
+const STILL = "(prefers-reduced-motion: reduce)";
 
 function Picture({ shot, large, alt }: { shot: Shot; large?: boolean; alt: string }) {
   const base = MEDIA_BASE + shot.file;
   if (large === true) {
     return (
       <picture>
+        <source media={STILL} type="image/webp" srcSet={`${base}.webp`} />
         <source type="image/avif" srcSet={`${base}.avif`} />
         <img src={`${base}.webp`} width={1200} height={703} alt={alt} decoding="async" />
       </picture>
@@ -26,6 +31,7 @@ function Picture({ shot, large, alt }: { shot: Shot; large?: boolean; alt: strin
   }
   return (
     <picture>
+      <source media={STILL} type="image/webp" srcSet={`${base}-640.webp 640w, ${base}.webp 1200w`} sizes={SIZES} />
       <source type="image/avif" srcSet={`${base}-640.avif 640w, ${base}.avif 1200w`} sizes={SIZES} />
       <source type="image/webp" srcSet={`${base}-640.webp 640w, ${base}.webp 1200w`} sizes={SIZES} />
       <img src={`${base}.webp`} width={1200} height={703} loading="lazy" decoding="async" alt={alt} />
