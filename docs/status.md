@@ -155,6 +155,24 @@ The server side of [web accounts](web-accounts.md) lands in three PRs.
   with a moved account, the browser crypto against `central-crypto`'s server,
   and the pages with stand-ins and the strict mock. Deploy: the deploy hook
   migrates; no grant changes.
+- **Display name and tag** (23.10.2026, the accounts and administration
+  design's step 3; [web accounts](web-accounts.md) §"Display name and tag").
+  Central keeps a display name (the gateway's rule, eight reserved names for
+  a chosen one) and a unique tag per account (migration 000011, which draws
+  one for every registered account). `Register` takes an optional name and
+  draws the tag at random from `0x1000` up, widening once half a range is
+  taken; `SetDisplayName` (browser listener, terms accepted) sets a name once;
+  `AccountSummary` carries both. The bridge carries a moved account's name
+  and tag in `LegacyReserve` and, for one reserved before, `LegacyProfile`
+  once; `GatewayProfile` tells a gateway the name and tag behind a live lease
+  it holds (gateways use it from step 4). The website has the field, the
+  handle in the header and on the account page, the sign-in name small, and
+  "Choose your display name". Tests: the shared name table, the upgrade over
+  000010 with the backfill and its widening, the draws, retries and `Busy`
+  with the range injected small, every request over PostgreSQL 18, the
+  website's flow over the real browser listener, the pages with stand-ins and
+  the strict mock. Deploy: the floor check ([operations](operations.md#display-names-and-tags)),
+  the hook migrates; no grant changes.
 - **Not yet deployed.** Deploy: migrate, grant, add `browser.listen`, pass
   `/api/*` in the `baylee.app` site block, issue beta keys. Central's own terms
   are still `draft`, so none are in force.

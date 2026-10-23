@@ -63,6 +63,37 @@ can be restarted after process restart; committed credentials, documents and
 session revocation must survive it. Secret storage never silently regenerates
 OPAQUE deployment keys after a missing/corrupt file.
 
+## The bridge's reservation carries the name and tag
+
+*Added 23.10.2026 (the accounts and administration design, step 3; [web
+accounts](web-accounts.md) §"Display name and tag").* A moved account keeps
+the display name and tag it had at the official gateway, so the bridge sends
+both from the legacy row:
+
+- `LegacyReserve { legacy_id, username, display_name, tag }`: both optional
+  (`#[serde(default)]`, absent on the wire when `None`), so a bridge built
+  before them still decodes and is still decoded. They are stored with the
+  reservation, and a renewed reservation of a pending account refreshes them:
+  the name it carries replaces the one held, and a tag, once held, never
+  changes. A name that does not keep the rule (`profile::valid_display_name`)
+  is `Rejected`; the bridge sends none for such a name (one written before the
+  gateway's rule of 15.09.2026), and the account chooses a name on the
+  website. Reserved names are kept as they are. A tag outside `1..=i32::MAX`
+  is `Rejected`; one another account holds is replaced by a drawn one (the
+  registered accounts' draw), and the name is kept.
+- `LegacyProfile { legacy_id, display_name: Option<String>, tag: u32 }`
+  (bridge only) → `Done`, for a legacy account reserved before Central kept
+  them: it sets the tag and, when given, the name, once. `Conflict` once the
+  account has a tag (and with it any name), so the bridge may send it at
+  every sign-in of such an account and read `Conflict` as done; an unknown
+  legacy account or a malformed name or tag is `Rejected`. The design's
+  once-marker was the name; the tag is the one every moved account gets
+  (see web accounts §"Display name and tag" for why). The browser listener
+  refuses it.
+
+Baylee's bridge sends both with every `LegacyReserve`, and `LegacyProfile`
+at a moved account's Central sign-in (Baylee `docs/central-login.md`).
+
 ## Implementation status
 
 This document specifies the integration in progress. It does not claim that

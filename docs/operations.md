@@ -213,6 +213,36 @@ UPDATE central_identity.gateway_approvals SET enabled = false
     WHERE gateway_id = (SELECT id FROM central_identity.gateways WHERE official);
 ```
 
+## Display names and tags
+
+Migration 000011 (the accounts and administration design, step 3; [web
+accounts](web-accounts.md) §"Display name and tag") draws a tag for every
+registered account from `0x1000` up, and moved accounts keep the official
+gateway's tags, which must stay below that floor
+(`profile::REGISTERED_TAG_FLOOR` in `central-api`, and the `4096` of the
+migration's backfill). Before the migration runs in production, read the
+official gateway's highest tag, guests included, on its own database:
+
+```sql
+SELECT max(tag), count(*) FROM account;
+```
+
+It answered `13 | 7` on 23.10.2026, so the floor stays. Were it `0x1000` or
+more, the floor would move to the next multiple of `0x1000` above it, in
+both places, before 000011 is applied. The official gateway makes no local
+accounts once bound to Central, so the number cannot grow afterwards; a
+carried tag that is taken anyway is replaced by a drawn one.
+
+No grant changes. The deploy order: Central first (the hook does so: it
+installs the revision the gateway links, migrates and grants before the
+gateway starts), then the gateway whose bridge sends the name and tag
+(Baylee pinned to this revision). The previous Central binary keeps working
+on the migrated schema (it registers without a tag; the new one draws it at
+that account's next sign-in), and a bridge from before keeps reserving
+without name and tag. The privacy notice's new version (display name and
+tag, `legal/privacy.*.md` §3, §6 and §9) has to be published before the
+website offers the field.
+
 ## Secrets
 
 Run `umask 077; central-service --generate-secrets > secrets.json` once and merge

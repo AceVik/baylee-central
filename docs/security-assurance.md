@@ -973,3 +973,97 @@ stopped and checked (both listeners and the stand-in refusing connections,
 the container removed by its label), and the passwords, secrets document and
 certificates, which lived only in that run's shell and its owned directory,
 are gone.
+
+## Display name and tag at Central, 2026-10-23
+
+Owner decision 1 of 22.10.2026: display name and tag live at Central, a
+moved account keeps its gateway's, a new one picks a name and draws a tag
+(the accounts and administration design's step 3; [web
+accounts](web-accounts.md) §"Display name and tag").
+
+Design pass: the assets are the tag's uniqueness and permanence (chat on a
+gateway is keyed by it), the moved account's own name and tag, the names of
+the people who sign in at a gateway (which that gateway may learn, and no
+other), and what a tag tells about the number of accounts. Callers: anyone
+with a beta key registers (the browser listener's per-address budget), the
+cookie's session chooses a name, the bridge credential carries names, a
+gateway's redemption credential (or the bridge) asks for a lease's profile.
+Invariants: the name's rule is a CHECK as well as code, and the gateway's
+rule exactly; a tag is UNIQUE, positive, fits a gateway's column, and no
+statement changes one once held; a registered tag is drawn from
+operating-system randomness at or above the floor, so it is no counter;
+`GatewayProfile` answers only through `GatewaySession`'s lease check, so a
+gateway learns only the names of its own sessions; a name a person chooses
+is never one of the reserved eight; nothing new is logged, and names are no
+secrets but stay out of every log as before. Findings before code: the
+gateway's rule was 3 to 32 characters without the edge rule until
+15.09.2026, and its importer copied names unchecked, so a legacy name may
+fail the CHECK and a bridge sending it would block that account's move: the
+bridge sends none for it, and `LegacyProfile`'s once-marker became the tag
+(a moved account has a name only with its tag); `SetDisplayName` refuses a
+moved account before its tag is carried, or the website would let a person
+replace the name decision 1 says it keeps; `Response::Enrollment` is the
+bridge's too, so the tag reaches the page through the summary, not there.
+
+Implementation pass: draws are rejection-sampled from `getrandom`, each in a
+savepoint, and a unique violation counts as a taken tag only when another
+account holds that tag afterwards, so any other violation (a taken name on
+the bridge's reservation) keeps its own answer. The registration checks the
+display name after the key, inside the key's transaction, so a refused name
+reserves nothing. A carried tag is tried first and replaced by a draw only
+when taken; a renewed reservation keeps a held tag (`COALESCE`). The backfill
+is a bounded `DO` block that raises rather than loops once no range is left.
+`set_display_name` reads the browser session's account `FOR UPDATE`, and its
+`UPDATE` repeats `display_name IS NULL AND tag IS NOT NULL`;
+`legacy_profile` locks the legacy row and repeats `tag IS NULL`.
+`GatewayProfile` is a request and an answer of their own, counted with the
+control requests and refused on the browser listener; `SetDisplayName` is
+browser-only, uses the cookie, needs the terms and counts with the data
+requests. Old requests decode: `Register` and `LegacyReserve` gain only
+optional fields, absent on the wire when `None`. The page holds the same
+rules, sends the name with the form, and shows the handle (never the
+username) in the header. No new dependency, no grant: the runtime updates
+`accounts` already.
+
+Adversarial pass: over PostgreSQL 18.6 (`cargo xtask postgres`), the upgrade
+applies 000011 over legacy and registered rows the previous versions wrote
+(registered rows, pending and enrolled, get distinct tags of four hex
+digits; legacy rows none; the previous binary still registers), the CHECKs
+refuse the gateway's table of bad names, a name without its time, tag 0, a
+negative and a duplicate tag, and the backfill run again over a half-taken
+first range draws a five-digit tag. The store: refused display names at
+registration (reserved, malformed, and an unknown key first) reserve
+nothing; a name and tag chosen at registration; a name chosen later once,
+the same again `Done`, another `Conflict`, with a native bearer, without a
+session, reserved or malformed `Rejected`; the previous binary's untagged
+account draws its tag at its sign-in; a moved account without a tag cannot
+choose until `LegacyProfile` carried its own, one with a tag but no name
+chooses; `LegacyReserve` stores both, refreshes the name and keeps the tag,
+keeps a reserved name, refuses a malformed name or tag, draws when the tag
+is held; `LegacyProfile` once only (`Conflict` with the same and with other
+values), unknown or registered accounts and malformed values refused, a held
+tag drawn anew; with the floor injected as 1 and the draws given, seven of
+fifteen taken still draws there, taken draws are drawn again, eight taken
+widen to the next range, eight taken draws are `Busy` and reserve nothing, a
+draw outside its range is refused, and once `MAX_TAG` is held no range is
+left. `GatewayProfile` names the lease's account, its name and tag once
+carried, and refuses another gateway's lease, the bridge asking for a
+registered gateway's, `admin` and `export`, an unknown lease, a disabled
+gateway and an expired lease. Over the real listeners (`central-client`),
+the registered account's summary has the name it registered with and a tag
+of four digits, refused names are `Rejected` with a valid key, the moved
+account's summary has the bridge's name and tag 13, and `SetDisplayName`
+needs the terms, takes the same name, refuses another (`Conflict`) and a
+reserved one, and is refused on the native listener with either token.
+The website's tests (stand-ins, and the strict mock under the production
+CSP at both widths) cover the field and its rules, the handle on the
+recovery step, in the header and on the account page, choosing a name
+once the terms are accepted, a name chosen elsewhere meanwhile, and the
+moved account's note, in English and German. Injected faults each failed a
+test, and were taken out again: a name of 17 characters allowed (the shared
+table), `LegacyProfile` without its once-check and its `tag IS NULL`
+(`Conflict` expected, `None` came), `GatewayProfile` without the lease's
+gateway in its check (the bridge read a registered gateway's lease), draws
+below the floor (a tag of three digits in the summary), and the page's
+reserved names compared without stripping `_` and `-`. Engineering review,
+not an audit.
