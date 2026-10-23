@@ -128,13 +128,19 @@ switch() {
     say "deployed $rev"
 }
 
-# Whether Central answers its liveness probe within 30 seconds.
+# Whether Central answers its liveness probe within 30 seconds. A service
+# that is still starting refuses the first tries; those stay quiet, and only
+# the last try's error is shown when it never answers.
 live() {
-    local _
-    for _ in $(seq 30); do
-        curl -fsS -o /dev/null -H 'Host: central.baylee.app' "http://$LISTEN/health/live" && return 0
+    local try
+    for try in $(seq 30); do
+        if curl -fs -o /dev/null -H 'Host: central.baylee.app' "http://$LISTEN/health/live"; then
+            say "live after $try tries"
+            return 0
+        fi
         sleep 1
     done
+    curl -fsS -o /dev/null -H 'Host: central.baylee.app' "http://$LISTEN/health/live" || true
     return 1
 }
 
