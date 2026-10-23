@@ -74,8 +74,8 @@ pub(super) fn central() -> Result<Option<TermsDocument>, Error> {
 }
 
 /// Operations a session whose account has not accepted the terms in force
-/// may still use: read its status and the terms, accept, read and export its
-/// own data, confirm a restore, sign out.
+/// may still use: read its status, its summary and the terms, accept, read
+/// and export its own data, confirm a restore, sign out.
 pub(super) fn needs_acceptance(request: &Request) -> bool {
     matches!(
         request,
@@ -86,6 +86,7 @@ pub(super) fn needs_acceptance(request: &Request) -> bool {
             | Request::RegisterGateway { .. }
             | Request::SetGatewayAdmins { .. }
             | Request::GatewayTicket { .. }
+            | Request::SetRecovery { .. }
     )
 }
 
@@ -95,14 +96,19 @@ impl IdentityService {
     }
 
     /// Refuse a session operation while Central's terms in force are not
-    /// accepted by the session's account.
-    pub(super) async fn require_terms(&self, bearer: Option<&Token>) -> Result<(), Error> {
+    /// accepted by the session's account. The token is a session of the
+    /// listener's kind: on the browser listener the cookie's.
+    pub(super) async fn require_terms(
+        &self,
+        bearer: Option<&Token>,
+        surface: Surface,
+    ) -> Result<(), Error> {
         let Some(current) = self.current() else {
             return Ok(());
         };
         if self
             .store
-            .terms_status(bearer.ok_or(Error::Rejected)?, Some(current))
+            .terms_status(surface.session(bearer)?, Some(current))
             .await?
         {
             Ok(())
@@ -263,8 +269,12 @@ mod tests {
             gateway: "https://gateway.invalid".into(),
             purpose: central_api::wire::TicketPurpose::Admit,
         }));
+        assert!(needs_acceptance(&Request::SetRecovery {
+            recovery: vec![1; 73]
+        }));
         for free in [
             Request::SessionStatus,
+            Request::AccountSummary,
             Request::RenewSession,
             Request::Logout,
             Request::Terms,

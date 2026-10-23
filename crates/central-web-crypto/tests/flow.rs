@@ -1,16 +1,17 @@
-//! The browser's registration and sign-in steps against `central-crypto`'s
-//! server side, with real serialized messages and the fixed Argon2 profile:
-//! what the WebAssembly exports do, driven on the host.
+//! The browser's registration, sign-in and recovery-code steps against
+//! `central-crypto`'s server side, with real serialized messages and the
+//! fixed Argon2 profile: what the WebAssembly exports do, driven on the host.
 #![forbid(unsafe_code)]
 
 use central_api::{Endpoint, LEGACY_ORIGIN, LIVE_ORIGIN};
 use central_crypto::{
-    Context,
-    opaque::{Login, server::ServerKeys},
-    vault::{ObjectContext, RecoveryCode},
+    Context, CryptoError,
+    opaque::{Enrollment, Login, server::ServerKeys},
+    vault::{MasterKey, ObjectContext, RecoveryCode, WrappedMasterKey},
 };
 use central_web_crypto::flow::{
-    self, DOCUMENT, enrollment_finish, enrollment_start, login_confirm, login_finish, login_start,
+    self, DOCUMENT, Recovery, SignedIn, enrollment_finish, enrollment_start, login_confirm,
+    login_finish, login_start, recovery_create,
 };
 
 const ACCOUNT: [u8; 16] = [
@@ -180,4 +181,134 @@ fn malformed_starts_and_answers_are_rejected() {
     assert!(enrollment_finish(state, &response).is_err());
     let (state, _) = login_start(PASSWORD.into(), &ACCOUNT, 1).unwrap();
     assert!(login_finish(state, &[0; 320]).is_err());
+}
+
+/// An account as the official gateway's move enrolls it (Baylee's native
+/// client, `central-crypto` directly): a password wrapper and a document,
+/// and no recovery wrapper. Returns the server's record, the wrapper and the
+/// sealed document.
+fn moved(
+    server: &ServerKeys,
+    epoch: u64,
+) -> (
+    central_crypto::opaque::server::Record,
+    WrappedMasterKey,
+    Vec<u8>,
+) {
+    let (enrollment, request) = Enrollment::start(PASSWORD.into(), context(epoch)).unwrap();
+    let response = server
+        .enrollment_response(context(epoch), &request)
+        .unwrap();
+    let enrolled = enrollment.finish(&response).unwrap();
+    let master = MasterKey::generate().unwrap();
+    let wrapped = enrolled.wrapping_key.wrap(&master).unwrap();
+    let object = ObjectContext::new(context(epoch), ACCOUNT, 1).unwrap();
+    let document = master
+        .seal_object(object, b"a moved account's document")
+        .unwrap();
+    (
+        ServerKeys::enrollment_record(&enrolled.upload).unwrap(),
+        wrapped,
+        document,
+    )
+}
+
+/// The browser's sign-in up to the state `login_confirm` or
+/// `recovery_create` takes.
+fn signed_in(
+    server: &ServerKeys,
+    record: &central_crypto::opaque::server::Record,
+    epoch: u64,
+) -> SignedIn {
+    let (state, ke1) = login_start(PASSWORD.into(), &ACCOUNT, epoch).unwrap();
+    let (attempt, ke2) = server
+        .start_login(context(epoch), Some(record), &ke1)
+        .unwrap();
+    let (key, ke3) = login_finish(state, &ke2).unwrap();
+    attempt.finish(&ke3).unwrap();
+    key
+}
+
+#[test]
+fn a_code_made_after_a_sign_in_opens_the_master_key_the_password_wrapper_holds() {
+    let server = ServerKeys::generate();
+    let (record, wrapped, document) = moved(&server, 3);
+    let made = recovery_create(signed_in(&server, &record, 3), wrapped.as_bytes()).unwrap();
+    assert_eq!(made.recovery.as_bytes().len(), 73);
+    assert_ne!(made.recovery, wrapped);
+    // the code, typed back in lower case, opens the wrapper to the master key
+    // the password wrapper holds: both open the same document
+    let object = ObjectContext::new(context(3), ACCOUNT, 1).unwrap();
+    let code = RecoveryCode::parse(&made.recovery_code.to_lowercase()).unwrap();
+    let recovered = code.unwrap(context(3), &made.recovery).unwrap();
+    assert_eq!(
+        &**recovered.open_object(object, &document).unwrap(),
+        b"a moved account's document"
+    );
+    // bound to the account's context: another epoch's does not open it
+    assert!(code.unwrap(context(4), &made.recovery).is_err());
+    // a second code is another code, with another wrapper the first cannot open
+    let again = recovery_create(signed_in(&server, &record, 3), wrapped.as_bytes()).unwrap();
+    assert_ne!(again.recovery_code.as_str(), made.recovery_code.as_str());
+    assert_ne!(again.recovery, made.recovery);
+    assert!(code.unwrap(context(3), &again.recovery).is_err());
+}
+
+#[test]
+fn a_registered_accounts_new_code_opens_its_master_key_too() {
+    let server = ServerKeys::generate();
+    let (record, registered) = register(&server, 1);
+    let made = recovery_create(
+        signed_in(&server, &record, 1),
+        registered.wrapped_master.as_bytes(),
+    )
+    .unwrap();
+    let object = ObjectContext::new(context(1), ACCOUNT, 1).unwrap();
+    let recovered = RecoveryCode::parse(&made.recovery_code)
+        .unwrap()
+        .unwrap(context(1), &made.recovery)
+        .unwrap();
+    assert_eq!(
+        &**recovered.open_object(object, &registered.document).unwrap(),
+        DOCUMENT
+    );
+}
+
+#[test]
+fn a_code_is_made_only_from_a_wrapper_this_password_opens() {
+    let server = ServerKeys::generate();
+    let (record, wrapped, _) = moved(&server, 1);
+    // the wrong key: another account's wrapper, a recovery wrapper, any
+    // flipped bit, any other length; each fails as `login_confirm` does
+    let (_, other, _) = moved(&server, 1);
+    assert_eq!(
+        recovery_create(signed_in(&server, &record, 1), other.as_bytes()).err(),
+        Some(CryptoError::Invalid)
+    );
+    let made = recovery_create(signed_in(&server, &record, 1), wrapped.as_bytes()).unwrap();
+    assert!(recovery_create(signed_in(&server, &record, 1), made.recovery.as_bytes()).is_err());
+    for index in [0, 1, 24, 25, 56, 57, 72] {
+        let mut changed = *wrapped.as_bytes();
+        changed[index] ^= 0x10;
+        assert!(
+            recovery_create(signed_in(&server, &record, 1), &changed).is_err(),
+            "byte {index}"
+        );
+    }
+    for size in [0, 72, 74] {
+        assert!(recovery_create(signed_in(&server, &record, 1), &vec![1; size]).is_err());
+    }
+}
+
+#[test]
+fn a_sign_in_is_confirmed_or_makes_a_code_once() {
+    // Both steps take the sign-in's state by value: once either has run, the
+    // state is gone (in WebAssembly its JavaScript object is emptied), so a
+    // sign-in can neither make two codes nor confirm after making one.
+    let confirm: fn(SignedIn, &[u8]) -> Result<(), CryptoError> = login_confirm;
+    let create: fn(SignedIn, &[u8]) -> Result<Recovery, CryptoError> = recovery_create;
+    let server = ServerKeys::generate();
+    let (record, wrapped, _) = moved(&server, 1);
+    assert!(confirm(signed_in(&server, &record, 1), wrapped.as_bytes()).is_ok());
+    assert!(create(signed_in(&server, &record, 1), wrapped.as_bytes()).is_ok());
 }

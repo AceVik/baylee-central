@@ -49,6 +49,8 @@ impl AccountStore {
     /// Invalidate a pending migration before changing its legacy password. Already closed
     /// migrations reject this operation, including when gateway cutover is being retried.
     /// Old ciphertext is archived before any replacement; sessions and capabilities revoke atomically.
+    /// A recovery wrapper goes with the vault epoch it was bound to, although
+    /// `SetRecovery` already refuses an unfinished move.
     ///
     /// # Errors
     /// Rejects finalized migration, archive capacity, exhausted counters or storage failure.
@@ -96,9 +98,10 @@ impl AccountStore {
             transaction
                 .execute_raw(statement(
                     "UPDATE central_identity.accounts SET credential = NULL, wrapped_master = NULL,
-                 document = NULL, document_revision = 0, restored = false, enrollment_digest = NULL,
-                 enrollment_expires = NULL, vault_epoch = vault_epoch + 1,
-                 credential_revision = credential_revision + 1 WHERE id = $1",
+                 recovery_wrapped_master = NULL, document = NULL, document_revision = 0,
+                 restored = false, enrollment_digest = NULL, enrollment_expires = NULL,
+                 vault_epoch = vault_epoch + 1, credential_revision = credential_revision + 1
+                 WHERE id = $1",
                     vec![uuid(account).into()],
                 ))
                 .await

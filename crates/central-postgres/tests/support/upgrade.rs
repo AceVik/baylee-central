@@ -1,7 +1,8 @@
 //! A prior-version upgrade: the exact migration SQL of 000001 to 000006 in a
 //! scratch schema, legacy accounts and sessions written as those versions wrote
 //! them, then 000007, then 000008 over a live session and its lease, then 000009
-//! over registered gateways. All inside one transaction that is rolled back.
+//! over registered gateways, then 000010 over legacy and registered
+//! accounts. All inside one transaction that is rolled back.
 use super::scalar;
 use sea_orm::{ConnectionTrait, DatabaseConnection, TransactionTrait};
 
@@ -22,6 +23,8 @@ const RENEWAL: &str =
     include_str!("../../../central-migration/src/m20261022_000008_session_renewal.sql");
 const OFFICIAL: &str =
     include_str!("../../../central-migration/src/m20261022_000009_official_gateway.sql");
+const LEGACY_RECOVERY: &str =
+    include_str!("../../../central-migration/src/m20261022_000010_legacy_recovery.sql");
 
 fn scratch(sql: &str) -> String {
     sql.replace("central_identity", "upgrade_probe")
@@ -103,6 +106,7 @@ pub(crate) async fn run(operator: &DatabaseConnection) {
     );
     renewal(&tx).await;
     official(&tx).await;
+    legacy_recovery(&tx).await;
     tx.rollback().await.unwrap();
     assert_eq!(
         scalar(
@@ -271,4 +275,61 @@ async fn official(tx: &sea_orm::DatabaseTransaction) {
         .await,
         1
     );
+}
+
+/// 000010 over what came before: every row keeps its wrapper or its lack of
+/// one; then an enrolled legacy account may take a recovery wrapper, while a
+/// pending account still may not hold one and a registered account may not
+/// lose its own.
+async fn legacy_recovery(tx: &sea_orm::DatabaseTransaction) {
+    // As the binary before it wrote one: a registered account with its wrapper.
+    tx.execute_unprepared(
+        "INSERT INTO upgrade_probe.accounts (source, username_key, credential, wrapped_master, document,
+             document_revision, recovery_wrapped_master)
+         VALUES ('registered', 'registered-player', '\\x01', decode(repeat('01', 73), 'hex'),
+             decode(repeat('01', 41), 'hex'), 1, decode(repeat('02', 73), 'hex'));",
+    )
+    .await
+    .unwrap();
+    tx.execute_unprepared(&scratch(LEGACY_RECOVERY))
+        .await
+        .unwrap();
+    for (expected, sql) in [
+        (
+            3,
+            "SELECT count(*)::bigint AS value FROM upgrade_probe.accounts
+             WHERE source = 'legacy' AND recovery_wrapped_master IS NULL",
+        ),
+        (
+            1,
+            "SELECT count(*)::bigint AS value FROM upgrade_probe.accounts
+             WHERE source = 'registered' AND recovery_wrapped_master = decode(repeat('02', 73), 'hex')",
+        ),
+        (
+            1,
+            "SELECT count(*)::bigint AS value FROM pg_catalog.pg_constraint
+             WHERE conrelid = 'upgrade_probe.accounts'::regclass AND conname = 'account_recovery'",
+        ),
+    ] {
+        assert_eq!(scalar(tx, sql).await, expected, "{sql}");
+    }
+    // The closed, enrolled legacy account takes a wrapper now.
+    tx.execute_unprepared(
+        "UPDATE upgrade_probe.accounts SET recovery_wrapped_master = decode(repeat('03', 73), 'hex')
+         WHERE legacy_id = 'legacy-1'",
+    )
+    .await
+    .unwrap();
+    for sql in [
+        "UPDATE upgrade_probe.accounts SET recovery_wrapped_master = decode(repeat('03', 73), 'hex')
+         WHERE legacy_id = 'legacy-2'",
+        "UPDATE upgrade_probe.accounts SET recovery_wrapped_master = NULL WHERE source = 'registered'",
+        "UPDATE upgrade_probe.accounts SET recovery_wrapped_master = decode(repeat('03', 72), 'hex')
+         WHERE legacy_id = 'legacy-1'",
+        // a credential's removal must take the wrapper with it
+        "UPDATE upgrade_probe.accounts SET credential = NULL, wrapped_master = NULL, document = NULL,
+         document_revision = 0, restored = false, legacy_closed = false WHERE legacy_id = 'legacy-1'",
+    ] {
+        refused(tx, sql).await;
+    }
 }

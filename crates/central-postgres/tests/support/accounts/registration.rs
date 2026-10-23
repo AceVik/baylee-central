@@ -179,6 +179,24 @@ async fn constraints(store: &AccountStore, operator: &DatabaseConnection, keys: 
         .await,
         1
     );
+    // Since 000010 an enrolled legacy account may hold a recovery wrapper
+    // (one made after a sign-in); a pending one still may not.
+    operator
+        .execute_unprepared(
+            "UPDATE central_identity.accounts SET recovery_wrapped_master = decode(repeat('01', 73), 'hex')
+             WHERE legacy_id = 'source-legacy';
+             UPDATE central_identity.accounts SET recovery_wrapped_master = NULL WHERE legacy_id = 'source-legacy';",
+        )
+        .await
+        .unwrap();
+    store
+        .reserve_legacy(
+            "pending-legacy",
+            "pending-legacy",
+            &Token::generate().unwrap(),
+        )
+        .await
+        .unwrap();
     let pending = format!(
         "INSERT INTO central_identity.accounts (source, username_key, enrollment_digest, enrollment_expires, beta_key_id)
          VALUES ('registered', 'constraint-probe', decode(repeat('cd', 32), 'hex'), clock_timestamp() + interval '10 minutes', {KEY})"
@@ -200,7 +218,7 @@ async fn constraints(store: &AccountStore, operator: &DatabaseConnection, keys: 
         "INSERT INTO central_identity.accounts (source, legacy_id, username_key) VALUES ('other', 'probe-seven', 'probe-seven')".into(),
         format!("UPDATE central_identity.accounts SET legacy_closed = true {probe}"),
         format!("UPDATE central_identity.accounts SET {recovery} {probe}"),
-        format!("UPDATE central_identity.accounts SET {recovery} WHERE legacy_id = 'source-legacy'"),
+        format!("UPDATE central_identity.accounts SET {recovery} WHERE legacy_id = 'pending-legacy'"),
         format!("UPDATE central_identity.accounts SET {enrolled}, beta_key_id = NULL {probe}"),
         format!("UPDATE central_identity.accounts SET {enrolled}, {recovery} {probe}"),
         format!("UPDATE central_identity.accounts SET {enrolled}, beta_key_id = NULL,

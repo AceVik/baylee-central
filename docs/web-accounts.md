@@ -85,6 +85,52 @@ bits. `central-crypto` gains `RecoveryCode` (generate, parse, wrap, unwrap) with
 known-answer tests. Central stores the 73 bytes as `recovery_wrapped_master`;
 reset, which uses it, comes with M1.
 
+### A recovery code after a sign-in
+
+*Added 22.10.2026 (the accounts and administration design, step 2).* An
+account moved from the official gateway has no recovery code: Baylee's
+client enrols it without one, and the website used to tell it to keep one
+safe. Such an account makes its code on the website:
+
+1. After `LoginFinish` the page asks `AccountSummary` while the sign-in's
+   Worker still holds its state. For an account without a code the Worker
+   runs `recovery_create` in place of `login_confirm`: it opens the master key
+   with the sign-in's wrapping key (so a wrong key fails as `login_confirm`
+   does), makes a new `RecoveryCode` and wraps the same master key under it
+   with the account's context (§"The recovery code"). The page keeps only the
+   code and the 73-byte wrapper, never the key; the Worker ends with the
+   sign-in. When `AccountSummary` does not answer, the sign-in confirms the
+   password as before and offers no code.
+2. On `/signin` the terms come first, since storing the code needs them
+   accepted; then the code is shown with the registration's step (copy,
+   download, "I kept it"), or put off with "Not now", which throws it away:
+   nothing of it reaches Central. Only after "I kept it" does the page send
+   `SetRecovery`, and it keeps the 73 bytes until Central answers, so a lost
+   answer is retried with the same bytes; "Not now" is gone once a request
+   may have stored the code.
+3. Later, the account page's "Make a recovery code" asks for the password
+   again ("To make the code, sign in again") and signs in anew the same way,
+   which replaces the browser session. The master key exists only inside one
+   flow's Worker, so the code is made right after a sign-in and never from a
+   stored key.
+
+`SetRecovery { recovery }` stores the 73 bytes when the browser session's
+account is enrolled, has finished moving (`legacy_closed`, or registered),
+has no wrapper, and the session's password sign-in (`sessions.created_at`,
+which renewal never moves) is less than 10 minutes old, so a stolen cookie
+cannot put a wrapper on an account long after its owner signed in. The same
+bytes again are `Done` at any time; other bytes while a wrapper exists are
+`Conflict`; an unfinished move, a sign-in 10 minutes old or older, a
+malformed wrapper or no live browser session are `Rejected` (the design left
+these two codes open). A registered account keeps the wrapper of its
+registration. Replacing a code comes with password reset (M1). Migration
+`m20261022_000010_legacy_recovery` lets an enrolled legacy account hold the
+wrapper (`account_recovery`: none while pending, required for an enrolled
+registered account, allowed for an enrolled legacy one), and
+`invalidate_legacy` clears it with the vault epoch it was bound to; whatever
+later raises the epoch (an administrator's reset, M1) must clear it in the
+same statement.
+
 ## Server (Central)
 
 **Migration `m20261021_000007_registration`:**
@@ -156,14 +202,28 @@ with the `Host` header unchanged. It has one route, `POST /api/v1`, which
 takes the same tagged `Request` JSON. Only these operations are allowed:
 `Discover`, `LoginStart`, `LoginFinish`, `Register`, `EnrollmentStart`,
 `EnrollmentFinish`, `SessionStatus`, `RenewSession`, `Logout`, `Terms`,
-`TermsStatus`, `AcceptTerms` for Central's terms (a gateway's terms are
-accepted from the client) and `GatewayDirectory`, the public gateway directory
-of the `/gateways` page ([gateway registry](gateway-registry.md)). Every other
-operation is refused. The list is one exhaustive match in `central-identity`
-(`browser_operation`), so a new operation does not compile until it is decided
-there. The cookie's token is used only by `SessionStatus`, `RenewSession`,
-`Logout`, `TermsStatus` and `AcceptTerms`; the directory uses none, and the
-page sends it with `credentials: "omit"`.
+`TermsStatus`, `AccountSummary`, `SetRecovery`, `AcceptTerms` for Central's
+terms (a gateway's terms are accepted from the client) and `GatewayDirectory`,
+the public gateway directory of the `/gateways` page ([gateway
+registry](gateway-registry.md)). Every other operation is refused. The list is
+one exhaustive match in `central-identity` (`browser_operation`), so a new
+operation does not compile until it is decided there. The cookie's token is
+used only by `SessionStatus`, `RenewSession`, `Logout`, `TermsStatus`,
+`AcceptTerms`, `AccountSummary` and `SetRecovery`; the directory uses none, and
+the page sends it with `credentials: "omit"`.
+
+- `AccountSummary` (the cookie's session; no accepted terms needed) answers
+  `AccountSummary { identity, username, display_name, tag, source, recovery,
+  admin, signed_in_at, expires_at }`: `source` is `legacy` or `registered`,
+  `recovery` whether the account has a recovery wrapper, `signed_in_at` the
+  session's password sign-in in Unix seconds (renewal never moves it).
+  `display_name` and `tag` are `null` and `admin` is `false` until the later
+  steps that keep them; the shape is complete now, so it changes once.
+- `SetRecovery { recovery }` (the cookie's session; Central's terms
+  accepted) answers `Done` (§"A recovery code after a sign-in").
+
+The native listener refuses both (`Rejected`): making a code in the client is
+M6.
 
 A request is refused (403, `request not permitted`) unless all of these hold.
 Each header is compared byte for byte and must appear exactly once.
@@ -205,9 +265,12 @@ room, so a crowd of addresses cannot lock new ones out.
 | `LoginStart` | 30 a minute, apart from `Discover` |
 | `GatewayDirectory` | 60 a minute, apart from the others |
 
-The global budgets of the native surface apply as well. The native surface
-(`/v1/native`) is unchanged, except that it refuses `Register` and a browser
-session.
+The global budgets of the native surface apply as well: `AccountSummary`
+counts with the control requests (`SessionStatus`, `RenewSession`, …) and
+`SetRecovery` with the data requests, per session, and neither has a
+per-address budget, since each needs a live browser session. The native
+surface (`/v1/native`) is unchanged, except that it refuses `Register`,
+`AccountSummary`, `SetRecovery` and a browser session.
 
 **Local runs.** `central-service --dev-accounts-stdin` takes an optional
 `"browser": {"listen": "127.0.0.1:<port>", "origin": "http://127.0.0.1:<page
@@ -238,6 +301,11 @@ call is the page's.
   (64 bytes); a wrong password fails here, before anything is sent
 - `login_confirm(key, wrapped_master)`, which fails when the master key does
   not unwrap
+- `recovery_create(key, wrapped_master)` → `Recovered { recovery_code,
+  recovery }`, in place of `login_confirm` for an account without a recovery
+  code: it fails as `login_confirm` does, then wraps the same master key
+  under a new code; freeing it wipes the code (§"A recovery code after a
+  sign-in", added 22.10.2026)
 - `central_origin()`, the Central the module is bound to (the live one)
 
 *Changed 21.10.2026 while building it:* `login_finish` first took
@@ -259,7 +327,10 @@ committed bytes are what the source builds ([xtask](xtask.md)).
 ## Web pages (`web/`)
 
 `/register`, `/signin` and `/account` (shows the account's username, signs
-out). The header gains "Sign in" and the account's name.
+out). The header gains "Sign in" and the account's name. Since 22.10.2026
+the account page also says where the account came from and whether it has a
+recovery code (`AccountSummary`), and offers a moved account "Make a
+recovery code" (§"A recovery code after a sign-in").
 
 Registration has these fields:
 

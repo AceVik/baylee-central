@@ -259,6 +259,31 @@ pub enum Request {
         /// The gateway's own current terms, or none when it has none.
         terms: Option<TermsVersion>,
     },
+    /// The browser session's account, for the account page: who, where it
+    /// came from, whether it has a recovery code, and when the session's
+    /// password sign-in was. Browser listener only; needs no accepted terms.
+    /// Answered with [`Response::AccountSummary`].
+    AccountSummary,
+    /// Store the master key wrapped under a recovery code made after a
+    /// sign-in, for an account that has none (one moved from the official
+    /// gateway): browser listener only, with accepted terms, within 10
+    /// minutes of the browser session's password sign-in. The same bytes
+    /// again are `Done` at any time; other bytes while a wrapper exists are
+    /// `Conflict` (`docs/web-accounts.md`).
+    SetRecovery {
+        /// The master key under the recovery code, exactly 73 bytes.
+        recovery: Vec<u8>,
+    },
+}
+
+/// Where an account came from.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AccountSource {
+    /// Moved from the official gateway, which kept no recovery code.
+    Legacy,
+    /// Registered on the website with a beta key.
+    Registered,
 }
 
 /// Account credential destination decision; transport errors are never legacy eligibility.
@@ -470,6 +495,28 @@ pub enum Response {
         /// The account accepted the gateway's named terms, or it named none.
         gateway_terms: bool,
     },
+    /// The browser session's account ([`Request::AccountSummary`]).
+    AccountSummary {
+        /// Identity bound to this session.
+        identity: Identity,
+        /// The account's canonical username, its private sign-in name.
+        username: String,
+        /// The display name other players see; none until Central keeps one.
+        display_name: Option<String>,
+        /// The tag drawn beside the display name; none until Central keeps one.
+        tag: Option<u32>,
+        /// Where the account came from.
+        source: AccountSource,
+        /// The account has a recovery wrapper.
+        recovery: bool,
+        /// The account holds Central's administrator role.
+        admin: bool,
+        /// Absolute Unix seconds of the session's password sign-in; renewal
+        /// never moves it.
+        signed_in_at: i64,
+        /// Absolute Unix-seconds expiry; this query does not renew it.
+        expires_at: i64,
+    },
 }
 
 #[cfg(test)]
@@ -511,6 +558,55 @@ mod tests {
             panic!("an enrollment");
         };
         assert_eq!(recovery, Some(vec![4]));
+    }
+
+    #[test]
+    fn the_account_summary_and_set_recovery_have_the_designed_shapes() {
+        let summary = Response::AccountSummary {
+            identity: Identity {
+                account: [7; 16],
+                epoch: 2,
+            },
+            username: "synthetic".into(),
+            display_name: None,
+            tag: None,
+            source: AccountSource::Legacy,
+            recovery: false,
+            admin: false,
+            signed_in_at: 1_800_000_000,
+            expires_at: 1_800_001_800,
+        };
+        let text = String::from_utf8(crate::encode(&summary).unwrap()).unwrap();
+        assert_eq!(
+            text,
+            r#"{"result":"account_summary","identity":{"account":[7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7],"epoch":2},"username":"synthetic","display_name":null,"tag":null,"source":"legacy","recovery":false,"admin":false,"signed_in_at":1800000000,"expires_at":1800001800}"#
+        );
+        assert!(crate::decode::<Response>(text.as_bytes()).is_ok());
+        let registered = text.replace(r#""legacy""#, r#""registered""#);
+        let Response::AccountSummary { source, .. } =
+            crate::decode::<Response>(registered.as_bytes()).unwrap()
+        else {
+            panic!("a summary");
+        };
+        assert_eq!(source, AccountSource::Registered);
+        for bad in [
+            text.replace(r#""legacy""#, r#""official""#),
+            text.replace(r#","admin":false"#, ""),
+            text.replace(r#""admin":false"#, r#""admin":false,"role":"admin""#),
+        ] {
+            assert!(crate::decode::<Response>(bad.as_bytes()).is_err(), "{bad}");
+        }
+        assert!(matches!(
+            crate::decode::<Request>(br#"{"operation":"account_summary"}"#).unwrap(),
+            Request::AccountSummary
+        ));
+        let Request::SetRecovery { recovery } =
+            crate::decode(br#"{"operation":"set_recovery","recovery":[1,2,3]}"#).unwrap()
+        else {
+            panic!("a recovery");
+        };
+        assert_eq!(recovery, [1, 2, 3]);
+        assert!(crate::decode::<Request>(br#"{"operation":"set_recovery"}"#).is_err());
     }
 
     #[test]

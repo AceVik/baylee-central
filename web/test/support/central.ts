@@ -1,11 +1,12 @@
 // Stand-ins for the account pages' two collaborators: Central's browser
 // surface as an in-memory `Api` (the shapes of docs/web-accounts.md, with
-// its refusals) and the crypto Worker as a `CryptoFactory` that knows the
+// its refusals, and an account moved from the official gateway without a
+// recovery code) and the crypto Worker as a `CryptoFactory` that knows the
 // right password. Synthetic data only. The real crypto is tested in Rust
 // (crates/central-web-crypto) and test/central-wasm.test.ts; the real HTTP
 // shapes in test/account/api.test.ts and e2e/account.spec.ts.
 
-import { ApiError, type Api, type BrowserSession, type Identity, type TermsDocument, type TermsVersion } from "../../src/account/api";
+import { ApiError, type AccountSource, type AccountSummary, type Api, type BrowserSession, type Identity, type TermsDocument, type TermsVersion } from "../../src/account/api";
 import { CryptoError, type Crypto, type CryptoFactory } from "../../src/account/crypto";
 
 export const fill = (n: number, byte: number) => new Uint8Array(n).fill(byte);
@@ -14,20 +15,43 @@ export const ACCOUNT = Uint8Array.from([0x01, 0x92, 0xd0, 0xc5, 0x7b, 0x3e, 0x7a
 export const KEY = "CENTRAL-TEST-0000-0000-0001";
 export const CODE = "Y06Z-NKPA-ZTZE-Y093-8NKR-KAYD-XZZD-SEMR";
 export const WRAPPED = fill(73, 2);
+/** The code the stand-in crypto makes after a sign-in, and its wrapper. */
+export const NEW_CODE = "7Q3K-AXWD-0P4N-9RTB-5MHE-ZC2G-8VFJ-1YS6";
+export const NEW_WRAPPER = fill(73, 11);
+export const SIGNED_IN_AT = 3_999_998_200;
+
+export interface FakeAccount {
+  identity: Identity;
+  wrapped: Uint8Array;
+  /** The recovery wrapper; none for an account moved from the official gateway. */
+  recovery: Uint8Array | null;
+  source?: AccountSource;
+}
 
 export interface FakeCentral extends Api {
   calls: string[];
-  accounts: Map<string, { identity: Identity; wrapped: Uint8Array; recovery: Uint8Array }>;
+  accounts: Map<string, FakeAccount>;
   session: { name: string; expiresAt: number } | null;
   current: TermsDocument | null;
   accepted: TermsVersion | null;
+  /** Every wrapper `setRecovery` was sent, in order. */
+  recoveries: Uint8Array[];
+  /** Refuse `setRecovery` for an account without a wrapper, as for a sign-in 10 minutes old. */
+  late: boolean;
   /** Make the next call to `operation` fail with `failure`. */
   fail(operation: string, failure: ApiError["kind"]): void;
+  /** Let the next call to `operation` take effect, then lose its answer. */
+  lose(operation: string): void;
+  /** An account moved from the official gateway: enrolled, no recovery code. */
+  moved(name: string): void;
 }
 
 /** `serverName`: the name Central gives the account, if not its own. */
-export function fakeCentral(opts: { terms?: TermsDocument | null; foreignIdentity?: boolean; wrapped?: Uint8Array; serverName?: string } = {}): FakeCentral {
+export function fakeCentral(
+  opts: { terms?: TermsDocument | null; foreignIdentity?: boolean; foreignSummary?: boolean; wrapped?: Uint8Array; serverName?: string } = {},
+): FakeCentral {
   const failures = new Map<string, ApiError["kind"]>();
+  const lost = new Set<string>();
   const tickets = new Map<string, { name: string; identity: Identity }>();
   let attempt: string | null = null;
   const c: FakeCentral = {
@@ -36,8 +60,16 @@ export function fakeCentral(opts: { terms?: TermsDocument | null; foreignIdentit
     session: null,
     current: opts.terms ?? null,
     accepted: null,
+    recoveries: [],
+    late: false,
     fail: (op: string, kind: ApiError["kind"]) => {
       failures.set(op, kind);
+    },
+    lose: (op: string) => {
+      lost.add(op);
+    },
+    moved: (name: string) => {
+      c.accounts.set(name, { identity: { account: ACCOUNT, epoch: 1 }, wrapped: WRAPPED, recovery: null, source: "legacy" });
     },
   } as unknown as FakeCentral;
   const said = (name: string) => opts.serverName ?? name;
@@ -119,6 +151,33 @@ export function fakeCentral(opts: { terms?: TermsDocument | null; foreignIdentit
       const accepted = current === null || (c.accepted?.version === current.version && c.accepted.digest.join() === current.digest.join());
       return { current, accepted };
     },
+    async accountSummary(): Promise<AccountSummary> {
+      step("account_summary");
+      const [name, account] = [...c.accounts.entries()][0] ?? [];
+      if (c.session === null || account === undefined || name === undefined) throw new ApiError("rejected");
+      return {
+        identity: opts.foreignSummary ? { account: fill(16, 0x77), epoch: 1 } : account.identity,
+        username: said(name),
+        displayName: null,
+        tag: null,
+        source: account.source ?? "registered",
+        recovery: account.recovery !== null,
+        admin: false,
+        signedInAt: SIGNED_IN_AT,
+        expiresAt: c.session.expiresAt,
+      };
+    },
+    async setRecovery(recovery: Uint8Array) {
+      step("set_recovery");
+      c.recoveries.push(recovery.slice());
+      const account = [...c.accounts.values()][0];
+      if (c.session === null || account === undefined || recovery.length !== 73) throw new ApiError("rejected");
+      if (account.recovery !== null) {
+        if (account.recovery.join() !== recovery.join()) throw new ApiError("conflict");
+      } else if (c.late) throw new ApiError("rejected");
+      else account.recovery = recovery.slice();
+      if (lost.delete("set_recovery")) throw new ApiError("network");
+    },
     async acceptTerms(v: TermsVersion) {
       step("accept_terms");
       if (c.session === null) throw new ApiError("rejected");
@@ -135,11 +194,14 @@ export interface FakeCrypto {
   opened: number;
   closed: number;
   passwords: string[];
+  /** Sign-ins that ended in `loginConfirm`, and in `recoveryCreate`. */
+  confirmed: number;
+  created: number;
 }
 
 /** Crypto that accepts `password` only, and only `WRAPPED` as the master key's wrapper. */
 export function fakeCrypto(password: string, opts: { failStart?: boolean } = {}): FakeCrypto {
-  const f: FakeCrypto = { factory: () => flow(), opened: 0, closed: 0, passwords: [] };
+  const f: FakeCrypto = { factory: () => flow(), opened: 0, closed: 0, passwords: [], confirmed: 0, created: 0 };
   function flow(): Crypto {
     f.opened++;
     let given = "";
@@ -164,7 +226,13 @@ export function fakeCrypto(password: string, opts: { failStart?: boolean } = {})
         return fill(64, 10);
       },
       async loginConfirm(wrapped) {
+        f.confirmed++;
         if (wrapped.join() !== WRAPPED.join()) throw new CryptoError("rejected");
+      },
+      async recoveryCreate(wrapped) {
+        f.created++;
+        if (wrapped.join() !== WRAPPED.join()) throw new CryptoError("rejected");
+        return { recovery: NEW_WRAPPER, recoveryCode: NEW_CODE };
       },
       close() {
         f.closed++;

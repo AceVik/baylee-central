@@ -860,3 +860,116 @@ no longer official in a live store); the SDK over HTTP (the bridge's heartbeat,
 heartbeat refused on the browser listener); the listener's budget per address
 apart from the others; the page's request, the mark and paging after
 Central's last id. Engineering review, not an audit.
+
+## The account page and recovery codes for moved accounts, 2026-10-22
+
+Owner decision (22.10.2026): moved accounts have no recovery code, and the
+website must stop telling them to keep one safe; the accounts and
+administration design's step 2 ([web accounts](web-accounts.md) §"A
+recovery code after a sign-in").
+
+Design pass: the assets are the master key, which exists only inside one
+sign-in's Worker and is why the code is made right after a sign-in and never
+later; the new code, held by the page until the person decides and never
+stored by it; the 73-byte wrapper, which opens the master key with that code;
+and the browser session. The page is trusted code from this origin, Central's
+answers are checked, the cookie may be stolen. A stolen cookie cannot make a
+wrapper of the real master key (it opens nothing without the password), so
+what it could do is put bytes of its choosing on an account and block the
+owner's code; `SetRecovery` therefore takes a wrapper only within 10 minutes
+of the session's password sign-in (`created_at`, which renewal never moves),
+only while the account has none, only with Central's terms accepted, and
+only on the browser listener; other bytes later are `Conflict`, and
+replacing a code waits for password reset (M1). Not addressed, recorded:
+within those 10 minutes a stolen cookie can still store a wrapper that opens
+nothing, and the owner learns of it from the account page and the
+`Conflict`; Central cannot tell a good wrapper from a bad one without the
+key, and must not have it. Findings before code: `require_terms` looked the
+token up as a native session, harmless only because no browser operation
+needed accepted terms before this one, and now takes the listener's kind; the
+design's German wording says "Konto" where the site's glossary
+(`web/README.md` §"The words") says "Account", so the page says "Account";
+the design left the codes for a stale sign-in and an unfinished move open,
+both are `Rejected`; a registered account's own wrapper sent again is
+`Done`, any other `Conflict`.
+
+Implementation pass: `set_recovery` checks the wrapper's format before the
+database, then reads the browser session's account `FOR UPDATE` in one
+transaction: two codes sent at once store one and refuse the other. The
+same bytes are compared after the lock, so a retry after a lost answer is
+`Done` even past the 10 minutes. The store's `account_summary` and
+`set_recovery` take a browser session only, matched by its digest domain and
+its kind, so no caller can hand them a native bearer; the identity service
+refuses both on the native listener before it looks at the terms. `invalidate_legacy` clears the
+wrapper in the statement that raises the epoch; the schema would refuse the
+credential's removal otherwise. Migration 000010 only widens the check, so
+the previous binary, which the deploy hook restarts when a new one fails,
+still runs. `recovery_create` opens the master key before it asks for
+randomness, so a wrong key fails as `login_confirm` does; the key is wiped
+when the step ends, and the code leaves the module read from its zeroizing
+buffer, as at registration; the Worker frees the result once read. The page
+keeps the code and the wrapper in its state only, sends the wrapper only
+after "I kept it", sends the same bytes on a retry, withdraws "Not now" once
+a request may have stored the code, and says so honestly when a refusal
+follows a lost answer. A summary naming another account than the sign-in
+ends the new session. No new dependency and no grant: the runtime already
+updates `accounts`.
+
+Adversarial pass: over PostgreSQL 18.6 (`cargo xtask postgres`), the
+upgrade applies 000010 over legacy and registered rows written by the
+previous versions, keeps every row's wrapper or its lack, then lets the
+closed legacy account take one while a pending account, a registered account
+losing its own, a 72-byte wrapper and a credential removed under a wrapper
+stay refused. `SetRecovery` refuses an unfinished move (also once restored
+but not closed), malformed wrappers (72, 74 and 0 bytes, version 2), a native
+bearer and an unknown session, stores once, is `Done` for the same bytes
+again (also after 11 minutes) and `Conflict` for others, refuses a fresh
+wrapper at exactly 10 minutes and takes it at 9:50, stores nothing after
+sign-out; two codes sent at once store one; a registered account keeps its
+own; `invalidate_legacy` clears a wrapper and raises the epoch. The summary
+reads the browser session only, its sign-in exactly 30 minutes before its
+first end, unmoved by a renewal. Over the real browser and native listeners
+(`central-client`), a registered account's summary says so, `SetRecovery`
+answers `TermsRequired` until the terms are accepted and then keeps the
+registration's wrapper; an account moved as Baylee's client moves one signs
+in on the website, its summary says `legacy` without a code, the native
+listener refuses both requests with its own session and with the cookie,
+the code is stored once after the terms and opens the stored wrapper to the
+account's master key. In `central-web-crypto`, against `central-crypto`'s
+server side, a code made after a sign-in opens to the master key the
+password wrapper holds (for a moved and for a registered account), is bound
+to the epoch, differs each time, and is made only from the account's own
+password wrapper. The website's tests (stand-ins and the strict mock of the
+browser surface under the production CSP) cover both wordings in English and
+German, both ways to make the code, "Not now", the retry with the same bytes
+after a lost answer, a refused and a conflicting code. Findings fixed: the
+native listener first answered `TermsRequired` to `SetRecovery` from an
+account without accepted terms, since the terms were checked before the
+surface (the integration run caught it); the store first took any session
+kind, so a native session could store a wrapper had a caller passed one.
+Injected faults each failed a test: the terms looked up as a native session
+again, no 10-minute rule, `invalidate_legacy` keeping the wrapper,
+`recovery_create` wrapping a fresh key, and one opening any wrapper, a
+sign-in that never makes a code, no identity check of the summary, and a
+retry with other bytes. Engineering review, not an audit.
+
+Against a real Central, 23.10.2026 (`web/e2e-real/moved.spec.ts`): this
+branch's release build in the deployed mode (`--accounts-stdin` with
+`browser.listen`, the committed terms in force) over verify-full TLS to
+PostgreSQL 18.6, provisioned, migrated (000001 to 000010, rebased onto step 1) and
+granted as `docs/operations.md` says, behind the stand-in for the site's
+Caddy; Chromium at `https://baylee.app`, at a phone's and a desktop's width.
+Per width, one synthetic account was moved as Baylee's client and the bridge
+move one (`LegacyReserve` with the bridge credential, enrollment without a
+recovery wrapper, sign-in, `ConfirmRestore`, `LegacyClose`, over the native
+listener with the committed WebAssembly); then the page signed in with real
+OPAQUE and Argon2 in its Worker, asked `AccountSummary`, showed the terms,
+accepted them, showed the code the sign-in made, sent `SetRecovery` once
+after "I kept it", and the account page said the account has a code, also
+after a reload. The rows: `source = legacy`, the move closed and restored,
+73-byte password and recovery wrappers, epoch 1, only browser sessions left;
+Central's log named no token, password or key. Everything started was
+stopped and checked (both listeners and the stand-in refusing connections,
+the container removed by its label), and the passwords, secrets document and
+certificates, which lived only in that run's shell and its owned directory,
+are gone.

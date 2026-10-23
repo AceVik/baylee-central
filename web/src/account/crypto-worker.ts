@@ -7,6 +7,9 @@
 // and terminates it at the end, which discards the module's memory with
 // whatever a JavaScript string or a freed buffer left there. The states
 // between two messages stay here; the page sends and receives bytes only.
+// A sign-in ends in `login_confirm` or, for an account without a recovery
+// code, in `recovery_create`, which opens the master key the same way and
+// wraps it under a new code: the master key never leaves this Worker.
 
 import init, {
   enrollment_finish,
@@ -14,6 +17,7 @@ import init, {
   login_confirm,
   login_finish,
   login_start,
+  recovery_create,
   type Enrollment,
   type Login,
   type LoginKey,
@@ -77,6 +81,17 @@ function step(m: WorkerRequest): WorkerReply {
       key = null;
       login_confirm(state, m.wrappedMaster);
       return { op: m.op };
+    }
+    case "recovery_create": {
+      const state = take(key);
+      key = null;
+      const made = recovery_create(state, m.wrappedMaster);
+      try {
+        return { op: m.op, recovery: made.recovery, recoveryCode: made.recovery_code };
+      } finally {
+        // wipes the code's buffer in the module
+        made.free();
+      }
     }
   }
 }

@@ -15,10 +15,12 @@ mod grants;
 mod leases;
 mod migration;
 mod objects;
+mod recovery;
 mod registration;
 mod sessions;
 mod terms;
 pub use migration::Status;
+pub use recovery::Summary;
 pub use sessions::{Issued, Session};
 pub use terms::MAX_GATEWAY_VERSIONS;
 

@@ -5,6 +5,7 @@ export const __wbg_enrolled_free: (a: number, b: number) => void;
 export const __wbg_enrollment_free: (a: number, b: number) => void;
 export const __wbg_login_free: (a: number, b: number) => void;
 export const __wbg_loginkey_free: (a: number, b: number) => void;
+export const __wbg_recovered_free: (a: number, b: number) => void;
 export const central_origin: () => [number, number];
 export const enrolled_document: (a: number) => [number, number];
 export const enrolled_record: (a: number) => [number, number];
@@ -19,6 +20,9 @@ export const login_finish: (a: number, b: number, c: number) => [number, number,
 export const login_message: (a: number) => [number, number];
 export const login_start: (a: number, b: number, c: number, d: number, e: bigint) => [number, number, number];
 export const loginkey_message: (a: number) => [number, number];
+export const recovered_recovery: (a: number) => [number, number];
+export const recovered_recovery_code: (a: number) => any;
+export const recovery_create: (a: number, b: number, c: number) => [number, number, number];
 export const __wbindgen_exn_store: (a: number) => void;
 export const __externref_table_alloc: () => number;
 export const __wbindgen_externrefs: WebAssembly.Table;

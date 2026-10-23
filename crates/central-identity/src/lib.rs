@@ -81,7 +81,9 @@ pub fn browser_operation(request: &Request) -> bool {
         | Request::Logout
         | Request::Terms
         | Request::TermsStatus
-        | Request::GatewayDirectory { .. } => true,
+        | Request::GatewayDirectory { .. }
+        | Request::AccountSummary
+        | Request::SetRecovery { .. } => true,
         Request::AcceptTerms { subject, .. } => matches!(subject, TermsSubject::Central),
         Request::CreateObject
         | Request::ReadObject { .. }
@@ -108,6 +110,17 @@ pub fn browser_operation(request: &Request) -> bool {
     }
 }
 
+/// Operations the browser listener alone serves: registration has its
+/// per-address budget there, and the account page's requests are the
+/// website's (the native client makes no recovery code yet, M6). The native
+/// listener refuses them before anything else is checked.
+fn browser_only(request: &Request) -> bool {
+    matches!(
+        request,
+        Request::Register { .. } | Request::AccountSummary | Request::SetRecovery { .. }
+    )
+}
+
 /// Browser operations that act on the cookie's session; the others ignore it.
 fn uses_session(request: &Request) -> bool {
     matches!(
@@ -117,6 +130,8 @@ fn uses_session(request: &Request) -> bool {
             | Request::Logout
             | Request::TermsStatus
             | Request::AcceptTerms { .. }
+            | Request::AccountSummary
+            | Request::SetRecovery { .. }
     )
 }
 
@@ -421,6 +436,10 @@ mod tests {
                 digest: [0; 32],
             },
             Request::GatewayDirectory { after: None },
+            Request::AccountSummary,
+            Request::SetRecovery {
+                recovery: vec![1; 73],
+            },
         ]
     }
 
@@ -528,7 +547,17 @@ mod tests {
                 text[start..].split('"').next().unwrap().to_owned()
             })
             .collect();
-        assert_eq!(named.len(), 35, "every operation is in one of the lists");
+        assert_eq!(named.len(), 37, "every operation is in one of the lists");
+    }
+
+    #[test]
+    fn the_native_listener_refuses_the_websites_own_operations() {
+        let (served, _) = (served(), refused());
+        let only: Vec<&Request> = served.iter().filter(|r| browser_only(r)).collect();
+        assert_eq!(only.len(), 3);
+        assert!(only.iter().all(|r| browser_operation(r)));
+        assert!(!browser_only(&Request::SessionStatus));
+        assert!(!browser_only(&Request::Logout));
     }
 
     #[test]
@@ -537,6 +566,10 @@ mod tests {
         assert!(uses_session(&Request::RenewSession));
         assert!(uses_session(&Request::Logout));
         assert!(uses_session(&Request::TermsStatus));
+        assert!(uses_session(&Request::AccountSummary));
+        assert!(uses_session(&Request::SetRecovery {
+            recovery: vec![1; 73]
+        }));
         assert!(!uses_session(&Request::Terms));
         assert!(!uses_session(&Request::GatewayDirectory { after: None }));
         assert!(!uses_session(&Request::Discover {

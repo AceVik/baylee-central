@@ -100,7 +100,7 @@ describe("registration", () => {
     await waitFor(() => expect(window.location.pathname).toBe("/account"));
     // only the end is kept; the name is Central's, in memory
     expect(JSON.parse(window.localStorage.getItem(SESSION_KEY) ?? "{}")).toEqual({ expiresAt: 4_000_000_000 });
-    expect(api.calls).toEqual(["register", "enrollment_start", "enrollment_finish", "discover", "login_start", "login_finish", "terms_status"]);
+    expect(api.calls).toEqual(["register", "enrollment_start", "enrollment_finish", "discover", "login_start", "login_finish", "account_summary", "terms_status"]);
   });
 
   it("says what is missing before sending anything", async () => {

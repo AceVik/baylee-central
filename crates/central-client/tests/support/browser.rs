@@ -2,13 +2,15 @@
 //! their WebAssembly crypto run it: register with a beta key, enroll with a
 //! recovery wrapper, sign in to a browser session held in the cookie, accept
 //! Central's terms, sign out. Then the same account plays natively, and the
-//! official gateway's bridge admits it without a legacy ID.
+//! official gateway's bridge admits it without a legacy ID. Last, an account
+//! moved from the official gateway signs in on the website, accepts the terms
+//! there and stores the recovery code the page makes for it.
 use super::Http;
 use central_api::{
     Error, Token,
     beta_key::BetaKey,
     terms::TermsSubject,
-    wire::{Discovery, Request, Response, TicketPurpose},
+    wire::{AccountSource, Discovery, Identity, Request, Response, TicketPurpose},
 };
 use central_client::Transport;
 use central_crypto::{
@@ -242,9 +244,169 @@ pub(crate) fn run(
     assert_eq!(&opened.open_object(first, &document).unwrap()[..], DOCUMENT);
     budgets(browser, &key);
     let cookie = sign_in(browser, http, context);
+    summary(browser, http, &cookie, account, &recovery);
     session(browser, http, bridge, &cookie);
     directory(browser, http);
+    // With the terms accepted, the registration's own wrapper is `Done` again
+    // and another is a conflict: a registered account keeps its code.
+    let set = |r: &WrappedMasterKey| Request::SetRecovery {
+        recovery: r.as_bytes().to_vec(),
+    };
+    assert!(matches!(
+        browser.answer(&set(&recovery), Some(&cookie)).unwrap(),
+        Response::Done
+    ));
+    let other = RecoveryCode::generate()
+        .unwrap()
+        .wrap(context, &master)
+        .unwrap();
+    assert_eq!(
+        browser.answer(&set(&other), Some(&cookie)).err(),
+        Some(Error::Conflict)
+    );
     play(browser, http, bridge, &cookie);
+    moved(browser, http, bridge, runtime, operator);
+}
+
+/// The account page's summary of a registered account; storing a code needs
+/// the terms accepted, checked against the cookie's browser session.
+fn summary(
+    browser: &Browser,
+    http: &Http,
+    cookie: &Token,
+    account: Identity,
+    recovery: &WrappedMasterKey,
+) {
+    let Response::AccountSummary {
+        identity,
+        username,
+        display_name: None,
+        tag: None,
+        source: AccountSource::Registered,
+        recovery: true,
+        admin: false,
+        signed_in_at,
+        expires_at,
+    } = browser
+        .answer(&Request::AccountSummary, Some(cookie))
+        .unwrap()
+    else {
+        panic!("a registered account's summary");
+    };
+    assert_eq!(identity.account, account.account);
+    assert_eq!(username, "web-player");
+    assert_eq!(expires_at - signed_in_at, 1800, "issued at the sign-in");
+    assert_eq!(
+        browser.answer(&Request::AccountSummary, None).err(),
+        Some(Error::Rejected)
+    );
+    assert!(
+        http.exchange(&Request::AccountSummary, Some(cookie))
+            .is_err()
+    );
+    let set = Request::SetRecovery {
+        recovery: recovery.as_bytes().to_vec(),
+    };
+    assert_eq!(
+        browser.answer(&set, Some(cookie)).err(),
+        Some(Error::TermsRequired),
+        "the terms in force are not accepted yet"
+    );
+}
+
+/// A player of the official gateway, its move closed, signs in on the
+/// website: the summary says it moved and has no code; the code the page
+/// makes is stored once the terms are accepted, on the website only, and
+/// opens the account's master key.
+fn moved(
+    browser: &Browser,
+    http: &Http,
+    bridge: &Token,
+    runtime: &Runtime,
+    operator: &DatabaseConnection,
+) {
+    let (context, identity, master, cookie) = moved_sign_in(browser, http, bridge);
+    // What the page's `recovery_create` does: the same master key under a new code.
+    let code = RecoveryCode::generate().unwrap();
+    let recovery = code.wrap(context, &master).unwrap();
+    let set = |r: &WrappedMasterKey| Request::SetRecovery {
+        recovery: r.as_bytes().to_vec(),
+    };
+    // The native listener serves neither, with its own session or the cookie.
+    let token = native_refuses(http, context, identity, &cookie, &set(&recovery));
+    assert_eq!(
+        browser.answer(&set(&recovery), None).err(),
+        Some(Error::Rejected)
+    );
+    // Not before the terms in force are accepted, then stored once; the same
+    // bytes again are done, another code a conflict.
+    assert_eq!(
+        browser.answer(&set(&recovery), Some(&cookie)).err(),
+        Some(Error::TermsRequired)
+    );
+    let Response::TermsStatus {
+        current: Some(current),
+        accepted: false,
+    } = browser
+        .answer(&Request::TermsStatus, Some(&cookie))
+        .unwrap()
+    else {
+        panic!("terms to accept");
+    };
+    assert!(matches!(
+        browser
+            .answer(
+                &Request::AcceptTerms {
+                    subject: TermsSubject::Central,
+                    version: current.version,
+                    digest: current.digest,
+                },
+                Some(&cookie),
+            )
+            .unwrap(),
+        Response::Done
+    ));
+    for _ in 0..2 {
+        assert!(matches!(
+            browser.answer(&set(&recovery), Some(&cookie)).unwrap(),
+            Response::Done
+        ));
+    }
+    let other = RecoveryCode::generate()
+        .unwrap()
+        .wrap(context, &master)
+        .unwrap();
+    assert_eq!(
+        browser.answer(&set(&other), Some(&cookie)).err(),
+        Some(Error::Conflict)
+    );
+    assert!(matches!(
+        browser
+            .answer(&Request::AccountSummary, Some(&cookie))
+            .unwrap(),
+        Response::AccountSummary { recovery: true, .. }
+    ));
+    // The stored wrapper opens with the code to the account's master key.
+    let stored: Vec<u8> = runtime
+        .block_on(operator.query_one_raw(sea_orm::Statement::from_string(
+            sea_orm::DbBackend::Postgres,
+            "SELECT recovery_wrapped_master FROM central_identity.accounts WHERE legacy_id = 'moved-legacy'",
+        )))
+        .unwrap()
+        .unwrap()
+        .try_get("", "recovery_wrapped_master")
+        .unwrap();
+    let opened = code
+        .unwrap(context, &WrappedMasterKey::from_bytes(&stored).unwrap())
+        .unwrap();
+    let probe = ObjectContext::new(context, identity.account, 9).unwrap();
+    let sealed = master.seal_object(probe, b"probe").unwrap();
+    assert_eq!(&opened.open_object(probe, &sealed).unwrap()[..], b"probe");
+    assert!(matches!(
+        browser.answer(&Request::Logout, Some(&cookie)).unwrap(),
+        Response::Done
+    ));
+    http.exchange(&Request::Logout, Some(&token)).unwrap();
 }
 
 /// Registration is budgeted per client address, five an hour; a page from
@@ -534,4 +696,138 @@ fn play(browser: &Browser, http: &Http, bridge: &Token, cookie: &Token) {
     );
     session.check_active(http).unwrap();
     session.logout(http).unwrap();
+}
+
+const MOVED: &str = "synthetic moved password";
+
+/// A player moved from the official gateway as Baylee's client moves one
+/// (`LegacyReserve` by the bridge, enrollment, restore, `LegacyClose`), then
+/// its sign-in on the website, as the page runs it: its context, identity,
+/// master key and cookie. The summary says it moved here and has no code.
+fn moved_sign_in(
+    browser: &Browser,
+    http: &Http,
+    bridge: &Token,
+) -> (Context, Identity, MasterKey, Token) {
+    let Response::Enrollment { identity, ticket } = http
+        .exchange(
+            &Request::LegacyReserve {
+                legacy_id: "moved-legacy".into(),
+                username: "moved-player".into(),
+            },
+            Some(bridge),
+        )
+        .unwrap()
+    else {
+        panic!("a legacy enrollment");
+    };
+    central_client::enroll(http, identity, ticket, MOVED.into(), DOCUMENT).unwrap();
+    let mut session = central_client::login(http, identity, MOVED.into()).unwrap();
+    session.confirm_restored(http).unwrap();
+    http.exchange(
+        &Request::LegacyClose {
+            legacy_id: "moved-legacy".into(),
+            identity,
+        },
+        Some(bridge),
+    )
+    .unwrap();
+    session.logout(http).unwrap();
+    let Response::Discovery {
+        discovery: Discovery::Central { identity },
+    } = browser
+        .answer(
+            &Request::Discover {
+                username: "Moved-Player".into(),
+            },
+            None,
+        )
+        .unwrap()
+    else {
+        panic!("a central account");
+    };
+    let context = Context::new(http.endpoint.issuer(), identity.account, identity.epoch).unwrap();
+    let (login, message) = Login::start(MOVED.into(), context).unwrap();
+    let Response::LoginChallenge { attempt, message } = browser
+        .answer(&Request::LoginStart { identity, message }, None)
+        .unwrap()
+    else {
+        panic!("a challenge");
+    };
+    let result = login.finish(&message).unwrap();
+    let reply = browser
+        .call(
+            &Request::LoginFinish {
+                attempt,
+                message: result.finalization,
+            },
+            None,
+        )
+        .unwrap();
+    let Response::BrowserSession { wrapped_master, .. } = reply.response else {
+        panic!("a browser session");
+    };
+    let cookie = reply.session.expect("a session for the cookie");
+    let Response::AccountSummary {
+        identity: summarized,
+        username,
+        display_name: None,
+        tag: None,
+        source: AccountSource::Legacy,
+        recovery: false,
+        admin: false,
+        ..
+    } = browser
+        .answer(&Request::AccountSummary, Some(&cookie))
+        .unwrap()
+    else {
+        panic!("a moved account's summary");
+    };
+    assert_eq!(summarized.account, identity.account);
+    assert_eq!(username, "moved-player");
+    let master = result
+        .wrapping_key
+        .unwrap(&WrappedMasterKey::from_bytes(&wrapped_master).unwrap())
+        .unwrap();
+    (context, identity, master, cookie)
+}
+
+/// A native session of the moved account: the native listener refuses the
+/// account page's requests with it, and with the cookie. Returns the session.
+fn native_refuses(
+    http: &Http,
+    context: Context,
+    identity: Identity,
+    cookie: &Token,
+    set: &Request,
+) -> Token {
+    let (native, message) = Login::start(MOVED.into(), context).unwrap();
+    let Response::LoginChallenge { attempt, message } = http
+        .exchange(&Request::LoginStart { identity, message }, None)
+        .unwrap()
+    else {
+        panic!("a challenge");
+    };
+    let finished = native.finish(&message).unwrap();
+    let Response::Session { token, .. } = http
+        .exchange(
+            &Request::LoginFinish {
+                attempt,
+                message: finished.finalization,
+            },
+            None,
+        )
+        .unwrap()
+    else {
+        panic!("a native session");
+    };
+    for request in [&Request::AccountSummary, set] {
+        for bearer in [&token, cookie] {
+            assert_eq!(
+                http.exchange(request, Some(bearer)).err(),
+                Some(Error::Rejected)
+            );
+        }
+    }
+    token
 }

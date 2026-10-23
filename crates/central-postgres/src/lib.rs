@@ -7,7 +7,9 @@ mod accounts;
 mod beta_keys;
 mod connection;
 mod pending;
-pub use accounts::{AccountStore, Credential, Issued, MAX_GATEWAY_VERSIONS, Session, Status};
+pub use accounts::{
+    AccountStore, Credential, Issued, MAX_GATEWAY_VERSIONS, Session, Status, Summary,
+};
 
 pub use beta_keys::{
     BetaKeyBatch, MAX_BETA_KEY_DAYS, MAX_BETA_KEY_NOTE, MAX_BETA_KEY_USES, MAX_BETA_KEYS,

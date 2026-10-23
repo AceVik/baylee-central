@@ -19,6 +19,7 @@ import {
   login_confirm,
   login_finish,
   login_start,
+  recovery_create,
 } from "../src/central-wasm/central_web_crypto.js";
 
 // relative to web/, where vitest runs (as test/boot.test.ts reads public/)
@@ -90,5 +91,18 @@ describe("the module", () => {
     expect(() => login_finish(signingIn, new Uint8Array(320))).toThrow("null pointer passed to rust");
     expect(() => login_finish(login_start(PASSWORD, ACCOUNT, 1n), new Uint8Array(319))).toThrow("rejected");
     expect(login_confirm).toBeTypeOf("function");
+  });
+
+  it("makes a recovery code only from a finished sign-in's state", () => {
+    // Both steps that end a sign-in take its LoginKey, which only a real KE2
+    // makes (the exchange is crates/central-web-crypto/tests/flow.rs); any
+    // other handle is refused before a key is touched.
+    expect(recovery_create).toBeTypeOf("function");
+    const signingIn = login_start(PASSWORD, ACCOUNT, 1n);
+    // (the two classes have the same shape to TypeScript; the glue checks the class)
+    expect(() => recovery_create(signingIn, new Uint8Array(73))).toThrow("expected instance of LoginKey");
+    // @ts-expect-error -- nor is a plain object
+    expect(() => recovery_create({}, new Uint8Array(73))).toThrow("expected instance of LoginKey");
+    signingIn.free();
   });
 });

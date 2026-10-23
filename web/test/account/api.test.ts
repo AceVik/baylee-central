@@ -48,10 +48,12 @@ describe("the request", () => {
       recovery: new Uint8Array(n(73, 6)),
     });
     await client.acceptTerms({ version: "2026-10-21", digest: new Uint8Array(n(32, 7)) });
+    await client.setRecovery(new Uint8Array(n(73, 8)));
     await client.logout();
     expect(calls.map((c) => c.body)).toEqual([
       { operation: "enrollment_finish", ticket: n(32, 2), record: n(192, 3), wrapped_master: n(73, 4), document: n(5, 5), recovery: n(73, 6) },
       { operation: "accept_terms", subject: { kind: "central" }, version: "2026-10-21", digest: n(32, 7) },
+      { operation: "set_recovery", recovery: n(73, 8) },
       { operation: "logout" },
     ]);
   });
@@ -138,6 +140,64 @@ describe("the answers", () => {
     ]) {
       expect(() => parse.renewed(bad)).toThrow(ApiError);
     }
+  });
+
+  it("take the account summary's exact shape", async () => {
+    const summary = {
+      result: "account_summary",
+      identity: IDENTITY,
+      username: "synthetic_name",
+      display_name: null,
+      tag: null,
+      source: "legacy",
+      recovery: false,
+      admin: false,
+      signed_in_at: 3_999_998_200,
+      expires_at: 4_000_000_000,
+    };
+    expect(parse.accountSummary(summary)).toEqual({
+      identity: { account: Uint8Array.from(ACCOUNT), epoch: 1 },
+      username: "synthetic_name",
+      displayName: null,
+      tag: null,
+      source: "legacy",
+      recovery: false,
+      admin: false,
+      signedInAt: 3_999_998_200,
+      expiresAt: 4_000_000_000,
+    });
+    // the fields later steps fill, within their rules
+    expect(parse.accountSummary({ ...summary, display_name: "Alice_7", tag: 7, admin: true })).toMatchObject({ displayName: "Alice_7", tag: 7, admin: true });
+    expect(parse.accountSummary({ ...summary, source: "registered", recovery: true }).source).toBe("registered");
+    const withoutAdmin = Object.fromEntries(Object.entries(summary).filter(([key]) => key !== "admin"));
+    for (const bad of [
+      withoutAdmin,
+      { ...summary, role: "admin" },
+      { ...summary, result: "browser_status" },
+      { ...summary, source: "official" },
+      { ...summary, source: null },
+      { ...summary, recovery: "no" },
+      { ...summary, admin: 0 },
+      { ...summary, username: "Synthetic_Name" },
+      { ...summary, display_name: "ab" },
+      { ...summary, display_name: "a".repeat(17) },
+      { ...summary, display_name: "_alice" },
+      { ...summary, display_name: "alice!" },
+      { ...summary, tag: 0 },
+      { ...summary, tag: 2 ** 31 },
+      { ...summary, tag: 1.5 },
+      { ...summary, tag: "7" },
+      { ...summary, signed_in_at: 0 },
+      { ...summary, signed_in_at: 4_000_000_000 },
+      { ...summary, expires_at: "4000000000" },
+      // every registered account holds the code of its registration
+      { ...summary, source: "registered", recovery: false },
+    ]) {
+      expect(() => parse.accountSummary(bad)).toThrow(ApiError);
+    }
+    const calls = serve(() => ({ body: summary }));
+    expect((await api().accountSummary()).recovery).toBe(false);
+    expect(calls.map((c) => c.body)).toEqual([{ operation: "account_summary" }]);
   });
 
   it("read discovery's two kinds and nothing else", () => {
