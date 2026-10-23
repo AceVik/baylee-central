@@ -1,8 +1,9 @@
 // The account pages with the stand-in Central and crypto: registration to
-// the recovery code (shown once, copied, downloaded, confirmed) and on to
-// the account; what the form refuses before sending; the terms, accepted
-// only when their texts match their digest; sign-in; the account page and
-// the header.
+// the recovery code (shown once, copied, downloaded, confirmed, with the
+// handle drawn) and on to the account; what the form refuses before
+// sending; the terms, accepted only when their texts match their digest;
+// sign-in; the account page (the handle, the sign-in name, choosing a
+// display name) and the header.
 
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -19,6 +20,8 @@ import { Header } from "../../src/components/Header";
 import { LangProvider, type Lang } from "../../src/i18n";
 import { CODE, KEY, fakeCentral, fakeCrypto, type FakeCentral } from "../support/central";
 
+const HANDLE = "Synthetic_Name#3fa2";
+
 const PASSWORD = "violet lantern harbour quietly";
 
 function show(node: ReactNode, api: FakeCentral, lang: Lang = "en", password = PASSWORD) {
@@ -31,10 +34,14 @@ function show(node: ReactNode, api: FakeCentral, lang: Lang = "en", password = P
   );
 }
 
-async function fill(user: ReturnType<typeof userEvent.setup>, fields: { key?: string; name?: string; password?: string; again?: string; age?: boolean; consent?: boolean } = {}) {
-  const { key = KEY, name = "Synthetic_Name", password = PASSWORD, again = password, age = true, consent = true } = fields;
+async function fill(
+  user: ReturnType<typeof userEvent.setup>,
+  fields: { key?: string; name?: string; display?: string; password?: string; again?: string; age?: boolean; consent?: boolean } = {},
+) {
+  const { key = KEY, name = "Synthetic_Name", display = "Synthetic_Name", password = PASSWORD, again = password, age = true, consent = true } = fields;
   if (key) await user.type(screen.getByLabelText("Beta key"), key);
   if (name) await user.type(screen.getByLabelText("Username"), name);
+  if (display) await user.type(screen.getByLabelText("Display name"), display);
   if (password) await user.type(screen.getByLabelText("Password"), password);
   if (again) await user.type(screen.getByLabelText("Password again"), again);
   if (age) await user.click(screen.getByLabelText("I am at least 16 years old."));
@@ -59,10 +66,11 @@ async function registerAndContinue(api: FakeCentral) {
   return user;
 }
 
-async function account(): Promise<FakeCentral> {
-  const api = fakeCentral();
+/** A registered account, `displayName` chosen at registration or (null) not yet. */
+async function account(displayName: string | null = null, opts: Parameters<typeof fakeCentral>[0] = {}): Promise<FakeCentral> {
+  const api = fakeCentral(opts);
   const { register } = await import("../../src/account/flows");
-  await register({ username: "synthetic_name", betaKey: KEY, password: PASSWORD }, { api, crypto: fakeCrypto(PASSWORD).factory });
+  await register({ username: "synthetic_name", betaKey: KEY, displayName, password: PASSWORD }, { api, crypto: fakeCrypto(PASSWORD).factory });
   return api;
 }
 
@@ -83,7 +91,10 @@ describe("registration", () => {
 
     const step = await screen.findByRole("region", { name: "Your recovery code" });
     expect(within(step).getByLabelText("Recovery code").textContent).toBe(CODE);
-    expect(api.accounts.has("synthetic_name")).toBe(true);
+    expect(api.accounts.get("synthetic_name")?.displayName).toBe("Synthetic_Name");
+    // the whole handle, once the sign-in started at once has read the tag drawn
+    expect((await within(step).findByText(HANDLE)).tagName).toBe("B");
+    expect(within(step).getByText(/Other players see you as/)).toBeTruthy();
     await user.click(within(step).getByRole("button", { name: "Copy" }));
     expect(await navigator.clipboard.readText()).toBe(CODE);
     expect(await within(step).findByText("Copied.")).toBeTruthy();
@@ -117,6 +128,21 @@ describe("registration", () => {
     expect(screen.getByText("That username does not follow the rules above.")).toBeTruthy();
     await user.clear(screen.getByLabelText("Username"));
     await user.type(screen.getByLabelText("Username"), "synthetic_name");
+    await submit();
+    expect(screen.getByText("That display name does not follow the rules above.")).toBeTruthy();
+    expect(document.activeElement).toBe(screen.getByLabelText("Display name"));
+    for (const bad of ["_Synthetic", "ab", "Synthetic Name"]) {
+      await user.clear(screen.getByLabelText("Display name"));
+      await user.type(screen.getByLabelText("Display name"), bad);
+      await submit();
+      expect(screen.getByText("That display name does not follow the rules above.")).toBeTruthy();
+    }
+    await user.clear(screen.getByLabelText("Display name"));
+    await user.type(screen.getByLabelText("Display name"), "Ad-min");
+    await submit();
+    expect(screen.getByText("That display name is kept for Baylee itself. Please choose another.")).toBeTruthy();
+    await user.clear(screen.getByLabelText("Display name"));
+    await user.type(screen.getByLabelText("Display name"), "Synthetic_Name");
     await user.type(screen.getByLabelText("Password"), "short");
     await submit();
     expect(screen.getByText(/needs at least 8 characters/)).toBeTruthy();
@@ -142,6 +168,7 @@ describe("registration", () => {
     show(<RegisterPage />, api, "de");
     await user.type(screen.getByLabelText("Beta-Key"), "CENTRAL-WRONG");
     await user.type(screen.getByLabelText("Benutzername"), "synthetic_name");
+    await user.type(screen.getByLabelText("Anzeigename"), "Synthetischer");
     await user.type(screen.getByLabelText("Passwort"), PASSWORD);
     await user.type(screen.getByLabelText("Passwort wiederholen"), PASSWORD);
     await user.click(screen.getByLabelText("Ich bin mindestens 16 Jahre alt."));
@@ -242,7 +269,8 @@ describe("sign-in", () => {
         </AccountProvider>
       </LangProvider>,
     );
-    expect(await screen.findByText("synthetic_name")).toBeTruthy();
+    // no display name yet: "signed in", and the sign-in name small, nowhere else
+    expect(await screen.findByText("Sign-in name: synthetic_name")).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "Sign out" }));
     expect(await screen.findByText(/You are not signed in/)).toBeTruthy();
     expect(api.session).toBeNull();
@@ -254,8 +282,9 @@ describe("signing out", () => {
   it("says so when Central could not end the session, and when it ends by itself", async () => {
     window.localStorage.setItem(SESSION_KEY, JSON.stringify({ expiresAt: Math.floor(Date.now() / 1000) + 600 }));
     const api = fakeCentral();
+    api.moved("synthetic_name");
     api.session = { name: "synthetic_name", expiresAt: 4_000_000_000 };
-    api.fail("session_status", "network");
+    api.fail("account_summary", "network");
     api.fail("logout", "network");
     const user = userEvent.setup();
     show(<AccountPage />, api);
@@ -273,12 +302,14 @@ describe("the header", () => {
 
   it("names a remembered session as Central does, and links to it", async () => {
     window.localStorage.setItem(SESSION_KEY, JSON.stringify({ expiresAt: Math.floor(Date.now() / 1000) + 600 }));
-    const api = await account();
+    const api = await account("Synthetic_Name");
     api.session = { name: "synthetic_name", expiresAt: 4_000_000_000 };
     show(<Header page="account" />, api);
     // until Central answers, it is just "your account"
     expect(screen.getByRole("link", { name: "Your account" }).getAttribute("href")).toBe("/account");
-    const link = await screen.findByRole("link", { name: "Your account, synthetic_name" });
+    // the handle others see, never the private sign-in name
+    const link = await screen.findByRole("link", { name: `Your account, ${HANDLE}` });
+    expect(link.textContent).toBe(HANDLE);
     expect(link.getAttribute("href")).toBe("/account");
     expect(link.getAttribute("aria-current")).toBe("page");
   });
@@ -286,9 +317,104 @@ describe("the header", () => {
   it("stays unnamed while Central cannot be reached", async () => {
     window.localStorage.setItem(SESSION_KEY, JSON.stringify({ expiresAt: Math.floor(Date.now() / 1000) + 600 }));
     const api = fakeCentral();
-    api.fail("session_status", "network");
+    api.fail("account_summary", "network");
     show(<Header page="home" />, api);
-    await waitFor(() => expect(api.calls).toEqual(["session_status"]));
+    await waitFor(() => expect(api.calls).toEqual(["account_summary"]));
     expect(screen.getByRole("link", { name: "Your account" }).getAttribute("href")).toBe("/account");
+  });
+});
+
+/** Signed in to `api`'s account on the account page, with the header. */
+async function signedIn(api: FakeCentral) {
+  const { signIn } = await import("../../src/account/flows");
+  await signIn({ username: "synthetic_name", password: PASSWORD }, { api, crypto: fakeCrypto(PASSWORD).factory });
+  window.localStorage.setItem(SESSION_KEY, JSON.stringify({ expiresAt: 4_000_000_000 }));
+  api.calls.length = 0;
+  const user = userEvent.setup();
+  show(
+    <>
+      <Header page="account" />
+      <AccountPage />
+    </>,
+    api,
+  );
+  return user;
+}
+
+describe("the display name", () => {
+  it("shows the handle on the account page, the sign-in name small", async () => {
+    const api = await account("Synthetic_Name");
+    await signedIn(api);
+    expect(await screen.findByText(HANDLE, { selector: ".account-name bdi" })).toBeTruthy();
+    expect(screen.getByText("Sign-in name: synthetic_name")).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Choose your display name" })).toBeNull();
+  });
+
+  it("is chosen first on the account page by an account without one, within the rules, once", async () => {
+    const api = await account(null);
+    const user = await signedIn(api);
+    const form = await screen.findByRole("region", { name: "Choose your display name" });
+    expect(within(form).getByText(/beside your tag, #3fa2/)).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Your account" })).toBeTruthy();
+    const save = () => user.click(within(form).getByRole("button", { name: "Save the name" }));
+    await user.type(within(form).getByLabelText("Display name"), "System");
+    await save();
+    expect(within(form).getByText("That display name is kept for Baylee itself. Please choose another.")).toBeTruthy();
+    await user.clear(within(form).getByLabelText("Display name"));
+    await user.type(within(form).getByLabelText("Display name"), "-Chosen");
+    await save();
+    expect(within(form).getByText("That display name does not follow the rules above.")).toBeTruthy();
+    expect(api.names).toEqual([]);
+    await user.clear(within(form).getByLabelText("Display name"));
+    await user.type(within(form).getByLabelText("Display name"), "Chosen_Name");
+    await save();
+    // the header and the page show it at once
+    expect(await screen.findByRole("link", { name: "Your account, Chosen_Name#3fa2" })).toBeTruthy();
+    expect(screen.getByText("Chosen_Name#3fa2", { selector: ".account-name bdi" })).toBeTruthy();
+    expect(screen.queryByRole("region", { name: "Choose your display name" })).toBeNull();
+    expect(api.names).toEqual(["Chosen_Name"]);
+  });
+
+  it("shows a name chosen elsewhere meanwhile, and keeps it", async () => {
+    const api = await account(null);
+    const user = await signedIn(api);
+    const form = await screen.findByRole("region", { name: "Choose your display name" });
+    const stored = api.accounts.get("synthetic_name");
+    if (stored === undefined) throw new Error("the account");
+    stored.displayName = "Elsewhere";
+    await user.type(within(form).getByLabelText("Display name"), "Chosen_Name");
+    await user.click(within(form).getByRole("button", { name: "Save the name" }));
+    expect(await screen.findByText("Elsewhere#3fa2", { selector: ".account-name bdi" })).toBeTruthy();
+    expect(screen.queryByRole("region", { name: "Choose your display name" })).toBeNull();
+  });
+
+  it("waits for the terms, which choosing a name needs accepted", async () => {
+    const api = await account(null, { terms: await terms() });
+    const user = await signedIn(api);
+    await user.click(await screen.findByRole("button", { name: "I accept" }));
+    expect(await screen.findByRole("region", { name: "Choose your display name" })).toBeTruthy();
+  });
+
+  it("comes from the official gateway for a moved account, in German too", async () => {
+    const api = fakeCentral();
+    api.moved("synthetic_name");
+    const { signIn } = await import("../../src/account/flows");
+    await signIn({ username: "synthetic_name", password: PASSWORD }, { api, crypto: fakeCrypto(PASSWORD).factory });
+    window.localStorage.setItem(SESSION_KEY, JSON.stringify({ expiresAt: 4_000_000_000 }));
+    show(<AccountPage />, api, "de");
+    expect(await screen.findByText(/kommen vom offiziellen Gateway mit/)).toBeTruthy();
+    expect(screen.getByText("Anmeldename: synthetic_name")).toBeTruthy();
+    expect(screen.queryByRole("region", { name: "Wähl deinen Anzeigenamen" })).toBeNull();
+  });
+
+  it("is a moved account's own once carried", async () => {
+    const api = fakeCentral();
+    api.moved("synthetic_name", { displayName: "Carried", tag: 13 });
+    const { signIn } = await import("../../src/account/flows");
+    await signIn({ username: "synthetic_name", password: PASSWORD }, { api, crypto: fakeCrypto(PASSWORD).factory });
+    window.localStorage.setItem(SESSION_KEY, JSON.stringify({ expiresAt: 4_000_000_000 }));
+    show(<AccountPage />, api);
+    expect(await screen.findByText("Carried#000d", { selector: ".account-name bdi" })).toBeTruthy();
+    expect(screen.queryByText(/come with you from the official gateway/)).toBeNull();
   });
 });

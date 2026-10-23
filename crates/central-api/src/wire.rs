@@ -153,6 +153,29 @@ pub enum Request {
         legacy_id: String,
         /// Canonical username vouched for by the authenticated migration bridge.
         username: String,
+        /// The legacy account's display name, kept as it is when it keeps
+        /// [`crate::profile::valid_display_name`]; the bridge sends none for
+        /// a name that does not, and the account chooses one on the website.
+        /// Absent on the wire when `None`, so bridges built before it still
+        /// decode and are still decoded.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        display_name: Option<String>,
+        /// The legacy account's tag, kept unless another account holds it
+        /// already, when it draws a new one. Absent on the wire when `None`.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        tag: Option<u32>,
+    },
+    /// Carry a legacy account's display name and tag once, for an account
+    /// reserved before Central kept them (bridge only): `Done` when they were
+    /// set, `Conflict` when the account has its tag already (and with it any
+    /// name), so a bridge may send it at every sign-in.
+    LegacyProfile {
+        /// Original gateway account identifier.
+        legacy_id: String,
+        /// Its display name, or none when it does not keep the rule.
+        display_name: Option<String>,
+        /// Its tag at the official gateway.
+        tag: u32,
     },
     /// Reserve a new registered account with a beta key, on the browser listener
     /// only (`docs/web-accounts.md`). A bad, used-up, expired or revoked key is
@@ -163,6 +186,12 @@ pub enum Request {
         username: String,
         /// The beta key as typed, read like the recovery code.
         beta_key: String,
+        /// The display name other players see, chosen now; a malformed or
+        /// reserved one is `Rejected`, after the key check. `None` chooses it
+        /// later on the account page. The tag is drawn with the reservation.
+        /// Absent on the wire when `None`.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        display_name: Option<String>,
     },
     /// An enrollment capability authorizes a response, not replacement of an existing record.
     EnrollmentStart {
@@ -273,6 +302,27 @@ pub enum Request {
     SetRecovery {
         /// The master key under the recovery code, exactly 73 bytes.
         recovery: Vec<u8>,
+    },
+    /// Choose the display name of the browser session's account, which has
+    /// none yet (renaming comes later): browser listener only, with accepted
+    /// terms. The same name again is `Done`; another while one is set is
+    /// `Conflict`; a malformed or reserved name, or an account moved from the
+    /// official gateway whose name and tag the bridge has not carried yet, is
+    /// `Rejected` (`docs/web-accounts.md`).
+    SetDisplayName {
+        /// The name, kept as typed: [`crate::profile::choosable`].
+        display_name: String,
+    },
+    /// The display name and tag of the account behind a live lease the
+    /// asking gateway holds, under its redemption credential or the bridge,
+    /// as [`Request::GatewaySession`]: a gateway learns the names of the
+    /// people who sign in there, nobody else's. Answered with
+    /// [`Response::GatewayProfile`].
+    GatewayProfile {
+        /// Lease returned only to the redeeming gateway, never its client.
+        lease: Token,
+        /// Exactly Admit or Admin; purposes cannot be promoted.
+        purpose: TicketPurpose,
     },
 }
 
@@ -495,15 +545,27 @@ pub enum Response {
         /// The account accepted the gateway's named terms, or it named none.
         gateway_terms: bool,
     },
+    /// A live lease's account as other players see it ([`Request::GatewayProfile`]).
+    GatewayProfile {
+        /// Account authenticated by this lease.
+        identity: Identity,
+        /// Its display name; none until the account chose one.
+        display_name: Option<String>,
+        /// Its tag; none for an account moved from the official gateway
+        /// whose tag the bridge has not carried yet.
+        tag: Option<u32>,
+    },
     /// The browser session's account ([`Request::AccountSummary`]).
     AccountSummary {
         /// Identity bound to this session.
         identity: Identity,
         /// The account's canonical username, its private sign-in name.
         username: String,
-        /// The display name other players see; none until Central keeps one.
+        /// The display name other players see; none until the account
+        /// chose one (or the bridge carried it).
         display_name: Option<String>,
-        /// The tag drawn beside the display name; none until Central keeps one.
+        /// The tag beside the display name: drawn for a registered account,
+        /// carried from the official gateway for a moved one; none until then.
         tag: Option<u32>,
         /// Where the account came from.
         source: AccountSource,
@@ -607,6 +669,151 @@ mod tests {
         };
         assert_eq!(recovery, [1, 2, 3]);
         assert!(crate::decode::<Request>(br#"{"operation":"set_recovery"}"#).is_err());
+    }
+
+    #[test]
+    fn register_and_legacy_reserve_from_before_still_decode() {
+        // The page and the bridge built before display names send neither field.
+        let Request::Register {
+            username,
+            display_name,
+            ..
+        } = crate::decode(br#"{"operation":"register","username":"synthetic","beta_key":"k"}"#)
+            .unwrap()
+        else {
+            panic!("a registration");
+        };
+        assert_eq!((username.as_str(), display_name), ("synthetic", None));
+        let Request::LegacyReserve {
+            display_name, tag, ..
+        } = crate::decode(
+            br#"{"operation":"legacy_reserve","legacy_id":"x","username":"synthetic"}"#,
+        )
+        .unwrap()
+        else {
+            panic!("a reservation");
+        };
+        assert_eq!((display_name, tag), (None, None));
+        // Without them, both are sent exactly as before.
+        for (request, earlier) in [
+            (
+                Request::Register {
+                    username: "synthetic".into(),
+                    beta_key: "k".into(),
+                    display_name: None,
+                },
+                r#"{"operation":"register","username":"synthetic","beta_key":"k"}"#,
+            ),
+            (
+                Request::LegacyReserve {
+                    legacy_id: "x".into(),
+                    username: "synthetic".into(),
+                    display_name: None,
+                    tag: None,
+                },
+                r#"{"operation":"legacy_reserve","legacy_id":"x","username":"synthetic"}"#,
+            ),
+        ] {
+            assert_eq!(
+                String::from_utf8(crate::encode(&request).unwrap()).unwrap(),
+                earlier
+            );
+        }
+        let Request::LegacyReserve {
+            display_name, tag, ..
+        } = crate::decode(
+            br#"{"operation":"legacy_reserve","legacy_id":"x","username":"synthetic","display_name":"Alice","tag":7}"#,
+        )
+        .unwrap()
+        else {
+            panic!("a reservation");
+        };
+        assert_eq!((display_name.as_deref(), tag), (Some("Alice"), Some(7)));
+        let Request::Register { display_name, .. } = crate::decode(
+            br#"{"operation":"register","username":"synthetic","beta_key":"k","display_name":"Alice"}"#,
+        )
+        .unwrap()
+        else {
+            panic!("a registration");
+        };
+        assert_eq!(display_name.as_deref(), Some("Alice"));
+        for bad in [
+            br#"{"operation":"legacy_reserve","legacy_id":"x","username":"synthetic","tag":-1}"#.as_slice(),
+            br#"{"operation":"legacy_reserve","legacy_id":"x","username":"synthetic","tag":4294967296}"#,
+            br#"{"operation":"register","username":"synthetic","beta_key":"k","name":"Alice"}"#,
+        ] {
+            assert!(crate::decode::<Request>(bad).is_err());
+        }
+    }
+
+    #[test]
+    fn the_profile_requests_and_answer_have_the_designed_shapes() {
+        let Request::SetDisplayName { display_name } =
+            crate::decode(br#"{"operation":"set_display_name","display_name":"Alice"}"#).unwrap()
+        else {
+            panic!("a name");
+        };
+        assert_eq!(display_name, "Alice");
+        assert!(crate::decode::<Request>(br#"{"operation":"set_display_name"}"#).is_err());
+        let Request::LegacyProfile {
+            legacy_id,
+            display_name,
+            tag,
+        } = crate::decode(
+            br#"{"operation":"legacy_profile","legacy_id":"x","display_name":null,"tag":13}"#,
+        )
+        .unwrap()
+        else {
+            panic!("a profile");
+        };
+        assert_eq!((legacy_id.as_str(), display_name, tag), ("x", None, 13));
+        // The tag is what a profile carries; it is never left out.
+        assert!(
+            crate::decode::<Request>(
+                br#"{"operation":"legacy_profile","legacy_id":"x","display_name":"Alice"}"#
+            )
+            .is_err()
+        );
+        assert!(matches!(
+            crate::decode::<Request>(
+                br#"{"operation":"gateway_profile","lease":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"purpose":"admit"}"#
+            )
+            .unwrap(),
+            Request::GatewayProfile {
+                purpose: TicketPurpose::Admit,
+                ..
+            }
+        ));
+        let answer = Response::GatewayProfile {
+            identity: Identity {
+                account: [7; 16],
+                epoch: 1,
+            },
+            display_name: Some("Alice".into()),
+            tag: Some(0x3fa2),
+        };
+        let text = String::from_utf8(crate::encode(&answer).unwrap()).unwrap();
+        assert_eq!(
+            text,
+            r#"{"result":"gateway_profile","identity":{"account":[7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7],"epoch":1},"display_name":"Alice","tag":16290}"#
+        );
+        assert!(crate::decode::<Response>(text.as_bytes()).is_ok());
+        assert!(
+            crate::decode::<Response>(
+                text.replace(r#""tag":16290"#, r#""tag":16290,"role":"admin""#)
+                    .as_bytes()
+            )
+            .is_err()
+        );
+        // A gateway built before this answer decodes `GatewayIdentity` as it
+        // always did; the profile is an answer of its own.
+        assert!(
+            crate::decode::<Response>(
+                text.replace("gateway_profile", "gateway_identity")
+                    .as_bytes()
+            )
+            .is_err()
+        );
     }
 
     #[test]

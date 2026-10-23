@@ -193,6 +193,8 @@ async fn constraints(store: &AccountStore, operator: &DatabaseConnection, keys: 
         .reserve_legacy(
             "pending-legacy",
             "pending-legacy",
+            None,
+            None,
             &Token::generate().unwrap(),
         )
         .await
@@ -244,7 +246,7 @@ async fn registered(store: &AccountStore, operator: &DatabaseConnection, keys: &
     let key = super::register::issue(operator, 1, "registered-one").await;
     let ticket = Token::generate().unwrap();
     let identity = store
-        .register("Registered-One", &key.digest(), &ticket)
+        .register("Registered-One", None, &key.digest(), &ticket)
         .await
         .unwrap();
     assert_eq!(

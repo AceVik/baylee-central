@@ -15,6 +15,7 @@ mod gateways;
 mod kinds;
 mod migration;
 mod objects;
+mod profiles;
 mod recovery;
 mod register;
 mod registration;
@@ -68,13 +69,25 @@ pub(crate) async fn run(operator: &DatabaseConnection) {
     let bob = login(&store, &keys, second).await;
     assert!(
         store
-            .reserve_legacy("synthetic-a", "alice", &Token::generate().unwrap())
+            .reserve_legacy(
+                "synthetic-a",
+                "alice",
+                None,
+                None,
+                &Token::generate().unwrap()
+            )
             .await
             .is_err()
     );
     assert!(
         store
-            .reserve_legacy("synthetic-c", "alice", &Token::generate().unwrap())
+            .reserve_legacy(
+                "synthetic-c",
+                "alice",
+                None,
+                None,
+                &Token::generate().unwrap()
+            )
             .await
             .is_err()
     );
@@ -96,16 +109,20 @@ pub(crate) async fn run(operator: &DatabaseConnection) {
     register::run(&store, operator, &keys).await;
     renewal::run(&store, operator, &keys).await;
     recovery::run(&store, operator, &keys).await;
+    profiles::run(&store, operator, &keys).await;
     store.close().await.unwrap();
 }
 
 async fn enroll(store: &AccountStore, keys: &ServerKeys, legacy: &str, name: &str) -> Identity {
     let stale = Token::generate().unwrap();
-    let identity = store.reserve_legacy(legacy, name, &stale).await.unwrap();
+    let identity = store
+        .reserve_legacy(legacy, name, None, None, &stale)
+        .await
+        .unwrap();
     let ticket = Token::generate().unwrap();
     assert_eq!(
         store
-            .reserve_legacy(legacy, name, &ticket)
+            .reserve_legacy(legacy, name, None, None, &ticket)
             .await
             .unwrap()
             .account,
@@ -294,7 +311,7 @@ async fn expiry_and_revision(
     );
     let token = Token::generate().unwrap();
     store
-        .reserve_legacy("expired", "expired", &token)
+        .reserve_legacy("expired", "expired", None, None, &token)
         .await
         .unwrap();
     operator.execute_unprepared("UPDATE central_identity.accounts SET enrollment_expires = clock_timestamp() - interval '1 second' WHERE legacy_id = 'expired'").await.unwrap();

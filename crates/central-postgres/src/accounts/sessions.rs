@@ -63,7 +63,10 @@ pub struct Issued {
 impl AccountStore {
     /// Issue after OPAQUE verification, conditional on the unchanged credential revision.
     /// Atomically replace the account's earlier session of the same kind, with its
-    /// tickets and leases; a session of the other kind stays.
+    /// tickets and leases; a session of the other kind stays. A registered
+    /// account without a tag (one the binary before migration 000011
+    /// registered) draws it now; when none can be drawn, the sign-in goes on
+    /// without one and the next one tries again.
     ///
     /// # Errors
     /// Rejects stale credentials or database failure without revoking the current session.
@@ -75,10 +78,33 @@ impl AccountStore {
         let session = session.into();
         let transaction = self.db.begin().await.map_err(|_| Error::Unavailable)?;
         let row = transaction.query_one_raw(statement(
-            "SELECT wrapped_master, username_key FROM central_identity.accounts WHERE id = $1
+            "SELECT wrapped_master, username_key, source = 'registered' AND tag IS NULL AS untagged
+             FROM central_identity.accounts WHERE id = $1
              AND vault_epoch = $2 AND credential_revision = $3 AND credential IS NOT NULL FOR UPDATE",
             vec![uuid(credential.identity.account).into(), number(credential.identity.epoch)?.into(), credential.revision.into()],
         )).await.map_err(|_| Error::Unavailable)?.ok_or(Error::Rejected)?;
+        if row
+            .try_get::<bool>("", "untagged")
+            .map_err(|_| Error::Unavailable)?
+        {
+            let account = uuid(credential.identity.account);
+            // Each draw runs in a savepoint: a failed one leaves the sign-in intact.
+            let _ = self
+                .first_free_tag(
+                    &transaction,
+                    Some(account),
+                    None,
+                    Error::Unavailable,
+                    |tag| {
+                        statement(
+                        "UPDATE central_identity.accounts SET tag = $2 WHERE id = $1 AND tag IS NULL
+                         RETURNING id",
+                        vec![account.into(), tag.into()],
+                    )
+                    },
+                )
+                .await;
+        }
         transaction
             .execute_raw(statement(
                 "DELETE FROM central_identity.sessions WHERE account_id = $1 AND kind = $2",

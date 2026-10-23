@@ -11,6 +11,10 @@
 .account-form .check-label input, .recovery .check-label input { flex: none; }
 .field-hint { margin: 0; font-family: var(--sans); font-size: 0.88rem; color: var(--ink-faint); }
 .account-name { font-family: var(--sans); font-size: 1.3rem; font-weight: 700; color: var(--title); overflow-wrap: anywhere; }
+/* the private sign-in name, small under the handle others see */
+.account-signin-name { margin-top: -0.6rem; overflow-wrap: anywhere; }
+.choose-name { margin: 0 0 1.2rem; padding: 0 0 1.2rem; border-bottom: 1px solid var(--edge-soft); }
+.choose-name h2 { margin-top: 0; }
 
 /* ---------------------------------------------------------------- the strength hint */
 .strength { display: flex; align-items: center; gap: 0.6rem; min-height: 1.4em; font-family: var(--sans); font-size: 0.88rem; }
@@ -26,6 +30,7 @@
 /* ---------------------------------------------------------------- the recovery code */
 .recovery { padding: clamp(1.2rem, 3vw, 1.8rem); margin: 0 0 1rem; }
 .recovery h2 { margin-top: 0; outline: none; }
+.recovery-handle { display: block; font-family: var(--sans); overflow-wrap: anywhere; }
 .recovery-code { margin: 1.2rem 0; text-align: center; }
 .recovery-code code {
   display: inline-block; max-width: 100%; padding: 0.8rem 1rem; border-radius: 12px;

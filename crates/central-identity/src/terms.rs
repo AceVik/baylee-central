@@ -87,6 +87,7 @@ pub(super) fn needs_acceptance(request: &Request) -> bool {
             | Request::SetGatewayAdmins { .. }
             | Request::GatewayTicket { .. }
             | Request::SetRecovery { .. }
+            | Request::SetDisplayName { .. }
     )
 }
 

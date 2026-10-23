@@ -1,21 +1,24 @@
 // Who is signed in, for the header and the account page. The session itself
 // is Central's `__Host-central` cookie, which the page cannot read. The page
 // keeps only when that session ends (localStorage, `baylee-central-session`),
-// so that after a reload it knows to ask Central (`SessionStatus`) whose
-// session it is; the name is always Central's, held in memory only. Signing
-// out, an expired session or Central's "no" forget it. Nothing else about the
-// account stays in the browser. While a page is open and in view, it renews
-// the session (`RenewSession`), which Central caps at 12 hours after the
-// sign-in.
+// so that after a reload it knows to ask Central (`AccountSummary`) whose
+// session it is; the handle shown (`Name#3fa2`, never the private sign-in
+// name) is always Central's, held in memory only. Signing out, an expired
+// session or Central's "no" forget it. Nothing else about the account stays
+// in the browser. While a page is open and in view, it renews the session
+// (`RenewSession`), which Central caps at 12 hours after the sign-in.
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { ApiError, api as defaultApi, type Api } from "./api";
 import { workerCrypto, type CryptoFactory } from "./crypto";
+import { handleOf } from "./flows";
 
 export interface Account {
-  /** The name as Central keeps it; null until Central has said it, after a reload. */
-  name: string | null;
+  /** Central has said whose session this is; not yet after a reload. */
+  known: boolean;
+  /** The handle other players see, as Central says it; null until then, or while the account has no display name. */
+  handle: string | null;
   /** When the session ends, in Unix seconds. */
   expiresAt: number;
 }
@@ -39,7 +42,7 @@ export function remembered(now = Date.now()): Account | null {
     if (typeof v !== "object" || v === null || Array.isArray(v) || Object.keys(v).join() !== "expiresAt") return null;
     const { expiresAt } = v as Record<string, unknown>;
     if (typeof expiresAt !== "number" || !Number.isSafeInteger(expiresAt) || expiresAt * 1000 <= now) return null;
-    return { name: null, expiresAt };
+    return { known: false, handle: null, expiresAt };
   } catch {
     return null;
   }
@@ -59,8 +62,8 @@ interface AccountState {
   api: Api;
   /** A new flow's crypto: one Worker each. */
   crypto: CryptoFactory;
-  /** A sign-in's answer: Central's name for the account and the session's end. */
-  signedIn(account: { name: string; expiresAt: number }): void;
+  /** A sign-in's answer, or a name just chosen: Central's handle for the account (or none yet) and the session's end. */
+  signedIn(account: { handle: string | null; expiresAt: number }): void;
   /**
    * Ends the session at Central and forgets it here, also when Central
    * cannot be reached: `false` then, since the cookie lives until its end.
@@ -101,15 +104,16 @@ export function AccountProvider({
     remember(next);
     setAccount(next);
   }, []);
+  const signedIn = useCallback((next: { handle: string | null; expiresAt: number }) => change({ ...next, known: true }), [change]);
 
   // a session known only by its end is Central's to name, or to end
-  const unnamed = account !== null && account.name === null;
+  const unnamed = account !== null && !account.known;
   useEffect(() => {
     if (!unnamed) return;
     let live = true;
-    api.sessionStatus().then(
-      (status) => {
-        if (live) change({ name: status.username, expiresAt: status.expiresAt });
+    api.accountSummary().then(
+      (summary) => {
+        if (live) change({ known: true, handle: handleOf(summary), expiresAt: summary.expiresAt });
       },
       (error: unknown) => {
         // no live session: forget it; Central unreachable: keep it, unnamed, until it ends
@@ -123,7 +127,7 @@ export function AccountProvider({
 
   // a named session renews while the page is in view: on a timer, and when the
   // page is shown again; Central's "no" means it is over, anything else waits
-  const named = account !== null && account.name !== null;
+  const named = account !== null && account.known;
   useEffect(() => {
     if (!named) return;
     let live = true;
@@ -190,7 +194,7 @@ export function AccountProvider({
     return ended;
   }, [api, change]);
 
-  const value = useMemo(() => ({ account, api, crypto, signedIn: change, signOut }), [account, api, crypto, change, signOut]);
+  const value = useMemo(() => ({ account, api, crypto, signedIn, signOut }), [account, api, crypto, signedIn, signOut]);
   return <AccountContext value={value}>{children}</AccountContext>;
 }
 

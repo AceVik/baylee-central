@@ -28,9 +28,12 @@ first. Every piece goes through the three passes of
 
 **Registration** (website, no session yet):
 
-1. `Register { username, beta_key }` → `Enrollment { identity, ticket }`. The
-   key is checked and one use reserved; the username must be free under the
-   versioned name policy. The account row is created with no legacy source.
+1. `Register { username, beta_key, display_name }` → `Enrollment { identity,
+   ticket }`. The key is checked and one use reserved; the username must be
+   free under the versioned name policy; the display name, which the page
+   always sends, keeps the name rule and is no reserved name (§"Display name
+   and tag"), and a tag is drawn for it. The account row is created with no
+   legacy source.
 2. The browser runs OPAQUE registration with the context
    `(issuer, identity.account, identity.epoch)`; `EnrollmentStart { ticket,
    message }` → `EnrollmentChallenge`.
@@ -40,7 +43,9 @@ first. Every piece goes through the three passes of
    as object 1. `EnrollmentFinish { ticket, record, wrapped_master, document,
    recovery }` → `Done`. The commit is atomic and consumes the key's use.
 4. The page shows the recovery code once (copy, download as a text file, and a
-   confirmation that it was kept) and signs in (below) to accept Central's terms.
+   confirmation that it was kept) and signs in (below) to accept Central's
+   terms; the sign-in's `AccountSummary` gives it the tag, and the code's step
+   then shows the whole handle, `Name#3fa2`.
 
 **Sign-in** (website): `Discover` → `LoginStart` → `LoginFinish`, as native.
 On the browser surface `LoginFinish` answers `BrowserSession { identity,
@@ -131,6 +136,89 @@ registered account, allowed for an enrolled legacy one), and
 later raises the epoch (an administrator's reset, M1) must clear it in the
 same statement.
 
+### Display name and tag
+
+*Added 23.10.2026 (the accounts and administration design, step 3).* What
+other players see of an account is its handle, `Name#3fa2`: a display name,
+which is not unique, and a tag, which is. The username is the private
+sign-in name (`Discover` treats it so): the account page shows it small, as
+"Sign-in name", and nothing else does; the header and the account page show
+the handle.
+
+- **The name** keeps the gateway's rule exactly (central-api's
+  `profile::valid_display_name`, Baylee's `auth.rs` `valid_display_name`,
+  tested on the same table of cases in both repositories): 3 to 16 ASCII
+  letters and digits, with `_` and `-` only inside, case kept. A person may
+  not choose `admin`, `administrator`, `baylee`, `central`, `moderator`,
+  `official`, `support` or `system`, compared without case, `_` and `-`
+  (`profile::reserved`); a name carried from the official gateway is kept as
+  it is.
+- **The tag** is unique at Central, positive, at most `i32::MAX` (a
+  gateway's column), drawn as `handle.rs` draws it (`7` is `0007`, `0x10000`
+  is `10000`, `profile::tag_text`), and never changes once held: chat on a
+  gateway is keyed by it. A registered account draws its tag with its
+  reservation, at random (operating-system randomness, rejection-sampled)
+  from `REGISTERED_TAG_FLOOR = 0x1000` to `0xffff` while fewer than half of
+  those are taken, then from `[16f, 256f - 1]`, and so on to `i32::MAX`
+  (`profile::tag_ranges`). Each draw runs in a savepoint; one another account
+  holds is drawn again, eight draws in all (`TAG_DRAWS`), then the request is
+  `Busy`, as it is once no range is left. An abandoned registration frees the
+  tag with its name. Random rather than counted, so a tag says nothing about
+  how many accounts exist.
+- **A moved account** keeps the name and tag it had at the official
+  gateway. Those tags are the gateway's identity values, below the floor
+  (its highest was 13 on 23.10.2026, guests included; it makes no local
+  accounts once bound to Central). The bridge sends both in `LegacyReserve`
+  ([native login](native-login.md)); a carried tag another account holds is
+  replaced by a drawn one, and the name is kept.
+
+*Departures from the design, found in the code:* names written before
+15.09.2026 (when the gateway's rule was 3 to 32 characters without the edge
+rule, and the importer of `gateway-store.json` copied names unchecked) may
+not keep the rule, which migration 000011's CHECK holds; the bridge
+therefore sends no name for such an account, which keeps its tag and
+chooses a name on the website. So `LegacyProfile` sets name and tag once
+while the account has **no tag** (a moved account has a name only with its
+tag), not "while it has no name", and `SetDisplayName` refuses a moved
+account whose tag the bridge has not carried yet, so the website never asks
+a moved account for a name before its own arrives.
+
+**Wire.**
+
+- `Register` gains `display_name: Option<String>` (`#[serde(default)]`,
+  absent when `None`); a malformed or reserved name is `Rejected`, after
+  the key check. `None` chooses it later.
+- `SetDisplayName { display_name }` (browser listener, the cookie's session,
+  Central's terms accepted) → `Done`, only while the account has no name
+  (renaming comes later): the same name again is `Done`, so a retry after a
+  lost answer takes; another while one is set is `Conflict`; a malformed or
+  reserved name, no live browser session, or an account without a tag (a
+  moved one not carried yet) is `Rejected`.
+- `AccountSummary` carries `display_name` and `tag` (its shape is step 2's).
+- `LegacyReserve` and `LegacyProfile`, the bridge's, are in [native
+  login](native-login.md); `GatewayProfile`, a gateway's, in [gateway
+  registry](gateway-registry.md).
+
+**Schema: migration `m20261023_000011_profiles`.** `accounts.display_name
+text` with the rule as a CHECK (`^[A-Za-z0-9][A-Za-z0-9_-]{1,14}[A-Za-z0-9]$`),
+`display_name_at timestamptz` (when the name was set, present exactly with
+the name), and `tag integer UNIQUE CHECK (tag > 0)`. A `DO` block draws a
+tag for every registered account, pending or enrolled, the same way (over
+`random()`: tags are public); legacy rows stay without one until the bridge
+carries it. `tag` stays nullable, so the previous binary, which the deploy
+hook restarts when a new one fails, still registers (000007's rule); the new
+binary draws a missing tag at that account's next sign-in, and a sign-in
+whose draw fails goes on without one. No grant changes: the runtime updates
+`accounts` already.
+
+**The website.** Registration has "Display name" below the username ("How
+other players see you: 3 to 16 letters, digits, - and _. Your tag is drawn
+for you."). An account without a name sees "Choose your display name" first
+on the account page, once the terms are settled; until it chooses, gateways
+show it as `Player` with its tag (step 4). A moved account whose name and
+tag have not been carried yet is told they come with its next sign-in at the
+official gateway with the Baylee client.
+
 ## Server (Central)
 
 **Migration `m20261021_000007_registration`:**
@@ -169,7 +257,8 @@ the recovery code. The admin UI (M2) comes later.
 
 **Wire.**
 
-- `Request::Register { username, beta_key }` → `Response::Enrollment`. It needs
+- `Request::Register { username, beta_key, display_name }` (the name since
+  23.10.2026, optional on the wire) → `Response::Enrollment`. It needs
   no credential, shares the unauthenticated budget and takes a per-address
   budget on the browser surface. It is served **on the browser surface only**;
   `/v1/native` answers `Rejected`. (Changed in the server PR: the per-address
@@ -202,14 +291,16 @@ with the `Host` header unchanged. It has one route, `POST /api/v1`, which
 takes the same tagged `Request` JSON. Only these operations are allowed:
 `Discover`, `LoginStart`, `LoginFinish`, `Register`, `EnrollmentStart`,
 `EnrollmentFinish`, `SessionStatus`, `RenewSession`, `Logout`, `Terms`,
-`TermsStatus`, `AccountSummary`, `SetRecovery`, `AcceptTerms` for Central's
-terms (a gateway's terms are accepted from the client) and `GatewayDirectory`,
+`TermsStatus`, `AccountSummary`, `SetRecovery`, `SetDisplayName`,
+`AcceptTerms` for Central's terms (a gateway's terms are accepted from the
+client) and `GatewayDirectory`,
 the public gateway directory of the `/gateways` page ([gateway
 registry](gateway-registry.md)). Every other operation is refused. The list is
 one exhaustive match in `central-identity` (`browser_operation`), so a new
 operation does not compile until it is decided there. The cookie's token is
 used only by `SessionStatus`, `RenewSession`, `Logout`, `TermsStatus`,
-`AcceptTerms`, `AccountSummary` and `SetRecovery`; the directory uses none, and
+`AcceptTerms`, `AccountSummary`, `SetRecovery` and `SetDisplayName`; the
+directory uses none, and
 the page sends it with `credentials: "omit"`.
 
 - `AccountSummary` (the cookie's session; no accepted terms needed) answers
@@ -217,13 +308,16 @@ the page sends it with `credentials: "omit"`.
   admin, signed_in_at, expires_at }`: `source` is `legacy` or `registered`,
   `recovery` whether the account has a recovery wrapper, `signed_in_at` the
   session's password sign-in in Unix seconds (renewal never moves it).
-  `display_name` and `tag` are `null` and `admin` is `false` until the later
-  steps that keep them; the shape is complete now, so it changes once.
+  `display_name` and `tag` are the account's (§"Display name and tag", since
+  23.10.2026), `null` until it has them; `admin` is `false` until the later
+  step that keeps roles; the shape was complete from the start.
 - `SetRecovery { recovery }` (the cookie's session; Central's terms
   accepted) answers `Done` (§"A recovery code after a sign-in").
+- `SetDisplayName { display_name }` (the cookie's session; Central's terms
+  accepted) answers `Done` (§"Display name and tag").
 
-The native listener refuses both (`Rejected`): making a code in the client is
-M6.
+The native listener refuses all three (`Rejected`): making a code and
+choosing a name in the client are M6.
 
 A request is refused (403, `request not permitted`) unless all of these hold.
 Each header is compared byte for byte and must appear exactly once.
@@ -266,11 +360,12 @@ room, so a crowd of addresses cannot lock new ones out.
 | `GatewayDirectory` | 60 a minute, apart from the others |
 
 The global budgets of the native surface apply as well: `AccountSummary`
-counts with the control requests (`SessionStatus`, `RenewSession`, …) and
-`SetRecovery` with the data requests, per session, and neither has a
-per-address budget, since each needs a live browser session. The native
-surface (`/v1/native`) is unchanged, except that it refuses `Register`,
-`AccountSummary`, `SetRecovery` and a browser session.
+counts with the control requests (`SessionStatus`, `RenewSession`, …),
+`SetRecovery` and `SetDisplayName` with the data requests, per session, and
+none has a per-address budget, since each needs a live browser session. The
+native surface (`/v1/native`) is unchanged, except that it refuses
+`Register`, `AccountSummary`, `SetRecovery`, `SetDisplayName` and a browser
+session.
 
 **Local runs.** `central-service --dev-accounts-stdin` takes an optional
 `"browser": {"listen": "127.0.0.1:<port>", "origin": "http://127.0.0.1:<page
@@ -326,8 +421,10 @@ committed bytes are what the source builds ([xtask](xtask.md)).
 
 ## Web pages (`web/`)
 
-`/register`, `/signin` and `/account` (shows the account's username, signs
-out). The header gains "Sign in" and the account's name. Since 22.10.2026
+`/register`, `/signin` and `/account` (shows the account's handle and, small,
+its sign-in name; signs out). The header gains "Sign in" and the account's
+handle (§"Display name and tag", since 23.10.2026; the username before).
+Since 22.10.2026
 the account page also says where the account came from and whether it has a
 recovery code (`AccountSummary`), and offers a moved account "Make a
 recovery code" (§"A recovery code after a sign-in").
@@ -336,6 +433,7 @@ Registration has these fields:
 
 - beta key
 - username, with the name rules shown
+- display name, with its rules shown (since 23.10.2026)
 - password, twice, with a strength hint and no composition rules
 - confirmation of the minimum age of 16 (Central's terms §2)
 - acceptance of Central's terms and privacy notice, linked and shown in the
@@ -366,12 +464,15 @@ The CSP gains `'wasm-unsafe-eval'` in `script-src`.
 - The browser surface names the account (agreed with the server work on
   21.10.2026): `BrowserSession { identity, username, wrapped_master,
   expires_at }`, and `SessionStatus` answered there as `browser_status {
-  identity, username, expires_at }`. The page takes exactly these shapes;
-  the name it shows is always Central's canonical one, held in memory.
+  identity, username, expires_at }`. The page takes exactly these shapes.
+  Since 23.10.2026 the name it shows is the handle of the account's
+  `AccountSummary` (§"Display name and tag"), always Central's, held in
+  memory; without a display name the header says "Your account".
 - The page keeps only the session's end in localStorage
-  (`baylee-central-session`), so after a reload it knows to ask
-  `SessionStatus` whose session it is (until then the header says "Your
-  account"), and forgets it on signing out, at its end or on Central's 401.
+  (`baylee-central-session`), so after a reload it knows to ask whose
+  session it is (`AccountSummary` since 23.10.2026, `SessionStatus` before;
+  until then the header says "Your account"), and forgets it on signing
+  out, at its end or on Central's 401.
   The privacy notice says so. The earlier key that also held the name
   (`baylee-central-account`) is deleted wherever the page finds it.
 
@@ -398,7 +499,7 @@ with a legacy link still has to match it. An e2e test covers both.
 ## Not in this round
 
 - password change, reset (by recovery code, e-mail or administrator)
-- e-mail, 2FA, profile picture, display name on Central
+- e-mail, 2FA, profile picture (the display name came on 23.10.2026)
 - export and self-service deletion: by request to the operator until M1
 - the administration UI (M2)
 - registration in the native client (M6)

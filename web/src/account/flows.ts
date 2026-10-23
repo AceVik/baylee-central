@@ -3,10 +3,12 @@
 // flow's Worker is closed when the flow ends, however it ends. A sign-in to
 // an account without a recovery code (one moved from the official gateway)
 // makes one in its Worker; the page shows it, and stores it only once the
-// person says they kept it (§"A recovery code after a sign-in").
+// person says they kept it (§"A recovery code after a sign-in"). An account
+// without a display name chooses one (§"Display name and tag").
 
 import { ApiError, sameIdentity, type AccountSummary, type Api, type BrowserSession } from "./api";
 import { CryptoError, type CryptoFactory } from "./crypto";
+import { handle } from "./names";
 
 /** What the page says when a flow stops. */
 export type FlowFailure =
@@ -27,7 +29,13 @@ export type FlowFailure =
   /** A new recovery code: Central did not take it (the sign-in is too old, or the session over). */
   | "codeRefused"
   /** A new recovery code: the account has another one already. */
-  | "codeTaken";
+  | "codeTaken"
+  /** A display name: Central did not take it (not allowed, or the session is over). */
+  | "nameRefused"
+  /** A display name: the account has another one by now. */
+  | "nameTaken"
+  /** Central's terms in force must be accepted first. */
+  | "terms";
 
 export class FlowError extends Error {
   readonly kind: FlowFailure;
@@ -60,19 +68,19 @@ function fromApi(error: unknown, rejected: FlowFailure): FlowError {
 }
 
 /**
- * Registers `username` with `betaKey` and `password`; the recovery code to
- * show once. The key is checked before the name, so `taken` comes only
- * with a valid key.
+ * Registers `username` with `betaKey`, `displayName` (null: chosen later)
+ * and `password`; the recovery code to show once. The key is checked before
+ * the names, so `taken` comes only with a valid key.
  */
 export async function register(
-  input: { username: string; betaKey: string; password: string },
+  input: { username: string; betaKey: string; displayName?: string | null; password: string },
   { api, crypto }: Deps,
   progress: (p: Progress) => void = () => {},
 ): Promise<string> {
   progress("key");
   let enrollment;
   try {
-    enrollment = await api.register(input.username, input.betaKey);
+    enrollment = await api.register(input.username, input.betaKey, input.displayName ?? null);
   } catch (error) {
     if (error instanceof ApiError && error.kind === "conflict") throw new FlowError("taken");
     throw fromApi(error, "badKey");
@@ -192,5 +200,28 @@ export async function storeCode(code: NewCode, { api }: Pick<Deps, "api">): Prom
   } catch (error) {
     if (error instanceof ApiError && error.kind === "conflict") throw new FlowError("codeTaken");
     throw fromApi(error, "codeRefused");
+  }
+}
+
+/** The handle other players see, `Name#3fa2`; null while the account has no display name or tag. */
+export function handleOf(summary: AccountSummary | null): string | null {
+  if (summary === null || summary.displayName === null || summary.tag === null) return null;
+  return handle(summary.displayName, summary.tag);
+}
+
+/**
+ * Chooses the display name of the cookie's account (`SetDisplayName`). The
+ * same name again is Central's `Done`, so a retry after a lost answer takes.
+ * `nameTaken`: the account has another name by now; `nameRefused`: Central
+ * does not take the name, or the session is over; `terms`: the terms in
+ * force are not accepted.
+ */
+export async function chooseName(name: string, { api }: Pick<Deps, "api">): Promise<void> {
+  try {
+    await api.setDisplayName(name);
+  } catch (error) {
+    if (error instanceof ApiError && error.kind === "conflict") throw new FlowError("nameTaken");
+    if (error instanceof ApiError && error.kind === "forbidden") throw new FlowError("terms");
+    throw fromApi(error, "nameRefused");
   }
 }

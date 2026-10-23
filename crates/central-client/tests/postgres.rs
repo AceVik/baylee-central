@@ -138,10 +138,11 @@ async fn prepare() -> DatabaseConnection {
 }
 
 fn run(http: &Http, bridge: &Token, runtime: &Runtime, operator: &DatabaseConnection) {
-    let reserve = Request::LegacyReserve {
-        legacy_id: "synthetic-legacy".into(),
-        username: "synthetic".into(),
-    };
+    // As a bridge from before display names sends it.
+    let reserve: Request = central_api::decode(
+        br#"{"operation":"legacy_reserve","legacy_id":"synthetic-legacy","username":"synthetic"}"#,
+    )
+    .unwrap();
     assert!(http.exchange(&reserve, None).is_err());
     assert!(
         http.exchange(&reserve, Some(&Token::generate().unwrap()))

@@ -15,11 +15,13 @@ mod grants;
 mod leases;
 mod migration;
 mod objects;
+mod profiles;
 mod recovery;
 mod registration;
 mod sessions;
 mod terms;
 pub use migration::Status;
+pub use profiles::{Profile, TAG_DRAWS, TagDraw};
 pub use recovery::Summary;
 pub use sessions::{Issued, Session};
 pub use terms::MAX_GATEWAY_VERSIONS;
@@ -38,6 +40,7 @@ pub struct Credential {
 #[derive(Clone)]
 pub struct AccountStore {
     db: DatabaseConnection,
+    tags: profiles::Tags,
 }
 
 fn statement(sql: &str, values: Vec<Value>) -> Statement {
@@ -104,7 +107,10 @@ impl AccountStore {
         pending: Result<PendingAccountStore, crate::StoreError>,
     ) -> Result<Self, Error> {
         let db = pending.map_err(|_| Error::Unavailable)?.into_connection();
-        let store = Self { db };
+        let store = Self {
+            db,
+            tags: profiles::Tags::default(),
+        };
         if !store.valid_grants().await {
             let _ = store.db.close().await;
             return Err(Error::Unavailable);
@@ -125,13 +131,21 @@ impl AccountStore {
 
     /// Reserve after the bridge has freshly verified legacy ownership. Existing credentials stay intact.
     /// An abandoned registration holding the name gives it up; a live one keeps it.
+    /// The bridge's display name and tag are stored with it, and a renewed
+    /// reservation of a pending account refreshes them: the name it carries
+    /// replaces the one held, and a tag, once held, never changes. A carried
+    /// tag another account holds already is replaced by a drawn one.
     ///
     /// # Errors
-    /// Rejects conflicting links/names, committed accounts or inaccessible storage.
+    /// Rejects conflicting links/names, committed accounts, a malformed
+    /// carried name or tag, or inaccessible storage; `Busy` when a taken
+    /// tag cannot be replaced.
     pub async fn reserve_legacy(
         &self,
         legacy: &str,
         name: &str,
+        display_name: Option<&str>,
+        tag: Option<u32>,
         ticket: &Token,
     ) -> Result<Identity, Error> {
         if legacy.is_empty()
@@ -143,6 +157,8 @@ impl AccountStore {
             return Err(Error::Rejected);
         }
         let name = username(name)?;
+        let display_name = profiles::carried_name(display_name)?;
+        let carried = profiles::carried_tag(tag)?;
         let tx = self.db.begin().await.map_err(|_| Error::Unavailable)?;
         tx.execute_raw(statement(
             "DELETE FROM central_identity.accounts WHERE username_key = $1 AND source = 'registered'
@@ -151,15 +167,56 @@ impl AccountStore {
         ))
         .await
         .map_err(|_| Error::Unavailable)?;
-        let row = tx.query_one_raw(statement(
-            "INSERT INTO central_identity.accounts (source, legacy_id, username_key, enrollment_digest, enrollment_expires)
-             VALUES ('legacy', $1, $2, $3, pg_catalog.clock_timestamp() + interval '10 minutes')
-             ON CONFLICT (legacy_id) DO UPDATE SET enrollment_digest = EXCLUDED.enrollment_digest,
-                enrollment_expires = EXCLUDED.enrollment_expires, username_key = EXCLUDED.username_key
-             WHERE central_identity.accounts.credential IS NULL AND NOT central_identity.accounts.legacy_closed
-             RETURNING id, vault_epoch",
-            vec![legacy.into(), name.into(), ticket.digest().to_vec().into()],
-        )).await.map_err(|_| Error::Conflict)?.ok_or(Error::Conflict)?;
+        let reserve = |tag: Option<i32>| {
+            statement(
+                "INSERT INTO central_identity.accounts (source, legacy_id, username_key, enrollment_digest,
+                    enrollment_expires, display_name, display_name_at, tag)
+                 SELECT 'legacy', $1, $2, $3, now + interval '10 minutes', $4,
+                    CASE WHEN $4::text IS NULL THEN NULL ELSE now END, $5
+                 FROM (SELECT pg_catalog.clock_timestamp() AS now) clock
+                 ON CONFLICT (legacy_id) DO UPDATE SET enrollment_digest = EXCLUDED.enrollment_digest,
+                    enrollment_expires = EXCLUDED.enrollment_expires, username_key = EXCLUDED.username_key,
+                    display_name = COALESCE(EXCLUDED.display_name, central_identity.accounts.display_name),
+                    display_name_at = CASE
+                        WHEN EXCLUDED.display_name IS NULL THEN central_identity.accounts.display_name_at
+                        WHEN EXCLUDED.display_name = central_identity.accounts.display_name
+                            THEN central_identity.accounts.display_name_at
+                        ELSE EXCLUDED.display_name_at END,
+                    tag = COALESCE(central_identity.accounts.tag, EXCLUDED.tag)
+                 WHERE central_identity.accounts.credential IS NULL AND NOT central_identity.accounts.legacy_closed
+                 RETURNING id, vault_epoch",
+                vec![
+                    legacy.into(),
+                    name.clone().into(),
+                    ticket.digest().to_vec().into(),
+                    display_name.into(),
+                    tag.into(),
+                ],
+            )
+        };
+        let row = match carried {
+            // The row being refreshed is this legacy account's, whose own tag is no collision.
+            Some(_) => {
+                let own: Option<Uuid> = tx
+                    .query_one_raw(statement(
+                        "SELECT id FROM central_identity.accounts WHERE legacy_id = $1",
+                        vec![legacy.into()],
+                    ))
+                    .await
+                    .map_err(|_| Error::Unavailable)?
+                    .map(|row| row.try_get("", "id"))
+                    .transpose()
+                    .map_err(|_| Error::Unavailable)?;
+                self.first_free_tag(&tx, own, carried, Error::Conflict, |tag| reserve(Some(tag)))
+                    .await?
+            }
+            // A bridge from before: no tag, and none drawn; it waits for the bridge.
+            None => tx
+                .query_one_raw(reserve(None))
+                .await
+                .map_err(|_| Error::Conflict)?,
+        }
+        .ok_or(Error::Conflict)?;
         let identity = identity(&row)?;
         tx.commit().await.map_err(|_| Error::Unavailable)?;
         Ok(identity)

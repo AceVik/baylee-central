@@ -61,6 +61,7 @@ impl Limits {
             Request::SessionStatus
                 | Request::RenewSession
                 | Request::GatewaySession { .. }
+                | Request::GatewayProfile { .. }
                 | Request::GatewayAuthorize { .. }
                 | Request::TermsStatus
                 | Request::AccountSummary

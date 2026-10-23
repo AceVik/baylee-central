@@ -120,6 +120,20 @@ The response is bound to the same identity and expires no later than its parent
 central session. A lease from another gateway or purpose cannot be substituted.
 Central rechecks approval and admin membership on both redemption and use.
 
+`GatewayProfile { lease, purpose }`, under the same authority as
+`GatewaySession` (a gateway's redemption credential, or the bridge for the
+official origin), answers `Response::GatewayProfile { identity, display_name:
+Option<String>, tag: Option<u32> }`: the display name and tag of the account
+behind the lease ([web accounts](web-accounts.md) §"Display name and tag"),
+`null` while the account has none. It runs exactly `GatewaySession`'s lease
+check (that gateway's lease, that audience and purpose, both expiries, an
+approved gateway, an admin's membership for `admin`), so a gateway learns the
+names of the people who sign in there, nobody else's, and an expired or
+foreign lease is `Rejected`. It is a request of its own (added 23.10.2026)
+because a field on `GatewayIdentity` would break every gateway built before
+it; gateways start asking it with the accounts design's step 4. It counts
+with the control requests and is refused on the browser listener.
+
 Exactly **one** central session is active per account, even on the same device. A successfully verified
 new login atomically deletes earlier sessions and their tickets/leases before
 inserting the new session under an account row lock. Concurrent successful
@@ -142,8 +156,11 @@ and heartbeat behavior, the official row (one at most, without owner or
 credentials; the bridge's heartbeat moves it alone; no registered credential
 or ticket reaches it; listed when approved, hidden when disabled; the upgrade
 over registered gateways), owner isolation, administrator CAS and revocation,
-audience/purpose/replay isolation, absence of foreign legacy IDs, and central
-single-session replacement including concurrent logins. No production accounts
+audience/purpose/replay isolation, absence of foreign legacy IDs, central
+single-session replacement including concurrent logins, and `GatewayProfile`
+(the lease's account's name and tag; another gateway's lease, the bridge
+asking for a registered gateway's, another purpose, a disabled gateway, an
+unknown and an expired lease are refused). No production accounts
 or credentials are used. CI must also validate the shared Rust implementation
 on Windows, Linux and macOS before release.
 

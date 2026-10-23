@@ -41,8 +41,10 @@ needed.
 REAL_KEYS=<keys file> REAL_OUT=<empty folder> npx playwright test -c e2e-real/playwright.config.ts e2e-real/account.spec.ts
 ```
 
-registers one account at each width, keeps its recovery code in `REAL_OUT`,
-checks the cookie, signs out and in, and meets a taken name and a bad key.
+registers one account at each width with the display name `Real_Runner`,
+sees the handle with the tag Central drew on the recovery step, the account
+page and the header, keeps its recovery code in `REAL_OUT`, checks the
+cookie, signs out and in, and meets a taken name and a bad key.
 
 ```bash
 REAL_OUT=<that folder> npx playwright test -c e2e-real/playwright.config.ts e2e-real/terms.spec.ts

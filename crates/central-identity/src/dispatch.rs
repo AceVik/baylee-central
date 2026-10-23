@@ -53,18 +53,21 @@ impl IdentityService {
             request @ (Request::SessionStatus | Request::RenewSession | Request::Logout) => {
                 self.session_request(&request, bearer, surface).await
             }
-            request @ (Request::AccountSummary | Request::SetRecovery { .. }) => {
+            request @ (Request::AccountSummary
+            | Request::SetRecovery { .. }
+            | Request::SetDisplayName { .. }) => {
                 self.account_request(request, bearer, surface).await
             }
-            request @ (Request::LegacyInvalidate { .. } | Request::LegacyClose { .. }) => {
-                self.legacy_mutation(request, bearer).await
-            }
+            request @ (Request::LegacyInvalidate { .. }
+            | Request::LegacyClose { .. }
+            | Request::LegacyProfile { .. }) => self.legacy_mutation(request, bearer).await,
             request @ (Request::RegisterGateway { .. }
             | Request::GatewayDirectory { .. }
             | Request::GatewayHeartbeat { .. }
             | Request::SetGatewayAdmins { .. }
             | Request::CheckGatewayAdmin { .. }
             | Request::GatewaySession { .. }
+            | Request::GatewayProfile { .. }
             | Request::GatewayTicket { .. }
             | Request::RedeemGateway { .. }) => self.gateway_request(request, bearer).await,
             Request::Discover { username } => self.discover(&username).await,
@@ -73,18 +76,25 @@ impl IdentityService {
             }
             // Answered by `dispatch`, which knows how to hand out the session.
             Request::LoginFinish { .. } => Err(Error::Rejected),
-            Request::Register { username, beta_key } => {
-                self.register(&username, &beta_key, surface).await
+            Request::Register {
+                username,
+                beta_key,
+                display_name,
+            } => {
+                self.register(&username, &beta_key, display_name.as_deref(), surface)
+                    .await
             }
             Request::LegacyReserve {
                 legacy_id,
                 username,
+                display_name,
+                tag,
             } => {
                 self.bridge(bearer)?;
                 let ticket = Token::generate()?;
                 let identity = self
                     .store
-                    .reserve_legacy(&legacy_id, &username, &ticket)
+                    .reserve_legacy(&legacy_id, &username, display_name.as_deref(), tag, &ticket)
                     .await?;
                 Ok(Response::Enrollment { identity, ticket })
             }
@@ -158,8 +168,9 @@ impl IdentityService {
     }
 
     /// The account page's requests, on the browser listener only
-    /// ([`browser_only`]): the session's account, and a recovery wrapper for
-    /// an account without one (`docs/web-accounts.md`).
+    /// ([`browser_only`]): the session's account, a recovery wrapper for an
+    /// account without one, and a display name for an account without one
+    /// (`docs/web-accounts.md`).
     async fn account_request(
         &self,
         request: Request,
@@ -175,12 +186,12 @@ impl IdentityService {
                 Ok(Response::AccountSummary {
                     identity: summary.identity,
                     username: summary.username,
-                    // Display names, tags and roles come with later steps
-                    // (docs/accounts-admin-proposal.md, steps 3 and 5).
-                    display_name: None,
-                    tag: None,
+                    display_name: summary.display_name,
+                    tag: summary.tag,
                     source: summary.source,
                     recovery: summary.recovery,
+                    // Roles come with a later step (the accounts and
+                    // administration design, step 5).
                     admin: false,
                     signed_in_at: summary.signed_in_at,
                     expires_at: summary.expires_at,
@@ -188,6 +199,10 @@ impl IdentityService {
             }
             Request::SetRecovery { recovery } => {
                 self.store.set_recovery(cookie, &recovery).await?;
+                Ok(Response::Done)
+            }
+            Request::SetDisplayName { display_name } => {
+                self.store.set_display_name(cookie, &display_name).await?;
                 Ok(Response::Done)
             }
             _ => Err(Error::Rejected),
@@ -209,6 +224,7 @@ impl IdentityService {
         &self,
         username: &str,
         beta_key: &str,
+        display_name: Option<&str>,
         surface: Surface,
     ) -> Result<Response, Error> {
         // Registration has the browser listener's per-address budget; the
@@ -221,7 +237,7 @@ impl IdentityService {
         let ticket = Token::generate()?;
         let identity = self
             .store
-            .register(username, &key.digest(), &ticket)
+            .register(username, display_name, &key.digest(), &ticket)
             .await?;
         Ok(Response::Enrollment { identity, ticket })
     }
@@ -268,6 +284,15 @@ impl IdentityService {
                 legacy_id,
                 identity,
             } => self.store.close_legacy(&legacy_id, identity).await?,
+            Request::LegacyProfile {
+                legacy_id,
+                display_name,
+                tag,
+            } => {
+                self.store
+                    .legacy_profile(&legacy_id, display_name.as_deref(), tag)
+                    .await?;
+            }
             _ => return Err(Error::Rejected),
         }
         Ok(Response::Done)

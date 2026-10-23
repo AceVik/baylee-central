@@ -76,12 +76,24 @@ async fn constraints(store: &AccountStore, operator: &DatabaseConnection) {
     );
     let enrollment = Token::generate().unwrap();
     store
-        .reserve_legacy("unique-ticket-one", "unique-ticket-one", &enrollment)
+        .reserve_legacy(
+            "unique-ticket-one",
+            "unique-ticket-one",
+            None,
+            None,
+            &enrollment,
+        )
         .await
         .unwrap();
     assert!(
         store
-            .reserve_legacy("unique-ticket-two", "unique-ticket-two", &enrollment)
+            .reserve_legacy(
+                "unique-ticket-two",
+                "unique-ticket-two",
+                None,
+                None,
+                &enrollment
+            )
             .await
             .is_err()
     );

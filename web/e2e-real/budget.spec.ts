@@ -8,6 +8,7 @@ test("the sixth registration attempt in an hour is refused, and the page says wh
   test.skip(info.project.name !== "desktop", "one address, one budget");
   await page.goto("/register?lang=en");
   await page.getByLabel("Username").fill(`rr_budget_${Date.now() % 100_000}`);
+  await page.getByLabel("Display name").fill("Real_Budget");
   await page.getByLabel("Password", { exact: true }).fill("violet lantern harbour quietly");
   await page.getByLabel("Password again").fill("violet lantern harbour quietly");
   await page.getByLabel("I am at least 16 years old.").check();

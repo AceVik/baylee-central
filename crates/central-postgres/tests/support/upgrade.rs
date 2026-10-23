@@ -2,7 +2,8 @@
 //! scratch schema, legacy accounts and sessions written as those versions wrote
 //! them, then 000007, then 000008 over a live session and its lease, then 000009
 //! over registered gateways, then 000010 over legacy and registered
-//! accounts. All inside one transaction that is rolled back.
+//! accounts, then 000011 over the same, drawing the registered accounts'
+//! tags. All inside one transaction that is rolled back.
 use super::scalar;
 use sea_orm::{ConnectionTrait, DatabaseConnection, TransactionTrait};
 
@@ -25,6 +26,7 @@ const OFFICIAL: &str =
     include_str!("../../../central-migration/src/m20261022_000009_official_gateway.sql");
 const LEGACY_RECOVERY: &str =
     include_str!("../../../central-migration/src/m20261022_000010_legacy_recovery.sql");
+const PROFILES: &str = include_str!("../../../central-migration/src/m20261023_000011_profiles.sql");
 
 fn scratch(sql: &str) -> String {
     sql.replace("central_identity", "upgrade_probe")
@@ -107,6 +109,7 @@ pub(crate) async fn run(operator: &DatabaseConnection) {
     renewal(&tx).await;
     official(&tx).await;
     legacy_recovery(&tx).await;
+    profiles(&tx).await;
     tx.rollback().await.unwrap();
     assert_eq!(
         scalar(
@@ -332,4 +335,137 @@ async fn legacy_recovery(tx: &sea_orm::DatabaseTransaction) {
     ] {
         refused(tx, sql).await;
     }
+}
+
+/// 000011 over what came before: every registered account, pending or
+/// enrolled, draws a distinct tag at or above the floor, of four hex digits;
+/// legacy accounts stay without name and tag; the previous binary still
+/// registers (without a tag); the schema holds the name's rule, its time and
+/// the tag's.
+async fn profiles(tx: &sea_orm::DatabaseTransaction) {
+    use central_api::profile::REGISTERED_TAG_FLOOR;
+    // As the binary before it wrote one: a pending registration with its key.
+    tx.execute_unprepared(
+        "INSERT INTO upgrade_probe.beta_keys (digest, uses_left, note)
+         VALUES (decode(repeat('21', 32), 'hex'), 1, 'upgrade');
+         INSERT INTO upgrade_probe.accounts (source, username_key, enrollment_digest, enrollment_expires, beta_key_id)
+         SELECT 'registered', 'pending-registered', decode(repeat('22', 32), 'hex'),
+             clock_timestamp() + interval '10 minutes', id FROM upgrade_probe.beta_keys;",
+    )
+    .await
+    .unwrap();
+    tx.execute_unprepared(&scratch(PROFILES)).await.unwrap();
+    for (expected, sql) in [
+        (
+            2,
+            format!(
+                "SELECT count(DISTINCT tag)::bigint AS value FROM upgrade_probe.accounts
+                 WHERE source = 'registered' AND tag BETWEEN {REGISTERED_TAG_FLOOR} AND 65535
+                 AND display_name IS NULL AND display_name_at IS NULL"
+            ),
+        ),
+        (
+            0,
+            "SELECT count(*)::bigint AS value FROM upgrade_probe.accounts
+             WHERE source = 'legacy' AND (tag IS NOT NULL OR display_name IS NOT NULL)"
+                .into(),
+        ),
+        (
+            3,
+            "SELECT count(*)::bigint AS value FROM upgrade_probe.accounts WHERE source = 'legacy'"
+                .into(),
+        ),
+    ] {
+        assert_eq!(scalar(tx, &sql).await, expected, "{sql}");
+    }
+    // The previous binary registers without a tag; the new one draws it at the sign-in.
+    tx.execute_unprepared(
+        "INSERT INTO upgrade_probe.beta_keys (digest, uses_left, note)
+         VALUES (decode(repeat('23', 32), 'hex'), 1, 'upgrade');
+         INSERT INTO upgrade_probe.accounts (source, username_key, enrollment_digest, enrollment_expires, beta_key_id)
+         SELECT 'registered', 'later-registered', decode(repeat('24', 32), 'hex'),
+             clock_timestamp() + interval '10 minutes', id FROM upgrade_probe.beta_keys
+             WHERE digest = decode(repeat('23', 32), 'hex');",
+    )
+    .await
+    .unwrap();
+    let account = "WHERE legacy_id = 'legacy-1'";
+    for sql in [
+        // the name's rule, exactly the gateway's
+        format!(
+            "UPDATE upgrade_probe.accounts SET display_name = '_Alice', display_name_at = now() {account}"
+        ),
+        format!(
+            "UPDATE upgrade_probe.accounts SET display_name = 'Alice-', display_name_at = now() {account}"
+        ),
+        format!(
+            "UPDATE upgrade_probe.accounts SET display_name = 'ab', display_name_at = now() {account}"
+        ),
+        format!(
+            "UPDATE upgrade_probe.accounts SET display_name = 'seventeen_chars_x', display_name_at = now() {account}"
+        ),
+        format!(
+            "UPDATE upgrade_probe.accounts SET display_name = 'Zoë', display_name_at = now() {account}"
+        ),
+        format!(
+            "UPDATE upgrade_probe.accounts SET display_name = 'Alice#af03', display_name_at = now() {account}"
+        ),
+        format!(
+            "UPDATE upgrade_probe.accounts SET display_name = E'Alice\n', display_name_at = now() {account}"
+        ),
+        // a name and its time together
+        format!("UPDATE upgrade_probe.accounts SET display_name = 'Alice' {account}"),
+        format!("UPDATE upgrade_probe.accounts SET display_name_at = now() {account}"),
+        // a positive tag, held once
+        format!("UPDATE upgrade_probe.accounts SET tag = 0 {account}"),
+        format!("UPDATE upgrade_probe.accounts SET tag = -7 {account}"),
+        format!(
+            "UPDATE upgrade_probe.accounts SET tag = (SELECT tag FROM upgrade_probe.accounts
+             WHERE username_key = 'registered-player') {account}"
+        ),
+    ] {
+        refused(tx, &sql).await;
+    }
+    tx.execute_unprepared(&format!(
+        "UPDATE upgrade_probe.accounts SET display_name = 'player_one-99', display_name_at = now(), tag = 13 {account};
+         UPDATE upgrade_probe.accounts SET display_name = 'Sixteen_chars_yz', display_name_at = now() WHERE legacy_id = 'legacy-2';"
+    ))
+    .await
+    .unwrap();
+    widening(tx).await;
+}
+
+/// The backfill again, over a half-taken first range: with half of the
+/// four-digit tags taken (by legacy rows, as any account counts), the
+/// previous binary's later registration draws a tag of five digits.
+async fn widening(tx: &sea_orm::DatabaseTransaction) {
+    use central_api::profile::REGISTERED_TAG_FLOOR;
+    tx.execute_unprepared(&format!(
+        "INSERT INTO upgrade_probe.accounts (legacy_id, username_key, enrollment_digest, enrollment_expires, tag)
+         SELECT 'fill-' || n, 'fill-' || n, sha256(convert_to('fill-' || n, 'UTF8')),
+             clock_timestamp() + interval '10 minutes', n
+         FROM generate_series({REGISTERED_TAG_FLOOR}, {REGISTERED_TAG_FLOOR} + 30720) n
+         WHERE NOT EXISTS (SELECT 1 FROM upgrade_probe.accounts a WHERE a.tag = n);"
+    ))
+    .await
+    .unwrap();
+    let backfill = &PROFILES[PROFILES.find("DO $$").unwrap()..];
+    tx.execute_unprepared(&scratch(backfill)).await.unwrap();
+    assert_eq!(
+        scalar(
+            tx,
+            "SELECT count(*)::bigint AS value FROM upgrade_probe.accounts
+             WHERE username_key = 'later-registered' AND tag BETWEEN 65536 AND 1048575"
+        )
+        .await,
+        1
+    );
+    assert_eq!(
+        scalar(
+            tx,
+            "SELECT count(*)::bigint AS value FROM upgrade_probe.accounts WHERE source = 'registered' AND tag IS NULL"
+        )
+        .await,
+        0
+    );
 }

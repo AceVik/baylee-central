@@ -26,12 +26,15 @@ async function failure(p: Promise<unknown>): Promise<string> {
 describe("the request", () => {
   it("posts the tagged operation to /api/v1 with the two headers, the cookie and nothing else", async () => {
     const calls = serve(() => ({ body: { result: "enrollment", identity: IDENTITY, ticket: n(32) } }));
-    await api().register("synthetic_name", "CENTRAL-TEST-0000-0000-0001");
-    expect(calls).toHaveLength(1);
+    await api().register("synthetic_name", "CENTRAL-TEST-0000-0000-0001", "Synthetic_Name");
+    await api().register("synthetic_name", "CENTRAL-TEST-0000-0000-0001", null);
+    expect(calls).toHaveLength(2);
     const call = calls[0];
     expect(call?.url).toBe("/api/v1");
     expect(call?.method).toBe("POST");
-    expect(call?.body).toEqual({ operation: "register", username: "synthetic_name", beta_key: "CENTRAL-TEST-0000-0000-0001" });
+    expect(call?.body).toEqual({ operation: "register", username: "synthetic_name", beta_key: "CENTRAL-TEST-0000-0000-0001", display_name: "Synthetic_Name" });
+    // without a name, the request is the one from before display names
+    expect(calls[1]?.body).toEqual({ operation: "register", username: "synthetic_name", beta_key: "CENTRAL-TEST-0000-0000-0001" });
     expect(call?.init?.credentials).toBe("same-origin");
     expect(call?.init?.redirect).toBe("error");
     expect(call?.init?.headers).toEqual({ "Content-Type": "application/json", "X-Baylee-Central": "1" });
@@ -49,11 +52,13 @@ describe("the request", () => {
     });
     await client.acceptTerms({ version: "2026-10-21", digest: new Uint8Array(n(32, 7)) });
     await client.setRecovery(new Uint8Array(n(73, 8)));
+    await client.setDisplayName("Synthetic_Name");
     await client.logout();
     expect(calls.map((c) => c.body)).toEqual([
       { operation: "enrollment_finish", ticket: n(32, 2), record: n(192, 3), wrapped_master: n(73, 4), document: n(5, 5), recovery: n(73, 6) },
       { operation: "accept_terms", subject: { kind: "central" }, version: "2026-10-21", digest: n(32, 7) },
       { operation: "set_recovery", recovery: n(73, 8) },
+      { operation: "set_display_name", display_name: "Synthetic_Name" },
       { operation: "logout" },
     ]);
   });

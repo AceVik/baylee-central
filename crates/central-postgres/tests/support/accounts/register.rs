@@ -68,7 +68,7 @@ fn expire(name: &str) -> String {
 
 async fn register(store: &AccountStore, name: &str, key: &BetaKey) -> Result<Identity, Error> {
     store
-        .register(name, &key.digest(), &Token::generate().unwrap())
+        .register(name, None, &key.digest(), &Token::generate().unwrap())
         .await
 }
 
@@ -150,7 +150,7 @@ async fn reservations(store: &AccountStore, operator: &DatabaseConnection, keys:
     let key = issue(operator, 1, "one-use").await;
     let first = Token::generate().unwrap();
     let a = store
-        .register("reserve-a", &key.digest(), &first)
+        .register("reserve-a", None, &key.digest(), &first)
         .await
         .unwrap();
     // The key's only use is reserved.
@@ -162,7 +162,7 @@ async fn reservations(store: &AccountStore, operator: &DatabaseConnection, keys:
     sql(operator, &expire("reserve-a")).await;
     let second = Token::generate().unwrap();
     let b = store
-        .register("reserve-b", &key.digest(), &second)
+        .register("reserve-b", None, &key.digest(), &second)
         .await
         .unwrap();
     assert_ne!(a.account, b.account);
@@ -239,7 +239,7 @@ async fn revocation(store: &AccountStore, operator: &DatabaseConnection, keys: &
     let revocable = issue(operator, 5, "revoke-later").await;
     let ticket = Token::generate().unwrap();
     let c = store
-        .register("reserve-c", &revocable.digest(), &ticket)
+        .register("reserve-c", None, &revocable.digest(), &ticket)
         .await
         .unwrap();
     sql(operator, "UPDATE central_identity.beta_keys SET revoked_at = clock_timestamp() WHERE note = 'revoke-later'").await;
@@ -265,7 +265,7 @@ async fn names(store: &AccountStore, operator: &DatabaseConnection) {
     // A live reservation holds its name; an expired one is reclaimed.
     let first = Token::generate().unwrap();
     let a = store
-        .register("reclaimed", &key.digest(), &first)
+        .register("reclaimed", None, &key.digest(), &first)
         .await
         .unwrap();
     assert_eq!(
@@ -275,7 +275,7 @@ async fn names(store: &AccountStore, operator: &DatabaseConnection) {
     sql(operator, &expire("reclaimed")).await;
     let second = Token::generate().unwrap();
     let b = store
-        .register("Reclaimed", &key.digest(), &second)
+        .register("Reclaimed", None, &key.digest(), &second)
         .await
         .unwrap();
     assert_ne!(a.account, b.account);
@@ -285,19 +285,31 @@ async fn names(store: &AccountStore, operator: &DatabaseConnection) {
     // and a registration never takes a legacy name.
     let ticket = Token::generate().unwrap();
     store
-        .register("legacy-name", &key.digest(), &ticket)
+        .register("legacy-name", None, &key.digest(), &ticket)
         .await
         .unwrap();
     assert_eq!(
         store
-            .reserve_legacy("legacy-x", "legacy-name", &Token::generate().unwrap())
+            .reserve_legacy(
+                "legacy-x",
+                "legacy-name",
+                None,
+                None,
+                &Token::generate().unwrap()
+            )
             .await
             .err(),
         Some(Error::Conflict)
     );
     sql(operator, &expire("legacy-name")).await;
     store
-        .reserve_legacy("legacy-x", "legacy-name", &Token::generate().unwrap())
+        .reserve_legacy(
+            "legacy-x",
+            "legacy-name",
+            None,
+            None,
+            &Token::generate().unwrap(),
+        )
         .await
         .unwrap();
     assert!(store.enrollment(&ticket).await.is_err());

@@ -118,6 +118,18 @@ impl IdentityService {
                     expires_at,
                 })
             }
+            Request::GatewayProfile { lease, purpose } => {
+                let (gateway, origin) = self.gateway_authority(bearer).await?;
+                let profile = self
+                    .store
+                    .gateway_profile(&lease, &origin, gateway, purpose)
+                    .await?;
+                Ok(Response::GatewayProfile {
+                    identity: profile.identity,
+                    display_name: profile.display_name,
+                    tag: profile.tag,
+                })
+            }
             Request::GatewayTicket { gateway, purpose } => {
                 let session = bearer.ok_or(Error::Rejected)?;
                 let ticket = Token::generate()?;

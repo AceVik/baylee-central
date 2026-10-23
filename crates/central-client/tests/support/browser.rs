@@ -1,14 +1,17 @@
 //! The website's flow over the real browser listener, as the web pages and
 //! their WebAssembly crypto run it: register with a beta key, enroll with a
 //! recovery wrapper, sign in to a browser session held in the cookie, accept
-//! Central's terms, sign out. Then the same account plays natively, and the
-//! official gateway's bridge admits it without a legacy ID. Last, an account
-//! moved from the official gateway signs in on the website, accepts the terms
-//! there and stores the recovery code the page makes for it.
+//! Central's terms, sign out; its display name chosen at registration and the
+//! tag drawn for it are in its summary. Then the same account plays natively,
+//! and the official gateway's bridge admits it without a legacy ID. Last, an
+//! account moved from the official gateway, its name and tag carried by the
+//! bridge, signs in on the website, accepts the terms there and stores the
+//! recovery code the page makes for it.
 use super::Http;
 use central_api::{
     Error, Token,
     beta_key::BetaKey,
+    profile::REGISTERED_TAG_FLOOR,
     terms::TermsSubject,
     wire::{AccountSource, Discovery, Identity, Request, Response, TicketPurpose},
 };
@@ -170,20 +173,13 @@ pub(crate) fn run(
                 .issue(operator),
         )
         .unwrap();
-    let register = |name: &str| Request::Register {
+    let named = |name: &str, display_name: &str| Request::Register {
         username: name.into(),
         beta_key: key.display().as_str().to_lowercase(),
+        display_name: Some(display_name.into()),
     };
-    // Registration is the browser listener's; the native surface refuses it.
-    assert_eq!(
-        http.exchange(&register("web-player"), None).err(),
-        Some(Error::Rejected)
-    );
-    assert_eq!(
-        browser.answer(&register("synthetic"), None).err(),
-        Some(Error::Conflict),
-        "a valid key learns that the name is taken"
-    );
+    let register = |name: &str| named(name, "Web_Player");
+    refusals(browser, http, &named);
     let Response::Enrollment {
         identity: account,
         ticket,
@@ -268,6 +264,41 @@ pub(crate) fn run(
     moved(browser, http, bridge, runtime, operator);
 }
 
+/// Registration is the browser listener's; with a good key a taken name is
+/// a conflict, and a display name a person may not choose is refused (from
+/// another address: these count against its budget).
+fn refusals(browser: &Browser, http: &Http, named: &dyn Fn(&str, &str) -> Request) {
+    assert_eq!(
+        http.exchange(&named("web-player", "Web_Player"), None)
+            .err(),
+        Some(Error::Rejected)
+    );
+    assert_eq!(
+        browser
+            .answer(&named("synthetic", "Web_Player"), None)
+            .err(),
+        Some(Error::Conflict),
+        "a valid key learns that the name is taken"
+    );
+    let elsewhere = Browser {
+        address: browser.address,
+        client: "198.51.100.78",
+    };
+    for refused in [
+        "Admin",
+        "b-a-y-l-e-e",
+        "_Web",
+        "Web Player",
+        "seventeen_chars_x",
+    ] {
+        assert_eq!(
+            elsewhere.answer(&named("web-player", refused), None).err(),
+            Some(Error::Rejected),
+            "{refused}"
+        );
+    }
+}
+
 /// The account page's summary of a registered account; storing a code needs
 /// the terms accepted, checked against the cookie's browser session.
 fn summary(
@@ -280,8 +311,8 @@ fn summary(
     let Response::AccountSummary {
         identity,
         username,
-        display_name: None,
-        tag: None,
+        display_name: Some(display_name),
+        tag: Some(tag),
         source: AccountSource::Registered,
         recovery: true,
         admin: false,
@@ -295,6 +326,9 @@ fn summary(
     };
     assert_eq!(identity.account, account.account);
     assert_eq!(username, "web-player");
+    // The name chosen at registration, as typed, and the tag drawn with it.
+    assert_eq!(display_name, "Web_Player");
+    assert!((REGISTERED_TAG_FLOOR..=0xffff).contains(&tag), "{tag}");
     assert_eq!(expires_at - signed_in_at, 1800, "issued at the sign-in");
     assert_eq!(
         browser.answer(&Request::AccountSummary, None).err(),
@@ -344,34 +378,39 @@ fn moved(
         browser.answer(&set(&recovery), Some(&cookie)).err(),
         Some(Error::TermsRequired)
     );
-    let Response::TermsStatus {
-        current: Some(current),
-        accepted: false,
-    } = browser
-        .answer(&Request::TermsStatus, Some(&cookie))
-        .unwrap()
-    else {
-        panic!("terms to accept");
+    let name = |display_name: &str| Request::SetDisplayName {
+        display_name: display_name.into(),
     };
-    assert!(matches!(
-        browser
-            .answer(
-                &Request::AcceptTerms {
-                    subject: TermsSubject::Central,
-                    version: current.version,
-                    digest: current.digest,
-                },
-                Some(&cookie),
-            )
-            .unwrap(),
-        Response::Done
-    ));
+    assert_eq!(
+        browser.answer(&name("Moved_Player"), Some(&cookie)).err(),
+        Some(Error::TermsRequired)
+    );
+    accept_terms(browser, &cookie);
     for _ in 0..2 {
         assert!(matches!(
             browser.answer(&set(&recovery), Some(&cookie)).unwrap(),
             Response::Done
         ));
     }
+    // The carried name is the account's: the same again is done, another
+    // is a rename, which waits (and a reserved one is no name at all).
+    assert!(matches!(
+        browser
+            .answer(&name("Moved_Player"), Some(&cookie))
+            .unwrap(),
+        Response::Done
+    ));
+    for (other, refusal) in [("Someone", Error::Conflict), ("Admin", Error::Rejected)] {
+        assert_eq!(
+            browser.answer(&name(other), Some(&cookie)).err(),
+            Some(refusal)
+        );
+    }
+    assert_eq!(
+        browser.answer(&name("Moved_Player"), None).err(),
+        Some(Error::Rejected),
+        "no cookie, no account"
+    );
     let other = RecoveryCode::generate()
         .unwrap()
         .wrap(context, &master)
@@ -409,6 +448,30 @@ fn moved(
     http.exchange(&Request::Logout, Some(&token)).unwrap();
 }
 
+/// The cookie's account accepts Central's terms in force, which it had not.
+fn accept_terms(browser: &Browser, cookie: &Token) {
+    let Response::TermsStatus {
+        current: Some(current),
+        accepted: false,
+    } = browser.answer(&Request::TermsStatus, Some(cookie)).unwrap()
+    else {
+        panic!("terms to accept");
+    };
+    assert!(matches!(
+        browser
+            .answer(
+                &Request::AcceptTerms {
+                    subject: TermsSubject::Central,
+                    version: current.version,
+                    digest: current.digest,
+                },
+                Some(cookie),
+            )
+            .unwrap(),
+        Response::Done
+    ));
+}
+
 /// Registration is budgeted per client address, five an hour; a page from
 /// another origin is refused before any of that.
 fn budgets(browser: &Browser, key: &BetaKey) {
@@ -427,6 +490,7 @@ fn budgets(browser: &Browser, key: &BetaKey) {
     let wrong = |name: &str| Request::Register {
         username: name.into(),
         beta_key: "CENTRAL-0000-0000-0000-0000".into(),
+        display_name: None,
     };
     for _ in 0..3 {
         assert_eq!(
@@ -437,6 +501,7 @@ fn budgets(browser: &Browser, key: &BetaKey) {
     let right = |name: &str| Request::Register {
         username: name.into(),
         beta_key: key.display().as_str().into(),
+        display_name: None,
     };
     assert_eq!(
         browser.answer(&right("budget-probe"), None).err(),
@@ -714,6 +779,8 @@ fn moved_sign_in(
             &Request::LegacyReserve {
                 legacy_id: "moved-legacy".into(),
                 username: "moved-player".into(),
+                display_name: Some("Moved_Player".into()),
+                tag: Some(13),
             },
             Some(bridge),
         )
@@ -768,11 +835,12 @@ fn moved_sign_in(
         panic!("a browser session");
     };
     let cookie = reply.session.expect("a session for the cookie");
+    // The bridge carried its name and tag from the official gateway.
     let Response::AccountSummary {
         identity: summarized,
         username,
-        display_name: None,
-        tag: None,
+        display_name: Some(display_name),
+        tag: Some(13),
         source: AccountSource::Legacy,
         recovery: false,
         admin: false,
@@ -785,6 +853,7 @@ fn moved_sign_in(
     };
     assert_eq!(summarized.account, identity.account);
     assert_eq!(username, "moved-player");
+    assert_eq!(display_name, "Moved_Player");
     let master = result
         .wrapping_key
         .unwrap(&WrappedMasterKey::from_bytes(&wrapped_master).unwrap())
@@ -821,7 +890,10 @@ fn native_refuses(
     else {
         panic!("a native session");
     };
-    for request in [&Request::AccountSummary, set] {
+    let name = Request::SetDisplayName {
+        display_name: "Moved_Player".into(),
+    };
+    for request in [&Request::AccountSummary, set, &name] {
         for bearer in [&token, cookie] {
             assert_eq!(
                 http.exchange(request, Some(bearer)).err(),

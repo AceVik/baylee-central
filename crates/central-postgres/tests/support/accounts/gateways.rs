@@ -179,10 +179,15 @@ async fn delegation(
             .await
             .is_err()
     );
-    store
-        .gateway_session(&lease, origin, Some(gateway), TicketPurpose::Admit)
-        .await
-        .unwrap();
+    profile(
+        store,
+        operator,
+        session,
+        &lease,
+        (origin, gateway),
+        (foreign_origin, foreign),
+    )
+    .await;
     assert!(
         store
             .gateway_session(&lease, foreign_origin, Some(foreign), TicketPurpose::Admit)
@@ -217,6 +222,94 @@ async fn delegation(
             .all(|entry| entry.id != gateway)
     );
     approval(operator, gateway, true).await;
+}
+
+/// `GatewayProfile` answers only for a live lease the asking gateway holds,
+/// with the purpose it was given, while the gateway is approved: a moved
+/// account reserved before display names has neither name nor tag until the
+/// bridge carries them. An expired lease names nobody.
+async fn profile(
+    store: &AccountStore,
+    operator: &DatabaseConnection,
+    session: &Token,
+    lease: &Token,
+    (origin, gateway): (&str, [u8; 16]),
+    (foreign_origin, foreign): (&str, [u8; 16]),
+) {
+    let read = async |lease: &Token| {
+        store
+            .gateway_profile(lease, origin, Some(gateway), TicketPurpose::Admit)
+            .await
+    };
+    let (admitted, _) = store
+        .gateway_session(lease, origin, Some(gateway), TicketPurpose::Admit)
+        .await
+        .unwrap();
+    let before = read(lease).await.unwrap();
+    assert_eq!(before.identity.account, admitted.account);
+    assert_eq!((before.display_name, before.tag), (None, None));
+    store
+        .legacy_profile("registry-member", Some("Registry_Member"), 0x331)
+        .await
+        .unwrap();
+    let after = read(lease).await.unwrap();
+    assert_eq!(
+        (after.display_name.as_deref(), after.tag),
+        (Some("Registry_Member"), Some(0x331))
+    );
+    for (audience, asking, purpose) in [
+        (foreign_origin, Some(foreign), TicketPurpose::Admit),
+        (origin, Some(foreign), TicketPurpose::Admit),
+        (origin, Some(gateway), TicketPurpose::Admin),
+        (origin, Some(gateway), TicketPurpose::Export),
+        (origin, None, TicketPurpose::Admit),
+        (origin, None, TicketPurpose::Admin),
+    ] {
+        assert_eq!(
+            store
+                .gateway_profile(lease, audience, asking, purpose)
+                .await
+                .err(),
+            Some(Error::Rejected),
+            "{audience} {asking:?} {}",
+            purpose.as_str()
+        );
+    }
+    assert_eq!(
+        read(&Token::generate().unwrap()).await.err(),
+        Some(Error::Rejected)
+    );
+    approval(operator, gateway, false).await;
+    assert_eq!(read(lease).await.err(), Some(Error::Rejected), "disabled");
+    approval(operator, gateway, true).await;
+    // A second lease of the same session, expired.
+    let (ticket, expired) = (Token::generate().unwrap(), Token::generate().unwrap());
+    store
+        .registered_ticket(session, origin, &ticket, TicketPurpose::Admit)
+        .await
+        .unwrap();
+    store
+        .redeem_lease(
+            &ticket,
+            origin,
+            TicketPurpose::Admit,
+            Some(gateway),
+            Some(&expired),
+        )
+        .await
+        .unwrap();
+    assert!(read(&expired).await.is_ok());
+    operator
+        .execute_raw(Statement::from_sql_and_values(
+            DbBackend::Postgres,
+            "UPDATE central_identity.gateway_leases SET created_at = clock_timestamp() - interval '2 minutes',
+             expires_at = clock_timestamp() - interval '1 minute' WHERE digest = $1",
+            vec![expired.digest().to_vec().into()],
+        ))
+        .await
+        .unwrap();
+    assert_eq!(read(&expired).await.err(), Some(Error::Rejected), "expired");
+    assert!(read(lease).await.is_ok(), "the first lease still names it");
 }
 
 async fn privilege_gate(operator: &DatabaseConnection) {
