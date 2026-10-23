@@ -13,6 +13,8 @@ import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 const KEY = readFileSync(process.env["REAL_KEYS"] ?? "", "utf8").split("\n")[0]?.trim() ?? "";
 const OUT = process.env["REAL_OUT"] ?? "";
 const PASSWORD = "violet lantern harbour quietly";
+/** The display name every run's account chooses at registration. */
+const DISPLAY = "Real_Runner";
 const STAMP = String(Date.now() % 1_000_000);
 const CODE = /^[0-9A-HJKMNP-TV-Z]{4}(-[0-9A-HJKMNP-TV-Z]{4}){7}$/;
 
@@ -36,6 +38,8 @@ async function menu(page: Page, phone: boolean) {
 test("register, keep the code, sign out, sign in again", async ({ page, context }, info) => {
   const phone = info.project.name === "phone";
   const name = `rr_${info.project.name}_${STAMP}`;
+  // what other players see: the display name chosen here, and the tag Central draws (four hex digits)
+  const HANDLE = new RegExp(`^${DISPLAY}#[0-9a-f]{4}$`);
   const errors = watch(page);
   expect(KEY).toMatch(/^CENTRAL-/);
 
@@ -46,6 +50,7 @@ test("register, keep the code, sign out, sign in again", async ({ page, context 
   expect(await page.evaluate(() => window.localStorage.getItem("baylee-central-account"))).toBeNull();
   await page.getByLabel("Beta key").fill(KEY.toLowerCase());
   await page.getByLabel("Username").fill(name.toUpperCase());
+  await page.getByLabel("Display name").fill(DISPLAY);
   await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
   await page.getByLabel("Password again").fill(PASSWORD);
   await page.getByLabel("I am at least 16 years old.").check();
@@ -55,6 +60,8 @@ test("register, keep the code, sign out, sign in again", async ({ page, context 
 
   const step = page.getByRole("region", { name: "Your recovery code" });
   await expect(step).toBeVisible({ timeout: 60_000 });
+  // the whole handle, with the tag Central drew
+  await expect(step.getByText(HANDLE)).toBeVisible({ timeout: 60_000 });
   const code = (await step.getByLabel("Recovery code", { exact: true }).textContent()) ?? "";
   expect(code).toMatch(CODE);
   writeFileSync(join(OUT, `${name}.code`), code);
@@ -62,7 +69,8 @@ test("register, keep the code, sign out, sign in again", async ({ page, context 
   await step.getByLabel("I have kept my recovery code in a safe place.").check();
   await step.getByRole("button", { name: "Continue" }).click();
   await expect(page).toHaveURL(/\/account$/, { timeout: 60_000 });
-  await expect(page.locator(".account-name bdi")).toHaveText(name);
+  await expect(page.locator(".account-name bdi")).toHaveText(HANDLE);
+  await expect(page.getByText(`Sign-in name: ${name}`)).toBeVisible();
 
   // Central's cookie: HttpOnly, Secure, SameSite=Strict, Path=/, 64 hex digits,
   // and invisible to the page
@@ -78,7 +86,7 @@ test("register, keep the code, sign out, sign in again", async ({ page, context 
   // a reload: the header names the account once Central confirms the session
   await page.reload();
   await menu(page, phone);
-  await expect(page.getByRole("link", { name: `Your account, ${name}` })).toBeVisible();
+  await expect(page.getByRole("link", { name: new RegExp(`^Your account, ${DISPLAY}#[0-9a-f]{4}$`) })).toBeVisible();
   await menu(page, phone);
   await page.getByRole("button", { name: "Sign out" }).click();
   await expect(page.getByText(/You are not signed in/)).toBeVisible();
@@ -94,7 +102,7 @@ test("register, keep the code, sign out, sign in again", async ({ page, context 
   await page.getByLabel("Password").fill(PASSWORD);
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL(/\/account$/, { timeout: 60_000 });
-  await expect(page.locator(".account-name bdi")).toHaveText(name);
+  await expect(page.locator(".account-name bdi")).toHaveText(HANDLE);
   expect(await session(context)).toBeDefined();
 
   if (!phone) {
@@ -102,6 +110,7 @@ test("register, keep the code, sign out, sign in again", async ({ page, context 
     await page.goto("/register?lang=en");
     await page.getByLabel("Beta key").fill(KEY);
     await page.getByLabel("Username").fill(name);
+    await page.getByLabel("Display name").fill(DISPLAY);
     await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
     await page.getByLabel("Password again").fill(PASSWORD);
     await page.getByLabel("I am at least 16 years old.").check();

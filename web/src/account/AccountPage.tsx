@@ -1,7 +1,10 @@
-// `/account`: whose account this browser is signed in to, until when, where
-// the account came from and whether it has a recovery code
-// (`AccountSummary`), and signing out. An account moved here from the
-// official gateway has no code; "Make a recovery code" signs in again (the
+// `/account`: whose account this browser is signed in to (the handle other
+// players see, and the private sign-in name small beneath it), until when,
+// where the account came from and whether it has a recovery code
+// (`AccountSummary`), and signing out. An account without a display name
+// chooses one first (ChooseName); a moved one whose name and tag the
+// official gateway has not carried yet is told where they come from. An
+// account moved here has no code; "Make a recovery code" signs in again (the
 // master key exists only inside a sign-in's Worker) and shows the code the
 // sign-in made, stored once kept (NewCodeStep). Changing the password,
 // e-mail and deletion come with M1; until then deletion is by request to the
@@ -14,8 +17,10 @@ import { Link, PATHS } from "../router";
 import "../styles/account.css";
 import type { AccountSummary } from "./api";
 import { SubmitButton } from "./Busy";
+import { ChooseName } from "./ChooseName";
 import { FAILURE } from "./errors";
-import { FlowError, signIn, type NewCode } from "./flows";
+import { FlowError, handleOf, signIn, type NewCode } from "./flows";
+import { handle } from "./names";
 import { NewCodeStep } from "./NewCodeStep";
 import { useAccount } from "./session";
 import { TermsStep } from "./TermsStep";
@@ -53,7 +58,7 @@ function SignInAgain({ name, onSignedIn, onCancel }: { name: string; onSignedIn(
       ({ session, summary, code }) => {
         setPassword("");
         // the new sign-in replaced this browser's session
-        signedIn({ name: session.username, expiresAt: session.expiresAt });
+        signedIn({ handle: handleOf(summary), expiresAt: session.expiresAt });
         onSignedIn(code, summary);
       },
       (error: unknown) => {
@@ -118,7 +123,7 @@ function Recovery({ summary, offer, onMake }: { summary: AccountSummary; offer: 
 export default function AccountPage() {
   useTitle("title.account");
   const lang = useLang();
-  const { account, api, signOut } = useAccount();
+  const { account, api, signOut, signedIn } = useAccount();
   // when Central could not end the session: the time it ends by itself
   const [unconfirmed, setUnconfirmed] = useState<string | null>(null);
   const [summary, setSummary] = useState<AccountSummary | null>(null);
@@ -151,10 +156,27 @@ export default function AccountPage() {
     };
   }, [api, present]);
 
+  // the header and this page show Central's handle as soon as it changes
+  const shown = handleOf(summary) ?? account?.handle ?? null;
+  // a name chosen elsewhere meanwhile refused this page's: read the account again
+  const reread = () => {
+    api.accountSummary().then(setSummary, () => setUnread(true));
+  };
+  const named = (name: string) => {
+    if (summary === null || summary.tag === null || account === null) return;
+    setSummary({ ...summary, displayName: name });
+    signedIn({ handle: handle(name, summary.tag), expiresAt: account.expiresAt });
+  };
+  useEffect(() => {
+    if (account === null || summary === null) return;
+    const drawn = handleOf(summary);
+    if (drawn !== null && drawn !== account.handle) signedIn({ handle: drawn, expiresAt: account.expiresAt });
+  }, [account, summary, signedIn]);
+
   const signedInAgain = (code: NewCode | null, now: AccountSummary | null) => {
     if (now !== null) setSummary(now);
     // an account that has a code by now (made elsewhere) shows that it has one
-    setMaking(code === null ? null : { at: "code", code, name: now?.username ?? account?.name ?? "" });
+    setMaking(code === null ? null : { at: "code", code, name: now?.username ?? summary?.username ?? "" });
   };
   const stored = (done: boolean) => {
     setMaking(null);
@@ -181,18 +203,32 @@ export default function AccountPage() {
           </p>
         ) : (
           <div className="account-card glass">
+            {/* first, once the terms are settled: choosing a name needs them accepted */}
+            {settled && summary !== null && summary.displayName === null && summary.tag !== null && (
+              <ChooseName tag={summary.tag} onChosen={named} onStale={reread} />
+            )}
             <p className="account-name">
-              {account.name === null ? (
+              {shown === null ? (
                 <T id="account.signedIn" />
               ) : (
                 <>
                   <span className="small">
                     <T id="account.signedInAs" />
                   </span>{" "}
-                  <bdi>{account.name}</bdi>
+                  <bdi translate="no">{shown}</bdi>
                 </>
               )}
             </p>
+            {summary !== null && (
+              <p className="small account-signin-name">
+                <T id="account.signInName" args={{ name: summary.username }} />
+              </p>
+            )}
+            {summary !== null && summary.source === "legacy" && summary.tag === null && (
+              <p className="small">
+                <T id="account.nameFromGateway" />
+              </p>
+            )}
             <p>
               <T id="account.session" args={{ time: until }} />
             </p>

@@ -26,6 +26,7 @@ function save(name: string, text: string): void {
 export function RecoveryStep({
   code,
   name,
+  handle = null,
   onKept,
   lead = "recovery.lead",
   onLater,
@@ -33,7 +34,10 @@ export function RecoveryStep({
   status = null,
 }: {
   code: string;
+  /** The private sign-in name, for the file only. */
   name: string;
+  /** The handle other players see, once known (after a registration). */
+  handle?: string | null;
   onKept(): void;
   /** What the step says first: the registration's words, or a moved account's. */
   lead?: Key;
@@ -71,6 +75,9 @@ export function RecoveryStep({
       <p>
         <T id={lead} />
       </p>
+      <output className="recovery-handle">
+        {handle !== null && <T id="recovery.handle" args={{ handle }} />}
+      </output>
       <p className="recovery-code" id="recovery-code" aria-label={t(lang, "recovery.label")}>
         <code translate="no">{code}</code>
       </p>

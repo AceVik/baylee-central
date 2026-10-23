@@ -1,5 +1,5 @@
 // The bar every page shares: the brand, the sections, the Discord community
-// and the account (Sign in, or the signed-in name; a menu on narrow
+// and the account (Sign in, or the signed-in handle; a menu on narrow
 // screens), and the language switch: one button
 // per language with a file, each in its own name. Over the start page's hero
 // it is clear; once the page moves, or on any other page, it frosts.
@@ -101,11 +101,11 @@ export function Header({ page }: { page: Page | null }) {
             <Link
               className="nav-account"
               to={PATHS.account}
-              aria-label={account.name === null ? undefined : t(lang, "nav.account", { name: account.name })}
+              aria-label={account.handle === null ? undefined : t(lang, "nav.account", { name: account.handle })}
               aria-current={page === "account" ? "page" : undefined}
             >
-              {/* until Central names a remembered session, it is just "your account" */}
-              {account.name === null ? t(lang, "nav.accountUnnamed") : <bdi>{account.name}</bdi>}
+              {/* the handle others see, never the private sign-in name; until Central names it, "your account" */}
+              {account.handle === null ? t(lang, "nav.accountUnnamed") : <bdi translate="no">{account.handle}</bdi>}
             </Link>
           )}
         </nav>

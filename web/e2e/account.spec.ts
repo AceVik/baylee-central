@@ -1,7 +1,7 @@
 // The account pages against the build, its CSP and a strict stand-in for
 // Central's browser surface (e2e/central.ts): registration to the recovery
-// code and the terms, the refusals, sign-in and sign-out, at a phone's and a
-// desktop's width. Two tests use the real WebAssembly in its Worker, under
+// code and the terms, the refusals, sign-in and sign-out, choosing a display
+// name and the handle in the header, at a phone's and a desktop's width. Two tests use the real WebAssembly in its Worker, under
 // the production CSP: it starts both exchanges with the suite's message
 // sizes, and refuses what a forged Central answers. A third proves the CSP's
 // `'wasm-unsafe-eval'` is what lets it run.
@@ -29,6 +29,7 @@ async function openMenu(page: Page, phone: boolean) {
 async function fillRegistration(page: Page, name = "Synthetic_Name", key = KEY) {
   await page.getByLabel("Beta key").fill(key);
   await page.getByLabel("Username").fill(name);
+  await page.getByLabel("Display name").fill("Synthetic_Name");
   await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
   await page.getByLabel("Password again").fill(PASSWORD);
   await page.getByLabel("I am at least 16 years old.").check();
@@ -58,6 +59,8 @@ test.describe("accounts", () => {
     const step = page.getByRole("region", { name: "Your recovery code" });
     await expect(step.getByLabel("Recovery code", { exact: true })).toHaveText(CODE);
     await expect(step.getByRole("heading", { name: "Your recovery code" })).toBeFocused();
+    // the whole handle, once the sign-in started at once has read the tag drawn
+    await expect(step.getByText(/Other players see you as Synthetic_Name#3fa2\./)).toBeVisible();
     await expectNoSideScroll(page);
     await step.getByRole("button", { name: "Copy" }).click();
     await expect(step.getByText("Copied.")).toBeVisible();
@@ -79,14 +82,15 @@ test.describe("accounts", () => {
     await expect(page.getByText("Synthetic terms for the test.")).toBeVisible();
     await page.getByRole("button", { name: "I accept" }).click();
     await expect(page).toHaveURL(/\/account$/);
-    await expect(page.locator(".account-name bdi")).toHaveText("synthetic_name");
+    await expect(page.locator(".account-name bdi")).toHaveText("Synthetic_Name#3fa2");
+    await expect(page.getByText("Sign-in name: synthetic_name")).toBeVisible();
     expect(central.accepted?.version).toBe("2026-10-21");
     await expectNoSideScroll(page);
 
-    // the header names the account, also after a reload (Central confirms the session)
+    // the header names the account by its handle, also after a reload (Central confirms the session)
     await page.reload();
     await openMenu(page, phone);
-    await expect(page.getByRole("link", { name: "Your account, synthetic_name" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Your account, Synthetic_Name#3fa2" })).toBeVisible();
     await openMenu(page, phone);
     await page.getByRole("button", { name: "Sign out" }).click();
     await expect(page.getByText(/You are not signed in/)).toBeVisible();
@@ -108,9 +112,9 @@ test.describe("accounts", () => {
     // on the account page, its terms step and its summary each ask once, in either order
     expect(central.operations.slice(10, 12).sort()).toEqual(["account_summary", "terms_status"]);
     // after the reload, the provider, the terms step and the summary each ask once, in any order
-    expect(central.operations.slice(12, 15).sort()).toEqual(["account_summary", "session_status", "terms_status"]);
+    expect(central.operations.slice(12, 15).sort()).toEqual(["account_summary", "account_summary", "terms_status"]);
     expect(central.operations.slice(15)).toEqual(["logout"]);
-    expect(central.bodies.get("register")).toEqual({ operation: "register", username: "synthetic_name", beta_key: KEY });
+    expect(central.bodies.get("register")).toEqual({ operation: "register", username: "synthetic_name", beta_key: KEY, display_name: "Synthetic_Name" });
     expect(central.bodies.get("enrollment_finish")?.["document"]).toHaveLength(SEALED_DOCUMENT);
     expect(central.violations).toEqual([]);
     expect(m.stray).toEqual([]);
@@ -155,7 +159,10 @@ test.describe("accounts", () => {
     await page.getByLabel("Passwort").fill(PASSWORD);
     await page.getByRole("button", { name: "Anmelden" }).click();
     await expect(page).toHaveURL(/\/account$/);
-    await expect(page.locator(".account-name bdi")).toHaveText("synthetic_name");
+    // registered before display names: no handle yet, so the page asks for a name first
+    await expect(page.locator(".account-name")).toHaveText("Angemeldet");
+    await expect(page.getByText("Anmeldename: synthetic_name")).toBeVisible();
+    await expect(page.getByRole("region", { name: "Wähl deinen Anzeigenamen" })).toBeVisible();
     await expectNoSideScroll(page);
     expect(central.violations).toEqual([]);
     expect(m.stray).toEqual([]);
@@ -181,6 +188,9 @@ test.describe("accounts", () => {
     await expect(page).toHaveURL(/\/account$/);
     expect(central.operations).not.toContain("set_recovery");
     await expect(page.getByText(/Your account has no recovery code yet\. It moved here from the official gateway/)).toBeVisible();
+    // moved before its name and tag were carried: they come with the next sign-in there, nothing to choose here
+    await expect(page.getByText(/Your display name and tag come with you from the official gateway/)).toBeVisible();
+    await expect(page.getByRole("region", { name: "Choose your display name" })).toHaveCount(0);
 
     // on the account page: the password again, then the code, stored once kept
     await page.getByRole("button", { name: "Make a recovery code" }).click();
@@ -201,7 +211,8 @@ test.describe("accounts", () => {
     expect(errors).toEqual([]);
   });
 
-  test("the header and the account page name the account as Central does", async ({ page, baseURL }, info) => {
+  test("an account without a display name chooses one, and the header names it by its handle", async ({ page, baseURL }, info) => {
+    const phone = info.project.name === "phone";
     const errors = watchErrors(page);
     const m = await mock(page);
     const central = await mockCentral(page, new URL(baseURL ?? "").origin, { accounts: ["synthetic_name"] });
@@ -211,11 +222,24 @@ test.describe("accounts", () => {
     await page.getByLabel("Password").fill(PASSWORD);
     await page.getByRole("button", { name: "Sign in" }).click();
     await expect(page).toHaveURL(/\/account$/);
-    await expect(page.locator(".account-name bdi")).toHaveText("synthetic_name");
+    const form = page.getByRole("region", { name: "Choose your display name" });
+    await expect(form.getByText(/beside your tag, #3fa2/)).toBeVisible();
+    await expectNoSideScroll(page);
+    await form.getByLabel("Display name").fill("Official");
+    await form.getByRole("button", { name: "Save the name" }).click();
+    await expect(form.getByText("That display name is kept for Baylee itself. Please choose another.")).toBeVisible();
+    expect(central.operations).not.toContain("set_display_name");
+    await form.getByLabel("Display name").fill("Chosen_Name");
+    await form.getByRole("button", { name: "Save the name" }).click();
+    await expect(page.locator(".account-name bdi")).toHaveText("Chosen_Name#3fa2");
+    await expect(form).toHaveCount(0);
+    expect(central.bodies.get("set_display_name")).toEqual({ operation: "set_display_name", display_name: "Chosen_Name" });
+    await openMenu(page, phone);
+    await expect(page.getByRole("link", { name: "Your account, Chosen_Name#3fa2" })).toBeVisible();
     await page.reload();
-    await openMenu(page, info.project.name === "phone");
-    await expect(page.getByRole("link", { name: "Your account, synthetic_name" })).toBeVisible();
-    expect(central.operations).toContain("session_status");
+    await openMenu(page, phone);
+    await expect(page.getByRole("link", { name: "Your account, Chosen_Name#3fa2" })).toBeVisible();
+    expect(central.operations.filter((op) => op === "session_status")).toEqual([]);
     expect(central.violations).toEqual([]);
     expect(m.stray).toEqual([]);
     expect(errors).toEqual([]);

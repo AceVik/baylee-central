@@ -1,29 +1,34 @@
 // The registration form (docs/web-accounts.md §"Web pages"): the beta key,
-// the username with its rules, the password twice with a strength hint, the
-// minimum age of 16 (Central's terms §2), and the acceptance of Central's
-// terms and the privacy notice, linked. The page checks what it can say
-// early; Central decides.
+// the username with its rules, the display name other players see with its
+// rules, the password twice with a strength hint, the minimum age of 16
+// (Central's terms §2), and the acceptance of Central's terms and the
+// privacy notice, linked. The page checks what it can say early; Central
+// decides.
 
 import { useRef, useState, type FormEvent } from "react";
 
 import { T, type Elems, type Key } from "../i18n";
 import { PATHS } from "../router";
 import { SubmitButton } from "./Busy";
-import { canonicalName, validName } from "./names";
+import { canonicalName, reservedDisplayName, validDisplayName, validName } from "./names";
 import { PasswordFields } from "./PasswordFields";
 import { acceptable, MAX_BYTES } from "./strength";
 
 export interface Registration {
   betaKey: string;
   username: string;
+  /** Kept as typed; other players see it beside the tag Central draws. */
+  displayName: string;
   password: string;
 }
 
-type Problem = "key" | "username" | "password" | "again" | "age" | "consent";
+type Problem = "key" | "username" | "displayName" | "reserved" | "password" | "again" | "age" | "consent";
 
 const SAY: Readonly<Record<Problem, Key>> = {
   key: "register.errKey",
   username: "register.errUsername",
+  displayName: "register.errDisplayName",
+  reserved: "register.errDisplayNameReserved",
   password: "register.errPassword",
   again: "register.errMismatch",
   age: "register.errAge",
@@ -47,6 +52,7 @@ const LINKS: Elems = {
 export function RegisterForm({ busy, status, onSubmit }: { busy: boolean; status: { bad: boolean; key: Key } | null; onSubmit(r: Registration): void }) {
   const [betaKey, setBetaKey] = useState("");
   const [username, setUsername] = useState("");
+  const [displayName, setDisplayName] = useState("");
   const [password, setPassword] = useState("");
   const [again, setAgain] = useState("");
   const [age, setAge] = useState(false);
@@ -56,6 +62,7 @@ export function RegisterForm({ busy, status, onSubmit }: { busy: boolean; status
   const [complaints, setComplaints] = useState(0);
   const keyRef = useRef<HTMLInputElement>(null);
   const nameRef = useRef<HTMLInputElement>(null);
+  const displayRef = useRef<HTMLInputElement>(null);
   const ageRef = useRef<HTMLInputElement>(null);
   const consentRef = useRef<HTMLInputElement>(null);
 
@@ -67,25 +74,30 @@ export function RegisterForm({ busy, status, onSubmit }: { busy: boolean; status
         ? "key"
         : !validName(username)
           ? "username"
-          : !acceptable(password)
-            ? "password"
-            : password !== again
-              ? "again"
-              : !age
-                ? "age"
-                : !consent
-                  ? "consent"
-                  : null;
+          : !validDisplayName(displayName.trim())
+            ? "displayName"
+            : reservedDisplayName(displayName.trim())
+              ? "reserved"
+              : !acceptable(password)
+                ? "password"
+                : password !== again
+                  ? "again"
+                  : !age
+                    ? "age"
+                    : !consent
+                      ? "consent"
+                      : null;
     setProblem(found);
     if (found !== null) {
       setComplaints((n) => n + 1);
       if (found === "key") keyRef.current?.focus();
       else if (found === "username") nameRef.current?.focus();
+      else if (found === "displayName" || found === "reserved") displayRef.current?.focus();
       else if (found === "age") ageRef.current?.focus();
       else if (found === "consent") consentRef.current?.focus();
       return;
     }
-    onSubmit({ betaKey: betaKey.trim(), username: canonicalName(username), password });
+    onSubmit({ betaKey: betaKey.trim(), username: canonicalName(username), displayName: displayName.trim(), password });
   };
 
   const invalid = (p: Problem) => (problem === p ? true : undefined);
@@ -138,6 +150,30 @@ export function RegisterForm({ busy, status, onSubmit }: { busy: boolean; status
         />
         <p id="r-name-rules" className="field-hint">
           <T id="register.usernameRules" />
+        </p>
+      </div>
+      <div className="field">
+        <label htmlFor="r-display">
+          <T id="register.displayName" />
+        </label>
+        <input
+          ref={displayRef}
+          id="r-display"
+          type="text"
+          autoComplete="off"
+          autoCapitalize="none"
+          spellCheck={false}
+          maxLength={16}
+          value={displayName}
+          aria-invalid={problem === "displayName" || problem === "reserved" ? true : undefined}
+          aria-describedby="r-display-rules"
+          onChange={(e) => {
+            setDisplayName(e.target.value);
+            if (problem === "displayName" || problem === "reserved") setProblem(null);
+          }}
+        />
+        <p id="r-display-rules" className="field-hint">
+          <T id="register.displayNameRules" />
         </p>
       </div>
       <PasswordFields

@@ -1,6 +1,6 @@
 // `/signin` (docs/web-accounts.md §"Flows"): the name and the password,
 // then OPAQUE in the crypto Worker; Central sets its session cookie, the
-// page remembers only the name and the end. Then the terms, where Central's
+// page remembers only the end, and shows Central's handle for the account. Then the terms, where Central's
 // terms in force are not yet accepted; for an account moved here without a
 // recovery code, the code the sign-in made (shown, then stored once kept,
 // which needs the terms accepted); and the account page.
@@ -12,7 +12,7 @@ import { Link, PATHS, navigate, useLocation } from "../router";
 import "../styles/account.css";
 import { SubmitButton } from "./Busy";
 import { FAILURE } from "./errors";
-import { FlowError, signIn, type NewCode } from "./flows";
+import { FlowError, handleOf, signIn, type NewCode } from "./flows";
 import { canonicalName } from "./names";
 import { NewCodeStep } from "./NewCodeStep";
 import { useAccount } from "./session";
@@ -55,11 +55,11 @@ export default function SignInPage() {
     setBusy(true);
     setStatus({ bad: false, key: "signin.progress" });
     signIn({ username: name, password }, { api, crypto }).then(
-      ({ session, code }) => {
+      ({ session, summary, code }) => {
         setPassword("");
         setBusy(false);
         setStatus(null);
-        signedIn({ name: session.username, expiresAt: session.expiresAt });
+        signedIn({ handle: handleOf(summary), expiresAt: session.expiresAt });
         setAfter({ at: "terms", name: session.username, code });
       },
       (error: unknown) => {
@@ -85,10 +85,10 @@ export default function SignInPage() {
           <NewCodeStep code={after.code} name={after.name} onDone={() => navigate(PATHS.account)} />
         ) : account !== null && !busy ? (
           <p className="account-note">
-            {account.name === null ? (
+            {account.handle === null ? (
               <T id="signin.alreadyUnnamed" elems={LINKS} />
             ) : (
-              <T id="signin.already" args={{ name: account.name }} elems={LINKS} />
+              <T id="signin.already" args={{ name: account.handle }} elems={LINKS} />
             )}
           </p>
         ) : (

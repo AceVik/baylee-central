@@ -35,7 +35,8 @@ test("the terms in force are shown, accepted once, and not asked again", async (
   await page.getByRole("button", { name: "I accept" }).click();
   await expect(page).toHaveURL(/\/account$/, { timeout: 30_000 });
   await page.reload();
-  await expect(page.locator(".account-name bdi")).toHaveText(account("desktop"));
+  // the handle account.spec.ts registered it with
+  await expect(page.locator(".account-name bdi")).toHaveText(/^Real_Runner#[0-9a-f]{4}$/);
   await expect(page.getByRole("heading", { name: "Accept the terms of use" })).toHaveCount(0);
   expect(errors).toEqual([]);
 });

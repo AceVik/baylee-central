@@ -13,4 +13,7 @@ export const FAILURE: Readonly<Record<FlowFailure, Key>> = {
   mismatch: "acct.errMismatch",
   codeRefused: "recovery.errRefused",
   codeTaken: "recovery.errTaken",
+  nameRefused: "account.errNameRefused",
+  nameTaken: "account.errNameTaken",
+  terms: "account.errNameTerms",
 };

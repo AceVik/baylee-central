@@ -19,9 +19,9 @@ same app; administration comes later.
 | `/impressum` | the legal notice (§ 5 DDG), details behind a proof of work |
 | `/privacy` | the privacy notice (Art. 13 GDPR) |
 | `/terms` | Baylee Central's terms of use |
-| `/register` | a new account: beta key, name, password, age, consent; then the recovery code, shown once |
+| `/register` | a new account: beta key, name, display name, password, age, consent; then the recovery code, shown once, with the handle |
 | `/signin` | signing in at Baylee Central |
-| `/account` | who is signed in, until when; signing out |
+| `/account` | who is signed in (the handle others see, the sign-in name small), until when; choosing a display name; signing out |
 
 English and German today, one at a time, and ready for every language Magic
 is printed in (§"The words"): `?lang=<code>` wins, then the choice made with
@@ -390,20 +390,26 @@ Registration, sign-in and the account page follow `docs/web-accounts.md`:
   WebAssembly module's memory; the page hands it the password and bytes and
   never holds a state or a key. Argon2 (64 MiB) never blocks the page.
 - **Registration**: the form says early what Central would refuse (the
-  name's rules, eight characters, the two passwords, the age of 16, the
-  consent, linked to `/terms` and `/privacy` in a new tab); then `Register`,
-  the enrollment, the recovery code (copy, download as a text file, and a
-  confirmation before going on; leaving earlier asks first), a sign-in
-  started at once so the password is let go, and the terms.
+  name's rules, the display name's rules and Central's reserved names,
+  eight characters, the two passwords, the age of 16, the consent, linked
+  to `/terms` and `/privacy` in a new tab); then `Register` with the display
+  name (Central draws the tag), the enrollment, the recovery code (copy,
+  download as a text file, and a confirmation before going on; leaving
+  earlier asks first) with the whole handle, `Name#3fa2`, once the sign-in
+  started at once (so the password is let go) has read it, and the terms.
+  The display name and tag rules are central-api's `profile` module's
+  (`src/account/names.ts`; the same table of cases as Central and Baylee).
 - **Terms**: after a sign-in, `TermsStatus`; where Central's terms in force
   are not accepted, the page shows the texts Central serves in its language
   and accepts only when they hash to the version's digest
   (`src/account/digest.ts`), so an acceptance names exactly what was shown.
   While the texts are `draft`, nothing is in force and there is no step.
 - **Who is signed in** (`src/account/session.tsx`): only the session's end
-  is remembered; after a reload `SessionStatus` says whose session it is
-  (the name is always Central's, in memory), and the session is forgotten
-  on signing out, at the end, or on Central's no.
+  is remembered; after a reload `AccountSummary` says whose session it is,
+  and the header shows the handle other players see (always Central's, in
+  memory), never the private sign-in name, or "Your account" while there is
+  no display name; the session is forgotten on signing out, at the end, or
+  on Central's no.
 - **The account page** asks `AccountSummary`: where the account came from
   and whether it has a recovery code, in the design's two wordings. An
   account moved from the official gateway has none; after every sign-in the
@@ -414,7 +420,13 @@ Registration, sign-in and the account page follow `docs/web-accounts.md`:
   `RecoveryStep.tsx`) and stored (`SetRecovery`) only once kept; "Not now"
   throws it away, and a lost answer is retried with the same 73 bytes. The
   account page's "Make a recovery code" signs in again for it
-  (`docs/web-accounts.md` §"A recovery code after a sign-in").
+  (`docs/web-accounts.md` §"A recovery code after a sign-in"). The page
+  shows the handle, and the sign-in name small beneath it and nowhere
+  else; an account without a display name chooses one first, once the
+  terms are settled (`src/account/ChooseName.tsx`, `SetDisplayName`); a
+  moved account whose name and tag the official gateway has not carried
+  yet is told they come with its next sign-in there (§"Display name and
+  tag").
 
 The unit tests use stand-ins for Central and the crypto
 (`test/support/central.ts`, with an account moved here without a code;

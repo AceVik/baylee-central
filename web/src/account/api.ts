@@ -13,7 +13,7 @@
 // `malformed` and nothing of it is used.
 
 import { CENTRAL_API } from "../config";
-import { canonicalName, validName } from "./names";
+import { canonicalName, validDisplayName, validName, validTag } from "./names";
 
 /** Why a request did not give its answer. */
 export type Failure =
@@ -87,9 +87,9 @@ export interface AccountSummary {
   identity: Identity;
   /** The private sign-in name, canonical. */
   username: string;
-  /** The name other players see; none until Central keeps one. */
+  /** The name other players see; none until the account chose one (or the bridge carried it). */
   displayName: string | null;
-  /** The tag beside it; none until Central keeps one. */
+  /** The tag beside it: drawn for a registered account, carried for a moved one; none until then. */
   tag: number | null;
   source: AccountSource;
   /** The account has a recovery code. */
@@ -182,11 +182,6 @@ function termsText(v: unknown): TermsText {
   return { lang, updated, markdown };
 }
 
-/** The gateway's display-name rule: 3 to 16 ASCII letters and digits, `_` and `-` inside. */
-const DISPLAY_NAME = /^[A-Za-z0-9][A-Za-z0-9_-]{1,14}[A-Za-z0-9]$/;
-/** A tag is positive and fits a gateway's column (`i32`). */
-const MAX_TAG = 2 ** 31 - 1;
-
 // ---------------------------------------------------------------- answers
 
 export const parse = {
@@ -248,8 +243,8 @@ export const parse = {
       "expires_at",
     ]);
     const { display_name: displayName, tag, source, recovery, admin } = o;
-    if (displayName !== null && (typeof displayName !== "string" || !DISPLAY_NAME.test(displayName))) throw malformed();
-    if (tag !== null && (typeof tag !== "number" || !Number.isInteger(tag) || tag < 1 || tag > MAX_TAG)) throw malformed();
+    if (displayName !== null && (typeof displayName !== "string" || !validDisplayName(displayName))) throw malformed();
+    if (tag !== null && (typeof tag !== "number" || !validTag(tag))) throw malformed();
     if (source !== "legacy" && source !== "registered") throw malformed();
     if (typeof recovery !== "boolean" || typeof admin !== "boolean") throw malformed();
     if (source === "registered" && !recovery) throw malformed();
@@ -297,7 +292,8 @@ const array = (b: Uint8Array): number[] => Array.from(b);
 const wireIdentity = (i: Identity) => ({ account: array(i.account), epoch: i.epoch });
 
 export interface Api {
-  register(username: string, betaKey: string): Promise<{ identity: Identity; ticket: Uint8Array }>;
+  /** Reserves the account; `displayName` null chooses it later on the account page. */
+  register(username: string, betaKey: string, displayName: string | null): Promise<{ identity: Identity; ticket: Uint8Array }>;
   enrollmentStart(ticket: Uint8Array, message: Uint8Array): Promise<Uint8Array>;
   enrollmentFinish(body: {
     ticket: Uint8Array;
@@ -316,6 +312,8 @@ export interface Api {
   accountSummary(): Promise<AccountSummary>;
   /** Stores the recovery wrapper (73 bytes) made after a sign-in; the same bytes again are `Done`. */
   setRecovery(recovery: Uint8Array): Promise<void>;
+  /** Chooses the display name of an account that has none; the same name again is `Done`. */
+  setDisplayName(displayName: string): Promise<void>;
   logout(): Promise<void>;
   terms(): Promise<TermsDocument | null>;
   termsStatus(): Promise<{ current: TermsVersion | null; accepted: boolean }>;
@@ -357,7 +355,13 @@ export function api({ base = CENTRAL_API, fetch: doFetch = (...a) => fetch(...a)
   }
 
   return {
-    register: (username, betaKey) => post({ operation: "register", username, beta_key: betaKey }, parse.enrollment),
+    register: (username, betaKey, displayName) =>
+      post(
+        displayName === null
+          ? { operation: "register", username, beta_key: betaKey }
+          : { operation: "register", username, beta_key: betaKey, display_name: displayName },
+        parse.enrollment,
+      ),
     enrollmentStart: (ticket, message) =>
       post({ operation: "enrollment_start", ticket: array(ticket), message: array(message) }, parse.enrollmentChallenge),
     enrollmentFinish: (b) =>
@@ -379,6 +383,7 @@ export function api({ base = CENTRAL_API, fetch: doFetch = (...a) => fetch(...a)
     renewSession: () => post({ operation: "renew_session" }, parse.renewed),
     accountSummary: () => post({ operation: "account_summary" }, parse.accountSummary),
     setRecovery: (recovery) => post({ operation: "set_recovery", recovery: array(recovery) }, parse.done),
+    setDisplayName: (displayName) => post({ operation: "set_display_name", display_name: displayName }, parse.done),
     logout: () => post({ operation: "logout" }, parse.done),
     terms: () => post({ operation: "terms" }, parse.terms),
     termsStatus: () => post({ operation: "terms_status" }, parse.termsStatus),

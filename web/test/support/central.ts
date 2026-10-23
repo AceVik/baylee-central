@@ -1,11 +1,12 @@
 // Stand-ins for the account pages' two collaborators: Central's browser
 // surface as an in-memory `Api` (the shapes of docs/web-accounts.md, with
-// its refusals, and an account moved from the official gateway without a
-// recovery code) and the crypto Worker as a `CryptoFactory` that knows the
-// right password. Synthetic data only. The real crypto is tested in Rust
+// its refusals, an account moved from the official gateway without a
+// recovery code, and display names with the tags drawn for them) and the
+// crypto Worker as a `CryptoFactory` that knows the right password. Synthetic data only. The real crypto is tested in Rust
 // (crates/central-web-crypto) and test/central-wasm.test.ts; the real HTTP
 // shapes in test/account/api.test.ts and e2e/account.spec.ts.
 
+import { reservedDisplayName, validDisplayName } from "../../src/account/names";
 import { ApiError, type AccountSource, type AccountSummary, type Api, type BrowserSession, type Identity, type TermsDocument, type TermsVersion } from "../../src/account/api";
 import { CryptoError, type Crypto, type CryptoFactory } from "../../src/account/crypto";
 
@@ -19,6 +20,8 @@ export const WRAPPED = fill(73, 2);
 export const NEW_CODE = "7Q3K-AXWD-0P4N-9RTB-5MHE-ZC2G-8VFJ-1YS6";
 export const NEW_WRAPPER = fill(73, 11);
 export const SIGNED_IN_AT = 3_999_998_200;
+/** The tag the stand-in draws for a registration: `#3fa2`. */
+export const TAG = 0x3fa2;
 
 export interface FakeAccount {
   identity: Identity;
@@ -26,6 +29,8 @@ export interface FakeAccount {
   /** The recovery wrapper; none for an account moved from the official gateway. */
   recovery: Uint8Array | null;
   source?: AccountSource;
+  displayName?: string | null;
+  tag?: number | null;
 }
 
 export interface FakeCentral extends Api {
@@ -36,14 +41,16 @@ export interface FakeCentral extends Api {
   accepted: TermsVersion | null;
   /** Every wrapper `setRecovery` was sent, in order. */
   recoveries: Uint8Array[];
+  /** Every name `setDisplayName` was sent, in order. */
+  names: string[];
   /** Refuse `setRecovery` for an account without a wrapper, as for a sign-in 10 minutes old. */
   late: boolean;
   /** Make the next call to `operation` fail with `failure`. */
   fail(operation: string, failure: ApiError["kind"]): void;
   /** Let the next call to `operation` take effect, then lose its answer. */
   lose(operation: string): void;
-  /** An account moved from the official gateway: enrolled, no recovery code. */
-  moved(name: string): void;
+  /** An account moved from the official gateway: enrolled, no recovery code; its name and tag as carried, if they were. */
+  moved(name: string, profile?: { displayName: string | null; tag: number | null }): void;
 }
 
 /** `serverName`: the name Central gives the account, if not its own. */
@@ -52,7 +59,7 @@ export function fakeCentral(
 ): FakeCentral {
   const failures = new Map<string, ApiError["kind"]>();
   const lost = new Set<string>();
-  const tickets = new Map<string, { name: string; identity: Identity }>();
+  const tickets = new Map<string, { name: string; identity: Identity; displayName: string | null }>();
   let attempt: string | null = null;
   const c: FakeCentral = {
     calls: [],
@@ -61,6 +68,7 @@ export function fakeCentral(
     current: opts.terms ?? null,
     accepted: null,
     recoveries: [],
+    names: [],
     late: false,
     fail: (op: string, kind: ApiError["kind"]) => {
       failures.set(op, kind);
@@ -68,8 +76,8 @@ export function fakeCentral(
     lose: (op: string) => {
       lost.add(op);
     },
-    moved: (name: string) => {
-      c.accounts.set(name, { identity: { account: ACCOUNT, epoch: 1 }, wrapped: WRAPPED, recovery: null, source: "legacy" });
+    moved: (name: string, profile = { displayName: null, tag: null }) => {
+      c.accounts.set(name, { identity: { account: ACCOUNT, epoch: 1 }, wrapped: WRAPPED, recovery: null, source: "legacy", ...profile });
     },
   } as unknown as FakeCentral;
   const said = (name: string) => opts.serverName ?? name;
@@ -82,13 +90,15 @@ export function fakeCentral(
     }
   };
   Object.assign(c, {
-    async register(username: string, betaKey: string) {
+    async register(username: string, betaKey: string, displayName: string | null) {
       step("register");
       if (betaKey !== KEY) throw new ApiError("rejected");
+      // after the key, as Central
+      if (displayName !== null && (!validDisplayName(displayName) || reservedDisplayName(displayName))) throw new ApiError("rejected");
       if (c.accounts.has(username)) throw new ApiError("conflict");
       const ticket = fill(32, tickets.size + 1);
       const identity = { account: ACCOUNT, epoch: 1 };
-      tickets.set(ticket.join(), { name: username, identity });
+      tickets.set(ticket.join(), { name: username, identity, displayName });
       return { identity, ticket };
     },
     async enrollmentStart(ticket: Uint8Array, message: Uint8Array) {
@@ -101,7 +111,7 @@ export function fakeCentral(
       const t = tickets.get(b.ticket.join());
       if (t === undefined || b.wrappedMaster.length !== 73 || b.recovery.length !== 73 || b.record.length !== 192) throw new ApiError("rejected");
       tickets.delete(b.ticket.join());
-      c.accounts.set(t.name, { identity: t.identity, wrapped: b.wrappedMaster, recovery: b.recovery });
+      c.accounts.set(t.name, { identity: t.identity, wrapped: b.wrappedMaster, recovery: b.recovery, displayName: t.displayName, tag: TAG });
     },
     async discover(username: string) {
       step("discover");
@@ -158,8 +168,8 @@ export function fakeCentral(
       return {
         identity: opts.foreignSummary ? { account: fill(16, 0x77), epoch: 1 } : account.identity,
         username: said(name),
-        displayName: null,
-        tag: null,
+        displayName: account.displayName ?? null,
+        tag: account.tag ?? null,
         source: account.source ?? "registered",
         recovery: account.recovery !== null,
         admin: false,
@@ -177,6 +187,19 @@ export function fakeCentral(
       } else if (c.late) throw new ApiError("rejected");
       else account.recovery = recovery.slice();
       if (lost.delete("set_recovery")) throw new ApiError("network");
+    },
+    async setDisplayName(displayName: string) {
+      step("set_display_name");
+      c.names.push(displayName);
+      const account = [...c.accounts.values()][0];
+      if (c.session === null || account === undefined) throw new ApiError("rejected");
+      const current = c.current?.version ?? null;
+      if (current !== null && c.accepted?.version !== current.version) throw new ApiError("forbidden");
+      if (!validDisplayName(displayName) || reservedDisplayName(displayName) || (account.tag ?? null) === null) throw new ApiError("rejected");
+      const had = account.displayName ?? null;
+      if (had !== null && had !== displayName) throw new ApiError("conflict");
+      account.displayName = displayName;
+      if (lost.delete("set_display_name")) throw new ApiError("network");
     },
     async acceptTerms(v: TermsVersion) {
       step("accept_terms");

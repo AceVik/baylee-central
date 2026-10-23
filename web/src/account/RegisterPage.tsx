@@ -1,10 +1,11 @@
 // `/register` (docs/web-accounts.md §"Flows"): the form; then Central
-// reserves the name for the beta key, the crypto Worker enrols the password
-// and wraps a new master key under it and under a new recovery code; then
-// the code, shown once; then a sign-in (started at once, so the password is
-// let go), the terms where they are in force, and the account page. If the
-// sign-in fails, the account still exists: the page sends the person to
-// `/signin` after the code.
+// reserves the name for the beta key with the display name and a tag drawn
+// for it, the crypto Worker enrols the password and wraps a new master key
+// under it and under a new recovery code; then the code, shown once, with
+// the whole handle (`Name#3fa2`) once the sign-in, started at once so the
+// password is let go, has read it; then the terms where they are in force,
+// and the account page. If the sign-in fails, the account still exists: the
+// page sends the person to `/signin` after the code.
 
 import { useState } from "react";
 
@@ -12,7 +13,7 @@ import { T, useTitle, type Elems, type Key } from "../i18n";
 import { Link, PATHS, navigate } from "../router";
 import "../styles/account.css";
 import { FAILURE } from "./errors";
-import { FlowError, register, signIn, type Progress } from "./flows";
+import { FlowError, handleOf, register, signIn, type Progress } from "./flows";
 import { RecoveryStep } from "./RecoveryStep";
 import { RegisterForm, type Registration } from "./RegisterForm";
 import { useAccount } from "./session";
@@ -39,6 +40,8 @@ export default function RegisterPage() {
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<{ bad: boolean; key: Key } | null>(null);
   const [finishing, setFinishing] = useState(false);
+  /** The handle Central drew, once the sign-in after the registration has read it. */
+  const [handle, setHandle] = useState<string | null>(null);
 
   const submit = (r: Registration) => {
     setBusy(true);
@@ -47,8 +50,10 @@ export default function RegisterPage() {
       (code) => {
         // sign in now, so the password is let go while the code is read
         const session = signIn({ username: r.username, password: r.password }, { api, crypto }).then(
-          ({ session: s }) => {
-            signedIn({ name: s.username, expiresAt: s.expiresAt });
+          ({ session: s, summary }) => {
+            const drawn = handleOf(summary);
+            signedIn({ handle: drawn, expiresAt: s.expiresAt });
+            setHandle(drawn);
             return true;
           },
           () => false,
@@ -98,7 +103,7 @@ export default function RegisterPage() {
         )}
         {stage.at === "code" && (
           <>
-            <RecoveryStep code={stage.code} name={stage.name} onKept={kept} />
+            <RecoveryStep code={stage.code} name={stage.name} handle={handle} onKept={kept} />
             <output className="form-status">
               {finishing && <T id="signin.progress" />}
             </output>

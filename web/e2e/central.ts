@@ -25,12 +25,15 @@ export const NEW_CODE = "7Q3K-AXWD-0P4N-9RTB-5MHE-ZC2G-8VFJ-1YS6";
 export const ACCOUNT = [0x01, 0x92, 0xd0, 0xc5, 0x7b, 0x3e, 0x7a, 0x1f, 0x8c, 0x2d, 0x3e, 0x4f, 0x5a, 0x6b, 0x7c, 0x8d];
 /** The initial document's 125 bytes, sealed: 1 + 24 + 125 + 16. */
 export const SEALED_DOCUMENT = 166;
+/** The tag the mock draws for a registration: `#3fa2`. */
+export const TAG = 0x3fa2;
 
 const n = (length: number, byte = 0) => Array.from({ length }, () => byte);
 
 /** What each operation's request holds besides `operation`. */
 const FIELDS: Readonly<Record<string, readonly string[]>> = {
-  register: ["username", "beta_key"],
+  // the page always sends the name chosen with the form
+  register: ["username", "beta_key", "display_name"],
   enrollment_start: ["ticket", "message"],
   enrollment_finish: ["ticket", "record", "wrapped_master", "document", "recovery"],
   discover: ["username"],
@@ -44,6 +47,7 @@ const FIELDS: Readonly<Record<string, readonly string[]>> = {
   gateway_directory: ["after"],
   account_summary: [],
   set_recovery: ["recovery"],
+  set_display_name: ["display_name"],
 };
 
 /** Exact byte lengths, by operation and field. */
@@ -84,7 +88,7 @@ export interface CentralMock {
   /** The bodies, by operation, last first. */
   bodies: Map<string, Record<string, unknown>>;
   /** An account moved from the official gateway has no recovery wrapper until it stores one. */
-  accounts: Map<string, { wrapped: number[]; recovery: number[] | null }>;
+  accounts: Map<string, { wrapped: number[]; recovery: number[] | null; displayName: string | null; tag: number | null }>;
   signedIn: string | null;
   accepted: { version: string; digest: number[] } | null;
 }
@@ -92,8 +96,10 @@ export interface CentralMock {
 interface Options {
   /** Central's terms in force, or none (as today: `draft`). */
   terms?: { version: string; texts: TermsText[]; digest?: number[] } | null;
-  /** Accounts that exist already: name → password stand-in. */
+  /** Accounts that exist already, registered without a display name: name → password stand-in. */
   accounts?: string[];
+  /** Registered accounts that exist already with a display name: name → display name. */
+  named?: Record<string, string>;
   /** Accounts moved from the official gateway, without a recovery code. */
   moved?: string[];
   /** Answer the crypto's first message with bytes the real module refuses. */
@@ -133,10 +139,12 @@ const refuse = (route: Route, status: number) => route.fulfill({ status, content
 
 export async function mockCentral(page: Page, origin: string, opts: Options = {}): Promise<CentralMock> {
   const m: CentralMock = { operations: [], violations: [], bodies: new Map(), accounts: new Map(), signedIn: null, accepted: null };
-  for (const name of opts.accounts ?? []) m.accounts.set(name, { wrapped: n(73, 2), recovery: n(73, 4) });
-  for (const name of opts.moved ?? []) m.accounts.set(name, { wrapped: n(73, 2), recovery: null });
+  for (const name of opts.accounts ?? []) m.accounts.set(name, { wrapped: n(73, 2), recovery: n(73, 4), displayName: null, tag: TAG });
+  for (const [name, displayName] of Object.entries(opts.named ?? {})) m.accounts.set(name, { wrapped: n(73, 2), recovery: n(73, 4), displayName, tag: TAG });
+  // moved before its name and tag were carried
+  for (const name of opts.moved ?? []) m.accounts.set(name, { wrapped: n(73, 2), recovery: null, displayName: null, tag: null });
   let signedInAt = 0;
-  const tickets = new Map<string, string>();
+  const tickets = new Map<string, { name: string; displayName: string }>();
   let attempt: string | null = null;
   const terms = opts.terms ?? null;
   const version = terms === null ? null : { version: terms.version, digest: terms.digest ?? termsDigest(terms.texts) };
@@ -162,9 +170,10 @@ export async function mockCentral(page: Page, origin: string, opts: Options = {}
       case "register": {
         if (body["beta_key"] !== KEY) return refuse(route, 401);
         const name = String(body["username"]);
+        if (!/^[A-Za-z0-9][A-Za-z0-9_-]{1,14}[A-Za-z0-9]$/.test(String(body["display_name"]))) return refuse(route, 401);
         if (m.accounts.has(name)) return refuse(route, 409);
         const ticket = n(32, tickets.size + 1);
-        tickets.set(ticket.join(), name);
+        tickets.set(ticket.join(), { name, displayName: String(body["display_name"]) });
         return json(route, { result: "enrollment", identity, ticket });
       }
       case "enrollment_start":
@@ -172,10 +181,15 @@ export async function mockCentral(page: Page, origin: string, opts: Options = {}
         // the real module refuses a zero point; the stand-in takes it
         return json(route, { result: "enrollment_challenge", message: n(64, opts.refuseCrypto ? 0 : 5) });
       case "enrollment_finish": {
-        const name = tickets.get(String(body["ticket"]));
-        if (name === undefined) return refuse(route, 401);
+        const reserved = tickets.get(String(body["ticket"]));
+        if (reserved === undefined) return refuse(route, 401);
         tickets.delete(String(body["ticket"]));
-        m.accounts.set(name, { wrapped: body["wrapped_master"] as number[], recovery: body["recovery"] as number[] });
+        m.accounts.set(reserved.name, {
+          wrapped: body["wrapped_master"] as number[],
+          recovery: body["recovery"] as number[],
+          displayName: reserved.displayName,
+          tag: TAG,
+        });
         return json(route, { result: "done" });
       }
       case "discover":
@@ -221,8 +235,8 @@ export async function mockCentral(page: Page, origin: string, opts: Options = {}
           result: "account_summary",
           identity,
           username: m.signedIn,
-          display_name: null,
-          tag: null,
+          display_name: account.displayName,
+          tag: account.tag,
           source: account.recovery === null || opts.moved?.includes(m.signedIn) ? "legacy" : "registered",
           recovery: account.recovery !== null,
           admin: false,
@@ -236,6 +250,16 @@ export async function mockCentral(page: Page, origin: string, opts: Options = {}
         const recovery = body["recovery"] as number[];
         if (account.recovery !== null) return account.recovery.join() === recovery.join() ? json(route, { result: "done" }) : refuse(route, 409);
         account.recovery = recovery;
+        return json(route, { result: "done" });
+      }
+      case "set_display_name": {
+        const account = m.signedIn === null ? undefined : m.accounts.get(m.signedIn);
+        if (m.signedIn === null || account === undefined) return refuse(route, 401);
+        if (version !== null && m.accepted?.version !== version.version) return refuse(route, 403);
+        const name = body["display_name"];
+        if (typeof name !== "string" || !/^[A-Za-z0-9][A-Za-z0-9_-]{1,14}[A-Za-z0-9]$/.test(name) || account.tag === null) return refuse(route, 401);
+        if (account.displayName !== null) return account.displayName === name ? json(route, { result: "done" }) : refuse(route, 409);
+        account.displayName = name;
         return json(route, { result: "done" });
       }
       case "accept_terms": {

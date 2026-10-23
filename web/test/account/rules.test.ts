@@ -1,8 +1,8 @@
-// The username rule and the strength hint.
+// The username rule, the display name's and the tag's, and the strength hint.
 
 import { describe, expect, it } from "vitest";
 
-import { canonicalName, validName } from "../../src/account/names";
+import { canonicalName, handle, reservedDisplayName, tagText, validDisplayName, validName, validTag } from "../../src/account/names";
 import { acceptable, strength } from "../../src/account/strength";
 
 describe("the username rule", () => {
@@ -14,6 +14,48 @@ describe("the username rule", () => {
       expect({ bad, valid: validName(bad) }).toEqual({ bad, valid: false });
     }
     expect(canonicalName("  Synthetic_Name ")).toBe("synthetic_name");
+  });
+});
+
+describe("the display name and the tag", () => {
+  it("keep the gateway's rule, the table central-api and Baylee test too", () => {
+    for (const [name, valid] of [
+      ["Alice", true],
+      ["player_one-99", true],
+      ["ab", false],
+      ["has space", false],
+      ["emoji🎉", false],
+      ["sixteen_chars_yz", true],
+      ["seventeen_chars_x", false],
+      ["alice@example.com", false],
+      ["Alice#af03", false],
+      ["_Alice", false],
+      ["Alice-", false],
+      ["abc", true],
+      ["a_-b", true],
+      ["Zoë", false],
+      ["abc\n", false],
+    ] as const) {
+      expect({ name, valid: validDisplayName(name) }).toEqual({ name, valid });
+    }
+  });
+
+  it("keep Central's reserved names for Baylee, read without case, _ and -", () => {
+    for (const name of ["admin", "Administrator", "Bay-lee", "c_e_n_t_r_a_l", "MODERATOR", "Official", "sup-port", "System"]) {
+      expect({ name, reserved: reservedDisplayName(name) }).toEqual({ name, reserved: true });
+    }
+    for (const name of ["admins", "Admin1", "Baylee2", "Alice"]) {
+      expect({ name, reserved: reservedDisplayName(name) }).toEqual({ name, reserved: false });
+    }
+  });
+
+  it("draw a tag as the client does: lowercase hex, four digits at least", () => {
+    expect(tagText(7)).toBe("0007");
+    expect(tagText(0x3fa2)).toBe("3fa2");
+    expect(tagText(0x10000)).toBe("10000");
+    expect(tagText(2 ** 31 - 1)).toBe("7fffffff");
+    expect(handle("Alice", 7)).toBe("Alice#0007");
+    expect([0, 1, 2 ** 31 - 1, 2 ** 31, 1.5].map(validTag)).toEqual([false, true, true, false, false]);
   });
 });
 
