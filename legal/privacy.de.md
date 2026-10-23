@@ -1,5 +1,5 @@
-<!-- version: 2026-10-22 -->
-<!-- updated: 2026-10-21 -->
+<!-- version: 2026-10-23 -->
+<!-- updated: 2026-10-23 -->
 
 # Datenschutzerklärung von Baylee Central
 
@@ -32,7 +32,7 @@ Datenschutzbeauftragten gibt es nicht, weil keine Pflicht dazu besteht.
 
 ## 3. Was wir verarbeiten, wozu und auf welcher Grundlage
 
-- **Benutzername, Konto-ID, Erstellungszeitpunkt** (Anzeigename, Profilbild und Rollen folgen) – dein Konto führen und anzeigen. *Art. 6 Abs. 1 lit. b DSGVO (Vertrag)*
+- **Benutzername, Konto-ID, Erstellungszeitpunkt, Anzeigename und Tag** (Profilbild und Rollen folgen) – dein Konto führen und anzeigen. Andere Spieler sehen deinen Anzeigenamen und Tag, nie deinen Benutzernamen; ein vom offiziellen Gateway umgezogenes Konto behält den Namen und Tag, die es dort hatte. *Art. 6 Abs. 1 lit. b DSGVO (Vertrag)*
 - **OPAQUE-Anmeldedatensatz, verschlüsselter Schlüsselcontainer, Stand der Zugangsdaten** – Anmeldung, Schutz deiner verschlüsselten Daten. *Art. 6 Abs. 1 lit. b DSGVO*
 - *Noch nicht verfügbar:* **E-Mail-Adresse (freiwillig) und ihre Bestätigung** – Passwort zurücksetzen, Kontohinweise. *Art. 6 Abs. 1 lit. b DSGVO*
 - **dein Schlüsselcontainer, mit deinem Wiederherstellungscode verschlüsselt** (den Code selbst kennen wir nicht); eine zweite Anmeldestufe (freiwillig) folgt – Schutz deines Kontos und deiner verschlüsselten Daten. *Art. 6 Abs. 1 lit. b DSGVO*
@@ -88,8 +88,8 @@ dich sammeln.
 - **E-Mail-Versand** (sobald es ihn gibt): Wenn du eine E-Mail-Adresse hinterlegst, versenden wir
   Bestätigungen und Rücksetz-Links über einen Versanddienstleister im
   Europäischen Wirtschaftsraum als Auftragsverarbeiter.
-- **Gateways:** Meldest du dich an einem Gateway an, erhält es deine Konto-ID
-  sowie die Bestätigung, dass du angemeldet bist,
+- **Gateways:** Meldest du dich an einem Gateway an, erhält es deine Konto-ID,
+  deinen Anzeigenamen und Tag sowie die Bestätigung, dass du angemeldet bist,
   nicht aber dein Passwort oder deine verschlüsselten Daten.
 - **Behörden** erhalten Daten nur, wenn wir gesetzlich dazu verpflichtet sind.
 
