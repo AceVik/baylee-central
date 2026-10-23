@@ -37,6 +37,16 @@ describe("the page shell", () => {
     expect(html).not.toMatch(/\son[a-z]+=/);
   });
 
+  it("reserves text and data mining in machine-readable form", () => {
+    const reservation = JSON.parse(read("public/.well-known/tdmrep.json"));
+    expect(reservation).toEqual([{ location: "/", "tdm-reservation": 1 }]);
+    expect(read("index.html")).toContain('<meta name="tdm-reservation" content="1" />');
+    const robots = read("public/robots.txt");
+    for (const agent of ["GPTBot", "ClaudeBot", "Google-Extended", "CCBot"]) {
+      expect(robots).toContain(`User-agent: ${agent}`);
+    }
+  });
+
   it("asks robots to leave the Impressum alone", () => {
     const robots = read("public/robots.txt");
     expect(robots).toContain("Disallow: /impressum");

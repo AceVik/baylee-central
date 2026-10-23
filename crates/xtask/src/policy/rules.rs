@@ -24,6 +24,11 @@ static UNSAFE_MARKERS: LazyLock<[Regex; 3]> = LazyLock::new(|| {
     ]
 });
 
+/// The licence of the crates the Baylee client links (`LICENSE.md` § 6).
+pub const AGPL: &str = "AGPL-3.0-only";
+/// The licence of everything else (`LICENSE.md`).
+pub const SOURCE_AVAILABLE: &str = "LicenseRef-Baylee-Central-Source-Available-1.0";
+
 /// Native or assembly sources, which no first-party code may carry.
 const NATIVE: [&str; 10] = ["s", "asm", "c", "cpp", "cc", "cxx", "h", "hh", "hpp", "hxx"];
 
@@ -70,4 +75,10 @@ pub fn is_native(name: &str) -> bool {
 #[must_use]
 pub fn is_rust(name: &str) -> bool {
     extension(name).as_deref() == Some("rs")
+}
+
+/// A member's declared licence is one of the two the repository uses.
+#[must_use]
+pub fn known_licence(license: Option<&str>) -> bool {
+    matches!(license, Some(AGPL | SOURCE_AVAILABLE))
 }
