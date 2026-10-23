@@ -100,6 +100,7 @@ export const KEYS = [
   "shots.eyebrow",
   "shots.title",
   "shots.lead",
+  "shots.credit",
   "shots.showLarge",
   "shots.dialog",
   "shots.previous",

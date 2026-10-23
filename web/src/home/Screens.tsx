@@ -1,9 +1,10 @@
 // The screenshots, in a grid, each opening large in a dialog with the
-// arrow keys to step. They show the client's text view (card text, no card
-// image): each AVIF is a short recording that loops, each WebP a still of it,
-// which `prefers-reduced-motion` gets (WCAG 2.3.3) and a browser without AVIF
-// shows. They live outside this repository: `npm run content` copies them
-// from a Baylee checkout (README.md §"Content from Baylee").
+// arrow keys to step. They show the game with Scryfall's card images, so the
+// grid and the dialog each carry the credit (`shots.credit`; Baylee's
+// docs/legal.md §3): each AVIF is a short recording that loops, each WebP a
+// still of it, which `prefers-reduced-motion` gets (WCAG 2.3.3) and a browser
+// without AVIF shows. They live outside this repository: `npm run content`
+// copies them from a Baylee checkout (README.md §"Content from Baylee").
 
 import { useState } from "react";
 
@@ -78,11 +79,17 @@ export function Screens() {
           </li>
         ))}
       </ul>
+      <p className="small shots-credit">
+        <T id="shots.credit" />
+      </p>
       {shot && (
         <Modal className="lightbox" label={t(lang, "shots.dialog")} onClose={() => setAt(null)} onKey={onKey}>
           <Picture shot={shot} large alt={t(lang, shot.alt)} />
           <p className="lightbox-cap">
             <b>{t(lang, shot.title)}</b> {t(lang, shot.caption)}
+            <span className="lightbox-credit">
+              <T id="shots.credit" />
+            </span>
           </p>
           <button type="button" className="round-btn lightbox-prev" onClick={() => step(-1)} aria-label={t(lang, "shots.previous")}>
             <Icon name="prev" />

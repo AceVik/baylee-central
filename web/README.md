@@ -201,9 +201,11 @@ assets here):
   numbers are those of the client the download button offers; the copy
   below is only its fallback when GitHub does not answer or a tag carries
   no status;
-- the client's screenshots (`shot-*.avif|webp`), which show its text view:
-  each AVIF a short recording that loops, each WebP a still of it for
-  `prefers-reduced-motion` and browsers without AVIF, at 1200 and 640 px.
+- the client's screenshots (`shot-*.avif|webp`), which show the game with
+  Scryfall's card images (© Wizards of the Coast, credited beside them, not
+  under this repository's licence): each AVIF a short recording that loops,
+  each WebP a still of it for `prefers-reduced-motion` and browsers without
+  AVIF, at 1200 and 640 px.
 
 ```bash
 npm run content -- ~/Projects/baylee
