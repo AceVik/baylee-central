@@ -1,5 +1,5 @@
-<!-- version: 2026-10-22 -->
-<!-- updated: 2026-10-21 -->
+<!-- version: 2026-10-23 -->
+<!-- updated: 2026-10-23 -->
 
 # Baylee Central privacy policy
 
@@ -31,7 +31,7 @@ data protection officer, as none is required.
 
 ## 3. What we process, why, and on what basis
 
-- **Username, account ID, creation time** (display name, profile picture and roles will follow) – running and showing your account. *Art. 6(1)(b) GDPR (contract)*
+- **Username, account ID, creation time, display name and tag** (profile picture and roles will follow) – running and showing your account. Other players see your display name and tag, never your username; an account moved from the official gateway keeps the name and tag it had there. *Art. 6(1)(b) GDPR (contract)*
 - **OPAQUE sign-in record, encrypted key container, credential state** – sign-in, protecting your encrypted data. *Art. 6(1)(b) GDPR*
 - *Not available yet:* **e-mail address (optional) and its confirmation** – password reset, account notices. *Art. 6(1)(b) GDPR*
 - **Your key container, encrypted under your recovery code** (we never learn the code); a second sign-in factor (optional) will follow – protecting your account and your encrypted data. *Art. 6(1)(b) GDPR*
@@ -83,9 +83,9 @@ third-party services that collect data about you.
 - **E-mail** (once it exists): if you add an e-mail address, we send confirmations and reset
   links through a mail provider in the European Economic Area acting as a
   processor.
-- **Gateways:** when you sign in to a gateway, it receives your account ID and
-  the confirmation that you are signed in, but not your
-  password or your encrypted data.
+- **Gateways:** when you sign in to a gateway, it receives your account ID,
+  your display name and tag, and the confirmation that you are signed in, but
+  not your password or your encrypted data.
 - **Authorities** receive data only where we are legally obliged.
 
 No data is transferred to countries outside the European Economic Area.
