@@ -203,7 +203,7 @@ async fn registered(store: &AccountStore, operator: &DatabaseConnection, keys: &
     let key = super::register::issue(operator, 1, "recovery-registered").await;
     let ticket = Token::generate().unwrap();
     let identity = store
-        .register("recovery-registered", &key.digest(), &ticket)
+        .register("recovery-registered", None, &key.digest(), &ticket)
         .await
         .unwrap();
     let enrolled = super::register::credentials(keys, identity);
@@ -256,6 +256,8 @@ async fn invalidated(store: &AccountStore, operator: &DatabaseConnection, keys: 
         .reserve_legacy(
             "recovery-reset",
             "recovery-reset",
+            None,
+            None,
             &Token::generate().unwrap(),
         )
         .await

@@ -13,6 +13,10 @@ pub struct Summary {
     pub identity: Identity,
     /// The account's canonical username.
     pub username: String,
+    /// The display name other players see, if it has one.
+    pub display_name: Option<String>,
+    /// Its tag, if it has one.
+    pub tag: Option<u32>,
     /// Where the account came from.
     pub source: AccountSource,
     /// The account has a recovery wrapper.
@@ -44,7 +48,7 @@ impl AccountStore {
         let row = self
             .db
             .query_one_raw(statement(
-                "SELECT a.id, a.vault_epoch, a.username_key, a.source,
+                "SELECT a.id, a.vault_epoch, a.username_key, a.source, a.display_name, a.tag,
              a.recovery_wrapped_master IS NOT NULL AS recovery,
              floor(extract(epoch FROM s.created_at))::bigint AS signed_in_at,
              floor(extract(epoch FROM s.expires_at))::bigint AS expires_at
@@ -61,11 +65,14 @@ impl AccountStore {
             row.try_get::<i64>("", column)
                 .map_err(|_| Error::Unavailable)
         };
+        let (display_name, tag) = super::profiles::columns(&row)?;
         Ok(Summary {
             identity: identity(&row)?,
             username: row
                 .try_get("", "username_key")
                 .map_err(|_| Error::Unavailable)?,
+            display_name,
+            tag,
             source: source(
                 &row.try_get::<String>("", "source")
                     .map_err(|_| Error::Unavailable)?,

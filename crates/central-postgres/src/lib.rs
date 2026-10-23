@@ -8,7 +8,8 @@ mod beta_keys;
 mod connection;
 mod pending;
 pub use accounts::{
-    AccountStore, Credential, Issued, MAX_GATEWAY_VERSIONS, Session, Status, Summary,
+    AccountStore, Credential, Issued, MAX_GATEWAY_VERSIONS, Profile, Session, Status, Summary,
+    TAG_DRAWS, TagDraw,
 };
 
 pub use beta_keys::{

@@ -5,6 +5,7 @@ pub mod beta_key;
 mod endpoint;
 pub mod gateway;
 pub mod object;
+pub mod profile;
 pub mod terms;
 mod token;
 pub mod wire;

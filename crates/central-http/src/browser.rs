@@ -606,10 +606,21 @@ mod tests {
             Request::LegacyReserve {
                 legacy_id: "x".into(),
                 username: "synthetic".into(),
+                display_name: None,
+                tag: None,
             },
             Request::LegacyClose {
                 legacy_id: "x".into(),
                 identity,
+            },
+            Request::LegacyProfile {
+                legacy_id: "x".into(),
+                display_name: Some("Synthetic".into()),
+                tag: 13,
+            },
+            Request::GatewayProfile {
+                lease: Token::generate().unwrap(),
+                purpose: TicketPurpose::Admit,
             },
             Request::AcceptTerms {
                 subject: TermsSubject::Gateway {
@@ -681,6 +692,7 @@ mod tests {
         let register = body(&Request::Register {
             username: "synthetic".into(),
             beta_key: "CENTRAL-0000-0000-0000-0000".into(),
+            display_name: None,
         });
         for forged in 0..5 {
             let hops = format!("203.0.113.{forged}, 198.51.100.20");
@@ -812,6 +824,7 @@ mod tests {
         let register = body(&Request::Register {
             username: "synthetic".into(),
             beta_key: "CENTRAL-0000-0000-0000-0000".into(),
+            display_name: None,
         });
         for _ in 0..5 {
             assert_eq!(

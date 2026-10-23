@@ -83,7 +83,8 @@ pub fn browser_operation(request: &Request) -> bool {
         | Request::TermsStatus
         | Request::GatewayDirectory { .. }
         | Request::AccountSummary
-        | Request::SetRecovery { .. } => true,
+        | Request::SetRecovery { .. }
+        | Request::SetDisplayName { .. } => true,
         Request::AcceptTerms { subject, .. } => matches!(subject, TermsSubject::Central),
         Request::CreateObject
         | Request::ReadObject { .. }
@@ -92,11 +93,13 @@ pub fn browser_operation(request: &Request) -> bool {
         | Request::DeleteObject { .. }
         | Request::LegacyInvalidate { .. }
         | Request::LegacyClose { .. }
+        | Request::LegacyProfile { .. }
         | Request::RegisterGateway { .. }
         | Request::GatewayHeartbeat { .. }
         | Request::SetGatewayAdmins { .. }
         | Request::CheckGatewayAdmin { .. }
         | Request::GatewaySession { .. }
+        | Request::GatewayProfile { .. }
         | Request::LegacyReserve { .. }
         | Request::ReadDocument
         | Request::WriteDocument { .. }
@@ -112,12 +115,16 @@ pub fn browser_operation(request: &Request) -> bool {
 
 /// Operations the browser listener alone serves: registration has its
 /// per-address budget there, and the account page's requests are the
-/// website's (the native client makes no recovery code yet, M6). The native
-/// listener refuses them before anything else is checked.
+/// website's (the native client makes no recovery code and chooses no
+/// display name yet, M6). The native listener refuses them before anything
+/// else is checked.
 fn browser_only(request: &Request) -> bool {
     matches!(
         request,
-        Request::Register { .. } | Request::AccountSummary | Request::SetRecovery { .. }
+        Request::Register { .. }
+            | Request::AccountSummary
+            | Request::SetRecovery { .. }
+            | Request::SetDisplayName { .. }
     )
 }
 
@@ -132,6 +139,7 @@ fn uses_session(request: &Request) -> bool {
             | Request::AcceptTerms { .. }
             | Request::AccountSummary
             | Request::SetRecovery { .. }
+            | Request::SetDisplayName { .. }
     )
 }
 
@@ -413,6 +421,7 @@ mod tests {
             Request::Register {
                 username: "synthetic".into(),
                 beta_key: String::new(),
+                display_name: Some("Synthetic".into()),
             },
             Request::EnrollmentStart {
                 ticket: token(),
@@ -439,6 +448,9 @@ mod tests {
             Request::AccountSummary,
             Request::SetRecovery {
                 recovery: vec![1; 73],
+            },
+            Request::SetDisplayName {
+                display_name: "Synthetic".into(),
             },
         ]
     }
@@ -470,6 +482,11 @@ mod tests {
                 legacy_id: "x".into(),
                 identity,
             },
+            Request::LegacyProfile {
+                legacy_id: "x".into(),
+                display_name: Some("Synthetic".into()),
+                tag: 13,
+            },
             Request::RegisterGateway {
                 origin: "https://gateway.invalid".into(),
                 metadata: metadata(),
@@ -487,9 +504,15 @@ mod tests {
                 lease: token(),
                 purpose: TicketPurpose::Admit,
             },
+            Request::GatewayProfile {
+                lease: token(),
+                purpose: TicketPurpose::Admit,
+            },
             Request::LegacyReserve {
                 legacy_id: "x".into(),
                 username: "synthetic".into(),
+                display_name: Some("Synthetic".into()),
+                tag: Some(13),
             },
             Request::ReadDocument,
             Request::WriteDocument {
@@ -547,14 +570,14 @@ mod tests {
                 text[start..].split('"').next().unwrap().to_owned()
             })
             .collect();
-        assert_eq!(named.len(), 37, "every operation is in one of the lists");
+        assert_eq!(named.len(), 40, "every operation is in one of the lists");
     }
 
     #[test]
     fn the_native_listener_refuses_the_websites_own_operations() {
         let (served, _) = (served(), refused());
         let only: Vec<&Request> = served.iter().filter(|r| browser_only(r)).collect();
-        assert_eq!(only.len(), 3);
+        assert_eq!(only.len(), 4);
         assert!(only.iter().all(|r| browser_operation(r)));
         assert!(!browser_only(&Request::SessionStatus));
         assert!(!browser_only(&Request::Logout));
@@ -570,6 +593,9 @@ mod tests {
         assert!(uses_session(&Request::SetRecovery {
             recovery: vec![1; 73]
         }));
+        assert!(uses_session(&Request::SetDisplayName {
+            display_name: "Synthetic".into()
+        }));
         assert!(!uses_session(&Request::Terms));
         assert!(!uses_session(&Request::GatewayDirectory { after: None }));
         assert!(!uses_session(&Request::Discover {
@@ -578,6 +604,7 @@ mod tests {
         assert!(!uses_session(&Request::Register {
             username: "synthetic".into(),
             beta_key: String::new(),
+            display_name: None,
         }));
     }
 }
