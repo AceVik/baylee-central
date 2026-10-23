@@ -956,7 +956,7 @@ retry with other bytes. Engineering review, not an audit.
 Against a real Central, 23.10.2026 (`web/e2e-real/moved.spec.ts`): this
 branch's release build in the deployed mode (`--accounts-stdin` with
 `browser.listen`, the committed terms in force) over verify-full TLS to
-PostgreSQL 18.6, provisioned, migrated (000001 to 000008 and 000010) and
+PostgreSQL 18.6, provisioned, migrated (000001 to 000010, rebased onto step 1) and
 granted as `docs/operations.md` says, behind the stand-in for the site's
 Caddy; Chromium at `https://baylee.app`, at a phone's and a desktop's width.
 Per width, one synthetic account was moved as Baylee's client and the bridge
