@@ -30,13 +30,18 @@ export function Modal({
     if (!dialog) return;
     const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     if (!dialog.open) dialog.showModal();
+    let backdropDown = false;
+    const down = (e: PointerEvent) => { backdropDown = e.target === dialog; };
     const click = (e: MouseEvent) => {
-      if (e.target === dialog) handlers.current.onClose();
+      if (backdropDown && e.target === dialog) handlers.current.onClose();
+      backdropDown = false;
     };
     const key = (e: KeyboardEvent) => handlers.current.onKey?.(e);
+    dialog.addEventListener("pointerdown", down);
     dialog.addEventListener("click", click);
     dialog.addEventListener("keydown", key);
     return () => {
+      dialog.removeEventListener("pointerdown", down);
       dialog.removeEventListener("click", click);
       dialog.removeEventListener("keydown", key);
       if (dialog.open) dialog.close();
@@ -51,6 +56,7 @@ export function Modal({
       aria-labelledby={labelledBy}
       onCancel={(e) => {
         e.preventDefault();
+        e.stopPropagation();
         onClose();
       }}
     >

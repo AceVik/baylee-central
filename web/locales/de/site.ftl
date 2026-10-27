@@ -705,7 +705,7 @@ baylee-chapter5Body =
 
 baylee-chapter6Title = Mit erhobenem Schwanz
 baylee-chapter6Body =
-    Irgendwann brach der Tumor auf. Baylee hatte sichtbar Schmerzen. Als diese nachließen, war sie wieder unsere kleine Katze, die mit erhobenem Schwanz durch die Räume zog und ihre Menschen für sich beanspruchte.
+    Der Tumor wurde größer und nässte zunehmend. Baylee hatte sichtbar Schmerzen. Als diese nachließen, war sie wieder unsere kleine Katze, die mit erhobenem Schwanz durch die Räume zog und ihre Menschen für sich beanspruchte.
 
     Wir sahen, dass ihre Kräfte langsam weniger wurden. Doch ihr Appetit, ihre Neugier, ihre verschmuste Art und ihr lautes Schnurren waren noch da.
 
@@ -742,3 +742,15 @@ baylee-chapter8Body =
     Hier darf sie friedlich auf ihrer Wolke schlafen, im warmen Sonnenlicht, umgeben von Blumen, Tauben und Gartenvögeln.
 
     Ruhe in Frieden, meine liebste Baylee.
+
+baylee-photoOpen = Foto groß ansehen
+baylee-photoClose = Foto schließen
+baylee-zoomIn = Vergrößern
+baylee-zoomOut = Verkleinern
+baylee-fit = Einpassen
+
+baylee-photo6 = Baylee, gemütlich zwischen den Decken.
+baylee-photo7 = Geborgen im roten Body.
+baylee-photo8 = Ein Sonnenplatz im Karton.
+baylee-photo9 = Eingekuschelt und ganz entspannt.
+baylee-photo10 = Ihr Lieblingsplatz: ganz nah bei uns.

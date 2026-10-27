@@ -1,10 +1,10 @@
 .remembrance { min-width: 0; align-self: center; margin-top: -3rem; grid-column: 2; grid-row: 1 / span 2; }
 .baylee-cloud { appearance: none; border: 0; background: transparent; padding: 0; width: 100%; position: relative; isolation: isolate; cursor: pointer; color: #293d3d; font-family: var(--serif); text-align: center; border-radius: 45%; }
-.baylee-cloud > img { position: relative; width: 100%; height: auto; filter: drop-shadow(0 12px 30px #e4bc6b25); transition: filter 550ms ease, transform 650ms var(--ease); animation: cloud-breath 9s ease-in-out infinite; }
-.cloud-halo { position: absolute; inset: -5% -3% 2%; z-index: -1; border-radius: 50%; border: 1px solid #fff4ce80; outline: 1px solid #f5d78d50; outline-offset: 10px; background: radial-gradient(ellipse, #fff5d95c, transparent 65%); opacity: 0; transform: scale(0.96); transition: opacity 500ms ease, transform 650ms var(--ease); }
+.baylee-cloud > img { position: relative; width: 100%; height: auto; filter: drop-shadow(0 12px 30px #e4bc6b25); transition: filter 550ms ease; animation: cloud-breath 9s ease-in-out infinite; }
+.cloud-halo { position: absolute; inset: -5% -3% 2%; z-index: -1; border-radius: 50%; border: 1px solid #fff4ce80; outline: 1px solid #f5d78d50; outline-offset: 10px; background: radial-gradient(ellipse, #fff5d95c, transparent 65%); opacity: 0; transition: opacity 500ms ease; }
 .cloud-halo::before, .cloud-halo::after { content: '✧'; position: absolute; top: 15%; font-size: 2.4rem; color: #fff9dd; text-shadow: 0 0 15px #fff0a5; }
 .cloud-halo::before { left: 9%; } .cloud-halo::after { right: 9%; top: 70%; }
-.baylee-cloud:hover .cloud-halo, .baylee-cloud:focus-visible .cloud-halo { opacity: 1; transform: scale(1.025); }
+.baylee-cloud:hover .cloud-halo, .baylee-cloud:focus-visible .cloud-halo { opacity: 1; }
 .baylee-cloud:hover > img, .baylee-cloud:focus-visible > img { filter: drop-shadow(0 0 25px #ffeaa5b0) drop-shadow(0 14px 28px #806b4530); }
 .cloud-caption { position: relative; display: inline-flex; flex-direction: column; align-items: center; margin-top: 0.8rem; padding: 0.8rem 1.7rem; border: 1px solid #fff5d9b3; border-radius: 999px; background: #fff9e9eb; box-shadow: 0 12px 35px #3a555529; transition: background 300ms ease, box-shadow 300ms ease; }
 .cloud-dedication { font-size: clamp(1.1rem, 1.5vw, 1.5rem); font-style: italic; }
@@ -14,3 +14,6 @@
 .baylee-cloud:focus-visible .cloud-caption { outline: 3px solid #235b66; outline-offset: 5px; }
 @keyframes cloud-breath { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-7px); } }
 @media (max-width: 900px) { .remembrance { margin: 0 auto; width: min(35rem, 100%); grid-column: 1; grid-row: 2; } }
+
+/* The hit region and controls stay still while light answers the pointer. */
+.baylee-cloud, .baylee-cloud:hover, .baylee-cloud:active { transform: none; }

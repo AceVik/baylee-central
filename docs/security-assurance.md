@@ -1141,3 +1141,21 @@ licenses, sources and dependency bans pass. Manifests/lockfiles are unchanged.
 The advisory is not ignored: full release checks remain blocked and nothing was
 pushed, deployed or migrated in production. This is the implementing agent’s
 engineering review, not an independent security audit.
+
+### Parchment memorial UI review — 27 October 2026
+
+Design pass: local static owner-supplied photos, decorative preview effects only,
+uncropped originals loaded on demand, no protocol/account/storage change and no
+new dependency. Preserve the approved 37 paragraphs and family-requested wording.
+Implementation pass: nested native dialogs isolate Escape and restore focus;
+backdrop dismissal requires a pointer-down on the backdrop; late image loads do
+not discard zoom; bounded panning resets on photo/fit/zoom/resize. All transient
+listeners/observers/timeouts are cleaned up. Ten images have metadata stripped.
+Adversarial pass: desktop/phone tests exercise rapid chapter reversal, reduced
+motion during a turn, no-WebGL/context recovery, all ten photos, delayed full
+image loading, zoom bounds, dragging, stable hover geometry and nested dismissal.
+`npm run check` passes; full mocked browser suite: 40 passed, 40 opt-in screen
+capture cases skipped. Rust gate, PostgreSQL, smoke and secrets checks pass.
+Pinned audit/deny still fail on the pre-existing `crypto-bigint 0.5.5` advisory
+RUSTSEC-2026-0387, also present before this UI change. No exception or dependency
+change was introduced. This is feature-branch work, not external release approval.
