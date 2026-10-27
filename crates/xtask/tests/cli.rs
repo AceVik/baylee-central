@@ -10,6 +10,7 @@ fn args(line: &str) -> Vec<String> {
 #[test]
 fn every_task_and_flag_parses() {
     assert_eq!(parse(&args("gate")), Ok(Task::Gate));
+    assert_eq!(parse(&args("crypto-scope")), Ok(Task::CryptoScope));
     assert_eq!(
         parse(&args("policy")),
         Ok(Task::Policy {
@@ -45,6 +46,7 @@ fn anything_else_is_the_usage() {
         "",
         "deploy",
         "gate --compiler-probe",
+        "crypto-scope --skip",
         "policy --exercise-failure",
         "smoke --exercise-failure extra",
         "wasm --exercise-failure",

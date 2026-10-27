@@ -10,6 +10,7 @@ the gate starts never replace the running executable, which Windows refuses.
 | task | does | replaced |
 | --- | --- | --- |
 | `cargo xtask gate` | `cargo fmt --check`, the policy with its compiler probe, clippy `-D warnings`, every test, the doc tests, the release build | `scripts/test.ps1` |
+| `cargo xtask crypto-scope` | exact graph and source bounds of the unreachable bigint advisory; also mandatory in `gate` | (new, 2026-10-28) |
 | `cargo xtask policy [--compiler-probe]` | the code policy (below) | `scripts/check-policy.ps1` |
 | `cargo xtask postgres [--exercise-failure]` | the `PostgreSQL` integration fixture ([database development](database-development.md)) | `scripts/test-postgres.ps1` |
 | `cargo xtask smoke [--exercise-failure]` | the development listener's HTTP boundary ([dev mode](dev-mode.md)); build `--release` first | `scripts/smoke-dev.ps1` |
@@ -23,6 +24,11 @@ and the gate run them (they replaced `scripts/test-policy.ps1`). CI runs
 every task under bash on all four runners.
 
 ## The code policy
+
+The gate additionally enforces the reviewed Ristretto advisory scope through
+`crypto-scope` ([review and removal condition](crypto-proposal/bigint-advisory.md)).
+CI's dependency job runs it before the pinned audit and deny tools. A scanner
+pass alone does not validate the exception's reachability bounds.
 
 - The workspace sets `unsafe_code = "forbid"`. Every member inherits the
   workspace lints, is not published (an absent `publish`, which allows

@@ -60,6 +60,9 @@ performance policy. Do not import its permission to write unsafe or assembly.
 - Run `cargo xtask gate`, `cargo xtask postgres`, `cargo xtask smoke` and
   `cargo xtask secrets` (docs/xtask.md), plus cargo audit --deny warnings and
   cargo deny check. Pin checker versions as in CI.
+  The gate and dependency CI job also require `cargo xtask crypto-scope`:
+  the bigint exception is bounded by reviewed sources and graph, never a
+  standalone scanner waiver (`docs/crypto-proposal/bigint-advisory.md`).
 - Keep protocol specs, migrations, threat model and operator runbooks in sync.
   Do not assert anonymity, audit completion or legal compliance without evidence.
 - External release, production migration and processing human training replays

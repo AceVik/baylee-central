@@ -1,5 +1,9 @@
 # Cryptography dependency proposal
 
+Current advisory handling: [bounded Ristretto exception for RUSTSEC-2026-0387](bigint-advisory.md),
+enforced by the gate and dependency CI job since 28 October 2026. The historical
+19 October scanner result below predates that advisory.
+
 Status: owner accepted on 2026-10-19 subject to review and tests. Used only by the isolated central-crypto spike; see ../crypto-protocol.md for evidence and gaps. This acceptance is separate from the HTTP graph.
 
 Direct candidates: opaque-ke 4.0.1 (RFC 9807 OPAQUE), sha2 0.10.9, rand 0.8.8 (opaque-ke compatibility), chacha20poly1305 0.11.0 with zeroization, hkdf 0.12.4, zeroize 1.9.1, secrecy 0.10.3 and getrandom 0.4.3. OPAQUE brings Argon2 0.5.3. Cargo.lock resolves 61 external packages.

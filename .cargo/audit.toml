@@ -1,0 +1,5 @@
+[advisories]
+# Unreachable only in the reviewed fixed Ristretto suite. Both the required
+# gate and CI dependency job enforce cargo xtask crypto-scope first.
+# See docs/crypto-proposal/bigint-advisory.md; never extend without review.
+ignore = ["RUSTSEC-2026-0387"]

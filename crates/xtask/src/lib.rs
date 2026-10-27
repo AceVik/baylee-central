@@ -15,6 +15,7 @@ pub mod policy;
 pub mod random;
 pub mod secrets;
 
+mod crypto_scope;
 mod gate;
 mod postgres;
 mod process;

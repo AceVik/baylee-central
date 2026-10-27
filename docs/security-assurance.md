@@ -1159,3 +1159,35 @@ capture cases skipped. Rust gate, PostgreSQL, smoke and secrets checks pass.
 Pinned audit/deny still fail on the pre-existing `crypto-bigint 0.5.5` advisory
 RUSTSEC-2026-0387, also present before this UI change. No exception or dependency
 change was introduced. This is feature-branch work, not external release approval.
+
+
+## Bounded bigint advisory handling, 28 October 2026
+
+Design pass: the affected operations from RUSTSEC-2026-0387 are not reached by
+the fixed Ristretto255/SHA-512 OPAQUE suite. Reviewed both upstream Ristretto
+implementations and the hash-expansion/domain helpers. The current dependency
+requirements cannot take fixed bigint >=0.7.6 independently. Preserve protocol,
+stored credentials and vetted cryptography; do not introduce a fork or new
+primitives. This is an unreachable-code exception, not a patched-library claim.
+See [the source review and removal condition](crypto-proposal/bigint-advisory.md).
+
+Implementation pass: exact registry versions/features and reverse consumers are
+checked with all-feature metadata including inactive optional packages. Bind
+the local crypto member to its manifest location and fingerprint its entire
+reviewed crate. Both the complete gate and dependency CI job require the guard
+before accepting the narrowly named audit/deny exception. No dependencies,
+cryptographic code, browser module, data formats or KDF parameters changed.
+
+Adversarial pass: regression tests reject additional consumers at each affected
+boundary, changed sources/versions/features, missing and duplicate packages/nodes,
+non-workspace crypto, edited/added/removed/renamed source files and links. A test
+found that duplicate central-crypto resolution nodes were initially accepted;
+that is now rejected too. LF and CRLF source text produce the same fingerprint.
+All six scope regressions pass. Full local gate, PostgreSQL fixture, development
+smoke, history/worktree secret scan, pinned audit 0.22.2 and deny 0.20.2 pass.
+These are engineering checks; independent protocol review and release gates
+remain separate requirements.
+
+An additional Argon High review of the supplied guard and reached upstream
+sources found no confirmed findings. It did not run commands or independently
+certify the protocol; local/CI checks supply the execution evidence.

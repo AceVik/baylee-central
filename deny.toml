@@ -2,6 +2,9 @@
 all-features = true
 
 [advisories]
+# Bound by cargo xtask crypto-scope in the gate and dependency job.
+# See docs/crypto-proposal/bigint-advisory.md for the unreachable arithmetic.
+ignore = ["RUSTSEC-2026-0387"]
 unmaintained = "all"
 unsound = "all"
 
