@@ -278,6 +278,13 @@ SystemCallFilter=@system-service
 
 ## Deploying with the gateway
 
+For the 28 October 2026 release, the service executable and website package
+are versioned `0.1.1-beta.9a`. Reusable library versions and the authentication
+protocol are unchanged. Deploy the exact green main revision, recorded in
+`state/deployed`; the native release pins that same revision. The release
+includes the sunlit Baylee memorial, parchment story and photo viewer.
+
+
 `ops/deploy-hook` keeps Central and the website (`web/`) in lockstep with the
 official gateway on the same machine. It is a Baylee deploy hook (Baylee's
 `docs/deploy-hooks.md`): installed root-owned, `0755`, as
