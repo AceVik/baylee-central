@@ -1,7 +1,7 @@
 //! The command line: `cargo xtask <task> [flag]`, nothing else.
 
 use crate::fail::{Fail, Result};
-use crate::{gate, policy, postgres, secrets, smoke, wasm, workspace};
+use crate::{crypto_scope, gate, policy, postgres, secrets, smoke, wasm, workspace};
 
 /// What to run.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -9,6 +9,8 @@ pub enum Task {
     /// fmt, the policy with its compiler probe, clippy, the tests, the doc
     /// tests and the release build.
     Gate,
+    /// The exact source and dependency bounds for the bigint advisory.
+    CryptoScope,
     /// The code policy.
     Policy {
         /// Also check that rustc rejects unsafe code under the forbid lint.
@@ -37,6 +39,7 @@ pub enum Task {
 pub const USAGE: &str = "usage: cargo xtask <task>
 
 tasks:
+  crypto-scope                 verify the reviewed Ristretto advisory scope
   gate                          fmt, policy, clippy, tests, doc tests, release build
   policy [--compiler-probe]     the code policy: unsafe, native sources, links, dependencies
   postgres [--exercise-failure] the PostgreSQL integration fixture (needs Docker and OpenSSL)
@@ -58,6 +61,7 @@ pub fn parse(args: &[String]) -> Result<Task> {
     };
     match (task.as_str(), flag) {
         ("gate", None) => Ok(Task::Gate),
+        ("crypto-scope", None) => Ok(Task::CryptoScope),
         ("policy", None) => Ok(Task::Policy {
             compiler_probe: false,
         }),
@@ -92,6 +96,7 @@ pub fn run(args: &[String]) -> Result<()> {
     let root = workspace::root()?;
     match task {
         Task::Gate => gate::run(&root),
+        Task::CryptoScope => crypto_scope::check(&root),
         Task::Policy { compiler_probe } => {
             policy::check(&root, compiler_probe)?;
             println!("{}", policy::PASSED);

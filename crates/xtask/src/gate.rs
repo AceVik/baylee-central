@@ -8,7 +8,7 @@ use std::process::Command;
 
 use crate::fail::Result;
 use crate::process;
-use crate::{policy, workspace};
+use crate::{crypto_scope, policy, workspace};
 
 fn cargo(root: &Path, args: &[&str], failure: &str) -> Result<()> {
     process::succeed(
@@ -23,6 +23,7 @@ pub(crate) fn run(root: &Path) -> Result<()> {
     cargo(root, &["fmt", "--all", "--", "--check"], "Format failed")?;
     policy::check(root, true)?;
     println!("{}", policy::PASSED);
+    crypto_scope::check(root)?;
     cargo(
         root,
         &[
