@@ -1105,3 +1105,39 @@ No advisory was ignored and no security gate was weakened. The local website
 change is reviewable, but the full release checks are not green and no push,
 deployment or production migration was performed. This is an engineering
 review, not an independent security audit.
+
+## Baylee’s complete remembrance — 27 October 2026
+
+Design pass: replace the album’s short draft with the owner-approved family story,
+in eight chapters and 37 paragraphs, alongside the existing five photographs.
+The same German prose and English translation are embedded in the native client.
+These are deliberately public, owner-supplied memories. No new personal data is
+collected; account/session boundaries, requests, CSP and dependencies are unchanged.
+
+Implementation pass: the reading column is ordinary escaped React text, with no
+HTML injection. Native dialog ownership/focus restoration remain in the shared
+component. Chapters and photos have independent state; photo changes preserve the
+reading offset. The date range says “With us”, not a fabricated birth date. The
+new WebGL canvas is limited to the masthead, 960 × 300 pixels and 20 draws/second;
+it releases GPU objects and listeners on unmount, pauses for hidden documents,
+stills for reduced motion and rebuilds after context restoration. CSS supplies
+the fallback. No remote asset, analytics, unsafe API, dependency or CSP exception.
+
+Adversarial/QA pass: `npm run check` passed typechecking, lint, 215 unit tests and
+the production build. Browser checks pass at desktop/phone widths in light/dark,
+including all 37 paragraphs, the last words at the scroll end, independent photo
+navigation, chapter boundary controls, keyboard focus/escape, Home/End on tabs,
+320-pixel layout, WebGL disabled, real context loss/restoration and no continuing
+GPU draws while reduced-motion or closed. Shader alpha was corrected after visual
+inspection; the header cloud and warm light do not cover the prose. All 34 normal
+E2E tests pass; the 40 opt-in whole-site screenshot tests were not rerun because
+the changes are confined to this album. No production accounts or data were used.
+
+The Rust gate, isolated PostgreSQL 18.6 fixture, development smoke and working-tree/
+history secret scans passed again. Each fixture verified its owned process,
+listener and container cleanup. Pinned `cargo-audit 0.22.2` and `cargo-deny 0.20.2`
+still report the previously documented **RUSTSEC-2026-0387**, `crypto-bigint 0.5.5`;
+licenses, sources and dependency bans pass. Manifests/lockfiles are unchanged.
+The advisory is not ignored: full release checks remain blocked and nothing was
+pushed, deployed or migrated in production. This is the implementing agent’s
+engineering review, not an independent security audit.

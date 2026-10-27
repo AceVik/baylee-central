@@ -33,5 +33,7 @@ separate browser layers, so they never repaint Baylee's likeness.
 The photos, in album order, derive from the owner's `PXL_20260212_084326728.jpg`,
 `PXL_20260127_075332867.jpg`, `PXL_20260113_125944795.jpg`,
 `PXL_20260131_092837183.jpg` and `PXL_20260212_084306146.jpg`.
-Original files remain untouched. The short dedication uses only the details
-the owner supplied; it does not invent a birthday, biography or age.
+Original files remain untouched. The full approved family remembrance now replaces the short draft: eight
+chapters, 37 paragraphs, identical to the native client in each language.
+The date range explicitly describes her time with the family; no birthday
+is invented. The cloud in the album masthead uses the same approved asset.

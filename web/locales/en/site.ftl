@@ -637,8 +637,6 @@ baylee-dedication = For Baylee. Forever in the sunlight.
 baylee-invitation = Meet the little soul behind this world
 baylee-open = Remember Baylee · open her photo album
 baylee-eyebrow = The heart of this project
-baylee-story = Baylee was a small, delicate cat, loved very much. She loved watching the garden birds and pigeons. This project carries her name and is dedicated to her.
-baylee-memory = Here she sleeps peacefully on a sunlit cloud, surrounded by flowers and the birds she loved. A little world beneath her, and a place for our memories.
 baylee-date = In loving memory · 26 October 2026
 baylee-close = Back to her world
 baylee-previous = Previous photograph
@@ -648,3 +646,102 @@ baylee-photo2 = Baylee looking out from the flowered duvet.
 baylee-photo3 = Resting in her round, grey bed.
 baylee-photo4 = Baylee asleep, curled up close.
 baylee-photo5 = A quiet moment, nestled in the duvet.
+
+# Baylee’s story, approved by her family on 27 October 2026.
+baylee-storyTitle = For Baylee. Forever in the sunlight.
+baylee-together = With us · 17 November 2025 – 26 October 2026
+baylee-chapters = Her story
+baylee-chapterPrevious = Previous chapter
+baylee-chapterNext = Next chapter
+baylee-photos = Our memories
+baylee-read = Scroll to read
+
+baylee-chapter1Title = A home for Baylee
+baylee-chapter1Body =
+    Baylee came home to us on 17 November 2025.
+
+    My wife and I had adopted her from the animal shelter in Krefeld. She was estimated to be about thirteen years old. She had malignant mammary tumours, and the cancer had already spread to her liver. Baylee was a palliative-care cat. We knew our time together would be limited. With us, she was to have a home where she was loved.
+
+    She soon showed us just how quickly she would claim that home as her own.
+
+    On her very first day, she slipped onto my lap while I was working. And on her first night, she tore a hole in a bag of cat food I had ordered for my parents’ cats and helped herself. Of course she had been given her own food and had eaten well that evening. But Baylee had apparently decided that this supply still deserved a closer investigation.
+
+    Our little mouse had an astonishing appetite – and an incredible amount of energy.
+
+baylee-chapter2Title = Growing trust
+baylee-chapter2Body =
+    When we noticed that she was drinking a lot of water, we took her to the vet. A blood test revealed a thyroid condition, which also explained her great hunger and lively nature. She was given thyroid medication and a temporary course of antibiotics because her inflammation markers were elevated.
+
+    When she suddenly began rubbing herself against everything, meowing a lot and becoming unusually cuddly and attached to us, we initially worried that she was reacting badly to one of her new medicines. Another examination revealed the explanation: our little darling was in heat. She had not been spayed.
+
+    We got through that time together, too. Baylee trusted us more and more, and we grew ever closer to one another.
+
+baylee-chapter3Title = Our little princess
+baylee-chapter3Body =
+    I still remember exactly how happy she was when she got her cat tree. She immediately sat on the very top perch and looked contentedly around the flat. Strangely enough, she never used that particular spot again. Why remained her secret.
+
+    Other places were rarely left unoccupied: my lap, my legs and our bed. There she usually slept on me or on my wife. Best of all was managing to lie on both of us at once.
+
+    She strutted through the flat with her tail held high, as though she knew perfectly well that she was the princess here. She had spirit and knew how to make her boundaries clear. With us, she could be entirely herself. Her quirks, her demands and her little stubborn streak were all loved, too.
+
+    I had never formed such a deep bond with an animal before. Baylee found a place very deep in both my wife’s heart and mine.
+
+baylee-chapter4Title = Hours in the sunshine
+baylee-chapter4Body =
+    When the weather grew warmer, she discovered the balcony. She loved feeling the day’s first rays of sunshine in her fur. Before long, she was spending almost the entire day out there.
+
+    The pigeons and garden birds were a particular fascination. She watched them intently, lay in wait and repeatedly tried to startle them. Between sunbathing and birdwatching, our little princess had a very full daily schedule.
+
+baylee-chapter5Title = Her own little mind
+baylee-chapter5Body =
+    Meanwhile, her illness continued to progress.
+
+    The tumour became inflamed, and Baylee kept licking the affected area open. At the vet’s she was given her first recovery suit, a red one. From then on, she had to wear one every day to keep her from injuring the wound further.
+
+    She quickly got used to wearing it. Having it put on, however, was something she disliked right up to her last day. Even a bowl of food could only do so much to coax her out then. Big as her appetite was, her opinion of the suit was unmistakable.
+
+    The wound grew worse. It discharged pus, eventually began to bleed and developed an unpleasant smell. At the same time, Baylee kept showing us how much joy she still found in her everyday life. She played, ate, explored her surroundings and climbed her scratching board and the cupboards.
+
+    Sometimes she lay for hours on the edge of the bed beside us, waiting for us to finally wake up and make her breakfast. If that took too long, she simply climbed over us. Our faces were no obstacle.
+
+    She had very definite ideas about food. Her taste was rather in the “frozen pizza” camp: after a while, high-quality cat food could no longer excite her, and variety was essential. The same food twice in a row was out of the question. Chicken with liver, anything with cheese, tuna or salmon – those were things that made her happy.
+
+baylee-chapter6Title = With her tail held high
+baylee-chapter6Body =
+    Eventually, the tumour broke open. Baylee was visibly in pain. When the pain eased, she was once again our little cat, moving through the rooms with her tail held high and claiming her people for herself.
+
+    We could see her strength slowly fading. But her appetite, her curiosity, her affectionate nature and her loud purr were still there.
+
+baylee-chapter7Title = Saying goodbye
+baylee-chapter7Body =
+    On Friday evening, 23 October 2026, she developed symptoms that at first seemed like a cold. Her nose was running, and her breathing was deep and laboured, as though she were struggling for air.
+
+    On Saturday she seemed livelier again. The unusual breathing and runny nose remained, but she once more showed the energy and love of life we knew so well.
+
+    Sunday morning was difficult. Her eyes were watering, she was struggling to breathe and she was in pain. I gave her pain medication. After about an hour she felt better again, but her breathing remained different. We knew we needed to take her to the vet.
+
+    On Monday morning her condition worsened again. Fortunately, my wife had the day off. We called the practice, made an appointment and took Baylee there.
+
+    The X-ray showed how far the cancer had spread. We were told that only about a third of her lungs remained available for breathing. Letting her continue to live would have meant that she would get less and less air.
+
+    We had to say goodbye.
+
+    On Monday, 26 October 2026, at around noon, our dearest Baylee was put to sleep.
+
+baylee-chapter8Title = Forever in the sunlight
+baylee-chapter8Body =
+    She was with us for just under a year. In that time, she had become part of our family and a very close friend. She belonged to our working days, our nights and our waking up in the morning. To sunny hours on the balcony and to the little habits that make up a life together.
+
+    Now she is missing from all those moments.
+
+    The emptiness is still fresh and deep. We miss her purr, her weight on our legs, her upright tail and her unquestioning expectation that we would finally see to her breakfast.
+
+    If there is something after this life, whatever it may be, then I wish to meet that soul again one day.
+
+    Until then, we will carry our little mouse in our hearts forever.
+
+    That is why this hobby project is dedicated to Baylee. To her spirit, her closeness, her joy in the sun and the birds. And to the love that grew during our time together.
+
+    Here she may sleep peacefully on her cloud, in the warm sunshine, surrounded by flowers, pigeons and garden birds.
+
+    Rest in peace, my dearest Baylee.

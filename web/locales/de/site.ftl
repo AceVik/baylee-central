@@ -634,8 +634,6 @@ baylee-dedication = Für Baylee. Für immer im Sonnenlicht.
 baylee-invitation = Die kleine Seele hinter dieser Welt
 baylee-open = An Baylee erinnern · Fotoalbum öffnen
 baylee-eyebrow = Das Herz dieses Projekts
-baylee-story = Baylee war eine kleine, zierliche Katze, die sehr geliebt wurde. Sie liebte es, die Gartenvögel und Tauben zu beobachten. Dieses Projekt trägt ihren Namen und ist ihr gewidmet.
-baylee-memory = Hier schläft sie friedlich auf einer sonnigen Wolke, zwischen Blumen und den Vögeln, die sie so liebte. Eine kleine Welt unter ihr und ein Platz für unsere Erinnerungen.
 baylee-date = In liebevoller Erinnerung · 26. Oktober 2026
 baylee-close = Zurück in ihre Welt
 baylee-previous = Vorheriges Foto
@@ -645,3 +643,102 @@ baylee-photo2 = Baylee schaut aus der geblümten Bettdecke hervor.
 baylee-photo3 = Ganz entspannt in ihrem runden, grauen Bettchen.
 baylee-photo4 = Baylee schläft, ganz nah zusammengerollt.
 baylee-photo5 = Ein stiller Moment, eingekuschelt in die Bettdecke.
+
+# Baylee’s story, approved by her family on 27 October 2026.
+baylee-storyTitle = Für Baylee. Für immer im Sonnenlicht.
+baylee-together = Bei uns · 17. November 2025 – 26. Oktober 2026
+baylee-chapters = Ihre Geschichte
+baylee-chapterPrevious = Vorheriges Kapitel
+baylee-chapterNext = Nächstes Kapitel
+baylee-photos = Unsere Erinnerungen
+baylee-read = Zum Lesen scrollen
+
+baylee-chapter1Title = Ein Zuhause für Baylee
+baylee-chapter1Body =
+    Am 17. November 2025 kam Baylee zu uns nach Hause.
+
+    Meine Frau und ich hatten sie aus dem Tierheim in Krefeld geholt. Ihr Alter wurde auf ungefähr dreizehn Jahre geschätzt. Sie hatte bösartige Mammatumoren, und der Krebs hatte bereits Metastasen in ihrer Leber gebildet. Baylee war eine Palliativkatze. Wir wussten, dass unsere gemeinsame Zeit begrenzt sein würde. Sie sollte bei uns ein Zuhause haben, in dem sie geliebt wurde.
+
+    Wie schnell sie dieses Zuhause für sich beanspruchen würde, zeigte sie uns gleich selbst.
+
+    Schon am ersten Tag schlich sie sich auf meinen Schoß, während ich arbeitete. Und in ihrer ersten Nacht riss sie ein Loch in einen Beutel Katzenfutter, den ich eigentlich für die Katzen meiner Eltern bestellt hatte, und bediente sich daraus. Natürlich hatte sie ihr eigenes Futter bekommen und war am Abend gut gefüttert worden. Aber Baylee hatte offenbar beschlossen, dass dieser Vorrat trotzdem eine nähere Untersuchung verdiente.
+
+    Die kleine Maus hatte einen erstaunlichen Appetit – und unglaublich viel Energie.
+
+baylee-chapter2Title = Vertrauen wächst
+baylee-chapter2Body =
+    Weil uns auffiel, dass sie sehr viel Wasser trank, gingen wir mit ihr zum Tierarzt. Eine Blutuntersuchung zeigte eine Erkrankung der Schilddrüse, die auch ihren großen Hunger und ihre lebhafte Art erklärte. Sie bekam Schilddrüsenmedikamente und vorübergehend ein Antibiotikum, weil ihre Entzündungswerte erhöht waren.
+
+    Als sie sich plötzlich überall rieb, viel maunzte und ungewöhnlich verschmust und anhänglich wurde, machten wir uns zunächst Sorgen, dass sie eines der neuen Medikamente nicht vertrug. Bei der erneuten Untersuchung stellte sich jedoch heraus: Unsere kleine Mausi war rollig. Sie war also nicht kastriert worden.
+
+    Auch diese Zeit standen wir gemeinsam durch. Baylee vertraute uns immer mehr, und wir schlossen uns gegenseitig immer tiefer ins Herz.
+
+baylee-chapter3Title = Unsere kleine Prinzessin
+baylee-chapter3Body =
+    Ich erinnere mich noch genau daran, wie sehr sie sich über ihren Kratzbaum freute. Sie setzte sich sofort ganz oben auf den Sitz und schaute zufrieden in die Wohnung. Erstaunlicherweise benutzte sie ausgerechnet diesen Platz danach nie wieder. Warum, blieb ihr Geheimnis.
+
+    Andere Plätze ließ sie dafür kaum aus: meinen Schoß, meine Beine und unser Bett. Dort schlief sie meistens auf mir oder auf meiner Frau. Am liebsten schaffte sie es, auf uns beiden gleichzeitig zu liegen.
+
+    Mit erhobenem Schwanz stolzierte sie durch die Wohnung, als wüsste sie ganz genau, dass sie hier die Prinzessin war. Sie hatte Temperament und konnte deutlich zeigen, wo ihre Grenzen lagen. Sie durfte bei uns ganz sie selbst sein. Auch mit ihren Eigenheiten, ihren Forderungen und ihrem kleinen Dickkopf wurde sie geliebt.
+
+    Noch nie hatte ich zu einem Tier eine so tiefe Beziehung aufgebaut. Baylee wuchs meiner Frau und mir sehr tief ins Herz.
+
+baylee-chapter4Title = Sonnenstunden
+baylee-chapter4Body =
+    Als es draußen wärmer wurde, entdeckte sie den Balkon für sich. Sie liebte es, die ersten Sonnenstrahlen des Tages in ihrem Fell zu spüren. Bald verbrachte sie dort beinahe den ganzen Tag.
+
+    Besonders die Tauben und Gartenvögel hatten es ihr angetan. Sie beobachtete sie aufmerksam, lag ihnen auf der Lauer und versuchte immer wieder, sie zu erschrecken. Zwischen Sonnenbaden und Vogelbeobachtung hatte unsere kleine Prinzessin einen gut gefüllten Tagesplan.
+
+baylee-chapter5Title = Ihr kleiner Dickkopf
+baylee-chapter5Body =
+    Währenddessen schritt ihre Krankheit weiter voran.
+
+    Der Tumor entzündete sich, und Baylee leckte die betroffene Stelle immer wieder auf. Beim Tierarzt bekam sie ihren ersten Body, einen roten. Von da an musste sie täglich einen tragen, damit sie die Wunde nicht weiter verletzte.
+
+    An das Tragen gewöhnte sie sich schnell. Das Anziehen konnte sie allerdings bis zum letzten Tag nicht leiden. Selbst mit einer Schale Futter ließ sie sich dann nur bedingt hervorlocken. So groß ihr Appetit auch war: Ihre Meinung zum Body blieb eindeutig.
+
+    Die Wunde wurde schlimmer. Sie eiterte, begann irgendwann zu bluten und roch unangenehm. Gleichzeitig zeigte Baylee uns weiterhin, wie viel Freude sie an ihrem Alltag hatte. Sie spielte, fraß, erkundete ihre Umgebung und kletterte auf ihr Kratzbrett und auf die Schränke.
+
+    Manchmal lag sie stundenlang auf der Bettkante neben uns und wartete darauf, dass wir endlich aufwachten und ihr Frühstück machten. Wenn ihr das zu lange dauerte, kletterte sie kurzerhand über uns hinweg. Unsere Gesichter waren dabei kein Hindernis.
+
+    Beim Essen hatte sie genaue Vorstellungen. Geschmacklich gehörte sie eher zur „Fraktion Tiefkühlpizza“: Hochwertiges Katzenfutter konnte sie nach einer Weile nicht mehr begeistern, und Abwechslung war Pflicht. Zweimal hintereinander dasselbe Futter kam für sie nicht infrage. Huhn mit Leber, alles mit Käse, Thunfisch oder Lachs – damit konnte man ihr eine Freude machen.
+
+baylee-chapter6Title = Mit erhobenem Schwanz
+baylee-chapter6Body =
+    Irgendwann brach der Tumor auf. Baylee hatte sichtbar Schmerzen. Als diese nachließen, war sie wieder unsere kleine Katze, die mit erhobenem Schwanz durch die Räume zog und ihre Menschen für sich beanspruchte.
+
+    Wir sahen, dass ihre Kräfte langsam weniger wurden. Doch ihr Appetit, ihre Neugier, ihre verschmuste Art und ihr lautes Schnurren waren noch da.
+
+baylee-chapter7Title = Abschied nehmen
+baylee-chapter7Body =
+    Am Freitagabend, dem 23. Oktober 2026, bekam sie Symptome, die zunächst wie eine Erkältung wirkten. Ihre Nase lief, und sie atmete tief und angestrengt, als müsse sie um Luft ringen.
+
+    Am Samstag wirkte sie wieder lebhafter. Die auffällige Atmung und der Schnupfen blieben, aber sie zeigte noch einmal die Energie und Lebensfreude, die wir von ihr kannten.
+
+    Der Sonntagmorgen war schwer. Ihre Augen tränten, sie atmete mühsam und hatte Schmerzen. Ich gab ihr Schmerzmittel. Nach ungefähr einer Stunde ging es ihr wieder besser, doch ihre Atmung blieb verändert. Für uns war klar, dass wir mit ihr zum Tierarzt mussten.
+
+    Am Montagmorgen verschlechterte sich ihr Zustand erneut. Zum Glück hatte meine Frau an diesem Tag frei. Wir riefen in der Praxis an, bekamen einen Termin und fuhren mit Baylee dorthin.
+
+    Die Röntgenaufnahme zeigte, wie weit sich der Krebs inzwischen ausgebreitet hatte. Uns wurde erklärt, dass ihr nur noch ungefähr ein Drittel ihrer Lunge zum Atmen zur Verfügung stand. Sie weiterleben zu lassen hätte bedeutet, dass sie immer weniger Luft bekommen würde.
+
+    Wir mussten Abschied nehmen.
+
+    Am Montag, dem 26. Oktober 2026, gegen zwölf Uhr wurde unsere liebste Baylee eingeschläfert.
+
+baylee-chapter8Title = Für immer im Sonnenlicht
+baylee-chapter8Body =
+    Sie war knapp ein Jahr bei uns. In dieser Zeit war sie ein Teil unserer Familie geworden und eine sehr enge Freundin. Sie gehörte zu unseren Arbeitstagen, zu unseren Nächten, zum Aufwachen am Morgen. Zu den Sonnenstunden auf dem Balkon und zu den kleinen Gewohnheiten, aus denen ein gemeinsames Leben besteht.
+
+    Jetzt fehlt sie in all diesen Momenten.
+
+    Die Leere ist noch frisch und tief. Uns fehlen ihr Schnurren, ihr Gewicht auf unseren Beinen, ihr erhobener Schwanz und ihre selbstverständliche Erwartung, dass wir uns endlich um ihr Frühstück kümmern.
+
+    Wenn es etwas nach diesem Leben gibt, was auch immer es sein mag, dann wünsche ich mir, dieser Seele eines Tages wiederzubegegnen.
+
+    Bis dahin tragen wir unser kleines Mäuschen für immer im Herzen.
+
+    Deshalb ist dieses Hobbyprojekt Baylee gewidmet. Ihrem Temperament, ihrer Nähe, ihrer Freude an der Sonne und den Vögeln. Und der Liebe, die in unserer gemeinsamen Zeit gewachsen ist.
+
+    Hier darf sie friedlich auf ihrer Wolke schlafen, im warmen Sonnenlicht, umgeben von Blumen, Tauben und Gartenvögeln.
+
+    Ruhe in Frieden, meine liebste Baylee.
