@@ -10,7 +10,6 @@ import { useAccount } from "../account/session";
 import { DISCORD } from "../config";
 import { OFFERED, nameOf, t, tagOf, useChooseLang, useLang, wordOf, type Key } from "../i18n";
 import { Link, PATHS, type Page } from "../router";
-import { Logo } from "./Logo";
 
 const NAV: { page: Page; label: Key }[] = [
   { page: "cards", label: "nav.cards" },
@@ -70,7 +69,8 @@ export function Header({ page }: { page: Page | null }) {
     <header className={`top${solid ? " solid" : ""}${overHero ? " over-hero" : ""}`}>
       <div className="top-inner">
         <Link to="/" className="brand" aria-label="Baylee">
-          <Logo sizes="7.6rem" alt="Baylee" />
+          <img src="/img/baylee-sunlight-icon.webp" width={192} height={192} alt="" />
+          <span>Baylee</span>
         </Link>
         <button
           ref={menu}

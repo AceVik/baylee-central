@@ -35,6 +35,7 @@ export function Footer() {
             templates (English, and Wizards' official translation of it);
             Baylee's docs/legal.md §1. The English one stands in every
             language, the page's own beside it. */}
+        <p className="footer-dedication"><T id="baylee.dedication" /></p>
         <FanContent lang="en" />
         {lang !== "en" && <FanContent lang={lang} />}
         <p className="notice">

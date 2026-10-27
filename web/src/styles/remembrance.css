@@ -1,0 +1,27 @@
+.remembrance { min-width: 0; align-self: center; margin-top: -3rem; grid-column: 2; grid-row: 1 / span 2; }
+.baylee-cloud { appearance: none; border: 0; background: transparent; padding: 0; width: 100%; position: relative; isolation: isolate; cursor: pointer; color: #293d3d; font-family: var(--serif); text-align: center; border-radius: 45%; }
+.baylee-cloud > img { position: relative; width: 100%; height: auto; filter: drop-shadow(0 12px 30px #e4bc6b25); transition: filter 550ms ease, transform 650ms var(--ease); animation: cloud-breath 9s ease-in-out infinite; }
+.cloud-halo { position: absolute; inset: -5% -3% 2%; z-index: -1; border-radius: 50%; border: 1px solid #fff4ce80; outline: 1px solid #f5d78d50; outline-offset: 10px; background: radial-gradient(ellipse, #fff5d95c, transparent 65%); opacity: 0; transform: scale(0.96); transition: opacity 500ms ease, transform 650ms var(--ease); }
+.cloud-halo::before, .cloud-halo::after { content: '✧'; position: absolute; top: 15%; font-size: 2.4rem; color: #fff9dd; text-shadow: 0 0 15px #fff0a5; }
+.cloud-halo::before { left: 9%; } .cloud-halo::after { right: 9%; top: 70%; }
+.baylee-cloud:hover .cloud-halo, .baylee-cloud:focus-visible .cloud-halo { opacity: 1; transform: scale(1.025); }
+.baylee-cloud:hover > img, .baylee-cloud:focus-visible > img { filter: drop-shadow(0 0 25px #ffeaa5b0) drop-shadow(0 14px 28px #806b4530); }
+.cloud-caption { position: relative; display: inline-flex; flex-direction: column; align-items: center; margin-top: 0.8rem; padding: 0.8rem 1.7rem; border: 1px solid #fff5d9b3; border-radius: 999px; background: #fff9e9eb; box-shadow: 0 12px 35px #3a555529; transition: background 300ms ease, box-shadow 300ms ease; }
+.cloud-dedication { font-size: clamp(1.1rem, 1.5vw, 1.5rem); font-style: italic; }
+.cloud-invitation { font: 500 0.75rem var(--sans); letter-spacing: 0.08em; margin-top: 0.35rem; color: #556360; }
+.baylee-cloud:hover .cloud-caption { background: #fffdf3; box-shadow: 0 0 30px #fff0c573; }
+.baylee-cloud:focus-visible { outline: none; }
+.baylee-cloud:focus-visible .cloud-caption { outline: 3px solid #235b66; outline-offset: 5px; }
+@keyframes cloud-breath { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-7px); } }
+.baylee-album { width: min(62rem, calc(100vw - 2rem)); max-width: none; max-height: 90svh; padding: 0; border: 1px solid var(--edge); border-radius: 24px; color: var(--ink); background: var(--panel-solid); box-shadow: 0 30px 100px #0006; overflow: auto; }
+.album-dismiss { position: absolute; top: 0.65rem; right: 0.65rem; z-index: 2; }
+.album-layout { display: grid; grid-template-columns: 1.1fr 1fr; }
+.album-photo { margin: 0; padding: 1rem; background: var(--bg-alt); display: flex; flex-direction: column; justify-content: center; }
+.album-photo img { width: 100%; height: min(50vh, 28rem); object-fit: contain; border-radius: 14px; }
+.album-photo figcaption { font: 0.9rem / 1.5 var(--sans); text-align: center; margin-top: 1rem; color: var(--ink-soft); }
+.album-controls { display: flex; align-items: center; justify-content: center; gap: 1.5rem; margin-top: 0.6rem; font: 0.85rem var(--sans); }
+.album-story { padding: clamp(1.5rem, 4vw, 3rem); align-self: center; }
+.album-story h2 { font-size: 3rem; }
+.album-love { color: var(--link); font-style: italic; font-size: 1.3rem; }
+@media (max-width: 900px) { .remembrance { margin: 0 auto; width: min(35rem, 100%); grid-column: 1; grid-row: 2; } }
+@media (max-width: 650px) { .album-layout { grid-template-columns: 1fr; } .album-photo img { height: 30svh; } .album-story { padding: 1.4rem; } }

@@ -628,3 +628,20 @@ privacy-cookieBasis = Rechtsgrundlage: § 25 Abs. 2 Nr. 2 TDDDG, unbedingt erfor
 privacy-countersTitle = Grenzen für Versuche
 privacy-counters = Damit niemand Beta-Keys oder Passwörter durchprobiert, zählt Baylee Central Registrierungen (fünf pro Stunde) und Anmeldeversuche (dreißig pro Minute) je IP-Adresse. Diese Zähler liegen nur im Arbeitsspeicher: nie auf der Festplatte, spätestens nach einer Stunde weg und bei jedem Neustart des Dienstes verloren.
 privacy-countersBasis = Rechtsgrundlage: Art. 6 Abs. 1 lit. f DSGVO, mein berechtigtes Interesse, Accounts zu schützen.
+
+# Baylee, the little soul this project is dedicated to.
+baylee-dedication = Für Baylee. Für immer im Sonnenlicht.
+baylee-invitation = Die kleine Seele hinter dieser Welt
+baylee-open = An Baylee erinnern · Fotoalbum öffnen
+baylee-eyebrow = Das Herz dieses Projekts
+baylee-story = Baylee war eine kleine, zierliche Katze, die sehr geliebt wurde. Sie liebte es, die Gartenvögel und Tauben zu beobachten. Dieses Projekt trägt ihren Namen und ist ihr gewidmet.
+baylee-memory = Hier schläft sie friedlich auf einer sonnigen Wolke, zwischen Blumen und den Vögeln, die sie so liebte. Eine kleine Welt unter ihr und ein Platz für unsere Erinnerungen.
+baylee-date = In liebevoller Erinnerung · 26. Oktober 2026
+baylee-close = Zurück in ihre Welt
+baylee-previous = Vorheriges Foto
+baylee-next = Nächstes Foto
+baylee-photo1 = Baylee, eingerollt in der weichen weißen Bettdecke.
+baylee-photo2 = Baylee schaut aus der geblümten Bettdecke hervor.
+baylee-photo3 = Ganz entspannt in ihrem runden, grauen Bettchen.
+baylee-photo4 = Baylee schläft, ganz nah zusammengerollt.
+baylee-photo5 = Ein stiller Moment, eingekuschelt in die Bettdecke.

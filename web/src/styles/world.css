@@ -1,0 +1,19 @@
+/* One quiet landscape behind the site, with a brighter foreground on arrival. */
+#root { isolation: isolate; }
+.world-backdrop { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
+.world-landscape { position: absolute; inset: 0; background: url('/img/baylees-world.webp') 64% center / cover; opacity: 0.45; }
+.world-wash { position: absolute; inset: 0; background: linear-gradient(100deg, var(--bg) 6%, transparent 100%), linear-gradient(0deg, var(--bg), transparent 80%); }
+.world-companion { position: absolute; right: 3vw; top: 24vh; width: min(42vw, 42rem); height: auto; filter: drop-shadow(0 16px 35px #d8b67325); }
+.page-head:not(.account-page) { background: linear-gradient(180deg, transparent, var(--bg)); }
+main > .section { background: var(--bg); }
+main > .section-alt { background: var(--bg-alt); }
+.glass { border-color: var(--edge); }
+@media (min-width: 1000px) {
+  .account-page { min-height: 88svh; }
+  .account-page .section-inner { width: min(48vw, 38rem); margin-left: max(var(--gutter), calc((100vw - var(--wrap)) / 2)); margin-right: auto; }
+}
+@media (max-width: 999px) {
+  .world-companion { display: none; }
+  .world-landscape { background-position: 70% center; opacity: 0.28; }
+}
+.footer-dedication { font-style: italic; color: var(--title); margin-bottom: 1.8rem; }
