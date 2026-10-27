@@ -13,15 +13,4 @@
 .baylee-cloud:focus-visible { outline: none; }
 .baylee-cloud:focus-visible .cloud-caption { outline: 3px solid #235b66; outline-offset: 5px; }
 @keyframes cloud-breath { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-7px); } }
-.baylee-album { width: min(62rem, calc(100vw - 2rem)); max-width: none; max-height: 90svh; padding: 0; border: 1px solid var(--edge); border-radius: 24px; color: var(--ink); background: var(--panel-solid); box-shadow: 0 30px 100px #0006; overflow: auto; }
-.album-dismiss { position: absolute; top: 0.65rem; right: 0.65rem; z-index: 2; }
-.album-layout { display: grid; grid-template-columns: 1.1fr 1fr; }
-.album-photo { margin: 0; padding: 1rem; background: var(--bg-alt); display: flex; flex-direction: column; justify-content: center; }
-.album-photo img { width: 100%; height: min(50vh, 28rem); object-fit: contain; border-radius: 14px; }
-.album-photo figcaption { font: 0.9rem / 1.5 var(--sans); text-align: center; margin-top: 1rem; color: var(--ink-soft); }
-.album-controls { display: flex; align-items: center; justify-content: center; gap: 1.5rem; margin-top: 0.6rem; font: 0.85rem var(--sans); }
-.album-story { padding: clamp(1.5rem, 4vw, 3rem); align-self: center; }
-.album-story h2 { font-size: 3rem; }
-.album-love { color: var(--link); font-style: italic; font-size: 1.3rem; }
 @media (max-width: 900px) { .remembrance { margin: 0 auto; width: min(35rem, 100%); grid-column: 1; grid-row: 2; } }
-@media (max-width: 650px) { .album-layout { grid-template-columns: 1fr; } .album-photo img { height: 30svh; } .album-story { padding: 1.4rem; } }

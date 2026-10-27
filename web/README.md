@@ -472,6 +472,28 @@ palette. A set's card grid is one stop for Tab (arrow keys, Home, End; Space
 shows a card large, Enter opens it on Scryfall). Motion is transform and
 opacity, 160–360 ms, and `prefers-reduced-motion` stills all of it.
 
+## Baylee’s remembrance
+
+`home/MemorialAlbum.tsx` presents the complete family-approved story from the
+German and English Fluent files. Eight keyboard-accessible chapter tabs and a
+scrollable, selectable HTML reading column sit beside the five real photographs.
+Photo changes keep the reading position; chapter changes reset it. The chapter
+arrows stop at the beginning and end. Left/Right turns photos, Alt+Left/Right
+turns chapters; focused chapter tabs also use arrows and Home/End. Native dialog
+focus, Escape and returning to the opener use the shared modal component.
+
+`MemorialLight.tsx` draws nine warm motes and soft rays in the masthead, at most
+960 × 300 pixels and 20 draws per second. It pauses when hidden and renders one
+static frame for reduced motion. Context loss keeps the CSS gradient and readable
+content; restoration recreates the GPU resources. Unmount cancels the animation
+and releases resources/listeners. The approved cloud breathes gently beside the
+heading; all CSS animation also obeys the shared reduced-motion policy. No new
+runtime dependency, external resource or CSP exception is needed.
+
+`e2e/remembrance.spec.ts` checks all 37 paragraphs, chapter/photo independence,
+keyboard/focus, scrolling to the final words, both languages and themes, mobile,
+WebGL absence, context loss/restoration and stopping GPU draws when still/closed.
+
 ## Known gaps
 
 The policy check (`cargo xtask policy`) skips
