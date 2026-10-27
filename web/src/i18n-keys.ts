@@ -519,6 +519,21 @@ export const KEYS = [
   "privacy.countersTitle",
   "privacy.counters",
   "privacy.countersBasis",
+  "baylee.dedication",
+  "baylee.invitation",
+  "baylee.open",
+  "baylee.eyebrow",
+  "baylee.story",
+  "baylee.memory",
+  "baylee.date",
+  "baylee.close",
+  "baylee.previous",
+  "baylee.next",
+  "baylee.photo1",
+  "baylee.photo2",
+  "baylee.photo3",
+  "baylee.photo4",
+  "baylee.photo5",
 ] as const;
 
 export type Key = (typeof KEYS)[number];

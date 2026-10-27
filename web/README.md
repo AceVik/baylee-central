@@ -218,8 +218,31 @@ that and a new build, or copying the data straight into the served `data/`.
 Without them the pages say the list did not load and the screenshots stay
 empty; the tests mock both.
 
-The logo, the painting and the fonts (Faustina and Alegreya Sans, SIL OFL 1.1,
-licences beside them in `public/fonts/`) are our own or free, and committed.
+The sunlight world, Baylee's cloud portrait, both logos and her five photographs
+are committed local assets. [Sources and preparation](assets-sunlight.md)
+record their provenance. The former sanctuary painting and logos are retired.
+The fonts (Faustina and Alegreya Sans, SIL OFL 1.1) retain their licences beside
+them in `public/fonts/`.
+
+## Baylee in sunlight
+
+The home page pairs the approved cloud portrait with the garden city below it.
+Its warm light, breathing cloud and hover halo use CSS; the landscape also uses
+the existing restrained scroll parallax. Reduced motion freezes these effects.
+The compact logo in the header, large wordmark, icons and sharing image belong
+to the same design. Ivory/teal and deep teal/gold palettes cover all routes;
+account forms have a quiet landscape and a desktop cloud companion.
+
+The cloud opens a native dialog with five owner-supplied photographs, localized
+captions and a short dedication. Photographs are requested only when the album
+opens and as visitors step through it. Arrow keys, visible previous/next buttons
+and Escape work; closing restores focus to the cloud. On phones the cloud sits
+between the heading and the longer project description. This is a visual setting,
+not a claim that the future open world is already playable.
+
+`e2e/remembrance.spec.ts` checks the album, keyboard operation, focus restoration,
+motion preferences, hover decoration and sign-in layout in both themes at both
+widths. Its screenshots wait for image decoding and are written to `screens/`.
 
 ## Settings
 

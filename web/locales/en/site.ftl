@@ -631,3 +631,20 @@ privacy-cookieBasis = Legal basis: § 25(2) no. 2 TDDDG, strictly necessary for 
 privacy-countersTitle = Limits on attempts
 privacy-counters = To stop the guessing of beta keys and passwords, Baylee Central counts registrations (five an hour) and sign-in attempts (thirty a minute) per IP address. These counters live in its memory only: never written to disk, gone after an hour at the latest, and lost whenever the service restarts.
 privacy-countersBasis = Legal basis: Art. 6(1)(f) GDPR, my legitimate interest in keeping accounts safe.
+
+# Baylee, the little soul this project is dedicated to.
+baylee-dedication = For Baylee. Forever in the sunlight.
+baylee-invitation = Meet the little soul behind this world
+baylee-open = Remember Baylee · open her photo album
+baylee-eyebrow = The heart of this project
+baylee-story = Baylee was a small, delicate cat, loved very much. She loved watching the garden birds and pigeons. This project carries her name and is dedicated to her.
+baylee-memory = Here she sleeps peacefully on a sunlit cloud, surrounded by flowers and the birds she loved. A little world beneath her, and a place for our memories.
+baylee-date = In loving memory · 26 October 2026
+baylee-close = Back to her world
+baylee-previous = Previous photograph
+baylee-next = Next photograph
+baylee-photo1 = Baylee curled up in the soft white duvet.
+baylee-photo2 = Baylee looking out from the flowered duvet.
+baylee-photo3 = Resting in her round, grey bed.
+baylee-photo4 = Baylee asleep, curled up close.
+baylee-photo5 = A quiet moment, nestled in the duvet.

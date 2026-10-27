@@ -1,6 +1,5 @@
-/* baylee.app — the blue hour of the old landing page (our own painting,
-   wisteria petals past the moon), tidied: centred section heads, grids that
-   divide evenly at every width, and motion that is short and quiet.
+/* baylee.app — Baylee in sunlight: warm ivory, garden teal and soft gold,
+   with a deep blue-green evening palette and quiet movement.
    Transform and opacity only; `prefers-reduced-motion` stills all of it.
    The CSP allows no inline style, so everything lives in files. */
 
@@ -22,22 +21,22 @@
   --gutter: 16px;
   --radius: 18px;
 
-  --bg: #0b1322;
-  --bg-alt: #0e1729;
-  --panel: rgba(20, 31, 52, 0.78);
-  --panel-solid: #121c30;
-  --panel-2: #1a2740;
+  --bg: #122c36;
+  --bg-alt: #16353e;
+  --panel: rgba(20, 46, 55, 0.94);
+  --panel-solid: #193b44;
+  --panel-2: #234953;
   --edge: rgba(222, 190, 128, 0.26);
   --edge-soft: rgba(170, 190, 220, 0.14);
-  --ink: #e9edf5;
-  --ink-soft: #c3ccdc;
-  --ink-faint: #9aa6bc;
-  --title: #f8f2e5;
+  --ink: #f3f1e9;
+  --ink-soft: #d4e2df;
+  --ink-faint: #a9c2c0;
+  --title: #fff8e5;
   --gold: #e0be7c;
   --gold-2: #f6dfa6;
   --gold-ink: #1b1407;
-  --violet: #b9a2ff;
-  --violet-soft: rgba(170, 140, 255, 0.16);
+  --violet: #a0d7df;
+  --violet-soft: rgba(135, 207, 219, 0.14);
   --link: #e8cb8c;
   --link-hover: #f8e6b9;
   --focus: #ffe8a8;
@@ -53,35 +52,36 @@
   --mist: rgba(190, 210, 240, 0.10);
   --shadow: 0 24px 50px -30px rgba(0, 0, 0, 0.75);
   --shadow-lift: 0 30px 60px -28px rgba(0, 0, 0, 0.85), 0 0 0 1px var(--edge);
-  --top-bg: rgba(10, 17, 31, 0.82);
+  --top-bg: rgba(15, 39, 48, 0.94);
   --code-bg: #0a1120;
   --code-ink: #e6ebf5;
   --kbd-bg: #1b2740;
-  --field-bg: rgba(9, 15, 28, 0.65);
+  --field-bg: rgba(11, 31, 39, 0.85);
   --field-edge: rgba(170, 190, 220, 0.55);
+  --scene-veil: rgba(16, 39, 49, 0.94);
   color-scheme: dark;
 }
 @media (prefers-color-scheme: light) {
   :root:not([data-theme="dark"]) {
-    --bg: #eef2f8;
-    --bg-alt: #e3e9f3;
-    --panel: rgba(253, 252, 248, 0.88);
-    --panel-solid: #fbfaf6;
-    --panel-2: #f0eee7;
+    --bg: #f5f2e9;
+    --bg-alt: #e9eee8;
+    --panel: rgba(255, 253, 246, 0.96);
+    --panel-solid: #fffdf5;
+    --panel-2: #eceee5;
     --edge: rgba(140, 104, 40, 0.30);
     --edge-soft: rgba(40, 60, 100, 0.15);
-    --ink: #1b2233;
-    --ink-soft: #3b465a;
-    --ink-faint: #536075;
-    --title: #151d31;
-    --gold: #1f2a44;
-    --gold-2: #34446a;
-    --gold-ink: #f7f1e4;
-    --violet: #5b3fb0;
-    --violet-soft: rgba(91, 63, 176, 0.10);
-    --link: #7a5516;
-    --link-hover: #4f370b;
-    --focus: #1f2a44;
+    --ink: #233e43;
+    --ink-soft: #415c5e;
+    --ink-faint: #536c6b;
+    --title: #173c43;
+    --gold: #235b66;
+    --gold-2: #174955;
+    --gold-ink: #fffaf0;
+    --violet: #326b75;
+    --violet-soft: rgba(50, 107, 117, 0.10);
+    --link: #76511c;
+    --link-hover: #583b11;
+    --focus: #235b66;
     --ok: #1e7a4a;
     --warn: #8a5a05;
     --untested: #1f6f6a;
@@ -94,34 +94,35 @@
     --mist: rgba(255, 255, 255, 0.22);
     --shadow: 0 24px 50px -30px rgba(20, 30, 60, 0.38);
     --shadow-lift: 0 30px 60px -28px rgba(20, 30, 60, 0.45), 0 0 0 1px var(--edge);
-    --top-bg: rgba(238, 242, 248, 0.88);
-    --code-bg: #1b2233;
+    --top-bg: rgba(251, 248, 236, 0.94);
+    --code-bg: #233e43;
     --kbd-bg: #e3e8f1;
     --field-bg: rgba(255, 255, 255, 0.9);
     --field-edge: rgba(40, 60, 100, 0.6);
+    --scene-veil: rgba(250, 247, 232, 0.96);
     color-scheme: light;
   }
 }
 :root[data-theme="light"] {
-  --bg: #eef2f8;
-  --bg-alt: #e3e9f3;
-  --panel: rgba(253, 252, 248, 0.88);
-  --panel-solid: #fbfaf6;
-  --panel-2: #f0eee7;
+  --bg: #f5f2e9;
+  --bg-alt: #e9eee8;
+  --panel: rgba(255, 253, 246, 0.96);
+  --panel-solid: #fffdf5;
+  --panel-2: #eceee5;
   --edge: rgba(140, 104, 40, 0.30);
   --edge-soft: rgba(40, 60, 100, 0.15);
-  --ink: #1b2233;
-  --ink-soft: #3b465a;
-  --ink-faint: #536075;
-  --title: #151d31;
-  --gold: #1f2a44;
-  --gold-2: #34446a;
-  --gold-ink: #f7f1e4;
-  --violet: #5b3fb0;
-  --violet-soft: rgba(91, 63, 176, 0.10);
-  --link: #7a5516;
-  --link-hover: #4f370b;
-  --focus: #1f2a44;
+  --ink: #233e43;
+  --ink-soft: #415c5e;
+  --ink-faint: #536c6b;
+  --title: #173c43;
+  --gold: #235b66;
+  --gold-2: #174955;
+  --gold-ink: #fffaf0;
+  --violet: #326b75;
+  --violet-soft: rgba(50, 107, 117, 0.10);
+  --link: #76511c;
+  --link-hover: #583b11;
+  --focus: #235b66;
   --ok: #1e7a4a;
   --warn: #8a5a05;
   --untested: #1f6f6a;
@@ -134,10 +135,11 @@
   --mist: rgba(255, 255, 255, 0.22);
   --shadow: 0 24px 50px -30px rgba(20, 30, 60, 0.38);
   --shadow-lift: 0 30px 60px -28px rgba(20, 30, 60, 0.45), 0 0 0 1px var(--edge);
-  --top-bg: rgba(238, 242, 248, 0.88);
-  --code-bg: #1b2233;
+  --top-bg: rgba(251, 248, 236, 0.94);
+  --code-bg: #233e43;
   --kbd-bg: #e3e8f1;
   --field-bg: rgba(255, 255, 255, 0.9);
   --field-edge: rgba(40, 60, 100, 0.6);
+  --scene-veil: rgba(250, 247, 232, 0.96);
   color-scheme: light;
 }

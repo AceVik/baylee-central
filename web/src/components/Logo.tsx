@@ -1,5 +1,5 @@
 // The logo (our own, Baylee's docs/legal.md §10) at the sizes it is shown:
-// AVIF where the browser takes it, WebP otherwise.
+// The approved sunlight wordmark, in two WebP sizes.
 
 export function Logo({
   sizes,
@@ -16,13 +16,12 @@ export function Logo({
 }) {
   return (
     <picture>
-      <source type="image/avif" srcSet="/img/baylee-logo-400.avif 400w, /img/baylee-logo-800.avif 800w" sizes={sizes} />
-      <source type="image/webp" srcSet="/img/baylee-logo-400.webp 400w, /img/baylee-logo.webp 800w" sizes={sizes} />
+      <source type="image/webp" srcSet="/img/baylee-sunlight-480.webp 480w, /img/baylee-sunlight-960.webp 960w" sizes={sizes} />
       <img
         className={className}
-        src="/img/baylee-logo.webp"
-        width={800}
-        height={336}
+        src="/img/baylee-sunlight-960.webp"
+        width={960}
+        height={400}
         alt={alt}
         decoding="async"
         loading={lazy === true ? "lazy" : "eager"}

@@ -1,0 +1,40 @@
+/* Baylee above the garden city: the approved portrait stays unaltered. */
+.hero { position: relative; overflow: hidden; isolation: isolate; min-height: min(100svh, 58rem); display: flex; align-items: center; }
+.sky { position: absolute; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; background: var(--bg); }
+.sky > div { position: absolute; inset: 0; }
+.sky > .sky-painting { inset: -5% -2%; background: url('/img/baylees-world.webp') 62% center / cover no-repeat; }
+.sky > .sky-light { background: radial-gradient(ellipse at 92% 8%, #ffefb975, transparent 60%); mix-blend-mode: screen; animation: sunlight 24s ease-in-out infinite alternate; }
+.sky > .sky-mist { inset: 65% -15% -10%; background: radial-gradient(ellipse at 70% 50%, #fff8e555, transparent 65%); animation: sunlight 32s ease-in-out infinite alternate-reverse; }
+.sky > .sky-veil { background: linear-gradient(90deg, var(--scene-veil) 0%, var(--scene-veil) 25%, transparent 78%), linear-gradient(0deg, var(--bg), transparent 25%); }
+@keyframes sunlight { from { opacity: 0.45; transform: translate3d(0, 0, 0); } to { opacity: 0.85; transform: translate3d(-2%, 1%, 0); } }
+.hero-inner { width: 100%; max-width: 82rem; margin: 0 auto; padding: calc(var(--top-h) + 3rem) max(var(--gutter), 3vw) 6rem; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); column-gap: 2vw; align-items: start; }
+.hero-heading, .hero-details { position: relative; z-index: 1; max-width: 34rem; grid-column: 1; }
+.hero-heading { grid-row: 1; }
+.hero-details { grid-row: 2; }
+.hero-logo { width: min(21rem, 68vw); height: auto; margin: 0 0 1.6rem; filter: drop-shadow(0 8px 20px #263d4930); }
+.kicker { font-family: var(--sans); font-weight: 700; font-size: 0.7rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-soft); margin: 0 0 1rem; max-width: 33em; }
+.hero h1 { margin: 0 0 0.5em; max-width: 11em; font-size: clamp(2.5rem, 3.8vw, 4.3rem); line-height: 1.04; text-wrap: balance; }
+.glow { color: var(--link); font-style: italic; }
+.lead { font-size: 1.03rem; max-width: 31em; color: var(--ink); margin: 0 0 1.7rem; line-height: 1.6; }
+.hero-note { max-width: 32em; font: 0.86rem / 1.5 var(--sans); color: var(--ink-soft); margin: 1.3rem 0 0; }
+.hero-actions { margin: 1rem 0 0; font-size: 0.9rem; }
+.hero .button-ghost { background: color-mix(in srgb, var(--panel-solid) 80%, transparent); }
+.scroll-cue { position: absolute; left: 50%; bottom: 1.5rem; width: 44px; height: 44px; margin-left: -22px; display: flex; align-items: center; justify-content: center; border-radius: 50%; color: var(--ink); background: var(--panel); border: 1px solid var(--edge); }
+@media (max-width: 900px) {
+  .hero-inner { padding-top: calc(var(--top-h) + 2rem); grid-template-columns: 1fr; gap: 1.5rem; padding-bottom: 3rem; }
+  .hero-heading, .hero-details { max-width: 38rem; margin: 0 auto; text-align: center; }
+  .hero-details { grid-row: 3; }
+  .hero-logo, .hero h1, .kicker, .lead, .hero-note { margin-left: auto; margin-right: auto; }
+  .hero h1 { max-width: 14em; }
+  .hero-actions { justify-content: center; }
+  .sky > .sky-veil { background: linear-gradient(180deg, var(--scene-veil) 0%, transparent 36%, var(--scene-veil) 62%, var(--bg)); }
+  .sky > .sky-painting { background-position: 70% center; }
+  .scroll-cue { display: none; }
+}
+@media (max-width: 480px) {
+  .hero-inner { padding-top: calc(var(--top-h) + 1.2rem); }
+  .hero-logo { width: 12rem; margin-bottom: 1.2rem; }
+  .hero h1 { font-size: 2.3rem; }
+  .lead { font-size: 1rem; }
+  .hero-actions .button { padding-inline: 1em; font-size: 0.92rem; }
+}

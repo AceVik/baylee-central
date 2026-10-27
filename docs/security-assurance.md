@@ -1067,3 +1067,41 @@ gateway in its check (the bridge read a registered gateway's lease), draws
 below the floor (a tag of three digits in the summary), and the page's
 reserved names compared without stripping `_` and `-`. Engineering review,
 not an audit.
+
+## Central sunlight website — 27 October 2026
+
+Design pass: adapt the website to the owner-approved Baylee memorial artwork,
+including responsive light/dark palettes and a local photograph album. Keep
+account protocols, server boundaries, CSP, dependency versions and external
+origins unchanged. Photographs are the existing metadata-stripped derivatives;
+no production account, private database or credentials enter the test setup.
+Asset provenance is in `web/assets-sunlight.md`.
+
+Implementation pass: decorative images ignore pointer input; the interactive
+cloud is a labelled native button opening the shared native dialog. No HTML
+injection, remote media embed, new dependency or inline script/style exemption.
+Photos load only as the album is opened and traversed. The shared dialog now
+explicitly returns focus when React unmounts it; previously removing an open
+dialog could lose the opener. Reduced motion freezes all idle animation.
+The mobile layout keeps the cloud before the longer project description.
+
+Validation: `npm run check` passed (typecheck, lint, 215 tests and production
+build), `npm run e2e` passed 30 tests, and `npm run screens` rendered all 40
+combinations of ten routes, two widths and two themes. The new browser tests
+exercise image decoding, photo wrapping in both directions, Escape and button
+closure, opener focus, motion preference changes and the hover halo. Existing
+browser tests continue to use synthetic external responses under the production
+CSP. Desktop/mobile hero, album, sign-in, registration and card views were
+visually inspected; the album was also operated in the in-app browser.
+
+`cargo xtask gate`, `cargo xtask postgres`, `cargo xtask smoke` and
+`cargo xtask secrets` passed. PostgreSQL and smoke fixtures verified removal
+of their owned processes/listeners. Pinned `cargo-audit 0.22.2` and
+`cargo-deny 0.20.2` both failed their advisory checks on **RUSTSEC-2026-0387**
+(`crypto-bigint 0.5.5`, timing variability; advisory dated 23 October 2026).
+The Rust and npm manifests/lockfiles are byte-identical to base `efc6731`;
+this is a pre-existing dependency finding, not a dependency introduced here.
+No advisory was ignored and no security gate was weakened. The local website
+change is reviewable, but the full release checks are not green and no push,
+deployment or production migration was performed. This is an engineering
+review, not an independent security audit.

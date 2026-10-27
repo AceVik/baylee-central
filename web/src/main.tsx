@@ -5,6 +5,7 @@ import { App } from "./App";
 import { LangProvider, initialLang, loadLang, type Lang } from "./i18n";
 import "./styles/tokens.css";
 import "./styles/base.css";
+import "./styles/world.css";
 import "./styles/header.css";
 import "./styles/buttons.css";
 import "./styles/forms.css";

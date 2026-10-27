@@ -7,6 +7,7 @@ import { Suspense, lazy, useEffect, useRef } from "react";
 import { AccountProvider } from "./account/session";
 import { Footer } from "./components/Footer";
 import { Header } from "./components/Header";
+import { WorldBackdrop } from "./components/WorldBackdrop";
 import { NotFound } from "./components/NotFound";
 import { SkipLink } from "./components/Section";
 import Home from "./home/Home";
@@ -111,6 +112,7 @@ export function App() {
 
   return (
     <AccountProvider>
+      <WorldBackdrop companion={page === "signIn" || page === "register" || page === "account"} />
       <SkipLink />
       <Header page={page} />
       <main id="main" tabIndex={-1} ref={main}>

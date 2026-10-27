@@ -1,6 +1,6 @@
 // A modal on the browser's own `<dialog>`: mounted while open, focus held
 // inside, Escape or a click on the backdrop closes it, and closing gives the
-// focus back to what had it before (the browser does that on `close()`).
+// focus back to its opener, including when React removes the dialog first.
 
 import { useEffect, useRef, type ReactNode } from "react";
 
@@ -28,6 +28,7 @@ export function Modal({
   useEffect(() => {
     const dialog = ref.current;
     if (!dialog) return;
+    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     if (!dialog.open) dialog.showModal();
     const click = (e: MouseEvent) => {
       if (e.target === dialog) handlers.current.onClose();
@@ -39,6 +40,7 @@ export function Modal({
       dialog.removeEventListener("click", click);
       dialog.removeEventListener("keydown", key);
       if (dialog.open) dialog.close();
+      if (previous?.isConnected) previous.focus({ preventScroll: true });
     };
   }, []);
   return (
