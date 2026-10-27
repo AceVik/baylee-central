@@ -555,6 +555,16 @@ export const KEYS = [
   "baylee.chapter7Body",
   "baylee.chapter8Title",
   "baylee.chapter8Body",
+  "baylee.photoOpen",
+  "baylee.photoClose",
+  "baylee.zoomIn",
+  "baylee.zoomOut",
+  "baylee.fit",
+  "baylee.photo6",
+  "baylee.photo7",
+  "baylee.photo8",
+  "baylee.photo9",
+  "baylee.photo10",
 ] as const;
 
 export type Key = (typeof KEYS)[number];

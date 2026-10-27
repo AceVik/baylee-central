@@ -37,3 +37,22 @@ Original files remain untouched. The full approved family remembrance now replac
 chapters, 37 paragraphs, identical to the native client in each language.
 The date range explicitly describes her time with the family; no birthday
 is invented. The cloud in the album masthead uses the same approved asset.
+
+## Parchment album and ten photographs — 27 October 2026
+
+The five additional owner-supplied photos are, in album order 6–10:
+`PXL_20260116_225450836.MP.jpg`, `PXL_20260324_064651597.jpg`,
+`PXL_20260409_112337689.jpg`, `PXL_20251220_022019300.jpg`, and
+`PXL_20260307_202151314.jpg`. New previews have a maximum side of 960 px.
+All ten `public/img/memorial/full/baylee-{1..10}.jpg` preserve the full original
+4032-pixel-side composition. FFmpeg decodes the original and writes JPEG quality
+2 with `-map_metadata -1`; motion-photo trailers and capture/location metadata
+are not shipped. The owner’s source files are unchanged. Hashes and provenance
+are recorded in Baylee's `art/baylee/memorial/assets.json`.
+
+Only the small preview uses cover cropping, individual subject anchors, rounded
+corners and a mild CSS vignette. The modal uses contain at fit, explicit bounded
+zoom and drag. Full images load only when opened. Stationary parchment and
+italic ink carry the complete 37 paragraphs; chapter six uses the family's
+requested description of increasing size and weeping. Page leaves, finite slide
+transitions and layered shadows respect reduced motion; controls never scale.

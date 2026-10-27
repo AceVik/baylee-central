@@ -708,7 +708,7 @@ baylee-chapter5Body =
 
 baylee-chapter6Title = With her tail held high
 baylee-chapter6Body =
-    Eventually, the tumour broke open. Baylee was visibly in pain. When the pain eased, she was once again our little cat, moving through the rooms with her tail held high and claiming her people for herself.
+    The tumour grew larger and wept increasingly. Baylee was visibly in pain. When the pain eased, she was once again our little cat, moving through the rooms with her tail held high and claiming her people for herself.
 
     We could see her strength slowly fading. But her appetite, her curiosity, her affectionate nature and her loud purr were still there.
 
@@ -745,3 +745,15 @@ baylee-chapter8Body =
     Here she may sleep peacefully on her cloud, in the warm sunshine, surrounded by flowers, pigeons and garden birds.
 
     Rest in peace, my dearest Baylee.
+
+baylee-photoOpen = View full photograph
+baylee-photoClose = Close photograph
+baylee-zoomIn = Zoom in
+baylee-zoomOut = Zoom out
+baylee-fit = Fit
+
+baylee-photo6 = Baylee, cosy among the blankets.
+baylee-photo7 = Snuggled up in her red recovery suit.
+baylee-photo8 = A sunny spot in a cardboard box.
+baylee-photo9 = Tucked in and completely relaxed.
+baylee-photo10 = Her favourite place: right beside us.

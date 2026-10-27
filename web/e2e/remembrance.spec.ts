@@ -2,6 +2,8 @@ import { expect, test } from "@playwright/test";
 
 import { mock } from "./mocks.ts";
 
+test.use({ video: { mode: "on", size: { width: 960, height: 720 } } });
+
 for (const theme of ["light", "dark"]) {
   test(`sunlight ${theme}: album, keyboard and stillness`, async ({ page }, info) => {
     const outside = await mock(page);
@@ -23,7 +25,7 @@ for (const theme of ["light", "dark"]) {
     await expect(dialog.getByRole("img")).toHaveAttribute("src", "/img/memorial/baylee-2.jpg");
     await page.keyboard.press("ArrowLeft");
     await page.keyboard.press("ArrowLeft");
-    await expect(dialog.getByRole("img")).toHaveAttribute("src", "/img/memorial/baylee-5.jpg");
+    await expect(dialog.getByRole("img")).toHaveAttribute("src", "/img/memorial/baylee-10.jpg");
     await dialog.getByRole("img").evaluate((image: HTMLImageElement) => image.decode());
     await page.screenshot({ path: `screens/album-${info.project.name}-${theme}.png` });
     const book = dialog.getByRole("tabpanel");
@@ -139,4 +141,130 @@ test("the album shader stops for reduced motion, restores its context and stops 
   const closed = await draws();
   await page.waitForTimeout(200);
   expect(await draws()).toBe(closed);
+});
+
+test.describe("parchment interaction recordings", () => {
+  test("photo zoom, drag, nested Escape and unchanged hit areas", async ({ page }, info) => {
+    const outside = await mock(page);
+    await page.emulateMedia({ reducedMotion: "no-preference" });
+    await page.goto("/?lang=de&theme=light");
+    await page.getByRole("button", { name: "An Baylee erinnern · Fotoalbum öffnen" }).click();
+    const album = page.getByRole("dialog", { name: "Baylee", exact: true });
+    const opener = album.getByRole("button", { name: "Foto groß ansehen" });
+    await expect(album).toHaveCSS("transform", "none");
+    await page.evaluate(() => document.fonts.ready);
+    const before = await opener.boundingBox();
+    if (info.project.name === "desktop") await opener.hover();
+    await expect(opener).toHaveCSS("transform", "none");
+    expect(await opener.boundingBox()).toEqual(before);
+    await opener.click();
+    const viewer = page.locator(".baylee-photo-viewer");
+    await expect(viewer).toBeVisible();
+    await viewer.getByRole("img").evaluate((img: HTMLImageElement) => img.decode());
+    const plus = viewer.getByRole("button", { name: "Vergrößern", exact: true });
+    const minus = viewer.getByRole("button", { name: "Verkleinern", exact: true });
+    await expect(minus).toBeDisabled();
+    for (let i = 0; i < 6; i++) await plus.click();
+    await expect(plus).toBeDisabled();
+    await expect(viewer.locator("output")).toHaveText("400 %");
+    await page.keyboard.press("+");
+    await expect(viewer.locator("output")).toHaveText("400 %");
+    if (info.project.name === "desktop") {
+      const box = await viewer.locator(".photo-viewport").boundingBox();
+      if (!box) throw new Error("Missing photo viewport");
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+      await page.mouse.down(); await page.mouse.move(box.x + box.width / 2, box.y + box.height - 5, { steps: 12 }); await page.mouse.up();
+      expect(await viewer.getByRole("img").evaluate(el => new DOMMatrix(getComputedStyle(el).transform).m42)).toBeGreaterThan(0);
+    }
+    await page.screenshot({ path: `screens/parchment-zoom-${info.project.name}.png` });
+    await viewer.getByRole("button", { name: "Einpassen" }).click();
+    await expect(viewer.locator("output")).toHaveText("100 %");
+    await page.keyboard.press("ArrowRight");
+    await expect(viewer.getByRole("img")).toHaveAttribute("src", "/img/memorial/full/baylee-2.jpg");
+    await page.keyboard.press("Escape");
+    await expect(viewer).not.toBeVisible();
+    await expect(album).toBeVisible();
+    await expect(opener).toBeFocused();
+    await expect(album.getByRole("img")).toHaveAttribute("src", "/img/memorial/baylee-2.jpg");
+    await page.keyboard.press("Escape");
+    await expect(album).not.toBeVisible();
+    expect(outside.stray).toEqual([]);
+  });
+
+  test("chapter reversals, no animation restart for photo and reduced motion", async ({ page }, info) => {
+    await mock(page);
+    await page.emulateMedia({ reducedMotion: "no-preference" });
+    await page.goto("/?lang=de&theme=dark");
+    await page.getByRole("button", { name: "An Baylee erinnern · Fotoalbum öffnen" }).click();
+    const tabs = page.getByRole("tab");
+    await tabs.nth(2).click();
+    await expect(page.locator(".story-turning-leaf.forward")).toHaveCount(1);
+    await tabs.nth(1).click();
+    await expect(page.locator(".story-turning-leaf.backward")).toHaveCount(1);
+    await expect(page.getByRole("tabpanel")).toContainText("Vertrauen wächst");
+    await page.screenshot({ path: `screens/parchment-turn-${info.project.name}.png` });
+    await expect(page.locator(".story-turning-leaf")).toHaveCount(0);
+    await page.getByRole("button", { name: "Nächstes Foto", exact: true }).click();
+    await expect(page.locator(".story-turning-leaf")).toHaveCount(0);
+    await tabs.nth(5).click();
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await expect(page.locator(".story-turning-leaf")).toBeHidden();
+    await expect(page.getByRole("tabpanel")).toContainText("Der Tumor wurde größer und nässte zunehmend.");
+    await page.screenshot({ path: `screens/parchment-book-${info.project.name}.png` });
+  });
+});
+
+test("ten previews, full originals and late-loading zoom", async ({ page }, info) => {
+  await mock(page);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/?lang=de&theme=light");
+  await page.getByRole("button", { name: "An Baylee erinnern · Fotoalbum öffnen" }).click();
+  const album = page.locator(".baylee-album");
+  const preview = album.locator(".photo-preview");
+  await expect(preview).toHaveCSS("border-radius", "12px");
+  await expect(preview.locator("img")).toHaveCSS("object-fit", "cover");
+  for (let n = 1; n <= 10; n++) {
+    await expect(preview.locator("img")).toHaveAttribute("src", `/img/memorial/baylee-${n}.jpg`);
+    await preview.locator("img").evaluate((img: HTMLImageElement) => img.decode());
+    if (n >= 6) await page.screenshot({ path: `screens/photo-${n}-${info.project.name}.png` });
+    await album.getByRole("button", { name: "Nächstes Foto", exact: true }).click();
+  }
+  let release: (() => void) | undefined;
+  const delayed = new Promise<void>(resolve => { release = resolve; });
+  await page.route("**/img/memorial/full/baylee-1.jpg", async route => { await delayed; await route.continue(); });
+  await album.getByRole("button", { name: "Foto groß ansehen" }).click();
+  const viewer = page.locator(".baylee-photo-viewer");
+  await viewer.getByRole("button", { name: "Vergrößern", exact: true }).click();
+  await expect(viewer.locator("output")).toHaveText("150 %");
+  release?.();
+  await viewer.getByRole("img").evaluate((img: HTMLImageElement) => img.decode());
+  await expect(viewer.locator("output")).toHaveText("150 %");
+  await viewer.getByRole("button", { name: "Einpassen" }).click();
+  await expect(viewer.getByRole("img")).toHaveCSS("object-fit", "contain");
+  expect(await viewer.getByRole("img").evaluate((img: HTMLImageElement) => Math.max(img.naturalWidth, img.naturalHeight))).toBe(4032);
+  let releaseSecond: (() => void) | undefined;
+  const second = new Promise<void>(resolve => { releaseSecond = resolve; });
+  await page.route("**/img/memorial/full/baylee-2.jpg", async route => { await second; await route.continue(); });
+  await viewer.getByRole("button", { name: "Nächstes Foto", exact: true }).click();
+  await expect(viewer.getByRole("img")).toHaveJSProperty("naturalWidth", 0);
+  await viewer.getByRole("button", { name: "Vergrößern", exact: true }).click();
+  await page.keyboard.press("Control+ArrowRight");
+  await expect(viewer.getByRole("img")).toHaveAttribute("src", "/img/memorial/full/baylee-2.jpg");
+  releaseSecond?.();
+  await viewer.getByRole("img").evaluate((img: HTMLImageElement) => img.decode());
+  await expect(viewer.locator("output")).toHaveText("150 %");
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Control+ArrowRight");
+  await expect(preview.locator("img")).toHaveAttribute("src", "/img/memorial/baylee-2.jpg");
+  const book = page.getByRole("tabpanel");
+  await book.focus(); await page.keyboard.press("Alt+ArrowRight");
+  await expect(book).toBeFocused();
+  await expect(book).toContainText("Vertrauen wächst");
+  if (info.project.name === "desktop") {
+    const bounds = await book.boundingBox(); if (!bounds) throw new Error("Missing book");
+    await page.mouse.move(bounds.x + 20, bounds.y + 30); await page.mouse.down();
+    await page.mouse.move(1, 1); await page.mouse.up();
+    await expect(album).toBeVisible();
+    await page.mouse.click(1, 1); await expect(album).not.toBeVisible();
+  }
 });
