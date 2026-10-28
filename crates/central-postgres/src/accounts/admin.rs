@@ -462,13 +462,24 @@ pub async fn appoint_admin(db: &DatabaseConnection, name: &str) -> Result<Appoin
     })
 }
 
-/// Delete audit events older than [`AUDIT_YEARS`], under the operator's
-/// (migrator's) login, as the privacy notice allows. Returns how many.
+/// What the operator's [`sweep`] deleted.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Swept {
+    /// Audit events older than [`AUDIT_YEARS`].
+    pub events: u64,
+    /// Reset codes past their expiry, whose digests no longer work.
+    pub codes: u64,
+}
+
+/// Delete audit events older than [`AUDIT_YEARS`] and the digests of expired
+/// reset codes, under the operator's (migrator's) login, as the privacy
+/// notice allows; both or neither.
 ///
 /// # Errors
 /// Storage failure.
-pub async fn sweep(db: &DatabaseConnection) -> Result<u64, Error> {
-    Ok(db
+pub async fn sweep(db: &DatabaseConnection) -> Result<Swept, Error> {
+    let tx = db.begin().await.map_err(|_| Error::Unavailable)?;
+    let events = tx
         .execute_raw(statement(
             "DELETE FROM central_identity.audit_events
              WHERE at < pg_catalog.clock_timestamp() - pg_catalog.make_interval(years => $1)",
@@ -476,5 +487,16 @@ pub async fn sweep(db: &DatabaseConnection) -> Result<u64, Error> {
         ))
         .await
         .map_err(|_| Error::Unavailable)?
-        .rows_affected())
+        .rows_affected();
+    let codes = tx
+        .execute_raw(statement(
+            "UPDATE central_identity.accounts SET reset_digest = NULL, reset_expires = NULL
+             WHERE reset_expires <= pg_catalog.clock_timestamp()",
+            vec![],
+        ))
+        .await
+        .map_err(|_| Error::Unavailable)?
+        .rows_affected();
+    tx.commit().await.map_err(|_| Error::Unavailable)?;
+    Ok(Swept { events, codes })
 }

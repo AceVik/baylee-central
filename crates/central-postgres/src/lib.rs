@@ -9,7 +9,7 @@ mod connection;
 mod pending;
 pub use accounts::{
     AUDIT_YEARS, AccountStore, Action, Appointed, Credential, Issued, MAX_GATEWAY_VERSIONS,
-    Profile, Session, Status, Summary, TAG_DRAWS, TagDraw, appoint_admin, sweep,
+    Profile, Session, Status, Summary, Swept, TAG_DRAWS, TagDraw, appoint_admin, sweep,
 };
 
 pub use beta_keys::{

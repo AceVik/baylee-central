@@ -312,11 +312,14 @@ async fn appoint() -> Result<Appointed, ()> {
     Ok(appointed)
 }
 
-/// Delete audit events older than three years under the migrator login,
-/// which a daily timer runs (`docs/operations.md`).
+/// Delete audit events older than three years and expired reset codes under
+/// the migrator login, which a daily timer runs (`docs/operations.md`).
 pub(super) async fn run_sweep() -> ExitCode {
-    if let Ok(count) = swept().await {
-        eprintln!("central: {count} audit events older than three years deleted");
+    if let Ok(swept) = swept().await {
+        eprintln!(
+            "central: {} audit events older than three years and {} expired reset codes deleted",
+            swept.events, swept.codes
+        );
         ExitCode::SUCCESS
     } else {
         eprintln!("central: sweep rejected configuration or failed");
@@ -324,7 +327,7 @@ pub(super) async fn run_sweep() -> ExitCode {
     }
 }
 
-async fn swept() -> Result<u64, ()> {
+async fn swept() -> Result<central_postgres::Swept, ()> {
     let bytes = read_settings()?;
     let mut settings: Migration = parse(&bytes)?;
     drop(bytes);

@@ -7,7 +7,7 @@ use super::{
 };
 use central_api::{reset_code::ResetCode, wire::ResetVault, wire::TicketPurpose};
 use central_crypto::vault::RecoveryCode;
-use central_postgres::{Credential, Session, appoint_admin};
+use central_postgres::{Credential, Session, Swept, appoint_admin, sweep};
 use sea_orm::{ConnectionTrait, DatabaseConnection};
 
 async fn count(db: &impl ConnectionTrait, sql: &str) -> i64 {
@@ -580,4 +580,14 @@ async fn ended(
             .await
             .is_err()
     );
+    // The operator's sweep clears the expired digest.
+    assert!(state(operator, moved).await.code);
+    assert_eq!(
+        sweep(operator).await,
+        Ok(Swept {
+            events: 0,
+            codes: 1
+        })
+    );
+    assert!(!state(operator, moved).await.code);
 }
