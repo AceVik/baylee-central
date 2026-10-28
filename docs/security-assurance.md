@@ -1471,3 +1471,38 @@ without its event, and the sweep keeping expired codes. Not detectable, on
 purpose: refusing one's own login, since an actor is always an
 administrator and an administrator's login is refused anyway; the explicit
 check stays as defence in depth. Engineering review, not an audit.
+
+## Deleting and exporting an account, 28 October 2026
+
+Roadmap M1 step 3 ([account deletion](account-deletion.md)), with the
+owner's decisions of the same day.
+
+Design pass: the assets are the account's existence (a deletion cannot be
+undone), the data it takes with it (documents, objects, sessions, owned
+gateways), and the metadata an export hands out. Callers: the person with a
+live session, a thief holding only that session, and the account's own
+concurrent operations (a sign-in, a password change, an administrator's
+appointment, a reset). Invariants: a deletion carries a fresh OPAQUE proof of
+the password, bound to the session, the listener and the purpose, charged one
+unit of the account's login budget; it commits under the account's lock with
+the session, credential revision and epoch rechecked in a fresh statement
+after the lock, and is refused for an administrator (checked after the lock,
+so an appointment racing it either waits or is seen) and for an open legacy
+move; foreign keys remove every row naming the account, under the runtime's
+grants (no new grant: a cascade needs no privilege on the child tables), and
+the audit stays; Central's terms are not required to leave or to export; an
+export needs a password sign-in under 30 minutes, names only the session's
+own account, carries no credential, wrapper, digest or ciphertext, and every
+list in it has a stated bound. Findings before code: deleting an owner frees
+its gateways' origins, but their published terms are keyed by origin and stay
+(the runtime may not delete them), so a later registrant of the same origin
+would inherit them as current (documented for the operator and the owner;
+no cascade can fix it under the current grants); the gateways the account
+administers lose its row, so their `admin_revision` is raised in the same
+transaction and an owner's next list change sees `Conflict` instead of a
+stale list; a deletion's lost answer cannot be told from a replaced session,
+so the SDK says `Unavailable` only while this session lives. Accepted: a
+gateway registered between the start (whose answer names the owned gateways
+for the warning) and the finish is deleted without having been named; the
+official gateway keeps a moved account's source data (its own copy, password
+retired), which a Central deletion does not reach.
