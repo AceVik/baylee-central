@@ -293,14 +293,18 @@ takes the same tagged `Request` JSON. Only these operations are allowed:
 `EnrollmentFinish`, `SessionStatus`, `RenewSession`, `Logout`, `Terms`,
 `TermsStatus`, `AccountSummary`, `SetRecovery`, `SetDisplayName`,
 `AcceptTerms` for Central's terms (a gateway's terms are accepted from the
-client) and `GatewayDirectory`,
+client), `GatewayDirectory`,
 the public gateway directory of the `/gateways` page ([gateway
-registry](gateway-registry.md)). Every other operation is refused. The list is
+registry](gateway-registry.md)), and since 28.10.2026 `ChangePasswordStart`
+and `ChangePasswordFinish` ([native login](native-login.md) §"Password
+change"; served on both listeners, the page's form comes with M4). Every
+other operation is refused. The list is
 one exhaustive match in `central-identity` (`browser_operation`), so a new
 operation does not compile until it is decided there. The cookie's token is
 used only by `SessionStatus`, `RenewSession`, `Logout`, `TermsStatus`,
-`AcceptTerms`, `AccountSummary`, `SetRecovery` and `SetDisplayName`; the
-directory uses none, and
+`AcceptTerms`, `AccountSummary`, `SetRecovery`, `SetDisplayName` and the
+password change's two requests (whose finish sets a new cookie, as
+`LoginFinish` does); the directory uses none, and
 the page sends it with `credentials: "omit"`.
 
 - `AccountSummary` (the cookie's session; no accepted terms needed) answers
@@ -361,8 +365,10 @@ room, so a crowd of addresses cannot lock new ones out.
 
 The global budgets of the native surface apply as well: `AccountSummary`
 counts with the control requests (`SessionStatus`, `RenewSession`, …),
-`SetRecovery` and `SetDisplayName` with the data requests, per session, and
-none has a per-address budget, since each needs a live browser session. The
+`SetRecovery`, `SetDisplayName` and the password change with the data
+requests, per session, and none has a per-address budget, since each needs a
+live browser session; a change's start also spends two units of the
+account's login budget. The
 native surface (`/v1/native`) is unchanged, except that it refuses
 `Register`, `AccountSummary`, `SetRecovery`, `SetDisplayName` and a browser
 session.
@@ -498,7 +504,8 @@ with a legacy link still has to match it. An e2e test covers both.
 
 ## Not in this round
 
-- password change, reset (by recovery code, e-mail or administrator)
+- password change (served since 28.10.2026, the page's form is M4), reset
+  (by recovery code, e-mail or administrator)
 - e-mail, 2FA, profile picture (the display name came on 23.10.2026)
 - export and self-service deletion: by request to the operator until M1
 - the administration UI (M2)

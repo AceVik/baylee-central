@@ -173,6 +173,26 @@ The server side of [web accounts](web-accounts.md) lands in three PRs.
   website's flow over the real browser listener, the pages with stand-ins and
   the strict mock. Deploy: the floor check ([operations](operations.md#display-names-and-tags)),
   the hook migrates; no grant changes.
+- **Password change** (28.10.2026, roadmap M1 step 1; [native
+  login](native-login.md) §"Password change"). `ChangePasswordStart` and
+  `ChangePasswordFinish`, on both listeners with a live session and accepted
+  terms, for an account whose move is finished: a fresh OPAQUE proof of the
+  current password inside the change, the new record and the same master
+  key under the new password in one transaction with a raised credential
+  revision, every session (and with it every ticket and lease) ended, and a
+  new session for the caller. Documents, objects, vault epoch and recovery
+  wrapper stay. `central-client` has `Session::change_password`. Tests: over
+  PostgreSQL 18 the store's refusals (session kind, another account's
+  session, a stale revision, short and long records, a short wrapper) and
+  what one commit replaces, ends and keeps, and a change whose session is
+  deleted while it waits on the lock; over the real listeners the SDK (an
+  open move, a short or wrong password, a sign-in racing the change, a lost
+  answer), the protocol's refusals by hand (foreign bearer, consumed and
+  crossed attempts, a replaced session, a forged proof, the budget, where a
+  change's start counts as two sign-ins) and the website's change
+  on a registered account (cookie, native session and gateway lease ended,
+  recovery code still opening the document). No migration or grant change.
+  The website's form (M4) and the client's (M6) are separate.
 - **Not yet deployed.** Deploy: migrate, grant, add `browser.listen`, pass
   `/api/*` in the `baylee.app` site block, issue beta keys. Central's own terms
   are still `draft`, so none are in force.
@@ -237,8 +257,9 @@ evidence of production capacity.
 Native OPAQUE login, account persistence, gateway registration/admin APIs,
 exclusive sessions, guarded legacy migration and encrypted private-object/chat
 storage are implemented and tested with synthetic data. They have not been
-deployed for real users. Browser SSO, password change/reset/recovery service
-and UI flows and MFA remain unfinished (sessions renew, up to 12 hours); registration and
+deployed for real users. Browser SSO, password reset/recovery service, the
+password change's UI flows (its service exists since 28.10.2026) and MFA
+remain unfinished (sessions renew, up to 12 hours); registration and
 browser sign-in are in progress (above). Live discovery exposes enrollment state
 and requires its documented review before public use.
 

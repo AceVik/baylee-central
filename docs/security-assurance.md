@@ -1191,3 +1191,125 @@ remain separate requirements.
 An additional Argon High review of the supplied guard and reached upstream
 sources found no confirmed findings. It did not run commands or independently
 certify the protocol; local/CI checks supply the execution evidence.
+
+## Password change, 28 October 2026
+
+Roadmap M1, step 1 ([native login](native-login.md) §"Password change").
+
+Design pass: the assets are the account's login (the OPAQUE record), its
+vault (the master key, reachable through the password wrapper and, for
+accounts that have one, the recovery wrapper), and the sessions and gateway
+leases that act for it. Callers: a session holder on either listener, who may
+be the owner or a thief of a bearer or cookie. Central cannot check that a
+new wrapper holds the same master key, so the decisive finding before code
+was that a session alone must not change the password: a first proposal,
+a sign-in less than 10 minutes old (the `SetRecovery` rule), would
+let a thief with a fresh token install their own credential and a wrapper of
+a random key, taking the login and leaving the owner's data reachable only
+through a recovery code. The change instead carries a fresh OPAQUE proof of
+the current password inside the exchange, bound to the starting session and
+to the account's login budget. That budget counts OPRF evaluations, not
+requests: the start answers a registration response besides KE2, both
+evaluations of the account's OPRF key, and with the registration response's
+output for a guessed password the masked envelope in KE2 can be opened and
+checked offline, so one start tests two guesses. A start therefore costs two
+of the eight units a minute, and a stolen token guesses no faster than
+anyone can through `LoginStart` without a session, and gains nothing alone
+(found in the second review, below). Invariants: the account is taken from the
+session, never from the request; a change commits only at the credential
+revision its proof was made against, with the session still live; every
+session ends with it (a stolen session too), and the caller's next session
+is issued in the same transaction; vault epoch, document, objects and
+recovery wrapper do not change; a legacy account changes its password only
+once its move is closed, so the bridge's `LegacyInvalidate` never meets a
+changed Central credential; nothing new is logged. Accepted limits: the
+client is trusted with its own vault's continuity (a modified client can
+only lose its own data); devices learn of the change when refused (an
+e-mail notice comes with step 4); no audit entry yet (the audit log comes
+with step 2's roles).
+
+Implementation pass: `Pending` gained a purpose, a sign-in or a change bound
+to the digest of the starting token; `LoginFinish` refuses a change's
+attempt and `ChangePasswordFinish` a sign-in's, each after consuming it.
+The start reads the credential through the live session of the listener's
+kind and a finished move, then charges two units of the per-account budget
+(`Limits::account` takes the units and spends nothing when they do not fit)
+before the worker permit, then runs KE2 and the registration response in one blocking
+task. The finish verifies KE3 off the async workers, then the store parses
+record and wrapper, locks the account through the session at the start's
+revision (`FOR UPDATE OF a`), updates record, wrapper and revision, deletes
+all of the account's sessions and inserts the new one. The lock and the
+session are read in two statements, as `objects::locked_owner` reads them:
+a joined `FOR UPDATE` that waited re-evaluates only the locked account row,
+so a session replaced meanwhile would still have looked live (the
+adversarial pass below proved it). `dispatch` answers
+the finish beside `LoginFinish`, so the browser listener sets the new cookie
+as for a sign-in; the terms are checked at the start (an acceptance is never
+withdrawn, and a new version needs a restart, which forgets every pending
+attempt). Both requests are browser operations (the exhaustive
+`browser_operation` match) and data requests per session; the native
+listener serves them too. The SDK checks the answer's identity and that the
+stored wrapper is the one it sent, logs a mismatched new session out, and
+resolves a lost answer by the old session's status. No new dependency,
+migration or grant: the runtime already has `UPDATE` on `accounts` and full
+rights on `sessions`. The identity service's session-binding and listener
+checks are also enforced by the store's join on the session's digest, kind
+and account, so a fault in either alone is caught by the other.
+
+Adversarial pass: over PostgreSQL 18.6 (`cargo xtask postgres`), the store
+refuses a password credential while the legacy move is open, for a token of
+the other kind and for an unknown token; refuses a commit with a record one
+byte short or long, a wrapper one byte short, a next session of the other
+kind, another account's session and a credential revision other than the
+account's, each changing nothing; one commit raises the revision, ends both
+kinds of session, issues one, keeps epoch, document and its revision, and
+the replaced credential commits nothing again; a change waiting on the
+account's lock while its session is deleted is `Rejected` and changes
+nothing. Over the real listeners (`central-client`): the SDK is refused
+while the move is open, refuses a seven-character password before sending
+anything and a wrong current password at its own KE2 check, the session
+staying live; a sign-in begun before the change and finished after it is
+`Rejected`; the old password fails after the change and the document
+reads; a lost answer after a commit is `Rejected` (the old session ended)
+and the newer password signs in. By hand: no session and an unknown bearer
+start nothing; a change finished with another bearer, then (consumed) with
+its own and with none; a change's attempt as a sign-in's and the reverse;
+a proof with one bit changed; a short wrapper beside a good proof; each
+refused and consumed, the credential revision unchanged; with seven units
+spent a sign-in's start fits and a change's does not (`Busy`, nothing
+spent), and once eight are spent the next sign-in is `Busy`. On the
+website, with a registered account playing natively at the official
+gateway: no change before the terms (`TermsRequired`), the cookie as a
+native bearer starts nothing, a change begun on the website cannot finish
+on the native listener; the change answers a browser session with a new
+cookie, the old cookie, the native session and the gateway's lease end,
+the summary still has its recovery code, the stored recovery wrapper is the
+registration's and opens the first document, the new password signs the
+client in (leaving the website's session) and the old one fails. A change
+whose session a later sign-in replaced cannot be finished by the
+replacement. Each test asserts the exact answer (`Rejected`, `Busy`), so a
+spent budget cannot pass for a refusal. Injected faults each failed a test and were taken out again:
+`LoginFinish` taking a change's attempt, the start charging no account
+budget, an open legacy move allowed, the lock's revision check dropped
+(the update's own check still refused: `Unavailable` where `Rejected` was
+expected), the revision not raised, only native sessions deleted, no
+wrapper length check, the SDK reporting a lost answer as `Unavailable`,
+no terms needed, the finish not bound to its starting session (first run:
+undetected, since the store's join refuses a foreign session; the test of a
+replaced session was added and catches it), and the commit without its
+session recheck (a real finding: it committed after the session was
+deleted; fixed as above). Clippy (pedantic, all targets and features), the
+unit suites and the gate pass.
+
+Second review, from scratch at the owner's required effort (the first
+implementation was written before the session's effort was raised): the
+budget finding above, fixed with a unit test of the two-unit cost (and a
+change charged one unit fails the wire suite's budget test); tests
+that accepted any error where a spent budget could hide a wrong answer now
+assert the exact one, and each part of the wire suite has an account of its
+own with its units counted; the record's wording of the lock was brought in
+line with the two statements. The lock order matches the other account
+mutations (account row first, then sessions); walking it against a sign-in,
+a renewal (session row, then its leases) and a logout found no lock cycle.
+That is reasoning, not a concurrency test. Engineering review, not
+an audit.

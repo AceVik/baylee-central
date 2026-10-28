@@ -106,7 +106,7 @@ async fn mutation(
     }
 }
 
-async fn wait_for_account_lock(operator: &DatabaseConnection) {
+pub(super) async fn wait_for_account_lock(operator: &DatabaseConnection) {
     tokio::time::timeout(Duration::from_secs(5), async {
         loop {
             let row = operator.query_one_raw(Statement::from_string(DbBackend::Postgres,

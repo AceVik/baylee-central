@@ -324,6 +324,36 @@ pub enum Request {
         /// Exactly Admit or Admin; purposes cannot be promoted.
         purpose: TicketPurpose,
     },
+    /// Begin changing the password of the session's account, on either
+    /// listener, with Central's terms accepted: a fresh OPAQUE login with the
+    /// current password and an OPAQUE registration of the new one, for the
+    /// session's own account and epoch. The account must have finished
+    /// moving. Answered with [`Response::PasswordChallenge`]; it shares the
+    /// per-account login budget (`docs/native-login.md` §"Password change").
+    ChangePasswordStart {
+        /// KE1 under the current password.
+        login: Vec<u8>,
+        /// OPAQUE registration request for the new password.
+        registration: Vec<u8>,
+    },
+    /// Finish a password change with the session that started it: the proof
+    /// of the current password, the new record and the same master key
+    /// wrapped under the new password. Every session of the account ends and
+    /// one new session of the calling listener's kind is answered, as
+    /// `LoginFinish` answers it; the vault epoch, documents, objects and
+    /// recovery wrapper stay as they are.
+    ChangePasswordFinish {
+        /// The attempt of [`Response::PasswordChallenge`], consumed on
+        /// success and failure.
+        attempt: Token,
+        /// KE3 under the current password, not a password.
+        proof: Vec<u8>,
+        /// OPAQUE registration upload for the new password.
+        record: Vec<u8>,
+        /// The account's master key wrapped under the new password, exactly
+        /// 73 bytes.
+        wrapped_master: Vec<u8>,
+    },
 }
 
 /// Where an account came from.
@@ -484,6 +514,16 @@ pub enum Response {
     EnrollmentChallenge {
         /// Suite-specific registration response.
         message: Vec<u8>,
+    },
+    /// The answer to [`Request::ChangePasswordStart`]: KE2 for the current
+    /// password and the registration response for the new one.
+    PasswordChallenge {
+        /// One-use attempt capability, bound to the session that started it.
+        attempt: Token,
+        /// OPAQUE KE2 under the stored credential.
+        login: Vec<u8>,
+        /// OPAQUE registration response for the new password.
+        registration: Vec<u8>,
     },
     /// Authenticated encrypted account document.
     Document {
@@ -814,6 +854,57 @@ mod tests {
             )
             .is_err()
         );
+    }
+
+    #[test]
+    fn the_password_change_has_the_designed_shapes() {
+        const ATTEMPT: &str = "[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]";
+        let start = br#"{"operation":"change_password_start","login":[1],"registration":[2]}"#;
+        let Request::ChangePasswordStart {
+            login,
+            registration,
+        } = crate::decode(start).unwrap()
+        else {
+            panic!("a start");
+        };
+        assert_eq!((login, registration), (vec![1], vec![2]));
+        let finish = format!(
+            r#"{{"operation":"change_password_finish","attempt":{ATTEMPT},"proof":[3],"record":[4],"wrapped_master":[5]}}"#
+        );
+        let Request::ChangePasswordFinish {
+            proof,
+            record,
+            wrapped_master,
+            ..
+        } = crate::decode(finish.as_bytes()).unwrap()
+        else {
+            panic!("a finish");
+        };
+        assert_eq!((proof, record, wrapped_master), (vec![3], vec![4], vec![5]));
+        let challenge = Response::PasswordChallenge {
+            attempt: Token::from_secret_bytes(zeroize::Zeroizing::new([0; 32])),
+            login: vec![6],
+            registration: vec![7],
+        };
+        let text = String::from_utf8(crate::encode(&challenge).unwrap()).unwrap();
+        assert_eq!(
+            text,
+            format!(
+                r#"{{"result":"password_challenge","attempt":{ATTEMPT},"login":[6],"registration":[7]}}"#
+            )
+        );
+        assert!(crate::decode::<Response>(text.as_bytes()).is_ok());
+        // Neither part may be left out, and no password or identity rides along.
+        for bad in [
+            br#"{"operation":"change_password_start","login":[1]}"#.to_vec(),
+            br#"{"operation":"change_password_start","login":[1],"registration":[2],"password":"never"}"#.to_vec(),
+            br#"{"operation":"change_password_start","login":[1],"registration":[2],"identity":{"account":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"epoch":1}}"#.to_vec(),
+            finish.replace(r#","wrapped_master":[5]"#, "").into_bytes(),
+            finish.replace(r#""proof":[3],"#, "").into_bytes(),
+            finish.replace(r#""record":[4]"#, r#""record":[4],"recovery":[6]"#).into_bytes(),
+        ] {
+            assert!(crate::decode::<Request>(&bad).is_err(), "{}", String::from_utf8_lossy(&bad));
+        }
     }
 
     #[test]

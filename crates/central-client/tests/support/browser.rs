@@ -97,7 +97,11 @@ impl Browser {
         }
     }
 
-    fn call(&self, request: &Request, cookie: Option<&Token>) -> Result<BrowserReply, Error> {
+    pub(crate) fn call(
+        &self,
+        request: &Request,
+        cookie: Option<&Token>,
+    ) -> Result<BrowserReply, Error> {
         let logout = matches!(request, Request::Logout);
         let answer = self.post(
             "https://baylee.app",
@@ -147,7 +151,11 @@ impl Browser {
     }
 
     /// An answer that issues no session.
-    fn answer(&self, request: &Request, cookie: Option<&Token>) -> Result<Response, Error> {
+    pub(crate) fn answer(
+        &self,
+        request: &Request,
+        cookie: Option<&Token>,
+    ) -> Result<Response, Error> {
         let reply = self.call(request, cookie)?;
         assert!(reply.session.is_none());
         Ok(reply.response)
@@ -449,7 +457,7 @@ fn moved(
 }
 
 /// The cookie's account accepts Central's terms in force, which it had not.
-fn accept_terms(browser: &Browser, cookie: &Token) {
+pub(crate) fn accept_terms(browser: &Browser, cookie: &Token) {
     let Response::TermsStatus {
         current: Some(current),
         accepted: false,

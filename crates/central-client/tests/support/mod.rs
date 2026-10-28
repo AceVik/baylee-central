@@ -12,6 +12,7 @@ use std::{
 };
 pub(super) mod browser;
 pub(super) mod gateways;
+pub(super) mod password;
 pub(super) mod terms;
 
 pub(super) fn config(user: &str, password: &str) -> DevConfig {
@@ -32,6 +33,8 @@ pub(super) struct Http {
     pub(super) endpoint: Endpoint,
     pub(super) address: SocketAddr,
     pub(super) lose_write_reply: AtomicBool,
+    /// Lose the answer to the next committed `ChangePasswordFinish`.
+    pub(super) lose_password_reply: AtomicBool,
 }
 
 impl Transport for Http {
@@ -76,6 +79,11 @@ impl Transport for Http {
         }
         if matches!(request, Request::WriteDocument { .. })
             && self.lose_write_reply.swap(false, Ordering::AcqRel)
+        {
+            return Err(Error::Unavailable);
+        }
+        if matches!(request, Request::ChangePasswordFinish { .. })
+            && self.lose_password_reply.swap(false, Ordering::AcqRel)
         {
             return Err(Error::Unavailable);
         }

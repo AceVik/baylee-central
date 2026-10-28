@@ -340,6 +340,8 @@ not per client address: behind the proxy every client shares one address, so a
 flood can exhaust the shared login budget for everyone (service denial, not
 account takeover). The browser listener adds per-address budgets in front of the
 same global ones; a client with many addresses still shares the global budget.
-Central sessions last 30 minutes unless renewed, and at most 12 hours. Password change and
-recovery are not served. Discovery reveals enrollment state for a supplied
+Central sessions last 30 minutes unless renewed, and at most 12 hours. Password change
+is served on both listeners since 28.10.2026 ([native login](native-login.md)
+§"Password change"; no migration or grant), with no form on the website or in
+the client yet; reset and recovery are not served. Discovery reveals enrollment state for a supplied
 username (see [native login](native-login.md)), on both listeners.
