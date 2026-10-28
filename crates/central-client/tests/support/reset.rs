@@ -120,12 +120,18 @@ fn recovery(
         .err(),
         Some(Error::Rejected)
     );
-    twice(http, identity, issue);
+    twice(http, browser, identity, issue);
 }
 
-/// Two starts of one code, by hand: the first finish spends it, the second is
-/// refused.
-fn twice(http: &Http, identity: Identity, issue: &dyn Fn(Identity) -> ResetCode) {
+/// Two starts of one code, by hand: a finish on the other listener is refused
+/// and consumed, the first finish spends the code, the second is refused.
+/// Then a start spends a unit of the account's budget, as a sign-in does.
+fn twice(
+    http: &Http,
+    browser: &Browser,
+    identity: Identity,
+    issue: &dyn Fn(Identity) -> ResetCode,
+) {
     let code = issue(identity);
     let start = || {
         let (enrollment, registration) =
@@ -165,12 +171,33 @@ fn twice(http: &Http, identity: Identity, issue: &dyn Fn(Identity) -> ResetCode)
         }
     };
     let (first, second) = (start(), start());
+    assert_eq!(browser.answer(&second, None).err(), Some(Error::Rejected));
     assert!(matches!(
         http.exchange(&first, None).unwrap(),
         Response::Done
     ));
     assert_eq!(http.exchange(&second, None).err(), Some(Error::Rejected));
     assert_eq!(http.exchange(&first, None).err(), Some(Error::Rejected));
+    // Six units so far (two resets, two sign-ins, these two starts); two
+    // failed sign-ins make eight, and a start with a good code is `Busy`.
+    for _ in 0..2 {
+        assert_eq!(
+            central_client::login(http, identity, OLD.into()).err(),
+            Some(Error::Rejected)
+        );
+    }
+    let code = issue(identity);
+    assert_eq!(
+        central_client::reset(
+            http,
+            "reset-web-a".into(),
+            code,
+            NEW.into(),
+            ResetData::New(DOCUMENT)
+        )
+        .err(),
+        Some(Error::Busy)
+    );
 }
 
 /// A moved account starts a new vault: a new recovery code, the next epoch,
