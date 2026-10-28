@@ -227,6 +227,29 @@ The server side of [web accounts](web-accounts.md) lands in three PRs.
   codes spending nothing, two finishes of one code, the other listener and
   the budget. Deploy: the hook migrates; no grant change. The website's and
   the client's forms are M4 and M6.
+- **Deleting and exporting an account** (28.10.2026, roadmap M1 step 3;
+  [account deletion](account-deletion.md)). `AccountExport` (both
+  listeners, a password sign-in under 30 minutes): everything Central stores
+  about the account apart from secrets and ciphertext, every list bounded;
+  `DeleteAccountStart` and `DeleteAccountFinish` (both listeners): a fresh
+  OPAQUE proof of the password, one unit of the login budget, refused for an
+  administrator and an open move, then the account row deleted under its
+  lock and the foreign keys taking sessions, tickets, leases, objects,
+  archives, owned gateways, list places, terms and roles; the audit stays.
+  Neither needs Central's terms. `central-client`: `Session::export`,
+  `Session::export_objects`, `Session::start_deletion` and
+  `Session::delete_account`. Tests: over PostgreSQL 18 under the runtime's
+  grants, a deletion leaving no row in any uuid column (or session digest)
+  that names the account or its gateway, after checking each held one;
+  refusals; an appointment and a session replacement racing the deletion's
+  lock; the export field by field, stale, of the other kind, cut at its
+  bound; over the real listeners the SDK with a gateway and an object, an
+  account without accepted terms, a lost answer, crossed and replaced
+  attempts, an administrator, the budget, and the website's export and
+  deletion with the cookie cleared. No migration or grant change. Not
+  covered: the official gateway's copy of a moved account, and an origin's
+  terms after its owner's deletion (both the operator's, [operations](operations.md#deleting-and-exporting-accounts)).
+  The pages are M4 and M6.
 - **Not yet deployed.** Deploy: migrate, grant, add `browser.listen`, pass
   `/api/*` in the `baylee.app` site block, issue beta keys. Central's own terms
   are still `draft`, so none are in force.

@@ -12,6 +12,7 @@ use std::{
 };
 pub(super) mod admin;
 pub(super) mod browser;
+pub(super) mod deletion;
 pub(super) mod gateways;
 pub(super) mod password;
 pub(super) mod reset;
@@ -37,6 +38,8 @@ pub(super) struct Http {
     pub(super) lose_write_reply: AtomicBool,
     /// Lose the answer to the next committed `ChangePasswordFinish`.
     pub(super) lose_password_reply: AtomicBool,
+    /// Lose the answer to the next committed `DeleteAccountFinish`.
+    pub(super) lose_delete_reply: AtomicBool,
 }
 
 impl Transport for Http {
@@ -86,6 +89,11 @@ impl Transport for Http {
         }
         if matches!(request, Request::ChangePasswordFinish { .. })
             && self.lose_password_reply.swap(false, Ordering::AcqRel)
+        {
+            return Err(Error::Unavailable);
+        }
+        if matches!(request, Request::DeleteAccountFinish { .. })
+            && self.lose_delete_reply.swap(false, Ordering::AcqRel)
         {
             return Err(Error::Unavailable);
         }

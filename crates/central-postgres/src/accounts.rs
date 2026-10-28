@@ -11,6 +11,8 @@ use sea_orm::{
 };
 
 mod admin;
+mod deletion;
+mod export;
 mod gateways;
 mod grants;
 mod leases;

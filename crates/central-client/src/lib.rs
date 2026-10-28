@@ -12,12 +12,15 @@ use central_crypto::{
 };
 use zeroize::Zeroizing;
 
+mod deletion;
+mod export;
 mod gateways;
 mod objects;
 mod password;
 mod reset;
 mod session;
 mod terms;
+pub use deletion::Deletion;
 pub use gateways::{GatewayRegistration, gateway_directory};
 pub use objects::ObjectDocument;
 pub use password::MIN_PASSWORD_CHARS;

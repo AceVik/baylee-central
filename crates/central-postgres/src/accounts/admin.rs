@@ -59,7 +59,7 @@ const ACCOUNT_COLUMNS: &str = "a.id, a.username_key, a.display_name, a.tag, a.so
         THEN floor(extract(epoch FROM a.reset_expires))::bigint END AS reset_until";
 
 /// The columns of an [`AuditEvent`], from `audit_events e`.
-const EVENT_COLUMNS: &str = "e.id, floor(extract(epoch FROM e.at))::bigint AS at,
+pub(super) const EVENT_COLUMNS: &str = "e.id, floor(extract(epoch FROM e.at))::bigint AS at,
     e.actor_account, e.action, e.account_id, e.gateway_id, e.beta_key_id";
 
 /// The live browser session `browser` of an administrator, as a condition on
@@ -69,7 +69,7 @@ const ADMIN_SESSION: &str = "s.digest = $1 AND s.kind = 'browser'
     AND EXISTS (SELECT 1 FROM central_identity.account_roles r
         WHERE r.account_id = a.id AND r.role = 'admin')";
 
-fn id(row: &QueryResult, column: &str) -> Result<[u8; 16], Error> {
+pub(super) fn id(row: &QueryResult, column: &str) -> Result<[u8; 16], Error> {
     let id: Uuid = row.try_get("", column).map_err(|_| Error::Unavailable)?;
     Ok(*id.as_bytes())
 }
@@ -114,7 +114,7 @@ fn account(row: &QueryResult) -> Result<AdminAccount, Error> {
     })
 }
 
-fn event(row: &QueryResult) -> Result<AuditEvent, Error> {
+pub(super) fn event(row: &QueryResult) -> Result<AuditEvent, Error> {
     Ok(AuditEvent {
         id: id(row, "id")?,
         at: row.try_get("", "at").map_err(|_| Error::Unavailable)?,
@@ -123,6 +123,17 @@ fn event(row: &QueryResult) -> Result<AuditEvent, Error> {
         account: optional_id(row, "account_id")?,
         gateway: optional_id(row, "gateway_id")?,
         beta_key: optional_id(row, "beta_key_id")?,
+    })
+}
+
+/// An [`OwnedGateway`] from `id`, `origin` and `approved`.
+pub(super) fn owned_gateway(row: &QueryResult) -> Result<OwnedGateway, Error> {
+    Ok(OwnedGateway {
+        id: id(row, "id")?,
+        origin: row.try_get("", "origin").map_err(|_| Error::Unavailable)?,
+        approved: row
+            .try_get("", "approved")
+            .map_err(|_| Error::Unavailable)?,
     })
 }
 
@@ -273,15 +284,7 @@ impl AccountStore {
             .await
             .map_err(|_| Error::Unavailable)?
             .iter()
-            .map(|row| {
-                Ok(OwnedGateway {
-                    id: id(row, "id")?,
-                    origin: row.try_get("", "origin").map_err(|_| Error::Unavailable)?,
-                    approved: row
-                        .try_get("", "approved")
-                        .map_err(|_| Error::Unavailable)?,
-                })
-            })
+            .map(owned_gateway)
             .collect::<Result<Vec<_>, Error>>()?;
         let audit = tx
             .query_all_raw(statement(

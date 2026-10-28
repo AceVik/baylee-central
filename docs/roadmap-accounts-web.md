@@ -118,10 +118,13 @@ reset, 3 deletion and export, 4 e-mail and e-mail reset, 5 two-factor sign-in
 
 **Open-beta blocker: abuse protection for registration** (owner,
 28.10.2026). Registration needs strong captcha and spam protection before
-the open beta, privacy-friendly and without a third-party tracker; a short
-design goes to the owner before anything is built
+the open beta, privacy-friendly and without a third-party tracker
 ([registration abuse](registration-abuse.md)). A new dependency or
-third-party service needs the owner's approval.
+third-party service needs the owner's approval. *Decided 28.10.2026:* two
+modes an administrator switches at any time, `open` (no key, the open beta)
+and `invite` (an invitation from any member, unlimited, recorded); one code
+admits one account; no ceiling in all; a self-hosted proof of work that grows
+harder under a flood. Built after step 3.
 
 **M2 — administration API** [central] → M1. Users (search, lock, unlock, reset,
 revoke sessions, delete), beta keys, gateway registry with self-service

@@ -12,6 +12,7 @@ use central_postgres::{AccountStore, Credential};
 use sea_orm::{ConnectionTrait, DatabaseConnection};
 
 mod admin;
+mod deletion;
 mod gateways;
 mod kinds;
 mod migration;
@@ -116,6 +117,7 @@ pub(crate) async fn run(operator: &DatabaseConnection) {
     password::run(&store, operator, &keys).await;
     admin::run(&store, operator, &keys).await;
     reset::run(&store, operator, &keys).await;
+    deletion::run(&store, operator, &keys).await;
     store.close().await.unwrap();
 }
 

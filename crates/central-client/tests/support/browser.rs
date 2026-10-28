@@ -103,6 +103,7 @@ impl Browser {
         cookie: Option<&Token>,
     ) -> Result<BrowserReply, Error> {
         let logout = matches!(request, Request::Logout);
+        let deletion = matches!(request, Request::DeleteAccountFinish { .. });
         let answer = self.post(
             "https://baylee.app",
             &central_api::encode(&request)?,
@@ -115,6 +116,13 @@ impl Browser {
                 "signing out clears the cookie"
             );
         }
+        if deletion {
+            assert_eq!(
+                answer.cookie.as_deref(),
+                (answer.status == 200).then_some(CLEARED),
+                "a deletion clears the cookie once it is done, and only then"
+            );
+        }
         match answer.status {
             200 => {}
             403 => return Err(Error::TermsRequired),
@@ -125,7 +133,7 @@ impl Browser {
         }
         let response = central_api::decode(&answer.body)?;
         let session = match answer.cookie {
-            Some(cookie) if !logout => {
+            Some(cookie) if !logout && !deletion => {
                 let value = cookie.strip_prefix("__Host-central=").unwrap();
                 let value = value
                     .strip_suffix(SET)
