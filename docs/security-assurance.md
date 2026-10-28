@@ -1303,7 +1303,8 @@ unit suites and the gate pass.
 
 Second review, from scratch at the owner's required effort (the first
 implementation was written before the session's effort was raised): the
-budget finding above, fixed with a unit test of the two-unit cost; tests
+budget finding above, fixed with a unit test of the two-unit cost (and a
+change charged one unit fails the wire suite's budget test); tests
 that accepted any error where a spent budget could hide a wrong answer now
 assert the exact one, and each part of the wire suite has an account of its
 own with its units counted; the record's wording of the lock was brought in
