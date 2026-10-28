@@ -26,6 +26,7 @@ mod gateways;
 mod limits;
 mod objects;
 mod password;
+mod reset;
 mod terms;
 
 struct Pending {
@@ -100,7 +101,9 @@ pub fn browser_operation(request: &Request) -> bool {
         | Request::SetDisplayName { .. }
         | Request::ChangePasswordStart { .. }
         | Request::ChangePasswordFinish { .. }
-        | Request::Admin { .. } => true,
+        | Request::Admin { .. }
+        | Request::ResetStart { .. }
+        | Request::ResetFinish { .. } => true,
         Request::AcceptTerms { subject, .. } => matches!(subject, TermsSubject::Central),
         Request::CreateObject
         | Request::ReadObject { .. }
@@ -201,6 +204,7 @@ pub struct IdentityService {
     gateway: String,
     legacy_discovery: bool,
     pending: Mutex<BTreeMap<[u8; 32], Pending>>,
+    resets: Mutex<BTreeMap<[u8; 32], reset::PendingReset>>,
     limits: Mutex<limits::Limits>,
     workers: Arc<Semaphore>,
     terms: Option<central_api::terms::TermsDocument>,
@@ -236,6 +240,7 @@ impl IdentityService {
             gateway: gateway.into(),
             legacy_discovery: endpoint.legacy_origin().is_some(),
             pending: Mutex::default(),
+            resets: Mutex::default(),
             limits: Mutex::default(),
             workers: Arc::new(Semaphore::new(4)),
             terms: terms::central()?,
@@ -496,6 +501,17 @@ mod tests {
                     before: None,
                 },
             },
+            Request::ResetStart {
+                username: "synthetic".into(),
+                code: central_api::reset_code::ResetCode::generate().unwrap(),
+                registration: vec![],
+            },
+            Request::ResetFinish {
+                attempt: token(),
+                record: vec![],
+                wrapped_master: vec![],
+                vault: central_api::wire::ResetVault::Keep,
+            },
         ]
     }
 
@@ -614,7 +630,7 @@ mod tests {
                 text[start..].split('"').next().unwrap().to_owned()
             })
             .collect();
-        assert_eq!(named.len(), 43, "every operation is in one of the lists");
+        assert_eq!(named.len(), 45, "every operation is in one of the lists");
     }
 
     #[test]

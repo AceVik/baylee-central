@@ -3,6 +3,7 @@
 //! whose account holds the administrator role. No answer has a field that
 //! could carry a credential, a wrapper, a document or any other ciphertext.
 use crate::Error;
+use crate::reset_code::ResetCode;
 use crate::wire::AccountSource;
 use serde::{Deserialize, Serialize};
 
@@ -42,6 +43,14 @@ pub enum AdminRequest {
         /// Whether it holds the role afterwards.
         admin: bool,
     },
+    /// Make a reset code for an enrolled account whose move is finished and
+    /// which is neither an administrator's nor one's own
+    /// (`docs/account-reset.md`): a change. A new code replaces the previous
+    /// one; issuing ends nothing. Answered with [`AdminAnswer::ResetCode`].
+    ResetLogin {
+        /// The account's id.
+        account: [u8; 16],
+    },
     /// Audit events, newest first, [`PAGE`] at a time, of one account or all.
     /// Answered with [`AdminAnswer::Audit`].
     Audit {
@@ -59,7 +68,7 @@ impl AdminRequest {
     #[must_use]
     pub const fn changes(&self) -> bool {
         match self {
-            Self::SetAdmin { .. } => true,
+            Self::SetAdmin { .. } | Self::ResetLogin { .. } => true,
             Self::Accounts { .. } | Self::Account { .. } | Self::Audit { .. } => false,
         }
     }
@@ -139,6 +148,8 @@ pub struct AdminAccount {
     pub last_sign_in_at: Option<i64>,
     /// It holds the administrator role.
     pub admin: bool,
+    /// Until when an unused reset code is valid, in Unix seconds, if one is.
+    pub reset_until: Option<i64>,
 }
 
 /// A gateway an account owns.
@@ -202,6 +213,13 @@ pub enum AdminAnswer {
         /// Another page follows.
         more: bool,
     },
+    /// A reset code, shown to the administrator once; Central keeps its digest.
+    ResetCode {
+        /// The code to hand over.
+        code: ResetCode,
+        /// Until when it is valid, in Unix seconds.
+        expires_at: i64,
+    },
 }
 
 #[cfg(test)]
@@ -251,6 +269,7 @@ mod tests {
             }
             .changes()
         );
+        assert!(AdminRequest::ResetLogin { account: [0; 16] }.changes());
         for read in [
             AdminRequest::Accounts {
                 query: None,

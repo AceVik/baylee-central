@@ -3,6 +3,7 @@
 //! checked again by the store in the statement or transaction that acts.
 use super::{Error, IdentityService, Response, Surface, Token};
 use central_api::admin::{AccountQuery, AdminAnswer, AdminRequest};
+use central_api::reset_code::ResetCode;
 
 impl IdentityService {
     pub(super) async fn admin_request(
@@ -37,7 +38,15 @@ impl IdentityService {
                 let (events, more) = self.store.admin_audit(cookie, account, before).await?;
                 AdminAnswer::Audit { events, more }
             }
-            // A change: the store checks the sign-in's age and writes the audit.
+            // Changes: the store checks the sign-in's age and writes the audit.
+            AdminRequest::ResetLogin { account } => {
+                let code = ResetCode::generate()?;
+                let expires_at = self
+                    .store
+                    .issue_reset(cookie, account, &code.digest())
+                    .await?;
+                AdminAnswer::ResetCode { code, expires_at }
+            }
             AdminRequest::SetAdmin { account, admin } => {
                 self.store.set_admin(cookie, account, admin).await?;
                 return Ok(Response::Done);

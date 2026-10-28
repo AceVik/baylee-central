@@ -20,6 +20,7 @@ mod m20261022_000009_official_gateway;
 mod m20261022_000010_legacy_recovery;
 mod m20261023_000011_profiles;
 mod m20261028_000012_administration;
+mod m20261028_000013_reset;
 
 use sea_orm_migration::{
     MigrationTrait, MigratorTrait,
@@ -45,6 +46,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261022_000010_legacy_recovery::Migration),
             Box::new(m20261023_000011_profiles::Migration),
             Box::new(m20261028_000012_administration::Migration),
+            Box::new(m20261028_000013_reset::Migration),
         ]
     }
 }

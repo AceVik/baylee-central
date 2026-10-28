@@ -7,6 +7,7 @@ mod endpoint;
 pub mod gateway;
 pub mod object;
 pub mod profile;
+pub mod reset_code;
 pub mod terms;
 mod token;
 pub mod wire;

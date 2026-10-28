@@ -2,7 +2,8 @@
 //! change"): the identity service proves the current password with a fresh
 //! OPAQUE login; this commits the new record and the same master key wrapped
 //! under it, ends every session of the account and issues the caller's next.
-//! The vault epoch, documents, objects and the recovery wrapper stay.
+//! The vault epoch, documents, objects and the recovery wrapper stay; a reset
+//! code still outstanding is cleared, since the current password was just proven.
 use super::{AccountStore, Credential, Error, Issued, Session, identity, number, statement, uuid};
 use central_crypto::{opaque::server::ServerKeys, vault::WrappedMasterKey};
 use sea_orm::{ConnectionTrait, TransactionTrait};
@@ -115,7 +116,8 @@ impl AccountStore {
             .query_one_raw(statement(
                 "UPDATE central_identity.accounts SET credential = $2, wrapped_master = $3,
                  credential_revision = credential_revision + 1,
-                 last_sign_in_at = pg_catalog.clock_timestamp()
+                 last_sign_in_at = pg_catalog.clock_timestamp(),
+                 reset_digest = NULL, reset_expires = NULL
                  WHERE id = $1 AND credential_revision = $4 AND credential IS NOT NULL
                  RETURNING credential_revision",
                 vec![

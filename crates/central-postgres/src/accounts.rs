@@ -20,6 +20,7 @@ mod password;
 mod profiles;
 mod recovery;
 mod registration;
+mod reset;
 mod sessions;
 mod terms;
 pub use admin::{AUDIT_YEARS, Action, Appointed, appoint_admin, sweep};

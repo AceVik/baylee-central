@@ -19,6 +19,8 @@ pub enum Action {
     AdminGranted,
     /// An account's administrator role was removed.
     AdminRemoved,
+    /// A reset code was made for an account.
+    ResetIssued,
 }
 
 impl Action {
@@ -28,6 +30,7 @@ impl Action {
         match self {
             Self::AdminGranted => "account.admin_granted",
             Self::AdminRemoved => "account.admin_removed",
+            Self::ResetIssued => "account.reset_issued",
         }
     }
 }
@@ -51,7 +54,9 @@ const ACCOUNT_COLUMNS: &str = "a.id, a.username_key, a.display_name, a.tag, a.so
     floor(extract(epoch FROM a.created_at))::bigint AS created_at,
     floor(extract(epoch FROM a.last_sign_in_at))::bigint AS last_sign_in_at,
     EXISTS (SELECT 1 FROM central_identity.account_roles r
-        WHERE r.account_id = a.id AND r.role = 'admin') AS admin";
+        WHERE r.account_id = a.id AND r.role = 'admin') AS admin,
+    CASE WHEN a.reset_expires > pg_catalog.clock_timestamp()
+        THEN floor(extract(epoch FROM a.reset_expires))::bigint END AS reset_until";
 
 /// The columns of an [`AuditEvent`], from `audit_events e`.
 const EVENT_COLUMNS: &str = "e.id, floor(extract(epoch FROM e.at))::bigint AS at,
@@ -103,6 +108,9 @@ fn account(row: &QueryResult) -> Result<AdminAccount, Error> {
             .try_get("", "last_sign_in_at")
             .map_err(|_| Error::Unavailable)?,
         admin: get("admin")?,
+        reset_until: row
+            .try_get("", "reset_until")
+            .map_err(|_| Error::Unavailable)?,
     })
 }
 
@@ -136,7 +144,7 @@ fn limit(n: usize) -> Value {
 }
 
 /// Write one audit event in `db`'s transaction.
-async fn audit(
+pub(super) async fn audit(
     db: &impl ConnectionTrait,
     actor: Option<Uuid>,
     action: Action,
@@ -155,7 +163,7 @@ async fn audit(
 impl AccountStore {
     /// The administrator behind the live browser session `browser`, with
     /// whether its password sign-in is less than 30 minutes old.
-    async fn administrator(
+    pub(super) async fn administrator(
         db: &impl ConnectionTrait,
         browser: &Token,
     ) -> Result<(Uuid, bool), Error> {
