@@ -43,7 +43,7 @@ pub(crate) async fn search_path(operator: &DatabaseConnection) {
             "SELECT count(*)::bigint AS value FROM public.seaql_migrations"
         )
         .await,
-        11
+        12
     );
     operator
         .execute_unprepared(

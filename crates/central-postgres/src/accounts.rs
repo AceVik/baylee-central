@@ -10,6 +10,7 @@ use sea_orm::{
     Value, prelude::Uuid,
 };
 
+mod admin;
 mod gateways;
 mod grants;
 mod leases;
@@ -21,6 +22,7 @@ mod recovery;
 mod registration;
 mod sessions;
 mod terms;
+pub use admin::{Action, Appointed, appoint_admin, sweep};
 pub use migration::Status;
 pub use profiles::{Profile, TAG_DRAWS, TagDraw};
 pub use recovery::Summary;

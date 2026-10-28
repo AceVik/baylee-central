@@ -354,6 +354,15 @@ pub enum Request {
         /// 73 bytes.
         wrapped_master: Vec<u8>,
     },
+    /// An administrator's request (`docs/administration.md`): browser
+    /// listener only, a browser session whose account holds the role, and
+    /// Central's terms accepted; a change also needs a password sign-in less
+    /// than 30 minutes old. Answered with [`Response::Admin`], or `Done` for
+    /// a change.
+    Admin {
+        /// The action.
+        request: crate::admin::AdminRequest,
+    },
 }
 
 /// Where an account came from.
@@ -594,6 +603,11 @@ pub enum Response {
         /// Its tag; none for an account moved from the official gateway
         /// whose tag the bridge has not carried yet.
         tag: Option<u32>,
+    },
+    /// What an administrator's reading request found ([`Request::Admin`]).
+    Admin {
+        /// The answer.
+        answer: crate::admin::AdminAnswer,
     },
     /// The browser session's account ([`Request::AccountSummary`]).
     AccountSummary {

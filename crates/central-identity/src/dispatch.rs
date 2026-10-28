@@ -69,9 +69,8 @@ impl IdentityService {
             }
             request @ (Request::AccountSummary
             | Request::SetRecovery { .. }
-            | Request::SetDisplayName { .. }) => {
-                self.account_request(request, bearer, surface).await
-            }
+            | Request::SetDisplayName { .. }
+            | Request::Admin { .. }) => self.account_request(request, bearer, surface).await,
             request @ (Request::LegacyInvalidate { .. }
             | Request::LegacyClose { .. }
             | Request::LegacyProfile { .. }) => self.legacy_mutation(request, bearer).await,
@@ -189,7 +188,7 @@ impl IdentityService {
     /// The account page's requests, on the browser listener only
     /// ([`browser_only`]): the session's account, a recovery wrapper for an
     /// account without one, and a display name for an account without one
-    /// (`docs/web-accounts.md`).
+    /// (`docs/web-accounts.md`); and administration (`docs/administration.md`).
     async fn account_request(
         &self,
         request: Request,
@@ -200,6 +199,7 @@ impl IdentityService {
             return Err(Error::Rejected);
         };
         match request {
+            Request::Admin { request } => self.admin_request(request, bearer, surface).await,
             Request::AccountSummary => {
                 let summary = self.store.account_summary(cookie).await?;
                 Ok(Response::AccountSummary {
@@ -209,9 +209,7 @@ impl IdentityService {
                     tag: summary.tag,
                     source: summary.source,
                     recovery: summary.recovery,
-                    // Roles come with a later step (the accounts and
-                    // administration design, step 5).
-                    admin: false,
+                    admin: summary.admin,
                     signed_in_at: summary.signed_in_at,
                     expires_at: summary.expires_at,
                 })

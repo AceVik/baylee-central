@@ -11,6 +11,7 @@ use central_crypto::{
 use central_postgres::{AccountStore, Credential};
 use sea_orm::{ConnectionTrait, DatabaseConnection};
 
+mod admin;
 mod gateways;
 mod kinds;
 mod migration;
@@ -112,6 +113,7 @@ pub(crate) async fn run(operator: &DatabaseConnection) {
     recovery::run(&store, operator, &keys).await;
     profiles::run(&store, operator, &keys).await;
     password::run(&store, operator, &keys).await;
+    admin::run(&store, operator, &keys).await;
     store.close().await.unwrap();
 }
 

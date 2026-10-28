@@ -114,7 +114,8 @@ impl AccountStore {
         let changed = tx
             .query_one_raw(statement(
                 "UPDATE central_identity.accounts SET credential = $2, wrapped_master = $3,
-                 credential_revision = credential_revision + 1
+                 credential_revision = credential_revision + 1,
+                 last_sign_in_at = pg_catalog.clock_timestamp()
                  WHERE id = $1 AND credential_revision = $4 AND credential IS NOT NULL
                  RETURNING credential_revision",
                 vec![

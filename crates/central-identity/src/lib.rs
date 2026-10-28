@@ -20,6 +20,7 @@ use std::{
 use subtle::ConstantTimeEq;
 use tokio::sync::Semaphore;
 
+mod admin;
 mod dispatch;
 mod gateways;
 mod limits;
@@ -98,7 +99,8 @@ pub fn browser_operation(request: &Request) -> bool {
         | Request::SetRecovery { .. }
         | Request::SetDisplayName { .. }
         | Request::ChangePasswordStart { .. }
-        | Request::ChangePasswordFinish { .. } => true,
+        | Request::ChangePasswordFinish { .. }
+        | Request::Admin { .. } => true,
         Request::AcceptTerms { subject, .. } => matches!(subject, TermsSubject::Central),
         Request::CreateObject
         | Request::ReadObject { .. }
@@ -128,10 +130,10 @@ pub fn browser_operation(request: &Request) -> bool {
 }
 
 /// Operations the browser listener alone serves: registration has its
-/// per-address budget there, and the account page's requests are the
-/// website's (the native client makes no recovery code and chooses no
-/// display name yet, M6). The native listener refuses them before anything
-/// else is checked.
+/// per-address budget there, the account page's requests are the website's
+/// (the native client makes no recovery code and chooses no display name
+/// yet, M6), and administration is the website's (`docs/administration.md`).
+/// The native listener refuses them before anything else is checked.
 fn browser_only(request: &Request) -> bool {
     matches!(
         request,
@@ -139,6 +141,7 @@ fn browser_only(request: &Request) -> bool {
             | Request::AccountSummary
             | Request::SetRecovery { .. }
             | Request::SetDisplayName { .. }
+            | Request::Admin { .. }
     )
 }
 
@@ -156,6 +159,7 @@ fn uses_session(request: &Request) -> bool {
             | Request::SetDisplayName { .. }
             | Request::ChangePasswordStart { .. }
             | Request::ChangePasswordFinish { .. }
+            | Request::Admin { .. }
     )
 }
 
@@ -486,6 +490,12 @@ mod tests {
                 record: vec![],
                 wrapped_master: vec![],
             },
+            Request::Admin {
+                request: central_api::admin::AdminRequest::Accounts {
+                    query: None,
+                    before: None,
+                },
+            },
         ]
     }
 
@@ -604,14 +614,14 @@ mod tests {
                 text[start..].split('"').next().unwrap().to_owned()
             })
             .collect();
-        assert_eq!(named.len(), 42, "every operation is in one of the lists");
+        assert_eq!(named.len(), 43, "every operation is in one of the lists");
     }
 
     #[test]
     fn the_native_listener_refuses_the_websites_own_operations() {
         let (served, _) = (served(), refused());
         let only: Vec<&Request> = served.iter().filter(|r| browser_only(r)).collect();
-        assert_eq!(only.len(), 4);
+        assert_eq!(only.len(), 5);
         assert!(only.iter().all(|r| browser_operation(r)));
         assert!(!browser_only(&Request::SessionStatus));
         assert!(!browser_only(&Request::Logout));
