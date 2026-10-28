@@ -3,7 +3,8 @@
 //! them, then 000007, then 000008 over a live session and its lease, then 000009
 //! over registered gateways, then 000010 over legacy and registered
 //! accounts, then 000011 over the same, drawing the registered accounts'
-//! tags. All inside one transaction that is rolled back.
+//! tags, then 000012's administration over all of it. All inside one
+//! transaction that is rolled back.
 use super::scalar;
 use sea_orm::{ConnectionTrait, DatabaseConnection, TransactionTrait};
 
@@ -27,6 +28,8 @@ const OFFICIAL: &str =
 const LEGACY_RECOVERY: &str =
     include_str!("../../../central-migration/src/m20261022_000010_legacy_recovery.sql");
 const PROFILES: &str = include_str!("../../../central-migration/src/m20261023_000011_profiles.sql");
+const ADMINISTRATION: &str =
+    include_str!("../../../central-migration/src/m20261028_000012_administration.sql");
 
 fn scratch(sql: &str) -> String {
     sql.replace("central_identity", "upgrade_probe")
@@ -110,6 +113,7 @@ pub(crate) async fn run(operator: &DatabaseConnection) {
     official(&tx).await;
     legacy_recovery(&tx).await;
     profiles(&tx).await;
+    administration(&tx).await;
     tx.rollback().await.unwrap();
     assert_eq!(
         scalar(
@@ -467,5 +471,84 @@ async fn widening(tx: &sea_orm::DatabaseTransaction) {
         )
         .await,
         0
+    );
+}
+
+/// 000012 over what came before: no role and no event yet, no account with a
+/// sign-in time; the previous binary still signs in (without the time); the
+/// schema holds the role's name, an event's actor and its action's shape.
+async fn administration(tx: &sea_orm::DatabaseTransaction) {
+    tx.execute_unprepared(&scratch(ADMINISTRATION))
+        .await
+        .unwrap();
+    for (expected, sql) in [
+        (
+            0,
+            "SELECT count(*)::bigint AS value FROM upgrade_probe.account_roles",
+        ),
+        (
+            0,
+            "SELECT count(*)::bigint AS value FROM upgrade_probe.audit_events",
+        ),
+        (
+            0,
+            "SELECT count(*)::bigint AS value FROM upgrade_probe.accounts WHERE last_sign_in_at IS NOT NULL",
+        ),
+    ] {
+        assert_eq!(scalar(tx, sql).await, expected, "{sql}");
+    }
+    // As the previous binary signs in: a session without the time.
+    tx.execute_unprepared(
+        "DELETE FROM upgrade_probe.sessions WHERE account_id = (SELECT id FROM upgrade_probe.accounts WHERE legacy_id = 'legacy-1') AND kind = 'native';
+         INSERT INTO upgrade_probe.sessions (digest, account_id, credential_revision, kind, expires_at)
+         SELECT decode(repeat('31', 32), 'hex'), id, 1, 'native', clock_timestamp() + interval '30 minutes'
+         FROM upgrade_probe.accounts WHERE legacy_id = 'legacy-1';",
+    )
+    .await
+    .unwrap();
+    let account = "(SELECT id FROM upgrade_probe.accounts WHERE legacy_id = 'legacy-1')";
+    tx.execute_unprepared(&format!(
+        "INSERT INTO upgrade_probe.account_roles (account_id, role) SELECT {account}, 'admin';
+         INSERT INTO upgrade_probe.audit_events (actor_kind, action, account_id)
+         SELECT 'operator', 'account.admin_granted', {account};"
+    ))
+    .await
+    .unwrap();
+    for sql in [
+        format!("INSERT INTO upgrade_probe.account_roles (account_id, role) SELECT {account}, 'owner'"),
+        "INSERT INTO upgrade_probe.audit_events (actor_kind, action) VALUES ('admin', 'account.admin_granted')".into(),
+        format!(
+            "INSERT INTO upgrade_probe.audit_events (actor_kind, actor_account, action)
+             SELECT 'operator', {account}, 'account.admin_granted'"
+        ),
+        "INSERT INTO upgrade_probe.audit_events (actor_kind, action) VALUES ('operator', 'Granted admin to Alice')".into(),
+        "INSERT INTO upgrade_probe.audit_events (actor_kind, action) VALUES ('system', 'account.admin_granted')".into(),
+        "INSERT INTO upgrade_probe.audit_events (actor_kind, action, detail)
+         VALUES ('operator', 'account.admin_granted', jsonb_build_object('x', repeat('a', 1100)))"
+            .into(),
+    ] {
+        refused(tx, &sql).await;
+    }
+    // An account's roles go with it; its events stay.
+    tx.execute_unprepared(&format!(
+        "DELETE FROM upgrade_probe.gateway_tickets; DELETE FROM upgrade_probe.accounts WHERE id = {account}"
+    ))
+    .await
+    .unwrap();
+    assert_eq!(
+        scalar(
+            tx,
+            "SELECT count(*)::bigint AS value FROM upgrade_probe.account_roles"
+        )
+        .await,
+        0
+    );
+    assert_eq!(
+        scalar(
+            tx,
+            "SELECT count(*)::bigint AS value FROM upgrade_probe.audit_events"
+        )
+        .await,
+        1
     );
 }

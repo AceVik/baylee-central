@@ -25,7 +25,7 @@ use sea_orm::{ConnectionTrait, DatabaseConnection};
 use std::sync::atomic::Ordering;
 use tokio::runtime::Runtime;
 
-const OLD: &str = "synthetic first password";
+pub(crate) const OLD: &str = "synthetic first password";
 const NEW: &str = "synthetic second password";
 const DOCUMENT: &[u8] = br#"{"version":1,"gateways":[],"settings":{"password":true}}"#;
 
@@ -77,7 +77,7 @@ fn accept(http: &Http, session: &Session) {
 
 /// A player moved from the official gateway, signed in with [`OLD`] and its
 /// document restored; its move is still open. One unit.
-fn moved(http: &Http, bridge: &Token, legacy: &str) -> (Identity, Session) {
+pub(crate) fn moved(http: &Http, bridge: &Token, legacy: &str) -> (Identity, Session) {
     let Response::Enrollment { identity, ticket } = http
         .exchange(
             &Request::LegacyReserve {
@@ -99,7 +99,7 @@ fn moved(http: &Http, bridge: &Token, legacy: &str) -> (Identity, Session) {
     (identity, session)
 }
 
-fn close(http: &Http, bridge: &Token, legacy: &str, identity: Identity) {
+pub(crate) fn close(http: &Http, bridge: &Token, legacy: &str, identity: Identity) {
     http.exchange(
         &Request::LegacyClose {
             legacy_id: legacy.into(),
@@ -168,7 +168,7 @@ fn login_attempt(http: &Http, identity: Identity, password: &str) -> (Token, Vec
     (attempt, login.finish(&message).unwrap().finalization)
 }
 
-fn context(http: &Http, identity: Identity) -> Context {
+pub(crate) fn context(http: &Http, identity: Identity) -> Context {
     Context::new(http.endpoint.issuer(), identity.account, identity.epoch).unwrap()
 }
 
@@ -500,7 +500,7 @@ fn copy(token: &Token) -> Token {
 }
 
 /// The website's sign-in, as the page runs it: the cookie's session.
-fn browser_sign_in(
+pub(crate) fn browser_sign_in(
     browser: &Browser,
     identity: Identity,
     context: Context,

@@ -21,6 +21,8 @@ pub struct Summary {
     pub source: AccountSource,
     /// The account has a recovery wrapper.
     pub recovery: bool,
+    /// The account holds the administrator role.
+    pub admin: bool,
     /// Absolute Unix seconds of the session's password sign-in; renewal never
     /// moves it.
     pub signed_in_at: i64,
@@ -28,7 +30,7 @@ pub struct Summary {
     pub expires_at: i64,
 }
 
-fn source(value: &str) -> Result<AccountSource, Error> {
+pub(super) fn source(value: &str) -> Result<AccountSource, Error> {
     match value {
         "legacy" => Ok(AccountSource::Legacy),
         "registered" => Ok(AccountSource::Registered),
@@ -50,6 +52,8 @@ impl AccountStore {
             .query_one_raw(statement(
                 "SELECT a.id, a.vault_epoch, a.username_key, a.source, a.display_name, a.tag,
              a.recovery_wrapped_master IS NOT NULL AS recovery,
+             EXISTS (SELECT 1 FROM central_identity.account_roles r
+                 WHERE r.account_id = a.id AND r.role = 'admin') AS admin,
              floor(extract(epoch FROM s.created_at))::bigint AS signed_in_at,
              floor(extract(epoch FROM s.expires_at))::bigint AS expires_at
              FROM central_identity.accounts a JOIN central_identity.sessions s
@@ -80,6 +84,7 @@ impl AccountStore {
             recovery: row
                 .try_get("", "recovery")
                 .map_err(|_| Error::Unavailable)?,
+            admin: row.try_get("", "admin").map_err(|_| Error::Unavailable)?,
             signed_in_at: get("signed_in_at")?,
             expires_at: get("expires_at")?,
         })

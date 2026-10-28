@@ -176,6 +176,59 @@ The runtime role may only `SELECT` keys and `UPDATE` their `uses_left`; it can
 neither issue, revoke, re-date nor delete one, and the store refuses to start
 with any wider or narrower grant.
 
+## Administration
+
+Central's administrators act on the website ([administration](administration.md));
+the operator appoints the first one, and the way back in when none can sign
+in, with the migrator login from a file the operator keeps:
+
+```sh
+central-service --appoint-admin-stdin < appoint.json
+```
+
+```json
+{"database": {"host": "…", "port": 5432, "name": "baylee_central", "user": "central_migrator",
+  "password": "…", "ca_certificate": "…"},
+ "username": "…"}
+```
+
+The account must be enrolled. It prints `administrator appointed`, or
+`already an administrator; nothing changed`, on standard error, and writes an
+audit event with the operator as its actor. Keep the username out of the
+repository and of shell history: the file holds it.
+
+The audit keeps administrators' and the operator's actions for three years;
+a daily timer deletes older events with the migration document
+(`/etc/baylee-central/migrate.json`), under the same `systemd-run` user as
+the deploy hook's migration:
+
+```ini
+# /etc/systemd/system/baylee-central-sweep.service
+[Service]
+Type=oneshot
+User=central
+ExecStart=/opt/baylee-central/bin/central-service --sweep-stdin
+StandardInput=file:/etc/baylee-central/migrate.json
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+
+# /etc/systemd/system/baylee-central-sweep.timer
+[Timer]
+OnCalendar=daily
+RandomizedDelaySec=1h
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+```
+
+The runtime role may grant and remove administrator roles and append audit
+events, never rewrite or delete one (`ops/grants.sql`, checked at startup).
+What a taken-over service gains by that is in [administration](administration.md)
+and the [threat model](threat-model.md).
+
 ## The official gateway
 
 The directory lists the official gateway (the migration bridge's,

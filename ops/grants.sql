@@ -16,3 +16,8 @@ GRANT SELECT, INSERT ON central_identity.gateway_terms, central_identity.gateway
   central_identity.terms_acceptances TO central_runtime;
 -- A key's uses are spent by enrollment; issuing and revoking keys stay with the operator.
 GRANT SELECT, UPDATE (uses_left) ON central_identity.beta_keys TO central_runtime;
+-- Administrators' decisions are the runtime's (docs/administration.md): it
+-- grants and removes roles, and writes the audit, which it can neither rewrite
+-- nor delete; the operator's sweep deletes events after three years.
+GRANT SELECT, INSERT, DELETE ON central_identity.account_roles TO central_runtime;
+GRANT SELECT, INSERT ON central_identity.audit_events TO central_runtime;

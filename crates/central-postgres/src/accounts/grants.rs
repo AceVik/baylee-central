@@ -1,6 +1,8 @@
 //! Exact runtime privileges: approving origins, rewriting archives and issuing or
 //! revoking beta keys remain operator-only; the runtime only spends a key's uses
-//! and moves a lease's expiry with its renewed session.
+//! and moves a lease's expiry with its renewed session. It grants and removes
+//! administrator roles and appends to the audit, which it cannot rewrite or
+//! delete (`docs/administration.md`).
 use super::{AccountStore, statement};
 use sea_orm::ConnectionTrait;
 
@@ -20,8 +22,10 @@ impl AccountStore {
              ('gateway_terms', ARRAY['SELECT','INSERT'], NULL),
              ('gateway_terms_texts', ARRAY['SELECT','INSERT'], NULL),
              ('terms_acceptances', ARRAY['SELECT','INSERT'], NULL),
-             ('beta_keys', ARRAY['SELECT'], 'uses_left'))
-             SELECT count(*) = 13 AND bool_and(
+             ('beta_keys', ARRAY['SELECT'], 'uses_left'),
+             ('account_roles', ARRAY['SELECT','INSERT','DELETE'], NULL),
+             ('audit_events', ARRAY['SELECT','INSERT'], NULL))
+             SELECT count(*) = 15 AND bool_and(
                NOT pg_catalog.pg_has_role(c.relowner, 'USAGE')
                AND (SELECT bool_and(pg_catalog.has_table_privilege(c.oid, p)) FROM unnest(r.privileges) p)
                AND NOT pg_catalog.has_table_privilege(c.oid, 'TRUNCATE, REFERENCES, TRIGGER, MAINTAIN, SELECT WITH GRANT OPTION, INSERT WITH GRANT OPTION, UPDATE WITH GRANT OPTION, DELETE WITH GRANT OPTION')

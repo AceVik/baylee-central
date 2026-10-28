@@ -1,5 +1,6 @@
 //! Deployed operation: the live account service, explicit migrations, issuing
-//! beta keys and secret generation. Configuration arrives over stdin, never argv
+//! beta keys, appointing an administrator, the audit's sweep and secret
+//! generation. Configuration arrives over stdin, never argv
 //! or the environment.
 //!
 //! The endpoint is always [`Endpoint::live`] and the database is reached only over
@@ -12,7 +13,10 @@ use central_crypto::opaque::server::ServerKeys;
 use central_http::{BROWSER_REQUEST_BYTES, BrowserOrigin, DevelopmentServer};
 use central_identity::IdentityService;
 use central_policy::config::Config;
-use central_postgres::{AccountStore, BetaKeyBatch, MAX_BETA_KEYS, ServerConfig, connect_server};
+use central_postgres::{
+    AccountStore, Appointed, BetaKeyBatch, MAX_BETA_KEYS, ServerConfig, appoint_admin,
+    connect_server, sweep,
+};
 use serde::Deserialize;
 use std::{
     io::{IsTerminal, Read, Write},
@@ -91,6 +95,16 @@ struct Issue {
     #[serde(default)]
     expires_days: Option<u32>,
     note: String,
+}
+
+/// An administrator to appoint under the migrator login
+/// (`docs/administration.md`): an enrolled account's username, which arrives
+/// at run time so the repository names nobody.
+#[derive(Deserialize, Zeroize, ZeroizeOnDrop)]
+#[serde(deny_unknown_fields)]
+struct Appoint {
+    database: Database,
+    username: String,
 }
 
 fn read_settings() -> Result<Zeroizing<Vec<u8>>, ()> {
@@ -262,6 +276,66 @@ async fn issue_beta_keys() -> Result<Vec<BetaKey>, ()> {
     let closed = db.close().await.map_err(|_| ());
     issued.and(closed)?;
     Ok(keys)
+}
+
+/// Appoint an enrolled account as an administrator: the first one, and the
+/// way back in when none can sign in. Again is no error.
+pub(super) async fn run_appoint_admin() -> ExitCode {
+    match appoint().await {
+        Ok(Appointed::Appointed) => {
+            eprintln!("central: administrator appointed");
+            ExitCode::SUCCESS
+        }
+        Ok(Appointed::Already) => {
+            eprintln!("central: already an administrator; nothing changed");
+            ExitCode::SUCCESS
+        }
+        Err(()) => {
+            eprintln!(
+                "central: appointment rejected configuration, found no enrolled account of that name, or failed"
+            );
+            ExitCode::FAILURE
+        }
+    }
+}
+
+async fn appoint() -> Result<Appointed, ()> {
+    let bytes = read_settings()?;
+    let mut settings: Appoint = parse(&bytes)?;
+    drop(bytes);
+    let database = settings.database.server()?;
+    let db = connect_server(database).await.map_err(|_| ())?;
+    let appointed = appoint_admin(&db, &settings.username).await.map_err(|_| ());
+    let closed = db.close().await.map_err(|_| ());
+    let appointed = appointed?;
+    closed?;
+    Ok(appointed)
+}
+
+/// Delete audit events older than three years under the migrator login,
+/// which a daily timer runs (`docs/operations.md`).
+pub(super) async fn run_sweep() -> ExitCode {
+    if let Ok(count) = swept().await {
+        eprintln!("central: {count} audit events older than three years deleted");
+        ExitCode::SUCCESS
+    } else {
+        eprintln!("central: sweep rejected configuration or failed");
+        ExitCode::FAILURE
+    }
+}
+
+async fn swept() -> Result<u64, ()> {
+    let bytes = read_settings()?;
+    let mut settings: Migration = parse(&bytes)?;
+    drop(bytes);
+    let database = settings.database.server()?;
+    drop(settings);
+    let db = connect_server(database).await.map_err(|_| ())?;
+    let swept = sweep(&db).await.map_err(|_| ());
+    let closed = db.close().await.map_err(|_| ());
+    let swept = swept?;
+    closed?;
+    Ok(swept)
 }
 
 /// Write a fresh OPAQUE setup and bridge credential as one JSON document.
@@ -451,6 +525,32 @@ mod tests {
         }
         let without_note = issue("").replace(r#","note":"October playtest""#, "");
         assert!(parse::<Issue>(without_note.as_bytes()).is_err());
+    }
+
+    #[test]
+    fn an_appointment_takes_a_username_and_its_database_only() {
+        let appoint =
+            |extra: &str| format!(r#"{{"database":{},"username":"Owner"{extra}}}"#, database());
+        let mut settings: Appoint = parse(appoint("").as_bytes()).unwrap();
+        assert_eq!(settings.username, "Owner");
+        assert!(settings.database.server().is_ok());
+        for extra in [
+            r#","admin":true"#,
+            r#","role":"admin""#,
+            r#","account":[1]"#,
+        ] {
+            assert!(
+                parse::<Appoint>(appoint(extra).as_bytes()).is_err(),
+                "{extra}"
+            );
+        }
+        let without = appoint("").replace(r#","username":"Owner""#, "");
+        assert!(parse::<Appoint>(without.as_bytes()).is_err());
+        // The sweep takes the migration document, nothing else.
+        let sweep = format!(r#"{{"database":{}}}"#, database());
+        assert!(parse::<Migration>(sweep.as_bytes()).is_ok());
+        let longer = format!(r#"{{"database":{},"years":1}}"#, database());
+        assert!(parse::<Migration>(longer.as_bytes()).is_err());
     }
 
     #[test]

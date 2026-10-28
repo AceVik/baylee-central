@@ -105,6 +105,15 @@ impl AccountStore {
                 )
                 .await;
         }
+        // The password sign-in's time, for administering accounts; renewal never moves it.
+        transaction
+            .execute_raw(statement(
+                "UPDATE central_identity.accounts SET last_sign_in_at = pg_catalog.clock_timestamp()
+                 WHERE id = $1",
+                vec![uuid(credential.identity.account).into()],
+            ))
+            .await
+            .map_err(|_| Error::Unavailable)?;
         transaction
             .execute_raw(statement(
                 "DELETE FROM central_identity.sessions WHERE account_id = $1 AND kind = $2",
