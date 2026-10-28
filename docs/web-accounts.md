@@ -295,16 +295,17 @@ takes the same tagged `Request` JSON. Only these operations are allowed:
 `AcceptTerms` for Central's terms (a gateway's terms are accepted from the
 client), `GatewayDirectory`,
 the public gateway directory of the `/gateways` page ([gateway
-registry](gateway-registry.md)), and since 28.10.2026 `ChangePasswordStart`
+registry](gateway-registry.md)), since 28.10.2026 `ChangePasswordStart`
 and `ChangePasswordFinish` ([native login](native-login.md) §"Password
-change"; served on both listeners, the page's form comes with M4). Every
-other operation is refused. The list is
+change"; served on both listeners, the page's form comes with M4), and
+`Admin`, an administrator's requests ([administration](administration.md);
+browser listener only). Every other operation is refused. The list is
 one exhaustive match in `central-identity` (`browser_operation`), so a new
 operation does not compile until it is decided there. The cookie's token is
 used only by `SessionStatus`, `RenewSession`, `Logout`, `TermsStatus`,
 `AcceptTerms`, `AccountSummary`, `SetRecovery`, `SetDisplayName` and the
 password change's two requests (whose finish sets a new cookie, as
-`LoginFinish` does); the directory uses none, and
+`LoginFinish` does) and `Admin`; the directory uses none, and
 the page sends it with `credentials: "omit"`.
 
 - `AccountSummary` (the cookie's session; no accepted terms needed) answers
@@ -370,8 +371,9 @@ requests, per session, and none has a per-address budget, since each needs a
 live browser session; a change's start also spends two units of the
 account's login budget. The
 native surface (`/v1/native`) is unchanged, except that it refuses
-`Register`, `AccountSummary`, `SetRecovery`, `SetDisplayName` and a browser
-session.
+`Register`, `AccountSummary`, `SetRecovery`, `SetDisplayName`, `Admin` and a
+browser session. `AccountSummary.admin` is the account's role since
+28.10.2026.
 
 **Local runs.** `central-service --dev-accounts-stdin` takes an optional
 `"browser": {"listen": "127.0.0.1:<port>", "origin": "http://127.0.0.1:<page

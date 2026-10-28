@@ -4,7 +4,7 @@
 //! reads and the sign-in time.
 use super::{AccountStore, Error, Identity, ServerKeys, Token, config, enroll, login};
 use central_api::admin::{AccountQuery, AccountState};
-use central_postgres::{Appointed, Session, appoint_admin, sweep};
+use central_postgres::{AUDIT_YEARS, Appointed, Session, appoint_admin, sweep};
 use sea_orm::{ConnectionTrait, DatabaseConnection, TransactionTrait};
 use std::time::Duration;
 
@@ -462,6 +462,7 @@ async fn sign_in_time(
 
 /// The sweep deletes events older than three years, and only those.
 async fn swept(operator: &DatabaseConnection) {
+    assert_eq!(AUDIT_YEARS, 3, "the privacy notice's three years");
     let all = "SELECT count(*)::bigint AS value FROM central_identity.audit_events";
     let kept = count(operator, all).await;
     operator

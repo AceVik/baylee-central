@@ -1313,3 +1313,75 @@ mutations (account row first, then sessions); walking it against a sign-in,
 a renewal (session row, then its leases) and a logout found no lock cycle.
 That is reasoning, not a concurrency test. Engineering review, not
 an audit.
+
+## Central administration, 28 October 2026
+
+Roadmap M1 step 2a ([administration](administration.md)): the accounts and
+administration design's step 5, server side.
+
+Design pass: the assets are the administrator role (which approves
+nothing yet but will lock, ban and reset), the audit's completeness, and
+what administrators see of accounts. Callers: an administrator's browser
+session, any other session, and the operator under the migrator login.
+The owner decided (22.10.2026) that the runtime login writes administrators'
+decisions; what a taken-over service gains is recorded in the design and
+the threat model. Invariants: `Admin` only on the browser listener with an
+administrator's browser session; the role checked in the statement or
+transaction that acts; a change only within 30 minutes of a password
+sign-in, renewal not counting; every change writes its event in its
+transaction; the audit holds ids, never words, and the runtime can neither
+rewrite nor delete it; nobody removes their own role, so one administrator
+always remains; the answers have no field for a credential, wrapper or
+ciphertext. Finding before code: two administrators removing each other at
+once would each see the other still present and leave none; changes are
+serialized on the administrators' rows and the acting role is read again
+after the lock.
+
+Implementation pass: migration 000012 (roles, audit, `last_sign_in_at`),
+exact grants and their startup check (two more tables, `count(*) = 15`); the
+store's reads check the administrator in their transaction, and `SetAdmin`
+refuses anyone else before taking a lock, then locks the administrators'
+account rows in id order and reads the acting role in a fresh statement.
+The design's lock on the role rows needs an `UPDATE` grant there, which the
+runtime does not hold; the first run of the role tests found it (the change
+failed as `Unavailable`), and the account rows are locked instead. A search
+is a plain `strpos` substring or a tag, never a pattern. The operator's
+`--appoint-admin-stdin` and `--sweep-stdin` read the migrator login from
+standard input, as `--migrate-stdin` does, and print fixed messages; the
+username arrives at run time. No new dependency.
+
+Adversarial pass: over PostgreSQL 18.6 (`cargo xtask postgres`), the
+runtime refuses to start with `UPDATE`, `DELETE` or `TRUNCATE` on the audit,
+an `UPDATE` column on roles, or without `INSERT` on the audit or `DELETE` on
+roles, and its own login cannot update, delete or truncate an event; the
+operator's appointment refuses an unknown, pending or malformed name,
+appoints once and writes one operator event, and again changes nothing; a
+non-administrator, a native bearer and an unknown token change and read
+nothing; a pending or unknown account is not appointed; nobody removes
+their own role; refusals write no event; appointing and removing again
+write nothing new; a removed administrator's next read is refused; a
+sign-in 31 minutes old reads but does not change, and a renewal does not
+freshen it; two administrators removing each other while their rows are
+held leave exactly one; the search finds newest first, pages, matches a
+display name without case and a tag exactly, and treats `%` as text; the
+account view and the audit name the acting administrator and nothing else;
+a password sign-in of either kind sets the sign-in time and renewal keeps
+it; the sweep deletes the event older than three years and keeps the one a
+day younger, and the runtime cannot sweep; the upgrade applies 000012 over
+000011's rows, the previous binary still signs in, and the CHECKs refuse a
+role other than `admin`, an administrator's event without an actor, an
+operator's with one, an action in words, an unknown actor kind and a detail
+over 1024 bytes; an account's roles go with it and its events stay. Over
+the real listeners: the operator appoints, the summary says so, the native
+listener refuses `Admin` with the cookie and with any token, the list,
+account and audit answers carry what the store tests showed, and a stale
+sign-in and a malformed search are refused. Injected faults each failed a
+test and were taken out again: a stale sign-in allowed to change, removing
+one's own role, no role check after the lock, the account list without a
+role check, a change without its event, a pending account appointed, the
+grant check skipping the audit table, no sign-in time, and the summary never
+saying administrator. The identity service's refusal of `Admin` on the
+native listener is also enforced by the store (a native bearer is no browser
+session), so a fault in either alone is caught by the other; the unit test
+names `Admin` among the browser's own operations. Engineering review, not an
+audit.

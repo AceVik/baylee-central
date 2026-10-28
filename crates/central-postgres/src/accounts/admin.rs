@@ -32,6 +32,10 @@ impl Action {
     }
 }
 
+/// How long the audit keeps an event, as the privacy notice says; the
+/// operator's [`sweep`] deletes older ones.
+pub const AUDIT_YEARS: i32 = 3;
+
 /// What the operator's appointment found.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Appointed {
@@ -450,7 +454,7 @@ pub async fn appoint_admin(db: &DatabaseConnection, name: &str) -> Result<Appoin
     })
 }
 
-/// Delete audit events older than three years, under the operator's
+/// Delete audit events older than [`AUDIT_YEARS`], under the operator's
 /// (migrator's) login, as the privacy notice allows. Returns how many.
 ///
 /// # Errors
@@ -459,8 +463,8 @@ pub async fn sweep(db: &DatabaseConnection) -> Result<u64, Error> {
     Ok(db
         .execute_raw(statement(
             "DELETE FROM central_identity.audit_events
-             WHERE at < pg_catalog.clock_timestamp() - interval '3 years'",
-            vec![],
+             WHERE at < pg_catalog.clock_timestamp() - pg_catalog.make_interval(years => $1)",
+            vec![AUDIT_YEARS.into()],
         ))
         .await
         .map_err(|_| Error::Unavailable)?

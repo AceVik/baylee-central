@@ -193,6 +193,23 @@ The server side of [web accounts](web-accounts.md) lands in three PRs.
   on a registered account (cookie, native session and gateway lease ended,
   recovery code still opening the document). No migration or grant change.
   The website's form (M4) and the client's (M6) are separate.
+- **Administration** (28.10.2026, roadmap M1 step 2a; [administration](administration.md)).
+  Migration 000012: administrator roles, an append-only audit (the runtime
+  may only read and insert it) and the last password sign-in time.
+  `--appoint-admin-stdin` (the first administrator, under the migrator
+  login) and `--sweep-stdin` (audit events older than three years, a daily
+  timer). `Request::Admin` on the browser listener only: `Accounts` (search
+  by text or `#tag`, pages), `Account`, `SetAdmin` and `Audit`, the role
+  checked where it acts, a change needing a password sign-in under 30
+  minutes and writing its event; `AccountSummary.admin` is real. Tests: the
+  exact grants (wider and narrower refused, the runtime unable to rewrite or
+  delete an event), the appointment and the sweep, every role rule (a stale
+  sign-in, oneself, a pending or unknown target, a removed administrator,
+  two removing each other at once), the reads, the sign-in time, the upgrade
+  over 000011 with the CHECKs, the launcher modes, and the flow over the
+  real listeners. Deploy: the hook migrates and grants; then appoint the
+  owner and install the sweep's timer. The privacy notice's new version is
+  for the owner first; the pages are M4.
 - **Not yet deployed.** Deploy: migrate, grant, add `browser.listen`, pass
   `/api/*` in the `baylee.app` site block, issue beta keys. Central's own terms
   are still `draft`, so none are in force.

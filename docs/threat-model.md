@@ -16,7 +16,7 @@ deny service and attack authentication; weak-password guessing remains a risk.
 | Cross-account access/IDOR | Ownership on every metadata/object operation | Negative tests across accounts, devices and gateways |
 | Credential replay/downgrade | Bound protocol transcripts, one-use challenges, migration state | RFC vectors and adversarial replay/destination tests |
 | Token theft/confusion | Issuer, audience, algorithm and action validation; rotation | Wrong issuer/audience, expired/revoked token tests |
-| Admin escalation | Separate owner/heartbeat keys, scoped roles, step-up | Compromised heartbeat cannot mutate admins |
+| Admin escalation | Separate owner/heartbeat keys, scoped roles, step-up; Central administrators act through the runtime login, guarded by the browser-only `Admin` request, the role checked where it acts, a password sign-in under 30 minutes for changes, the append-only audit and the exact grant check ([administration](administration.md)); a taken-over service can appoint administrators and act without an audit event | Compromised heartbeat cannot mutate admins; refused stale, self and last-administrator changes; concurrent removals leave one |
 | Vault substitution/rollback | AEAD context, epochs, revisions, explicit freshness limits | Swapped objects/accounts, stale revisions, fresh-device tests |
 | Password reset takeover | Separate authentication reset and key recovery | Email/session possession cannot decrypt or pair devices |
 | Data loss in migration | Durable state machine, preserved sources, restore proof | Failure injection at every transition |

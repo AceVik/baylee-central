@@ -22,7 +22,7 @@ mod recovery;
 mod registration;
 mod sessions;
 mod terms;
-pub use admin::{Action, Appointed, appoint_admin, sweep};
+pub use admin::{AUDIT_YEARS, Action, Appointed, appoint_admin, sweep};
 pub use migration::Status;
 pub use profiles::{Profile, TAG_DRAWS, TagDraw};
 pub use recovery::Summary;

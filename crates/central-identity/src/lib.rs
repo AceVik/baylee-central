@@ -622,6 +622,13 @@ mod tests {
         let (served, _) = (served(), refused());
         let only: Vec<&Request> = served.iter().filter(|r| browser_only(r)).collect();
         assert_eq!(only.len(), 5);
+        // Administration is the website's alone.
+        assert!(browser_only(&Request::Admin {
+            request: central_api::admin::AdminRequest::Accounts {
+                query: None,
+                before: None,
+            },
+        }));
         assert!(only.iter().all(|r| browser_operation(r)));
         assert!(!browser_only(&Request::SessionStatus));
         assert!(!browser_only(&Request::Logout));
