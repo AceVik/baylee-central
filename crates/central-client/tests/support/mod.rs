@@ -14,6 +14,7 @@ pub(super) mod admin;
 pub(super) mod browser;
 pub(super) mod gateways;
 pub(super) mod password;
+pub(super) mod reset;
 pub(super) mod terms;
 
 pub(super) fn config(user: &str, password: &str) -> DevConfig {

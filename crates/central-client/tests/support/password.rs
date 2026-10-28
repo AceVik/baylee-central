@@ -26,8 +26,8 @@ use std::sync::atomic::Ordering;
 use tokio::runtime::Runtime;
 
 pub(crate) const OLD: &str = "synthetic first password";
-const NEW: &str = "synthetic second password";
-const DOCUMENT: &[u8] = br#"{"version":1,"gateways":[],"settings":{"password":true}}"#;
+pub(crate) const NEW: &str = "synthetic second password";
+pub(crate) const DOCUMENT: &[u8] = br#"{"version":1,"gateways":[],"settings":{"password":true}}"#;
 
 pub(crate) fn run(
     http: &Http,
@@ -528,17 +528,19 @@ pub(crate) fn browser_sign_in(
 }
 
 /// A registered account, as the website's registration leaves it.
-struct Registered {
-    identity: Identity,
-    context: Context,
-    master: MasterKey,
-    code: RecoveryCode,
-    recovery: WrappedMasterKey,
-    document: Vec<u8>,
+pub(crate) struct Registered {
+    pub(crate) identity: Identity,
+    pub(crate) context: Context,
+    pub(crate) master: MasterKey,
+    pub(crate) code: RecoveryCode,
+    pub(crate) recovery: WrappedMasterKey,
+    pub(crate) document: Vec<u8>,
 }
 
-/// Register `password-web` with a beta key of its own, enrolled under [`OLD`].
-fn register(
+/// Register `name` with a beta key of its own, enrolled under [`OLD`], its
+/// first document [`DOCUMENT`].
+pub(crate) fn register(
+    name: &str,
     http: &Http,
     browser: &Browser,
     runtime: &Runtime,
@@ -555,7 +557,7 @@ fn register(
     let Response::Enrollment { identity, ticket } = browser
         .answer(
             &Request::Register {
-                username: "password-web".into(),
+                username: name.into(),
                 beta_key: key.display().as_str().into(),
                 display_name: Some("Pass_Web".into()),
             },
@@ -668,7 +670,7 @@ fn website(
         address: browser.address,
         client: "198.51.100.40",
     };
-    let registered = register(http, &browser, runtime, operator);
+    let registered = register("password-web", http, &browser, runtime, operator);
     let (identity, context, master) = (registered.identity, registered.context, &registered.master);
     // Unit 1: the website's sign-in, and the terms.
     let cookie = browser_sign_in(&browser, identity, context, OLD);
