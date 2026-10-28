@@ -1202,14 +1202,20 @@ accounts that have one, the recovery wrapper), and the sessions and gateway
 leases that act for it. Callers: a session holder on either listener, who may
 be the owner or a thief of a bearer or cookie. Central cannot check that a
 new wrapper holds the same master key, so the decisive finding before code
-was that a session alone must not change the password: the advisor's first
-proposal, a sign-in less than 10 minutes old (the `SetRecovery` rule), would
+was that a session alone must not change the password: a first proposal,
+a sign-in less than 10 minutes old (the `SetRecovery` rule), would
 let a thief with a fresh token install their own credential and a wrapper of
 a random key, taking the login and leaving the owner's data reachable only
 through a recovery code. The change instead carries a fresh OPAQUE proof of
 the current password inside the exchange, bound to the starting session and
-to the account's login budget, so a stolen token guesses no faster than a
-sign-in and gains nothing alone. Invariants: the account is taken from the
+to the account's login budget. That budget counts OPRF evaluations, not
+requests: the start answers a registration response besides KE2, both
+evaluations of the account's OPRF key, and with the registration response's
+output for a guessed password the masked envelope in KE2 can be opened and
+checked offline, so one start tests two guesses. A start therefore costs two
+of the eight units a minute, and a stolen token guesses no faster than
+anyone can through `LoginStart` without a session, and gains nothing alone
+(found in the second review, below). Invariants: the account is taken from the
 session, never from the request; a change commits only at the credential
 revision its proof was made against, with the session still live; every
 session ends with it (a stolen session too), and the caller's next session
@@ -1226,8 +1232,9 @@ Implementation pass: `Pending` gained a purpose, a sign-in or a change bound
 to the digest of the starting token; `LoginFinish` refuses a change's
 attempt and `ChangePasswordFinish` a sign-in's, each after consuming it.
 The start reads the credential through the live session of the listener's
-kind and a finished move, then charges the per-account budget before the
-worker permit, then runs KE2 and the registration response in one blocking
+kind and a finished move, then charges two units of the per-account budget
+(`Limits::account` takes the units and spends nothing when they do not fit)
+before the worker permit, then runs KE2 and the registration response in one blocking
 task. The finish verifies KE3 off the async workers, then the store parses
 record and wrapper, locks the account through the session at the start's
 revision (`FOR UPDATE OF a`), updates record, wrapper and revision, deletes
@@ -1268,8 +1275,9 @@ and the newer password signs in. By hand: no session and an unknown bearer
 start nothing; a change finished with another bearer, then (consumed) with
 its own and with none; a change's attempt as a sign-in's and the reverse;
 a proof with one bit changed; a short wrapper beside a good proof; each
-refused and consumed, the credential revision unchanged; the ninth start
-of the minute is `Busy`, and so is the account's next sign-in. On the
+refused and consumed, the credential revision unchanged; with seven units
+spent a sign-in's start fits and a change's does not (`Busy`, nothing
+spent), and once eight are spent the next sign-in is `Busy`. On the
 website, with a registered account playing natively at the official
 gateway: no change before the terms (`TermsRequired`), the cookie as a
 native bearer starts nothing, a change begun on the website cannot finish
@@ -1277,9 +1285,10 @@ on the native listener; the change answers a browser session with a new
 cookie, the old cookie, the native session and the gateway's lease end,
 the summary still has its recovery code, the stored recovery wrapper is the
 registration's and opens the first document, the new password signs the
-client in (leaving the website's session), the old one fails, and a
-change whose session a later sign-in replaced cannot be finished by the
-replacement. Injected faults each failed a test and were taken out again:
+client in (leaving the website's session) and the old one fails. A change
+whose session a later sign-in replaced cannot be finished by the
+replacement. Each test asserts the exact answer (`Rejected`, `Busy`), so a
+spent budget cannot pass for a refusal. Injected faults each failed a test and were taken out again:
 `LoginFinish` taking a change's attempt, the start charging no account
 budget, an open legacy move allowed, the lock's revision check dropped
 (the update's own check still refused: `Unavailable` where `Rejected` was
@@ -1290,4 +1299,16 @@ undetected, since the store's join refuses a foreign session; the test of a
 replaced session was added and catches it), and the commit without its
 session recheck (a real finding: it committed after the session was
 deleted; fixed as above). Clippy (pedantic, all targets and features), the
-unit suites and the gate pass. Engineering review, not an audit.
+unit suites and the gate pass.
+
+Second review, from scratch at the owner's required effort (the first
+implementation was written before the session's effort was raised): the
+budget finding above, fixed with a unit test of the two-unit cost; tests
+that accepted any error where a spent budget could hide a wrong answer now
+assert the exact one, and each part of the wire suite has an account of its
+own with its units counted; the record's wording of the lock was brought in
+line with the two statements. The lock order matches the other account
+mutations (account row first, then sessions); walking it against a sign-in,
+a renewal (session row, then its leases) and a logout found no lock cycle.
+That is reasoning, not a concurrency test. Engineering review, not
+an audit.

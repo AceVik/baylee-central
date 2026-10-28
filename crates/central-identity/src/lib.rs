@@ -269,7 +269,7 @@ impl IdentityService {
         self.limits
             .lock()
             .map_err(|_| Error::Unavailable)?
-            .account(identity.account, Instant::now())?;
+            .account(identity.account, Instant::now(), 1)?;
         let permit = self
             .workers
             .clone()

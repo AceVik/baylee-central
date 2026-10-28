@@ -116,8 +116,11 @@ current password (ASVS 6.2.3, in OPAQUE's form), inside the exchange itself:
    the session live, the account's move finished (registered, or the legacy
    move closed: while it is open the bridge's `LegacyInvalidate` is the reset
    authority) and Central's terms accepted. It charges the account's login
-   budget (eight OPAQUE starts a minute, shared with `LoginStart`), so a
-   stolen session guesses no faster than a sign-in, and answers
+   budget (eight OPRF evaluations a minute, shared with `LoginStart`) twice:
+   the registration response is an evaluation of the account's OPRF key as
+   KE2 is, and with it a guessed password unmasks KE2's envelope, so one
+   start can test two guesses. Charged double, a stolen session guesses no
+   faster than anyone can without a session through `LoginStart`. It answers
    `PasswordChallenge { attempt, login: KE2, registration }`. The attempt
    lives 60 seconds, is bound to this purpose, this listener and the digest
    of the starting session's token, and shares the 128 pending sign-ins.
@@ -129,10 +132,11 @@ current password (ASVS 6.2.3, in OPAQUE's form), inside the exchange itself:
    is a change's (a sign-in's attempt is not, nor is a change's a sign-in's
    for `LoginFinish`), started on this listener by this session, unexpired,
    and its proof verifies. In one transaction Central then locks the account
-   through the still live session at the credential revision the start read,
-   stores the record and wrapper, raises `credential_revision`, deletes every
-   session of the account (both kinds, with their gateway tickets and
-   leases) and inserts one new session of the caller's kind. The answer is
+   at the credential revision the start read, checks again after the lock
+   that the session is live (a sign-in may have replaced it while the lock
+   was awaited), stores the record and wrapper, raises `credential_revision`,
+   deletes every session of the account (both kinds, with their gateway
+   tickets and leases) and inserts one new session of the caller's kind. The answer is
    the sign-in's: `Session { token, identity, wrapped_master }` natively,
    `BrowserSession` with the new `__Host-central` cookie on the website. The
    new session counts its 12 hours from the change, a fresh password proof.
@@ -141,8 +145,9 @@ Anything else is `Rejected` and changes nothing: no or a foreign session, a
 session of the other kind, an unfinished move, a record or wrapper of the
 wrong length, a credential changed since the start (another change), a
 session replaced meanwhile. A sign-in begun before the change and finished
-after it is refused by `issue_session`'s revision check. The ninth start of a
-minute is `Busy`.
+after it is refused by `issue_session`'s revision check. A change's start
+that does not fit the minute's budget (two units of eight) is `Busy` and
+spends nothing.
 
 **A lost answer.** The commit ends the calling session, so `SessionStatus`
 with the old token is the authenticated read: still live means nothing

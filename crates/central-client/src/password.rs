@@ -17,7 +17,7 @@ impl Session {
     /// `Rejected` for a new password shorter than [`MIN_PASSWORD_CHARS`] or
     /// longer than 1024 bytes, for a wrong `current` (found before anything
     /// is committed) and for an ended session; `Busy` once the account's
-    /// login budget is spent; `TermsRequired`. After `Rejected`,
+    /// login budget is spent (a change counts as two sign-ins); `TermsRequired`. After `Rejected`,
     /// [`Session::check_active`] tells which: a live session means nothing
     /// changed; an ended one may have committed, so sign in again with
     /// `new` first. A lost answer is `Rejected` when this session has ended

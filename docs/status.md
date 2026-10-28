@@ -184,10 +184,12 @@ The server side of [web accounts](web-accounts.md) lands in three PRs.
   wrapper stay. `central-client` has `Session::change_password`. Tests: over
   PostgreSQL 18 the store's refusals (session kind, another account's
   session, a stale revision, short and long records, a short wrapper) and
-  what one commit replaces, ends and keeps; over the real listeners the SDK
-  (an open move, a short or wrong password, a sign-in racing the change, a
-  lost answer), the protocol's refusals by hand (foreign bearer, consumed
-  and crossed attempts, a forged proof, the budget) and the website's change
+  what one commit replaces, ends and keeps, and a change whose session is
+  deleted while it waits on the lock; over the real listeners the SDK (an
+  open move, a short or wrong password, a sign-in racing the change, a lost
+  answer), the protocol's refusals by hand (foreign bearer, consumed and
+  crossed attempts, a replaced session, a forged proof, the budget, where a
+  change's start counts as two sign-ins) and the website's change
   on a registered account (cookie, native session and gateway lease ended,
   recovery code still opening the document). No migration or grant change.
   The website's form (M4) and the client's (M6) are separate.

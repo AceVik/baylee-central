@@ -11,6 +11,10 @@ use central_crypto::opaque::server::ServerKeys;
 use std::time::{Duration, Instant};
 use subtle::ConstantTimeEq;
 
+/// What a change's start spends of the account's login budget: two OPRF
+/// evaluations, KE2's and the registration response's.
+const CHANGE_UNITS: u32 = 2;
+
 impl IdentityService {
     /// KE2 for the current password and the registration response for the
     /// new one, both for the session's own account and epoch.
@@ -32,11 +36,14 @@ impl IdentityService {
         let identity = credential.identity;
         let context = self.context(identity)?;
         // The login budget bounds guesses at the current password, also with
-        // a stolen session.
+        // a stolen session. The registration response is a second evaluation
+        // of the account's OPRF key: with it a guess unmasks KE2's envelope as
+        // KE2's own evaluation does, so a start costs two sign-ins and a
+        // session guesses no faster than anyone can without one.
         self.limits
             .lock()
             .map_err(|_| Error::Unavailable)?
-            .account(identity.account, Instant::now())?;
+            .account(identity.account, Instant::now(), CHANGE_UNITS)?;
         let permit = self
             .workers
             .clone()

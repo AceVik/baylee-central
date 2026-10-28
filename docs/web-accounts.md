@@ -367,8 +367,8 @@ The global budgets of the native surface apply as well: `AccountSummary`
 counts with the control requests (`SessionStatus`, `RenewSession`, …),
 `SetRecovery`, `SetDisplayName` and the password change with the data
 requests, per session, and none has a per-address budget, since each needs a
-live browser session; a change's start also spends the account's login
-budget. The
+live browser session; a change's start also spends two units of the
+account's login budget. The
 native surface (`/v1/native`) is unchanged, except that it refuses
 `Register`, `AccountSummary`, `SetRecovery`, `SetDisplayName` and a browser
 session.

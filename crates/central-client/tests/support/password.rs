@@ -1,10 +1,12 @@
 //! Password change over the real listeners (`docs/native-login.md`
-//! §"Password change"), each part with an account of its own, since every
-//! change and sign-in spends the account's eight OPAQUE starts a minute:
-//! the SDK on a moved account (refused before its move closed, a wrong
-//! current password, a sign-in racing the change, a lost answer), the raw
-//! protocol's refusals on another, and the website's change on a registered
-//! account, whose recovery code, document and other sessions are checked.
+//! §"Password change"). A sign-in's start spends one of the account's eight
+//! OPAQUE evaluations a minute and a change's start two, so each part has an
+//! account of its own and counts what it spends: the SDK on a moved account
+//! (refused before its move closed, a short or wrong password, a sign-in
+//! racing the change), a lost answer, a change whose session was replaced,
+//! the protocol's crossed and forged attempts by hand, the budget, and the
+//! website's change on a registered account, whose recovery code, document
+//! and other sessions are checked.
 use super::{Http, browser::Browser};
 use central_api::{
     Error, Token,
@@ -25,7 +27,6 @@ use tokio::runtime::Runtime;
 
 const OLD: &str = "synthetic first password";
 const NEW: &str = "synthetic second password";
-const NEWER: &str = "synthetic third password";
 const DOCUMENT: &[u8] = br#"{"version":1,"gateways":[],"settings":{"password":true}}"#;
 
 pub(crate) fn run(
@@ -36,7 +37,10 @@ pub(crate) fn run(
     operator: &DatabaseConnection,
 ) {
     sdk(http, bridge, runtime, operator);
-    protocol(http, bridge, runtime, operator);
+    lost(http, bridge);
+    replaced(http, bridge, runtime, operator);
+    crossed(http, bridge, runtime, operator);
+    budget(http, bridge, runtime, operator);
     website(http, browser, bridge, runtime, operator);
 }
 
@@ -51,6 +55,19 @@ fn row(runtime: &Runtime, operator: &DatabaseConnection, sql: &str) -> sea_orm::
         .unwrap()
 }
 
+fn revision(runtime: &Runtime, operator: &DatabaseConnection, identity: Identity) -> i64 {
+    let account = hex(identity.account);
+    row(
+        runtime,
+        operator,
+        &format!(
+            "SELECT credential_revision FROM central_identity.accounts WHERE id = '{account}'"
+        ),
+    )
+    .try_get("", "credential_revision")
+    .unwrap()
+}
+
 fn accept(http: &Http, session: &Session) {
     let current = session.terms_status(http).unwrap().current.unwrap();
     session
@@ -59,13 +76,13 @@ fn accept(http: &Http, session: &Session) {
 }
 
 /// A player moved from the official gateway, signed in with [`OLD`] and its
-/// document restored; its move is still open. One OPAQUE start.
-fn moved(http: &Http, bridge: &Token, legacy: &str, name: &str) -> (Identity, Session) {
+/// document restored; its move is still open. One unit.
+fn moved(http: &Http, bridge: &Token, legacy: &str) -> (Identity, Session) {
     let Response::Enrollment { identity, ticket } = http
         .exchange(
             &Request::LegacyReserve {
                 legacy_id: legacy.into(),
-                username: name.into(),
+                username: legacy.into(),
                 display_name: None,
                 tag: None,
             },
@@ -93,8 +110,18 @@ fn close(http: &Http, bridge: &Token, legacy: &str, identity: Identity) {
     .unwrap();
 }
 
+/// A moved account whose move is closed, signed in by hand: its identity,
+/// bearer and master key. Two units.
+fn closed(http: &Http, bridge: &Token, legacy: &str) -> (Identity, Token, MasterKey) {
+    let (identity, session) = moved(http, bridge, legacy);
+    close(http, bridge, legacy, identity);
+    drop(session);
+    let (bearer, master) = sign_in(http, identity, OLD);
+    (identity, bearer, master)
+}
+
 /// A raw native sign-in: its bearer, and the master key it opens, as a
-/// signed-in client holds it.
+/// signed-in client holds it. One unit.
 fn sign_in(http: &Http, identity: Identity, password: &str) -> (Token, MasterKey) {
     let context = context(http, identity);
     let (login, message) = Login::start(password.into(), context).unwrap();
@@ -128,13 +155,25 @@ fn sign_in(http: &Http, identity: Identity, password: &str) -> (Token, MasterKey
     (token, master)
 }
 
+/// A sign-in begun with `password` and left unfinished: its attempt and
+/// proof. One unit.
+fn login_attempt(http: &Http, identity: Identity, password: &str) -> (Token, Vec<u8>) {
+    let (login, message) = Login::start(password.into(), context(http, identity)).unwrap();
+    let Response::LoginChallenge { attempt, message } = http
+        .exchange(&Request::LoginStart { identity, message }, None)
+        .unwrap()
+    else {
+        panic!("a challenge");
+    };
+    (attempt, login.finish(&message).unwrap().finalization)
+}
+
 fn context(http: &Http, identity: Identity) -> Context {
     Context::new(http.endpoint.issuer(), identity.account, identity.epoch).unwrap()
 }
 
 /// A change begun by hand: its attempt and the finish's parts, the proof
-/// under `current` (a wrong one has no proof) and the master key wrapped
-/// under `new`.
+/// under `current` and the master key wrapped under `new`.
 struct Begun {
     attempt: Token,
     proof: Vec<u8>,
@@ -142,6 +181,7 @@ struct Begun {
     wrapped: Vec<u8>,
 }
 
+/// Start a change by hand: two units.
 fn begin(
     send: &dyn Fn(&Request) -> Result<Response, Error>,
     context: Context,
@@ -180,7 +220,7 @@ fn begin(
 impl Begun {
     fn finish(&self) -> Request {
         Request::ChangePasswordFinish {
-            attempt: Token::from_secret_bytes(self.attempt.to_secret_bytes()),
+            attempt: copy(&self.attempt),
             proof: self.proof.clone(),
             record: self.record.clone(),
             wrapped_master: self.wrapped.clone(),
@@ -188,13 +228,13 @@ impl Begun {
     }
 }
 
-/// The SDK's change on a moved account: eight OPAQUE starts in all.
+/// The SDK's change on a moved account: seven units.
 fn sdk(http: &Http, bridge: &Token, runtime: &Runtime, operator: &DatabaseConnection) {
-    let legacy = "synthetic-password-sdk";
-    // Start 1.
-    let (identity, mut session) = moved(http, bridge, legacy, "password-sdk");
+    let legacy = "password-sdk";
+    // Unit 1.
+    let (identity, mut session) = moved(http, bridge, legacy);
     // While the move is open, the bridge's reset authority stands: refused
-    // before any OPAQUE work, so no start is spent.
+    // before any OPAQUE work, so nothing is spent.
     assert_eq!(
         session.change_password(http, OLD.into(), NEW.into()),
         Err(Error::Rejected)
@@ -205,33 +245,38 @@ fn sdk(http: &Http, bridge: &Token, runtime: &Runtime, operator: &DatabaseConnec
         session.change_password(http, OLD.into(), "seven c".into()),
         Err(Error::Rejected)
     );
-    // Start 2: a wrong current password fails at the client; nothing changed.
+    // Units 2 and 3: a wrong current password fails at the client; nothing changed.
     assert_eq!(
         session.change_password(http, "not the password".into(), NEW.into()),
         Err(Error::Rejected)
     );
     session.check_active(http).unwrap();
     let account = hex(identity.account);
+    let state = |sessions: bool| {
+        row(
+            runtime,
+            operator,
+            &format!(
+                "SELECT credential_revision, vault_epoch, document_revision, document,
+                 (SELECT count(*) FROM central_identity.sessions WHERE account_id = '{account}') AS sessions
+                 FROM central_identity.accounts WHERE id = '{account}'"
+            ),
+        )
+        .try_get::<i64>("", if sessions { "sessions" } else { "credential_revision" })
+        .unwrap()
+    };
     let before = row(
         runtime,
         operator,
         &format!(
-            "SELECT credential_revision, vault_epoch, document_revision, document
-             FROM central_identity.accounts WHERE id = '{account}'"
+            "SELECT vault_epoch, document_revision, document FROM central_identity.accounts
+             WHERE id = '{account}'"
         ),
     );
-    let revision: i64 = before.try_get("", "credential_revision").unwrap();
-    // Start 3: a sign-in with the old password, begun before the change.
-    let stale = context(http, identity);
-    let (racing, message) = Login::start(OLD.into(), stale).unwrap();
-    let Response::LoginChallenge { attempt, message } = http
-        .exchange(&Request::LoginStart { identity, message }, None)
-        .unwrap()
-    else {
-        panic!("a challenge");
-    };
-    let racing = racing.finish(&message).unwrap().finalization;
-    // Start 4: the change.
+    let unchanged = state(false);
+    // Unit 4: a sign-in with the old password, begun before the change.
+    let (racing, proof) = login_attempt(http, identity, OLD);
+    // Units 5 and 6: the change.
     session
         .change_password(http, OLD.into(), NEW.into())
         .unwrap();
@@ -242,26 +287,22 @@ fn sdk(http: &Http, bridge: &Token, runtime: &Runtime, operator: &DatabaseConnec
     assert_eq!(
         http.exchange(
             &Request::LoginFinish {
-                attempt,
-                message: racing,
+                attempt: racing,
+                message: proof,
             },
             None,
         )
         .err(),
         Some(Error::Rejected)
     );
+    assert_eq!((state(false), state(true)), (unchanged + 1, 1));
     let after = row(
         runtime,
         operator,
         &format!(
-            "SELECT credential_revision, vault_epoch, document_revision, document,
-             (SELECT count(*) FROM central_identity.sessions WHERE account_id = '{account}') AS sessions
-             FROM central_identity.accounts WHERE id = '{account}'"
+            "SELECT vault_epoch, document_revision, document FROM central_identity.accounts
+             WHERE id = '{account}'"
         ),
-    );
-    assert_eq!(
-        after.try_get::<i64>("", "credential_revision").unwrap(),
-        revision + 1
     );
     for column in ["vault_epoch", "document_revision"] {
         assert_eq!(
@@ -274,57 +315,81 @@ fn sdk(http: &Http, bridge: &Token, runtime: &Runtime, operator: &DatabaseConnec
         after.try_get::<Vec<u8>>("", "document").unwrap(),
         before.try_get::<Vec<u8>>("", "document").unwrap()
     );
-    assert_eq!(after.try_get::<i64>("", "sessions").unwrap(), 1);
-    // Start 5: the old password is refused, at the client already.
-    assert!(central_client::login(http, identity, OLD.into()).is_err());
-    // A lost answer after the commit: the session it ended says so.
-    http.lose_password_reply.store(true, Ordering::Release);
-    // Start 6.
+    // Unit 7: the old password is refused, at the client already.
     assert_eq!(
-        session.change_password(http, NEW.into(), NEWER.into()),
-        Err(Error::Rejected)
+        central_client::login(http, identity, OLD.into()).err(),
+        Some(Error::Rejected)
     );
-    assert!(session.check_active(http).is_err());
-    // Start 7: the newer password is the account's; its key opens the document.
-    let session = central_client::login(http, identity, NEWER.into()).unwrap();
-    assert_eq!(session.document(), DOCUMENT);
-    // Start 8: and the one before is refused.
-    assert!(central_client::login(http, identity, NEW.into()).is_err());
     session.logout(http).unwrap();
 }
 
-/// The protocol's refusals, by hand on another moved account; each refused
-/// finish consumes its attempt and changes nothing. Then the budget: the
-/// ninth start of the minute is `Busy`.
-fn protocol(http: &Http, bridge: &Token, runtime: &Runtime, operator: &DatabaseConnection) {
-    let legacy = "synthetic-password-raw";
-    // Start 1.
-    let (identity, session) = moved(http, bridge, legacy, "password-raw");
+/// A lost answer after the commit: the session it ended says so. Five units.
+fn lost(http: &Http, bridge: &Token) {
+    let legacy = "password-lost";
+    // Unit 1.
+    let (identity, mut session) = moved(http, bridge, legacy);
     close(http, bridge, legacy, identity);
-    drop(session);
-    // Start 2: a bearer of this test's own.
-    let (bearer, master) = sign_in(http, identity, OLD);
+    http.lose_password_reply.store(true, Ordering::Release);
+    // Units 2 and 3.
+    assert_eq!(
+        session.change_password(http, OLD.into(), NEW.into()),
+        Err(Error::Rejected)
+    );
+    assert_eq!(session.check_active(http), Err(Error::Rejected));
+    // Unit 4: the new password is the account's; its key opens the document.
+    let session = central_client::login(http, identity, NEW.into()).unwrap();
+    assert_eq!(session.document(), DOCUMENT);
+    // Unit 5: and the old one is refused.
+    assert_eq!(
+        central_client::login(http, identity, OLD.into()).err(),
+        Some(Error::Rejected)
+    );
+    session.logout(http).unwrap();
+}
+
+/// A change begun, then its session replaced by a new sign-in: the
+/// replacement cannot finish what the replaced one began. Five units.
+fn replaced(http: &Http, bridge: &Token, runtime: &Runtime, operator: &DatabaseConnection) {
+    // Units 1 and 2.
+    let (identity, bearer, master) = closed(http, bridge, "password-replaced");
+    let unchanged = revision(runtime, operator, identity);
+    let context = context(http, identity);
+    // Units 3 and 4.
+    let begun = begin(
+        &|request: &Request| http.exchange(request, Some(&bearer)),
+        context,
+        &master,
+        OLD,
+        NEW,
+    )
+    .unwrap();
+    // Unit 5.
+    let (replacement, _) = sign_in(http, identity, OLD);
+    assert_eq!(
+        http.exchange(&begun.finish(), Some(&replacement)).err(),
+        Some(Error::Rejected)
+    );
+    assert_eq!(
+        http.exchange(&begun.finish(), Some(&bearer)).err(),
+        Some(Error::Rejected)
+    );
+    assert_eq!(revision(runtime, operator, identity), unchanged);
+    http.exchange(&Request::Logout, Some(&replacement)).unwrap();
+}
+
+/// Attempts refused by hand, each consumed by the refusal and changing
+/// nothing: no session, an unknown bearer, another bearer, a change's
+/// attempt as a sign-in's and the reverse. Seven units.
+fn crossed(http: &Http, bridge: &Token, runtime: &Runtime, operator: &DatabaseConnection) {
+    // Units 1 and 2.
+    let (identity, bearer, master) = closed(http, bridge, "password-crossed");
     let context = context(http, identity);
     let send = |request: &Request| http.exchange(request, Some(&bearer));
-    let account = hex(identity.account);
-    let revision = || -> i64 {
-        row(
-            runtime,
-            operator,
-            &format!(
-                "SELECT credential_revision FROM central_identity.accounts WHERE id = '{account}'"
-            ),
-        )
-        .try_get("", "credential_revision")
-        .unwrap()
-    };
-    let unchanged = revision();
-    // Without a session, or with a browser session's kind, nothing starts.
-    let (_, message) = Login::start(OLD.into(), context).unwrap();
-    let (_, registration) = Enrollment::start(NEW.into(), context).unwrap();
+    let unchanged = revision(runtime, operator, identity);
+    // Without a session, or with an unknown one, nothing starts or is spent.
     let start = Request::ChangePasswordStart {
-        login: message,
-        registration,
+        login: Login::start(OLD.into(), context).unwrap().1,
+        registration: Enrollment::start(NEW.into(), context).unwrap().1,
     };
     assert_eq!(http.exchange(&start, None).err(), Some(Error::Rejected));
     assert_eq!(
@@ -332,7 +397,7 @@ fn protocol(http: &Http, bridge: &Token, runtime: &Runtime, operator: &DatabaseC
             .err(),
         Some(Error::Rejected)
     );
-    // Start 3: finished with another bearer, then (consumed) with its own.
+    // Units 3 and 4: finished with another bearer, then (consumed) with its own and none.
     let begun = begin(&send, context, &master, OLD, NEW).unwrap();
     assert_eq!(
         http.exchange(&begun.finish(), Some(&Token::generate().unwrap()))
@@ -344,47 +409,12 @@ fn protocol(http: &Http, bridge: &Token, runtime: &Runtime, operator: &DatabaseC
         http.exchange(&begun.finish(), None).err(),
         Some(Error::Rejected)
     );
-    crossed(http, &send, identity, context, &master);
-    forged(&send, context, &master);
-    // Start 9, with the account's sign-ins: the budget is spent.
-    assert_eq!(
-        begin(&send, context, &master, OLD, NEW).err(),
-        Some(Error::Busy)
-    );
-    assert!(matches!(
-        http.exchange(
-            &Request::LoginStart {
-                identity,
-                message: Login::start(OLD.into(), context).unwrap().1,
-            },
-            None,
-        ),
-        Err(Error::Busy)
-    ));
-    // Nothing changed: the same credential, and the bearer still lives.
-    assert_eq!(revision(), unchanged);
-    assert!(matches!(
-        send(&Request::SessionStatus).unwrap(),
-        Response::SessionStatus { .. }
-    ));
-    send(&Request::Logout).unwrap();
-}
-
-/// Starts 4 to 6: attempts of one purpose are refused for the other, and
-/// consumed by trying.
-fn crossed(
-    http: &Http,
-    send: &dyn Fn(&Request) -> Result<Response, Error>,
-    identity: Identity,
-    context: Context,
-    master: &MasterKey,
-) {
-    // Start 4: a change's attempt is no sign-in, and is consumed by trying.
-    let begun = begin(send, context, master, OLD, NEW).unwrap();
+    // Units 5 and 6: a change's attempt is no sign-in, and is consumed by trying.
+    let begun = begin(&send, context, &master, OLD, NEW).unwrap();
     assert_eq!(
         http.exchange(
             &Request::LoginFinish {
-                attempt: Token::from_secret_bytes(begun.attempt.to_secret_bytes()),
+                attempt: copy(&begun.attempt),
                 message: begun.proof.clone(),
             },
             None,
@@ -393,67 +423,72 @@ fn crossed(
         Some(Error::Rejected)
     );
     assert_eq!(send(&begun.finish()).err(), Some(Error::Rejected));
-    // Start 5: nor is a sign-in's attempt a change's.
-    let (login, message) = Login::start(OLD.into(), context).unwrap();
-    let Response::LoginChallenge { attempt, message } = http
-        .exchange(&Request::LoginStart { identity, message }, None)
-        .unwrap()
-    else {
-        panic!("a challenge");
-    };
-    let proof = login.finish(&message).unwrap().finalization;
-    let (enrollment, registration) = Enrollment::start(NEW.into(), context).unwrap();
-    // A registration response from a real start, for an upload of the right shape.
-    let Response::PasswordChallenge {
-        registration: answer,
-        attempt: spare,
-        ..
-    } = send(&Request::ChangePasswordStart {
-        login: Login::start(OLD.into(), context).unwrap().1,
-        registration,
-    })
-    .unwrap()
-    else {
-        panic!("a password challenge");
-    };
-    // (That was start 6; its attempt is never finished.)
-    drop(spare);
-    let enrolled = enrollment.finish(&answer).unwrap();
-    let wrapped = enrolled.wrapping_key.wrap(master).unwrap();
+    // Unit 7: nor is a sign-in's attempt a change's, with a well-formed upload.
+    let (attempt, proof) = login_attempt(http, identity, OLD);
     assert_eq!(
         send(&Request::ChangePasswordFinish {
             attempt,
             proof,
-            record: enrolled.upload.clone(),
-            wrapped_master: wrapped.as_bytes().to_vec(),
+            record: begun.record.clone(),
+            wrapped_master: begun.wrapped.clone(),
         })
         .err(),
         Some(Error::Rejected)
     );
+    assert_eq!(revision(runtime, operator, identity), unchanged);
+    send(&Request::Logout).unwrap();
 }
 
-/// Starts 7 and 8: a forged proof, and a short wrapper beside a good proof.
-fn forged(
-    send: &dyn Fn(&Request) -> Result<Response, Error>,
-    context: Context,
-    master: &MasterKey,
-) {
-    // Start 7: a proof with one bit changed.
-    let begun = begin(send, context, master, OLD, NEW).unwrap();
+/// A forged proof and a short wrapper beside a good proof, refused and
+/// consumed; then the budget, where a change's start costs two sign-ins.
+fn budget(http: &Http, bridge: &Token, runtime: &Runtime, operator: &DatabaseConnection) {
+    // Units 1 and 2.
+    let (identity, bearer, master) = closed(http, bridge, "password-budget");
+    let context = context(http, identity);
+    let send = |request: &Request| http.exchange(request, Some(&bearer));
+    let unchanged = revision(runtime, operator, identity);
+    // Units 3 and 4: a proof with one bit changed.
+    let begun = begin(&send, context, &master, OLD, NEW).unwrap();
     let mut forged = begun.finish();
     if let Request::ChangePasswordFinish { proof, .. } = &mut forged {
         proof[0] ^= 1;
     }
     assert_eq!(send(&forged).err(), Some(Error::Rejected));
     assert_eq!(send(&begun.finish()).err(), Some(Error::Rejected));
-    // Start 8: a wrapper one byte short, with a good proof and record.
-    let begun = begin(send, context, master, OLD, NEW).unwrap();
+    // Units 5 and 6: a wrapper one byte short, with a good proof and record.
+    let begun = begin(&send, context, &master, OLD, NEW).unwrap();
     let mut short = begun.finish();
     if let Request::ChangePasswordFinish { wrapped_master, .. } = &mut short {
         wrapped_master.pop();
     }
     assert_eq!(send(&short).err(), Some(Error::Rejected));
     assert_eq!(send(&begun.finish()).err(), Some(Error::Rejected));
+    // Unit 7: a sign-in's start still fits; a change's two do not, and spend nothing.
+    let _ = login_attempt(http, identity, OLD);
+    assert_eq!(
+        begin(&send, context, &master, OLD, NEW).err(),
+        Some(Error::Busy)
+    );
+    // Unit 8, and then the account's next sign-in is `Busy` too.
+    let _ = login_attempt(http, identity, OLD);
+    assert_eq!(
+        http.exchange(
+            &Request::LoginStart {
+                identity,
+                message: Login::start(OLD.into(), context).unwrap().1,
+            },
+            None,
+        )
+        .err(),
+        Some(Error::Busy)
+    );
+    // Nothing changed: the same credential, and the bearer still lives.
+    assert_eq!(revision(runtime, operator, identity), unchanged);
+    assert!(matches!(
+        send(&Request::SessionStatus).unwrap(),
+        Response::SessionStatus { .. }
+    ));
+    send(&Request::Logout).unwrap();
 }
 
 fn hex(bytes: [u8; 16]) -> String {
@@ -584,7 +619,7 @@ fn register(
     }
 }
 
-/// Start 2: the native client plays; the official gateway holds a lease,
+/// Unit 2: the native client plays; the official gateway holds a lease,
 /// whose check is answered.
 fn playing(http: &Http, bridge: &Token, identity: Identity) -> (Session, Request) {
     let mut native = central_client::login(http, identity, OLD.into()).unwrap();
@@ -620,8 +655,7 @@ fn playing(http: &Http, bridge: &Token, identity: Identity) -> (Session, Request
 /// The website's change on a registered account, while the native client
 /// plays at the official gateway: the cookie and the native session end,
 /// with the gateway's lease; a new cookie is set; the recovery code and the
-/// document stay; a replaced session cannot finish a change. Eight OPAQUE
-/// starts.
+/// document stay. Eight units.
 fn website(
     http: &Http,
     browser: &Browser,
@@ -636,9 +670,9 @@ fn website(
     };
     let registered = register(http, &browser, runtime, operator);
     let (identity, context, master) = (registered.identity, registered.context, &registered.master);
-    // Start 1: the website's sign-in, and the terms.
+    // Unit 1: the website's sign-in, and the terms.
     let cookie = browser_sign_in(&browser, identity, context, OLD);
-    // Before the terms, no change starts (and no start is spent).
+    // Before the terms, no change starts, and nothing is spent.
     let over_browser = |request: &Request| browser.answer(request, Some(&cookie));
     assert_eq!(
         begin(&over_browser, context, master, OLD, NEW).err(),
@@ -646,13 +680,13 @@ fn website(
     );
     super::browser::accept_terms(&browser, &cookie);
     let (native, lease) = playing(http, bridge, identity);
-    // The cookie is no native bearer: nothing starts, no start is spent.
+    // The cookie is no native bearer: nothing starts, nothing is spent.
     let over_native = |request: &Request| http.exchange(request, Some(&cookie));
     assert_eq!(
         begin(&over_native, context, master, OLD, NEW).err(),
         Some(Error::Rejected)
     );
-    // Start 3: begun on the website, finished on the native listener with
+    // Units 3 and 4: begun on the website, finished on the native listener with
     // the same token: refused, and consumed.
     let begun = begin(&over_browser, context, master, OLD, NEW).unwrap();
     assert_eq!(
@@ -663,7 +697,7 @@ fn website(
         browser.call(&begun.finish(), Some(&cookie)).err(),
         Some(Error::Rejected)
     );
-    // Start 4: the change; its answer is a browser session in a new cookie.
+    // Units 5 and 6: the change; its answer is a browser session in a new cookie.
     let begun = begin(&over_browser, context, master, OLD, NEW).unwrap();
     let reply = browser.call(&begun.finish(), Some(&cookie)).unwrap();
     let Response::BrowserSession {
@@ -697,7 +731,7 @@ fn website(
     };
     assert!(has_code);
     // The native session ended with it, and the gateway's lease.
-    assert!(native.check_active(http).is_err());
+    assert_eq!(native.check_active(http), Err(Error::Rejected));
     assert_eq!(
         http.exchange(&lease, Some(bridge)).err(),
         Some(Error::Rejected)
@@ -706,7 +740,7 @@ fn website(
 }
 
 /// After the website's change: the recovery code, the document and the new
-/// password; starts 5 to 8.
+/// password; units 7 and 8.
 fn afterwards(
     http: &Http,
     browser: &Browser,
@@ -742,7 +776,7 @@ fn afterwards(
             .unwrap()[..],
         DOCUMENT
     );
-    // Start 5: the new password signs the client in, and its key opens the
+    // Unit 7: the new password signs the client in, and its key opens the
     // document; a native sign-in leaves the website's session alone.
     let native = central_client::login(http, identity, NEW.into()).unwrap();
     assert_eq!(native.document(), DOCUMENT);
@@ -752,25 +786,11 @@ fn afterwards(
             .unwrap(),
         Response::BrowserStatus { .. }
     ));
-    // Start 6: the old password is refused.
-    assert!(central_client::login(http, identity, OLD.into()).is_err());
-    native.logout(http).unwrap();
-    // Starts 7 and 8: a change begun, then its session replaced by a new
-    // sign-in; the replacement cannot finish what the replaced one began.
-    let begun = begin(
-        &|request: &Request| browser.answer(request, Some(renewed)),
-        context,
-        &registered.master,
-        NEW,
-        NEWER,
-    )
-    .unwrap();
-    let replacement = browser_sign_in(browser, identity, context, NEW);
+    // Unit 8: the old password is refused.
     assert_eq!(
-        browser.call(&begun.finish(), Some(&replacement)).err(),
+        central_client::login(http, identity, OLD.into()).err(),
         Some(Error::Rejected)
     );
-    browser
-        .answer(&Request::Logout, Some(&replacement))
-        .unwrap();
+    native.logout(http).unwrap();
+    browser.answer(&Request::Logout, Some(renewed)).unwrap();
 }
