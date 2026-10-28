@@ -299,7 +299,9 @@ registry](gateway-registry.md)), since 28.10.2026 `ChangePasswordStart`
 and `ChangePasswordFinish` ([native login](native-login.md) §"Password
 change"; served on both listeners, the page's form comes with M4), and
 `Admin`, an administrator's requests ([administration](administration.md);
-browser listener only). Every other operation is refused. The list is
+browser listener only), and `ResetStart` and `ResetFinish`, a reset code's
+use ([account reset](account-reset.md); both listeners, no session). Every
+other operation is refused. The list is
 one exhaustive match in `central-identity` (`browser_operation`), so a new
 operation does not compile until it is decided there. The cookie's token is
 used only by `SessionStatus`, `RenewSession`, `Logout`, `TermsStatus`,
@@ -363,6 +365,7 @@ room, so a crowd of addresses cannot lock new ones out.
 | `Discover` | 30 a minute |
 | `LoginStart` | 30 a minute, apart from `Discover` |
 | `GatewayDirectory` | 60 a minute, apart from the others |
+| `ResetStart` | 10 an hour |
 
 The global budgets of the native surface apply as well: `AccountSummary`
 counts with the control requests (`SessionStatus`, `RenewSession`, …),

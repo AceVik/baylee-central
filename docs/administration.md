@@ -58,6 +58,10 @@ changes nothing. It is also the way back in when no administrator can sign
 in. The owner's account is the first once it has moved to Central; the
 username arrives at run time, so the repository names nobody.
 
+A second change, `ResetLogin { account }`, makes a reset code
+([account reset](account-reset.md), M1 step 2b), audited as
+`account.reset_issued`.
+
 ## Reads
 
 - `Accounts { query, before }` → `Accounts { accounts, more }`: newest first,
@@ -67,7 +71,7 @@ username arrives at run time, so the repository names nobody.
   the username and the display name as a plain substring (`strpos`, never a
   pattern). None lists all. Each row: id, username, display name, tag,
   source, state (`pending`, `enrolled`, `restored`), created, last sign-in,
-  administrator.
+  administrator, and an outstanding reset code's expiry (since step 2b).
 - `Account { account }` → `Account { account, recovery, gateways, audit }`:
   the row, whether a recovery wrapper exists, the gateways it owns (id,
   origin, approved; at most 20) and its latest 20 audit events. An unknown
@@ -101,8 +105,9 @@ restarts when a new one fails, runs unchanged over it.
 ## The sweep
 
 `central-service --sweep-stdin` with the migration document deletes audit
-events older than three years, as the privacy notice allows, and prints the
-count on standard error. A daily systemd timer runs it ([operations](operations.md)
+events older than three years, as the privacy notice allows, and (since
+step 2b) the digests of expired reset codes, in one transaction, and prints
+both counts on standard error. A daily systemd timer runs it ([operations](operations.md)
 §"Administration"). The runtime cannot.
 
 ## Departures from the design

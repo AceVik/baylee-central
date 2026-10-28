@@ -101,13 +101,27 @@ is still to be reviewed before accounts exist.
 
 **M1 — account lifecycle** [central] → M0. Registration with Central beta keys
 (single or multi-use, expiry, notes), username rules, recovery code, password
-change, optional e-mail (add, verify, remove; sending through an HTTP mail API
-because the host blocks outbound SMTP), e-mail reset, administrator reset, TOTP
-2FA with backup codes, session renewal and a device/session list, display name,
-profile picture (bounded, re-encoded server side, size and type checked),
-account export and deletion (GDPR Art. 15, 17, 20), the role model (Central
-admin, user) with an operator bootstrap command, and an audit log. The SDK
-(`central-client`) gets each operation for the native client.
+change, optional e-mail (add, verify, remove; sent through `baylee-mailer`,
+our own service on the same server, over loopback HTTP, which relays through
+mailbox.org: the host blocks outbound SMTP), e-mail reset, administrator reset,
+two-factor sign-in (always optional, never forced: a code by e-mail, which
+needs a verified address, or an authenticator app (TOTP), with backup codes),
+session renewal and a device/session list, display name, profile picture
+(bounded, re-encoded server side, size and type checked), account export and
+deletion (GDPR Art. 15, 17, 20), the role model (Central admin, user) with an
+operator bootstrap command, and an audit log. The SDK (`central-client`) gets
+each operation for the native client.
+
+*Order (28.10.2026):* 1 password change, 2 roles, audit and administrator
+reset, 3 deletion and export, 4 e-mail and e-mail reset, 5 two-factor sign-in
+(e-mail and TOTP, both optional), sessions list, profile picture.
+
+**Open-beta blocker: abuse protection for registration** (owner,
+28.10.2026). Registration needs strong captcha and spam protection before
+the open beta, privacy-friendly and without a third-party tracker; a short
+design goes to the owner before anything is built
+([registration abuse](registration-abuse.md)). A new dependency or
+third-party service needs the owner's approval.
 
 **M2 — administration API** [central] → M1. Users (search, lock, unlock, reset,
 revoke sessions, delete), beta keys, gateway registry with self-service
@@ -154,7 +168,9 @@ M5's settings work can run beside them.
 
 - Does each gateway also serve the web app build, scoped to itself (its page and
   its admin area), or is administration only reachable through `baylee.app`?
-- Which HTTP mail provider (data processing agreement, EU hosting)?
+- ~~Which HTTP mail provider?~~ Decided 28.10.2026: `baylee-mailer` relays
+  through mailbox.org (Heinlein Hosting GmbH, Berlin), processing agreement
+  concluded 28.10.2026.
 - Profile pictures: moderation and reporting, or picture choice from a fixed set
   first?
 - Minimum age and parental consent (GDPR Art. 8; 16 in Germany) at registration.
