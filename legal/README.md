@@ -1,6 +1,6 @@
 # Legal texts of Baylee Central
 
-**Status: the terms are in force at version 2026-10-22, the privacy policy at 2026-10-23** (display name and tag, 23.10.2026). The owner published the drafts on
+**Status: the terms are in force at version 2026-10-22, the privacy policy at 2026-10-28** (administration, login reset, deletion and export; approved by the owner on 28.10.2026; before that 2026-10-23, display name and tag). The owner published the drafts on
 21.10.2026 with registration on `baylee.app`, after only the statements the
 deployed service did not yet bear out were corrected: deletion is on request
 until it is in the settings, there is no password reset or e-mail yet, and the
