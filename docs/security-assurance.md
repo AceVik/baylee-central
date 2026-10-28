@@ -1506,3 +1506,29 @@ gateway registered between the start (whose answer names the owned gateways
 for the warning) and the finish is deleted without having been named; the
 official gateway keeps a moved account's source data (its own copy, password
 retired), which a Central deletion does not reach.
+
+Implementation pass: the three requests are in `browser_operation` and
+`uses_session`, not in `browser_only` and not in `needs_acceptance` (a test
+names each). The start finds the account deletable before it charges the
+unit, so an administrator or an open move spends nothing; the attempt is a
+`Pending` of its own purpose (`DeleteAccount` with the starting session's
+digest), consumed before every check, so a sign-in's attempt finishes no
+deletion and a deletion's no sign-in. The finish's lock is the password
+change's (session, revision, epoch, a finished move, `FOR UPDATE OF a`); the
+recheck after it is a fresh statement with the role condition, since an
+appointment's insert holds the account row's key-share lock and the lock's
+own recheck sees only the account row. The other owners' gateways the
+account administers raise `admin_revision` in the same transaction; the
+`DELETE` names the revision again. The runtime's grants are unchanged: the
+cascades into `gateway_approvals`, `migration_archives` and
+`terms_acceptances`, which the runtime may not delete from, run without that
+privilege, and the store's tests run under the runtime login to show it. The
+export is one read-only repeatable-read transaction whose queries name their
+columns; its lists are cut at 256 with `complete` false, and a worst-case
+export encodes within the wire's limit. On the browser listener a deletion
+that succeeded clears the cookie; a refused one leaves it. The SDK proves the
+password at the start (a wrong one is `Rejected` there), returns the owned
+gateways for the warning, and resolves a lost finish by the session's status.
+Two departures from the design, recorded there: the challenge's gateways are
+`OwnedGateway` (id, origin, approved) rather than a name, and the export's
+`restored` flag became a `state`.

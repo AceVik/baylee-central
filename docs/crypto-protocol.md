@@ -98,6 +98,12 @@ key derivation or the wrapper changes. The vault epoch changes when
 intentionally creating a new vault, not automatically on each password change,
 so the recovery wrapper stays valid across a change.
 
+Deleting an account ([account deletion](account-deletion.md), since
+28.10.2026) uses the same proof: a fresh OPAQUE login (KE1, KE2, KE3) inside
+the deletion, bound to the starting session, listener and purpose, so a
+sign-in's attempt finishes no deletion and a deletion's no sign-in. No key,
+wrapper or wire format is added.
+
 Secret-containing public types do not implement Clone or Serialize; their Debug
 output is redacted or absent. OPAQUE states are consumed once. Owned secret
 buffers use zeroization, including explicit export/session key cleanup. This is

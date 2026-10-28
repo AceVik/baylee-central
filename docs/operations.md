@@ -230,6 +230,34 @@ events, never rewrite or delete one (`ops/grants.sql`, checked at startup).
 What a taken-over service gains by that is in [administration](administration.md)
 and the [threat model](threat-model.md).
 
+## Deleting and exporting accounts
+
+A person deletes and exports their own account ([account
+deletion](account-deletion.md)); nothing is deployed for it, no migration and
+no grant. What stays the operator's:
+
+- **An administrator who wants to leave:** another administrator removes the
+  role first; the last one is replaced by an appointment (above) first.
+- **An export that says `complete: false`:** a list passed its 256 entries.
+  Answer the rest by hand, read-only, under the migrator login: the
+  account's rows in `terms_acceptances`, `gateway_admins` and
+  `audit_events` (as `account_id` and as `actor_account`).
+- **A moved account's copy at the official gateway:** a move keeps the
+  source data there, its password retired; a deletion at Central does not
+  reach it. Until M8 removes it, delete that copy at the gateway when the
+  person asks (the official gateway's own runbook).
+- **An origin registered again after its owner was deleted:** the old
+  owner's terms for that origin are still stored. Before approving the new
+  registration, delete them under the migrator login (their texts go with
+  them):
+
+  ```sql
+  DELETE FROM central_identity.gateway_terms WHERE audience = '<origin>';
+  ```
+
+- **Backups** keep a deleted account until they rotate out, at most 12
+  months, as the privacy notice says.
+
 ## The official gateway
 
 The directory lists the official gateway (the migration bridge's,

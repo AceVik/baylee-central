@@ -300,14 +300,17 @@ and `ChangePasswordFinish` ([native login](native-login.md) §"Password
 change"; served on both listeners, the page's form comes with M4), and
 `Admin`, an administrator's requests ([administration](administration.md);
 browser listener only), and `ResetStart` and `ResetFinish`, a reset code's
-use ([account reset](account-reset.md); both listeners, no session). Every
+use ([account reset](account-reset.md); both listeners, no session), and
+`AccountExport`, `DeleteAccountStart` and `DeleteAccountFinish` ([account
+deletion](account-deletion.md); both listeners, with the session, Central's
+terms not required; a finished deletion clears the cookie). Every
 other operation is refused. The list is
 one exhaustive match in `central-identity` (`browser_operation`), so a new
 operation does not compile until it is decided there. The cookie's token is
 used only by `SessionStatus`, `RenewSession`, `Logout`, `TermsStatus`,
 `AcceptTerms`, `AccountSummary`, `SetRecovery`, `SetDisplayName` and the
 password change's two requests (whose finish sets a new cookie, as
-`LoginFinish` does) and `Admin`; the directory uses none, and
+`LoginFinish` does), `Admin`, and the export and the deletion's two; the directory uses none, and
 the page sends it with `credentials: "omit"`.
 
 - `AccountSummary` (the cookie's session; no accepted terms needed) answers
