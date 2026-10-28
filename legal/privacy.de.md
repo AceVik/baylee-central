@@ -1,5 +1,5 @@
-<!-- version: 2026-10-23 -->
-<!-- updated: 2026-10-23 -->
+<!-- version: 2026-10-28 -->
+<!-- updated: 2026-10-28 -->
 
 # Datenschutzerklärung von Baylee Central
 
@@ -32,8 +32,11 @@ Datenschutzbeauftragten gibt es nicht, weil keine Pflicht dazu besteht.
 
 ## 3. Was wir verarbeiten, wozu und auf welcher Grundlage
 
-- **Benutzername, Konto-ID, Erstellungszeitpunkt, Anzeigename und Tag** (Profilbild und Rollen folgen) – dein Konto führen und anzeigen. Andere Spieler sehen deinen Anzeigenamen und Tag, nie deinen Benutzernamen; ein vom offiziellen Gateway umgezogenes Konto behält den Namen und Tag, die es dort hatte. *Art. 6 Abs. 1 lit. b DSGVO (Vertrag)*
+- **Benutzername, Konto-ID, Erstellungszeitpunkt, Anzeigename und Tag** (ein Profilbild folgt) – dein Konto führen und anzeigen. Andere Spieler sehen deinen Anzeigenamen und Tag, nie deinen Benutzernamen; ein vom offiziellen Gateway umgezogenes Konto behält den Namen und Tag, die es dort hatte. *Art. 6 Abs. 1 lit. b DSGVO (Vertrag)*
+- **Rollen (Administrator)** – Verwaltung von Baylee Central. *Art. 6 Abs. 1 lit. b DSGVO*
+- **Zeitpunkt deiner letzten Anmeldung mit Passwort** (keine Adresse) – Konten verwalten und Missbrauch bemerken. *Art. 6 Abs. 1 lit. f DSGVO (unser Interesse an einem sicheren Betrieb)*
 - **OPAQUE-Anmeldedatensatz, verschlüsselter Schlüsselcontainer, Stand der Zugangsdaten** – Anmeldung, Schutz deiner verschlüsselten Daten. *Art. 6 Abs. 1 lit. b DSGVO*
+- **Fingerabdruck eines Rücksetzcodes, wenn ein Administrator dir einen erstellt hat** (wir speichern nur seinen SHA-256-Hash, nie den Code) – damit du ein neues Passwort setzen kannst, wenn du deines vergessen hast. *Art. 6 Abs. 1 lit. b DSGVO*
 - *Noch nicht verfügbar:* **E-Mail-Adresse (freiwillig) und ihre Bestätigung** – Passwort zurücksetzen, Kontohinweise. *Art. 6 Abs. 1 lit. b DSGVO*
 - **dein Schlüsselcontainer, mit deinem Wiederherstellungscode verschlüsselt** (den Code selbst kennen wir nicht); eine zweite Anmeldestufe (freiwillig) folgt – Schutz deines Kontos und deiner verschlüsselten Daten. *Art. 6 Abs. 1 lit. b DSGVO*
 - **Sitzungen, Anmeldetickets für Gateways, Gateway-Zugänge** – dich angemeldet halten und an Gateways anmelden. *Art. 6 Abs. 1 lit. b DSGVO*
@@ -45,6 +48,7 @@ Datenschutzbeauftragten gibt es nicht, weil keine Pflicht dazu besteht.
 - **Nachrichten über das Kontaktformular der Website** (Text; Name und E-Mail-Adresse nur, wenn du sie angibst; Sprache; Zeitpunkt) – deine Nachricht beantworten. *Art. 6 Abs. 1 lit. f DSGVO*
 - **Anonyme Nutzungszählung:** während einer Offline-Partie sendet der Client einmal pro Minute eine zufällige Kennung dieser Partie, sonst nichts; wir halten sie nur im Arbeitsspeicher – zählen, wie viele offline spielen. *Art. 6 Abs. 1 lit. f DSGVO*; abschaltbar unter „Anonyme Nutzungszahl senden“.
 - **Meldungen über Inhalte oder Konten, Moderationsentscheidungen** – Durchsetzung der Bedingungen, Pflichten als Hostingdienst. *Art. 6 Abs. 1 lit. c und f DSGVO*
+- **Protokoll dessen, was unsere Administratoren getan haben** (wer gehandelt hat, was, welches Konto oder Gateway es betraf, wann; keine Namen, Begründungen oder Notizen) – administrative Entscheidungen nachvollziehbar halten. *Art. 6 Abs. 1 lit. c und f DSGVO*
 - **technische Zugriffsdaten (IP-Adresse, Zeitpunkt, angefragte Adresse) kurzzeitig im Arbeitsspeicher und in Protokollen** – Sicherheit, Abwehr von Missbrauch und Überlastung. *Art. 6 Abs. 1 lit. f DSGVO*
 
 Unser berechtigtes Interesse beim letzten Punkt ist der sichere und
@@ -74,7 +78,7 @@ Dabei erfahren diese Anbieter deine IP-Adresse, aber nichts über dein Konto.
 ## 5. Cookies und Speicher im Browser
 
 Die Website setzt nur ein technisch notwendiges Cookie: ein Sitzungscookie,
-solange du angemeldet bist, höchstens 30 Minuten. Gegen gefälschte Anfragen
+solange du angemeldet bist, höchstens 12 Stunden. Gegen gefälschte Anfragen
 schützt sie sich ohne Cookie. Dafür braucht es keine Einwilligung (§ 25 Abs. 2 Nr. 2 TDDDG). Deine
 Sprach- und Darstellungswahl speichert der Browser lokal. Es gibt keine
 Tracking-Cookies und keine eingebundenen Dienste Dritter, die Daten über
@@ -88,6 +92,11 @@ dich sammeln.
 - **E-Mail-Versand** (sobald es ihn gibt): Wenn du eine E-Mail-Adresse hinterlegst, versenden wir
   Bestätigungen und Rücksetz-Links über einen Versanddienstleister im
   Europäischen Wirtschaftsraum als Auftragsverarbeiter.
+- **Unsere Administratoren** sehen zur Verwaltung der Konten deinen
+  Benutzernamen, Anzeigenamen und Tag, woher dein Konto stammt, wann es
+  erstellt wurde und wann du dich zuletzt angemeldet hast, ob es einen
+  Wiederherstellungscode hat und welche Gateways dir gehören; nie deine
+  verschlüsselten Daten, die wir nicht lesen können.
 - **Gateways:** Meldest du dich an einem Gateway an, erhält es deine Konto-ID,
   deinen Anzeigenamen und Tag sowie die Bestätigung, dass du angemeldet bist,
   nicht aber dein Passwort oder deine verschlüsselten Daten.
@@ -100,9 +109,21 @@ findet nicht statt.
 
 - Kontodaten speichern wir, bis du dein Konto löschst. Danach entfernen wir
   sie aus dem laufenden System sofort und aus Sicherungen spätestens nach
-  12 Monaten, wenn die Sicherungen turnusmäßig überschrieben werden.
-- Sitzungen enden spätestens 30 Minuten nach der Anmeldung, Anmeldetickets nach
-  Sekunden.
+  12 Monaten, wenn die Sicherungen turnusmäßig überschrieben werden. Ein
+  Gateway, das du eingetragen hast, wird mit deinem Konto gelöscht; Spieler
+  können sich dann nicht mehr über Baylee Central daran anmelden. Ist dein
+  Konto vom offiziellen Gateway umgezogen, behält dieses Gateway seine eigene
+  Kopie deines alten Kontos, ohne Passwort; wir löschen sie auf Anfrage und
+  für alle Konten, sobald der Umzug vom offiziellen Gateway endet.
+- Sitzungen enden 30 Minuten nach ihrer letzten Nutzung und spätestens
+  12 Stunden nach der Anmeldung, Anmeldetickets nach Sekunden.
+- Den Zeitpunkt deiner letzten Anmeldung speichern wir für die Dauer deines
+  Kontos.
+- Das Protokoll dessen, was unsere Administratoren getan haben, bewahren wir
+  drei Jahre auf; danach wird es automatisch gelöscht.
+- Den Fingerabdruck eines Rücksetzcodes löschen wir, wenn der Code benutzt
+  wird oder du dein Passwort änderst, sonst spätestens einen Tag nach seinem
+  Ablauf, 24 Stunden nach seiner Erstellung.
 - Server-Protokolle löschen wir nach höchstens 14 Tagen.
 - Meldungen und Moderationsentscheidungen bewahren wir so lange auf, wie es
   zur Nachvollziehbarkeit nötig ist, höchstens drei Jahre.
@@ -121,8 +142,10 @@ Du hast das Recht auf Auskunft (Art. 15), Berichtigung (Art. 16), Löschung
 (Art. 17), Einschränkung (Art. 18), Datenübertragbarkeit (Art. 20) und
 Widerspruch gegen Verarbeitungen auf Grundlage berechtigter Interessen
 (Art. 21 DSGVO). Viele davon kannst du selbst ausüben: Konto löschen,
-Daten exportieren und Angaben ändern geht in den Einstellungen. Sonst
-genügt eine Nachricht an die Kontaktdaten im Impressum.
+Daten exportieren und Angaben ändern geht in den Einstellungen; das Löschen
+fragt dein Passwort erneut ab, und ein gelöschtes Konto lässt sich nicht
+wiederherstellen. Sonst genügt eine Nachricht an die Kontaktdaten im
+Impressum.
 
 Du kannst dich bei einer Datenschutz-Aufsichtsbehörde beschweren, etwa bei
 der deines Wohnorts oder der für uns zuständigen.
