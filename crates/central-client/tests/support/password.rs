@@ -620,7 +620,8 @@ fn playing(http: &Http, bridge: &Token, identity: Identity) -> (Session, Request
 /// The website's change on a registered account, while the native client
 /// plays at the official gateway: the cookie and the native session end,
 /// with the gateway's lease; a new cookie is set; the recovery code and the
-/// document stay. Six OPAQUE starts.
+/// document stay; a replaced session cannot finish a change. Eight OPAQUE
+/// starts.
 fn website(
     http: &Http,
     browser: &Browser,
@@ -705,7 +706,7 @@ fn website(
 }
 
 /// After the website's change: the recovery code, the document and the new
-/// password; starts 5 and 6.
+/// password; starts 5 to 8.
 fn afterwards(
     http: &Http,
     browser: &Browser,
@@ -754,5 +755,22 @@ fn afterwards(
     // Start 6: the old password is refused.
     assert!(central_client::login(http, identity, OLD.into()).is_err());
     native.logout(http).unwrap();
-    browser.answer(&Request::Logout, Some(renewed)).unwrap();
+    // Starts 7 and 8: a change begun, then its session replaced by a new
+    // sign-in; the replacement cannot finish what the replaced one began.
+    let begun = begin(
+        &|request: &Request| browser.answer(request, Some(renewed)),
+        context,
+        &registered.master,
+        NEW,
+        NEWER,
+    )
+    .unwrap();
+    let replacement = browser_sign_in(browser, identity, context, NEW);
+    assert_eq!(
+        browser.call(&begun.finish(), Some(&replacement)).err(),
+        Some(Error::Rejected)
+    );
+    browser
+        .answer(&Request::Logout, Some(&replacement))
+        .unwrap();
 }

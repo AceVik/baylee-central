@@ -1,11 +1,14 @@
 //! The store's half of a password change: whose credential a session may
 //! change, and what one commit replaces, ends and keeps.
 use super::{
-    AccountStore, Credential, Enrollment, Error, Identity, MasterKey, ServerKeys, Token, context,
-    enroll, login,
+    AccountStore, Credential, Enrollment, Error, Identity, MasterKey, ServerKeys, Token, config,
+    context, enroll, login,
 };
 use central_postgres::Session;
-use sea_orm::{ConnectionTrait, DatabaseConnection};
+use sea_orm::{
+    ConnectionTrait, DatabaseConnection, DbBackend, Statement, TransactionTrait, prelude::Uuid,
+};
+use std::time::Duration;
 
 /// A new record and a wrapper for it, as a client makes them.
 fn upload(keys: &ServerKeys, identity: Identity) -> (Vec<u8>, Vec<u8>) {
@@ -22,7 +25,7 @@ fn upload(keys: &ServerKeys, identity: Identity) -> (Vec<u8>, Vec<u8>) {
 }
 
 async fn state(operator: &DatabaseConnection, identity: Identity) -> (i64, i64, i64, Vec<u8>, i64) {
-    let account = sea_orm::prelude::Uuid::from_bytes(identity.account);
+    let account = Uuid::from_bytes(identity.account);
     let row = operator
         .query_one_raw(sea_orm::Statement::from_string(
             sea_orm::DbBackend::Postgres,
@@ -139,6 +142,76 @@ pub(super) async fn run(store: &AccountStore, operator: &DatabaseConnection, key
     );
     // The stranger's own session is untouched.
     store.session_status(&stranger).await.unwrap();
+    replaced_while_waiting(store, operator, keys, identity).await;
+}
+
+/// A change that waited on the account's lock while its session was
+/// replaced commits nothing: the session is checked again after the lock.
+async fn replaced_while_waiting(
+    store: &AccountStore,
+    operator: &DatabaseConnection,
+    keys: &ServerKeys,
+    identity: Identity,
+) {
+    let observer =
+        central_postgres::connect_dev(config("central_runtime", "CENTRAL_TEST_RUNTIME_PASSWORD"))
+            .await
+            .unwrap();
+    let session = Token::generate().unwrap();
+    let credential = store.credential(identity).await.unwrap().unwrap();
+    store.issue_session(&credential, &session).await.unwrap();
+    let credential = store
+        .password_credential(Session::Native(&session))
+        .await
+        .unwrap();
+    let before = state(operator, identity).await;
+    let (record, wrapped) = upload(keys, identity);
+    let tx = operator.begin().await.unwrap();
+    tx.query_one_raw(Statement::from_sql_and_values(
+        DbBackend::Postgres,
+        "SELECT id FROM central_identity.accounts WHERE id = $1 FOR UPDATE",
+        vec![Uuid::from_bytes(identity.account).into()],
+    ))
+    .await
+    .unwrap()
+    .unwrap();
+    let waiting = store.clone();
+    let waiter = tokio::spawn(async move {
+        let next = Token::generate().unwrap();
+        waiting
+            .change_password(
+                Session::Native(&session),
+                &credential,
+                &record,
+                &wrapped,
+                Session::Native(&next),
+            )
+            .await
+            .map(|_| ())
+    });
+    super::revocation_race::wait_for_account_lock(&observer).await;
+    tx.execute_raw(Statement::from_sql_and_values(
+        DbBackend::Postgres,
+        "DELETE FROM central_identity.sessions WHERE account_id = $1",
+        vec![Uuid::from_bytes(identity.account).into()],
+    ))
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+    assert_eq!(
+        tokio::time::timeout(Duration::from_secs(5), waiter)
+            .await
+            .unwrap()
+            .unwrap(),
+        Err(Error::Rejected)
+    );
+    let after = state(operator, identity).await;
+    assert_eq!(
+        (after.0, after.4),
+        (before.0, 0),
+        "nothing changed, no session"
+    );
+    observer.close().await.unwrap();
 }
 
 /// Every refusal of a change, each before anything is written: malformed

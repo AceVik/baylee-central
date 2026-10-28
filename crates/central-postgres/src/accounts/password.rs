@@ -69,22 +69,41 @@ impl AccountStore {
             return Err(Error::Rejected);
         }
         let account = uuid(credential.identity.account);
+        let epoch = number(credential.identity.epoch)?;
         let tx = self.db.begin().await.map_err(|_| Error::Unavailable)?;
-        let row = tx
-            .query_one_raw(statement(
-                "SELECT a.username_key FROM central_identity.accounts a JOIN central_identity.sessions s
-             ON s.account_id = a.id AND s.credential_revision = a.credential_revision
-             WHERE s.digest = $1 AND s.kind = $2 AND s.expires_at > pg_catalog.clock_timestamp()
-             AND a.id = $3 AND a.vault_epoch = $4 AND a.credential_revision = $5
-             AND a.credential IS NOT NULL AND (a.source = 'registered' OR a.legacy_closed)
-             FOR UPDATE OF a",
+        let lock = |sql| {
+            statement(
+                sql,
                 vec![
                     current.digest().to_vec().into(),
                     current.kind().into(),
                     account.into(),
-                    number(credential.identity.epoch)?.into(),
                     credential.revision.into(),
+                    epoch.into(),
                 ],
+            )
+        };
+        tx.query_one_raw(lock(
+            "SELECT a.id FROM central_identity.accounts a JOIN central_identity.sessions s
+             ON s.account_id = a.id AND s.credential_revision = a.credential_revision
+             WHERE s.digest = $1 AND s.kind = $2 AND s.expires_at > pg_catalog.clock_timestamp()
+             AND a.id = $3 AND a.credential_revision = $4 AND a.vault_epoch = $5
+             AND a.credential IS NOT NULL AND (a.source = 'registered' OR a.legacy_closed)
+             FOR UPDATE OF a",
+        ))
+        .await
+        .map_err(|_| Error::Unavailable)?
+        .ok_or(Error::Rejected)?;
+        // After the lock, a fresh snapshot: a sign-in that replaced `current`
+        // while this waited has committed, and the lock's own recheck saw only
+        // the account row again (`objects::locked_owner` does the same).
+        let row = tx
+            .query_one_raw(lock(
+                "SELECT a.username_key FROM central_identity.sessions s JOIN central_identity.accounts a
+                 ON a.id = s.account_id AND a.credential_revision = s.credential_revision
+                 WHERE s.digest = $1 AND s.kind = $2 AND s.expires_at > pg_catalog.clock_timestamp()
+                 AND s.account_id = $3 AND a.credential_revision = $4 AND a.vault_epoch = $5
+                 FOR SHARE OF s",
             ))
             .await
             .map_err(|_| Error::Unavailable)?
