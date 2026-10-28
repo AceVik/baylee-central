@@ -285,6 +285,13 @@ mod tests {
             Request::ReadDocument,
             Request::ConfirmRestore { revision: 1 },
             Request::ListObjects { after: None },
+            // A person who will not accept new terms may still see their data and leave.
+            Request::AccountExport,
+            Request::DeleteAccountStart { login: vec![] },
+            Request::DeleteAccountFinish {
+                attempt: Token::generate().unwrap(),
+                proof: vec![],
+            },
         ] {
             assert!(!needs_acceptance(&free));
         }

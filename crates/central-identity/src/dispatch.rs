@@ -71,7 +71,8 @@ impl IdentityService {
             | Request::SetRecovery { .. }
             | Request::SetDisplayName { .. }
             | Request::Admin { .. }) => self.account_request(request, bearer, surface).await,
-            request @ (Request::LegacyInvalidate { .. }
+            request @ (Request::LegacyReserve { .. }
+            | Request::LegacyInvalidate { .. }
             | Request::LegacyClose { .. }
             | Request::LegacyProfile { .. }) => self.legacy_mutation(request, bearer).await,
             request @ (Request::RegisterGateway { .. }
@@ -83,6 +84,11 @@ impl IdentityService {
             | Request::GatewayProfile { .. }
             | Request::GatewayTicket { .. }
             | Request::RedeemGateway { .. }) => self.gateway_request(request, bearer).await,
+            request @ (Request::AccountExport
+            | Request::DeleteAccountStart { .. }
+            | Request::DeleteAccountFinish { .. }) => {
+                self.lifecycle_request(request, bearer, surface).await
+            }
             Request::Discover { username } => self.discover(&username).await,
             Request::LoginStart { identity, message } => {
                 self.start(identity, message, surface).await
@@ -101,20 +107,6 @@ impl IdentityService {
             } => {
                 self.register(&username, &beta_key, display_name.as_deref(), surface)
                     .await
-            }
-            Request::LegacyReserve {
-                legacy_id,
-                username,
-                display_name,
-                tag,
-            } => {
-                self.bridge(bearer)?;
-                let ticket = Token::generate()?;
-                let identity = self
-                    .store
-                    .reserve_legacy(&legacy_id, &username, display_name.as_deref(), tag, &ticket)
-                    .await?;
-                Ok(Response::Enrollment { identity, ticket })
             }
             Request::EnrollmentStart { ticket, message } => {
                 self.enrollment_challenge(&ticket, message).await
@@ -294,6 +286,19 @@ impl IdentityService {
     ) -> Result<Response, Error> {
         self.bridge(bearer)?;
         match request {
+            Request::LegacyReserve {
+                legacy_id,
+                username,
+                display_name,
+                tag,
+            } => {
+                let ticket = Token::generate()?;
+                let identity = self
+                    .store
+                    .reserve_legacy(&legacy_id, &username, display_name.as_deref(), tag, &ticket)
+                    .await?;
+                return Ok(Response::Enrollment { identity, ticket });
+            }
             Request::LegacyInvalidate { legacy_id } => {
                 self.store.invalidate_legacy(&legacy_id).await?;
             }

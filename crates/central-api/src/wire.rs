@@ -392,6 +392,31 @@ pub enum Request {
         /// The action.
         request: crate::admin::AdminRequest,
     },
+    /// Everything Central stores about the session's account apart from its
+    /// secrets and ciphertext (`docs/account-deletion.md`), on either
+    /// listener. Needs a password sign-in less than 30 minutes old, not
+    /// Central's terms. Answered with [`Response::AccountExport`].
+    AccountExport,
+    /// Begin deleting the session's account, on either listener, without
+    /// Central's terms: a fresh OPAQUE login with the password, for the
+    /// session's own account and epoch. The account must have finished
+    /// moving and hold no administrator role. Answered with
+    /// [`Response::DeleteChallenge`]; it spends one unit of the account's
+    /// login budget.
+    DeleteAccountStart {
+        /// KE1 under the password.
+        login: Vec<u8>,
+    },
+    /// Finish a deletion with the session that started it: the account, the
+    /// gateways it owns and every row naming it are deleted; `Done`, and on
+    /// the browser listener the cookie is cleared. Cannot be undone.
+    DeleteAccountFinish {
+        /// The attempt of [`Response::DeleteChallenge`], consumed on success
+        /// and failure.
+        attempt: Token,
+        /// KE3 under the password, not a password.
+        proof: Vec<u8>,
+    },
 }
 
 /// What a reset does with the account's encrypted data.
@@ -596,6 +621,22 @@ pub enum Response {
         login: Vec<u8>,
         /// OPAQUE registration response for the new password.
         registration: Vec<u8>,
+    },
+    /// The answer to [`Request::DeleteAccountStart`]: KE2, and the gateways
+    /// the account owns, which the deletion takes with it, for the warning
+    /// shown before the proof is sent.
+    DeleteChallenge {
+        /// One-use attempt capability, bound to the session that started it.
+        attempt: Token,
+        /// OPAQUE KE2 under the stored credential.
+        login: Vec<u8>,
+        /// The gateways the account owns.
+        gateways: Vec<crate::admin::OwnedGateway>,
+    },
+    /// The answer to [`Request::AccountExport`].
+    AccountExport {
+        /// What Central stores about the account.
+        export: Box<crate::export::AccountExport>,
     },
     /// Authenticated encrypted account document.
     Document {
@@ -979,6 +1020,55 @@ mod tests {
             finish.replace(r#","wrapped_master":[5]"#, "").into_bytes(),
             finish.replace(r#""proof":[3],"#, "").into_bytes(),
             finish.replace(r#""record":[4]"#, r#""record":[4],"recovery":[6]"#).into_bytes(),
+        ] {
+            assert!(crate::decode::<Request>(&bad).is_err(), "{}", String::from_utf8_lossy(&bad));
+        }
+    }
+
+    #[test]
+    fn deletion_and_export_have_the_designed_shapes() {
+        const ATTEMPT: &str = "[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]";
+        assert!(matches!(
+            crate::decode(br#"{"operation":"account_export"}"#).unwrap(),
+            Request::AccountExport
+        ));
+        let Request::DeleteAccountStart { login } =
+            crate::decode(br#"{"operation":"delete_account_start","login":[1]}"#).unwrap()
+        else {
+            panic!("a start");
+        };
+        assert_eq!(login, vec![1]);
+        let finish =
+            format!(r#"{{"operation":"delete_account_finish","attempt":{ATTEMPT},"proof":[2]}}"#);
+        let Request::DeleteAccountFinish { proof, .. } = crate::decode(finish.as_bytes()).unwrap()
+        else {
+            panic!("a finish");
+        };
+        assert_eq!(proof, vec![2]);
+        let challenge = Response::DeleteChallenge {
+            attempt: Token::from_secret_bytes(zeroize::Zeroizing::new([0; 32])),
+            login: vec![3],
+            gateways: vec![crate::admin::OwnedGateway {
+                id: [1; 16],
+                origin: "https://gateway.example".into(),
+                approved: true,
+            }],
+        };
+        let text = String::from_utf8(crate::encode(&challenge).unwrap()).unwrap();
+        assert_eq!(
+            text,
+            format!(
+                r#"{{"result":"delete_challenge","attempt":{ATTEMPT},"login":[3],"gateways":[{{"id":[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],"origin":"https://gateway.example","approved":true}}]}}"#
+            )
+        );
+        assert!(crate::decode::<Response>(text.as_bytes()).is_ok());
+        // No password, identity or session rides along, and nothing is left out.
+        for bad in [
+            br#"{"operation":"delete_account_start"}"#.to_vec(),
+            br#"{"operation":"delete_account_start","login":[1],"password":"never"}"#.to_vec(),
+            br#"{"operation":"delete_account_start","login":[1],"account":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]}"#.to_vec(),
+            finish.replace(r#","proof":[2]"#, "").into_bytes(),
+            finish.replace(r#""proof":[2]"#, r#""proof":[2],"login":[1]"#).into_bytes(),
         ] {
             assert!(crate::decode::<Request>(&bad).is_err(), "{}", String::from_utf8_lossy(&bad));
         }

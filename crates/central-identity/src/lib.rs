@@ -21,6 +21,7 @@ use subtle::ConstantTimeEq;
 use tokio::sync::Semaphore;
 
 mod admin;
+mod deletion;
 mod dispatch;
 mod gateways;
 mod limits;
@@ -45,6 +46,9 @@ enum Purpose {
     /// A password change, finished by `ChangePasswordFinish` with the session
     /// whose token has this digest, and with no other.
     ChangePassword([u8; 32]),
+    /// An account's deletion, finished by `DeleteAccountFinish` with the
+    /// session whose token has this digest, and with no other.
+    DeleteAccount([u8; 32]),
 }
 
 /// The listener a request arrived on.
@@ -103,7 +107,10 @@ pub fn browser_operation(request: &Request) -> bool {
         | Request::ChangePasswordFinish { .. }
         | Request::Admin { .. }
         | Request::ResetStart { .. }
-        | Request::ResetFinish { .. } => true,
+        | Request::ResetFinish { .. }
+        | Request::AccountExport
+        | Request::DeleteAccountStart { .. }
+        | Request::DeleteAccountFinish { .. } => true,
         Request::AcceptTerms { subject, .. } => matches!(subject, TermsSubject::Central),
         Request::CreateObject
         | Request::ReadObject { .. }
@@ -163,6 +170,9 @@ fn uses_session(request: &Request) -> bool {
             | Request::ChangePasswordStart { .. }
             | Request::ChangePasswordFinish { .. }
             | Request::Admin { .. }
+            | Request::AccountExport
+            | Request::DeleteAccountStart { .. }
+            | Request::DeleteAccountFinish { .. }
     )
 }
 
@@ -512,6 +522,12 @@ mod tests {
                 wrapped_master: vec![],
                 vault: central_api::wire::ResetVault::Keep,
             },
+            Request::AccountExport,
+            Request::DeleteAccountStart { login: vec![] },
+            Request::DeleteAccountFinish {
+                attempt: token(),
+                proof: vec![],
+            },
         ]
     }
 
@@ -630,7 +646,7 @@ mod tests {
                 text[start..].split('"').next().unwrap().to_owned()
             })
             .collect();
-        assert_eq!(named.len(), 45, "every operation is in one of the lists");
+        assert_eq!(named.len(), 48, "every operation is in one of the lists");
     }
 
     #[test]
@@ -673,6 +689,18 @@ mod tests {
             record: vec![],
             wrapped_master: vec![],
         }));
+        // Deletion and export act on the cookie's account, on both listeners.
+        for request in [
+            Request::AccountExport,
+            Request::DeleteAccountStart { login: vec![] },
+            Request::DeleteAccountFinish {
+                attempt: token(),
+                proof: vec![],
+            },
+        ] {
+            assert!(uses_session(&request) && browser_operation(&request));
+            assert!(!browser_only(&request));
+        }
         assert!(!uses_session(&Request::Terms));
         assert!(!uses_session(&Request::GatewayDirectory { after: None }));
         assert!(!uses_session(&Request::Discover {

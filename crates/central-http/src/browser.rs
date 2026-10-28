@@ -167,8 +167,11 @@ async fn call<A: Accounts>(State(state): State<Arc<Browser<A>>>, request: HttpRe
         return failure(Error::Busy);
     }
     let logout = matches!(request, Request::Logout);
+    let deletion = matches!(request, Request::DeleteAccountFinish { .. });
     let cookie = cookie(headers);
     let result = state.accounts.browser(request, cookie.as_ref()).await;
+    // A deleted account's session is gone with it.
+    let deleted = deletion && result.is_ok();
     let mut response = match result.and_then(|reply| {
         let bytes = central_api::encode(&reply.response)?;
         Ok((bytes, reply.session))
@@ -183,7 +186,7 @@ async fn call<A: Accounts>(State(state): State<Arc<Browser<A>>>, request: HttpRe
         }
         Err(error) => failure(error),
     };
-    if logout {
+    if logout || deleted {
         // Signing out always clears the cookie, also when the session was gone.
         set_cookie(&mut response, None);
     }
@@ -772,6 +775,43 @@ mod tests {
         mock.calls.lock().unwrap().clear();
         send(&app, &headers, status).await;
         assert_eq!(mock.calls.lock().unwrap()[0].1, Some(session));
+    }
+
+    #[tokio::test]
+    async fn a_deletion_clears_the_cookie_only_once_it_is_done() {
+        let cleared = "__Host-central=; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=0";
+        let finish = || {
+            body(&Request::DeleteAccountFinish {
+                attempt: Token::from_secret_bytes(Zeroizing::new([2; 32])),
+                proof: vec![3],
+            })
+        };
+        let headers = cookie_header(&format!("__Host-central={}", hex(1)));
+        let (app, _) = listener();
+        let sent = send(&app, &headers, finish()).await;
+        assert_eq!(sent.status, StatusCode::OK);
+        assert_eq!(sent.headers[header::SET_COOKIE], cleared);
+        // A refused deletion (a wrong password) keeps the session and its cookie.
+        let app = router(
+            Arc::new(Mock {
+                fail: Some(Error::Rejected),
+                ..Mock::default()
+            }),
+            BrowserOrigin::live(),
+        );
+        let sent = send(&app, &headers, finish()).await;
+        assert_eq!(sent.status, StatusCode::UNAUTHORIZED);
+        assert!(!sent.headers.contains_key(header::SET_COOKIE));
+        // The start leaves the cookie alone.
+        let (app, _) = listener();
+        let sent = send(
+            &app,
+            &headers,
+            body(&Request::DeleteAccountStart { login: vec![1] }),
+        )
+        .await;
+        assert_eq!(sent.status, StatusCode::OK);
+        assert!(!sent.headers.contains_key(header::SET_COOKIE));
     }
 
     #[tokio::test]
