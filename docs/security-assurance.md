@@ -1532,3 +1532,66 @@ gateways for the warning, and resolves a lost finish by the session's status.
 Two departures from the design, recorded there: the challenge's gateways are
 `OwnedGateway` (id, origin, approved) rather than a name, and the export's
 `restored` flag became a `state`.
+
+Adversarial pass: over PostgreSQL 18.6, under the runtime login with the
+deployed grants. One account was given a row in every table that can name
+it: two sessions, an outstanding ticket and a lease, its own approved gateway
+with another account on its list, a place on another owner's list, objects
+(live, a reservation, a deleted one), an archive, an acceptance, a reset code
+and audit events. Each of those columns was seen to hold a row first. After
+the deletion no uuid column of the schema (apart from the audit and
+`granted_by`) and no session digest names the account or its gateway. The
+audit kept its events, the other owner's `admin_revision` rose by one, and its
+session lived. Refused, each changing nothing: an open move, an administrator
+at the start, an administrator appointed after the start at the finish, a
+session of the other kind, an unknown token, another account's session with
+this account's credential, and a revision or an epoch one ahead. Races, each
+by holding the account row from the operator's connection until the
+deletion was seen waiting: an appointment committed meanwhile, and the
+account's sessions deleted meanwhile. Both delete nothing. The export,
+field by field; refused for a sign-in 31 minutes old, a token of the other
+kind and an unknown one; cut at 256 terms with `complete` false. Over the
+real listeners:
+- the SDK on a moved account with a gateway and an object (refused while the
+  move was open, a wrong password changing nothing, the warning naming the
+  gateway, which left the directory);
+- an account that had not accepted the terms in force (an object refused with
+  `TermsRequired`), exporting and deleting;
+- a lost answer (`Rejected`, account gone);
+- an attempt finished on the other listener, then consumed;
+- a deletion's attempt as a sign-in's and a sign-in's as a deletion's;
+- a newer session of the same account finishing an older one's attempt;
+- an administrator refused before anything was spent, with an export saying
+  so;
+- six starts and a seventh `Busy`;
+- the website's export and deletion, the cookie cleared only on success.
+
+Fault injection, each fault reverted after its run. Nineteen faults were
+injected, and eighteen were caught by the assertion meant for them:
+- the role condition removed;
+- the recheck removed, or without the role, or without the session (caught
+  only by the replaced-session race);
+- the role checked in the lock statement alone (caught only by the
+  appointment race: the lock's recheck does not see a role committed while
+  it waited, which is why the fresh statement exists);
+- open moves made deletable;
+- no `admin_revision` raised;
+- a start that costs nothing;
+- the session binding disabled;
+- a sign-in's attempt accepted as a deletion;
+- the terms required for leaving;
+- the cookie cleared on the wrong outcome;
+- the freshness dropped;
+- `complete` always true;
+- a lost answer called retryable;
+- the export forgetting the events the account acted in;
+- the warning naming every owner's gateways;
+- the export reading another account's row (the SDK's account check refused
+  it first).
+
+Not detectable, on purpose: the listener binding of the attempt. A token is
+a session of one kind only, and the store finds no session of the other kind
+for it, so the deletion is refused there too; the check stays as defence in
+depth. The local runs used a raised fixture timeout, because the shared
+machine was loaded; CI ran the real five-minute limit (the postgres job took
+173 seconds). Engineering review, not an audit.
