@@ -87,12 +87,12 @@ impl IdentityService {
             Request::LoginStart { identity, message } => {
                 self.start(identity, message, surface).await
             }
-            request @ Request::ChangePasswordStart { .. } => {
-                self.change_password_start(request, bearer, surface).await
-            }
-            // Answered by `dispatch`, which knows how to hand out the session.
-            Request::LoginFinish { .. } | Request::ChangePasswordFinish { .. } => {
-                Err(Error::Rejected)
+            request @ (Request::ChangePasswordStart { .. }
+            | Request::ResetStart { .. }
+            | Request::ResetFinish { .. }
+            | Request::LoginFinish { .. }
+            | Request::ChangePasswordFinish { .. }) => {
+                self.credential_request(request, bearer, surface).await
             }
             Request::Register {
                 username,

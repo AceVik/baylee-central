@@ -3,8 +3,8 @@
 //! them, then 000007, then 000008 over a live session and its lease, then 000009
 //! over registered gateways, then 000010 over legacy and registered
 //! accounts, then 000011 over the same, drawing the registered accounts'
-//! tags, then 000012's administration over all of it. All inside one
-//! transaction that is rolled back.
+//! tags, then 000012's administration over all of it, then 000013's reset
+//! codes. All inside one transaction that is rolled back.
 use super::scalar;
 use sea_orm::{ConnectionTrait, DatabaseConnection, TransactionTrait};
 
@@ -30,6 +30,7 @@ const LEGACY_RECOVERY: &str =
 const PROFILES: &str = include_str!("../../../central-migration/src/m20261023_000011_profiles.sql");
 const ADMINISTRATION: &str =
     include_str!("../../../central-migration/src/m20261028_000012_administration.sql");
+const RESET: &str = include_str!("../../../central-migration/src/m20261028_000013_reset.sql");
 
 fn scratch(sql: &str) -> String {
     sql.replace("central_identity", "upgrade_probe")
@@ -114,6 +115,7 @@ pub(crate) async fn run(operator: &DatabaseConnection) {
     legacy_recovery(&tx).await;
     profiles(&tx).await;
     administration(&tx).await;
+    reset(&tx).await;
     tx.rollback().await.unwrap();
     assert_eq!(
         scalar(
@@ -551,4 +553,42 @@ async fn administration(tx: &sea_orm::DatabaseTransaction) {
         .await,
         1
     );
+}
+
+/// 000013 over what came before: no account has a code; a code needs its
+/// expiry, 32 bytes and an enrolled account.
+async fn reset(tx: &sea_orm::DatabaseTransaction) {
+    tx.execute_unprepared(&scratch(RESET)).await.unwrap();
+    assert_eq!(
+        scalar(
+            tx,
+            "SELECT count(*)::bigint AS value FROM upgrade_probe.accounts WHERE reset_digest IS NOT NULL"
+        )
+        .await,
+        0
+    );
+    let pending = "WHERE credential IS NULL";
+    tx.execute_unprepared(
+        "UPDATE upgrade_probe.accounts SET reset_digest = decode(repeat('41', 32), 'hex'),
+         reset_expires = clock_timestamp() + interval '24 hours'
+         WHERE id = (SELECT id FROM upgrade_probe.accounts WHERE credential IS NOT NULL ORDER BY id LIMIT 1)",
+    )
+    .await
+    .unwrap();
+    for sql in [
+        format!(
+            "UPDATE upgrade_probe.accounts SET reset_digest = decode(repeat('42', 32), 'hex') {pending}"
+        ),
+        format!(
+            "UPDATE upgrade_probe.accounts SET reset_digest = decode(repeat('43', 32), 'hex'),
+             reset_expires = clock_timestamp() {pending}"
+        ),
+        "UPDATE upgrade_probe.accounts SET reset_digest = decode(repeat('44', 31), 'hex'),
+         reset_expires = clock_timestamp() WHERE credential IS NOT NULL"
+            .into(),
+        "UPDATE upgrade_probe.accounts SET reset_expires = NULL WHERE reset_digest IS NOT NULL"
+            .into(),
+    ] {
+        refused(tx, &sql).await;
+    }
 }

@@ -210,6 +210,23 @@ The server side of [web accounts](web-accounts.md) lands in three PRs.
   real listeners. Deploy: the hook migrates and grants; then appoint the
   owner and install the sweep's timer. The privacy notice's new version is
   for the owner first; the pages are M4.
+- **Resetting a login** (28.10.2026, roadmap M1 step 2b; [account reset](account-reset.md)).
+  Migration 000013: an account's reset code (its digest and expiry, 24
+  hours). An administrator's `ResetLogin` makes one; `ResetStart` and
+  `ResetFinish` (both listeners, no session; 10 starts an hour per address on
+  the website) set a new password with it, keeping the vault (recovery code,
+  or a signed-in device's key) or making a new one at the next epoch, and
+  end every session. `central-client`: `reset` and `Session::redeem_reset`.
+  **Until locks exist (the administration design's step 6), a reset answers
+  a forgotten password, not a taken-over account:** issuing ends nothing,
+  and the old password works until the code is used. Tests: who may issue
+  for whom, what a code finds, keep and new vault column by column (objects,
+  quota, recovery wrapper, `restored`, sessions), a spent, replaced, expired
+  or cleared code, the gateway ticket after a new vault, and over the real
+  listeners all three ways to keep or renew, a wrong recovery code, wrong
+  codes spending nothing, two finishes of one code, the other listener and
+  the budget. Deploy: the hook migrates; no grant change. The website's and
+  the client's forms are M4 and M6.
 - **Not yet deployed.** Deploy: migrate, grant, add `browser.listen`, pass
   `/api/*` in the `baylee.app` site block, issue beta keys. Central's own terms
   are still `draft`, so none are in force.

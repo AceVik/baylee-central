@@ -198,7 +198,8 @@ audit event with the operator as its actor. Keep the username out of the
 repository and of shell history: the file holds it.
 
 The audit keeps administrators' and the operator's actions for three years;
-a daily timer deletes older events with the migration document
+a daily timer deletes older events, and the digests of expired reset codes,
+with the migration document
 (`/etc/baylee-central/migrate.json`), under the same `systemd-run` user as
 the deploy hook's migration:
 

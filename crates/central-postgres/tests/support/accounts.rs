@@ -22,6 +22,7 @@ mod recovery;
 mod register;
 mod registration;
 mod renewal;
+mod reset;
 mod revocation_race;
 mod single_session;
 mod terms;
@@ -114,6 +115,7 @@ pub(crate) async fn run(operator: &DatabaseConnection) {
     profiles::run(&store, operator, &keys).await;
     password::run(&store, operator, &keys).await;
     admin::run(&store, operator, &keys).await;
+    reset::run(&store, operator, &keys).await;
     store.close().await.unwrap();
 }
 

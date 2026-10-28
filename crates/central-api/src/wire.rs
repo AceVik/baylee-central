@@ -354,6 +354,35 @@ pub enum Request {
         /// 73 bytes.
         wrapped_master: Vec<u8>,
     },
+    /// Begin setting a new password with a reset code an administrator made
+    /// (`docs/account-reset.md`), on either listener without a session: an
+    /// OPAQUE registration request for the new password. A valid, unexpired
+    /// code for this username spends one unit of the account's login budget
+    /// and is answered with [`Response::ResetChallenge`]; anything else is
+    /// `Rejected`, spending nothing of the account's.
+    ResetStart {
+        /// The account's username, as typed.
+        username: String,
+        /// The code, as typed; it must carry its `RESET` prefix.
+        code: crate::reset_code::ResetCode,
+        /// OPAQUE registration request for the new password.
+        registration: Vec<u8>,
+    },
+    /// Finish a reset: the new record and the master key wrapped under the new
+    /// password, keeping the vault or making a new one. Spends the code, ends
+    /// every session; `Done`. A lost answer cannot be retried: sign in with the
+    /// new password to learn whether it took.
+    ResetFinish {
+        /// The attempt of [`Response::ResetChallenge`], consumed on success and
+        /// failure.
+        attempt: Token,
+        /// OPAQUE registration upload for the new password.
+        record: Vec<u8>,
+        /// The (kept or new) master key under the new password, 73 bytes.
+        wrapped_master: Vec<u8>,
+        /// What happens to the encrypted data.
+        vault: ResetVault,
+    },
     /// An administrator's request (`docs/administration.md`): browser
     /// listener only, a browser session whose account holds the role, and
     /// Central's terms accepted; a change also needs a password sign-in less
@@ -362,6 +391,26 @@ pub enum Request {
     Admin {
         /// The action.
         request: crate::admin::AdminRequest,
+    },
+}
+
+/// What a reset does with the account's encrypted data.
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum ResetVault {
+    /// The same master key, opened with the recovery code or held by a device
+    /// still signed in: the epoch, documents, objects and recovery wrapper stay.
+    Keep,
+    /// A new master key at the next epoch (the identity's epoch plus one):
+    /// the old documents and objects, which no one can open any more, are
+    /// replaced and deleted.
+    New {
+        /// The new first account document, sealed under the new key as object
+        /// one at the new epoch.
+        document: Vec<u8>,
+        /// The new key under a new recovery code, 73 bytes: required for a
+        /// registered account, optional for a moved one.
+        recovery: Option<Vec<u8>>,
     },
 }
 
@@ -523,6 +572,20 @@ pub enum Response {
     EnrollmentChallenge {
         /// Suite-specific registration response.
         message: Vec<u8>,
+    },
+    /// The answer to [`Request::ResetStart`]. `identity` is the account's
+    /// current one: a reset that keeps the vault registers at its epoch, one
+    /// that makes a new vault at its epoch plus one.
+    ResetChallenge {
+        /// One-use attempt capability, bound to the account and the code.
+        attempt: Token,
+        /// The account's current identity.
+        identity: Identity,
+        /// OPAQUE registration response for the new password.
+        registration: Vec<u8>,
+        /// The account's recovery wrapper, if it has one, for the recovery code
+        /// to open; the reset code authorizes handing it out before any proof.
+        recovery: Option<Vec<u8>>,
     },
     /// The answer to [`Request::ChangePasswordStart`]: KE2 for the current
     /// password and the registration response for the new one.

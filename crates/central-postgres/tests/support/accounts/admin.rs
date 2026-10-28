@@ -473,9 +473,9 @@ async fn swept(operator: &DatabaseConnection) {
         )
         .await
         .unwrap();
-    assert_eq!(sweep(operator).await, Ok(1));
+    assert_eq!(sweep(operator).await.map(|s| s.events), Ok(1));
     assert_eq!(count(operator, all).await, kept + 1);
-    assert_eq!(sweep(operator).await, Ok(0));
+    assert_eq!(sweep(operator).await.map(|s| s.events), Ok(0));
     // The runtime's own login has no right to sweep.
     let runtime =
         central_postgres::connect_dev(config("central_runtime", "CENTRAL_TEST_RUNTIME_PASSWORD"))

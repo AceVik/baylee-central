@@ -47,6 +47,8 @@ impl Limits {
                 | Request::GatewayDirectory { .. }
                 | Request::Terms
                 | Request::GatewayTerms { .. }
+                | Request::ResetStart { .. }
+                | Request::ResetFinish { .. }
         ) {
             return self.global(now);
         }

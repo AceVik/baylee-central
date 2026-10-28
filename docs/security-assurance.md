@@ -1385,3 +1385,89 @@ native listener is also enforced by the store (a native bearer is no browser
 session), so a fault in either alone is caught by the other; the unit test
 names `Admin` among the browser's own operations. Engineering review, not an
 audit.
+
+## Resetting a login, 28 October 2026
+
+Roadmap M1 step 2b ([account reset](account-reset.md)).
+
+Design pass: the assets are the login (a reset replaces it), the vault (a
+new one destroys what the old key opened), and the recovery wrapper.
+Callers: an administrator who issues a code, whoever holds the code (the
+person, or an administrator keeping it), and a device still signed in.
+Invariants: only an administrator with a fresh sign-in makes a code, never
+for an administrator, oneself, a pending account or an open legacy move,
+and every code is audited; Central keeps the code's digest only, for 24
+hours, and a new code, its use or a password change ends it; a code finds
+its account only with the right username and an unexpired digest, and a
+wrong code spends nothing of the account's budget; a start that answers a
+registration response (one OPRF evaluation) spends one unit; a finish
+commits under the account's lock with the code, revision and epoch checked
+there, spends the code and ends every session; keeping changes only the
+credential; a new vault raises the epoch, replaces document and recovery
+wrapper, deletes the objects the old key encrypted and empties their quota.
+Findings before code: a reset code's start is an OPRF oracle for its holder
+(charged a unit, after the code is found, so it is no worse than
+`LoginStart`, which needs no code); the recovery wrapper leaves Central
+before any password proof (authorized by the code's 160 bits, and opened
+only by the recovery code's own; recorded as a deliberate departure);
+issuing ends nothing, so until locks exist a reset answers a forgotten
+password, not a takeover (said in `status.md`). Accepted: whoever holds a
+code takes the login, and with a new vault destroys the data; the audit
+makes an administrator who keeps a code visible, it does not prevent it.
+
+Implementation pass: `ResetCode` (central-api) is 160 bits of
+operating-system randomness, read only with its `RESET` prefix, without
+Clone, redacted in Debug, carried as its printed form only in the
+administrator's answer; `ResetStart` decodes it, so a malformed code never
+reaches the store. Issuing locks the administrators' rows as `SetAdmin`
+does, so the target cannot become an administrator meanwhile, then checks
+the acting role after the lock. Pending resets have a map of their own (32,
+60 seconds, bound to account, digest and listener). The finish's lock is a
+single-table `SELECT … FOR UPDATE` whose recheck sees the row's latest
+version. Two findings in the code, fixed before tests: migration 000005's
+`account_closed_enrolled` requires `restored` for a closed move, so a moved
+account's new vault keeps it (the design cleared it for every account); and
+`object_bytes`, the quota's byte counter, must be emptied with the objects.
+A registered account's new vault without a recovery wrapper is refused in
+Rust, so the client sees `Rejected`, not the schema's `Unavailable`. A
+password change clears an outstanding code; a sign-in does not.
+
+Adversarial pass: over PostgreSQL 18.6, refused issuers (a non-administrator,
+a native bearer, a sign-in 31 minutes old) and targets (oneself, another
+administrator, an open move, a pending and an unknown account) write no
+event; a code is audited once, its expiry is 24 hours ahead and shown on the
+account's row; it finds the account by name without case and nothing with
+another code or name; a second code replaces it, and issuing ends no
+session. Keeping: a short record or wrapper and a stale revision change
+nothing; the finish changes only the credential, ends both sessions and
+spends the code, after which neither the finish nor the start works. A
+registered account's new vault: refused without or with a short recovery
+wrapper and with a malformed document, each changing nothing; then the
+whole row compares equal to the expected one (revision, epoch, document,
+revision 1, the new recovery wrapper, `restored` false, no objects, an empty
+quota, no session, no code); the old epoch finds nothing, the new one signs
+in, takes no gateway ticket until it confirms and then does. A moved
+account's new vault keeps `restored`, may go without a wrapper and compares
+equal in full. A password change clears a code; an expired one finds
+nothing, and the sweep clears it. The upgrade applies 000013 over 000012
+and its CHECK refuses a digest without expiry, a code on a pending account
+and a short digest. Over the real listeners: an administrator's code from
+the website; a wrong recovery code refused at the client with the code
+still usable; the right one keeps the document under the new password, and
+the old one and the spent code are refused; two starts of one code, the
+finish on the other listener refused, the first finish spending it and the
+second refused; eight wrong codes spending nothing of the account's budget
+before a new vault, which signs in at the next epoch with its own document
+and a new recovery code; a signed-in device keeping its data, refused with
+another account's name, its own session ended; and a start with a good code
+`Busy` once the account's eight units are spent. Injected faults each
+failed a test and were taken out again: an administrator's login reset, a
+stale sign-in issuing, an expired code found, a finish that does not spend
+its code, a new vault keeping the objects, the quota or `restored`, a
+registered account's new vault without its wrapper passing the Rust check
+(the schema refused it as `Unavailable`), a start spending nothing, a
+password change keeping the code, a finish on the other listener, issuing
+without its event, and the sweep keeping expired codes. Not detectable, on
+purpose: refusing one's own login, since an actor is always an
+administrator and an administrator's login is refused anyway; the explicit
+check stays as defence in depth. Engineering review, not an audit.

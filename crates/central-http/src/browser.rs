@@ -317,6 +317,7 @@ struct Budgets {
     discover: Book,
     login: Book,
     directory: Book,
+    reset: Book,
 }
 
 impl Budgets {
@@ -328,6 +329,8 @@ impl Budgets {
             // The public directory needs no session; a page reads it a few
             // times, so a minute's budget leaves room for paging.
             Request::GatewayDirectory { .. } => self.directory.charge(client, now, 60, MINUTE),
+            // A reset needs a code; a few tries an hour leave room for typing it.
+            Request::ResetStart { .. } => self.reset.charge(client, now, 10, HOUR),
             _ => true,
         }
     }
@@ -955,6 +958,31 @@ mod tests {
         }
         assert!(!budgets.charge(&request, client, now + Duration::from_secs(59)));
         assert!(budgets.charge(&request, client, now + MINUTE));
+    }
+
+    #[test]
+    fn a_reset_has_ten_starts_an_hour_per_address() {
+        let mut budgets = Budgets::default();
+        let client = Client::from("198.51.100.43".parse::<IpAddr>().unwrap());
+        let request = Request::ResetStart {
+            username: "synthetic".into(),
+            code: central_api::reset_code::ResetCode::generate().unwrap(),
+            registration: vec![],
+        };
+        let now = Instant::now();
+        for _ in 0..10 {
+            assert!(budgets.charge(&request, client, now));
+        }
+        assert!(!budgets.charge(&request, client, now + Duration::from_secs(3_599)));
+        // The other budgets are apart.
+        assert!(budgets.charge(
+            &Request::Discover {
+                username: "synthetic".into()
+            },
+            client,
+            now
+        ));
+        assert!(budgets.charge(&request, client, now + HOUR));
     }
 
     #[test]
