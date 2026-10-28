@@ -14,10 +14,12 @@ use zeroize::Zeroizing;
 
 mod gateways;
 mod objects;
+mod password;
 mod session;
 mod terms;
 pub use gateways::{GatewayRegistration, gateway_directory};
 pub use objects::ObjectDocument;
+pub use password::MIN_PASSWORD_CHARS;
 pub use session::Session;
 pub use terms::{TermsStatus, central_terms, gateway_terms};
 

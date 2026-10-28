@@ -24,6 +24,7 @@ mod dispatch;
 mod gateways;
 mod limits;
 mod objects;
+mod password;
 mod terms;
 
 struct Pending {
@@ -31,6 +32,17 @@ struct Pending {
     attempt: Attempt,
     credential: Option<Credential>,
     surface: Surface,
+    purpose: Purpose,
+}
+
+/// What a pending OPAQUE login proves the password for.
+#[derive(Clone, Copy)]
+enum Purpose {
+    /// A sign-in, finished by `LoginFinish`.
+    Login,
+    /// A password change, finished by `ChangePasswordFinish` with the session
+    /// whose token has this digest, and with no other.
+    ChangePassword([u8; 32]),
 }
 
 /// The listener a request arrived on.
@@ -84,7 +96,9 @@ pub fn browser_operation(request: &Request) -> bool {
         | Request::GatewayDirectory { .. }
         | Request::AccountSummary
         | Request::SetRecovery { .. }
-        | Request::SetDisplayName { .. } => true,
+        | Request::SetDisplayName { .. }
+        | Request::ChangePasswordStart { .. }
+        | Request::ChangePasswordFinish { .. } => true,
         Request::AcceptTerms { subject, .. } => matches!(subject, TermsSubject::Central),
         Request::CreateObject
         | Request::ReadObject { .. }
@@ -140,7 +154,38 @@ fn uses_session(request: &Request) -> bool {
             | Request::AccountSummary
             | Request::SetRecovery { .. }
             | Request::SetDisplayName { .. }
+            | Request::ChangePasswordStart { .. }
+            | Request::ChangePasswordFinish { .. }
     )
+}
+
+/// The answer to a password proof that issued `token`: the native bearer in
+/// the body, or the browser session apart from it, for the cookie.
+fn signed_in(
+    surface: Surface,
+    identity: Identity,
+    issued: central_postgres::Issued,
+    token: Token,
+) -> BrowserReply {
+    match surface {
+        Surface::Native => BrowserReply {
+            response: Response::Session {
+                token,
+                identity,
+                wrapped_master: issued.wrapped_master,
+            },
+            session: None,
+        },
+        Surface::Browser => BrowserReply {
+            response: Response::BrowserSession {
+                identity,
+                username: issued.username,
+                wrapped_master: issued.wrapped_master,
+                expires_at: issued.expires_at,
+            },
+            session: Some(token),
+        },
+    }
 }
 
 /// Shared service state. Pending challenges are bounded, expiring and single-use.
@@ -260,6 +305,7 @@ impl IdentityService {
                 attempt,
                 credential,
                 surface,
+                purpose: Purpose::Login,
             },
         );
         Ok(Response::LoginChallenge {
@@ -291,8 +337,11 @@ impl IdentityService {
             .map_err(|_| Error::Unavailable)?
             .remove(&ticket.digest())
             .ok_or(Error::Rejected)?;
-        // An attempt finishes on the listener that started it.
-        if pending.expires <= Instant::now() || pending.surface != surface {
+        // An attempt finishes on the listener that started it, as a sign-in.
+        if pending.expires <= Instant::now()
+            || pending.surface != surface
+            || !matches!(pending.purpose, Purpose::Login)
+        {
             return Err(Error::Rejected);
         }
         let permit = self
@@ -311,36 +360,11 @@ impl IdentityService {
         .await
         .map_err(|_| Error::Unavailable)??;
         let token = Token::generate()?;
-        let identity = credential.identity;
-        Ok(match surface {
-            Surface::Native => BrowserReply {
-                response: Response::Session {
-                    wrapped_master: self
-                        .store
-                        .issue_session(&credential, &token)
-                        .await?
-                        .wrapped_master,
-                    token,
-                    identity,
-                },
-                session: None,
-            },
-            Surface::Browser => {
-                let issued = self
-                    .store
-                    .issue_session(&credential, Session::Browser(&token))
-                    .await?;
-                BrowserReply {
-                    response: Response::BrowserSession {
-                        identity,
-                        username: issued.username,
-                        wrapped_master: issued.wrapped_master,
-                        expires_at: issued.expires_at,
-                    },
-                    session: Some(token),
-                }
-            }
-        })
+        let issued = self
+            .store
+            .issue_session(&credential, surface.session(Some(&token))?)
+            .await?;
+        Ok(signed_in(surface, credential.identity, issued, token))
     }
 
     /// Process a typed native command. Authentication is checked for each operation.
@@ -451,6 +475,16 @@ mod tests {
             },
             Request::SetDisplayName {
                 display_name: "Synthetic".into(),
+            },
+            Request::ChangePasswordStart {
+                login: vec![],
+                registration: vec![],
+            },
+            Request::ChangePasswordFinish {
+                attempt: token(),
+                proof: vec![],
+                record: vec![],
+                wrapped_master: vec![],
             },
         ]
     }
@@ -570,7 +604,7 @@ mod tests {
                 text[start..].split('"').next().unwrap().to_owned()
             })
             .collect();
-        assert_eq!(named.len(), 40, "every operation is in one of the lists");
+        assert_eq!(named.len(), 42, "every operation is in one of the lists");
     }
 
     #[test]
@@ -595,6 +629,16 @@ mod tests {
         }));
         assert!(uses_session(&Request::SetDisplayName {
             display_name: "Synthetic".into()
+        }));
+        assert!(uses_session(&Request::ChangePasswordStart {
+            login: vec![],
+            registration: vec![],
+        }));
+        assert!(uses_session(&Request::ChangePasswordFinish {
+            attempt: token(),
+            proof: vec![],
+            record: vec![],
+            wrapped_master: vec![],
         }));
         assert!(!uses_session(&Request::Terms));
         assert!(!uses_session(&Request::GatewayDirectory { after: None }));

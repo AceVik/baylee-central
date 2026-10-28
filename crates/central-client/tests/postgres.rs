@@ -84,6 +84,7 @@ fn real_native_login_restore_migration_and_adversarial_paths() {
         endpoint,
         address,
         lose_write_reply: AtomicBool::new(false),
+        lose_password_reply: AtomicBool::new(false),
     };
     let tested = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         run(&http, &bridge, &runtime, &operator);
@@ -92,6 +93,7 @@ fn real_native_login_restore_migration_and_adversarial_paths() {
             client: "198.51.100.7",
         };
         support::browser::run(&browser, &http, &bridge, &runtime, &operator);
+        support::password::run(&http, &browser, &bridge, &runtime, &operator);
     }));
     // Cleanup runs even if an assertion panics; listeners and pools belong to this fixture only.
     let _ = stop.send(());

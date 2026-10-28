@@ -88,6 +88,7 @@ pub(super) fn needs_acceptance(request: &Request) -> bool {
             | Request::GatewayTicket { .. }
             | Request::SetRecovery { .. }
             | Request::SetDisplayName { .. }
+            | Request::ChangePasswordStart { .. }
     )
 }
 

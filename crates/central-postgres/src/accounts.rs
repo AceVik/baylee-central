@@ -15,6 +15,7 @@ mod grants;
 mod leases;
 mod migration;
 mod objects;
+mod password;
 mod profiles;
 mod recovery;
 mod registration;

@@ -21,6 +21,20 @@ impl IdentityService {
         if let Request::LoginFinish { attempt, message } = request {
             return self.finish(&attempt, message, surface).await;
         }
+        if let Request::ChangePasswordFinish {
+            attempt,
+            proof,
+            record,
+            wrapped_master,
+        } = request
+        {
+            // The start needed the terms accepted, and the attempt is bound to
+            // its session; acceptances are never withdrawn, and a new version
+            // comes with a restart, which forgets every pending attempt.
+            return self
+                .change_password_finish(bearer, surface, &attempt, proof, &record, &wrapped_master)
+                .await;
+        }
         Ok(BrowserReply {
             response: self.respond(request, bearer, surface).await?,
             session: None,
@@ -74,8 +88,13 @@ impl IdentityService {
             Request::LoginStart { identity, message } => {
                 self.start(identity, message, surface).await
             }
+            request @ Request::ChangePasswordStart { .. } => {
+                self.change_password_start(request, bearer, surface).await
+            }
             // Answered by `dispatch`, which knows how to hand out the session.
-            Request::LoginFinish { .. } => Err(Error::Rejected),
+            Request::LoginFinish { .. } | Request::ChangePasswordFinish { .. } => {
+                Err(Error::Rejected)
+            }
             Request::Register {
                 username,
                 beta_key,

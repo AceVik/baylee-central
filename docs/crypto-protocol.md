@@ -87,10 +87,16 @@ account, epoch or code, and each wrapper under the other's domain are refused.
 Reset by the code, which uses this wrapper, is later work (M1).
 
 Password changes re-enroll the new password and re-wrap the SAME master key.
-The spike tests this cryptographic operation only. A real change still needs
-fresh authorization, atomic database commit, revision conflict handling, session
-revocation and idempotent retry. The vault epoch changes when intentionally
-creating a new vault, not automatically on each password change.
+The service does so since 28.10.2026 ([native login](native-login.md)
+§"Password change"): fresh authorization is an OPAQUE proof of the current
+password inside the change, bound to the starting session; the record, the
+wrapper and a raised credential revision commit in one transaction, which
+refuses a revision changed since the start; every session ends in it and the
+caller gets a new one; a lost answer is resolved by the old session's status
+(ended means committed), so a retry is safe. Nothing in the wire formats, the
+key derivation or the wrapper changes. The vault epoch changes when
+intentionally creating a new vault, not automatically on each password change,
+so the recovery wrapper stays valid across a change.
 
 Secret-containing public types do not implement Clone or Serialize; their Debug
 output is redacted or absent. OPAQUE states are consumed once. Owned secret

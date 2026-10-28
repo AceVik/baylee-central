@@ -94,6 +94,75 @@ both from the legacy row:
 Baylee's bridge sends both with every `LegacyReserve`, and `LegacyProfile`
 at a moved account's Central sign-in (Baylee `docs/central-login.md`).
 
+## Password change
+
+*Added 28.10.2026 (roadmap M1, step 1).* A signed-in account changes its
+password on either listener: the native client with its bearer, the website
+with its cookie. The vault stays: the client wraps the **same** master key
+under the new password, so the account document, the private objects, the
+vault epoch and the recovery wrapper (bound to the epoch, not the password)
+are untouched, and the recovery code still opens the key.
+
+A session alone is not enough. Central cannot see whether a new wrapper
+holds the same master key, so a stolen token able to change the password
+would take the login and leave the owner's vault reachable only by the
+recovery code. The change therefore carries a fresh OPAQUE proof of the
+current password (ASVS 6.2.3, in OPAQUE's form), inside the exchange itself:
+
+1. `ChangePasswordStart { login, registration }` with the session: KE1 under
+   the current password and an OPAQUE registration request for the new one,
+   both for the session's own account and epoch (there is no identity field;
+   a client using another context fails at its own KE2 check). Central needs
+   the session live, the account's move finished (registered, or the legacy
+   move closed: while it is open the bridge's `LegacyInvalidate` is the reset
+   authority) and Central's terms accepted. It charges the account's login
+   budget (eight OPAQUE starts a minute, shared with `LoginStart`), so a
+   stolen session guesses no faster than a sign-in, and answers
+   `PasswordChallenge { attempt, login: KE2, registration }`. The attempt
+   lives 60 seconds, is bound to this purpose, this listener and the digest
+   of the starting session's token, and shares the 128 pending sign-ins.
+2. The client checks KE2 (a wrong current password fails here, before
+   anything is sent), finishes the registration under the new password and
+   wraps the master key it holds with the new export key's wrapping key.
+3. `ChangePasswordFinish { attempt, proof: KE3, record, wrapped_master }` with
+   the same session. The attempt is consumed first, then refused unless it
+   is a change's (a sign-in's attempt is not, nor is a change's a sign-in's
+   for `LoginFinish`), started on this listener by this session, unexpired,
+   and its proof verifies. In one transaction Central then locks the account
+   through the still live session at the credential revision the start read,
+   stores the record and wrapper, raises `credential_revision`, deletes every
+   session of the account (both kinds, with their gateway tickets and
+   leases) and inserts one new session of the caller's kind. The answer is
+   the sign-in's: `Session { token, identity, wrapped_master }` natively,
+   `BrowserSession` with the new `__Host-central` cookie on the website. The
+   new session counts its 12 hours from the change, a fresh password proof.
+
+Anything else is `Rejected` and changes nothing: no or a foreign session, a
+session of the other kind, an unfinished move, a record or wrapper of the
+wrong length, a credential changed since the start (another change), a
+session replaced meanwhile. A sign-in begun before the change and finished
+after it is refused by `issue_session`'s revision check. The ninth start of a
+minute is `Busy`.
+
+**A lost answer.** The commit ends the calling session, so `SessionStatus`
+with the old token is the authenticated read: still live means nothing
+changed and a retry is safe; `Rejected` means the change (or another sign-in)
+ended it, and the client signs in again, with the new password first.
+`central-client`'s `Session::change_password(transport, current, new)` does
+this check itself and refuses a new password shorter than eight characters
+(`MIN_PASSWORD_CHARS`, the website's rule) before anything is sent; on
+success the `Session` holds the new token and its master key and document
+stay.
+
+**Accepted limits.** The client is trusted with its own vault's continuity:
+a modified client can wrap another key and lose its own data, nothing of
+anyone else's. A device signed in elsewhere learns of the change when its
+session is refused; there is no notice by e-mail yet (M1 step 4). The
+browser page has no change form yet (M4): it keeps no master key after a
+sign-in, so its form will sign in and change inside one Worker, with a
+`central-web-crypto` export like `recovery_create`. The native client's form
+is M6.
+
 ## Implementation status
 
 This document specifies the integration in progress. It does not claim that
