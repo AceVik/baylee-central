@@ -44,7 +44,8 @@ closure. Agent-started interactive clients must likewise be closed after testing
 Use `cargo xtask smoke --exercise-failure` to deliberately fail immediately after
 startup and verify the same cleanup path. It must report Synthetic development
 failure only after cleanup; a cleanup error is a failure, not an expected result.
-CI exercises both paths on every supported native platform. Cleanup probes have
+CI exercises both paths on Linux x86-64, the server's one platform (owner,
+29.10.2026; [xtask](xtask.md#which-runner-runs-what)). Cleanup probes have
 deadlines and require a refused connection; a probe timeout is not proof of closure.
 
 The policy checker scans all first-party source trees, including hidden paths.
@@ -53,8 +54,11 @@ directories or import sources through filesystem links. Dependency versions and
 Cargo feature names must match the reviewed inventory exactly. Synthetic fixtures
 test these boundaries, while compiler probes cover expanded/generated Rust.
 
-Supported native platforms: Linux x86-64, Windows x86-64, macOS ARM64 and x86-64.
-CI uses ubuntu-24.04, windows-2025, macos-15 and macos-15-intel. Device keychain
+Native platforms (owner, 29.10.2026): the server is built and tested for Linux
+x86-64 only, where production runs (CI: ubuntu-24.04). The crates the Baylee
+client links (central-api, central-client, central-crypto) are checked on Linux
+x86-64, Windows x86-64, macOS ARM64 and x86-64 (CI: windows-2025, macos-15 and
+macos-15-intel run `cargo xtask gate --client`). Device keychain
 integration remains a platform adapter; no desktop keychain is implemented yet.
 central-crypto is a reusable native-client library with an optional server feature,
 no HTTP/database dependency and no production integration yet. See crypto-protocol.md.

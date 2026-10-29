@@ -8,7 +8,11 @@ use crate::{crypto_scope, gate, policy, postgres, secrets, smoke, wasm, workspac
 pub enum Task {
     /// fmt, the policy with its compiler probe, clippy, the tests, the doc
     /// tests and the release build.
-    Gate,
+    Gate {
+        /// Only what the Baylee client links (and these tasks): clippy, the
+        /// tests and the doc tests, without the release build.
+        client: bool,
+    },
     /// The exact source and dependency bounds for the bigint advisory.
     CryptoScope,
     /// The code policy.
@@ -40,7 +44,8 @@ pub const USAGE: &str = "usage: cargo xtask <task>
 
 tasks:
   crypto-scope                 verify the reviewed Ristretto advisory scope
-  gate                          fmt, policy, clippy, tests, doc tests, release build
+  gate [--client]               fmt, policy, clippy, tests, doc tests, release build;
+                                --client: only the client's crates, no release build
   policy [--compiler-probe]     the code policy: unsafe, native sources, links, dependencies
   postgres [--exercise-failure] the PostgreSQL integration fixture (needs Docker and OpenSSL)
   smoke [--exercise-failure]    the development listener smoke test (build --release first)
@@ -60,7 +65,8 @@ pub fn parse(args: &[String]) -> Result<Task> {
         _ => return Err(usage()),
     };
     match (task.as_str(), flag) {
-        ("gate", None) => Ok(Task::Gate),
+        ("gate", None) => Ok(Task::Gate { client: false }),
+        ("gate", Some("--client")) => Ok(Task::Gate { client: true }),
         ("crypto-scope", None) => Ok(Task::CryptoScope),
         ("policy", None) => Ok(Task::Policy {
             compiler_probe: false,
@@ -95,7 +101,7 @@ pub fn run(args: &[String]) -> Result<()> {
     let task = parse(args)?;
     let root = workspace::root()?;
     match task {
-        Task::Gate => gate::run(&root),
+        Task::Gate { client } => gate::run(&root, client),
         Task::CryptoScope => crypto_scope::check(&root),
         Task::Policy { compiler_probe } => {
             policy::check(&root, compiler_probe)?;

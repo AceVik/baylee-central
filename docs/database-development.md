@@ -107,7 +107,11 @@ Provision deployment roles/grants by the operations runbook; fixture bootstrap i
 not an installer. New schema versions must pass fresh-install and prior-version upgrade,
 partial-failure, lock, compatibility and privilege tests.
 
-Cross-platform native compilation/unit tests run on Linux, Windows and both macOS
+The adapter and the migrations belong to the server, which is built for Linux
+x86-64 only (owner, 29.10.2026): CI compiles and unit-tests them there. Windows
+and macOS CI compile them only as development dependencies of central-client's
+tests and run none of their tests ([xtask](xtask.md#which-runner-runs-what)).
+Until 29.10.2026 their unit tests also ran on Windows and both macOS
 architectures. The Docker integration job runs on Linux CI and has also been
-validated locally from Windows. macOS live-database/TLS integration and production
-secret loading remain explicit follow-up validation.
+validated locally from Windows. Production secret loading remains explicit
+follow-up validation.

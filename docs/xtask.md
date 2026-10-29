@@ -9,7 +9,7 @@ the gate starts never replace the running executable, which Windows refuses.
 
 | task | does | replaced |
 | --- | --- | --- |
-| `cargo xtask gate` | `cargo fmt --check`, the policy with its compiler probe, clippy `-D warnings`, every test, the doc tests, the release build | `scripts/test.ps1` |
+| `cargo xtask gate [--client]` | `cargo fmt --check`, the policy with its compiler probe, clippy `-D warnings`, every test, the doc tests, the release build; `--client` limits clippy and the tests to the client's crates and drops the release build ([below](#which-runner-runs-what)) | `scripts/test.ps1` |
 | `cargo xtask crypto-scope` | exact graph and source bounds of the unreachable bigint advisory; also mandatory in `gate` | (new, 2026-10-28) |
 | `cargo xtask policy [--compiler-probe]` | the code policy (below) | `scripts/check-policy.ps1` |
 | `cargo xtask postgres [--exercise-failure]` | the `PostgreSQL` integration fixture ([database development](database-development.md)) | `scripts/test-postgres.ps1` |
@@ -20,8 +20,48 @@ the gate starts never replace the running executable, which Windows refuses.
 `cargo xtask` is an alias (`.cargo/config.toml`) for
 `cargo run --locked --quiet -p xtask --`. The policy's regressions are
 ordinary tests of the crate (`crates/xtask/tests/policy/`), so `cargo test`
-and the gate run them (they replaced `scripts/test-policy.ps1`). CI runs
-every task under bash on all four runners.
+and the gate run them (they replaced `scripts/test-policy.ps1`). CI runs the
+tasks under bash, on the runners the next section names.
+
+## Which runner runs what
+
+Production runs on one Linux x86-64 host, and only the Baylee client must be
+built for every system and architecture (owner, 29.10.2026). So CI builds and
+tests Central's server, `central-service` and the crates only it needs, on
+Linux x86-64 alone, and checks on Windows and macOS just what the Baylee
+desktop client links from this repository.
+
+| runner | runs |
+| --- | --- |
+| ubuntu-24.04 | `gate` (the whole workspace, release build included), then `smoke` and `smoke --exercise-failure`; the separate Linux jobs run `postgres`, `crypto-scope` with the audit and deny tools, `secrets`, `wasm --check` and the web app |
+| windows-2025, macos-15 (ARM64), macos-15-intel (x86-64) | `gate --client` |
+
+`gate --client` runs the format check (the whole tree), the policy with its
+compiler probe and the crypto scope exactly as `gate` does, then clippy
+`-D warnings`, the tests and the doc tests with all features and a `-p` for
+each package of its set. It skips the release build: Baylee's packaging builds
+those crates in release for all six client targets.
+
+The set is read from `cargo metadata`, not listed by hand: `central-api` and
+`central-client`, the two crates Baylee pins in its root `Cargo.toml`, and
+every workspace member they reach through normal or build dependencies.
+Development dependencies serve only their own tests, so they do not count.
+Today that is `central-api`, `central-client` and `central-crypto`. The task
+prints its set first, and a unit test (`crates/xtask/src/client/tests.rs`)
+pins it, so a new dependency changes this page as well. `xtask` joins the set
+because its policy regressions (links, junctions, case-insensitive paths)
+depend on the platform the gate runs on.
+
+Two limits remain:
+
+- Testing `central-client` still compiles the server crates (`central-http`,
+  `central-identity`, `central-postgres` and `central-migration`, with SeaORM
+  and Tokio) in debug on those runners. They are development dependencies of
+  its PostgreSQL integration test (`tests/postgres.rs`, ignored there and run
+  by `cargo xtask postgres`), and cargo builds every development dependency
+  for any test target of a package. Their own tests do not run there.
+- Nothing checks the server on Windows or macOS any more. It may still build
+  there, but CI no longer shows whether it does.
 
 ## The code policy
 
