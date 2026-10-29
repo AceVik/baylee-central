@@ -54,6 +54,11 @@ validation and a review-record update. Synthetic negative tests cover changed
 sources/versions/features, new consumers at every affected boundary, missing or
 duplicate nodes, and source-tree edits/additions/removals/renames/links.
 
+On 29 October 2026, the fingerprint was refreshed after the
+`central-crypto/Cargo.toml` licence metadata changed to retain its AGPL licence
+under the new workspace licence. Review confirmed that no cryptographic source,
+dependency, or feature changed.
+
 `.cargo/audit.toml` and `deny.toml` name only this advisory exception. Audit and
 deny alone do not establish its applicability: run the scope check and full
 gate too. Other advisories and all existing warnings remain blocking.
