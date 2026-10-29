@@ -14,7 +14,7 @@
 //! - optionally, rustc itself rejects direct and generated `unsafe` under the
 //!   forbid lint.
 
-mod metadata;
+pub(crate) mod metadata;
 mod paths;
 mod probe;
 pub mod rules;

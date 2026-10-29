@@ -10,6 +10,14 @@ concurrency:
   group: foundation-${{ github.ref }}
   cancel-in-progress: true
 jobs:
+  # The server (central-service and its crates) runs in production on Linux
+  # x86-64 alone, so only ubuntu-24.04 builds and tests it, release build and
+  # development smoke included (owner, 29.10.2026). Windows and both macOS
+  # architectures check what the Baylee desktop client links from here
+  # (central-api, central-client and their workspace dependencies, read from
+  # `cargo metadata`), with the policy and the tasks: `cargo xtask gate
+  # --client` (docs/xtask.md). The matrix and job name stay as they were:
+  # branch protection requires `verify (<os>)` for all four.
   verify:
     strategy:
       fail-fast: false
@@ -31,8 +39,13 @@ jobs:
       - name: Fetch locked dependencies
         run: cargo fetch --locked
       - name: Policy, tests, lint and release build
+        if: matrix.os == 'ubuntu-24.04'
         run: cargo xtask gate
+      - name: Policy, tests and lint of the client's crates
+        if: matrix.os != 'ubuntu-24.04'
+        run: cargo xtask gate --client
       - name: Verify development lifecycle and failure cleanup
+        if: matrix.os == 'ubuntu-24.04'
         run: |
           cargo xtask smoke
           # The deliberate failure must fail, and only for its own reason,

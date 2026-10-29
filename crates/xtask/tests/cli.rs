@@ -9,7 +9,11 @@ fn args(line: &str) -> Vec<String> {
 
 #[test]
 fn every_task_and_flag_parses() {
-    assert_eq!(parse(&args("gate")), Ok(Task::Gate));
+    assert_eq!(parse(&args("gate")), Ok(Task::Gate { client: false }));
+    assert_eq!(
+        parse(&args("gate --client")),
+        Ok(Task::Gate { client: true })
+    );
     assert_eq!(parse(&args("crypto-scope")), Ok(Task::CryptoScope));
     assert_eq!(
         parse(&args("policy")),
@@ -46,6 +50,8 @@ fn anything_else_is_the_usage() {
         "",
         "deploy",
         "gate --compiler-probe",
+        "gate --client --client",
+        "gate --clients",
         "crypto-scope --skip",
         "policy --exercise-failure",
         "smoke --exercise-failure extra",

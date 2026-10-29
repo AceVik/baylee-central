@@ -20,12 +20,12 @@ const CRATES_IO: &str = "registry+https://github.com/rust-lang/crates.io-index";
 const EXCLUDED: [&str; 4] = [".git", "target", "node_modules", "web/node_modules"];
 
 /// `cargo metadata` for the workspace at `root`, with or without its graph.
-pub(super) struct Metadata {
+pub(crate) struct Metadata {
     pub(super) workspace_root: PathBuf,
-    json: Value,
+    pub(crate) json: Value,
 }
 
-pub(super) fn read(root: &Path, graph: bool) -> Result<Metadata> {
+pub(crate) fn read(root: &Path, graph: bool) -> Result<Metadata> {
     let failure = if graph {
         "Full Cargo metadata failed"
     } else {
