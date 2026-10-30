@@ -66,3 +66,19 @@ review the complete graph and run published vectors, stored-credential/wire
 compatibility checks and the browser rebuild. No protocol, KDF strength, data
 format, cryptographic dependency or new dependency-internal operations changed
 in this fix.
+
+## Changes since the review
+
+Each change to `central-crypto` repeats the source and graph review for it,
+moves the fingerprint only afterwards, and is recorded here.
+
+### 30 October 2026: two values derived from the master key
+
+`src/vault/derived.rs` (with `tests/derived-vectors.py`) derives the key
+check and a local vault's key from the master key with HKDF-SHA-512
+(`../crypto-protocol.md` §"Derived from the master key"), and
+`Context::bound` became `pub(crate)` for it. No dependency, feature or graph
+edge changed: `hkdf` and `sha2` were `central-crypto`'s already. Neither value
+touches `opaque::Suite`, its Ristretto arithmetic or `elliptic-curve`, so
+the reachability above is unchanged. Fingerprint `3d0f6adb…`; a second
+model reviews the change before it lands (`Review: pending`).

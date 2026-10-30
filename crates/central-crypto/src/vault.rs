@@ -1,8 +1,11 @@
-//! Versioned master-key wrappers (password and recovery code) and bounded
-//! encrypted personal objects.
+//! Versioned master-key wrappers (password and recovery code), bounded
+//! encrypted personal objects, and what is derived one way from the master
+//! key (its key check, a local vault's key).
 
+mod derived;
 mod object;
 mod recovery;
+pub use derived::{KeyCheck, LocalVaultKey};
 pub use object::{MAX_OBJECT_BYTES, ObjectContext};
 pub use recovery::RecoveryCode;
 
