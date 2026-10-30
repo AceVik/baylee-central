@@ -616,7 +616,8 @@ async fn tokens(tx: &sea_orm::DatabaseTransaction) {
         .await,
         before
     );
-    let owner = "(SELECT id FROM upgrade_probe.accounts WHERE legacy_id = 'legacy-1')";
+    // any account: earlier steps leave several, not always the same ones
+    let owner = "(SELECT id FROM upgrade_probe.accounts ORDER BY id LIMIT 1)";
     tx.execute_unprepared(&format!(
         "INSERT INTO upgrade_probe.gateways (owner_id, origin, name, version, website)
          VALUES ({owner}, 'https://tokens.invalid', 'Tokens', '0', 'https://tokens.invalid/')"
