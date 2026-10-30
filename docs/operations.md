@@ -380,11 +380,17 @@ SystemCallFilter=@system-service
 
 ## Deploying with the gateway
 
-For the 28 October 2026 release, the service executable and website package
-are versioned `0.1.1-beta.9a`. Reusable library versions and the authentication
-protocol are unchanged. Deploy the exact green main revision, recorded in
-`state/deployed`; the native release pins that same revision. The release
-includes the sunlit Baylee memorial, parchment story and photo viewer.
+For the 30 October 2026 release, the service executable and website package
+are versioned `0.1.1-beta.9b`. Reusable library versions and the authentication
+protocol are unchanged, and the wire changes since `0.1.1-beta.9a` are only
+additions, so the `0.1.1-beta.9b` gateway, which still links `0.1.1-beta.9a`
+(3ae5035), works beside it. The release is main at c531e9c (#42 to #50: password
+change, administration, login reset, deletion and export, the website's design
+guidelines, account area, gateway tokens and administration) plus this version
+commit on `codex/release-0.1.1-beta.9b`, deployed by hand (`10-central manual`);
+#51 (the official gateway's new origin) waits for the gateway that accepts it.
+The 28 October release (`0.1.1-beta.9a`) was the sunlit Baylee memorial,
+parchment story and photo viewer.
 
 
 `ops/deploy-hook` keeps Central and the website (`web/`) in lockstep with the
