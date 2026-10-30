@@ -25,7 +25,7 @@ pub use central_crypto::pairing::PairingSecret;
 pub use deletion::Deletion;
 pub use gateways::{GatewayRegistration, gateway_directory};
 pub use objects::ObjectDocument;
-pub use pairing::{Pairing, claim};
+pub use pairing::{PairedAccount, Pairing, claim};
 pub use password::MIN_PASSWORD_CHARS;
 pub use reset::{ResetData, reset};
 pub use session::Session;

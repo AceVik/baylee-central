@@ -4,9 +4,11 @@
 //! check, claimed once within two minutes, approved once by the session that
 //! started it, and redeemed once: a wrong verifier ends it, and the session it
 //! gives counts its 12 hours from the browser session's password proof. An
-//! ended pairing, an account at another epoch and a proof too old give nothing.
+//! ended pairing, an account at another epoch and a proof too old give
+//! nothing, and each ends the pairing; the operator's sweep deletes expired
+//! ones.
 use super::{AccountStore, Error, ServerKeys, Token, enroll, login};
-use central_postgres::{OPEN_PER_ACCOUNT, Session};
+use central_postgres::{OPEN_PER_ACCOUNT, Session, sweep};
 use sea_orm::{ConnectionTrait, DatabaseConnection};
 
 async fn scalar(db: &impl ConnectionTrait, sql: &str) -> i64 {
@@ -48,6 +50,28 @@ async fn pairings_aged(operator: &DatabaseConnection, name: &str, ago: &str) {
         ))
         .await
         .unwrap();
+}
+
+/// The pairings of the account `pairing` still in the table.
+async fn pairings(operator: &DatabaseConnection) -> i64 {
+    scalar(
+        operator,
+        "SELECT count(*)::bigint AS value FROM central_identity.pairings p
+         JOIN central_identity.accounts a ON a.id = p.account_id WHERE a.username_key = 'pairing'",
+    )
+    .await
+}
+
+/// The live native sessions of the account `pairing`.
+async fn natives(operator: &DatabaseConnection) -> i64 {
+    scalar(
+        operator,
+        "SELECT count(*)::bigint AS value FROM central_identity.sessions s
+         JOIN central_identity.accounts a ON a.id = s.account_id
+         WHERE a.username_key = 'pairing' AND s.kind = 'native'
+         AND s.expires_at > pg_catalog.clock_timestamp()",
+    )
+    .await
 }
 
 fn handle() -> [u8; 32] {
@@ -164,22 +188,7 @@ async fn claimed_and_approved(
         "nothing to poll before a claim"
     );
 
-    // The claim: once.
-    assert_eq!(
-        store
-            .claim_pairing(&first, &[1; 32], &[2; 32], &[3; 32])
-            .await
-            .unwrap(),
-        ends
-    );
-    assert_eq!(
-        store
-            .claim_pairing(&first, &[4; 32], &[5; 32], &[6; 32])
-            .await
-            .err(),
-        Some(Error::Conflict),
-        "a second claim, as a hijacking app would make it"
-    );
+    claimed_once(store, &first, ends).await;
     let claim = store.pairing_claim(page, &first).await.unwrap().unwrap();
     assert_eq!(
         (claim.public_key, claim.challenge, claim.mac),
@@ -234,6 +243,48 @@ async fn claimed_and_approved(
     );
 }
 
+/// The claim: once; the same claim again, as a client resends it after
+/// losing the answer, is answered the same; any other is a conflict.
+async fn claimed_once(store: &AccountStore, first: &[u8; 32], ends: i64) {
+    assert_eq!(
+        store
+            .claim_pairing(first, &[1; 32], &[2; 32], &[3; 32])
+            .await
+            .unwrap(),
+        ends
+    );
+    assert_eq!(
+        store
+            .claim_pairing(first, &[1; 32], &[2; 32], &[3; 32])
+            .await
+            .unwrap(),
+        ends,
+        "a resent claim"
+    );
+    assert_eq!(
+        store
+            .claim_pairing(first, &[4; 32], &[5; 32], &[6; 32])
+            .await
+            .err(),
+        Some(Error::Conflict),
+        "a second claim, as a hijacking app would make it"
+    );
+    for other in [
+        ([1; 32], [2; 32], [6; 32]),
+        ([1; 32], [5; 32], [3; 32]),
+        ([4; 32], [2; 32], [3; 32]),
+    ] {
+        assert_eq!(
+            store
+                .claim_pairing(first, &other.0, &other.1, &other.2)
+                .await
+                .err(),
+            Some(Error::Conflict),
+            "any one byte string of the three differs"
+        );
+    }
+}
+
 /// A pairing that goes through: the session comes with the sealed key,
 /// replaces the account's native session, and counts from the browser
 /// session's password proof.
@@ -263,6 +314,15 @@ async fn redeemed(
         .approve_pairing(page, &second, &[0xcc; 80])
         .await
         .unwrap();
+    // A name and tag carried for this moved account, for the client's question.
+    operator
+        .execute_unprepared(
+            "UPDATE central_identity.accounts SET display_name = 'Pairer',
+                 display_name_at = pg_catalog.clock_timestamp(), tag = 101
+             WHERE username_key = 'pairing'",
+        )
+        .await
+        .unwrap();
     let paired = Token::generate().unwrap();
     let redeemed = store
         .redeem_pairing(&second, &[2; 32], &paired)
@@ -270,6 +330,10 @@ async fn redeemed(
         .unwrap();
     assert_eq!(redeemed.identity.account, identity.account);
     assert_eq!(redeemed.username, "pairing");
+    assert_eq!(
+        (redeemed.display_name.as_deref(), redeemed.tag),
+        (Some("Pairer"), Some(101))
+    );
     assert_eq!(redeemed.sealed, vec![0xcc; 80]);
     assert_eq!(
         store.session_status(native).await.err(),
@@ -303,7 +367,9 @@ async fn redeemed(
 }
 
 /// What gives nothing: another epoch, a proof too old, an ended pairing.
+/// Each refusal ends the pairing and leaves the account's native session.
 async fn refused(store: &AccountStore, operator: &DatabaseConnection, page: &Token) {
+    assert_eq!(natives(operator).await, 1, "the paired session");
     // The account rotated between approval and redeem: nothing.
     let third = handle();
     store.start_pairing(page, &third).await.unwrap();
@@ -329,6 +395,8 @@ async fn refused(store: &AccountStore, operator: &DatabaseConnection, page: &Tok
             .err(),
         Some(Error::Rejected)
     );
+    assert_eq!(pairings(operator).await, 0, "ended by the refusal");
+    assert_eq!(natives(operator).await, 1, "the native session stays");
 
     // A password proof too old to leave a minute of its 12 hours gives no session.
     let fourth = handle();
@@ -355,6 +423,12 @@ async fn refused(store: &AccountStore, operator: &DatabaseConnection, page: &Tok
             .err(),
         Some(Error::Rejected)
     );
+    assert_eq!(pairings(operator).await, 0, "ended by the refusal");
+    assert_eq!(
+        natives(operator).await,
+        1,
+        "the native session stays: the refusal undid its replacement"
+    );
 
     // An ended pairing answers nothing; a late claim is refused.
     let fifth = handle();
@@ -373,7 +447,11 @@ async fn refused(store: &AccountStore, operator: &DatabaseConnection, page: &Tok
         store.pairing_claim(page, &fifth).await.err(),
         Some(Error::Rejected)
     );
-    // The next start sweeps it.
+    // The operator's daily sweep deletes it, and the next start sweeps too.
+    assert!(sweep(operator).await.unwrap().pairings >= 1);
+    assert_eq!(pairings(operator).await, 0);
+    store.start_pairing(page, &handle()).await.unwrap();
+    pairings_aged(operator, "pairing", "6 minutes").await;
     store.start_pairing(page, &handle()).await.unwrap();
     assert_eq!(
         scalar(

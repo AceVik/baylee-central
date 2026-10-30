@@ -447,10 +447,11 @@ within two minutes of the session's password proof: the client and the
 page send it after a password sign-in when `KeyCheckStatus` says there is
 none, so a new account and an existing one gain it at their next sign-in.
 A new vault (a reset to a new one) clears it, and the next sign-in sets the
-new vault's. Both requests work
-on either listener; a set check is `Conflict`, a late one `Rejected`. A
-stolen session or cookie therefore cannot plant a check of its own. No
-pairing starts for an account without one.
+new vault's. Unlike Baylee's specification, neither `EnrollmentFinish` nor
+`ResetVault::New` carries a check: the sign-in after either sets it. Both
+requests work on either listener; a set check is `Conflict`, a late one
+`Rejected`. A stolen session or cookie therefore cannot plant a check of its
+own. No pairing starts for an account without one.
 
 **The steps.**
 
@@ -461,7 +462,9 @@ pairing starts for an account without one.
    of its own that Central never sees.
 3. `PairClaim { handle, public_key, challenge, mac }` (native listener, no
    session) → `PairAccepted { expires_at }`: within the pairing's first two
-   minutes, once; a second claim is `Conflict`.
+   minutes, once. The same claim again, as a client resends it after losing
+   the answer, gets the same answer (compared in constant time); any other
+   is `Conflict`.
 4. `PairStatus { handle }` (the starting cookie) → `PairClaimed { … }` or
    `Pending`. The page checks the MAC under `S`, shows the comparison code
    and the account's name beside Approve.
@@ -471,15 +474,22 @@ pairing starts for an account without one.
    `PairCancel { handle }` ends a pairing at once.
 6. `PairPoll { handle }` (native, no session) → `Pending` or `Approved`, at
    most 300 times; then `PairRedeem { handle, verifier }` →
-   `PairSession { token, identity, username, sealed, expires_at }`. The
-   pairing is deleted whatever the verifier: a wrong one ends it. The session
-   replaces the account's native session as a sign-in does.
+   `PairSession { token, identity, username, display_name, tag, sealed,
+   expires_at }`, the name and tag for the client's question beside the
+   username. The pairing is deleted whatever the redeem finds: a wrong
+   verifier, an account at another epoch or a proof too old each end it,
+   and only a storage failure leaves it. The session replaces the account's
+   native session as a sign-in does.
 
 **The 12 hours.** `sessions.proven_at` is the password proof a session rests
 on when it is not its own creation (NULL: the creation). A paired session
 takes the browser session's, the lifetime check and renewal count from
 `COALESCE(proven_at, created_at)`, and a redeem whose proof leaves less than
-a minute gives no session.
+a minute gives no session. Every check of a password sign-in's age (the
+export's, recovery's, the tokens' and administration's step-ups) and the
+"signed in at" an account sees read the same, so a pairing never counts as a
+fresh password sign-in. NULL rather than a copy of `created_at`: every
+existing insert stays valid, and the meaning is the same.
 
 **Budgets.** `PairStart` 10 an hour and `PairStatus` 120 a minute per
 address on the browser listener; `PairApprove`, `PairCancel` and the key
@@ -494,7 +504,9 @@ serves `PairStart`, `PairStatus`, `PairApprove`, `PairCancel`,
 four and serves the claim, poll and redeem.
 
 **Deletion.** A pairing goes with its browser session (`ON DELETE CASCADE`):
-signing out of the page ends it.
+signing out of the page ends it. An expired one goes with the next start and
+with the operator's daily sweep ([administration](administration.md) §"The
+sweep").
 
 ## Browser crypto (`central-web-crypto`)
 

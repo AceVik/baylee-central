@@ -470,7 +470,8 @@ pub enum Request {
     },
     /// A client claims a pairing (native listener, no session): once per
     /// handle, within its first two minutes. Answered with
-    /// [`Response::PairAccepted`]; a second claim is `Conflict`.
+    /// [`Response::PairAccepted`], again for the same claim resent; another
+    /// claim is `Conflict`.
     PairClaim {
         /// The pairing's handle, from the link.
         handle: Token,
@@ -489,7 +490,7 @@ pub enum Request {
     },
     /// Redeem an approved pairing with the verifier, once (native listener,
     /// no session). Answered with [`Response::PairSession`]; the pairing is
-    /// gone afterwards.
+    /// gone afterwards, also after a refusal.
     PairRedeem {
         /// The pairing's handle.
         handle: Token,
@@ -875,6 +876,11 @@ pub enum Response {
         identity: Identity,
         /// The account's canonical username, for the client's question.
         username: String,
+        /// Its display name, for the question beside the username; none
+        /// until the account chose one.
+        display_name: Option<String>,
+        /// Its tag beside the display name; none until drawn or carried.
+        tag: Option<u32>,
         /// The master key sealed to the client's key, 80 bytes.
         sealed: Vec<u8>,
         /// Absolute Unix-seconds expiry of the session.

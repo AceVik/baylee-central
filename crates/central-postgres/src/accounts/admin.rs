@@ -268,7 +268,7 @@ impl AccountStore {
         let row = db
             .query_one_raw(statement(
                 &format!(
-                    "SELECT a.id, s.created_at > pg_catalog.clock_timestamp() - interval '30 minutes' AS fresh
+                    "SELECT a.id, COALESCE(s.proven_at, s.created_at) > pg_catalog.clock_timestamp() - interval '30 minutes' AS fresh
                      FROM central_identity.accounts a JOIN central_identity.sessions s
                      ON s.account_id = a.id AND s.credential_revision = a.credential_revision
                      WHERE {ADMIN_SESSION}"
@@ -825,11 +825,14 @@ pub struct Swept {
     pub events: u64,
     /// Reset codes past their expiry, whose digests no longer work.
     pub codes: u64,
+    /// Pairings past their five minutes, with what the client and the page
+    /// left in them.
+    pub pairings: u64,
 }
 
-/// Delete audit events older than [`AUDIT_YEARS`] and the digests of expired
-/// reset codes, under the operator's (migrator's) login, as the privacy
-/// notice allows; both or neither.
+/// Delete audit events older than [`AUDIT_YEARS`], the digests of expired
+/// reset codes and expired pairings, under the operator's (migrator's)
+/// login, as the privacy notice allows; all or none.
 ///
 /// # Errors
 /// Storage failure.
@@ -853,6 +856,18 @@ pub async fn sweep(db: &DatabaseConnection) -> Result<Swept, Error> {
         .await
         .map_err(|_| Error::Unavailable)?
         .rows_affected();
+    let pairings = tx
+        .execute_raw(statement(
+            "DELETE FROM central_identity.pairings WHERE expires_at <= pg_catalog.clock_timestamp()",
+            vec![],
+        ))
+        .await
+        .map_err(|_| Error::Unavailable)?
+        .rows_affected();
     tx.commit().await.map_err(|_| Error::Unavailable)?;
-    Ok(Swept { events, codes })
+    Ok(Swept {
+        events,
+        codes,
+        pairings,
+    })
 }

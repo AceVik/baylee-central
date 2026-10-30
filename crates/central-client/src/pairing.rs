@@ -26,7 +26,21 @@ impl std::fmt::Debug for Pairing {
     }
 }
 
+/// Whom a redeemed pairing signs in as, for the client's question: the
+/// display name and tag other players see beside the private username.
+#[derive(Clone, PartialEq, Eq)]
+pub struct PairedAccount {
+    /// The account's canonical username, its private sign-in name.
+    pub username: String,
+    /// The display name other players see; none until the account chose one.
+    pub display_name: Option<String>,
+    /// The tag beside the display name; none until it was drawn or carried.
+    pub tag: Option<u32>,
+}
+
 /// Claim the pairing a link names, with its handle and the page's secret.
+/// A claim whose answer was lost may be sent again: the same claim is
+/// answered the same.
 ///
 /// # Errors
 /// `Conflict` when another client claimed it first, `Rejected` for an
@@ -93,19 +107,21 @@ impl Pairing {
     }
 
     /// Redeem the approved pairing, once: the session, with the master key
-    /// opened from the seal, and the account's username for the client's
-    /// question. A seal that does not open ends the session it came with.
+    /// opened from the seal, and the account for the client's question. A
+    /// seal that does not open ends the session it came with.
     ///
     /// # Errors
     /// `Rejected` for a pairing not approved or ended, a seal that does not
     /// open under this pairing's binding, or a session that cannot read its
     /// document; transport failures.
-    pub fn redeem(self, transport: &impl Transport) -> Result<(Session, String), Error> {
+    pub fn redeem(self, transport: &impl Transport) -> Result<(Session, PairedAccount), Error> {
         self.same_endpoint(transport)?;
         let Response::PairSession {
             token,
             identity,
             username,
+            display_name,
+            tag,
             sealed,
             ..
         } = transport.exchange(
@@ -140,7 +156,14 @@ impl Pairing {
             let _ = session.logout(transport);
             return Err(error);
         }
-        Ok((session, username))
+        Ok((
+            session,
+            PairedAccount {
+                username,
+                display_name,
+                tag,
+            },
+        ))
     }
 
     fn same_endpoint(&self, transport: &impl Transport) -> Result<(), Error> {

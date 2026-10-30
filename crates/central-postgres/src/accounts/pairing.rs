@@ -9,7 +9,8 @@
 //! A pairing lives five minutes and is deleted when redeemed, cancelled, or
 //! when its browser session ends.
 use super::{AccountStore, Error, Identity, Session, Token, identity, statement, uuid};
-use sea_orm::{ConnectionTrait, TransactionTrait, prelude::Uuid};
+use sea_orm::{ConnectionTrait, DatabaseTransaction, TransactionTrait, prelude::Uuid};
+use subtle::ConstantTimeEq;
 
 /// Pairings one account may have open at once.
 pub const OPEN_PER_ACCOUNT: i64 = 3;
@@ -49,6 +50,10 @@ pub struct Redeemed {
     pub identity: Identity,
     /// The account's canonical username.
     pub username: String,
+    /// The display name other players see; none until the account chose one.
+    pub display_name: Option<String>,
+    /// The tag beside it; none until it was drawn or carried.
+    pub tag: Option<u32>,
     /// The master key sealed to the client.
     pub sealed: Vec<u8>,
     /// Absolute Unix-seconds expiry of the new session.
@@ -336,11 +341,14 @@ impl AccountStore {
     }
 
     /// A client's claim: once per pairing, within its first two minutes.
-    /// Returns the pairing's end, which the seal is bound to.
+    /// Returns the pairing's end, which the seal is bound to. The same claim
+    /// again, as a client resends it after losing the answer, is answered
+    /// the same.
     ///
     /// # Errors
-    /// `Conflict` when the pairing was claimed already; `Rejected` for an
-    /// unknown or ended pairing or a late claim; storage failure.
+    /// `Conflict` when the pairing was claimed with another key, challenge or
+    /// MAC; `Rejected` for an unknown or ended pairing or a late claim;
+    /// storage failure.
     pub async fn claim_pairing(
         &self,
         handle: &[u8; 32],
@@ -373,18 +381,27 @@ impl AccountStore {
         let claimed = self
             .db
             .query_one_raw(statement(
-                "SELECT 1 AS claimed FROM central_identity.pairings
+                "SELECT public_key, challenge, mac,
+                     floor(extract(epoch FROM expires_at))::bigint AS expires_at
+                 FROM central_identity.pairings
                  WHERE digest = $1 AND public_key IS NOT NULL
                  AND expires_at > pg_catalog.clock_timestamp()",
                 vec![handle.to_vec().into()],
             ))
             .await
-            .map_err(|_| Error::Unavailable)?;
-        Err(if claimed.is_some() {
-            Error::Conflict
-        } else {
-            Error::Rejected
-        })
+            .map_err(|_| Error::Unavailable)?
+            .ok_or(Error::Rejected)?;
+        // Compared in constant time: a lost answer's resend is the client's
+        // own claim, anything else another application's.
+        let same = bytes::<32>(&claimed, "public_key")?.ct_eq(public_key)
+            & bytes::<32>(&claimed, "challenge")?.ct_eq(challenge)
+            & bytes::<32>(&claimed, "mac")?.ct_eq(mac);
+        if !bool::from(same) {
+            return Err(Error::Conflict);
+        }
+        claimed
+            .try_get("", "expires_at")
+            .map_err(|_| Error::Unavailable)
     }
 
     /// Whether the claimed pairing was approved; counts one of its
@@ -410,10 +427,12 @@ impl AccountStore {
     }
 
     /// Redeem an approved pairing: the pairing is deleted whatever the
-    /// verifier says (a wrong one ends it), and with the right one a native
-    /// session is issued for the account at the pairing's epoch, replacing the
-    /// account's native session as a sign-in does. The session's 12 hours
-    /// count from the browser session's password proof, never from now.
+    /// redeem finds (a wrong verifier, an account at another epoch or a proof
+    /// too old each end it), and with the right verifier a native session is
+    /// issued for the account at the pairing's epoch, replacing the account's
+    /// native session as a sign-in does. The session's 12 hours count from
+    /// the browser session's password proof, never from now. Only a storage
+    /// failure leaves the pairing as it was.
     ///
     /// # Errors
     /// `Rejected` for an unknown, unapproved or ended pairing, a wrong
@@ -435,80 +454,101 @@ impl AccountStore {
                 vec![handle.to_vec().into()],
             ))
             .await
-            .map_err(|_| Error::Unavailable)?;
-        let Some(pairing) = pairing else {
-            return Err(Error::Rejected);
-        };
-        let stored: [u8; 32] = bytes(&pairing, "challenge")?;
-        if stored != *challenge {
-            // The deletion stands: a wrong verifier ends the pairing.
-            tx.commit().await.map_err(|_| Error::Unavailable)?;
-            return Err(Error::Rejected);
-        }
-        let account: Uuid = pairing
-            .try_get("", "account_id")
-            .map_err(|_| Error::Unavailable)?;
-        let epoch: i64 = pairing
-            .try_get("", "epoch")
-            .map_err(|_| Error::Unavailable)?;
-        let sealed: Vec<u8> = pairing
-            .try_get("", "sealed")
-            .map_err(|_| Error::Unavailable)?;
-        let row = tx
-            .query_one_raw(statement(
-                "SELECT id, vault_epoch, username_key, credential_revision
-                 FROM central_identity.accounts
-                 WHERE id = $1 AND vault_epoch = $2 AND credential IS NOT NULL FOR UPDATE",
-                vec![account.into(), epoch.into()],
-            ))
-            .await
             .map_err(|_| Error::Unavailable)?
             .ok_or(Error::Rejected)?;
-        let identity = identity(&row)?;
-        let revision: i64 = row
-            .try_get("", "credential_revision")
-            .map_err(|_| Error::Unavailable)?;
-        tx.execute_raw(statement(
-            "DELETE FROM central_identity.sessions WHERE account_id = $1 AND kind = 'native'",
-            vec![uuid(identity.account).into()],
+        let stored: [u8; 32] = bytes(&pairing, "challenge")?;
+        let redeemed = if bool::from(stored.ct_eq(challenge)) {
+            // In a savepoint: a refusal undoes the session's issue, never the
+            // pairing's deletion.
+            let issue = tx.begin().await.map_err(|_| Error::Unavailable)?;
+            match paired_session(&issue, &pairing, session).await {
+                Ok(redeemed) => {
+                    issue.commit().await.map_err(|_| Error::Unavailable)?;
+                    Ok(redeemed)
+                }
+                Err(Error::Rejected) => {
+                    issue.rollback().await.map_err(|_| Error::Unavailable)?;
+                    Err(Error::Rejected)
+                }
+                Err(error) => return Err(error),
+            }
+        } else {
+            Err(Error::Rejected)
+        };
+        tx.commit().await.map_err(|_| Error::Unavailable)?;
+        redeemed
+    }
+}
+
+/// The native session a redeemed pairing gives, for the account at the
+/// pairing's epoch, with at least a minute of its 12 hours left.
+async fn paired_session(
+    tx: &DatabaseTransaction,
+    pairing: &sea_orm::QueryResult,
+    session: &Token,
+) -> Result<Redeemed, Error> {
+    let account: Uuid = pairing
+        .try_get("", "account_id")
+        .map_err(|_| Error::Unavailable)?;
+    let epoch: i64 = pairing
+        .try_get("", "epoch")
+        .map_err(|_| Error::Unavailable)?;
+    let row = tx
+        .query_one_raw(statement(
+            "SELECT id, vault_epoch, username_key, display_name, tag, credential_revision
+             FROM central_identity.accounts
+             WHERE id = $1 AND vault_epoch = $2 AND credential IS NOT NULL FOR UPDATE",
+            vec![account.into(), epoch.into()],
         ))
         .await
+        .map_err(|_| Error::Unavailable)?
+        .ok_or(Error::Rejected)?;
+    let identity = identity(&row)?;
+    let revision: i64 = row
+        .try_get("", "credential_revision")
         .map_err(|_| Error::Unavailable)?;
-        // At least a minute of the 12 hours must be left, or no session.
-        let inserted = tx
-            .query_one_raw(statement(
-                "INSERT INTO central_identity.sessions
-                 (digest, account_id, credential_revision, kind, created_at, proven_at, expires_at)
-                 SELECT $1, $2, $3, 'native', t, p,
-                        LEAST(t + interval '30 minutes', p + interval '12 hours')
-                 FROM (SELECT pg_catalog.clock_timestamp() AS t, $4::timestamptz AS p) clock
-                 WHERE p + interval '12 hours' > t + interval '1 minute'
-                 RETURNING floor(extract(epoch FROM expires_at))::bigint AS expires_at",
-                vec![
-                    session.digest().to_vec().into(),
-                    uuid(identity.account).into(),
-                    revision.into(),
-                    pairing
-                        .try_get::<sea_orm::prelude::DateTimeWithTimeZone>("", "proven_at")
-                        .map_err(|_| Error::Unavailable)?
-                        .into(),
-                ],
-            ))
-            .await
-            .map_err(|_| Error::Unavailable)?
-            .ok_or(Error::Rejected)?;
-        let expires_at = inserted
-            .try_get("", "expires_at")
-            .map_err(|_| Error::Unavailable)?;
-        let username = row
+    tx.execute_raw(statement(
+        "DELETE FROM central_identity.sessions WHERE account_id = $1 AND kind = 'native'",
+        vec![uuid(identity.account).into()],
+    ))
+    .await
+    .map_err(|_| Error::Unavailable)?;
+    // At least a minute of the 12 hours must be left, or no session.
+    let inserted = tx
+        .query_one_raw(statement(
+            "INSERT INTO central_identity.sessions
+             (digest, account_id, credential_revision, kind, created_at, proven_at, expires_at)
+             SELECT $1, $2, $3, 'native', t, p,
+                    LEAST(t + interval '30 minutes', p + interval '12 hours')
+             FROM (SELECT pg_catalog.clock_timestamp() AS t, $4::timestamptz AS p) clock
+             WHERE p + interval '12 hours' > t + interval '1 minute'
+             RETURNING floor(extract(epoch FROM expires_at))::bigint AS expires_at",
+            vec![
+                session.digest().to_vec().into(),
+                uuid(identity.account).into(),
+                revision.into(),
+                pairing
+                    .try_get::<sea_orm::prelude::DateTimeWithTimeZone>("", "proven_at")
+                    .map_err(|_| Error::Unavailable)?
+                    .into(),
+            ],
+        ))
+        .await
+        .map_err(|_| Error::Unavailable)?
+        .ok_or(Error::Rejected)?;
+    let (display_name, tag) = super::profiles::columns(&row)?;
+    Ok(Redeemed {
+        identity,
+        username: row
             .try_get("", "username_key")
-            .map_err(|_| Error::Unavailable)?;
-        tx.commit().await.map_err(|_| Error::Unavailable)?;
-        Ok(Redeemed {
-            identity,
-            username,
-            sealed,
-            expires_at,
-        })
-    }
+            .map_err(|_| Error::Unavailable)?,
+        display_name,
+        tag,
+        sealed: pairing
+            .try_get("", "sealed")
+            .map_err(|_| Error::Unavailable)?,
+        expires_at: inserted
+            .try_get("", "expires_at")
+            .map_err(|_| Error::Unavailable)?,
+    })
 }

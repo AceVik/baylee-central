@@ -103,3 +103,7 @@ and 4.1.3's callers (`opaque-ke`, `voprf`), which it did not pin before; a
 third generation, a new consumer of any of them or another feature fails
 (`graph/tests.rs`, and with the 5.0.0 pin removed two of its tests fail).
 Fingerprint `b3ab6d24…`; `Review: pending`, as above.
+
+After the second model's review of the same day, `KeyCheck` derives `Clone`
+only: equality was variable-time and unused. No other source, dependency or
+edge in `central-crypto` changed. Fingerprint `2cb6fb13…`.

@@ -1815,16 +1815,59 @@ account's cookie reading, approving or cancelling; a second claim (the
 hijacking application); a second approval; a wrong verifier, then the right
 one; a second redeem; another epoch between approval and redeem; a proof too
 old; a late claim and an ended pairing; and that signing out ends the page's
-pairings. The listener lists name every one of the 57 operations. The crypto
+pairings. The listener lists name every one of the 59 operations. The crypto
 tests are those of the two commits before this one.
 
 Evidence on macOS, 30.10.2026: `cargo xtask gate` (format, policy, crypto
 scope, clippy, tests, doc tests, release build), `cargo xtask postgres`,
 `smoke`, `secrets` (tree and history), `cargo deny` and `cargo audit` 0.22.2
 pass. `cargo xtask wasm --check` builds on Linux x86-64 only and did not run
-here; `central-web-crypto` takes `central-crypto` as a development
-dependency only. The first PostgreSQL run found the migration count still at
-13 and an ambiguous column in the test's own helper, both fixed. With the
+here; `central-web-crypto` depends on `central-crypto`, so the module takes
+`hpke` and `curve25519-dalek` 5 too (corrected after the review below; this
+sentence first called it a development dependency). The first PostgreSQL run
+found the migration count still at 13 and an ambiguous column in the test's
+own helper, both fixed. With the
 store made to keep a pairing after a wrong verifier, the test fails at
 "ended by the wrong verifier". Engineering review, not an audit; a second
 model reviews these three commits before they land.
+
+Second-model review, 30.10.2026 (read-only, of `c41/pairing` at 6a6f99f): no
+critical or high finding. Fixed in the commits after it:
+- The service and the SDK had no attack tests of their own. Now
+  `central-client/tests/support/pairing.rs` runs the page's half as the
+  website's crypto does and the client's through the SDK, over both real
+  listeners: the key check set once after a password sign-in and never
+  replaced by the cookie's holder; a proof under another check, a proof over
+  another seal, a seal or proof one byte short, another handle and a second
+  approval refused; a resent claim answered the same, another one a
+  conflict; a verifier of the wrong length refused, a wrong one ending the
+  pairing; the redeem replacing the account's earlier native session; and a
+  seal to a stranger's key or bound to another expiry, which Central accepts
+  with a valid proof, refused by the SDK, which signs the session out, so the
+  account keeps no native session.
+- A redeem refused after the deletion (another epoch, a proof too old) rolled
+  the deletion back. The session's issue now runs in a savepoint: a refusal
+  undoes the issue and keeps the deletion, and only a storage failure leaves
+  the pairing. The fixture checks that the pairing is gone and the account's
+  native session stays.
+- Step-ups and "signed in at" counted from a session's creation, which for a
+  paired session is the redeem: `AccountExport` would have taken a pairing
+  as a fresh password sign-in for 30 minutes. Every such check now reads
+  `COALESCE(proven_at, created_at)`, as the key check and renewal did.
+- A claim resent after a lost answer was a conflict, the hijack's signal. The
+  same triple, compared in constant time, now gets the same answer.
+- The redeem's challenge is compared in constant time; `KeyCheck` no longer
+  derives equality.
+- Expired pairings went only with the next start; the operator's daily
+  sweep deletes them too.
+- The redeem answers the account's display name and tag beside its username,
+  so the client's question can name the account as other players see it.
+Recorded, not changed: the native listener's one window for claims, polls and
+redeems and the thousand open pairings are global, as its other budgets are
+(availability only); the migration number skips 000015, which the parallel
+legacy login holds. Open: whether the seal uses HPKE's PSK mode with the
+link's secret, so a seal Central or a database writer made itself would not
+open (the owner decides; until then a malicious Central can make the client
+run under a key it chose, which the client notices only as an empty
+account); and the page's MAC check, which lives in `central-web-crypto` and
+is reviewed when it is built.

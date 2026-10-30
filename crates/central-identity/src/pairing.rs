@@ -109,6 +109,8 @@ impl IdentityService {
                     token,
                     identity: redeemed.identity,
                     username: redeemed.username,
+                    display_name: redeemed.display_name,
+                    tag: redeemed.tag,
                     sealed: redeemed.sealed,
                     expires_at: redeemed.expires_at,
                 })

@@ -20,7 +20,7 @@ const VAULT_DOMAIN: &[u8] = b"baylee-central/local-vault/v1\0";
 /// The account's key check: 32 bytes Central stores so that a proof made
 /// with it shows the master key's holder (pairing's approval), while the
 /// value reveals nothing of the master key. It changes with the epoch.
-#[derive(Clone, Eq, PartialEq)]
+#[derive(Clone)]
 pub struct KeyCheck([u8; 32]);
 
 impl fmt::Debug for KeyCheck {
