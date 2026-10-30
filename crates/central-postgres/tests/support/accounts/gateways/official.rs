@@ -247,15 +247,24 @@ async fn moved(
             true
         ))
     );
-    aliased(store, session).await;
+    aliased(store, operator, session).await;
     operator.execute_unprepared(back).await.unwrap();
 }
 
 /// A ticket an installed client asks for the old address is redeemed and its
 /// lease checked under the whole set, and keeps the address it was for; a
 /// player who accepted the gateway's terms there has accepted them.
-async fn aliased(store: &AccountStore, session: &Token) {
+async fn aliased(store: &AccountStore, operator: &DatabaseConnection, session: &Token) {
     let set = [OFFICIAL_ORIGIN, LEGACY_ORIGIN];
+    // the session holds the 32 leases of the cap test (`limits`); free them
+    operator
+        .execute_raw(Statement::from_sql_and_values(
+            DbBackend::Postgres,
+            "DELETE FROM central_identity.gateway_leases WHERE session_digest = $1",
+            vec![session.digest().to_vec().into()],
+        ))
+        .await
+        .unwrap();
     // its terms, accepted under the old address before the move
     let words = texts("Official");
     let terms = version("official-1", &words);
