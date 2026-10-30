@@ -201,10 +201,7 @@ async fn beat_for_it(
 }
 
 /// The official gateway moved (`OFFICIAL_ORIGIN`, its old address an alias):
-/// its heartbeat keeps the row under either origin and a website on either;
-/// a ticket an installed client asks for the old address is redeemed and its
-/// lease checked under the whole set, and keeps the address it was for; a
-/// player who accepted the gateway's terms there has accepted them.
+/// its heartbeat keeps the row under either origin and a website on either.
 async fn moved(
     store: &AccountStore,
     operator: &DatabaseConnection,
@@ -250,6 +247,15 @@ async fn moved(
             true
         ))
     );
+    aliased(store, session).await;
+    operator.execute_unprepared(back).await.unwrap();
+}
+
+/// A ticket an installed client asks for the old address is redeemed and its
+/// lease checked under the whole set, and keeps the address it was for; a
+/// player who accepted the gateway's terms there has accepted them.
+async fn aliased(store: &AccountStore, session: &Token) {
+    let set = [OFFICIAL_ORIGIN, LEGACY_ORIGIN];
     // its terms, accepted under the old address before the move
     let words = texts("Official");
     let terms = version("official-1", &words);
@@ -332,7 +338,6 @@ async fn moved(
         .await
         .unwrap();
     assert!(!accepted);
-    operator.execute_unprepared(back).await.unwrap();
 }
 
 /// It is the official gateway only while its origin is the bridge's: moved to

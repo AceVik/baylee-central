@@ -190,10 +190,29 @@ async fn delegation(
         (foreign_origin, foreign),
     )
     .await;
+    held(
+        store,
+        operator,
+        &lease,
+        (origin, gateway),
+        (foreign_origin, foreign),
+    )
+    .await;
+}
+
+/// The lease answers only its own gateway, purpose and authority, and ends
+/// when the gateway is disabled, which also hides it.
+async fn held(
+    store: &AccountStore,
+    operator: &DatabaseConnection,
+    lease: &Token,
+    (origin, gateway): (&str, [u8; 16]),
+    (foreign_origin, foreign): (&str, [u8; 16]),
+) {
     assert!(
         store
             .gateway_session(
-                &lease,
+                lease,
                 &[foreign_origin],
                 Some(foreign),
                 TicketPurpose::Admit
@@ -203,20 +222,20 @@ async fn delegation(
     );
     assert!(
         store
-            .gateway_session(&lease, &[origin], Some(gateway), TicketPurpose::Admin)
+            .gateway_session(lease, &[origin], Some(gateway), TicketPurpose::Admin)
             .await
             .is_err()
     );
     assert!(
         store
-            .gateway_session(&lease, &[origin], None, TicketPurpose::Admit)
+            .gateway_session(lease, &[origin], None, TicketPurpose::Admit)
             .await
             .is_err()
     );
     approval(operator, gateway, false).await;
     assert!(
         store
-            .gateway_session(&lease, &[origin], Some(gateway), TicketPurpose::Admit)
+            .gateway_session(lease, &[origin], Some(gateway), TicketPurpose::Admit)
             .await
             .is_err()
     );
