@@ -140,7 +140,7 @@ async fn delegation(
     ] {
         assert!(
             store
-                .redeem_lease(&ticket, origin, purpose, Some(gateway), Some(&lease))
+                .redeem_lease(&ticket, &[origin], purpose, Some(gateway), Some(&lease))
                 .await
                 .is_err()
         );
@@ -149,7 +149,7 @@ async fn delegation(
         store
             .redeem_lease(
                 &ticket,
-                foreign_origin,
+                &[foreign_origin],
                 TicketPurpose::Admit,
                 Some(foreign),
                 Some(&lease)
@@ -160,7 +160,7 @@ async fn delegation(
     let (_, legacy, expires) = store
         .redeem_lease(
             &ticket,
-            origin,
+            &[origin],
             TicketPurpose::Admit,
             Some(gateway),
             Some(&lease),
@@ -173,7 +173,7 @@ async fn delegation(
         store
             .redeem_lease(
                 &ticket,
-                origin,
+                &[origin],
                 TicketPurpose::Admit,
                 Some(gateway),
                 Some(&Token::generate().unwrap())
@@ -192,26 +192,31 @@ async fn delegation(
     .await;
     assert!(
         store
-            .gateway_session(&lease, foreign_origin, Some(foreign), TicketPurpose::Admit)
+            .gateway_session(
+                &lease,
+                &[foreign_origin],
+                Some(foreign),
+                TicketPurpose::Admit
+            )
             .await
             .is_err()
     );
     assert!(
         store
-            .gateway_session(&lease, origin, Some(gateway), TicketPurpose::Admin)
+            .gateway_session(&lease, &[origin], Some(gateway), TicketPurpose::Admin)
             .await
             .is_err()
     );
     assert!(
         store
-            .gateway_session(&lease, origin, None, TicketPurpose::Admit)
+            .gateway_session(&lease, &[origin], None, TicketPurpose::Admit)
             .await
             .is_err()
     );
     approval(operator, gateway, false).await;
     assert!(
         store
-            .gateway_session(&lease, origin, Some(gateway), TicketPurpose::Admit)
+            .gateway_session(&lease, &[origin], Some(gateway), TicketPurpose::Admit)
             .await
             .is_err()
     );
@@ -240,11 +245,11 @@ async fn profile(
 ) {
     let read = async |lease: &Token| {
         store
-            .gateway_profile(lease, origin, Some(gateway), TicketPurpose::Admit)
+            .gateway_profile(lease, &[origin], Some(gateway), TicketPurpose::Admit)
             .await
     };
     let (admitted, _) = store
-        .gateway_session(lease, origin, Some(gateway), TicketPurpose::Admit)
+        .gateway_session(lease, &[origin], Some(gateway), TicketPurpose::Admit)
         .await
         .unwrap();
     let before = read(lease).await.unwrap();
@@ -269,7 +274,7 @@ async fn profile(
     ] {
         assert_eq!(
             store
-                .gateway_profile(lease, audience, asking, purpose)
+                .gateway_profile(lease, &[audience], asking, purpose)
                 .await
                 .err(),
             Some(Error::Rejected),
@@ -293,7 +298,7 @@ async fn profile(
     store
         .redeem_lease(
             &ticket,
-            origin,
+            &[origin],
             TicketPurpose::Admit,
             Some(gateway),
             Some(&expired),
@@ -490,7 +495,7 @@ async fn admin_revocation(
     store
         .redeem_lease(
             &admin_ticket,
-            origin,
+            &[origin],
             TicketPurpose::Admin,
             Some(gateway),
             Some(&admin_lease),
@@ -509,7 +514,7 @@ async fn admin_revocation(
     assert!(!store.gateway_admin(gateway, member).await.unwrap());
     assert!(
         store
-            .gateway_session(&admin_lease, origin, Some(gateway), TicketPurpose::Admin)
+            .gateway_session(&admin_lease, &[origin], Some(gateway), TicketPurpose::Admin)
             .await
             .is_err()
     );
@@ -517,7 +522,7 @@ async fn admin_revocation(
         store
             .redeem_lease(
                 &pending_admin,
-                origin,
+                &[origin],
                 TicketPurpose::Admin,
                 Some(gateway),
                 Some(&Token::generate().unwrap())

@@ -145,8 +145,15 @@ impl IdentityService {
             }),
             Request::GatewayTerms { origin } => {
                 self.origin(&origin)?;
+                // the official gateway publishes under its canonical origin;
+                // a client that knows it by an alias reads those terms
+                let origin = if self.is_official(&origin) {
+                    self.canonical()
+                } else {
+                    &origin
+                };
                 Ok(Response::Terms {
-                    terms: self.store.gateway_terms(&origin).await?,
+                    terms: self.store.gateway_terms(origin).await?,
                 })
             }
             Request::TermsStatus => Ok(Response::TermsStatus {
@@ -179,15 +186,23 @@ impl IdentityService {
                         if !terms::valid_version(&accepted.version) {
                             return Err(Error::Rejected);
                         }
+                        // the official gateway's terms are published under its
+                        // canonical origin; the acceptance is kept there too
+                        let origin = if self.is_official(&origin) {
+                            self.canonical()
+                        } else {
+                            &origin
+                        };
                         self.store
-                            .accept_gateway_terms(session, &origin, &accepted)
+                            .accept_gateway_terms(session, origin, &accepted)
                             .await?;
                     }
                 }
                 Ok(Response::Done)
             }
             Request::PublishGatewayTerms { version, texts } => {
-                let (_, origin) = self.gateway_authority(bearer).await?;
+                let (_, origins) = self.gateway_authority(bearer).await?;
+                let origin = &origins[0];
                 if !terms::valid_version(&version) {
                     return Err(Error::Rejected);
                 }
@@ -197,7 +212,7 @@ impl IdentityService {
                     digest: terms::digest(&texts),
                 };
                 self.store
-                    .publish_gateway_terms(&origin, &published, &texts)
+                    .publish_gateway_terms(origin, &published, &texts)
                     .await?;
                 Ok(Response::TermsPublished {
                     digest: published.digest,
@@ -208,12 +223,12 @@ impl IdentityService {
                 purpose,
                 terms,
             } => {
-                let (gateway, origin) = self.gateway_authority(bearer).await?;
+                let (gateway, origins) = self.gateway_authority(bearer).await?;
                 let (identity, expires_at, central_terms, gateway_terms) = self
                     .store
                     .gateway_authorize(
                         &lease,
-                        &origin,
+                        &origins,
                         gateway,
                         purpose,
                         self.current(),

@@ -13,7 +13,9 @@ pub mod reset_code;
 pub mod terms;
 mod token;
 pub mod wire;
-pub use endpoint::{Endpoint, LEGACY_ORIGIN, LIVE_ORIGIN};
+pub use endpoint::{
+    Endpoint, LEGACY_ORIGIN, LIVE_ORIGIN, OFFICIAL_ALIASES, OFFICIAL_ORIGIN, is_official_origin,
+};
 pub use token::Token;
 
 /// Maximum serialized native request or response, independently enforced by both transports.

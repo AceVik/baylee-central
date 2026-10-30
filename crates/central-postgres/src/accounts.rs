@@ -53,6 +53,24 @@ pub struct AccountStore {
 fn statement(sql: &str, values: Vec<Value>) -> Statement {
     Statement::from_sql_and_values(DbBackend::Postgres, sql, values)
 }
+/// The origins a gateway answers for as one parameter, read back by
+/// [`any_origin`]: a validated origin holds no space, so a space divides them.
+fn origins<S: AsRef<str>>(set: &[S]) -> Result<Value, Error> {
+    let set: Vec<&str> = set.iter().map(AsRef::as_ref).collect();
+    if set.is_empty() || set.iter().any(|o| o.is_empty() || o.contains(' ')) {
+        return Err(Error::Rejected);
+    }
+    Ok(set.join(" ").into())
+}
+/// `ANY(...)` over the [`origins`] parameter number `n`.
+fn any_origin(n: u8) -> String {
+    format!("ANY(pg_catalog.string_to_array(${n}::text,' '))")
+}
+/// A registered gateway `g` an administrator has not disabled: approved or
+/// still pending. A pending gateway signs players in by token
+/// (`GatewayState`); only the directory waits for the approval.
+const NOT_DISABLED: &str = "NOT EXISTS(SELECT 1 FROM central_identity.gateway_approvals d
+    WHERE d.gateway_id=g.id AND NOT d.enabled)";
 fn uuid(id: [u8; 16]) -> Uuid {
     Uuid::from_bytes(id)
 }

@@ -606,7 +606,7 @@ mod tests {
             Request::CreateObject,
             Request::ConfirmRestore { revision: 1 },
             Request::GatewayTicket {
-                gateway: "https://baylee.acevik.de".into(),
+                gateway: central_api::OFFICIAL_ORIGIN.into(),
                 purpose: TicketPurpose::Admit,
             },
             Request::LegacyReserve {
@@ -630,7 +630,7 @@ mod tests {
             },
             Request::AcceptTerms {
                 subject: TermsSubject::Gateway {
-                    origin: "https://baylee.acevik.de".into(),
+                    origin: central_api::OFFICIAL_ORIGIN.into(),
                 },
                 version: "1".into(),
                 digest: [0; 32],

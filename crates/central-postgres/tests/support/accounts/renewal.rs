@@ -58,7 +58,7 @@ pub(super) async fn run(store: &AccountStore, operator: &DatabaseConnection, key
     store
         .redeem_lease(
             &ticket,
-            "official",
+            &["official"],
             TicketPurpose::Admit,
             None,
             Some(&lease),
@@ -85,7 +85,7 @@ pub(super) async fn run(store: &AccountStore, operator: &DatabaseConnection, key
         1
     );
     let (_, until) = store
-        .gateway_session(&lease, "official", None, TicketPurpose::Admit)
+        .gateway_session(&lease, &["official"], None, TicketPurpose::Admit)
         .await
         .unwrap();
     assert_eq!(until, renewed, "the gateway learns the new expiry");

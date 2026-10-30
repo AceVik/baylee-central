@@ -6,8 +6,8 @@
 //! read or written.
 use super::{AccountStore, Error, Session, Token, statement};
 use central_api::{
-    LEGACY_ORIGIN,
     gateway::{GatewayMetadata, GatewayState, validate_origin},
+    is_official_origin,
     owner::{
         GatewayScopes, MAX_TOKEN_DAYS, MyGateway, SessionInfo, SessionKind, TOKENS_PER_GATEWAY,
         TokenInfo, token_name,
@@ -261,10 +261,11 @@ impl AccountStore {
     }
 
     /// Register a gateway at `origin` named `name` for the account behind
-    /// `browser`, awaiting an administrator's approval. It has no credential
-    /// pair: it authenticates by tokens alone. The official gateway's origin
-    /// is the bridge's ([`LEGACY_ORIGIN`]), so it is a `Conflict`, as is an
-    /// origin registered already; `development` allows loopback http origins.
+    /// `browser`, awaiting an administrator's approval for the directory. It has
+    /// no credential pair: it authenticates by tokens alone, approved or not.
+    /// The official gateway's origins are the bridge's ([`is_official_origin`]),
+    /// so each is a `Conflict`, as is an origin registered already;
+    /// `development` allows loopback http origins.
     ///
     /// # Errors
     /// `Rejected` without a live browser session, for an account whose move
@@ -277,7 +278,7 @@ impl AccountStore {
         name: &str,
         development: bool,
     ) -> Result<[u8; 16], Error> {
-        if origin == LEGACY_ORIGIN {
+        if is_official_origin(origin) {
             return Err(Error::Conflict);
         }
         validate_origin(origin, development)?;

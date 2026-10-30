@@ -102,9 +102,11 @@ writes its audit event in its transaction; reads do not.
   `RegisterGateway` credential pair. `Gateway { gateway }` adds its latest 20
   tokens (name, scopes, times; never a token or digest).
 - `SetGatewayApproval { gateway, enabled }`: approve or enable again
-  (`gateway.approved`), or disable (`gateway.disabled`). Approval stays a
-  person's decision after checking outside Central who runs the origin; the
-  page says so in its dialog. Disabling hides the gateway from the directory
+  (`gateway.approved`), or disable (`gateway.disabled`). Approval puts the
+  gateway in the public directory; its tokens sign players in without it
+  (owner, 30.10.2026; [gateway registry](gateway-registry.md) §"Gateway
+  tokens"). It stays a person's decision after checking outside Central who
+  runs the origin; the page says so in its dialog. Disabling hides the gateway from the directory
   at once, stops its credentials and tokens (the joins that authenticate
   them), and deletes its leases, so each of its sessions fails at its next
   check. The official gateway's row can be disabled too, which hides it; its
