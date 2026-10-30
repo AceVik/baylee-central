@@ -114,6 +114,9 @@ pub(super) async fn run(store: &AccountStore, operator: &DatabaseConnection, key
     )
     .await;
     limits::run(store, operator, &owner_session, gateway, origin).await;
+    // The bridge admits a moved account once its move is closed, and the
+    // official gateway's tests redeem the owner's tickets there.
+    store.close_legacy("registry-owner", owner).await.unwrap();
     official::run(store, operator, &owner_session, gateway).await;
     tokens::run(store, operator, keys).await;
 }
