@@ -116,8 +116,15 @@ writes its audit event in its transaction; reads do not.
   index; a taken tag is `Conflict`), so `Name#tag` does. The event's
   `detail` holds `{"from": old, "to": new}`, numbers only. Gateways take the
   new tag into their projection at the account's next sign-in there
-  (Baylee's `take_profile`); whispers on a gateway are keyed by tag, so
-  earlier whisper threads may not show under the new one: the dialog warns.
+  (Baylee's `take_profile`). **Earlier whisper threads are gone for the
+  account after the change:** a gateway names a whisper after both tags
+  (`dm:<tagA>:<tagB>`, Baylee's `docs/protocol.md` §"Conversations and who
+  is in them"), so the new tag starts new threads, and the old ones are
+  found under neither participant's new pair; the chat archive's device
+  records name the tag too (Baylee's `docs/central-chat-sync.md` §"Key
+  ownership and local migration"). The confirmation dialog says so before
+  the change. Re-keying the old threads when a gateway's `take_profile` sees
+  a changed tag is not built (an open point).
 
 The runtime gains `INSERT` and `UPDATE (enabled)` on `gateway_approvals`
 (never `DELETE`) and `SELECT, INSERT, UPDATE (revoked_at, last_used_at)` on

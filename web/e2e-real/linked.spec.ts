@@ -22,17 +22,17 @@ async function shoot(page: Page, file: string) {
   await page.screenshot({ path: join(OUT, `${file}.png`), fullPage: true });
 }
 
-test("the directory lists the linked gateway with its deep link", async ({ page }, info) => {
+test("the directory lists the linked gateway with its address to copy", async ({ page }, info) => {
   const suffix = info.project.name;
   for (const theme of ["dark", "light"] as const) {
     await page.goto(`/gateways?lang=de&theme=${theme}`);
     const card = page.locator(".gateways > li").filter({ hasText: "QA table" });
     await expect(card).toBeVisible({ timeout: 30_000 });
     await expect(card.getByText("online")).toBeVisible();
-    await expect(card.getByRole("link", { name: "In Baylee öffnen" })).toHaveAttribute(
-      "href",
-      `baylee://gateway/add?origin=${encodeURIComponent(QA_ORIGIN)}`,
-    );
+    // gateway links stay off until a client release reads them: the address is copied
+    await expect(card.getByText(QA_ORIGIN)).toBeVisible();
+    await expect(card.getByRole("button", { name: "Adresse kopieren" })).toBeVisible();
+    await expect(card.getByRole("link", { name: "In Baylee öffnen" })).toHaveCount(0);
     await shoot(page, `10-gateways-${theme}-${suffix}`);
   }
   await page.goto("/?lang=de&theme=dark");

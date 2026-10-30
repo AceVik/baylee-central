@@ -34,6 +34,16 @@ export function impressumEndpoint(hostname?: string): string {
   return onLoopback(hostname) ? `${FEEDBACK_LOCAL}/site/impressum` : "/site/impressum";
 }
 
+/**
+ * Whether a gateway card offers "Open in Baylee" (`central/deeplink.ts`).
+ * Off until a client release that reads gateway links is out, so the public
+ * page shows no button that does nothing; until then copying the address is
+ * the card's first action. `VITE_DEEP_LINKS=on` at build time turns it on.
+ */
+export function deepLinks(): boolean {
+  return import.meta.env.VITE_DEEP_LINKS === "on";
+}
+
 /** Central's API, same origin (README.md §"The gateway directory"). */
 export const CENTRAL_API = import.meta.env.VITE_CENTRAL_API ?? "/api";
 

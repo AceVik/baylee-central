@@ -155,8 +155,10 @@ the handle.
   it is.
 - **The tag** is unique at Central, positive, at most `i32::MAX` (a
   gateway's column), drawn as `handle.rs` draws it (`7` is `0007`, `0x10000`
-  is `10000`, `profile::tag_text`), and never changes once held: chat on a
-  gateway is keyed by it. A registered account draws its tag with its
+  is `10000`, `profile::tag_text`). It changes only when an administrator
+  sets another one ([administration](administration.md) §"Gateways, tokens
+  and tags"): chat on a gateway is keyed by it, so earlier whisper threads
+  are gone after the change. A registered account draws its tag with its
   reservation, at random (operating-system randomness, rejection-sampled)
   from `REGISTERED_TAG_FLOOR = 0x1000` to `0xffff` while fewer than half of
   those are taken, then from `[16f, 256f - 1]`, and so on to `i32::MAX`

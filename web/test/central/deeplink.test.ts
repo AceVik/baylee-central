@@ -20,6 +20,11 @@ describe("a gateway's deep link", () => {
       "baylee://gateway/add?origin=https://x.invalid",
       "",
       `https://${"a".repeat(260)}.invalid`,
+      // hosts the client ignores: an IP address or a single label
+      "https://203.0.113.7",
+      "https://[2001:db8::1]",
+      "https://localhost",
+      "https://printer:8443",
     ]) {
       expect({ origin, link: gatewayLink(origin) }).toEqual({ origin, link: null });
     }

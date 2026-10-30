@@ -257,7 +257,9 @@ sign-in; a visitor's first page fetches neither.
   rule beside every animation.
 - `e2e/`, under the production CSP at a phone's and a desktop's width:
   no sideways scroll on the main pages (`expectNoSideScroll`; the memorial
-  at 320 px too), a gateway card's controls 44 px high and its deep link,
-  and the reduced-motion preference hiding nothing.
+  at 320 px too), a gateway card's controls 44 px high with copying its
+  address as the first action while gateway links are off
+  (`VITE_DEEP_LINKS`, `web/README.md` §"Settings"), and the reduced-motion
+  preference hiding nothing.
 - `npm run screens`: every page at phone and desktop width in both schemes,
   for a person to look at before a change lands.
