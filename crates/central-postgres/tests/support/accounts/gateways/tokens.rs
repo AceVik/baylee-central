@@ -234,6 +234,13 @@ async fn minting(
         1,
         "the digest is stored, never the token"
     );
+    capacity(store, browser, stranger, gateway).await;
+    token
+}
+
+/// Eight live tokens at most; revoked ones free their slots, and only their
+/// owner revokes them.
+async fn capacity(store: &AccountStore, browser: &Token, stranger: &Token, gateway: [u8; 16]) {
     for n in 1..8 {
         store
             .create_gateway_token(
@@ -283,7 +290,6 @@ async fn minting(
             Some(Error::Rejected)
         );
     }
-    token
 }
 
 /// A token authenticates its gateway while it is approved, for its scopes.
@@ -414,29 +420,7 @@ async fn administration(
     );
     let (_, tokens) = store.admin_gateway(&cookie, gateway).await.unwrap();
     assert!(tokens.iter().any(|t| t.name == "Main"));
-    // a player admitted there holds a lease until the gateway is disabled
-    let ticket = Token::generate().unwrap();
-    store
-        .registered_ticket(native, ORIGIN, &ticket, TicketPurpose::Admit)
-        .await
-        .unwrap();
-    let lease = Token::generate().unwrap();
-    store
-        .redeem_lease(
-            &ticket,
-            ORIGIN,
-            TicketPurpose::Admit,
-            Some(gateway),
-            Some(&lease),
-        )
-        .await
-        .unwrap();
-    let sessions = store.owner_sessions(owner_browser).await.unwrap();
-    let client = sessions
-        .iter()
-        .find(|s| s.kind == SessionKind::Native)
-        .unwrap();
-    assert_eq!(client.gateways, vec![ORIGIN.to_owned()]);
+    let lease = admitted(store, native, owner_browser, gateway).await;
     let audit = |action: &'static str| {
         count(
             operator,
@@ -473,19 +457,11 @@ async fn administration(
             .iter()
             .all(|g| g.id != gateway)
     );
-    let (_, _, _, state, _, _) = store
-        .gateway_status(&{
-            // the console still learns why
-            let token = Token::generate().unwrap();
-            store
-                .create_gateway_token(owner_browser, gateway, "While disabled", SSO, 1, &token)
-                .await
-                .unwrap();
-            token
-        })
-        .await
-        .unwrap();
-    assert_eq!(state, GatewayState::Disabled);
+    assert_eq!(
+        disabled_status(store, owner_browser, gateway).await,
+        GatewayState::Disabled,
+        "the console still learns why"
+    );
     store
         .set_gateway_approval(&cookie, gateway, true)
         .await
@@ -513,6 +489,54 @@ async fn administration(
     );
     age(operator, admin.account, -31).await;
     (cookie, admin.account)
+}
+
+/// A player admitted at the gateway: a lease, which the owner's session
+/// list names by the gateway's origin.
+async fn admitted(
+    store: &AccountStore,
+    native: &Token,
+    owner_browser: &Token,
+    gateway: [u8; 16],
+) -> Token {
+    // a player admitted there holds a lease until the gateway is disabled
+    let ticket = Token::generate().unwrap();
+    store
+        .registered_ticket(native, ORIGIN, &ticket, TicketPurpose::Admit)
+        .await
+        .unwrap();
+    let lease = Token::generate().unwrap();
+    store
+        .redeem_lease(
+            &ticket,
+            ORIGIN,
+            TicketPurpose::Admit,
+            Some(gateway),
+            Some(&lease),
+        )
+        .await
+        .unwrap();
+    let sessions = store.owner_sessions(owner_browser).await.unwrap();
+    let client = sessions
+        .iter()
+        .find(|s| s.kind == SessionKind::Native)
+        .unwrap();
+    assert_eq!(client.gateways, vec![ORIGIN.to_owned()]);
+    lease
+}
+
+/// What a disabled gateway's console learns with a new token.
+async fn disabled_status(
+    store: &AccountStore,
+    owner_browser: &Token,
+    gateway: [u8; 16],
+) -> GatewayState {
+    let token = Token::generate().unwrap();
+    store
+        .create_gateway_token(owner_browser, gateway, "While disabled", SSO, 1, &token)
+        .await
+        .unwrap();
+    store.gateway_status(&token).await.unwrap().3
 }
 
 /// Tags: unique, audited with both, the same again nothing, the admin only.
