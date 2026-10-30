@@ -88,7 +88,11 @@ pub(super) async fn run(store: &AccountStore, operator: &DatabaseConnection, key
     assert!(snapshot.verified());
     assert_eq!(snapshot.username, "legacy-one");
     let (deadline, listed) = legacy.listing().await.unwrap();
-    assert_eq!(deadline, None);
+    assert_eq!(
+        deadline,
+        Some(1_814_392_800),
+        "the owner's date, the end of 30.06.2027 in Berlin"
+    );
     assert_eq!(listed.len(), 2);
     assert!(
         listed
@@ -392,11 +396,12 @@ async fn deadline_and_sweep(legacy: &LegacyStore, operator: &DatabaseConnection)
             "{bad}"
         );
     }
+    // The date is the last day: its end in Berlin (CET in January).
     assert_eq!(
         set_legacy_deadline(operator, Some("2099-01-01"))
             .await
             .unwrap(),
-        Some(4_070_908_800)
+        Some(4_070_991_600)
     );
     assert_eq!(sweep_legacy(operator).await.unwrap().expired, 0);
     assert!(legacy.candidate("legacy-two").await.unwrap().is_some());

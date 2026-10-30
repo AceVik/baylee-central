@@ -145,8 +145,9 @@ account whose move has not closed is refused, with or without the store, so a
 the old id's link to the Central identity at that first admission (Baylee
 `docs/central-login.md` §"Legacy migration").
 
-**The deadline.** None until the operator sets the date the owner chose.
-After it no row is handed out, sweep or not; the daily sweep then deletes every
+**The deadline.** The owner's date, the end of 30.06.2027 in
+Europe/Berlin, set by migration 000015; the operator can move or clear it
+(`docs/operations.md` §"The legacy store"). After it no row is handed out, sweep or not; the daily sweep then deletes every
 row and every legacy reservation that never enrolled, which gives its name up.
 An administrator lists what is left on the website's `/admin/legacy`
 (`AdminRequest::LegacyAccounts`: names,

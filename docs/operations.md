@@ -395,7 +395,9 @@ the export's: the counts and digests are equal. Then add the `legacy` block
 (the `central_legacy` login, `{"database": {…, "user": "central_legacy", …}}`)
 to `central.json`, restart Central, start the gateway.
 
-**The deadline** is the owner's date; until it is set the store stays:
+**The deadline** is the owner's date, **30.06.2027** (end of day,
+Europe/Berlin): migration 000015 sets it, so it holds without a step. The
+operator moves it, or clears it, only on the owner's word:
 
 ```sh
 central-service --legacy-deadline-stdin < legacy-deadline.json
@@ -404,11 +406,12 @@ central-service --legacy-deadline-stdin < legacy-deadline.json
 ```json
 {"database": {"host": "…", "port": 5432, "name": "baylee_central", "user": "central_migrator",
   "password": "…", "ca_certificate": "…"},
- "deadline": "2027-01-31"}
+ "deadline": "2027-06-30"}
 ```
 
-The start of that day in UTC; `null` clears it. From then no legacy sign-in is
-taken, and the daily sweep (`--sweep-stdin`, [administration](#administration))
+The date is the last day a legacy sign-in is taken: the deadline is the end
+of that day in Europe/Berlin; `null` clears it (the store then stays until a
+date is set again). From then no legacy sign-in is taken, and the daily sweep (`--sweep-stdin`, [administration](#administration))
 deletes every row left and every legacy reservation that never enrolled; it
 deletes the row of a closed move at any time. Administrators see what is left
 on the website, at `/admin/legacy` (`AdminRequest::LegacyAccounts`). After the deadline's sweep,

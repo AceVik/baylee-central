@@ -19,8 +19,9 @@ pub struct LegacySwept {
     pub reservations: u64,
 }
 
-/// Set the deadline to the start of `date` (`YYYY-MM-DD`, UTC), or clear it
-/// with `None`. Answers it in Unix seconds.
+/// Set the deadline to the end of `date` (`YYYY-MM-DD`) in Europe/Berlin,
+/// the last day a legacy sign-in is taken, or clear it with `None`. Answers
+/// it in Unix seconds.
 ///
 /// # Errors
 /// Rejects anything but a valid date, and reports unavailable storage.
@@ -41,7 +42,7 @@ pub async fn set_legacy_deadline(
     }
     db.query_one_raw(statement(
         "UPDATE central_legacy.settings
-         SET deadline = ($1::date)::timestamp AT TIME ZONE 'UTC'
+         SET deadline = (($1::date + 1)::timestamp) AT TIME ZONE 'Europe/Berlin'
          RETURNING floor(extract(epoch FROM deadline))::bigint AS deadline",
         vec![date.map(str::to_owned).into()],
     ))

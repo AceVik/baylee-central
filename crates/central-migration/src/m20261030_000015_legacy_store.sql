@@ -25,7 +25,8 @@
 --   legacy role may change.
 --
 -- `settings` holds the deadline after which no legacy sign-in is taken and the
--- sweep deletes what is left; none until the operator sets one.
+-- sweep deletes what is left: the end of 30.06.2027 in Europe/Berlin, the
+-- owner's date, until the operator moves or clears it.
 
 CREATE SCHEMA central_legacy;
 REVOKE ALL ON SCHEMA central_legacy FROM PUBLIC;
@@ -55,6 +56,7 @@ CREATE TABLE central_legacy.settings (
     singleton boolean PRIMARY KEY DEFAULT true CHECK (singleton),
     deadline timestamptz
 );
-INSERT INTO central_legacy.settings (singleton) VALUES (true);
+INSERT INTO central_legacy.settings (singleton, deadline)
+VALUES (true, TIMESTAMP '2027-07-01 00:00:00' AT TIME ZONE 'Europe/Berlin');
 
 REVOKE ALL ON central_legacy.accounts, central_legacy.settings FROM PUBLIC;

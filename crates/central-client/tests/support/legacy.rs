@@ -522,7 +522,7 @@ fn listing(
     else {
         panic!("the listing");
     };
-    assert_eq!(store.deadline, None);
+    assert_eq!(store.deadline, Some(1_814_392_800), "the owner's date");
     let names: Vec<&str> = store
         .accounts
         .iter()
