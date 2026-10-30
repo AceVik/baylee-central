@@ -6,12 +6,11 @@
 //!
 //! This derives; it does not compare. The caller compares the output with the
 //! stored one in constant time and drops both. Argon2's own intermediate
-//! hashes (H0, the final block) stay on the worker's stack, as they do for
-//! the OPAQUE stretch: argon2's `zeroize` feature would wipe them and is not
-//! in the approved inventory yet.
+//! hashes (H0, the final block) are wiped by argon2 itself, its `zeroize`
+//! feature on, as they are for the OPAQUE stretch.
 
 use crate::{CryptoError, opaque::stretch::WorkBuffer};
-use opaque_ke::argon2::{Algorithm, Argon2, Block, Params, Version};
+use argon2::{Algorithm, Argon2, Block, Params, Version};
 use zeroize::Zeroizing;
 
 /// The gateway's salt length: `RECOMMENDED_SALT_LEN` of its `password-hash`.

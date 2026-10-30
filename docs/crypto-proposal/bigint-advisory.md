@@ -53,6 +53,19 @@ as well and waits for that feature's approval) and by the author; the
 fingerprint is pinned again (`crypto_scope/sources.rs`). The gateway's own hash is reproduced by the module's test
 vector and was checked against OpenSSL's Argon2id.
 
+
+**argon2's `zeroize` feature, the same day.** The owner approved argon2's
+`zeroize` feature (the crate itself was approved for the legacy check), so
+`central-crypto` names `argon2 =0.5.3`, the version opaque-ke already uses,
+as a direct dependency with that feature alone, and `legacy.rs` imports it
+from there instead of through the re-export. No package is added: the
+lockfile gains the edge `argon2 → zeroize` (zeroize was in the graph) and
+`central-crypto → argon2`. Features unify, so the OPAQUE stretch's argon2 is
+the same crate with the same feature: argon2 now wipes its own H0 and final
+blocks for both, which closes the review's hygiene finding above; the
+caller-owned work buffer is still wiped by `WorkBuffer`. Bigint's consumers
+and the graph guard's versions and features are unchanged. Reviewed by the
+author (a manifest line and an import); the fingerprint is pinned again.
 ## Enforcement
 
 `cargo xtask crypto-scope` is mandatory in `cargo xtask gate` on every native CI

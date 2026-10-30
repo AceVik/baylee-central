@@ -1710,8 +1710,8 @@ Implementation pass: `LegacyPassword` is the only password wire type, without
 `Debug`, wiped on drop, native listener only, and its sign-in is not retried by
 the client's transport on `Busy`. The derivation runs on the worker semaphore
 over a caller-owned buffer wiped on success, error and unwind; argon2's own
-H0 and final block are not wiped (its `zeroize` feature is not approved yet,
-the same for the OPAQUE stretch). The comparison is
+H0 and final blocks are wiped by argon2 itself, its `zeroize` feature on for
+the OPAQUE stretch too. The comparison is
 `subtle`'s. Limits: the global request budget, 30 legacy sign-ins a minute in
 all and five per name, ten failures lock an account for an hour. The import
 runs under the migrator in one transaction, refuses the whole batch for any
