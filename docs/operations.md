@@ -411,7 +411,7 @@ The start of that day in UTC; `null` clears it. From then no legacy sign-in is
 taken, and the daily sweep (`--sweep-stdin`, [administration](#administration))
 deletes every row left and every legacy reservation that never enrolled; it
 deletes the row of a closed move at any time. Administrators see what is left
-on the website (`AdminRequest::LegacyAccounts`). After the deadline's sweep,
+on the website, at `/admin/legacy` (`AdminRequest::LegacyAccounts`). After the deadline's sweep,
 remove the `legacy` block, revoke the role's grants and drop the role; a later
 release removes the schema.
 

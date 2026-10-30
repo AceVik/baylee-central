@@ -421,7 +421,8 @@ the account through a live browser session of the current credential
 
 The pages: `/account` (the profile, as before), `/account/security` and
 `/account/gateways`, in one frame with the administration's
-(`/admin`, `/admin/users/<id>`, `/admin/gateways`, `/admin/audit`), whose
+(`/admin`, `/admin/users/<id>`, `/admin/gateways`, `/admin/audit`,
+`/admin/legacy`), whose
 part of the navigation only an administrator sees. A change that needs the
 recent password asks for it first and signs in again (the same OPAQUE
 sign-in, in its Worker), which replaces the browser session. A token is shown

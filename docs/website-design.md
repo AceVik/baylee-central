@@ -243,7 +243,7 @@ WCAG 2.1 AA, mobile first:
 | --- | --- | --- |
 | Public | `/`, `/download`, `/cards`, `/gateways`, `/contact`, legal pages | the bar, sections, the footer |
 | Account | `/account`, `/account/security`, `/account/gateways` | the app frame |
-| Administration | `/admin`, `/admin/users`, `/admin/users/<id>`, `/admin/gateways`, `/admin/audit` | the app frame, loaded only for an administrator |
+| Administration | `/admin`, `/admin/users`, `/admin/users/<id>`, `/admin/gateways`, `/admin/audit`, `/admin/legacy` | the app frame, loaded only for an administrator |
 | Sign-in | `/signin`, `/register` | a centred card beside Baylee's cloud |
 
 The account area and the administration are loaded lazily and only after a

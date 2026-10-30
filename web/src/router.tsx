@@ -25,6 +25,7 @@ export const PAGES = [
   "adminUser",
   "adminGateways",
   "adminAudit",
+  "adminLegacy",
 ] as const;
 export type Page = (typeof PAGES)[number];
 
@@ -47,6 +48,7 @@ export const PATHS: Record<Page, string> = {
   adminUser: "/admin/users",
   adminGateways: "/admin/gateways",
   adminAudit: "/admin/audit",
+  adminLegacy: "/admin/legacy",
 };
 
 /** The administration's page of the account with the id `hex` (32 hex digits). */

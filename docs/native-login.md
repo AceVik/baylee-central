@@ -148,7 +148,8 @@ the old id's link to the Central identity at that first admission (Baylee
 **The deadline.** None until the operator sets the date the owner chose.
 After it no row is handed out, sweep or not; the daily sweep then deletes every
 row and every legacy reservation that never enrolled, which gives its name up.
-An administrator lists what is left (`AdminRequest::LegacyAccounts`: names,
+An administrator lists what is left on the website's `/admin/legacy`
+(`AdminRequest::LegacyAccounts`: names,
 tags, progress, failures, lockout, refusals, sizes; no hash, no snapshot).
 
 ## The bridge's reservation carries the name and tag

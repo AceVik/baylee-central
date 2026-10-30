@@ -9,8 +9,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { idText } from "../../src/account/owner-api";
 import { AccountProvider, SESSION_KEY } from "../../src/account/session";
-import type { AdminApi, AdminGateway } from "../../src/admin/admin-api";
+import { ApiError } from "../../src/account/api";
+import type { AdminApi, AdminGateway, LegacyStore } from "../../src/admin/admin-api";
 import GatewaysPage from "../../src/admin/GatewaysPage";
+import LegacyPage from "../../src/admin/LegacyPage";
 import UserPage from "../../src/admin/UserPage";
 import UsersPage from "../../src/admin/UsersPage";
 import { LangProvider } from "../../src/i18n";
@@ -69,6 +71,25 @@ function gateway(state: AdminGateway["state"]): AdminGateway {
   };
 }
 
+const LEGACY: LegacyStore = {
+  deadline: 1_800_864_000,
+  accounts: [
+    {
+      legacyId: "0192d0c5-7b3e-7a1f-8c2d-3e4f5a6b7c01",
+      username: "synthetic_moving",
+      displayName: "Moving",
+      tag: 0x2b1c,
+      progress: "reserved",
+      importedAt: 1_800_000_000,
+      failures: 3,
+      lockedUntil: 4_000_000_000,
+      mustChangePassword: false,
+      banned: true,
+      snapshotBytes: 2048,
+    },
+  ],
+};
+
 function admin(overrides: Partial<AdminApi> = {}): AdminApi {
   return {
     accounts: vi.fn<AdminApi["accounts"]>(async () => ({ items: [account], more: false })),
@@ -81,6 +102,7 @@ function admin(overrides: Partial<AdminApi> = {}): AdminApi {
     setTag: vi.fn<AdminApi["setTag"]>(async () => {}),
     setGatewayApproval: vi.fn<AdminApi["setGatewayApproval"]>(async () => {}),
     revokeGatewayToken: vi.fn<AdminApi["revokeGatewayToken"]>(async () => {}),
+    legacyAccounts: vi.fn<AdminApi["legacyAccounts"]>(async () => LEGACY),
     ...overrides,
   };
 }
@@ -122,6 +144,22 @@ describe("the administration", () => {
     await user.click(within(dialog).getByRole("button", { name: "Set the tag" }));
     await waitFor(() => expect(client.setTag).toHaveBeenCalledWith(OTHER, 0x1a2b));
     expect(await screen.findByText("The tag is set.")).toBeTruthy();
+  });
+
+  it("lists the legacy accounts left, how far each got and what holds it back", async () => {
+    show(<LegacyPage client={admin()} />);
+    expect(await screen.findByText("synthetic_moving")).toBeTruthy();
+    expect(screen.getByText("Moving#2b1c")).toBeTruthy();
+    expect(screen.getByText("Name reserved")).toBeTruthy();
+    expect(screen.getByText("Banned")).toBeTruthy();
+    expect(screen.getByText(/^Locked until/)).toBeTruthy();
+    expect(screen.getByText(/^Left: 1\. After /)).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Legacy accounts" }).getAttribute("aria-current")).toBe("page");
+  });
+
+  it("says when this Central keeps no legacy accounts", async () => {
+    show(<LegacyPage client={admin({ legacyAccounts: vi.fn<AdminApi["legacyAccounts"]>(async () => Promise.reject(new ApiError("rejected"))) })} />);
+    expect(await screen.findByText("This Central keeps no legacy accounts.")).toBeTruthy();
   });
 
   it("approves a pending gateway and disables an approved one", async () => {
