@@ -152,8 +152,16 @@ constant time (`hmac`'s `verify_slice`).
   `baylee-central/pair-code/v1\0`, the handle and the public key, written
   `XXX-XXX`: one glance on both screens, nothing typed.
 - **Seal**: RFC 9180 HPKE through the `hpke` crate (owner's choice,
-  `dependency-proposal/hpke.md`), base mode, DHKEM(X25519, HKDF-SHA256),
-  HKDF-SHA256, ChaCha20-Poly1305; plaintext the 32-byte master key, empty
+  `dependency-proposal/hpke.md`), PSK mode (mode 1) with `S` as the
+  pre-shared key and the raw handle as its ID, DHKEM(X25519, HKDF-SHA256),
+  HKDF-SHA256, ChaCha20-Poly1305. PSK mode is the owner's decision after the
+  second model's review (30.10.2026): Central knows everything else the seal
+  binds and the client's public key, so in base mode Central, or anyone
+  writing its database, could seal a key of its own choosing that the
+  client would open and use; under `S`, which Central never sees, only the
+  page that made the link can. `S` is 32 random bytes, RFC 9180 §5.1.2's
+  floor; it also keys the claim MAC, where it is HMAC's key, while HPKE's key
+  schedule reads it as labelled input. Plaintext the 32-byte master key, empty
   AAD, and `info` = `baylee-central/pair-seal/v1\0`, issuer, account, epoch
   (eight big-endian bytes), handle, the pairing's end (eight big-endian
   bytes). 32 bytes of encapsulated key and 48 of ciphertext and tag. A
@@ -166,10 +174,12 @@ constant time (`hmac`'s `verify_slice`).
   `baylee-central/pair-approve/v1\0`, the handle, the public key, the
   challenge and SHA-256 of the seal.
 
-Tests: RFC 9180 Appendix A.2.1 whole through the crate's public API (the
-KEM's keys, the encapsulated key, sequence numbers 0 to 256 both ways, the
-exporter), with a fixed-output RNG in the test code only; every byte of a
-seal; another key, account, issuer, epoch, handle or expiry; a low-order key;
+Tests: RFC 9180 Appendix A.2.1 (base mode) and A.2.2 (PSK mode) whole
+through the crate's public API (the KEM's keys, the encapsulated key,
+sequence numbers 0 to 256 both ways, the exporter), with a fixed-output RNG
+in the test code only; every byte of a seal; another key, account, issuer,
+epoch, handle or expiry; another secret, a seal made without it in base
+mode and one under a guessed secret, as Central could make them; a low-order key;
 the MACs and code against `tests/pairing-vectors.py` (the standard library's
 HMAC and SHA-256); refusals of other secrets, fields and lengths; redacted
 `Debug`.

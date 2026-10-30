@@ -5,17 +5,21 @@
 //! The link gives the client a handle and the page's one-time secret. The
 //! client claims the pairing with a key pair and a verifier made for it,
 //! waits until the page approves, and redeems once with the verifier: the
-//! answer is a native session and the master key sealed to its key, which
-//! only this client can open. The password plays no part.
+//! answer is a native session and the master key sealed to its key under the
+//! link's secret, which only this client can open, and which Central cannot
+//! have made, since it never sees the secret. The password plays no part.
 use super::{Endpoint, Error, Request, Response, Session, Token, Transport, context};
 use central_crypto::pairing::{self, ClientPairing, PairingSecret, SealBinding};
 use zeroize::Zeroizing;
 
 /// A claimed pairing, waiting for the page's approval. Holds the client's
-/// private key and verifier for its five minutes; wiped when dropped.
+/// private key, its verifier and the link's secret for its five minutes;
+/// all are wiped when it is dropped, so a client that gives up (cancelled,
+/// expired, refused) drops it.
 pub struct Pairing {
     endpoint: Endpoint,
     handle: Zeroizing<[u8; 32]>,
+    secret: PairingSecret,
     client: ClientPairing,
     expires_at: i64,
 }
@@ -38,21 +42,22 @@ pub struct PairedAccount {
     pub tag: Option<u32>,
 }
 
-/// Claim the pairing a link names, with its handle and the page's secret.
-/// A claim whose answer was lost may be sent again: the same claim is
-/// answered the same.
+/// Claim the pairing a link names, with its handle and the page's secret,
+/// which the pairing keeps until the seal is opened. A claim whose answer
+/// was lost may be sent again: the same claim is answered the same.
 ///
 /// # Errors
 /// `Conflict` when another client claimed it first, `Rejected` for an
-/// unknown, ended or late pairing, and transport failures.
+/// unknown, ended or late pairing, and transport failures; the secret is
+/// wiped with the refusal.
 pub fn claim(
     transport: &impl Transport,
     handle: [u8; 32],
-    secret: &PairingSecret,
+    secret: PairingSecret,
 ) -> Result<Pairing, Error> {
     let client = ClientPairing::generate().map_err(|_| Error::Unavailable)?;
     let endpoint = transport.endpoint().clone();
-    let mac = client.claim_mac(secret, &endpoint.issuer(), &handle);
+    let mac = client.claim_mac(&secret, &endpoint.issuer(), &handle);
     let handle = Zeroizing::new(handle);
     let Response::PairAccepted { expires_at } = transport.exchange(
         &Request::PairClaim {
@@ -69,6 +74,7 @@ pub fn claim(
     Ok(Pairing {
         endpoint,
         handle,
+        secret,
         client,
         expires_at,
     })
@@ -108,12 +114,13 @@ impl Pairing {
 
     /// Redeem the approved pairing, once: the session, with the master key
     /// opened from the seal, and the account for the client's question. A
-    /// seal that does not open ends the session it came with.
+    /// seal that does not open ends the session it came with. The link's
+    /// secret is wiped as soon as the seal was tried, opened or not.
     ///
     /// # Errors
     /// `Rejected` for a pairing not approved or ended, a seal that does not
-    /// open under this pairing's binding, or a session that cannot read its
-    /// document; transport failures.
+    /// open under this pairing's secret and binding, or a session that cannot
+    /// read its document; transport failures.
     pub fn redeem(self, transport: &impl Transport) -> Result<(Session, PairedAccount), Error> {
         self.same_endpoint(transport)?;
         let Response::PairSession {
@@ -134,16 +141,24 @@ impl Pairing {
         else {
             return Err(Error::Rejected);
         };
-        let master = context(&self.endpoint, identity).and_then(|context| {
+        let Self {
+            endpoint,
+            handle,
+            secret,
+            client,
+            expires_at,
+        } = self;
+        let master = context(&endpoint, identity).and_then(|context| {
             let binding = SealBinding {
                 context,
-                handle: *self.handle,
-                expires_at: self.expires_at,
+                handle: *handle,
+                expires_at,
             };
-            self.client
-                .open(&sealed, &binding)
+            client
+                .open(&secret, &sealed, &binding)
                 .map_err(|_| Error::Rejected)
         });
+        drop(secret);
         let master = match master {
             Ok(master) => master,
             Err(error) => {
@@ -151,7 +166,7 @@ impl Pairing {
                 return Err(error);
             }
         };
-        let mut session = Session::new(self.endpoint, identity, token, master);
+        let mut session = Session::new(endpoint, identity, token, master);
         if let Err(error) = session.refresh(transport) {
             let _ = session.logout(transport);
             return Err(error);

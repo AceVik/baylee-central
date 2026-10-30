@@ -1865,9 +1865,22 @@ critical or high finding. Fixed in the commits after it:
 Recorded, not changed: the native listener's one window for claims, polls and
 redeems and the thousand open pairings are global, as its other budgets are
 (availability only); the migration number skips 000015, which the parallel
-legacy login holds. Open: whether the seal uses HPKE's PSK mode with the
-link's secret, so a seal Central or a database writer made itself would not
-open (the owner decides; until then a malicious Central can make the client
-run under a key it chose, which the client notices only as an empty
-account); and the page's MAC check, which lives in `central-web-crypto` and
-is reviewed when it is built.
+legacy login holds. Open: the page's MAC check, which lives in
+`central-web-crypto` and is reviewed when it is built.
+
+The review's one medium finding about the design, decided by the owner the
+same evening ("Yes, PSK mode"): in HPKE's base mode Central, or anyone
+writing its database, knows everything a seal binds and the client's public
+key, so it could seal a master key of its own that the client would open
+and then run under, writing its local vault wrapper and new objects under a
+key Central knows. The seal is now RFC 9180 PSK mode with the link's secret
+`S` as the pre-shared key and the handle as its ID. Central never sees `S`,
+so a seal it makes does not open; the client keeps `S` from its claim to
+the redeem and wipes it once the seal was tried, and with the pairing when
+it gives up. Tests: RFC 9180 Appendix A.2.2 (this suite in PSK mode) whole;
+a seal under another secret, one made in base mode with everything Central
+knows and one under a guessed secret do not open; over both listeners, a
+seal approved with a valid proof but made without the link's secret is
+refused by the SDK, which signs the session out. The page must seal under
+the same `S` it checks the claim's MAC with (`central-web-crypto`, not built
+yet).

@@ -6,11 +6,14 @@
 //! carry. The client makes an X25519 key pair and a verifier, and claims the
 //! pairing with its public key, the verifier's challenge and a MAC under `S`.
 //! The page checks that MAC, seals the master key to the client's key with
-//! HPKE (RFC 9180, base mode, DHKEM(X25519, HKDF-SHA256), HKDF-SHA256,
-//! ChaCha20-Poly1305, through the `hpke` crate), bound to the issuer,
-//! account, epoch, handle and expiry, and proves to Central with its key
-//! check that it holds the master key. Every value here is fixed-size; every
-//! comparison of a received MAC or proof is constant-time.
+//! HPKE (RFC 9180, PSK mode with `S` as the pre-shared key and the handle as
+//! its ID, DHKEM(X25519, HKDF-SHA256), HKDF-SHA256, ChaCha20-Poly1305,
+//! through the `hpke` crate), bound to the issuer, account, epoch, handle and
+//! expiry, and proves to Central with its key check that it holds the master
+//! key. Since Central never sees `S`, a seal Central (or anyone writing its
+//! database) made to the client's key does not open: only the page that made
+//! the link can bring a key. Every value here is fixed-size; every comparison
+//! of a received MAC or proof is constant-time.
 
 use crate::vault::{KeyCheck, MasterKey};
 use crate::{Context, CryptoError};
@@ -19,7 +22,7 @@ use hmac::{Hmac, Mac};
 use hpke::aead::ChaCha20Poly1305;
 use hpke::kdf::HkdfSha256;
 use hpke::kem::X25519HkdfSha256;
-use hpke::{Deserializable, Kem, OpModeR, OpModeS, Serializable};
+use hpke::{Deserializable, Kem, OpModeR, OpModeS, PskBundle, Serializable};
 use sha2::{Digest, Sha256};
 use std::fmt;
 use zeroize::Zeroizing;
@@ -79,6 +82,12 @@ impl PairingSecret {
     fn mac(&self) -> Hmac<Sha256> {
         <Hmac<Sha256> as Mac>::new_from_slice(self.0.as_ref())
             .expect("HMAC takes a key of any length")
+    }
+
+    /// HPKE's pre-shared key: `S` itself, with the handle as its ID (RFC 9180
+    /// §5.1.2: 32 random bytes meet its entropy floor).
+    fn psk<'a>(&'a self, handle: &'a [u8; LEN]) -> Result<PskBundle<'a>, CryptoError> {
+        PskBundle::new(self.0.as_ref(), handle).map_err(|_| CryptoError::Invalid)
     }
 }
 
@@ -226,17 +235,23 @@ impl ClientPairing {
         mac.finalize().into_bytes().into()
     }
 
-    /// Opens what the page sealed to this key: the master key, or a refusal
-    /// for anything sealed to another key, under another binding, or changed.
+    /// Opens what the page sealed to this key under the link's secret: the
+    /// master key, or a refusal for anything sealed to another key, under
+    /// another secret or binding, or changed.
     ///
     /// # Errors
-    /// A wrong size, key, binding or any changed byte.
-    pub fn open(&self, sealed: &[u8], binding: &SealBinding) -> Result<MasterKey, CryptoError> {
+    /// A wrong size, key, secret, binding or any changed byte.
+    pub fn open(
+        &self,
+        secret: &PairingSecret,
+        sealed: &[u8],
+        binding: &SealBinding,
+    ) -> Result<MasterKey, CryptoError> {
         let sealed: &[u8; SEALED_LEN] = sealed.try_into().map_err(|_| CryptoError::Invalid)?;
         let encapped = EncappedKey::from_bytes(&sealed[..LEN]).map_err(|_| CryptoError::Invalid)?;
         let plain = Zeroizing::new(
             hpke::single_shot_open::<ChaCha20Poly1305, HkdfSha256, X25519HkdfSha256>(
-                &OpModeR::Base,
+                &OpModeR::Psk(secret.psk(&binding.handle)?),
                 &self.private,
                 &encapped,
                 &binding.info(),
@@ -306,7 +321,8 @@ fn approval_mac(
 
 impl MasterKey {
     /// The master key sealed to a client's public key for a pairing (the
-    /// page's step), with a fresh ephemeral key from the operating system.
+    /// page's step), under the link's secret, with a fresh ephemeral key from
+    /// the operating system.
     ///
     /// # Errors
     /// A public key that is not one (a wrong size, or one HPKE refuses, such
@@ -317,13 +333,14 @@ impl MasterKey {
     /// does (`docs/crypto-protocol.md` §"Evidence and remaining gates").
     pub fn seal_for_pairing(
         &self,
+        secret: &PairingSecret,
         public_key: &[u8],
         binding: &SealBinding,
     ) -> Result<[u8; SEALED_LEN], CryptoError> {
         let public = PublicKey::from_bytes(public_key).map_err(|_| CryptoError::Invalid)?;
         let (encapped, ciphertext) =
             hpke::single_shot_seal_with_rng::<ChaCha20Poly1305, HkdfSha256, X25519HkdfSha256>(
-                &OpModeS::Base,
+                &OpModeS::Psk(secret.psk(&binding.handle)?),
                 &public,
                 &binding.info(),
                 self.expose(),

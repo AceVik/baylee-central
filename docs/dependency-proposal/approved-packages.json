@@ -1659,7 +1659,7 @@
     {
       "approved_on": "2026-10-30",
       "reason": "owner approved 30.10.2026 (\"choose the more secure variant\"), relayed by the PM; release review accepted the same day",
-      "for": "central-crypto's pairing seal, RFC 9180 HPKE base mode with DHKEM(X25519, HKDF-SHA256), HKDF-SHA256 and ChaCha20-Poly1305 (docs/dependency-proposal/hpke.md)",
+      "for": "central-crypto's pairing seal, RFC 9180 HPKE (PSK mode under the link's secret since the owner's decision after the review) with DHKEM(X25519, HKDF-SHA256), HKDF-SHA256 and ChaCha20-Poly1305 (docs/dependency-proposal/hpke.md)",
       "entries": [
         "hpke@0.15.1 as a direct dependency of central-crypto, default features off, with alloc, chacha and x25519",
         "x25519-dalek@3.0.0 with static_secrets and zeroize",

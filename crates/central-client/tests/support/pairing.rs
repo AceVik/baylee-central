@@ -7,8 +7,9 @@
 //! native session and the account's name and tag. The identity service
 //! refuses a wrong proof, a proof over another seal, wrong lengths, a second
 //! approval and a wrong verifier, and answers a resent claim the same; a seal
-//! the client cannot open, to a stranger's key or bound to another expiry,
-//! ends the session it came with: the SDK signs it out.
+//! the client cannot open, to a stranger's key, bound to another expiry or
+//! made without the link's secret as Central could make it, ends the session
+//! it came with: the SDK signs it out.
 use super::{
     Http,
     browser::Browser,
@@ -45,8 +46,9 @@ impl Transport for Counting<'_> {
     }
 }
 
-/// The page's view of a claimed pairing.
+/// The page's view of a claimed pairing, with the link's secret it made.
 struct Claimed {
+    secret: PairingSecret,
     handle: Token,
     expires_at: i64,
     public_key: [u8; 32],
@@ -65,6 +67,18 @@ impl Claimed {
             handle: self.bytes(),
             expires_at,
         }
+    }
+
+    /// The master key sealed to the claimed key, as the page seals it.
+    fn sealed(&self, account: &Registered) -> [u8; SEALED_LEN] {
+        account
+            .master
+            .seal_for_pairing(
+                &self.secret,
+                &self.public_key,
+                &self.binding(account, self.expires_at),
+            )
+            .unwrap()
     }
 
     fn proof(&self, check: &KeyCheck, sealed: &[u8; SEALED_LEN]) -> Vec<u8> {
@@ -154,8 +168,10 @@ fn claimed(http: &Http, browser: &Browser, cookie: &Token) -> (Pairing, Claimed)
     else {
         panic!("a pairing");
     };
+    // The page's secret, and the copy the link carries to the client.
     let secret = PairingSecret::generate().unwrap();
-    let client = central_client::claim(http, *handle.to_secret_bytes(), &secret).unwrap();
+    let link = PairingSecret::from_bytes(secret.as_bytes()).unwrap();
+    let client = central_client::claim(http, *handle.to_secret_bytes(), link).unwrap();
     assert_eq!(client.expires_at(), expires_at);
     let Ok(Response::PairClaimed {
         public_key,
@@ -171,6 +187,7 @@ fn claimed(http: &Http, browser: &Browser, cookie: &Token) -> (Pairing, Claimed)
         panic!("the claim");
     };
     let claimed = Claimed {
+        secret,
         handle,
         expires_at,
         public_key: public_key.try_into().unwrap(),
@@ -178,7 +195,7 @@ fn claimed(http: &Http, browser: &Browser, cookie: &Token) -> (Pairing, Claimed)
         mac,
     };
     assert!(pairing::claim_ok(
-        &secret,
+        &claimed.secret,
         &http.endpoint().issuer(),
         &claimed.bytes(),
         &claimed.public_key,
@@ -223,20 +240,8 @@ fn approved(
     client: &Pairing,
     claimed: &Claimed,
 ) {
-    let sealed = account
-        .master
-        .seal_for_pairing(
-            &claimed.public_key,
-            &claimed.binding(account, claimed.expires_at),
-        )
-        .unwrap();
-    let other = account
-        .master
-        .seal_for_pairing(
-            &claimed.public_key,
-            &claimed.binding(account, claimed.expires_at),
-        )
-        .unwrap();
+    let sealed = claimed.sealed(account);
+    let other = claimed.sealed(account);
     let stranger = KeyCheck::from_bytes(&[9; 32]).unwrap();
     for (request, why) in [
         (
@@ -349,13 +354,7 @@ fn wrong_verifier(
     cookie: &Token,
 ) {
     let (client, claimed) = claimed(http, browser, cookie);
-    let sealed = account
-        .master
-        .seal_for_pairing(
-            &claimed.public_key,
-            &claimed.binding(account, claimed.expires_at),
-        )
-        .unwrap();
+    let sealed = claimed.sealed(account);
     assert!(matches!(
         browser.answer(
             &claimed.approve(&sealed, claimed.proof(check, &sealed)),
@@ -378,8 +377,10 @@ fn wrong_verifier(
 }
 
 /// A seal the client cannot open, though Central took its proof: sealed to a
-/// stranger's key, or bound to another expiry. The SDK refuses it and signs
-/// out the session it came with, so the account keeps no native session.
+/// stranger's key, bound to another expiry, or made without the link's
+/// secret, as Central (which never sees it) could make one with everything
+/// else it knows. The SDK refuses it and signs out the session it came with,
+/// so the account keeps no native session.
 fn unopened(
     http: &Http,
     browser: &Browser,
@@ -390,19 +391,26 @@ fn unopened(
     cookie: &Token,
 ) {
     let stranger = ClientPairing::generate().unwrap();
-    for (to_stranger, why) in [
-        (true, "sealed to a stranger's key"),
-        (false, "another expiry"),
+    let guess = PairingSecret::generate().unwrap();
+    for (to_stranger, later, guessed, why) in [
+        (true, 0, false, "sealed to a stranger's key"),
+        (false, 1, false, "bound to another expiry"),
+        (false, 0, true, "sealed without the link's secret"),
     ] {
         let (client, claimed) = claimed(http, browser, cookie);
-        let (key, expires_at) = if to_stranger {
-            (stranger.public_key(), claimed.expires_at)
+        let key = if to_stranger {
+            stranger.public_key()
         } else {
-            (&claimed.public_key, claimed.expires_at + 1)
+            &claimed.public_key
         };
+        let secret = if guessed { &guess } else { &claimed.secret };
         let sealed = account
             .master
-            .seal_for_pairing(key, &claimed.binding(account, expires_at))
+            .seal_for_pairing(
+                secret,
+                key,
+                &claimed.binding(account, claimed.expires_at + later),
+            )
             .unwrap();
         assert!(matches!(
             browser.answer(

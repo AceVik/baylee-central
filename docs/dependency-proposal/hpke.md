@@ -5,8 +5,9 @@ variant"), relayed by the PM: the pairing (Baylee
 `docs/proposals/deep-links.md` §"Protocol specification") seals the master key
 to the client with RFC 9180 HPKE. Writing HPKE here was the alternative and is
 ruled out by `AGENTS.md` (no custom cryptographic primitives; vetted crypto is
-not replaced by our own). One suite only: base mode, DHKEM(X25519,
-HKDF-SHA256), HKDF-SHA256, ChaCha20-Poly1305.
+not replaced by our own). One suite only, DHKEM(X25519, HKDF-SHA256),
+HKDF-SHA256, ChaCha20-Poly1305, in PSK mode (below); base mode appears only
+in a known-answer test.
 
 ```toml
 hpke = { version = "=0.15.1", default-features = false, features = ["x25519", "chacha", "alloc"] }
@@ -16,6 +17,18 @@ hpke = { version = "=0.15.1", default-features = false, features = ["x25519", "c
 randomness is getrandom 0.4's `SysRng` (its `sys_rng` feature), wrapped as
 `opaque-ke`'s already is: an entropy failure panics rather than falling back.
 The crate's `danger` module (unstable API) is not used.
+
+## PSK mode (30.10.2026)
+
+The second model's review of the pairing found that in base mode Central, or
+anyone writing its database, could seal a master key of its own to the
+client's public key: it knows the public key and everything `info` binds.
+The owner chose PSK mode ("Yes, PSK mode"): the link's secret `S`, which
+Central never sees, is the pre-shared key and the handle its ID
+(`OpModeS::Psk(PskBundle::new(S, handle))`, `OpModeR::Psk` to open). It
+needs no feature, dependency or `danger` API: `PskBundle` and both modes are
+the crate's public API under the features above. RFC 9180 Appendix A.2.2,
+this suite in PSK mode, is tested whole beside A.2.1.
 
 ## Review of the release (30.10.2026)
 

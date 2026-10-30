@@ -107,3 +107,9 @@ Fingerprint `b3ab6d24…`; `Review: pending`, as above.
 After the second model's review of the same day, `KeyCheck` derives `Clone`
 only: equality was variable-time and unused. No other source, dependency or
 edge in `central-crypto` changed. Fingerprint `2cb6fb13…`.
+
+The owner then chose HPKE's PSK mode for the seal: `seal_for_pairing` and
+`open` take the link's secret, which becomes the pre-shared key with the
+handle as its ID (`hpke`'s public `PskBundle`, no new feature or edge), and
+the tests add RFC 9180 Appendix A.2.2. The graph and the reachability above
+are unchanged. Fingerprint `d7adcac6…`.

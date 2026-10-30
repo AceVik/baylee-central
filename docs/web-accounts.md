@@ -469,8 +469,11 @@ own. No pairing starts for an account without one.
    `Pending`. The page checks the MAC under `S`, shows the comparison code
    and the account's name beside Approve.
 5. `PairApprove { handle, sealed, proof }` (the starting cookie) → `Done`:
-   Central checks the proof (HMAC under the stored key check over handle,
-   key, challenge and the seal's digest) and stores the 80-byte seal, once.
+   `sealed` is the master key sealed to the client's key under `S` (HPKE's
+   PSK mode, `crypto-protocol.md` §"Pairing"), so Central cannot make one
+   the client opens. Central checks the proof (HMAC under the stored key
+   check over handle, key, challenge and the seal's digest) and stores the
+   80-byte seal, once.
    `PairCancel { handle }` ends a pairing at once.
 6. `PairPoll { handle }` (native, no session) → `Pending` or `Approved`, at
    most 300 times; then `PairRedeem { handle, verifier }` →
