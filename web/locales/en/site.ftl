@@ -408,6 +408,7 @@ selfhost-title = Run your own gateway
 selfhost-processes = You do not need our server. A gateway is three kinds of process: <code>baylee-gateway</code> handles accounts, decks, rooms and routing and needs PostgreSQL; <code>baylee-agent</code> starts one engine process per game; <code>baylee-engine-server</code> is one game. The first two run no rules at all.
 selfhost-proxy = Put a TLS proxy in front, set <code>BAYLEE_REGISTRATION=invite</code> if you want your own closed circle, create keys with <code>baylee-gateway invite create</code>, and the client's front door takes your address like any other. Card text in 19 languages is an optional ingest of Scryfall's bulk data into the same database.
 selfhost-guide = <guide>The self-hosting guide</guide> walks through it; <protocol>docs/protocol.md</protocol> is the reference.
+selfhost-central = To sign your players in with their Baylee Central accounts and to appear in this list: register your gateway's address under <mine>Your gateways</mine>, wait for an administrator's approval, make a token there and paste it into your gateway's admin console, under Baylee Central.
 selfhost-source = Every gateway answers <code>GET /source</code> with its licence, version and commit, without sign-in. The AGPL asks you to offer your source to the people who use your server; that route does it for you.
 
 ## Contact
@@ -903,7 +904,7 @@ adm-tagTitle = Tag
 adm-tagText = A tag is unique at Baylee Central, so Name#tag is too. Write it in hex, such as #1a2b. Every change is in the audit log with the old and the new tag.
 adm-tagSave = Set the tag
 adm-tagConfirm = Give { $name } the tag #{ $tag }?
-adm-tagWarn = Gateways take the new tag at the next sign-in there. Whispers on a gateway are kept by tag, so earlier whisper conversations may not show up under the new one.
+adm-tagWarn = Gateways take the new tag at the next sign-in there. Whispers on a gateway are kept by tag, so earlier whisper conversations of this account no longer show up after the change.
 adm-tagSaved = The tag is set.
 adm-errTag = A tag is one to eight hex digits, from #0001.
 adm-actions = Actions

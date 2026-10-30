@@ -63,7 +63,7 @@
 .session-none { justify-content: center; color: var(--ink-faint); }
 .session-skeleton { min-height: 5rem; border-radius: var(--radius-md); }
 .gw-pills { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: 0 0 var(--space-3); }
-.add-gateway { display: grid; grid-template-columns: 1fr 1fr; gap: 0 var(--space-4); }
+.add-gateway { display: grid; grid-template-columns: 1fr 1fr; gap: 0 var(--space-4); align-items: start; }
 .add-gateway .form-row { grid-column: 1 / -1; }
 
 /* dialogs */

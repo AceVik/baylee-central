@@ -405,6 +405,7 @@ selfhost-title = Ein eigenes Gateway betreiben
 selfhost-processes = Du brauchst unseren Server nicht. Ein Gateway sind drei Arten von Prozessen: <code>baylee-gateway</code> verwaltet Accounts, Decks, Räume und das Routing und braucht PostgreSQL; <code>baylee-agent</code> startet pro Spiel einen Engine-Prozess; <code>baylee-engine-server</code> ist ein Spiel. Die ersten beiden kennen keine Regeln.
 selfhost-proxy = Setz einen TLS-Proxy davor, setz <code>BAYLEE_REGISTRATION=invite</code>, wenn du einen eigenen geschlossenen Kreis willst, erzeuge Schlüssel mit <code>baylee-gateway invite create</code>, und die Eingangstür des Clients nimmt deine Adresse wie jede andere. Kartentext in 19 Sprachen ist ein optionaler Import von Scryfalls Bulk-Daten in dieselbe Datenbank.
 selfhost-guide = <guide>Die Anleitung</guide> geht alles durch; <protocol>docs/protocol.md</protocol> ist die Referenz.
+selfhost-central = Damit sich deine Spieler mit ihrem Baylee-Central-Account anmelden und dein Gateway in dieser Liste erscheint: Registriere seine Adresse unter <mine>Deine Gateways</mine>, warte auf die Freigabe durch einen Admin, erzeuge dort ein Token und füge es in der Admin-Konsole deines Gateways unter Baylee Central ein.
 selfhost-source = Jedes Gateway beantwortet <code>GET /source</code> mit Lizenz, Version und Commit, ohne Anmeldung. Die AGPL verlangt, dass du den Leuten, die deinen Server nutzen, den Quellcode anbietest; diese Route erledigt das für dich.
 
 ## Contact
@@ -900,7 +901,7 @@ adm-tagTitle = Tag
 adm-tagText = Ein Tag ist bei Baylee Central eindeutig, also auch Name#Tag. Schreib ihn hexadezimal, etwa #1a2b. Jede Änderung steht mit altem und neuem Tag im Protokoll.
 adm-tagSave = Tag setzen
 adm-tagConfirm = { $name } den Tag #{ $tag } geben?
-adm-tagWarn = Gateways übernehmen den neuen Tag bei der nächsten Anmeldung dort. Flüstern wird auf einem Gateway nach Tag geführt, frühere Flüster-Verläufe erscheinen unter dem neuen Tag deshalb unter Umständen nicht.
+adm-tagWarn = Gateways übernehmen den neuen Tag bei der nächsten Anmeldung dort. Flüstern wird auf einem Gateway nach Tag geführt, frühere Flüster-Verläufe dieses Kontos erscheinen nach dem Wechsel deshalb nicht mehr.
 adm-tagSaved = Der Tag ist gesetzt.
 adm-errTag = Ein Tag hat ein bis acht Hex-Ziffern, ab #0001.
 adm-actions = Aktionen

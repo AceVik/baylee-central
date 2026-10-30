@@ -266,6 +266,7 @@ Build-time, through Vite's environment (`VITE_…`), each with a default:
 | --- | --- | --- |
 | `VITE_FEEDBACK_ORIGIN` | `https://feedback.baylee.acevik.de` | the feedback service the contact form posts to |
 | `VITE_CENTRAL_API` | `/api` | Central's API on this origin, for the directory |
+| `VITE_DEEP_LINKS` | off | `on` gives each gateway card "Open in Baylee" (`baylee://gateway/add`); stays off until a client release reads gateway links, and copying the address is the first action until then |
 
 Nothing in the build is a secret; everything in it is downloaded by every
 visitor.

@@ -1684,3 +1684,25 @@ repeated digest and a revocation before creation. The website's area is
 covered by unit tests of every answer's exact shape and by page tests with
 stand-ins (`npm run check`: 287 tests). Engineering review, not an audit.
 
+## Website follow-ups: gateway links behind a switch, 30 October 2026
+
+Design pass: the gateway cards offered "Open in Baylee" through
+`baylee://gateway/add` before any released client reads that link, so the
+public page had a button that did nothing. The link is now behind a
+build-time switch (`VITE_DEEP_LINKS`, off), and copying the address is the
+card's first action until a client release with gateway links is out. The
+link is also refused for an https origin whose host is an IP address or a
+single label, which the client ignores (Baylee's `docs/proposals/deep-links.md`).
+The account area's token table takes the table styles, the administration's
+account page drops an actions panel with nothing in it, and a gateway's
+placeholder version shows as "—" until its first heartbeat.
+
+Implementation pass: `deepLinks()` reads the build's environment on each
+call, so the cards and the directory's hint follow one switch; with it off
+no `baylee:` URL is in the page at all.
+
+Adversarial pass: unit tests for both switch states, for the IP-literal and
+single-label refusals beside the earlier ones, and for the empty actions
+panel (an injected always-shown panel fails the test). The smoke test and
+the real-Central run check that the default build has no "Open in Baylee"
+link. Engineering review, not an audit.

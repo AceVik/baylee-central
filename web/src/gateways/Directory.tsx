@@ -3,7 +3,7 @@
 
 import { PAGE_SIZE, type DirectoryClient, type DirectoryFailure, type GatewayListing } from "../central/directory";
 import { Icon } from "../components/icons";
-import { OFFICIAL_GATEWAY } from "../config";
+import { deepLinks, OFFICIAL_GATEWAY } from "../config";
 import { T, t, useLang, type Key } from "../i18n";
 import { GatewayCard } from "./GatewayCard";
 import { useDirectory } from "./useDirectory";
@@ -55,9 +55,11 @@ export function Directory({ client }: { client: DirectoryClient }) {
               <GatewayCard key={g.id} g={g} official={g.origin === OFFICIAL_GATEWAY} />
             ))}
           </ul>
-          <p className="small dir-hint">
-            <T id="gw.openHint" />
-          </p>
+          {deepLinks() && (
+            <p className="small dir-hint">
+              <T id="gw.openHint" />
+            </p>
+          )}
         </>
       )}
       {loading && gateways.length === 0 && (
