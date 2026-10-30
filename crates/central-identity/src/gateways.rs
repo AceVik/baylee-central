@@ -144,44 +144,59 @@ impl IdentityService {
                 }
                 Ok(Response::GatewayTicket { ticket })
             }
-            Request::GatewayStatus => {
-                let (gateway, origin, metadata, state, scopes, expires_at) = self
-                    .store
-                    .gateway_status(bearer.ok_or(Error::Rejected)?)
-                    .await?;
-                Ok(Response::GatewayStatus {
-                    gateway,
-                    origin,
-                    metadata,
-                    state,
-                    scopes,
-                    expires_at,
-                })
-            }
+            Request::GatewayStatus => self.gateway_status(bearer).await,
             Request::RedeemGateway { ticket, purpose } => {
-                let (gateway, origin) = self.gateway_authority(bearer).await?;
-                // a sign-in is one of the uses a token's owner sees; a
-                // credential pair or the bridge is no token and is left alone
-                if gateway.is_some()
-                    && let Some(bearer) = bearer
-                {
-                    self.store.touch_gateway_token(bearer).await?;
-                }
-                let lease = matches!(purpose, TicketPurpose::Admit | TicketPurpose::Admin)
-                    .then(Token::generate)
-                    .transpose()?;
-                let (identity, legacy_id, expires_at) = self
-                    .store
-                    .redeem_lease(&ticket, &origin, purpose, gateway, lease.as_ref())
-                    .await?;
-                Ok(Response::GatewayIdentity {
-                    identity,
-                    legacy_id,
-                    lease,
-                    expires_at,
-                })
+                self.redeem(&ticket, purpose, bearer).await
             }
             _ => Err(Error::Rejected),
         }
+    }
+
+    /// What Central knows about the gateway whose token this is
+    /// (`docs/gateway-registry.md` §"Gateway tokens").
+    async fn gateway_status(&self, bearer: Option<&Token>) -> Result<Response, Error> {
+        let (gateway, origin, metadata, state, scopes, expires_at) = self
+            .store
+            .gateway_status(bearer.ok_or(Error::Rejected)?)
+            .await?;
+        Ok(Response::GatewayStatus {
+            gateway,
+            origin,
+            metadata,
+            state,
+            scopes,
+            expires_at,
+        })
+    }
+
+    /// A gateway redeems its player's ticket for an identity, and a lease for
+    /// admission and administration.
+    async fn redeem(
+        &self,
+        ticket: &Token,
+        purpose: TicketPurpose,
+        bearer: Option<&Token>,
+    ) -> Result<Response, Error> {
+        let (gateway, origin) = self.gateway_authority(bearer).await?;
+        // a sign-in is one of the uses a token's owner sees; a
+        // credential pair or the bridge is no token and is left alone
+        if gateway.is_some()
+            && let Some(bearer) = bearer
+        {
+            self.store.touch_gateway_token(bearer).await?;
+        }
+        let lease = matches!(purpose, TicketPurpose::Admit | TicketPurpose::Admin)
+            .then(Token::generate)
+            .transpose()?;
+        let (identity, legacy_id, expires_at) = self
+            .store
+            .redeem_lease(ticket, &origin, purpose, gateway, lease.as_ref())
+            .await?;
+        Ok(Response::GatewayIdentity {
+            identity,
+            legacy_id,
+            lease,
+            expires_at,
+        })
     }
 }
