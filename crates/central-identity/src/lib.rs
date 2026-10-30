@@ -217,7 +217,8 @@ pub struct IdentityService {
     issuer: [u8; 32],
     keys: Arc<ServerKeys>,
     bridge_digest: [u8; 32],
-    gateway: String,
+    /// The official gateway's origins, canonical first (`Endpoint::official_origins`).
+    official: Vec<String>,
     legacy_discovery: bool,
     pending: Mutex<BTreeMap<[u8; 32], Pending>>,
     resets: Mutex<BTreeMap<[u8; 32], reset::PendingReset>>,
@@ -233,7 +234,9 @@ impl IdentityService {
     ///
     /// # Errors
     /// Rejects an invalid development gateway or live gateway other than the official bridge,
-    /// and compiled-in terms of use that do not parse (`docs/terms.md`).
+    /// and compiled-in terms of use that do not parse (`docs/terms.md`). A live
+    /// service's official gateway is [`central_api::OFFICIAL_ORIGIN`] with its
+    /// compiled aliases.
     pub fn new(
         store: AccountStore,
         endpoint: &Endpoint,
@@ -241,19 +244,21 @@ impl IdentityService {
         bridge: &Token,
         gateway: &str,
     ) -> Result<Self, Error> {
-        if endpoint.legacy_origin().is_some() {
-            if gateway != central_api::LEGACY_ORIGIN {
+        let official = if endpoint.legacy_origin().is_some() {
+            if gateway != central_api::OFFICIAL_ORIGIN {
                 return Err(Error::Rejected);
             }
+            endpoint.official_origins()
         } else {
             Endpoint::development(gateway)?;
-        }
+            vec![gateway.to_owned()]
+        };
         Ok(Self {
             store,
             issuer: endpoint.issuer(),
             keys: Arc::new(keys),
             bridge_digest: bridge.digest(),
-            gateway: gateway.into(),
+            official,
             legacy_discovery: endpoint.legacy_origin().is_some(),
             pending: Mutex::default(),
             resets: Mutex::default(),
@@ -261,6 +266,37 @@ impl IdentityService {
             workers: Arc::new(Semaphore::new(4)),
             terms: terms::central()?,
         })
+    }
+
+    /// Further numeric-loopback origins of the official gateway in development,
+    /// as a live service has [`central_api::OFFICIAL_ALIASES`].
+    ///
+    /// # Errors
+    /// Rejects any alias on a live service, whose aliases are compiled, and one
+    /// that is not a numeric-loopback development origin.
+    pub fn with_aliases(mut self, aliases: Vec<String>) -> Result<Self, Error> {
+        if self.legacy_discovery {
+            return Err(Error::Rejected);
+        }
+        for alias in aliases {
+            if Endpoint::development(&alias)?.origin() != alias {
+                return Err(Error::Rejected);
+            }
+            if !self.official.contains(&alias) {
+                self.official.push(alias);
+            }
+        }
+        Ok(self)
+    }
+
+    /// The official gateway's canonical origin.
+    fn canonical(&self) -> &str {
+        &self.official[0]
+    }
+
+    /// Whether `origin` is one of the official gateway's.
+    fn is_official(&self, origin: &str) -> bool {
+        self.official.iter().any(|o| o == origin)
     }
 
     /// Put `terms` in force instead of the compiled-in `legal/` texts, for an

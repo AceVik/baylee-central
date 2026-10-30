@@ -16,6 +16,10 @@ use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 struct Settings {
     endpoint: String,
     gateway: String,
+    /// Further numeric-loopback origins of the official gateway, as a live
+    /// service has its compiled aliases; absent means none.
+    #[serde(default)]
+    gateway_aliases: Vec<String>,
     database_port: u16,
     database_user: String,
     database_name: String,
@@ -96,7 +100,8 @@ async fn serve() -> Result<(), ()> {
         keys,
         &settings.bridge,
         &settings.gateway,
-    );
+    )
+    .and_then(|identity| identity.with_aliases(settings.gateway_aliases.clone()));
     drop(settings);
     let result = async {
         let identity = Arc::new(identity.map_err(|_| ())?);

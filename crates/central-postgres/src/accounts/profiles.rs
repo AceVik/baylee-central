@@ -2,7 +2,10 @@
 //! §"Display name and tag"): the tag a registered account draws, the name it
 //! chooses, the name and tag the bridge carries from the official gateway,
 //! and what a gateway learns of the people who sign in there.
-use super::{AccountStore, Error, Identity, Session, Token, identity, statement};
+use super::{
+    AccountStore, Error, Identity, NOT_DISABLED, Session, Token, any_origin, identity, origins,
+    statement,
+};
 use central_api::{
     profile::{self, REGISTERED_TAG_FLOOR},
     wire::TicketPurpose,
@@ -234,16 +237,16 @@ impl AccountStore {
     }
 
     /// The display name and tag of the account behind a live lease that
-    /// `gateway` (`None` for the bridge) holds for `audience` and `purpose`:
-    /// exactly the lease check of `GatewaySession`.
+    /// `gateway` (`None` for the bridge) holds for one of `audiences` and
+    /// `purpose`: exactly the lease check of `GatewaySession`.
     ///
     /// # Errors
     /// Rejects an expired, revoked or foreign lease, another purpose and a
     /// disabled gateway; reports storage failure.
-    pub async fn gateway_profile(
+    pub async fn gateway_profile<S: AsRef<str> + Sync>(
         &self,
         lease: &Token,
-        audience: &str,
+        audiences: &[S],
         gateway: Option<[u8; 16]>,
         purpose: TicketPurpose,
     ) -> Result<Profile, Error> {
@@ -253,16 +256,15 @@ impl AccountStore {
             return Err(Error::Rejected);
         }
         let row = self.db.query_one_raw(statement(
-            "SELECT a.id,a.vault_epoch,a.display_name,a.tag
+            &format!("SELECT a.id,a.vault_epoch,a.display_name,a.tag
              FROM central_identity.gateway_leases l JOIN central_identity.sessions s ON s.digest=l.session_digest
              JOIN central_identity.accounts a ON a.id=s.account_id AND a.credential_revision=s.credential_revision
-             WHERE l.digest=$1 AND l.audience=$2 AND l.gateway_id IS NOT DISTINCT FROM $3::uuid AND l.purpose=$4
+             WHERE l.digest=$1 AND l.audience={} AND l.gateway_id IS NOT DISTINCT FROM $3::uuid AND l.purpose=$4
              AND l.expires_at>pg_catalog.clock_timestamp() AND s.expires_at>pg_catalog.clock_timestamp() AND a.restored
              AND ($3::uuid IS NULL OR EXISTS(SELECT 1 FROM central_identity.gateways g
-                 JOIN central_identity.gateway_approvals p ON p.gateway_id=g.id AND p.enabled
-                 WHERE g.id=$3 AND g.origin=$2 AND ($4='admit' OR EXISTS
-                     (SELECT 1 FROM central_identity.gateway_admins m WHERE m.gateway_id=g.id AND m.account_id=a.id))))",
-            vec![lease.digest().to_vec().into(), audience.into(), gateway.map(Uuid::from_bytes).into(), purpose.as_str().into()],
+                 WHERE g.id=$3 AND g.origin=l.audience AND {NOT_DISABLED} AND ($4='admit' OR EXISTS
+                     (SELECT 1 FROM central_identity.gateway_admins m WHERE m.gateway_id=g.id AND m.account_id=a.id))))", any_origin(2)),
+            vec![lease.digest().to_vec().into(), origins(audiences)?, gateway.map(Uuid::from_bytes).into(), purpose.as_str().into()],
         )).await.map_err(|_| Error::Unavailable)?.ok_or(Error::Rejected)?;
         let (display_name, tag) = columns(&row)?;
         Ok(Profile {

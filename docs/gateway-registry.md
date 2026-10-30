@@ -13,9 +13,10 @@ session. The response contains a PostgreSQL-generated UUIDv7, a redemption
 `credential`, and a separate `heartbeat` token. Store both tokens privately.
 Registration reserves the origin but does **not** authorize SSO or publish the
 gateway. Each owner can reserve at most eight origins. The official gateway's
-origin (the bridge's, `LEGACY_ORIGIN` in a live service) is never registered:
-`RegisterGateway` for it answers `Conflict`, since a registered credential for
-that audience could redeem the bridge's tickets a second time. Before the first approval,
+origins (the bridge's: `OFFICIAL_ORIGIN` and its aliases in a live service,
+`central_api::is_official_origin`) are never registered: `RegisterGateway` for
+one answers `Conflict`, since a registered credential for that audience could
+redeem the bridge's tickets a second time. Before the first approval,
 the same authenticated owner may repeat registration to recover a lost response;
 this rotates both pending credentials. An approved or disabled origin cannot be
 rotated this way, nor can another account claim an existing origin.
@@ -76,9 +77,10 @@ Central for its players' sign-ins and its entry in the gateway list.
   reserves the origin for the account, as `RegisterGateway` does, but without
   a credential pair: the row authenticates by tokens alone. An origin
   registered already is a `Conflict` (no rotation as with
-  `RegisterGateway`); the official gateway's origin is refused; eight per
+  `RegisterGateway`); the official gateway's origins are refused; eight per
   account, shared with `RegisterGateway`; the account's move must be
-  finished. The row waits for an administrator's approval.
+  finished. Its tokens sign players in at once; the row waits for an
+  administrator's approval for the directory only.
 - **A token** is a [`Token`](../crates/central-api/src/token.rs): 32 random
   bytes; Central stores its SHA-256 digest in `gateway_tokens` and shows the
   token once, in the answer to `Owner { CreateToken }`, whose text form is
@@ -96,11 +98,16 @@ Central for its players' sign-ins and its entry in the gateway list.
 - **Authentication.** `authenticate_gateway` (every SSO request) accepts the
   credential pair's redemption credential or a live token with `sso`;
   `gateway_heartbeat` the heartbeat credential or a live token with
-  `listing`. Both require the gateway approved and enabled, so a pending or
-  disabled gateway's token authenticates nothing, and a revoked or expired
-  one fails at once: the check is in the authenticating query, not a cache.
-  A gateway with another live token keeps its players' leases when one token
-  is revoked; disabling the gateway ends them.
+  `listing`. **Approval is the directory's, not admission's** (owner,
+  30.10.2026): a token authenticates while its gateway is pending or
+  approved, since it names an owner who answers for the gateway and can be
+  revoked at once; a credential pair, which its owner cannot revoke, still
+  needs the approval. A disabled gateway's token authenticates nothing, and
+  a revoked or expired one fails at once: the check is in the
+  authenticating query, not a cache. Redemption, lease checks, profiles,
+  admin checks and tickets for a registered origin follow the same rule
+  (not disabled). A gateway with another live token keeps its players'
+  leases when one token is revoked; disabling the gateway ends them.
 - **Status.** `GatewayStatus`, under a live token whatever the approval,
   answers the gateway's id, origin, metadata and state, and the token's
   scopes and expiry, so a console can say "waits for approval" before it is
@@ -114,7 +121,8 @@ Central for its players' sign-ins and its entry in the gateway list.
 
 ## Discovery, heartbeats and administrators
 
-`GatewayDirectory { after }` is public and returns up to 100 approved gateways in
+`GatewayDirectory { after }` is public and returns up to 100 approved gateways (a
+pending one beats, so its owner sees it seen, but is not listed) in
 UUID order. Pass the last returned UUID as `after` for the next page. Each entry
 contains origin, public metadata and `online`. Online means Central accepted a
 heartbeat within 90 seconds; it is not an independent availability guarantee.
@@ -125,7 +133,7 @@ uses no session and has a per-address budget of 60 a minute
 one update per five seconds, and cannot alter owner, origin, administrator list,
 approval, or SSO credentials.
 
-**The official gateway** is the migration bridge's, and the directory lists it
+**The official gateway** is the bridge's, and the directory lists it
 like any other approved gateway (the website marks it and shows it first). Its
 row (migration 000009) has `official = true`, no owner and no credential: a
 CHECK pairs `official` with a NULL `owner_id`, `credential_digest` and
@@ -136,11 +144,23 @@ login ([operations](operations.md#the-official-gateway)); the runtime role could
 insert such a row but, as for every gateway, not approve it.
 `GatewayHeartbeat { metadata }` with the bridge credential updates that row and
 no other, under the same five-second limit, after `metadata.validate` against
-the bridge's origin. The row is the official gateway only while its origin is
-the bridge's: `LEGACY_ORIGIN` in a live service (the store refuses any other
-there), the configured development gateway in a development one. Without a
-listed, approved and enabled row the bridge's heartbeat is `Rejected`; a
-disabled row is hidden like any other.
+one of the bridge's origins. The row is the official gateway only while its
+origin is one of the bridge's: `OFFICIAL_ORIGIN` or an alias in a live service
+(the store refuses any other there), the configured development gateway and its
+`gateway_aliases` in a development one. Without a listed, approved and enabled
+row the bridge's heartbeat is `Rejected`; a disabled row is hidden like any
+other.
+
+**Its old address** (30.10.2026). The official gateway moved from
+`https://baylee.acevik.de` (`LEGACY_ORIGIN`, which migrated account documents
+keep naming) to `https://gateway.baylee.app` (`OFFICIAL_ORIGIN`). The old address
+is a compiled alias (`OFFICIAL_ALIASES`), so installed clients keep working:
+`GatewayTicket` for any official origin is the bridge's, bound to the origin the
+client asked for; the bridge redeems it and checks leases, profiles and terms
+under the whole set, and a lease keeps its ticket's origin; `GatewayTerms` for
+an alias answers the canonical origin's publication, and an acceptance sent for
+an alias is kept under the canonical one, while one kept under the alias before
+the move still counts. The wire is unchanged. Dropping the alias is a release.
 
 `SetGatewayAdmins { gateway, expected_revision, accounts }` requires the owner's
 central session and replaces at most 32 explicit administrator UUIDs with a
@@ -172,7 +192,8 @@ with that gateway's credential and fail closed if Central rejects or cannot be
 reached. A previous successful response is not authorization for later requests.
 The response is bound to the same identity and expires no later than its parent
 central session. A lease from another gateway or purpose cannot be substituted.
-Central rechecks approval and admin membership on both redemption and use.
+Central rechecks that the gateway is not disabled, and admin membership, on both
+redemption and use.
 
 `GatewayProfile { lease, purpose }`, under the same authority as
 `GatewaySession` (a gateway's redemption credential, or the bridge for the
@@ -180,8 +201,8 @@ official origin), answers `Response::GatewayProfile { identity, display_name:
 Option<String>, tag: Option<u32> }`: the display name and tag of the account
 behind the lease ([web accounts](web-accounts.md) §"Display name and tag"),
 `null` while the account has none. It runs exactly `GatewaySession`'s lease
-check (that gateway's lease, that audience and purpose, both expiries, an
-approved gateway, an admin's membership for `admin`), so a gateway learns the
+check (that gateway's lease, that audience and purpose, both expiries, a
+gateway not disabled, an admin's membership for `admin`), so a gateway learns the
 names of the people who sign in there, nobody else's, and an expired or
 foreign lease is `Rejected`. It is a request of its own (added 23.10.2026)
 because a field on `GatewayIdentity` would break every gateway built before

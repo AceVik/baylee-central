@@ -1706,3 +1706,60 @@ single-label refusals beside the earlier ones, and for the empty actions
 panel (an injected always-shown panel fails the test). The smoke test and
 the real-Central run check that the default build has no "Open in Baylee"
 link. Engineering review, not an audit.
+||||||| parent of a6c349d (The official gateway moves to gateway.baylee.app; a gateway token signs players in without approval)
+
+## The official gateway's move, and approval for the directory only, 30 October 2026
+
+Design pass. Two owner decisions of 30.10.2026. First, the official gateway
+moves from `https://baylee.acevik.de` to `https://gateway.baylee.app`, and
+installed clients, which ask Central for tickets at the old address, must keep
+working. The official set is compiled (`OFFICIAL_ORIGIN`, `OFFICIAL_ALIASES`),
+as the official origin always was. No configuration names another gateway
+the bridge's authority; the production config still has no gateway field.
+The development launcher's `gateway_aliases` takes numeric-loopback origins
+only, and a live service refuses `with_aliases`.
+
+Second, a gateway token signs players in without an administrator's approval,
+which now governs the directory only. A token names an owner who answers for
+the gateway, and that owner or an administrator revokes it at once. A
+credential pair, which its owner cannot revoke, keeps needing the approval.
+Disabling still stops both and ends the gateway's leases.
+
+Implementation pass.
+- The bridge's authority carries the set: `gateway_authority` answers the
+  canonical origin first, and every lease query reads
+  `audience = ANY(string_to_array($n, ' '))`. A validated origin holds no
+  space, and `origins()` refuses an empty set or one with a space. No
+  `postgres-array` feature, so no dependency change.
+- A redeemed lease keeps the ticket's own audience: it is selected with the
+  spent ticket, not taken from the caller.
+- Gateway terms: the authorization reads an acceptance under any origin of
+  the set. `GatewayTerms` and `AcceptTerms` for an alias use the canonical
+  origin, where the bridge publishes.
+- The store refuses to register any compiled official origin, beside the
+  identity service's check of the configured set. So nobody can take the new
+  origin before the official row moves to it.
+- Pending gateways: the token arms of `authenticate_gateway` and
+  `gateway_heartbeat` test "not disabled" (`NOT_DISABLED`) instead of joining
+  an enabled approval. The credential arms keep the join. Redemption, lease
+  checks, profiles, admin checks and registered tickets use "not disabled",
+  so they are never stricter than the authentication before them. The
+  directory still joins an enabled approval.
+
+Adversarial pass (PostgreSQL fixture):
+- Both official origins are refused to `RegisterGateway` and to the
+  website's `AddGateway`, in both modes.
+- A live heartbeat set with a foreign origin is refused. The heartbeat finds
+  the row under either origin, before and after the operator moves it, and
+  takes a website on the old one. The directory then shows the new origin.
+- A ticket asked for each official origin is redeemed under the set, and
+  its lease is checked under the set and under its own origin, but not under
+  the other one alone.
+- Terms accepted under the old address count under the set, and not for a
+  lease checked under the new address alone.
+- A pending token gateway admits a player and beats, unlisted, and is listed
+  once approved. A disabled one's token neither authenticates nor beats.
+
+No migration, no grant change, no dependency change. Engineering review, not
+an audit.
+

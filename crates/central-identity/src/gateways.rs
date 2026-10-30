@@ -2,30 +2,33 @@ use super::{Error, IdentityService, Request, Response, Token};
 use central_api::{gateway::GatewayMetadata, wire::TicketPurpose};
 
 impl IdentityService {
+    /// The gateway behind `bearer` and the origins it answers for, canonical
+    /// first: the official gateway's set for the bridge, a registered
+    /// gateway's one origin otherwise.
     pub(super) async fn gateway_authority(
         &self,
         bearer: Option<&Token>,
-    ) -> Result<(Option<[u8; 16]>, String), Error> {
+    ) -> Result<(Option<[u8; 16]>, Vec<String>), Error> {
         if self.bridge(bearer).is_ok() {
-            return Ok((None, self.gateway.clone()));
+            return Ok((None, self.official.clone()));
         }
         let (id, origin) = self
             .store
             .authenticate_gateway(bearer.ok_or(Error::Rejected)?)
             .await?;
-        Ok((Some(id), origin))
+        Ok((Some(id), vec![origin]))
     }
 
-    /// Reserve an origin for the session's account. The bridge's origin is the
-    /// official gateway's: no registered credential may redeem its tickets
-    /// (docs/gateway-registry.md), so it is a conflict.
+    /// Reserve an origin for the session's account. The bridge's origins are
+    /// the official gateway's: no registered credential may redeem their
+    /// tickets (docs/gateway-registry.md), so each is a conflict.
     async fn register_gateway(
         &self,
         origin: &str,
         metadata: &GatewayMetadata,
         bearer: Option<&Token>,
     ) -> Result<Response, Error> {
-        if origin == self.gateway {
+        if self.is_official(origin) {
             return Err(Error::Conflict);
         }
         let credential = Token::generate()?;
@@ -58,7 +61,7 @@ impl IdentityService {
         if self.bridge(bearer).is_ok() {
             return self
                 .store
-                .official_heartbeat(&self.gateway, metadata, !self.legacy_discovery)
+                .official_heartbeat(&self.official, metadata, !self.legacy_discovery)
                 .await;
         }
         self.store
@@ -108,10 +111,10 @@ impl IdentityService {
                 })
             }
             Request::GatewaySession { lease, purpose } => {
-                let (gateway, origin) = self.gateway_authority(bearer).await?;
+                let (gateway, origins) = self.gateway_authority(bearer).await?;
                 let (identity, expires_at) = self
                     .store
-                    .gateway_session(&lease, &origin, gateway, purpose)
+                    .gateway_session(&lease, &origins, gateway, purpose)
                     .await?;
                 Ok(Response::GatewaySession {
                     identity,
@@ -119,10 +122,10 @@ impl IdentityService {
                 })
             }
             Request::GatewayProfile { lease, purpose } => {
-                let (gateway, origin) = self.gateway_authority(bearer).await?;
+                let (gateway, origins) = self.gateway_authority(bearer).await?;
                 let profile = self
                     .store
-                    .gateway_profile(&lease, &origin, gateway, purpose)
+                    .gateway_profile(&lease, &origins, gateway, purpose)
                     .await?;
                 Ok(Response::GatewayProfile {
                     identity: profile.identity,
@@ -133,7 +136,9 @@ impl IdentityService {
             Request::GatewayTicket { gateway, purpose } => {
                 let session = bearer.ok_or(Error::Rejected)?;
                 let ticket = Token::generate()?;
-                if gateway == self.gateway && !matches!(purpose, TicketPurpose::Admin) {
+                // a ticket for any of the official origins is the bridge's,
+                // bound to the origin the client asked for
+                if self.is_official(&gateway) && !matches!(purpose, TicketPurpose::Admin) {
                     self.store
                         .gateway_ticket(session, &gateway, &ticket, purpose)
                         .await?;
@@ -177,7 +182,7 @@ impl IdentityService {
         purpose: TicketPurpose,
         bearer: Option<&Token>,
     ) -> Result<Response, Error> {
-        let (gateway, origin) = self.gateway_authority(bearer).await?;
+        let (gateway, origins) = self.gateway_authority(bearer).await?;
         // a sign-in is one of the uses a token's owner sees; a
         // credential pair or the bridge is no token and is left alone
         if gateway.is_some()
@@ -190,7 +195,7 @@ impl IdentityService {
             .transpose()?;
         let (identity, legacy_id, expires_at) = self
             .store
-            .redeem_lease(ticket, &origin, purpose, gateway, lease.as_ref())
+            .redeem_lease(ticket, &origins, purpose, gateway, lease.as_ref())
             .await?;
         Ok(Response::GatewayIdentity {
             identity,

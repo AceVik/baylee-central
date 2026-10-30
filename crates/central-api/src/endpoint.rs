@@ -5,8 +5,25 @@ use url::Url;
 
 /// Official central service. A gateway cannot override this credential destination.
 pub const LIVE_ORIGIN: &str = "https://central.baylee.app";
-/// Sole live gateway permitted to receive the one-time legacy migration password.
+/// Sole live gateway permitted to receive the one-time legacy migration password,
+/// and the official gateway's origin before it moved: migrated account
+/// documents name it (`legacy.gateway`), so it never changes.
 pub const LEGACY_ORIGIN: &str = "https://baylee.acevik.de";
+/// The official gateway's canonical origin, where its bridge answers now.
+pub const OFFICIAL_ORIGIN: &str = "https://gateway.baylee.app";
+/// Further origins of the official gateway: installed clients ask Central for
+/// its tickets at the address they know, and players who accepted its terms
+/// there keep that acceptance. Compiled, as the official origin is: no
+/// configuration can name another gateway the bridge's authority.
+pub const OFFICIAL_ALIASES: &[&str] = &[LEGACY_ORIGIN];
+
+/// Whether `origin` is one of the live official gateway's compiled origins
+/// ([`OFFICIAL_ORIGIN`] or one of [`OFFICIAL_ALIASES`]), which no registered
+/// gateway may hold.
+#[must_use]
+pub fn is_official_origin(origin: &str) -> bool {
+    origin == OFFICIAL_ORIGIN || OFFICIAL_ALIASES.contains(&origin)
+}
 
 /// Explicit environment selection; development never falls back to live services.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -63,6 +80,19 @@ impl Endpoint {
     #[must_use]
     pub fn native_url(&self) -> String {
         format!("{}/v1/native", self.origin)
+    }
+
+    /// The live official gateway's origins, canonical first; none in development,
+    /// where the launcher names them.
+    #[must_use]
+    pub fn official_origins(&self) -> Vec<String> {
+        if !self.live {
+            return Vec::new();
+        }
+        std::iter::once(OFFICIAL_ORIGIN)
+            .chain(OFFICIAL_ALIASES.iter().copied())
+            .map(String::from)
+            .collect()
     }
 
     /// Whether an explicitly authorized live legacy migration is available.

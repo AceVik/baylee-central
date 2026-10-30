@@ -254,8 +254,8 @@ The server side of [web accounts](web-accounts.md) lands in three PRs.
   migration 000014).** Owners register gateways on the website and mint
   scoped, named, expiring, revocable tokens for them, stored as digests
   ([gateway registry](gateway-registry.md) §"Gateway tokens"); a token
-  authenticates its gateway only while it is approved, and `GatewayStatus`
-  answers a console. Administrators approve, disable and enable gateways,
+  authenticates its gateway unless it is disabled (approval is the
+  directory's, since 30.10.2026), and `GatewayStatus` answers a console. Administrators approve, disable and enable gateways,
   revoke tokens and change tags, each audited
   ([administration](administration.md) §"Gateways, tokens and tags"). The
   runtime gains `INSERT, UPDATE (enabled)` on `gateway_approvals` and its
@@ -264,6 +264,12 @@ The server side of [web accounts](web-accounts.md) lands in three PRs.
   client's ([web accounts](web-accounts.md) §"The account area"). Tests:
   the migration over earlier rows, the grant contract both ways, and the
   token, approval, tag and session rules over PostgreSQL 18.
+- **The official gateway's move (30.10.2026).** Its canonical origin is
+  `https://gateway.baylee.app` (`OFFICIAL_ORIGIN`), and `https://baylee.acevik.de`
+  is a compiled alias, so installed clients keep their tickets, leases and
+  accepted terms ([gateway registry](gateway-registry.md) §"Discovery,
+  heartbeats and administrators"). No migration; the operator moves the
+  official row in the deploy's window ([operations](operations.md#the-official-gateway)).
 - **Not yet deployed.** Deploy: migrate, grant, add `browser.listen`, pass
   `/api/*` in the `baylee.app` site block, issue beta keys. Central's own terms
   are still `draft`, so none are in force.
