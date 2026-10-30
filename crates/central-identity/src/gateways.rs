@@ -38,7 +38,7 @@ impl IdentityService {
                 metadata,
                 &credential,
                 &heartbeat,
-                !self.legacy_discovery,
+                self.development,
             )
             .await?;
         Ok(Response::GatewayRegistered {
@@ -58,7 +58,7 @@ impl IdentityService {
         if self.bridge(bearer).is_ok() {
             return self
                 .store
-                .official_heartbeat(&self.gateway, metadata, !self.legacy_discovery)
+                .official_heartbeat(&self.gateway, metadata, self.development)
                 .await;
         }
         self.store

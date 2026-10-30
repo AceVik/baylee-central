@@ -134,7 +134,7 @@ impl IdentityService {
     }
 
     fn origin(&self, origin: &str) -> Result<(), Error> {
-        validate_origin(origin, !self.legacy_discovery)
+        validate_origin(origin, self.development)
     }
 
     pub(super) async fn terms_request(

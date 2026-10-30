@@ -9,6 +9,7 @@ use super::{Http, browser::Browser, config, password, terms};
 use central_api::{
     Endpoint, Error, Token,
     admin::{AdminAnswer, AdminRequest},
+    gateway::GatewayMetadata,
     legacy::LegacyProgress,
     terms::TermsSubject,
     wire::{Discovery, Request, Response, TicketPurpose},
@@ -313,7 +314,25 @@ fn good_path(http: &Http, bridge: &Token, runtime: &Runtime, operator: &Database
             Some(Error::Rejected)
         );
     }
+    registers_a_loopback_gateway(http, &session);
     session.logout(http).unwrap();
+}
+
+/// A legacy store makes discovery answer `Legacy` and leaves this
+/// development Central one: a moved account registers a loopback gateway.
+fn registers_a_loopback_gateway(http: &Http, session: &Session) {
+    let origin = "http://127.0.0.1:28768";
+    session
+        .register_gateway(
+            http,
+            origin.into(),
+            GatewayMetadata {
+                name: "Synthetic moved gateway".into(),
+                version: "test-1".into(),
+                website: format!("{origin}/"),
+            },
+        )
+        .unwrap();
 }
 
 /// The bridge learns a legacy id only for a closed move.

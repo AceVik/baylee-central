@@ -222,7 +222,13 @@ pub struct IdentityService {
     keys: Arc<ServerKeys>,
     bridge_digest: [u8; 32],
     gateway: String,
+    /// Whether discovery answers `Legacy` for a name it does not find: on
+    /// the live service, and wherever a legacy store is configured.
     legacy_discovery: bool,
+    /// Whether gateway origins may be numeric-loopback development origins:
+    /// everywhere but the live service. Its own flag, not the inverse of
+    /// [`Self::legacy_discovery`], which a development legacy store turns on.
+    development: bool,
     pending: Mutex<BTreeMap<[u8; 32], Pending>>,
     resets: Mutex<BTreeMap<[u8; 32], reset::PendingReset>>,
     limits: Mutex<limits::Limits>,
@@ -263,6 +269,7 @@ impl IdentityService {
             bridge_digest: bridge.digest(),
             gateway: gateway.into(),
             legacy_discovery: endpoint.legacy_origin().is_some(),
+            development: endpoint.legacy_origin().is_none(),
             pending: Mutex::default(),
             resets: Mutex::default(),
             limits: Mutex::default(),
