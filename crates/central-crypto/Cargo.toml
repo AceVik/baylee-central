@@ -5,7 +5,7 @@ edition.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 license.workspace = true
-description = "Experimental native-client OPAQUE and master-key wrapping; not a deployed protocol"
+description = "Experimental native-client OPAQUE and master-key wrapping, and the legacy store's Argon2id check; not a deployed protocol"
 
 [features]
 default = []

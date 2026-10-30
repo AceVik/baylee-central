@@ -4,10 +4,19 @@ use std::{
     time::{Duration, Instant},
 };
 
+/// Legacy sign-ins a minute, all names together: the store holds a handful
+/// of accounts, and each sign-in is one Argon2 derivation.
+pub(super) const LEGACY_PER_MINUTE: u32 = 30;
+/// Legacy sign-ins a minute for one name, as typed and lowercased; the
+/// store's lockout counts the failures that pass this.
+pub(super) const LEGACY_PER_NAME: u32 = 5;
+
 #[derive(Default)]
 pub(super) struct Limits {
     global: Option<(Instant, u32)>,
     accounts: BTreeMap<[u8; 16], (Instant, u32)>,
+    legacy: Option<(Instant, u32)>,
+    legacy_names: BTreeMap<String, (Instant, u32)>,
     data: Window,
     control: Window,
     peers: BTreeMap<([u8; 32], bool), Window>,
@@ -49,6 +58,7 @@ impl Limits {
                 | Request::GatewayTerms { .. }
                 | Request::ResetStart { .. }
                 | Request::ResetFinish { .. }
+                | Request::LegacyLogin { .. }
         ) {
             return self.global(now);
         }
@@ -101,6 +111,32 @@ impl Limits {
         *used += 1;
         Ok(())
     }
+    /// Spend one legacy sign-in: of [`LEGACY_PER_MINUTE`] for all names and
+    /// [`LEGACY_PER_NAME`] for this one (as typed, lowercased, at most 64
+    /// bytes of it). Nothing is spent when either is used up. A name that is
+    /// nobody's is counted like one that is somebody's.
+    pub(super) fn legacy(&mut self, typed: &str, now: Instant) -> Result<(), Error> {
+        let minute = Duration::from_secs(60);
+        let name: String = typed.chars().take(64).collect::<String>().to_lowercase();
+        self.legacy_names
+            .retain(|_, (start, _)| now.duration_since(*start) < minute);
+        let (start, used) = self.legacy.get_or_insert((now, 0));
+        if now.duration_since(*start) >= minute {
+            *start = now;
+            *used = 0;
+        }
+        let per_name = self.legacy_names.get(&name).map_or(0, |(_, used)| *used);
+        if *used >= LEGACY_PER_MINUTE
+            || per_name >= LEGACY_PER_NAME
+            || (per_name == 0 && self.legacy_names.len() >= 1024)
+        {
+            return Err(Error::Busy);
+        }
+        *used += 1;
+        self.legacy_names.entry(name).or_insert((now, 0)).1 += 1;
+        Ok(())
+    }
+
     /// Spend `units` of the account's eight OPAQUE evaluations a minute: a
     /// sign-in's start is one, a password change's start two (it answers a
     /// registration response besides KE2, and each is an evaluation of the
@@ -203,6 +239,30 @@ mod tests {
             .unwrap();
         assert_eq!(limits.accounts.len(), 1);
     }
+    #[test]
+    fn legacy_sign_ins_are_bounded_per_name_and_altogether() {
+        let now = Instant::now();
+        let mut limits = Limits::default();
+        for _ in 0..LEGACY_PER_NAME {
+            limits.legacy("Synthetic", now).unwrap();
+        }
+        // The same name in another case is the same name.
+        assert_eq!(limits.legacy("SYNTHETIC", now), Err(Error::Busy));
+        for i in 1..(LEGACY_PER_MINUTE / LEGACY_PER_NAME) {
+            for _ in 0..LEGACY_PER_NAME {
+                limits.legacy(&format!("name{i}"), now).unwrap();
+            }
+        }
+        assert_eq!(
+            limits.legacy("fresh", now),
+            Err(Error::Busy),
+            "all names together are bounded too"
+        );
+        let later = now + Duration::from_secs(60);
+        limits.legacy("synthetic", later).unwrap();
+        assert_eq!(limits.legacy_names.len(), 1, "a passed minute is forgotten");
+    }
+
     #[test]
     fn a_password_change_costs_two_sign_ins_and_nothing_when_refused() {
         let now = Instant::now();

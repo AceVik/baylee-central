@@ -97,6 +97,8 @@ fn an_explicit_mode_is_required_and_extra_arguments_are_rejected() {
         &["--issue-beta-keys-stdin", "PRIVATE_ARG_CANARY"],
         &["--appoint-admin-stdin", "PRIVATE_ARG_CANARY"],
         &["--sweep-stdin", "--dev"],
+        &["--legacy-import-stdin", "PRIVATE_ARG_CANARY"],
+        &["--legacy-deadline-stdin", "--dev"],
         &["--generate-secrets", "PRIVATE_ARG_CANARY"],
         &["--DEV"],
     ] {
@@ -106,7 +108,7 @@ fn an_explicit_mode_is_required_and_extra_arguments_are_rejected() {
         assert!(!stderr.contains("PRIVATE_ARG_CANARY"));
         assert_eq!(
             stderr.trim(),
-            "usage: central-service --dev | --dev-accounts-stdin | --accounts-stdin | --migrate-stdin | --issue-beta-keys-stdin | --appoint-admin-stdin | --sweep-stdin | --generate-secrets"
+            "usage: central-service --dev | --dev-accounts-stdin | --accounts-stdin | --migrate-stdin | --issue-beta-keys-stdin | --appoint-admin-stdin | --sweep-stdin | --legacy-import-stdin | --legacy-deadline-stdin | --generate-secrets"
         );
     }
 }

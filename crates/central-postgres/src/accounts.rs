@@ -16,6 +16,7 @@ mod export;
 mod gateways;
 mod grants;
 mod leases;
+mod legacy;
 mod migration;
 mod objects;
 mod password;
@@ -27,6 +28,7 @@ mod sessions;
 mod terms;
 mod tokens;
 pub use admin::{AUDIT_YEARS, Action, Appointed, Swept, appoint_admin, sweep};
+pub use legacy::LegacyMove;
 pub use migration::Status;
 pub use profiles::{Profile, TAG_DRAWS, TagDraw};
 pub use recovery::Summary;
@@ -73,7 +75,7 @@ fn identity(row: &QueryResult) -> Result<Identity, Error> {
 }
 
 /// Canonical native username. Clients normalize existing NFKC names before this boundary.
-fn username(value: &str) -> Result<String, Error> {
+pub(crate) fn username(value: &str) -> Result<String, Error> {
     let name = value.to_ascii_lowercase();
     if !(3..=24).contains(&name.len())
         || !name
@@ -118,7 +120,7 @@ impl AccountStore {
             db,
             tags: profiles::Tags::default(),
         };
-        if !store.valid_grants().await {
+        if !store.valid_grants().await || !store.legacy_store_closed().await {
             let _ = store.db.close().await;
             return Err(Error::Unavailable);
         }

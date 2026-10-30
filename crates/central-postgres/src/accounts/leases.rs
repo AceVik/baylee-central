@@ -43,6 +43,7 @@ impl AccountStore {
              FROM central_identity.sessions s JOIN central_identity.accounts a
              ON a.id=s.account_id AND a.credential_revision=s.credential_revision
              WHERE s.digest=$1 AND s.expires_at>pg_catalog.clock_timestamp() AND a.restored
+             AND ($2::uuid IS NOT NULL OR a.legacy_id IS NULL OR a.legacy_closed)
              AND ($2::uuid IS NULL OR EXISTS(SELECT 1 FROM central_identity.gateways g
                  JOIN central_identity.gateway_approvals p ON p.gateway_id=g.id AND p.enabled
                  WHERE g.id=$2 AND g.origin=$3 AND ($4='admit' OR EXISTS
@@ -66,7 +67,9 @@ impl AccountStore {
             return Err(Error::Rejected);
         }
         let identity = identity(&row)?;
-        // Only the bridge learns a legacy ID; a registered account has none.
+        // Only the bridge learns a legacy ID, and only for a closed move (the
+        // query refuses an open one), so the gateway may link it at once; a
+        // registered account has none.
         let legacy = if gateway.is_none() {
             row.try_get("", "legacy_id")
                 .map_err(|_| Error::Unavailable)?

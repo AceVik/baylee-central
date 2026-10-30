@@ -15,6 +15,7 @@ mod admin;
 mod deletion;
 mod gateways;
 mod kinds;
+mod legacy_store;
 mod migration;
 mod objects;
 mod password;
@@ -118,6 +119,8 @@ pub(crate) async fn run(operator: &DatabaseConnection) {
     admin::run(&store, operator, &keys).await;
     reset::run(&store, operator, &keys).await;
     deletion::run(&store, operator, &keys).await;
+    // Last: its sweep deletes every unenrolled legacy reservation.
+    legacy_store::run(&store, operator, &keys).await;
     store.close().await.unwrap();
 }
 

@@ -5,6 +5,11 @@ pub(super) async fn run(store: &AccountStore, keys: &ServerKeys) {
     let identity = enroll(store, keys, "single-session", "single-session").await;
     let first = login(store, keys, identity).await;
     store.confirm_restore(&first, 1).await.unwrap();
+    // The bridge admits a moved account once its move is closed.
+    store
+        .close_legacy("single-session", identity)
+        .await
+        .unwrap();
     let ticket = Token::generate().unwrap();
     store
         .gateway_ticket(&first, "official", &ticket, TicketPurpose::Admit)

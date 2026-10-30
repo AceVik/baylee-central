@@ -46,6 +46,7 @@ impl IdentityService {
                 let (gateway, tokens) = self.store.admin_gateway(cookie, gateway).await?;
                 AdminAnswer::Gateway { gateway, tokens }
             }
+            AdminRequest::LegacyAccounts => self.admin_legacy(cookie).await?,
             // Changes: the store checks the sign-in's age and writes the audit.
             AdminRequest::ResetLogin { account } => {
                 let code = ResetCode::generate()?;

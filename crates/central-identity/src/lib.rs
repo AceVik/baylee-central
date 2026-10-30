@@ -11,7 +11,7 @@ use central_crypto::{
     Context,
     opaque::server::{Attempt, ServerKeys},
 };
-use central_postgres::{AccountStore, Credential, Session};
+use central_postgres::{AccountStore, Credential, LegacyStore, Session};
 use std::{
     collections::BTreeMap,
     sync::{Arc, Mutex},
@@ -24,6 +24,7 @@ mod admin;
 mod deletion;
 mod dispatch;
 mod gateways;
+mod legacy;
 mod limits;
 mod objects;
 mod owner;
@@ -138,7 +139,10 @@ pub fn browser_operation(request: &Request) -> bool {
         | Request::GatewayTerms { .. }
         | Request::PublishGatewayTerms { .. }
         | Request::GatewayAuthorize { .. }
-        | Request::GatewayStatus => false,
+        | Request::GatewayStatus
+        | Request::LegacyLogin { .. }
+        | Request::LegacyExport
+        | Request::LegacyLink { .. } => false,
     }
 }
 
@@ -224,6 +228,10 @@ pub struct IdentityService {
     limits: Mutex<limits::Limits>,
     workers: Arc<Semaphore>,
     terms: Option<central_api::terms::TermsDocument>,
+    /// The legacy store, from the cutover until its deadline
+    /// (`docs/native-login.md` §"Legacy login"); with it the bridge's own
+    /// legacy operations are refused.
+    legacy: Option<LegacyStore>,
 }
 
 impl IdentityService {
@@ -260,7 +268,19 @@ impl IdentityService {
             limits: Mutex::default(),
             workers: Arc::new(Semaphore::new(4)),
             terms: terms::central()?,
+            legacy: None,
         })
+    }
+
+    /// Serve the legacy sign-in from `store` (`docs/native-login.md`
+    /// §"Legacy login"): discovery answers `Legacy` for every name it does
+    /// not find enrolled, in development too, and the bridge's own legacy
+    /// operations are refused, since Central is the source now.
+    #[must_use]
+    pub fn with_legacy(mut self, store: LegacyStore) -> Self {
+        self.legacy = Some(store);
+        self.legacy_discovery = true;
+        self
     }
 
     /// Put `terms` in force instead of the compiled-in `legal/` texts, for an

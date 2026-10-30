@@ -91,6 +91,10 @@ pub(super) fn needs_acceptance(request: &Request) -> bool {
             | Request::SetDisplayName { .. }
             | Request::ChangePasswordStart { .. }
             | Request::Admin { .. }
+            // A move's export and close wait for the terms, as the gateway
+            // tickets before them did (`docs/native-login.md` §"Legacy login").
+            | Request::LegacyExport
+            | Request::LegacyLink { .. }
     ) || matches!(
         // An account's own area: making something needs the terms; reading
         // its sessions and gateways, ending a session and revoking a token

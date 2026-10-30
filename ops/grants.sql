@@ -26,3 +26,17 @@ GRANT SELECT, UPDATE (uses_left) ON central_identity.beta_keys TO central_runtim
 -- nor delete; the operator's sweep deletes events after three years.
 GRANT SELECT, INSERT, DELETE ON central_identity.account_roles TO central_runtime;
 GRANT SELECT, INSERT ON central_identity.audit_events TO central_runtime;
+-- The legacy store (docs/operations.md §"The legacy store"): its own role,
+-- which reads its accounts, deletes a row when its move closes and counts the
+-- lockout, and nothing else; the runtime role gets nothing in the schema.
+-- The import, the deadline and the sweep stay the migrator's. Only where the
+-- operator made the role: a deployment without it serves no legacy sign-in,
+-- and a service configured for one refuses to start (its role check).
+DO $legacy$ BEGIN
+  IF EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = 'central_legacy') THEN
+    GRANT USAGE ON SCHEMA central_legacy TO central_legacy;
+    GRANT SELECT, DELETE ON central_legacy.accounts TO central_legacy;
+    GRANT UPDATE (failures, locked_until) ON central_legacy.accounts TO central_legacy;
+    GRANT SELECT ON central_legacy.settings TO central_legacy;
+  END IF;
+END $legacy$;

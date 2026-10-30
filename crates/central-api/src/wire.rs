@@ -165,6 +165,35 @@ pub enum Request {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         tag: Option<u32>,
     },
+    /// A legacy account's sign-in from Central's legacy store
+    /// (`docs/native-login.md` §"Legacy login"), on the native listener only
+    /// and only before the store's deadline: the username and the old
+    /// password, which Central verifies against the gateway's hash and
+    /// forgets. With the password proven and no forced change or ban in
+    /// force, Central reserves the account's identity under its name and tag
+    /// and answers [`Response::LegacyEnrollment`]; `Conflict` once it is
+    /// enrolled. Every refusal before the proof (an unknown, closed, locked
+    /// or registered name, a wrong password) is the same `Rejected`.
+    LegacyLogin {
+        /// Username as entered, canonicalized by the service's name policy.
+        username: String,
+        /// The old password; sent once, never stored or logged.
+        password: crate::legacy::LegacyPassword,
+    },
+    /// The session's account's source snapshot again, while its move is
+    /// open, with Central's terms accepted: for a client whose restored
+    /// document names another digest. Answered with
+    /// [`Response::LegacySnapshot`].
+    LegacyExport,
+    /// Close the session's account's move once its document is restored,
+    /// with Central's terms accepted: `digest` must be the stored
+    /// snapshot's. The account's row leaves the legacy store; the official
+    /// gateway learns the link at the account's next admission there. Again
+    /// after the close is `Done`; a wrong digest is `Conflict`.
+    LegacyLink {
+        /// The source digest the restored document holds.
+        digest: [u8; 32],
+    },
     /// Carry a legacy account's display name and tag once, for an account
     /// reserved before Central kept them (bridge only): `Done` when they were
     /// set, `Conflict` when the account has its tag already (and with it any
@@ -659,6 +688,23 @@ pub enum Response {
         revision: u64,
         /// Ciphertext; successful HTTP does not mean the client can decrypt it.
         document: Vec<u8>,
+    },
+    /// A legacy sign-in's reservation: as [`Response::Enrollment`], with the
+    /// stored source and the official gateway's origin it moves from.
+    LegacyEnrollment {
+        /// Central identity reserved by PostgreSQL before client key derivation.
+        identity: Identity,
+        /// Fresh short-lived enrollment capability, bound to this account.
+        ticket: Token,
+        /// The official gateway the account moves from: the bridge's origin.
+        gateway: String,
+        /// The account's source, as the gateway exported it.
+        snapshot: crate::legacy::LegacySnapshot,
+    },
+    /// The answer to [`Request::LegacyExport`].
+    LegacySnapshot {
+        /// The account's source, as the gateway exported it.
+        snapshot: crate::legacy::LegacySnapshot,
     },
     /// Durable migration status; bridge-authenticated only.
     LegacyStatus {
