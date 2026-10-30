@@ -1706,7 +1706,6 @@ single-label refusals beside the earlier ones, and for the empty actions
 panel (an injected always-shown panel fails the test). The smoke test and
 the real-Central run check that the default build has no "Open in Baylee"
 link. Engineering review, not an audit.
-||||||| parent of a6c349d (The official gateway moves to gateway.baylee.app; a gateway token signs players in without approval)
 
 ## The official gateway's move, and approval for the directory only, 30 October 2026
 
