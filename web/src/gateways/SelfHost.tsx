@@ -19,6 +19,9 @@ const guides = (lang: Lang): Elems => ({
   ),
 });
 
+/** Where a signed-in owner makes the token for a gateway's console. */
+const ACCOUNT: Elems = { mine: (words) => <Link to={PATHS.accountGateways}>{words}</Link> };
+
 export function SelfHost() {
   const lang = useLang();
   return (
@@ -35,7 +38,7 @@ export function SelfHost() {
             <T id="selfhost.guide" elems={guides(lang)} />
           </p>
           <p>
-            <T id="selfhost.central" elems={{ mine: (words) => <Link to={PATHS.accountGateways}>{words}</Link> }} />
+            <T id="selfhost.central" elems={ACCOUNT} />
           </p>
         </div>
         <div>

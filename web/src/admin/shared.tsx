@@ -12,7 +12,6 @@ import { Reauth } from "../app/Reauth";
 import { fresh, useSummary } from "../app/useSummary";
 import { T, type Key } from "../i18n";
 import type { Page } from "../router";
-import "../styles/tables.css";
 import { adminApi, type AdminApi } from "./admin-api";
 
 /** An account as the administration names it: its handle, or its sign-in name until it has one. */

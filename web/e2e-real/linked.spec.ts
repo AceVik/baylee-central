@@ -8,9 +8,12 @@ import { join } from "node:path";
 
 import { expect, test, type Page } from "@playwright/test";
 
+// stills of whole pages: no section waits to come into view
+test.use({ contextOptions: { reducedMotion: "reduce" } });
+
 const OUT = process.env["REAL_OUT"] ?? "";
 const PASSWORD = "violet lantern harbour quietly";
-const QA_ORIGIN = "https://qa-gateway.invalid";
+const QA_ORIGIN = readFileSync(join(OUT, "origin"), "utf8").trim();
 
 async function shoot(page: Page, file: string) {
   await page.waitForTimeout(400);
