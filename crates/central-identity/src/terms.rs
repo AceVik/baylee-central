@@ -133,6 +133,17 @@ impl IdentityService {
         validate_origin(origin, !self.legacy_discovery)
     }
 
+    /// Where a gateway's terms are kept: the official gateway publishes under
+    /// its canonical origin, and a client that knows it by an alias reads and
+    /// accepts those.
+    fn terms_origin<'a>(&'a self, origin: &'a str) -> &'a str {
+        if self.is_official(origin) {
+            self.canonical()
+        } else {
+            origin
+        }
+    }
+
     pub(super) async fn terms_request(
         &self,
         request: Request,
@@ -145,15 +156,8 @@ impl IdentityService {
             }),
             Request::GatewayTerms { origin } => {
                 self.origin(&origin)?;
-                // the official gateway publishes under its canonical origin;
-                // a client that knows it by an alias reads those terms
-                let origin = if self.is_official(&origin) {
-                    self.canonical()
-                } else {
-                    &origin
-                };
                 Ok(Response::Terms {
-                    terms: self.store.gateway_terms(origin).await?,
+                    terms: self.store.gateway_terms(self.terms_origin(&origin)).await?,
                 })
             }
             Request::TermsStatus => Ok(Response::TermsStatus {
@@ -186,15 +190,8 @@ impl IdentityService {
                         if !terms::valid_version(&accepted.version) {
                             return Err(Error::Rejected);
                         }
-                        // the official gateway's terms are published under its
-                        // canonical origin; the acceptance is kept there too
-                        let origin = if self.is_official(&origin) {
-                            self.canonical()
-                        } else {
-                            &origin
-                        };
                         self.store
-                            .accept_gateway_terms(session, origin, &accepted)
+                            .accept_gateway_terms(session, self.terms_origin(&origin), &accepted)
                             .await?;
                     }
                 }

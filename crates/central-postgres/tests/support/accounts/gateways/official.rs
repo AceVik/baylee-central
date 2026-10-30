@@ -273,7 +273,11 @@ async fn moved(
             .await
             .unwrap();
         // the lease is for the address asked, under the set
-        let other = set.iter().find(|o| **o != *asked).unwrap();
+        let other = if asked == OFFICIAL_ORIGIN {
+            LEGACY_ORIGIN
+        } else {
+            OFFICIAL_ORIGIN
+        };
         assert!(
             store
                 .gateway_session(&lease, &set, None, TicketPurpose::Admit)
@@ -288,7 +292,7 @@ async fn moved(
         );
         assert!(
             store
-                .gateway_session(&lease, &[*other], None, TicketPurpose::Admit)
+                .gateway_session(&lease, &[other], None, TicketPurpose::Admit)
                 .await
                 .is_err(),
             "{asked}"
