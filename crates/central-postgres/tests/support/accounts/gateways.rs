@@ -7,6 +7,7 @@ use sea_orm::{ConnectionTrait, DbBackend, Statement, prelude::Uuid};
 
 mod limits;
 mod official;
+mod tokens;
 
 fn metadata(origin: &str) -> GatewayMetadata {
     GatewayMetadata {
@@ -114,6 +115,7 @@ pub(super) async fn run(store: &AccountStore, operator: &DatabaseConnection, key
     .await;
     limits::run(store, operator, &owner_session, gateway, origin).await;
     official::run(store, operator, &owner_session, gateway).await;
+    tokens::run(store, operator, keys).await;
 }
 
 async fn delegation(
@@ -312,38 +314,53 @@ async fn profile(
     assert!(read(lease).await.is_ok(), "the first lease still names it");
 }
 
+/// The runtime approves, enables and disables gateways (an administrator's
+/// decision, 000014) and stores gateway tokens, and refuses to start with
+/// anything wider on either table: deleting an approval, another column, a
+/// grant option; or narrower: no `INSERT` on approvals.
 async fn privilege_gate(operator: &DatabaseConnection) {
-    for privilege in [
-        "INSERT",
-        "UPDATE(enabled)",
-        "DELETE",
-        "SELECT WITH GRANT OPTION",
+    let connect =
+        || AccountStore::connect_dev(config("central_runtime", "CENTRAL_TEST_RUNTIME_PASSWORD"));
+    for (grant, revoke) in [
+        (
+            "GRANT DELETE ON central_identity.gateway_approvals TO central_runtime",
+            "REVOKE DELETE ON central_identity.gateway_approvals FROM central_runtime",
+        ),
+        (
+            "GRANT UPDATE (approved_at) ON central_identity.gateway_approvals TO central_runtime",
+            "REVOKE UPDATE (approved_at) ON central_identity.gateway_approvals FROM central_runtime",
+        ),
+        (
+            "GRANT SELECT ON central_identity.gateway_approvals TO central_runtime WITH GRANT OPTION",
+            "REVOKE GRANT OPTION FOR SELECT ON central_identity.gateway_approvals FROM central_runtime",
+        ),
+        (
+            "GRANT DELETE ON central_identity.gateway_tokens TO central_runtime",
+            "REVOKE DELETE ON central_identity.gateway_tokens FROM central_runtime",
+        ),
+        (
+            "GRANT UPDATE (digest) ON central_identity.gateway_tokens TO central_runtime",
+            "REVOKE UPDATE (digest) ON central_identity.gateway_tokens FROM central_runtime",
+        ),
+        (
+            "GRANT UPDATE (expires_at) ON central_identity.gateway_tokens TO central_runtime",
+            "REVOKE UPDATE (expires_at) ON central_identity.gateway_tokens FROM central_runtime",
+        ),
+        (
+            "REVOKE INSERT ON central_identity.gateway_approvals FROM central_runtime",
+            "GRANT INSERT ON central_identity.gateway_approvals TO central_runtime",
+        ),
+        (
+            "REVOKE UPDATE (last_used_at) ON central_identity.gateway_tokens FROM central_runtime",
+            "GRANT UPDATE (last_used_at) ON central_identity.gateway_tokens TO central_runtime",
+        ),
     ] {
-        let grant = if privilege == "SELECT WITH GRANT OPTION" {
-            "GRANT SELECT ON central_identity.gateway_approvals TO central_runtime WITH GRANT OPTION".into()
-        } else {
-            format!("GRANT {privilege} ON central_identity.gateway_approvals TO central_runtime")
-        };
-        operator.execute_unprepared(&grant).await.unwrap();
-        let connection =
-            AccountStore::connect_dev(config("central_runtime", "CENTRAL_TEST_RUNTIME_PASSWORD"))
-                .await;
-        let revoke = if privilege == "SELECT WITH GRANT OPTION" {
-            "REVOKE GRANT OPTION FOR SELECT ON central_identity.gateway_approvals FROM central_runtime".into()
-        } else {
-            format!("REVOKE {privilege} ON central_identity.gateway_approvals FROM central_runtime")
-        };
-        operator.execute_unprepared(&revoke).await.unwrap();
-        assert!(
-            connection.is_err(),
-            "unsafe approval privilege: {privilege}"
-        );
+        operator.execute_unprepared(grant).await.unwrap();
+        let connection = connect().await;
+        operator.execute_unprepared(revoke).await.unwrap();
+        assert!(connection.is_err(), "unsafe gateway privilege: {grant}");
     }
-    let connection =
-        AccountStore::connect_dev(config("central_runtime", "CENTRAL_TEST_RUNTIME_PASSWORD"))
-            .await
-            .unwrap();
-    connection.close().await.unwrap();
+    connect().await.unwrap().close().await.unwrap();
 }
 
 async fn registration(

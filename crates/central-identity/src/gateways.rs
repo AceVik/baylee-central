@@ -144,8 +144,29 @@ impl IdentityService {
                 }
                 Ok(Response::GatewayTicket { ticket })
             }
+            Request::GatewayStatus => {
+                let (gateway, origin, metadata, state, scopes, expires_at) = self
+                    .store
+                    .gateway_status(bearer.ok_or(Error::Rejected)?)
+                    .await?;
+                Ok(Response::GatewayStatus {
+                    gateway,
+                    origin,
+                    metadata,
+                    state,
+                    scopes,
+                    expires_at,
+                })
+            }
             Request::RedeemGateway { ticket, purpose } => {
                 let (gateway, origin) = self.gateway_authority(bearer).await?;
+                // a sign-in is one of the uses a token's owner sees; a
+                // credential pair or the bridge is no token and is left alone
+                if gateway.is_some()
+                    && let Some(bearer) = bearer
+                {
+                    self.store.touch_gateway_token(bearer).await?;
+                }
                 let lease = matches!(purpose, TicketPurpose::Admit | TicketPurpose::Admin)
                     .then(Token::generate)
                     .transpose()?;

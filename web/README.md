@@ -22,6 +22,12 @@ same app; administration comes later.
 | `/register` | a new account: beta key, name, display name, password, age, consent; then the recovery code, shown once, with the handle |
 | `/signin` | signing in at Baylee Central |
 | `/account` | who is signed in (the handle others see, the sign-in name small), until when; choosing a display name; signing out |
+| `/account/security` | the account's sessions as Central knows them (this website's, the client's with the gateways it is signed in to); signing the client out |
+| `/account/gateways` | the gateways the account registered: registering one, its tokens (made with a name, scopes and a lifetime, shown once; revoked) |
+| `/admin` | the administration (administrators only): accounts, searched by name or `#tag` |
+| `/admin/users/<id>` | one account: its tag (changed, audited), the administrator role, a reset code, its gateways and audit |
+| `/admin/gateways` | every registered gateway by state: approve, disable, its tokens revoked |
+| `/admin/audit` | the audit log |
 
 English and German today, one at a time, and ready for every language Magic
 is printed in (§"The words"): `?lang=<code>` wins, then the choice made with

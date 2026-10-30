@@ -258,6 +258,26 @@ no grant. What stays the operator's:
 - **Backups** keep a deleted account until they rotate out, at most 12
   months, as the privacy notice says.
 
+## Gateways and their tokens
+
+Since 30.10.2026 Central's administrators approve, disable and enable
+gateways on the website (`/admin/gateways`), and owners mint and revoke their
+gateways' tokens there ([gateway registry](gateway-registry.md) §"Gateway
+tokens"). The deploy hook applies `ops/grants.sql` after the migration,
+which gives the runtime `INSERT` and `UPDATE (enabled)` on
+`gateway_approvals` and its rights on `gateway_tokens`; a binary from before
+migration 000014 refuses to start over the wider grants, so roll back the
+grants with the binary. The operator's SQL stays the fallback when no
+administrator can sign in:
+
+```sql
+INSERT INTO central_identity.gateway_approvals (gateway_id)
+    SELECT id FROM central_identity.gateways WHERE origin = 'https://…';
+UPDATE central_identity.gateway_tokens SET revoked_at = clock_timestamp()
+    WHERE gateway_id = (SELECT id FROM central_identity.gateways WHERE origin = 'https://…')
+    AND revoked_at IS NULL;
+```
+
 ## The official gateway
 
 The directory lists the official gateway (the migration bridge's,

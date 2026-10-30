@@ -70,7 +70,8 @@ impl IdentityService {
             request @ (Request::AccountSummary
             | Request::SetRecovery { .. }
             | Request::SetDisplayName { .. }
-            | Request::Admin { .. }) => self.account_request(request, bearer, surface).await,
+            | Request::Admin { .. }
+            | Request::Owner { .. }) => self.account_request(request, bearer, surface).await,
             request @ (Request::LegacyReserve { .. }
             | Request::LegacyInvalidate { .. }
             | Request::LegacyClose { .. }
@@ -83,7 +84,8 @@ impl IdentityService {
             | Request::GatewaySession { .. }
             | Request::GatewayProfile { .. }
             | Request::GatewayTicket { .. }
-            | Request::RedeemGateway { .. }) => self.gateway_request(request, bearer).await,
+            | Request::RedeemGateway { .. }
+            | Request::GatewayStatus) => self.gateway_request(request, bearer).await,
             request @ (Request::AccountExport
             | Request::DeleteAccountStart { .. }
             | Request::DeleteAccountFinish { .. }) => {
@@ -192,6 +194,7 @@ impl IdentityService {
         };
         match request {
             Request::Admin { request } => self.admin_request(request, bearer, surface).await,
+            Request::Owner { request } => self.owner_request(request, cookie).await,
             Request::AccountSummary => {
                 let summary = self.store.account_summary(cookie).await?;
                 Ok(Response::AccountSummary {

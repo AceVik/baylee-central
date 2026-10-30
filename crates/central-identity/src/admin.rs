@@ -38,6 +38,14 @@ impl IdentityService {
                 let (events, more) = self.store.admin_audit(cookie, account, before).await?;
                 AdminAnswer::Audit { events, more }
             }
+            AdminRequest::Gateways { state, before } => {
+                let (gateways, more) = self.store.admin_gateways(cookie, state, before).await?;
+                AdminAnswer::Gateways { gateways, more }
+            }
+            AdminRequest::Gateway { gateway } => {
+                let (gateway, tokens) = self.store.admin_gateway(cookie, gateway).await?;
+                AdminAnswer::Gateway { gateway, tokens }
+            }
             // Changes: the store checks the sign-in's age and writes the audit.
             AdminRequest::ResetLogin { account } => {
                 let code = ResetCode::generate()?;
@@ -49,6 +57,20 @@ impl IdentityService {
             }
             AdminRequest::SetAdmin { account, admin } => {
                 self.store.set_admin(cookie, account, admin).await?;
+                return Ok(Response::Done);
+            }
+            AdminRequest::SetGatewayApproval { gateway, enabled } => {
+                self.store
+                    .set_gateway_approval(cookie, gateway, enabled)
+                    .await?;
+                return Ok(Response::Done);
+            }
+            AdminRequest::RevokeGatewayToken { token } => {
+                self.store.admin_revoke_gateway_token(cookie, token).await?;
+                return Ok(Response::Done);
+            }
+            AdminRequest::SetTag { account, tag } => {
+                self.store.set_tag(cookie, account, tag).await?;
                 return Ok(Response::Done);
             }
         };

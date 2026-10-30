@@ -102,16 +102,16 @@ export interface AccountSummary {
 
 // ---------------------------------------------------------------- shapes
 
-type Json = Record<string, unknown>;
+export type Json = Record<string, unknown>;
 
-const malformed = () => new ApiError("malformed");
+export const malformed = () => new ApiError("malformed");
 
-function isObject(v: unknown): v is Json {
+export function isObject(v: unknown): v is Json {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 
 /** `v` is an object with exactly these keys. */
-function exact(v: unknown, keys: readonly string[]): Json {
+export function exact(v: unknown, keys: readonly string[]): Json {
   if (!isObject(v)) throw malformed();
   const own = Object.keys(v);
   if (own.length !== keys.length || !keys.every((k) => Object.hasOwn(v, k))) throw malformed();
@@ -119,7 +119,7 @@ function exact(v: unknown, keys: readonly string[]): Json {
 }
 
 /** The answer `raw` is `result` with exactly `keys` besides. */
-function answer(raw: unknown, result: string, keys: readonly string[] = []): Json {
+export function answer(raw: unknown, result: string, keys: readonly string[] = []): Json {
   const o = exact(raw, ["result", ...keys]);
   if (o["result"] !== result) throw malformed();
   return o;
@@ -138,7 +138,7 @@ export function bytes(v: unknown, length?: number, max = 1_056_768): Uint8Array 
   return out;
 }
 
-function safeInteger(v: unknown, min: number): number {
+export function safeInteger(v: unknown, min: number): number {
   if (typeof v !== "number" || !Number.isSafeInteger(v) || v < min) throw malformed();
   return v;
 }
@@ -328,8 +328,17 @@ const STATUS: Readonly<Record<number, Failure>> = {
   503: "unavailable",
 };
 
-export function api({ base = CENTRAL_API, fetch: doFetch = (...a) => fetch(...a) }: { base?: string; fetch?: typeof fetch } = {}): Api {
-  async function post<T>(request: Json, read: (raw: unknown) => T): Promise<T> {
+/** Where requests go, and the `fetch` that sends them (a test's stand-in). */
+export interface Endpoint {
+  base?: string;
+  fetch?: typeof fetch;
+}
+
+/** Posts one request to Central's browser surface and reads its answer with `read`. */
+export type Post = <T>(request: Json, read: (raw: unknown) => T) => Promise<T>;
+
+export function poster({ base = CENTRAL_API, fetch: doFetch = (...a) => fetch(...a) }: Endpoint = {}): Post {
+  return async function post<T>(request: Json, read: (raw: unknown) => T): Promise<T> {
     let r: Response;
     try {
       r = await doFetch(`${base}/v1`, {
@@ -352,8 +361,11 @@ export function api({ base = CENTRAL_API, fetch: doFetch = (...a) => fetch(...a)
       throw malformed();
     }
     return read(raw);
-  }
+  };
+}
 
+export function api(endpoint: Endpoint = {}): Api {
+  const post = poster(endpoint);
   return {
     register: (username, betaKey, displayName) =>
       post(
