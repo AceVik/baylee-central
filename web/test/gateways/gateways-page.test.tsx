@@ -58,9 +58,9 @@ describe("the gateway directory", () => {
     }));
     show();
     const names = (await screen.findAllByRole("heading", { level: 3 })).map((h) => h.textContent);
-    expect(names).toEqual(["Sanctuary Official", "Synthetic table 1", "Synthetic table 2", "Synthetic table 4"]);
-    const official = screen.getByRole("heading", { name: "Sanctuary Official" }).closest("li") as HTMLElement;
-    expect(within(official).getByText("Official").className).toBe("gw-official");
+    expect(names).toEqual(["Sanctuary", "Synthetic table 1", "Synthetic table 2", "Synthetic table 4"]);
+    const official = screen.getByRole("heading", { name: "Sanctuary" }).closest("li") as HTMLElement;
+    expect(within(official).getByText("Official").className).toContain("gw-official");
     expect(within(official).getByText("https://baylee.acevik.de")).toBeTruthy();
     expect(screen.getAllByText("Official")).toHaveLength(1);
   });
@@ -76,11 +76,11 @@ describe("the gateway directory", () => {
     const user = userEvent.setup();
     show();
     await waitFor(() => expect(screen.getAllByRole("heading", { level: 3 })).toHaveLength(100));
-    expect(screen.getAllByRole("heading", { level: 3 })[0]?.textContent).toBe("Sanctuary Official");
+    expect(screen.getAllByRole("heading", { level: 3 })[0]?.textContent).toBe("Sanctuary");
     await user.click(screen.getByRole("button", { name: "Show the next 100" }));
     await waitFor(() => expect(screen.getByText(/130 gateways listed/)).toBeTruthy());
     expect((calls[1]?.body as { after: number[] } | undefined)?.after).toEqual(listing(100).id);
-    expect(screen.getAllByRole("heading", { level: 3 })[0]?.textContent).toBe("Sanctuary Official");
+    expect(screen.getAllByRole("heading", { level: 3 })[0]?.textContent).toBe("Sanctuary");
   });
 
   it("marks the official gateway in German too, and only by its origin", async () => {

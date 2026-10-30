@@ -47,7 +47,7 @@
   width: min(92vw, 75rem); max-width: none; max-height: 92vh; padding: 0; border: 1px solid var(--edge); border-radius: var(--radius);
   background: var(--panel-solid); color: var(--ink); box-shadow: 0 40px 80px -30px rgba(0, 0, 0, 0.8); overflow: hidden;
 }
-.lightbox img { width: 100%; max-height: calc(92vh - 5rem); object-fit: contain; background: #05080f; }
+.lightbox img { width: 100%; max-height: calc(92vh - 5rem); object-fit: contain; background: var(--photo-ground); }
 .lightbox-cap { margin: 0; padding: 0.9rem 4.5rem 1rem 1.2rem; font-size: 0.95rem; }
 .lightbox-credit { display: block; margin-top: 0.3rem; font-size: 0.8rem; color: var(--ink-faint); }
 .lightbox-close { position: absolute; top: 0.6rem; right: 0.6rem; }

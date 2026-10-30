@@ -1,6 +1,8 @@
-/* baylee.app — Baylee in sunlight: warm ivory, garden teal and soft gold,
-   with a deep blue-green evening palette and quiet movement.
-   Transform and opacity only; `prefers-reduced-motion` stills all of it.
+/* baylee.app — Baylee in sunlight by day, the blue hour by night
+   (docs/website-design.md). Every colour, size, radius, shadow and duration
+   the pages use is named here, for what it means; no other stylesheet names
+   a raw colour except the artwork's own. Transform and opacity only;
+   `prefers-reduced-motion` stills all of it (base.css §"stillness").
    The CSP allows no inline style, so everything lives in files. */
 
 @font-face { font-family: "Faustina"; src: url("/fonts/Faustina.woff2") format("woff2"); font-weight: 300 800; font-style: normal; font-display: swap; }
@@ -14,37 +16,74 @@
   --serif: "Faustina", Georgia, "Times New Roman", serif;
   --sans: "Alegreya Sans", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
-  --ease: cubic-bezier(0.22, 1, 0.36, 1);
-  --fast: 160ms;
-  --top-h: 3.9rem;
-  --wrap: 72rem;
-  --gutter: 16px;
-  --radius: 18px;
 
-  --bg: #122c36;
-  --bg-alt: #16353e;
-  --panel: rgba(20, 46, 55, 0.94);
-  --panel-solid: #193b44;
-  --panel-2: #234953;
-  --edge: rgba(222, 190, 128, 0.26);
-  --edge-soft: rgba(170, 190, 220, 0.14);
-  --ink: #f3f1e9;
-  --ink-soft: #d4e2df;
-  --ink-faint: #a9c2c0;
-  --title: #fff8e5;
-  --gold: #e0be7c;
-  --gold-2: #f6dfa6;
-  --gold-ink: #1b1407;
-  --violet: #a0d7df;
-  --violet-soft: rgba(135, 207, 219, 0.14);
-  --link: #e8cb8c;
+  /* type scale (docs/website-design.md §"Typography") */
+  --text-xs: 0.78rem;
+  --text-sm: 0.9rem;
+  --text-md: 1rem;
+  --text-lg: clamp(1.12rem, 1rem + 0.4vw, 1.32rem);
+  --text-xl: clamp(1.7rem, 1.2rem + 1.7vw, 2.6rem);
+  --text-2xl: clamp(2.2rem, 1.4rem + 3.4vw, 4rem);
+
+  /* one step is 4 px (§"Space and layout") */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 40px;
+  --space-8: 48px;
+  --space-9: 64px;
+  --space-10: 80px;
+  --space-12: 96px;
+  --prose: 46rem;
+  --wrap: 72rem;
+  --wrap-app: 80rem;
+  --gutter: 16px;
+  --top-h: 3.9rem;
+
+  /* shape (§"Shape and depth") */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius: 18px;
+  --pill: 999px;
+
+  /* motion (§"Motion"): a control settles in about 120 ms */
+  --dur-fast: 120ms;
+  --dur: 180ms;
+  --dur-slow: 320ms;
+  --fast: var(--dur-fast);
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --stagger: 45ms;
+
+  /* the blue hour: deep twilight blue, cornflower for information, the last
+     warm light for the one thing to do */
+  --bg: #0f1b2d;
+  --bg-alt: #13223a;
+  --panel: rgba(23, 39, 65, 0.94);
+  --panel-solid: #172741;
+  --panel-2: #1f3253;
+  --edge: rgba(227, 192, 126, 0.30);
+  --edge-soft: rgba(160, 185, 230, 0.16);
+  --ink: #eef1f8;
+  --ink-soft: #cdd6ea;
+  --ink-faint: #a3b3d1;
+  --title: #fff7e4;
+  --gold: #e3c07e;
+  --gold-2: #f3dca6;
+  --gold-ink: #1a1306;
+  --violet: #aebfff;
+  --violet-soft: rgba(147, 166, 255, 0.14);
+  --link: #ebcd8f;
   --link-hover: #f8e6b9;
-  --focus: #ffe8a8;
+  --focus: #ffe7a6;
   --ok: #7fd3a1;
   --warn: #f0c076;
-  --untested: #86c9c4;
-  --bad: #f09a8f;
-  --off: #8b96aa;
+  --untested: #8fcfe0;
+  --bad: #f39c92;
+  --off: #93a0bb;
   --veil-top: rgba(8, 14, 28, 0.30);
   --veil-mid: rgba(11, 19, 34, 0.55);
   --hero-shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 2px 22px rgba(0, 0, 0, 0.45);
@@ -52,13 +91,16 @@
   --mist: rgba(190, 210, 240, 0.10);
   --shadow: 0 24px 50px -30px rgba(0, 0, 0, 0.75);
   --shadow-lift: 0 30px 60px -28px rgba(0, 0, 0, 0.85), 0 0 0 1px var(--edge);
-  --top-bg: rgba(15, 39, 48, 0.94);
-  --code-bg: #0a1120;
+  --top-bg: rgba(14, 25, 43, 0.92);
+  --code-bg: #0a1222;
   --code-ink: #e6ebf5;
   --kbd-bg: #1b2740;
-  --field-bg: rgba(11, 31, 39, 0.85);
-  --field-edge: rgba(170, 190, 220, 0.55);
-  --scene-veil: rgba(16, 39, 49, 0.94);
+  --field-bg: rgba(9, 18, 33, 0.85);
+  --field-edge: rgba(170, 190, 230, 0.55);
+  --scene-veil: rgba(15, 27, 45, 0.94);
+  --bar-ink: #eef1f7;
+  --photo-ground: #05080f;
+  --backdrop: rgba(4, 8, 16, 0.72);
   color-scheme: dark;
 }
 @media (prefers-color-scheme: light) {
@@ -100,6 +142,8 @@
     --field-bg: rgba(255, 255, 255, 0.9);
     --field-edge: rgba(40, 60, 100, 0.6);
     --scene-veil: rgba(250, 247, 232, 0.96);
+    --bar-ink: #233e43;
+    --backdrop: rgba(23, 40, 45, 0.55);
     color-scheme: light;
   }
 }
@@ -141,5 +185,7 @@
   --field-bg: rgba(255, 255, 255, 0.9);
   --field-edge: rgba(40, 60, 100, 0.6);
   --scene-veil: rgba(250, 247, 232, 0.96);
+  --bar-ink: #233e43;
+  --backdrop: rgba(23, 40, 45, 0.55);
   color-scheme: light;
 }

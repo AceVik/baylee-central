@@ -31,6 +31,14 @@ browser's languages; only a language with a file counts, else English.
 `prefers-color-scheme` decides. `public/boot.js` makes both choices before
 the first paint.
 
+## Its look
+
+[Website design](../docs/website-design.md) is the written contract: the
+mood (sunlight by day, the blue hour by night), the tokens, the type and
+spacing scales, the components, motion and accessibility.
+`src/styles/tokens.css` holds every value; `test/styles/` measures the
+contrast of both schemes and keeps raw colours out of the other files.
+
 ## The stack
 
 The one of Baylee's `web/feedback`, at its versions: React 19.3, TypeScript

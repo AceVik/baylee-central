@@ -26,6 +26,17 @@ const PATHS = {
   prev: "M15.4 7.4 14 6l-6 6 6 6 1.4-1.4L10.8 12z",
   next: "M8.6 16.6 10 18l6-6-6-6-1.4 1.4 4.6 4.6z",
   server: "M4 3h16a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zm0 10h16a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1zm3-7v2h2V6zm0 10v2h2v-2z",
+  play: "M8 5v14l11-7z",
+  external: "M14 3h7v7h-2V6.4l-9.3 9.3-1.4-1.4L17.6 5H14zM5 5h6v2H5v12h12v-6h2v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z",
+  key: "M7 8a4 4 0 0 1 3.9 3H22v2h-2v3h-2v-3h-2v3h-2v-3h-3.1A4 4 0 1 1 7 8zm0 2a2 2 0 1 0 2 2 2 2 0 0 0-2-2z",
+  shield: "M12 2 4 5v6c0 5 3.4 9.7 8 11 4.6-1.3 8-6 8-11V5zm-1 14-4-4 1.4-1.4 2.6 2.6 5.6-5.6L18 9z",
+  user: "M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4zm0 2c-3.3 0-8 1.7-8 5v1h16v-1c0-3.3-4.7-5-8-5z",
+  logout: "M10 17l1.4 1.4L17.8 12l-6.4-6.4L10 7l4 4H3v2h11zM19 3h-6v2h6v14h-6v2h6a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z",
+  warn: "M1 21h22L12 2zm12-3h-2v-2h2zm0-4h-2v-4h2z",
+  plus: "M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z",
+  lock: "M17 8V7a5 5 0 0 0-10 0v1H5v14h14V8zM9 7a3 3 0 0 1 6 0v1H9zm4 10.7V19h-2v-1.3a2 2 0 1 1 2 0z",
+  tag: "M2 12V3h9l11 11-9 9zm5-5a1.5 1.5 0 1 0-1.5-1.5A1.5 1.5 0 0 0 7 7z",
+  list: "M3 5h2v2H3zm4 0h14v2H7zM3 11h2v2H3zm4 0h14v2H7zm-4 6h2v2H3zm4 0h14v2H7z",
 } as const;
 
 export type IconName = keyof typeof PATHS;
