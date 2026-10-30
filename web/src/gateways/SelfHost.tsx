@@ -1,6 +1,7 @@
 // How to run a gateway of one's own, from the old site's self-hosting part.
 
 import { GITHUB } from "../config";
+import { Link, PATHS } from "../router";
 import { Section } from "../components/Section";
 import { T, t, useLang, type Elems, type Lang } from "../i18n";
 
@@ -32,6 +33,9 @@ export function SelfHost() {
           </p>
           <p>
             <T id="selfhost.guide" elems={guides(lang)} />
+          </p>
+          <p>
+            <T id="selfhost.central" elems={{ mine: (words) => <Link to={PATHS.accountGateways}>{words}</Link> }} />
           </p>
         </div>
         <div>
