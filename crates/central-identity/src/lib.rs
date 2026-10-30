@@ -27,6 +27,7 @@ mod gateways;
 mod limits;
 mod objects;
 mod owner;
+mod pairing;
 mod password;
 mod reset;
 mod terms;
@@ -112,7 +113,13 @@ pub fn browser_operation(request: &Request) -> bool {
         | Request::ResetFinish { .. }
         | Request::AccountExport
         | Request::DeleteAccountStart { .. }
-        | Request::DeleteAccountFinish { .. } => true,
+        | Request::DeleteAccountFinish { .. }
+        | Request::KeyCheckStatus
+        | Request::SetKeyCheck { .. }
+        | Request::PairStart
+        | Request::PairStatus { .. }
+        | Request::PairApprove { .. }
+        | Request::PairCancel { .. } => true,
         Request::AcceptTerms { subject, .. } => matches!(subject, TermsSubject::Central),
         Request::CreateObject
         | Request::ReadObject { .. }
@@ -138,7 +145,10 @@ pub fn browser_operation(request: &Request) -> bool {
         | Request::GatewayTerms { .. }
         | Request::PublishGatewayTerms { .. }
         | Request::GatewayAuthorize { .. }
-        | Request::GatewayStatus => false,
+        | Request::GatewayStatus
+        | Request::PairClaim { .. }
+        | Request::PairPoll { .. }
+        | Request::PairRedeem { .. } => false,
     }
 }
 
@@ -157,6 +167,10 @@ fn browser_only(request: &Request) -> bool {
             | Request::SetDisplayName { .. }
             | Request::Admin { .. }
             | Request::Owner { .. }
+            | Request::PairStart
+            | Request::PairStatus { .. }
+            | Request::PairApprove { .. }
+            | Request::PairCancel { .. }
     )
 }
 
@@ -179,6 +193,12 @@ fn uses_session(request: &Request) -> bool {
             | Request::AccountExport
             | Request::DeleteAccountStart { .. }
             | Request::DeleteAccountFinish { .. }
+            | Request::KeyCheckStatus
+            | Request::SetKeyCheck { .. }
+            | Request::PairStart
+            | Request::PairStatus { .. }
+            | Request::PairApprove { .. }
+            | Request::PairCancel { .. }
     )
 }
 
@@ -573,6 +593,16 @@ mod tests {
             Request::Owner {
                 request: central_api::owner::OwnerRequest::Sessions,
             },
+            Request::KeyCheckStatus,
+            Request::SetKeyCheck { check: vec![] },
+            Request::PairStart,
+            Request::PairStatus { handle: token() },
+            Request::PairApprove {
+                handle: token(),
+                sealed: vec![],
+                proof: vec![],
+            },
+            Request::PairCancel { handle: token() },
         ]
     }
 
@@ -584,18 +614,6 @@ mod tests {
             website: "https://gateway.invalid".into(),
         };
         vec![
-            Request::CreateObject,
-            Request::ReadObject { id: [0; 16] },
-            Request::ListObjects { after: None },
-            Request::WriteObject {
-                id: [0; 16],
-                expected_revision: 0,
-                document: vec![],
-            },
-            Request::DeleteObject {
-                id: [0; 16],
-                expected_revision: 1,
-            },
             Request::LegacyInvalidate {
                 legacy_id: "x".into(),
             },
@@ -677,6 +695,45 @@ mod tests {
             // a gateway's token is no website's business
             Request::GatewayStatus,
         ]
+        .into_iter()
+        .chain(objects())
+        .chain(claimed_by_the_client())
+        .collect()
+    }
+
+    /// A native session's own objects.
+    fn objects() -> [Request; 5] {
+        [
+            Request::CreateObject,
+            Request::ReadObject { id: [0; 16] },
+            Request::ListObjects { after: None },
+            Request::WriteObject {
+                id: [0; 16],
+                expected_revision: 0,
+                document: vec![],
+            },
+            Request::DeleteObject {
+                id: [0; 16],
+                expected_revision: 1,
+            },
+        ]
+    }
+
+    /// The client's half of a pairing, which only the native listener serves.
+    fn claimed_by_the_client() -> [Request; 3] {
+        [
+            Request::PairClaim {
+                handle: token(),
+                public_key: vec![],
+                challenge: vec![],
+                mac: vec![],
+            },
+            Request::PairPoll { handle: token() },
+            Request::PairRedeem {
+                handle: token(),
+                verifier: vec![],
+            },
+        ]
     }
 
     #[test]
@@ -693,14 +750,14 @@ mod tests {
                 text[start..].split('"').next().unwrap().to_owned()
             })
             .collect();
-        assert_eq!(named.len(), 50, "every operation is in one of the lists");
+        assert_eq!(named.len(), 59, "every operation is in one of the lists");
     }
 
     #[test]
     fn the_native_listener_refuses_the_websites_own_operations() {
         let (served, _) = (served(), refused());
         let only: Vec<&Request> = served.iter().filter(|r| browser_only(r)).collect();
-        assert_eq!(only.len(), 6);
+        assert_eq!(only.len(), 10);
         // An account's own area is the website's alone, as administration is.
         assert!(browser_only(&Request::Owner {
             request: central_api::owner::OwnerRequest::Gateways,

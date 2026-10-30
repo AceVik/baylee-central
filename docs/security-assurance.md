@@ -1763,3 +1763,69 @@ Adversarial pass (PostgreSQL fixture):
 No migration, no grant change, no dependency change. Engineering review, not
 an audit.
 
+## Pairing a signed-in website to Baylee's client, 30 October 2026
+
+The owner's decision of 30.10.2026 (Baylee `docs/proposals/deep-links.md`
+§"Protocol specification"; here [web accounts](web-accounts.md) §"Pairing"
+and [the protocol](crypto-protocol.md) §"Derived from the master key" and
+§"Pairing").
+
+Design pass: the assets are the master key, the account's native session and
+the key check. Callers: the page with its cookie, who may be the owner or a
+cookie thief; whatever local program receives the `baylee://pair` link, which
+on Windows and Linux can be another application that registered the scheme
+(the named attacker); anyone reaching the native listener; and Central
+itself, which must never learn the master key. Invariants: Central sees
+neither the link's secret nor the master key; a native session leaves
+Central only together with the sealed key, once, for the verifier whose
+challenge was claimed; a cookie alone cannot approve, since the proof needs
+the key check, which needs the master key; a stolen session cannot plant a
+check (two minutes from a password proof, never overwritten); a paired
+session's 12 hours count from the page's password proof. A hijacking
+application that claims first makes the real client's claim a `Conflict`,
+so the real client shows an error instead of a code, and the hijacker's code
+on the page matches nothing on the person's screen. Accepted limits, decided
+by the PM: a reader of the same user's memory is out of scope; approval is one
+click beside a comparison code read at a glance; the claim, polls and redeem
+carry no session and are bounded by the handle's 32 random bytes, 300 polls
+and five minutes.
+
+Implementation pass: migration 000016 adds `accounts.key_check`,
+`sessions.proven_at` (NULL meaning the creation, so every existing insert
+stays valid) and `pairings`, keyed by the handle's digest, deleted with the
+browser session that started it, at most five minutes long and 300 polls.
+The store starts at most three per account and a thousand in all after
+sweeping ended ones; claims once within two minutes; shows a claim and takes
+an approval only from the starting session, once; and deletes the pairing on
+every redeem, so a wrong verifier ends it. A redeem checks the challenge, the
+epoch and that the proof leaves at least a minute, then issues a native
+session in place of the account's last one, resting on the page's proof. The
+identity service checks exact lengths and the approval proof against the
+stored check before the seal is stored. The browser listener serves the
+page's four requests and the key check's two, the native listener the
+client's three, under a budget window of their own so polling cannot spend
+the sign-ins'. A reset to a new vault clears the check (found while writing
+the store: the old vault's check would otherwise have outlived its key). The
+SDK opens the seal under its binding before it keeps a session and ends a
+session whose seal does not open.
+
+Adversarial pass: `tests/support/accounts/pairing.rs` runs every refusal
+against PostgreSQL: no check, no pairing; a second check, a late one, one
+without a session; a native bearer starting; a fourth open pairing; another
+account's cookie reading, approving or cancelling; a second claim (the
+hijacking application); a second approval; a wrong verifier, then the right
+one; a second redeem; another epoch between approval and redeem; a proof too
+old; a late claim and an ended pairing; and that signing out ends the page's
+pairings. The listener lists name every one of the 57 operations. The crypto
+tests are those of the two commits before this one.
+
+Evidence on macOS, 30.10.2026: `cargo xtask gate` (format, policy, crypto
+scope, clippy, tests, doc tests, release build), `cargo xtask postgres`,
+`smoke`, `secrets` (tree and history), `cargo deny` and `cargo audit` 0.22.2
+pass. `cargo xtask wasm --check` builds on Linux x86-64 only and did not run
+here; `central-web-crypto` takes `central-crypto` as a development
+dependency only. The first PostgreSQL run found the migration count still at
+13 and an ambiguous column in the test's own helper, both fixed. With the
+store made to keep a pairing after a wrong verifier, the test fails at
+"ended by the wrong verifier". Engineering review, not an audit; a second
+model reviews these three commits before they land.

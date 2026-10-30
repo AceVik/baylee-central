@@ -17,6 +17,7 @@ mod gateways;
 mod kinds;
 mod migration;
 mod objects;
+mod pairing;
 mod password;
 mod profiles;
 mod recovery;
@@ -118,6 +119,7 @@ pub(crate) async fn run(operator: &DatabaseConnection) {
     admin::run(&store, operator, &keys).await;
     reset::run(&store, operator, &keys).await;
     deletion::run(&store, operator, &keys).await;
+    pairing::run(&store, operator, &keys).await;
     store.close().await.unwrap();
 }
 

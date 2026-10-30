@@ -292,16 +292,21 @@ impl AccountStore {
         let session = session.into();
         let digest = session.digest().to_vec();
         let tx = self.db.begin().await.map_err(|_| Error::Unavailable)?;
-        let row = tx.query_one_raw(statement(
-            "UPDATE central_identity.sessions s SET expires_at = LEAST(
-                 pg_catalog.clock_timestamp() + interval '30 minutes', s.created_at + interval '12 hours')
+        let row = tx
+            .query_one_raw(statement(
+                "UPDATE central_identity.sessions s SET expires_at = LEAST(
+                 pg_catalog.clock_timestamp() + interval '30 minutes',
+                 COALESCE(s.proven_at, s.created_at) + interval '12 hours')
              FROM central_identity.accounts a
              WHERE s.digest = $1 AND s.kind = $2 AND a.id = s.account_id
              AND a.credential_revision = s.credential_revision AND a.credential IS NOT NULL
              AND s.expires_at > pg_catalog.clock_timestamp()
              RETURNING floor(extract(epoch FROM s.expires_at))::bigint AS expires_at",
-            vec![digest.clone().into(), session.kind().into()],
-        )).await.map_err(|_| Error::Unavailable)?.ok_or(Error::Rejected)?;
+                vec![digest.clone().into(), session.kind().into()],
+            ))
+            .await
+            .map_err(|_| Error::Unavailable)?
+            .ok_or(Error::Rejected)?;
         let expires_at: i64 = row
             .try_get("", "expires_at")
             .map_err(|_| Error::Unavailable)?;

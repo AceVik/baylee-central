@@ -10,6 +10,7 @@ pub(super) struct Limits {
     accounts: BTreeMap<[u8; 16], (Instant, u32)>,
     data: Window,
     control: Window,
+    pairing: Window,
     peers: BTreeMap<([u8; 32], bool), Window>,
 }
 
@@ -36,6 +37,14 @@ impl Limits {
         bearer: Option<&Token>,
         now: Instant,
     ) -> Result<(), Error> {
+        // A client's claim, polls and redeem carry no session; their own
+        // window keeps a few pairings' polling from spending the sign-ins'.
+        if matches!(
+            request,
+            Request::PairClaim { .. } | Request::PairPoll { .. } | Request::PairRedeem { .. }
+        ) {
+            return self.pairing.charge(now, 64);
+        }
         if matches!(
             request,
             Request::Discover { .. }

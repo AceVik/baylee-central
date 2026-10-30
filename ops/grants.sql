@@ -26,3 +26,6 @@ GRANT SELECT, UPDATE (uses_left) ON central_identity.beta_keys TO central_runtim
 -- nor delete; the operator's sweep deletes events after three years.
 GRANT SELECT, INSERT, DELETE ON central_identity.account_roles TO central_runtime;
 GRANT SELECT, INSERT ON central_identity.audit_events TO central_runtime;
+-- Pairings (Baylee's deep links): the runtime starts, claims, approves and
+-- redeems them, and deletes each when it is used or over.
+GRANT SELECT, INSERT, UPDATE, DELETE ON central_identity.pairings TO central_runtime;
