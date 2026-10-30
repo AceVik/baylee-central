@@ -16,6 +16,8 @@ const PASSWORD = "violet lantern harbour quietly";
 const QA_ORIGIN = readFileSync(join(OUT, "origin"), "utf8").trim();
 
 async function shoot(page: Page, file: string) {
+  // from the top: a sticky header photographed mid-scroll covers the page's title
+  await page.evaluate(() => window.scrollTo(0, 0));
   await page.waitForTimeout(400);
   await page.screenshot({ path: join(OUT, `${file}.png`), fullPage: true });
 }

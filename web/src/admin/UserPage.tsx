@@ -89,6 +89,9 @@ function Detail({ api, id, summary, replace }: { api: AdminApi; id: Uint8Array; 
     );
   };
 
+  // nothing to do to a pending account, nor to one's own
+  const acts = a.state !== "pending" && !self;
+
   return (
     <>
       <Panel title={<bdi translate="no">{who(a)}</bdi>}>
@@ -116,21 +119,23 @@ function Detail({ api, id, summary, replace }: { api: AdminApi; id: Uint8Array; 
         </Panel>
       )}
 
-      <Panel title={<T id="adm.actions" />}>
-        <div className="action-row">
-          {a.state !== "pending" && !self && (
-            <button type="button" className={a.admin ? "button button-danger" : "button button-ghost"} onClick={() => setAsking({ at: "admin", admin: !a.admin })}>
-              <T id={a.admin ? "adm.removeAdmin" : "adm.makeAdmin"} />
-            </button>
+      {(acts || a.resetUntil !== null) && (
+        <Panel title={<T id="adm.actions" />}>
+          {acts && (
+            <div className="action-row">
+              <button type="button" className={a.admin ? "button button-danger" : "button button-ghost"} onClick={() => setAsking({ at: "admin", admin: !a.admin })}>
+                <T id={a.admin ? "adm.removeAdmin" : "adm.makeAdmin"} />
+              </button>
+              {!a.admin && (
+                <button type="button" className="button button-ghost" onClick={() => setAsking({ at: "reset" })}>
+                  <T id="adm.reset" />
+                </button>
+              )}
+            </div>
           )}
-          {a.state !== "pending" && !a.admin && !self && (
-            <button type="button" className="button button-ghost" onClick={() => setAsking({ at: "reset" })}>
-              <T id="adm.reset" />
-            </button>
-          )}
-        </div>
-        {a.resetUntil !== null && <p className="small"><T id="adm.resetOpen" args={{ time: when(lang, a.resetUntil) }} /></p>}
-      </Panel>
+          {a.resetUntil !== null && <p className="small"><T id="adm.resetOpen" args={{ time: when(lang, a.resetUntil) }} /></p>}
+        </Panel>
+      )}
 
       {detail.gateways.length > 0 && (
         <Panel title={<T id="adm.ownedGateways" />}>

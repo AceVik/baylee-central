@@ -29,6 +29,8 @@ const DISPLAY = `Owner_${STAMP}`;
 const QA_ORIGIN = `https://qa-${STAMP}.invalid`;
 
 async function shoot(page: Page, file: string, mask: string[] = []) {
+  // from the top: a sticky header photographed mid-scroll covers the page's title
+  await page.evaluate(() => window.scrollTo(0, 0));
   await page.waitForTimeout(400);
   await page.screenshot({ path: join(OUT, `${file}.png`), fullPage: true, mask: mask.map((m) => page.locator(m)) });
 }
