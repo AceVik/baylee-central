@@ -25,6 +25,12 @@ const Terms = lazy(() => import("./legal/TermsPage"));
 const Register = lazy(() => import("./account/RegisterPage"));
 const SignIn = lazy(() => import("./account/SignInPage"));
 const Account = lazy(() => import("./account/AccountPage"));
+const Security = lazy(() => import("./account/SecurityPage"));
+const MyGateways = lazy(() => import("./account/GatewaysPage"));
+const AdminUsers = lazy(() => import("./admin/UsersPage"));
+const AdminUser = lazy(() => import("./admin/UserPage"));
+const AdminGateways = lazy(() => import("./admin/GatewaysPage"));
+const AdminAudit = lazy(() => import("./admin/AuditPage"));
 
 function Loading() {
   return (
@@ -60,6 +66,18 @@ function PageView({ page }: { page: Page | null }) {
       return <SignIn />;
     case "account":
       return <Account />;
+    case "accountSecurity":
+      return <Security />;
+    case "accountGateways":
+      return <MyGateways />;
+    case "admin":
+      return <AdminUsers />;
+    case "adminUser":
+      return <AdminUser />;
+    case "adminGateways":
+      return <AdminGateways />;
+    case "adminAudit":
+      return <AdminAudit />;
     case null:
       return <NotFound />;
   }
@@ -112,7 +130,7 @@ export function App() {
 
   return (
     <AccountProvider>
-      <WorldBackdrop companion={page === "signIn" || page === "register" || page === "account"} />
+      <WorldBackdrop companion={page === "signIn" || page === "register"} />
       <SkipLink />
       <Header page={page} />
       <main id="main" tabIndex={-1} ref={main}>

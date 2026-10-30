@@ -1,6 +1,7 @@
 //! Central's own terms of use, compiled in from `legal/` (`docs/terms.md`),
 //! and the operations on terms.
 use super::{Error, IdentityService, Request, Response, Session, Surface, Token};
+use central_api::owner::OwnerRequest;
 use central_api::{
     gateway::validate_origin,
     terms::{self, DRAFT, TermsDocument, TermsSubject, TermsText, TermsVersion},
@@ -90,6 +91,14 @@ pub(super) fn needs_acceptance(request: &Request) -> bool {
             | Request::SetDisplayName { .. }
             | Request::ChangePasswordStart { .. }
             | Request::Admin { .. }
+    ) || matches!(
+        // An account's own area: making something needs the terms; reading
+        // its sessions and gateways, ending a session and revoking a token
+        // stay open to a person who will not accept new ones.
+        request,
+        Request::Owner {
+            request: OwnerRequest::AddGateway { .. } | OwnerRequest::CreateToken { .. }
+        }
     )
 }
 
@@ -292,8 +301,37 @@ mod tests {
                 attempt: Token::generate().unwrap(),
                 proof: vec![],
             },
+            Request::Owner {
+                request: OwnerRequest::Sessions,
+            },
+            Request::Owner {
+                request: OwnerRequest::EndClientSession,
+            },
+            Request::Owner {
+                request: OwnerRequest::Gateways,
+            },
+            Request::Owner {
+                request: OwnerRequest::RevokeToken { token: [0; 16] },
+            },
         ] {
             assert!(!needs_acceptance(&free));
         }
+        assert!(needs_acceptance(&Request::Owner {
+            request: OwnerRequest::AddGateway {
+                origin: "https://gateway.invalid".into(),
+                name: "Synthetic".into(),
+            },
+        }));
+        assert!(needs_acceptance(&Request::Owner {
+            request: OwnerRequest::CreateToken {
+                gateway: [0; 16],
+                name: "Main".into(),
+                scopes: central_api::owner::GatewayScopes {
+                    sso: true,
+                    listing: true,
+                },
+                days: 30,
+            },
+        }));
     }
 }

@@ -26,6 +26,7 @@ mod dispatch;
 mod gateways;
 mod limits;
 mod objects;
+mod owner;
 mod password;
 mod reset;
 mod terms;
@@ -106,6 +107,7 @@ pub fn browser_operation(request: &Request) -> bool {
         | Request::ChangePasswordStart { .. }
         | Request::ChangePasswordFinish { .. }
         | Request::Admin { .. }
+        | Request::Owner { .. }
         | Request::ResetStart { .. }
         | Request::ResetFinish { .. }
         | Request::AccountExport
@@ -135,14 +137,16 @@ pub fn browser_operation(request: &Request) -> bool {
         | Request::RedeemGateway { .. }
         | Request::GatewayTerms { .. }
         | Request::PublishGatewayTerms { .. }
-        | Request::GatewayAuthorize { .. } => false,
+        | Request::GatewayAuthorize { .. }
+        | Request::GatewayStatus => false,
     }
 }
 
 /// Operations the browser listener alone serves: registration has its
 /// per-address budget there, the account page's requests are the website's
 /// (the native client makes no recovery code and chooses no display name
-/// yet, M6), and administration is the website's (`docs/administration.md`).
+/// yet, M6), administration is the website's (`docs/administration.md`),
+/// and so is an account's area with its sessions, gateways and tokens.
 /// The native listener refuses them before anything else is checked.
 fn browser_only(request: &Request) -> bool {
     matches!(
@@ -152,6 +156,7 @@ fn browser_only(request: &Request) -> bool {
             | Request::SetRecovery { .. }
             | Request::SetDisplayName { .. }
             | Request::Admin { .. }
+            | Request::Owner { .. }
     )
 }
 
@@ -170,6 +175,7 @@ fn uses_session(request: &Request) -> bool {
             | Request::ChangePasswordStart { .. }
             | Request::ChangePasswordFinish { .. }
             | Request::Admin { .. }
+            | Request::Owner { .. }
             | Request::AccountExport
             | Request::DeleteAccountStart { .. }
             | Request::DeleteAccountFinish { .. }
@@ -528,6 +534,9 @@ mod tests {
                 attempt: token(),
                 proof: vec![],
             },
+            Request::Owner {
+                request: central_api::owner::OwnerRequest::Sessions,
+            },
         ]
     }
 
@@ -629,6 +638,8 @@ mod tests {
                     digest: [0; 32],
                 }),
             },
+            // a gateway's token is no website's business
+            Request::GatewayStatus,
         ]
     }
 
@@ -646,15 +657,18 @@ mod tests {
                 text[start..].split('"').next().unwrap().to_owned()
             })
             .collect();
-        assert_eq!(named.len(), 48, "every operation is in one of the lists");
+        assert_eq!(named.len(), 50, "every operation is in one of the lists");
     }
 
     #[test]
     fn the_native_listener_refuses_the_websites_own_operations() {
         let (served, _) = (served(), refused());
         let only: Vec<&Request> = served.iter().filter(|r| browser_only(r)).collect();
-        assert_eq!(only.len(), 5);
-        // Administration is the website's alone.
+        assert_eq!(only.len(), 6);
+        // An account's own area is the website's alone, as administration is.
+        assert!(browser_only(&Request::Owner {
+            request: central_api::owner::OwnerRequest::Gateways,
+        }));
         assert!(browser_only(&Request::Admin {
             request: central_api::admin::AdminRequest::Accounts {
                 query: None,
@@ -701,6 +715,9 @@ mod tests {
             assert!(uses_session(&request) && browser_operation(&request));
             assert!(!browser_only(&request));
         }
+        assert!(uses_session(&Request::Owner {
+            request: central_api::owner::OwnerRequest::Sessions,
+        }));
         assert!(!uses_session(&Request::Terms));
         assert!(!uses_session(&Request::GatewayDirectory { after: None }));
         assert!(!uses_session(&Request::Discover {

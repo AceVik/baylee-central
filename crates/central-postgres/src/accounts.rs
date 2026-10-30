@@ -25,6 +25,7 @@ mod registration;
 mod reset;
 mod sessions;
 mod terms;
+mod tokens;
 pub use admin::{AUDIT_YEARS, Action, Appointed, Swept, appoint_admin, sweep};
 pub use migration::Status;
 pub use profiles::{Profile, TAG_DRAWS, TagDraw};

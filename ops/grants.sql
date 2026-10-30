@@ -8,7 +8,12 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON central_identity.accounts, central_ident
   central_identity.gateway_tickets, central_identity.private_objects TO central_runtime;
 GRANT SELECT, INSERT ON central_identity.migration_archives TO central_runtime;
 GRANT SELECT, INSERT, UPDATE ON central_identity.gateways TO central_runtime;
-GRANT SELECT ON central_identity.gateway_approvals TO central_runtime;
+-- Administrators approve, enable and disable gateways on the website
+-- (docs/administration.md §"Gateways"); an approval is never deleted.
+GRANT SELECT, INSERT, UPDATE (enabled) ON central_identity.gateway_approvals TO central_runtime;
+-- Gateway tokens (docs/gateway-registry.md §"Gateway tokens"): stored by
+-- digest; afterwards only their revocation and last use change.
+GRANT SELECT, INSERT, UPDATE (revoked_at, last_used_at) ON central_identity.gateway_tokens TO central_runtime;
 GRANT SELECT, INSERT, DELETE ON central_identity.gateway_admins, central_identity.gateway_leases TO central_runtime;
 -- A renewed session moves its leases' expiry with it, and nothing else of them.
 GRANT UPDATE (expires_at) ON central_identity.gateway_leases TO central_runtime;

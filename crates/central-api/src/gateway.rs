@@ -29,6 +29,19 @@ pub struct GatewayListing {
     pub online: bool,
 }
 
+/// Where a registered gateway stands with Central's administrators. Only an
+/// approved gateway is listed and authenticates; a disabled one neither.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum GatewayState {
+    /// Registered, not yet approved.
+    Pending,
+    /// Approved and enabled.
+    Approved,
+    /// Approved once, or refused, and disabled now.
+    Disabled,
+}
+
 /// Validate a canonical live HTTPS or explicitly selected loopback development origin.
 ///
 /// # Errors

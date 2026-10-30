@@ -1,0 +1,96 @@
+/* The frame of the account area and the administration (src/app/AppFrame.tsx,
+   docs/website-design.md §"Components", the app frame): the side navigation
+   beside the content from 1100 px, a row of tabs above it below; panels,
+   dialogs, steps and session rows. */
+
+.app { padding: calc(var(--top-h) + var(--space-7)) 0 var(--space-9); }
+.app-inner {
+  max-width: var(--wrap-app); margin: 0 auto; padding: 0 var(--gutter);
+  display: grid; grid-template-columns: 15rem minmax(0, 1fr); gap: var(--space-6); align-items: start;
+}
+.app-nav { position: sticky; top: calc(var(--top-h) + var(--space-5)); font-family: var(--sans); }
+.app-nav-head { font: 700 var(--text-xs) var(--sans); letter-spacing: 0.16em; text-transform: uppercase; color: var(--violet); margin: var(--space-5) 0 var(--space-2) var(--space-3); }
+.app-nav-head:first-child { margin-top: 0; }
+.app-nav-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-1); }
+.app-nav-link {
+  position: relative; display: flex; align-items: center; gap: var(--space-3); min-height: 44px; padding: 0 var(--space-3);
+  border-radius: var(--radius-md); color: var(--ink-soft); text-decoration: none; font-weight: 500;
+  transition: background-color var(--dur-fast) ease, color var(--dur-fast) ease;
+}
+.app-nav-link:hover { background: var(--panel-2); color: var(--title); }
+.app-nav-link[aria-current="page"] { background: var(--panel-solid); color: var(--title); box-shadow: inset 3px 0 0 var(--gold); }
+.app-nav-icon { width: 1.15rem; height: 1.15rem; flex: none; color: var(--violet); }
+.app-main { min-width: 0; display: grid; gap: var(--space-5); }
+.app-head { text-align: start; }
+.app-head h1 { font-size: var(--text-xl); margin-bottom: 0.3em; }
+.app-lead { color: var(--ink-soft); max-width: var(--prose); margin: 0; }
+.app-panel { padding: var(--space-5); }
+.app-panel-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-4); }
+.app-panel-title { margin: 0; font-size: var(--text-lg); overflow-wrap: anywhere; }
+.app-panel-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.app-sub { font-size: var(--text-md); font-family: var(--sans); color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.12em; margin: var(--space-5) 0 var(--space-3); }
+.app-empty { text-align: center; display: grid; justify-items: center; gap: var(--space-3); }
+.app-empty p { margin: 0; }
+.app-skeleton { min-height: 8rem; border-radius: var(--radius); }
+.app-none { text-align: center; }
+.action-row { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
+.search-row { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-bottom: var(--space-4); }
+.search-row input {
+  flex: 1 1 14rem; min-height: 44px; font: 1rem var(--sans); color: var(--ink); background: var(--field-bg);
+  border: 1px solid var(--field-edge); border-radius: var(--radius-md); padding: 0.5em 0.85em;
+}
+.search-row input:focus-visible { outline: none; border-color: var(--gold); box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold) 35%, transparent); }
+.chips { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-bottom: var(--space-3); }
+.pill-icon { width: 0.95em; height: 0.95em; }
+
+/* the three steps of hosting a gateway */
+.steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-4); }
+.step { display: flex; gap: var(--space-3); align-items: flex-start; padding: var(--space-4); font-family: var(--sans); color: var(--ink-soft); }
+.step-n {
+  flex: none; display: inline-grid; place-items: center; width: 2rem; height: 2rem; border-radius: 50%;
+  background: var(--gold); color: var(--gold-ink); font-weight: 700;
+}
+.steps-small { margin: var(--space-4) 0; padding-left: 1.3em; font-family: var(--sans); color: var(--ink-soft); }
+.steps-small li { margin-bottom: var(--space-1); }
+
+/* sessions */
+.sessions { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-3); }
+.session { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3) var(--space-4); padding: var(--space-4); border: 1px solid var(--edge-soft); border-radius: var(--radius-md); background: var(--panel-solid); }
+.session-icon { display: inline-grid; place-items: center; width: 2.6rem; height: 2.6rem; border-radius: var(--radius-md); background: var(--violet-soft); color: var(--violet); flex: none; }
+.session-body { flex: 1 1 16rem; min-width: 0; }
+.session-body p { margin: 0 0 var(--space-1); }
+.session-title { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); font: 700 var(--text-md) var(--sans); color: var(--title); }
+.session-none { justify-content: center; color: var(--ink-faint); }
+.session-skeleton { min-height: 5rem; border-radius: var(--radius-md); }
+.gw-pills { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: 0 0 var(--space-3); }
+.add-gateway { display: grid; grid-template-columns: 1fr 1fr; gap: 0 var(--space-4); }
+.add-gateway .form-row { grid-column: 1 / -1; }
+
+/* dialogs */
+.app-dialog {
+  width: min(34rem, calc(100vw - 2 * var(--gutter))); max-width: none; padding: var(--space-5);
+  border: 1px solid var(--edge); border-radius: var(--radius); background: var(--panel-solid); color: var(--ink);
+  box-shadow: var(--shadow-lift);
+}
+.app-dialog-wide { width: min(44rem, calc(100vw - 2 * var(--gutter))); }
+.app-dialog-title { font-size: var(--text-lg); margin: 0 0 var(--space-3); text-align: center; }
+.app-dialog-body { color: var(--ink-soft); }
+.app-dialog-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-2); margin-top: var(--space-4); }
+.app-dialog select {
+  min-height: 46px; font: 1rem var(--sans); color: var(--ink); background: var(--field-bg);
+  border: 1px solid var(--field-edge); border-radius: var(--radius-md); padding: 0 0.8em;
+}
+.app-dialog fieldset legend { font-weight: 700; margin-bottom: var(--space-1); }
+
+@media (max-width: 1100px) {
+  .app-inner { grid-template-columns: 1fr; gap: var(--space-4); }
+  .app-nav { position: static; display: flex; flex-wrap: wrap; gap: var(--space-2); overflow-x: auto; }
+  .app-nav-head { display: none; }
+  .app-nav-list { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+  .app-nav-link { border: 1px solid var(--edge-soft); border-radius: var(--pill); }
+  .app-nav-link[aria-current="page"] { box-shadow: inset 0 -2px 0 var(--gold); }
+}
+@media (max-width: 860px) {
+  .steps { grid-template-columns: 1fr; }
+  .add-gateway { grid-template-columns: 1fr; }
+}

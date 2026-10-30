@@ -1,0 +1,23 @@
+/* Tables of the administration and of a gateway's tokens
+   (docs/website-design.md §"Components", tables): the interface face,
+   tabular figures, a row's hover, the actions last; a wide table scrolls in
+   its own box. */
+
+.table-wrap { position: relative; overflow-x: auto; margin: 0 0 var(--space-3); border: 1px solid var(--edge-soft); border-radius: var(--radius-md); }
+.table { width: 100%; border-collapse: collapse; font: var(--text-sm) var(--sans); }
+.table th, .table td { padding: var(--space-3); text-align: start; vertical-align: middle; border-bottom: 1px solid var(--edge-soft); }
+.table thead th { font-size: var(--text-xs); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); background: var(--panel-solid); white-space: nowrap; }
+.table tbody th { font-weight: 700; color: var(--title); }
+.table tbody tr { transition: background-color var(--dur-fast) ease; }
+.table tbody tr:hover { background: var(--panel-2); }
+.table tbody tr:last-child > * { border-bottom: 0; }
+.table .num, .table td.num { font-variant-numeric: tabular-nums lining-nums; white-space: nowrap; }
+.table-actions { text-align: end; white-space: nowrap; }
+.table code { white-space: nowrap; }
+
+/* the administration's gateways */
+.agws { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-4); }
+.agw { padding: var(--space-5); display: grid; gap: var(--space-3); }
+.agw-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: var(--space-3); }
+.agw-name { margin: 0 0 var(--space-1); font-size: var(--text-lg); overflow-wrap: anywhere; }
+.agw-kv { margin: 0; }

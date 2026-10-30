@@ -1,3 +1,4 @@
+use super::tokens::LIVE_TOKEN;
 use super::{AccountStore, Error, Token, number, statement, uuid};
 use central_api::{
     LEGACY_ORIGIN,
@@ -109,18 +110,28 @@ impl AccountStore {
             .collect()
     }
 
-    /// Authenticate only a gateway's redemption credential, never its heartbeat credential.
-    /// The official gateway holds none (migration 000009); the bridge is its authority.
+    /// Authenticate a gateway's redemption credential or a live gateway token
+    /// with the `sso` scope (migration 000014), never a heartbeat credential
+    /// or a listing-only token. The official gateway holds neither
+    /// (migration 000009); the bridge is its authority.
     ///
     /// # Errors
-    /// Rejects unapproved/disabled gateways and incorrect credentials.
+    /// Rejects unapproved/disabled gateways, revoked or expired tokens and
+    /// incorrect credentials.
     pub async fn authenticate_gateway(
         &self,
         credential: &Token,
     ) -> Result<([u8; 16], String), Error> {
+        // Two lookups by a unique digest each; a 256-bit random token cannot
+        // be both a credential and a token, so at most one row answers.
         let row=self.db.query_one_raw(statement(
-            "SELECT g.id,g.origin FROM central_identity.gateways g JOIN central_identity.gateway_approvals p
-             ON p.gateway_id=g.id AND p.enabled WHERE g.credential_digest=$1 AND NOT g.official", vec![credential.digest().to_vec().into()]
+            &format!("SELECT g.id,g.origin FROM central_identity.gateways g JOIN central_identity.gateway_approvals p
+             ON p.gateway_id=g.id AND p.enabled WHERE g.credential_digest=$1 AND NOT g.official
+             UNION ALL
+             SELECT g.id,g.origin FROM central_identity.gateway_tokens t
+             JOIN central_identity.gateways g ON g.id=t.gateway_id
+             JOIN central_identity.gateway_approvals p ON p.gateway_id=g.id AND p.enabled
+             WHERE t.digest=$1 AND t.sso AND {LIVE_TOKEN} AND NOT g.official LIMIT 1"), vec![credential.digest().to_vec().into()]
         )).await.map_err(|_| Error::Unavailable)?.ok_or(Error::Rejected)?;
         let id: Uuid = row.try_get("", "id").map_err(|_| Error::Unavailable)?;
         Ok((
@@ -130,26 +141,42 @@ impl AccountStore {
     }
 
     /// Update public metadata and central-clock liveness only, at most once per five seconds.
+    /// The credential is a registered gateway's heartbeat token or a live
+    /// gateway token with the `listing` scope (migration 000014), which this
+    /// marks used.
     ///
     /// # Errors
-    /// Rejects wrong credentials, unapproved gateways, unsafe metadata and excessive heartbeat rate.
+    /// Rejects wrong credentials, unapproved gateways, revoked or expired
+    /// tokens, unsafe metadata and excessive heartbeat rate.
     pub async fn gateway_heartbeat(
         &self,
         token: &Token,
         metadata: &GatewayMetadata,
     ) -> Result<(), Error> {
         let row=self.db.query_one_raw(statement(
-            "SELECT g.origin FROM central_identity.gateways g JOIN central_identity.gateway_approvals p
-             ON p.gateway_id=g.id AND p.enabled WHERE g.heartbeat_digest=$1 AND NOT g.official",vec![token.digest().to_vec().into()]
+            &format!("SELECT g.id,g.origin,false AS by_token FROM central_identity.gateways g JOIN central_identity.gateway_approvals p
+             ON p.gateway_id=g.id AND p.enabled WHERE g.heartbeat_digest=$1 AND NOT g.official
+             UNION ALL
+             SELECT g.id,g.origin,true FROM central_identity.gateway_tokens t
+             JOIN central_identity.gateways g ON g.id=t.gateway_id
+             JOIN central_identity.gateway_approvals p ON p.gateway_id=g.id AND p.enabled
+             WHERE t.digest=$1 AND t.listing AND {LIVE_TOKEN} AND NOT g.official LIMIT 1"),vec![token.digest().to_vec().into()]
         )).await.map_err(|_|Error::Unavailable)?.ok_or(Error::Rejected)?;
+        let gateway: Uuid = row.try_get("", "id").map_err(|_| Error::Unavailable)?;
         let origin: String = row.try_get("", "origin").map_err(|_| Error::Unavailable)?;
+        let by_token: bool = row
+            .try_get("", "by_token")
+            .map_err(|_| Error::Unavailable)?;
         metadata.validate(&origin)?;
+        if by_token {
+            self.touch_gateway_token(token).await?;
+        }
         let updated=self.db.execute_raw(statement(
             "UPDATE central_identity.gateways g SET name=$2,version=$3,website=$4,last_seen=pg_catalog.clock_timestamp()
-             WHERE heartbeat_digest=$1 AND NOT official
+             WHERE id=$1 AND NOT official
              AND (last_seen IS NULL OR last_seen<=pg_catalog.clock_timestamp()-interval '5 seconds')
              AND EXISTS(SELECT 1 FROM central_identity.gateway_approvals p WHERE p.gateway_id=g.id AND p.enabled)",
-            vec![token.digest().to_vec().into(),metadata.name.clone().into(),metadata.version.clone().into(),metadata.website.clone().into()]
+            vec![gateway.into(),metadata.name.clone().into(),metadata.version.clone().into(),metadata.website.clone().into()]
         )).await.map_err(|_|Error::Unavailable)?;
         if updated.rows_affected() != 1 {
             return Err(Error::Busy);

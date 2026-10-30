@@ -383,6 +383,21 @@ pub enum Request {
         /// What happens to the encrypted data.
         vault: ResetVault,
     },
+    /// An account's request about its own sessions and gateways
+    /// (`docs/web-accounts.md` §"The account area"): browser listener only,
+    /// the cookie's session, Central's terms accepted; minting a token also
+    /// needs a password sign-in less than 30 minutes old. Answered with
+    /// [`Response::Owner`], or `Done` for a change that creates nothing.
+    Owner {
+        /// The action.
+        request: crate::owner::OwnerRequest,
+    },
+    /// What Central knows about the gateway whose token authenticates this
+    /// request (`docs/gateway-registry.md` §"Gateway tokens"): its origin,
+    /// metadata and approval, and the token's scopes and expiry. Answered
+    /// for a live token whatever the approval, so a new gateway's console
+    /// can say it waits for one; anything else is `Rejected`.
+    GatewayStatus,
     /// An administrator's request (`docs/administration.md`): browser
     /// listener only, a browser session whose account holds the role, and
     /// Central's terms accepted; a change also needs a password sign-in less
@@ -707,6 +722,26 @@ pub enum Response {
         /// Its tag; none for an account moved from the official gateway
         /// whose tag the bridge has not carried yet.
         tag: Option<u32>,
+    },
+    /// What an account's own request found or made ([`Request::Owner`]).
+    Owner {
+        /// The answer.
+        answer: crate::owner::OwnerAnswer,
+    },
+    /// The token's gateway as Central knows it ([`Request::GatewayStatus`]).
+    GatewayStatus {
+        /// The gateway's id.
+        gateway: [u8; 16],
+        /// Its origin, the audience of its players' tickets.
+        origin: String,
+        /// Its public metadata as Central holds it.
+        metadata: crate::gateway::GatewayMetadata,
+        /// Whether it is approved, and so listed and able to sign players in.
+        state: crate::gateway::GatewayState,
+        /// What the token allows.
+        scopes: crate::owner::GatewayScopes,
+        /// When the token stops working, in Unix seconds.
+        expires_at: i64,
     },
     /// What an administrator's reading request found ([`Request::Admin`]).
     Admin {

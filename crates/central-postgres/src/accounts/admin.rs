@@ -3,10 +3,15 @@
 //! or transaction that acts, and the operator's appointment and sweep. The
 //! queries name their columns and never read a credential, a wrapper or a
 //! document.
+use super::tokens::{LIVE_TOKEN, STATE, TOKEN_COLUMNS, metadata, state, token_info};
 use super::{AccountStore, Error, Session, Token, statement, username};
 use central_api::admin::{
-    ACCOUNT_LIST, AccountQuery, AccountState, AdminAccount, AuditEvent, OwnedGateway, PAGE,
+    ACCOUNT_LIST, AccountQuery, AccountState, AdminAccount, AdminGateway, AuditEvent, OwnedGateway,
+    PAGE,
 };
+use central_api::gateway::GatewayState;
+use central_api::owner::TokenInfo;
+use central_api::profile::valid_tag;
 use sea_orm::{
     ConnectionTrait, DatabaseConnection, QueryResult, TransactionTrait, Value, prelude::Uuid,
 };
@@ -21,6 +26,14 @@ pub enum Action {
     AdminRemoved,
     /// A reset code was made for an account.
     ResetIssued,
+    /// An account was given another tag; the detail holds both.
+    TagChanged,
+    /// A gateway was approved, or enabled again.
+    GatewayApproved,
+    /// A gateway was disabled.
+    GatewayDisabled,
+    /// A gateway token was revoked by an administrator.
+    GatewayTokenRevoked,
 }
 
 impl Action {
@@ -31,6 +44,10 @@ impl Action {
             Self::AdminGranted => "account.admin_granted",
             Self::AdminRemoved => "account.admin_removed",
             Self::ResetIssued => "account.reset_issued",
+            Self::TagChanged => "account.tag_changed",
+            Self::GatewayApproved => "gateway.approved",
+            Self::GatewayDisabled => "gateway.disabled",
+            Self::GatewayTokenRevoked => "gateway.token_revoked",
         }
     }
 }
@@ -169,6 +186,75 @@ pub(super) async fn audit(
     .await
     .map_err(|_| Error::Unavailable)?;
     Ok(())
+}
+
+/// Write one audit event about a gateway in `db`'s transaction.
+async fn audit_gateway(
+    db: &impl ConnectionTrait,
+    actor: Uuid,
+    action: Action,
+    gateway: Uuid,
+) -> Result<(), Error> {
+    db.execute_raw(statement(
+        "INSERT INTO central_identity.audit_events (actor_kind, actor_account, action, gateway_id)
+         VALUES ('admin', $1, $2, $3)",
+        vec![actor.into(), action.as_str().into(), gateway.into()],
+    ))
+    .await
+    .map_err(|_| Error::Unavailable)?;
+    Ok(())
+}
+
+/// The columns of an [`AdminGateway`], from `gateways g` with `gateway_approvals p`
+/// left-joined and the owner `accounts o` left-joined.
+const GATEWAY_COLUMNS: &str = "g.id, g.origin, g.name, g.version, g.website, g.official, g.owner_id,
+    o.display_name AS owner_name, o.tag AS owner_tag,
+    CASE WHEN p.gateway_id IS NULL THEN 'pending' WHEN p.enabled THEN 'approved' ELSE 'disabled' END AS state,
+    COALESCE(g.last_seen > pg_catalog.clock_timestamp() - interval '90 seconds', false) AS online,
+    floor(extract(epoch FROM g.last_seen))::bigint AS last_seen,
+    floor(extract(epoch FROM g.created_at))::bigint AS created_at,
+    g.credential_digest IS NOT NULL AS credential_pair";
+
+/// The joins under [`GATEWAY_COLUMNS`].
+const GATEWAY_FROM: &str = "central_identity.gateways g
+    LEFT JOIN central_identity.gateway_approvals p ON p.gateway_id = g.id
+    LEFT JOIN central_identity.accounts o ON o.id = g.owner_id";
+
+fn admin_gateway(row: &QueryResult) -> Result<AdminGateway, Error> {
+    let owner_tag: Option<i32> = row
+        .try_get("", "owner_tag")
+        .map_err(|_| Error::Unavailable)?;
+    let live: i64 = row
+        .try_get("", "live_tokens")
+        .map_err(|_| Error::Unavailable)?;
+    Ok(AdminGateway {
+        id: id(row, "id")?,
+        origin: row.try_get("", "origin").map_err(|_| Error::Unavailable)?,
+        metadata: metadata(row)?,
+        official: row
+            .try_get("", "official")
+            .map_err(|_| Error::Unavailable)?,
+        owner: optional_id(row, "owner_id")?,
+        owner_name: row
+            .try_get("", "owner_name")
+            .map_err(|_| Error::Unavailable)?,
+        owner_tag: owner_tag
+            .map(u32::try_from)
+            .transpose()
+            .map_err(|_| Error::Unavailable)?,
+        state: state(row)?,
+        online: row.try_get("", "online").map_err(|_| Error::Unavailable)?,
+        last_seen: row
+            .try_get("", "last_seen")
+            .map_err(|_| Error::Unavailable)?,
+        created_at: row
+            .try_get("", "created_at")
+            .map_err(|_| Error::Unavailable)?,
+        live_tokens: u32::try_from(live).map_err(|_| Error::Unavailable)?,
+        credential_pair: row
+            .try_get("", "credential_pair")
+            .map_err(|_| Error::Unavailable)?,
+    })
 }
 
 impl AccountStore {
@@ -338,6 +424,285 @@ impl AccountStore {
         Ok(page)
     }
 
+    /// The administrator behind `browser` for a change in `tx`: anyone else
+    /// is refused before any lock is taken; then every administrator's
+    /// account row is locked, in one order so two changes cannot deadlock
+    /// (the role rows themselves need an UPDATE grant to lock), and the role
+    /// and a password sign-in less than 30 minutes old are checked again in a
+    /// fresh snapshot, so a removal that committed meanwhile is seen.
+    async fn acting_administrator(
+        &self,
+        tx: &sea_orm::DatabaseTransaction,
+        browser: &Token,
+    ) -> Result<Uuid, Error> {
+        Self::administrator(&self.db, browser).await?;
+        tx.query_all_raw(statement(
+            "SELECT a.id FROM central_identity.accounts a JOIN central_identity.account_roles r
+             ON r.account_id = a.id WHERE r.role = 'admin' ORDER BY a.id FOR UPDATE OF a",
+            vec![],
+        ))
+        .await
+        .map_err(|_| Error::Unavailable)?;
+        let (actor, fresh) = Self::administrator(tx, browser).await?;
+        if !fresh {
+            return Err(Error::Rejected);
+        }
+        Ok(actor)
+    }
+
+    /// A page of registered gateways for the administrator behind
+    /// `browser`, newest first, all or those in `filter`'s state.
+    ///
+    /// # Errors
+    /// `Rejected` without an administrator's live browser session; storage
+    /// failure.
+    pub async fn admin_gateways(
+        &self,
+        browser: &Token,
+        filter: Option<GatewayState>,
+        before: Option<[u8; 16]>,
+    ) -> Result<(Vec<AdminGateway>, bool), Error> {
+        let filter = filter.map(|state| match state {
+            GatewayState::Pending => "pending",
+            GatewayState::Approved => "approved",
+            GatewayState::Disabled => "disabled",
+        });
+        let tx = self.db.begin().await.map_err(|_| Error::Unavailable)?;
+        Self::administrator(&tx, browser).await?;
+        let rows = tx
+            .query_all_raw(statement(
+                &format!(
+                    "SELECT {GATEWAY_COLUMNS},
+                         (SELECT count(*) FROM central_identity.gateway_tokens t
+                          WHERE t.gateway_id = g.id AND {LIVE_TOKEN})::bigint AS live_tokens
+                     FROM {GATEWAY_FROM}
+                     WHERE ($1::text IS NULL OR {STATE} = $1) AND ($2::uuid IS NULL OR g.id < $2)
+                     ORDER BY g.id DESC LIMIT $3"
+                ),
+                vec![
+                    filter.into(),
+                    before.map(Uuid::from_bytes).into(),
+                    limit(PAGE + 1),
+                ],
+            ))
+            .await
+            .map_err(|_| Error::Unavailable)?;
+        let page = page(&rows, admin_gateway)?;
+        tx.commit().await.map_err(|_| Error::Unavailable)?;
+        Ok(page)
+    }
+
+    /// One gateway for the administrator behind `browser`, with its latest
+    /// tokens.
+    ///
+    /// # Errors
+    /// `Rejected` without an administrator's live browser session or for an
+    /// unknown gateway; storage failure.
+    pub async fn admin_gateway(
+        &self,
+        browser: &Token,
+        gateway: [u8; 16],
+    ) -> Result<(AdminGateway, Vec<TokenInfo>), Error> {
+        let tx = self.db.begin().await.map_err(|_| Error::Unavailable)?;
+        Self::administrator(&tx, browser).await?;
+        let gateway = Uuid::from_bytes(gateway);
+        let row = tx
+            .query_one_raw(statement(
+                &format!(
+                    "SELECT {GATEWAY_COLUMNS},
+                         (SELECT count(*) FROM central_identity.gateway_tokens t
+                          WHERE t.gateway_id = g.id AND {LIVE_TOKEN})::bigint AS live_tokens
+                     FROM {GATEWAY_FROM} WHERE g.id = $1"
+                ),
+                vec![gateway.into()],
+            ))
+            .await
+            .map_err(|_| Error::Unavailable)?
+            .ok_or(Error::Rejected)?;
+        let tokens = tx
+            .query_all_raw(statement(
+                &format!(
+                    "SELECT {TOKEN_COLUMNS} FROM central_identity.gateway_tokens t
+                     WHERE t.gateway_id = $1 ORDER BY t.id DESC LIMIT $2"
+                ),
+                vec![gateway.into(), limit(ACCOUNT_LIST)],
+            ))
+            .await
+            .map_err(|_| Error::Unavailable)?
+            .iter()
+            .map(token_info)
+            .collect::<Result<Vec<_>, Error>>()?;
+        let gateway = admin_gateway(&row)?;
+        tx.commit().await.map_err(|_| Error::Unavailable)?;
+        Ok((gateway, tokens))
+    }
+
+    /// Approve or enable `gateway` (`enabled`), or disable it, for the
+    /// administrator behind `browser`, whose password sign-in must be less
+    /// than 30 minutes old. Disabling ends every lease at that gateway, so
+    /// each of its sessions fails at its next check; its credentials and
+    /// tokens stop authenticating with the approval. The same state again
+    /// changes nothing; a change writes its audit event in the same
+    /// transaction.
+    ///
+    /// # Errors
+    /// `Rejected` without a fresh administrator's browser session or for an
+    /// unknown gateway; storage failure.
+    pub async fn set_gateway_approval(
+        &self,
+        browser: &Token,
+        gateway: [u8; 16],
+        enabled: bool,
+    ) -> Result<(), Error> {
+        let tx = self.db.begin().await.map_err(|_| Error::Unavailable)?;
+        let actor = self.acting_administrator(&tx, browser).await?;
+        let gateway = Uuid::from_bytes(gateway);
+        tx.query_one_raw(statement(
+            "SELECT id FROM central_identity.gateways WHERE id = $1 FOR UPDATE",
+            vec![gateway.into()],
+        ))
+        .await
+        .map_err(|_| Error::Unavailable)?
+        .ok_or(Error::Rejected)?;
+        let changed = tx
+            .query_one_raw(statement(
+                "INSERT INTO central_identity.gateway_approvals (gateway_id, enabled) VALUES ($1, $2)
+                 ON CONFLICT (gateway_id) DO UPDATE SET enabled = EXCLUDED.enabled
+                 WHERE central_identity.gateway_approvals.enabled IS DISTINCT FROM EXCLUDED.enabled
+                 RETURNING gateway_id",
+                vec![gateway.into(), enabled.into()],
+            ))
+            .await
+            .map_err(|_| Error::Unavailable)?
+            .is_some();
+        if changed {
+            if !enabled {
+                tx.execute_raw(statement(
+                    "DELETE FROM central_identity.gateway_leases WHERE gateway_id = $1",
+                    vec![gateway.into()],
+                ))
+                .await
+                .map_err(|_| Error::Unavailable)?;
+            }
+            let action = if enabled {
+                Action::GatewayApproved
+            } else {
+                Action::GatewayDisabled
+            };
+            audit_gateway(&tx, actor, action, gateway).await?;
+        }
+        tx.commit().await.map_err(|_| Error::Unavailable)
+    }
+
+    /// Revoke the gateway token `token` for the administrator behind
+    /// `browser`, whose password sign-in must be less than 30 minutes old.
+    /// One revoked already changes nothing.
+    ///
+    /// # Errors
+    /// `Rejected` without a fresh administrator's browser session or for an
+    /// unknown token; storage failure.
+    pub async fn admin_revoke_gateway_token(
+        &self,
+        browser: &Token,
+        token: [u8; 16],
+    ) -> Result<(), Error> {
+        let tx = self.db.begin().await.map_err(|_| Error::Unavailable)?;
+        let actor = self.acting_administrator(&tx, browser).await?;
+        let token = Uuid::from_bytes(token);
+        let row = tx
+            .query_one_raw(statement(
+                "SELECT gateway_id, revoked_at IS NULL AS live FROM central_identity.gateway_tokens
+                 WHERE id = $1",
+                vec![token.into()],
+            ))
+            .await
+            .map_err(|_| Error::Unavailable)?
+            .ok_or(Error::Rejected)?;
+        let gateway: Uuid = row
+            .try_get("", "gateway_id")
+            .map_err(|_| Error::Unavailable)?;
+        if row
+            .try_get::<bool>("", "live")
+            .map_err(|_| Error::Unavailable)?
+        {
+            tx.execute_raw(statement(
+                "UPDATE central_identity.gateway_tokens SET revoked_at = pg_catalog.clock_timestamp()
+                 WHERE id = $1 AND revoked_at IS NULL",
+                vec![token.into()],
+            ))
+            .await
+            .map_err(|_| Error::Unavailable)?;
+            audit_gateway(&tx, actor, Action::GatewayTokenRevoked, gateway).await?;
+        }
+        tx.commit().await.map_err(|_| Error::Unavailable)
+    }
+
+    /// Give the enrolled account `target` the tag `tag`, for the
+    /// administrator behind `browser`, whose password sign-in must be less
+    /// than 30 minutes old. Tags stay unique, so the handle `Name#tag` does.
+    /// The same tag again changes nothing; a change writes its audit event,
+    /// with the old and the new tag, in the same transaction.
+    ///
+    /// # Errors
+    /// `Rejected` without a fresh administrator's browser session, for a tag
+    /// out of range and for an unknown or unenrolled account; `Conflict` for a
+    /// tag another account holds; storage failure.
+    pub async fn set_tag(&self, browser: &Token, target: [u8; 16], tag: u32) -> Result<(), Error> {
+        if !valid_tag(tag) {
+            return Err(Error::Rejected);
+        }
+        let tag = i32::try_from(tag).map_err(|_| Error::Rejected)?;
+        let tx = self.db.begin().await.map_err(|_| Error::Unavailable)?;
+        let actor = self.acting_administrator(&tx, browser).await?;
+        let target = Uuid::from_bytes(target);
+        let before: Option<i32> = tx
+            .query_one_raw(statement(
+                "SELECT tag FROM central_identity.accounts WHERE id = $1 AND credential IS NOT NULL
+                 FOR UPDATE",
+                vec![target.into()],
+            ))
+            .await
+            .map_err(|_| Error::Unavailable)?
+            .ok_or(Error::Rejected)?
+            .try_get("", "tag")
+            .map_err(|_| Error::Unavailable)?;
+        if before == Some(tag) {
+            return tx.commit().await.map_err(|_| Error::Unavailable);
+        }
+        let taken = tx
+            .query_one_raw(statement(
+                "SELECT 1 AS taken FROM central_identity.accounts WHERE tag = $1",
+                vec![tag.into()],
+            ))
+            .await
+            .map_err(|_| Error::Unavailable)?
+            .is_some();
+        if taken {
+            return Err(Error::Conflict);
+        }
+        // A tag taken by a concurrent change is the unique index's to refuse.
+        tx.execute_raw(statement(
+            "UPDATE central_identity.accounts SET tag = $2 WHERE id = $1",
+            vec![target.into(), tag.into()],
+        ))
+        .await
+        .map_err(|_| Error::Conflict)?;
+        tx.execute_raw(statement(
+            "INSERT INTO central_identity.audit_events (actor_kind, actor_account, action, account_id, detail)
+             VALUES ('admin', $1, $2, $3, pg_catalog.jsonb_build_object('from', $4::integer, 'to', $5::integer))",
+            vec![
+                actor.into(),
+                Action::TagChanged.as_str().into(),
+                target.into(),
+                before.into(),
+                tag.into(),
+            ],
+        ))
+        .await
+        .map_err(|_| Error::Unavailable)?;
+        tx.commit().await.map_err(|_| Error::Unavailable)
+    }
+
     /// Grant or remove the administrator role of `target` for the
     /// administrator behind `browser`, whose password sign-in must be less
     /// than 30 minutes old. Every administrator's account row is locked
@@ -357,22 +722,10 @@ impl AccountStore {
         target: [u8; 16],
         admin: bool,
     ) -> Result<(), Error> {
-        // Anyone else is refused before any lock is taken.
-        Self::administrator(&self.db, browser).await?;
         let tx = self.db.begin().await.map_err(|_| Error::Unavailable)?;
-        // The administrators' account rows, in one order so two changes cannot
-        // deadlock; the role rows themselves need an UPDATE grant to lock.
-        tx.query_all_raw(statement(
-            "SELECT a.id FROM central_identity.accounts a JOIN central_identity.account_roles r
-             ON r.account_id = a.id WHERE r.role = 'admin' ORDER BY a.id FOR UPDATE OF a",
-            vec![],
-        ))
-        .await
-        .map_err(|_| Error::Unavailable)?;
-        // A fresh snapshot after the lock: a removal that committed meanwhile is seen.
-        let (actor, fresh) = Self::administrator(&tx, browser).await?;
+        let actor = self.acting_administrator(&tx, browser).await?;
         let target = Uuid::from_bytes(target);
-        if !fresh || (!admin && actor == target) {
+        if !admin && actor == target {
             return Err(Error::Rejected);
         }
         let changed = if admin {

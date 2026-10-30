@@ -303,14 +303,16 @@ browser listener only), and `ResetStart` and `ResetFinish`, a reset code's
 use ([account reset](account-reset.md); both listeners, no session), and
 `AccountExport`, `DeleteAccountStart` and `DeleteAccountFinish` ([account
 deletion](account-deletion.md); both listeners, with the session, Central's
-terms not required; a finished deletion clears the cookie). Every
+terms not required; a finished deletion clears the cookie), and, since
+30.10.2026, `Owner`, an account's own area (§"The account area"; browser
+listener only, with the session). Every
 other operation is refused. The list is
 one exhaustive match in `central-identity` (`browser_operation`), so a new
 operation does not compile until it is decided there. The cookie's token is
 used only by `SessionStatus`, `RenewSession`, `Logout`, `TermsStatus`,
 `AcceptTerms`, `AccountSummary`, `SetRecovery`, `SetDisplayName` and the
 password change's two requests (whose finish sets a new cookie, as
-`LoginFinish` does), `Admin`, and the export and the deletion's two; the directory uses none, and
+`LoginFinish` does), `Admin`, `Owner`, and the export and the deletion's two; the directory uses none, and
 the page sends it with `credentials: "omit"`.
 
 - `AccountSummary` (the cookie's session; no accepted terms needed) answers
@@ -392,6 +394,39 @@ development `endpoint`'s, the native listener's origin, so a WebAssembly build
 for such a run uses `Endpoint::development(<endpoint>)`, never the committed
 live issuer. The deployed `--accounts-stdin` has no origin field: `baylee.app`
 is fixed there.
+
+### The account area
+
+*30.10.2026.* `Request::Owner { request: OwnerRequest }` (central-api
+`owner`) answers `Response::Owner { answer }`, or `Done`. Browser listener
+only; the native listener refuses it before anything else. The store finds
+the account through a live browser session of the current credential
+(`s.kind = 'browser'`), so a native bearer acts on nothing here.
+
+- `Sessions` → the account's live sessions, the asking one first: kind
+  (`browser` or `native`), whether it is the asking one, its password
+  sign-in, its end, and for each the gateways it holds a live lease at (their
+  origins). Central keeps no device; the page says so.
+- `EndClientSession` → `Done`: deletes the account's native session, and with
+  it its tickets and leases (their foreign keys cascade). The website's own
+  session ends with `Logout`.
+- `Gateways`, `AddGateway { origin, name }`, `CreateToken { gateway, name,
+  scopes, days }` and `RevokeToken { token }`: [gateway
+  registry](gateway-registry.md) §"Gateway tokens". `CreateToken` alone
+  needs a password sign-in less than 30 minutes old (`OwnerRequest::mints`).
+- **Terms.** `AddGateway` and `CreateToken` need Central's terms accepted;
+  reading the sessions and gateways, ending the client's session and
+  revoking a token do not, so a person who will not accept new terms can
+  still see what exists and shut it.
+
+The pages: `/account` (the profile, as before), `/account/security` and
+`/account/gateways`, in one frame with the administration's
+(`/admin`, `/admin/users/<id>`, `/admin/gateways`, `/admin/audit`), whose
+part of the navigation only an administrator sees. A change that needs the
+recent password asks for it first and signs in again (the same OPAQUE
+sign-in, in its Worker), which replaces the browser session. A token is shown
+once, in its text form, in a dialog that closes only when the person says
+they kept it; the page keeps it nowhere.
 
 ## Browser crypto (`central-web-crypto`)
 

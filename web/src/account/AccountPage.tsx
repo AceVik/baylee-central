@@ -12,6 +12,7 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
+import { AppFrame } from "../app/AppFrame";
 import { T, localeOf, useLang, useTitle, type Elems, type Key } from "../i18n";
 import { Link, PATHS } from "../router";
 import "../styles/account.css";
@@ -184,80 +185,72 @@ export default function AccountPage() {
   };
 
   return (
-    <header className="page-head account-page">
-      <div className="section-inner">
-        <p className="eyebrow">
-          <T id="acct.eyebrow" />
+    <AppFrame page="account" admin={summary?.admin ?? false} eyebrow="acct.eyebrow" title={<T id="account.title" />}>
+      {unconfirmed !== null && (
+        <p className="account-note bad" role="alert">
+          <T id="account.signOutUnconfirmed" args={{ time: unconfirmed }} />
         </p>
-        <h1>
-          <T id="account.title" />
-        </h1>
-        {unconfirmed !== null && (
-          <p className="account-note bad" role="alert">
-            <T id="account.signOutUnconfirmed" args={{ time: unconfirmed }} />
-          </p>
-        )}
-        {account === null ? (
-          <p className="account-note">
-            <T id="account.notSignedIn" elems={LINKS} />
-          </p>
-        ) : (
-          <div className="account-card glass">
-            {/* first, once the terms are settled: choosing a name needs them accepted */}
-            {settled && summary !== null && summary.displayName === null && summary.tag !== null && (
-              <ChooseName tag={summary.tag} onChosen={named} onStale={reread} />
-            )}
-            <p className="account-name">
-              {shown === null ? (
-                <T id="account.signedIn" />
-              ) : (
-                <>
-                  <span className="small">
-                    <T id="account.signedInAs" />
-                  </span>{" "}
-                  <bdi translate="no">{shown}</bdi>
-                </>
-              )}
-            </p>
-            {summary !== null && (
-              <p className="small account-signin-name">
-                <T id="account.signInName" args={{ name: summary.username }} />
-              </p>
-            )}
-            {summary !== null && summary.source === "legacy" && summary.tag === null && (
-              <p className="small">
-                <T id="account.nameFromGateway" />
-              </p>
-            )}
-            <p>
-              <T id="account.session" args={{ time: until }} />
-            </p>
-            <TermsStep onDone={() => setSettled(true)} />
-            <p>
-              <T id="account.client" elems={LINKS} />
-            </p>
-            {making?.at === "password" && summary !== null ? (
-              <SignInAgain name={summary.username} onSignedIn={signedInAgain} onCancel={() => setMaking(null)} />
-            ) : making?.at === "code" ? (
-              <NewCodeStep code={making.code} name={making.name} onDone={stored} />
-            ) : summary !== null ? (
-              <Recovery summary={summary} offer={settled} onMake={() => setMaking({ at: "password" })} />
+      )}
+      {account === null ? (
+        <p className="account-note">
+          <T id="account.notSignedIn" elems={LINKS} />
+        </p>
+      ) : (
+        <div className="account-card card reveal">
+          {/* first, once the terms are settled: choosing a name needs them accepted */}
+          {settled && summary !== null && summary.displayName === null && summary.tag !== null && (
+            <ChooseName tag={summary.tag} onChosen={named} onStale={reread} />
+          )}
+          <p className="account-name">
+            {shown === null ? (
+              <T id="account.signedIn" />
             ) : (
-              unread && (
-                <p className="small">
-                  <T id="acct.errUnreachable" />
-                </p>
-              )
+              <>
+                <span className="small">
+                  <T id="account.signedInAs" />
+                </span>{" "}
+                <bdi translate="no">{shown}</bdi>
+              </>
             )}
-            <p className="small">
-              <T id="account.later" elems={LINKS} />
+          </p>
+          {summary !== null && (
+            <p className="small account-signin-name">
+              <T id="account.signInName" args={{ name: summary.username }} />
             </p>
-            <button type="button" className="button button-ghost" onClick={leave}>
-              <T id="account.signOut" />
-            </button>
-          </div>
-        )}
-      </div>
-    </header>
+          )}
+          {summary !== null && summary.source === "legacy" && summary.tag === null && (
+            <p className="small">
+              <T id="account.nameFromGateway" />
+            </p>
+          )}
+          <p>
+            <T id="account.session" args={{ time: until }} />
+          </p>
+          <TermsStep onDone={() => setSettled(true)} />
+          <p>
+            <T id="account.client" elems={LINKS} />
+          </p>
+          {making?.at === "password" && summary !== null ? (
+            <SignInAgain name={summary.username} onSignedIn={signedInAgain} onCancel={() => setMaking(null)} />
+          ) : making?.at === "code" ? (
+            <NewCodeStep code={making.code} name={making.name} onDone={stored} />
+          ) : summary !== null ? (
+            <Recovery summary={summary} offer={settled} onMake={() => setMaking({ at: "password" })} />
+          ) : (
+            unread && (
+              <p className="small">
+                <T id="acct.errUnreachable" />
+              </p>
+            )
+          )}
+          <p className="small">
+            <T id="account.later" elems={LINKS} />
+          </p>
+          <button type="button" className="button button-ghost" onClick={leave}>
+            <T id="account.signOut" />
+          </button>
+        </div>
+      )}
+    </AppFrame>
   );
 }

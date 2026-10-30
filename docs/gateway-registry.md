@@ -26,10 +26,13 @@ origins with a nonzero port. Metadata has bounded name/version fields and a
 canonical website URL on the same origin. Metadata is untrusted display text:
 render it as text, never HTML. Software versions are self-reported.
 
-An operator must independently verify control of the claimed origin and the
-gateway operator's identity before inserting its `gateway_approvals` row. This is
-a deliberate administrative action using the separate operator connection, not
-an automatic network probe or public API. Coordinate the approval transaction by
+A person must independently verify control of the claimed origin and the
+gateway operator's identity before approving it. Since 30.10.2026 Central's
+administrators approve, disable and enable gateways on the website
+([administration](administration.md) §"Gateways"), which writes the
+`gateway_approvals` row through the runtime with the grants that decision
+needs; the operator's SQL below stays the fallback. It is a deliberate
+administrative action, not an automatic network probe. Coordinate the approval transaction by
 locking the relevant `gateways` row `FOR UPDATE`, verifying the current ownership
 record, and inserting approval before commit. Disabling approval immediately
 hides the entry and rejects credential authentication, new admission and lease
@@ -41,7 +44,8 @@ The runtime may use these registry privileges without grant options:
 
 ```sql
 GRANT SELECT, INSERT, UPDATE ON central_identity.gateways TO central_runtime;
-GRANT SELECT ON central_identity.gateway_approvals TO central_runtime;
+GRANT SELECT, INSERT, UPDATE (enabled) ON central_identity.gateway_approvals TO central_runtime;
+GRANT SELECT, INSERT, UPDATE (revoked_at, last_used_at) ON central_identity.gateway_tokens TO central_runtime;
 GRANT SELECT, INSERT, DELETE ON central_identity.gateway_admins,
     central_identity.gateway_leases TO central_runtime;
 ```
@@ -51,12 +55,62 @@ also requires the [private object and archive grants](private-objects.md).
 The reusable SDK exposes `gateway_directory`, `Session::register_gateway` and
 `Session::set_gateway_admins`; it validates returned IDs and public metadata.
 The runtime
-must not own these objects or inherit operator privileges. Startup rejects write,
-DDL-related, column-write and grant-option permissions on the approval table,
-including inherited effective privileges. Operator credential rotation/revocation
-is an administrative DB operation; there is no public operator-approval endpoint.
+must not own these objects or inherit operator privileges. Startup rejects any
+privilege on the approval table beyond `SELECT`, `INSERT` and `UPDATE (enabled)`
+(no `DELETE`, no other column, no grant option), including inherited effective
+privileges. Credential-pair rotation and revocation stay an administrative DB
+operation; gateway tokens are revoked on the website.
 The current executable remains an isolated development service, not a reviewed
 production deployment.
+
+## Gateway tokens
+
+*30.10.2026, migration 000014.* A token is the credential a self-hosted
+gateway pastes into its admin console (Baylee `docs/central-login.md`
+§"Linking a gateway with a token"); the owner's request on the website, in the
+owner's words: tokens to host one's own gateway, with which it connects to
+Central for its players' sign-ins and its entry in the gateway list.
+
+- **Registration on the website.** `Owner { AddGateway { origin, name } }`
+  (browser listener only, the cookie's session, Central's terms accepted)
+  reserves the origin for the account, as `RegisterGateway` does, but without
+  a credential pair: the row authenticates by tokens alone. An origin
+  registered already is a `Conflict` (no rotation as with
+  `RegisterGateway`); the official gateway's origin is refused; eight per
+  account, shared with `RegisterGateway`; the account's move must be
+  finished. The row waits for an administrator's approval.
+- **A token** is a [`Token`](../crates/central-api/src/token.rs): 32 random
+  bytes; Central stores its SHA-256 digest in `gateway_tokens` and shows the
+  token once, in the answer to `Owner { CreateToken }`, whose text form is
+  `bgt_` and 64 lowercase hex digits (`central_api::owner::token_text`; the
+  gateway reads it back with `parse_token_text`). It has
+  - a **name**, the owner's label (1 to 64 bytes, no control characters);
+  - **scopes**: `sso` (redeem its players' tickets; check their leases,
+    profiles, admin rights and terms; publish its terms) and `listing` (its
+    directory heartbeat), at least one;
+  - an **expiry**, 1 to 366 days (the table's CHECK holds both ends);
+  - a **revocation**, by its owner or an administrator, at once.
+- **Minting** needs a password sign-in less than 30 minutes old, as an
+  administrator's change does: a stolen cookie mints nothing after that.
+  A gateway holds at most eight live tokens, and is given at most 32 a day.
+- **Authentication.** `authenticate_gateway` (every SSO request) accepts the
+  credential pair's redemption credential or a live token with `sso`;
+  `gateway_heartbeat` the heartbeat credential or a live token with
+  `listing`. Both require the gateway approved and enabled, so a pending or
+  disabled gateway's token authenticates nothing, and a revoked or expired
+  one fails at once: the check is in the authenticating query, not a cache.
+  A gateway with another live token keeps its players' leases when one token
+  is revoked; disabling the gateway ends them.
+- **Status.** `GatewayStatus`, under a live token whatever the approval,
+  answers the gateway's id, origin, metadata and state, and the token's
+  scopes and expiry, so a console can say "waits for approval" before it is
+  listed. It is refused on the browser listener.
+- **Last use.** A heartbeat, a redemption (an admission or an admin sign-in)
+  and a status check mark the token used, at most once a minute; the
+  per-request lease checks do not, so no hot path writes.
+- **Owner's view.** `Owner { Gateways }` lists the account's gateways with
+  their state, liveness and tokens (live ones, and those revoked or expired
+  in the last 30 days), never a token or digest.
 
 ## Discovery, heartbeats and administrators
 

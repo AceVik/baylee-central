@@ -1625,3 +1625,62 @@ and the build) and `npm run e2e` (40 passed under the production CSP) pass.
 The first e2e run caught the cross-fade waiting on a frame callback that
 never comes inside a transition; fixed as above. Engineering review, not an
 audit.
+
+## Gateway tokens, the account area and gateway administration, 30 October 2026
+
+Design pass. Assets: a gateway's ability to sign players in for its own
+audience and to appear in the public directory, an account's sessions, and
+the administrators' decisions. The owner asked for tokens that let a user host
+a gateway, for the gateway to connect with one, and for administrators to
+edit tags. A token is the existing primitive (`Token`, 32 random bytes,
+SHA-256 digest only), scoped (`sso`, `listing`; the two existing credentials'
+roles), named, expiring within 366 days (a CHECK bounds both ends) and
+revocable. It authenticates only through the two queries that already decide
+every gateway request (`authenticate_gateway`, `gateway_heartbeat`), with
+revocation, expiry, scope and approval checked in the same statement, so
+there is no cache to go stale and no third path that half-works. Approval
+stays a person's decision; Central fetches no registered address. Minting is
+a change and needs a password sign-in under 30 minutes old, so a stolen
+cookie mints nothing later. The account area is browser-only and acts
+through a live browser session of the current credential (`kind =
+'browser'`); a native bearer acts on nothing there. Administrators' changes
+reuse the role-after-lock pattern and write their audit in the same
+transaction; the tag change keeps both tags (numbers) in `detail`.
+
+Implementation pass: owners and administrators read token rows without the
+digest; the token itself appears once, in `OwnerAnswer::TokenCreated`, and
+its text form (`bgt_` + hex) is formatted by the same rule on both sides
+(a shared vector). `last_used_at` is touched on heartbeats, redemptions and
+status checks, at most once a minute, never by the per-request lease checks.
+Disabling deletes the gateway's leases in the transaction that disables it.
+The runtime gains exactly `INSERT, UPDATE (enabled)` on `gateway_approvals`
+(never `DELETE`) and `SELECT, INSERT, UPDATE (revoked_at, last_used_at)` on
+`gateway_tokens`; the startup check now names a list of updatable columns
+and still refuses any other column, `DELETE`, a grant option or ownership.
+Migration 000014 relaxes the official CHECK so a registered row may have no
+credential pair, never half of one; the previous binary's lookups never match
+a NULL digest, but it refuses to start over the wider grants, so a rollback
+rolls the grants back with it ([operations](operations.md) §"Gateways and
+their tokens"). Reading one's sessions and gateways, ending the client's
+session and revoking a token need no accepted terms; registering and
+minting do.
+
+Adversarial pass (PostgreSQL fixture, `tests/support/accounts/gateways/
+tokens.rs`, and the upgrade test): the official origin, malformed origins,
+a control character in a name, a native bearer, a taken origin; bounds of
+name, scopes and lifetime; another owner's gateway; a stale sign-in; the
+ninth live token; a pending gateway's token (status yes, authentication
+and heartbeat no); approval; scope separation both ways; an expired and a
+revoked token; disabling (leases refused, directory hidden, status says
+disabled), the same state twice writing one event, enabling, an
+administrator's revocation, a stale administrator; a taken tag, out-of-range
+tags, the same tag twice writing one event with both tags; sessions listed
+with the lease's origin and the client's session ended. The grant contract
+is probed both ways (each wider privilege and each missing one refuses
+startup). The upgrade test adds a token-only row and refuses half a pair, a
+pair on the official row, an ownerless registered row, a token without
+scope, longer than 366 days, empty-named, of the wrong digest length, a
+repeated digest and a revocation before creation. The website's area is
+covered by unit tests of every answer's exact shape and by page tests with
+stand-ins (`npm run check`: 287 tests). Engineering review, not an audit.
+

@@ -7,6 +7,7 @@ mod endpoint;
 pub mod export;
 pub mod gateway;
 pub mod object;
+pub mod owner;
 pub mod profile;
 pub mod reset_code;
 pub mod terms;
