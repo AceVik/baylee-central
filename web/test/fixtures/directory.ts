@@ -5,7 +5,7 @@
 import { PAGE_SIZE } from "../../src/central/directory";
 
 /** `OFFICIAL_GATEWAY` of src/config.ts, spelt out: e2e/ reads this file without Vite's types. */
-const OFFICIAL_GATEWAY = "https://baylee.acevik.de";
+const OFFICIAL_GATEWAY = "https://gateway.baylee.app";
 
 /** A UUIDv7 as Central's wire carries it: 16 integers. */
 export function idBytes(n: number): number[] {

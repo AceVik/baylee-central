@@ -91,7 +91,14 @@ impl IdentityService {
         Ok(Response::LegacyEnrollment {
             identity,
             ticket,
-            gateway: self.gateway.clone(),
+            // The origin the move's documents name (`LEGACY_ORIGIN`), which
+            // stays the old one after the official gateway moved.
+            gateway: if self.development {
+                self.canonical()
+            } else {
+                central_api::LEGACY_ORIGIN
+            }
+            .to_owned(),
             snapshot,
         })
     }

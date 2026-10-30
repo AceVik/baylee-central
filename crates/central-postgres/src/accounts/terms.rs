@@ -1,6 +1,9 @@
 //! Terms of use (`docs/terms.md`): published gateway versions and acceptances,
 //! both immutable records. The caller validates texts and computes digests.
-use super::{AccountStore, Error, Identity, Session, Token, identity, statement};
+use super::{
+    AccountStore, Error, Identity, NOT_DISABLED, Session, Token, any_origin, identity, origins,
+    statement,
+};
 use central_api::{
     terms::{TermsDocument, TermsText, TermsVersion},
     wire::TicketPurpose,
@@ -279,14 +282,16 @@ impl AccountStore {
 
     /// [`Self::gateway_session`] plus whether the account accepted `central`
     /// (Central's terms in force) and `gateway` (the gateway's own current
-    /// terms); a missing one counts as accepted.
+    /// terms, accepted under any of `audiences`: an official gateway's
+    /// acceptance under its old origin counts); a missing one counts as
+    /// accepted.
     ///
     /// # Errors
     /// As [`Self::gateway_session`].
-    pub async fn gateway_authorize(
+    pub async fn gateway_authorize<S: AsRef<str> + Sync>(
         &self,
         lease: &Token,
-        audience: &str,
+        audiences: &[S],
         gateway: Option<[u8; 16]>,
         purpose: TicketPurpose,
         central: Option<&TermsVersion>,
@@ -299,21 +304,21 @@ impl AccountStore {
         }
         let [central_version, central_digest] = version_values(central);
         let [gateway_version, gateway_digest] = version_values(terms);
+        let any = any_origin(2);
         let row=self.db.query_one_raw(statement(
-            "SELECT a.id,a.vault_epoch,floor(extract(epoch FROM LEAST(l.expires_at,s.expires_at)))::bigint AS expires_at,
+            &format!("SELECT a.id,a.vault_epoch,floor(extract(epoch FROM LEAST(l.expires_at,s.expires_at)))::bigint AS expires_at,
              ($5::text IS NULL OR EXISTS(SELECT 1 FROM central_identity.terms_acceptances t
                  WHERE t.account_id=a.id AND t.subject=$9 AND t.version=$5 AND t.digest=$6)) AS central_terms,
              ($7::text IS NULL OR EXISTS(SELECT 1 FROM central_identity.terms_acceptances t
-                 WHERE t.account_id=a.id AND t.subject=$2 AND t.version=$7 AND t.digest=$8)) AS gateway_terms
+                 WHERE t.account_id=a.id AND t.subject={any} AND t.version=$7 AND t.digest=$8)) AS gateway_terms
              FROM central_identity.gateway_leases l JOIN central_identity.sessions s ON s.digest=l.session_digest
              JOIN central_identity.accounts a ON a.id=s.account_id AND a.credential_revision=s.credential_revision
-             WHERE l.digest=$1 AND l.audience=$2 AND l.gateway_id IS NOT DISTINCT FROM $3::uuid AND l.purpose=$4
+             WHERE l.digest=$1 AND l.audience={any} AND l.gateway_id IS NOT DISTINCT FROM $3::uuid AND l.purpose=$4
              AND l.expires_at>pg_catalog.clock_timestamp() AND s.expires_at>pg_catalog.clock_timestamp() AND a.restored
              AND ($3::uuid IS NULL OR EXISTS(SELECT 1 FROM central_identity.gateways g
-                 JOIN central_identity.gateway_approvals p ON p.gateway_id=g.id AND p.enabled
-                 WHERE g.id=$3 AND g.origin=$2 AND ($4='admit' OR EXISTS
-                     (SELECT 1 FROM central_identity.gateway_admins m WHERE m.gateway_id=g.id AND m.account_id=a.id))))",
-            vec![lease.digest().to_vec().into(),audience.into(),gateway.map(Uuid::from_bytes).into(),purpose.as_str().into(),
+                 WHERE g.id=$3 AND g.origin=l.audience AND {NOT_DISABLED} AND ($4='admit' OR EXISTS
+                     (SELECT 1 FROM central_identity.gateway_admins m WHERE m.gateway_id=g.id AND m.account_id=a.id))))"),
+            vec![lease.digest().to_vec().into(),origins(audiences)?,gateway.map(Uuid::from_bytes).into(),purpose.as_str().into(),
                  central_version,central_digest,gateway_version,gateway_digest,CENTRAL.into()]
         )).await.map_err(|_|Error::Unavailable)?.ok_or(Error::Rejected)?;
         Ok((

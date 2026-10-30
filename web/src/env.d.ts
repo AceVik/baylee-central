@@ -4,4 +4,5 @@
 interface ImportMetaEnv {
   readonly VITE_FEEDBACK_ORIGIN?: string;
   readonly VITE_CENTRAL_API?: string;
+  readonly VITE_DEEP_LINKS?: string;
 }

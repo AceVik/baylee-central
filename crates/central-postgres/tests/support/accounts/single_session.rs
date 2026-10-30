@@ -19,7 +19,7 @@ pub(super) async fn run(store: &AccountStore, keys: &ServerKeys) {
     store
         .redeem_lease(
             &ticket,
-            "official",
+            &["official"],
             TicketPurpose::Admit,
             None,
             Some(&lease),
@@ -53,7 +53,7 @@ pub(super) async fn run(store: &AccountStore, keys: &ServerKeys) {
     );
     store.document(&first).await.unwrap();
     store
-        .gateway_session(&lease, "official", None, TicketPurpose::Admit)
+        .gateway_session(&lease, &["official"], None, TicketPurpose::Admit)
         .await
         .unwrap();
 
@@ -61,7 +61,7 @@ pub(super) async fn run(store: &AccountStore, keys: &ServerKeys) {
     assert!(store.document(&first).await.is_err());
     assert!(
         store
-            .gateway_session(&lease, "official", None, TicketPurpose::Admit)
+            .gateway_session(&lease, &["official"], None, TicketPurpose::Admit)
             .await
             .is_err()
     );
@@ -69,7 +69,7 @@ pub(super) async fn run(store: &AccountStore, keys: &ServerKeys) {
         store
             .redeem_lease(
                 &outstanding,
-                "official",
+                &["official"],
                 TicketPurpose::Admit,
                 None,
                 Some(&Token::generate().unwrap())

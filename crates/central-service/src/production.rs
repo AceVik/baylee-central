@@ -8,7 +8,7 @@
 //! operator's root-owned configuration file and hands it over as standard input,
 //! so the service identity itself never needs read access to that file.
 use super::listeners::{stopped, together};
-use central_api::{Endpoint, LEGACY_ORIGIN, MAX_WIRE_BYTES, Token, beta_key::BetaKey};
+use central_api::{Endpoint, MAX_WIRE_BYTES, OFFICIAL_ORIGIN, Token, beta_key::BetaKey};
 use central_crypto::opaque::server::ServerKeys;
 use central_http::{BROWSER_REQUEST_BYTES, BrowserOrigin, DevelopmentServer};
 use central_identity::IdentityService;
@@ -57,7 +57,8 @@ impl Database {
 }
 
 /// The live account service. There is no endpoint field: production is the
-/// compiled live endpoint, and its sole legacy gateway is compiled in too.
+/// compiled live endpoint, and its official gateway (`OFFICIAL_ORIGIN` and
+/// its aliases) is compiled in too.
 #[derive(Deserialize, Zeroize, ZeroizeOnDrop)]
 #[serde(deny_unknown_fields)]
 struct Service {
@@ -199,7 +200,7 @@ async fn serve() -> Result<(), ()> {
         &endpoint,
         keys,
         &settings.bridge,
-        LEGACY_ORIGIN,
+        OFFICIAL_ORIGIN,
     )
     .map(|identity| match &legacy {
         Some(legacy) => identity.with_legacy(legacy.clone()),
@@ -497,7 +498,8 @@ mod tests {
         // loopback-only database; neither exists in production.
         for extra in [
             r#","endpoint":"http://127.0.0.1:9000""#,
-            r#","gateway":"https://baylee.acevik.de""#,
+            r#","gateway":"https://gateway.baylee.app""#,
+            r#","gateway_aliases":["https://gateway.baylee.app"]"#,
             r#","database_port":5432"#,
             r#","sslmode":"disable""#,
         ] {

@@ -14,8 +14,10 @@ secret arrives as one bounded JSON document on standard input (at most 128 KiB),
 never in argv or the environment. Unknown fields fail closed.
 
 - `--accounts-stdin` serves the live native account protocol. The endpoint is
-  always `https://central.baylee.app` and the sole legacy gateway is the compiled
-  `https://baylee.acevik.de`; neither is configurable. Input:
+  always `https://central.baylee.app`, and the official gateway is the compiled
+  `OFFICIAL_ORIGIN` with its compiled aliases (`central_api::OFFICIAL_ALIASES`,
+  its old address, which is also the legacy migration's); none is configurable.
+  Input:
   `listen`, `database`, `opaque_setup`, `bridge`, and optionally
   `browser: {"listen": …}` for the browser listener (absent means off) and
   `legacy: {"database": …}`, the legacy store's own login (absent means no
@@ -286,16 +288,17 @@ UPDATE central_identity.gateway_tokens SET revoked_at = clock_timestamp()
 
 ## The official gateway
 
-The directory lists the official gateway (the migration bridge's,
-`https://baylee.acevik.de`) from a row of its own: no owner, no credential, so
-the bridge stays the only authority for that origin ([gateway
+The directory lists the official gateway (the bridge's,
+`https://gateway.baylee.app`, `central_api::OFFICIAL_ORIGIN`) from a row of its
+own: no owner, no credential, so the bridge stays the only authority for its
+origins ([gateway
 registry](gateway-registry.md#discovery-heartbeats-and-administrators)).
 Migration 000009 makes room for it; listing it is the operator's, under the
 migrator login (`central_migrator`, which owns the tables), once:
 
 ```sql
 INSERT INTO central_identity.gateways (official, origin, name, version, website)
-    VALUES (true, 'https://baylee.acevik.de', 'Baylee', '0', 'https://baylee.acevik.de/');
+    VALUES (true, 'https://gateway.baylee.app', 'Baylee', '0', 'https://gateway.baylee.app/');
 INSERT INTO central_identity.gateway_approvals (gateway_id)
     SELECT id FROM central_identity.gateways WHERE official;
 ```
@@ -303,18 +306,33 @@ INSERT INTO central_identity.gateway_approvals (gateway_id)
 Until its first heartbeat the entry shows these values and offline. The
 official gateway's `BAYLEE_CENTRAL_CONFIG_FILE` gains `metadata` beside its
 `bridge` (Baylee `docs/central-login.md`), for example `"metadata": {"name":
-"Baylee", "version": "0", "website": "https://baylee.acevik.de/"}`; the website
-must be on that origin, and the gateway sends its own binary's version in place
-of `version`. It then sends `GatewayHeartbeat` with the bridge credential every
+"Baylee", "version": "0", "website": "https://gateway.baylee.app/"}`; the website
+must be on one of its origins, and the gateway sends its own binary's version in
+place of `version`. It then sends `GatewayHeartbeat` with the bridge credential every
 30 seconds, which replaces the name, version and website and marks it online.
 Without `metadata` the entry stays listed and offline. A second official row is
 refused, as is an owner or a credential on it; `RegisterGateway` for the
 origin answers `Conflict`.
 
-The entry stays `https://baylee.acevik.de` until the official gateway moves to
-`https://gateway.baylee.app` (roadmap M5), which also moves the bridge's
-compiled audience: listing the new name earlier would hand clients an origin
-Central issues no tickets for. To hide the entry, disable its approval:
+**The move to `gateway.baylee.app` (30.10.2026).** The official gateway's
+canonical origin is `OFFICIAL_ORIGIN`, and its old address is an alias
+(`OFFICIAL_ALIASES`), both compiled: a ticket an installed client asks for the
+old address is the bridge's, bound to that address; the bridge redeems it and
+checks its leases under either; an acceptance of the gateway's terms under
+either counts; the old address cannot be registered. The heartbeat finds the
+row under either origin, so the operator moves the row in the deploy's window,
+after checking that no registered gateway holds the new origin:
+
+```sql
+SELECT id FROM central_identity.gateways WHERE origin = 'https://gateway.baylee.app';  -- no rows
+UPDATE central_identity.gateways SET origin = 'https://gateway.baylee.app',
+    website = 'https://gateway.baylee.app/' WHERE official;
+```
+
+Until then the directory shows the old address, which the website does not
+mark official. Dropping the alias is a release that empties
+`OFFICIAL_ALIASES`, once installed clients ask for the new address. To hide the
+entry, disable its approval:
 
 ```sql
 UPDATE central_identity.gateway_approvals SET enabled = false

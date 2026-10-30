@@ -307,7 +307,7 @@ async fn registered(store: &AccountStore, operator: &DatabaseConnection, keys: &
     let (redeemed, legacy, expires) = store
         .redeem_lease(
             &ticket,
-            "official",
+            &["official"],
             TicketPurpose::Admit,
             None,
             Some(&lease),

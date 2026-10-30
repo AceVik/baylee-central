@@ -162,6 +162,19 @@ describe("the administration", () => {
     expect(await screen.findByText("This Central keeps no legacy accounts.")).toBeTruthy();
   });
 
+  it("offers actions on another account and none on one's own", async () => {
+    window.history.replaceState(null, "", `/admin/users/${idText(OTHER)}`);
+    const other = show(<UserPage client={admin()} />);
+    expect(await screen.findByRole("button", { name: "Make administrator" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Actions" })).toBeTruthy();
+    other.unmount();
+    const own = { ...account, id: ACCOUNT, admin: true };
+    window.history.replaceState(null, "", `/admin/users/${idText(ACCOUNT)}`);
+    show(<UserPage client={admin({ account: vi.fn<AdminApi["account"]>(async () => ({ account: own, recovery: true, gateways: [], audit: [] })) })} />);
+    expect(await screen.findByLabelText("Tag", { selector: "input" })).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Actions" })).toBeNull();
+  });
+
   it("approves a pending gateway and disables an approved one", async () => {
     const user = userEvent.setup();
     const client = admin();

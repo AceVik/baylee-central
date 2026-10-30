@@ -321,6 +321,7 @@ export const KEYS = [
   "selfhost.processes",
   "selfhost.proxy",
   "selfhost.guide",
+  "selfhost.central",
   "selfhost.source",
   "contact.eyebrow",
   "contact.title",

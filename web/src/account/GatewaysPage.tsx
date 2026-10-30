@@ -1,8 +1,8 @@
 // `/account/gateways`: the gateways this account registered, to host for
 // others (docs/gateway-registry.md §"Gateway tokens"). Three steps: register
-// the gateway's address here; a Central administrator approves it; make a
-// token and paste it into the gateway's admin console, which then signs its
-// players in through Central and keeps its entry in the public list.
+// the gateway's address here; make a token and paste it into the gateway's
+// admin console, which then signs its players in through Central; a Central
+// administrator approves it for the public list, where its token keeps it.
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 
@@ -160,7 +160,8 @@ function Gateway({ g, onToken, onRevoke }: { g: MyGateway; onToken(): void; onRe
       </p>
       <dl className="kv">
         <div><dt><T id="gw.address" /></dt><dd><code translate="no">{g.origin}</code></dd></div>
-        <div><dt><T id="gw.version" /></dt><dd><code translate="no">{g.metadata.version}</code></dd></div>
+        {/* a registered gateway's version is a placeholder until its first heartbeat */}
+        <div><dt><T id="gw.version" /></dt><dd>{g.lastSeen === null ? "—" : <code translate="no">{g.metadata.version}</code>}</dd></div>
         <div><dt><T id="gwo.registered" /></dt><dd className="num">{day(lang, g.createdAt)}</dd></div>
         <div><dt><T id="gwo.lastSeen" /></dt><dd className="num">{g.lastSeen === null ? "—" : when(lang, g.lastSeen)}</dd></div>
       </dl>

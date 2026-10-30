@@ -20,8 +20,9 @@ pub struct LegacyEnrollment {
     pub snapshot: LegacySnapshot,
 }
 
-/// The gateway a move names: the compiled official one with the live
-/// endpoint, an explicit loopback one in development.
+/// The gateway a move names: the official gateway's compiled origin from
+/// before it moved with the live endpoint, an explicit loopback one in
+/// development.
 fn official(endpoint: &Endpoint, gateway: &str) -> Result<(), Error> {
     match endpoint.legacy_origin() {
         Some(official) if official == gateway => Ok(()),

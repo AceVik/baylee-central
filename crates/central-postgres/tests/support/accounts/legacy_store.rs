@@ -139,7 +139,7 @@ async fn closed_move(
         store
             .redeem_lease(
                 &ticket,
-                "official",
+                &["official"],
                 TicketPurpose::Admit,
                 None,
                 Some(&lease)
@@ -151,7 +151,7 @@ async fn closed_move(
     let (_, legacy_id, _) = store
         .redeem_lease(
             &ticket,
-            "official",
+            &["official"],
             TicketPurpose::Admit,
             None,
             Some(&lease),

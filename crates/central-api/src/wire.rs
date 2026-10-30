@@ -696,7 +696,9 @@ pub enum Response {
         identity: Identity,
         /// Fresh short-lived enrollment capability, bound to this account.
         ticket: Token,
-        /// The official gateway the account moves from: the bridge's origin.
+        /// The official gateway the account moves from, by the origin its
+        /// documents name: [`crate::LEGACY_ORIGIN`] live, the development
+        /// gateway's in development.
         gateway: String,
         /// The account's source, as the gateway exported it.
         snapshot: crate::legacy::LegacySnapshot,

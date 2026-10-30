@@ -10,6 +10,7 @@ import { Icon, type IconName } from "../components/icons";
 import { T, t, useLang, type Key } from "../i18n";
 import { Link, PATHS, type Page } from "../router";
 import "../styles/app.css";
+import "../styles/tables.css";
 
 interface Item {
   page: Page;

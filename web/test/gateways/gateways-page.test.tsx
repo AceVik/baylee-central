@@ -1,6 +1,6 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { directoryClient } from "../../src/central/directory";
 import Gateways from "../../src/gateways/GatewaysPage";
@@ -16,7 +16,27 @@ function show(lang: "en" | "de" = "en") {
   );
 }
 
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
+
 describe("the gateway directory", () => {
+  it("offers copying the address first while gateway links are off, opening the client once they are on", async () => {
+    serve(() => ({ body: { result: "gateway_directory", gateways: [listing(1)] } }));
+    const off = show();
+    const card = (await screen.findByRole("heading", { name: "Synthetic table 1" })).closest("li") as HTMLElement;
+    expect(within(card).getByRole("button", { name: "Copy address" }).className).toContain("gw-open");
+    expect(within(card).queryByRole("link", { name: "Open in Baylee" })).toBeNull();
+    expect(screen.queryByText(/once your client knows gateway links/)).toBeNull();
+    off.unmount();
+    vi.stubEnv("VITE_DEEP_LINKS", "on");
+    show();
+    const linked = (await screen.findByRole("heading", { name: "Synthetic table 1" })).closest("li") as HTMLElement;
+    expect(within(linked).getByRole("link", { name: "Open in Baylee" }).getAttribute("href")).toMatch(/^baylee:\/\/gateway\/add\?origin=https%3A%2F%2F/);
+    expect(within(linked).getByRole("button", { name: "Copy address" }).className).toContain("gw-copy");
+    expect(screen.getByText(/once your client knows gateway links/)).toBeTruthy();
+  });
+
   it("lists a page, then the next one after the last id", async () => {
     const calls = serve((c) => {
       if (c.url !== "/api/v1") return undefined;
@@ -61,7 +81,7 @@ describe("the gateway directory", () => {
     expect(names).toEqual(["Sanctuary", "Synthetic table 1", "Synthetic table 2", "Synthetic table 4"]);
     const official = screen.getByRole("heading", { name: "Sanctuary" }).closest("li") as HTMLElement;
     expect(within(official).getByText("Official").className).toContain("gw-official");
-    expect(within(official).getByText("https://baylee.acevik.de")).toBeTruthy();
+    expect(within(official).getByText("https://gateway.baylee.app")).toBeTruthy();
     expect(screen.getAllByText("Official")).toHaveLength(1);
   });
 

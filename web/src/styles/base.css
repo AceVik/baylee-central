@@ -124,7 +124,11 @@ dialog[open] { animation: pop 200ms var(--ease); }
   transition: transform var(--dur) var(--ease), box-shadow var(--dur) ease, border-color var(--dur) ease, opacity var(--dur-slow) ease;
 }
 .card-link:hover, .card-link:focus-within { transform: translateY(-2px); box-shadow: var(--shadow-lift); border-color: var(--edge); }
-.grid-cards { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 20rem), 1fr)); gap: var(--space-4); }
+/* equal columns, and a row that is not full stands in the middle */
+.grid-cards {
+  list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-4);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 22rem)); justify-content: center;
+}
 /* a lone last card stands in the middle of its row */
 .grid-centred { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-4); list-style: none; margin: 0; padding: 0; }
 .grid-centred > * { flex: 0 1 calc((100% - 2 * var(--space-4)) / 3); min-width: min(100%, 18rem); }
