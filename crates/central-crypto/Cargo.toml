@@ -22,4 +22,9 @@ chacha20poly1305 = { version = "=0.11.0", default-features = false, features = [
 hkdf = { version = "=0.12.4", default-features = false }
 zeroize = { version = "=1.9.1", features = ["alloc", "derive"] }
 secrecy = "=0.10.3"
-getrandom = "=0.4.3"
+getrandom = { version = "=0.4.3", features = ["sys_rng"] }
+# The pairing's HMACs (`pairing.rs`), the same release `hkdf` builds on.
+hmac = { version = "=0.12.1", default-features = false }
+# The pairing's seal (`pairing.rs`): RFC 9180 HPKE for one suite only, the
+# owner's choice of 30.10.2026 (docs/dependency-proposal/hpke.md).
+hpke = { version = "=0.15.1", default-features = false, features = ["x25519", "chacha", "alloc"] }

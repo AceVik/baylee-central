@@ -29,6 +29,8 @@ skip = [
   { name = "cpufeatures", version = "=0.2.17", reason = "OPAQUE/Dalek/SHA2 vs ChaCha20/Poly1305 generation" },
   { name = "getrandom", version = "=0.2.17", reason = "OPAQUE rand 0.8 trait compatibility; application uses 0.4" },
   { name = "syn", version = "=2.0.119", reason = "Dalek/zeroize proc macros still require syn 2" },
+  { name = "curve25519-dalek", version = "=4.1.3", reason = "OPAQUE (opaque-ke 4) vs the pairing's HPKE X25519 (x25519-dalek 3); no shared types" },
+  { name = "fiat-crypto", version = "=0.2.9", reason = "curve25519-dalek 4.1.3's fiat backend; built by neither (cfg never set)" },
 ]
 
 [licenses]

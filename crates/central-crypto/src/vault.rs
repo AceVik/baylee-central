@@ -72,6 +72,24 @@ impl MasterKey {
     }
 }
 
+impl MasterKey {
+    /// A master key received sealed (a pairing): exactly 32 bytes.
+    pub(crate) fn from_slice(bytes: &[u8]) -> Result<Self, CryptoError> {
+        let mut key = Zeroizing::new([0; 32]);
+        if bytes.len() != key.len() {
+            return Err(CryptoError::Invalid);
+        }
+        key.copy_from_slice(bytes);
+        Ok(Self(key))
+    }
+
+    /// The key's bytes, for this crate's own seals only (a pairing); never
+    /// public.
+    pub(crate) fn expose(&self) -> &[u8; 32] {
+        &self.0
+    }
+}
+
 impl WrappingKey {
     pub(crate) fn from_export(export: &[u8], context: Context) -> Result<Self, CryptoError> {
         let mut key = Zeroizing::new([0; 32]);

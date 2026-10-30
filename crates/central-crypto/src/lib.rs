@@ -8,6 +8,7 @@
 
 mod context;
 pub mod opaque;
+pub mod pairing;
 pub mod vault;
 
 pub use context::Context;

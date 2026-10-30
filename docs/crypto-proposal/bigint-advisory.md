@@ -39,7 +39,9 @@ cryptographic audit or a general safety statement about bigint 0.5.5.
 platform and in the dependency job **before** audit/deny. It checks:
 
 - Exact registry versions/sources and features of the five reviewed upstream
-  packages; no duplicate versions or missing resolution nodes.
+  packages and of the pairing's three (`hpke`, `x25519-dalek` and the second
+  `curve25519-dalek` generation, 5.0.0, beside 4.1.3); no other duplicate
+  versions, and no missing resolution nodes.
 - All-feature metadata without target filtering, including inactive optional
   consumers. Reverse dependencies must remain
   `crypto-bigint ← elliptic-curve ← opaque-ke/voprf ← central-crypto`.
@@ -82,3 +84,22 @@ edge changed: `hkdf` and `sha2` were `central-crypto`'s already. Neither value
 touches `opaque::Suite`, its Ristretto arithmetic or `elliptic-curve`, so
 the reachability above is unchanged. Fingerprint `3d0f6adb…`; a second
 model reviews the change before it lands (`Review: pending`).
+
+### 30 October 2026: the pairing's seal
+
+`src/pairing.rs` (tests in `src/pairing/tests.rs` and
+`tests/pairing-vectors.py`) adds the pairing's MACs, its comparison code and
+its RFC 9180 seal through `hpke` 0.15.1 (`../dependency-proposal/hpke.md`);
+`MasterKey` gained two crate-private accessors for the seal. The graph
+gained `hpke` 0.15.1 (from `central-crypto`), `x25519-dalek` 3.0.0 (from
+`hpke`) and a second `curve25519-dalek`, 5.0.0 (from both), whose
+`fiat-crypto` 0.3.0 sits behind a cfg no build sets. All-feature metadata
+shows none of them depending on `elliptic-curve` or `crypto-bigint`:
+`crypto-bigint`'s only caller is still `elliptic-curve`, whose only callers
+are still `opaque-ke` and `voprf`. The seal's X25519 shares no type with the
+Ristretto suite, which is unchanged. The guard now pins the three, their
+features and reverse edges, exactly the two `curve25519-dalek` generations,
+and 4.1.3's callers (`opaque-ke`, `voprf`), which it did not pin before; a
+third generation, a new consumer of any of them or another feature fails
+(`graph/tests.rs`, and with the 5.0.0 pin removed two of its tests fail).
+Fingerprint `b3ab6d24…`; `Review: pending`, as above.
