@@ -5,6 +5,7 @@
 // these paths with index.html (README.md §"Serving it").
 
 import { useEffect, useState, type AnchorHTMLAttributes, type MouseEvent } from "react";
+import { flushSync } from "react-dom";
 
 export const PAGES = ["home", "download", "cards", "gateways", "contact", "impressum", "privacy", "terms", "register", "signIn", "account"] as const;
 export type Page = (typeof PAGES)[number];
@@ -43,11 +44,34 @@ function here(): Location {
   return { pathname, search, hash };
 }
 
-/** Goes to `to` (a path on this site, with or without a hash) without a reload. */
-export function navigate(to: string, replace = false): void {
+/** Changes the address and tells every `useLocation`. */
+function go(to: string, replace: boolean): void {
   if (replace) window.history.replaceState(null, "", to);
   else window.history.pushState(null, "", to);
   window.dispatchEvent(new Event(EVENT));
+}
+
+type Transitioning = Document & { startViewTransition?: (update: () => Promise<void>) => unknown };
+
+/**
+ * Goes to `to` (a path on this site, with or without a hash) without a
+ * reload. Another page cross-fades in where the browser has View Transitions
+ * and motion is welcome (docs/website-design.md §"Motion").
+ */
+export function navigate(to: string, replace = false): void {
+  const doc = document as Transitioning;
+  const samePage = new URL(to, window.location.href).pathname === window.location.pathname;
+  const still = typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (samePage || still || typeof doc.startViewTransition !== "function") {
+    go(to, replace);
+    return;
+  }
+  // the browser draws nothing while the update runs, so no frame callback
+  // would come: React draws the new page synchronously instead
+  doc.startViewTransition(() => {
+    flushSync(() => go(to, replace));
+    return Promise.resolve();
+  });
 }
 
 export function useLocation(): Location {

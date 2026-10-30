@@ -43,3 +43,24 @@ describe("the page shell", () => {
     expect(robots).toContain("Disallow: /site/impressum/");
   });
 });
+
+describe("the palette", () => {
+  // docs/website-design.md §"Colour": the artwork keeps its own colours
+  const ARTWORK = new Set(["memorial-book.css", "remembrance.css", "hero.css", "world.css", "tokens.css"]);
+
+  it("is named in tokens.css alone, besides the artwork's own colours", () => {
+    for (const file of readdirSync("src/styles")) {
+      if (ARTWORK.has(file)) continue;
+      const css = read(join("src/styles", file)).replace(/\/\*[\s\S]*?\*\//g, "");
+      expect(`${file}: ${css.match(/#[0-9a-f]{3,8}\b/gi)?.join(", ") ?? ""}`).toBe(`${file}: `);
+    }
+  });
+});
+
+describe("motion", () => {
+  it("stills every animation and transition under prefers-reduced-motion", () => {
+    const base = read("src/styles/base.css");
+    const still = /@media \(prefers-reduced-motion: reduce\) \{\s*\*, \*::before, \*::after \{ animation: none !important; transition: none !important;/;
+    expect(base).toMatch(still);
+  });
+});

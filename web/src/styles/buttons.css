@@ -41,3 +41,11 @@
 .chip-btn:hover { border-color: var(--edge); color: var(--title); }
 .chip-btn[aria-pressed="true"] { background: var(--gold); border-color: var(--gold); color: var(--gold-ink); font-weight: 700; }
 .chip-n { font-size: 0.85em; opacity: 0.8; }
+/* danger: a ghost that turns `--bad`, for revoke, lock and delete; it always
+   asks a second time in a dialog (docs/website-design.md §"Colour") */
+.button-danger { background: transparent; color: var(--ink); border-color: var(--edge-soft); box-shadow: none; font-weight: 500; }
+.button-danger::after { background: linear-gradient(105deg, transparent 30%, color-mix(in srgb, var(--bad) 18%, transparent) 50%, transparent 70%); }
+.button-danger:hover, .button-danger:focus-visible { background: color-mix(in srgb, var(--bad) 10%, transparent); color: var(--bad); border-color: var(--bad); box-shadow: none; }
+.button-danger.solid { background: var(--bad); color: var(--bg); border-color: var(--bad); font-weight: 700; }
+.button-danger.solid:hover { background: color-mix(in srgb, var(--bad) 85%, var(--ink)); color: var(--bg); }
+.button-sm { min-height: 44px; padding: 0.3em 0.95em; font-size: var(--text-sm); }

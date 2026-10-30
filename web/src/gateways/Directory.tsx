@@ -49,16 +49,21 @@ export function Directory({ client }: { client: DirectoryClient }) {
         {!loading && failure === null && gateways.length === 0 && t(lang, "gw.none")}
       </output>
       {gateways.length > 0 && (
-        <ul className="gateways">
-          {officialFirst(gateways).map((g) => (
-            <GatewayCard key={g.id} g={g} official={g.origin === OFFICIAL_GATEWAY} />
-          ))}
-        </ul>
+        <>
+          <ul className="gateways grid-cards stagger">
+            {officialFirst(gateways).map((g) => (
+              <GatewayCard key={g.id} g={g} official={g.origin === OFFICIAL_GATEWAY} />
+            ))}
+          </ul>
+          <p className="small dir-hint">
+            <T id="gw.openHint" />
+          </p>
+        </>
       )}
       {loading && gateways.length === 0 && (
-        <ul className="gateways" aria-hidden="true">
-          {[0, 1].map((i) => (
-            <li key={i} className="gw glass gw-skeleton" />
+        <ul className="gateways grid-cards" aria-hidden="true">
+          {[0, 1, 2].map((i) => (
+            <li key={i} className="gw card skeleton gw-skeleton" />
           ))}
         </ul>
       )}

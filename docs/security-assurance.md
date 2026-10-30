@@ -1595,3 +1595,33 @@ for it, so the deletion is refused there too; the check stays as defence in
 depth. The local runs used a raised fixture timeout, because the shared
 machine was loaded; CI ran the real five-minute limit (the postgres job took
 173 seconds). Engineering review, not an audit.
+
+## The website's design guidelines and public pages, 30 October 2026
+
+Design pass: [website design](website-design.md) writes down the look the
+pages already had and the rules for the account area and the administration
+to come: semantic tokens, a type and spacing scale, components, motion and
+accessibility. The dark scheme becomes the blue hour; the footer becomes a
+three-column map; the gateway directory gets cards with a deep link that
+opens the client on that gateway, in the grammar of Baylee's deep-link design
+(`baylee://gateway/add?origin=…`). No request, answer, boundary, CSP,
+dependency or stored value changes.
+
+Implementation pass: the deep link is built only from an origin the
+directory's checks have already passed, and `central/deeplink.ts` refuses
+anything but a bare https origin (a loopback http origin only on a page
+served from this machine): no path, query, credentials or operator text
+reaches the link. The link carries nothing secret, and a client that does
+not know the scheme leaves it unanswered; the page says so and keeps "copy
+the address". Page changes cross-fade through the View Transitions API only
+where the browser has it and motion is welcome; the update draws the new
+page synchronously, because the browser runs no frame callbacks during it.
+Staggered arrival is a backwards-filling animation, so a card's own hover
+transition is untouched, and the global reduced-motion rule stills it.
+
+Validation: `npm run check` (typecheck, lint, 248 unit tests including the new
+contrast test of both schemes, the palette rule and the deep-link refusals,
+and the build) and `npm run e2e` (40 passed under the production CSP) pass.
+The first e2e run caught the cross-fade waiting on a frame callback that
+never comes inside a transition; fixed as above. Engineering review, not an
+audit.
