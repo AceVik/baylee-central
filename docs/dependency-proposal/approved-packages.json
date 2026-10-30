@@ -1668,8 +1668,8 @@
       "implied": "hpke's x25519 feature turns on its hkdfsha2 feature and x25519-dalek's static_secrets. hmac@0.12.1 and getrandom@0.4.3/sys_rng were already approved. No other package or feature."
     },
     {
-      "proposed_on": "2026-10-30",
-      "reason": "PROPOSAL, not an approval: the owner approved hpke with x25519-dalek 3 and curve25519-dalek 5 only; the PM puts these two to the owner. Listed so the policy check passes; until the owner decides they are not approved",
+      "approved_on": "2026-10-30",
+      "reason": "owner approved 30.10.2026 (\"yes\"), relayed by the PM; proposed the same day, when the policy check asked for them beyond the three packages of the hpke approval",
       "for": "curve25519-dalek 5, which the approved hpke needs",
       "entries": [
         "fiat-crypto@0.3.0: curve25519-dalek 5's dependency under cfg(curve25519_dalek_backend = \"fiat\"), which no build here sets, as fiat-crypto@0.2.9 is for 4.1.3; in the lock, compiled on no target; MIT OR Apache-2.0 OR BSD-1-Clause; no unsafe, no asm, no build script",

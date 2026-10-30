@@ -71,9 +71,10 @@ exception with this reason. Baylee's client already linked 5.0.0 and
 ## What else enters the lock
 
 Two entries the policy check (`cargo xtask policy`) asked for beyond the
-three crates. The owner's approval of 30.10.2026 names only the three, so
-`approved-packages.json` lists these two as a **proposal** awaiting the
-owner's decision, not as approved:
+three crates. The owner's first approval of 30.10.2026 named only the
+three; these two were proposed separately the same day and approved by the
+owner on 30.10.2026 ("yes", relayed by the PM), with their own record in
+`approved-packages.json`:
 
 - `fiat-crypto` 0.3.0: `curve25519-dalek` 5's dependency under
   `cfg(curve25519_dalek_backend = "fiat")`, which no build here sets, the
