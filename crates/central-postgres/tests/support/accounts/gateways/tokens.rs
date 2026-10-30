@@ -584,6 +584,14 @@ async fn tags(
         .try_get("", "detail")
         .unwrap();
     assert!(detail.contains("\"to\": 180150000"), "{detail}");
+    // the administration's own fixture counts its administrators: this one goes
+    operator
+        .execute_unprepared(&format!(
+            "DELETE FROM central_identity.account_roles WHERE account_id = '{}'",
+            Uuid::from_bytes(admin_account)
+        ))
+        .await
+        .unwrap();
 }
 
 /// The account's sessions, and ending the client's.
