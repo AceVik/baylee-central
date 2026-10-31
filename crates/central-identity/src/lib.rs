@@ -725,6 +725,7 @@ mod tests {
         .into_iter()
         .chain(objects())
         .chain(claimed_by_the_client())
+        .chain(moved_by_the_client())
         .collect()
     }
 
@@ -763,6 +764,19 @@ mod tests {
         ]
     }
 
+    /// The legacy store's sign-in and move, which only the native listener
+    /// serves.
+    fn moved_by_the_client() -> [Request; 3] {
+        [
+            Request::LegacyLogin {
+                username: "synthetic".into(),
+                password: central_api::legacy::LegacyPassword::new("synthetic".into()),
+            },
+            Request::LegacyExport,
+            Request::LegacyLink { digest: [0; 32] },
+        ]
+    }
+
     #[test]
     fn the_browser_listener_serves_exactly_its_operations() {
         let (served, refused) = (served(), refused());
@@ -777,7 +791,7 @@ mod tests {
                 text[start..].split('"').next().unwrap().to_owned()
             })
             .collect();
-        assert_eq!(named.len(), 59, "every operation is in one of the lists");
+        assert_eq!(named.len(), 62, "every operation is in one of the lists");
     }
 
     #[test]

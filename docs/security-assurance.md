@@ -1878,7 +1878,9 @@ account's cookie reading, approving or cancelling; a second claim (the
 hijacking application); a second approval; a wrong verifier, then the right
 one; a second redeem; another epoch between approval and redeem; a proof too
 old; a late claim and an ended pairing; and that signing out ends the page's
-pairings. The listener lists name every one of the 59 operations. The crypto
+pairings. The listener lists name every one of the 59 operations (62 since
+the merge with the legacy store, whose sign-in, export and link they had not
+named). The crypto
 tests are those of the two commits before this one.
 
 Evidence on macOS, 30.10.2026: `cargo xtask gate` (format, policy, crypto
