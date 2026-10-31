@@ -164,25 +164,42 @@ is built before the owner's go.
 Both on the native listener beside `/v1/native`, each with its own body
 bound (the wire's 1 MiB does not apply, and nothing here is wire JSON):
 
+**Gzip all the way (owner, 31.10.2026: "the feedback traffic should be
+sent gzipped").** What is heavy travels and rests compressed: the `client`
+object (system details, the window's picture) and the record are gzip from
+the gateway to Central to the administrator's browser, and Central stores
+those bytes as they came. Central never unpacks them: it checks their
+length and SHA-256 against what the report announced, so it needs no
+decompressor (no new crate) and no compressed body can grow inside it. The
+browser unpacks one (`DecompressionStream`) and stops past a bound (16 MiB
+for `client`, the record only on download). What a list filters and
+searches by stays plain JSON in the report's metadata: the build, and a
+crash's message and place. Answers to the browser are compressed by the
+proxy as every answer is (`encode zstd gzip`).
+
 - `POST /v1/reports`, `Authorization: Bearer <credential>`: the bridge's
   credential (the official gateway), or a live gateway token with the `sso`
   scope of an **approved** gateway (a pending one files nothing: a public
-  intake for strangers is what approval exists for). Body: the feedback
-  service's intake shape (`gateway {name, url, version}`, `reporter`,
-  `kind`, `text`, `game_id`, `client`, `record_origin`, and
-  `record: {complete, sha256, bytes} | null` instead of the bytes),
-  `deny_unknown_fields`, at most 2.2 MiB (`text` 20000 characters, `client`
-  2 MiB serialized as an object, `game_id` 128, `reporter` 1–128 hex);
-  `direct` only from the bridge. The gateway is the authenticated one,
-  never the body's claim (its name and address are stored beside what it
-  says of itself). Answers `201 {"report_id"}`; the report is kept but not
-  listed until its record arrives, when it announced one.
-- `PUT /v1/reports/{id}/record`, the same credential, the gzip as the raw
-  body (`Content-Type: application/gzip`, `Content-Length` required): at
-  most 64 MiB, 4 MiB when `record_origin` is `client`; read with that bound
-  while hashing, refused unless length and SHA-256 equal what the report
-  announced, written once (`409` again). Two uploads at a time
-  (a semaphore), so at most 128 MiB of record is in memory.
+  intake for strangers is what approval exists for). Body, the metadata
+  only, `deny_unknown_fields`, at most 64 KiB: `gateway {name, url,
+  version}` as the gateway says it, `channel` (`direct` only from the
+  bridge), `reporter` (1–128 hex), `kind` (`bug`, `improvement`,
+  `feedback`, `crash`, `other`; a chat message is the gateway's
+  moderation and refused), `text` (1–20000 characters), `game_id` (≤ 128),
+  `build {version, commit}`, `crash {message, location} | null` (≤ 2000 and
+  512 characters), and for each part it will send `{bytes, sha256}`:
+  `client` (≤ 2 MiB of gzip) and `record` (`{complete, origin, bytes,
+  sha256}`, ≤ 64 MiB, 4 MiB when its origin is `client`). The gateway is the
+  authenticated one, never the body's claim (its name and address are
+  stored beside what it says of itself). Answers `201 {"report_id"}`; the
+  report is listed at once, its parts shown as awaited until they come.
+- `PUT /v1/reports/{id}/client` and `PUT /v1/reports/{id}/record`, the same
+  credential and the same gateway, the gzip as the raw body
+  (`Content-Type: application/gzip`, `Content-Length` required): read with
+  the announced length as the bound while hashing, refused unless length
+  and SHA-256 equal what the report announced, starting with gzip's magic,
+  written once (`409` again), within an hour of the report. Two uploads at
+  a time (a semaphore), so at most 128 MiB of parts is in memory.
 - Budgets: per gateway 120 reports an hour, besides the native listener's
   global budget every request spends; `429` past them. Nothing of a
   body is logged; the log names the report id and the gateway.
@@ -217,10 +234,10 @@ and `_` literal; days `from`/`to`; `has_record`; `channel`; `gateway`;
 `trash`; `unseen`), typed and bounded in `central-api`, never SQL text.
 The assignee is an administrator's account id, shown by its handle.
 
-Two raw reads on the browser listener, because a `client` object (2 MiB, a
-screenshot inside) and a record (64 MiB) exceed the wire and are not JSON
-numbers: `POST /api/v1/reports/{id}/client` (JSON) and
-`POST /api/v1/reports/{id}/record` (`application/gzip`), with every header
+Two raw reads on the browser listener, because a `client` object (2 MiB of
+gzip, a screenshot inside) and a record (64 MiB) exceed the wire and are
+not JSON numbers: `POST /api/v1/reports/{id}/client` and
+`POST /api/v1/reports/{id}/record`, both `application/gzip` as stored, with every header
 check of `POST /api/v1` (Host, Origin, Sec-Fetch-Site, `X-Baylee-Central`,
 no Authorization, an administrator's cookie) and an empty body. The page
 fetches them and makes the download itself. A screenshot inside `client`
@@ -230,9 +247,11 @@ out (#55).
 
 ### Schema: migration 000018
 
-As §"Data" above, in `central_identity`: `reports` with the record in a
-table of its own (`report_records(report_id, gzip bytea, bytes, sha256)`,
-so a list never touches it), `report_notes`, `report_audit`,
+As §"Data" above, in `central_identity`, with the gzip parts in a table of
+their own (`report_parts(report_id, part client|record, gzip bytea, bytes,
+sha256)`, so a list never touches them) and `reports` holding the plain
+metadata, the announced parts' lengths and hashes, `build_version`,
+`build_commit`, `crash_message` and `crash_location`, `report_notes`, `report_audit`,
 `report_views`, `report_seen`. Indexes for the list's sorts and filters.
 Runtime grants as §"Data", checked at startup like the others (a wider or
 narrower grant refuses to start). Migration 000017 is the PM's (the
