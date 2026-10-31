@@ -4,6 +4,22 @@ use std::{
     time::{Duration, Instant},
 };
 
+/// Requests a second without a session, all clients together: discovery,
+/// sign-in, registration and the other public operations.
+pub(super) const GLOBAL_PER_SECOND: u32 = 32;
+/// How long an unfinished OPAQUE sign-in, password change or deletion waits
+/// for its second message.
+pub(super) const PENDING_SECONDS: u64 = 60;
+/// Unfinished OPAQUE exchanges held at once. More than the global budget can
+/// start within their lifetime ([`GLOBAL_PER_SECOND`] × [`PENDING_SECONDS`] =
+/// 1920), so no sequence of public requests fills the table before it spends
+/// the budget everyone shares; a password change or deletion besides needs a
+/// signed-in account and its eight units a minute. Each entry is an OPAQUE
+/// server state and a credential record, about a kilobyte: a few megabytes
+/// at most.
+pub(super) const PENDING: usize = 4096;
+const _: () = assert!(PENDING as u64 > GLOBAL_PER_SECOND as u64 * PENDING_SECONDS);
+
 /// Legacy sign-ins a minute, all names together: the store holds a handful
 /// of accounts, and each sign-in is one Argon2 derivation.
 pub(super) const LEGACY_PER_MINUTE: u32 = 30;
@@ -114,7 +130,7 @@ impl Limits {
             *start = now;
             *used = 0;
         }
-        if *used >= 32 {
+        if *used >= GLOBAL_PER_SECOND {
             return Err(Error::Busy);
         }
         *used += 1;

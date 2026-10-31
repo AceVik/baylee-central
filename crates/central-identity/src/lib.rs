@@ -403,13 +403,13 @@ impl IdentityService {
         .map_err(|_| Error::Unavailable)??;
         let ticket = Token::generate()?;
         let mut pending = self.pending.lock().map_err(|_| Error::Unavailable)?;
-        if pending.len() >= 128 {
+        if pending.len() >= limits::PENDING {
             return Err(Error::Busy);
         }
         pending.insert(
             ticket.digest(),
             Pending {
-                expires: Instant::now() + Duration::from_secs(60),
+                expires: Instant::now() + Duration::from_secs(limits::PENDING_SECONDS),
                 attempt,
                 credential,
                 surface,
@@ -426,7 +426,7 @@ impl IdentityService {
         let mut pending = self.pending.lock().map_err(|_| Error::Unavailable)?;
         let now = Instant::now();
         pending.retain(|_, value| value.expires > now);
-        if pending.len() >= 128 {
+        if pending.len() >= limits::PENDING {
             return Err(Error::Busy);
         }
         Ok(())
