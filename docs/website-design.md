@@ -302,7 +302,8 @@ sign-in; a visitor's first page fetches neither.
 
 - `test/styles/contrast.test.ts`: the token pairs above in both schemes.
 - `test/csp.test.ts`: the policy names GitHub only at Baylee's repository,
-  takes no `data:` picture and switches off unused browser features.
+  takes no `data:` picture (`blob:` only for one the page made from bytes it
+  checked: a report's screenshot) and switches off unused browser features.
 - `test/styles/rules.test.ts`: no inline script or style in the shell, card
   pictures untouched, no raw colour outside `tokens.css`, a reduced-motion
   rule beside every animation.

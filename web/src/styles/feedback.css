@@ -230,3 +230,33 @@ a.fb-label:hover, button.fb-label:hover { border-color: var(--edge); color: var(
   .fb-swatch.fb-chart-reports { background: CanvasText; }
   .fb-swatch.fb-chart-crashes { background: Highlight; }
 }
+
+/* ---------------------------------------------------------------- what the client sent */
+.fb-client { display: grid; gap: var(--space-3); }
+.fb-shot {
+  appearance: none; display: block; width: 100%; padding: 0; border: 1px solid var(--edge-soft); border-radius: var(--radius-sm);
+  background: var(--code-bg); cursor: zoom-in; overflow: hidden;
+}
+.fb-shot img { display: block; width: 100%; height: auto; image-rendering: auto; }
+.fb-shot:hover { border-color: var(--edge); }
+.fb-lightbox { width: min(96vw, 110rem); max-height: 96dvh; overflow: auto; }
+.fb-lightbox img { display: block; max-width: 100%; height: auto; margin: 0 auto; }
+.fb-chip, .fb-chip-card {
+  display: inline; padding: 0.05em 0.45em; border: 1px solid var(--edge-soft); border-radius: var(--radius-sm);
+  background: var(--panel-2); color: var(--title); font-family: var(--sans); white-space: normal; box-decoration-break: clone; -webkit-box-decoration-break: clone;
+}
+a.fb-chip-card { color: var(--link); text-decoration: none; }
+a.fb-chip-card:hover { color: var(--link-hover); border-color: var(--edge); }
+.fb-chip-wrap { position: relative; }
+.fb-card-preview {
+  position: absolute; z-index: 25; left: 0; top: calc(100% + var(--space-1)); display: grid; gap: var(--space-1); padding: var(--space-2);
+  width: 13rem; border: 1px solid var(--edge); border-radius: var(--radius-md); background: var(--panel-solid); box-shadow: var(--shadow-lift);
+}
+.fb-card-preview img { display: block; width: 100%; height: auto; border-radius: 4.75% / 3.5%; }
+.fb-json, .fb-j-children { list-style: none; margin: 0; padding: 0; font: var(--text-sm) / 1.6 var(--mono); overflow-wrap: anywhere; }
+.fb-j-children { padding-left: 1.1rem; border-left: 1px solid var(--edge-soft); margin-left: 0.3rem; }
+.fb-json summary { cursor: pointer; min-height: 1.6em; }
+.fb-j-key { color: var(--violet); }
+.fb-j-string { color: var(--ink); }
+.fb-j-value { color: var(--gold); }
+.fb-log { margin: 0; padding-left: 1.4em; max-height: 24rem; overflow: auto; display: grid; gap: var(--space-1); font: var(--text-sm) var(--sans); }

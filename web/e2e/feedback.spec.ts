@@ -8,6 +8,7 @@ import { expect, test } from "@playwright/test";
 
 import { signedIn } from "./signed-in.ts";
 import { expectNoSideScroll, watchErrors } from "./mocks.ts";
+import { hexOf, rid } from "./reports.ts";
 
 test.describe("the feedback section", () => {
   test("lists the reports, filters them in the address and opens one", async ({ page, baseURL }, info) => {
@@ -94,6 +95,31 @@ test.describe("the feedback section's tools", () => {
     await page.keyboard.press("?");
     await expect(page.getByRole("dialog", { name: "Keys" })).toBeVisible();
     await page.keyboard.press("Escape");
+    expect(central.violations).toEqual([]);
+    expect(errors).toEqual([]);
+  });
+});
+
+test.describe("what a report carries", () => {
+  test("the client's details under the policy, and the record as a download", async ({ page, baseURL }) => {
+    const errors = watchErrors(page);
+    const central = await signedIn(page, new URL(baseURL ?? "").origin);
+    await page.goto(`/admin/feedback/${hexOf(rid(1))}?lang=en`);
+    // a checked PNG through a blob: address, which the policy allows (and data: it does not)
+    const shot = page.getByRole("img", { name: /The client's window when the report was written/ });
+    await expect(shot).toBeVisible();
+    await expect(shot).toHaveAttribute("src", /^blob:/);
+    expect(await shot.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBe(1);
+    await expect(page.getByRole("link", { name: /^Lightning Bolt/ })).toHaveAttribute("href", "https://scryfall.com/card/77c6fa74-5543-42ac-9ead-0e890b188e99");
+    await page.getByText("Everything it sent, as a tree").click();
+    await page.getByText("screenshot:", { exact: true }).click();
+    await expect(page.getByText(/characters of base64/)).toBeVisible();
+    const download = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Download the record (.gz)" }).click();
+    expect((await download).suggestedFilename()).toMatch(/^baylee-report-[0-9a-f]{8}-record\.jsonl\.gz$/);
+    await page.waitForLoadState("networkidle");
+    await expectNoSideScroll(page);
+    expect(central.operations.filter((o) => o.startsWith("part:"))).toEqual(["part:client", "part:record"]);
     expect(central.violations).toEqual([]);
     expect(errors).toEqual([]);
   });

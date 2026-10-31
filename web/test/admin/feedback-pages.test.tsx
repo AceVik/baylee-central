@@ -1,8 +1,11 @@
+/// <reference types="node" />
 // The feedback section with stand-ins (test/support/reports.ts): the views
 // with their counts, the search in the address, a report triaged on its page
 // with its revision named and read again on a conflict, notes removed by
 // their author only, the unread count in the navigation, and the overview's
 // tile.
+
+import { gzipSync } from "node:zlib";
 
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -256,5 +259,44 @@ describe("the feedback section", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("shows what the client sent: the screenshot through a blob address, the cards as chips; and hands over the record as gzip", async () => {
+    const user = userEvent.setup();
+    const reports = fakeReports();
+    const row = reports.rows[0];
+    if (row === undefined) throw new Error("no row");
+    row.text = "It went wrong after [Lightning Bolt] resolved.";
+    row.client = { bytes: 300, received: true };
+    row.record = { bytes: 40, received: true };
+    row.summary = { ...row.summary, recordOrigin: "gateway", recordBytes: 40, hasRecord: true };
+    const client = {
+      screenshot: { width: 1, height: 1, png_base64: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGNQM3ABAAEaAJsR09CMAAAAAElFTkSuQmCC" },
+      refs: { cards: [{ text: "Lightning Bolt", at: [20, 36], zone: "stack", owner: 1, print: { scryfall_id: "77c6fa74-5543-42ac-9ead-0e890b188e99" } }], players: [] },
+      system: { platform: "Synthetic OS", cpus: 8 },
+    };
+    vi.mocked(reports.part).mockImplementation(async (_r, part) =>
+      part === "client" ? { gzip: new Uint8Array(gzipSync(JSON.stringify(client))), origin: null } : { gzip: new Uint8Array(gzipSync("{}\n")), origin: "gateway" },
+    );
+    const made: Blob[] = [];
+    const created = vi.fn<(b: Blob) => string>((b) => {
+      made.push(b);
+      return `blob:test/${made.length}`;
+    });
+    const revoked = vi.fn<(url: string) => void>();
+    Object.assign(URL, { createObjectURL: created, revokeObjectURL: revoked });
+    window.history.replaceState(null, "", `/admin/feedback/${idText(id(1))}`);
+    const view = show(<ReportPage client={admin()} reports={reports} />);
+    const shot = await screen.findByRole("img", { name: /The client's window when the report was written, 1 × 1 pixels/ });
+    expect(shot.getAttribute("src")).toBe("blob:test/1");
+    expect(made[0]?.type).toBe("image/png");
+    expect(reports.part).toHaveBeenCalledWith(id(1), "client", 2 * 1024 * 1024);
+    expect(screen.getByRole("link", { name: /Lightning Bolt/ }).getAttribute("href")).toBe("https://scryfall.com/card/77c6fa74-5543-42ac-9ead-0e890b188e99");
+    expect(screen.getByText("Synthetic OS")).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Download the record (.gz)" }));
+    await waitFor(() => expect(reports.part).toHaveBeenCalledWith(id(1), "record", 64 * 1024 * 1024));
+    await waitFor(() => expect(made.some((b) => b.type === "application/gzip")).toBe(true));
+    view.unmount();
+    expect(revoked).toHaveBeenCalledWith("blob:test/1");
   });
 });

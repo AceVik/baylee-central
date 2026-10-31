@@ -1464,3 +1464,58 @@ fb-keyHelp = these keys
 fb-keySteps = the previous or next report of the list
 fb-keysOn = Single keys on this page
 fb-keysWhy = Switched off, only Ctrl+K and the buttons act; that helps with speech input. This browser keeps the choice.
+fb-clientSent = What the client sent
+fb-noClientPart = The client sent no details with this report.
+fb-errClientLarge = The client's details unpack to more than this page reads (16 MiB). Nothing of them is shown.
+fb-errClientShape = The client's details could not be read: they are no gzip of a JSON object.
+fb-noShot = No picture of the window.
+fb-screenshot = The window's picture
+fb-shotAlt = The client's window when the report was written, { $width } × { $height } pixels
+fb-enlarge = Show it large
+fb-gameWhen = In the game
+fb-gameTurn = Turn
+fb-gameOwnTurn = { $n }, the reporter's own
+fb-gameSeatTurn = { $n }, seat { $seat }'s
+fb-gameSeat = Seat
+fb-gameSeatOf = { $seat } of { $n } players
+fb-gamePending = Asked for
+fb-gameNothing = nothing
+fb-backtrace = The backtrace
+fb-log =
+
+    { $n ->
+        [one] The log, one line
+       *[other] The log, { $n } lines
+    }
+fb-system = The system
+fb-sysPlatform = Platform
+fb-sysCpus = Processors
+fb-sysAdapter = Graphics adapter
+fb-sysBackend = Graphics backend
+fb-sysWindow = Window
+fb-sysScale = Scale
+fb-sysLang = Language
+fb-settings = The settings
+fb-everything = Everything it sent, as a tree
+fb-jsonAll = all { $n } characters
+fb-jsonBase64 = ({ $n } characters of base64)
+fb-jsonItems =
+
+    { $n ->
+        [one] one item
+       *[other] { $n } items
+    }
+fb-jsonKeys =
+
+    { $n ->
+        [one] one key
+       *[other] { $n } keys
+    }
+fb-jsonMore = the next { $n } of { $left }
+fb-cardImage = The card { $name }
+fb-scryfall = Picture: Scryfall
+fb-seat = seat { $n }
+fb-downloadRecord = Download the record (.gz)
+fb-downloadClientRecord = Download the client's record (.gz, unverified)
+fb-recordSaved = The record is handed to your browser.
+fb-recordSavedClient = The client's record is handed to your browser. The client wrote it; nobody checked it.

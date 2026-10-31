@@ -2039,3 +2039,65 @@ names of an administrator's change over the browser listener; the wire tests
 refuse an unknown field in the overview and in a named audit page. The
 website: page tests with stand-ins, and the e2e mock's answers in the exact
 shapes. Engineering review, not an audit.
+
+## The administration's feedback section, 31 October 2026
+
+Design pass. The website's side of bug and crash reports
+([reports](reports.md) §"The website's section"): `/admin/feedback` and a
+page per report, every triage request of `AdminRequest`, and the two raw
+part reads (`POST /api/v1/reports/{id}/client|record`). Assets: the
+players' words and pseudonyms, the client's details (a screenshot, the
+table, the log), a game's record, and the administrators' notes. Caller
+trust: an administrator's browser session, which Central checks on every
+read and change; the page asks only once the summary says administrator.
+Untrusted input: everything a report holds, including what a gateway says
+of itself, and the client part's gzip, which a modified client can shape.
+Not built here: Central's routes and their budgets (reviewed with #58).
+
+Implementation pass:
+- **Text only.** No report field, note, history line, gateway string or
+  client value is drawn as HTML; names are `<bdi>`, ids and versions
+  `<code>`, the player's words a text node (`dir="auto"`). A card the text
+  names is a link built from its Scryfall id alone (checked as a UUID), its
+  picture from `cards.scryfall.io` with `referrerPolicy="no-referrer"`.
+- **Shapes.** Every answer is parsed by its exact keys and central-api's
+  bounds (`admin/feedback/api.ts`); a filter is sent with its set parts only
+  and mirrors `ReportFilter::validate`, so an address with a bad part drops
+  that part instead of sending it.
+- **The client part.** At most 2 MiB of gzip are read (the body counted
+  while it streams, `Content-Length` checked first, gzip's magic required),
+  inflated through `DecompressionStream` and stopped past 16 MiB of output
+  while it streams (`MAX_CLIENT_JSON`, the design's bound), decoded as
+  strict UTF-8 and only then parsed. The JSON tree draws children only when
+  unfolded, 200 at a time, at most 32 levels deep.
+- **The screenshot.** Shown only when its base64 decodes to a PNG by its
+  eight-byte signature and an `IHDR` of 1 to 16,384 pixels a side; the
+  bytes become a `Blob` shown through `URL.createObjectURL`, revoked when
+  the view goes. `img-src` gains `blob:` for this and keeps `data:` out
+  (`scripts/csp.ts`, `test/csp.test.ts`).
+- **The record.** Never unpacked in the page: read with a 64 MiB bound and
+  handed to the browser as the `.gz` Central keeps; a client's record says
+  it is unverified.
+- **GitHub.** An issue link is `ISSUES/<n>` for Central's number (1 to
+  10,000,000); a new issue's form carries only the administrator's own
+  summary, a neutral category and a build that reads as a version.
+- **CSV.** Made in the browser; a cell starting with `=`, `+`, `-`, `@`, a
+  tab or a carriage return gets an apostrophe in front.
+- **Reauthentication.** Only a purge (one report's or a selection's) runs
+  through `useChange`, so a stale sign-in asks for the password first;
+  triage, notes, the trash, views and the unread mark go straight, as
+  `AdminRequest::fresh` rules.
+- **Requests.** The search waits for a pause in typing; facets are read once
+  per filter; the views' counts are two reads; the quiet refresh runs every
+  30 seconds only while the page is in view; the drawer reads a client part
+  only once the reader stops on a report.
+
+Adversarial pass: unit tests refuse answers with an unknown field, a bad
+label, signature, id or word, a control character in an excerpt and an
+oversized part; a gzip bomb stops at its bound; a GIF and broken base64 are
+no screenshot; a CSV cell starting a formula is defused; a pasted issue
+from another repository is refused. The e2e mock refuses any report
+request with a field too many or too few and checks the part route's
+headers and empty body; a spec shows the screenshot through `blob:` under
+the production policy with no console error. Engineering review, not an
+audit.

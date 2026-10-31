@@ -395,7 +395,9 @@ crypto, and allows no `eval` of JavaScript; owner, 21.10.2026),
 `connect-src 'self'` plus GitHub only at Baylee's repository
 (`https://api.github.com/repos/AceVik/baylee` and below it,
 `https://raw.githubusercontent.com/AceVik/baylee/`) and the feedback service,
-`img-src 'self' https://cards.scryfall.io`, `worker-src 'self'`. Beside it the
+`img-src 'self' blob: https://cards.scryfall.io` (`blob:` only for a picture
+the page made itself from bytes it checked: a report's screenshot in the
+administration, a PNG by its signature; never `data:`), `worker-src 'self'`. Beside it the
 site sends `Permissions-Policy` (`PERMISSIONS` in the same file: no camera,
 microphone, location, payment or device access) and
 `Cross-Origin-Opener-Policy: same-origin`.

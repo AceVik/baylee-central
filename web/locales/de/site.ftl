@@ -1460,3 +1460,58 @@ fb-keyHelp = diese Tasten
 fb-keySteps = vorige oder nächste Meldung der Liste
 fb-keysOn = Einzelne Tasten auf dieser Seite
 fb-keysWhy = Ausgeschaltet wirken nur Strg+K und die Knöpfe; das hilft bei Spracheingabe. Dieser Browser merkt sich die Wahl.
+fb-clientSent = Was der Client geschickt hat
+fb-noClientPart = Der Client hat keine Details mitgeschickt.
+fb-errClientLarge = Die Details des Clients sind entpackt größer, als diese Seite liest (16 MiB). Nichts davon wird gezeigt.
+fb-errClientShape = Die Details des Clients ließen sich nicht lesen: Sie sind kein gzip eines JSON-Objekts.
+fb-noShot = Kein Bild des Fensters.
+fb-screenshot = Das Bild des Fensters
+fb-shotAlt = Das Fenster des Clients beim Schreiben der Meldung, { $width } × { $height } Pixel
+fb-enlarge = Groß zeigen
+fb-gameWhen = Im Spiel
+fb-gameTurn = Zug
+fb-gameOwnTurn = { $n }, der eigene
+fb-gameSeatTurn = { $n }, von Platz { $seat }
+fb-gameSeat = Platz
+fb-gameSeatOf = { $seat } von { $n } Spielern
+fb-gamePending = Gefragt war
+fb-gameNothing = nichts
+fb-backtrace = Der Backtrace
+fb-log =
+
+    { $n ->
+        [one] Das Protokoll, eine Zeile
+       *[other] Das Protokoll, { $n } Zeilen
+    }
+fb-system = Das System
+fb-sysPlatform = Plattform
+fb-sysCpus = Prozessoren
+fb-sysAdapter = Grafikkarte
+fb-sysBackend = Grafik-Backend
+fb-sysWindow = Fenster
+fb-sysScale = Skalierung
+fb-sysLang = Sprache
+fb-settings = Die Einstellungen
+fb-everything = Alles, was er geschickt hat, als Baum
+fb-jsonAll = alle { $n } Zeichen
+fb-jsonBase64 = ({ $n } Zeichen Base64)
+fb-jsonItems =
+
+    { $n ->
+        [one] ein Eintrag
+       *[other] { $n } Einträge
+    }
+fb-jsonKeys =
+
+    { $n ->
+        [one] ein Schlüssel
+       *[other] { $n } Schlüssel
+    }
+fb-jsonMore = die nächsten { $n } von { $left }
+fb-cardImage = Die Karte { $name }
+fb-scryfall = Bild: Scryfall
+fb-seat = Platz { $n }
+fb-downloadRecord = Aufzeichnung herunterladen (.gz)
+fb-downloadClientRecord = Aufzeichnung des Clients herunterladen (.gz, ungeprüft)
+fb-recordSaved = Die Aufzeichnung ist an deinen Browser übergeben.
+fb-recordSavedClient = Die Aufzeichnung des Clients ist an deinen Browser übergeben. Der Client hat sie geschrieben; niemand hat sie geprüft.

@@ -21,6 +21,8 @@ import { BOUNDS, type ReportChange, type ReportDetail, type ReportSummary, type 
 import { firstLine } from "./github";
 import { Ago, KindPill, PriorityPill, Reporter, StatusPill, shortId, useNotices, type Admins } from "./pieces";
 import { listPath, reportPath, type ListQuery } from "./query";
+import { ClientDetails, RecordDownload, RefText, useClientPart } from "./ClientView";
+import { readRefs } from "./client";
 import { AssigneePicker, DuplicateEditor, History, IssueEditor, LabelEditor, Notes, PriorityPicker, Related, StatusPicker } from "./Triage";
 
 /** `bytes` as a person reads it: 912 B, 21.1 KiB, 3.4 MiB. */
@@ -96,6 +98,8 @@ export function ReportView({ api, hex, me, admins, query, summary, replace, comp
   const [asking, setAsking] = useState(false);
   const [known, setKnown] = useState<string[] | null>(null);
   const { run, pending } = useChange(summary, replace);
+  // the client's details, once the report says they arrived; in the drawer a moment later, so stepping through reads only where it stops
+  const [client, retryClient] = useClientPart(api, id, hex, load.at === "ready" && load.report.client?.received === true, compact ? 400 : 0);
   // the callbacks of the newest render, for answers that come after it
   const hooks = useRef({ onChanged, onDecided, onGone, onBack, recountUnread });
   useEffect(() => {
@@ -369,6 +373,12 @@ export function ReportView({ api, hex, me, admins, query, summary, replace, comp
                   who: t(lang, s.recordOrigin === "client" ? "fb.byClient" : "fb.byGateway"),
                   end: t(lang, s.recordComplete ? "fb.recordComplete" : "fb.recordPartial"),
                 })}
+            {report.record?.received === true && (
+              <>
+                <br />
+                <RecordDownload api={api} id={id} hex={hex} origin={s.recordOrigin} />
+              </>
+            )}
           </dd>
         </div>
         <div>
@@ -393,7 +403,7 @@ export function ReportView({ api, hex, me, admins, query, summary, replace, comp
         <p className="small">{t(lang, "fb.noText")}</p>
       ) : (
         <p className="fb-text" dir="auto">
-          {report.text}
+          <RefText text={report.text} refs={client.at === "ready" ? readRefs(client.client) : null} />
         </p>
       )}
       {s.crash !== null && (
@@ -403,6 +413,11 @@ export function ReportView({ api, hex, me, admins, query, summary, replace, comp
           {report.crashLocation !== null && <code className="fb-code">{report.crashLocation}</code>}
         </div>
       )}
+    </Section>
+  );
+  const sent = (
+    <Section title={t(lang, "fb.clientSent")}>
+      <ClientDetails load={client} onRetry={retryClient} compact={compact} />
     </Section>
   );
   const notes = (
@@ -472,6 +487,7 @@ export function ReportView({ api, hex, me, admins, query, summary, replace, comp
         <div className="fb-report-col">
           {triage}
           {text}
+          {sent}
           {facts}
           {notes}
           {related}
@@ -482,6 +498,7 @@ export function ReportView({ api, hex, me, admins, query, summary, replace, comp
         <div className="fb-report-grid">
           <div className="fb-report-col">
             {text}
+            {sent}
             {facts}
             {history}
           </div>

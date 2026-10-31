@@ -378,8 +378,8 @@ export function reportsAnswer(s: ReportsState, request: Record<string, unknown>)
   return undefined;
 }
 
-/** A PNG of 2 × 2 pixels, for the screenshot inside a client part. */
-const PNG = "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAFklEQVR4nGNgYPj/n4GBgYGJAQoAADsABgFpOvMAAAAASUVORK5CYII=";
+/** A PNG of one pixel (the one `mocks.ts` answers pictures with), for the screenshot inside a client part. */
+const PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGNQM3ABAAEaAJsR09CMAAAAAElFTkSuQmCC";
 
 /** A report's part as Central keeps it: gzip, and the record's origin; null when it has none. */
 export function reportPart(s: ReportsState, hex: string, part: string): { gzip: Buffer; origin: string | null } | null {
@@ -393,9 +393,9 @@ export function reportPart(s: ReportsState, hex: string, part: string): { gzip: 
     const client = {
       build: { version: "0.1.1-beta.9b", commit: "3f9a1c7e21" },
       system: { platform: "macOS 15", cpus: 8, adapter: "Synthetic GPU", backend: "Metal", window: [1280, 800], scale: 2, lang: "en" },
-      screenshot: { width: 2, height: 2, png_base64: PNG },
+      screenshot: { width: 1, height: 1, png_base64: PNG },
       refs: {
-        cards: [{ text: "Lightning Bolt", at: [43, 59], card: 17, zone: "stack", owner: 1, print: { scryfall_id: "77c6fa74-5543-42ac-9ead-0e890b188e99" } }],
+        cards: [{ text: "Lightning Bolt", at: [45, 61], card: 17, zone: "stack", owner: 1, print: { scryfall_id: "77c6fa74-5543-42ac-9ead-0e890b188e99" } }],
         players: [],
       },
       game: { table: { seat: 0, seq: 214, when: "Turn 2 · Main 1" }, view: { turn: 2, active: 1, players: [{}, {}] }, pending: { ChooseAttackers: { count: 2 } } },
