@@ -86,7 +86,10 @@ Central for its players' sign-ins and its entry in the gateway list.
   token once, in the answer to `Owner { CreateToken }`, whose text form is
   `bgt_` and 64 lowercase hex digits (`central_api::owner::token_text`; the
   gateway reads it back with `parse_token_text`). It has
-  - a **name**, the owner's label (1 to 64 bytes, no control characters);
+  - a **name**, the owner's label (1 to 64 bytes, no control characters and
+    none of the invisible characters that change how text reads, such as a
+    direction override; `central_api::gateway::shown_char`, the rule of a
+    gateway's own name as well);
   - **scopes**: `sso` (redeem its players' tickets; check their leases,
     profiles, admin rights and terms; publish its terms) and `listing` (its
     directory heartbeat), at least one;

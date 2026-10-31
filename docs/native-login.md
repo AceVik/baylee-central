@@ -213,7 +213,9 @@ current password (ASVS 6.2.3, in OPAQUE's form), inside the exchange itself:
    faster than anyone can without a session through `LoginStart`. It answers
    `PasswordChallenge { attempt, login: KE2, registration }`. The attempt
    lives 60 seconds, is bound to this purpose, this listener and the digest
-   of the starting session's token, and shares the 128 pending sign-ins.
+   of the starting session's token, and shares the table of pending
+   sign-ins (4096, more than the global budget can start in their 60
+   seconds).
 2. The client checks KE2 (a wrong current password fails here, before
    anything is sent), finishes the registration under the new password and
    wraps the master key it holds with the new export key's wrapping key.

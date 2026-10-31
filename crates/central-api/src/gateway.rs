@@ -7,7 +7,7 @@ use url::Url;
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct GatewayMetadata {
-    /// Human-readable gateway name, at most 80 UTF-8 bytes without control characters.
+    /// Human-readable gateway name, at most 80 UTF-8 bytes of [`shown_char`]s.
     pub name: String,
     /// Operator-reported software version, at most 64 ASCII bytes.
     pub version: String,
@@ -73,6 +73,31 @@ pub fn validate_origin(value: &str, development: bool) -> Result<(), Error> {
     Ok(())
 }
 
+/// Whether `c` may stand in a name another person reads: no control
+/// character, and none of the invisible characters that change how the text
+/// around them is drawn (direction marks, embeddings, overrides and
+/// isolates, invisible separators and spaces, the byte order mark), which
+/// could make a gateway's or a token's name read as something else. The
+/// zero-width joiner and non-joiner stay: emoji sequences and some scripts
+/// need them.
+#[must_use]
+pub const fn shown_char(c: char) -> bool {
+    !c.is_control()
+        && !matches!(
+            c,
+            '\u{061C}'
+                | '\u{200B}'
+                | '\u{200E}'
+                | '\u{200F}'
+                | '\u{202A}'..='\u{202E}'
+                | '\u{2028}'
+                | '\u{2029}'
+                | '\u{2060}'..='\u{2064}'
+                | '\u{2066}'..='\u{2069}'
+                | '\u{FEFF}'
+        )
+}
+
 impl GatewayMetadata {
     /// Validate metadata without dereferencing the website or accepting another origin.
     ///
@@ -83,7 +108,7 @@ impl GatewayMetadata {
         if self.name.is_empty()
             || self.name.len() > 80
             || self.name.trim() != self.name
-            || self.name.chars().any(char::is_control)
+            || !self.name.chars().all(shown_char)
             || self.version.is_empty()
             || self.version.len() > 64
             || !self
@@ -134,6 +159,42 @@ mod tests {
         ] {
             metadata.website = website.into();
             assert!(metadata.validate("https://gateway.invalid").is_err());
+        }
+    }
+
+    #[test]
+    fn a_name_cannot_hide_how_it_reads() {
+        let named = |name: &str| GatewayMetadata {
+            name: name.into(),
+            version: "1.2.3-test".into(),
+            website: "https://gateway.invalid/".into(),
+        };
+        // a right-to-left override, an isolate, a mark, an invisible space,
+        // a line separator, a byte order mark, a control character
+        for name in [
+            "Official\u{202E}lacif",
+            "Table \u{2067}x\u{2069}",
+            "Table\u{200F}",
+            "Bay\u{200B}lee",
+            "Two\u{2028}lines",
+            "\u{FEFF}Table",
+            "Tab\u{0007}le",
+        ] {
+            assert!(
+                named(name).validate("https://gateway.invalid").is_err(),
+                "{name:?}"
+            );
+            assert!(crate::owner::token_name(name).is_err(), "{name:?}");
+        }
+        // other scripts, accents and an emoji sequence with its joiners stay
+        for name in [
+            "Spieltisch Köln",
+            "東京テーブル",
+            "طاولة",
+            "Family 👨\u{200D}👩\u{200D}👧",
+        ] {
+            named(name).validate("https://gateway.invalid").unwrap();
+            crate::owner::token_name(name).unwrap();
         }
     }
 }

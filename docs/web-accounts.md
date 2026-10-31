@@ -354,7 +354,8 @@ other answers keep the native statuses too (409 `Conflict`, 429 `Busy`, 503
 
 The cookie is
 `__Host-central=<64 hex>; Path=/; Secure; HttpOnly; SameSite=Strict;
-Max-Age=1800`. The session is the native session with `kind = browser`. Only
+Max-Age=43200`: the session's 12-hour cap; the session itself ends after 30
+minutes unless renewed, and the cookie of an ended session finds none. The session is the native session with `kind = browser`. Only
 exactly one well-formed `__Host-central` counts; anything else in `Cookie` is
 no session. `Logout` clears the cookie (`Max-Age=0`) in every answer, also when
 the session was already gone.
