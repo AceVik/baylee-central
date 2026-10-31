@@ -5,8 +5,8 @@
 // because a Fluent id takes no dot.
 //
 // One language at a time. The choice: `?lang=` wins, then what this browser
-// chose last time (localStorage, the key the old site at baylee.acevik.de
-// used, so a visitor keeps it), then the browser's languages; only a language
+// chose last time (localStorage, the key Baylee's old static site used, so
+// a visitor keeps it), then the browser's languages; only a language
 // with a file counts, else English. `public/boot.js` makes the same choice
 // before the first paint.
 

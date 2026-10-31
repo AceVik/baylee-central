@@ -5,8 +5,28 @@
 // these paths with index.html (README.md §"Serving it").
 
 import { useEffect, useState, type AnchorHTMLAttributes, type MouseEvent } from "react";
+import { flushSync } from "react-dom";
 
-export const PAGES = ["home", "download", "cards", "gateways", "contact", "impressum", "privacy", "terms", "register", "signIn", "account"] as const;
+export const PAGES = [
+  "home",
+  "download",
+  "cards",
+  "gateways",
+  "contact",
+  "impressum",
+  "privacy",
+  "terms",
+  "register",
+  "signIn",
+  "account",
+  "accountSecurity",
+  "accountGateways",
+  "admin",
+  "adminUser",
+  "adminGateways",
+  "adminAudit",
+  "adminLegacy",
+] as const;
 export type Page = (typeof PAGES)[number];
 
 export const PATHS: Record<Page, string> = {
@@ -21,11 +41,30 @@ export const PATHS: Record<Page, string> = {
   register: "/register",
   signIn: "/signin",
   account: "/account",
+  accountSecurity: "/account/security",
+  accountGateways: "/account/gateways",
+  admin: "/admin",
+  // one account's page is `/admin/users/<its id in hex>` (`userPath`)
+  adminUser: "/admin/users",
+  adminGateways: "/admin/gateways",
+  adminAudit: "/admin/audit",
+  adminLegacy: "/admin/legacy",
 };
+
+/** The administration's page of the account with the id `hex` (32 hex digits). */
+export const userPath = (hex: string): string => `${PATHS.adminUser}/${hex}`;
+
+/** The account id in an administration's account page path, or null. */
+export function userAt(pathname: string): string | null {
+  return /^\/admin\/users\/([0-9a-f]{32})\/?$/.exec(pathname)?.[1] ?? null;
+}
 
 /** The page at `pathname`, or null for one this site does not have. */
 export function pageAt(pathname: string): Page | null {
+  if (userAt(pathname) !== null) return "adminUser";
   const path = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
+  // the list of accounts is the administration's first page
+  if (path === PATHS.adminUser) return "admin";
   for (const page of PAGES) if (PATHS[page] === path) return page;
   return null;
 }
@@ -43,11 +82,34 @@ function here(): Location {
   return { pathname, search, hash };
 }
 
-/** Goes to `to` (a path on this site, with or without a hash) without a reload. */
-export function navigate(to: string, replace = false): void {
+/** Changes the address and tells every `useLocation`. */
+function go(to: string, replace: boolean): void {
   if (replace) window.history.replaceState(null, "", to);
   else window.history.pushState(null, "", to);
   window.dispatchEvent(new Event(EVENT));
+}
+
+type Transitioning = Document & { startViewTransition?: (update: () => Promise<void>) => unknown };
+
+/**
+ * Goes to `to` (a path on this site, with or without a hash) without a
+ * reload. Another page cross-fades in where the browser has View Transitions
+ * and motion is welcome (docs/website-design.md §"Motion").
+ */
+export function navigate(to: string, replace = false): void {
+  const doc = document as Transitioning;
+  const samePage = new URL(to, window.location.href).pathname === window.location.pathname;
+  const still = typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (samePage || still || typeof doc.startViewTransition !== "function") {
+    go(to, replace);
+    return;
+  }
+  // the browser draws nothing while the update runs, so no frame callback
+  // would come: React draws the new page synchronously instead
+  doc.startViewTransition(() => {
+    flushSync(() => go(to, replace));
+    return Promise.resolve();
+  });
 }
 
 export function useLocation(): Location {

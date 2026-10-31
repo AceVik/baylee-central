@@ -70,11 +70,16 @@ impl IdentityService {
             request @ (Request::AccountSummary
             | Request::SetRecovery { .. }
             | Request::SetDisplayName { .. }
-            | Request::Admin { .. }) => self.account_request(request, bearer, surface).await,
+            | Request::Admin { .. }
+            | Request::Owner { .. }) => self.account_request(request, bearer, surface).await,
             request @ (Request::LegacyReserve { .. }
             | Request::LegacyInvalidate { .. }
             | Request::LegacyClose { .. }
-            | Request::LegacyProfile { .. }) => self.legacy_mutation(request, bearer).await,
+            | Request::LegacyProfile { .. }
+            | Request::LegacyStatus { .. }
+            | Request::LegacyLogin { .. }
+            | Request::LegacyExport
+            | Request::LegacyLink { .. }) => self.legacy(request, bearer, surface).await,
             request @ (Request::RegisterGateway { .. }
             | Request::GatewayDirectory { .. }
             | Request::GatewayHeartbeat { .. }
@@ -83,12 +88,22 @@ impl IdentityService {
             | Request::GatewaySession { .. }
             | Request::GatewayProfile { .. }
             | Request::GatewayTicket { .. }
-            | Request::RedeemGateway { .. }) => self.gateway_request(request, bearer).await,
+            | Request::RedeemGateway { .. }
+            | Request::GatewayStatus) => self.gateway_request(request, bearer).await,
             request @ (Request::AccountExport
             | Request::DeleteAccountStart { .. }
             | Request::DeleteAccountFinish { .. }) => {
                 self.lifecycle_request(request, bearer, surface).await
             }
+            request @ (Request::KeyCheckStatus
+            | Request::SetKeyCheck { .. }
+            | Request::PairStart
+            | Request::PairStatus { .. }
+            | Request::PairApprove { .. }
+            | Request::PairCancel { .. }
+            | Request::PairClaim { .. }
+            | Request::PairPoll { .. }
+            | Request::PairRedeem { .. }) => self.pairing_request(request, bearer, surface).await,
             Request::Discover { username } => self.discover(&username).await,
             Request::LoginStart { identity, message } => {
                 self.start(identity, message, surface).await
@@ -111,31 +126,10 @@ impl IdentityService {
             Request::EnrollmentStart { ticket, message } => {
                 self.enrollment_challenge(&ticket, message).await
             }
-            Request::EnrollmentFinish {
-                ticket,
-                record,
-                wrapped_master,
-                document,
-                recovery,
-            } => self
-                .store
-                .enroll(
-                    &ticket,
-                    &record,
-                    &wrapped_master,
-                    &document,
-                    recovery.as_deref(),
-                )
-                .await
-                .map(|()| Response::Done),
+            request @ Request::EnrollmentFinish { .. } => self.enrollment_finish(request).await,
             request @ (Request::ReadDocument
             | Request::WriteDocument { .. }
             | Request::ConfirmRestore { .. }) => self.document_request(request, bearer).await,
-            Request::LegacyStatus { legacy_id } => {
-                self.bridge(bearer)?;
-                let (identity, state) = self.store.legacy_status(&legacy_id).await?;
-                Ok(Response::LegacyStatus { identity, state })
-            }
         }
     }
 
@@ -192,6 +186,7 @@ impl IdentityService {
         };
         match request {
             Request::Admin { request } => self.admin_request(request, bearer, surface).await,
+            Request::Owner { request } => self.owner_request(request, cookie).await,
             Request::AccountSummary => {
                 let summary = self.store.account_summary(cookie).await?;
                 Ok(Response::AccountSummary {
@@ -279,12 +274,45 @@ impl IdentityService {
         }
     }
 
+    /// Every legacy operation: the legacy store's sign-in and move
+    /// (`legacy.rs`), and the bridge's own, which only a Central without the
+    /// store serves.
+    async fn legacy(
+        &self,
+        request: Request,
+        bearer: Option<&Token>,
+        surface: Surface,
+    ) -> Result<Response, Error> {
+        match request {
+            Request::LegacyLogin { username, password } => {
+                self.legacy_login(&username, password, surface).await
+            }
+            request @ (Request::LegacyExport | Request::LegacyLink { .. }) => {
+                self.legacy_request(request, bearer, surface).await
+            }
+            Request::LegacyStatus { legacy_id } => {
+                self.bridge(bearer)?;
+                if self.legacy.is_some() {
+                    return Err(Error::Rejected);
+                }
+                let (identity, state) = self.store.legacy_status(&legacy_id).await?;
+                Ok(Response::LegacyStatus { identity, state })
+            }
+            request => self.legacy_mutation(request, bearer).await,
+        }
+    }
+
     async fn legacy_mutation(
         &self,
         request: Request,
         bearer: Option<&Token>,
     ) -> Result<Response, Error> {
         self.bridge(bearer)?;
+        // Central is the source once it holds the legacy store: the bridge
+        // reserves, invalidates, closes and carries nothing any more.
+        if self.legacy.is_some() {
+            return Err(Error::Rejected);
+        }
         match request {
             Request::LegacyReserve {
                 legacy_id,
@@ -341,5 +369,28 @@ impl IdentityService {
         .await
         .map_err(|_| Error::Unavailable)??;
         Ok(Response::EnrollmentChallenge { message })
+    }
+
+    async fn enrollment_finish(&self, request: Request) -> Result<Response, Error> {
+        let Request::EnrollmentFinish {
+            ticket,
+            record,
+            wrapped_master,
+            document,
+            recovery,
+        } = request
+        else {
+            return Err(Error::Rejected);
+        };
+        self.store
+            .enroll(
+                &ticket,
+                &record,
+                &wrapped_master,
+                &document,
+                recovery.as_deref(),
+            )
+            .await
+            .map(|()| Response::Done)
     }
 }

@@ -30,7 +30,7 @@ export function About() {
           </p>
         </div>
       </div>
-      <ul className="features">
+      <ul className="features stagger">
         {FEATURES.map((f) => (
           <li key={f.icon} className="glass reveal">
             <span className="feat-icon">

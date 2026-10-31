@@ -8,7 +8,12 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON central_identity.accounts, central_ident
   central_identity.gateway_tickets, central_identity.private_objects TO central_runtime;
 GRANT SELECT, INSERT ON central_identity.migration_archives TO central_runtime;
 GRANT SELECT, INSERT, UPDATE ON central_identity.gateways TO central_runtime;
-GRANT SELECT ON central_identity.gateway_approvals TO central_runtime;
+-- Administrators approve, enable and disable gateways on the website
+-- (docs/administration.md §"Gateways"); an approval is never deleted.
+GRANT SELECT, INSERT, UPDATE (enabled) ON central_identity.gateway_approvals TO central_runtime;
+-- Gateway tokens (docs/gateway-registry.md §"Gateway tokens"): stored by
+-- digest; afterwards only their revocation and last use change.
+GRANT SELECT, INSERT, UPDATE (revoked_at, last_used_at) ON central_identity.gateway_tokens TO central_runtime;
 GRANT SELECT, INSERT, DELETE ON central_identity.gateway_admins, central_identity.gateway_leases TO central_runtime;
 -- A renewed session moves its leases' expiry with it, and nothing else of them.
 GRANT UPDATE (expires_at) ON central_identity.gateway_leases TO central_runtime;
@@ -21,3 +26,20 @@ GRANT SELECT, UPDATE (uses_left) ON central_identity.beta_keys TO central_runtim
 -- nor delete; the operator's sweep deletes events after three years.
 GRANT SELECT, INSERT, DELETE ON central_identity.account_roles TO central_runtime;
 GRANT SELECT, INSERT ON central_identity.audit_events TO central_runtime;
+-- Pairings (Baylee's deep links): the runtime starts, claims, approves and
+-- redeems them, and deletes each when it is used or over.
+GRANT SELECT, INSERT, UPDATE, DELETE ON central_identity.pairings TO central_runtime;
+-- The legacy store (docs/operations.md §"The legacy store"): its own role,
+-- which reads its accounts, deletes a row when its move closes and counts the
+-- lockout, and nothing else; the runtime role gets nothing in the schema.
+-- The import, the deadline and the sweep stay the migrator's. Only where the
+-- operator made the role: a deployment without it serves no legacy sign-in,
+-- and a service configured for one refuses to start (its role check).
+DO $legacy$ BEGIN
+  IF EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = 'central_legacy') THEN
+    GRANT USAGE ON SCHEMA central_legacy TO central_legacy;
+    GRANT SELECT, DELETE ON central_legacy.accounts TO central_legacy;
+    GRANT UPDATE (failures, locked_until) ON central_legacy.accounts TO central_legacy;
+    GRANT SELECT ON central_legacy.settings TO central_legacy;
+  END IF;
+END $legacy$;

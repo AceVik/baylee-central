@@ -73,6 +73,28 @@ npx playwright test -c e2e-real/playwright.config.ts e2e-real/budget.spec.ts --p
 
 on a freshly started Central: the sixth registration in an hour is refused.
 
+```bash
+REAL_KEYS=<keys file> REAL_OUT=<empty folder> REAL_SERVICE=<central-service> REAL_MIGRATE=<the migrator document> \
+  npx playwright test -c e2e-real/playwright.config.ts e2e-real/area.spec.ts --project desktop
+```
+
+the account area and the administration (30.10.2026): an owner registers,
+is appointed by the operator's own `--appoint-admin-stdin` (the spec runs it
+with the migrator document, which it reads from the file and never prints),
+registers `https://qa-gateway.invalid`, mints a token (kept in
+`REAL_OUT/token`, mode 0600, masked in the pictures), changes its own tag and
+approves the gateway; every page is photographed into `REAL_OUT`. Paste the
+token into a local QA gateway's console (`PUT /admin/central/token`, the
+gateway's `BAYLEE_CENTRAL_ENDPOINT` a loopback stand-in for Caddy that sets
+`Host: central.baylee.app` in front of the native listener), then
+
+```bash
+REAL_OUT=<that folder> npx playwright test -c e2e-real/playwright.config.ts e2e-real/linked.spec.ts
+```
+
+sees the directory list it online with its deep link, in both schemes and at
+both widths, and the owner's token used.
+
 The rows Central stored, the native client's sign-in to such an account and
 the recovery code's use were checked from outside the page; the run of
 21.10.2026 is in `../docs/security-assurance.md` §"Account pages".

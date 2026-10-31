@@ -11,9 +11,28 @@ import { SESSION_KEY } from "../../src/account/session";
 import { LangProvider, OFFERED } from "../../src/i18n";
 import { serve } from "../support/network";
 
-const PAGES = ["/", "/download", "/cards", "/gateways", "/contact", "/impressum", "/privacy", "/terms", "/register", "/signin", "/account", "/nowhere"];
+const PAGES = [
+  "/",
+  "/download",
+  "/cards",
+  "/gateways",
+  "/contact",
+  "/impressum",
+  "/privacy",
+  "/terms",
+  "/register",
+  "/signin",
+  "/account",
+  "/account/security",
+  "/account/gateways",
+  "/admin",
+  "/admin/users/0192d0c57b3e7a1f8c2d3e4f5a6b7c8d",
+  "/admin/gateways",
+  "/admin/audit",
+  "/nowhere",
+];
 /** The pages that change when an account is signed in (the header on every one). */
-const SIGNED_IN = ["/", "/signin", "/account"];
+const SIGNED_IN = ["/", "/signin", "/account", "/account/security", "/account/gateways", "/admin"];
 
 /** The words a visitor meets: the text, and what labels, alternatives and titles say. */
 function words(): string {

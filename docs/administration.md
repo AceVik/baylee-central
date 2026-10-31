@@ -31,9 +31,11 @@ assurance](security-assurance.md).
 - **The audit names ids, never words.** An event holds the actor (an
   administrator's account id, or the operator), the action from a closed
   list in `central-postgres` (`Action`: `account.admin_granted`,
-  `account.admin_removed` so far) and the ids it touched. No name, reason,
-  note or key. Reads are not audited. Each change writes its event in the
-  same transaction.
+  `account.admin_removed`, `account.reset_issued`, `account.tag_changed`,
+  `gateway.approved`, `gateway.disabled`, `gateway.token_revoked`) and the
+  ids it touched. No name, reason, note or key; a tag change keeps the two
+  tags, which are numbers. Reads are not audited. Each change writes its
+  event in the same transaction.
 - **The runtime decides, and cannot rewrite the record** (decision 4). It
   holds `SELECT, INSERT, DELETE` on `account_roles` and `SELECT, INSERT` on
   `audit_events`, and its startup check refuses any wider or narrower grant
@@ -87,6 +89,50 @@ so a removal that commits while a read runs lets that one read finish; the
 removed administrator's next request is refused. Changes check after their
 lock and are not affected.
 
+## Gateways, tokens and tags (30.10.2026)
+
+The design's step 7 for gateways, and the owner's request of 30.10.2026 that
+administrators edit tags. Every change below needs the recent password and
+writes its audit event in its transaction; reads do not.
+
+- `Gateways { state, before }` → `Gateways { gateways, more }`: newest first,
+  50 a page, all or those `pending`, `approved` or `disabled`. Each row: id,
+  origin, metadata, official, the owner's id, display name and tag, state,
+  online, last heartbeat, created, live tokens, and whether it still has a
+  `RegisterGateway` credential pair. `Gateway { gateway }` adds its latest 20
+  tokens (name, scopes, times; never a token or digest).
+- `SetGatewayApproval { gateway, enabled }`: approve or enable again
+  (`gateway.approved`), or disable (`gateway.disabled`). Approval puts the
+  gateway in the public directory; its tokens sign players in without it
+  (owner, 30.10.2026; [gateway registry](gateway-registry.md) §"Gateway
+  tokens"). It stays a person's decision after checking outside Central who
+  runs the origin; the page says so in its dialog. Disabling hides the gateway from the directory
+  at once, stops its credentials and tokens (the joins that authenticate
+  them), and deletes its leases, so each of its sessions fails at its next
+  check. The official gateway's row can be disabled too, which hides it; its
+  bridge is no approval's to stop. The same state again writes nothing.
+- `RevokeGatewayToken { token }` (`gateway.token_revoked`, with the gateway's
+  id): the token stops at once. Revoked already is `Done`.
+- `SetTag { account, tag }` (`account.tag_changed`): an enrolled account
+  gets another tag, 1 to `MAX_TAG`. Tags stay unique (the column's unique
+  index; a taken tag is `Conflict`), so `Name#tag` does. The event's
+  `detail` holds `{"from": old, "to": new}`, numbers only. Gateways take the
+  new tag into their projection at the account's next sign-in there
+  (Baylee's `take_profile`). **Earlier whisper threads are gone for the
+  account after the change:** a gateway names a whisper after both tags
+  (`dm:<tagA>:<tagB>`, Baylee's `docs/protocol.md` §"Conversations and who
+  is in them"), so the new tag starts new threads, and the old ones are
+  found under neither participant's new pair; the chat archive's device
+  records name the tag too (Baylee's `docs/central-chat-sync.md` §"Key
+  ownership and local migration"). The confirmation dialog says so before
+  the change. Re-keying the old threads when a gateway's `take_profile` sees
+  a changed tag is not built (an open point).
+
+The runtime gains `INSERT` and `UPDATE (enabled)` on `gateway_approvals`
+(never `DELETE`) and `SELECT, INSERT, UPDATE (revoked_at, last_used_at)` on
+`gateway_tokens`; the startup check names updatable columns as a list now and
+refuses any other column.
+
 ## Schema: migration `m20261028_000012_administration`
 
 `account_roles (account_id → accounts ON DELETE CASCADE, role CHECK IN
@@ -105,9 +151,9 @@ restarts when a new one fails, runs unchanged over it.
 ## The sweep
 
 `central-service --sweep-stdin` with the migration document deletes audit
-events older than three years, as the privacy notice allows, and (since
-step 2b) the digests of expired reset codes, in one transaction, and prints
-both counts on standard error. A daily systemd timer runs it ([operations](operations.md)
+events older than three years, as the privacy notice allows, (since
+step 2b) the digests of expired reset codes and (since the pairing) expired
+pairings, in one transaction, and prints the three counts on standard error. A daily systemd timer runs it ([operations](operations.md)
 §"Administration"). The runtime cannot.
 
 ## Departures from the design

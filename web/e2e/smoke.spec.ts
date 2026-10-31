@@ -73,6 +73,14 @@ test.describe("smoke", () => {
     await page.getByRole("button", { name: "Show the next 100" }).click();
     await expect(page.getByText("130 gateways listed")).toBeVisible();
     await expect(page.locator(".gateways > li")).toHaveCount(130);
+    // gateway links are off in this build: copying the address is each card's first action
+    const first = page.locator(".gateways > li").first();
+    await expect(first.getByRole("button", { name: "Copy address" })).toBeVisible();
+    await expect(first.getByRole("link", { name: "Open in Baylee" })).toHaveCount(0);
+    // every control of a card is 44 px high at least (docs/website-design.md §"Accessibility")
+    const heights = await first.locator("a, button").evaluateAll((els) => els.map((e) => e.getBoundingClientRect().height));
+    expect(heights.length).toBeGreaterThanOrEqual(2);
+    for (const height of heights) expect(height).toBeGreaterThanOrEqual(44);
     expect(m.directory).toHaveLength(2);
     expect(m.directory[0]).toEqual({ operation: "gateway_directory", after: null });
     expect(m.refused).toEqual([]);
@@ -138,7 +146,7 @@ test.describe("smoke", () => {
     await expect(page.locator(".repo-card")).toBeVisible();
     expect(await page.locator(".reveal").evaluateAll((els) => els.every((e) => getComputedStyle(e).opacity === "1"))).toBe(true);
     await page.emulateMedia({ colorScheme: "dark" });
-    expect(await page.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe("rgb(18, 44, 54)");
+    expect(await page.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe("rgb(15, 27, 45)");
     expect(errors).toEqual([]);
   });
 });

@@ -47,7 +47,7 @@ pub(super) async fn run(
         let result = store
             .redeem_lease(
                 &ticket,
-                origin,
+                &[origin],
                 TicketPurpose::Admit,
                 Some(gateway),
                 Some(&Token::generate().unwrap()),

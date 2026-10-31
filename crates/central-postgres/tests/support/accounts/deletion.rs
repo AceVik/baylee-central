@@ -77,6 +77,17 @@ async fn gateway(
         vec![Uuid::from_bytes(gateway).into()],
     )
     .await;
+    // a gateway token (migration 000014) goes with its gateway
+    sql(
+        operator,
+        "INSERT INTO central_identity.gateway_tokens(gateway_id, name, digest, sso, listing, expires_at)
+         VALUES ($1, 'Deletion', $2, true, true, clock_timestamp() + interval '1 day')",
+        vec![
+            Uuid::from_bytes(gateway).into(),
+            Token::generate().unwrap().digest().to_vec().into(),
+        ],
+    )
+    .await;
     gateway
 }
 
@@ -344,7 +355,7 @@ async fn fill(store: &AccountStore, operator: &DatabaseConnection, keys: &Server
     store
         .redeem_lease(
             &ticket,
-            "https://deletion-own.invalid",
+            &["https://deletion-own.invalid"],
             TicketPurpose::Admit,
             Some(own),
             Some(&Token::generate().unwrap()),
@@ -488,6 +499,7 @@ async fn everything(store: &AccountStore, operator: &DatabaseConnection, keys: &
         "gateways.owner_id",
         "gateways.id",
         "gateway_approvals.gateway_id",
+        "gateway_tokens.gateway_id",
         "gateway_admins.account_id",
         "gateway_admins.gateway_id",
         "gateway_leases.gateway_id",

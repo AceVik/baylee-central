@@ -21,6 +21,9 @@ mod m20261022_000010_legacy_recovery;
 mod m20261023_000011_profiles;
 mod m20261028_000012_administration;
 mod m20261028_000013_reset;
+mod m20261030_000014_gateway_tokens;
+mod m20261030_000015_legacy_store;
+mod m20261030_000016_pairing;
 
 use sea_orm_migration::{
     MigrationTrait, MigratorTrait,
@@ -47,6 +50,9 @@ impl MigratorTrait for Migrator {
             Box::new(m20261023_000011_profiles::Migration),
             Box::new(m20261028_000012_administration::Migration),
             Box::new(m20261028_000013_reset::Migration),
+            Box::new(m20261030_000014_gateway_tokens::Migration),
+            Box::new(m20261030_000015_legacy_store::Migration),
+            Box::new(m20261030_000016_pairing::Migration),
         ]
     }
 }

@@ -53,6 +53,21 @@ impl Session {
         self.identity
     }
 
+    /// The key of this device's local chat vault whose 32-byte scope is
+    /// `scope` (Baylee's `password.vault`), derived one way from the master
+    /// key (`docs/crypto-protocol.md` §"Derived from the master key"), so the
+    /// vault opens without the password. The master key stays inside.
+    ///
+    /// # Errors
+    /// An identity this endpoint cannot bind (never for a live session).
+    pub fn local_vault_key(&self, scope: &[u8; 32]) -> Result<Zeroizing<[u8; 32]>, Error> {
+        let context = context(&self.endpoint, self.identity)?;
+        self.master
+            .local_vault_key(context, scope)
+            .map(central_crypto::vault::LocalVaultKey::into_bytes)
+            .map_err(|_| Error::Rejected)
+    }
+
     /// Check whether this is still the account's single active session. Never
     /// renews expiry ([`Session::renew`] does).
     ///

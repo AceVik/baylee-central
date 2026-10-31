@@ -3,6 +3,8 @@
 //! whose account holds the administrator role. No answer has a field that
 //! could carry a credential, a wrapper, a document or any other ciphertext.
 use crate::Error;
+use crate::gateway::{GatewayMetadata, GatewayState};
+use crate::owner::TokenInfo;
 use crate::reset_code::ResetCode;
 use crate::wire::AccountSource;
 use serde::{Deserialize, Serialize};
@@ -59,6 +61,51 @@ pub enum AdminRequest {
         /// The last event of the page before, for the next.
         before: Option<[u8; 16]>,
     },
+    /// Registered gateways, newest first, [`PAGE`] at a time, all or those
+    /// in one state. Answered with [`AdminAnswer::Gateways`].
+    Gateways {
+        /// Only gateways in this state.
+        state: Option<GatewayState>,
+        /// The last gateway of the page before, for the next.
+        before: Option<[u8; 16]>,
+    },
+    /// One gateway with its tokens. Answered with [`AdminAnswer::Gateway`].
+    Gateway {
+        /// The gateway's id.
+        gateway: [u8; 16],
+    },
+    /// Approve (or enable again) a gateway, or disable it: a change. Approval
+    /// stays a person's decision after checking outside Central who runs the
+    /// origin (`docs/gateway-registry.md`). Disabling hides it from the
+    /// directory, stops its credentials and tokens, and ends its players'
+    /// sign-ins there. The same state again is `Done` and writes nothing.
+    SetGatewayApproval {
+        /// The gateway's id.
+        gateway: [u8; 16],
+        /// Approved and enabled afterwards.
+        enabled: bool,
+    },
+    /// Revoke one gateway token at once: a change. `Done` again for one
+    /// revoked already.
+    RevokeGatewayToken {
+        /// The token's id.
+        token: [u8; 16],
+    },
+    /// Give an enrolled account another tag: a change. The tag stays unique
+    /// at Central (`Conflict` when another account holds it), so the handle
+    /// `Name#tag` stays unique; gateways take it at the account's next
+    /// sign-in there. The same tag again is `Done` and writes nothing.
+    SetTag {
+        /// The account's id.
+        account: [u8; 16],
+        /// Its tag afterwards, 1 to [`crate::profile::MAX_TAG`].
+        tag: u32,
+    },
+    /// What is left of the legacy store (`docs/native-login.md` §"Legacy
+    /// login"): its deadline and every account not moved yet, without hashes
+    /// or snapshots. Answered with [`AdminAnswer::LegacyAccounts`]; refused
+    /// when this Central has no legacy store.
+    LegacyAccounts,
 }
 
 impl AdminRequest {
@@ -68,8 +115,17 @@ impl AdminRequest {
     #[must_use]
     pub const fn changes(&self) -> bool {
         match self {
-            Self::SetAdmin { .. } | Self::ResetLogin { .. } => true,
-            Self::Accounts { .. } | Self::Account { .. } | Self::Audit { .. } => false,
+            Self::SetAdmin { .. }
+            | Self::ResetLogin { .. }
+            | Self::SetGatewayApproval { .. }
+            | Self::RevokeGatewayToken { .. }
+            | Self::SetTag { .. } => true,
+            Self::Accounts { .. }
+            | Self::Account { .. }
+            | Self::Audit { .. }
+            | Self::Gateways { .. }
+            | Self::Gateway { .. }
+            | Self::LegacyAccounts => false,
         }
     }
 }
@@ -164,6 +220,38 @@ pub struct OwnedGateway {
     pub approved: bool,
 }
 
+/// A registered gateway as an administrator sees it.
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AdminGateway {
+    /// The gateway's id.
+    pub id: [u8; 16],
+    /// Its origin.
+    pub origin: String,
+    /// Its public metadata.
+    pub metadata: GatewayMetadata,
+    /// It is the official gateway, the bridge's.
+    pub official: bool,
+    /// The account that registered it; none for the official gateway.
+    pub owner: Option<[u8; 16]>,
+    /// That account's display name, if it has one.
+    pub owner_name: Option<String>,
+    /// That account's tag, if it has one.
+    pub owner_tag: Option<u32>,
+    /// Whether it is approved.
+    pub state: GatewayState,
+    /// A heartbeat arrived in the last 90 seconds.
+    pub online: bool,
+    /// Its last heartbeat, in Unix seconds, if any.
+    pub last_seen: Option<i64>,
+    /// When it was registered, in Unix seconds.
+    pub created_at: i64,
+    /// Its live tokens.
+    pub live_tokens: u32,
+    /// It still has the credential pair of `RegisterGateway`.
+    pub credential_pair: bool,
+}
+
 /// One audit event: who, what, and the ids it touched; never a word.
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -213,12 +301,31 @@ pub enum AdminAnswer {
         /// Another page follows.
         more: bool,
     },
+    /// A page of gateways.
+    Gateways {
+        /// At most [`PAGE`], newest first.
+        gateways: Vec<AdminGateway>,
+        /// Another page follows.
+        more: bool,
+    },
+    /// One gateway.
+    Gateway {
+        /// Its row.
+        gateway: AdminGateway,
+        /// Its tokens, newest first, at most [`ACCOUNT_LIST`].
+        tokens: Vec<TokenInfo>,
+    },
     /// A reset code, shown to the administrator once; Central keeps its digest.
     ResetCode {
         /// The code to hand over.
         code: ResetCode,
         /// Until when it is valid, in Unix seconds.
         expires_at: i64,
+    },
+    /// What is left of the legacy store.
+    LegacyAccounts {
+        /// Its deadline and its accounts.
+        store: crate::legacy::LegacyStore,
     },
 }
 
@@ -261,7 +368,7 @@ mod tests {
     }
 
     #[test]
-    fn only_set_admin_changes_anything() {
+    fn the_changes_are_named_and_the_reads_are_not() {
         assert!(
             AdminRequest::SetAdmin {
                 account: [0; 16],
@@ -270,7 +377,25 @@ mod tests {
             .changes()
         );
         assert!(AdminRequest::ResetLogin { account: [0; 16] }.changes());
+        for change in [
+            AdminRequest::SetGatewayApproval {
+                gateway: [0; 16],
+                enabled: false,
+            },
+            AdminRequest::RevokeGatewayToken { token: [0; 16] },
+            AdminRequest::SetTag {
+                account: [0; 16],
+                tag: 7,
+            },
+        ] {
+            assert!(change.changes());
+        }
         for read in [
+            AdminRequest::Gateways {
+                state: Some(GatewayState::Pending),
+                before: None,
+            },
+            AdminRequest::Gateway { gateway: [0; 16] },
             AdminRequest::Accounts {
                 query: None,
                 before: None,

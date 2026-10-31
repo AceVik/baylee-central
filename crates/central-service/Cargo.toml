@@ -1,6 +1,6 @@
 [package]
 name = "central-service"
-version = "0.1.1-beta.9a"
+version = "0.1.1-beta.9b"
 edition.workspace = true
 rust-version.workspace = true
 publish.workspace = true

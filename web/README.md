@@ -4,7 +4,7 @@ The public part of milestone M4 in the accounts and web roadmap
 (`docs/roadmap-accounts-web.md`, PR #5):
 what Baylee is, the download, the card status, the gateway directory,
 contact, the legal notice and the privacy notice. It replaces Baylee's static
-`web/site` (served at baylee.acevik.de), whose words it keeps and whose
+`web/site` (served on the official gateway's old address), whose words it keeps and whose
 layout it redraws. Registration, sign-in and the account page
 (`docs/web-accounts.md`, for 0.1.0-beta.8a) are lazily loaded pages of this
 same app; administration comes later.
@@ -22,6 +22,12 @@ same app; administration comes later.
 | `/register` | a new account: beta key, name, display name, password, age, consent; then the recovery code, shown once, with the handle |
 | `/signin` | signing in at Baylee Central |
 | `/account` | who is signed in (the handle others see, the sign-in name small), until when; choosing a display name; signing out |
+| `/account/security` | the account's sessions as Central knows them (this website's, the client's with the gateways it is signed in to); signing the client out |
+| `/account/gateways` | the gateways the account registered: registering one, its tokens (made with a name, scopes and a lifetime, shown once; revoked) |
+| `/admin` | the administration (administrators only): accounts, searched by name or `#tag` |
+| `/admin/users/<id>` | one account: its tag (changed, audited), the administrator role, a reset code, its gateways and audit |
+| `/admin/gateways` | every registered gateway by state: approve, disable, its tokens revoked |
+| `/admin/audit` | the audit log |
 
 English and German today, one at a time, and ready for every language Magic
 is printed in (§"The words"): `?lang=<code>` wins, then the choice made with
@@ -30,6 +36,14 @@ browser's languages; only a language with a file counts, else English.
 `?theme=dark|light` forces a colour scheme (for screenshots); otherwise
 `prefers-color-scheme` decides. `public/boot.js` makes both choices before
 the first paint.
+
+## Its look
+
+[Website design](../docs/website-design.md) is the written contract: the
+mood (sunlight by day, the blue hour by night), the tokens, the type and
+spacing scales, the components, motion and accessibility.
+`src/styles/tokens.css` holds every value; `test/styles/` measures the
+contrast of both schemes and keeps raw colours out of the other files.
 
 ## The stack
 
@@ -250,8 +264,9 @@ Build-time, through Vite's environment (`VITE_…`), each with a default:
 
 | variable | default | what |
 | --- | --- | --- |
-| `VITE_FEEDBACK_ORIGIN` | `https://feedback.baylee.acevik.de` | the feedback service the contact form posts to |
+| `VITE_FEEDBACK_ORIGIN` | `https://feedback.baylee.app` | the feedback service the contact form posts to |
 | `VITE_CENTRAL_API` | `/api` | Central's API on this origin, for the directory |
+| `VITE_DEEP_LINKS` | off | `on` gives each gateway card "Open in Baylee" (`baylee://gateway/add`); stays off until a client release reads gateway links, and copying the address is the first action until then |
 
 Nothing in the build is a secret; everything in it is downloaded by every
 visitor.
@@ -290,7 +305,7 @@ a link only after those checks, with `rel="noopener noreferrer nofollow"`.
 
 The official gateway comes first with an "Official" mark, the rest in
 Central's order. The page knows it by its origin, `OFFICIAL_GATEWAY` in
-`src/config.ts` (the bridge's, `https://baylee.acevik.de`), never by a name
+`src/config.ts` (the bridge's canonical origin, `https://gateway.baylee.app`), never by a name
 or anything else an operator sends; only what is drawn moves, so the next page still starts after
 Central's last id. Central lists it once the operator has
 (`docs/operations.md` §"The official gateway"); it shows online once the

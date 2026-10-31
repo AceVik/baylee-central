@@ -5,6 +5,11 @@ pub(super) async fn run(store: &AccountStore, keys: &ServerKeys) {
     let identity = enroll(store, keys, "single-session", "single-session").await;
     let first = login(store, keys, identity).await;
     store.confirm_restore(&first, 1).await.unwrap();
+    // The bridge admits a moved account once its move is closed.
+    store
+        .close_legacy("single-session", identity)
+        .await
+        .unwrap();
     let ticket = Token::generate().unwrap();
     store
         .gateway_ticket(&first, "official", &ticket, TicketPurpose::Admit)
@@ -14,7 +19,7 @@ pub(super) async fn run(store: &AccountStore, keys: &ServerKeys) {
     store
         .redeem_lease(
             &ticket,
-            "official",
+            &["official"],
             TicketPurpose::Admit,
             None,
             Some(&lease),
@@ -48,7 +53,7 @@ pub(super) async fn run(store: &AccountStore, keys: &ServerKeys) {
     );
     store.document(&first).await.unwrap();
     store
-        .gateway_session(&lease, "official", None, TicketPurpose::Admit)
+        .gateway_session(&lease, &["official"], None, TicketPurpose::Admit)
         .await
         .unwrap();
 
@@ -56,7 +61,7 @@ pub(super) async fn run(store: &AccountStore, keys: &ServerKeys) {
     assert!(store.document(&first).await.is_err());
     assert!(
         store
-            .gateway_session(&lease, "official", None, TicketPurpose::Admit)
+            .gateway_session(&lease, &["official"], None, TicketPurpose::Admit)
             .await
             .is_err()
     );
@@ -64,7 +69,7 @@ pub(super) async fn run(store: &AccountStore, keys: &ServerKeys) {
         store
             .redeem_lease(
                 &outstanding,
-                "official",
+                &["official"],
                 TicketPurpose::Admit,
                 None,
                 Some(&Token::generate().unwrap())

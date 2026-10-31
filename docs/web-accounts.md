@@ -155,8 +155,10 @@ the handle.
   it is.
 - **The tag** is unique at Central, positive, at most `i32::MAX` (a
   gateway's column), drawn as `handle.rs` draws it (`7` is `0007`, `0x10000`
-  is `10000`, `profile::tag_text`), and never changes once held: chat on a
-  gateway is keyed by it. A registered account draws its tag with its
+  is `10000`, `profile::tag_text`). It changes only when an administrator
+  sets another one ([administration](administration.md) §"Gateways, tokens
+  and tags"): chat on a gateway is keyed by it, so earlier whisper threads
+  are gone after the change. A registered account draws its tag with its
   reservation, at random (operating-system randomness, rejection-sampled)
   from `REGISTERED_TAG_FLOOR = 0x1000` to `0xffff` while fewer than half of
   those are taken, then from `[16f, 256f - 1]`, and so on to `i32::MAX`
@@ -303,14 +305,16 @@ browser listener only), and `ResetStart` and `ResetFinish`, a reset code's
 use ([account reset](account-reset.md); both listeners, no session), and
 `AccountExport`, `DeleteAccountStart` and `DeleteAccountFinish` ([account
 deletion](account-deletion.md); both listeners, with the session, Central's
-terms not required; a finished deletion clears the cookie). Every
+terms not required; a finished deletion clears the cookie), and, since
+30.10.2026, `Owner`, an account's own area (§"The account area"; browser
+listener only, with the session). Every
 other operation is refused. The list is
 one exhaustive match in `central-identity` (`browser_operation`), so a new
 operation does not compile until it is decided there. The cookie's token is
 used only by `SessionStatus`, `RenewSession`, `Logout`, `TermsStatus`,
 `AcceptTerms`, `AccountSummary`, `SetRecovery`, `SetDisplayName` and the
 password change's two requests (whose finish sets a new cookie, as
-`LoginFinish` does), `Admin`, and the export and the deletion's two; the directory uses none, and
+`LoginFinish` does), `Admin`, `Owner`, and the export and the deletion's two; the directory uses none, and
 the page sends it with `credentials: "omit"`.
 
 - `AccountSummary` (the cookie's session; no accepted terms needed) answers
@@ -392,6 +396,121 @@ development `endpoint`'s, the native listener's origin, so a WebAssembly build
 for such a run uses `Endpoint::development(<endpoint>)`, never the committed
 live issuer. The deployed `--accounts-stdin` has no origin field: `baylee.app`
 is fixed there.
+
+### The account area
+
+*30.10.2026.* `Request::Owner { request: OwnerRequest }` (central-api
+`owner`) answers `Response::Owner { answer }`, or `Done`. Browser listener
+only; the native listener refuses it before anything else. The store finds
+the account through a live browser session of the current credential
+(`s.kind = 'browser'`), so a native bearer acts on nothing here.
+
+- `Sessions` → the account's live sessions, the asking one first: kind
+  (`browser` or `native`), whether it is the asking one, its password
+  sign-in, its end, and for each the gateways it holds a live lease at (their
+  origins). Central keeps no device; the page says so.
+- `EndClientSession` → `Done`: deletes the account's native session, and with
+  it its tickets and leases (their foreign keys cascade). The website's own
+  session ends with `Logout`.
+- `Gateways`, `AddGateway { origin, name }`, `CreateToken { gateway, name,
+  scopes, days }` and `RevokeToken { token }`: [gateway
+  registry](gateway-registry.md) §"Gateway tokens". `CreateToken` alone
+  needs a password sign-in less than 30 minutes old (`OwnerRequest::mints`).
+- **Terms.** `AddGateway` and `CreateToken` need Central's terms accepted;
+  reading the sessions and gateways, ending the client's session and
+  revoking a token do not, so a person who will not accept new terms can
+  still see what exists and shut it.
+
+The pages: `/account` (the profile, as before), `/account/security` and
+`/account/gateways`, in one frame with the administration's
+(`/admin`, `/admin/users/<id>`, `/admin/gateways`, `/admin/audit`,
+`/admin/legacy`), whose
+part of the navigation only an administrator sees. A change that needs the
+recent password asks for it first and signs in again (the same OPAQUE
+sign-in, in its Worker), which replaces the browser session. A token is shown
+once, in its text form, in a dialog that closes only when the person says
+they kept it; the page keeps it nowhere.
+
+## Pairing
+
+The owner's decision of 30.10.2026 (Baylee `docs/proposals/deep-links.md`
+§"Protocol specification" is the contract): a person signed in on
+`baylee.app` starts Baylee's client signed in, without typing the password
+again. The password opens the master key once, where it was typed, and is
+dropped; the page brings the master key to the client sealed to a key the
+client made, and Central hands the client a native session only together
+with that sealed key, once.
+
+**The key check.** `accounts.key_check` (32 bytes, migration 000016) is
+derived one way from the master key (`crypto-protocol.md` §"Derived from the
+master key"). It is set once, with `SetKeyCheck`, while none is set and
+within two minutes of the session's password proof: the client and the
+page send it after a password sign-in when `KeyCheckStatus` says there is
+none, so a new account and an existing one gain it at their next sign-in.
+A new vault (a reset to a new one) clears it, and the next sign-in sets the
+new vault's. Unlike Baylee's specification, neither `EnrollmentFinish` nor
+`ResetVault::New` carries a check: the sign-in after either sets it. Both
+requests work on either listener; a set check is `Conflict`, a late one
+`Rejected`. A stolen session or cookie therefore cannot plant a check of its
+own. No pairing starts for an account without one.
+
+**The steps.**
+
+1. `PairStart` (browser listener, cookie) → `PairStarted { handle,
+   expires_at }`: five minutes, at most three open per account and a
+   thousand in all; ended pairings are swept first.
+2. The page opens `baylee://pair?h=<handle>&s=<S>`, `S` being 32 random bytes
+   of its own that Central never sees.
+3. `PairClaim { handle, public_key, challenge, mac }` (native listener, no
+   session) → `PairAccepted { expires_at }`: within the pairing's first two
+   minutes, once. The same claim again, as a client resends it after losing
+   the answer, gets the same answer (compared in constant time); any other
+   is `Conflict`.
+4. `PairStatus { handle }` (the starting cookie) → `PairClaimed { … }` or
+   `Pending`. The page checks the MAC under `S`, shows the comparison code
+   and the account's name beside Approve.
+5. `PairApprove { handle, sealed, proof }` (the starting cookie) → `Done`:
+   `sealed` is the master key sealed to the client's key under `S` (HPKE's
+   PSK mode, `crypto-protocol.md` §"Pairing"), so Central cannot make one
+   the client opens. Central checks the proof (HMAC under the stored key
+   check over handle, key, challenge and the seal's digest) and stores the
+   80-byte seal, once.
+   `PairCancel { handle }` ends a pairing at once.
+6. `PairPoll { handle }` (native, no session) → `Pending` or `Approved`, at
+   most 300 times; then `PairRedeem { handle, verifier }` →
+   `PairSession { token, identity, username, display_name, tag, sealed,
+   expires_at }`, the name and tag for the client's question beside the
+   username. The pairing is deleted whatever the redeem finds: a wrong
+   verifier, an account at another epoch or a proof too old each end it,
+   and only a storage failure leaves it. The session replaces the account's
+   native session as a sign-in does.
+
+**The 12 hours.** `sessions.proven_at` is the password proof a session rests
+on when it is not its own creation (NULL: the creation). A paired session
+takes the browser session's, the lifetime check and renewal count from
+`COALESCE(proven_at, created_at)`, and a redeem whose proof leaves less than
+a minute gives no session. Every check of a password sign-in's age (the
+export's, recovery's, the tokens' and administration's step-ups) and the
+"signed in at" an account sees read the same, so a pairing never counts as a
+fresh password sign-in. NULL rather than a copy of `created_at`: every
+existing insert stays valid, and the meaning is the same.
+
+**Budgets.** `PairStart` 10 an hour and `PairStatus` 120 a minute per
+address on the browser listener; `PairApprove`, `PairCancel` and the key
+check's two requests have no address budget, since each acts on a live
+session, which counts them as it counts its other requests. The native
+listener's claim, polls and redeem have a window of their own (64 a second),
+so polling cannot spend the sign-ins' budget, besides the per-pairing limits
+above. `PairCancel` ends a pairing in any state until it is redeemed, so a
+page that is left can end its own at once. The browser listener
+serves `PairStart`, `PairStatus`, `PairApprove`, `PairCancel`,
+`KeyCheckStatus` and `SetKeyCheck`; the native listener refuses the first
+four and serves the claim, poll and redeem.
+
+**Deletion.** A pairing goes with its browser session (`ON DELETE CASCADE`):
+signing out of the page ends it. An expired one goes with the next start and
+with the operator's daily sweep ([administration](administration.md) §"The
+sweep").
 
 ## Browser crypto (`central-web-crypto`)
 

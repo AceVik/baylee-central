@@ -1,4 +1,6 @@
-//! Native account protocol. Passwords and decrypted personal content have no server wire type.
+//! Native account protocol. Decrypted personal content has no server wire type,
+//! and neither have passwords but one: [`legacy::LegacyPassword`], the legacy
+//! store's sign-in, which ends with the store's deadline.
 #![forbid(unsafe_code)]
 
 pub mod admin;
@@ -6,13 +8,17 @@ pub mod beta_key;
 mod endpoint;
 pub mod export;
 pub mod gateway;
+pub mod legacy;
 pub mod object;
+pub mod owner;
 pub mod profile;
 pub mod reset_code;
 pub mod terms;
 mod token;
 pub mod wire;
-pub use endpoint::{Endpoint, LEGACY_ORIGIN, LIVE_ORIGIN};
+pub use endpoint::{
+    Endpoint, LEGACY_ORIGIN, LIVE_ORIGIN, OFFICIAL_ALIASES, OFFICIAL_ORIGIN, is_official_origin,
+};
 pub use token::Token;
 
 /// Maximum serialized native request or response, independently enforced by both transports.

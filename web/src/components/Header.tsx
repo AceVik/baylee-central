@@ -102,7 +102,7 @@ export function Header({ page }: { page: Page | null }) {
               className="nav-account"
               to={PATHS.account}
               aria-label={account.handle === null ? undefined : t(lang, "nav.account", { name: account.handle })}
-              aria-current={page === "account" ? "page" : undefined}
+              aria-current={page !== null && (page.startsWith("account") || page.startsWith("admin")) ? "page" : undefined}
             >
               {/* the handle others see, never the private sign-in name; until Central names it, "your account" */}
               {account.handle === null ? t(lang, "nav.accountUnnamed") : <bdi translate="no">{account.handle}</bdi>}

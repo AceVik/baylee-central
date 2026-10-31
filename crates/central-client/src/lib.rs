@@ -15,14 +15,19 @@ use zeroize::Zeroizing;
 mod deletion;
 mod export;
 mod gateways;
+mod legacy;
 mod objects;
+mod pairing;
 mod password;
 mod reset;
 mod session;
 mod terms;
+pub use central_crypto::pairing::PairingSecret;
 pub use deletion::Deletion;
 pub use gateways::{GatewayRegistration, gateway_directory};
+pub use legacy::{LegacyEnrollment, legacy_login};
 pub use objects::ObjectDocument;
+pub use pairing::{PairedAccount, Pairing, claim};
 pub use password::MIN_PASSWORD_CHARS;
 pub use reset::{ResetData, reset};
 pub use session::Session;
@@ -45,24 +50,20 @@ fn context(endpoint: &Endpoint, identity: Identity) -> Result<Context, Error> {
     Context::new(endpoint.issuer(), identity.account, identity.epoch).map_err(|_| Error::Rejected)
 }
 
-/// Resolve the login mapping. Only an explicit live Legacy result permits migration.
+/// Resolve the login mapping. `Legacy` permits [`legacy_login`] at this same
+/// Central, live or the explicit development endpoint; never another
+/// destination for the password.
 ///
 /// # Errors
-/// Rejects malformed mappings, development legacy redirects and unavailable transports.
+/// Rejects malformed mappings and unavailable transports.
 pub fn discover(transport: &impl Transport, username: String) -> Result<Discovery, Error> {
     let Response::Discovery { discovery } =
         transport.exchange(&Request::Discover { username }, None)?
     else {
         return Err(Error::Rejected);
     };
-    match &discovery {
-        Discovery::Central { identity } => {
-            context(transport.endpoint(), *identity)?;
-        }
-        Discovery::Legacy if transport.endpoint().legacy_origin().is_none() => {
-            return Err(Error::Rejected);
-        }
-        Discovery::Legacy => {}
+    if let Discovery::Central { identity } = &discovery {
+        context(transport.endpoint(), *identity)?;
     }
     Ok(discovery)
 }

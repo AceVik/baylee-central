@@ -4,7 +4,8 @@
 //! over registered gateways, then 000010 over legacy and registered
 //! accounts, then 000011 over the same, drawing the registered accounts'
 //! tags, then 000012's administration over all of it, then 000013's reset
-//! codes. All inside one transaction that is rolled back.
+//! codes, then 000014's gateway tokens over the registered gateways. All
+//! inside one transaction that is rolled back.
 use super::scalar;
 use sea_orm::{ConnectionTrait, DatabaseConnection, TransactionTrait};
 
@@ -31,6 +32,8 @@ const PROFILES: &str = include_str!("../../../central-migration/src/m20261023_00
 const ADMINISTRATION: &str =
     include_str!("../../../central-migration/src/m20261028_000012_administration.sql");
 const RESET: &str = include_str!("../../../central-migration/src/m20261028_000013_reset.sql");
+const TOKENS: &str =
+    include_str!("../../../central-migration/src/m20261030_000014_gateway_tokens.sql");
 
 fn scratch(sql: &str) -> String {
     sql.replace("central_identity", "upgrade_probe")
@@ -116,6 +119,7 @@ pub(crate) async fn run(operator: &DatabaseConnection) {
     profiles(&tx).await;
     administration(&tx).await;
     reset(&tx).await;
+    tokens(&tx).await;
     tx.rollback().await.unwrap();
     assert_eq!(
         scalar(
@@ -588,6 +592,89 @@ async fn reset(tx: &sea_orm::DatabaseTransaction) {
             .into(),
         "UPDATE upgrade_probe.accounts SET reset_expires = NULL WHERE reset_digest IS NOT NULL"
             .into(),
+    ] {
+        refused(tx, &sql).await;
+    }
+}
+
+/// 000014 over the registered and official gateways: every row keeps its
+/// pair or its lack of one; a registered gateway may now have no pair (it
+/// authenticates by tokens), never half of one, and the official row still
+/// none; a token is scoped, named, digested and lives at most 366 days.
+async fn tokens(tx: &sea_orm::DatabaseTransaction) {
+    let before = scalar(
+        tx,
+        "SELECT count(*)::bigint AS value FROM upgrade_probe.gateways WHERE credential_digest IS NOT NULL",
+    )
+    .await;
+    tx.execute_unprepared(&scratch(TOKENS)).await.unwrap();
+    assert_eq!(
+        scalar(
+            tx,
+            "SELECT count(*)::bigint AS value FROM upgrade_probe.gateways WHERE credential_digest IS NOT NULL"
+        )
+        .await,
+        before
+    );
+    // any account: earlier steps leave several, not always the same ones
+    let owner = "(SELECT id FROM upgrade_probe.accounts ORDER BY id LIMIT 1)";
+    tx.execute_unprepared(&format!(
+        "INSERT INTO upgrade_probe.gateways (owner_id, origin, name, version, website)
+         VALUES ({owner}, 'https://tokens.invalid', 'Tokens', '0', 'https://tokens.invalid/')"
+    ))
+    .await
+    .unwrap();
+    let gateway = "(SELECT id FROM upgrade_probe.gateways WHERE origin = 'https://tokens.invalid')";
+    // The longest lifetime, from one reading of the clock: `created_at`'s
+    // default reads it again, and a microsecond between the two readings
+    // crosses the 366 days.
+    tx.execute_unprepared(&format!(
+        "WITH now AS (SELECT clock_timestamp() AS at)
+         INSERT INTO upgrade_probe.gateway_tokens
+             (gateway_id, name, digest, sso, listing, created_at, expires_at)
+         SELECT {gateway}, 'Main', decode(repeat('51', 32), 'hex'), true, true,
+             at, at + interval '366 days' FROM now"
+    ))
+    .await
+    .unwrap();
+    for sql in [
+        format!(
+            "INSERT INTO upgrade_probe.gateways (owner_id, origin, name, version, website, credential_digest)
+             VALUES ({owner}, 'https://half.invalid', 'Half', '0', 'https://half.invalid/',
+                 decode(repeat('52', 32), 'hex'))"
+        ),
+        "UPDATE upgrade_probe.gateways SET credential_digest = decode(repeat('53', 32), 'hex'),
+         heartbeat_digest = decode(repeat('54', 32), 'hex') WHERE official"
+            .into(),
+        "INSERT INTO upgrade_probe.gateways (origin, name, version, website)
+         VALUES ('https://ownerless.invalid', 'Ownerless', '0', 'https://ownerless.invalid/')"
+            .into(),
+        format!(
+            "INSERT INTO upgrade_probe.gateway_tokens (gateway_id, name, digest, sso, listing, expires_at)
+             VALUES ({gateway}, 'None', decode(repeat('55', 32), 'hex'), false, false,
+                 clock_timestamp() + interval '1 day')"
+        ),
+        format!(
+            "INSERT INTO upgrade_probe.gateway_tokens (gateway_id, name, digest, sso, listing, expires_at)
+             VALUES ({gateway}, 'Long', decode(repeat('56', 32), 'hex'), true, false,
+                 clock_timestamp() + interval '367 days')"
+        ),
+        format!(
+            "INSERT INTO upgrade_probe.gateway_tokens (gateway_id, name, digest, sso, listing, expires_at)
+             VALUES ({gateway}, '', decode(repeat('57', 32), 'hex'), true, false,
+                 clock_timestamp() + interval '1 day')"
+        ),
+        format!(
+            "INSERT INTO upgrade_probe.gateway_tokens (gateway_id, name, digest, sso, listing, expires_at)
+             VALUES ({gateway}, 'Short', decode(repeat('58', 31), 'hex'), true, false,
+                 clock_timestamp() + interval '1 day')"
+        ),
+        format!(
+            "INSERT INTO upgrade_probe.gateway_tokens (gateway_id, name, digest, sso, listing, expires_at)
+             VALUES ({gateway}, 'Again', decode(repeat('51', 32), 'hex'), true, false,
+                 clock_timestamp() + interval '1 day')"
+        ),
+        "UPDATE upgrade_probe.gateway_tokens SET revoked_at = created_at - interval '1 second'".into(),
     ] {
         refused(tx, &sql).await;
     }

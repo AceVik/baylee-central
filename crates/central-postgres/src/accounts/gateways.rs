@@ -1,7 +1,10 @@
-use super::{AccountStore, Error, Token, number, statement, uuid};
+use super::tokens::LIVE_TOKEN;
+use super::{
+    AccountStore, Error, NOT_DISABLED, Token, any_origin, number, origins, statement, uuid,
+};
 use central_api::{
-    LEGACY_ORIGIN,
     gateway::{GatewayListing, GatewayMetadata, validate_origin},
+    is_official_origin,
     wire::TicketPurpose,
 };
 use sea_orm::{ConnectionTrait, DatabaseTransaction, TransactionTrait, prelude::Uuid};
@@ -36,9 +39,10 @@ impl AccountStore {
     /// An owned, never-approved reservation can be retried to recover a lost credential response.
     ///
     /// Rejects invalid metadata/session, foreign or approved origins and the owner quota.
-    /// The official gateway's origin is the bridge's alone ([`LEGACY_ORIGIN`]): a
-    /// registered credential for it would redeem that audience's tickets a second
-    /// time, so it is a conflict before anything else is looked at.
+    /// The official gateway's origins are the bridge's alone
+    /// ([`is_official_origin`]): a registered credential for one would redeem
+    /// that audience's tickets a second time, so it is a conflict before
+    /// anything else is looked at.
     pub async fn register_gateway(
         &self,
         session: &Token,
@@ -48,7 +52,7 @@ impl AccountStore {
         heartbeat: &Token,
         development: bool,
     ) -> Result<[u8; 16], Error> {
-        if origin == LEGACY_ORIGIN {
+        if is_official_origin(origin) {
             return Err(Error::Conflict);
         }
         validate_origin(origin, development)?;
@@ -109,18 +113,30 @@ impl AccountStore {
             .collect()
     }
 
-    /// Authenticate only a gateway's redemption credential, never its heartbeat credential.
-    /// The official gateway holds none (migration 000009); the bridge is its authority.
+    /// Authenticate a gateway's redemption credential or a live gateway token
+    /// with the `sso` scope (migration 000014), never a heartbeat credential
+    /// or a listing-only token. The official gateway holds neither
+    /// (migration 000009); the bridge is its authority. A token
+    /// authenticates while its gateway awaits approval (the token makes its
+    /// owner answerable and can be revoked; the approval is the directory's);
+    /// a credential pair needs the approval.
     ///
     /// # Errors
-    /// Rejects unapproved/disabled gateways and incorrect credentials.
+    /// Rejects disabled gateways, an unapproved credential pair, revoked or
+    /// expired tokens and incorrect credentials.
     pub async fn authenticate_gateway(
         &self,
         credential: &Token,
     ) -> Result<([u8; 16], String), Error> {
+        // Two lookups by a unique digest each; a 256-bit random token cannot
+        // be both a credential and a token, so at most one row answers.
         let row=self.db.query_one_raw(statement(
-            "SELECT g.id,g.origin FROM central_identity.gateways g JOIN central_identity.gateway_approvals p
-             ON p.gateway_id=g.id AND p.enabled WHERE g.credential_digest=$1 AND NOT g.official", vec![credential.digest().to_vec().into()]
+            &format!("SELECT g.id,g.origin FROM central_identity.gateways g JOIN central_identity.gateway_approvals p
+             ON p.gateway_id=g.id AND p.enabled WHERE g.credential_digest=$1 AND NOT g.official
+             UNION ALL
+             SELECT g.id,g.origin FROM central_identity.gateway_tokens t
+             JOIN central_identity.gateways g ON g.id=t.gateway_id
+             WHERE t.digest=$1 AND t.sso AND {LIVE_TOKEN} AND NOT g.official AND {NOT_DISABLED} LIMIT 1"), vec![credential.digest().to_vec().into()]
         )).await.map_err(|_| Error::Unavailable)?.ok_or(Error::Rejected)?;
         let id: Uuid = row.try_get("", "id").map_err(|_| Error::Unavailable)?;
         Ok((
@@ -130,26 +146,43 @@ impl AccountStore {
     }
 
     /// Update public metadata and central-clock liveness only, at most once per five seconds.
+    /// The credential is a registered gateway's heartbeat token or a live
+    /// gateway token with the `listing` scope (migration 000014), which this
+    /// marks used. A token beats while its gateway awaits approval, so its
+    /// owner sees it seen; the directory lists approved gateways only.
     ///
     /// # Errors
-    /// Rejects wrong credentials, unapproved gateways, unsafe metadata and excessive heartbeat rate.
+    /// Rejects wrong credentials, disabled gateways, an unapproved heartbeat
+    /// credential, revoked or expired tokens, unsafe metadata and excessive
+    /// heartbeat rate.
     pub async fn gateway_heartbeat(
         &self,
         token: &Token,
         metadata: &GatewayMetadata,
     ) -> Result<(), Error> {
         let row=self.db.query_one_raw(statement(
-            "SELECT g.origin FROM central_identity.gateways g JOIN central_identity.gateway_approvals p
-             ON p.gateway_id=g.id AND p.enabled WHERE g.heartbeat_digest=$1 AND NOT g.official",vec![token.digest().to_vec().into()]
+            &format!("SELECT g.id,g.origin,false AS by_token FROM central_identity.gateways g JOIN central_identity.gateway_approvals p
+             ON p.gateway_id=g.id AND p.enabled WHERE g.heartbeat_digest=$1 AND NOT g.official
+             UNION ALL
+             SELECT g.id,g.origin,true FROM central_identity.gateway_tokens t
+             JOIN central_identity.gateways g ON g.id=t.gateway_id
+             WHERE t.digest=$1 AND t.listing AND {LIVE_TOKEN} AND NOT g.official AND {NOT_DISABLED} LIMIT 1"),vec![token.digest().to_vec().into()]
         )).await.map_err(|_|Error::Unavailable)?.ok_or(Error::Rejected)?;
+        let gateway: Uuid = row.try_get("", "id").map_err(|_| Error::Unavailable)?;
         let origin: String = row.try_get("", "origin").map_err(|_| Error::Unavailable)?;
+        let by_token: bool = row
+            .try_get("", "by_token")
+            .map_err(|_| Error::Unavailable)?;
         metadata.validate(&origin)?;
+        if by_token {
+            self.touch_gateway_token(token).await?;
+        }
         let updated=self.db.execute_raw(statement(
-            "UPDATE central_identity.gateways g SET name=$2,version=$3,website=$4,last_seen=pg_catalog.clock_timestamp()
-             WHERE heartbeat_digest=$1 AND NOT official
+            &format!("UPDATE central_identity.gateways g SET name=$2,version=$3,website=$4,last_seen=pg_catalog.clock_timestamp()
+             WHERE id=$1 AND NOT official
              AND (last_seen IS NULL OR last_seen<=pg_catalog.clock_timestamp()-interval '5 seconds')
-             AND EXISTS(SELECT 1 FROM central_identity.gateway_approvals p WHERE p.gateway_id=g.id AND p.enabled)",
-            vec![token.digest().to_vec().into(),metadata.name.clone().into(),metadata.version.clone().into(),metadata.website.clone().into()]
+             AND {NOT_DISABLED}"),
+            vec![gateway.into(),metadata.name.clone().into(),metadata.version.clone().into(),metadata.website.clone().into()]
         )).await.map_err(|_|Error::Unavailable)?;
         if updated.rows_affected() != 1 {
             return Err(Error::Busy);
@@ -160,33 +193,41 @@ impl AccountStore {
     /// The official gateway's heartbeat, which its caller authenticated with the
     /// bridge credential: the public metadata and liveness of the official row
     /// and of no other, at most once per five seconds. The row is the official
-    /// gateway only while its origin is the bridge's, which a live service
-    /// (`development` false) holds to [`LEGACY_ORIGIN`].
+    /// gateway while its origin is one of the bridge's `origins` (canonical
+    /// first), which a live service (`development` false) holds to the
+    /// compiled ones ([`is_official_origin`]); the website may be on any of
+    /// them, so a gateway that still names its old address keeps its entry.
     ///
     /// # Errors
-    /// Rejects another origin, metadata not on it, an unlisted, unapproved or
-    /// disabled official row, and an excessive heartbeat rate (`Busy`).
-    pub async fn official_heartbeat(
+    /// Rejects another origin, metadata on none of them, an unlisted,
+    /// unapproved or disabled official row, and an excessive heartbeat rate
+    /// (`Busy`).
+    pub async fn official_heartbeat<S: AsRef<str> + Sync>(
         &self,
-        origin: &str,
+        set: &[S],
         metadata: &GatewayMetadata,
         development: bool,
     ) -> Result<(), Error> {
-        if !development && origin != LEGACY_ORIGIN {
+        if set.is_empty() || (!development && !set.iter().all(|o| is_official_origin(o.as_ref()))) {
             return Err(Error::Rejected);
         }
-        validate_origin(origin, development)?;
-        metadata.validate(origin)?;
+        for origin in set {
+            validate_origin(origin.as_ref(), development)?;
+        }
+        if !set.iter().any(|o| metadata.validate(o.as_ref()).is_ok()) {
+            return Err(Error::Rejected);
+        }
+        let any = any_origin(1);
         self.db.query_one_raw(statement(
-            "SELECT g.id FROM central_identity.gateways g JOIN central_identity.gateway_approvals p
-             ON p.gateway_id=g.id AND p.enabled WHERE g.official AND g.origin=$1",vec![origin.into()]
+            &format!("SELECT g.id FROM central_identity.gateways g JOIN central_identity.gateway_approvals p
+             ON p.gateway_id=g.id AND p.enabled WHERE g.official AND g.origin={any}"),vec![origins(set)?]
         )).await.map_err(|_|Error::Unavailable)?.ok_or(Error::Rejected)?;
         let updated=self.db.execute_raw(statement(
-            "UPDATE central_identity.gateways g SET name=$2,version=$3,website=$4,last_seen=pg_catalog.clock_timestamp()
-             WHERE official AND origin=$1
+            &format!("UPDATE central_identity.gateways g SET name=$2,version=$3,website=$4,last_seen=pg_catalog.clock_timestamp()
+             WHERE official AND origin={any}
              AND (last_seen IS NULL OR last_seen<=pg_catalog.clock_timestamp()-interval '5 seconds')
-             AND EXISTS(SELECT 1 FROM central_identity.gateway_approvals p WHERE p.gateway_id=g.id AND p.enabled)",
-            vec![origin.into(),metadata.name.clone().into(),metadata.version.clone().into(),metadata.website.clone().into()]
+             AND EXISTS(SELECT 1 FROM central_identity.gateway_approvals p WHERE p.gateway_id=g.id AND p.enabled)"),
+            vec![origins(set)?,metadata.name.clone().into(),metadata.version.clone().into(),metadata.website.clone().into()]
         )).await.map_err(|_|Error::Unavailable)?;
         if updated.rows_affected() != 1 {
             return Err(Error::Busy);
@@ -253,22 +294,21 @@ impl AccountStore {
     /// Check one account's current role on an already authenticated gateway.
     ///
     /// # Errors
-    /// Rejects invalid IDs or unavailable storage; approval removal returns false.
+    /// Rejects invalid IDs or unavailable storage; a disabled gateway returns false.
     pub async fn gateway_admin(&self, gateway: [u8; 16], account: [u8; 16]) -> Result<bool, Error> {
         if !valid_id(gateway) || !valid_id(account) {
             return Err(Error::Rejected);
         }
         let row=self.db.query_one_raw(statement(
-            "SELECT EXISTS(SELECT 1 FROM central_identity.gateways g JOIN central_identity.gateway_approvals p
-             ON p.gateway_id=g.id AND p.enabled WHERE g.id=$1 AND EXISTS
-             (SELECT 1 FROM central_identity.gateway_admins m WHERE m.gateway_id=g.id AND m.account_id=$2)) AS allowed",
+            &format!("SELECT EXISTS(SELECT 1 FROM central_identity.gateways g WHERE g.id=$1 AND {NOT_DISABLED} AND EXISTS
+             (SELECT 1 FROM central_identity.gateway_admins m WHERE m.gateway_id=g.id AND m.account_id=$2)) AS allowed"),
             vec![uuid(gateway).into(),uuid(account).into()]
         )).await.map_err(|_|Error::Unavailable)?.ok_or(Error::Unavailable)?;
         row.try_get("", "allowed").map_err(|_| Error::Unavailable)
     }
 
-    /// Resolve an approved registered audience and check Admin membership before issuing a
-    /// ticket. The official gateway's tickets are the bridge's ([`Self::gateway_ticket`]).
+    /// Resolve a registered audience that is not disabled and check Admin membership before
+    /// issuing a ticket. The official gateway's tickets are the bridge's ([`Self::gateway_ticket`]).
     ///
     /// # Errors
     /// Rejects unknown/disabled origins, invalid sessions and foreign admin membership.
@@ -283,12 +323,11 @@ impl AccountStore {
             return Err(Error::Rejected);
         }
         let row=self.db.query_one_raw(statement(
-            "SELECT g.id FROM central_identity.gateways g JOIN central_identity.gateway_approvals p
-             ON p.gateway_id=g.id AND p.enabled JOIN central_identity.sessions s ON s.digest=$2
+            &format!("SELECT g.id FROM central_identity.gateways g JOIN central_identity.sessions s ON s.digest=$2
              JOIN central_identity.accounts a ON a.id=s.account_id AND a.credential_revision=s.credential_revision
-             WHERE g.origin=$1 AND NOT g.official AND s.expires_at>pg_catalog.clock_timestamp() AND a.restored
+             WHERE g.origin=$1 AND NOT g.official AND {NOT_DISABLED} AND s.expires_at>pg_catalog.clock_timestamp() AND a.restored
              AND ($3='admit' OR EXISTS(SELECT 1 FROM central_identity.gateway_admins m
-                 WHERE m.gateway_id=g.id AND m.account_id=a.id))",
+                 WHERE m.gateway_id=g.id AND m.account_id=a.id))"),
             vec![origin.into(),session.digest().to_vec().into(),purpose.as_str().into()]
         )).await.map_err(|_|Error::Unavailable)?;
         if row.is_none() {

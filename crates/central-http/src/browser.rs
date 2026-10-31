@@ -321,6 +321,8 @@ struct Budgets {
     login: Book,
     directory: Book,
     reset: Book,
+    pair_start: Book,
+    pair_status: Book,
 }
 
 impl Budgets {
@@ -334,6 +336,10 @@ impl Budgets {
             Request::GatewayDirectory { .. } => self.directory.charge(client, now, 60, MINUTE),
             // A reset needs a code; a few tries an hour leave room for typing it.
             Request::ResetStart { .. } => self.reset.charge(client, now, 10, HOUR),
+            // A pairing is a click on "Play in Baylee"; its page asks for the
+            // claim about once a second for at most five minutes.
+            Request::PairStart => self.pair_start.charge(client, now, 10, HOUR),
+            Request::PairStatus { .. } => self.pair_status.charge(client, now, 120, MINUTE),
             _ => true,
         }
     }
@@ -606,7 +612,7 @@ mod tests {
             Request::CreateObject,
             Request::ConfirmRestore { revision: 1 },
             Request::GatewayTicket {
-                gateway: "https://baylee.acevik.de".into(),
+                gateway: central_api::OFFICIAL_ORIGIN.into(),
                 purpose: TicketPurpose::Admit,
             },
             Request::LegacyReserve {
@@ -630,7 +636,7 @@ mod tests {
             },
             Request::AcceptTerms {
                 subject: TermsSubject::Gateway {
-                    origin: "https://baylee.acevik.de".into(),
+                    origin: central_api::OFFICIAL_ORIGIN.into(),
                 },
                 version: "1".into(),
                 digest: [0; 32],

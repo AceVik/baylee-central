@@ -1,11 +1,27 @@
-/* The footer (src/components/Footer.tsx). */
+/* The footer (src/components/Footer.tsx): the brand and the dedication, the
+   site's map in three equal columns, the notices, the colophon. Centred. */
 
 /* ---------------------------------------------------------------- footer */
-.foot { background: var(--bg-alt); border-top: 1px solid var(--edge-soft); padding: 3rem 0 2.5rem; }
-.foot-inner { max-width: 52rem; margin: 0 auto; padding: 0 var(--gutter); text-align: center; }
-.foot-logo { width: 7rem; margin: 0 auto 1.4rem; opacity: 0.9; }
-.notice { font-size: 0.85rem; color: var(--ink-faint); margin: 0 auto 0.8em; max-width: 46rem; }
-.foot-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.2rem 0.4rem; margin: 1.6rem 0; font-family: var(--sans); font-size: 0.95rem; }
-.foot-links a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 0.6em; text-decoration: none; color: var(--ink-soft); border-radius: 999px; }
-.foot-links a:hover { color: var(--title); background: var(--panel-2); }
-.colophon { font-size: 0.8rem; color: var(--ink-faint); margin: 0; }
+.foot { background: var(--bg-alt); border-top: 1px solid var(--edge-soft); padding: var(--space-9) 0 var(--space-7); }
+.foot-inner { max-width: 56rem; margin: 0 auto; padding: 0 var(--gutter); text-align: center; }
+.foot-logo { width: 7rem; margin: 0 auto var(--space-5); opacity: 0.9; }
+.foot-map {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-5);
+  margin: var(--space-7) 0; padding: var(--space-6) 0; border-block: 1px solid var(--edge-soft);
+  font-family: var(--sans);
+}
+.foot-head { font: 700 var(--text-xs) var(--sans); letter-spacing: 0.16em; text-transform: uppercase; color: var(--violet); margin: 0 0 var(--space-3); }
+.foot-list { list-style: none; margin: 0; padding: 0; display: grid; justify-items: center; }
+.foot-list a {
+  display: inline-flex; align-items: center; min-height: 44px; padding: 0 0.7em; border-radius: var(--pill);
+  color: var(--ink-soft); text-decoration: none; font-size: 0.95rem;
+  transition: color var(--dur-fast) ease, background-color var(--dur-fast) ease;
+}
+.foot-list a:hover { color: var(--title); background: var(--panel-2); }
+.foot-notices { max-width: var(--prose); margin: 0 auto; }
+.notice { font-size: 0.85rem; color: var(--ink-faint); margin: 0 auto 0.8em; }
+.colophon { font-size: 0.8rem; color: var(--ink-faint); margin: var(--space-5) 0 0; }
+@media (max-width: 600px) {
+  .foot-map { grid-template-columns: 1fr 1fr; }
+  .foot-map .foot-col:last-child { grid-column: 1 / -1; }
+}

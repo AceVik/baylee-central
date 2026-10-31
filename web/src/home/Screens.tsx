@@ -60,7 +60,7 @@ export function Screens() {
       <p className="section-lead reveal">
         <T id="shots.lead" />
       </p>
-      <ul className="shots">
+      <ul className="shots stagger">
         {SHOTS.map((s, i) => (
           <li key={s.file} className="glass reveal">
             <figure>

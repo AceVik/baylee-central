@@ -34,10 +34,11 @@ pub(super) async fn run(store: &AccountStore, operator: &DatabaseConnection, key
     store.close_legacy("restart-legacy", next).await.unwrap();
     assert!(store.invalidate_legacy("restart-legacy").await.is_err());
     store.session_status(&current).await.unwrap();
-    // Runtime permissions cannot mutate archives or approve a gateway it registered.
+    // Runtime permissions cannot mutate archives or delete a gateway's
+    // approval (administrators approve and disable through it, 000014).
     for grant in [
         "UPDATE ON central_identity.migration_archives",
-        "INSERT ON central_identity.gateway_approvals",
+        "DELETE ON central_identity.gateway_approvals",
         "SELECT ON central_identity.private_objects WITH GRANT OPTION",
     ] {
         // GRANT OPTION uses a different SQL placement; keep identifiers fixed in this fixture.

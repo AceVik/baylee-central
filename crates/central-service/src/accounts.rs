@@ -5,7 +5,7 @@ use central_crypto::opaque::server::ServerKeys;
 use central_http::{BROWSER_REQUEST_BYTES, BrowserOrigin, DevelopmentServer};
 use central_identity::IdentityService;
 use central_policy::config::Config;
-use central_postgres::{AccountStore, DevConfig};
+use central_postgres::{AccountStore, DevConfig, LegacyStore};
 use serde::Deserialize;
 use std::{io::Read, process::ExitCode, sync::Arc};
 use tokio::sync::watch;
@@ -16,6 +16,10 @@ use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 struct Settings {
     endpoint: String,
     gateway: String,
+    /// Further numeric-loopback origins of the official gateway, as a live
+    /// service has its compiled aliases; absent means none.
+    #[serde(default)]
+    gateway_aliases: Vec<String>,
     database_port: u16,
     database_user: String,
     database_name: String,
@@ -25,6 +29,19 @@ struct Settings {
     /// A browser listener for a page served locally; absent means off.
     #[serde(default)]
     browser: Option<Browser>,
+    /// The legacy store's own login on the same loopback database
+    /// (`docs/native-login.md` §"Legacy login"); absent means no legacy
+    /// sign-in.
+    #[serde(default)]
+    legacy: Option<Legacy>,
+}
+
+/// The development legacy store's role and password.
+#[derive(Deserialize, Zeroize, ZeroizeOnDrop)]
+#[serde(deny_unknown_fields)]
+struct Legacy {
+    database_user: String,
+    database_password: String,
 }
 
 /// The development browser listener: a numeric loopback address, and the
@@ -48,6 +65,42 @@ impl Browser {
             config,
             BrowserOrigin::development(&self.origin).map_err(|_| ())?,
         ))
+    }
+}
+
+/// The legacy store's login on the same loopback database, if configured.
+fn legacy_config(settings: &mut Settings) -> Result<Option<DevConfig>, ()> {
+    let port = settings.database_port;
+    let name = settings.database_name.clone();
+    settings
+        .legacy
+        .as_mut()
+        .map(|legacy| {
+            DevConfig::new(
+                port,
+                &legacy.database_user,
+                std::mem::take(&mut legacy.database_password),
+                &name,
+            )
+            .map_err(|_| ())
+        })
+        .transpose()
+}
+
+/// The legacy store, if configured; one that will not open closes the
+/// account store too.
+async fn legacy_store(
+    store: &AccountStore,
+    config: Option<DevConfig>,
+) -> Result<Option<LegacyStore>, ()> {
+    let Some(config) = config else {
+        return Ok(None);
+    };
+    if let Ok(legacy) = LegacyStore::connect_dev(config).await {
+        Ok(Some(legacy))
+    } else {
+        let _ = store.clone().close().await;
+        Err(())
     }
 }
 
@@ -89,14 +142,21 @@ async fn serve() -> Result<(), ()> {
     )
     .map_err(|_| ())?;
     let browser = settings.browser.as_ref().map(Browser::config).transpose()?;
+    let legacy = legacy_config(&mut settings)?;
     let store = AccountStore::connect_dev(database).await.map_err(|_| ())?;
+    let legacy = legacy_store(&store, legacy).await?;
     let identity = IdentityService::new(
         store.clone(),
         &endpoint,
         keys,
         &settings.bridge,
         &settings.gateway,
-    );
+    )
+    .and_then(|identity| identity.with_aliases(settings.gateway_aliases.clone()))
+    .map(|identity| match &legacy {
+        Some(legacy) => identity.with_legacy(legacy.clone()),
+        None => identity,
+    });
     drop(settings);
     let result = async {
         let identity = Arc::new(identity.map_err(|_| ())?);
@@ -131,7 +191,11 @@ async fn serve() -> Result<(), ()> {
     }
     .await;
     let closed = store.close().await.map_err(|_| ());
-    result.and(closed)
+    let legacy_closed = match legacy {
+        Some(legacy) => legacy.close().await.map_err(|_| ()),
+        None => Ok(()),
+    };
+    result.and(closed).and(legacy_closed)
 }
 
 #[cfg(test)]

@@ -16,8 +16,10 @@ mod export;
 mod gateways;
 mod grants;
 mod leases;
+mod legacy;
 mod migration;
 mod objects;
+mod pairing;
 mod password;
 mod profiles;
 mod recovery;
@@ -25,8 +27,11 @@ mod registration;
 mod reset;
 mod sessions;
 mod terms;
+mod tokens;
 pub use admin::{AUDIT_YEARS, Action, Appointed, Swept, appoint_admin, sweep};
+pub use legacy::LegacyMove;
 pub use migration::Status;
+pub use pairing::{Approval, Claim, MAX_POLLS, OPEN_IN_ALL, OPEN_PER_ACCOUNT, Redeemed};
 pub use profiles::{Profile, TAG_DRAWS, TagDraw};
 pub use recovery::Summary;
 pub use sessions::{Issued, Session};
@@ -52,6 +57,24 @@ pub struct AccountStore {
 fn statement(sql: &str, values: Vec<Value>) -> Statement {
     Statement::from_sql_and_values(DbBackend::Postgres, sql, values)
 }
+/// The origins a gateway answers for as one parameter, read back by
+/// [`any_origin`]: a validated origin holds no space, so a space divides them.
+fn origins<S: AsRef<str>>(set: &[S]) -> Result<Value, Error> {
+    let set: Vec<&str> = set.iter().map(AsRef::as_ref).collect();
+    if set.is_empty() || set.iter().any(|o| o.is_empty() || o.contains(' ')) {
+        return Err(Error::Rejected);
+    }
+    Ok(set.join(" ").into())
+}
+/// `ANY(...)` over the [`origins`] parameter number `n`.
+fn any_origin(n: u8) -> String {
+    format!("ANY(pg_catalog.string_to_array(${n}::text,' '))")
+}
+/// A registered gateway `g` an administrator has not disabled: approved or
+/// still pending. A pending gateway signs players in by token
+/// (`GatewayState`); only the directory waits for the approval.
+const NOT_DISABLED: &str = "NOT EXISTS(SELECT 1 FROM central_identity.gateway_approvals d
+    WHERE d.gateway_id=g.id AND NOT d.enabled)";
 fn uuid(id: [u8; 16]) -> Uuid {
     Uuid::from_bytes(id)
 }
@@ -72,7 +95,7 @@ fn identity(row: &QueryResult) -> Result<Identity, Error> {
 }
 
 /// Canonical native username. Clients normalize existing NFKC names before this boundary.
-fn username(value: &str) -> Result<String, Error> {
+pub(crate) fn username(value: &str) -> Result<String, Error> {
     let name = value.to_ascii_lowercase();
     if !(3..=24).contains(&name.len())
         || !name
@@ -117,7 +140,7 @@ impl AccountStore {
             db,
             tags: profiles::Tags::default(),
         };
-        if !store.valid_grants().await {
+        if !store.valid_grants().await || !store.legacy_store_closed().await {
             let _ = store.db.close().await;
             return Err(Error::Unavailable);
         }

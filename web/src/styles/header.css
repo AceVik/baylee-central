@@ -38,7 +38,7 @@
 .nav a[aria-current="page"] { color: var(--title); }
 .lang { display: inline-flex; justify-self: end; border: 1px solid var(--edge); border-radius: 999px; overflow: hidden; font-family: var(--sans); font-size: 0.88rem; background: rgba(8, 14, 28, 0.25); }
 .lang-btn { appearance: none; border: 0; background: transparent; color: var(--ink-soft); cursor: pointer; font: inherit; font-weight: 500; padding: 0 0.85em; min-height: 44px; min-width: 44px; transition: background-color var(--fast) ease, color var(--fast) ease; }
-.top.over-hero:not(.solid) .lang-btn:not([aria-pressed="true"]) { color: #eef1f7; }
+.top.over-hero:not(.solid) .lang-btn:not([aria-pressed="true"]) { color: var(--bar-ink); }
 .lang-btn + .lang-btn { border-left: 1px solid var(--edge); }
 .lang-btn[aria-pressed="true"] { background: var(--gold); color: var(--gold-ink); font-weight: 700; }
 .lang-btn:hover:not([aria-pressed="true"]) { background: var(--panel-2); color: var(--ink); }
@@ -49,7 +49,7 @@
   color: var(--ink); cursor: pointer; align-items: center; justify-content: center;
   transition: background-color var(--fast) ease, transform var(--fast) var(--ease);
 }
-.top.over-hero:not(.solid) .menu-btn { color: #fff; }
+.top.over-hero:not(.solid) .menu-btn { color: var(--bar-ink); }
 .menu-btn:active { transform: scale(0.94); }
 .menu-btn .bars, .menu-btn .bars::before, .menu-btn .bars::after { display: block; width: 18px; height: 2px; border-radius: 2px; background: currentColor; transition: transform 220ms var(--ease), opacity 160ms ease; }
 .menu-btn .bars { position: relative; }

@@ -29,6 +29,22 @@ pub struct GatewayListing {
     pub online: bool,
 }
 
+/// Where a registered gateway stands with Central's administrators. Only an
+/// approved gateway is listed. A pending or approved one signs players in
+/// with a gateway token (the token makes its owner answerable and can be
+/// revoked); a credential pair still needs the approval. A disabled one does
+/// neither.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum GatewayState {
+    /// Registered, not yet approved: not listed, signs players in by token.
+    Pending,
+    /// Approved and enabled.
+    Approved,
+    /// Approved once, or refused, and disabled now.
+    Disabled,
+}
+
 /// Validate a canonical live HTTPS or explicitly selected loopback development origin.
 ///
 /// # Errors

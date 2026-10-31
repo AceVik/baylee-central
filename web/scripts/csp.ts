@@ -9,7 +9,7 @@
 // crypto's WebAssembly (owner, 21.10.2026); it allows no `eval` of
 // JavaScript and no inline script.
 
-export const FEEDBACK_ORIGIN = "https://feedback.baylee.acevik.de";
+export const FEEDBACK_ORIGIN = "https://feedback.baylee.app";
 
 export function csp(extraConnect: readonly string[] = []): string {
   const connect = [
