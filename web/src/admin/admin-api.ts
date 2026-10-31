@@ -8,6 +8,7 @@
 import { answer, bytes, exact, isUuidV7, malformed, poster, safeInteger, type Endpoint, type Json } from "../account/api";
 import { validDisplayName, validTag } from "../account/names";
 import { gatewayState, idText, metadata, tokenInfo, type GatewayState, type Metadata, type TokenInfo } from "../account/owner-api";
+import { OPEN, parseReports } from "./feedback/api";
 
 /** central-api's `admin::PAGE`. */
 export const PAGE = 50;
@@ -114,6 +115,14 @@ export interface LegacyAccount {
 export interface LegacyStore {
   deadline: number | null;
   accounts: LegacyAccount[];
+}
+
+/** The reports at a glance, for the first view (two counts of one read). */
+export interface ReportsAtGlance {
+  /** Not done, out of the trash. */
+  open: number;
+  /** Crashes nobody looked at yet: new ones. */
+  newCrashes: number;
 }
 
 /** central-postgres's `MAX_LEGACY_ROWS`: no import holds more. */
@@ -395,9 +404,14 @@ export interface AdminApi {
   setGatewayApproval(id: Uint8Array, enabled: boolean): Promise<void>;
   revokeGatewayToken(id: Uint8Array): Promise<void>;
   legacyAccounts(): Promise<LegacyStore>;
+  /** New reports this administrator has not opened: the navigation's count. */
+  reportsUnread(): Promise<number>;
+  reportsAtGlance(): Promise<ReportsAtGlance>;
 }
 
 const arr = (b: Uint8Array | null) => (b === null ? null : Array.from(b));
+/** How many a facet counts for `v`. */
+const countOf = <T,>(counts: readonly { value: T; count: number }[], v: T): number => counts.find((c) => c.value === v)?.count ?? 0;
 const request = (r: Json): Json => ({ operation: "admin", request: r });
 
 export function adminApi(endpoint: Endpoint = {}): AdminApi {
@@ -415,5 +429,18 @@ export function adminApi(endpoint: Endpoint = {}): AdminApi {
     revokeGatewayToken: (t) => post(request({ action: "revoke_gateway_token", token: arr(t) }), parseAdmin.done),
     legacyAccounts: () => post(request({ action: "legacy_accounts" }), parseAdmin.legacyAccounts),
     overview: () => post(request({ action: "overview" }), parseAdmin.overview),
+    // one row asked for, the total read: the new reports not opened yet
+    reportsUnread: () =>
+      post(
+        request({ action: "reports", filter: { statuses: ["new"], unseen: true }, sort: "received", descending: true, offset: 0, limit: 1 }),
+        (raw) => parseReports.page(raw, 1).total,
+      ),
+    // the facets under "new": the statuses counted without it (all, so the
+    // open ones), the kinds under it (so the new crashes)
+    reportsAtGlance: () =>
+      post(request({ action: "report_facets", filter: { statuses: ["new"] } }), (raw) => {
+        const f = parseReports.facets(raw);
+        return { open: OPEN.reduce((sum, s) => sum + countOf(f.statuses, s), 0), newCrashes: countOf(f.kinds, "crash") };
+      }),
   };
 }
