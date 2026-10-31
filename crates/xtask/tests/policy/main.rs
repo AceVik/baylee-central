@@ -6,6 +6,7 @@
 mod accepts;
 mod dependencies;
 mod fixture;
+mod licences;
 mod links;
 mod sources;
 mod targets;

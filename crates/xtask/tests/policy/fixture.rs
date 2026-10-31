@@ -19,6 +19,7 @@ name = \"policy-fixture\"
 version = \"0.1.0\"
 edition = \"2024\"
 publish = false
+license = \"LicenseRef-Baylee-Central-Source-Available-1.0\"
 [lints]
 workspace = true
 ";
