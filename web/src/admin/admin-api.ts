@@ -7,7 +7,7 @@
 
 import { answer, bytes, exact, isUuidV7, malformed, poster, safeInteger, type Endpoint, type Json } from "../account/api";
 import { validDisplayName, validTag } from "../account/names";
-import { gatewayState, metadata, tokenInfo, type GatewayState, type Metadata, type TokenInfo } from "../account/owner-api";
+import { gatewayState, idText, metadata, tokenInfo, type GatewayState, type Metadata, type TokenInfo } from "../account/owner-api";
 
 /** central-api's `admin::PAGE`. */
 export const PAGE = 50;
@@ -41,6 +41,32 @@ export interface AuditEvent {
   account: Uint8Array | null;
   gateway: Uint8Array | null;
   betaKey: Uint8Array | null;
+}
+
+/** An account or gateway an audit page names, as it is called today (central-api `NamedAccount`, `NamedGateway`). */
+export interface AuditNames {
+  /** By id in hex: the handle's parts. */
+  accounts: Map<string, { displayName: string | null; tag: number | null }>;
+  /** By id in hex. */
+  gateways: Map<string, { name: string; origin: string }>;
+}
+
+/** A page of the audit log, with today's names of what it names. */
+export interface AuditPage extends Page<AuditEvent> {
+  names: AuditNames;
+}
+
+/** The administration's first view: counts only (central-api `AdminOverview`). */
+export interface Overview {
+  accounts: number;
+  accountsWeek: number;
+  moved: number;
+  admins: number;
+  pending: number;
+  approved: number;
+  disabled: number;
+  online: number;
+  liveTokens: number;
 }
 
 export interface AccountDetail {
@@ -285,9 +311,52 @@ export const parseAdmin = {
       audit: list(o["audit"], 20, event),
     };
   },
-  audit(raw: unknown): Page<AuditEvent> {
-    const o = admin(raw, "audit", ["events", "more"]);
-    return { items: list(o["events"], PAGE, event), more: bool(o["more"]) };
+  audit(raw: unknown): AuditPage {
+    const o = admin(raw, "audit", ["events", "more", "accounts", "gateways"]);
+    const items = list(o["events"], PAGE, event);
+    // each named once, at most the two accounts and one gateway of each event
+    const accounts = new Map(
+      list(o["accounts"], PAGE * 2, (v) => {
+        const n = exact(v, ["id", "display_name", "tag"]);
+        return [idText(id(n["id"])), { displayName: name(n["display_name"]), tag: tag(n["tag"]) }] as const;
+      }),
+    );
+    const gateways = new Map(
+      list(o["gateways"], PAGE, (v) => {
+        const n = exact(v, ["id", "name", "origin"]);
+        const at = origin(n["origin"]);
+        const called = n["name"];
+        // a gateway's name as GatewayMetadata holds it: 1 to 80 bytes
+        if (typeof called !== "string" || called.length === 0 || new TextEncoder().encode(called).length > 80) throw malformed();
+        return [idText(id(n["id"])), { name: called, origin: at }] as const;
+      }),
+    );
+    return { items, more: bool(o["more"]), names: { accounts, gateways } };
+  },
+  overview(raw: unknown): Overview {
+    const o = exact(admin(raw, "overview", ["overview"])["overview"], [
+      "accounts",
+      "accounts_week",
+      "moved",
+      "admins",
+      "pending",
+      "approved",
+      "disabled",
+      "online",
+      "live_tokens",
+    ]);
+    const n = (key: string) => safeInteger(o[key], 0);
+    return {
+      accounts: n("accounts"),
+      accountsWeek: n("accounts_week"),
+      moved: n("moved"),
+      admins: n("admins"),
+      pending: n("pending"),
+      approved: n("approved"),
+      disabled: n("disabled"),
+      online: n("online"),
+      liveTokens: n("live_tokens"),
+    };
   },
   gateways(raw: unknown): Page<AdminGateway> {
     const o = admin(raw, "gateways", ["gateways", "more"]);
@@ -315,7 +384,9 @@ export const parseAdmin = {
 export interface AdminApi {
   accounts(query: string | null, before: Uint8Array | null): Promise<Page<AdminAccount>>;
   account(id: Uint8Array): Promise<AccountDetail>;
-  audit(account: Uint8Array | null, before: Uint8Array | null): Promise<Page<AuditEvent>>;
+  audit(account: Uint8Array | null, before: Uint8Array | null): Promise<AuditPage>;
+  /** Counts for the first view; a read, so no fresh password. */
+  overview(): Promise<Overview>;
   gateways(state: GatewayState | null, before: Uint8Array | null): Promise<Page<AdminGateway>>;
   gateway(id: Uint8Array): Promise<{ gateway: AdminGateway; tokens: TokenInfo[] }>;
   setAdmin(id: Uint8Array, admin: boolean): Promise<void>;
@@ -343,5 +414,6 @@ export function adminApi(endpoint: Endpoint = {}): AdminApi {
     setGatewayApproval: (g, enabled) => post(request({ action: "set_gateway_approval", gateway: arr(g), enabled }), parseAdmin.done),
     revokeGatewayToken: (t) => post(request({ action: "revoke_gateway_token", token: arr(t) }), parseAdmin.done),
     legacyAccounts: () => post(request({ action: "legacy_accounts" }), parseAdmin.legacyAccounts),
+    overview: () => post(request({ action: "overview" }), parseAdmin.overview),
   };
 }

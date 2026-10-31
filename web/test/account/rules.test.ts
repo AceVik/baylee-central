@@ -86,3 +86,11 @@ describe("the strength hint", () => {
     expect(acceptable("ä".repeat(513))).toBe(false);
   });
 });
+
+describe("a name another person reads", () => {
+  it("holds no invisible character that changes how it reads, as Central's rule says", async () => {
+    const { shownName } = await import("../../src/account/owner-api");
+    for (const bad of ["Official‮lacif", "Table ⁧x⁩", "Table‏", "Bay​lee", "Two lines", "﻿Table", "Tab\u0007le"]) expect(shownName(bad)).toBe(false);
+    for (const good of ["Spieltisch Köln", "東京テーブル", "طاولة", "Family 👨‍👩‍👧"]) expect(shownName(good)).toBe(true);
+  });
+});

@@ -46,3 +46,12 @@
   .strength-bar::after { transition: none; }
 }
 .account-note.bad { color: var(--bad); }
+
+/* the account page: who you are and this browser side by side, the
+   recovery code below across both, each a panel with its heading */
+.account-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr)); gap: var(--space-4); align-items: stretch; }
+.account-grid > :is(.account-wide, .accept, .account-note, .form-status) { grid-column: 1 / -1; }
+.account-part { padding: var(--space-5); }
+.account-part > .app-panel-title { margin-bottom: var(--space-3); }
+.account-part > :last-child, .account-grid .app-panel > :last-child { margin-bottom: 0; }
+.account-later { margin: 0; text-align: center; }

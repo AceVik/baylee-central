@@ -29,7 +29,8 @@ const LOAD = {
   account: () => import("./account/AccountPage"),
   accountSecurity: () => import("./account/SecurityPage"),
   accountGateways: () => import("./account/GatewaysPage"),
-  admin: () => import("./admin/UsersPage"),
+  admin: () => import("./admin/OverviewPage"),
+  adminUsers: () => import("./admin/UsersPage"),
   adminUser: () => import("./admin/UserPage"),
   adminGateways: () => import("./admin/GatewaysPage"),
   adminAudit: () => import("./admin/AuditPage"),
@@ -48,7 +49,8 @@ const SignIn = lazy(LOAD.signIn);
 const Account = lazy(LOAD.account);
 const Security = lazy(LOAD.accountSecurity);
 const MyGateways = lazy(LOAD.accountGateways);
-const AdminUsers = lazy(LOAD.admin);
+const AdminOverview = lazy(LOAD.admin);
+const AdminUsers = lazy(LOAD.adminUsers);
 const AdminUser = lazy(LOAD.adminUser);
 const AdminGateways = lazy(LOAD.adminGateways);
 const AdminAudit = lazy(LOAD.adminAudit);
@@ -102,6 +104,8 @@ function PageView({ page }: { page: Page | null }) {
     case "accountGateways":
       return <MyGateways />;
     case "admin":
+      return <AdminOverview />;
+    case "adminUsers":
       return <AdminUsers />;
     case "adminUser":
       return <AdminUser />;
@@ -160,6 +164,22 @@ export function App() {
   }, [pathname]);
 
   useReveal(main);
+
+  // Ctrl+K (Cmd+K on a Mac) reaches the page's search field, where it has
+  // one (`data-find`): two keys, so no single letter fires by accident
+  // (WCAG 2.1.4), and the browser's own Ctrl+K is left alone elsewhere
+  useEffect(() => {
+    const find = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() !== "k" || !(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return;
+      const field = document.querySelector<HTMLInputElement>("[data-find]");
+      if (!field) return;
+      e.preventDefault();
+      field.focus();
+      field.select();
+    };
+    document.addEventListener("keydown", find);
+    return () => document.removeEventListener("keydown", find);
+  }, []);
 
   // when the element that had focus goes away (a button that did its job, a
   // list read again), the keyboard goes on from the main content, never from

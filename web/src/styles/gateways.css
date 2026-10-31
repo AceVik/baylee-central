@@ -2,7 +2,16 @@
    fills its rows evenly, the official one first, and the three states of a
    list (docs/website-design.md §"Components"). */
 .directory { margin-top: var(--space-6); }
-.dir-count { text-align: center; margin: 0 0 var(--space-4); }
+.dir-count { display: block; text-align: center; margin: 0 0 var(--space-4); }
+/* finding one: a field and the online chip, in the middle above the cards */
+.dir-find { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: var(--space-2); max-width: 36rem; margin: 0 auto var(--space-3); }
+.dir-find input {
+  flex: 1 1 14rem; min-height: 44px; font: 1rem var(--sans); color: var(--ink); background: var(--field-bg);
+  border: 1px solid var(--field-edge); border-radius: var(--pill); padding: 0.5em 1em;
+}
+.dir-find input:focus-visible { outline: 2px solid transparent; border-color: var(--gold); box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold) 35%, transparent); }
+.dir-find .dot { margin-right: 0.15em; }
+.dir-none { text-align: center; color: var(--ink-soft); }
 .dir-hint { text-align: center; max-width: var(--prose); margin: var(--space-5) auto 0; }
 .gateways { text-align: start; }
 .gw { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-5); }
@@ -17,12 +26,13 @@
 .gw-facts dt { color: var(--ink-faint); font-size: var(--text-sm); }
 .gw-facts dd { margin: 0; min-width: 0; }
 .gw-address { display: flex; align-items: center; gap: var(--space-2); }
-.gw-address code { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* the whole address, wrapped where it must: its end (a port, a path) is often what tells two apart */
+.gw-address code { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; font-size: var(--text-sm); }
 .gw-copy { flex: none; width: 40px; height: 40px; min-width: 44px; min-height: 44px; }
 .gw-copy .icon { width: 1.05em; height: 1.05em; }
 .gw-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: auto; padding-top: var(--space-2); }
 .gw-actions .button { flex: 1 1 10rem; }
-.gw-said { font-family: var(--sans); font-size: var(--text-sm); color: var(--ink-soft); min-height: 1.3em; }
+.gw-open[data-copied] { color: var(--ok); border-color: var(--ok); }
 .gw-skeleton { min-height: 15rem; }
 .dir-failure { padding: var(--space-5); text-align: center; max-width: 36rem; margin: var(--space-4) auto 0; }
 .dir-failure output { margin: 0 0 var(--space-3); color: var(--ink-soft); }
