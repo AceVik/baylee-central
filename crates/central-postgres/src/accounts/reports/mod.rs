@@ -55,29 +55,83 @@ pub(super) async fn history(
     Ok(())
 }
 
+/// Opens again, in `db`'s transaction, the duplicates of the reports in
+/// `going` that do not go with them: a duplicate needs its original, so it
+/// becomes `triaged`, with a line in its history.
+pub(super) async fn release(
+    db: &impl ConnectionTrait,
+    going: &[Uuid],
+    actor: Option<Uuid>,
+) -> Result<(), Error> {
+    if going.is_empty() {
+        return Ok(());
+    }
+    let ids = going
+        .iter()
+        .map(Uuid::to_string)
+        .collect::<Vec<_>>()
+        .join(",");
+    let freed = db
+        .query_all_raw(statement(
+            "UPDATE central_identity.reports SET status = 'triaged', duplicate_of = NULL, done_at = NULL,
+                 revision = revision + 1, updated_at = pg_catalog.clock_timestamp()
+             WHERE duplicate_of = ANY(pg_catalog.string_to_array($1::text, ',')::uuid[])
+               AND NOT id = ANY(pg_catalog.string_to_array($1::text, ',')::uuid[])
+             RETURNING id",
+            vec![ids.into()],
+        ))
+        .await
+        .map_err(|_| Error::Unavailable)?;
+    for row in &freed {
+        let id: Uuid = row.try_get("", "id").map_err(|_| Error::Unavailable)?;
+        history(db, id, actor, "duplicate", "none: its original is gone").await?;
+    }
+    Ok(())
+}
+
 /// Deletes, in `db`'s transaction, every report done for [`DONE_DAYS`], in
 /// the trash for [`TRASH_DAYS`] or older than [`KEEP_DAYS`], with its parts,
-/// notes and opened marks; its history stays, with a line saying so.
-/// Returns how many went.
+/// notes and opened marks; its history stays, with a line saying so, and a
+/// duplicate of it that stays is opened again ([`release`]). Returns how many went.
 pub(super) async fn sweep(db: &impl ConnectionTrait) -> Result<u64, Error> {
-    let gone = db
+    let going = db
         .query_all_raw(statement(
             &format!(
-                "DELETE FROM central_identity.reports
+                "SELECT id FROM central_identity.reports
                  WHERE done_at < pg_catalog.clock_timestamp() - interval '{DONE_DAYS} days'
                     OR deleted_at < pg_catalog.clock_timestamp() - interval '{TRASH_DAYS} days'
                     OR created_at < pg_catalog.clock_timestamp() - interval '{KEEP_DAYS} days'
-                 RETURNING id"
+                 FOR UPDATE"
             ),
             vec![],
         ))
         .await
-        .map_err(|_| Error::Unavailable)?;
-    for row in &gone {
-        let id: Uuid = row.try_get("", "id").map_err(|_| Error::Unavailable)?;
-        history(db, id, None, "swept", "").await?;
+        .map_err(|_| Error::Unavailable)?
+        .iter()
+        .map(|row| {
+            row.try_get::<Uuid>("", "id")
+                .map_err(|_| Error::Unavailable)
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    if going.is_empty() {
+        return Ok(0);
     }
-    Ok(gone.len() as u64)
+    release(db, &going, None).await?;
+    let ids = going
+        .iter()
+        .map(Uuid::to_string)
+        .collect::<Vec<_>>()
+        .join(",");
+    db.execute_raw(statement(
+        "DELETE FROM central_identity.reports WHERE id = ANY(pg_catalog.string_to_array($1::text, ',')::uuid[])",
+        vec![ids.into()],
+    ))
+    .await
+    .map_err(|_| Error::Unavailable)?;
+    for id in &going {
+        history(db, *id, None, "swept", "").await?;
+    }
+    Ok(going.len() as u64)
 }
 
 impl AccountStore {

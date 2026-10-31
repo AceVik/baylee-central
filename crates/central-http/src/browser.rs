@@ -634,6 +634,134 @@ mod tests {
         mock.calls.lock().unwrap().len()
     }
 
+    /// A report part read as the page reads it: status, headers and the raw bytes.
+    async fn read_part(
+        app: &Router,
+        uri: &str,
+        headers: &[(&'static str, String)],
+        peer: &str,
+    ) -> (StatusCode, HeaderMap, Vec<u8>) {
+        let mut builder = HttpRequest::builder().method("POST").uri(uri);
+        for (name, value) in headers {
+            builder = builder.header(*name, value);
+        }
+        let response = app
+            .clone()
+            .oneshot(
+                builder
+                    .extension(Peer(peer.parse().unwrap()))
+                    .body(Body::from("{}"))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let (status, headers) = (response.status(), response.headers().clone());
+        assert_eq!(headers[header::CACHE_CONTROL], "no-store");
+        let bytes = to_bytes(response.into_body(), 1 << 20).await.unwrap();
+        (status, headers, bytes.to_vec())
+    }
+
+    #[tokio::test]
+    async fn a_report_part_is_the_page_s_own_read_with_a_cookie_and_comes_as_stored() {
+        let (app, mock) = listener();
+        let id = "0192d0c57b3e7a1f8c2d3e4f5a6b7c8d";
+        let cookie = with("cookie", &[&format!("{COOKIE}={}", "ab".repeat(32))]);
+        let (status, headers, body) = read_part(
+            &app,
+            &format!("/api/v1/reports/{id}/record"),
+            &cookie,
+            LOOPBACK,
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(headers[header::CONTENT_TYPE], "application/gzip");
+        assert_eq!(headers["x-record-origin"], "client");
+        assert_eq!(
+            body,
+            [0x1f, 0x8b, 8, 0],
+            "the bytes as stored, never unpacked"
+        );
+        let (_, headers, _) = read_part(
+            &app,
+            &format!("/api/v1/reports/{id}/client"),
+            &cookie,
+            LOOPBACK,
+        )
+        .await;
+        assert!(!headers.contains_key("x-record-origin"));
+        assert_eq!(calls(&mock), 2);
+        assert_eq!(
+            mock.calls.lock().unwrap()[0].1,
+            Some(Token::from_hex(&"ab".repeat(32)).unwrap().digest())
+        );
+        // the site's proofs, the address and a well-formed path, or nothing is asked
+        for (uri, headers, peer) in [
+            (
+                format!("/api/v1/reports/{id}/record"),
+                with("x-baylee-central", &[]),
+                LOOPBACK,
+            ),
+            (
+                format!("/api/v1/reports/{id}/record"),
+                with("origin", &["https://evil.example"]),
+                LOOPBACK,
+            ),
+            (
+                format!("/api/v1/reports/{id}/record"),
+                cookie.clone(),
+                "203.0.113.9:4444",
+            ),
+            (
+                format!("/api/v1/reports/{id}/record"),
+                with("x-forwarded-for", &[]),
+                LOOPBACK,
+            ),
+            (
+                format!("/api/v1/reports/{}/record", id.to_uppercase()),
+                cookie.clone(),
+                LOOPBACK,
+            ),
+            (
+                format!("/api/v1/reports/{id}/screenshot"),
+                cookie.clone(),
+                LOOPBACK,
+            ),
+        ] {
+            let (status, _, _) = read_part(&app, &uri, &headers, peer).await;
+            assert!(status.is_client_error(), "{uri} {status}");
+        }
+        assert_eq!(calls(&mock), 2);
+    }
+
+    #[tokio::test]
+    async fn report_parts_have_their_own_budget_per_address() {
+        let (app, _) = listener();
+        let uri = "/api/v1/reports/0192d0c57b3e7a1f8c2d3e4f5a6b7c8d/client";
+        for _ in 0..120 {
+            assert_eq!(
+                read_part(&app, uri, &base(), LOOPBACK).await.0,
+                StatusCode::OK
+            );
+        }
+        assert_eq!(
+            read_part(&app, uri, &base(), LOOPBACK).await.0,
+            StatusCode::TOO_MANY_REQUESTS
+        );
+        // another address still reads, and a sign-in is not charged by the reads
+        assert_eq!(
+            read_part(
+                &app,
+                uri,
+                &with("x-forwarded-for", &["198.51.100.8"]),
+                LOOPBACK
+            )
+            .await
+            .0,
+            StatusCode::OK
+        );
+        assert_eq!(send(&app, &base(), discover()).await.status, StatusCode::OK);
+    }
+
     #[tokio::test]
     async fn the_page_s_own_request_is_served() {
         let (app, mock) = listener();

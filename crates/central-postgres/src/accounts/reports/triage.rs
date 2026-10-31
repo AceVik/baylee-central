@@ -5,7 +5,7 @@
 //! history line for every change, never the report's words.
 use super::super::{AccountStore, Error, Token, statement, uuid};
 use super::list::{SUMMARY_COLUMNS, split, summary};
-use super::{history, sweep};
+use super::{history, release, sweep};
 use central_api::reports::{
     BulkAction, MAX_BULK, MAX_NOTE, MAX_SEEN, MAX_VIEWS, PartState, ReportAdmin, ReportAuditRow,
     ReportChange, ReportDetail, ReportNote, ReportStatus, SavedView, valid_view,
@@ -229,10 +229,14 @@ async fn bin(
                  updated_at = pg_catalog.clock_timestamp(), revision = revision + 1 WHERE id = $1",
             "restored",
         ),
-        BulkAction::Purge if was.trashed => (
-            "DELETE FROM central_identity.reports WHERE id = $1",
-            "purged",
-        ),
+        BulkAction::Purge if was.trashed => {
+            // its duplicates keep no original: they are opened again first
+            release(tx, &[report], Some(admin)).await?;
+            (
+                "DELETE FROM central_identity.reports WHERE id = $1",
+                "purged",
+            )
+        }
         BulkAction::Purge => return Err(Error::Rejected),
         _ => return Ok(false),
     };

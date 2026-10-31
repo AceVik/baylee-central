@@ -163,6 +163,66 @@ mod tests {
             .header(header::HOST, "127.0.0.1:28780")
     }
 
+    /// The boundary with a stand-in upload route that says whether the body
+    /// was still unread when it ran (the handler, not the boundary, reads it).
+    fn uploads() -> Router {
+        with_routes(
+            HeaderValue::from_static("127.0.0.1:28780"),
+            1024,
+            Router::new().route(
+                "/v1/reports/{report}/{part}",
+                axum::routing::put(|request: Request| async move {
+                    let unread = to_bytes(request.into_body(), 4096).await.map(|b| b.len());
+                    format!("read here: {unread:?}")
+                }),
+            ),
+        )
+    }
+
+    #[tokio::test]
+    async fn an_upload_declares_its_length_within_the_largest_part_and_is_read_by_its_handler() {
+        let put = |length: Option<&str>| {
+            let mut builder =
+                request("/v1/reports/0192d0c57b3e7a1f8c2d3e4f5a6b7c8d/record").method("PUT");
+            if let Some(length) = length {
+                builder = builder.header(header::CONTENT_LENGTH, length);
+            }
+            builder.body(Body::from(vec![0x1f; 2048])).unwrap()
+        };
+        let over = (u64::from(MAX_RECORD_GZIP) + 1).to_string();
+        assert_eq!(
+            uploads().oneshot(put(None)).await.unwrap().status(),
+            StatusCode::LENGTH_REQUIRED
+        );
+        assert_eq!(
+            uploads().oneshot(put(Some(&over))).await.unwrap().status(),
+            StatusCode::PAYLOAD_TOO_LARGE
+        );
+        assert_eq!(
+            uploads()
+                .oneshot(put(Some("not a number")))
+                .await
+                .unwrap()
+                .status(),
+            StatusCode::LENGTH_REQUIRED
+        );
+        // over the 1 KiB every other request has, and the boundary leaves it to the handler
+        let response = uploads().oneshot(put(Some("2048"))).await.unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let said = to_bytes(response.into_body(), 1024).await.unwrap();
+        assert_eq!(&said[..], b"read here: Ok(2048)");
+        // every other path keeps the small bound: a POST of the same size is refused
+        let post = request("/v1/native")
+            .method("POST")
+            .header(header::CONTENT_LENGTH, "2048")
+            .body(Body::from(vec![0; 2048]))
+            .unwrap();
+        assert_eq!(
+            uploads().oneshot(post).await.unwrap().status(),
+            StatusCode::PAYLOAD_TOO_LARGE
+        );
+    }
+
     #[tokio::test]
     async fn liveness_is_not_readiness_or_authentication() {
         for (path, status) in [
