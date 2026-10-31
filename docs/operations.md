@@ -62,7 +62,8 @@ exactly `baylee.app`, an `Origin` other than exactly `https://baylee.app`,
 is not loopback, or an operation outside the list. No CORS header is ever sent.
 Bodies are at most 64 KiB. Errors keep the native route's statuses and fixed
 text. The browser session is the cookie `__Host-central` (`Secure`, `HttpOnly`,
-`SameSite=Strict`, `Path=/`, `Max-Age=1800`), never in a body; signing out
+`SameSite=Strict`, `Path=/`, `Max-Age=43200`, the session's 12-hour cap),
+never in a body; signing out
 clears it. Sign-in and session status answer there with the account's
 canonical username (`BrowserSession`, `BrowserStatus`). The site is fixed to
 `baylee.app` in this mode; only the development launcher takes another.
@@ -598,7 +599,14 @@ startup).
 Request budgets on the native listener are global and per account or bearer,
 not per client address: behind the proxy every client shares one address, so a
 flood can exhaust the shared login budget for everyone (service denial, not
-account takeover). The browser listener adds per-address budgets in front of the
+account takeover). The table of unfinished sign-ins is larger than that budget
+can fill (4096 against 32 a second for 60 seconds), so it is never the cheaper
+target (31.10.2026; before, 128 entries filled at two requests a second). The
+per-account budget (eight OPAQUE evaluations a minute) is keyed by the
+account alone: whoever knows an account's identity can keep its sign-ins
+busy, and discovery still says whether a username is enrolled. Both are the
+price of the guessing brake as it stands; the trade-off is the owner's to
+decide (see the security record of 31.10.2026). The browser listener adds per-address budgets in front of the
 same global ones; a client with many addresses still shares the global budget.
 Central sessions last 30 minutes unless renewed, and at most 12 hours. Password change
 is served on both listeners since 28.10.2026 ([native login](native-login.md)

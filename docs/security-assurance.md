@@ -2062,3 +2062,53 @@ label outside the rule) storing nothing, a copy stored whole with its parts,
 notes and history, and a second run skipping it. Engineering review, not an
 audit.
 
+## Sign-in capacity and invisible characters in names, 31 October 2026
+
+Design pass. A read-only review of the website and the browser surface (the
+website's polish, the entry before) found two server matters. The table of
+unfinished OPAQUE exchanges (sign-ins, password changes, deletions) held 128
+entries for 60 seconds, shared by both listeners, while the public budget
+lets 32 requests a second through: about two `LoginStart`s a second with
+made-up, well-formed identities (OPAQUE answers an unknown one with a
+stand-in record, so each takes a slot) kept every real sign-in, and every
+password check before a token mint or an administrator's change, at
+`Busy`. And a gateway's or a token's name could hold invisible characters
+that change how the text reads (a right-to-left override, isolates, marks):
+cards draw names in `<bdi>`, but a name also stands in sentences such as an
+administrator's "Approve …?", where an override could make it read as
+another.
+
+Implementation pass:
+- **Capacity from the budget.** `limits::PENDING` is 4096, more than
+  `GLOBAL_PER_SECOND` (32) × `PENDING_SECONDS` (60) = 1920, which a constant
+  assertion holds; the three places that insert, and the prune, use it, and
+  the lifetime is the same constant. No sequence of public requests fills the
+  table before it spends the budget everyone shares (the documented limit);
+  a password change or a deletion needs a signed-in account and its eight
+  units a minute. An entry is about a kilobyte.
+- **Names.** `central_api::gateway::shown_char` refuses control characters
+  and U+061C, U+200B, U+200E–F, U+202A–E, U+2028–9, U+2060–4, U+2066–9 and
+  U+FEFF; the zero-width joiner and non-joiner stay (emoji sequences, some
+  scripts). It is the rule of `GatewayMetadata::validate` (registration and
+  every heartbeat) and of `token_name`. Strictly narrower: a gateway built on
+  the old rule sends nothing the new one would need, and one that sent such a
+  name has its heartbeat refused. Rows stored before keep their name; the
+  website's directory parser keeps the old rule, so one old row cannot fail
+  the whole list.
+- The documents gave the browser cookie `Max-Age=1800`; the code sends
+  43200, the session's 12-hour cap (`web-accounts.md`, `operations.md`).
+
+Adversarial pass: unit tests refuse each class (override, isolate, mark,
+invisible space, line separator, byte order mark, control) in a gateway name
+and a token name, and accept German, Japanese and Arabic names and an emoji
+sequence with its joiners. `cargo xtask gate` and `cargo xtask postgres`.
+
+Recorded, not changed, for the owner: the per-account budget is keyed by the
+account alone, so whoever knows an account's identity can keep its sign-ins
+busy, and `Discover` says whether a username is enrolled (`native-login.md`
+§"Implementation status"). Keying the budget by account and address instead
+would end that lockout but let many addresses guess faster; a stable fake
+identity for unknown names (derived with a server key) would end the
+enumeration but needs its own design with the legacy discovery. The native
+listener still sees one address behind the proxy. Engineering review, not an
+audit.

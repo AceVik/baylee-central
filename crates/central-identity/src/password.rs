@@ -5,7 +5,7 @@
 //! account's login budget.
 use super::{
     BrowserReply, Error, IdentityService, Pending, Purpose, Request, Response, Surface, Token,
-    signed_in,
+    limits, signed_in,
 };
 use central_crypto::opaque::server::ServerKeys;
 use std::time::{Duration, Instant};
@@ -68,13 +68,13 @@ impl IdentityService {
         let ticket = Token::generate()?;
         let started_by = bearer.ok_or(Error::Rejected)?.digest();
         let mut pending = self.pending.lock().map_err(|_| Error::Unavailable)?;
-        if pending.len() >= 128 {
+        if pending.len() >= limits::PENDING {
             return Err(Error::Busy);
         }
         pending.insert(
             ticket.digest(),
             Pending {
-                expires: Instant::now() + Duration::from_secs(60),
+                expires: Instant::now() + Duration::from_secs(limits::PENDING_SECONDS),
                 attempt,
                 credential: Some(credential),
                 surface,

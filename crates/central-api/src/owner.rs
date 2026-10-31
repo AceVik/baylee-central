@@ -51,17 +51,19 @@ impl GatewayScopes {
     }
 }
 
-/// Check a token's name: 1 to [`MAX_TOKEN_NAME`] bytes of text without
-/// control characters or surrounding space. It is the owner's own label,
-/// shown to them and to administrators as text, never as markup.
+/// Check a token's name: 1 to [`MAX_TOKEN_NAME`] bytes of text of
+/// [`crate::gateway::shown_char`]s without surrounding space. It is the
+/// owner's own label, shown to them and to administrators as text, never as
+/// markup.
 ///
 /// # Errors
-/// `Rejected` for an empty, overlong, padded or control-bearing name.
+/// `Rejected` for an empty, overlong or padded name, or one with a control
+/// or invisible formatting character.
 pub fn token_name(name: &str) -> Result<&str, Error> {
     if name.is_empty()
         || name.len() > MAX_TOKEN_NAME
         || name.trim() != name
-        || name.chars().any(char::is_control)
+        || !name.chars().all(crate::gateway::shown_char)
     {
         return Err(Error::Rejected);
     }

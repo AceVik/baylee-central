@@ -4,7 +4,7 @@
 //! still see their data. A stolen session token alone deletes nothing: the
 //! deletion carries a fresh OPAQUE proof of the password, bound to the
 //! session that started it and charged to the account's login budget.
-use super::{Error, IdentityService, Pending, Purpose, Request, Response, Surface, Token};
+use super::{Error, IdentityService, Pending, Purpose, Request, Response, Surface, Token, limits};
 use central_crypto::opaque::server::ServerKeys;
 use std::time::{Duration, Instant};
 use subtle::ConstantTimeEq;
@@ -77,13 +77,13 @@ impl IdentityService {
         let ticket = Token::generate()?;
         let started_by = bearer.ok_or(Error::Rejected)?.digest();
         let mut pending = self.pending.lock().map_err(|_| Error::Unavailable)?;
-        if pending.len() >= 128 {
+        if pending.len() >= limits::PENDING {
             return Err(Error::Busy);
         }
         pending.insert(
             ticket.digest(),
             Pending {
-                expires: Instant::now() + Duration::from_secs(60),
+                expires: Instant::now() + Duration::from_secs(limits::PENDING_SECONDS),
                 attempt,
                 credential: Some(credential),
                 surface,
