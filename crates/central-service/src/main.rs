@@ -10,8 +10,9 @@ mod accounts;
 mod legacy;
 mod listeners;
 mod production;
+mod reports_import;
 
-const USAGE: &str = "usage: central-service --dev | --dev-accounts-stdin | --accounts-stdin | --migrate-stdin | --issue-beta-keys-stdin | --appoint-admin-stdin | --sweep-stdin | --legacy-import-stdin | --legacy-deadline-stdin | --generate-secrets";
+const USAGE: &str = "usage: central-service --dev | --dev-accounts-stdin | --accounts-stdin | --migrate-stdin | --issue-beta-keys-stdin | --appoint-admin-stdin | --sweep-stdin | --legacy-import-stdin | --legacy-deadline-stdin | --import-reports-stdin | --generate-secrets";
 
 #[tokio::main]
 async fn main() -> ExitCode {
@@ -34,6 +35,7 @@ async fn main() -> ExitCode {
         Some("--sweep-stdin") => return production::run_sweep().await,
         Some("--legacy-import-stdin") => return legacy::run_import().await,
         Some("--legacy-deadline-stdin") => return legacy::run_deadline().await,
+        Some("--import-reports-stdin") => return reports_import::run().await,
         Some("--generate-secrets") => return production::generate_secrets(),
         _ => {
             eprintln!("{USAGE}");

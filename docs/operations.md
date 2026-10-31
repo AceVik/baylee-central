@@ -30,6 +30,8 @@ never in argv or the environment. Unknown fields fail closed.
 - `--legacy-import-stdin` and `--legacy-deadline-stdin` import the official
   gateway's legacy accounts once and set the legacy store's deadline, under the
   migration login ([the legacy store](#the-legacy-store)).
+- `--import-reports-stdin` copies the feedback service's open reports once,
+  under the migration login ([reports](#the-one-time-copy-of-the-feedback-services-reports)).
 - `--generate-secrets` writes a fresh `{"opaque_setup": [...], "bridge": [...]}`
   document to standard output and refuses when standard output is a terminal.
 - `--dev` and `--dev-accounts-stdin` are the local development modes described
@@ -466,6 +468,34 @@ columns only; `SELECT, INSERT, DELETE` on `report_parts`, `report_notes`,
 `report_seen` and `report_views` (with `UPDATE (query)`); `SELECT, INSERT`
 on `report_audit`. The daily sweep (`--sweep-stdin`) deletes reports past
 their retention and says how many. No secret and no setting is new.
+
+### The one-time copy of the feedback service's reports
+
+After the gateways file reports with Central (Baylee `BAYLEE_REPORTS_TO=central`),
+the reports still open at the feedback service are copied once, with their
+notes and history (Baylee `docs/feedback.md` §"The one-time copy to
+Central"):
+
+```sh
+{ cat /etc/baylee-central/migrate.json
+  echo '{"author": "<an administrator's account id, 32 hex digits>"}'
+  sudo -u baylee-feedback sh -c 'set -a; . /etc/baylee-feedback/env; exec baylee-feedback export-reports'
+} | central-service --import-reports-stdin
+```
+
+The migration document first, then the administrator the copied notes are
+filed under on a line of its own, then the service's lines; its database
+address is read from its own environment file, never from a command line.
+In one transaction the import checks every report by the intake's rules
+(and its status open, its labels, its issue), files it under the official
+gateway with its id, times, triage and parts as they were, each note under
+the author named, its first author's name in its text, and each line of the
+old history at its time, its actor named in its detail; a report whose id is
+here already is skipped. A count or SHA-256 that is not the lines', a line
+out of the rules, a copy cut short or anything after its last line stores
+nothing. Standard error says how many were stored and how many were here
+already; run it again and every report is skipped.
+
 
 ## Secrets
 

@@ -337,3 +337,32 @@ author, a selection, the trash and a purge with a fresh password, the
 released duplicate, views, the unread marker per administrator, the sweep
 keeping the history, and the grants both ways.
 
+## Pass 4: the one-time copy (31.10.2026)
+
+Step 3's copy of the reports still open at the feedback service, as built:
+Baylee's `baylee-feedback export-reports` writes them as JSON Lines (its
+`docs/feedback.md` §"The one-time copy to Central" is the format), and
+`central-service --import-reports-stdin` takes them under the migration login
+(`docs/operations.md`).
+
+- **Only open reports**, outside the service's trash; done ones stay there.
+  Each keeps its id (the service's are UUID v7), its times, status, issue,
+  priority and labels, its `client` object and record as the gzip they
+  were, and a crash's signature made here.
+- **What has no account here keeps its name in words.** Every copied
+  report is filed under the official gateway, its service name as its
+  label. A note is filed under the administrator the operator names, its
+  first author's name before its text; a line of the old history keeps its
+  time, its actor's name in its detail and its action where it reads as
+  Central's (`imported` otherwise); the assignee is named in the report's
+  own first line of history, since an account here cannot be guessed from a
+  name there. Seen marks and saved lists stay at the service.
+- **All or nothing, and once.** One transaction; the last line's count and
+  SHA-256 over the lines before it must match, so a copy cut short stores
+  nothing; a report whose id is here already is skipped, so running it
+  again copies nothing twice.
+- **The gzip travels as hex**, which Central reads without a decoder of its
+  own and without a new dependency.
+- **The checks are the intake's own** (`ReportIntake::validate`), the
+  status open, the labels Central's, the issue within its range.
+

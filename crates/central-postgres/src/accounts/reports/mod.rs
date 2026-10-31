@@ -14,8 +14,12 @@ use sea_orm::{ConnectionTrait, QueryResult, TransactionTrait, prelude::Uuid};
 use sha2::{Digest, Sha256};
 use subtle::ConstantTimeEq;
 
+mod import;
 mod list;
 mod triage;
+pub use import::{
+    ImportedHistory, ImportedNote, ImportedReport, ReportImport, ReportImportRefusal,
+};
 
 /// Who files a report: the authenticated gateway and its name in Central then.
 #[derive(Clone, Debug, PartialEq, Eq)]

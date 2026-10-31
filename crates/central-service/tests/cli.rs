@@ -99,6 +99,7 @@ fn an_explicit_mode_is_required_and_extra_arguments_are_rejected() {
         &["--sweep-stdin", "--dev"],
         &["--legacy-import-stdin", "PRIVATE_ARG_CANARY"],
         &["--legacy-deadline-stdin", "--dev"],
+        &["--import-reports-stdin", "PRIVATE_ARG_CANARY"],
         &["--generate-secrets", "PRIVATE_ARG_CANARY"],
         &["--DEV"],
     ] {
@@ -108,7 +109,7 @@ fn an_explicit_mode_is_required_and_extra_arguments_are_rejected() {
         assert!(!stderr.contains("PRIVATE_ARG_CANARY"));
         assert_eq!(
             stderr.trim(),
-            "usage: central-service --dev | --dev-accounts-stdin | --accounts-stdin | --migrate-stdin | --issue-beta-keys-stdin | --appoint-admin-stdin | --sweep-stdin | --legacy-import-stdin | --legacy-deadline-stdin | --generate-secrets"
+            "usage: central-service --dev | --dev-accounts-stdin | --accounts-stdin | --migrate-stdin | --issue-beta-keys-stdin | --appoint-admin-stdin | --sweep-stdin | --legacy-import-stdin | --legacy-deadline-stdin | --import-reports-stdin | --generate-secrets"
         );
     }
 }
@@ -147,6 +148,25 @@ fn production_modes_reject_missing_or_invalid_input_without_echoing_it() {
         assert!(!stderr.contains("PRIVATE_DB_CANARY"));
         assert_eq!(stderr.trim(), message);
     }
+}
+
+/// The reports' copy refuses what is not its migration document, and says
+/// why without echoing what it was given.
+#[test]
+fn the_reports_import_refuses_without_echoing_its_input() {
+    let message = "central: reports import refused, nothing was stored: the first document is not the operator's {\"database\": …}";
+    let output = run_invalid(&["--import-reports-stdin"], None);
+    assert_eq!(output.stdout, b"");
+    assert_eq!(String::from_utf8(output.stderr).unwrap().trim(), message);
+    let output = run_with_stdin(
+        "--import-reports-stdin",
+        br#"{"database":{"password":"PRIVATE_DB_CANARY"}}"#,
+    );
+    assert!(!output.status.success());
+    assert_eq!(output.stdout, b"");
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(!stderr.contains("PRIVATE_DB_CANARY"));
+    assert_eq!(stderr.trim(), message);
 }
 
 #[test]
