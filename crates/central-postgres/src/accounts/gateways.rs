@@ -9,7 +9,7 @@ use central_api::{
 };
 use sea_orm::{ConnectionTrait, DatabaseTransaction, TransactionTrait, prelude::Uuid};
 
-fn valid_id(id: [u8; 16]) -> bool {
+pub(super) fn valid_id(id: [u8; 16]) -> bool {
     id[6] >> 4 == 7 && id[8] >> 6 == 2
 }
 

@@ -950,4 +950,35 @@ mod tests {
         assert_eq!(ReportKind::from_stored("chat"), Err(Error::Unavailable));
         assert!(ReportStatus::Duplicate.done() && !ReportStatus::InProgress.done());
     }
+
+    /// A report as Baylee's gateway writes it (its `baylee_account::reports`
+    /// mirrors this type, which its pinned central-api predates): this must
+    /// keep decoding, or every report from a gateway is refused.
+    #[test]
+    fn a_report_as_baylees_gateway_writes_it() {
+        let sha = |b: u8| serde_json::Value::from(vec![b; 32]);
+        let json = serde_json::json!({
+            "gateway": {"name": "Synthetic gateway", "url": "https://gateway.example", "version": "0.1.1-beta.9b"},
+            "channel": "gateway",
+            "reporter": "5bdcc146bf60754e6a042426089575c75a003f089d2739839dec58b964ec3843",
+            "kind": "crash",
+            "text": "It crashed\nwhile I was choosing attackers",
+            "game_id": "0192d0c5-7b50-7a1f-8c2d-3e4f5a6b7c01",
+            "build": {"version": "0.1.1-beta.9b", "commit": "3f9a1c7e21"},
+            "crash": {"message": "index out of bounds", "location": "crates/baylee-client/src/table.rs:812:17"},
+            "client": {"bytes": 182, "sha256": sha(7)},
+            "record": {"complete": false, "origin": "gateway", "bytes": 4_000, "sha256": sha(9)},
+        });
+        let report: ReportIntake = serde_json::from_value(json).unwrap();
+        report.validate().unwrap();
+        let bare = serde_json::json!({
+            "gateway": {"name": null, "url": null, "version": "0.1.1"},
+            "channel": "gateway", "reporter": "ab", "kind": "bug", "text": "t", "game_id": null,
+            "build": null, "crash": null, "client": null, "record": null,
+        });
+        serde_json::from_value::<ReportIntake>(bare)
+            .unwrap()
+            .validate()
+            .unwrap();
+    }
 }

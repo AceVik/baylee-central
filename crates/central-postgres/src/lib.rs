@@ -9,8 +9,9 @@ mod connection;
 mod legacy;
 mod pending;
 pub use accounts::{
-    AUDIT_YEARS, AccountStore, Action, Appointed, Approval, Claim, Credential, Filer, Issued,
-    LegacyMove, MAX_GATEWAY_VERSIONS, MAX_POLLS, OPEN_IN_ALL, OPEN_PER_ACCOUNT, Profile, Redeemed,
+    AUDIT_YEARS, AccountStore, Action, Appointed, Approval, Claim, Credential, Filer,
+    ImportedHistory, ImportedNote, ImportedReport, Issued, LegacyMove, MAX_GATEWAY_VERSIONS,
+    MAX_POLLS, OPEN_IN_ALL, OPEN_PER_ACCOUNT, Profile, Redeemed, ReportImport, ReportImportRefusal,
     Session, Status, Summary, Swept, TAG_DRAWS, TagDraw, appoint_admin, sweep,
 };
 

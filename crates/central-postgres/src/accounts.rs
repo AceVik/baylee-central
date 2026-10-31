@@ -35,7 +35,9 @@ pub use migration::Status;
 pub use pairing::{Approval, Claim, MAX_POLLS, OPEN_IN_ALL, OPEN_PER_ACCOUNT, Redeemed};
 pub use profiles::{Profile, TAG_DRAWS, TagDraw};
 pub use recovery::Summary;
-pub use reports::Filer;
+pub use reports::{
+    Filer, ImportedHistory, ImportedNote, ImportedReport, ReportImport, ReportImportRefusal,
+};
 pub use sessions::{Issued, Session};
 pub use terms::MAX_GATEWAY_VERSIONS;
 
