@@ -28,14 +28,18 @@ assurance](security-assurance.md).
   than 30 minutes old; reads need not. The page knows the sign-in time
   from `AccountSummary` and asks for the password again, which signs in
   anew. TOTP for administrators' changes comes with M1 step 5.
-- **The audit names ids, never words.** An event holds the actor (an
+- **The audit records ids, never words.** An event holds the actor (an
   administrator's account id, or the operator), the action from a closed
   list in `central-postgres` (`Action`: `account.admin_granted`,
   `account.admin_removed`, `account.reset_issued`, `account.tag_changed`,
   `gateway.approved`, `gateway.disabled`, `gateway.token_revoked`) and the
   ids it touched. No name, reason, note or key; a tag change keeps the two
   tags, which are numbers. Reads are not audited. Each change writes its
-  event in the same transaction.
+  event in the same transaction. Reading a page of it joins today's names
+  (31.10.2026): the answer names each account and gateway the page's events
+  touch, as it is called now, beside the events; nothing about a name is
+  stored with them, so a renamed account shows its new name and a deleted
+  one only its id.
 - **The runtime decides, and cannot rewrite the record** (decision 4). It
   holds `SELECT, INSERT, DELETE` on `account_roles` and `SELECT, INSERT` on
   `audit_events`, and its startup check refuses any wider or narrower grant
@@ -78,8 +82,17 @@ A second change, `ResetLogin { account }`, makes a reset code
   the row, whether a recovery wrapper exists, the gateways it owns (id,
   origin, approved; at most 20) and its latest 20 audit events. An unknown
   id is `Rejected`.
-- `Audit { account, before }` → `Audit { events, more }`: newest first, 50 a
-  page, of one account or all.
+- `Audit { account, before }` → `Audit { events, more, accounts, gateways }`:
+  newest first, 50 a page, of one account or all, with the accounts (id,
+  display name, tag) and gateways (id, name, origin) its events name that
+  still exist, each once, read in the same statement.
+- `Overview` → `Overview { overview }` (31.10.2026): counts for the
+  administration's first view, in one statement: enrolled accounts, those
+  created in the last seven days, those moved from the official gateway,
+  administrators, registered gateways awaiting approval, approved and
+  disabled (the official gateway not among them), those heard from in the
+  last 90 seconds, and live gateway tokens. No row leaves; one pass over each
+  table.
 
 The queries name their columns and never read a credential, a wrapper or a
 document; the answer types have no field that could carry one.

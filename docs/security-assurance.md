@@ -1999,3 +1999,43 @@ password reset needs an administrator's reset code as well
 the clipboard after a secret was copied would also clear whatever the person
 copied next, so it stays theirs. Trusted Types need a browser run against
 the WebAssembly glue and wait. Engineering review, not an audit.
+
+## The administration's overview and named audit pages, 31 October 2026
+
+Design pass. Two reads for the administration's pages, no change: counts for
+a first view (`AdminRequest::Overview`) and today's names beside a page of
+the audit log. Assets: what an administrator may read about accounts and
+gateways, which the existing reads already show row by row. Caller trust:
+only an administrator's live browser session, checked in the read's own
+transaction like every other read; the native listener refuses `Admin`
+before anything else. The record itself does not change: it keeps ids; the
+names are joined when it is read and never stored with it.
+
+Implementation pass:
+- `Overview` is one statement of counts (`FILTER` aggregates, one pass over
+  `accounts`, `account_roles`, `gateways` with their approvals, and the live
+  `gateway_tokens`); no row, name or id leaves it. The official gateway is
+  not counted among the registered ones. A read, so `changes()` says false
+  and no fresh password is asked.
+- `Audit` joins the actor's and the subject's accounts and the gateway in
+  the statement that reads the events, so names and events agree; the answer
+  lists each named account (id, display name, tag) and gateway (id, name,
+  origin) once, only those that still exist. Display names and tags are what
+  `Accounts` already shows; no username, credential or note is read.
+- The website parses both answers by their exact keys and bounds (a page's
+  names at most two accounts and one gateway per event), asks for the counts
+  only once the summary says administrator, and draws names as text in
+  `<bdi>`. Pages: `/admin` is the overview, the list of accounts moved to
+  `/admin/users`.
+- The owner's and the administrator's forms check a new gateway's or token's
+  name against Central's new rule (`shownName`, the mirror of
+  `central_api::gateway::shown_char`); names read back keep the older rule.
+
+Adversarial pass: the PostgreSQL fixture compares every count with the
+tables, refuses the overview without an administrator's session, checks
+that a page names exactly the accounts its events name, each once, and that
+the operator's event names only its subject; the client SDK's test reads the
+names of an administrator's change over the browser listener; the wire tests
+refuse an unknown field in the overview and in a named audit page. The
+website: page tests with stand-ins, and the e2e mock's answers in the exact
+shapes. Engineering review, not an audit.

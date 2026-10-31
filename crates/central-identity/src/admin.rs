@@ -35,9 +35,17 @@ impl IdentityService {
                 }
             }
             AdminRequest::Audit { account, before } => {
-                let (events, more) = self.store.admin_audit(cookie, account, before).await?;
-                AdminAnswer::Audit { events, more }
+                let page = self.store.admin_audit(cookie, account, before).await?;
+                AdminAnswer::Audit {
+                    events: page.events,
+                    more: page.more,
+                    accounts: page.accounts,
+                    gateways: page.gateways,
+                }
             }
+            AdminRequest::Overview => AdminAnswer::Overview {
+                overview: self.store.admin_overview(cookie).await?,
+            },
             AdminRequest::Gateways { state, before } => {
                 let (gateways, more) = self.store.admin_gateways(cookie, state, before).await?;
                 AdminAnswer::Gateways { gateways, more }

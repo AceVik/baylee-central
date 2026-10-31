@@ -12,7 +12,7 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
-import { AppFrame } from "../app/AppFrame";
+import { AppFrame, Panel } from "../app/AppFrame";
 import { T, localeOf, useLang, useTitle, type Elems, type Key } from "../i18n";
 import { Link, PATHS } from "../router";
 import "../styles/account.css";
@@ -197,11 +197,16 @@ export default function AccountPage() {
           <T id="account.notSignedIn" elems={LINKS} />
         </p>
       ) : (
-        <div className="account-card card reveal">
-          {/* first, once the terms are settled: choosing a name needs them accepted */}
+        <div className="account-grid">
+          {/* the terms first, when Central has new ones to accept (it draws nothing otherwise) */}
+          <TermsStep onDone={() => setSettled(true)} />
+          {/* then, once the terms are settled: choosing a name needs them accepted */}
           {settled && summary !== null && summary.displayName === null && summary.tag !== null && (
-            <ChooseName tag={summary.tag} onChosen={named} onStale={reread} />
+            <section className="card account-part account-wide reveal">
+              <ChooseName tag={summary.tag} onChosen={named} onStale={reread} />
+            </section>
           )}
+          <Panel title={<T id="account.partWho" />}>
           <p className="account-name">
             {shown === null ? (
               <T id="account.signedIn" />
@@ -225,12 +230,21 @@ export default function AccountPage() {
             </p>
           )}
           <p>
-            <T id="account.session" args={{ time: until }} />
-          </p>
-          <TermsStep onDone={() => setSettled(true)} />
-          <p>
             <T id="account.client" elems={LINKS} />
           </p>
+          </Panel>
+          <Panel title={<T id="account.partSession" />}>
+          <p>
+            <T id="account.session" args={{ time: until }} />
+          </p>
+          <button type="button" className="button button-ghost" onClick={leave}>
+            <T id="account.signOut" />
+          </button>
+          </Panel>
+          <section className="card account-part account-wide reveal">
+          <h2 className="app-panel-title">
+            <T id="account.partRecovery" />
+          </h2>
           {making?.at === "password" && summary !== null ? (
             <SignInAgain name={summary.username} onSignedIn={signedInAgain} onCancel={() => setMaking(null)} />
           ) : making?.at === "code" ? (
@@ -244,12 +258,10 @@ export default function AccountPage() {
               </p>
             )
           )}
-          <p className="small">
+          </section>
+          <p className="small account-wide account-later">
             <T id="account.later" elems={LINKS} />
           </p>
-          <button type="button" className="button button-ghost" onClick={leave}>
-            <T id="account.signOut" />
-          </button>
         </div>
       )}
     </AppFrame>

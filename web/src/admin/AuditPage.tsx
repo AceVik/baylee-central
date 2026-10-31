@@ -1,6 +1,8 @@
 // `/admin/audit`: what administrators and the operator did, newest first, 50
-// a page. An event names ids, never words (docs/administration.md); a tag's
-// change keeps both tags, which the page reads from the account's page.
+// a page. An event records ids, never words (docs/administration.md); the
+// read brings today's names of the accounts and gateways a page names, which
+// the table shows (the id's end where a name is gone); a tag's change keeps
+// both tags, which the page reads from the account's page.
 
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 
@@ -10,8 +12,8 @@ import { Failed, Panel, TableBox } from "../app/AppFrame";
 import { when } from "../app/format";
 import { T, t, useLang, useTitle, type Key } from "../i18n";
 import { Link, userPath } from "../router";
-import type { AdminApi, AuditEvent } from "./admin-api";
-import { AdminFrame, useAdminApi } from "./shared";
+import type { AdminApi, AuditEvent, AuditNames } from "./admin-api";
+import { AdminFrame, useAdminApi, who } from "./shared";
 
 /** The words for an audited action; an action this page does not know is shown as Central names it. */
 const ACTIONS: Readonly<Record<string, Key>> = {
@@ -26,7 +28,29 @@ const ACTIONS: Readonly<Record<string, Key>> = {
 
 const short = (id: Uint8Array) => idText(id).slice(-8);
 
-export function AuditTable({ events, rows }: { events: AuditEvent[]; rows?: RefObject<HTMLTableSectionElement | null> }) {
+/** An account as the log names it: its handle today, else the end of its id. */
+function Account({ id, names }: { id: Uint8Array; names: AuditNames | undefined }) {
+  const named = names?.accounts.get(idText(id));
+  const handle = named === undefined ? "—" : who({ displayName: named.displayName, tag: named.tag });
+  return (
+    <Link to={userPath(idText(id))} title={idText(id)}>
+      {handle === "—" ? <code>…{short(id)}</code> : <bdi translate="no">{handle}</bdi>}
+    </Link>
+  );
+}
+
+/** A gateway as the log names it: its name today (its address beside), else the end of its id. */
+function Gateway({ id, names }: { id: Uint8Array; names: AuditNames | undefined }) {
+  const named = names?.gateways.get(idText(id));
+  if (named === undefined) return <code title={idText(id)}>gw …{short(id)}</code>;
+  return (
+    <span title={named.origin}>
+      <bdi>{named.name}</bdi>
+    </span>
+  );
+}
+
+export function AuditTable({ events, names, rows }: { events: AuditEvent[]; names?: AuditNames; rows?: RefObject<HTMLTableSectionElement | null> }) {
   const lang = useLang();
   if (events.length === 0) return <p className="small"><T id="aud.none" /></p>;
   return (
@@ -47,10 +71,11 @@ export function AuditTable({ events, rows }: { events: AuditEvent[]; rows?: RefO
               <tr key={idText(e.id)}>
                 <td className="num">{when(lang, e.at)}</td>
                 <th scope="row" tabIndex={-1}>{word === undefined ? <code>{e.action}</code> : t(lang, word)}</th>
-                <td>{e.actor === null ? t(lang, "aud.operator") : <Link to={userPath(idText(e.actor))}><code>…{short(e.actor)}</code></Link>}</td>
+                <td>{e.actor === null ? t(lang, "aud.operator") : <Account id={e.actor} names={names} />}</td>
                 <td>
-                  {e.account !== null && <Link to={userPath(idText(e.account))}><code>…{short(e.account)}</code></Link>}
-                  {e.gateway !== null && <code>gw …{short(e.gateway)}</code>}
+                  {e.account !== null && <Account id={e.account} names={names} />}
+                  {e.account !== null && e.gateway !== null && " · "}
+                  {e.gateway !== null && <Gateway id={e.gateway} names={names} />}
                 </td>
               </tr>
             );
@@ -63,6 +88,7 @@ export function AuditTable({ events, rows }: { events: AuditEvent[]; rows?: RefO
 
 function Events({ api }: { api: AdminApi }) {
   const [events, setEvents] = useState<AuditEvent[] | null>(null);
+  const [names, setNames] = useState<AuditNames>({ accounts: new Map(), gateways: new Map() });
   const [more, setMore] = useState(false);
   const [adding, setAdding] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -78,6 +104,11 @@ function Events({ api }: { api: AdminApi }) {
             return [...kept, ...page.items];
           });
           setMore(page.more);
+          // the names of every page read so far
+          setNames((now) => ({
+            accounts: new Map([...now.accounts, ...page.names.accounts]),
+            gateways: new Map([...now.gateways, ...page.names.gateways]),
+          }));
           setAdding(false);
           // after "More", the keyboard goes on at the first new event
           if (before !== null) requestAnimationFrame(() => rows.current?.rows[first]?.querySelector<HTMLElement>("a, th")?.focus());
@@ -103,7 +134,7 @@ function Events({ api }: { api: AdminApi }) {
           />
         )}
         {events === null && !failed && <div className="skeleton app-skeleton" aria-hidden="true" />}
-        {events !== null && <AuditTable events={events} rows={rows} />}
+        {events !== null && <AuditTable events={events} names={names} rows={rows} />}
         {events !== null && more && !failed && (
           <p className="dir-more">
             <BusyButton
@@ -127,7 +158,7 @@ export default function AuditPage({ client }: { client?: AdminApi }) {
   useTitle("title.adminAudit");
   const api = useAdminApi(client);
   return (
-    <AdminFrame page="adminAudit" title={<T id="aud.pageTitle" />} lead={<T id="aud.lead" />}>
+    <AdminFrame page="adminAudit" api={api} title={<T id="aud.pageTitle" />} lead={<T id="aud.lead" />}>
       {() => <Events api={api} />}
     </AdminFrame>
   );

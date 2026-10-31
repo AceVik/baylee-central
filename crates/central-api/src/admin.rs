@@ -106,6 +106,10 @@ pub enum AdminRequest {
     /// or snapshots. Answered with [`AdminAnswer::LegacyAccounts`]; refused
     /// when this Central has no legacy store.
     LegacyAccounts,
+    /// The administration's first view: how many accounts and gateways
+    /// there are, by kind and state. Counts only, no row. Answered with
+    /// [`AdminAnswer::Overview`].
+    Overview,
 }
 
 impl AdminRequest {
@@ -125,7 +129,8 @@ impl AdminRequest {
             | Self::Audit { .. }
             | Self::Gateways { .. }
             | Self::Gateway { .. }
-            | Self::LegacyAccounts => false,
+            | Self::LegacyAccounts
+            | Self::Overview => false,
         }
     }
 }
@@ -252,6 +257,58 @@ pub struct AdminGateway {
     pub credential_pair: bool,
 }
 
+/// How many accounts and gateways there are, for the administration's first
+/// view. Accounts count once enrolled; gateways are the registered ones,
+/// the official gateway not among them.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AdminOverview {
+    /// Enrolled accounts.
+    pub accounts: u64,
+    /// Of them, created in the last seven days.
+    pub accounts_week: u64,
+    /// Of them, moved from the official gateway.
+    pub moved: u64,
+    /// Accounts holding the administrator role.
+    pub admins: u64,
+    /// Registered gateways awaiting approval.
+    pub pending: u64,
+    /// Registered gateways approved and enabled.
+    pub approved: u64,
+    /// Registered gateways disabled.
+    pub disabled: u64,
+    /// Registered gateways heard from in the last 90 seconds.
+    pub online: u64,
+    /// Gateway tokens neither revoked nor expired.
+    pub live_tokens: u64,
+}
+
+/// An account an audit page names, as it is called today: the record keeps
+/// ids only, the read adds the names (a renamed account shows its new name,
+/// a deleted one none).
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct NamedAccount {
+    /// The account's id.
+    pub id: [u8; 16],
+    /// Its display name, if it has one.
+    pub display_name: Option<String>,
+    /// Its tag, if it has one.
+    pub tag: Option<u32>,
+}
+
+/// A gateway an audit page names, as it is called today.
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct NamedGateway {
+    /// The gateway's id.
+    pub id: [u8; 16],
+    /// Its name.
+    pub name: String,
+    /// Its origin.
+    pub origin: String,
+}
+
 /// One audit event: who, what, and the ids it touched; never a word.
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -300,6 +357,11 @@ pub enum AdminAnswer {
         events: Vec<AuditEvent>,
         /// Another page follows.
         more: bool,
+        /// The accounts the page names (actors and subjects) that still
+        /// exist, each once.
+        accounts: Vec<NamedAccount>,
+        /// The gateways the page names that still exist, each once.
+        gateways: Vec<NamedGateway>,
     },
     /// A page of gateways.
     Gateways {
@@ -326,6 +388,11 @@ pub enum AdminAnswer {
     LegacyAccounts {
         /// Its deadline and its accounts.
         store: crate::legacy::LegacyStore,
+    },
+    /// The counts of the administration's first view.
+    Overview {
+        /// Accounts and gateways by kind and state.
+        overview: AdminOverview,
     },
 }
 
@@ -438,9 +505,16 @@ mod tests {
                 beta_key: None,
             }],
             more: false,
+            accounts: vec![NamedAccount {
+                id: [2; 16],
+                display_name: Some("Synthetic".into()),
+                tag: Some(0x3fa2),
+            }],
+            gateways: Vec::new(),
         };
         let text = String::from_utf8(crate::encode(&answer).unwrap()).unwrap();
         assert!(text.starts_with(r#"{"answer":"audit","events":[{"id":[1,"#));
+        assert!(text.contains(r#""accounts":[{"id":[2,"#));
         assert!(crate::decode::<AdminAnswer>(text.as_bytes()).is_ok());
         assert!(
             crate::decode::<AdminAnswer>(
@@ -449,5 +523,30 @@ mod tests {
             )
             .is_err()
         );
+        // the overview: counts only, every field named
+        let overview = AdminAnswer::Overview {
+            overview: AdminOverview {
+                accounts: 12,
+                accounts_week: 3,
+                moved: 4,
+                admins: 2,
+                pending: 1,
+                approved: 5,
+                disabled: 0,
+                online: 4,
+                live_tokens: 7,
+            },
+        };
+        let text = String::from_utf8(crate::encode(&overview).unwrap()).unwrap();
+        assert!(text.starts_with(r#"{"answer":"overview","overview":{"accounts":12,"#));
+        assert!(
+            crate::decode::<AdminAnswer>(
+                text.replace(r#""online":4"#, r#""online":4,"rows":[]"#)
+                    .as_bytes()
+            )
+            .is_err()
+        );
+        let request = crate::decode::<AdminRequest>(br#"{"action":"overview"}"#).unwrap();
+        assert!(matches!(request, AdminRequest::Overview) && !request.changes());
     }
 }

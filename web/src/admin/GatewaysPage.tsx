@@ -13,12 +13,20 @@ import { idText, type GatewayState, type TokenInfo } from "../account/owner-api"
 import { Failed, Panel } from "../app/AppFrame";
 import { Confirm } from "../app/Confirm";
 import { day, when } from "../app/format";
-import { T, t, useLang, useTitle, type Key } from "../i18n";
+import { T, num, t, useLang, useTitle, type Key } from "../i18n";
 import { Link, userPath } from "../router";
-import type { AdminApi, AdminGateway } from "./admin-api";
+import type { AdminApi, AdminGateway, Overview } from "./admin-api";
 import { AdminFrame, failureKey, useAdminApi, useChange, who } from "./shared";
+import { Address, CopyButton } from "../app/Copy";
 
 const FILTERS: readonly (GatewayState | null)[] = ["pending", "approved", "disabled", null];
+
+/** The filter the address names (`?state=approved`, from the overview), else the gateways awaiting approval. */
+function filterAt(): GatewayState | null {
+  const state = new URLSearchParams(window.location.search).get("state");
+  if (state === "all") return null;
+  return state === "approved" || state === "disabled" ? state : "pending";
+}
 const FILTER_WORD: Readonly<Record<string, Key>> = { pending: "gwo.pending", approved: "gwo.approved", disabled: "gwo.disabled", all: "agw.all" };
 
 type Asking = { at: "approve" | "disable"; g: AdminGateway } | { at: "revoke"; token: TokenInfo } | null;
@@ -36,7 +44,7 @@ function GatewayRow({ g, open, onOpen, api, onAsk }: { g: AdminGateway; open: bo
       <div className="agw-head">
         <div>
           <h3 id={name} className="agw-name" tabIndex={-1}><bdi>{g.metadata.name}</bdi></h3>
-          <code translate="no">{g.origin}</code>
+          <span className="copyable"><Address origin={g.origin} /><CopyButton text={g.origin} label={t(lang, "copy.address")} /></span>
         </div>
         <p className="gw-pills">
           {g.official && <span className="pill gold"><T id="gw.official" /></span>}{" "}
@@ -70,9 +78,9 @@ function GatewayRow({ g, open, onOpen, api, onAsk }: { g: AdminGateway; open: bo
   );
 }
 
-function Gateways({ api, summary, replace }: { api: AdminApi; summary: AccountSummary; replace(s: AccountSummary): void }) {
+function Gateways({ api, summary, replace, overview, recount }: { api: AdminApi; summary: AccountSummary; replace(s: AccountSummary): void; overview: Overview | null; recount(): void }) {
   const lang = useLang();
-  const [filter, setFilter] = useState<GatewayState | null>("pending");
+  const [filter, setFilter] = useState<GatewayState | null>(filterAt);
   const [items, setItems] = useState<AdminGateway[] | null>(null);
   const [more, setMore] = useState(false);
   const [open, setOpen] = useState<string | null>(null);
@@ -114,11 +122,16 @@ function Gateways({ api, summary, replace }: { api: AdminApi; summary: AccountSu
   const done = (key: Key) => () => {
     setSaid({ bad: false, key });
     read(null);
+    // the navigation's count and the filters' follow
+    recount();
   };
   const show = (f: GatewayState | null) => {
     if (f === filter) return;
     setFailed(false);
     setItems(null);
+    const url = new URL(window.location.href);
+    url.searchParams.set("state", f ?? "all");
+    window.history.replaceState(null, "", url);
     setFilter(f);
   };
   const act = () => {
@@ -140,6 +153,8 @@ function Gateways({ api, summary, replace }: { api: AdminApi; summary: AccountSu
         {FILTERS.map((f) => (
           <button key={f ?? "all"} type="button" className="chip-btn" aria-pressed={filter === f} onClick={() => show(f)}>
             {t(lang, FILTER_WORD[f ?? "all"] ?? "agw.all")}
+            {overview !== null && " "}
+            {overview !== null && <span className="chip-n">{num(lang, f === null ? overview.pending + overview.approved + overview.disabled : overview[f])}</span>}
           </button>
         ))}
       </fieldset>
@@ -191,10 +206,10 @@ export default function AdminGatewaysPage({ client }: { client?: AdminApi }) {
   useTitle("title.adminGateways");
   const api = useAdminApi(client);
   return (
-    <AdminFrame page="adminGateways" title={<T id="agw.title" />} lead={<T id="agw.lead" />}>
-      {({ summary, replace }) => (
+    <AdminFrame page="adminGateways" api={api} title={<T id="agw.title" />} lead={<T id="agw.lead" />}>
+      {({ summary, replace, overview, recount }) => (
         <Panel title={<T id="agw.listTitle" />}>
-          <Gateways api={api} summary={summary} replace={replace} />
+          <Gateways api={api} summary={summary} replace={replace} overview={overview} recount={recount} />
         </Panel>
       )}
     </AdminFrame>

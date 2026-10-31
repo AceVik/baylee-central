@@ -337,19 +337,65 @@ async fn reads(
         store.admin_account(cookie, [9; 16]).await.err(),
         Some(Error::Rejected)
     );
-    let (events, more) = store
+    let page = store
         .admin_audit(cookie, Some(first.account), None)
         .await
         .unwrap();
-    assert_eq!(events.len(), 1);
-    assert_eq!(events[0].actor, None, "the operator's appointment");
-    assert!(!more);
-    let (all, _) = store.admin_audit(cookie, None, None).await.unwrap();
-    let (after, _) = store
-        .admin_audit(cookie, None, Some(all[0].id))
+    assert_eq!(page.events.len(), 1);
+    assert_eq!(page.events[0].actor, None, "the operator's appointment");
+    assert!(!page.more);
+    // the operator acted, so the page names only its subject, as it is called today
+    assert_eq!(
+        page.accounts.iter().map(|a| a.id).collect::<Vec<_>>(),
+        [first.account]
+    );
+    assert!(page.gateways.is_empty());
+    let all = store.admin_audit(cookie, None, None).await.unwrap();
+    let after = store
+        .admin_audit(cookie, None, Some(all.events[0].id))
         .await
         .unwrap();
-    assert_eq!(after.len(), all.len() - 1);
+    assert_eq!(after.events.len(), all.events.len() - 1);
+    // every account an event names is named once, and nothing else
+    let mut named: Vec<_> = all
+        .events
+        .iter()
+        .flat_map(|e| [e.actor, e.account])
+        .flatten()
+        .collect();
+    named.sort_unstable();
+    named.dedup();
+    assert_eq!(all.accounts.iter().map(|a| a.id).collect::<Vec<_>>(), named);
+    overview(store, operator, cookie).await;
+}
+
+/// The first view's counts agree with the tables, and only an administrator reads them.
+async fn overview(store: &AccountStore, operator: &DatabaseConnection, cookie: &Token) {
+    let seen = store.admin_overview(cookie).await.unwrap();
+    let counted =
+        |sql: &'static str| async move { u64::try_from(count(operator, sql).await).unwrap() };
+    assert_eq!(
+        seen.accounts,
+        counted("SELECT count(*) FROM central_identity.accounts WHERE credential IS NOT NULL")
+            .await
+    );
+    assert_eq!(
+        seen.admins,
+        counted("SELECT count(*) FROM central_identity.account_roles WHERE role = 'admin'").await
+    );
+    assert_eq!(
+        seen.pending + seen.approved + seen.disabled,
+        counted("SELECT count(*) FROM central_identity.gateways WHERE NOT official").await
+    );
+    assert!(seen.accounts_week <= seen.accounts && seen.moved <= seen.accounts);
+    assert!(seen.admins >= 1, "the reader is one");
+    assert_eq!(
+        store
+            .admin_overview(&Token::generate().unwrap())
+            .await
+            .err(),
+        Some(Error::Rejected)
+    );
 }
 
 /// Two administrators removing each other at once leave one.

@@ -168,6 +168,21 @@ Each lives in one stylesheet named after it and one component under
   on.
 - **Facts** (`.kv`): label and value side by side, the labels one column as
   wide as the longest, no rule under each; one column on a phone.
+- **Copying** (`app/Copy.tsx`): a value someone pastes elsewhere (an
+  address, a sign-in name, an id) has a quiet round copy button beside it,
+  named in words; it shows a check for a moment and the live words say it,
+  also the second time. An address (`Address`) breaks after `//` and before
+  a dot, never inside a name, and is never cut with an ellipsis: its end (a
+  port) is often what tells two apart.
+- **Tiles** (`.stats`, the administration's first view): one count each, its
+  label as an eyebrow, a sentence, and a link to where the work is; a count
+  that asks for attention (gateways awaiting approval) in the state colour
+  and in words, nowhere a badge without them.
+- **Finding** (`data-find`): a page with a list long enough to search has one
+  search field, which Ctrl+K (Cmd+K on a Mac) reaches from anywhere on the
+  page (`aria-keyshortcuts`); Escape empties it. A search that asks Central
+  follows the field after a short pause, the newest answer winning, and
+  stands in the address (`?q=`).
 - **Panels and cards** (`.glass`, `.card`): 18 px radius, one soft border,
   `--shadow`. A card that is a link lifts under the pointer.
 - **Pills** (`.pill`): a state in words, coloured by the state token,
@@ -277,7 +292,7 @@ WCAG 2.1 AA, mobile first:
 | --- | --- | --- |
 | Public | `/`, `/download`, `/cards`, `/gateways`, `/contact`, legal pages | the bar, sections, the footer |
 | Account | `/account`, `/account/security`, `/account/gateways` | the app frame |
-| Administration | `/admin`, `/admin/users`, `/admin/users/<id>`, `/admin/gateways`, `/admin/audit`, `/admin/legacy` | the app frame, loaded only for an administrator |
+| Administration | `/admin` (the overview), `/admin/users`, `/admin/users/<id>`, `/admin/gateways`, `/admin/audit`, `/admin/legacy` | the app frame, loaded only for an administrator |
 | Sign-in | `/signin`, `/register` | a centred card beside Baylee's cloud |
 
 The account area and the administration are loaded lazily and only after a
