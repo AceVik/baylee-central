@@ -1,15 +1,17 @@
 # Baylee Central
 
-Public development repository for Baylee's central accounts, encrypted personal
-storage, gateway directory, scoped administration, website and training intake.
+Baylee's central accounts, encrypted personal storage, gateway directory,
+scoped administration, website and training intake. The live service runs at
+`https://central.baylee.app`; the website will be `https://baylee.app`.
 
-**Implementation started on 2026-10-19 with owner authorization.** A local-only
-HTTP service, reusable OPAQUE/encrypted-account SDK, policy libraries and
-PostgreSQL account persistence exist, including a synthetic legacy bridge test
-with the sibling Baylee repository.
-PostgreSQL 18+, server-generated UUIDv7 and SeaORM 2 migrations are selected.
-Native Linux, Windows and macOS are required. Deployed authentication, storage and
-production privacy guarantees are not implemented. See [status](docs/status.md)
+- Game, client and gateways: [AceVik/baylee](https://github.com/AceVik/baylee)
+- Community: [Discord](https://discord.gg/4pP3uAwgY)
+
+Implementation started on 2026-10-19 with the owner's authorization. The
+service, the account SDK (`central-client`), the policy libraries and the
+PostgreSQL persistence exist and are deployed (milestone M0 of the
+[roadmap](docs/roadmap-accounts-web.md)); registration, password reset and
+the website's account area are still to come. See [status](docs/status.md)
 and [development commands](docs/dev-mode.md).
 
 Priority: **security > QA > performance > clean code**. First-party unsafe Rust
@@ -29,8 +31,16 @@ and assembly are forbidden. See [AGENTS.md](AGENTS.md) for binding development r
 
 Initial operator: one official central deployment; federation is deferred.
 Repository visibility: public, authorized by the owner on 2026-10-19.
-Licensed under [AGPL-3.0-only](LICENSE), as selected by the owner.
-The official live service address is `https://central.baylee.app`;
-source publication does not indicate that this service has been deployed.
+
+**Licence.** The source is public so that anyone can read exactly how Baylee
+Central handles their data. It is *source-available*, not open source: under
+the [Baylee Central Source-Available License](LICENSE.md) you may read it,
+build and run it unmodified to check its claims or to test software against
+the official service, and propose changes; copying, changing, distributing or
+operating it needs the owner's written permission. `crates/central-api`,
+`crates/central-client` and `crates/central-crypto`, which the Baylee client
+links, stay under the [GNU AGPL v3.0 only](LICENSE-AGPL). Versions published
+before the licence change remain available under the AGPL.
+
 No Wizards assets, user data, replay corpus, production secrets or credentials
 belong in this repository. This is an unofficial, non-commercial project.

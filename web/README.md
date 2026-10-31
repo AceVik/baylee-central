@@ -343,6 +343,11 @@ As on the old site (Baylee's `web/site/README.md` §"The Impressum" and
 
 Tests encode made-up details (`test/fixtures/impressum.ts`), never real ones.
 
+Text and data mining is reserved (§ 44b(3) UrhG, `LICENSE.md` § 4) in
+machine-readable form: `public/.well-known/tdmrep.json` (W3C TDMRep),
+`<meta name="tdm-reservation">` in `index.html`, and `robots.txt` shutting out
+the crawlers that collect training data; search engines stay welcome.
+
 ## Serving it
 
 The build is static: `dist/` behind Caddy, with no access log (the privacy
