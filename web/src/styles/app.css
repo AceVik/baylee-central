@@ -20,7 +20,7 @@
 .app-nav-link:hover { background: var(--panel-2); color: var(--title); }
 .app-nav-link[aria-current="page"] { background: var(--panel-solid); color: var(--title); box-shadow: inset 3px 0 0 var(--gold); }
 .app-nav-icon { width: 1.15rem; height: 1.15rem; flex: none; color: var(--violet); }
-.app-main { min-width: 0; display: grid; gap: var(--space-5); }
+.app-main { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-5); }
 .app-head { text-align: start; }
 .app-head h1 { font-size: var(--text-xl); margin-bottom: 0.3em; }
 .app-lead { color: var(--ink-soft); max-width: var(--prose); margin: 0; }
@@ -83,7 +83,8 @@
 .app-dialog fieldset legend { font-weight: 700; margin-bottom: var(--space-1); }
 
 @media (max-width: 1100px) {
-  .app-inner { grid-template-columns: 1fr; gap: var(--space-4); }
+  /* minmax(0, …): a wide table scrolls in its own box instead of widening the page */
+  .app-inner { grid-template-columns: minmax(0, 1fr); gap: var(--space-4); }
   .app-nav { position: static; display: flex; flex-wrap: wrap; gap: var(--space-2); overflow-x: auto; }
   .app-nav-head { display: none; }
   .app-nav-list { display: flex; flex-wrap: wrap; gap: var(--space-2); }
