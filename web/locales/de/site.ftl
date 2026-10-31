@@ -18,6 +18,12 @@ nav-label = Bereiche
 nav-signIn = Anmelden
 nav-account = Dein Account, { $name }
 nav-accountUnnamed = Dein Account
+theme-system = Farben wie auf diesem Gerät. Zu hell wechseln
+theme-light = Helle Farben. Zu dunkel wechseln
+theme-dark = Dunkle Farben. Zurück zu denen des Geräts
+theme-systemShort = Farben wie auf diesem Gerät
+theme-lightShort = Helle Farben
+theme-darkShort = Dunkle Farben
 notFound-title = Diese Seite gibt es nicht
 notFound-back = Zurück zur Startseite
 

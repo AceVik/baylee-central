@@ -9,6 +9,7 @@ import { resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { LANG_LIST, OFFERED, pickLang, tagOf, type Lang } from "../src/i18n";
+import { THEME_KEY } from "../src/theme";
 import { languagesOnDisk } from "../vite.config";
 
 // (vitest runs in web/, and its jsdom gives modules no file: address)
@@ -24,6 +25,15 @@ function boot(search: string, stored: string | null, languages: readonly string[
   Object.defineProperty(window.navigator, "languages", { value: languages, configurable: true });
   new Function(BOOT)();
   return { code: root.getAttribute("data-lang"), lang: root.getAttribute("lang"), theme: root.getAttribute("data-theme"), js: root.hasAttribute("data-js") };
+}
+
+/** The scheme boot.js applies with `value` stored. */
+function withStored(value: string | null, search = "") {
+  if (value === null) window.localStorage.removeItem(THEME_KEY);
+  else window.localStorage.setItem(THEME_KEY, value);
+  const theme = boot(search, null, [], ["en"]).theme;
+  window.localStorage.removeItem(THEME_KEY);
+  return theme;
 }
 
 afterEach(() => {
@@ -59,6 +69,15 @@ describe("boot.js", () => {
   it("says that scripts run, and takes the forced colour scheme", () => {
     expect(boot("?theme=dark", null, [], ["en"])).toMatchObject({ js: true, theme: "dark", code: "en" });
     expect(boot("?theme=pink", null, [], ["en"]).theme).toBeNull();
+  });
+
+  it("takes the stored colour scheme, under ?theme=, and nothing else", () => {
+    expect(withStored("light")).toBe("light");
+    expect(withStored("dark")).toBe("dark");
+    expect(withStored("light", "?theme=dark")).toBe("dark");
+    expect(withStored("system")).toBeNull();
+    expect(withStored("pink")).toBeNull();
+    expect(withStored(null)).toBeNull();
   });
 
   it("takes English alone when the build named no language", () => {

@@ -20,6 +20,13 @@ nav-label = Sections
 nav-signIn = Sign in
 nav-account = Your account, { $name }
 nav-accountUnnamed = Your account
+# the colour switch: the scheme now, then what a click does
+theme-system = Colours as on this device. Switch to light
+theme-light = Light colours. Switch to dark
+theme-dark = Dark colours. Switch back to this device's
+theme-systemShort = Colours as on this device
+theme-lightShort = Light colours
+theme-darkShort = Dark colours
 notFound-title = There is no such page
 notFound-back = Back to the start page
 

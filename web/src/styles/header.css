@@ -17,7 +17,8 @@
 .top-inner {
   position: relative;
   max-width: var(--wrap); margin: 0 auto; padding: 0 var(--gutter); min-height: var(--top-h);
-  display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 0.9rem;
+  /* the sections stay centred while both sides fit; a wider side takes its room instead of overlapping */
+  display: grid; grid-template-columns: minmax(max-content, 1fr) auto minmax(max-content, 1fr); align-items: center; gap: 0.9rem;
 }
 .brand { display: inline-flex; align-items: center; gap: 0.45rem; justify-self: start; min-height: 54px; color: var(--title); text-decoration: none; font: 600 1.55rem var(--serif); }
 .brand img { width: 3.1rem; height: 3.1rem; object-fit: contain; border-radius: 0.45rem; }
@@ -36,7 +37,8 @@
 .nav a:hover { color: var(--link-hover); }
 .nav a:hover::after, .nav a[aria-current="page"]::after { transform: scaleX(1); }
 .nav a[aria-current="page"] { color: var(--title); }
-.lang { display: inline-flex; justify-self: end; border: 1px solid var(--edge); border-radius: 999px; overflow: hidden; font-family: var(--sans); font-size: 0.88rem; background: rgba(8, 14, 28, 0.25); }
+.top-tools { display: flex; align-items: center; gap: var(--space-2); justify-self: end; }
+.lang { display: inline-flex; border: 1px solid var(--edge); border-radius: 999px; overflow: hidden; font-family: var(--sans); font-size: 0.88rem; background: rgba(8, 14, 28, 0.25); }
 .lang-btn { appearance: none; border: 0; background: transparent; color: var(--ink-soft); cursor: pointer; font: inherit; font-weight: 500; padding: 0 0.85em; min-height: 44px; min-width: 44px; transition: background-color var(--fast) ease, color var(--fast) ease; }
 .top.over-hero:not(.solid) .lang-btn:not([aria-pressed="true"]) { color: var(--bar-ink); }
 .lang-btn + .lang-btn { border-left: 1px solid var(--edge); }
@@ -49,7 +51,18 @@
   color: var(--ink); cursor: pointer; align-items: center; justify-content: center;
   transition: background-color var(--fast) ease, transform var(--fast) var(--ease);
 }
-.top.over-hero:not(.solid) .menu-btn { color: var(--bar-ink); }
+.top.over-hero:not(.solid) .menu-btn, .top.over-hero:not(.solid) .theme-btn { color: var(--bar-ink); }
+/* the colour switch: a round button like the menu's, in the bar or, on narrow screens, in the menu */
+.theme-btn {
+  appearance: none; flex: none; display: inline-grid; place-items: center;
+  width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--edge); background: rgba(8, 14, 28, 0.3);
+  color: var(--ink); cursor: pointer;
+  transition: background-color var(--fast) ease, color var(--fast) ease, transform var(--fast) var(--ease);
+}
+.theme-btn:hover { background: var(--panel-2); color: var(--title); }
+.theme-btn:active { transform: scale(0.94); }
+.theme-icon { width: 1.25rem; height: 1.25rem; }
+.theme-in-menu { display: none; }
 .menu-btn:active { transform: scale(0.94); }
 .menu-btn .bars, .menu-btn .bars::before, .menu-btn .bars::after { display: block; width: 18px; height: 2px; border-radius: 2px; background: currentColor; transition: transform 220ms var(--ease), opacity 160ms ease; }
 .menu-btn .bars { position: relative; }
@@ -62,24 +75,33 @@
 /* The light bar keeps its navigation readable above the sunlit world. */
 :root[data-theme="light"] .top.over-hero:not(.solid) .nav a,
 :root[data-theme="light"] .top.over-hero:not(.solid) .menu-btn,
+:root[data-theme="light"] .top.over-hero:not(.solid) .theme-btn,
 :root[data-theme="light"] .top.over-hero:not(.solid) .lang-btn:not([aria-pressed="true"]) { color: var(--ink); text-shadow: none; }
-:root[data-theme="light"] .lang, :root[data-theme="light"] .menu-btn { background: rgba(255, 255, 255, 0.6); }
+:root[data-theme="light"] .lang, :root[data-theme="light"] .menu-btn, :root[data-theme="light"] .theme-btn { background: rgba(255, 255, 255, 0.6); }
 @media (prefers-color-scheme: light) {
   :root:not([data-theme="dark"]) .top.over-hero:not(.solid) .nav a,
   :root:not([data-theme="dark"]) .top.over-hero:not(.solid) .menu-btn,
+  :root:not([data-theme="dark"]) .top.over-hero:not(.solid) .theme-btn,
   :root:not([data-theme="dark"]) .top.over-hero:not(.solid) .lang-btn:not([aria-pressed="true"]) { color: var(--ink); text-shadow: none; }
-  :root:not([data-theme="dark"]) .lang, :root:not([data-theme="dark"]) .menu-btn { background: rgba(255, 255, 255, 0.6); }
+  :root:not([data-theme="dark"]) .lang, :root:not([data-theme="dark"]) .menu-btn, :root:not([data-theme="dark"]) .theme-btn { background: rgba(255, 255, 255, 0.6); }
 }
 
 @media (max-width: 860px) {
   .top-inner { grid-template-columns: auto 1fr auto; }
   .menu-btn { display: inline-flex; grid-column: 3; grid-row: 1; }
-  .lang { grid-column: 2; justify-self: end; }
+  .top-tools { grid-column: 2; }
+  .theme-in-bar { display: none; }
+  .theme-in-menu {
+    display: inline-flex; gap: var(--space-3); width: auto; padding: 0 var(--space-4) 0 var(--space-3);
+    margin: var(--space-2) 0 0 0.6em; border-radius: var(--pill); justify-self: start; align-self: flex-start;
+    font: 500 1rem var(--sans); color: var(--ink);
+  }
   .nav {
     position: absolute; top: 100%; left: 0; right: 0; flex-direction: column; gap: 0;
     padding: 0.5rem var(--gutter) 1rem; background: var(--top-bg);
     backdrop-filter: blur(14px) saturate(1.15); -webkit-backdrop-filter: blur(14px) saturate(1.15);
     border-bottom: 1px solid var(--edge-soft); box-shadow: 0 20px 40px -24px rgba(0, 0, 0, 0.6);
+    max-height: calc(100dvh - var(--top-h)); overflow-y: auto; overscroll-behavior: contain;
     visibility: hidden; opacity: 0; transform: translateY(-6px);
     transition: opacity 180ms ease, transform 180ms var(--ease), visibility 0s linear 180ms;
   }
@@ -90,6 +112,8 @@
 }
 @media (max-width: 380px) {
   .lang-btn { padding: 0 0.6em; font-size: 0.82rem; }
+  /* the picture alone names the brand (its link keeps aria-label="Baylee") */
+  .brand span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 }
 .nav-discord { font-weight: 600; }
 
