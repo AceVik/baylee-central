@@ -1,6 +1,7 @@
 # Bug and crash reports in Central (design, pass 1)
 
-**Status: design, decided; pass 2 below awaits the owner's go (31.10.2026).**
+**Status: Central's part built (31.10.2026, owner's go the same day); the
+website's section and the switch follow (§"Order").**
 Owner decisions, 2026-10-20: reports go to
 Central; clients report through their gateway, which forwards; a client signed
 in nowhere reports directly; Central absorbs Baylee's feedback service. Later
@@ -297,4 +298,42 @@ unread ones.
 - **Order of deploys:** Central with this migration before any gateway
   that forwards to it; the import of open reports after the switch.
 - **Dependencies:** none new.
+
+## Pass 3: as built (31.10.2026)
+
+What the building decided beyond pass 2:
+
+- **A part's upload is authenticated before it is read.** The handler
+  checks the credential, the report and the announcement first (a report
+  of this gateway, filed within the hour, the part announced and not stored
+  yet), then the declared length must equal the announced one, then it
+  takes one of two slots and reads exactly that many bytes. A stranger's
+  slow body holds no slot and is never read; the boundary only refuses a
+  missing or oversized `Content-Length`.
+- **Triage asks for no fresh password; a purge does.** Triage is daily
+  work, reversible and in the report's history; only the purge cannot be
+  undone (`AdminRequest::fresh`).
+- **A duplicate needs its original.** When a report goes (a purge, the
+  sweep), its duplicates that stay are opened again as `triaged`, with a
+  line in their history, before it is deleted; the schema holds that a
+  duplicate names its original and that `done_at` goes with the done
+  statuses.
+- **The record's and the client's bytes are a table of their own**
+  (`report_parts`), written once and never updated; the announced lengths
+  and hashes are columns of the report, so a list reads none of the bytes.
+- **The operator's daily sweep** takes reports too (`Swept::reports`), so the
+  retention holds when nobody reads a list.
+
+Tests: the API's bounds, crash signatures, the change's leave-or-clear and
+the filter's types; the HTTP boundary (an upload's declared length, its
+handler reading the body) and the browser listener's part route (the
+site's proofs, the cookie, the bytes as stored, its own budget); and the
+PostgreSQL fixture (`tests/support/accounts/reports.rs`): a pending
+gateway files nothing, direct only through the bridge, a part's wrong
+length, hash or magic refused and a second one `Conflict`, administrators
+only, the filters and facets, the revision, assignees who are
+administrators, one duplicate level and the hand-on, notes by their
+author, a selection, the trash and a purge with a fresh password, the
+released duplicate, views, the unread marker per administrator, the sweep
+keeping the history, and the grants both ways.
 

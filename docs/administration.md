@@ -133,6 +133,20 @@ The runtime gains `INSERT` and `UPDATE (enabled)` on `gateway_approvals`
 `gateway_tokens`; the startup check names updatable columns as a list now and
 refuses any other column.
 
+## Reports (31.10.2026)
+
+An administrator triages bug and crash reports with `Admin` requests on the
+browser listener ([reports](reports.md) §"Triage"): `Reports`,
+`ReportFacets`, `Report`, `ReportNeighbours`, `CrashGroups`, `ReportStats`,
+`ReportAdmins` and `ReportViews` read; `SetReport`, `ReportsBulk`,
+`TrashReport`, `RestoreReport`, `PurgeReport`, `AddReportNote`,
+`RemoveReportNote`, `SaveReportView`, `DeleteReportView` and
+`SetReportsSeen` change. Triage is the administrators' daily work: it
+writes the report's own history (`report_audit`: who, what, the change in
+short, never the report's words), not `audit_events`, and asks for no fresh
+password; a purge, which cannot be undone, does (`AdminRequest::fresh`).
+An assignee is an administrator's account.
+
 ## Schema: migration `m20261028_000012_administration`
 
 `account_roles (account_id → accounts ON DELETE CASCADE, role CHECK IN
