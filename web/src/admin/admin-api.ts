@@ -66,6 +66,33 @@ export interface AdminGateway {
   credentialPair: boolean;
 }
 
+/** How far a legacy account's move got (central-api `LegacyProgress`). */
+export type LegacyProgress = "unstarted" | "reserved" | "enrolled" | "restored";
+
+/** One account left in the legacy store: names, times and counters, never a hash or a snapshot. */
+export interface LegacyAccount {
+  legacyId: string;
+  username: string;
+  displayName: string | null;
+  tag: number | null;
+  progress: LegacyProgress;
+  importedAt: number;
+  failures: number;
+  lockedUntil: number | null;
+  mustChangePassword: boolean;
+  banned: boolean;
+  snapshotBytes: number;
+}
+
+/** What is left of the legacy store, and its deadline. */
+export interface LegacyStore {
+  deadline: number | null;
+  accounts: LegacyAccount[];
+}
+
+/** central-postgres's `MAX_LEGACY_ROWS`: no import holds more. */
+export const MAX_LEGACY_ROWS = 1000;
+
 export interface Page<T> {
   items: T[];
   more: boolean;
@@ -128,6 +155,46 @@ function account(v: unknown): AdminAccount {
     lastSignInAt: optionalTime(o["last_sign_in_at"]),
     admin: bool(o["admin"]),
     resetUntil: optionalTime(o["reset_until"]),
+  };
+}
+
+const PROGRESS: readonly LegacyProgress[] = ["unstarted", "reserved", "enrolled", "restored"];
+
+function legacyAccount(v: unknown): LegacyAccount {
+  const o = exact(v, [
+    "legacy_id",
+    "username",
+    "display_name",
+    "tag",
+    "progress",
+    "imported_at",
+    "failures",
+    "locked_until",
+    "must_change_password",
+    "banned",
+    "snapshot_bytes",
+  ]);
+  const legacyId = o["legacy_id"];
+  if (typeof legacyId !== "string" || !/^[A-Za-z0-9-]{1,64}$/.test(legacyId)) throw malformed();
+  const username = o["username"];
+  if (typeof username !== "string" || !/^[a-z0-9][a-z0-9_.-]{1,22}[a-z0-9]$/.test(username)) throw malformed();
+  // a name from the gateway, which kept its own rule: bounded, not re-judged
+  const displayName = o["display_name"];
+  if (displayName !== null && (typeof displayName !== "string" || displayName.length === 0 || displayName.length > 64)) throw malformed();
+  const progress = PROGRESS.find((p) => p === o["progress"]);
+  if (progress === undefined) throw malformed();
+  return {
+    legacyId,
+    username,
+    displayName,
+    tag: o["tag"] === null ? null : safeInteger(o["tag"], 1),
+    progress,
+    importedAt: safeInteger(o["imported_at"], 1),
+    failures: safeInteger(o["failures"], 0),
+    lockedUntil: optionalTime(o["locked_until"]),
+    mustChangePassword: bool(o["must_change_password"]),
+    banned: bool(o["banned"]),
+    snapshotBytes: safeInteger(o["snapshot_bytes"], 0),
   };
 }
 
@@ -230,6 +297,10 @@ export const parseAdmin = {
     const o = admin(raw, "gateway", ["gateway", "tokens"]);
     return { gateway: adminGateway(o["gateway"]), tokens: list(o["tokens"], 20, tokenInfo) };
   },
+  legacyAccounts(raw: unknown): LegacyStore {
+    const store = exact(admin(raw, "legacy_accounts", ["store"])["store"], ["deadline", "accounts"]);
+    return { deadline: optionalTime(store["deadline"]), accounts: list(store["accounts"], MAX_LEGACY_ROWS, legacyAccount) };
+  },
   resetCode(raw: unknown): { code: string; expiresAt: number } {
     const o = admin(raw, "reset_code", ["code", "expires_at"]);
     const code = o["code"];
@@ -252,6 +323,7 @@ export interface AdminApi {
   setTag(id: Uint8Array, tag: number): Promise<void>;
   setGatewayApproval(id: Uint8Array, enabled: boolean): Promise<void>;
   revokeGatewayToken(id: Uint8Array): Promise<void>;
+  legacyAccounts(): Promise<LegacyStore>;
 }
 
 const arr = (b: Uint8Array | null) => (b === null ? null : Array.from(b));
@@ -270,5 +342,6 @@ export function adminApi(endpoint: Endpoint = {}): AdminApi {
     setTag: (a, t) => post(request({ action: "set_tag", account: arr(a), tag: t }), parseAdmin.done),
     setGatewayApproval: (g, enabled) => post(request({ action: "set_gateway_approval", gateway: arr(g), enabled }), parseAdmin.done),
     revokeGatewayToken: (t) => post(request({ action: "revoke_gateway_token", token: arr(t) }), parseAdmin.done),
+    legacyAccounts: () => post(request({ action: "legacy_accounts" }), parseAdmin.legacyAccounts),
   };
 }

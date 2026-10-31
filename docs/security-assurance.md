@@ -1706,7 +1706,6 @@ single-label refusals beside the earlier ones, and for the empty actions
 panel (an injected always-shown panel fails the test). The smoke test and
 the real-Central run check that the default build has no "Open in Baylee"
 link. Engineering review, not an audit.
-||||||| parent of a6c349d (The official gateway moves to gateway.baylee.app; a gateway token signs players in without approval)
 
 ## The official gateway's move, and approval for the directory only, 30 October 2026
 
@@ -1763,3 +1762,65 @@ Adversarial pass (PostgreSQL fixture):
 No migration, no grant change, no dependency change. Engineering review, not
 an audit.
 
+## The legacy store's sign-in, 30 October 2026
+
+Owner's decision of 30.10.2026: Central takes the official gateway's old
+accounts' sign-in and move over, and the gateway loses its password routes
+([native login](native-login.md#legacy-login)). This is the one place Central
+verifies a password itself.
+
+Design pass: assets are the six remaining Argon2id verifiers, their source
+snapshots and the accounts' names. The store is its own schema with its own
+login role; the runtime role is closed out of it and it out of everything
+else, both checked at startup. Only the gateway's parameters exist (m=19456,
+t=2, p=1, 32-byte output, 16-byte salt), kept as fixed-length bytes, so Central
+parses no PHC string and a row chooses nothing. Every refusal before the proof
+(unknown, locked-out, closed, registered name, wrong password) is one
+`Rejected` after one derivation and one failure statement; a forced change or
+ban is refused after the proof. The bridge's legacy operations are refused
+once the store exists, and the bridge's admission of an open move is refused
+at all times, so a `legacy_id` handed to the official gateway means a closed
+move. Rows are deleted at the close or after the deadline, never marked; the
+import reserves each name at Central so nobody registers it meanwhile.
+
+Implementation pass: `LegacyPassword` is the only password wire type, without
+`Debug`, wiped on drop, native listener only, and its sign-in is not retried by
+the client's transport on `Busy`. The derivation runs on the worker semaphore
+over a caller-owned buffer wiped on success, error and unwind; argon2's own
+H0 and final blocks are wiped by argon2 itself, its `zeroize` feature on for
+the OPAQUE stretch too. The comparison is
+`subtle`'s. Limits: the global request budget, 30 legacy sign-ins a minute in
+all and five per name, ten failures lock an account for an hour. The import
+runs under the migrator in one transaction, refuses the whole batch for any
+bad row, a taken name, a closed move, a non-empty store or a count or digest
+mismatch, and recomputes count and digest from the stored rows; the snapshot's
+SHA-256 is a constraint. The grant block is conditional on the role existing,
+so a deployment without it fails only the legacy store's own role check.
+
+Adversarial pass (PostgreSQL fixture, `tests/support/accounts/legacy_store.rs`;
+real HTTP, `central-client/tests/support/legacy.rs`): each wider privilege of
+either role and a missing one refuse startup, and the statements fail under
+the real roles; each malformed field, a duplicate, a count and a digest
+mismatch, a taken name and a closed move refuse the import and store nothing;
+the lockout's tenth failure, a locked account read as unknown, the hour
+passing; the deadline (malformed dates refused, rows hidden at once, the sweep
+deleting rows and unenrolled reservations); the sweep of a closed move whose
+deletion was lost. Over HTTP: the good path from discovery to the closed move
+and the official gateway's admission with the legacy id; a wrong password; a
+replayed enrollment ticket; a second legacy sign-in after enrollment
+(`Conflict`); the close before restore and before the terms; a wrong digest;
+the close repeated; export and sign-in after the close; the bridge's own legacy
+operations refused; the bridge's admission of an open move refused and then
+granted after the close; the per-name budget (`Busy`, even for the right
+password); a locked-out account refusing its right password; a ban and a
+forced change refusing theirs; a Central-only account and an unknown name on
+the legacy path, and a registered account's session refused export and close;
+an empty password refused before lookup; the administrator's listing refused
+to a non-administrator. The gateway's own hash is reproduced bit for bit
+(`central-crypto` test vector, also checked with OpenSSL's Argon2id). An
+independent agent reviewed the `central-crypto` change for the bigint scope
+([bigint advisory](crypto-proposal/bigint-advisory.md)). Known limits: timing
+differs between a proof and a refusal by the success path's statements; the
+lockout lets anyone who knows a legacy username lock it for an hour at a time;
+the store's verifiers, like the gateway's database before, can be attacked
+offline from a copy. Engineering review, not an audit.

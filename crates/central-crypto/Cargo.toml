@@ -5,7 +5,7 @@ edition.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 license.workspace = true
-description = "Experimental native-client OPAQUE and master-key wrapping; not a deployed protocol"
+description = "Experimental native-client OPAQUE and master-key wrapping, and the legacy store's Argon2id check; not a deployed protocol"
 
 [features]
 default = []
@@ -16,6 +16,10 @@ workspace = true
 
 [dependencies]
 opaque-ke = { version = "=4.0.1", default-features = false, features = ["ristretto255", "argon2"] }
+# The argon2 opaque-ke uses, named here only for its `zeroize` feature: it
+# wipes argon2's own H0 and final blocks, for the OPAQUE stretch and the
+# legacy store's check alike.
+argon2 = { version = "=0.5.3", default-features = false, features = ["zeroize"] }
 sha2 = { version = "=0.10.9", default-features = false }
 rand = { version = "=0.8.8", default-features = false, features = ["getrandom"] }
 chacha20poly1305 = { version = "=0.11.0", default-features = false, features = ["alloc", "zeroize"] }
