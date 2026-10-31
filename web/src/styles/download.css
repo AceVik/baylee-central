@@ -6,6 +6,8 @@
 .sep { margin: 0 0.45em; color: var(--ink-faint); }
 .dl-sub { font-family: var(--sans); font-size: 0.92rem; color: var(--ink-soft); margin: 0; text-shadow: var(--hero-shadow); }
 .dl-sub a { display: inline-block; padding: 0.35em 0.1em; }
+/* the line a release's links will take, held while GitHub answers */
+.dl-held { visibility: hidden; padding: 0.35em 0; }
 .hero .dl-sub a { color: var(--link-hover); }
 .dl-arch { font-family: var(--sans); font-size: 0.9rem; color: var(--ink-soft); margin: 0; max-width: 36em; text-shadow: var(--hero-shadow); }
 .page-dl { display: flex; justify-content: center; margin-top: 1.5rem; }

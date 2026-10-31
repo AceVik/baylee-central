@@ -29,7 +29,7 @@
 
 /* ---------------------------------------------------------------- the recovery code */
 .recovery { padding: clamp(1.2rem, 3vw, 1.8rem); margin: 0 0 1rem; }
-.recovery h2 { margin-top: 0; outline: none; }
+.recovery h2 { margin-top: 0; }
 .recovery-handle { display: block; font-family: var(--sans); overflow-wrap: anywhere; }
 .recovery-code { margin: 1.2rem 0; text-align: center; }
 .recovery-code code {
@@ -40,7 +40,6 @@
 }
 
 /* ---------------------------------------------------------------- the terms */
-.accept h2 { outline: none; }
 .accept-text { padding: 0 1rem; margin: 0 0 1.2rem; border-left: 3px solid var(--edge); }
 
 @media (prefers-reduced-motion: reduce) {

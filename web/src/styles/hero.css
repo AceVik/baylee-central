@@ -6,6 +6,9 @@
 .sky > .sky-light { background: radial-gradient(ellipse at 92% 8%, #ffefb975, transparent 60%); mix-blend-mode: screen; animation: sunlight 24s ease-in-out infinite alternate; }
 .sky > .sky-mist { inset: 65% -15% -10%; background: radial-gradient(ellipse at 70% 50%, #fff8e555, transparent 65%); animation: sunlight 32s ease-in-out infinite alternate-reverse; }
 .sky > .sky-veil { background: linear-gradient(90deg, var(--scene-veil) 0%, var(--scene-veil) 25%, transparent 78%), linear-gradient(0deg, var(--bg), transparent 25%); }
+/* still while the hero is off screen or a dialog covers the page */
+.hero[data-away] .sky > *, .hero[data-away] .baylee-cloud > img,
+body:has(dialog[open]) .sky > *, body:has(dialog[open]) .baylee-cloud > img { animation-play-state: paused; }
 @keyframes sunlight { from { opacity: 0.45; transform: translate3d(0, 0, 0); } to { opacity: 0.85; transform: translate3d(-2%, 1%, 0); } }
 .hero-inner { width: 100%; max-width: 82rem; margin: 0 auto; padding: calc(var(--top-h) + 3rem) max(var(--gutter), 3vw) 6rem; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); column-gap: 2vw; align-items: start; }
 .hero-heading, .hero-details { position: relative; z-index: 1; max-width: 34rem; grid-column: 1; }

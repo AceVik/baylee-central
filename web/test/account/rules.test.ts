@@ -3,7 +3,7 @@
 import { describe, expect, it } from "vitest";
 
 import { canonicalName, handle, reservedDisplayName, tagText, validDisplayName, validName, validTag } from "../../src/account/names";
-import { acceptable, strength } from "../../src/account/strength";
+import { acceptable, guessable, strength } from "../../src/account/strength";
 
 describe("the username rule", () => {
   it("is Central's: 3 to 24 of a–z, 0–9, . _ -, alphanumeric at both ends, no two separators in a row", () => {
@@ -68,6 +68,13 @@ describe("the strength hint", () => {
     expect(strength("synthetic_name42", "synthetic_name")).not.toBe("strong");
     expect(strength("k7#Qm2!x")).toBe("fair");
     expect(strength("violet lantern harbour quietly")).toBe("strong");
+  });
+
+  it("refuses what guessers try first, and nothing for how it is made up", () => {
+    const bad = ["aaaaaaaaaa", "abababab", "12345678", "87654321", "abcdefghij", "Password1!", "passwort2026", "123456!!", "Qwertz", "synthetic_name", "synthetic_name42"];
+    const good = ["violet lantern harbour quietly", "k7#Qm2!x", "my password is long enough", "Passwörter sind schön", "🂡🃁🂱🃑🂫🃋🂻🃛"];
+    expect(bad.filter((p) => !guessable(p, "synthetic_name"))).toEqual([]);
+    expect(good.filter((p) => guessable(p, "synthetic_name"))).toEqual([]);
   });
 
   it("allows 8 characters up to 1024 bytes, counting characters, not code units", () => {

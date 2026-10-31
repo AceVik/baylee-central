@@ -20,6 +20,13 @@ nav-label = Sections
 nav-signIn = Sign in
 nav-account = Your account, { $name }
 nav-accountUnnamed = Your account
+# the colour switch: the scheme now, then what a click does
+theme-system = Colours as on this device. Switch to light
+theme-light = Light colours. Switch to dark
+theme-dark = Dark colours. Switch back to this device's
+theme-systemShort = Colours as on this device
+theme-lightShort = Light colours
+theme-darkShort = Dark colours
 notFound-title = There is no such page
 notFound-back = Back to the start page
 
@@ -528,6 +535,8 @@ privacy-automated = There is no automated decision-making within the meaning of 
 acct-eyebrow = Baylee Central
 acct-username = Username
 acct-password = Password
+pw-show = Show password
+pw-caps = Caps Lock is on
 acct-errBusy = Too many attempts from here. Please wait a while and try again.
 acct-errUnreachable = Baylee Central did not answer. Please try again in a moment.
 acct-errCrypto = This browser could not run the account's encryption: it needs WebAssembly and Web Workers. Please try a current browser.
@@ -559,6 +568,7 @@ register-errUsername = That username does not follow the rules above.
 register-errDisplayName = That display name does not follow the rules above.
 register-errDisplayNameReserved = That display name is kept for Baylee itself. Please choose another.
 register-errPassword = The password needs at least 8 characters (and at most { $max } bytes).
+register-errGuessable = This password is one that guessers try first. Please choose another, for example a few words of your own.
 register-errMismatch = The two passwords differ.
 register-errAge = Please confirm that you are at least 16 years old.
 register-errConsent = Please accept the terms of use.
@@ -880,6 +890,11 @@ adm-search = Search
 adm-searchHint = Name, or #3fa2
 adm-errSearch = Baylee Central could not search. A search is 1 to 64 plain characters, or # and a tag.
 adm-noAccounts = No account matches.
+adm-shown =
+    { $n ->
+        [one] One account shown
+       *[other] { $n } accounts shown
+    }
 adm-handle = Name
 adm-username = Sign-in name
 adm-source = Came from

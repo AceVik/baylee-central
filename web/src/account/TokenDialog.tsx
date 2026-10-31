@@ -11,6 +11,7 @@ import { fresh } from "../app/useSummary";
 import { Modal } from "../components/Modal";
 import { T, t, useLang, type Key } from "../i18n";
 import { ApiError, type AccountSummary } from "./api";
+import { BusyButton } from "./Busy";
 import { validTokenName, type CreatedToken, type MyGateway, type OwnerApi, type Scopes } from "./owner-api";
 
 const LIFETIMES = [30, 90, 180, 365] as const;
@@ -39,6 +40,7 @@ export function TokenDialog({
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<Key | null>(null);
   const field = useRef<HTMLInputElement>(null);
+  const scopeBox = useRef<HTMLFieldSetElement>(null);
   useEffect(() => field.current?.focus(), []);
 
   const create = (now: AccountSummary) => {
@@ -69,6 +71,7 @@ export function TokenDialog({
     }
     if (!scopes.sso && !scopes.listing) {
       setStatus("tok.errScope");
+      scopeBox.current?.querySelector("input")?.focus();
       return;
     }
     if (fresh(summary)) create(summary);
@@ -91,7 +94,8 @@ export function TokenDialog({
 
   if (step.at === "token") {
     return (
-      <Modal className="app-dialog app-dialog-wide" labelledBy={heading} onClose={() => {}}>
+      // its own dialog (the key), so the screen reader hears the new title and focus starts inside it
+      <Modal key="token" className="app-dialog app-dialog-wide" labelledBy={heading} onClose={() => {}}>
         <h2 id={heading} className="app-dialog-title">
           <T id="tok.madeTitle" />
         </h2>
@@ -120,7 +124,7 @@ export function TokenDialog({
   }
 
   return (
-    <Modal className="app-dialog" labelledBy={heading} onClose={() => onClose(false)}>
+    <Modal key="form" className="app-dialog" labelledBy={heading} onClose={() => onClose(false)}>
       <form noValidate onSubmit={submit} aria-busy={busy}>
         <h2 id={heading} className="app-dialog-title">
           <T id="tok.title" args={{ gateway: gateway.metadata.name }} />
@@ -129,12 +133,24 @@ export function TokenDialog({
           <label htmlFor={`${heading}-name`}>
             <T id="tok.name" />
           </label>
-          <input ref={field} id={`${heading}-name`} maxLength={64} value={name} onChange={(e) => setName(e.target.value)} autoComplete="off" />
-          <p className="field-hint">
+          <input
+            ref={field}
+            id={`${heading}-name`}
+            maxLength={64}
+            value={name}
+            onChange={(e) => {
+              setName(e.target.value);
+              if (status === "tok.errName") setStatus(null);
+            }}
+            autoComplete="off"
+            aria-invalid={status === "tok.errName" ? true : undefined}
+            aria-describedby={status === "tok.errName" ? `${heading}-hint ${heading}-status` : `${heading}-hint`}
+          />
+          <p id={`${heading}-hint`} className="field-hint">
             <T id="tok.nameHint" />
           </p>
         </div>
-        <fieldset className="field">
+        <fieldset ref={scopeBox} className="field" aria-describedby={status === "tok.errScope" ? `${heading}-status` : undefined}>
           <legend>
             <T id="tok.scopes" />
           </legend>
@@ -163,14 +179,16 @@ export function TokenDialog({
             ))}
           </select>
         </div>
-        <output className="form-status bad">{status === null ? "" : t(lang, status)}</output>
+        <output id={`${heading}-status`} className="form-status bad">
+          {status === null ? "" : t(lang, status)}
+        </output>
         <div className="app-dialog-actions">
           <button type="button" className="button button-ghost" onClick={() => onClose(false)}>
             <T id="app.cancel" />
           </button>
-          <button type="submit" className="button" disabled={busy}>
+          <BusyButton busy={busy} type="submit">
             <T id="tok.create" />
-          </button>
+          </BusyButton>
         </div>
       </form>
     </Modal>

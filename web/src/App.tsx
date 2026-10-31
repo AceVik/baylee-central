@@ -13,25 +13,55 @@ import { SkipLink } from "./components/Section";
 import Home from "./home/Home";
 import { T } from "./i18n";
 import { reducedMotion, useReveal } from "./motion";
-import { navigate, pageAt, useLocation, type Page } from "./router";
+import { navigate, onPrefetch, pageAt, useLocation, type Page } from "./router";
 
-const Download = lazy(() => import("./download/DownloadPage"));
-const Cards = lazy(() => import("./cards/CardsPage"));
-const Gateways = lazy(() => import("./gateways/GatewaysPage"));
-const Contact = lazy(() => import("./contact/ContactPage"));
-const Impressum = lazy(() => import("./impressum/ImpressumPage"));
-const Privacy = lazy(() => import("./privacy/PrivacyPage"));
-const Terms = lazy(() => import("./legal/TermsPage"));
-const Register = lazy(() => import("./account/RegisterPage"));
-const SignIn = lazy(() => import("./account/SignInPage"));
-const Account = lazy(() => import("./account/AccountPage"));
-const Security = lazy(() => import("./account/SecurityPage"));
-const MyGateways = lazy(() => import("./account/GatewaysPage"));
-const AdminUsers = lazy(() => import("./admin/UsersPage"));
-const AdminUser = lazy(() => import("./admin/UserPage"));
-const AdminGateways = lazy(() => import("./admin/GatewaysPage"));
-const AdminAudit = lazy(() => import("./admin/AuditPage"));
-const AdminLegacy = lazy(() => import("./admin/LegacyPage"));
+/** Each page but the start page, as the code that draws it, fetched once. */
+const LOAD = {
+  download: () => import("./download/DownloadPage"),
+  cards: () => import("./cards/CardsPage"),
+  gateways: () => import("./gateways/GatewaysPage"),
+  contact: () => import("./contact/ContactPage"),
+  impressum: () => import("./impressum/ImpressumPage"),
+  privacy: () => import("./privacy/PrivacyPage"),
+  terms: () => import("./legal/TermsPage"),
+  register: () => import("./account/RegisterPage"),
+  signIn: () => import("./account/SignInPage"),
+  account: () => import("./account/AccountPage"),
+  accountSecurity: () => import("./account/SecurityPage"),
+  accountGateways: () => import("./account/GatewaysPage"),
+  admin: () => import("./admin/UsersPage"),
+  adminUser: () => import("./admin/UserPage"),
+  adminGateways: () => import("./admin/GatewaysPage"),
+  adminAudit: () => import("./admin/AuditPage"),
+  adminLegacy: () => import("./admin/LegacyPage"),
+} satisfies Record<Exclude<Page, "home">, () => Promise<unknown>>;
+
+const Download = lazy(LOAD.download);
+const Cards = lazy(LOAD.cards);
+const Gateways = lazy(LOAD.gateways);
+const Contact = lazy(LOAD.contact);
+const Impressum = lazy(LOAD.impressum);
+const Privacy = lazy(LOAD.privacy);
+const Terms = lazy(LOAD.terms);
+const Register = lazy(LOAD.register);
+const SignIn = lazy(LOAD.signIn);
+const Account = lazy(LOAD.account);
+const Security = lazy(LOAD.accountSecurity);
+const MyGateways = lazy(LOAD.accountGateways);
+const AdminUsers = lazy(LOAD.admin);
+const AdminUser = lazy(LOAD.adminUser);
+const AdminGateways = lazy(LOAD.adminGateways);
+const AdminAudit = lazy(LOAD.adminAudit);
+const AdminLegacy = lazy(LOAD.adminLegacy);
+
+// a link pointed at or focused fetches its page's code ahead, unless the
+// visitor asked their browser to save data
+onPrefetch((to) => {
+  const saving = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData === true;
+  const page = pageAt(new URL(to, window.location.href).pathname);
+  if (saving || page === null || page === "home") return;
+  void LOAD[page]().catch(() => {});
+});
 
 function Loading() {
   return (
@@ -130,6 +160,26 @@ export function App() {
   }, [pathname]);
 
   useReveal(main);
+
+  // when the element that had focus goes away (a button that did its job, a
+  // list read again), the keyboard goes on from the main content, never from
+  // the top of the page; pages that know a better place move it themselves
+  useEffect(() => {
+    let frame = 0;
+    const lost = (e: FocusEvent) => {
+      const gone = e.target;
+      if (e.relatedTarget !== null || !(gone instanceof Node)) return;
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        if (!gone.isConnected && (document.activeElement === null || document.activeElement === document.body)) main.current?.focus({ preventScroll: true });
+      });
+    };
+    document.addEventListener("focusout", lost);
+    return () => {
+      cancelAnimationFrame(frame);
+      document.removeEventListener("focusout", lost);
+    };
+  }, []);
 
   return (
     <AccountProvider>

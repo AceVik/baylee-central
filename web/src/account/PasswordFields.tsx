@@ -6,6 +6,7 @@ import { useEffect, useRef } from "react";
 
 import { T, t, useLang, type Key } from "../i18n";
 import { strength, type Strength } from "./strength";
+import { PasswordInput } from "./PasswordInput";
 
 const LEVEL: Readonly<Record<Strength, Key>> = {
   short: "register.strengthShort",
@@ -43,15 +44,14 @@ export function PasswordFields(p: PasswordProps) {
         <label htmlFor="r-password">
           <T id="register.password" />
         </label>
-        <input
-          ref={passwordRef}
+        <PasswordInput
+          inputRef={passwordRef}
           id="r-password"
-          type="password"
           autoComplete="new-password"
           value={p.password}
-          aria-invalid={invalid?.field === "password" ? true : undefined}
-          aria-describedby="r-password-hint r-strength"
-          onChange={(e) => p.onPassword(e.target.value)}
+          invalid={invalid?.field === "password"}
+          describedBy={invalid?.field === "password" ? "r-password-hint r-strength r-status" : "r-password-hint r-strength"}
+          onChange={p.onPassword}
         />
         <p id="r-password-hint" className="field-hint">
           <T id="register.passwordHint" />
@@ -67,14 +67,14 @@ export function PasswordFields(p: PasswordProps) {
         <label htmlFor="r-again">
           <T id="register.passwordAgain" />
         </label>
-        <input
-          ref={againRef}
+        <PasswordInput
+          inputRef={againRef}
           id="r-again"
-          type="password"
           autoComplete="new-password"
           value={p.again}
-          aria-invalid={invalid?.field === "again" ? true : undefined}
-          onChange={(e) => p.onAgain(e.target.value)}
+          invalid={invalid?.field === "again"}
+          {...(invalid?.field === "again" ? { describedBy: "r-status" } : {})}
+          onChange={p.onAgain}
         />
       </div>
     </>

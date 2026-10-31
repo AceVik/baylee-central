@@ -3,7 +3,7 @@
 // picture is Scryfall's "normal" image, fetched only then, unaltered, and
 // nothing is ever drawn on it: the status sits beside it.
 
-import { useLayoutEffect, useRef } from "react";
+import { useEffect, useImperativeHandle, useLayoutEffect, useRef, type Ref } from "react";
 import { createPortal } from "react-dom";
 
 import { t, useLang } from "../i18n";
@@ -54,31 +54,60 @@ export interface Shown {
   y: number | null;
 }
 
-/** The card large beside the pointer or the focused card; for the eye only (the tile says the same in words). */
-export function Preview({ shown }: { shown: Shown }) {
+/** Puts the preview `el` beside the point (x, y), or beside `tile` without one, inside the window. */
+function place(el: HTMLElement, tile: HTMLElement, at: { x: number | null; y: number | null }): void {
+  const w = el.offsetWidth;
+  const h = el.offsetHeight;
+  const W = window.innerWidth;
+  const H = window.innerHeight;
+  let { x, y } = at;
+  let gap = 18;
+  if (x === null || y === null) {
+    const r = tile.getBoundingClientRect();
+    x = r.right;
+    y = r.top + r.height / 2;
+    gap = 12;
+  }
+  let left = x + gap + w > W - 8 ? x - gap - w : x + gap;
+  if (left < 8) left = 8;
+  const top = Math.max(8, Math.min(H - h - 8, y - h / 2));
+  // CSSOM, which the CSP allows (a style attribute it would not)
+  el.style.transform = `translate3d(${Math.round(left)}px, ${Math.round(top)}px, 0)`;
+}
+
+export interface PreviewHandle {
+  /** Moves the preview beside the pointer at (x, y), at most once a frame. */
+  follow(x: number, y: number): void;
+}
+
+/**
+ * The card large beside the pointer or the focused card; for the eye only
+ * (the tile says the same in words). The pointer moves it through its
+ * handle, without drawing the grid again.
+ */
+export function Preview({ shown, ref }: { shown: Shown; ref?: Ref<PreviewHandle> }) {
   const lang = useLang();
   const box = useRef<HTMLDivElement>(null);
+  const frame = useRef(0);
+  const next = useRef<{ x: number; y: number } | null>(null);
   useLayoutEffect(() => {
-    const el = box.current;
-    if (!el) return;
-    const w = el.offsetWidth;
-    const h = el.offsetHeight;
-    const W = window.innerWidth;
-    const H = window.innerHeight;
-    let { x, y } = shown;
-    let gap = 18;
-    if (x === null || y === null) {
-      const r = shown.tile.getBoundingClientRect();
-      x = r.right;
-      y = r.top + r.height / 2;
-      gap = 12;
-    }
-    let left = x + gap + w > W - 8 ? x - gap - w : x + gap;
-    if (left < 8) left = 8;
-    const top = Math.max(8, Math.min(H - h - 8, y - h / 2));
-    // CSSOM, which the CSP allows (a style attribute it would not)
-    el.style.transform = `translate3d(${Math.round(left)}px, ${Math.round(top)}px, 0)`;
+    if (box.current) place(box.current, shown.tile, shown);
   }, [shown]);
+  useEffect(() => () => cancelAnimationFrame(frame.current), []);
+  useImperativeHandle(
+    ref,
+    () => ({
+      follow(x, y) {
+        next.current = { x, y };
+        if (frame.current !== 0) return;
+        frame.current = requestAnimationFrame(() => {
+          frame.current = 0;
+          if (box.current && next.current) place(box.current, shown.tile, next.current);
+        });
+      },
+    }),
+    [shown],
+  );
   return createPortal(
     <div className="cpreview" ref={box} aria-hidden="true">
       <BigPicture card={shown.card} />

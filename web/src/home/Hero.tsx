@@ -1,5 +1,7 @@
 // Baylee's cloud above the garden city, with the project and its download.
 
+import { useEffect, useRef } from "react";
+
 import { T, t, useLang, type Elems } from "../i18n";
 import { Icon } from "../components/icons";
 import { Logo } from "../components/Logo";
@@ -12,12 +14,33 @@ import { Link, PATHS } from "../router";
 
 const GLOW: Elems = { glow: (words) => <span className="glow">{words}</span> };
 
+/**
+ * The hero's slow light and Baylee's breathing cloud move only while the hero
+ * is on screen (`data-away` pauses them, hero.css): off screen they would
+ * repaint a blended layer for nobody.
+ */
+function useAwayMark(): { current: HTMLElement | null } {
+  const ref = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const hero = ref.current;
+    if (!hero || typeof IntersectionObserver !== "function") return;
+    const watch = new IntersectionObserver(([entry]) => {
+      if (entry?.isIntersecting) delete hero.dataset["away"];
+      else hero.dataset["away"] = "";
+    });
+    watch.observe(hero);
+    return () => watch.disconnect();
+  }, []);
+  return ref;
+}
+
 export function Hero() {
   const sky = useParallax(0.35);
   const state = useRelease();
   const lang = useLang();
+  const hero = useAwayMark();
   return (
-    <section className="hero" aria-labelledby="hero-title">
+    <section ref={hero} className="hero" aria-labelledby="hero-title">
       <div className="sky" aria-hidden="true">
         <div className="sky-painting" ref={sky} />
         <div className="sky-light" />

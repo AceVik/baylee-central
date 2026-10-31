@@ -1,6 +1,10 @@
 // A modal on the browser's own `<dialog>`: mounted while open, focus held
 // inside, Escape or a click on the backdrop closes it, and closing gives the
-// focus back to its opener, including when React removes the dialog first.
+// focus back to its opener, including when React removes the dialog first;
+// when the opener is gone too, to the page's main content, never to <body>.
+// The browser may close a dialog by itself (a second Escape in Chromium
+// skips `cancel`): that asks `onClose` too, and a dialog its owner keeps
+// open (a secret shown once) opens again.
 
 import { useEffect, useRef, type ReactNode } from "react";
 
@@ -37,15 +41,29 @@ export function Modal({
       backdropDown = false;
     };
     const key = (e: KeyboardEvent) => handlers.current.onKey?.(e);
+    let leaving = false;
+    let frame = 0;
+    const closed = () => {
+      if (leaving) return;
+      handlers.current.onClose();
+      frame = requestAnimationFrame(() => {
+        if (!leaving && dialog.isConnected && !dialog.open) dialog.showModal();
+      });
+    };
     dialog.addEventListener("pointerdown", down);
     dialog.addEventListener("click", click);
     dialog.addEventListener("keydown", key);
+    dialog.addEventListener("close", closed);
     return () => {
+      leaving = true;
+      cancelAnimationFrame(frame);
       dialog.removeEventListener("pointerdown", down);
       dialog.removeEventListener("click", click);
       dialog.removeEventListener("keydown", key);
+      dialog.removeEventListener("close", closed);
       if (dialog.open) dialog.close();
-      if (previous?.isConnected) previous.focus({ preventScroll: true });
+      const back = previous?.isConnected ? previous : document.getElementById("main");
+      back?.focus({ preventScroll: true });
     };
   }, []);
   return (

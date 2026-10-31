@@ -133,11 +133,11 @@
 
 /* the card in a dialog */
 .cardview {
-  width: min(92vw, 26rem); max-height: 94vh; padding: 0.8rem; border: 1px solid var(--edge); border-radius: var(--radius);
+  width: min(92vw, 26rem); max-height: 94vh; max-height: 94dvh; padding: 0.8rem; border: 1px solid var(--edge); border-radius: var(--radius);
   background: var(--panel-solid); color: var(--ink); overflow: auto;
 }
 .cardview-body { position: relative; font-family: var(--sans); }
-.cardview .cp-pic { width: min(100%, calc(70vh * 488 / 680)); margin: 0 auto; }
+.cardview .cp-pic { width: min(100%, calc(70dvh * 488 / 680)); margin: 0 auto; }
 .cardview .cp-name { font-size: 1.1rem; }
 .cardview .cp-go { text-align: center; margin: 0.8rem 0 0.4rem; }
 .cardview-close { position: absolute; top: 0; right: 0; }

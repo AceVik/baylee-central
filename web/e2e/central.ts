@@ -17,6 +17,8 @@ import type { Page, Request, Route } from "@playwright/test";
 
 import { csp } from "../scripts/csp.ts";
 
+import { adminAnswer, areaState, ownerAnswer, type AreaState } from "./area.ts";
+
 export const KEY = "CENTRAL-TEST-0000-0000-0001";
 export const PASSWORD = "violet lantern harbour quietly";
 export const CODE = "Y06Z-NKPA-ZTZE-Y093-8NKR-KAYD-XZZD-SEMR";
@@ -48,6 +50,8 @@ const FIELDS: Readonly<Record<string, readonly string[]>> = {
   account_summary: [],
   set_recovery: ["recovery"],
   set_display_name: ["display_name"],
+  owner: ["request"],
+  admin: ["request"],
 };
 
 /** Exact byte lengths, by operation and field. */
@@ -104,6 +108,10 @@ interface Options {
   moved?: string[];
   /** Answer the crypto's first message with bytes the real module refuses. */
   refuseCrypto?: boolean;
+  /** Signed in already as this account (one of `accounts` or `named`), its sign-in ten minutes old. */
+  signedIn?: string;
+  /** Answer the account area's and the administration's requests (`area.ts`), as an administrator or not. */
+  area?: { admin: boolean };
 }
 
 function bad(m: CentralMock, why: string, route: Route) {
@@ -144,6 +152,11 @@ export async function mockCentral(page: Page, origin: string, opts: Options = {}
   // moved before its name and tag were carried
   for (const name of opts.moved ?? []) m.accounts.set(name, { wrapped: n(73, 2), recovery: null, displayName: null, tag: null });
   let signedInAt = 0;
+  if (opts.signedIn !== undefined) {
+    m.signedIn = opts.signedIn;
+    signedInAt = Math.floor(Date.now() / 1000) - 600;
+  }
+  const area: AreaState | null = opts.area === undefined ? null : areaState(opts.area.admin);
   const tickets = new Map<string, { name: string; displayName: string }>();
   let attempt: string | null = null;
   const terms = opts.terms ?? null;
@@ -239,7 +252,7 @@ export async function mockCentral(page: Page, origin: string, opts: Options = {}
           tag: account.tag,
           source: account.recovery === null || opts.moved?.includes(m.signedIn) ? "legacy" : "registered",
           recovery: account.recovery !== null,
-          admin: false,
+          admin: area?.accounts[area.me]?.admin ?? false,
           signed_in_at: signedInAt,
           expires_at: signedInAt + 1800,
         });
@@ -269,6 +282,14 @@ export async function mockCentral(page: Page, origin: string, opts: Options = {}
         if (version === null || body["version"] !== version.version || (body["digest"] as number[]).join() !== version.digest.join()) return refuse(route, 409);
         m.accepted = { version: version.version, digest: body["digest"] as number[] };
         return json(route, { result: "done" });
+      }
+      case "owner":
+      case "admin": {
+        if (m.signedIn === null || area === null) return refuse(route, 401);
+        const asked = body["request"] as Record<string, unknown>;
+        if (op === "admin" && area.accounts[area.me]?.admin !== true) return refuse(route, 401);
+        const answer = op === "owner" ? ownerAnswer(area, asked) : adminAnswer(area, asked);
+        return typeof answer === "number" ? refuse(route, answer) : json(route, answer);
       }
       case "gateway_directory":
         // Checked like every request here, then answered by `mock`'s directory.

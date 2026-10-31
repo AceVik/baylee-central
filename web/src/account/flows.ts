@@ -132,7 +132,9 @@ export interface SignedIn {
  * code (`recoveryCreate`); for any other, or when Central does not say, it
  * only checks that the key opens (`loginConfirm`). Either proves the
  * password; nothing reaches Central of the code yet. On a mismatch the new
- * session is ended at once. The cookie is Central's to set.
+ * session is ended at once. The cookie is Central's to set. The Worker
+ * starts (and loads its WebAssembly) while Central looks the name up; it
+ * sees the password only after that, and is closed on every way out.
  */
 export async function signIn(
   input: { username: string; password: string },
@@ -140,16 +142,11 @@ export async function signIn(
   progress: (p: Progress) => void = () => {},
 ): Promise<SignedIn> {
   progress("signingIn");
-  let identity;
-  try {
-    identity = await api.discover(input.username);
-  } catch (error) {
-    throw fromApi(error, "wrongLogin");
-  }
-  // an unknown name, or one still at the legacy gateway: the page cannot say which
-  if (identity === null) throw new FlowError("wrongLogin");
   const flow = crypto();
   try {
+    const identity = await api.discover(input.username);
+    // an unknown name, or one still at the legacy gateway: the page cannot say which
+    if (identity === null) throw new FlowError("wrongLogin");
     const ke1 = await flow.loginStart(input.password, identity);
     const challenge = await api.loginStart(identity, ke1);
     let ke3;

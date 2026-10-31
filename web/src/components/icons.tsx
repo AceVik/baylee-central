@@ -37,6 +37,9 @@ const PATHS = {
   lock: "M17 8V7a5 5 0 0 0-10 0v1H5v14h14V8zM9 7a3 3 0 0 1 6 0v1H9zm4 10.7V19h-2v-1.3a2 2 0 1 1 2 0z",
   tag: "M2 12V3h9l11 11-9 9zm5-5a1.5 1.5 0 1 0-1.5-1.5A1.5 1.5 0 0 0 7 7z",
   list: "M3 5h2v2H3zm4 0h14v2H7zM3 11h2v2H3zm4 0h14v2H7zm-4 6h2v2H3zm4 0h14v2H7z",
+  sun: "M12 7.5a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9zM11 1h2v4h-2zm0 18h2v4h-2zM1 11h4v2H1zm18 0h4v2h-4zM4.2 5.6l1.4-1.4 2.9 2.9-1.4 1.4zm11.3 1.5 2.9-2.9 1.4 1.4-2.9 2.9zM4.2 18.4l2.9-2.9 1.4 1.4-2.9 2.9zm11.3-1.5 1.4-1.4 2.9 2.9-1.4 1.4z",
+  moon: "M12 3a9 9 0 1 0 9 9 7 7 0 0 1-9-9z",
+  half: "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 2v16a8 8 0 0 1 0-16z",
 } as const;
 
 export type IconName = keyof typeof PATHS;

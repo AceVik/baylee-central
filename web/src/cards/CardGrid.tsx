@@ -10,7 +10,7 @@ import { T, t, useLang } from "../i18n";
 import { Icon } from "../components/icons";
 import { Modal } from "../components/Modal";
 import { imgOf, pageOf, why } from "./card";
-import { Badge, BigPicture, CardText, Credit, Preview, type Shown } from "./CardView";
+import { Badge, BigPicture, CardText, Credit, Preview, type PreviewHandle, type Shown } from "./CardView";
 import { FilterBar, type Filter } from "./FilterBar";
 import { GROUP_LABEL, STATUS, type Card, type Counts } from "./model";
 
@@ -26,6 +26,8 @@ export function CardGrid({ cards, counts, setName }: { cards: Card[]; counts: Co
   const [opened, setOpened] = useState<{ card: Card } | null>(null);
   const grid = useRef<HTMLUListElement>(null);
   const timer = useRef(0);
+  // the preview follows the pointer itself; the grid is not drawn again on a move
+  const preview = useRef<PreviewHandle>(null);
   const canHover = useMemo(() => hoverable(), []);
 
   const visible = useMemo(
@@ -144,7 +146,7 @@ export function CardGrid({ cards, counts, setName }: { cards: Card[]; counts: Co
                 onPointerOver={(e) => onOver(e, card)}
                 onPointerLeave={hide}
                 onPointerMove={(e) => {
-                  if (shown?.card === card) setShown({ ...shown, x: e.clientX, y: e.clientY });
+                  if (shown?.card === card) preview.current?.follow(e.clientX, e.clientY);
                 }}
                 onFocus={(e) => onFocus(e, card, i)}
                 onBlur={hide}
@@ -171,7 +173,7 @@ export function CardGrid({ cards, counts, setName }: { cards: Card[]; counts: Co
           );
         })}
       </ul>
-      {shown && <Preview shown={shown} />}
+      {shown && <Preview shown={shown} ref={preview} />}
       {opened && (
         <Modal className="cardview" labelledBy="cardview-name" onClose={() => setOpened(null)}>
           <div className="cardview-body">
