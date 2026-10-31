@@ -3,11 +3,12 @@
 // every page draws its title, nothing scrolls sideways (a wide table scrolls
 // in its own box), and nothing is refused or thrown.
 
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
 import { uid } from "./area.ts";
-import { mockCentral, type CentralMock } from "./central.ts";
-import { expectNoSideScroll, mock, watchErrors } from "./mocks.ts";
+import { hexOf, rid } from "./reports.ts";
+import { expectNoSideScroll, watchErrors } from "./mocks.ts";
+import { signedIn } from "./signed-in.ts";
 
 const hex = (id: number[]) => id.map((b) => b.toString(16).padStart(2, "0")).join("");
 
@@ -21,15 +22,10 @@ const PAGES: [string, string][] = [
   ["/admin/gateways", "Gateways"],
   ["/admin/audit", "Audit log"],
   ["/admin/legacy", "Legacy accounts"],
+  ["/admin/feedback", "Feedback"],
+  [`/admin/feedback/${hexOf(rid(1))}`, "A report"],
 ];
 
-export async function signedIn(page: Page, origin: string, admin = true): Promise<CentralMock> {
-  await mock(page, { gateways: 4 });
-  const central = await mockCentral(page, origin, { named: { lantern: "Lantern" }, signedIn: "lantern", area: { admin } });
-  // the page asks Central whose session it is when it remembers one (src/account/session.tsx)
-  await page.addInitScript(() => localStorage.setItem("baylee-central-session", JSON.stringify({ expiresAt: Math.floor(Date.now() / 1000) + 1800 })));
-  return central;
-}
 
 test.describe("the signed-in area", () => {
   for (const [path, title] of PAGES) {

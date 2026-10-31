@@ -18,6 +18,7 @@ import type { Page, Request, Route } from "@playwright/test";
 import { csp } from "../scripts/csp.ts";
 
 import { adminAnswer, areaState, ownerAnswer, type AreaState } from "./area.ts";
+import { reportPart, reportShape } from "./reports.ts";
 
 export const KEY = "CENTRAL-TEST-0000-0000-0001";
 export const PASSWORD = "violet lantern harbour quietly";
@@ -288,6 +289,8 @@ export async function mockCentral(page: Page, origin: string, opts: Options = {}
         if (m.signedIn === null || area === null) return refuse(route, 401);
         const asked = body["request"] as Record<string, unknown>;
         if (op === "admin" && area.accounts[area.me]?.admin !== true) return refuse(route, 401);
+        const wrongReport = op === "admin" ? reportShape(asked) : null;
+        if (wrongReport !== null) return bad(m, wrongReport, route);
         const answer = op === "owner" ? ownerAnswer(area, asked) : adminAnswer(area, asked);
         return typeof answer === "number" ? refuse(route, answer) : json(route, answer);
       }
@@ -296,6 +299,21 @@ export async function mockCentral(page: Page, origin: string, opts: Options = {}
         return route.fallback();
     }
     return bad(m, `unhandled ${op}`, route);
+  });
+  // a report's part (crates/central-http browser.rs `report_part`): the same
+  // proofs as `/api/v1`, an empty body, an administrator's session, the gzip as stored
+  await page.route(/\/api\/v1\/reports\/[^/]+\/[^/]+$/, async (route) => {
+    const request = route.request();
+    const wrongHeaders = headersOk(request, origin, await request.allHeaders());
+    if (wrongHeaders !== null) return bad(m, `part: ${wrongHeaders}`, route);
+    if ((request.postData() ?? "") !== "") return bad(m, "part: a body", route);
+    const [, hex = "", part = ""] = /\/reports\/([^/]+)\/([^/]+)$/.exec(new URL(request.url()).pathname) ?? [];
+    m.operations.push(`part:${part}`);
+    if (!/^[0-9a-f]{32}$/.test(hex) || (part !== "client" && part !== "record")) return bad(m, `part: ${hex}/${part}`, route);
+    if (m.signedIn === null || area === null || area.accounts[area.me]?.admin !== true) return refuse(route, 401);
+    const found = reportPart(area.reports, hex, part);
+    if (found === null) return refuse(route, 401);
+    return route.fulfill({ status: 200, headers: { "Content-Type": "application/gzip", "Cache-Control": "no-store", ...(found.origin === null ? {} : { "X-Record-Origin": found.origin }) }, body: found.gzip });
   });
   return m;
 }

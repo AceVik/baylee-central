@@ -12,11 +12,12 @@ import { test } from "@playwright/test";
 import { uid } from "./area.ts";
 import { mockCentral } from "./central.ts";
 import { mock } from "./mocks.ts";
+import { hexOf, rid } from "./reports.ts";
 
 const PAGES = ["/", "/download", "/cards", "/gateways", "/contact", "/impressum", "/privacy", "/register", "/signin", "/account"];
 /** The account area and the administration, signed in as an administrator (`e2e/area.ts`). */
 const hex = (id: number[]) => id.map((b) => b.toString(16).padStart(2, "0")).join("");
-const AREA = ["/account", "/account/security", "/account/gateways", "/admin", "/admin/users", `/admin/users/${hex(uid(0x10, 1))}`, "/admin/gateways", "/admin/audit", "/admin/legacy"];
+const AREA = ["/account", "/account/security", "/account/gateways", "/admin", "/admin/users", `/admin/users/${hex(uid(0x10, 1))}`, "/admin/gateways", "/admin/audit", "/admin/legacy", "/admin/feedback", `/admin/feedback/${hexOf(rid(1))}`];
 const OWN = existsSync("dist/data/sets.json") && existsSync("dist/media");
 
 test.skip(process.env["SCREENS"] !== "1", "pictures only on request");
