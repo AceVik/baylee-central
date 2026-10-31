@@ -3,7 +3,7 @@
 // way a change is run (the password again when the sign-in is stale), and
 // how an account is named.
 
-import { useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 
 import type { AccountSummary } from "../account/api";
 import { handle } from "../account/names";
@@ -12,7 +12,7 @@ import { Reauth } from "../app/Reauth";
 import { fresh, useSummary } from "../app/useSummary";
 import { T, type Key } from "../i18n";
 import type { Page } from "../router";
-import { adminApi, type AdminApi } from "./admin-api";
+import { adminApi, type AdminApi, type Overview } from "./admin-api";
 
 /** An account as the administration names it: its handle, or its sign-in name until it has one. */
 export function who(a: { displayName: string | null; tag: number | null; username?: string }): string {
@@ -20,21 +20,52 @@ export function who(a: { displayName: string | null; tag: number | null; usernam
   return a.username ?? "—";
 }
 
+/** What an administration page is handed: the administrator, and the counts of the first view. */
+export interface AdminContext {
+  summary: AccountSummary;
+  replace(s: AccountSummary): void;
+  /** The counts, once read; null before, and when Central did not answer. */
+  overview: Overview | null;
+  /** Central did not answer the counts. */
+  uncounted: boolean;
+  /** Reads the counts again, after a change. */
+  recount(): void;
+}
+
 export function AdminFrame({
   page,
+  api,
   title,
   lead,
   children,
 }: {
   page: Page;
+  api: AdminApi;
   title: ReactNode;
   lead?: ReactNode;
-  children: (ctx: { summary: AccountSummary; replace(s: AccountSummary): void }) => ReactNode;
+  children: (ctx: AdminContext) => ReactNode;
 }) {
   const { state, replace } = useSummary();
   const admin = state.at === "ready" && state.summary.admin;
+  // the counts (for the navigation's "awaiting approval", the filters and
+  // the first view) are read once an administrator is known, never for anyone else
+  const [overview, setOverview] = useState<Overview | null>(null);
+  const [uncounted, setUncounted] = useState(false);
+  const recount = useCallback(() => {
+    api.overview().then(
+      (counts) => {
+        setOverview(counts);
+        setUncounted(false);
+      },
+      () => setUncounted(true),
+    );
+  }, [api]);
+  useEffect(() => {
+    if (admin) recount();
+  }, [admin, recount]);
+  const badges = overview === null ? undefined : { adminGateways: overview.pending };
   return (
-    <AppFrame page={page} admin={admin} eyebrow="app.admin" title={title} {...(lead === undefined ? {} : { lead })}>
+    <AppFrame page={page} admin={admin} {...(badges === undefined ? {} : { badges })} eyebrow="app.admin" title={title} {...(lead === undefined ? {} : { lead })}>
       {state.at === "signedOut" && <SignedOut />}
       {state.at === "loading" && <div className="card skeleton app-skeleton" aria-hidden="true" />}
       {state.at === "failed" && (
@@ -49,7 +80,7 @@ export function AdminFrame({
           </p>
         </div>
       )}
-      {state.at === "ready" && state.summary.admin && children({ summary: state.summary, replace })}
+      {state.at === "ready" && state.summary.admin && children({ summary: state.summary, replace, overview, uncounted, recount })}
     </AppFrame>
   );
 }

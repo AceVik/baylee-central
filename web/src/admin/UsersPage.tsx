@@ -1,5 +1,9 @@
-// `/admin`: the accounts, newest first, 50 a page, or those whose name holds
-// a search's words, or the one with a `#tag` (central-api `AccountQuery`).
+// `/admin/users`: the accounts, newest first, 50 a page, or those whose name
+// holds a search's words, or the one with a `#tag` (central-api
+// `AccountQuery`). The list follows the field as it is typed (after a short
+// pause, the newest answer winning), the search stands in the address
+// (`?q=`) so going back finds it again, Escape empties the field and
+// Ctrl/Cmd+K reaches it from anywhere on the page.
 
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 
@@ -15,16 +19,29 @@ import { AdminFrame, useAdminApi, who } from "./shared";
 
 type Load = { at: "loading" } | { at: "failed" } | { at: "ready"; accounts: AdminAccount[]; more: boolean; adding: boolean };
 
+/** The search in the address, as the page was opened. */
+function askedAt(): string | null {
+  const q = new URLSearchParams(window.location.search).get("q")?.trim() ?? "";
+  return q === "" ? null : q.slice(0, 64);
+}
+
+/** How long typing pauses before the list follows. */
+const PAUSE_MS = 300;
+
 function Accounts({ api }: { api: AdminApi }) {
   const lang = useLang();
-  const [query, setQuery] = useState("");
-  const [asked, setAsked] = useState<string | null>(null);
+  const [query, setQuery] = useState(() => askedAt() ?? "");
+  const [asked, setAsked] = useState<string | null>(askedAt);
   const [load, setLoad] = useState<Load>({ at: "loading" });
   const rows = useRef<HTMLTableSectionElement>(null);
+  // only the newest request's answer is drawn
+  const latest = useRef(0);
   const read = useCallback(
     (q: string | null, before: AdminAccount | null) => {
+      const mine = ++latest.current;
       api.accounts(q, before?.id ?? null).then(
         (page) => {
+          if (mine !== latest.current) return;
           let first = 0;
           setLoad((now) => {
             const kept = before !== null && now.at === "ready" ? now.accounts : [];
@@ -34,7 +51,9 @@ function Accounts({ api }: { api: AdminApi }) {
           // after "More", the keyboard goes on at the first new account
           if (before !== null) requestAnimationFrame(() => rows.current?.rows[first]?.querySelector("a")?.focus());
         },
-        () => setLoad({ at: "failed" }),
+        () => {
+          if (mine === latest.current) setLoad({ at: "failed" });
+        },
       );
     },
     [api],
@@ -44,13 +63,32 @@ function Accounts({ api }: { api: AdminApi }) {
     setLoad({ ...load, adding: true });
     read(asked, load.accounts.at(-1) ?? null);
   };
-  useEffect(() => read(null, null), [read]);
+  const ask = useCallback(
+    (text: string) => {
+      const q = text.trim() === "" ? null : text.trim();
+      setAsked(q);
+      setLoad({ at: "loading" });
+      read(q, null);
+      const url = new URL(window.location.href);
+      if (q === null) url.searchParams.delete("q");
+      else url.searchParams.set("q", q);
+      window.history.replaceState(null, "", url);
+    },
+    [read],
+  );
+  // the first list: the one the address asks for
+  const first = useRef(asked);
+  useEffect(() => read(first.current, null), [read]);
+  // the list follows the field once typing pauses
+  useEffect(() => {
+    const q = query.trim() === "" ? null : query.trim();
+    if (q === asked) return;
+    const pause = window.setTimeout(() => ask(query), PAUSE_MS);
+    return () => window.clearTimeout(pause);
+  }, [query, asked, ask]);
   const search = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const q = query.trim() === "" ? null : query.trim();
-    setAsked(q);
-    setLoad({ at: "loading" });
-    read(q, null);
+    ask(query);
   };
   return (
     <Panel title={<T id="adm.accounts" />}>
@@ -58,7 +96,22 @@ function Accounts({ api }: { api: AdminApi }) {
         <label className="vh" htmlFor="adm-q">
           <T id="adm.search" />
         </label>
-        <input id="adm-q" type="search" placeholder={t(lang, "adm.searchHint")} value={query} onChange={(e) => setQuery(e.target.value)} maxLength={64} />
+        <input
+          id="adm-q"
+          type="search"
+          data-find=""
+          aria-keyshortcuts="Control+K Meta+K"
+          placeholder={t(lang, "adm.searchHint")}
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Escape" && query !== "") {
+              e.preventDefault();
+              setQuery("");
+            }
+          }}
+          maxLength={64}
+        />
         <button type="submit" className="button button-ghost">
           <T id="adm.search" />
         </button>
@@ -129,10 +182,10 @@ function Accounts({ api }: { api: AdminApi }) {
 }
 
 export default function UsersPage({ client }: { client?: AdminApi }) {
-  useTitle("title.admin");
+  useTitle("title.adminUsers");
   const api = useAdminApi(client);
   return (
-    <AdminFrame page="admin" title={<T id="adm.usersTitle" />} lead={<T id="adm.usersLead" />}>
+    <AdminFrame page="adminUsers" api={api} title={<T id="adm.usersTitle" />} lead={<T id="adm.usersLead" />}>
       {() => <Accounts api={api} />}
     </AdminFrame>
   );

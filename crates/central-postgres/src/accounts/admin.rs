@@ -6,8 +6,8 @@
 use super::tokens::{LIVE_TOKEN, STATE, TOKEN_COLUMNS, metadata, state, token_info};
 use super::{AccountStore, Error, Session, Token, statement, username};
 use central_api::admin::{
-    ACCOUNT_LIST, AccountQuery, AccountState, AdminAccount, AdminGateway, AuditEvent, OwnedGateway,
-    PAGE,
+    ACCOUNT_LIST, AccountQuery, AccountState, AdminAccount, AdminGateway, AuditEvent, NamedAccount,
+    NamedGateway, OwnedGateway, PAGE,
 };
 use central_api::gateway::GatewayState;
 use central_api::owner::TokenInfo;
@@ -15,6 +15,7 @@ use central_api::profile::valid_tag;
 use sea_orm::{
     ConnectionTrait, DatabaseConnection, QueryResult, TransactionTrait, Value, prelude::Uuid,
 };
+use std::collections::BTreeMap;
 
 /// The closed list of audited actions. Each is `subject.verb`, as the
 /// schema's CHECK requires; later steps add theirs here.
@@ -152,6 +153,18 @@ pub(super) fn owned_gateway(row: &QueryResult) -> Result<OwnedGateway, Error> {
             .try_get("", "approved")
             .map_err(|_| Error::Unavailable)?,
     })
+}
+
+/// A page of the audit log, with today's names of what it names.
+pub struct AuditPage {
+    /// At most [`PAGE`] events, newest first.
+    pub events: Vec<AuditEvent>,
+    /// Another page follows.
+    pub more: bool,
+    /// The accounts the events name that still exist, each once.
+    pub accounts: Vec<NamedAccount>,
+    /// The gateways the events name that still exist, each once.
+    pub gateways: Vec<NamedGateway>,
 }
 
 /// A page of at most [`PAGE`] rows, and whether another follows.
@@ -401,13 +414,22 @@ impl AccountStore {
         browser: &Token,
         target: Option<[u8; 16]>,
         before: Option<[u8; 16]>,
-    ) -> Result<(Vec<AuditEvent>, bool), Error> {
+    ) -> Result<AuditPage, Error> {
         let tx = self.db.begin().await.map_err(|_| Error::Unavailable)?;
         Self::administrator(&tx, browser).await?;
+        // The record names ids; the same statement reads what those accounts
+        // and gateways are called today, so names and events agree.
         let rows = tx
             .query_all_raw(statement(
                 &format!(
-                    "SELECT {EVENT_COLUMNS} FROM central_identity.audit_events e
+                    "SELECT {EVENT_COLUMNS},
+                         actor.id IS NOT NULL AS actor_known, actor.display_name AS actor_name, actor.tag AS actor_tag,
+                         subject.id IS NOT NULL AS subject_known, subject.display_name AS subject_name, subject.tag AS subject_tag,
+                         gw.name AS gateway_name, gw.origin AS gateway_origin
+                     FROM central_identity.audit_events e
+                     LEFT JOIN central_identity.accounts actor ON actor.id = e.actor_account
+                     LEFT JOIN central_identity.accounts subject ON subject.id = e.account_id
+                     LEFT JOIN central_identity.gateways gw ON gw.id = e.gateway_id
                      WHERE ($1::uuid IS NULL OR e.account_id = $1) AND ($2::uuid IS NULL OR e.id < $2)
                      ORDER BY e.id DESC LIMIT $3"
                 ),
@@ -419,9 +441,56 @@ impl AccountStore {
             ))
             .await
             .map_err(|_| Error::Unavailable)?;
-        let page = page(&rows, event)?;
+        let (events, more) = page(&rows, event)?;
+        let mut accounts = BTreeMap::new();
+        let mut gateways = BTreeMap::new();
+        for (row, event) in rows.iter().zip(&events) {
+            for (id, prefix) in [(event.actor, "actor"), (event.account, "subject")] {
+                let Some(id) = id else { continue };
+                let known: bool = row
+                    .try_get("", &format!("{prefix}_known"))
+                    .map_err(|_| Error::Unavailable)?;
+                if known && !accounts.contains_key(&id) {
+                    let name: Option<String> = row
+                        .try_get("", &format!("{prefix}_name"))
+                        .map_err(|_| Error::Unavailable)?;
+                    let tag: Option<i32> = row
+                        .try_get("", &format!("{prefix}_tag"))
+                        .map_err(|_| Error::Unavailable)?;
+                    let tag = tag
+                        .map(|t| u32::try_from(t).map_err(|_| Error::Unavailable))
+                        .transpose()?;
+                    accounts.insert(
+                        id,
+                        NamedAccount {
+                            id,
+                            display_name: name,
+                            tag,
+                        },
+                    );
+                }
+            }
+            if let Some(id) = event.gateway {
+                let name: Option<String> = row
+                    .try_get("", "gateway_name")
+                    .map_err(|_| Error::Unavailable)?;
+                let origin: Option<String> = row
+                    .try_get("", "gateway_origin")
+                    .map_err(|_| Error::Unavailable)?;
+                if let (Some(name), Some(origin)) = (name, origin) {
+                    gateways
+                        .entry(id)
+                        .or_insert(NamedGateway { id, name, origin });
+                }
+            }
+        }
         tx.commit().await.map_err(|_| Error::Unavailable)?;
-        Ok(page)
+        Ok(AuditPage {
+            events,
+            more,
+            accounts: accounts.into_values().collect(),
+            gateways: gateways.into_values().collect(),
+        })
     }
 
     /// The administrator behind `browser` for a change in `tx`: anyone else

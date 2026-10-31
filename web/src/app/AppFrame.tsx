@@ -7,7 +7,7 @@
 import { useEffect, useRef, type ReactNode } from "react";
 
 import { Icon, type IconName } from "../components/icons";
-import { T, t, useLang, type Key } from "../i18n";
+import { T, num, t, useLang, type Key } from "../i18n";
 import { Link, PATHS, type Page } from "../router";
 import "../styles/app.css";
 import "../styles/tables.css";
@@ -25,23 +25,37 @@ const ACCOUNT: readonly Item[] = [
 ];
 
 const ADMIN: readonly Item[] = [
-  { page: "admin", label: "app.users", icon: "people" },
+  { page: "admin", label: "app.overview", icon: "grid" },
+  { page: "adminUsers", label: "app.users", icon: "people" },
   { page: "adminGateways", label: "app.adminGateways", icon: "globe" },
   { page: "adminAudit", label: "app.audit", icon: "list" },
   { page: "adminLegacy", label: "app.legacy", icon: "key" },
 ];
 
-function Items({ items, page }: { items: readonly Item[]; page: Page }) {
+/** A number beside an item of the navigation, such as the gateways awaiting approval. */
+export type Badges = Partial<Record<Page, number>>;
+
+const NO_BADGES: Badges = {};
+
+function Items({ items, page, badges = NO_BADGES }: { items: readonly Item[]; page: Page; badges?: Badges }) {
   const lang = useLang();
   return (
     <ul className="app-nav-list">
       {items.map((item) => {
-        const current = item.page === page || (item.page === "admin" && page === "adminUser");
+        const current = item.page === page || (item.page === "adminUsers" && page === "adminUser");
+        const badge = badges[item.page] ?? 0;
         return (
           <li key={item.page}>
             <Link to={PATHS[item.page]} className="app-nav-link" data-page={item.page} aria-current={current ? "page" : undefined}>
               <Icon name={item.icon} className="app-nav-icon" />
               <span>{t(lang, item.label)}</span>
+              {badge > 0 && " "}
+              {badge > 0 && (
+                <span className="app-nav-badge num">
+                  {num(lang, badge)}{" "}
+                  <span className="vh">{t(lang, "app.waiting")}</span>
+                </span>
+              )}
             </Link>
           </li>
         );
@@ -53,6 +67,7 @@ function Items({ items, page }: { items: readonly Item[]; page: Page }) {
 export function AppFrame({
   page,
   admin,
+  badges,
   eyebrow,
   title,
   lead,
@@ -60,6 +75,7 @@ export function AppFrame({
 }: {
   page: Page;
   admin: boolean;
+  badges?: Badges;
   eyebrow: Key;
   title: ReactNode;
   lead?: ReactNode;
@@ -86,7 +102,7 @@ export function AppFrame({
               <p className="app-nav-head">
                 <T id="app.admin" />
               </p>
-              <Items items={ADMIN} page={page} />
+              <Items items={ADMIN} page={page} {...(badges === undefined ? {} : { badges })} />
             </>
           )}
         </nav>

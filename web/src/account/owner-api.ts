@@ -81,6 +81,18 @@ export function validTokenName(name: string): boolean {
   return length >= 1 && length <= MAX_TOKEN_NAME && name.trim() === name && !/[\u0000-\u001f\u007f-\u009f]/.test(name);
 }
 
+/**
+ * central-api's `gateway::shown_char` for every character: no control
+ * character and none of the invisible ones that change how text reads
+ * (direction marks, embeddings, overrides, isolates, invisible separators
+ * and spaces, the byte order mark); the zero-width joiner and non-joiner
+ * stay. The forms check a new gateway's or token's name with it; names read
+ * back keep the older rule, so one stored before cannot fail a whole list.
+ */
+export function shownName(name: string): boolean {
+  return !/[\p{Cc}\u061c\u200b\u200e\u200f\u202a-\u202e\u2028\u2029\u2060-\u2064\u2066-\u2069\ufeff]/u.test(name);
+}
+
 /** An id as a path segment: 32 lowercase hex digits. */
 export const idText = hex;
 

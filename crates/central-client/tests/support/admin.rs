@@ -139,7 +139,9 @@ fn acting(
         Response::Done
     ));
     let Response::Admin {
-        answer: AdminAnswer::Audit { events, .. },
+        answer: AdminAnswer::Audit {
+            events, accounts, ..
+        },
     } = browser
         .answer(
             &admin(AdminRequest::Audit {
@@ -155,6 +157,13 @@ fn acting(
     assert_eq!(events.len(), 1);
     assert_eq!(events[0].action, "account.admin_granted");
     assert_eq!(events[0].actor, Some(identity.account));
+    // the page names its actor and subject as they are called today
+    for id in [identity.account, other.account] {
+        assert!(
+            accounts.iter().any(|named| named.id == id),
+            "a named account"
+        );
+    }
     stale(browser, cookie, identity, other, runtime, operator);
 }
 

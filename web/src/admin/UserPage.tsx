@@ -20,6 +20,7 @@ import { ApiError } from "../account/api";
 import type { AccountDetail, AdminApi } from "./admin-api";
 import { AuditTable } from "./AuditPage";
 import { AdminFrame, failureKey, useAdminApi, useChange, who } from "./shared";
+import { CopyButton } from "../app/Copy";
 
 /** A tag as an administrator types it: one to eight hex digits, `#` allowed. */
 export function readTag(text: string): number | null {
@@ -96,7 +97,8 @@ function Detail({ api, id, summary, replace }: { api: AdminApi; id: Uint8Array; 
     <>
       <Panel title={<bdi translate="no">{who(a)}</bdi>}>
         <dl className="kv">
-          <div><dt><T id="adm.username" /></dt><dd><code translate="no">{a.username}</code></dd></div>
+          <div><dt><T id="adm.username" /></dt><dd><span className="copyable"><code translate="no">{a.username}</code><CopyButton text={a.username} label={t(lang, "copy.username")} /></span></dd></div>
+          <div><dt><T id="adm.id" /></dt><dd><span className="copyable"><code translate="no" className="address">{idText(a.id)}</code><CopyButton text={idText(a.id)} label={t(lang, "copy.id")} /></span></dd></div>
           <div><dt><T id="adm.tag" /></dt><dd><code translate="no">{a.tag === null ? "—" : `#${tagText(a.tag)}`}</code></dd></div>
           <div><dt><T id="adm.source" /></dt><dd>{t(lang, a.source === "legacy" ? "adm.legacy" : "adm.registered")}</dd></div>
           <div><dt><T id="adm.state" /></dt><dd>{t(lang, `adm.state_${a.state}` as Key)}</dd></div>
@@ -190,10 +192,10 @@ export default function UserPage({ client }: { client?: AdminApi }) {
   const hex = userAt(pathname);
   const id = hex === null ? null : idOf(hex);
   return (
-    <AdminFrame page="adminUser" title={<T id="adm.userTitle" />}>
+    <AdminFrame page="adminUser" api={api} title={<T id="adm.userTitle" />}>
       {({ summary, replace }) =>
         id === null ? (
-          <p className="small"><T id="adm.errAccount" /> <Link to={PATHS.admin}><T id="adm.back" /></Link></p>
+          <p className="small"><T id="adm.errAccount" /> <Link to={PATHS.adminUsers}><T id="adm.back" /></Link></p>
         ) : (
           <Detail key={hex} api={api} id={id} summary={summary} replace={replace} />
         )

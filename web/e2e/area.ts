@@ -212,8 +212,34 @@ export function adminAnswer(s: AreaState, request: Record<string, unknown>): unk
         audit: s.audit.filter((e) => same(e.account, a.id) || same(e.actor, a.id)),
       });
     }
-    case "audit":
-      return admin("audit", { events: request["account"] === null ? s.audit : s.audit.filter((e) => same(e.account, request["account"] as number[])), more: false });
+    case "audit": {
+      const events = request["account"] === null ? s.audit : s.audit.filter((e) => same(e.account, request["account"] as number[]));
+      // today's names of the accounts and gateways the page names, each once
+      const ids = new Set(events.flatMap((e) => [e.actor, e.account]).filter((x) => x !== null).map((x) => x.join()));
+      const gws = new Set(events.map((e) => e.gateway).filter((x) => x !== null).map((x) => x.join()));
+      return admin("audit", {
+        events,
+        more: false,
+        accounts: s.accounts.filter((a) => ids.has(a.id.join())).map((a) => ({ id: a.id, display_name: a.display_name, tag: a.tag })),
+        gateways: s.gateways.filter((g) => gws.has(g.id.join())).map((g) => ({ id: g.id, name: g.name, origin: g.origin })),
+      });
+    }
+    case "overview": {
+      const registered = s.gateways.filter((g) => g.owner !== null);
+      return admin("overview", {
+        overview: {
+          accounts: s.accounts.length,
+          accounts_week: s.accounts.filter((a) => a.created_at > now() - 7 * DAY).length,
+          moved: s.accounts.filter((a) => a.source === "legacy").length,
+          admins: s.accounts.filter((a) => a.admin).length,
+          pending: registered.filter((g) => g.state === "pending").length,
+          approved: registered.filter((g) => g.state === "approved").length,
+          disabled: registered.filter((g) => g.state === "disabled").length,
+          online: registered.filter((g) => g.online).length,
+          live_tokens: s.gateways.flatMap((g) => g.tokens).filter((t) => t.revoked_at === null && t.expires_at > now()).length,
+        },
+      });
+    }
     case "gateways": {
       const state = request["state"];
       return admin("gateways", { gateways: s.gateways.filter((g) => state === null || g.state === state).map((g) => adminGateway(s, g)), more: false });

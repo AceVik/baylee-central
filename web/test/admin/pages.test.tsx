@@ -11,8 +11,10 @@ import { idText } from "../../src/account/owner-api";
 import { AccountProvider, SESSION_KEY } from "../../src/account/session";
 import { ApiError } from "../../src/account/api";
 import type { AdminApi, AdminGateway, LegacyStore } from "../../src/admin/admin-api";
+import AuditPage from "../../src/admin/AuditPage";
 import GatewaysPage from "../../src/admin/GatewaysPage";
 import LegacyPage from "../../src/admin/LegacyPage";
+import OverviewPage from "../../src/admin/OverviewPage";
 import UserPage from "../../src/admin/UserPage";
 import UsersPage from "../../src/admin/UsersPage";
 import { LangProvider } from "../../src/i18n";
@@ -90,11 +92,13 @@ const LEGACY: LegacyStore = {
   ],
 };
 
+const OVERVIEW = { accounts: 12, accountsWeek: 3, moved: 4, admins: 2, pending: 2, approved: 5, disabled: 1, online: 4, liveTokens: 7 };
+
 function admin(overrides: Partial<AdminApi> = {}): AdminApi {
   return {
     accounts: vi.fn<AdminApi["accounts"]>(async () => ({ items: [account], more: false })),
     account: vi.fn<AdminApi["account"]>(async () => ({ account, recovery: true, gateways: [], audit: [] })),
-    audit: vi.fn<AdminApi["audit"]>(async () => ({ items: [], more: false })),
+    audit: vi.fn<AdminApi["audit"]>(async () => ({ items: [], more: false, names: { accounts: new Map(), gateways: new Map() } })),
     gateways: vi.fn<AdminApi["gateways"]>(async (state) => ({ items: state === null ? [] : [gateway(state)], more: false })),
     gateway: vi.fn<AdminApi["gateway"]>(async () => ({ gateway: gateway("approved"), tokens: [] })),
     setAdmin: vi.fn<AdminApi["setAdmin"]>(async () => {}),
@@ -103,6 +107,7 @@ function admin(overrides: Partial<AdminApi> = {}): AdminApi {
     setGatewayApproval: vi.fn<AdminApi["setGatewayApproval"]>(async () => {}),
     revokeGatewayToken: vi.fn<AdminApi["revokeGatewayToken"]>(async () => {}),
     legacyAccounts: vi.fn<AdminApi["legacyAccounts"]>(async () => LEGACY),
+    overview: vi.fn<AdminApi["overview"]>(async () => OVERVIEW),
     ...overrides,
   };
 }
@@ -184,10 +189,56 @@ describe("the administration", () => {
     expect(within(dialog).getByText(/https:\/\/gateway\.invalid/)).toBeTruthy();
     await user.click(within(dialog).getByRole("button", { name: "Approve" }));
     await waitFor(() => expect(client.setGatewayApproval).toHaveBeenCalledWith(GW, true));
-    await user.click(screen.getByRole("button", { name: "Approved" }));
+    // the change is counted again: the navigation and the filters follow
+    await waitFor(() => expect(client.overview).toHaveBeenCalledTimes(2));
+    expect(screen.getByRole("link", { name: /^Gateways 2 awaiting approval/ })).toBeTruthy();
+    // each filter says how many it holds, and the address keeps the choice
+    await user.click(screen.getByRole("button", { name: "Approved 5" }));
+    expect(window.location.search).toBe("?state=approved");
     await user.click(await screen.findByRole("button", { name: "Disable" }));
     dialog = await screen.findByRole("dialog");
     await user.click(within(dialog).getByRole("button", { name: "Disable" }));
     await waitFor(() => expect(client.setGatewayApproval).toHaveBeenCalledWith(GW, false));
+  });
+
+  it("opens on the counts, each leading where the work is, and never for anyone else", async () => {
+    const client = admin();
+    show(<OverviewPage client={client} />);
+    expect(await screen.findByRole("heading", { name: "Awaiting approval" })).toBeTruthy();
+    expect(screen.getByText("3 new this week, 4 moved from the official gateway")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Review gateways" }).getAttribute("href")).toBe("/admin/gateways");
+    expect(screen.getByRole("link", { name: "Approved gateways" }).getAttribute("href")).toBe("/admin/gateways?state=approved");
+    // the legacy store's tile, from its own read
+    expect(await screen.findByRole("heading", { name: "Left to move" })).toBeTruthy();
+    const refused = admin();
+    show(<OverviewPage client={refused} />, false);
+    await screen.findAllByText("This part is for Baylee Central's administrators.");
+    expect(refused.overview).not.toHaveBeenCalled();
+  });
+
+  it("follows the search as it is typed, keeps it in the address, and Escape empties it", async () => {
+    const user = userEvent.setup();
+    const client = admin();
+    show(<UsersPage client={client} />);
+    await screen.findByRole("link", { name: "Synthetic_Player#3fa2" });
+    const field = screen.getByRole("searchbox", { name: "Search" });
+    await user.type(field, "synth");
+    await waitFor(() => expect(client.accounts).toHaveBeenLastCalledWith("synth", null));
+    expect(window.location.search).toBe("?q=synth");
+    await user.type(field, "{Escape}");
+    expect((field as HTMLInputElement).value).toBe("");
+    await waitFor(() => expect(client.accounts).toHaveBeenLastCalledWith(null, null));
+    expect(window.location.search).toBe("");
+  });
+
+  it("names the accounts and gateways of the audit log as they are called today", async () => {
+    const event = { id: GW, at: 1_800_000_000, actor: ACCOUNT, action: "gateway.approved", account: null, gateway: GW, betaKey: null };
+    const names = {
+      accounts: new Map([[idText(ACCOUNT), { displayName: "Synthetic_Admin", tag: 0x1000 }]]),
+      gateways: new Map([[idText(GW), { name: "Synthetic gateway", origin: "https://gateway.invalid" }]]),
+    };
+    show(<AuditPage client={admin({ audit: vi.fn<AdminApi["audit"]>(async () => ({ items: [event], more: false, names })) })} />);
+    expect(await screen.findByRole("link", { name: "Synthetic_Admin#1000" })).toBeTruthy();
+    expect(screen.getByText("Synthetic gateway")).toBeTruthy();
   });
 });

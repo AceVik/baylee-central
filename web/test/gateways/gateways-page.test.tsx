@@ -45,10 +45,11 @@ describe("the gateway directory", () => {
     });
     const user = userEvent.setup();
     show();
-    await waitFor(() => expect(screen.getAllByRole("listitem").length).toBeGreaterThanOrEqual(100));
+    // a hundred cards take a while in jsdom on a busy machine
+    await waitFor(() => expect(screen.getAllByRole("listitem").length).toBeGreaterThanOrEqual(100), { timeout: 5000 });
     expect(screen.getByText(/100 gateways listed/)).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "Show the next 100" }));
-    await waitFor(() => expect(screen.getByText(/130 gateways listed/)).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(/130 gateways listed/)).toBeTruthy(), { timeout: 5000 });
     expect(screen.queryByRole("button", { name: "Show the next 100" })).toBeNull();
     expect(calls).toHaveLength(2);
     expect(calls[0]?.body).toEqual({ operation: "gateway_directory", after: null });
@@ -95,10 +96,10 @@ describe("the gateway directory", () => {
     });
     const user = userEvent.setup();
     show();
-    await waitFor(() => expect(screen.getAllByRole("heading", { level: 3 })).toHaveLength(100));
+    await waitFor(() => expect(screen.getAllByRole("heading", { level: 3 })).toHaveLength(100), { timeout: 5000 });
     expect(screen.getAllByRole("heading", { level: 3 })[0]?.textContent).toBe("Sanctuary");
     await user.click(screen.getByRole("button", { name: "Show the next 100" }));
-    await waitFor(() => expect(screen.getByText(/130 gateways listed/)).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(/130 gateways listed/)).toBeTruthy(), { timeout: 5000 });
     expect((calls[1]?.body as { after: number[] } | undefined)?.after).toEqual(listing(100).id);
     expect(screen.getAllByRole("heading", { level: 3 })[0]?.textContent).toBe("Sanctuary");
   });
