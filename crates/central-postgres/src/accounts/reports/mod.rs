@@ -186,6 +186,51 @@ impl AccountStore {
         Ok(*id.as_bytes())
     }
 
+    /// The announced length of a part `filer` may still upload for `report`:
+    /// its own report, filed within [`PART_SECONDS`], the part announced and
+    /// not stored yet. Asked before a body is read, so nothing unannounced
+    /// is read at all.
+    ///
+    /// # Errors
+    /// `Rejected` for another gateway's report, one too old or a part not
+    /// announced; `Conflict` for a part stored already; storage failure.
+    pub async fn report_part_expected(
+        &self,
+        filer: &Filer,
+        report: [u8; 16],
+        part: Part,
+    ) -> Result<u32, Error> {
+        let bytes = match part {
+            Part::Client => "client_bytes",
+            Part::Record => "record_bytes",
+        };
+        let row = self
+            .db
+            .query_one_raw(statement(
+                &format!(
+                    "SELECT r.{bytes} AS bytes, EXISTS (SELECT 1 FROM central_identity.report_parts p
+                         WHERE p.report_id = r.id AND p.part = $3) AS stored
+                     FROM central_identity.reports r
+                     WHERE r.id = $1 AND r.gateway_id = $2
+                       AND r.created_at > pg_catalog.clock_timestamp() - interval '{PART_SECONDS} seconds'"
+                ),
+                vec![uuid(report).into(), uuid(filer.gateway).into(), part.as_str().into()],
+            ))
+            .await
+            .map_err(|_| Error::Unavailable)?
+            .ok_or(Error::Rejected)?;
+        if row
+            .try_get::<bool>("", "stored")
+            .map_err(|_| Error::Unavailable)?
+        {
+            return Err(Error::Conflict);
+        }
+        let announced: Option<i32> = row.try_get("", "bytes").map_err(|_| Error::Unavailable)?;
+        announced
+            .and_then(|n| u32::try_from(n).ok())
+            .ok_or(Error::Rejected)
+    }
+
     /// Store one announced part of a report `filer` filed within
     /// [`PART_SECONDS`]: once, and only when `gzip` starts as gzip and its
     /// length and SHA-256 equal the announcement (compared in constant time).

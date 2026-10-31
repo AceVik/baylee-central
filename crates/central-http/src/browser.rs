@@ -6,13 +6,17 @@
 use axum::{
     Router,
     body::to_bytes,
-    extract::{Request as HttpRequest, State},
+    extract::{Path, Request as HttpRequest, State},
     http::{HeaderMap, HeaderName, HeaderValue, StatusCode, Uri, header},
     middleware::{self, Next},
     response::{IntoResponse, Response},
     routing::post,
 };
-use central_api::{Error, Token, wire::Request};
+use central_api::{
+    Error, Token,
+    reports::{Part, RecordOrigin},
+    wire::Request,
+};
 use central_identity::{BrowserReply, IdentityService, browser_operation};
 use std::{
     collections::BTreeMap,
@@ -89,6 +93,14 @@ pub(crate) trait Accounts: Send + Sync + 'static {
         request: Request,
         cookie: Option<&Token>,
     ) -> impl Future<Output = Result<BrowserReply, Error>> + Send;
+
+    /// A report's part as stored, for an administrator's session (`docs/reports.md`).
+    fn report_part(
+        &self,
+        cookie: Option<&Token>,
+        report: [u8; 16],
+        part: Part,
+    ) -> impl Future<Output = Result<(Vec<u8>, Option<RecordOrigin>), Error>> + Send;
 }
 
 impl Accounts for IdentityService {
@@ -98,6 +110,15 @@ impl Accounts for IdentityService {
         cookie: Option<&Token>,
     ) -> impl Future<Output = Result<BrowserReply, Error>> + Send {
         self.handle_browser(request, cookie)
+    }
+
+    fn report_part(
+        &self,
+        cookie: Option<&Token>,
+        report: [u8; 16],
+        part: Part,
+    ) -> impl Future<Output = Result<(Vec<u8>, Option<RecordOrigin>), Error>> + Send {
+        IdentityService::report_part(self, cookie, report, part)
     }
 }
 
@@ -115,6 +136,7 @@ pub(crate) fn router<A: Accounts>(accounts: Arc<A>, site: BrowserOrigin) -> Rout
     });
     Router::new()
         .route("/api/v1", post(call::<A>))
+        .route("/api/v1/reports/{report}/{part}", post(report_part::<A>))
         .fallback(|| async { (StatusCode::NOT_FOUND, "not found\n") })
         .with_state(state)
         .layer(middleware::from_fn(bounded))
@@ -191,6 +213,68 @@ async fn call<A: Accounts>(State(state): State<Arc<Browser<A>>>, request: HttpRe
         set_cookie(&mut response, None);
     }
     response
+}
+
+/// A report's part for an administrator's page (`docs/reports.md`): the
+/// same proofs as `POST /api/v1` (the local proxy, the site's exact headers,
+/// a client address, its budget), an administrator's cookie, and the gzip as
+/// stored. The page unpacks it; nothing here does.
+async fn report_part<A: Accounts>(
+    State(state): State<Arc<Browser<A>>>,
+    Path((report, part)): Path<(String, String)>,
+    request: HttpRequest,
+) -> Response {
+    let (parts, _) = request.into_parts();
+    let headers = &parts.headers;
+    let local = parts
+        .extensions
+        .get::<Peer>()
+        .is_some_and(|Peer(peer)| peer.ip().is_loopback());
+    if !local || !permitted(&parts.uri, headers, &state.site) {
+        return refused();
+    }
+    let Some(client) = client(headers) else {
+        return (StatusCode::BAD_REQUEST, "invalid request\n").into_response();
+    };
+    let (Some(report), Ok(part)) = (hex_id(&report), Part::from_stored(&part)) else {
+        return failure(Error::Rejected);
+    };
+    let charged = match state.budgets.lock() {
+        Ok(mut budgets) => budgets.parts.charge(client, Instant::now(), 120, MINUTE),
+        Err(_) => return failure(Error::Unavailable),
+    };
+    if !charged {
+        return failure(Error::Busy);
+    }
+    match state
+        .accounts
+        .report_part(cookie(headers).as_ref(), report, part)
+        .await
+    {
+        Ok((gzip, origin)) => {
+            let mut response = ([(header::CONTENT_TYPE, "application/gzip")], gzip).into_response();
+            if let Some(origin) = origin {
+                response.headers_mut().insert(
+                    HeaderName::from_static("x-record-origin"),
+                    HeaderValue::from_static(origin.as_str()),
+                );
+            }
+            response
+        }
+        Err(error) => failure(error),
+    }
+}
+
+/// An id as a path segment: 32 lowercase hex digits.
+pub(crate) fn hex_id(text: &str) -> Option<[u8; 16]> {
+    if text.len() != 32 || !text.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f')) {
+        return None;
+    }
+    let mut id = [0; 16];
+    for (i, byte) in id.iter_mut().enumerate() {
+        *byte = u8::from_str_radix(&text[i * 2..i * 2 + 2], 16).ok()?;
+    }
+    Some(id)
 }
 
 /// The fixed public vocabulary of the native route; nothing of the request or
@@ -323,6 +407,8 @@ struct Budgets {
     reset: Book,
     pair_start: Book,
     pair_status: Book,
+    /// A report's parts an administrator's page reads.
+    parts: Book,
 }
 
 impl Budgets {
@@ -420,6 +506,25 @@ mod tests {
                 }),
             };
             std::future::ready(reply)
+        }
+
+        fn report_part(
+            &self,
+            cookie: Option<&Token>,
+            report: [u8; 16],
+            part: Part,
+        ) -> impl Future<Output = Result<(Vec<u8>, Option<RecordOrigin>), Error>> + Send {
+            self.calls.lock().unwrap().push((
+                format!("report_part {} {}", report[15], part.as_str()),
+                cookie.map(Token::digest),
+            ));
+            std::future::ready(match self.fail {
+                Some(error) => Err(error),
+                None => Ok((
+                    vec![0x1f, 0x8b, 8, 0],
+                    (part == Part::Record).then_some(RecordOrigin::Client),
+                )),
+            })
         }
     }
 
