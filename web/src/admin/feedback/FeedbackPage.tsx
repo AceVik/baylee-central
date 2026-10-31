@@ -246,7 +246,11 @@ function ReportList({ api, me, summary, replace, recountUnread }: ListProps) {
     if (page || !wide()) navigate(reportPath(r.id, query));
     else {
       setDrawer(idText(r.id));
-      requestAnimationFrame(() => drawerRef.current?.focus());
+      // the keyboard goes on in the drawer, which starts at its top; the page stays where it was
+      requestAnimationFrame(() => {
+        drawerRef.current?.focus({ preventScroll: true });
+        drawerRef.current?.scrollTo?.({ top: 0 });
+      });
     }
   };
 
@@ -255,7 +259,10 @@ function ReportList({ api, me, summary, replace, recountUnread }: ListProps) {
     const next = Math.max(0, Math.min(cursor + delta, reports.length - 1));
     setCursor(next);
     const r = reports[next];
-    if (drawer !== null && r !== undefined) setDrawer(idText(r.id));
+    if (drawer !== null && r !== undefined) {
+      setDrawer(idText(r.id));
+      drawerRef.current?.scrollTo?.({ top: 0 });
+    }
     focusRow(next);
   };
 

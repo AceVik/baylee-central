@@ -66,7 +66,7 @@ export function toCsv(reports: readonly ReportSummary[], name: (id: Uint8Array |
   return `${lines.join("\r\n")}\r\n`;
 }
 
-/** Hands `text` to the browser as a file called `name`; the address is given back a moment later. */
+/** Hands `data` to the browser as a file called `name`; the address is given back half a minute later. */
 export function download(name: string, data: BlobPart, type = "text/csv;charset=utf-8"): void {
   const url = URL.createObjectURL(new Blob([data], { type }));
   const a = document.createElement("a");
@@ -76,7 +76,8 @@ export function download(name: string, data: BlobPart, type = "text/csv;charset=
   document.body.append(a);
   a.click();
   a.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
+  // long enough for the browser to take a large record, then the memory is given back
+  window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
 }
 
 /** The most an export of "all that match" reads: 25 pages of 200. */

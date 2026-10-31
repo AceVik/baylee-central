@@ -73,9 +73,9 @@ a.fb-label:hover, button.fb-label:hover { border-color: var(--edge); color: var(
 /* ---------------------------------------------------------------- the drawer, beside the list from 1100 px */
 .fb-drawer { display: none; }
 @media (min-width: 1100px) {
-  .fb-split.with-drawer { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .fb-split.with-drawer { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); }
   .fb-split.with-drawer .fb-wide { display: none; }
-  .fb-split.with-drawer .fb-cell-report { min-width: 12rem; }
+  .fb-split.with-drawer .fb-cell-report { min-width: 10rem; }
   .fb-drawer {
     display: block; position: sticky; top: calc(var(--top-h) + var(--space-4)); max-height: calc(100dvh - var(--top-h) - var(--space-6));
     overflow-y: auto; overscroll-behavior: contain; padding: var(--space-4);
