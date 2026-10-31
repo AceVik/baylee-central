@@ -99,6 +99,7 @@ fn real_native_login_restore_migration_and_adversarial_paths() {
         support::reset::run(&http, &browser, &bridge, &runtime, &operator);
         support::deletion::run(&http, &browser, &bridge, &runtime, &operator);
         support::pairing::run(&http, &browser, &runtime, &operator);
+        support::legacy::run(&http, &browser, &bridge, &store, &runtime, &operator);
     }));
     // Cleanup runs even if an assertion panics; listeners and pools belong to this fixture only.
     let _ = stop.send(());
@@ -204,20 +205,12 @@ fn run(http: &Http, bridge: &Token, runtime: &Runtime, operator: &DatabaseConnec
     );
     first.confirm_restored(http).unwrap();
     support::terms::central(http, &first, "http://127.0.0.1:28766");
-    official_admission(http, &first, bridge);
     assert!(
         first
             .gateway_ticket(http, "https://attacker.invalid".into())
             .is_err()
     );
-    http.exchange(
-        &Request::LegacyClose {
-            legacy_id: "synthetic-legacy".into(),
-            identity,
-        },
-        Some(bridge),
-    )
-    .unwrap();
+    closed_then_admitted(http, &first, bridge, identity);
     support::gateways::run(http, &first, runtime, operator);
     support::gateways::official(
         http,
@@ -247,6 +240,27 @@ fn run(http: &Http, bridge: &Token, runtime: &Runtime, operator: &DatabaseConnec
     );
     first.logout(http).unwrap();
     assert!(first.refresh(http).is_err());
+}
+
+/// The bridge admits a moved account only once its move is closed, and then
+/// as [`official_admission`] says.
+fn closed_then_admitted(http: &Http, first: &Session, bridge: &Token, identity: Identity) {
+    let open = Request::RedeemGateway {
+        ticket: first
+            .gateway_ticket(http, "http://127.0.0.1:28766".into())
+            .unwrap(),
+        purpose: TicketPurpose::Admit,
+    };
+    assert!(http.exchange(&open, Some(bridge)).is_err());
+    http.exchange(
+        &Request::LegacyClose {
+            legacy_id: "synthetic-legacy".into(),
+            identity,
+        },
+        Some(bridge),
+    )
+    .unwrap();
+    official_admission(http, first, bridge);
 }
 
 /// Only the bridge redeems an official ticket, and only once.

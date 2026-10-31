@@ -35,6 +35,7 @@ pub(super) fn run(root: &Path, port: u16, secrets: &Secrets, tls: &Path) -> Resu
         .env("CENTRAL_TEST_PORT", port.to_string())
         .env("CENTRAL_TEST_MIGRATOR_PASSWORD", &secrets.migrator)
         .env("CENTRAL_TEST_RUNTIME_PASSWORD", &secrets.runtime)
+        .env("CENTRAL_TEST_LEGACY_PASSWORD", &secrets.legacy)
         .env("CENTRAL_TEST_CA_PEM", tls.join("ca.pem"))
         .env("CENTRAL_TEST_WRONG_CA_PEM", tls.join("wrong.pem"));
     let tests = Watched::start(&mut command, "PostgreSQL integration tests failed")?;

@@ -30,7 +30,7 @@ impl IdentityService {
                 OwnerAnswer::GatewayAdded {
                     gateway: self
                         .store
-                        .add_gateway(cookie, &origin, &name, !self.legacy_discovery)
+                        .add_gateway(cookie, &origin, &name, self.development)
                         .await?,
                 }
             }

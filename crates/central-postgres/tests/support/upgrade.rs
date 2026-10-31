@@ -625,10 +625,15 @@ async fn tokens(tx: &sea_orm::DatabaseTransaction) {
     .await
     .unwrap();
     let gateway = "(SELECT id FROM upgrade_probe.gateways WHERE origin = 'https://tokens.invalid')";
+    // The longest lifetime, from one reading of the clock: `created_at`'s
+    // default reads it again, and a microsecond between the two readings
+    // crosses the 366 days.
     tx.execute_unprepared(&format!(
-        "INSERT INTO upgrade_probe.gateway_tokens (gateway_id, name, digest, sso, listing, expires_at)
-         VALUES ({gateway}, 'Main', decode(repeat('51', 32), 'hex'), true, true,
-             clock_timestamp() + interval '366 days')"
+        "WITH now AS (SELECT clock_timestamp() AS at)
+         INSERT INTO upgrade_probe.gateway_tokens
+             (gateway_id, name, digest, sso, listing, created_at, expires_at)
+         SELECT {gateway}, 'Main', decode(repeat('51', 32), 'hex'), true, true,
+             at, at + interval '366 days' FROM now"
     ))
     .await
     .unwrap();

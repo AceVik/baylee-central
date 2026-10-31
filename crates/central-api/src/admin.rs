@@ -101,6 +101,11 @@ pub enum AdminRequest {
         /// Its tag afterwards, 1 to [`crate::profile::MAX_TAG`].
         tag: u32,
     },
+    /// What is left of the legacy store (`docs/native-login.md` §"Legacy
+    /// login"): its deadline and every account not moved yet, without hashes
+    /// or snapshots. Answered with [`AdminAnswer::LegacyAccounts`]; refused
+    /// when this Central has no legacy store.
+    LegacyAccounts,
 }
 
 impl AdminRequest {
@@ -119,7 +124,8 @@ impl AdminRequest {
             | Self::Account { .. }
             | Self::Audit { .. }
             | Self::Gateways { .. }
-            | Self::Gateway { .. } => false,
+            | Self::Gateway { .. }
+            | Self::LegacyAccounts => false,
         }
     }
 }
@@ -315,6 +321,11 @@ pub enum AdminAnswer {
         code: ResetCode,
         /// Until when it is valid, in Unix seconds.
         expires_at: i64,
+    },
+    /// What is left of the legacy store.
+    LegacyAccounts {
+        /// Its deadline and its accounts.
+        store: crate::legacy::LegacyStore,
     },
 }
 

@@ -14,8 +14,8 @@ use central_http::{BROWSER_REQUEST_BYTES, BrowserOrigin, DevelopmentServer};
 use central_identity::IdentityService;
 use central_policy::config::Config;
 use central_postgres::{
-    AccountStore, Appointed, BetaKeyBatch, MAX_BETA_KEYS, ServerConfig, appoint_admin,
-    connect_server, sweep,
+    AccountStore, Appointed, BetaKeyBatch, LegacyStore, MAX_BETA_KEYS, ServerConfig, appoint_admin,
+    connect_server, sweep, sweep_legacy,
 };
 use serde::Deserialize;
 use std::{
@@ -33,7 +33,7 @@ const MAX_SETTINGS: usize = 131_072;
 /// literal and the certificate authority a PEM bundle (see [`ServerConfig`]).
 #[derive(Deserialize, Zeroize, ZeroizeOnDrop)]
 #[serde(deny_unknown_fields)]
-struct Database {
+pub(super) struct Database {
     host: String,
     port: u16,
     name: String,
@@ -43,7 +43,7 @@ struct Database {
 }
 
 impl Database {
-    fn server(&mut self) -> Result<ServerConfig, ()> {
+    pub(super) fn server(&mut self) -> Result<ServerConfig, ()> {
         ServerConfig::new(
             &self.host,
             self.port,
@@ -69,6 +69,18 @@ struct Service {
     database: Database,
     opaque_setup: Vec<u8>,
     bridge: Token,
+    /// The legacy store's own login, from the cutover until its deadline
+    /// (`docs/operations.md` §"The legacy store"); absent means no legacy
+    /// sign-in.
+    #[serde(default)]
+    legacy: Option<Legacy>,
+}
+
+/// The legacy store's login: the `central_legacy` role, never the runtime's.
+#[derive(Deserialize, Zeroize, ZeroizeOnDrop)]
+#[serde(deny_unknown_fields)]
+struct Legacy {
+    database: Database,
 }
 
 /// The browser listener for `baylee.app`, a numeric loopback address behind
@@ -108,7 +120,7 @@ struct Appoint {
     username: String,
 }
 
-fn read_settings() -> Result<Zeroizing<Vec<u8>>, ()> {
+pub(super) fn read_settings() -> Result<Zeroizing<Vec<u8>>, ()> {
     let mut bytes = Zeroizing::new(Vec::new());
     std::io::stdin()
         .lock()
@@ -160,6 +172,11 @@ async fn serve() -> Result<(), ()> {
         .map_err(|_| ())?;
     let keys = ServerKeys::from_secret_bytes(&settings.opaque_setup).map_err(|_| ())?;
     let database = settings.database.server()?;
+    let legacy = settings
+        .legacy
+        .as_mut()
+        .map(|legacy| legacy.database.server())
+        .transpose()?;
     // Bind before connecting: a taken port fails fast without touching the database.
     let server = DevelopmentServer::bind(config).await.map_err(|_| ())?;
     let browser = match browser {
@@ -167,13 +184,28 @@ async fn serve() -> Result<(), ()> {
         None => None,
     };
     let store = AccountStore::connect(database).await.map_err(|_| ())?;
+    let legacy = match legacy {
+        Some(config) => {
+            if let Ok(legacy) = LegacyStore::connect(config).await {
+                Some(legacy)
+            } else {
+                let _ = store.close().await;
+                return Err(());
+            }
+        }
+        None => None,
+    };
     let identity = IdentityService::new(
         store.clone(),
         &endpoint,
         keys,
         &settings.bridge,
         OFFICIAL_ORIGIN,
-    );
+    )
+    .map(|identity| match &legacy {
+        Some(legacy) => identity.with_legacy(legacy.clone()),
+        None => identity,
+    });
     drop(settings);
     let result = async {
         let identity = Arc::new(identity.map_err(|_| ())?);
@@ -188,6 +220,9 @@ async fn serve() -> Result<(), ()> {
                 browser.local_addr()
             );
         }
+        if legacy.is_some() {
+            println!("central: legacy sign-in from the legacy store");
+        }
         let (stop, _) = watch::channel(false);
         let native = server.run_with_identity(&endpoint, identity.clone(), stopped(&stop));
         let browser = browser
@@ -198,7 +233,11 @@ async fn serve() -> Result<(), ()> {
     }
     .await;
     let closed = store.close().await.map_err(|_| ());
-    result.and(closed)
+    let legacy_closed = match legacy {
+        Some(legacy) => legacy.close().await.map_err(|_| ()),
+        None => Ok(()),
+    };
+    result.and(closed).and(legacy_closed)
 }
 
 /// Apply pending migrations once, under the migration login, then exit.
@@ -313,14 +352,18 @@ async fn appoint() -> Result<Appointed, ()> {
     Ok(appointed)
 }
 
-/// Delete audit events older than three years, expired reset codes and
-/// expired pairings under the migrator login, which a daily timer runs
-/// (`docs/operations.md`).
+/// Delete audit events older than three years, expired reset codes, expired
+/// pairings and what the legacy store no longer needs under the migrator
+/// login, which a daily timer runs (`docs/operations.md`).
 pub(super) async fn run_sweep() -> ExitCode {
-    if let Ok(swept) = swept().await {
+    if let Ok((swept, legacy)) = swept().await {
         eprintln!(
             "central: {} audit events older than three years, {} expired reset codes and {} expired pairings deleted",
             swept.events, swept.codes, swept.pairings
+        );
+        eprintln!(
+            "central: {} moved and {} expired legacy accounts and {} unused legacy reservations deleted",
+            legacy.moved, legacy.expired, legacy.reservations
         );
         ExitCode::SUCCESS
     } else {
@@ -329,7 +372,7 @@ pub(super) async fn run_sweep() -> ExitCode {
     }
 }
 
-async fn swept() -> Result<central_postgres::Swept, ()> {
+async fn swept() -> Result<(central_postgres::Swept, central_postgres::LegacySwept), ()> {
     let bytes = read_settings()?;
     let mut settings: Migration = parse(&bytes)?;
     drop(bytes);
@@ -337,10 +380,15 @@ async fn swept() -> Result<central_postgres::Swept, ()> {
     drop(settings);
     let db = connect_server(database).await.map_err(|_| ())?;
     let swept = sweep(&db).await.map_err(|_| ());
+    let legacy = match swept {
+        Ok(_) => sweep_legacy(&db).await.map_err(|_| ()),
+        Err(()) => Err(()),
+    };
     let closed = db.close().await.map_err(|_| ());
     let swept = swept?;
+    let legacy = legacy?;
     closed?;
-    Ok(swept)
+    Ok((swept, legacy))
 }
 
 /// Write a fresh OPAQUE setup and bridge credential as one JSON document.

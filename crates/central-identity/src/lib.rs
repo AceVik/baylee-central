@@ -11,7 +11,7 @@ use central_crypto::{
     Context,
     opaque::server::{Attempt, ServerKeys},
 };
-use central_postgres::{AccountStore, Credential, Session};
+use central_postgres::{AccountStore, Credential, LegacyStore, Session};
 use std::{
     collections::BTreeMap,
     sync::{Arc, Mutex},
@@ -24,6 +24,7 @@ mod admin;
 mod deletion;
 mod dispatch;
 mod gateways;
+mod legacy;
 mod limits;
 mod objects;
 mod owner;
@@ -146,6 +147,9 @@ pub fn browser_operation(request: &Request) -> bool {
         | Request::PublishGatewayTerms { .. }
         | Request::GatewayAuthorize { .. }
         | Request::GatewayStatus
+        | Request::LegacyLogin { .. }
+        | Request::LegacyExport
+        | Request::LegacyLink { .. }
         | Request::PairClaim { .. }
         | Request::PairPoll { .. }
         | Request::PairRedeem { .. } => false,
@@ -239,12 +243,22 @@ pub struct IdentityService {
     bridge_digest: [u8; 32],
     /// The official gateway's origins, canonical first (`Endpoint::official_origins`).
     official: Vec<String>,
+    /// Whether discovery answers `Legacy` for a name it does not find: on
+    /// the live service, and wherever a legacy store is configured.
     legacy_discovery: bool,
+    /// Whether gateway origins may be numeric-loopback development origins:
+    /// everywhere but the live service. Its own flag, not the inverse of
+    /// [`Self::legacy_discovery`], which a development legacy store turns on.
+    development: bool,
     pending: Mutex<BTreeMap<[u8; 32], Pending>>,
     resets: Mutex<BTreeMap<[u8; 32], reset::PendingReset>>,
     limits: Mutex<limits::Limits>,
     workers: Arc<Semaphore>,
     terms: Option<central_api::terms::TermsDocument>,
+    /// The legacy store, from the cutover until its deadline
+    /// (`docs/native-login.md` §"Legacy login"); with it the bridge's own
+    /// legacy operations are refused.
+    legacy: Option<LegacyStore>,
 }
 
 impl IdentityService {
@@ -280,12 +294,25 @@ impl IdentityService {
             bridge_digest: bridge.digest(),
             official,
             legacy_discovery: endpoint.legacy_origin().is_some(),
+            development: endpoint.legacy_origin().is_none(),
             pending: Mutex::default(),
             resets: Mutex::default(),
             limits: Mutex::default(),
             workers: Arc::new(Semaphore::new(4)),
             terms: terms::central()?,
+            legacy: None,
         })
+    }
+
+    /// Serve the legacy sign-in from `store` (`docs/native-login.md`
+    /// §"Legacy login"): discovery answers `Legacy` for every name it does
+    /// not find enrolled, in development too, and the bridge's own legacy
+    /// operations are refused, since Central is the source now.
+    #[must_use]
+    pub fn with_legacy(mut self, store: LegacyStore) -> Self {
+        self.legacy = Some(store);
+        self.legacy_discovery = true;
+        self
     }
 
     /// Further numeric-loopback origins of the official gateway in development,
@@ -295,7 +322,7 @@ impl IdentityService {
     /// Rejects any alias on a live service, whose aliases are compiled, and one
     /// that is not a numeric-loopback development origin.
     pub fn with_aliases(mut self, aliases: Vec<String>) -> Result<Self, Error> {
-        if self.legacy_discovery {
+        if !self.development {
             return Err(Error::Rejected);
         }
         for alias in aliases {

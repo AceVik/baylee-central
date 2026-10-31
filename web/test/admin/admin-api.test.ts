@@ -28,12 +28,44 @@ const gateway = (extra: Record<string, unknown> = {}) => ({
   ...extra,
 });
 
+const legacyRow = (extra: Record<string, unknown> = {}) => ({
+  legacy_id: "0192d0c5-7b3e-7a1f-8c2d-3e4f5a6b7c01",
+  username: "synthetic_moving",
+  display_name: null,
+  tag: 7,
+  progress: "unstarted",
+  imported_at: 1_800_000_000,
+  failures: 0,
+  locked_until: null,
+  must_change_password: false,
+  banned: false,
+  snapshot_bytes: 2,
+  ...extra,
+});
+const legacyStore = (accounts: unknown[], deadline: unknown = null) => admin({ answer: "legacy_accounts", store: { deadline, accounts } });
+
 describe("the answers", () => {
   it("take a page of gateways, the official one without an owner", () => {
     const page = parseAdmin.gateways(admin({ answer: "gateways", gateways: [gateway(), gateway({ official: true, owner: null, owner_name: null, owner_tag: null })], more: false }));
     expect(page.items.map((g) => g.official)).toEqual([false, true]);
     for (const bad of [gateway({ official: true }), gateway({ owner: null }), gateway({ state: "approved", extra: 1 }), gateway({ live_tokens: -1 })]) {
       expect(() => parseAdmin.gateways(admin({ answer: "gateways", gateways: [bad], more: false }))).toThrow(ApiError);
+    }
+  });
+
+  it("take what is left of the legacy store, names and counters only", () => {
+    const read = parseAdmin.legacyAccounts(legacyStore([legacyRow(), legacyRow({ legacy_id: "2", progress: "restored", locked_until: 1_800_000_600 })], 1_800_864_000));
+    expect(read.deadline).toBe(1_800_864_000);
+    expect(read.accounts.map((a) => [a.progress, a.lockedUntil])).toEqual([["unstarted", null], ["restored", 1_800_000_600]]);
+    for (const bad of [
+      legacyRow({ password_hash: [1] }),
+      legacyRow({ progress: "closed" }),
+      legacyRow({ username: "Synthetic" }),
+      legacyRow({ legacy_id: "../x" }),
+      legacyRow({ failures: -1 }),
+      legacyRow({ display_name: "x".repeat(65) }),
+    ]) {
+      expect(() => parseAdmin.legacyAccounts(legacyStore([bad]))).toThrow(ApiError);
     }
   });
 

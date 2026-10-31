@@ -42,6 +42,10 @@ login endpoints are exposed. ID allocation does not resolve this protocol gate.
 
 ## Transaction and privilege requirements
 
+- The legacy store (schema `central_legacy`, [native login](native-login.md#legacy-login))
+  has its own login role, the only one that reads it; the runtime role has
+  nothing in it, and the legacy role nothing outside it, both checked at
+  startup.
 - The runtime role is not a database owner, superuser, migration role or
   BYPASSRLS role. Separate credentials and explicit schema grants for identity,
   personal metadata, directory, intake and migrations; revoke public creation.

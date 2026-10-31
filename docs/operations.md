@@ -19,12 +19,17 @@ never in argv or the environment. Unknown fields fail closed.
   its old address, which is also the legacy migration's); none is configurable.
   Input:
   `listen`, `database`, `opaque_setup`, `bridge`, and optionally
-  `browser: {"listen": …}` for the browser listener (absent means off).
+  `browser: {"listen": …}` for the browser listener (absent means off) and
+  `legacy: {"database": …}`, the legacy store's own login (absent means no
+  legacy sign-in; [the legacy store](#the-legacy-store)).
 - `--migrate-stdin` applies pending migrations once under the migration login
   and exits. Input: `database` only. The service never migrates by itself.
 - `--issue-beta-keys-stdin` issues beta keys under the migration login (see
   [beta keys](#beta-keys)) and prints each once. Input: `database`, `count`,
   `uses`, `note` and optionally `expires_days`.
+- `--legacy-import-stdin` and `--legacy-deadline-stdin` import the official
+  gateway's legacy accounts once and set the legacy store's deadline, under the
+  migration login ([the legacy store](#the-legacy-store)).
 - `--generate-secrets` writes a fresh `{"opaque_setup": [...], "bridge": [...]}`
   document to standard output and refuses when standard output is a terminal.
 - `--dev` and `--dev-accounts-stdin` are the local development modes described
@@ -106,7 +111,7 @@ refuse unencrypted sessions in `pg_hba.conf`, above every other `host` line:
 
 ```text
 hostnossl baylee_central all all reject
-hostssl   baylee_central central_migrator,central_runtime all scram-sha-256
+hostssl   baylee_central central_migrator,central_runtime,central_legacy all scram-sha-256
 ```
 
 ## Provisioning (once, as a database superuser)
@@ -118,9 +123,10 @@ of a role owning anything it uses; the store refuses to start otherwise.
 ```sql
 CREATE ROLE central_migrator LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS PASSWORD '<migrator>';
 CREATE ROLE central_runtime  LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS PASSWORD '<runtime>';
+CREATE ROLE central_legacy   LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS PASSWORD '<legacy>';
 CREATE DATABASE baylee_central OWNER central_migrator;
 REVOKE CONNECT, CREATE, TEMP ON DATABASE baylee_central FROM PUBLIC;
-GRANT CONNECT ON DATABASE baylee_central TO central_migrator, central_runtime;
+GRANT CONNECT ON DATABASE baylee_central TO central_migrator, central_runtime, central_legacy;
 \connect baylee_central
 REVOKE CREATE ON SCHEMA public FROM PUBLIC;
 ```
@@ -362,6 +368,78 @@ that account's next sign-in), and a bridge from before keeps reserving
 without name and tag. The privacy notice's new version (display name and
 tag, `legal/privacy.*.md` §3, §6 and §9) has to be published before the
 website offers the field.
+
+## The legacy store
+
+From the cutover until its deadline, Central signs in the official gateway's
+accounts that had not moved, from its legacy store ([native
+login](native-login.md#legacy-login)), and the gateway has no password route.
+The store is schema `central_legacy` (migration 000015) with a login role of
+its own; the runtime role has nothing in it.
+
+**Once, before deploying a release with migration 000015** on a database
+provisioned before it, as a superuser (`openssl rand -hex 32` for the
+password), and add `central_legacy` to the `pg_hba.conf` line above:
+
+```sql
+CREATE ROLE central_legacy LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS PASSWORD '<legacy>';
+GRANT CONNECT ON DATABASE baylee_central TO central_legacy;
+```
+
+`ops/grants.sql` grants it exactly what its startup check requires, and
+nothing while the role does not exist; a service whose `central.json` has a
+`legacy` block then refuses to start.
+
+**The cutover,** in the official gateway's maintenance window, in this order
+(Baylee `docs/central-login.md` §"Cutover"): stop the gateway and deploy its
+release without password routes; then, as the migrator, in one pipe and
+without a file in between:
+
+```sh
+{ cat /etc/baylee-central/migrate.json; sudo -u baylee env DATABASE_URL=… baylee-gateway legacy export; } \
+  | central-service --legacy-import-stdin
+```
+
+The first document is the migration document (`{"database": …}`), the
+second the gateway's export, which holds every remaining password hash and is
+refused on a terminal. The import checks every row (canonical username, the
+display-name and tag rules, the snapshot's shape and bound), refuses the whole
+import for one bad row, for a username another Central account holds, for a
+move closed already, for a non-empty store, or for a count or digest that is
+not the export's, and stores nothing then. In one transaction it stores the
+rows, reserves each account's identity under its name, and computes the count
+and digest again from what it stored. Compare its line on standard error with
+the export's: the counts and digests are equal. Then add the `legacy` block
+(the `central_legacy` login, `{"database": {…, "user": "central_legacy", …}}`)
+to `central.json`, restart Central, start the gateway.
+
+**The deadline** is the owner's date, **30.06.2027** (end of day,
+Europe/Berlin): migration 000015 sets it, so it holds without a step. The
+operator moves it, or clears it, only on the owner's word:
+
+```sh
+central-service --legacy-deadline-stdin < legacy-deadline.json
+```
+
+```json
+{"database": {"host": "…", "port": 5432, "name": "baylee_central", "user": "central_migrator",
+  "password": "…", "ca_certificate": "…"},
+ "deadline": "2027-06-30"}
+```
+
+The date is the last day a legacy sign-in is taken: the deadline is the end
+of that day in Europe/Berlin; `null` clears it (the store then stays until a
+date is set again). From then no legacy sign-in is taken, and the daily sweep (`--sweep-stdin`, [administration](#administration))
+deletes every row left and every legacy reservation that never enrolled; it
+deletes the row of a closed move at any time. Administrators see what is left
+on the website, at `/admin/legacy` (`AdminRequest::LegacyAccounts`). After the deadline's sweep,
+remove the `legacy` block, revoke the role's grants and drop the role; a later
+release removes the schema.
+
+**Refused moves.** A forced password change or a ban in force at the gateway
+refuses the move, after a correct password, with the same answer as a wrong
+one; the listing shows them. Ten failed sign-ins in a row lock an account out
+for an hour (the listing shows until when).
 
 ## Secrets
 

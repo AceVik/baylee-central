@@ -28,6 +28,7 @@ const ADMIN: readonly Item[] = [
   { page: "admin", label: "app.users", icon: "people" },
   { page: "adminGateways", label: "app.adminGateways", icon: "globe" },
   { page: "adminAudit", label: "app.audit", icon: "list" },
+  { page: "adminLegacy", label: "app.legacy", icon: "key" },
 ];
 
 function Items({ items, page }: { items: readonly Item[]; page: Page }) {

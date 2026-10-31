@@ -1,9 +1,10 @@
 # Native login and legacy migration integration
 
 Owner authorization: 2026-10-19. Live issuer: https://central.baylee.app.
-Only https://baylee.acevik.de may receive a legacy password, and only in the
-explicit first-enrollment flow. Development endpoints are numeric loopback
-addresses, selected explicitly; they cannot authorize live legacy migration.
+Since the cutover (owner's decision of 30.10.2026) a legacy password goes to
+Central alone, once, from the legacy store's sign-in (§"Legacy login"); no
+gateway receives one any more. Development endpoints are numeric loopback
+addresses, selected explicitly.
 
 ## Boundaries
 
@@ -62,6 +63,95 @@ are necessary to recover from interruption at every step. Enrollment challenges
 can be restarted after process restart; committed credentials, documents and
 session revocation must survive it. Secret storage never silently regenerates
 OPAQUE deployment keys after a missing/corrupt file.
+
+## Legacy login
+
+*Added 30.10.2026 (owner's decision: Central takes the old accounts' sign-in
+and their move over from the official gateway, which then has no account
+management).* The official gateway's accounts that had not moved at the
+cutover are in Central's **legacy store** until their move closes or the
+store's deadline passes. Central verifies their old passwords itself: the one
+place it ever sees a password, ended by the deadline.
+
+**The store.** Schema `central_legacy` (migration 000015), closed to
+`PUBLIC`, with a login role of its own (`central_legacy`, `ops/grants.sql`):
+it reads the accounts, counts the lockout (`failures`, `locked_until`, the only
+columns it may change) and deletes a row when its move closes; it has no usage
+of `central_identity`. The runtime role has no usage of `central_legacy` and no
+privilege on anything in it. Each store checks its role at startup, the
+negatives included (`legacy-role.sql`, `AccountStore::legacy_store_closed`),
+and refuses to start otherwise. A row holds only what the move needs: the
+legacy id, username key, display name (when it keeps the rule) and tag; the
+Argon2id salt and output; the gateway's terms version, a forced password change
+and a ban in force; the source snapshot (at most 192 KiB) and its SHA-256,
+which a constraint keeps equal; the lockout's counters. No address, session or
+Central-only account. The operator imports it once and sets its deadline under
+the migrator login ([operations](operations.md#the-legacy-store)); the import
+also reserves each account's Central identity under its name, so that nobody
+registers the name before the account moves.
+
+**The hash.** Only Argon2id, version 0x13, m = 19456 KiB, t = 2, p = 1, a
+16-byte salt and a 32-byte output: the gateway's parameters (its argon2's
+defaults). The gateway's export refuses any other hash, and the store keeps
+salt and output as fixed-length bytes, so Central parses no PHC string and no
+stored row chooses what a verification costs. `central-crypto`'s `legacy`
+derives over a caller-owned work buffer it wipes, as the OPAQUE stretch does;
+the comparison is constant-time (`subtle`).
+
+**The sign-in.** `Discover` answers `Legacy` for every name it does not find
+enrolled, unknown ones included, as before. `LegacyLogin { username, password }`
+(native listener only; the browser listener refuses it) then:
+
+1. spends the global request budget, then one of 30 legacy sign-ins a minute
+   for all names and one of five a minute for this name (as typed,
+   lowercased); past either it is `Busy` and spends nothing;
+2. reads the row for the canonical name, unless it is locked out or the
+   deadline has passed;
+3. derives on the worker pool, against the row's salt or against a fixed one
+   when there is no usable row, under the same parameters, and compares in
+   constant time; the password is dropped and wiped there;
+4. on a failure counts one against the name (a statement that matches no row
+   for an unknown or locked-out name): the tenth in a row locks the account out
+   for an hour and starts the count again. `Rejected`;
+5. on the proof starts the count again; a forced change or a ban in force is
+   `Rejected`; otherwise it reserves the identity (`reserve_legacy`, keeping the
+   name and the tag; `Conflict` once the account enrolled) and answers
+   `LegacyEnrollment { identity, ticket, gateway, snapshot }`.
+
+An unknown name, a closed move (its row is gone), a locked-out account, a
+Central-only account (never in the store, its own password included) and a
+wrong password are the same `Rejected` after the same derivation and
+statement. Timing still differs by the success path's extra statements, which
+follow only a proof; the database round trip of the failure statement is the
+same for a row and for none.
+
+**The move.** The client enrolls the snapshot, signs in through OPAQUE and
+confirms its restored document as before. With Central's terms accepted
+(`LegacyExport` and `LegacyLink` wait for them, as the gateway tickets did),
+`LegacyLink { digest }` closes it: the digest must be the stored snapshot's
+(`Conflict` otherwise; `LegacyExport` hands the snapshot again), the account
+must be restored, and then `legacy_closed` is set and the row deleted, in that
+order through the two roles. Again after the close it is `Done` and deletes a
+row whose deletion was lost; so does the daily sweep. A restored account whose
+row the deadline removed still closes. A closed move is never reopened, and
+`LegacyExport` refuses it.
+
+**The bridge.** With the store configured, the bridge's `LegacyReserve`,
+`LegacyInvalidate`, `LegacyClose`, `LegacyProfile` and `LegacyStatus` are
+refused: Central is the source, and the gateway changes no legacy password
+any more. The bridge's admission (`RedeemGateway` for `Admit`) of a legacy
+account whose move has not closed is refused, with or without the store, so a
+`legacy_id` in `GatewayIdentity` means a closed move: the official gateway fixes
+the old id's link to the Central identity at that first admission (Baylee
+`docs/central-login.md` §"Legacy migration").
+
+**The deadline.** The owner's date, the end of 30.06.2027 in
+Europe/Berlin, set by migration 000015; the operator can move or clear it
+(`docs/operations.md` §"The legacy store"). After it no row is handed out, sweep or not; the daily sweep then deletes every
+row and every legacy reservation that never enrolled, which gives its name up.
+An administrator lists what is left on the website's `/admin/legacy`
+(`AdminRequest::LegacyAccounts`: names,
+tags, progress, failures, lockout, refusals, sizes; no hash, no snapshot).
 
 ## The bridge's reservation carries the name and tag
 
