@@ -583,7 +583,7 @@ dependencies = [
 
 [[package]]
 name = "central-service"
-version = "0.1.1-beta.9a"
+version = "0.1.1-beta.9b"
 dependencies = [
  "central-api",
  "central-crypto",
