@@ -145,6 +145,16 @@ pub(super) async fn run(store: &AccountStore, operator: &DatabaseConnection, key
     // a second administrator, whose marks and notes are their own
     let (_, other) = signed_in(store, keys, "report-admin-two").await;
     appoint_admin(operator, "report-admin-two").await.unwrap();
+    // the bridge files as the official gateway, which the operator lists
+    // once (docs/operations.md §"The official gateway"); until then it cannot
+    assert_eq!(store.official_filer().await.err(), Some(Error::Unavailable));
+    sql(
+        operator,
+        "INSERT INTO central_identity.gateways (official, origin, name, version, website)
+             VALUES (true, 'https://gateway.baylee.app', 'Baylee', '0', 'https://gateway.baylee.app/')",
+        vec![],
+    )
+    .await;
     let (first, second, crash) = filing(store, &filer).await;
     listing(store, &cookie, &stranger, first, crash).await;
     reading(store, &cookie, &stranger, first, crash).await;
