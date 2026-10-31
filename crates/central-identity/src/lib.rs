@@ -30,6 +30,7 @@ mod objects;
 mod owner;
 mod pairing;
 mod password;
+mod reports;
 mod reset;
 mod terms;
 
