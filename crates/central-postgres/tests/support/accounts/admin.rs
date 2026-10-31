@@ -374,7 +374,10 @@ async fn reads(
         }
     }
     existing.sort_unstable();
-    assert_eq!(all.accounts.iter().map(|a| a.id).collect::<Vec<_>>(), existing);
+    assert_eq!(
+        all.accounts.iter().map(|a| a.id).collect::<Vec<_>>(),
+        existing
+    );
     overview(store, operator, cookie).await;
 }
 
