@@ -28,6 +28,8 @@ same app; administration comes later.
 | `/admin/users/<id>` | one account: its tag (changed, audited), the administrator role, a reset code, its gateways and audit |
 | `/admin/gateways` | every registered gateway by state: approve, disable, its tokens revoked |
 | `/admin/audit` | the audit log |
+| `/admin/feedback` | bug and crash reports: views with counts, search and filters in the address, crash groups, the last 30 days, saved lists, a selection's changes, the trash, CSV; a report beside the list from 1100 px |
+| `/admin/feedback/<id>` | one report, its triage, notes and history, what the client sent (the screenshot, the cards it names) and its record as a download; `k`/`j` step through the list it came from |
 
 English and German today, one at a time, and ready for every language Magic
 is printed in (§"The words"): `?lang=<code>` wins, then the choice made with

@@ -73,6 +73,7 @@ Tokens are named for what they mean, not for how they look:
 | `--focus` | the focus ring | `#ffe7a6` | `#235b66` |
 | `--ok`, `--warn`, `--bad`, `--off` | states: fine, attention, failure or danger, inactive | | |
 | `--edge`, `--edge-soft` | a border that matters, a border that only separates | | |
+| `--chart-reports`, `--chart-crashes` | the two series of the feedback section's 30-day chart, nowhere else | `#6f8ae8`, `#e0665a` | `#1b7fae`, `#b8402f` |
 
 Rules:
 
@@ -292,11 +293,48 @@ WCAG 2.1 AA, mobile first:
 | --- | --- | --- |
 | Public | `/`, `/download`, `/cards`, `/gateways`, `/contact`, legal pages | the bar, sections, the footer |
 | Account | `/account`, `/account/security`, `/account/gateways` | the app frame |
-| Administration | `/admin` (the overview), `/admin/users`, `/admin/users/<id>`, `/admin/gateways`, `/admin/audit`, `/admin/legacy` | the app frame, loaded only for an administrator |
+| Administration | `/admin` (the overview), `/admin/feedback`, `/admin/feedback/<id>`, `/admin/users`, `/admin/users/<id>`, `/admin/gateways`, `/admin/audit`, `/admin/legacy` | the app frame, loaded only for an administrator |
 | Sign-in | `/signin`, `/register` | a centred card beside Baylee's cloud |
 
 The account area and the administration are loaded lazily and only after a
 sign-in; a visitor's first page fetches neither.
+
+### The feedback section
+
+Bug and crash reports (`src/admin/feedback/`, `styles/feedback.css`,
+[reports](reports.md) §"The website's section") follow the components
+above, with these of their own:
+
+- **The list.** The views (inbox, open, mine, unassigned, done, all, trash)
+  are a row of chips with their counts; the search and every filter stand
+  in the address, the filters beyond the view as pills that take themselves
+  out ("Clear filters" once there are two). A report's first line is the
+  row's name, its labels, notes, record and issue under it; the columns
+  sort with `aria-sort`. An unread report has a dot, the word "Unread" for a
+  screen reader, and a heavier line. On a phone the first line wraps and the
+  rest of the row scrolls in the table's box.
+- **The drawer.** From 1100 px a report opens beside the list and the list
+  keeps the columns that matter (the report, when it came, its status);
+  below, a report opens on its own page, which carries the list's query, so
+  the way back and `k`/`j` go through the same list.
+- **What happened.** Every change says so in a notice at the foot of the
+  screen (its words in a live region of their own, so its buttons are not
+  read out), the trash's with "Undo" for ten seconds; a failure stays until
+  it is dismissed. New reports found by the 30-second refresh are announced
+  above the list and shown on a press: no row moves under the reader.
+- **Keys.** `?` lists them. They act only when no field has the keyboard,
+  and one switch, kept by the browser, turns every single key off (WCAG
+  2.1.4); Ctrl+K and the buttons always work.
+- **The 30 days.** Folded until asked for: a column a day, the crashes
+  (`--chart-crashes`) stacked on the other reports (`--chart-reports`) with
+  a gap of the surface between them, a legend in words with the totals, each
+  day's numbers on hover and in a table. The two tokens are checked for
+  colour vision against the panel in both schemes; in forced colours they
+  become the system's text and highlight.
+- **What the client sent.** The screenshot fills the column and opens large
+  in a dialog; a card the text names is a chip whose picture shows under
+  the pointer or the keyboard; the rest folds (the log, the system, the
+  settings, the whole object as a tree drawn only as it is unfolded).
 
 ## How it is held
 
