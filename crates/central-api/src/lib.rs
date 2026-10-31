@@ -12,6 +12,7 @@ pub mod legacy;
 pub mod object;
 pub mod owner;
 pub mod profile;
+pub mod reports;
 pub mod reset_code;
 pub mod terms;
 mod token;

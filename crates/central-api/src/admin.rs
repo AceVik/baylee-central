@@ -5,6 +5,10 @@
 use crate::Error;
 use crate::gateway::{GatewayMetadata, GatewayState};
 use crate::owner::TokenInfo;
+use crate::reports::{
+    BulkAction, CrashGroup, DayCount, Neighbours, ReportAdmin, ReportChange, ReportDetail,
+    ReportFacets, ReportFilter, ReportSort, ReportSummary, SavedView,
+};
 use crate::reset_code::ResetCode;
 use crate::wire::AccountSource;
 use serde::{Deserialize, Serialize};
@@ -106,12 +110,128 @@ pub enum AdminRequest {
     /// or snapshots. Answered with [`AdminAnswer::LegacyAccounts`]; refused
     /// when this Central has no legacy store.
     LegacyAccounts,
+    /// A page of reports (`docs/reports.md` §"Triage"), metadata only,
+    /// after the sweep. Answered with [`AdminAnswer::Reports`].
+    Reports {
+        /// Which.
+        filter: ReportFilter,
+        /// In what order.
+        sort: ReportSort,
+        /// Newest, largest or last first.
+        descending: bool,
+        /// Skipped rows.
+        offset: u32,
+        /// At most [`crate::reports::MAX_PAGE`].
+        limit: u32,
+    },
+    /// Counts per dimension under the filter. Answered with [`AdminAnswer::ReportFacets`].
+    ReportFacets {
+        /// Which.
+        filter: ReportFilter,
+    },
+    /// One report with its notes and history, without its parts' bytes.
+    /// Answered with [`AdminAnswer::Report`].
+    Report {
+        /// Which.
+        report: [u8; 16],
+    },
+    /// A report's place in a list. Answered with [`AdminAnswer::Neighbours`].
+    ReportNeighbours {
+        /// Which.
+        report: [u8; 16],
+        /// The list's filter.
+        filter: ReportFilter,
+        /// Its order.
+        sort: ReportSort,
+        /// Its direction.
+        descending: bool,
+    },
+    /// Crashes grouped by signature. Answered with [`AdminAnswer::CrashGroups`].
+    CrashGroups {
+        /// Which reports.
+        filter: ReportFilter,
+    },
+    /// Reports per UTC day and kind. Answered with [`AdminAnswer::ReportStats`].
+    ReportStats,
+    /// The administrators a report may be assigned to. Answered with [`AdminAnswer::ReportAdmins`].
+    ReportAdmins,
+    /// Change one report's triage; `Conflict` when it moved past
+    /// `expected_revision`. Answered with [`AdminAnswer::Report`].
+    SetReport {
+        /// Which.
+        report: [u8; 16],
+        /// What.
+        change: ReportChange,
+        /// The revision it was read at, if the page knows it.
+        expected_revision: Option<u32>,
+    },
+    /// Change, trash, restore or purge a selection, in one transaction.
+    /// Answered with [`AdminAnswer::Changed`].
+    ReportsBulk {
+        /// Which, at most [`crate::reports::MAX_BULK`].
+        reports: Vec<[u8; 16]>,
+        /// What.
+        bulk: BulkAction,
+    },
+    /// Into the trash. Answered with `Done`.
+    TrashReport {
+        /// Which.
+        report: [u8; 16],
+    },
+    /// Out of the trash. Answered with `Done`.
+    RestoreReport {
+        /// Which.
+        report: [u8; 16],
+    },
+    /// Deleted for good from the trash. Answered with `Done`.
+    PurgeReport {
+        /// Which.
+        report: [u8; 16],
+    },
+    /// A note on a report. Answered with [`AdminAnswer::Report`].
+    AddReportNote {
+        /// Which.
+        report: [u8; 16],
+        /// Its words, 1 to [`crate::reports::MAX_NOTE`] characters.
+        text: String,
+    },
+    /// A note removed by its author. Answered with [`AdminAnswer::Report`].
+    RemoveReportNote {
+        /// Which report.
+        report: [u8; 16],
+        /// Which note.
+        note: [u8; 16],
+    },
+    /// The reading administrator's saved lists. Answered with [`AdminAnswer::ReportViews`].
+    ReportViews,
+    /// Save a list; a name saved again replaces its query. Answered with [`AdminAnswer::ReportViews`].
+    SaveReportView {
+        /// Its name.
+        name: String,
+        /// The list's query string.
+        query: String,
+    },
+    /// Forget a saved list. Answered with [`AdminAnswer::ReportViews`].
+    DeleteReportView {
+        /// Which.
+        view: [u8; 16],
+    },
+    /// Mark reports opened, or not, for the reading administrator. Answered with `Done`.
+    SetReportsSeen {
+        /// Which, at most [`crate::reports::MAX_SEEN`].
+        reports: Vec<[u8; 16]>,
+        /// Opened, or not.
+        seen: bool,
+    },
 }
 
 impl AdminRequest {
     /// Whether the request changes anything: a change needs a recent
     /// password sign-in and writes its audit event. Every action is named,
-    /// so a new one does not compile until it is decided here.
+    /// so a new one does not compile until it is decided here. A report's
+    /// triage is the administrators' daily work and writes the report's own
+    /// history instead (`report_audit`); of it only what cannot be undone,
+    /// a purge, asks for the password again ([`Self::fresh`]).
     #[must_use]
     pub const fn changes(&self) -> bool {
         match self {
@@ -119,13 +239,50 @@ impl AdminRequest {
             | Self::ResetLogin { .. }
             | Self::SetGatewayApproval { .. }
             | Self::RevokeGatewayToken { .. }
-            | Self::SetTag { .. } => true,
+            | Self::SetTag { .. }
+            | Self::SetReport { .. }
+            | Self::ReportsBulk { .. }
+            | Self::TrashReport { .. }
+            | Self::RestoreReport { .. }
+            | Self::PurgeReport { .. }
+            | Self::AddReportNote { .. }
+            | Self::RemoveReportNote { .. }
+            | Self::SaveReportView { .. }
+            | Self::DeleteReportView { .. }
+            | Self::SetReportsSeen { .. } => true,
             Self::Accounts { .. }
             | Self::Account { .. }
             | Self::Audit { .. }
             | Self::Gateways { .. }
             | Self::Gateway { .. }
-            | Self::LegacyAccounts => false,
+            | Self::LegacyAccounts
+            | Self::Reports { .. }
+            | Self::ReportFacets { .. }
+            | Self::Report { .. }
+            | Self::ReportNeighbours { .. }
+            | Self::CrashGroups { .. }
+            | Self::ReportStats
+            | Self::ReportAdmins
+            | Self::ReportViews => false,
+        }
+    }
+
+    /// Whether the change needs a password sign-in less than 30 minutes
+    /// old: every change of the administration's, and of a report's triage
+    /// only a purge, which cannot be undone.
+    #[must_use]
+    pub const fn fresh(&self) -> bool {
+        match self {
+            Self::SetReport { .. }
+            | Self::TrashReport { .. }
+            | Self::RestoreReport { .. }
+            | Self::AddReportNote { .. }
+            | Self::RemoveReportNote { .. }
+            | Self::SaveReportView { .. }
+            | Self::DeleteReportView { .. }
+            | Self::SetReportsSeen { .. } => false,
+            Self::ReportsBulk { bulk, .. } => matches!(bulk, BulkAction::Purge),
+            _ => self.changes(),
         }
     }
 }
@@ -326,6 +483,53 @@ pub enum AdminAnswer {
     LegacyAccounts {
         /// Its deadline and its accounts.
         store: crate::legacy::LegacyStore,
+    },
+    /// A page of reports.
+    Reports {
+        /// At most the page asked for.
+        reports: Vec<ReportSummary>,
+        /// All the filter matches.
+        total: u64,
+    },
+    /// Counts per dimension.
+    ReportFacets {
+        /// The counts.
+        facets: ReportFacets,
+    },
+    /// One report.
+    Report {
+        /// It.
+        report: ReportDetail,
+    },
+    /// A report's place in a list.
+    Neighbours {
+        /// Its place.
+        neighbours: Neighbours,
+    },
+    /// Crashes by signature.
+    CrashGroups {
+        /// At most [`crate::reports::MAX_CRASH_GROUPS`], the latest first.
+        groups: Vec<CrashGroup>,
+    },
+    /// Reports per day and kind.
+    ReportStats {
+        /// Over [`crate::reports::STATS_DAYS`] days, by day then kind.
+        days: Vec<DayCount>,
+    },
+    /// The administrators.
+    ReportAdmins {
+        /// Each once.
+        admins: Vec<ReportAdmin>,
+    },
+    /// How many reports a selection changed.
+    Changed {
+        /// How many.
+        changed: u32,
+    },
+    /// The reading administrator's saved lists.
+    ReportViews {
+        /// Oldest first.
+        views: Vec<SavedView>,
     },
 }
 
