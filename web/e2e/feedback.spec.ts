@@ -41,12 +41,14 @@ test.describe("the feedback section", () => {
     expect(errors).toEqual([]);
   });
 
-  test("decides a report on its page: status, a note, the way back", async ({ page, baseURL }) => {
+  test("decides a report on its page: status, a note, the way back", async ({ page, baseURL }, info) => {
     const errors = watchErrors(page);
     const central = await signedIn(page, new URL(baseURL ?? "").origin);
     await page.goto("/admin/feedback?lang=en&status=new,triaged,in_progress");
-    await page.getByRole("link", { name: /The client closed itself/ }).click({ modifiers: [] });
-    if (!/\/admin\/feedback\/[0-9a-f]{32}/.test(page.url())) await page.getByRole("link", { name: "Open its page" }).click();
+    await page.getByRole("link", { name: /The client closed itself/ }).click();
+    // beside the list on a desktop, its own page on a phone
+    if (info.project.name === "desktop") await page.getByRole("link", { name: "Open its page" }).click();
+    await expect(page).toHaveURL(/\/admin\/feedback\/[0-9a-f]{32}\?/);
     await expect(page.getByRole("heading", { level: 1 })).toHaveText("A report");
     await expect(page.getByText(/^\d+ of \d+$/)).toBeVisible();
     await page.getByRole("button", { name: "High" }).click();
@@ -58,6 +60,40 @@ test.describe("the feedback section", () => {
     await expectNoSideScroll(page);
     await page.getByRole("link", { name: "Back to the list" }).click();
     await expect(page).toHaveURL(/\/admin\/feedback\?status=new%2Ctriaged%2Cin_progress$/);
+    expect(central.violations).toEqual([]);
+    expect(errors).toEqual([]);
+  });
+});
+
+test.describe("the feedback section's tools", () => {
+  test("a selection, the trash with its undo, crash groups, the chart and the keys", async ({ page, baseURL }) => {
+    const errors = watchErrors(page);
+    const central = await signedIn(page, new URL(baseURL ?? "").origin);
+    await page.goto("/admin/feedback?lang=en&status=new");
+    await page.getByRole("checkbox", { name: /Select: The stack resolved twice/ }).check();
+    await page.getByRole("checkbox", { name: /Select: The client closed itself/ }).check();
+    const bar = page.getByRole("region", { name: "The selected reports" });
+    await bar.getByLabel("Set the status").selectOption("triaged");
+    await expect(page.getByText("2 reports set to Triaged.").first()).toBeVisible();
+    await page.goto("/admin/feedback?lang=en&status=triaged");
+    await page.getByRole("checkbox", { name: /Select: The stack resolved twice/ }).check();
+    await page.getByRole("region", { name: "The selected reports" }).getByRole("button", { name: "Move to the trash" }).click();
+    await expect(page.getByRole("link", { name: /The stack resolved twice/ })).toHaveCount(0);
+    await page.getByRole("button", { name: "Undo" }).click();
+    await expect(page.getByRole("link", { name: /The stack resolved twice/ })).toBeVisible();
+    await page.goto("/admin/feedback?lang=en");
+    await page.getByRole("button", { name: "Crash groups" }).click();
+    await expect(page.getByText("index 7 out of range for slice of length 3")).toBeVisible();
+    await page.getByRole("button", { name: "List" }).click();
+    await page.getByText("The last 30 days").click();
+    await expect(page.getByText(/Crashes: \d+/)).toBeVisible();
+    await page.waitForLoadState("networkidle");
+    await expectNoSideScroll(page);
+    // the single keys act when no field has the keyboard
+    await page.evaluate(() => (document.activeElement instanceof HTMLElement ? document.activeElement.blur() : undefined));
+    await page.keyboard.press("?");
+    await expect(page.getByRole("dialog", { name: "Keys" })).toBeVisible();
+    await page.keyboard.press("Escape");
     expect(central.violations).toEqual([]);
     expect(errors).toEqual([]);
   });

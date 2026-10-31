@@ -1277,3 +1277,186 @@ fb-previous = Vorige Meldung
 fb-next = Nächste Meldung
 fb-position = { $n } von { $total }
 fb-notInList = Nicht in dieser Liste
+fb-selection = Die ausgewählten Meldungen
+fb-selected =
+
+    { $n ->
+        [one] Eine Meldung ausgewählt
+       *[other] { $n } Meldungen ausgewählt
+    }
+fb-deselect = Auswahl aufheben
+fb-selectAll = Alle Meldungen dieser Seite auswählen
+fb-selectOne = Auswählen: { $what }
+fb-setStatus = Status setzen
+fb-setPriority = Priorität setzen
+fb-assignTo = Zuweisen an
+fb-removeLabelAll = Ein Label entfernen
+fb-mergeInto = Duplikate von
+fb-markRead = Als gelesen markieren
+fb-markUnread = Als ungelesen markieren
+fb-copyIds = Ihre IDs kopieren
+fb-exportSelected =
+
+    { $n ->
+        [one] Als CSV exportieren
+       *[other] Diese { $n } als CSV exportieren
+    }
+fb-exportAll =
+
+    { $n ->
+        [one] Als CSV exportieren
+       *[other] Alle { $n } als CSV exportieren
+    }
+fb-exported =
+
+    { $n ->
+        [one] Eine Meldung exportiert.
+       *[other] { $n } Meldungen exportiert.
+    }
+fb-idsCopied =
+
+    { $n ->
+        [one] Ihre ID ist kopiert.
+       *[other] { $n } IDs kopiert.
+    }
+fb-linkCopied = Die Adresse der Meldung ist kopiert.
+fb-markedRead =
+
+    { $n ->
+        [one] Als gelesen markiert.
+       *[other] { $n } als gelesen markiert.
+    }
+fb-markedUnread =
+
+    { $n ->
+        [one] Als ungelesen markiert.
+       *[other] { $n } als ungelesen markiert.
+    }
+fb-bulkStatus =
+
+    { $n ->
+        [one] Status auf „{ $status }“ gesetzt.
+       *[other] { $n } Meldungen auf „{ $status }“ gesetzt.
+    }
+fb-bulkPriority =
+
+    { $n ->
+        [one] Priorität auf „{ $priority }“ gesetzt.
+       *[other] { $n } Meldungen auf „{ $priority }“ gesetzt.
+    }
+fb-bulkAssigned =
+
+    { $n ->
+        [one] { $name } zugewiesen.
+       *[other] { $n } Meldungen { $name } zugewiesen.
+    }
+fb-bulkMine =
+
+    { $n ->
+        [one] Dir zugewiesen.
+       *[other] { $n } Meldungen dir zugewiesen.
+    }
+fb-bulkUnassigned =
+
+    { $n ->
+        [one] Niemandem mehr zugewiesen.
+       *[other] { $n } Meldungen niemandem mehr zugewiesen.
+    }
+fb-bulkLabelled =
+
+    { $n ->
+        [one] Mit { $label } versehen.
+       *[other] { $n } Meldungen mit { $label } versehen.
+    }
+fb-bulkUnlabelled =
+
+    { $n ->
+        [one] Label { $label } entfernt.
+       *[other] Label { $label } von { $n } Meldungen entfernt.
+    }
+fb-bulkMerged =
+
+    { $n ->
+        [one] Als Duplikat von …{ $id } markiert.
+       *[other] { $n } Meldungen als Duplikate von …{ $id } markiert.
+    }
+fb-bulkTrashed =
+
+    { $n ->
+        [one] Die Meldung liegt im Papierkorb.
+       *[other] { $n } Meldungen liegen im Papierkorb.
+    }
+fb-bulkRestored =
+
+    { $n ->
+        [one] Die Meldung ist zurück aus dem Papierkorb.
+       *[other] { $n } Meldungen sind zurück aus dem Papierkorb.
+    }
+fb-bulkPurged =
+
+    { $n ->
+        [one] Die Meldung ist endgültig gelöscht.
+       *[other] { $n } Meldungen sind endgültig gelöscht.
+    }
+fb-purgeManyTitle =
+
+    { $n ->
+        [one] Diese Meldung endgültig löschen?
+       *[other] Diese { $n } Meldungen endgültig löschen?
+    }
+fb-arrived =
+
+    { $n ->
+        [one] Eine neue Meldung ist eingegangen.
+       *[other] { $n } neue Meldungen sind eingegangen.
+    }
+fb-showArrived = Anzeigen
+fb-shownAs = Anzeige als
+fb-asList = Liste
+fb-asGroups = Absturzgruppen
+fb-groups = Absturzgruppen
+fb-noGroups = Kein Absturz in dieser Liste.
+fb-colCrash = Absturz
+fb-colCount = Meldungen
+fb-colOpen = Offen
+fb-colFirst = Zuerst
+fb-colLast = Zuletzt
+fb-showGroup = Ihre Meldungen zeigen
+fb-chart = Die letzten 30 Tage
+fb-errChart = Baylee Central hat nicht gesagt, wie viele gekommen sind.
+fb-chartOthers = Andere Meldungen: { $n }
+fb-chartCrashes = Abstürze: { $n }
+fb-chartDay = { $day }: { $n } Meldungen, davon { $crashes } Abstürze
+fb-chartTable = Als Tabelle
+fb-chartDayHead = Tag
+fb-chartOthersHead = Andere Meldungen
+fb-chartCrashesHead = Abstürze
+fb-savedViews = Gespeicherte Listen
+fb-errViews = Deine gespeicherten Listen ließen sich nicht lesen.
+fb-noViews = Noch keine gespeicherte Liste. Speichere diese unter einem Namen.
+fb-viewName = Ein Name für diese Liste
+fb-saveView = Speichern
+fb-viewSaved = Als „{ $name }“ gespeichert.
+fb-viewRemoved = „{ $name }“ ist vergessen.
+fb-removeView = Die Liste „{ $name }“ vergessen
+fb-viewsFull = Du hast { $n } Listen, mehr gehen nicht. Vergiss eine, um eine andere zu speichern.
+fb-keysTitle = Tasten
+fb-keyMove = nächste oder vorige Meldung; die Seitenleiste folgt
+fb-keyOpen = Meldung neben der Liste öffnen
+fb-keyPage = eigene Seite der Meldung öffnen
+fb-keySelect = auswählen oder abwählen
+fb-keySelectAll = alle Meldungen der Seite auswählen, oder keine
+fb-keyStatus = neu, gesichtet, in Arbeit, behoben, wird nicht behoben
+fb-keyMine = mir zuweisen, oder niemandem
+fb-keyRead = als gelesen oder ungelesen markieren
+fb-keyTrash = in den Papierkorb, mit Rückgängig
+fb-keyPages = vorige oder nächste Seite
+fb-keySearch = suchen
+fb-keyRefresh = Liste neu lesen
+fb-keyCopy = Adresse der Meldung kopieren
+fb-keyExport = Auswahl oder Seite als CSV exportieren
+fb-keyClose = Seitenleiste schließen, dann die Auswahl aufheben
+fb-keyHelp = diese Tasten
+fb-keySteps = vorige oder nächste Meldung der Liste
+fb-keysOn = Einzelne Tasten auf dieser Seite
+fb-keysWhy = Ausgeschaltet wirken nur Strg+K und die Knöpfe; das hilft bei Spracheingabe. Dieser Browser merkt sich die Wahl.

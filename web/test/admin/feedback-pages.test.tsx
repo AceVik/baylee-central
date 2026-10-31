@@ -19,6 +19,7 @@ import { LangProvider } from "../../src/i18n";
 import { ACCOUNT, fakeCentral, fakeCrypto } from "../support/central";
 import { standInDialogs } from "../support/dialog";
 import { fakeReports, id } from "../support/reports";
+import { idOf } from "../../src/account/owner-api";
 
 standInDialogs();
 
@@ -158,5 +159,102 @@ describe("the feedback section", () => {
     expect(await screen.findByRole("heading", { name: "Open reports" })).toBeTruthy();
     expect(screen.getByText("2 new crashes wait for you.")).toBeTruthy();
     expect(screen.getByRole("link", { name: "New crashes" }).getAttribute("href")).toBe("/admin/feedback?status=new&kind=crash");
+  });
+
+  it("changes a selection in one request, and takes a move to the trash back", async () => {
+    const user = userEvent.setup();
+    const reports = fakeReports();
+    window.history.replaceState(null, "", "/admin/feedback?status=new");
+    show(<FeedbackPage client={admin()} reports={reports} />);
+    await user.click(await screen.findByRole("checkbox", { name: /Select: Synthetic report 1/ }));
+    await user.click(screen.getByRole("checkbox", { name: /Select: Synthetic report 2/ }));
+    const bar = screen.getByRole("region", { name: "The selected reports" });
+    expect(within(bar).getByText("2 reports selected")).toBeTruthy();
+    await user.selectOptions(within(bar).getByLabelText("Set the priority"), "high");
+    await waitFor(() => expect(reports.bulk).toHaveBeenCalledWith([id(2), id(1)], { do: "change", change: { priority: "high" } }));
+    expect((await screen.findAllByText("2 reports set to High.")).length).toBeGreaterThan(0);
+    await user.click(within(screen.getByRole("region", { name: "The selected reports" })).getByRole("button", { name: "Move to the trash" }));
+    await waitFor(() => expect(reports.bulk).toHaveBeenCalledWith([id(2), id(1)], { do: "trash" }));
+    await waitFor(() => expect(screen.queryByRole("link", { name: /Synthetic report 1/ })).toBeNull());
+    await user.click(await screen.findByRole("button", { name: "Undo" }));
+    await waitFor(() => expect(reports.bulk).toHaveBeenCalledWith([id(2), id(1)], { do: "restore" }));
+    expect(await screen.findByRole("link", { name: /Synthetic report 1/ })).toBeTruthy();
+  });
+
+  it("deletes for good from the trash only after a second step", async () => {
+    const user = userEvent.setup();
+    const reports = fakeReports();
+    await reports.trash(id(4));
+    window.history.replaceState(null, "", "/admin/feedback?trash=1");
+    show(<FeedbackPage client={admin()} reports={reports} />);
+    await user.click(await screen.findByRole("checkbox", { name: /Select: Synthetic report 4/ }));
+    await user.click(screen.getByRole("button", { name: "Delete for good" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(reports.bulk).not.toHaveBeenCalled();
+    await user.click(within(dialog).getByRole("button", { name: "Delete for good" }));
+    await waitFor(() => expect(reports.bulk).toHaveBeenCalledWith([id(4)], { do: "purge" }));
+    expect(await screen.findByText("No report matches.")).toBeTruthy();
+  });
+
+  it("groups the crashes and shows a group's reports", async () => {
+    const user = userEvent.setup();
+    const reports = fakeReports();
+    window.history.replaceState(null, "", "/admin/feedback");
+    show(<FeedbackPage client={admin()} reports={reports} />);
+    await user.click(await screen.findByRole("button", { name: "Crash groups" }));
+    expect(await screen.findByText("index 7 out of range for 3")).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Show its reports" }));
+    expect(window.location.search).toBe(`?signature=${"a".repeat(32)}`);
+  });
+
+  it("draws the last 30 days when unfolded, and saves a list under a name", async () => {
+    const user = userEvent.setup();
+    const reports = fakeReports();
+    window.history.replaceState(null, "", "/admin/feedback?status=new&kind=crash");
+    show(<FeedbackPage client={admin()} reports={reports} />);
+    await screen.findByRole("link", { name: /Synthetic report 2/ });
+    expect(reports.stats).not.toHaveBeenCalled();
+    await user.click(screen.getByText("The last 30 days"));
+    expect(await screen.findByText(/^Crashes:/)).toBeTruthy();
+    await user.click(screen.getByText("Saved lists"));
+    await user.type(await screen.findByLabelText("A name for this list"), "New crashes");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(reports.saveView).toHaveBeenCalledWith("New crashes", "status=new&kind=crash"));
+    expect(await screen.findByRole("link", { name: "New crashes" })).toBeTruthy();
+  });
+
+  it("shows the keys on ?, and a single key does nothing once they are off", async () => {
+    const user = userEvent.setup();
+    const reports = fakeReports();
+    window.history.replaceState(null, "", "/admin/feedback?status=new");
+    show(<FeedbackPage client={admin()} reports={reports} />);
+    await screen.findByRole("link", { name: /Synthetic report 1/ });
+    await user.keyboard("?");
+    const dialog = await screen.findByRole("dialog", { name: "Keys" });
+    await user.click(within(dialog).getByRole("checkbox", { name: "Single keys on this page" }));
+    await user.click(within(dialog).getByRole("button", { name: "Close" }));
+    await user.keyboard("x");
+    expect(screen.queryByRole("region", { name: "The selected reports" })).toBeNull();
+  });
+
+  it("reads the list again quietly and announces new reports instead of moving the rows", async () => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+    try {
+      const reports = fakeReports();
+      window.history.replaceState(null, "", "/admin/feedback?status=new");
+      show(<FeedbackPage client={admin()} reports={reports} />);
+      await screen.findByRole("link", { name: /Synthetic report 1/ });
+      const fresh = structuredClone(reports.rows[0]);
+      if (fresh === undefined) throw new Error("no row");
+      fresh.summary = { ...fresh.summary, id: idOf("0192d0c57b3e7a1f8c2d3e4f5a6b7c09") ?? id(9), excerpt: "Synthetic report 9: brand new", createdAt: 1_900_000_000 };
+      reports.rows.push(fresh);
+      vi.advanceTimersByTime(30_000);
+      expect(await screen.findByText("A new report came in.")).toBeTruthy();
+      expect(screen.queryByRole("link", { name: /Synthetic report 9/ })).toBeNull();
+      await userEvent.setup().click(screen.getByRole("button", { name: "Show them" }));
+      expect(await screen.findByRole("link", { name: /Synthetic report 9/ })).toBeTruthy();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

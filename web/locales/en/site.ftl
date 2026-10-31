@@ -1281,3 +1281,186 @@ fb-previous = Previous report
 fb-next = Next report
 fb-position = { $n } of { $total }
 fb-notInList = Not in this list
+fb-selection = The selected reports
+fb-selected =
+
+    { $n ->
+        [one] One report selected
+       *[other] { $n } reports selected
+    }
+fb-deselect = Select none
+fb-selectAll = Select every report on this page
+fb-selectOne = Select: { $what }
+fb-setStatus = Set the status
+fb-setPriority = Set the priority
+fb-assignTo = Assign to
+fb-removeLabelAll = Remove a label
+fb-mergeInto = Duplicates of
+fb-markRead = Mark read
+fb-markUnread = Mark unread
+fb-copyIds = Copy their ids
+fb-exportSelected =
+
+    { $n ->
+        [one] Export it as CSV
+       *[other] Export these { $n } as CSV
+    }
+fb-exportAll =
+
+    { $n ->
+        [one] Export it as CSV
+       *[other] Export all { $n } as CSV
+    }
+fb-exported =
+
+    { $n ->
+        [one] One report exported.
+       *[other] { $n } reports exported.
+    }
+fb-idsCopied =
+
+    { $n ->
+        [one] Its id is copied.
+       *[other] { $n } ids copied.
+    }
+fb-linkCopied = The report's address is copied.
+fb-markedRead =
+
+    { $n ->
+        [one] Marked read.
+       *[other] { $n } marked read.
+    }
+fb-markedUnread =
+
+    { $n ->
+        [one] Marked unread.
+       *[other] { $n } marked unread.
+    }
+fb-bulkStatus =
+
+    { $n ->
+        [one] Status set to { $status }.
+       *[other] { $n } reports set to { $status }.
+    }
+fb-bulkPriority =
+
+    { $n ->
+        [one] Priority set to { $priority }.
+       *[other] { $n } reports set to { $priority }.
+    }
+fb-bulkAssigned =
+
+    { $n ->
+        [one] Assigned to { $name }.
+       *[other] { $n } reports assigned to { $name }.
+    }
+fb-bulkMine =
+
+    { $n ->
+        [one] Assigned to you.
+       *[other] { $n } reports assigned to you.
+    }
+fb-bulkUnassigned =
+
+    { $n ->
+        [one] Assigned to nobody.
+       *[other] { $n } reports assigned to nobody.
+    }
+fb-bulkLabelled =
+
+    { $n ->
+        [one] Labelled { $label }.
+       *[other] { $n } reports labelled { $label }.
+    }
+fb-bulkUnlabelled =
+
+    { $n ->
+        [one] Label { $label } removed.
+       *[other] Label { $label } removed from { $n } reports.
+    }
+fb-bulkMerged =
+
+    { $n ->
+        [one] Marked as a duplicate of …{ $id }.
+       *[other] { $n } reports marked as duplicates of …{ $id }.
+    }
+fb-bulkTrashed =
+
+    { $n ->
+        [one] The report is in the trash.
+       *[other] { $n } reports are in the trash.
+    }
+fb-bulkRestored =
+
+    { $n ->
+        [one] The report is back from the trash.
+       *[other] { $n } reports are back from the trash.
+    }
+fb-bulkPurged =
+
+    { $n ->
+        [one] The report is deleted for good.
+       *[other] { $n } reports are deleted for good.
+    }
+fb-purgeManyTitle =
+
+    { $n ->
+        [one] Delete this report for good?
+       *[other] Delete these { $n } reports for good?
+    }
+fb-arrived =
+
+    { $n ->
+        [one] A new report came in.
+       *[other] { $n } new reports came in.
+    }
+fb-showArrived = Show them
+fb-shownAs = Shown as
+fb-asList = List
+fb-asGroups = Crash groups
+fb-groups = Crash groups
+fb-noGroups = No crash in this list.
+fb-colCrash = Crash
+fb-colCount = Reports
+fb-colOpen = Open
+fb-colFirst = First
+fb-colLast = Last
+fb-showGroup = Show its reports
+fb-chart = The last 30 days
+fb-errChart = Baylee Central did not say how many came.
+fb-chartOthers = Other reports: { $n }
+fb-chartCrashes = Crashes: { $n }
+fb-chartDay = { $day }: { $n } reports, { $crashes } of them crashes
+fb-chartTable = As a table
+fb-chartDayHead = Day
+fb-chartOthersHead = Other reports
+fb-chartCrashesHead = Crashes
+fb-savedViews = Saved lists
+fb-errViews = Your saved lists could not be read.
+fb-noViews = No saved list yet. Save this one under a name.
+fb-viewName = A name for this list
+fb-saveView = Save
+fb-viewSaved = Saved as { $name }.
+fb-viewRemoved = { $name } is forgotten.
+fb-removeView = Forget the list { $name }
+fb-viewsFull = You keep { $n } lists, the most there may be. Forget one to save another.
+fb-keysTitle = Keys
+fb-keyMove = the next or previous report; the drawer follows
+fb-keyOpen = open the report beside the list
+fb-keyPage = open the report's own page
+fb-keySelect = select or deselect it
+fb-keySelectAll = select every report on the page, or none
+fb-keyStatus = new, triaged, in progress, resolved, won't fix
+fb-keyMine = assign to me, or to nobody
+fb-keyRead = mark read or unread
+fb-keyTrash = move to the trash, with an undo
+fb-keyPages = the previous or next page
+fb-keySearch = search
+fb-keyRefresh = read the list again
+fb-keyCopy = copy the report's address
+fb-keyExport = export the selection, or the page, as CSV
+fb-keyClose = close the drawer, then the selection
+fb-keyHelp = these keys
+fb-keySteps = the previous or next report of the list
+fb-keysOn = Single keys on this page
+fb-keysWhy = Switched off, only Ctrl+K and the buttons act; that helps with speech input. This browser keeps the choice.

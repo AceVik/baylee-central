@@ -27,7 +27,7 @@ interface Props {
 }
 
 /** The statuses a button sets; `duplicate` comes with the report it duplicates. */
-const SETTABLE = STATUSES.filter((s) => s !== "duplicate");
+export const SETTABLE = STATUSES.filter((s) => s !== "duplicate");
 
 export function StatusPicker({ report, busy, apply }: Props) {
   const lang = useLang();

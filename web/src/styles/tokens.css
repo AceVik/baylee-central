@@ -83,6 +83,10 @@
   --warn: #f0c076;
   --untested: #8fcfe0;
   --bad: #f39c92;
+  /* the feedback section's 30-day chart: two series, checked for colour
+     vision and against the panel (the dataviz validator, 31.10.2026) */
+  --chart-reports: #6f8ae8;
+  --chart-crashes: #e0665a;
   --off: #93a0bb;
   --veil-top: rgba(8, 14, 28, 0.30);
   --veil-mid: rgba(11, 19, 34, 0.55);
@@ -128,6 +132,8 @@
     --warn: #8a5a05;
     --untested: #1f6f6a;
     --bad: #a1332a;
+    --chart-reports: #1b7fae;
+    --chart-crashes: #b8402f;
     --off: #5d6779;
     --veil-top: rgba(222, 231, 244, 0.40);
     --veil-mid: rgba(232, 238, 247, 0.74);
@@ -171,6 +177,8 @@
   --warn: #8a5a05;
   --untested: #1f6f6a;
   --bad: #a1332a;
+  --chart-reports: #1b7fae;
+  --chart-crashes: #b8402f;
   --off: #5d6779;
   --veil-top: rgba(222, 231, 244, 0.40);
   --veil-mid: rgba(232, 238, 247, 0.74);

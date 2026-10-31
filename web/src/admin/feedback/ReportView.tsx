@@ -73,8 +73,10 @@ export interface ReportViewProps {
   replace(s: AccountSummary): void;
   /** One column, the long parts folded: the list's drawer. */
   compact?: boolean;
-  /** It changed (its triage, its unread mark). */
+  /** It was read or changed (its triage, its unread mark): the row that shows it follows. */
   onChanged?(s: ReportSummary): void;
+  /** An administrator decided something (a change, a note, the trash): the counts may have moved. */
+  onDecided?(): void;
   /** It left the list it was opened from: into the trash, or gone for good. */
   onGone?(hex: string): void;
   /** It came back from the trash, by the notice's "Undo". */
@@ -83,7 +85,7 @@ export interface ReportViewProps {
   recountUnread(): void;
 }
 
-export function ReportView({ api, hex, me, admins, query, summary, replace, compact = false, onChanged, onGone, onBack, recountUnread }: ReportViewProps) {
+export function ReportView({ api, hex, me, admins, query, summary, replace, compact = false, onChanged, onDecided, onGone, onBack, recountUnread }: ReportViewProps) {
   const lang = useLang();
   const notices = useNotices();
   // one id per report, not one per render: the reads depend on it
@@ -95,9 +97,9 @@ export function ReportView({ api, hex, me, admins, query, summary, replace, comp
   const [known, setKnown] = useState<string[] | null>(null);
   const { run, pending } = useChange(summary, replace);
   // the callbacks of the newest render, for answers that come after it
-  const hooks = useRef({ onChanged, onGone, onBack, recountUnread });
+  const hooks = useRef({ onChanged, onDecided, onGone, onBack, recountUnread });
   useEffect(() => {
-    hooks.current = { onChanged, onGone, onBack, recountUnread };
+    hooks.current = { onChanged, onDecided, onGone, onBack, recountUnread };
   });
 
   const show = useCallback((report: ReportDetail) => {
@@ -143,6 +145,7 @@ export function ReportView({ api, hex, me, admins, query, summary, replace, comp
         (report) => {
           show(report);
           notices.say(said);
+          hooks.current.onDecided?.();
           if (c.status !== undefined || Object.hasOwn(c, "duplicateOf")) hooks.current.recountUnread();
         },
         (e: unknown) => {
@@ -214,6 +217,7 @@ export function ReportView({ api, hex, me, admins, query, summary, replace, comp
       .then(
         () => {
           hooks.current.recountUnread();
+          hooks.current.onDecided?.();
           const gone = hooks.current.onGone;
           notices.say(t(lang, "fb.trashedOne"), { undo: restore });
           if (gone) gone(hex);

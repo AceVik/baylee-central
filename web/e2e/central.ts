@@ -18,7 +18,7 @@ import type { Page, Request, Route } from "@playwright/test";
 import { csp } from "../scripts/csp.ts";
 
 import { adminAnswer, areaState, ownerAnswer, type AreaState } from "./area.ts";
-import { reportPart, reportShape } from "./reports.ts";
+import { reportPart, reportShape, reportsState } from "./reports.ts";
 
 export const KEY = "CENTRAL-TEST-0000-0000-0001";
 export const PASSWORD = "violet lantern harbour quietly";
@@ -158,6 +158,8 @@ export async function mockCentral(page: Page, origin: string, opts: Options = {}
     signedInAt = Math.floor(Date.now() / 1000) - 600;
   }
   const area: AreaState | null = opts.area === undefined ? null : areaState(opts.area.admin);
+  // the signed-in administrator is the session's account (`ACCOUNT`), as Central's reports name it
+  if (area !== null) area.reports = reportsState(area.reports.admins.map((a, i) => (i === 0 ? { ...a, id: ACCOUNT } : a)));
   const tickets = new Map<string, { name: string; displayName: string }>();
   let attempt: string | null = null;
   const terms = opts.terms ?? null;

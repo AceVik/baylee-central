@@ -16,6 +16,7 @@ import { reportsApi, type Neighbours, type ReportsApi } from "./api";
 import { forUs } from "./keys";
 import { NoticeProvider, useAdmins } from "./pieces";
 import { ReportView } from "./ReportView";
+import { PAGE_KEYS, Shortcuts } from "./Shortcuts";
 import { listPath, readQuery, requestOf, reportPath, type ListQuery } from "./query";
 
 function Steps({ api, hex, query }: { api: ReportsApi; hex: string; query: ListQuery }) {
@@ -40,10 +41,17 @@ function Steps({ api, hex, query }: { api: ReportsApi; hex: string; query: ListQ
     };
   }, [api, hex, asked]);
   const at = near?.hex === hex ? near.at : null;
-  // k and j step to the list's previous and next report
+  const [help, setHelp] = useState(false);
+  // k and j step to the list's previous and next report; ? shows the keys
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (!forUs(e) || at === null) return;
+      if (!forUs(e)) return;
+      if (e.key === "?") {
+        e.preventDefault();
+        setHelp(true);
+        return;
+      }
+      if (at === null || help) return;
       const to = e.key === "j" ? at.next : e.key === "k" ? at.previous : null;
       if (to === null) return;
       e.preventDefault();
@@ -51,7 +59,7 @@ function Steps({ api, hex, query }: { api: ReportsApi; hex: string; query: ListQ
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [at, query]);
+  }, [at, query, help]);
   return (
     <nav className="fb-steps" aria-label={t(lang, "fb.steps")}>
       <Link className="button button-ghost button-sm" to={listPath(query)}>
@@ -80,7 +88,12 @@ function Steps({ api, hex, query }: { api: ReportsApi; hex: string; query: ListQ
             <Icon name="next" />
           </span>
         )}
+        <button type="button" className="round-btn" aria-keyshortcuts="?" onClick={() => setHelp(true)}>
+          <Icon name="keyboard" />
+          <span className="vh">{t(lang, "fb.keysTitle")}</span>
+        </button>
       </span>
+      {help && <Shortcuts keys={PAGE_KEYS} onClose={() => setHelp(false)} />}
     </nav>
   );
 }
