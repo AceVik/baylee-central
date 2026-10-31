@@ -1,20 +1,29 @@
-use std::{error::Error, sync::Arc, time::Duration};
+use std::{error::Error, future::Future, sync::Arc, time::Duration};
 
 use axum::{
     Router,
     body::{Body, to_bytes},
     extract::{Request, State},
-    http::{HeaderValue, StatusCode, header},
+    http::{HeaderValue, Method, StatusCode, header},
     middleware::{self, Next},
     response::{IntoResponse, Response},
     routing::get,
 };
-use tower_http::timeout::TimeoutLayer;
+use central_api::reports::MAX_RECORD_GZIP;
 
-#[derive(Clone)]
 struct Boundary {
     authority: HeaderValue,
     request_bytes: usize,
+}
+
+/// How long any request may take, its body included.
+const REQUEST_TIME: Duration = Duration::from_secs(5);
+/// How long a report part's upload may take.
+pub(crate) const UPLOAD_TIME: Duration = Duration::from_secs(60);
+
+/// A report part's upload (`PUT /v1/reports/{id}/{part}`, `native.rs`).
+fn upload(request: &Request) -> bool {
+    request.method() == Method::PUT && request.uri().path().starts_with("/v1/reports/")
 }
 
 pub(crate) fn router(authority: HeaderValue, request_bytes: usize) -> Router {
@@ -34,11 +43,8 @@ pub(crate) fn with_routes(authority: HeaderValue, request_bytes: usize, routes: 
             get(|| async { (StatusCode::SERVICE_UNAVAILABLE, "not ready\n") }),
         )
         .fallback(|| async { (StatusCode::NOT_FOUND, "not found\n") })
+        // Its own time limit per request (a report part's upload is longer).
         .layer(middleware::from_fn_with_state(boundary, inspect))
-        .layer(TimeoutLayer::with_status_code(
-            StatusCode::REQUEST_TIMEOUT,
-            Duration::from_secs(5),
-        ))
         // Outermost: timeout and rejection responses also receive these headers.
         .layer(middleware::from_fn(headers))
 }
@@ -58,7 +64,30 @@ async fn inspect(State(state): State<Arc<Boundary>>, request: Request, next: Nex
     {
         return (StatusCode::FORBIDDEN, "request not permitted\n").into_response();
     }
-    bounded(request, state.request_bytes, next).await
+    if !upload(&request) {
+        return timed(REQUEST_TIME, bounded(request, state.request_bytes, next)).await;
+    }
+    // A part's upload declares its length, within the largest part; its
+    // handler checks the credential and the announcement before it reads
+    // the body (exactly the announced length), so nothing is read here.
+    let declared = request
+        .headers()
+        .get(header::CONTENT_LENGTH)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.parse::<u64>().ok());
+    match declared {
+        None => (StatusCode::LENGTH_REQUIRED, "request rejected\n").into_response(),
+        Some(length) if length > u64::from(MAX_RECORD_GZIP) => {
+            (StatusCode::PAYLOAD_TOO_LARGE, "request rejected\n").into_response()
+        }
+        Some(_) => timed(UPLOAD_TIME, next.run(request)).await,
+    }
+}
+
+async fn timed(limit: Duration, response: impl Future<Output = Response>) -> Response {
+    tokio::time::timeout(limit, response)
+        .await
+        .unwrap_or_else(|_| (StatusCode::REQUEST_TIMEOUT, "request timed out\n").into_response())
 }
 
 /// Read the whole body, at most `limit` bytes, before `next` runs.
@@ -132,6 +161,66 @@ mod tests {
         Request::builder()
             .uri(path)
             .header(header::HOST, "127.0.0.1:28780")
+    }
+
+    /// The boundary with a stand-in upload route that says whether the body
+    /// was still unread when it ran (the handler, not the boundary, reads it).
+    fn uploads() -> Router {
+        with_routes(
+            HeaderValue::from_static("127.0.0.1:28780"),
+            1024,
+            Router::new().route(
+                "/v1/reports/{report}/{part}",
+                axum::routing::put(|request: Request| async move {
+                    let unread = to_bytes(request.into_body(), 4096).await.map(|b| b.len());
+                    format!("read here: {unread:?}")
+                }),
+            ),
+        )
+    }
+
+    #[tokio::test]
+    async fn an_upload_declares_its_length_within_the_largest_part_and_is_read_by_its_handler() {
+        let put = |length: Option<&str>| {
+            let mut builder =
+                request("/v1/reports/0192d0c57b3e7a1f8c2d3e4f5a6b7c8d/record").method("PUT");
+            if let Some(length) = length {
+                builder = builder.header(header::CONTENT_LENGTH, length);
+            }
+            builder.body(Body::from(vec![0x1f; 2048])).unwrap()
+        };
+        let over = (u64::from(MAX_RECORD_GZIP) + 1).to_string();
+        assert_eq!(
+            uploads().oneshot(put(None)).await.unwrap().status(),
+            StatusCode::LENGTH_REQUIRED
+        );
+        assert_eq!(
+            uploads().oneshot(put(Some(&over))).await.unwrap().status(),
+            StatusCode::PAYLOAD_TOO_LARGE
+        );
+        assert_eq!(
+            uploads()
+                .oneshot(put(Some("not a number")))
+                .await
+                .unwrap()
+                .status(),
+            StatusCode::LENGTH_REQUIRED
+        );
+        // over the 1 KiB every other request has, and the boundary leaves it to the handler
+        let response = uploads().oneshot(put(Some("2048"))).await.unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let said = to_bytes(response.into_body(), 1024).await.unwrap();
+        assert_eq!(&said[..], b"read here: Ok(2048)");
+        // every other path keeps the small bound: a POST of the same size is refused
+        let post = request("/v1/native")
+            .method("POST")
+            .header(header::CONTENT_LENGTH, "2048")
+            .body(Body::from(vec![0; 2048]))
+            .unwrap();
+        assert_eq!(
+            uploads().oneshot(post).await.unwrap().status(),
+            StatusCode::PAYLOAD_TOO_LARGE
+        );
     }
 
     #[tokio::test]

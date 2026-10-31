@@ -828,11 +828,15 @@ pub struct Swept {
     /// Pairings past their five minutes, with what the client and the page
     /// left in them.
     pub pairings: u64,
+    /// Reports the retention says are over (`docs/reports.md`), their
+    /// history kept.
+    pub reports: u64,
 }
 
 /// Delete audit events older than [`AUDIT_YEARS`], the digests of expired
-/// reset codes and expired pairings, under the operator's (migrator's)
-/// login, as the privacy notice allows; all or none.
+/// reset codes, expired pairings and the reports whose retention is over,
+/// under the operator's (migrator's) login, as the privacy notice allows;
+/// all or none.
 ///
 /// # Errors
 /// Storage failure.
@@ -864,10 +868,12 @@ pub async fn sweep(db: &DatabaseConnection) -> Result<Swept, Error> {
         .await
         .map_err(|_| Error::Unavailable)?
         .rows_affected();
+    let reports = super::reports::sweep(&tx).await?;
     tx.commit().await.map_err(|_| Error::Unavailable)?;
     Ok(Swept {
         events,
         codes,
         pairings,
+        reports,
     })
 }

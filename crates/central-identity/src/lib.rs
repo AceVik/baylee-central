@@ -30,6 +30,8 @@ mod objects;
 mod owner;
 mod pairing;
 mod password;
+mod reports;
+pub use reports::PartUpload;
 mod reset;
 mod terms;
 

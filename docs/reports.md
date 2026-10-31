@@ -1,6 +1,8 @@
 # Bug and crash reports in Central (design, pass 1)
 
-**Status: design, decided.** Owner decisions, 2026-10-20: reports go to
+**Status: Central's part built (31.10.2026, owner's go the same day); the
+website's section and the switch follow (§"Order").**
+Owner decisions, 2026-10-20: reports go to
 Central; clients report through their gateway, which forwards; a client signed
 in nowhere reports directly; Central absorbs Baylee's feedback service. Later
 the same day: the open reports move to Central, resolved ones are not
@@ -132,3 +134,206 @@ columns its reworked UI adds, so a move is a copy:
 
 None new for (i) or (ii): `serde_json`, `sha2`, SeaORM and the existing HTTP
 stack suffice; the gzip stays opaque.
+
+## Pass 2: the routes, the schema and the order (31.10.2026)
+
+The owner asked for the feedback view in the website's administration,
+"complete with every feature the feedback UI has, and more", and chose, on
+31.10.2026, the path above (Central stores the reports; no proxy to the
+feedback service) and the whole of its triage (not the official gateway's
+operations console, which stays the feedback service's, as the gateway is
+the operator's). This pass makes the transport (i) concrete. Nothing here
+is built before the owner's go.
+
+### Order
+
+1. **Central** (this repository, one pull request): the schema, the intake
+   routes, the triage requests, the downloads, the sweep, their tests.
+   Nothing reaches it yet, so it changes nothing in production.
+2. **The website** (this repository, its own pull request after #57): the
+   *Feedback* section of the administration, every feature below.
+3. **The switch** (Baylee, its own session, landed by the PM): the gateway
+   forwards to Central instead of the feedback service; the official
+   gateway takes direct client reports and forwards them marked `direct`;
+   a one-time copy of the open reports, their notes and audit rows
+   (`central-service --import-reports-stdin`, JSON Lines a Baylee export
+   writes). The feedback service keeps its contact form, Impressum, offline
+   count and gateway console until they move (point 6 above).
+
+### Intake: native listener, raw bodies
+
+Both on the native listener beside `/v1/native`, each with its own body
+bound (the wire's 1 MiB does not apply, and nothing here is wire JSON):
+
+**Gzip all the way (owner, 31.10.2026: "the feedback traffic should be
+sent gzipped").** What is heavy travels and rests compressed: the `client`
+object (system details, the window's picture) and the record are gzip from
+the gateway to Central to the administrator's browser, and Central stores
+those bytes as they came. Central never unpacks them: it checks their
+length and SHA-256 against what the report announced, so it needs no
+decompressor (no new crate) and no compressed body can grow inside it. The
+browser unpacks one (`DecompressionStream`) and stops past a bound (16 MiB
+for `client`, the record only on download). What a list filters and
+searches by stays plain JSON in the report's metadata: the build, and a
+crash's message and place. Answers to the browser are compressed by the
+proxy as every answer is (`encode zstd gzip`).
+
+- `POST /v1/reports`, `Authorization: Bearer <credential>`: the bridge's
+  credential (the official gateway), or a live gateway token with the `sso`
+  scope of an **approved** gateway (a pending one files nothing: a public
+  intake for strangers is what approval exists for). Body, the metadata
+  only, `deny_unknown_fields`, at most 64 KiB: `gateway {name, url,
+  version}` as the gateway says it, `channel` (`direct` only from the
+  bridge), `reporter` (1–128 hex), `kind` (`bug`, `improvement`,
+  `feedback`, `crash`, `other`; a chat message is the gateway's
+  moderation and refused), `text` (1–20000 characters), `game_id` (≤ 128),
+  `build {version, commit}`, `crash {message, location} | null` (≤ 2000 and
+  512 characters), and for each part it will send `{bytes, sha256}`:
+  `client` (≤ 2 MiB of gzip) and `record` (`{complete, origin, bytes,
+  sha256}`, ≤ 64 MiB, 4 MiB when its origin is `client`). The gateway is the
+  authenticated one, never the body's claim (its name and address are
+  stored beside what it says of itself). Answers `201 {"report_id"}`; the
+  report is listed at once, its parts shown as awaited until they come.
+- `PUT /v1/reports/{id}/client` and `PUT /v1/reports/{id}/record`, the same
+  credential and the same gateway, the gzip as the raw body
+  (`Content-Type: application/gzip`, `Content-Length` required): read with
+  the announced length as the bound while hashing, refused unless length
+  and SHA-256 equal what the report announced, starting with gzip's magic,
+  written once (`409` again), within an hour of the report. Two uploads at
+  a time (a semaphore), so at most 128 MiB of parts is in memory.
+- Budgets: per gateway 120 reports an hour, besides the native listener's
+  global budget every request spends; `429` past them. Nothing of a
+  body is logged; the log names the report id and the gateway.
+- The crash signature is made at intake as the feedback service makes it,
+  with SHA-256 (no MD5 crate), its first 16 bytes in hex.
+
+### Triage: browser listener, `Admin { request }`
+
+Reads and changes as `AdminRequest`s, the administrator checked in the
+statement's transaction like every admin request, changes needing the
+fresh password sign-in and writing `report_audit` in the same transaction:
+
+| request | answer |
+| --- | --- |
+| `Reports { filter, sort, page }` | a page (50, at most 200) and the total, metadata only: no `client`, no record |
+| `ReportFacets { filter }` | counts per status, kind, priority, assignee, label, gateway, channel and the busiest reporters, each under the filter but its own dimension |
+| `Report { report }` | one report's metadata, notes, audit rows, whether `client` and a record exist and their sizes |
+| `ReportNeighbours { report, filter, sort }` | previous, next, position, total in that list |
+| `CrashGroups { filter }` | crashes by signature: count, open, first, last, latest, message, location |
+| `ReportStats` | reports per UTC day and kind, 30 days |
+| `SetReport { report, change, expected_revision }` | status, issue number, assignee, priority, labels, duplicate of, as the feedback service's §"Triage" rules them (one duplicate level, revision `Conflict`) |
+| `ReportsBulk { reports ≤ 200, change \| trash \| restore \| purge }` | one transaction, an audit row per report and part |
+| `TrashReport`, `RestoreReport`, `PurgeReport` | the trash, 30 days |
+| `AddReportNote`, `RemoveReportNote` | notes, 1–4000 characters, removed by their author only |
+| `ReportViews`, `SaveReportView`, `DeleteReportView` | an administrator's saved lists, at most 50 |
+| `SetReportsSeen { reports ≤ 500, seen }` | the unread marker, per administrator |
+
+The filter is the feedback service's (`status`, `kind`, `priority` several
+each; `q` words and pieces of the text, a crash's message or the id, `%`
+and `_` literal; days `from`/`to`; `has_record`; `channel`; `gateway`;
+`assignee` (an account or none); `label`; `signature`; `duplicate_of`;
+`trash`; `unseen`), typed and bounded in `central-api`, never SQL text.
+The assignee is an administrator's account id, shown by its handle.
+
+Two raw reads on the browser listener, because a `client` object (2 MiB of
+gzip, a screenshot inside) and a record (64 MiB) exceed the wire and are
+not JSON numbers: `POST /api/v1/reports/{id}/client` and
+`POST /api/v1/reports/{id}/record`, both `application/gzip` as stored, with every header
+check of `POST /api/v1` (Host, Origin, Sec-Fetch-Site, `X-Baylee-Central`,
+no Authorization, an administrator's cookie) and an empty body. The page
+fetches them and makes the download itself. A screenshot inside `client`
+(a PNG data URL) is checked for the PNG signature and turned into a `Blob`,
+shown through a `blob:` address: `img-src` gains `blob:` and keeps `data:`
+out (#55).
+
+### Schema: migration 000018
+
+As §"Data" above, in `central_identity`, with the gzip parts in a table of
+their own (`report_parts(report_id, part client|record, gzip bytea, bytes,
+sha256)`, so a list never touches them) and `reports` holding the plain
+metadata, the announced parts' lengths and hashes, `build_version`,
+`build_commit`, `crash_message` and `crash_location`, `report_notes`, `report_audit`,
+`report_views`, `report_seen`. Indexes for the list's sorts and filters.
+Runtime grants as §"Data", checked at startup like the others (a wider or
+narrower grant refuses to start). Migration 000017 is the PM's (the
+gateway directory's auth-mode badge); this one follows it whichever lands
+first.
+
+### Retention and the sweep
+
+Before a list is read, in its transaction: a report done for 90 days, or
+in the trash for 30, or older than three years, goes with its record,
+notes, views' references and seen rows; its audit rows stay without its
+text (Central's privacy notice, "deleted once the bug is dealt with, after
+three years at the latest"). The operator's daily sweep does the same.
+
+### Privacy invariants (unchanged, now enforced)
+
+The reporter stays the gateway's pseudonym or the device's HMAC; Central
+holds no key to either and never joins a reporter to an account. A
+reported chat message is not filed here: it is the gateway's moderation.
+The `client` object and the record are read only by an administrator, one
+report at a time, and never logged.
+
+### The website's section
+
+`/admin/feedback` with the feedback UI's features, in the website's own
+components: the inbox and the other views with counts, search and every
+filter in the address as pills, facets, sortable columns, pages, saved
+views, crash groups, a drawer beside the list and a page per report with
+`j`/`k`, the record and the `client` object (a JSON tree, the screenshot,
+the card chips with Scryfall's pictures), every triage field, notes, the
+issue link with the neutral summary (never the player's words), the trash
+with undo, bulk changes, the unread marker, CSV of the selection or of all
+that match (made in the browser, a formula-starting cell prefixed with
+`'`), the 30-day chart, a quiet refresh every 30 seconds while visible that
+announces new reports, and `?` for the keys. Beyond it: the Overview's
+tile for open reports and new crashes, and the navigation's count of
+unread ones.
+
+### For the owner and the PM
+
+- **Who files:** the bridge and approved gateways' `sso` tokens. A pending
+  gateway and a listing-only token file nothing.
+- **Order of deploys:** Central with this migration before any gateway
+  that forwards to it; the import of open reports after the switch.
+- **Dependencies:** none new.
+
+## Pass 3: as built (31.10.2026)
+
+What the building decided beyond pass 2:
+
+- **A part's upload is authenticated before it is read.** The handler
+  checks the credential, the report and the announcement first (a report
+  of this gateway, filed within the hour, the part announced and not stored
+  yet), then the declared length must equal the announced one, then it
+  takes one of two slots and reads exactly that many bytes. A stranger's
+  slow body holds no slot and is never read; the boundary only refuses a
+  missing or oversized `Content-Length`.
+- **Triage asks for no fresh password; a purge does.** Triage is daily
+  work, reversible and in the report's history; only the purge cannot be
+  undone (`AdminRequest::fresh`).
+- **A duplicate needs its original.** When a report goes (a purge, the
+  sweep), its duplicates that stay are opened again as `triaged`, with a
+  line in their history, before it is deleted; the schema holds that a
+  duplicate names its original and that `done_at` goes with the done
+  statuses.
+- **The record's and the client's bytes are a table of their own**
+  (`report_parts`), written once and never updated; the announced lengths
+  and hashes are columns of the report, so a list reads none of the bytes.
+- **The operator's daily sweep** takes reports too (`Swept::reports`), so the
+  retention holds when nobody reads a list.
+
+Tests: the API's bounds, crash signatures, the change's leave-or-clear and
+the filter's types; the HTTP boundary (an upload's declared length, its
+handler reading the body) and the browser listener's part route (the
+site's proofs, the cookie, the bytes as stored, its own budget); and the
+PostgreSQL fixture (`tests/support/accounts/reports.rs`): a pending
+gateway files nothing, direct only through the bridge, a part's wrong
+length, hash or magic refused and a second one `Conflict`, administrators
+only, the filters and facets, the revision, assignees who are
+administrators, one duplicate level and the hand-on, notes by their
+author, a selection, the trash and a purge with a fresh password, the
+released duplicate, views, the unread marker per administrator, the sweep
+keeping the history, and the grants both ways.
+
