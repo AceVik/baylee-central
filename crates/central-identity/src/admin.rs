@@ -55,6 +55,28 @@ impl IdentityService {
                 AdminAnswer::Gateway { gateway, tokens }
             }
             AdminRequest::LegacyAccounts => self.admin_legacy(cookie).await?,
+            // Reports (`docs/reports.md`, `reports.rs`): the store checks the
+            // administrator, a purge's fresh sign-in, and writes the report's history.
+            request @ (AdminRequest::Reports { .. }
+            | AdminRequest::ReportFacets { .. }
+            | AdminRequest::Report { .. }
+            | AdminRequest::ReportNeighbours { .. }
+            | AdminRequest::CrashGroups { .. }
+            | AdminRequest::ReportStats
+            | AdminRequest::ReportAdmins
+            | AdminRequest::SetReport { .. }
+            | AdminRequest::ReportsBulk { .. }
+            | AdminRequest::TrashReport { .. }
+            | AdminRequest::RestoreReport { .. }
+            | AdminRequest::PurgeReport { .. }
+            | AdminRequest::AddReportNote { .. }
+            | AdminRequest::RemoveReportNote { .. }
+            | AdminRequest::ReportViews
+            | AdminRequest::SaveReportView { .. }
+            | AdminRequest::DeleteReportView { .. }
+            | AdminRequest::SetReportsSeen { .. }) => {
+                return self.report_admin(request, cookie).await;
+            }
             // Changes: the store checks the sign-in's age and writes the audit.
             AdminRequest::ResetLogin { account } => {
                 let code = ResetCode::generate()?;

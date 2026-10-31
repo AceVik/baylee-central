@@ -30,6 +30,10 @@ performance policy. Do not import its permission to write unsafe or assembly.
   decision, not a reason to silently weaken this rule.
 - No custom cryptographic primitives, password protocols or token algorithms.
   Pin versions and review advisories, licenses, provenance and build scripts.
+- Licences (`LICENSE.md` § 6): `central-api`, `central-client` and
+  `central-crypto` are AGPL-3.0-only, because the Baylee client links them,
+  and build only on each other; every other crate, the web app and the docs
+  are source-available. The policy check enforces both.
 - Never log secrets, password proofs, tokens, recovery codes, plaintext private
   content or identifying training payloads. Redaction must have tests.
 
