@@ -82,6 +82,12 @@ function str(v: unknown): string | null {
   return typeof v === "string" ? v : null;
 }
 
+/** A link GitHub sent, only when it is one of GitHub's pages (it becomes an href). */
+function githubPage(v: unknown): string | null {
+  const url = str(v);
+  return url !== null && url.startsWith("https://github.com/") ? url : null;
+}
+
 export interface CiRun {
   conclusion: string;
   url: string;
@@ -93,7 +99,7 @@ export function parseCi(raw: unknown): CiRun | null {
   if (!isObject(raw) || !Array.isArray(raw["workflow_runs"])) return null;
   const run: unknown = raw["workflow_runs"][0];
   if (!isObject(run)) return null;
-  const url = str(run["html_url"]);
+  const url = githubPage(run["html_url"]);
   const sha = str(run["head_sha"]);
   const updatedAt = str(run["updated_at"]);
   if (url === null || sha === null || updatedAt === null) return null;
@@ -113,7 +119,7 @@ export function parseCommit(raw: unknown): Commit | null {
   const inner = c["commit"];
   if (!isObject(inner)) return null;
   const sha = str(c["sha"]);
-  const url = str(c["html_url"]);
+  const url = githubPage(c["html_url"]);
   const committer = inner["committer"];
   const author = inner["author"];
   const when = (isObject(committer) ? str(committer["date"]) : null) ?? (isObject(author) ? str(author["date"]) : null);

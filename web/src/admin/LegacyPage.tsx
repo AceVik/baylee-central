@@ -9,7 +9,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { ApiError } from "../account/api";
-import { Panel } from "../app/AppFrame";
+import { Panel, TableBox } from "../app/AppFrame";
 import { day, when } from "../app/format";
 import { T, t, useLang, useTitle, type Key } from "../i18n";
 import type { AdminApi, LegacyAccount, LegacyProgress, LegacyStore } from "./admin-api";
@@ -35,7 +35,7 @@ function Accounts({ store, now }: { store: LegacyStore; now: number }) {
   const lang = useLang();
   if (store.accounts.length === 0) return <p className="small"><T id="leg.none" /></p>;
   return (
-    <div className="table-wrap">
+    <TableBox label={t(lang, "leg.title")}>
       <table className="table">
         <thead>
           <tr>
@@ -78,7 +78,7 @@ function Accounts({ store, now }: { store: LegacyStore; now: number }) {
           })}
         </tbody>
       </table>
-    </div>
+    </TableBox>
   );
 }
 

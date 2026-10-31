@@ -375,7 +375,9 @@ baylee.app {
 		file_server
 	}
 	header {
-		Content-Security-Policy "<scripts/csp.ts>"
+		Content-Security-Policy "<scripts/csp.ts csp()>"
+		Permissions-Policy "<scripts/csp.ts PERMISSIONS>"
+		Cross-Origin-Opener-Policy same-origin
 		X-Content-Type-Options nosniff
 		Referrer-Policy no-referrer
 	}
@@ -390,8 +392,13 @@ send too: `script-src 'self' 'wasm-unsafe-eval'; style-src 'self'` (no inline
 script or style; React sets styles through the CSSOM, which the CSP allows;
 `'wasm-unsafe-eval'` lets the account pages' Worker compile the browser
 crypto, and allows no `eval` of JavaScript; owner, 21.10.2026),
-`connect-src 'self' https://api.github.com https://raw.githubusercontent.com <feedback service>`,
-`img-src 'self' data: https://cards.scryfall.io`, `worker-src 'self'`.
+`connect-src 'self'` plus GitHub only at Baylee's repository
+(`https://api.github.com/repos/AceVik/baylee` and below it,
+`https://raw.githubusercontent.com/AceVik/baylee/`) and the feedback service,
+`img-src 'self' https://cards.scryfall.io`, `worker-src 'self'`. Beside it the
+site sends `Permissions-Policy` (`PERMISSIONS` in the same file: no camera,
+microphone, location, payment or device access) and
+`Cross-Origin-Opener-Policy: same-origin`.
 
 The feedback service needs `https://baylee.app` in `FEEDBACK_CONTACT_ORIGINS`
 for the contact form (it answers CORS only to those) and the proxy's address

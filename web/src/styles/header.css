@@ -3,6 +3,8 @@
 /* ---------------------------------------------------------------- top bar */
 .top {
   position: fixed; inset: 0 0 auto 0; z-index: 30;
+  /* fixed, so the body's safe-area padding does not reach it */
+  padding-inline: env(safe-area-inset-left) env(safe-area-inset-right);
   border-bottom: 1px solid var(--edge-soft);
   background: var(--top-bg);
   backdrop-filter: blur(14px);

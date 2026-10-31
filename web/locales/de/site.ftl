@@ -531,6 +531,8 @@ privacy-automated = Eine automatisierte Entscheidungsfindung im Sinne von Art. 2
 acct-eyebrow = Baylee Central
 acct-username = Benutzername
 acct-password = Passwort
+pw-show = Passwort zeigen
+pw-caps = Die Feststelltaste ist an
 acct-errBusy = Zu viele Versuche von hier. Bitte warte eine Weile und versuch es dann noch einmal.
 acct-errUnreachable = Baylee Central hat nicht geantwortet. Bitte versuch es gleich noch einmal.
 acct-errCrypto = Dieser Browser konnte die Verschlüsselung des Accounts nicht ausführen: Sie braucht WebAssembly und Web Workers. Bitte nimm einen aktuellen Browser.
@@ -562,6 +564,7 @@ register-errUsername = Dieser Benutzername folgt den Regeln oben nicht.
 register-errDisplayName = Dieser Anzeigename folgt den Regeln oben nicht.
 register-errDisplayNameReserved = Dieser Anzeigename ist Baylee selbst vorbehalten. Bitte wähl einen anderen.
 register-errPassword = Das Passwort braucht mindestens 8 Zeichen (und höchstens { $max } Bytes).
+register-errGuessable = Dieses Passwort probieren Angreifer als Erstes. Bitte wähl ein anderes, zum Beispiel ein paar eigene Wörter.
 register-errMismatch = Die beiden Passwörter sind verschieden.
 register-errAge = Bitte bestätige, dass du mindestens 16 Jahre alt bist.
 register-errConsent = Bitte nimm die Nutzungsbedingungen an.
@@ -883,6 +886,11 @@ adm-search = Suchen
 adm-searchHint = Name oder #3fa2
 adm-errSearch = Baylee Central konnte nicht suchen. Eine Suche hat 1 bis 64 einfache Zeichen, oder # und einen Tag.
 adm-noAccounts = Kein Account passt.
+adm-shown =
+    { $n ->
+        [one] Ein Account angezeigt
+       *[other] { $n } Accounts angezeigt
+    }
 adm-handle = Name
 adm-username = Anmeldename
 adm-source = Herkunft

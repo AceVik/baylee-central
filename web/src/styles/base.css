@@ -3,7 +3,8 @@
 /* ---------------------------------------------------------------- base */
 *, *::before, *::after { box-sizing: border-box; }
 html {
-  font-size: clamp(16px, 11px + 0.5vw, 20px);
+  /* 16 to 20 px at the browser's usual size, and with it when a reader sets it larger */
+  font-size: clamp(100%, 0.6875rem + 0.5vw, 125%);
   -webkit-text-size-adjust: 100%;
   scroll-padding-top: calc(var(--top-h) + 0.8rem);
   background: var(--bg);
@@ -19,6 +20,8 @@ body {
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   overflow-x: clip;
+  /* a phone on its side keeps the notch's strip free */
+  padding-inline: env(safe-area-inset-left) env(safe-area-inset-right);
 }
 #root { display: flex; flex-direction: column; min-height: 100svh; }
 main { flex: 1; outline: none; }
@@ -90,8 +93,9 @@ output { display: block; }
 @media (max-width: 860px) { .two-col { grid-template-columns: 1fr; } }
 .glass {
   background: var(--panel); border: 1px solid var(--edge-soft); border-radius: var(--radius);
+  /* no backdrop blur: the panel is nearly opaque, and a blur under each of
+     many panels is redrawn on every scroll over the fixed painting */
   box-shadow: var(--shadow);
-  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
 }
 .page-loading { min-height: 60vh; }
 
@@ -106,11 +110,17 @@ output { display: block; }
 .dot.bad { background: var(--bad); }
 .dot.warn { background: var(--warn); }
 .dot.off { background: var(--off); }
-.kv { margin: 0 0 1rem; display: grid; gap: 0.7rem; font-family: var(--sans); }
-.kv > div { display: grid; grid-template-columns: minmax(8rem, 38%) 1fr; gap: 0.8rem; align-items: baseline; border-bottom: 1px solid var(--edge-soft); padding-bottom: 0.6rem; }
-.kv dt { color: var(--ink-faint); font-size: 0.9rem; }
-.kv dd { margin: 0; overflow-wrap: anywhere; }
-@media (max-width: 420px) { .kv > div { grid-template-columns: 1fr; gap: 0.1rem; } }
+/* facts as label and value: the labels one column as wide as the longest,
+   the values beside them, no rule under each (each <div> lends its dt and
+   dd to the list's grid); one column on a phone */
+.kv { margin: 0 0 var(--space-4); display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: var(--space-2) var(--space-5); align-items: baseline; font-family: var(--sans); }
+.kv > div { display: contents; }
+.kv dt { color: var(--ink-faint); font-size: var(--text-sm); white-space: nowrap; }
+.kv dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+@media (max-width: 600px) {
+  .kv { grid-template-columns: minmax(0, 1fr); row-gap: 0; }
+  .kv dd { margin-bottom: var(--space-3); }
+}
 dialog::backdrop { background: var(--backdrop); backdrop-filter: blur(4px); }
 dialog[open] { animation: pop 200ms var(--ease); }
 @keyframes pop { from { opacity: 0; transform: translateY(8px) scale(0.98); } to { opacity: 1; transform: none; } }
@@ -194,4 +204,15 @@ dialog[open] { animation: pop 200ms var(--ease); }
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
   .sky-petals { display: none; }
   .reveal[data-wait]:not([data-in]) { opacity: 1; transform: none; }
+}
+
+/* ---------------------------------------------------------------- forced colours
+   Windows' high contrast keeps outlines and borders but drops shadows and
+   backgrounds: what a shadow or a fill marks (focus in a field, the current
+   page, a pressed choice) gets an outline in the system's colours. */
+@media (forced-colors: active) {
+  :focus-visible { outline-color: Highlight; }
+  [aria-current="page"], [aria-pressed="true"] { outline: 2px solid Highlight; outline-offset: -2px; }
+  .pill, .chip-btn, .theme-btn, .password-eye { border: 1px solid CanvasText; }
+  .skeleton { border: 1px dashed GrayText; }
 }

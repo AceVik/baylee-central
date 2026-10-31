@@ -4,7 +4,7 @@
 // that. The administration's part is shown to an administrator only;
 // Central refuses its requests to anybody else anyway.
 
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 
 import { Icon, type IconName } from "../components/icons";
 import { T, t, useLang, type Key } from "../i18n";
@@ -39,7 +39,7 @@ function Items({ items, page }: { items: readonly Item[]; page: Page }) {
         const current = item.page === page || (item.page === "admin" && page === "adminUser");
         return (
           <li key={item.page}>
-            <Link to={PATHS[item.page]} className="app-nav-link" aria-current={current ? "page" : undefined}>
+            <Link to={PATHS[item.page]} className="app-nav-link" data-page={item.page} aria-current={current ? "page" : undefined}>
               <Icon name={item.icon} className="app-nav-icon" />
               <span>{t(lang, item.label)}</span>
             </Link>
@@ -66,10 +66,17 @@ export function AppFrame({
   children: ReactNode;
 }) {
   const lang = useLang();
+  const nav = useRef<HTMLElement>(null);
+  // where the tabs are one row that scrolls, the current one is in sight
+  useEffect(() => {
+    const current = nav.current?.querySelector<HTMLElement>(`[data-page="${page === "adminUser" ? "admin" : page}"]`);
+    // (jsdom has no scrollIntoView)
+    current?.scrollIntoView?.({ block: "nearest", inline: "center" });
+  }, [page]);
   return (
     <div className="app">
       <div className="app-inner">
-        <nav className="app-nav" aria-label={t(lang, "app.nav")}>
+        <nav ref={nav} className="app-nav" aria-label={t(lang, "app.nav")}>
           <p className="app-nav-head">
             <T id="app.account" />
           </p>
@@ -109,6 +116,39 @@ export function SignedOut() {
         <T id="nav.signIn" />
       </Link>
     </div>
+  );
+}
+
+/**
+ * A list that could not be read says why and offers to try again; it never
+ * shows an empty list instead (docs/website-design.md §"Components", the
+ * states of a list).
+ */
+export function Failed({ onRetry, reason = "acct.errUnreachable" }: { onRetry(): void; reason?: Key }) {
+  return (
+    <div className="app-failed" role="alert">
+      <p className="small">
+        <T id={reason} />
+      </p>
+      <button type="button" className="button button-ghost button-sm" onClick={onRetry}>
+        <Icon name="retry" className="button-icon" />
+        <T id="gw.tryAgain" />
+      </button>
+    </div>
+  );
+}
+
+/**
+ * A table that may be wider than the screen scrolls in its own box, which
+ * the keyboard can reach and a screen reader names (Safari does not focus a
+ * scroll box by itself).
+ */
+export function TableBox({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a scroll box must be reachable by keyboard (WCAG 2.1.1)
+    <section className="table-wrap" aria-label={label} tabIndex={0}>
+      {children}
+    </section>
   );
 }
 

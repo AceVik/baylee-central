@@ -4,13 +4,13 @@
 // disables one (it leaves the list, its credentials and tokens stop, its
 // players' sign-ins there end), and revokes a token.
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 
 import type { AccountSummary } from "../account/api";
 import { ApiError } from "../account/api";
 import { STATE_TONE, STATE_WORD, TokenTable } from "../account/GatewaysPage";
 import { idText, type GatewayState, type TokenInfo } from "../account/owner-api";
-import { Panel } from "../app/AppFrame";
+import { Failed, Panel } from "../app/AppFrame";
 import { Confirm } from "../app/Confirm";
 import { day, when } from "../app/format";
 import { T, t, useLang, useTitle, type Key } from "../i18n";
@@ -25,6 +25,8 @@ type Asking = { at: "approve" | "disable"; g: AdminGateway } | { at: "revoke"; t
 
 function GatewayRow({ g, open, onOpen, api, onAsk }: { g: AdminGateway; open: boolean; onOpen(): void; api: AdminApi; onAsk(a: Asking): void }) {
   const lang = useLang();
+  // each row's buttons are named with its gateway ("Approve", for Garden Table)
+  const name = useId();
   const [tokens, setTokens] = useState<TokenInfo[] | null>(null);
   useEffect(() => {
     if (open) api.gateway(g.id).then((d) => setTokens(d.tokens), () => setTokens([]));
@@ -33,7 +35,7 @@ function GatewayRow({ g, open, onOpen, api, onAsk }: { g: AdminGateway; open: bo
     <li className="card agw reveal">
       <div className="agw-head">
         <div>
-          <h3 className="agw-name"><bdi>{g.metadata.name}</bdi></h3>
+          <h3 id={name} className="agw-name" tabIndex={-1}><bdi>{g.metadata.name}</bdi></h3>
           <code translate="no">{g.origin}</code>
         </div>
         <p className="gw-pills">
@@ -50,16 +52,16 @@ function GatewayRow({ g, open, onOpen, api, onAsk }: { g: AdminGateway; open: bo
       </dl>
       <div className="action-row">
         {g.state !== "approved" && (
-          <button type="button" className="button button-sm" onClick={() => onAsk({ at: "approve", g })}>
+          <button type="button" className="button button-sm" aria-describedby={name} onClick={() => onAsk({ at: "approve", g })}>
             <T id={g.state === "pending" ? "agw.approve" : "agw.enable"} />
           </button>
         )}
         {g.state !== "disabled" && (
-          <button type="button" className="button button-danger button-sm" onClick={() => onAsk({ at: "disable", g })}>
+          <button type="button" className="button button-danger button-sm" aria-describedby={name} onClick={() => onAsk({ at: "disable", g })}>
             <T id="agw.disable" />
           </button>
         )}
-        <button type="button" className="button button-ghost button-sm" aria-expanded={open} onClick={onOpen}>
+        <button type="button" className="button button-ghost button-sm" aria-expanded={open} aria-describedby={name} onClick={onOpen}>
           <T id={open ? "agw.hideTokens" : "agw.showTokens"} />
         </button>
       </div>
@@ -76,6 +78,13 @@ function Gateways({ api, summary, replace }: { api: AdminApi; summary: AccountSu
   const [open, setOpen] = useState<string | null>(null);
   const [asking, setAsking] = useState<Asking>(null);
   const [said, setSaid] = useState<{ bad: boolean; key: Key } | null>(null);
+  const [failed, setFailed] = useState(false);
+  const list = useRef<HTMLUListElement>(null);
+  const saidRef = useRef<HTMLOutputElement>(null);
+  // the row acted on: after the list is read again the keyboard goes on there,
+  // at the next gateway when this one left the filter, so an administrator
+  // works down the queue with Tab and Enter
+  const acted = useRef<number | null>(null);
   const { run, pending } = useChange(summary, replace);
   const read = useCallback(
     (before: AdminGateway | null) => {
@@ -83,21 +92,32 @@ function Gateways({ api, summary, replace }: { api: AdminApi; summary: AccountSu
         (page) => {
           setItems((now) => (before === null || now === null ? page.items : [...now, ...page.items]));
           setMore(page.more);
+          const at = acted.current;
+          acted.current = null;
+          if (at !== null)
+            requestAnimationFrame(() => {
+              const headings = list.current?.querySelectorAll<HTMLElement>(".agw-name") ?? [];
+              (headings[Math.min(at, headings.length - 1)] ?? saidRef.current)?.focus();
+            });
         },
-        () => setSaid({ bad: true, key: "acct.errUnreachable" }),
+        () => setFailed(true),
       );
     },
     [api, filter],
   );
   useEffect(() => read(null), [read]);
-  const fail = (error: unknown) => setSaid({ bad: true, key: failureKey(error instanceof ApiError ? error.kind : "network") });
+  const fail = (error: unknown) => {
+    setSaid({ bad: true, key: failureKey(error instanceof ApiError ? error.kind : "network") });
+    requestAnimationFrame(() => saidRef.current?.focus());
+  };
+  // the rows stay while the list is read again, so focus has somewhere to be
   const done = (key: Key) => () => {
     setSaid({ bad: false, key });
-    setItems(null);
     read(null);
   };
   const show = (f: GatewayState | null) => {
     if (f === filter) return;
+    setFailed(false);
     setItems(null);
     setFilter(f);
   };
@@ -105,6 +125,9 @@ function Gateways({ api, summary, replace }: { api: AdminApi; summary: AccountSu
     const a = asking;
     setAsking(null);
     if (a === null) return;
+    const id = a.at === "revoke" ? null : a.g.id;
+    const index = items?.findIndex((g) => g.id === id) ?? -1;
+    acted.current = index >= 0 ? index : null;
     run(() => {
       if (a.at === "revoke") api.revokeGatewayToken(a.token.id).then(done("tok.revokedSaid"), fail);
       else api.setGatewayApproval(a.g.id, a.at === "approve").then(done(a.at === "approve" ? "agw.approvedSaid" : "agw.disabledSaid"), fail);
@@ -120,11 +143,19 @@ function Gateways({ api, summary, replace }: { api: AdminApi; summary: AccountSu
           </button>
         ))}
       </fieldset>
-      <output className={`form-status${said?.bad === true ? " bad" : ""}`}>{said === null ? "" : t(lang, said.key)}</output>
-      {items === null && <div className="card skeleton app-skeleton" aria-hidden="true" />}
+      <output ref={saidRef} tabIndex={-1} className={`form-status${said?.bad === true ? " bad" : ""}`}>{said === null ? "" : t(lang, said.key)}</output>
+      {failed && (
+        <Failed
+          onRetry={() => {
+            setFailed(false);
+            read(null);
+          }}
+        />
+      )}
+      {items === null && !failed && <div className="card skeleton app-skeleton" aria-hidden="true" />}
       {items !== null && items.length === 0 && <p className="small app-none"><T id="agw.none" /></p>}
       {items !== null && items.length > 0 && (
-        <ul className="agws stagger">
+        <ul ref={list} className="agws stagger">
           {items.map((g) => (
             <GatewayRow key={g.origin} g={g} api={api} open={open === g.origin} onOpen={() => setOpen(open === g.origin ? null : g.origin)} onAsk={setAsking} />
           ))}

@@ -35,9 +35,13 @@ export function DownloadButton({ state, onDownloadPage }: { state: ReleaseState;
   const { release, files, machine, mine } = state;
   const others = onDownloadPage === true ? "#platforms" : "/download#platforms";
   if (!release) {
-    // asking, or GitHub did not answer: the releases page has every file
+    // asking, or GitHub did not answer: the releases page has every file.
+    // While asking, the lines the answer adds are held empty, so nothing
+    // below the button moves when it comes (no layout shift).
+    const asking = release === undefined;
+    const waitingNote = asking ? archNote(machine) : null;
     return (
-      <div className="dl" aria-live="polite" aria-busy={release === undefined}>
+      <div className="dl" aria-live="polite" aria-busy={asking}>
         <a className="button button-big" href={RELEASES_PAGE} rel="noopener">
           <Icon name="download" className="button-icon" />
           <T id="dl.button" />
@@ -45,6 +49,12 @@ export function DownloadButton({ state, onDownloadPage }: { state: ReleaseState;
         <p className="dl-meta">
           <T id="dl.fallbackMeta" />
         </p>
+        {asking && (
+          <p className="dl-sub dl-held" aria-hidden="true">
+            {"\u00a0"}
+          </p>
+        )}
+        {waitingNote !== null && waitingNote !== "mac-intel" && <p className="dl-arch">{t(lang, NOTES[waitingNote])}</p>}
       </div>
     );
   }

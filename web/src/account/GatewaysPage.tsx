@@ -4,9 +4,9 @@
 // admin console, which then signs its players in through Central; a Central
 // administrator approves it for the public list, where its token keeps it.
 
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 
-import { AppFrame, Panel, SignedOut } from "../app/AppFrame";
+import { AppFrame, Failed, Panel, SignedOut, TableBox } from "../app/AppFrame";
 import { Confirm } from "../app/Confirm";
 import { day, when } from "../app/format";
 import { useSummary } from "../app/useSummary";
@@ -14,6 +14,7 @@ import { Icon } from "../components/icons";
 import { T, t, useLang, useTitle, type Key } from "../i18n";
 import "../styles/account.css";
 import { ApiError, type AccountSummary } from "./api";
+import { BusyButton } from "./Busy";
 import { ownerApi, type GatewayState, type MyGateway, type OwnerApi, type TokenInfo } from "./owner-api";
 import { TokenDialog } from "./TokenDialog";
 
@@ -38,7 +39,7 @@ export function TokenTable({ tokens, onRevoke }: { tokens: TokenInfo[]; onRevoke
     );
   }
   return (
-    <div className="table-wrap">
+    <TableBox label={t(lang, "tok.title2")}>
       <table className="table">
         <thead>
           <tr>
@@ -77,7 +78,7 @@ export function TokenTable({ tokens, onRevoke }: { tokens: TokenInfo[]; onRevoke
           })}
         </tbody>
       </table>
-    </div>
+    </TableBox>
   );
 }
 
@@ -87,6 +88,10 @@ function AddGateway({ owner, onAdded }: { owner: OwnerApi; onAdded(): void }) {
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<{ bad: boolean; key: Key } | null>(null);
+  const originField = useRef<HTMLInputElement>(null);
+  const nameField = useRef<HTMLInputElement>(null);
+  // which field the problem is in, for aria-invalid and the message it points at
+  const wrong = status?.key === "gwo.errOrigin" || status?.key === "gwo.errTaken" ? "origin" : status?.key === "gwo.errName" ? "name" : null;
   const submit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (busy) return;
@@ -95,10 +100,12 @@ function AddGateway({ owner, onAdded }: { owner: OwnerApi; onAdded(): void }) {
       at = new URL(origin.trim()).origin;
     } catch {
       setStatus({ bad: true, key: "gwo.errOrigin" });
+      originField.current?.focus();
       return;
     }
     if (name.trim() === "") {
       setStatus({ bad: true, key: "gwo.errName" });
+      nameField.current?.focus();
       return;
     }
     setBusy(true);
@@ -121,19 +128,38 @@ function AddGateway({ owner, onAdded }: { owner: OwnerApi; onAdded(): void }) {
     <form className="add-gateway" noValidate onSubmit={submit} aria-busy={busy}>
       <div className="field">
         <label htmlFor="gw-origin"><T id="gwo.origin" /></label>
-        <input id="gw-origin" inputMode="url" autoComplete="off" spellCheck={false} value={origin} onChange={(e) => setOrigin(e.target.value)} />
-        <p className="field-hint"><T id="gwo.originHint" /></p>
+        <input
+          ref={originField}
+          id="gw-origin"
+          inputMode="url"
+          autoComplete="off"
+          spellCheck={false}
+          value={origin}
+          onChange={(e) => setOrigin(e.target.value)}
+          aria-invalid={wrong === "origin" ? true : undefined}
+          aria-describedby={wrong === "origin" ? "gw-origin-hint gw-add-status" : "gw-origin-hint"}
+        />
+        <p id="gw-origin-hint" className="field-hint"><T id="gwo.originHint" /></p>
       </div>
       <div className="field">
         <label htmlFor="gw-name"><T id="gwo.name" /></label>
-        <input id="gw-name" maxLength={80} autoComplete="off" value={name} onChange={(e) => setName(e.target.value)} />
+        <input
+          ref={nameField}
+          id="gw-name"
+          maxLength={80}
+          autoComplete="off"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          aria-invalid={wrong === "name" ? true : undefined}
+          aria-describedby={wrong === "name" ? "gw-add-status" : undefined}
+        />
       </div>
       <div className="form-row">
-        <button type="submit" className="button" disabled={busy}>
+        <BusyButton busy={busy} type="submit">
           <Icon name="plus" className="button-icon" />
           <T id="gwo.add" />
-        </button>
-        <output className={`form-status${status?.bad === true ? " bad" : ""}`}>{status === null ? "" : t(lang, status.key)}</output>
+        </BusyButton>
+        <output id="gw-add-status" className={`form-status${status?.bad === true ? " bad" : ""}`}>{status === null ? "" : t(lang, status.key)}</output>
       </div>
     </form>
   );
@@ -145,7 +171,7 @@ function Gateway({ g, onToken, onRevoke }: { g: MyGateway; onToken(): void; onRe
     <Panel
       title={<bdi>{g.metadata.name}</bdi>}
       actions={
-        <button type="button" className="button button-sm" onClick={onToken}>
+        <button type="button" className="button button-ghost button-sm" onClick={onToken}>
           <Icon name="key" className="button-icon" />
           <T id="tok.make" />
         </button>
@@ -184,7 +210,13 @@ export default function GatewaysPage({ client }: { client?: OwnerApi }) {
   const [making, setMaking] = useState<MyGateway | null>(null);
   const [revoking, setRevoking] = useState<TokenInfo | null>(null);
   const [said, setSaid] = useState<{ bad: boolean; key: Key } | null>(null);
+  const saidRef = useRef<HTMLOutputElement>(null);
   const ready = state.at === "ready";
+  // the revoked token's button goes away: focus the words that say what happened
+  const tell = (next: { bad: boolean; key: Key }) => {
+    setSaid(next);
+    requestAnimationFrame(() => saidRef.current?.focus());
+  };
   const read = useCallback(() => {
     owner.gateways().then(
       (gateways) => setLoad({ at: "ready", gateways }),
@@ -201,10 +233,10 @@ export default function GatewaysPage({ client }: { client?: OwnerApi }) {
     setRevoking(null);
     owner.revokeToken(token.id).then(
       () => {
-        setSaid({ bad: false, key: "tok.revokedSaid" });
+        tell({ bad: false, key: "tok.revokedSaid" });
         read();
       },
-      () => setSaid({ bad: true, key: "acct.errUnreachable" }),
+      () => tell({ bad: true, key: "acct.errUnreachable" }),
     );
   };
 
@@ -226,9 +258,9 @@ export default function GatewaysPage({ client }: { client?: OwnerApi }) {
           <Panel title={<T id="gwo.addTitle" />}>
             <AddGateway owner={owner} onAdded={read} />
           </Panel>
-          <output className={`form-status${said?.bad === true ? " bad" : ""}`}>{said === null ? "" : t(lang, said.key)}</output>
+          <output ref={saidRef} tabIndex={-1} className={`form-status${said?.bad === true ? " bad" : ""}`}>{said === null ? "" : t(lang, said.key)}</output>
           {load.at === "loading" && <div className="card skeleton app-skeleton" aria-hidden="true" />}
-          {load.at === "failed" && <p className="small" role="alert"><T id="acct.errUnreachable" /></p>}
+          {load.at === "failed" && <Failed onRetry={() => { setLoad({ at: "loading" }); read(); }} />}
           {load.at === "ready" && load.gateways.length === 0 && <p className="small app-none"><T id="gwo.none" /></p>}
           {load.at === "ready" &&
             load.gateways.map((g) => <Gateway key={g.origin} g={g} onToken={() => setMaking(g)} onRevoke={setRevoking} />)}

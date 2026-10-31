@@ -17,6 +17,7 @@ import { canonicalName } from "./names";
 import { NewCodeStep } from "./NewCodeStep";
 import { useAccount } from "./session";
 import { TermsStep } from "./TermsStep";
+import { PasswordInput } from "./PasswordInput";
 
 /** After the sign-in: the terms, then the new code when the sign-in made one. */
 type After = { at: "terms" | "code"; name: string; code: NewCode | null };
@@ -33,6 +34,8 @@ export default function SignInPage() {
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<{ bad: boolean; key: Key } | null>(null);
+  // the field a problem is in: aria-invalid, and described by the words in the status
+  const [wrong, setWrong] = useState<"name" | "password" | null>(null);
   const [after, setAfter] = useState<After | null>(null);
   const registered = new URLSearchParams(useLocation().search).get("registered") === "1";
   const nameRef = useRef<HTMLInputElement>(null);
@@ -44,15 +47,18 @@ export default function SignInPage() {
     const name = canonicalName(username);
     if (name === "" || name.length > 64) {
       setStatus({ bad: true, key: "signin.errName" });
+      setWrong("name");
       nameRef.current?.focus();
       return;
     }
     if (password === "") {
       setStatus({ bad: true, key: "signin.errPassword" });
+      setWrong("password");
       passwordRef.current?.focus();
       return;
     }
     setBusy(true);
+    setWrong(null);
     setStatus({ bad: false, key: "signin.progress" });
     signIn({ username: name, password }, { api, crypto }).then(
       ({ session, summary, code }) => {
@@ -65,7 +71,10 @@ export default function SignInPage() {
       (error: unknown) => {
         setBusy(false);
         setStatus({ bad: true, key: FAILURE[error instanceof FlowError ? error.kind : "unreachable"] });
-        if (error instanceof FlowError && error.kind === "wrongLogin") passwordRef.current?.select();
+        if (error instanceof FlowError && error.kind === "wrongLogin") {
+          setWrong("password");
+          passwordRef.current?.select();
+        }
       },
     );
   };
@@ -112,25 +121,34 @@ export default function SignInPage() {
                   spellCheck={false}
                   maxLength={64}
                   value={username}
-                  onChange={(e) => setUsername(e.target.value)}
+                  aria-invalid={wrong === "name" ? true : undefined}
+                  aria-describedby={wrong === "name" ? "s-status" : undefined}
+                  onChange={(e) => {
+                    setUsername(e.target.value);
+                    if (wrong === "name") setWrong(null);
+                  }}
                 />
               </div>
               <div className="field">
                 <label htmlFor="s-password">
                   <T id="acct.password" />
                 </label>
-                <input
-                  ref={passwordRef}
+                <PasswordInput
+                  inputRef={passwordRef}
                   id="s-password"
-                  type="password"
                   autoComplete="current-password"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  invalid={wrong === "password"}
+                  {...(wrong === "password" ? { describedBy: "s-status" } : {})}
+                  onChange={(value) => {
+                    setPassword(value);
+                    if (wrong === "password") setWrong(null);
+                  }}
                 />
               </div>
               <div className="form-row">
                 <SubmitButton busy={busy} label="signin.submit" busyLabel="signin.submitting" />
-                <output className={`form-status${status?.bad ? " bad" : ""}`}>{status !== null && <T id={status.key} />}</output>
+                <output id="s-status" className={`form-status${status?.bad ? " bad" : ""}`}>{status !== null && <T id={status.key} />}</output>
               </div>
             </form>
             <p className="small">

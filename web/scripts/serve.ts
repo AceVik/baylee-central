@@ -9,7 +9,7 @@ import { createReadStream, existsSync, statSync } from "node:fs";
 import { createServer } from "node:http";
 import { extname, join, resolve, sep } from "node:path";
 
-import { csp } from "./csp.ts";
+import { PERMISSIONS, csp } from "./csp.ts";
 
 function arg(name: string, fallback: string): string {
   const at = process.argv.indexOf(`--${name}`);
@@ -71,6 +71,8 @@ const server = createServer((req, res) => {
     "Content-Security-Policy": policy,
     "X-Content-Type-Options": "nosniff",
     "Referrer-Policy": "no-referrer",
+    "Cross-Origin-Opener-Policy": "same-origin",
+    "Permissions-Policy": PERMISSIONS,
   };
   if (/^\/impressum\/?$/.test(path)) headers["X-Robots-Tag"] = "noindex, noarchive, nosnippet";
   if (!isFile) {
