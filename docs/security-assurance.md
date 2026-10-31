@@ -2042,3 +2042,23 @@ note, the runtime trying to rewrite a report's words, a part or the history,
 and each wider or missing grant refusing startup. Not covered here: the
 website's section (its own pull request) and the gateways' switch (Baylee,
 landed by the PM). Engineering review, not an audit.
+
+## The reports' one-time copy, 31 October 2026
+
+`--import-reports-stdin` writes reports the intake never saw, so it holds
+them to the intake's own check (`ReportIntake::validate`) and the triage's
+rules (status open, labels, issue) before one row is written, under the
+migration login and in one transaction. Its input is bounded line by line
+(two record sizes as hex and a margin), the reports to 100 000, and the copy
+must end with a count and SHA-256 over its lines, so a truncated or padded
+copy stores nothing. The migration document's password is zeroized after
+the connection is made; the operator's command reads the feedback service's
+database address from its environment file, never from an argument. The
+gzip is hex: no new decoder or dependency, and Central still never unpacks
+it. Tests: the hex reader's bounds, the documents read no further than
+their line, a line as a report with its parts, and in PostgreSQL the
+refusals (no administrator, a count or digest that is not the lines', a
+label outside the rule) storing nothing, a copy stored whole with its parts,
+notes and history, and a second run skipping it. Engineering review, not an
+audit.
+

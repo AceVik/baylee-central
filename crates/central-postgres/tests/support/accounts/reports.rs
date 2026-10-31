@@ -11,7 +11,10 @@ use central_api::reports::{
     RecordOrigin, ReportChange, ReportFilter, ReportIntake, ReportKind, ReportSort, ReportStatus,
 };
 use central_api::wire::Identity;
-use central_postgres::{Session, appoint_admin};
+use central_postgres::{
+    ImportedHistory, ImportedNote, ImportedReport, ReportImport, ReportImportRefusal, Session,
+    appoint_admin,
+};
 use sea_orm::{ConnectionTrait, DbBackend, Statement, prelude::Uuid};
 use sha2::{Digest, Sha256};
 
@@ -171,6 +174,7 @@ pub(super) async fn run(store: &AccountStore, operator: &DatabaseConnection, key
     )
     .await;
     marking(store, &cookie, &other, admin, first).await;
+    importing(store, operator, &cookie, admin, owner).await;
     sweeping(store, operator, &cookie, first).await;
 }
 
@@ -723,6 +727,152 @@ async fn sweeping(
         count(operator, "SELECT count(*) AS n FROM central_identity.report_audit WHERE report_id = $1 AND action = 'report.swept'", vec![Uuid::from_bytes(done).into()]).await,
         1
     );
+}
+
+/// A UUID v7 from PostgreSQL, as Central makes its ids.
+async fn fresh_id(operator: &DatabaseConnection) -> Uuid {
+    operator
+        .query_one_raw(Statement::from_string(
+            DbBackend::Postgres,
+            "SELECT pg_catalog.uuidv7() AS id",
+        ))
+        .await
+        .unwrap()
+        .unwrap()
+        .try_get("", "id")
+        .unwrap()
+}
+
+/// A report of the feedback service's copy, as its line would hold it.
+fn copied(id: Uuid) -> ImportedReport {
+    ImportedReport {
+        id: *id.as_bytes(),
+        created_at: 1_761_000_000,
+        updated_at: 1_761_100_000,
+        gateway_label: "official".into(),
+        gateway_says: GatewaySays {
+            name: Some("Baylee".into()),
+            url: None,
+            version: Some("0.1.1".into()),
+        },
+        channel: Channel::Gateway,
+        reporter: "ab".repeat(32),
+        kind: ReportKind::Crash,
+        status: ReportStatus::Triaged,
+        text: "Copied from the service".into(),
+        game_id: None,
+        build: Some(Build {
+            version: "0.1.1".into(),
+            commit: None,
+        }),
+        crash: Some(Crash {
+            message: "boom".into(),
+            location: "a.rs:1".into(),
+        }),
+        issue: Some(42),
+        priority: Some(Priority::High),
+        labels: vec!["ui".into()],
+        assignee: Some("viktor".into()),
+        client: Some(gzip(1, 300)),
+        record: Some((true, RecordOrigin::Client, gzip(2, 900))),
+        notes: vec![ImportedNote {
+            at: 1_761_050_000,
+            author: "viktor".into(),
+            text: "Looks like the stack".into(),
+        }],
+        history: vec![ImportedHistory {
+            at: 1_761_060_000,
+            actor: "viktor".into(),
+            action: "status".into(),
+            detail: Some("new → triaged".into()),
+        }],
+    }
+}
+
+/// The one-time copy (`ReportImport`), under the migrator login: refused for
+/// an author who is no administrator, for a report outside the rules, and
+/// for a count or digest that is not the lines'; stored whole with its
+/// parts, notes and history, and skipped when run again.
+async fn importing(
+    store: &AccountStore,
+    operator: &DatabaseConnection,
+    cookie: &Token,
+    admin: Identity,
+    owner: Identity,
+) {
+    assert_eq!(
+        ReportImport::begin(operator, owner.account).await.err(),
+        Some(ReportImportRefusal::NotAnAdministrator)
+    );
+    let id = fresh_id(operator).await;
+    let report = copied(id);
+    let line = b"{\"the line\":\"as it came\"}\n";
+    let digest = central_api::reports::hex(&Sha256::digest(line));
+    let mut odd = copied(fresh_id(operator).await);
+    odd.labels = vec!["Not A Label".into()];
+    let mut import = ReportImport::begin(operator, admin.account).await.unwrap();
+    assert!(matches!(
+        import.add(line, &odd).await,
+        Err(ReportImportRefusal::Malformed {
+            field: "labels",
+            ..
+        })
+    ));
+    drop(import);
+    for (count, sha, refusal) in [
+        (2, digest.clone(), ReportImportRefusal::CountMismatch),
+        (1, "00".repeat(32), ReportImportRefusal::DigestMismatch),
+    ] {
+        let mut import = ReportImport::begin(operator, admin.account).await.unwrap();
+        import.add(line, &report).await.unwrap();
+        assert_eq!(import.finish(count, &sha).await.err(), Some(refusal));
+    }
+    assert_eq!(
+        store.report_detail(cookie, *id.as_bytes()).await.err(),
+        Some(Error::Rejected),
+        "a refused copy stored nothing"
+    );
+    let mut import = ReportImport::begin(operator, admin.account).await.unwrap();
+    import.add(line, &report).await.unwrap();
+    assert_eq!(import.finish(1, &digest).await.unwrap(), (1, 0));
+    let detail = store.report_detail(cookie, *id.as_bytes()).await.unwrap();
+    assert_eq!(
+        (
+            detail.summary.status,
+            detail.summary.issue,
+            detail.summary.labels.clone()
+        ),
+        (ReportStatus::Triaged, Some(42), vec!["ui".to_owned()])
+    );
+    assert_eq!(detail.summary.created_at, 1_761_000_000);
+    assert!(detail.summary.signature.is_some(), "a crash is grouped");
+    assert_eq!(detail.notes[0].author, admin.account);
+    assert_eq!(
+        detail.notes[0].text,
+        "viktor (feedback service): Looks like the stack"
+    );
+    assert!(
+        detail
+            .audit
+            .iter()
+            .any(|a| a.action == "report.status" && a.detail == "viktor: new → triaged")
+    );
+    assert!(
+        detail.audit.iter().any(
+            |a| a.action == "report.imported" && a.detail.ends_with("assigned there to viktor")
+        )
+    );
+    assert_eq!(
+        store
+            .report_part(cookie, *id.as_bytes(), Part::Record)
+            .await
+            .unwrap(),
+        (gzip(2, 900), Some(RecordOrigin::Client))
+    );
+    // the same copy again: nothing twice
+    let mut again = ReportImport::begin(operator, admin.account).await.unwrap();
+    again.add(line, &report).await.unwrap();
+    assert_eq!(again.finish(1, &digest).await.unwrap(), (0, 1));
 }
 
 /// The runtime holds exactly its grants on the report tables: each wider and
