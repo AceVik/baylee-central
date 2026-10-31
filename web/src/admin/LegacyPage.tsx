@@ -133,7 +133,7 @@ export default function LegacyPage({ client }: { client?: AdminApi }) {
   useTitle("title.adminLegacy");
   const api = useAdminApi(client);
   return (
-    <AdminFrame page="adminLegacy" title={<T id="leg.pageTitle" />} lead={<T id="leg.lead" />}>
+    <AdminFrame page="adminLegacy" api={api} title={<T id="leg.pageTitle" />} lead={<T id="leg.lead" />}>
       {() => <Store api={api} />}
     </AdminFrame>
   );

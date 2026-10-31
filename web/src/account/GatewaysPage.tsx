@@ -15,8 +15,9 @@ import { T, t, useLang, useTitle, type Key } from "../i18n";
 import "../styles/account.css";
 import { ApiError, type AccountSummary } from "./api";
 import { BusyButton } from "./Busy";
-import { ownerApi, type GatewayState, type MyGateway, type OwnerApi, type TokenInfo } from "./owner-api";
+import { ownerApi, shownName, type GatewayState, type MyGateway, type OwnerApi, type TokenInfo } from "./owner-api";
 import { TokenDialog } from "./TokenDialog";
+import { Address, CopyButton } from "../app/Copy";
 
 export const STATE_WORD: Readonly<Record<GatewayState, Key>> = { pending: "gwo.pending", approved: "gwo.approved", disabled: "gwo.disabled" };
 export const STATE_TONE: Readonly<Record<GatewayState, string>> = { pending: "warn", approved: "ok", disabled: "bad" };
@@ -91,7 +92,7 @@ function AddGateway({ owner, onAdded }: { owner: OwnerApi; onAdded(): void }) {
   const originField = useRef<HTMLInputElement>(null);
   const nameField = useRef<HTMLInputElement>(null);
   // which field the problem is in, for aria-invalid and the message it points at
-  const wrong = status?.key === "gwo.errOrigin" || status?.key === "gwo.errTaken" ? "origin" : status?.key === "gwo.errName" ? "name" : null;
+  const wrong = status?.key === "gwo.errOrigin" || status?.key === "gwo.errTaken" ? "origin" : status?.key === "gwo.errName" || status?.key === "gwo.errNameChars" ? "name" : null;
   const submit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (busy) return;
@@ -103,8 +104,8 @@ function AddGateway({ owner, onAdded }: { owner: OwnerApi; onAdded(): void }) {
       originField.current?.focus();
       return;
     }
-    if (name.trim() === "") {
-      setStatus({ bad: true, key: "gwo.errName" });
+    if (name.trim() === "" || !shownName(name.trim())) {
+      setStatus({ bad: true, key: name.trim() === "" ? "gwo.errName" : "gwo.errNameChars" });
       nameField.current?.focus();
       return;
     }
@@ -185,7 +186,7 @@ function Gateway({ g, onToken, onRevoke }: { g: MyGateway; onToken(): void; onRe
         </span>
       </p>
       <dl className="kv">
-        <div><dt><T id="gw.address" /></dt><dd><code translate="no">{g.origin}</code></dd></div>
+        <div><dt><T id="gw.address" /></dt><dd><span className="copyable"><Address origin={g.origin} /><CopyButton text={g.origin} label={t(lang, "copy.address")} /></span></dd></div>
         {/* a registered gateway's version is a placeholder until its first heartbeat */}
         <div><dt><T id="gw.version" /></dt><dd>{g.lastSeen === null ? "—" : <code translate="no">{g.metadata.version}</code>}</dd></div>
         <div><dt><T id="gwo.registered" /></dt><dd className="num">{day(lang, g.createdAt)}</dd></div>
@@ -247,6 +248,16 @@ export default function GatewaysPage({ client }: { client?: OwnerApi }) {
         <SignedOut />
       ) : (
         <>
+          {load.at === "ready" && load.gateways.length > 0 ? (
+            <details className="steps-more">
+              <summary><T id="gwo.howTo" /></summary>
+              <ol className="steps-small">
+                {(["gwo.step1", "gwo.step2", "gwo.step3"] as const).map((key) => (
+                  <li key={key}><T id={key} /></li>
+                ))}
+              </ol>
+            </details>
+          ) : (
           <ol className="steps stagger">
             {(["gwo.step1", "gwo.step2", "gwo.step3"] as const).map((key, i) => (
               <li key={key} className="step card reveal">
@@ -255,6 +266,7 @@ export default function GatewaysPage({ client }: { client?: OwnerApi }) {
               </li>
             ))}
           </ol>
+          )}
           <Panel title={<T id="gwo.addTitle" />}>
             <AddGateway owner={owner} onAdded={read} />
           </Panel>

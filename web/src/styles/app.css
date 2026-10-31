@@ -20,6 +20,11 @@
 .app-nav-link:hover { background: var(--panel-2); color: var(--title); }
 .app-nav-link[aria-current="page"] { background: var(--panel-solid); color: var(--title); box-shadow: inset 3px 0 0 var(--gold); }
 .app-nav-icon { width: 1.15rem; height: 1.15rem; flex: none; color: var(--violet); }
+/* a count that asks for attention (gateways awaiting approval): in words for a screen reader */
+.app-nav-badge {
+  margin-left: auto; min-width: 1.6rem; padding: 0 var(--space-2); border-radius: var(--pill);
+  border: 1px solid currentColor; color: var(--warn); font: 700 var(--text-xs) var(--sans); text-align: center; line-height: 1.5;
+}
 .app-main { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-5); }
 .app-head { text-align: start; }
 .app-head h1 { font-size: var(--text-xl); margin-bottom: 0.3em; }
@@ -107,3 +112,27 @@
   .steps { grid-template-columns: 1fr; }
   .add-gateway { grid-template-columns: 1fr; }
 }
+
+/* the administration's first view: a grid of calm tiles, a count each,
+   the one that asks for attention in the state colour and in words */
+.stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: var(--space-4); }
+.stat { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-5); }
+.stat-label { margin: 0; font: 700 var(--text-xs) var(--sans); letter-spacing: 0.16em; text-transform: uppercase; color: var(--violet); }
+.stat-n { margin: 0; font: 600 var(--text-xl) var(--serif); line-height: 1.05; color: var(--title); font-variant-numeric: tabular-nums lining-nums; }
+.stat-sub { margin: 0; flex: 1; color: var(--ink-soft); }
+.stat-go { align-self: center; display: inline-flex; align-items: center; min-height: 44px; font-family: var(--sans); font-weight: 700; }
+.stat-warn { border-color: var(--warn); }
+.stat-warn .stat-n { color: var(--warn); }
+.stat-skeleton { min-height: 11rem; }
+
+/* a value with a copy button beside it (src/app/Copy.tsx) */
+.copyable { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-2); max-width: 100%; }
+.copy-btn { width: 44px; height: 44px; flex: none; }
+.copy-btn .icon { width: 1.05em; height: 1.05em; }
+.copy-btn[data-copied] { color: var(--ok); border-color: var(--ok); }
+code.address { overflow-wrap: anywhere; }
+
+/* the steps of hosting, folded away once a gateway is registered */
+.steps-more { font-family: var(--sans); }
+.steps-more > summary { display: inline-flex; align-items: center; min-height: 44px; cursor: pointer; color: var(--link); font-weight: 700; }
+.steps-more > summary:hover { color: var(--link-hover); }

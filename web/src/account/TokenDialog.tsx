@@ -12,7 +12,7 @@ import { Modal } from "../components/Modal";
 import { T, t, useLang, type Key } from "../i18n";
 import { ApiError, type AccountSummary } from "./api";
 import { BusyButton } from "./Busy";
-import { validTokenName, type CreatedToken, type MyGateway, type OwnerApi, type Scopes } from "./owner-api";
+import { shownName, validTokenName, type CreatedToken, type MyGateway, type OwnerApi, type Scopes } from "./owner-api";
 
 const LIFETIMES = [30, 90, 180, 365] as const;
 
@@ -64,7 +64,7 @@ export function TokenDialog({
   const submit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (busy) return;
-    if (!validTokenName(name.trim())) {
+    if (!validTokenName(name.trim()) || !shownName(name.trim())) {
       setStatus("tok.errName");
       field.current?.focus();
       return;

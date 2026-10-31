@@ -22,6 +22,7 @@ export const PAGES = [
   "accountSecurity",
   "accountGateways",
   "admin",
+  "adminUsers",
   "adminUser",
   "adminGateways",
   "adminAudit",
@@ -43,7 +44,9 @@ export const PATHS: Record<Page, string> = {
   account: "/account",
   accountSecurity: "/account/security",
   accountGateways: "/account/gateways",
+  // the administration's first view: its counts (`admin/OverviewPage.tsx`)
   admin: "/admin",
+  adminUsers: "/admin/users",
   // one account's page is `/admin/users/<its id in hex>` (`userPath`)
   adminUser: "/admin/users",
   adminGateways: "/admin/gateways",
@@ -63,8 +66,8 @@ export function userAt(pathname: string): string | null {
 export function pageAt(pathname: string): Page | null {
   if (userAt(pathname) !== null) return "adminUser";
   const path = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
-  // the list of accounts is the administration's first page
-  if (path === PATHS.adminUser) return "admin";
+  // `/admin/users` alone is the list; one account's page has its id after it
+  if (path === PATHS.adminUsers) return "adminUsers";
   for (const page of PAGES) if (PATHS[page] === path) return page;
   return null;
 }
