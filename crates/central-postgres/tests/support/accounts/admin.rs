@@ -356,15 +356,24 @@ async fn reads(
         .await
         .unwrap();
     assert_eq!(after.events.len(), all.events.len() - 1);
-    // every account an event names is named once, and nothing else
-    let mut named: Vec<_> = all
+    // every account an event names that still exists is named once, and
+    // nothing else (an event keeps the id of an account deleted since)
+    let mut named = Vec::new();
+    for id in all
         .events
         .iter()
         .flat_map(|e| [e.actor, e.account])
         .flatten()
-        .collect();
+    {
+        let sql = format!(
+            "SELECT count(*) FROM central_identity.accounts WHERE id = '{}'",
+            sea_orm::prelude::Uuid::from_bytes(id)
+        );
+        if count(operator, &sql).await == 1 && !named.contains(&id) {
+            named.push(id);
+        }
+    }
     named.sort_unstable();
-    named.dedup();
     assert_eq!(all.accounts.iter().map(|a| a.id).collect::<Vec<_>>(), named);
     overview(store, operator, cookie).await;
 }
