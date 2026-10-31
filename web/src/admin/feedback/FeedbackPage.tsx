@@ -563,7 +563,7 @@ function ReportList({ api, me, summary, replace, recountUnread }: ListProps) {
                       <th scope="col">{t(lang, "fb.colReport")}</th>
                       <SortHead sort="received" label="fb.colReceived" query={query} set={set} />
                       <SortHead sort="kind" label="fb.colKind" query={query} set={set} className="fb-wide" />
-                      <SortHead sort="status" label="fb.colStatus" query={query} set={set} />
+                      <SortHead sort="status" label="fb.colStatus" query={query} set={set} className="fb-status" />
                       <SortHead sort="priority" label="fb.colPriority" query={query} set={set} className="fb-wide" />
                       <th scope="col" className="fb-wide">
                         {t(lang, "fb.colAssignee")}
@@ -690,6 +690,10 @@ function Row({
           {line === "" ? t(lang, "fb.noText") : line}
         </Link>
         <span className="fb-marks">
+          {/* beside the drawer the status column gives way, and the status shows here */}
+          <span className="fb-status-inline">
+            <StatusPill status={r.status} />
+          </span>
           <Labels labels={r.labels} onPick={(label) => set({ label })} />
           {r.notes > 0 && <span className="small">{t(lang, "fb.notesN", { n: r.notes })}</span>}
           {r.duplicateOf !== null && <span className="small">{t(lang, "fb.dupOf", { id: shortId(r.duplicateOf) })}</span>}
@@ -707,13 +711,13 @@ function Row({
           )}
         </span>
       </th>
-      <td className="num">
+      <td className="num fb-received">
         <Ago at={r.createdAt} />
       </td>
       <td className="fb-wide">
         <KindPill kind={r.kind} />
       </td>
-      <td>
+      <td className="fb-status">
         <StatusPill status={r.status} />
       </td>
       <td className="fb-wide">{r.priority === null ? <span className="small">—</span> : <PriorityPill priority={r.priority} />}</td>
