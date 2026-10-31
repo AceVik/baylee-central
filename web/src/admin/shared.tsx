@@ -30,6 +30,8 @@ export interface AdminContext {
   uncounted: boolean;
   /** Reads the counts again, after a change. */
   recount(): void;
+  /** Reads the navigation's count of unread reports again, after one was opened or decided. */
+  recountUnread(): void;
 }
 
 export function AdminFrame({
@@ -60,10 +62,21 @@ export function AdminFrame({
       () => setUncounted(true),
     );
   }, [api]);
+  // the new reports not opened yet, for the navigation; a count that cannot
+  // be read is simply not shown
+  const [unread, setUnread] = useState<number | null>(null);
+  const recountUnread = useCallback(() => {
+    api.reportsUnread().then(setUnread, () => setUnread(null));
+  }, [api]);
   useEffect(() => {
-    if (admin) recount();
-  }, [admin, recount]);
-  const badges = overview === null ? undefined : { adminGateways: overview.pending };
+    if (!admin) return;
+    recount();
+    recountUnread();
+  }, [admin, recount, recountUnread]);
+  const badges =
+    overview === null && unread === null
+      ? undefined
+      : { ...(overview === null ? {} : { adminGateways: overview.pending }), ...(unread === null ? {} : { adminFeedback: unread }) };
   return (
     <AppFrame page={page} admin={admin} {...(badges === undefined ? {} : { badges })} eyebrow="app.admin" title={title} {...(lead === undefined ? {} : { lead })}>
       {state.at === "signedOut" && <SignedOut />}
@@ -80,7 +93,7 @@ export function AdminFrame({
           </p>
         </div>
       )}
-      {state.at === "ready" && state.summary.admin && children({ summary: state.summary, replace, overview, uncounted, recount })}
+      {state.at === "ready" && state.summary.admin && children({ summary: state.summary, replace, overview, uncounted, recount, recountUnread })}
     </AppFrame>
   );
 }

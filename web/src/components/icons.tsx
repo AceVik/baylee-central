@@ -40,6 +40,12 @@ const PATHS = {
   sun: "M12 7.5a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9zM11 1h2v4h-2zm0 18h2v4h-2zM1 11h4v2H1zm18 0h4v2h-4zM4.2 5.6l1.4-1.4 2.9 2.9-1.4 1.4zm11.3 1.5 2.9-2.9 1.4 1.4-2.9 2.9zM4.2 18.4l2.9-2.9 1.4 1.4-2.9 2.9zm11.3-1.5 1.4-1.4 2.9 2.9-1.4 1.4z",
   moon: "M12 3a9 9 0 1 0 9 9 7 7 0 0 1-9-9z",
   half: "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 2v16a8 8 0 0 1 0-16z",
+  flag: "M5 2h2v20H5zm3 1h11l-2.5 4.5L19 12H8z",
+  trash: "M9 3h6l1 1h4v2H4V4h4zM6 8h12l-1 13H7zm3 2v9h2v-9zm4 0v9h2v-9z",
+  refresh: "M12 4a8 8 0 1 0 7.7 10h-2.1A6 6 0 1 1 12 6a5.9 5.9 0 0 1 4.2 1.8L13 11h7V4l-2.4 2.4A8 8 0 0 0 12 4z",
+  keyboard: "M3 6h18a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1zm2 3v2h2V9zm4 0v2h2V9zm4 0v2h2V9zm4 0v2h2V9zM5 13v2h2v-2zm4 0v2h6v-2zm8 0v2h2v-2z",
+  filter: "M3 5h18l-7 8v6l-4 2v-8z",
+  bookmark: "M6 3h12v18l-6-4-6 4z",
 } as const;
 
 export type IconName = keyof typeof PATHS;

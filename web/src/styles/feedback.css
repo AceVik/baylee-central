@@ -1,0 +1,167 @@
+/* The administration's feedback section (src/admin/feedback/,
+   docs/website-design.md §"Areas"): the list of reports with its views,
+   filters and pills, a drawer beside it from 1100 px, one report's page, its
+   triage, notes and history, and the notices at the foot of the screen.
+   Tokens only; every track may shrink (minmax(0, …)), so nothing scrolls
+   sideways but a table in its own box. */
+
+/* ---------------------------------------------------------------- the list */
+.fb-split { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-4); align-items: start; }
+.fb-views { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-bottom: var(--space-4); }
+.fb-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin-bottom: var(--space-3); }
+.fb-toolbar .fb-search { flex: 1 1 16rem; margin: 0; min-width: 0; }
+.fb-toolbar .fb-search input { min-width: 0; }
+.fb-filters { display: grid; gap: var(--space-4); padding: var(--space-4); margin-bottom: var(--space-4); border: 1px solid var(--edge-soft); border-radius: var(--radius-md); background: var(--panel-2); }
+.fb-chip-groups { display: grid; gap: var(--space-3); }
+.fb-chips { border: 0; margin: 0; padding: 0; min-width: 0; }
+.fb-chips legend, .fb-legend { font: 700 var(--text-sm) var(--sans); color: var(--ink); margin: 0 0 var(--space-2); padding: 0; }
+.fb-chips .chips { margin: 0; }
+.fb-section .fb-chips, .fb-section .fb-field { margin-bottom: var(--space-4); }
+.fb-fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 13rem), 1fr)); gap: 0 var(--space-4); }
+.fb-field { margin: 0 0 var(--space-3); min-width: 0; }
+.fb-field select, .fb-select, .fb-input, .fb-field input[type="date"] {
+  width: 100%; min-width: 0; min-height: 44px; font: 1rem var(--sans); color: var(--ink); background: var(--field-bg);
+  border: 1px solid var(--field-edge); border-radius: var(--radius-md); padding: 0 0.8em;
+}
+.fb-select { width: auto; }
+.fb-field select:focus-visible, .fb-select:focus-visible, .fb-input:focus-visible, .fb-field input[type="date"]:focus-visible {
+  outline: 2px solid transparent; border-color: var(--gold); box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold) 35%, transparent);
+}
+.fb-pills { list-style: none; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin: 0 0 var(--space-3); padding: 0; }
+.fb-pill { max-width: 100%; }
+.fb-pill bdi { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 22rem; }
+.fb-pill-x { width: 0.9em; height: 0.9em; flex: none; }
+.fb-empty { text-align: center; margin: 0 0 var(--space-3); }
+
+/* the table: the report's first line is the row's name; on a narrow column the side columns go */
+.fb-table th, .fb-table td { vertical-align: top; }
+.fb-cell-report { min-width: 16rem; max-width: 34rem; white-space: normal; }
+.fb-table tbody th { font-weight: 500; }
+/* on a phone the report's line wraps beside the one line of the rest */
+.fb-table .fb-cell-report { white-space: normal; }
+@media (max-width: 600px) {
+  .fb-table .fb-cell-report { min-width: min(15rem, 68vw); }
+}
+.fb-cell-report a { overflow-wrap: anywhere; }
+.fb-table tbody tr.fb-unread th a { font-weight: 700; }
+.fb-table tbody tr.fb-cursor { box-shadow: inset 3px 0 0 var(--gold); }
+.fb-table tbody tr.fb-opened { background: var(--panel-2); }
+.fb-dot { display: inline-block; width: 0.55rem; height: 0.55rem; margin-right: var(--space-2); border-radius: 50%; background: var(--violet); vertical-align: middle; }
+.fb-marks { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-2); margin-top: var(--space-1); font-weight: 400; }
+.fb-sort {
+  appearance: none; display: inline-flex; align-items: center; gap: var(--space-1); min-height: 44px; margin: calc(-1 * var(--space-3)) 0;
+  padding: 0; border: 0; background: none; color: inherit; font: inherit; letter-spacing: inherit; text-transform: inherit; cursor: pointer;
+}
+.fb-sort:hover { color: var(--title); }
+.fb-sort-mark { display: inline-block; min-width: 0.8em; color: var(--gold); }
+.fb-linkish {
+  appearance: none; display: inline; padding: 0; border: 0; background: none; color: var(--violet); font: inherit; text-align: start; cursor: pointer;
+  text-decoration: underline; text-decoration-color: color-mix(in srgb, currentColor 35%, transparent); text-underline-offset: 0.2em;
+}
+.fb-linkish:hover { color: var(--title); text-decoration-color: currentColor; }
+.fb-labels { display: inline-flex; flex-wrap: wrap; gap: var(--space-1); }
+.fb-label {
+  display: inline-flex; align-items: center; min-height: 1.6rem; padding: 0 0.55em; border: 1px solid var(--edge-soft); border-radius: var(--pill);
+  font: 500 var(--text-xs) var(--mono); color: var(--ink-soft); text-decoration: none; background: transparent;
+}
+a.fb-label:hover, button.fb-label:hover { border-color: var(--edge); color: var(--title); }
+.fb-reporter { display: inline-flex; align-items: baseline; gap: var(--space-1); white-space: nowrap; }
+.fb-short { font-size: var(--text-xs); color: var(--ink-faint); }
+.fb-pager { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: var(--space-2) var(--space-3); margin-top: var(--space-4); }
+.round-btn[disabled] { opacity: 0.45; cursor: default; }
+
+/* ---------------------------------------------------------------- the drawer, beside the list from 1100 px */
+.fb-drawer { display: none; }
+@media (min-width: 1100px) {
+  .fb-split.with-drawer { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .fb-split.with-drawer .fb-wide { display: none; }
+  .fb-split.with-drawer .fb-cell-report { min-width: 12rem; }
+  .fb-drawer {
+    display: block; position: sticky; top: calc(var(--top-h) + var(--space-4)); max-height: calc(100dvh - var(--top-h) - var(--space-6));
+    overflow-y: auto; overscroll-behavior: contain; padding: var(--space-4);
+  }
+}
+.fb-drawer:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+.fb-drawer-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); margin-bottom: var(--space-3); }
+
+/* ---------------------------------------------------------------- one report */
+.fb-page { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-4); }
+.fb-steps { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.fb-steps-near { display: inline-flex; align-items: center; gap: var(--space-2); }
+.fb-off { opacity: 0.4; }
+.fb-report { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-4); }
+.fb-report-head { display: grid; gap: var(--space-2); }
+.fb-report-head p { margin: 0; }
+.fb-report-pills { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.fb-report-title { margin: 0; font-size: var(--text-lg); overflow-wrap: anywhere; }
+.fb-report-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-4); align-items: start; }
+@media (min-width: 860px) {
+  .fb-report-grid { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); }
+}
+.fb-report-col { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-4); align-content: start; }
+.fb-section { padding: var(--space-4) var(--space-5); }
+.fb-section-title { margin: 0 0 var(--space-3); font: 700 var(--text-xs) var(--sans); letter-spacing: 0.16em; text-transform: uppercase; color: var(--violet); }
+.fb-fold > summary { display: flex; align-items: center; min-height: 44px; cursor: pointer; list-style: none; }
+.fb-fold > summary::-webkit-details-marker { display: none; }
+.fb-fold > summary::after { content: "▾"; margin-left: auto; color: var(--ink-faint); transition: transform var(--dur-fast) ease; }
+.fb-fold[open] > summary::after { transform: rotate(180deg); }
+.fb-fold > summary .fb-section-title { margin: 0; }
+.fb-text { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; max-width: var(--prose); }
+.fb-crash { margin-top: var(--space-4); }
+.fb-pre {
+  margin: 0 0 var(--space-2); padding: var(--space-3); max-height: 20rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere;
+  font: var(--text-sm) / 1.5 var(--mono); color: var(--code-ink); background: var(--code-bg); border-radius: var(--radius-sm);
+}
+.fb-code { font-size: var(--text-sm); overflow-wrap: anywhere; }
+.fb-kv { margin: 0; }
+.fb-kv dd { overflow-wrap: anywhere; }
+@media (max-width: 600px) {
+  .fb-kv { grid-template-columns: minmax(0, 1fr); gap: var(--space-1); }
+  .fb-kv dd { margin-bottom: var(--space-2); }
+}
+.fb-trashed { padding: var(--space-4) var(--space-5); border-color: var(--warn); display: grid; gap: var(--space-3); }
+.fb-trashed p { margin: 0; }
+.fb-error, .fb-bad { color: var(--bad); display: flex; align-items: center; gap: var(--space-2); margin: 0; }
+.fb-inline { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.fb-inline .fb-input, .fb-inline select { flex: 1 1 10rem; width: auto; }
+.fb-label-list { list-style: none; display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-2); margin: 0 0 var(--space-2); padding: 0; }
+.fb-label-list li { display: inline-flex; align-items: center; gap: var(--space-1); }
+.fb-x { width: 44px; height: 44px; flex: none; }
+.fb-x .icon { width: 0.9em; height: 0.9em; }
+.fb-ext { width: 0.9em; height: 0.9em; margin-left: 0.2em; vertical-align: -0.1em; }
+.fb-more { margin-top: var(--space-3); }
+.fb-more > summary { display: inline-flex; align-items: center; min-height: 44px; cursor: pointer; color: var(--link); font: 700 var(--text-md) var(--sans); }
+.fb-more > summary:hover { color: var(--link-hover); }
+.fb-more[open] > summary { margin-bottom: var(--space-3); }
+.fb-notes { list-style: none; margin: 0 0 var(--space-4); padding: 0; display: grid; gap: var(--space-3); }
+.fb-note { padding: var(--space-3); border: 1px solid var(--edge-soft); border-radius: var(--radius-md); background: var(--panel-2); }
+.fb-note-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); margin: 0; }
+.fb-note-head .fb-x { margin-left: auto; margin-block: calc(-1 * var(--space-2)); }
+.fb-note-text { margin: var(--space-1) 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.fb-note-form { margin: 0; }
+.fb-note-form textarea { min-height: 5rem; }
+.fb-note-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.fb-history { margin: 0; padding-left: 1.2em; display: grid; gap: var(--space-2); font: var(--text-sm) var(--sans); color: var(--ink-soft); }
+.fb-detail { overflow-wrap: anywhere; }
+.fb-related { margin: 0; padding-left: 1.2em; display: grid; gap: var(--space-1); font-family: var(--sans); }
+.fb-related a { display: inline-flex; align-items: center; min-height: 44px; }
+
+/* ---------------------------------------------------------------- notices */
+.fb-notices {
+  position: fixed; z-index: 30; left: 50%; bottom: max(var(--space-4), env(safe-area-inset-bottom)); transform: translateX(-50%);
+  width: min(32rem, calc(100vw - 2 * var(--gutter))); display: grid; gap: var(--space-2); pointer-events: none;
+}
+.fb-notice {
+  pointer-events: auto; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
+  border: 1px solid var(--edge); border-radius: var(--radius-md); background: var(--panel-solid); color: var(--ink); box-shadow: var(--shadow-lift);
+  font-family: var(--sans); animation: fb-rise var(--dur) var(--ease);
+}
+.fb-notice > span { flex: 1 1 12rem; }
+.fb-notice.bad { border-color: var(--bad); }
+.fb-notice-close { flex: none; }
+@keyframes fb-rise { from { opacity: 0; transform: translateY(8px); } }
+
+@media (forced-colors: active) {
+  .fb-table tbody tr.fb-cursor { outline: 2px solid CanvasText; outline-offset: -2px; }
+  .fb-dot { forced-color-adjust: none; background: CanvasText; }
+}

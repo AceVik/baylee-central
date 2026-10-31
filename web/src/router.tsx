@@ -27,6 +27,8 @@ export const PAGES = [
   "adminGateways",
   "adminAudit",
   "adminLegacy",
+  "adminFeedback",
+  "adminReport",
 ] as const;
 export type Page = (typeof PAGES)[number];
 
@@ -52,6 +54,10 @@ export const PATHS: Record<Page, string> = {
   adminGateways: "/admin/gateways",
   adminAudit: "/admin/audit",
   adminLegacy: "/admin/legacy",
+  // bug and crash reports (`admin/feedback/`); one report's page is
+  // `/admin/feedback/<its id in hex>` (`reportAt`)
+  adminFeedback: "/admin/feedback",
+  adminReport: "/admin/feedback",
 };
 
 /** The administration's page of the account with the id `hex` (32 hex digits). */
@@ -62,12 +68,19 @@ export function userAt(pathname: string): string | null {
   return /^\/admin\/users\/([0-9a-f]{32})\/?$/.exec(pathname)?.[1] ?? null;
 }
 
+/** The report id in a report's page path, or null. */
+export function reportAt(pathname: string): string | null {
+  return /^\/admin\/feedback\/([0-9a-f]{32})\/?$/.exec(pathname)?.[1] ?? null;
+}
+
 /** The page at `pathname`, or null for one this site does not have. */
 export function pageAt(pathname: string): Page | null {
   if (userAt(pathname) !== null) return "adminUser";
+  if (reportAt(pathname) !== null) return "adminReport";
   const path = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
   // `/admin/users` alone is the list; one account's page has its id after it
   if (path === PATHS.adminUsers) return "adminUsers";
+  if (path === PATHS.adminFeedback) return "adminFeedback";
   for (const page of PAGES) if (PATHS[page] === path) return page;
   return null;
 }

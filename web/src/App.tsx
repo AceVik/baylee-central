@@ -35,6 +35,8 @@ const LOAD = {
   adminGateways: () => import("./admin/GatewaysPage"),
   adminAudit: () => import("./admin/AuditPage"),
   adminLegacy: () => import("./admin/LegacyPage"),
+  adminFeedback: () => import("./admin/feedback/FeedbackPage"),
+  adminReport: () => import("./admin/feedback/ReportPage"),
 } satisfies Record<Exclude<Page, "home">, () => Promise<unknown>>;
 
 const Download = lazy(LOAD.download);
@@ -55,6 +57,8 @@ const AdminUser = lazy(LOAD.adminUser);
 const AdminGateways = lazy(LOAD.adminGateways);
 const AdminAudit = lazy(LOAD.adminAudit);
 const AdminLegacy = lazy(LOAD.adminLegacy);
+const AdminFeedback = lazy(LOAD.adminFeedback);
+const AdminReport = lazy(LOAD.adminReport);
 
 // a link pointed at or focused fetches its page's code ahead, unless the
 // visitor asked their browser to save data
@@ -115,6 +119,10 @@ function PageView({ page }: { page: Page | null }) {
       return <AdminAudit />;
     case "adminLegacy":
       return <AdminLegacy />;
+    case "adminFeedback":
+      return <AdminFeedback />;
+    case "adminReport":
+      return <AdminReport />;
     case null:
       return <NotFound />;
   }

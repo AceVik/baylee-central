@@ -16,6 +16,8 @@ interface Item {
   page: Page;
   label: Key;
   icon: IconName;
+  /** What its count means, in words for a screen reader. */
+  counts?: Key;
 }
 
 const ACCOUNT: readonly Item[] = [
@@ -26,23 +28,31 @@ const ACCOUNT: readonly Item[] = [
 
 const ADMIN: readonly Item[] = [
   { page: "admin", label: "app.overview", icon: "grid" },
+  { page: "adminFeedback", label: "app.feedback", icon: "flag", counts: "app.unread" },
   { page: "adminUsers", label: "app.users", icon: "people" },
-  { page: "adminGateways", label: "app.adminGateways", icon: "globe" },
+  { page: "adminGateways", label: "app.adminGateways", icon: "globe", counts: "app.waiting" },
   { page: "adminAudit", label: "app.audit", icon: "list" },
   { page: "adminLegacy", label: "app.legacy", icon: "key" },
 ];
 
-/** A number beside an item of the navigation, such as the gateways awaiting approval. */
+/** A number beside an item of the navigation: the gateways awaiting approval, the unread reports. */
 export type Badges = Partial<Record<Page, number>>;
 
 const NO_BADGES: Badges = {};
+
+/** The item a page that has none of its own stands under: an account's under the accounts, a report's under the reports. */
+function parentOf(page: Page): Page {
+  if (page === "adminUser") return "adminUsers";
+  if (page === "adminReport") return "adminFeedback";
+  return page;
+}
 
 function Items({ items, page, badges = NO_BADGES }: { items: readonly Item[]; page: Page; badges?: Badges }) {
   const lang = useLang();
   return (
     <ul className="app-nav-list">
       {items.map((item) => {
-        const current = item.page === page || (item.page === "adminUsers" && page === "adminUser");
+        const current = item.page === page || item.page === parentOf(page);
         const badge = badges[item.page] ?? 0;
         return (
           <li key={item.page}>
@@ -53,7 +63,7 @@ function Items({ items, page, badges = NO_BADGES }: { items: readonly Item[]; pa
               {badge > 0 && (
                 <span className="app-nav-badge num">
                   {num(lang, badge)}{" "}
-                  <span className="vh">{t(lang, "app.waiting")}</span>
+                  <span className="vh">{t(lang, item.counts ?? "app.waiting")}</span>
                 </span>
               )}
             </Link>
@@ -85,7 +95,7 @@ export function AppFrame({
   const nav = useRef<HTMLElement>(null);
   // where the tabs are one row that scrolls, the current one is in sight
   useEffect(() => {
-    const current = nav.current?.querySelector<HTMLElement>(`[data-page="${page === "adminUser" ? "admin" : page}"]`);
+    const current = nav.current?.querySelector<HTMLElement>(`[data-page="${parentOf(page)}"]`);
     // (jsdom has no scrollIntoView)
     current?.scrollIntoView?.({ block: "nearest", inline: "center" });
   }, [page]);
