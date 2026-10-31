@@ -12,7 +12,7 @@ import { PATHS } from "../router";
 import { SubmitButton } from "./Busy";
 import { canonicalName, reservedDisplayName, validDisplayName, validName } from "./names";
 import { PasswordFields } from "./PasswordFields";
-import { acceptable, MAX_BYTES } from "./strength";
+import { acceptable, guessable, MAX_BYTES } from "./strength";
 
 export interface Registration {
   betaKey: string;
@@ -22,7 +22,7 @@ export interface Registration {
   password: string;
 }
 
-type Problem = "key" | "username" | "displayName" | "reserved" | "password" | "again" | "age" | "consent";
+type Problem = "key" | "username" | "displayName" | "reserved" | "password" | "guessable" | "again" | "age" | "consent";
 
 const SAY: Readonly<Record<Problem, Key>> = {
   key: "register.errKey",
@@ -30,6 +30,7 @@ const SAY: Readonly<Record<Problem, Key>> = {
   displayName: "register.errDisplayName",
   reserved: "register.errDisplayNameReserved",
   password: "register.errPassword",
+  guessable: "register.errGuessable",
   again: "register.errMismatch",
   age: "register.errAge",
   consent: "register.errConsent",
@@ -80,7 +81,9 @@ export function RegisterForm({ busy, status, onSubmit }: { busy: boolean; status
               ? "reserved"
               : !acceptable(password)
                 ? "password"
-                : password !== again
+                : guessable(password, username)
+                  ? "guessable"
+                  : password !== again
                   ? "again"
                   : !age
                     ? "age"
@@ -101,6 +104,9 @@ export function RegisterForm({ busy, status, onSubmit }: { busy: boolean; status
   };
 
   const invalid = (p: Problem) => (problem === p ? true : undefined);
+  // a field in trouble is also described by the status that says what is wrong
+  const told = (p: Problem | readonly Problem[], ...base: string[]) =>
+    [...base, ...(problem !== null && (typeof p === "string" ? p === problem : p.includes(problem)) ? ["r-status"] : [])].join(" ") || undefined;
   const shown = problem !== null ? { bad: true, key: SAY[problem] } : status;
   return (
     <form className="account-form" noValidate onSubmit={submit} aria-busy={busy}>
@@ -118,7 +124,7 @@ export function RegisterForm({ busy, status, onSubmit }: { busy: boolean; status
           maxLength={64}
           value={betaKey}
           aria-invalid={invalid("key")}
-          aria-describedby="r-key-hint"
+          aria-describedby={told("key", "r-key-hint")}
           onChange={(e) => {
             setBetaKey(e.target.value);
             if (problem === "key") setProblem(null);
@@ -142,7 +148,7 @@ export function RegisterForm({ busy, status, onSubmit }: { busy: boolean; status
           maxLength={24}
           value={username}
           aria-invalid={invalid("username")}
-          aria-describedby="r-name-rules"
+          aria-describedby={told("username", "r-name-rules")}
           onChange={(e) => {
             setUsername(e.target.value);
             if (problem === "username") setProblem(null);
@@ -166,7 +172,7 @@ export function RegisterForm({ busy, status, onSubmit }: { busy: boolean; status
           maxLength={16}
           value={displayName}
           aria-invalid={problem === "displayName" || problem === "reserved" ? true : undefined}
-          aria-describedby="r-display-rules"
+          aria-describedby={told(["displayName", "reserved"], "r-display-rules")}
           onChange={(e) => {
             setDisplayName(e.target.value);
             if (problem === "displayName" || problem === "reserved") setProblem(null);
@@ -180,10 +186,10 @@ export function RegisterForm({ busy, status, onSubmit }: { busy: boolean; status
         password={password}
         again={again}
         username={username}
-        invalid={problem === "password" || problem === "again" ? { field: problem, n: complaints } : null}
+        invalid={problem === "password" || problem === "guessable" ? { field: "password", n: complaints } : problem === "again" ? { field: "again", n: complaints } : null}
         onPassword={(value) => {
           setPassword(value);
-          if (problem === "password") setProblem(null);
+          if (problem === "password" || problem === "guessable") setProblem(null);
         }}
         onAgain={(value) => {
           setAgain(value);
@@ -192,7 +198,7 @@ export function RegisterForm({ busy, status, onSubmit }: { busy: boolean; status
       />
       <p className="field">
         <label className="check-label">
-          <input ref={ageRef} type="checkbox" checked={age} aria-invalid={invalid("age")} onChange={(e) => setAge(e.target.checked)} />
+          <input ref={ageRef} type="checkbox" checked={age} aria-invalid={invalid("age")} aria-describedby={told("age")} onChange={(e) => setAge(e.target.checked)} />
           <span>
             <T id="register.age" />
           </span>
@@ -200,7 +206,7 @@ export function RegisterForm({ busy, status, onSubmit }: { busy: boolean; status
       </p>
       <p className="field">
         <label className="check-label">
-          <input ref={consentRef} type="checkbox" checked={consent} aria-invalid={invalid("consent")} onChange={(e) => setConsent(e.target.checked)} />
+          <input ref={consentRef} type="checkbox" checked={consent} aria-invalid={invalid("consent")} aria-describedby={told("consent")} onChange={(e) => setConsent(e.target.checked)} />
           <span>
             <T id="register.consent" elems={LINKS} />
           </span>

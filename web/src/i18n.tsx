@@ -187,7 +187,9 @@ export type Args = Readonly<Record<string, string | number>>;
  */
 export function t(lang: Lang, key: Key, args: Args = {}): string {
   const id = fluentId(key);
-  for (const each of lang === "en" ? [bundle("en")] : [bundle(lang), bundle("en")]) {
+  // English is built only when the language lacks a message (a German visitor rarely needs it)
+  for (const code of lang === "en" ? ["en" as const] : [lang, "en" as const]) {
+    const each = bundle(code);
     const pattern = each?.getMessage(id)?.value;
     if (each !== undefined && pattern !== undefined && pattern !== null) return each.formatPattern(pattern, args, []);
   }

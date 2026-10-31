@@ -4,6 +4,10 @@
 // guessers try first: one character repeated, runs like `abc` or `321`, the
 // name, and a few words everyone uses. Eight characters are the minimum;
 // fifteen or more make a strong passphrase on their own (NIST SP 800-63B).
+// One check is a rule, as NIST SP 800-63B §5.1.1.2 asks of every verifier,
+// and still no composition rule: a password guessers try first (one or two
+// characters repeated, one run like `12345678`, the username, or a common
+// word with digits or marks around it) is refused (`guessable`).
 
 export type Strength = "short" | "weak" | "fair" | "strong";
 
@@ -58,14 +62,24 @@ export function strength(password: string, username = ""): Strength {
   if (chars.length < MIN_LENGTH) return "short";
   const lower = password.toLowerCase();
   const name = username.trim().toLowerCase();
-  const guessable =
+  const predictable =
     new Set(chars).size <= 2 || COMMON.some((w) => lower.includes(w)) || (name.length >= 3 && lower.includes(name));
   // each character in a run, or repeated, adds little
   const effective = Math.max(1, chars.length - runs(chars) * 0.75);
-  const bits = effective * Math.log2(pool(chars)) * (guessable ? 0.5 : 1);
+  const bits = effective * Math.log2(pool(chars)) * (predictable ? 0.5 : 1);
   if (bits < 40) return "weak";
   if (bits < 65 && chars.length < 15) return "fair";
-  return guessable ? "fair" : "strong";
+  return predictable ? "fair" : "strong";
+}
+
+/** Whether `password` is one guessers try first: the page refuses it at registration. */
+export function guessable(password: string, username = ""): boolean {
+  const chars = Array.from(password);
+  const lower = password.toLowerCase();
+  const name = username.trim().toLowerCase();
+  // what is left once marks (and digits) around it go: `123456!!` is `123456`, `Password1!` is `password`
+  const cores = new Set([lower, lower.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, ""), lower.replace(/^[^\p{L}]+|[^\p{L}]+$/gu, "")]);
+  return new Set(chars).size <= 2 || runs(chars) >= chars.length - 1 || (name.length > 0 && cores.has(name)) || COMMON.some((w) => cores.has(w));
 }
 
 /** Whether `password` may be sent at all: at least eight characters, at most 1024 bytes. */

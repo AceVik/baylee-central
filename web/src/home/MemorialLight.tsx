@@ -5,7 +5,10 @@ import fragment from "./memorial-light.frag?raw";
 // CSS supplies the same warm atmosphere when WebGL is unavailable or lost.
 export function MemorialLight() {
   const ref = useRef<HTMLCanvasElement>(null);
+  const made = useRef<WebGLRenderingContext | null>(null);
   const [generation, restore] = useState(0);
+  // closing the album gives the GPU's context back at once, not when the page is collected
+  useEffect(() => () => made.current?.getExtension("WEBGL_lose_context")?.loseContext(), []);
   useEffect(() => {
     const canvas = ref.current;
     if (!canvas) return;
@@ -14,6 +17,7 @@ export function MemorialLight() {
     try { gl = canvas.getContext("webgl", { alpha: true, antialias: false, depth: false, powerPreference: "low-power" }); }
     catch { return; }
     if (!gl) return;
+    made.current = gl;
     const shaders: WebGLShader[] = [];
     const shader = (kind: number, source: string) => {
       const value = gl.createShader(kind);

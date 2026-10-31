@@ -71,6 +71,7 @@ export function ChooseName({ tag, onChosen, onStale }: { tag: number; onChosen(n
             maxLength={16}
             value={name}
             aria-invalid={status?.bad ? true : undefined}
+            aria-describedby={status?.bad ? "a-display-status" : undefined}
             onChange={(e) => {
               setName(e.target.value);
               if (status?.bad) setStatus(null);
@@ -79,7 +80,7 @@ export function ChooseName({ tag, onChosen, onStale }: { tag: number; onChosen(n
         </div>
         <div className="form-row">
           <SubmitButton busy={busy} label="account.chooseNameSubmit" busyLabel="account.chooseNameSaving" />
-          <output className={`form-status${status?.bad ? " bad" : ""}`}>{status !== null && <T id={status.key} />}</output>
+          <output id="a-display-status" className={`form-status${status?.bad ? " bad" : ""}`}>{status !== null && <T id={status.key} />}</output>
         </div>
       </form>
     </section>

@@ -44,8 +44,11 @@ Baylee in sunlight by day, the blue hour by night.
 
 Every colour is a custom property in `web/src/styles/tokens.css`, defined
 for the dark scheme in `:root`, for the light scheme under
-`prefers-color-scheme: light` and again under `[data-theme="light"]`
-(`?theme=` and `public/boot.js`). No other file names a raw colour, except
+`prefers-color-scheme: light` and again under `[data-theme="light"]`. The
+header's colour switch goes from the device's scheme to light, dark and back
+(`src/theme.ts`); the browser keeps the choice like the language (the
+privacy notice's "language and display"), `public/boot.js` applies it before
+the first paint, and `?theme=` overrides it for one visit. No other file names a raw colour, except
 the artwork's own: the memorial's parchment (`memorial-book.css`,
 `remembrance.css`) and the painted light over the world (`hero.css`,
 `world.css`).
@@ -147,37 +150,57 @@ The scale (`--text-*`, rem at a root of 16–20 px by viewport):
 Each lives in one stylesheet named after it and one component under
 `web/src/components/` when it has behaviour.
 
-- **Buttons** (`buttons.css`): `.button` gold, primary, one per view;
+- **Buttons** (`buttons.css`): `.button` gold, primary, one per view (one
+  exception: a queue whose rows each wait for the same decision, the
+  gateways awaiting approval, gives that decision the gold in every row);
   `.button-ghost` for every other action; `.button-danger` (ghost that
   turns `--bad`) for revoke, lock and delete; `.round-btn` for an icon
   alone, always with a hidden label; `.chip-btn` for a filter or a choice
-  among few. 44 px high at least, on every screen.
+  among few. 44 px high at least, on every screen. A button whose action
+  takes a moment stays focusable while it works (`BusyButton`:
+  `aria-disabled` and a spinner, never `disabled`), and a row's buttons are
+  described by the row's name.
 - **Fields** (`forms.css`): label above, hint below, error below the hint in
   `--bad` with an icon and the words; `aria-describedby` ties both to the
-  field. A field's border is 3:1.
+  field, and `aria-invalid` marks it while the problem stands. A field's
+  border is 3:1. A password field (`PasswordInput`) has a button that shows
+  what was typed (pressed state, spellcheck off) and says when Caps Lock is
+  on.
+- **Facts** (`.kv`): label and value side by side, the labels one column as
+  wide as the longest, no rule under each; one column on a phone.
 - **Panels and cards** (`.glass`, `.card`): 18 px radius, one soft border,
   `--shadow`. A card that is a link lifts under the pointer.
 - **Pills** (`.pill`): a state in words, coloured by the state token,
   `--text-xs`, never alone without the word.
 - **Tables** (`tables.css`): for administration only. Header row in the
   interface face, tabular figures, row hover, the first column the thing's
-  name, the last column its actions. On a phone a table becomes a list of
-  cards (`.table-cards`).
+  name (in the heading's ink, underlined under the pointer), the last column
+  its actions. A table stands in its own scroll box (`TableBox`), which the
+  keyboard reaches and a screen reader names; on a phone each row stays one
+  line and the box scrolls. (A list of cards on a phone was the first plan;
+  restyling table rows drops their table semantics in Safari, so it waits
+  for explicit roles.)
 - **The app frame** (`app.css`): the account area and the administration
   share one shell: a side navigation on the left at 1100 px and wider, a
-  row of tabs above the content below it. The current item is marked with
-  `aria-current="page"` and the gold rule.
+  row of tabs above the content below it, one line that scrolls sideways
+  with the current tab in sight. The current item is marked with
+  `aria-current="page"` and the gold rule. Its head is start-aligned, beside
+  the navigation, unlike the centred page heads of the public pages.
 - **Dialogs** (`components/Modal.tsx`): the native `<dialog>`, centred,
   focus inside, Escape and the close button close it, focus returns to the
-  opener. A dangerous change names the thing it acts on and asks for the
+  opener (or to the main content when the opener is gone). A dialog the
+  browser closes by itself while its owner keeps it (a secret shown once)
+  opens again. A dangerous change names the thing it acts on and asks for the
   change in words on its button ("Revoke token"), never "OK".
 - **The secret box** (`.secret`): a token, key or code shown once. Mono,
   selectable, a copy button, the warning "shown only now" above it, and the
   dialog does not close on a click outside until the person says they kept
   it. A secret is never put in a URL, the page's storage or a log.
 - **States of a list**: loading is a skeleton of the list's shape
-  (`.skeleton`), empty is a sentence and the next step, failure is the
-  reason and "Try again". The three never look alike.
+  (`.skeleton`) under `aria-busy`, empty is a sentence and the next step,
+  failure is the reason and "Try again" (`Failed`). The three never look
+  alike. A list says how many it shows; "More" focuses the first new row and
+  takes no second press while it loads.
 - **Live words** (`<output>` or `role="status"`): what an action did ("Address
   copied", "Token revoked") is said in a live region next to it.
 
@@ -208,8 +231,10 @@ to feel slow and over the 60 ms where it reads as a snap.
   Transitions API where the browser has it; elsewhere the page simply
   changes.
 - **Ambient**: the online dot breathes slowly (2.4 s); the painting drifts
-  with the scroll; the memorial's light is its own (limited to 20 draws a
-  second). Nothing else moves by itself.
+  with the scroll; the hero's light and Baylee's cloud move slowly, and only
+  while the hero is on screen and no dialog covers it; the memorial's light
+  is its own (limited to 20 draws a second, its GPU context given back when
+  the album closes). Nothing else moves by itself.
 - **Reduced motion** (`prefers-reduced-motion: reduce`): every transition,
   animation, drift and count-up stops, and content is shown at once
   (`base.css` §"stillness", `motion.ts`). This is WCAG 2.3.3 and the same
@@ -231,7 +256,16 @@ WCAG 2.1 AA, mobile first:
   link to `#main`, `document.title` per page.
 - Every control works by keyboard, in reading order, with a visible focus
   ring (`--focus`, 3 px, offset 3 px). Menus close with Escape and return
-  focus to their button.
+  focus to their button, and close when focus or a tap goes elsewhere.
+- Focus never falls to the page: when the element that had it goes away (a
+  button that did its job, a list read again) a page moves it to the words
+  that say what happened or to the next row, and the app frame catches the
+  rest at the main content.
+- Windows' high contrast (`forced-colors`) keeps a focus ring in every
+  field and outlines the current page and a pressed choice.
+- The root size follows the browser's own text setting (16 to 20 px at
+  its usual size), and the page keeps clear of a phone's notch
+  (`safe-area-inset`).
 - Touch targets are at least 44 × 44 px.
 - An asynchronous result is announced (`aria-live` / `<output>`), and a list
   that loads says it is busy (`aria-busy`).
@@ -252,14 +286,19 @@ sign-in; a visitor's first page fetches neither.
 ## How it is held
 
 - `test/styles/contrast.test.ts`: the token pairs above in both schemes.
+- `test/csp.test.ts`: the policy names GitHub only at Baylee's repository,
+  takes no `data:` picture and switches off unused browser features.
 - `test/styles/rules.test.ts`: no inline script or style in the shell, card
   pictures untouched, no raw colour outside `tokens.css`, a reduced-motion
   rule beside every animation.
 - `e2e/`, under the production CSP at a phone's and a desktop's width:
-  no sideways scroll on the main pages (`expectNoSideScroll`; the memorial
+  no sideways scroll on the main pages and on every page of the account
+  area and the administration, signed in (`area.spec.ts`, against
+  `e2e/area.ts`) (`expectNoSideScroll`; the memorial
   at 320 px too), a gateway card's controls 44 px high with copying its
   address as the first action while gateway links are off
   (`VITE_DEEP_LINKS`, `web/README.md` §"Settings"), and the reduced-motion
   preference hiding nothing.
 - `npm run screens`: every page at phone and desktop width in both schemes,
-  for a person to look at before a change lands.
+  the account area and the administration signed in as well, for a person
+  to look at before a change lands.

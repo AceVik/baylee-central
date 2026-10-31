@@ -25,6 +25,7 @@ import { handle } from "./names";
 import { NewCodeStep } from "./NewCodeStep";
 import { useAccount } from "./session";
 import { TermsStep } from "./TermsStep";
+import { PasswordInput } from "./PasswordInput";
 
 const LINKS: Elems = {
   signin: (words) => <Link to={PATHS.signIn}>{words}</Link>,
@@ -79,7 +80,7 @@ function SignInAgain({ name, onSignedIn, onCancel }: { name: string; onSignedIn(
         <label htmlFor="a-password">
           <T id="acct.password" />
         </label>
-        <input ref={field} id="a-password" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} />
+        <PasswordInput inputRef={field} id="a-password" autoComplete="current-password" value={password} onChange={setPassword} />
       </div>
       <div className="form-row">
         <SubmitButton busy={busy} label="signin.submit" busyLabel="signin.submitting" />

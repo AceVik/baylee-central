@@ -21,8 +21,14 @@
     <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <script src="/boot.js"></script>
+    <!-- the painting every page stands on, and the faces of the first screen, before the app asks for them -->
+    <link rel="preload" href="/img/baylees-world.webp" as="image" type="image/webp" fetchpriority="high" />
     <link rel="preload" href="/fonts/Faustina.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/Faustina-Italic.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="preload" href="/fonts/AlegreyaSans-Medium.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/AlegreyaSans-Bold.woff2" as="font" type="font/woff2" crossorigin />
+    <!-- the release, the build's state and the card status come from GitHub -->
+    <link rel="preconnect" href="https://api.github.com" crossorigin />
     <script type="module" src="/src/main.tsx"></script>
   </head>
   <body>

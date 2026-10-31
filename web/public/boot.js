@@ -1,6 +1,7 @@
 // Runs before the first paint: in <head>, not deferred, about a kilobyte,
 // a file because the CSP allows no inline script. It says that scripts run
-// (data-js), applies ?theme= and picks the language as src/i18n.tsx does, so
+// (data-js), applies ?theme= or the stored colour scheme (src/theme.ts) and
+// picks the language as src/i18n.tsx does, so
 // the first frame already has the right colours, the right `lang` and the
 // no-script note hidden. Everything else is the app's. The languages with a
 // file are in <html data-langs>, which the build writes (vite.config.ts);
@@ -22,6 +23,7 @@
   try { q = new URLSearchParams(location.search); } catch (e) { /* very old browser: defaults */ }
   root.setAttribute("data-js", "");
   var theme = q && q.get("theme");
+  if (theme !== "dark" && theme !== "light") { try { theme = localStorage.getItem("baylee-site-theme"); } catch (e) { theme = null; } }
   if (theme === "dark" || theme === "light") root.setAttribute("data-theme", theme);
   l = q && q.get("lang");
   if (!offered(l)) { try { l = localStorage.getItem("baylee-site-lang"); } catch (e) { l = null; } }

@@ -128,10 +128,21 @@ export function useLocation(): Location {
   return location;
 }
 
+let prefetcher: ((to: string) => void) | null = null;
+
+/** What fetches a page's code before it is opened (the app's, `App.tsx`). */
+export function onPrefetch(fetchPage: (to: string) => void): void {
+  prefetcher = fetchPage;
+}
+
 type LinkProps = Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "href"> & { to: string };
 
-/** A link within the site: a plain click stays in the app, anything else is the browser's. */
-export function Link({ to, onClick, children, ...rest }: LinkProps) {
+/**
+ * A link within the site: a plain click stays in the app, anything else is
+ * the browser's. Pointing at it or focusing it fetches its page's code, so
+ * the page is there when the click comes.
+ */
+export function Link({ to, onClick, onPointerEnter, onFocus, children, ...rest }: LinkProps) {
   const click = (e: MouseEvent<HTMLAnchorElement>) => {
     onClick?.(e);
     if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
@@ -139,7 +150,19 @@ export function Link({ to, onClick, children, ...rest }: LinkProps) {
     navigate(to);
   };
   return (
-    <a href={to} onClick={click} {...rest}>
+    <a
+      href={to}
+      onClick={click}
+      onPointerEnter={(e) => {
+        onPointerEnter?.(e);
+        prefetcher?.(to);
+      }}
+      onFocus={(e) => {
+        onFocus?.(e);
+        prefetcher?.(to);
+      }}
+      {...rest}
+    >
       {children}
     </a>
   );

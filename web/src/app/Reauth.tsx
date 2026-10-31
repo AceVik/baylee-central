@@ -7,6 +7,8 @@ import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 
 import type { AccountSummary } from "../account/api";
 import { FAILURE } from "../account/errors";
+import { BusyButton } from "../account/Busy";
+import { PasswordInput } from "../account/PasswordInput";
 import { FlowError, handleOf, signIn } from "../account/flows";
 import { useAccount } from "../account/session";
 import { Modal } from "../components/Modal";
@@ -19,6 +21,8 @@ export function Reauth({ summary, onDone, onCancel }: { summary: AccountSummary;
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<{ bad: boolean; key: Key } | null>(null);
+  // the field is wrong only when it is empty or the password was refused, not when Central is away
+  const [wrong, setWrong] = useState(false);
   const field = useRef<HTMLInputElement>(null);
   useEffect(() => field.current?.focus(), []);
 
@@ -27,9 +31,12 @@ export function Reauth({ summary, onDone, onCancel }: { summary: AccountSummary;
     if (busy) return;
     if (password === "") {
       setStatus({ bad: true, key: "signin.errPassword" });
+      setWrong(true);
+      field.current?.focus();
       return;
     }
     setBusy(true);
+    setWrong(false);
     setStatus({ bad: false, key: "signin.progress" });
     signIn({ username: summary.username, password }, { api, crypto }).then(
       ({ session, summary: now }) => {
@@ -48,7 +55,10 @@ export function Reauth({ summary, onDone, onCancel }: { summary: AccountSummary;
       (error: unknown) => {
         setBusy(false);
         setStatus({ bad: true, key: FAILURE[error instanceof FlowError ? error.kind : "unreachable"] });
-        if (error instanceof FlowError && error.kind === "wrongLogin") field.current?.select();
+        if (error instanceof FlowError && error.kind === "wrongLogin") {
+          setWrong(true);
+          field.current?.select();
+        }
       },
     );
   };
@@ -66,24 +76,29 @@ export function Reauth({ summary, onDone, onCancel }: { summary: AccountSummary;
           <label htmlFor={`${heading}-password`}>
             <T id="acct.password" />
           </label>
-          <input
-            ref={field}
+          <PasswordInput
+            inputRef={field}
             id={`${heading}-password`}
-            type="password"
             autoComplete="current-password"
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            aria-invalid={status?.bad === true}
+            onChange={(value) => {
+              setPassword(value);
+              setWrong(false);
+            }}
+            invalid={wrong}
+            {...(wrong ? { describedBy: `${heading}-status` } : {})}
           />
         </div>
-        <output className={`form-status${status?.bad === true ? " bad" : ""}`}>{status === null ? "" : t(lang, status.key)}</output>
+        <output id={`${heading}-status`} className={`form-status${status?.bad === true ? " bad" : ""}`}>
+          {status === null ? "" : t(lang, status.key)}
+        </output>
         <div className="app-dialog-actions">
           <button type="button" className="button button-ghost" onClick={onCancel}>
             <T id="app.cancel" />
           </button>
-          <button type="submit" className="button" disabled={busy}>
+          <BusyButton busy={busy} type="submit">
             <T id="app.reauthGo" />
-          </button>
+          </BusyButton>
         </div>
       </form>
     </Modal>

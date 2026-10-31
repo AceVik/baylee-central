@@ -1949,3 +1949,53 @@ seal approved with a valid proof but made without the link's secret is
 refused by the SDK, which signs the session out. The page must seal under
 the same `S` it checks the claim's MAC with (`central-web-crypto`, not built
 yet).
+
+## The website's polish: keyboard, focus, policy and passwords, 31 October 2026
+
+Design pass. The owner asked for a clearer, faster, more accessible site with
+more conveniences, in the order security, performance, clean code. Assets on
+the page: the secrets shown once (a gateway token, a reset code, a recovery
+code), the session, and what an injected script could reach. Three read-only
+reviews (security, accessibility and keyboard, performance) and a design
+review fed one list; the server findings (sign-in budgets, format characters
+in names) are a change of their own to Central, not this one.
+
+Implementation pass:
+- **Policy.** `connect-src` names GitHub only at Baylee's repository
+  (`api.github.com/repos/AceVik/baylee` and below, `raw.githubusercontent.com/
+  AceVik/baylee/`), so a script that got in cannot post to another repository
+  or gist through it; `img-src` drops `data:`, which nothing used. The local
+  server sends `Permissions-Policy` (no camera, microphone, location, payment
+  or device access) and `Cross-Origin-Opener-Policy: same-origin`; the
+  README's Caddy block names both. `test/csp.test.ts` holds the policy.
+- **Links from GitHub.** A CI run's and a commit's page become an `href` only
+  under `https://github.com/`, as releases already did.
+- **Passwords at registration.** A password guessers try first is refused in
+  the page (`guessable`: one or two characters repeated, one run, the
+  username, a common word with digits or marks around it), the blocklist
+  NIST SP 800-63B §5.1.1.2 asks for; the strength meter stays a hint and
+  there is still no composition rule. Central cannot check it (OPAQUE: the
+  password never leaves the page), so a client that skips the page skips the
+  check too.
+- **Showing a password** turns the field to text with spellcheck and
+  autocorrect off, so it never goes to a spelling service; it hides again
+  once the field is emptied.
+- **Secrets shown once.** A dialog the browser closes by itself (Chromium's
+  second Escape skips `cancel`) asks its owner, and one that keeps it open
+  (the token, the reset code) opens again instead of losing the secret.
+- **Sign-in.** The crypto Worker starts while Central looks the name up; it
+  receives the password only after the lookup and is closed on every way out
+  (the flow tests count opened and closed Workers).
+
+Adversarial pass (`npm run check`: 299 unit tests; `npm run e2e` under the
+production CSP at both widths, now with every page of the account area and
+the administration signed in): policy directives exact; `javascript:`,
+`data:`, `http:` and look-alike hosts refused as GitHub links; the blocklist
+both ways (refused patterns, accepted passphrases and non-Latin passwords);
+the colour switch's stored value only `light` or `dark`. Checked and not
+changed: the recovery file names the sign-in name beside the code, but a
+password reset needs an administrator's reset code as well
+(`account-reset.md`), so the file alone does not reset a password; clearing
+the clipboard after a secret was copied would also clear whatever the person
+copied next, so it stays theirs. Trusted Types need a browser run against
+the WebAssembly glue and wait. Engineering review, not an audit.

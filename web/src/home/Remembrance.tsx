@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 
-import { MemorialAlbum } from "./MemorialAlbum";
 import { T, t, useLang } from "../i18n";
 import "../styles/remembrance.css";
 
+
+// the album, its photographs' viewer and its light load when it is first opened
+const MemorialAlbum = lazy(() => import("./MemorialAlbum").then((m) => ({ default: m.MemorialAlbum })));
 
 export function Remembrance() {
   const lang = useLang();
@@ -20,7 +22,11 @@ export function Remembrance() {
           <span className="cloud-invitation"><T id="baylee.invitation" /><span aria-hidden="true"> ↗</span></span>
         </span>
       </button>
-      {open && <MemorialAlbum photo={photo} chapter={chapter} onPhoto={setPhoto} onChapter={setChapter} onClose={() => setOpen(false)} />}
+      {open && (
+        <Suspense fallback={null}>
+          <MemorialAlbum photo={photo} chapter={chapter} onPhoto={setPhoto} onChapter={setChapter} onClose={() => setOpen(false)} />
+        </Suspense>
+      )}
     </div>
   );
 }

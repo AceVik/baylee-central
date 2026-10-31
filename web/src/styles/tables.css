@@ -14,6 +14,13 @@
 .table .num, .table td.num { font-variant-numeric: tabular-nums lining-nums; white-space: nowrap; }
 .table-actions { text-align: end; white-space: nowrap; }
 .table code { white-space: nowrap; }
+/* a thing's name in the first column is the row's link: in the heading's ink, underlined under the pointer */
+.table tbody th a { color: var(--title); text-decoration: none; }
+.table tbody th a:hover { color: var(--link-hover); text-decoration: underline; }
+/* on a phone a row stays one line and the box scrolls (docs/website-design.md §"Components", tables) */
+@media (max-width: 600px) {
+  .table th, .table td { white-space: nowrap; }
+}
 
 /* the administration's gateways */
 .agws { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-4); }

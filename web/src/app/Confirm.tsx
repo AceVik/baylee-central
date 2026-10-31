@@ -4,6 +4,7 @@
 
 import { useId, type ReactNode } from "react";
 
+import { BusyButton } from "../account/Busy";
 import { Modal } from "../components/Modal";
 import { T } from "../i18n";
 import type { Key } from "../i18n";
@@ -36,9 +37,9 @@ export function Confirm({
         <button type="button" className="button button-ghost" onClick={onCancel}>
           <T id="app.cancel" />
         </button>
-        <button type="button" className={danger ? "button button-danger solid" : "button"} onClick={onConfirm} disabled={busy} aria-busy={busy}>
+        <BusyButton busy={busy} className={danger ? "button button-danger solid" : "button"} onClick={onConfirm}>
           <T id={action} />
-        </button>
+        </BusyButton>
       </div>
     </Modal>
   );
