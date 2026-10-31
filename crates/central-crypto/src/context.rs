@@ -45,7 +45,7 @@ impl Context {
     }
 
     /// `domain`, then the issuer, account and epoch; `N` is `domain`'s length plus 56.
-    fn bound<const N: usize>(self, domain: &[u8]) -> [u8; N] {
+    pub(crate) fn bound<const N: usize>(self, domain: &[u8]) -> [u8; N] {
         let mut result = [0; N];
         let (label, fields) = result.split_at_mut(domain.len());
         label.copy_from_slice(domain);

@@ -193,7 +193,7 @@ impl AccountStore {
                  FROM central_identity.accounts a JOIN central_identity.sessions s
                  ON s.account_id = a.id AND s.credential_revision = a.credential_revision
                  WHERE s.digest = $1 AND s.kind = $2 AND s.expires_at > pg_catalog.clock_timestamp()
-                 AND s.created_at > pg_catalog.clock_timestamp() - interval '30 minutes'
+                 AND COALESCE(s.proven_at, s.created_at) > pg_catalog.clock_timestamp() - interval '30 minutes'
                  AND a.credential IS NOT NULL",
                 vec![session.digest().to_vec().into(), session.kind().into()],
             ))

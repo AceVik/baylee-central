@@ -112,6 +112,78 @@ history, swap, crash dumps, hostile devices or every internal dependency tempora
 The upstream Argon2 adapter does not wipe its allocated work area; our wrapper
 addresses that specific gap without replacing the algorithm.
 
+## Derived from the master key
+
+Two values are derived one way from the master key, for the pairing that
+brings a signed-in website's key to Baylee's client (Baylee
+`docs/proposals/deep-links.md` §"Protocol specification", owner's decision
+of 30.10.2026). Both are HKDF-SHA-512 with the master key as input, as the
+object keys are; each has a salt of its own, and its info is its domain
+followed by the 32-byte issuer, the 16-byte account and the epoch as eight
+big-endian bytes, the same fields the wrappers bind. The master key keeps
+no export; each value comes from a method that answers it alone
+(`vault/derived.rs`).
+
+- **Key check**: salt `baylee-central/key-check/v1`, domain
+  `baylee-central/key-check/v1\0`, 32 bytes. Central stores it; a proof
+  made with it shows the holder of the master key without the stored value
+  revealing the key. A new epoch gives a new check.
+- **Local vault key**: salt `baylee-central/local-vault/v1`, domain
+  `baylee-central/local-vault/v1\0`, then the vault's 32-byte scope. The
+  client wraps one local chat vault's data key under it, so that vault
+  opens without the password. Never stored, never sent, wiped on drop.
+
+Known-answer tests pin both for two vectors computed apart from the crate
+(`tests/derived-vectors.py`: RFC 5869 over Python's standard-library HMAC,
+itself checked against RFC 5869's test case 1). A test also holds that every
+input (key, issuer, account, epoch, scope) moves every output and that no two
+purposes share a value; `Debug` prints neither.
+
+## Pairing
+
+`pairing.rs` (the contract is `web-accounts.md` §"Pairing"). Every value is
+32 bytes but the seal (80); every received MAC or proof is compared in
+constant time (`hmac`'s `verify_slice`).
+
+- **Claim MAC**: HMAC-SHA-256 under the page's one-time secret `S` over
+  `baylee-central/pair-claim/v1\0`, the issuer, the handle, the client's
+  X25519 public key and its challenge (SHA-256 of its verifier).
+- **Comparison code**: Crockford base32 of the first 30 bits of SHA-256 over
+  `baylee-central/pair-code/v1\0`, the handle and the public key, written
+  `XXX-XXX`: one glance on both screens, nothing typed.
+- **Seal**: RFC 9180 HPKE through the `hpke` crate (owner's choice,
+  `dependency-proposal/hpke.md`), PSK mode (mode 1) with `S` as the
+  pre-shared key and the raw handle as its ID, DHKEM(X25519, HKDF-SHA256),
+  HKDF-SHA256, ChaCha20-Poly1305. PSK mode is the owner's decision after the
+  second model's review (30.10.2026): Central knows everything else the seal
+  binds and the client's public key, so in base mode Central, or anyone
+  writing its database, could seal a key of its own choosing that the
+  client would open and use; under `S`, which Central never sees, only the
+  page that made the link can. `S` is 32 random bytes, RFC 9180 §5.1.2's
+  floor; it also keys the claim MAC, where it is HMAC's key, while HPKE's key
+  schedule reads it as labelled input. Plaintext the 32-byte master key, empty
+  AAD, and `info` = `baylee-central/pair-seal/v1\0`, issuer, account, epoch
+  (eight big-endian bytes), handle, the pairing's end (eight big-endian
+  bytes). 32 bytes of encapsulated key and 48 of ciphertext and tag. A
+  low-order public key, whose shared secret is all zero, is refused (RFC 9180
+  §7.1.4). The client's private key is derived from 32 bytes of the system's
+  randomness and never serialized; the sender's ephemeral key comes from
+  getrandom's `SysRng`, which panics on an entropy failure as `opaque-ke`
+  does.
+- **Approval proof**: HMAC-SHA-256 under the key check over
+  `baylee-central/pair-approve/v1\0`, the handle, the public key, the
+  challenge and SHA-256 of the seal.
+
+Tests: RFC 9180 Appendix A.2.1 (base mode) and A.2.2 (PSK mode) whole
+through the crate's public API (the KEM's keys, the encapsulated key,
+sequence numbers 0 to 256 both ways, the exporter), with a fixed-output RNG
+in the test code only; every byte of a seal; another key, account, issuer,
+epoch, handle or expiry; another secret, a seal made without it in base
+mode and one under a guessed secret, as Central could make them; a low-order key;
+the MACs and code against `tests/pairing-vectors.py` (the standard library's
+HMAC and SHA-256); refusals of other secrets, fields and lengths; redacted
+`Debug`.
+
 ## Evidence and remaining gates
 
 - RFC 9807 Appendix C.1.1 registration upload, KE2/KE3, export key and both peers'

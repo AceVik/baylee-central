@@ -1,8 +1,11 @@
-//! Versioned master-key wrappers (password and recovery code) and bounded
-//! encrypted personal objects.
+//! Versioned master-key wrappers (password and recovery code), bounded
+//! encrypted personal objects, and what is derived one way from the master
+//! key (its key check, a local vault's key).
 
+mod derived;
 mod object;
 mod recovery;
+pub use derived::{KeyCheck, LocalVaultKey};
 pub use object::{MAX_OBJECT_BYTES, ObjectContext};
 pub use recovery::RecoveryCode;
 
@@ -66,6 +69,24 @@ impl MasterKey {
         let mut key = Zeroizing::new([0; 32]);
         getrandom::fill(key.as_mut()).map_err(|_| CryptoError::RandomnessUnavailable)?;
         Ok(Self(key))
+    }
+}
+
+impl MasterKey {
+    /// A master key received sealed (a pairing): exactly 32 bytes.
+    pub(crate) fn from_slice(bytes: &[u8]) -> Result<Self, CryptoError> {
+        let mut key = Zeroizing::new([0; 32]);
+        if bytes.len() != key.len() {
+            return Err(CryptoError::Invalid);
+        }
+        key.copy_from_slice(bytes);
+        Ok(Self(key))
+    }
+
+    /// The key's bytes, for this crate's own seals only (a pairing); never
+    /// public.
+    pub(crate) fn expose(&self) -> &[u8; 32] {
+        &self.0
     }
 }
 

@@ -15,6 +15,7 @@ pub(super) mod browser;
 pub(super) mod deletion;
 pub(super) mod gateways;
 pub(super) mod legacy;
+pub(super) mod pairing;
 pub(super) mod password;
 pub(super) mod reset;
 pub(super) mod terms;

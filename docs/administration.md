@@ -151,9 +151,9 @@ restarts when a new one fails, runs unchanged over it.
 ## The sweep
 
 `central-service --sweep-stdin` with the migration document deletes audit
-events older than three years, as the privacy notice allows, and (since
-step 2b) the digests of expired reset codes, in one transaction, and prints
-both counts on standard error. A daily systemd timer runs it ([operations](operations.md)
+events older than three years, as the privacy notice allows, (since
+step 2b) the digests of expired reset codes and (since the pairing) expired
+pairings, in one transaction, and prints the three counts on standard error. A daily systemd timer runs it ([operations](operations.md)
 §"Administration"). The runtime cannot.
 
 ## Departures from the design

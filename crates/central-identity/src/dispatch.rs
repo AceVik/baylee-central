@@ -95,6 +95,15 @@ impl IdentityService {
             | Request::DeleteAccountFinish { .. }) => {
                 self.lifecycle_request(request, bearer, surface).await
             }
+            request @ (Request::KeyCheckStatus
+            | Request::SetKeyCheck { .. }
+            | Request::PairStart
+            | Request::PairStatus { .. }
+            | Request::PairApprove { .. }
+            | Request::PairCancel { .. }
+            | Request::PairClaim { .. }
+            | Request::PairPoll { .. }
+            | Request::PairRedeem { .. }) => self.pairing_request(request, bearer, surface).await,
             Request::Discover { username } => self.discover(&username).await,
             Request::LoginStart { identity, message } => {
                 self.start(identity, message, surface).await
@@ -117,23 +126,7 @@ impl IdentityService {
             Request::EnrollmentStart { ticket, message } => {
                 self.enrollment_challenge(&ticket, message).await
             }
-            Request::EnrollmentFinish {
-                ticket,
-                record,
-                wrapped_master,
-                document,
-                recovery,
-            } => self
-                .store
-                .enroll(
-                    &ticket,
-                    &record,
-                    &wrapped_master,
-                    &document,
-                    recovery.as_deref(),
-                )
-                .await
-                .map(|()| Response::Done),
+            request @ Request::EnrollmentFinish { .. } => self.enrollment_finish(request).await,
             request @ (Request::ReadDocument
             | Request::WriteDocument { .. }
             | Request::ConfirmRestore { .. }) => self.document_request(request, bearer).await,
@@ -376,5 +369,28 @@ impl IdentityService {
         .await
         .map_err(|_| Error::Unavailable)??;
         Ok(Response::EnrollmentChallenge { message })
+    }
+
+    async fn enrollment_finish(&self, request: Request) -> Result<Response, Error> {
+        let Request::EnrollmentFinish {
+            ticket,
+            record,
+            wrapped_master,
+            document,
+            recovery,
+        } = request
+        else {
+            return Err(Error::Rejected);
+        };
+        self.store
+            .enroll(
+                &ticket,
+                &record,
+                &wrapped_master,
+                &document,
+                recovery.as_deref(),
+            )
+            .await
+            .map(|()| Response::Done)
     }
 }

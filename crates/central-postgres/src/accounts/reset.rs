@@ -193,7 +193,10 @@ impl AccountStore {
                      credential_revision = credential_revision + 1, vault_epoch = vault_epoch + 1,
                      document = $4, document_revision = 1, recovery_wrapped_master = $5,
                      object_bytes = 0, restored = restored AND source = 'legacy',
-                     reset_digest = NULL, reset_expires = NULL WHERE id = $1",
+                     reset_digest = NULL, reset_expires = NULL,
+                     -- A new master key: the key check of the old one is
+                     -- stale, and the next password sign-in sets it again.
+                     key_check = NULL WHERE id = $1",
                     vec![
                         account.into(),
                         record.to_vec().into(),

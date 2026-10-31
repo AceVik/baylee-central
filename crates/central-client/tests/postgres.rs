@@ -98,6 +98,7 @@ fn real_native_login_restore_migration_and_adversarial_paths() {
         support::admin::run(&http, &browser, &bridge, &runtime, &operator);
         support::reset::run(&http, &browser, &bridge, &runtime, &operator);
         support::deletion::run(&http, &browser, &bridge, &runtime, &operator);
+        support::pairing::run(&http, &browser, &runtime, &operator);
         support::legacy::run(&http, &browser, &bridge, &store, &runtime, &operator);
     }));
     // Cleanup runs even if an assertion panics; listeners and pools belong to this fixture only.

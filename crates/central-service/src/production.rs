@@ -352,14 +352,14 @@ async fn appoint() -> Result<Appointed, ()> {
     Ok(appointed)
 }
 
-/// Delete audit events older than three years, expired reset codes and what
-/// the legacy store no longer needs under the migrator login, which a daily
-/// timer runs (`docs/operations.md`).
+/// Delete audit events older than three years, expired reset codes, expired
+/// pairings and what the legacy store no longer needs under the migrator
+/// login, which a daily timer runs (`docs/operations.md`).
 pub(super) async fn run_sweep() -> ExitCode {
     if let Ok((swept, legacy)) = swept().await {
         eprintln!(
-            "central: {} audit events older than three years and {} expired reset codes deleted",
-            swept.events, swept.codes
+            "central: {} audit events older than three years, {} expired reset codes and {} expired pairings deleted",
+            swept.events, swept.codes, swept.pairings
         );
         eprintln!(
             "central: {} moved and {} expired legacy accounts and {} unused legacy reservations deleted",

@@ -461,6 +461,71 @@ pub enum Request {
         /// KE3 under the password, not a password.
         proof: Vec<u8>,
     },
+    /// Whether the session's account has a key check (`docs/web-accounts.md`
+    /// §"Pairing"), on either listener. Answered with [`Response::KeyCheck`].
+    KeyCheckStatus,
+    /// Store the account's key check, on either listener: accepted once,
+    /// while none is set and within two minutes of the session's password
+    /// proof. `Done`; `Conflict` when one is set, `Rejected` when too late.
+    SetKeyCheck {
+        /// The 32-byte check derived from the master key.
+        check: Vec<u8>,
+    },
+    /// Start a pairing for the browser session's account (browser listener
+    /// only). Answered with [`Response::PairStarted`].
+    PairStart,
+    /// The pairing's claim, if a client made one (browser listener only, the
+    /// session that started it). Answered with [`Response::PairClaimed`] or
+    /// [`Response::Pending`].
+    PairStatus {
+        /// The pairing's handle.
+        handle: Token,
+    },
+    /// Approve a claimed pairing with the sealed master key and the proof
+    /// under the key check (browser listener only, the session that started
+    /// it). `Done`.
+    PairApprove {
+        /// The pairing's handle.
+        handle: Token,
+        /// The master key sealed to the client's key, 80 bytes.
+        sealed: Vec<u8>,
+        /// HMAC-SHA-256 under the key check over the approval, 32 bytes.
+        proof: Vec<u8>,
+    },
+    /// End a pairing at once (browser listener only). `Done`.
+    PairCancel {
+        /// The pairing's handle.
+        handle: Token,
+    },
+    /// A client claims a pairing (native listener, no session): once per
+    /// handle, within its first two minutes. Answered with
+    /// [`Response::PairAccepted`], again for the same claim resent; another
+    /// claim is `Conflict`.
+    PairClaim {
+        /// The pairing's handle, from the link.
+        handle: Token,
+        /// The client's X25519 public key, 32 bytes.
+        public_key: Vec<u8>,
+        /// SHA-256 of the client's verifier, 32 bytes.
+        challenge: Vec<u8>,
+        /// HMAC-SHA-256 under the link's secret over the claim, 32 bytes.
+        mac: Vec<u8>,
+    },
+    /// Whether the claimed pairing was approved (native listener, no
+    /// session). Answered with [`Response::Pending`] or [`Response::Approved`].
+    PairPoll {
+        /// The pairing's handle.
+        handle: Token,
+    },
+    /// Redeem an approved pairing with the verifier, once (native listener,
+    /// no session). Answered with [`Response::PairSession`]; the pairing is
+    /// gone afterwards, also after a refusal.
+    PairRedeem {
+        /// The pairing's handle.
+        handle: Token,
+        /// The verifier whose SHA-256 the claim sent, 32 bytes.
+        verifier: Vec<u8>,
+    },
 }
 
 /// What a reset does with the account's encrypted data.
@@ -818,6 +883,55 @@ pub enum Response {
         /// never moves it.
         signed_in_at: i64,
         /// Absolute Unix-seconds expiry; this query does not renew it.
+        expires_at: i64,
+    },
+    /// Whether the account has a key check ([`Request::KeyCheckStatus`]).
+    KeyCheck {
+        /// One is stored.
+        set: bool,
+    },
+    /// A pairing started ([`Request::PairStart`]).
+    PairStarted {
+        /// The pairing's handle, for the link.
+        handle: Token,
+        /// Absolute Unix-seconds end of the pairing.
+        expires_at: i64,
+    },
+    /// The client's claim ([`Request::PairStatus`]).
+    PairClaimed {
+        /// The client's X25519 public key, 32 bytes.
+        public_key: Vec<u8>,
+        /// SHA-256 of the client's verifier, 32 bytes.
+        challenge: Vec<u8>,
+        /// The claim's MAC under the link's secret, 32 bytes.
+        mac: Vec<u8>,
+    },
+    /// A claim taken ([`Request::PairClaim`]).
+    PairAccepted {
+        /// Absolute Unix-seconds end of the pairing, bound into the seal.
+        expires_at: i64,
+    },
+    /// Not yet: no claim, or no approval.
+    Pending,
+    /// The pairing is approved and may be redeemed ([`Request::PairPoll`]).
+    Approved,
+    /// The redeemed pairing ([`Request::PairRedeem`]): a native session and
+    /// the master key sealed to the client, together and once.
+    PairSession {
+        /// The new native session's bearer.
+        token: Token,
+        /// The account and epoch the seal is bound to.
+        identity: Identity,
+        /// The account's canonical username, for the client's question.
+        username: String,
+        /// Its display name, for the question beside the username; none
+        /// until the account chose one.
+        display_name: Option<String>,
+        /// Its tag beside the display name; none until drawn or carried.
+        tag: Option<u32>,
+        /// The master key sealed to the client's key, 80 bytes.
+        sealed: Vec<u8>,
+        /// Absolute Unix-seconds expiry of the session.
         expires_at: i64,
     },
 }

@@ -12,6 +12,7 @@ mod context;
 #[cfg(feature = "server")]
 pub mod legacy;
 pub mod opaque;
+pub mod pairing;
 pub mod vault;
 
 pub use context::Context;

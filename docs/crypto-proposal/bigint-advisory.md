@@ -72,7 +72,9 @@ author (a manifest line and an import); the fingerprint is pinned again.
 platform and in the dependency job **before** audit/deny. It checks:
 
 - Exact registry versions/sources and features of the five reviewed upstream
-  packages; no duplicate versions or missing resolution nodes.
+  packages and of the pairing's three (`hpke`, `x25519-dalek` and the second
+  `curve25519-dalek` generation, 5.0.0, beside 4.1.3); no other duplicate
+  versions, and no missing resolution nodes.
 - All-feature metadata without target filtering, including inactive optional
   consumers. Reverse dependencies must remain
   `crypto-bigint ← elliptic-curve ← opaque-ke/voprf ← central-crypto`.
@@ -99,3 +101,57 @@ review the complete graph and run published vectors, stored-credential/wire
 compatibility checks and the browser rebuild. No protocol, KDF strength, data
 format, cryptographic dependency or new dependency-internal operations changed
 in this fix.
+
+## Changes since the review
+
+Each change to `central-crypto` repeats the source and graph review for it,
+moves the fingerprint only afterwards, and is recorded here.
+
+### 30 October 2026: two values derived from the master key
+
+`src/vault/derived.rs` (with `tests/derived-vectors.py`) derives the key
+check and a local vault's key from the master key with HKDF-SHA-512
+(`../crypto-protocol.md` §"Derived from the master key"), and
+`Context::bound` became `pub(crate)` for it. No dependency, feature or graph
+edge changed: `hkdf` and `sha2` were `central-crypto`'s already. Neither value
+touches `opaque::Suite`, its Ristretto arithmetic or `elliptic-curve`, so
+the reachability above is unchanged. Fingerprint `3d0f6adb…`; a second
+model reviews the change before it lands (`Review: pending`).
+
+### 30 October 2026: the pairing's seal
+
+`src/pairing.rs` (tests in `src/pairing/tests.rs` and
+`tests/pairing-vectors.py`) adds the pairing's MACs, its comparison code and
+its RFC 9180 seal through `hpke` 0.15.1 (`../dependency-proposal/hpke.md`);
+`MasterKey` gained two crate-private accessors for the seal. The graph
+gained `hpke` 0.15.1 (from `central-crypto`), `x25519-dalek` 3.0.0 (from
+`hpke`) and a second `curve25519-dalek`, 5.0.0 (from both), whose
+`fiat-crypto` 0.3.0 sits behind a cfg no build sets. All-feature metadata
+shows none of them depending on `elliptic-curve` or `crypto-bigint`:
+`crypto-bigint`'s only caller is still `elliptic-curve`, whose only callers
+are still `opaque-ke` and `voprf`. The seal's X25519 shares no type with the
+Ristretto suite, which is unchanged. The guard now pins the three, their
+features and reverse edges, exactly the two `curve25519-dalek` generations,
+and 4.1.3's callers (`opaque-ke`, `voprf`), which it did not pin before; a
+third generation, a new consumer of any of them or another feature fails
+(`graph/tests.rs`, and with the 5.0.0 pin removed two of its tests fail).
+Fingerprint `b3ab6d24…`; `Review: pending`, as above.
+
+After the second model's review of the same day, `KeyCheck` derives `Clone`
+only: equality was variable-time and unused. No other source, dependency or
+edge in `central-crypto` changed. Fingerprint `2cb6fb13…`.
+
+The owner then chose HPKE's PSK mode for the seal: `seal_for_pairing` and
+`open` take the link's secret, which becomes the pre-shared key with the
+handle as its ID (`hpke`'s public `PskBundle`, no new feature or edge), and
+the tests add RFC 9180 Appendix A.2.2. The graph and the reachability above
+are unchanged. Fingerprint `d7adcac6…`.
+
+### 31 October 2026: the legacy store's check and the pairing together
+
+Merging the pairing onto the legacy store (§"Re-review for the legacy
+store's check", fingerprint `a55d829a…`) changes no line of either reviewed
+change. They touch different files but two: the manifest, where each adds
+its own dependencies (`argon2` with `zeroize`; `hmac`, `hpke` and
+`getrandom`'s `sys_rng`), and `lib.rs`, where each adds its own module.
+Both reviews stand as written. Fingerprint `36dc9ccf…`.
