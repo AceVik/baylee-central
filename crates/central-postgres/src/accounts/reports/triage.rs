@@ -56,19 +56,18 @@ fn shown(id: Option<Uuid>) -> String {
     id.map_or_else(|| "none".into(), |id| id.to_string())
 }
 
-/// Apply `change` to `report` by `admin` in `tx`: the rules, the row and its
-/// history. Returns whether anything changed.
-async fn apply(
-    tx: &DatabaseTransaction,
-    admin: Uuid,
-    report: Uuid,
-    change: &ReportChange,
-    expected: Option<u32>,
-) -> Result<bool, Error> {
-    let was = locked(tx, report).await?;
-    if expected.is_some_and(|e| i64::from(e) != i64::from(was.revision)) {
-        return Err(Error::Conflict);
-    }
+/// A report's triage after a change, before it is written.
+struct Decided {
+    status: ReportStatus,
+    issue: Option<i32>,
+    assignee: Option<Uuid>,
+    priority: Option<String>,
+    labels: Vec<String>,
+    duplicate_of: Option<Uuid>,
+}
+
+/// What `change` makes of `was`, by the rules that need no other row.
+fn decide(was: &Triage, change: &ReportChange) -> Result<Decided, Error> {
     let mut status = change.status.unwrap_or(was.status);
     let mut duplicate_of = match change.duplicate_of {
         Some(target) => target.map(Uuid::from_bytes),
@@ -89,36 +88,10 @@ async fn apply(
     } else if duplicate_of.is_none() {
         return Err(Error::Rejected);
     }
-    if let Some(original) = duplicate_of.filter(|o| Some(*o) != was.duplicate_of) {
-        // one level: the original is no duplicate itself, and not this one
-        let row = tx
-            .query_one_raw(statement(
-                "SELECT duplicate_of IS NULL AS free FROM central_identity.reports WHERE id = $1 AND id <> $2",
-                vec![original.into(), report.into()],
-            ))
-            .await
-            .map_err(|_| Error::Unavailable)?
-            .ok_or(Error::Rejected)?;
-        if !get::<bool>(&row, "free")? {
-            return Err(Error::Rejected);
-        }
-    }
     let assignee = match change.assignee {
         Some(target) => target.map(Uuid::from_bytes),
         None => was.assignee,
     };
-    if let Some(assignee) = assignee.filter(|a| Some(*a) != was.assignee) {
-        let row = tx
-            .query_one_raw(statement(
-                "SELECT 1 AS yes FROM central_identity.account_roles WHERE account_id = $1 AND role = 'admin'",
-                vec![assignee.into()],
-            ))
-            .await
-            .map_err(|_| Error::Unavailable)?;
-        if row.is_none() {
-            return Err(Error::Rejected);
-        }
-    }
     let issue = change.issue.map_or(was.issue, |i| {
         i.map(|n| i32::try_from(n).unwrap_or(i32::MAX))
     });
@@ -133,34 +106,102 @@ async fn apply(
     if labels.len() > central_api::reports::MAX_LABELS {
         return Err(Error::Rejected);
     }
-    let mut lines: Vec<(&str, String)> = Vec::new();
-    if status != was.status {
+    Ok(Decided {
+        status,
+        issue,
+        assignee,
+        priority,
+        labels,
+        duplicate_of,
+    })
+}
+
+/// The rules that read other rows: a new original is in one level and is
+/// not `report`, and a new assignee holds the administrator's role.
+async fn allowed(
+    tx: &DatabaseTransaction,
+    report: Uuid,
+    was: &Triage,
+    next: &Decided,
+) -> Result<(), Error> {
+    if let Some(original) = next.duplicate_of.filter(|o| Some(*o) != was.duplicate_of) {
+        let row = tx
+            .query_one_raw(statement(
+                "SELECT duplicate_of IS NULL AS free FROM central_identity.reports WHERE id = $1 AND id <> $2",
+                vec![original.into(), report.into()],
+            ))
+            .await
+            .map_err(|_| Error::Unavailable)?
+            .ok_or(Error::Rejected)?;
+        if !get::<bool>(&row, "free")? {
+            return Err(Error::Rejected);
+        }
+    }
+    if let Some(assignee) = next.assignee.filter(|a| Some(*a) != was.assignee) {
+        let row = tx
+            .query_one_raw(statement(
+                "SELECT 1 AS yes FROM central_identity.account_roles WHERE account_id = $1 AND role = 'admin'",
+                vec![assignee.into()],
+            ))
+            .await
+            .map_err(|_| Error::Unavailable)?;
+        if row.is_none() {
+            return Err(Error::Rejected);
+        }
+    }
+    Ok(())
+}
+
+/// One history line per part that changes; none when nothing does.
+fn lines(was: &Triage, next: &Decided) -> Vec<(&'static str, String)> {
+    let mut lines = Vec::new();
+    if next.status != was.status {
         lines.push((
             "status",
-            format!("{} → {}", was.status.as_str(), status.as_str()),
+            format!("{} → {}", was.status.as_str(), next.status.as_str()),
         ));
     }
-    if issue != was.issue {
+    if next.issue != was.issue {
         lines.push((
             "issue",
-            issue.map_or_else(|| "none".into(), |n| format!("#{n}")),
+            next.issue
+                .map_or_else(|| "none".into(), |n| format!("#{n}")),
         ));
     }
-    if assignee != was.assignee {
-        lines.push(("assignee", shown(assignee)));
+    if next.assignee != was.assignee {
+        lines.push(("assignee", shown(next.assignee)));
     }
-    if priority != was.priority {
+    if next.priority != was.priority {
         lines.push((
             "priority",
-            priority.clone().unwrap_or_else(|| "none".into()),
+            next.priority.clone().unwrap_or_else(|| "none".into()),
         ));
     }
-    if labels != was.labels {
-        lines.push(("labels", labels.join(", ")));
+    if next.labels != was.labels {
+        lines.push(("labels", next.labels.join(", ")));
     }
-    if duplicate_of != was.duplicate_of {
-        lines.push(("duplicate", shown(duplicate_of)));
+    if next.duplicate_of != was.duplicate_of {
+        lines.push(("duplicate", shown(next.duplicate_of)));
     }
+    lines
+}
+
+/// Apply `change` to `report` by `admin` in `tx`: the rules, the row and its
+/// history. Returns whether anything changed.
+async fn apply(
+    tx: &DatabaseTransaction,
+    admin: Uuid,
+    report: Uuid,
+    change: &ReportChange,
+    expected: Option<u32>,
+) -> Result<bool, Error> {
+    let was = locked(tx, report).await?;
+    if expected.is_some_and(|e| i64::from(e) != i64::from(was.revision)) {
+        return Err(Error::Conflict);
+    }
+    let next = decide(&was, change)?;
+    allowed(tx, report, &was, &next).await?;
+    let lines = lines(&was, &next);
     if lines.is_empty() {
         return Ok(false);
     }
@@ -172,18 +213,18 @@ async fn apply(
          WHERE id = $1",
         vec![
             report.into(),
-            status.as_str().into(),
-            issue.into(),
-            assignee.into(),
-            priority.into(),
-            labels.join(",").into(),
-            duplicate_of.into(),
+            next.status.as_str().into(),
+            next.issue.into(),
+            next.assignee.into(),
+            next.priority.into(),
+            next.labels.join(",").into(),
+            next.duplicate_of.into(),
         ],
     ))
     .await
     .map_err(|_| Error::Unavailable)?;
     // a report that became a duplicate hands its own duplicates on to its original
-    if let Some(original) = duplicate_of.filter(|_| status == ReportStatus::Duplicate) {
+    if let Some(original) = next.duplicate_of {
         let moved = tx
             .query_all_raw(statement(
                 "UPDATE central_identity.reports SET duplicate_of = $2, revision = revision + 1,

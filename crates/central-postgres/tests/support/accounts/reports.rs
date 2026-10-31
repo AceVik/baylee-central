@@ -142,18 +142,25 @@ pub(super) async fn run(store: &AccountStore, operator: &DatabaseConnection, key
         store.report_filer(&Token::generate().unwrap()).await.err(),
         Some(Error::Rejected)
     );
+    // a second administrator, whose marks and notes are their own
+    let (_, other) = signed_in(store, keys, "report-admin-two").await;
+    appoint_admin(operator, "report-admin-two").await.unwrap();
     let (first, second, crash) = filing(store, &filer).await;
+    listing(store, &cookie, &stranger, first, crash).await;
     reading(store, &cookie, &stranger, first, crash).await;
-    triage(
+    triage(store, &cookie, admin, owner, first).await;
+    duplicates(store, &cookie, [first, second, crash]).await;
+    notes(store, &cookie, &other, admin, first).await;
+    binning(
         store,
         operator,
-        keys,
         &cookie,
+        &other,
         admin,
-        owner,
         [first, second, crash],
     )
     .await;
+    marking(store, &cookie, &other, admin, first).await;
     sweeping(store, operator, &cookie, first).await;
 }
 
@@ -263,8 +270,8 @@ async fn filing(
     (first, second, crash)
 }
 
-/// Reading: administrators only, the list's filters, one report, a part as stored.
-async fn reading(
+/// Listing: administrators only, the list's order, search and filters.
+async fn listing(
     store: &AccountStore,
     cookie: &Token,
     stranger: &Token,
@@ -333,6 +340,17 @@ async fn reading(
             .err(),
         Some(Error::Rejected)
     );
+}
+
+/// Reading one report: its detail, a part as stored, crash groups, facets,
+/// the month's numbers and its place in a list.
+async fn reading(
+    store: &AccountStore,
+    cookie: &Token,
+    stranger: &Token,
+    first: [u8; 16],
+    crash: [u8; 16],
+) {
     let detail = store.report_detail(cookie, first).await.unwrap();
     assert_eq!(detail.text, "The stack went wrong");
     assert!(
@@ -358,6 +376,10 @@ async fn reading(
             .iter()
             .any(|g| g.latest == crash && g.count >= 1 && g.open >= 1)
     );
+    let crashes = ReportFilter {
+        kinds: vec![ReportKind::Crash],
+        ..all()
+    };
     let facets = store.report_facets(cookie, &crashes).await.unwrap();
     assert!(facets.kinds.len() > 1, "its own dimension is not filtered");
     assert!(facets.statuses.iter().all(|c| c.value == ReportStatus::New));
@@ -376,15 +398,13 @@ async fn reading(
     assert!(place.position.is_some() && place.total >= 4);
 }
 
-/// Triage: the rules, notes, bulk, trash and purge, views, the unread marker.
+/// Triage: the revision, the assignee, labels, priority and issue.
 async fn triage(
     store: &AccountStore,
-    operator: &DatabaseConnection,
-    keys: &ServerKeys,
     cookie: &Token,
     admin: Identity,
     owner: Identity,
-    [first, second, crash]: [[u8; 16]; 3],
+    first: [u8; 16],
 ) {
     let change = |f: fn(&mut ReportChange)| {
         let mut c = ReportChange::default();
@@ -440,7 +460,11 @@ async fn triage(
         (now.summary.assignee, now.summary.issue),
         (Some(admin.account), Some(311))
     );
-    // one duplicate level, and a duplicate hands its own on
+}
+
+/// One duplicate level; a report that becomes a duplicate hands its own on,
+/// and unmarking one opens it again.
+async fn duplicates(store: &AccountStore, cookie: &Token, [first, second, crash]: [[u8; 16]; 3]) {
     let dup = |of: [u8; 16]| ReportChange {
         duplicate_of: Some(Some(of)),
         ..ReportChange::default()
@@ -489,6 +513,16 @@ async fn triage(
         (undone.summary.status, undone.summary.done_at),
         (ReportStatus::Triaged, None)
     );
+}
+
+/// Notes: added, removed only by their author.
+async fn notes(
+    store: &AccountStore,
+    cookie: &Token,
+    other: &Token,
+    admin: Identity,
+    first: [u8; 16],
+) {
     // notes: added, removed only by their author
     let noted = store
         .add_report_note(cookie, first, "Looks like the stack")
@@ -496,21 +530,23 @@ async fn triage(
         .unwrap();
     let note = noted.notes[0].id;
     assert_eq!(noted.notes[0].author, admin.account);
-    let (_, other) = signed_in(store, keys, "report-admin-two").await;
-    appoint_admin(operator, "report-admin-two").await.unwrap();
     assert_eq!(
-        store.remove_report_note(&other, first, note).await.err(),
+        store.remove_report_note(other, first, note).await.err(),
         Some(Error::Rejected)
     );
-    assert!(
-        store
-            .remove_report_note(cookie, first, note)
-            .await
-            .unwrap()
-            .notes
-            .is_empty()
-    );
-    // a selection: labels added, into the trash, a purge only with a fresh password
+    let left = store.remove_report_note(cookie, first, note).await.unwrap();
+    assert_eq!(left.notes.len(), 0);
+}
+
+/// A selection changed, the trash, and a purge only from it with a fresh password.
+async fn binning(
+    store: &AccountStore,
+    operator: &DatabaseConnection,
+    cookie: &Token,
+    other: &Token,
+    admin: Identity,
+    [first, second, crash]: [[u8; 16]; 3],
+) {
     let add = ReportChange {
         labels_add: vec!["batch".into()],
         ..ReportChange::default()
@@ -565,11 +601,11 @@ async fn triage(
         .await
         .unwrap();
     store
-        .bin_report(&other, crash, &BulkAction::Trash)
+        .bin_report(other, crash, &BulkAction::Trash)
         .await
         .unwrap();
     store
-        .bin_report(&other, crash, &BulkAction::Purge)
+        .bin_report(other, crash, &BulkAction::Purge)
         .await
         .unwrap();
     assert_eq!(
@@ -586,6 +622,16 @@ async fn triage(
         count(operator, "SELECT count(*) AS n FROM central_identity.report_audit WHERE report_id = $1 AND action = 'report.purged'", vec![Uuid::from_bytes(crash).into()]).await == 1,
         "the history stays"
     );
+}
+
+/// Saved views, the unread marker (each administrator's own) and who may be assigned.
+async fn marking(
+    store: &AccountStore,
+    cookie: &Token,
+    other: &Token,
+    admin: Identity,
+    first: [u8; 16],
+) {
     // views: saved, replaced by name, forgotten
     store
         .save_report_view(cookie, "Mine", "assignee=me")
@@ -599,13 +645,8 @@ async fn triage(
         (views.len(), views[0].query.as_str()),
         (1, "assignee=me&status=new")
     );
-    assert!(
-        store
-            .delete_report_view(cookie, views[0].id)
-            .await
-            .unwrap()
-            .is_empty()
-    );
+    let left = store.delete_report_view(cookie, views[0].id).await.unwrap();
+    assert_eq!(left.len(), 0);
     assert_eq!(
         store.save_report_view(cookie, " ", "x").await.err(),
         Some(Error::Rejected)
@@ -625,7 +666,7 @@ async fn triage(
         .unwrap();
     assert!(!mine.iter().any(|r| r.id == first));
     let (theirs, _) = store
-        .reports(&other, &unseen, ReportSort::Received, true, 0, 50)
+        .reports(other, &unseen, ReportSort::Received, true, 0, 50)
         .await
         .unwrap();
     assert!(theirs.iter().any(|r| r.id == first));

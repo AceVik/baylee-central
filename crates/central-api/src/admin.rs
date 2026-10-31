@@ -498,8 +498,8 @@ pub enum AdminAnswer {
     },
     /// One report.
     Report {
-        /// It.
-        report: ReportDetail,
+        /// It, boxed: the largest answer by far.
+        report: Box<ReportDetail>,
     },
     /// A report's place in a list.
     Neighbours {

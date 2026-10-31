@@ -3,7 +3,6 @@
 //! checked again by the store in the statement or transaction that acts.
 use super::{Error, IdentityService, Response, Surface, Token};
 use central_api::admin::{AccountQuery, AdminAnswer, AdminRequest};
-use central_api::reports::BulkAction;
 use central_api::reset_code::ResetCode;
 
 impl IdentityService {
@@ -48,96 +47,27 @@ impl IdentityService {
                 AdminAnswer::Gateway { gateway, tokens }
             }
             AdminRequest::LegacyAccounts => self.admin_legacy(cookie).await?,
-            // Reports (`docs/reports.md`): the store checks the administrator,
-            // a purge's fresh sign-in, and writes the report's history.
-            AdminRequest::Reports {
-                filter,
-                sort,
-                descending,
-                offset,
-                limit,
-            } => {
-                let (reports, total) = self
-                    .store
-                    .reports(cookie, &filter, sort, descending, offset, limit)
-                    .await?;
-                AdminAnswer::Reports { reports, total }
-            }
-            AdminRequest::ReportFacets { filter } => AdminAnswer::ReportFacets {
-                facets: self.store.report_facets(cookie, &filter).await?,
-            },
-            AdminRequest::Report { report } => AdminAnswer::Report {
-                report: self.store.report_detail(cookie, report).await?,
-            },
-            AdminRequest::ReportNeighbours {
-                report,
-                filter,
-                sort,
-                descending,
-            } => AdminAnswer::Neighbours {
-                neighbours: self
-                    .store
-                    .report_neighbours(cookie, report, &filter, sort, descending)
-                    .await?,
-            },
-            AdminRequest::CrashGroups { filter } => AdminAnswer::CrashGroups {
-                groups: self.store.crash_groups(cookie, &filter).await?,
-            },
-            AdminRequest::ReportStats => AdminAnswer::ReportStats {
-                days: self.store.report_stats(cookie).await?,
-            },
-            AdminRequest::ReportAdmins => AdminAnswer::ReportAdmins {
-                admins: self.store.report_admins(cookie).await?,
-            },
-            AdminRequest::SetReport {
-                report,
-                change,
-                expected_revision,
-            } => AdminAnswer::Report {
-                report: self
-                    .store
-                    .set_report(cookie, report, &change, expected_revision)
-                    .await?,
-            },
-            AdminRequest::ReportsBulk { reports, bulk } => AdminAnswer::Changed {
-                changed: self.store.reports_bulk(cookie, &reports, &bulk).await?,
-            },
-            AdminRequest::TrashReport { report } => {
-                self.store
-                    .bin_report(cookie, report, &BulkAction::Trash)
-                    .await?;
-                return Ok(Response::Done);
-            }
-            AdminRequest::RestoreReport { report } => {
-                self.store
-                    .bin_report(cookie, report, &BulkAction::Restore)
-                    .await?;
-                return Ok(Response::Done);
-            }
-            AdminRequest::PurgeReport { report } => {
-                self.store
-                    .bin_report(cookie, report, &BulkAction::Purge)
-                    .await?;
-                return Ok(Response::Done);
-            }
-            AdminRequest::AddReportNote { report, text } => AdminAnswer::Report {
-                report: self.store.add_report_note(cookie, report, &text).await?,
-            },
-            AdminRequest::RemoveReportNote { report, note } => AdminAnswer::Report {
-                report: self.store.remove_report_note(cookie, report, note).await?,
-            },
-            AdminRequest::ReportViews => AdminAnswer::ReportViews {
-                views: self.store.report_views(cookie).await?,
-            },
-            AdminRequest::SaveReportView { name, query } => AdminAnswer::ReportViews {
-                views: self.store.save_report_view(cookie, &name, &query).await?,
-            },
-            AdminRequest::DeleteReportView { view } => AdminAnswer::ReportViews {
-                views: self.store.delete_report_view(cookie, view).await?,
-            },
-            AdminRequest::SetReportsSeen { reports, seen } => {
-                self.store.set_reports_seen(cookie, &reports, seen).await?;
-                return Ok(Response::Done);
+            // Reports (`docs/reports.md`, `reports.rs`): the store checks the
+            // administrator, a purge's fresh sign-in, and writes the report's history.
+            request @ (AdminRequest::Reports { .. }
+            | AdminRequest::ReportFacets { .. }
+            | AdminRequest::Report { .. }
+            | AdminRequest::ReportNeighbours { .. }
+            | AdminRequest::CrashGroups { .. }
+            | AdminRequest::ReportStats
+            | AdminRequest::ReportAdmins
+            | AdminRequest::SetReport { .. }
+            | AdminRequest::ReportsBulk { .. }
+            | AdminRequest::TrashReport { .. }
+            | AdminRequest::RestoreReport { .. }
+            | AdminRequest::PurgeReport { .. }
+            | AdminRequest::AddReportNote { .. }
+            | AdminRequest::RemoveReportNote { .. }
+            | AdminRequest::ReportViews
+            | AdminRequest::SaveReportView { .. }
+            | AdminRequest::DeleteReportView { .. }
+            | AdminRequest::SetReportsSeen { .. }) => {
+                return self.report_admin(request, cookie).await;
             }
             // Changes: the store checks the sign-in's age and writes the audit.
             AdminRequest::ResetLogin { account } => {

@@ -247,9 +247,8 @@ fn shown(text: &str, max: usize, lines: bool) -> bool {
             .all(|c| (lines && (c == '\n' || c == '\t')) || (!c.is_control() && !invisible(c)))
 }
 
-fn said(text: &Option<String>) -> bool {
-    text.as_deref()
-        .is_none_or(|t| !t.is_empty() && t.len() <= MAX_SAID && shown(t, MAX_SAID, false))
+fn said(text: Option<&str>) -> bool {
+    text.is_none_or(|t| !t.is_empty() && t.len() <= MAX_SAID && shown(t, MAX_SAID, false))
 }
 
 impl ReportIntake {
@@ -300,9 +299,9 @@ impl ReportIntake {
             && client
             && record
             && consistent
-            && said(&self.gateway.name)
-            && said(&self.gateway.url)
-            && said(&self.gateway.version)
+            && said(self.gateway.name.as_deref())
+            && said(self.gateway.url.as_deref())
+            && said(self.gateway.version.as_deref())
         {
             Ok(())
         } else {
@@ -333,7 +332,12 @@ pub fn crash_signature(message: &str, location: &str) -> String {
 /// Lowercase hex of `bytes`.
 #[must_use]
 pub fn hex(bytes: &[u8]) -> String {
-    bytes.iter().map(|b| format!("{b:02x}")).collect()
+    use std::fmt::Write as _;
+    let mut out = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        let _ = write!(out, "{byte:02x}");
+    }
+    out
 }
 
 /// A label: lowercase letters, digits and dashes, 1 to [`MAX_LABEL`].
@@ -832,13 +836,13 @@ mod tests {
                 r.crash = Some(Crash {
                     message: "m".into(),
                     location: "f".into(),
-                })
+                });
             },
             |r| {
                 r.client = Some(Announced {
                     bytes: MAX_CLIENT_GZIP + 1,
                     sha256: [0; 32],
-                })
+                });
             },
             |r| {
                 r.record = Some(AnnouncedRecord {
@@ -846,7 +850,7 @@ mod tests {
                     origin: RecordOrigin::Client,
                     bytes: MAX_CLIENT_RECORD_GZIP + 1,
                     sha256: [0; 32],
-                })
+                });
             },
             |r| r.channel = Channel::Direct,
             |r| r.gateway.name = Some(String::new()),
@@ -854,7 +858,7 @@ mod tests {
                 r.build = Some(Build {
                     version: "1".into(),
                     commit: Some("xyz".into()),
-                })
+                });
             },
         ];
         for refuse in refused {

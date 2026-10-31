@@ -8,7 +8,9 @@ use central_api::reports::{
     Neighbours, Priority, RecordOrigin, ReportFacets, ReportFilter, ReportKind, ReportSort,
     ReportStatus, ReportSummary, STATS_DAYS,
 };
-use sea_orm::{ConnectionTrait, QueryResult, TransactionTrait, Value, prelude::Uuid};
+use sea_orm::{
+    ConnectionTrait, DatabaseTransaction, QueryResult, TransactionTrait, Value, prelude::Uuid,
+};
 
 /// The columns of a [`ReportSummary`] from `reports r`; `$1` is the reading administrator.
 pub(super) const SUMMARY_COLUMNS: &str = "r.id,
@@ -90,6 +92,43 @@ pub(super) fn summary(row: &QueryResult) -> Result<ReportSummary, Error> {
     })
 }
 
+/// One facet's rows: `column`'s values and their counts under `filter`
+/// but `skip`'s dimension, the most frequent first.
+async fn facet(
+    tx: &DatabaseTransaction,
+    admin: Uuid,
+    filter: &ReportFilter,
+    column: &str,
+    skip: Dimension,
+    limit: Option<usize>,
+) -> Result<Vec<QueryResult>, Error> {
+    let at = Where::new(admin).filter(filter, Some(skip));
+    let limit = limit.map_or_else(String::new, |n| format!(" LIMIT {n}"));
+    let sql = format!(
+        "SELECT {column} AS value, count(*)::bigint AS n FROM central_identity.reports r {}
+         GROUP BY 1 ORDER BY 2 DESC, 1{limit}",
+        at.clause()
+    );
+    tx.query_all_raw(statement(&sql, at.into_values()))
+        .await
+        .map_err(|_| Error::Unavailable)
+}
+
+/// A facet of words, each read by `read`.
+fn counted<T>(
+    rows: &[QueryResult],
+    read: impl Fn(&str) -> Result<T, Error>,
+) -> Result<Vec<Count<T>>, Error> {
+    rows.iter()
+        .map(|row| {
+            Ok(Count {
+                value: read(&get::<String>(row, "value")?)?,
+                count: n(row)?,
+            })
+        })
+        .collect()
+}
+
 /// A dimension a facet counts, left out of its own condition.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Dimension {
@@ -127,9 +166,22 @@ impl Where {
         self.conditions.push(condition);
     }
 
+    /// `column` is one of the comma-joined `words`.
+    fn one_of(&mut self, column: &str, words: String) {
+        let n = self.value(words);
+        self.when(format!(
+            "{column} = ANY(pg_catalog.string_to_array({n}::text, ','))"
+        ));
+    }
+
+    /// `column` equals `value`.
+    fn equals(&mut self, column: &str, value: impl Into<Value>) {
+        let n = self.value(value);
+        self.when(format!("{column} = {n}"));
+    }
+
     /// Every part of `filter` but `skip`'s dimension.
     fn filter(mut self, filter: &ReportFilter, skip: Option<Dimension>) -> Self {
-        let keep = |d: Dimension| skip != Some(d);
         self.when(
             if filter.trash {
                 "r.deleted_at IS NOT NULL"
@@ -138,18 +190,22 @@ impl Where {
             }
             .into(),
         );
+        self.faceted(filter, skip);
+        self.narrowed(filter);
+        self
+    }
+
+    /// The dimensions a facet counts, each but `skip`.
+    fn faceted(&mut self, filter: &ReportFilter, skip: Option<Dimension>) {
+        let keep = |d: Dimension| skip != Some(d);
         if keep(Dimension::Status) && !filter.statuses.is_empty() {
-            let words = words(filter.statuses.iter().map(|s| s.as_str()));
-            let n = self.value(words);
-            self.when(format!(
-                "r.status = ANY(pg_catalog.string_to_array({n}::text, ','))"
-            ));
+            self.one_of(
+                "r.status",
+                words(filter.statuses.iter().map(|s| s.as_str())),
+            );
         }
         if keep(Dimension::Kind) && !filter.kinds.is_empty() {
-            let n = self.value(words(filter.kinds.iter().map(|k| k.as_str())));
-            self.when(format!(
-                "r.kind = ANY(pg_catalog.string_to_array({n}::text, ','))"
-            ));
+            self.one_of("r.kind", words(filter.kinds.iter().map(|k| k.as_str())));
         }
         if keep(Dimension::Priority) && !filter.priorities.is_empty() {
             let none = filter.priorities.contains(&None);
@@ -161,6 +217,38 @@ impl Where {
                 if none { " OR r.priority IS NULL" } else { "" }
             ));
         }
+        if keep(Dimension::Channel)
+            && let Some(channel) = filter.channel
+        {
+            self.equals("r.channel", channel.as_str());
+        }
+        if keep(Dimension::Gateway)
+            && let Some(gateway) = &filter.gateway
+        {
+            self.equals("r.gateway_label", gateway.clone());
+        }
+        if keep(Dimension::Assignee) {
+            if filter.unassigned {
+                self.when("r.assignee IS NULL".into());
+            } else if let Some(assignee) = filter.assignee {
+                self.equals("r.assignee", Uuid::from_bytes(assignee));
+            }
+        }
+        if keep(Dimension::Label)
+            && let Some(label) = &filter.label
+        {
+            let n = self.value(label.clone());
+            self.when(format!("{n} = ANY(r.labels)"));
+        }
+        if keep(Dimension::Reporter)
+            && let Some(reporter) = &filter.reporter
+        {
+            self.equals("r.reporter", reporter.clone());
+        }
+    }
+
+    /// The parts of a filter no facet counts.
+    fn narrowed(&mut self, filter: &ReportFilter) {
         if let Some(q) = &filter.q {
             let n = self.value(q.trim().to_lowercase());
             self.when(format!(
@@ -190,52 +278,17 @@ impl Where {
                 .into(),
             );
         }
-        if keep(Dimension::Channel)
-            && let Some(channel) = filter.channel
-        {
-            let n = self.value(channel.as_str());
-            self.when(format!("r.channel = {n}"));
-        }
-        if keep(Dimension::Gateway)
-            && let Some(gateway) = &filter.gateway
-        {
-            let n = self.value(gateway.clone());
-            self.when(format!("r.gateway_label = {n}"));
-        }
-        if keep(Dimension::Assignee) {
-            if filter.unassigned {
-                self.when("r.assignee IS NULL".into());
-            } else if let Some(assignee) = filter.assignee {
-                let n = self.value(Uuid::from_bytes(assignee));
-                self.when(format!("r.assignee = {n}"));
-            }
-        }
-        if keep(Dimension::Label)
-            && let Some(label) = &filter.label
-        {
-            let n = self.value(label.clone());
-            self.when(format!("{n} = ANY(r.labels)"));
-        }
-        if keep(Dimension::Reporter)
-            && let Some(reporter) = &filter.reporter
-        {
-            let n = self.value(reporter.clone());
-            self.when(format!("r.reporter = {n}"));
-        }
         if let Some(signature) = &filter.signature {
-            let n = self.value(signature.clone());
-            self.when(format!("r.signature = {n}"));
+            self.equals("r.signature", signature.clone());
         }
         if let Some(original) = filter.duplicate_of {
-            let n = self.value(Uuid::from_bytes(original));
-            self.when(format!("r.duplicate_of = {n}"));
+            self.equals("r.duplicate_of", Uuid::from_bytes(original));
         }
         if filter.unseen {
             self.when(
                 "NOT EXISTS (SELECT 1 FROM central_identity.report_seen s WHERE s.admin = $1 AND s.report_id = r.id)".into(),
             );
         }
-        self
     }
 
     /// `WHERE …`, never empty: the trash's condition is always there.
@@ -312,16 +365,7 @@ impl AccountStore {
             .await
             .map_err(|_| Error::Unavailable)?;
         let page = rows.iter().map(summary).collect::<Result<Vec<_>, _>>()?;
-        let counted = Where::new(admin).filter(filter, None);
-        let total = count(
-            &tx,
-            &format!(
-                "SELECT count(*) AS n FROM central_identity.reports r {}",
-                counted.clause()
-            ),
-            counted.into_values(),
-        )
-        .await?;
+        let total = matching(&tx, admin, filter).await?;
         tx.commit().await.map_err(|_| Error::Unavailable)?;
         Ok((page, total))
     }
@@ -338,64 +382,21 @@ impl AccountStore {
         filter.validate()?;
         let tx = self.db.begin().await.map_err(|_| Error::Unavailable)?;
         let admin = reader(&tx, browser).await?;
-        let group = |column: &str, skip: Dimension, limit: Option<usize>| {
-            let at = Where::new(admin).filter(filter, Some(skip));
-            let limit = limit.map_or_else(String::new, |n| format!(" LIMIT {n}"));
-            (
-                format!(
-                    "SELECT {column} AS value, count(*)::bigint AS n FROM central_identity.reports r {}
-                     GROUP BY 1 ORDER BY 2 DESC, 1{limit}",
-                    at.clause()
-                ),
-                at.into_values(),
-            )
-        };
-        let rows = |(sql, values): (String, Vec<Value>)| {
-            let tx = &tx;
-            async move {
-                tx.query_all_raw(statement(&sql, values))
-                    .await
-                    .map_err(|_| Error::Unavailable)
-            }
-        };
-        let read_words = |rows: Vec<QueryResult>| -> Result<Vec<Count<String>>, Error> {
-            rows.iter()
-                .map(|row| {
-                    Ok(Count {
-                        value: get(row, "value")?,
-                        count: n(row)?,
-                    })
-                })
-                .collect()
-        };
-        let statuses = read_words(rows(group("r.status", Dimension::Status, None)).await?)?
-            .into_iter()
-            .map(|c| {
-                Ok(Count {
-                    value: ReportStatus::from_stored(&c.value)?,
-                    count: c.count,
-                })
-            })
-            .collect::<Result<_, Error>>()?;
-        let kinds = read_words(rows(group("r.kind", Dimension::Kind, None)).await?)?
-            .into_iter()
-            .map(|c| {
-                Ok(Count {
-                    value: ReportKind::from_stored(&c.value)?,
-                    count: c.count,
-                })
-            })
-            .collect::<Result<_, Error>>()?;
-        let channels = read_words(rows(group("r.channel", Dimension::Channel, None)).await?)?
-            .into_iter()
-            .map(|c| {
-                Ok(Count {
-                    value: Channel::from_stored(&c.value)?,
-                    count: c.count,
-                })
-            })
-            .collect::<Result<_, Error>>()?;
-        let priorities = rows(group("r.priority", Dimension::Priority, None))
+        let facet = |column, skip, limit| facet(&tx, admin, filter, column, skip, limit);
+        let words = |s: &str| Ok(s.to_owned());
+        let statuses = counted(
+            &facet("r.status", Dimension::Status, None).await?,
+            ReportStatus::from_stored,
+        )?;
+        let kinds = counted(
+            &facet("r.kind", Dimension::Kind, None).await?,
+            ReportKind::from_stored,
+        )?;
+        let channels = counted(
+            &facet("r.channel", Dimension::Channel, None).await?,
+            Channel::from_stored,
+        )?;
+        let priorities = facet("r.priority", Dimension::Priority, None)
             .await?
             .iter()
             .map(|row| {
@@ -406,7 +407,7 @@ impl AccountStore {
                 })
             })
             .collect::<Result<_, Error>>()?;
-        let assignees = rows(group("r.assignee", Dimension::Assignee, None))
+        let assignees = facet("r.assignee", Dimension::Assignee, None)
             .await?
             .iter()
             .map(|row| {
@@ -416,27 +417,19 @@ impl AccountStore {
                 })
             })
             .collect::<Result<_, Error>>()?;
-        let labels =
-            read_words(rows(group("pg_catalog.unnest(r.labels)", Dimension::Label, None)).await?)?;
-        let gateways = read_words(rows(group("r.gateway_label", Dimension::Gateway, None)).await?)?;
-        let reporters = read_words(
-            rows(group(
-                "r.reporter",
-                Dimension::Reporter,
-                Some(FACET_REPORTERS),
-            ))
-            .await?,
+        let labels = counted(
+            &facet("pg_catalog.unnest(r.labels)", Dimension::Label, None).await?,
+            words,
         )?;
-        let counted = Where::new(admin).filter(filter, None);
-        let total = count(
-            &tx,
-            &format!(
-                "SELECT count(*) AS n FROM central_identity.reports r {}",
-                counted.clause()
-            ),
-            counted.into_values(),
-        )
-        .await?;
+        let gateways = counted(
+            &facet("r.gateway_label", Dimension::Gateway, None).await?,
+            words,
+        )?;
+        let reporters = counted(
+            &facet("r.reporter", Dimension::Reporter, Some(FACET_REPORTERS)).await?,
+            words,
+        )?;
+        let total = matching(&tx, admin, filter).await?;
         tx.commit().await.map_err(|_| Error::Unavailable)?;
         Ok(ReportFacets {
             statuses,
@@ -566,31 +559,22 @@ impl AccountStore {
             ))
             .await
             .map_err(|_| Error::Unavailable)?;
-        let neighbours = match row {
-            Some(row) => Neighbours {
+        let neighbours = if let Some(row) = row {
+            Neighbours {
                 previous: optional_id(&row, "previous")?,
                 next: optional_id(&row, "next")?,
                 position: Some(
                     u64::try_from(get::<i64>(&row, "position")?).map_err(|_| Error::Unavailable)?,
                 ),
                 total: u64::try_from(get::<i64>(&row, "total")?).map_err(|_| Error::Unavailable)?,
-            },
-            None => {
-                let counted = Where::new(admin).filter(filter, None);
-                Neighbours {
-                    previous: None,
-                    next: None,
-                    position: None,
-                    total: count(
-                        &tx,
-                        &format!(
-                            "SELECT count(*) AS n FROM central_identity.reports r {}",
-                            counted.clause()
-                        ),
-                        counted.into_values(),
-                    )
-                    .await?,
-                }
+            }
+        } else {
+            // not in the list: no place, and the list's length still
+            Neighbours {
+                previous: None,
+                next: None,
+                position: None,
+                total: matching(&tx, admin, filter).await?,
             }
         };
         tx.commit().await.map_err(|_| Error::Unavailable)?;
@@ -600,6 +584,20 @@ impl AccountStore {
 
 fn n(row: &QueryResult) -> Result<u64, Error> {
     u64::try_from(get::<i64>(row, "n")?).map_err(|_| Error::Unavailable)
+}
+
+/// How many reports `filter` matches.
+async fn matching(
+    tx: &DatabaseTransaction,
+    admin: Uuid,
+    filter: &ReportFilter,
+) -> Result<u64, Error> {
+    let at = Where::new(admin).filter(filter, None);
+    let sql = format!(
+        "SELECT count(*) AS n FROM central_identity.reports r {}",
+        at.clause()
+    );
+    count(tx, &sql, at.into_values()).await
 }
 
 async fn count(db: &impl ConnectionTrait, sql: &str, values: Vec<Value>) -> Result<u64, Error> {
