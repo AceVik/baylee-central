@@ -16,8 +16,9 @@ fn algorithm() -> Result<Argon2<'static>, InternalError> {
     Ok(Argon2::new(Algorithm::Argon2id, Version::V0x13, parameters))
 }
 
-// This guard also wipes the entire scratch buffer on error or unwinding.
-struct WorkBuffer<'a>(&'a mut [Block]);
+// This guard also wipes the entire scratch buffer on error or unwinding; the
+// legacy store's verification (`crate::legacy`) uses it too.
+pub(crate) struct WorkBuffer<'a>(pub(crate) &'a mut [Block]);
 impl Drop for WorkBuffer<'_> {
     fn drop(&mut self) {
         for block in &mut *self.0 {

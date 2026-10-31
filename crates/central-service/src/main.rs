@@ -7,10 +7,11 @@ use central_policy::config::{Config, is_reserved_setting};
 use std::process::ExitCode;
 
 mod accounts;
+mod legacy;
 mod listeners;
 mod production;
 
-const USAGE: &str = "usage: central-service --dev | --dev-accounts-stdin | --accounts-stdin | --migrate-stdin | --issue-beta-keys-stdin | --appoint-admin-stdin | --sweep-stdin | --generate-secrets";
+const USAGE: &str = "usage: central-service --dev | --dev-accounts-stdin | --accounts-stdin | --migrate-stdin | --issue-beta-keys-stdin | --appoint-admin-stdin | --sweep-stdin | --legacy-import-stdin | --legacy-deadline-stdin | --generate-secrets";
 
 #[tokio::main]
 async fn main() -> ExitCode {
@@ -31,6 +32,8 @@ async fn main() -> ExitCode {
         Some("--issue-beta-keys-stdin") => return production::run_issue_beta_keys().await,
         Some("--appoint-admin-stdin") => return production::run_appoint_admin().await,
         Some("--sweep-stdin") => return production::run_sweep().await,
+        Some("--legacy-import-stdin") => return legacy::run_import().await,
+        Some("--legacy-deadline-stdin") => return legacy::run_deadline().await,
         Some("--generate-secrets") => return production::generate_secrets(),
         _ => {
             eprintln!("{USAGE}");

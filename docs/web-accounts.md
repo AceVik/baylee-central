@@ -423,12 +423,94 @@ the account through a live browser session of the current credential
 
 The pages: `/account` (the profile, as before), `/account/security` and
 `/account/gateways`, in one frame with the administration's
-(`/admin`, `/admin/users/<id>`, `/admin/gateways`, `/admin/audit`), whose
+(`/admin`, `/admin/users/<id>`, `/admin/gateways`, `/admin/audit`,
+`/admin/legacy`), whose
 part of the navigation only an administrator sees. A change that needs the
 recent password asks for it first and signs in again (the same OPAQUE
 sign-in, in its Worker), which replaces the browser session. A token is shown
 once, in its text form, in a dialog that closes only when the person says
 they kept it; the page keeps it nowhere.
+
+## Pairing
+
+The owner's decision of 30.10.2026 (Baylee `docs/proposals/deep-links.md`
+§"Protocol specification" is the contract): a person signed in on
+`baylee.app` starts Baylee's client signed in, without typing the password
+again. The password opens the master key once, where it was typed, and is
+dropped; the page brings the master key to the client sealed to a key the
+client made, and Central hands the client a native session only together
+with that sealed key, once.
+
+**The key check.** `accounts.key_check` (32 bytes, migration 000016) is
+derived one way from the master key (`crypto-protocol.md` §"Derived from the
+master key"). It is set once, with `SetKeyCheck`, while none is set and
+within two minutes of the session's password proof: the client and the
+page send it after a password sign-in when `KeyCheckStatus` says there is
+none, so a new account and an existing one gain it at their next sign-in.
+A new vault (a reset to a new one) clears it, and the next sign-in sets the
+new vault's. Unlike Baylee's specification, neither `EnrollmentFinish` nor
+`ResetVault::New` carries a check: the sign-in after either sets it. Both
+requests work on either listener; a set check is `Conflict`, a late one
+`Rejected`. A stolen session or cookie therefore cannot plant a check of its
+own. No pairing starts for an account without one.
+
+**The steps.**
+
+1. `PairStart` (browser listener, cookie) → `PairStarted { handle,
+   expires_at }`: five minutes, at most three open per account and a
+   thousand in all; ended pairings are swept first.
+2. The page opens `baylee://pair?h=<handle>&s=<S>`, `S` being 32 random bytes
+   of its own that Central never sees.
+3. `PairClaim { handle, public_key, challenge, mac }` (native listener, no
+   session) → `PairAccepted { expires_at }`: within the pairing's first two
+   minutes, once. The same claim again, as a client resends it after losing
+   the answer, gets the same answer (compared in constant time); any other
+   is `Conflict`.
+4. `PairStatus { handle }` (the starting cookie) → `PairClaimed { … }` or
+   `Pending`. The page checks the MAC under `S`, shows the comparison code
+   and the account's name beside Approve.
+5. `PairApprove { handle, sealed, proof }` (the starting cookie) → `Done`:
+   `sealed` is the master key sealed to the client's key under `S` (HPKE's
+   PSK mode, `crypto-protocol.md` §"Pairing"), so Central cannot make one
+   the client opens. Central checks the proof (HMAC under the stored key
+   check over handle, key, challenge and the seal's digest) and stores the
+   80-byte seal, once.
+   `PairCancel { handle }` ends a pairing at once.
+6. `PairPoll { handle }` (native, no session) → `Pending` or `Approved`, at
+   most 300 times; then `PairRedeem { handle, verifier }` →
+   `PairSession { token, identity, username, display_name, tag, sealed,
+   expires_at }`, the name and tag for the client's question beside the
+   username. The pairing is deleted whatever the redeem finds: a wrong
+   verifier, an account at another epoch or a proof too old each end it,
+   and only a storage failure leaves it. The session replaces the account's
+   native session as a sign-in does.
+
+**The 12 hours.** `sessions.proven_at` is the password proof a session rests
+on when it is not its own creation (NULL: the creation). A paired session
+takes the browser session's, the lifetime check and renewal count from
+`COALESCE(proven_at, created_at)`, and a redeem whose proof leaves less than
+a minute gives no session. Every check of a password sign-in's age (the
+export's, recovery's, the tokens' and administration's step-ups) and the
+"signed in at" an account sees read the same, so a pairing never counts as a
+fresh password sign-in. NULL rather than a copy of `created_at`: every
+existing insert stays valid, and the meaning is the same.
+
+**Budgets.** `PairStart` 10 an hour and `PairStatus` 120 a minute per
+address on the browser listener; `PairApprove`, `PairCancel` and the key
+check's two requests have no address budget, since each acts on a live
+session, which counts them as it counts its other requests. The native
+listener's claim, polls and redeem have a window of their own (64 a second),
+so polling cannot spend the sign-ins' budget, besides the per-pairing limits
+above. `PairCancel` ends a pairing in any state until it is redeemed, so a
+page that is left can end its own at once. The browser listener
+serves `PairStart`, `PairStatus`, `PairApprove`, `PairCancel`,
+`KeyCheckStatus` and `SetKeyCheck`; the native listener refuses the first
+four and serves the claim, poll and redeem.
+
+**Deletion.** A pairing goes with its browser session (`ON DELETE CASCADE`):
+signing out of the page ends it. An expired one goes with the next start and
+with the operator's daily sweep ([administration](administration.md) §"The
+sweep").
 
 ## Browser crypto (`central-web-crypto`)
 

@@ -1706,3 +1706,246 @@ single-label refusals beside the earlier ones, and for the empty actions
 panel (an injected always-shown panel fails the test). The smoke test and
 the real-Central run check that the default build has no "Open in Baylee"
 link. Engineering review, not an audit.
+
+## The official gateway's move, and approval for the directory only, 30 October 2026
+
+Design pass. Two owner decisions of 30.10.2026. First, the official gateway
+moves from `https://baylee.acevik.de` to `https://gateway.baylee.app`, and
+installed clients, which ask Central for tickets at the old address, must keep
+working. The official set is compiled (`OFFICIAL_ORIGIN`, `OFFICIAL_ALIASES`),
+as the official origin always was. No configuration names another gateway
+the bridge's authority; the production config still has no gateway field.
+The development launcher's `gateway_aliases` takes numeric-loopback origins
+only, and a live service refuses `with_aliases`.
+
+Second, a gateway token signs players in without an administrator's approval,
+which now governs the directory only. A token names an owner who answers for
+the gateway, and that owner or an administrator revokes it at once. A
+credential pair, which its owner cannot revoke, keeps needing the approval.
+Disabling still stops both and ends the gateway's leases.
+
+Implementation pass.
+- The bridge's authority carries the set: `gateway_authority` answers the
+  canonical origin first, and every lease query reads
+  `audience = ANY(string_to_array($n, ' '))`. A validated origin holds no
+  space, and `origins()` refuses an empty set or one with a space. No
+  `postgres-array` feature, so no dependency change.
+- A redeemed lease keeps the ticket's own audience: it is selected with the
+  spent ticket, not taken from the caller.
+- Gateway terms: the authorization reads an acceptance under any origin of
+  the set. `GatewayTerms` and `AcceptTerms` for an alias use the canonical
+  origin, where the bridge publishes.
+- The store refuses to register any compiled official origin, beside the
+  identity service's check of the configured set. So nobody can take the new
+  origin before the official row moves to it.
+- Pending gateways: the token arms of `authenticate_gateway` and
+  `gateway_heartbeat` test "not disabled" (`NOT_DISABLED`) instead of joining
+  an enabled approval. The credential arms keep the join. Redemption, lease
+  checks, profiles, admin checks and registered tickets use "not disabled",
+  so they are never stricter than the authentication before them. The
+  directory still joins an enabled approval.
+
+Adversarial pass (PostgreSQL fixture):
+- Both official origins are refused to `RegisterGateway` and to the
+  website's `AddGateway`, in both modes.
+- A live heartbeat set with a foreign origin is refused. The heartbeat finds
+  the row under either origin, before and after the operator moves it, and
+  takes a website on the old one. The directory then shows the new origin.
+- A ticket asked for each official origin is redeemed under the set, and
+  its lease is checked under the set and under its own origin, but not under
+  the other one alone.
+- Terms accepted under the old address count under the set, and not for a
+  lease checked under the new address alone.
+- A pending token gateway admits a player and beats, unlisted, and is listed
+  once approved. A disabled one's token neither authenticates nor beats.
+
+No migration, no grant change, no dependency change. Engineering review, not
+an audit.
+
+## The legacy store's sign-in, 30 October 2026
+
+Owner's decision of 30.10.2026: Central takes the official gateway's old
+accounts' sign-in and move over, and the gateway loses its password routes
+([native login](native-login.md#legacy-login)). This is the one place Central
+verifies a password itself.
+
+Design pass: assets are the six remaining Argon2id verifiers, their source
+snapshots and the accounts' names. The store is its own schema with its own
+login role; the runtime role is closed out of it and it out of everything
+else, both checked at startup. Only the gateway's parameters exist (m=19456,
+t=2, p=1, 32-byte output, 16-byte salt), kept as fixed-length bytes, so Central
+parses no PHC string and a row chooses nothing. Every refusal before the proof
+(unknown, locked-out, closed, registered name, wrong password) is one
+`Rejected` after one derivation and one failure statement; a forced change or
+ban is refused after the proof. The bridge's legacy operations are refused
+once the store exists, and the bridge's admission of an open move is refused
+at all times, so a `legacy_id` handed to the official gateway means a closed
+move. Rows are deleted at the close or after the deadline, never marked; the
+import reserves each name at Central so nobody registers it meanwhile.
+
+Implementation pass: `LegacyPassword` is the only password wire type, without
+`Debug`, wiped on drop, native listener only, and its sign-in is not retried by
+the client's transport on `Busy`. The derivation runs on the worker semaphore
+over a caller-owned buffer wiped on success, error and unwind; argon2's own
+H0 and final blocks are wiped by argon2 itself, its `zeroize` feature on for
+the OPAQUE stretch too. The comparison is
+`subtle`'s. Limits: the global request budget, 30 legacy sign-ins a minute in
+all and five per name, ten failures lock an account for an hour. The import
+runs under the migrator in one transaction, refuses the whole batch for any
+bad row, a taken name, a closed move, a non-empty store or a count or digest
+mismatch, and recomputes count and digest from the stored rows; the snapshot's
+SHA-256 is a constraint. The grant block is conditional on the role existing,
+so a deployment without it fails only the legacy store's own role check.
+
+Adversarial pass (PostgreSQL fixture, `tests/support/accounts/legacy_store.rs`;
+real HTTP, `central-client/tests/support/legacy.rs`): each wider privilege of
+either role and a missing one refuse startup, and the statements fail under
+the real roles; each malformed field, a duplicate, a count and a digest
+mismatch, a taken name and a closed move refuse the import and store nothing;
+the lockout's tenth failure, a locked account read as unknown, the hour
+passing; the deadline (malformed dates refused, rows hidden at once, the sweep
+deleting rows and unenrolled reservations); the sweep of a closed move whose
+deletion was lost. Over HTTP: the good path from discovery to the closed move
+and the official gateway's admission with the legacy id; a wrong password; a
+replayed enrollment ticket; a second legacy sign-in after enrollment
+(`Conflict`); the close before restore and before the terms; a wrong digest;
+the close repeated; export and sign-in after the close; the bridge's own legacy
+operations refused; the bridge's admission of an open move refused and then
+granted after the close; the per-name budget (`Busy`, even for the right
+password); a locked-out account refusing its right password; a ban and a
+forced change refusing theirs; a Central-only account and an unknown name on
+the legacy path, and a registered account's session refused export and close;
+an empty password refused before lookup; the administrator's listing refused
+to a non-administrator. The gateway's own hash is reproduced bit for bit
+(`central-crypto` test vector, also checked with OpenSSL's Argon2id). An
+independent agent reviewed the `central-crypto` change for the bigint scope
+([bigint advisory](crypto-proposal/bigint-advisory.md)). Known limits: timing
+differs between a proof and a refusal by the success path's statements; the
+lockout lets anyone who knows a legacy username lock it for an hour at a time;
+the store's verifiers, like the gateway's database before, can be attacked
+offline from a copy. Engineering review, not an audit.
+
+## Pairing a signed-in website to Baylee's client, 30 October 2026
+
+The owner's decision of 30.10.2026 (Baylee `docs/proposals/deep-links.md`
+§"Protocol specification"; here [web accounts](web-accounts.md) §"Pairing"
+and [the protocol](crypto-protocol.md) §"Derived from the master key" and
+§"Pairing").
+
+Design pass: the assets are the master key, the account's native session and
+the key check. Callers: the page with its cookie, who may be the owner or a
+cookie thief; whatever local program receives the `baylee://pair` link, which
+on Windows and Linux can be another application that registered the scheme
+(the named attacker); anyone reaching the native listener; and Central
+itself, which must never learn the master key. Invariants: Central sees
+neither the link's secret nor the master key; a native session leaves
+Central only together with the sealed key, once, for the verifier whose
+challenge was claimed; a cookie alone cannot approve, since the proof needs
+the key check, which needs the master key; a stolen session cannot plant a
+check (two minutes from a password proof, never overwritten); a paired
+session's 12 hours count from the page's password proof. A hijacking
+application that claims first makes the real client's claim a `Conflict`,
+so the real client shows an error instead of a code, and the hijacker's code
+on the page matches nothing on the person's screen. Accepted limits, decided
+by the PM: a reader of the same user's memory is out of scope; approval is one
+click beside a comparison code read at a glance; the claim, polls and redeem
+carry no session and are bounded by the handle's 32 random bytes, 300 polls
+and five minutes.
+
+Implementation pass: migration 000016 adds `accounts.key_check`,
+`sessions.proven_at` (NULL meaning the creation, so every existing insert
+stays valid) and `pairings`, keyed by the handle's digest, deleted with the
+browser session that started it, at most five minutes long and 300 polls.
+The store starts at most three per account and a thousand in all after
+sweeping ended ones; claims once within two minutes; shows a claim and takes
+an approval only from the starting session, once; and deletes the pairing on
+every redeem, so a wrong verifier ends it. A redeem checks the challenge, the
+epoch and that the proof leaves at least a minute, then issues a native
+session in place of the account's last one, resting on the page's proof. The
+identity service checks exact lengths and the approval proof against the
+stored check before the seal is stored. The browser listener serves the
+page's four requests and the key check's two, the native listener the
+client's three, under a budget window of their own so polling cannot spend
+the sign-ins'. A reset to a new vault clears the check (found while writing
+the store: the old vault's check would otherwise have outlived its key). The
+SDK opens the seal under its binding before it keeps a session and ends a
+session whose seal does not open.
+
+Adversarial pass: `tests/support/accounts/pairing.rs` runs every refusal
+against PostgreSQL: no check, no pairing; a second check, a late one, one
+without a session; a native bearer starting; a fourth open pairing; another
+account's cookie reading, approving or cancelling; a second claim (the
+hijacking application); a second approval; a wrong verifier, then the right
+one; a second redeem; another epoch between approval and redeem; a proof too
+old; a late claim and an ended pairing; and that signing out ends the page's
+pairings. The listener lists name every one of the 59 operations (62 since
+the merge with the legacy store, whose sign-in, export and link they had not
+named). The crypto
+tests are those of the two commits before this one.
+
+Evidence on macOS, 30.10.2026: `cargo xtask gate` (format, policy, crypto
+scope, clippy, tests, doc tests, release build), `cargo xtask postgres`,
+`smoke`, `secrets` (tree and history), `cargo deny` and `cargo audit` 0.22.2
+pass. `cargo xtask wasm --check` builds on Linux x86-64 only and did not run
+here; `central-web-crypto` depends on `central-crypto`, so the module takes
+`hpke` and `curve25519-dalek` 5 too (corrected after the review below; this
+sentence first called it a development dependency). The first PostgreSQL run
+found the migration count still at 13 and an ambiguous column in the test's
+own helper, both fixed. With the
+store made to keep a pairing after a wrong verifier, the test fails at
+"ended by the wrong verifier". Engineering review, not an audit; a second
+model reviews these three commits before they land.
+
+Second-model review, 30.10.2026 (read-only, of `c41/pairing` at 6a6f99f): no
+critical or high finding. Fixed in the commits after it:
+- The service and the SDK had no attack tests of their own. Now
+  `central-client/tests/support/pairing.rs` runs the page's half as the
+  website's crypto does and the client's through the SDK, over both real
+  listeners: the key check set once after a password sign-in and never
+  replaced by the cookie's holder; a proof under another check, a proof over
+  another seal, a seal or proof one byte short, another handle and a second
+  approval refused; a resent claim answered the same, another one a
+  conflict; a verifier of the wrong length refused, a wrong one ending the
+  pairing; the redeem replacing the account's earlier native session; and a
+  seal to a stranger's key or bound to another expiry, which Central accepts
+  with a valid proof, refused by the SDK, which signs the session out, so the
+  account keeps no native session.
+- A redeem refused after the deletion (another epoch, a proof too old) rolled
+  the deletion back. The session's issue now runs in a savepoint: a refusal
+  undoes the issue and keeps the deletion, and only a storage failure leaves
+  the pairing. The fixture checks that the pairing is gone and the account's
+  native session stays.
+- Step-ups and "signed in at" counted from a session's creation, which for a
+  paired session is the redeem: `AccountExport` would have taken a pairing
+  as a fresh password sign-in for 30 minutes. Every such check now reads
+  `COALESCE(proven_at, created_at)`, as the key check and renewal did.
+- A claim resent after a lost answer was a conflict, the hijack's signal. The
+  same triple, compared in constant time, now gets the same answer.
+- The redeem's challenge is compared in constant time; `KeyCheck` no longer
+  derives equality.
+- Expired pairings went only with the next start; the operator's daily
+  sweep deletes them too.
+- The redeem answers the account's display name and tag beside its username,
+  so the client's question can name the account as other players see it.
+Recorded, not changed: the native listener's one window for claims, polls and
+redeems and the thousand open pairings are global, as its other budgets are
+(availability only); the migration number left 000015 to the legacy store,
+which landed first. Open: the page's MAC check, which lives in
+`central-web-crypto` and is reviewed when it is built.
+
+The review's one medium finding about the design, decided by the owner the
+same evening ("Yes, PSK mode"): in HPKE's base mode Central, or anyone
+writing its database, knows everything a seal binds and the client's public
+key, so it could seal a master key of its own that the client would open
+and then run under, writing its local vault wrapper and new objects under a
+key Central knows. The seal is now RFC 9180 PSK mode with the link's secret
+`S` as the pre-shared key and the handle as its ID. Central never sees `S`,
+so a seal it makes does not open; the client keeps `S` from its claim to
+the redeem and wipes it once the seal was tried, and with the pairing when
+it gives up. Tests: RFC 9180 Appendix A.2.2 (this suite in PSK mode) whole;
+a seal under another secret, one made in base mode with everything Central
+knows and one under a guessed secret do not open; over both listeners, a
+seal approved with a valid proof but made without the link's secret is
+refused by the SDK, which signs the session out. The page must seal under
+the same `S` it checks the claim's MAC with (`central-web-crypto`, not built
+yet).

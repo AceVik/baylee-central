@@ -6,8 +6,8 @@
 //! read or written.
 use super::{AccountStore, Error, Session, Token, statement};
 use central_api::{
-    LEGACY_ORIGIN,
     gateway::{GatewayMetadata, GatewayState, validate_origin},
+    is_official_origin,
     owner::{
         GatewayScopes, MAX_TOKEN_DAYS, MyGateway, SessionInfo, SessionKind, TOKENS_PER_GATEWAY,
         TokenInfo, token_name,
@@ -93,7 +93,7 @@ async fn owner(
     let row = db
         .query_one_raw(statement(
             &format!(
-                "SELECT a.id, s.created_at > pg_catalog.clock_timestamp() - interval '30 minutes' AS fresh
+                "SELECT a.id, COALESCE(s.proven_at, s.created_at) > pg_catalog.clock_timestamp() - interval '30 minutes' AS fresh
                  FROM central_identity.accounts a JOIN central_identity.sessions s
                  ON s.account_id = a.id AND s.credential_revision = a.credential_revision
                  WHERE s.digest = $1 AND s.kind = 'browser' AND a.credential IS NOT NULL
@@ -123,7 +123,7 @@ impl AccountStore {
         let rows = tx
             .query_all_raw(statement(
                 "SELECT s.kind, s.digest = $2 AS current,
-                     floor(extract(epoch FROM s.created_at))::bigint AS signed_in_at,
+                     floor(extract(epoch FROM COALESCE(s.proven_at, s.created_at)))::bigint AS signed_in_at,
                      floor(extract(epoch FROM s.expires_at))::bigint AS expires_at,
                      (SELECT string_agg(DISTINCT l.audience, ' ' ORDER BY l.audience)
                       FROM central_identity.gateway_leases l
@@ -261,10 +261,11 @@ impl AccountStore {
     }
 
     /// Register a gateway at `origin` named `name` for the account behind
-    /// `browser`, awaiting an administrator's approval. It has no credential
-    /// pair: it authenticates by tokens alone. The official gateway's origin
-    /// is the bridge's ([`LEGACY_ORIGIN`]), so it is a `Conflict`, as is an
-    /// origin registered already; `development` allows loopback http origins.
+    /// `browser`, awaiting an administrator's approval for the directory. It has
+    /// no credential pair: it authenticates by tokens alone, approved or not.
+    /// The official gateway's origins are the bridge's ([`is_official_origin`]),
+    /// so each is a `Conflict`, as is an origin registered already;
+    /// `development` allows loopback http origins.
     ///
     /// # Errors
     /// `Rejected` without a live browser session, for an account whose move
@@ -277,7 +278,7 @@ impl AccountStore {
         name: &str,
         development: bool,
     ) -> Result<[u8; 16], Error> {
-        if origin == LEGACY_ORIGIN {
+        if is_official_origin(origin) {
             return Err(Error::Conflict);
         }
         validate_origin(origin, development)?;

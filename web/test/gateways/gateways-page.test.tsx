@@ -81,7 +81,7 @@ describe("the gateway directory", () => {
     expect(names).toEqual(["Sanctuary", "Synthetic table 1", "Synthetic table 2", "Synthetic table 4"]);
     const official = screen.getByRole("heading", { name: "Sanctuary" }).closest("li") as HTMLElement;
     expect(within(official).getByText("Official").className).toContain("gw-official");
-    expect(within(official).getByText("https://baylee.acevik.de")).toBeTruthy();
+    expect(within(official).getByText("https://gateway.baylee.app")).toBeTruthy();
     expect(screen.getAllByText("Official")).toHaveLength(1);
   });
 

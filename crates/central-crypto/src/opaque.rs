@@ -38,7 +38,7 @@ impl opaque_ke::CipherSuite for Suite {
     type Ksf = stretch::FixedKsf;
 }
 
-mod stretch;
+pub(crate) mod stretch;
 
 fn identifiers(context: &Context) -> Identifiers<'_> {
     Identifiers {

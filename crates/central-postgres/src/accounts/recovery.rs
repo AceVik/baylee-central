@@ -54,7 +54,7 @@ impl AccountStore {
              a.recovery_wrapped_master IS NOT NULL AS recovery,
              EXISTS (SELECT 1 FROM central_identity.account_roles r
                  WHERE r.account_id = a.id AND r.role = 'admin') AS admin,
-             floor(extract(epoch FROM s.created_at))::bigint AS signed_in_at,
+             floor(extract(epoch FROM COALESCE(s.proven_at, s.created_at)))::bigint AS signed_in_at,
              floor(extract(epoch FROM s.expires_at))::bigint AS expires_at
              FROM central_identity.accounts a JOIN central_identity.sessions s
              ON s.account_id = a.id AND s.credential_revision = a.credential_revision
@@ -110,7 +110,7 @@ impl AccountStore {
         let tx = self.db.begin().await.map_err(|_| Error::Unavailable)?;
         let row = tx.query_one_raw(statement(
             "SELECT a.id, a.recovery_wrapped_master, a.source = 'registered' OR a.legacy_closed AS moved,
-             s.created_at > pg_catalog.clock_timestamp() - interval '10 minutes' AS fresh
+             COALESCE(s.proven_at, s.created_at) > pg_catalog.clock_timestamp() - interval '10 minutes' AS fresh
              FROM central_identity.accounts a JOIN central_identity.sessions s
              ON s.account_id = a.id AND s.credential_revision = a.credential_revision
              WHERE s.digest = $1 AND s.kind = $2 AND a.credential IS NOT NULL

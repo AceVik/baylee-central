@@ -355,7 +355,7 @@ async fn fill(store: &AccountStore, operator: &DatabaseConnection, keys: &Server
     store
         .redeem_lease(
             &ticket,
-            "https://deletion-own.invalid",
+            &["https://deletion-own.invalid"],
             TicketPurpose::Admit,
             Some(own),
             Some(&Token::generate().unwrap()),

@@ -11,7 +11,7 @@ use central_crypto::{
     Context,
     opaque::server::{Attempt, ServerKeys},
 };
-use central_postgres::{AccountStore, Credential, Session};
+use central_postgres::{AccountStore, Credential, LegacyStore, Session};
 use std::{
     collections::BTreeMap,
     sync::{Arc, Mutex},
@@ -24,9 +24,11 @@ mod admin;
 mod deletion;
 mod dispatch;
 mod gateways;
+mod legacy;
 mod limits;
 mod objects;
 mod owner;
+mod pairing;
 mod password;
 mod reset;
 mod terms;
@@ -112,7 +114,13 @@ pub fn browser_operation(request: &Request) -> bool {
         | Request::ResetFinish { .. }
         | Request::AccountExport
         | Request::DeleteAccountStart { .. }
-        | Request::DeleteAccountFinish { .. } => true,
+        | Request::DeleteAccountFinish { .. }
+        | Request::KeyCheckStatus
+        | Request::SetKeyCheck { .. }
+        | Request::PairStart
+        | Request::PairStatus { .. }
+        | Request::PairApprove { .. }
+        | Request::PairCancel { .. } => true,
         Request::AcceptTerms { subject, .. } => matches!(subject, TermsSubject::Central),
         Request::CreateObject
         | Request::ReadObject { .. }
@@ -138,7 +146,13 @@ pub fn browser_operation(request: &Request) -> bool {
         | Request::GatewayTerms { .. }
         | Request::PublishGatewayTerms { .. }
         | Request::GatewayAuthorize { .. }
-        | Request::GatewayStatus => false,
+        | Request::GatewayStatus
+        | Request::LegacyLogin { .. }
+        | Request::LegacyExport
+        | Request::LegacyLink { .. }
+        | Request::PairClaim { .. }
+        | Request::PairPoll { .. }
+        | Request::PairRedeem { .. } => false,
     }
 }
 
@@ -157,6 +171,10 @@ fn browser_only(request: &Request) -> bool {
             | Request::SetDisplayName { .. }
             | Request::Admin { .. }
             | Request::Owner { .. }
+            | Request::PairStart
+            | Request::PairStatus { .. }
+            | Request::PairApprove { .. }
+            | Request::PairCancel { .. }
     )
 }
 
@@ -179,6 +197,12 @@ fn uses_session(request: &Request) -> bool {
             | Request::AccountExport
             | Request::DeleteAccountStart { .. }
             | Request::DeleteAccountFinish { .. }
+            | Request::KeyCheckStatus
+            | Request::SetKeyCheck { .. }
+            | Request::PairStart
+            | Request::PairStatus { .. }
+            | Request::PairApprove { .. }
+            | Request::PairCancel { .. }
     )
 }
 
@@ -217,13 +241,24 @@ pub struct IdentityService {
     issuer: [u8; 32],
     keys: Arc<ServerKeys>,
     bridge_digest: [u8; 32],
-    gateway: String,
+    /// The official gateway's origins, canonical first (`Endpoint::official_origins`).
+    official: Vec<String>,
+    /// Whether discovery answers `Legacy` for a name it does not find: on
+    /// the live service, and wherever a legacy store is configured.
     legacy_discovery: bool,
+    /// Whether gateway origins may be numeric-loopback development origins:
+    /// everywhere but the live service. Its own flag, not the inverse of
+    /// [`Self::legacy_discovery`], which a development legacy store turns on.
+    development: bool,
     pending: Mutex<BTreeMap<[u8; 32], Pending>>,
     resets: Mutex<BTreeMap<[u8; 32], reset::PendingReset>>,
     limits: Mutex<limits::Limits>,
     workers: Arc<Semaphore>,
     terms: Option<central_api::terms::TermsDocument>,
+    /// The legacy store, from the cutover until its deadline
+    /// (`docs/native-login.md` §"Legacy login"); with it the bridge's own
+    /// legacy operations are refused.
+    legacy: Option<LegacyStore>,
 }
 
 impl IdentityService {
@@ -233,7 +268,9 @@ impl IdentityService {
     ///
     /// # Errors
     /// Rejects an invalid development gateway or live gateway other than the official bridge,
-    /// and compiled-in terms of use that do not parse (`docs/terms.md`).
+    /// and compiled-in terms of use that do not parse (`docs/terms.md`). A live
+    /// service's official gateway is [`central_api::OFFICIAL_ORIGIN`] with its
+    /// compiled aliases.
     pub fn new(
         store: AccountStore,
         endpoint: &Endpoint,
@@ -241,26 +278,72 @@ impl IdentityService {
         bridge: &Token,
         gateway: &str,
     ) -> Result<Self, Error> {
-        if endpoint.legacy_origin().is_some() {
-            if gateway != central_api::LEGACY_ORIGIN {
+        let official = if endpoint.legacy_origin().is_some() {
+            if gateway != central_api::OFFICIAL_ORIGIN {
                 return Err(Error::Rejected);
             }
+            endpoint.official_origins()
         } else {
             Endpoint::development(gateway)?;
-        }
+            vec![gateway.to_owned()]
+        };
         Ok(Self {
             store,
             issuer: endpoint.issuer(),
             keys: Arc::new(keys),
             bridge_digest: bridge.digest(),
-            gateway: gateway.into(),
+            official,
             legacy_discovery: endpoint.legacy_origin().is_some(),
+            development: endpoint.legacy_origin().is_none(),
             pending: Mutex::default(),
             resets: Mutex::default(),
             limits: Mutex::default(),
             workers: Arc::new(Semaphore::new(4)),
             terms: terms::central()?,
+            legacy: None,
         })
+    }
+
+    /// Serve the legacy sign-in from `store` (`docs/native-login.md`
+    /// §"Legacy login"): discovery answers `Legacy` for every name it does
+    /// not find enrolled, in development too, and the bridge's own legacy
+    /// operations are refused, since Central is the source now.
+    #[must_use]
+    pub fn with_legacy(mut self, store: LegacyStore) -> Self {
+        self.legacy = Some(store);
+        self.legacy_discovery = true;
+        self
+    }
+
+    /// Further numeric-loopback origins of the official gateway in development,
+    /// as a live service has [`central_api::OFFICIAL_ALIASES`].
+    ///
+    /// # Errors
+    /// Rejects any alias on a live service, whose aliases are compiled, and one
+    /// that is not a numeric-loopback development origin.
+    pub fn with_aliases(mut self, aliases: Vec<String>) -> Result<Self, Error> {
+        if !self.development {
+            return Err(Error::Rejected);
+        }
+        for alias in aliases {
+            if Endpoint::development(&alias)?.origin() != alias {
+                return Err(Error::Rejected);
+            }
+            if !self.official.contains(&alias) {
+                self.official.push(alias);
+            }
+        }
+        Ok(self)
+    }
+
+    /// The official gateway's canonical origin.
+    fn canonical(&self) -> &str {
+        &self.official[0]
+    }
+
+    /// Whether `origin` is one of the official gateway's.
+    fn is_official(&self, origin: &str) -> bool {
+        self.official.iter().any(|o| o == origin)
     }
 
     /// Put `terms` in force instead of the compiled-in `legal/` texts, for an
@@ -537,6 +620,16 @@ mod tests {
             Request::Owner {
                 request: central_api::owner::OwnerRequest::Sessions,
             },
+            Request::KeyCheckStatus,
+            Request::SetKeyCheck { check: vec![] },
+            Request::PairStart,
+            Request::PairStatus { handle: token() },
+            Request::PairApprove {
+                handle: token(),
+                sealed: vec![],
+                proof: vec![],
+            },
+            Request::PairCancel { handle: token() },
         ]
     }
 
@@ -548,18 +641,6 @@ mod tests {
             website: "https://gateway.invalid".into(),
         };
         vec![
-            Request::CreateObject,
-            Request::ReadObject { id: [0; 16] },
-            Request::ListObjects { after: None },
-            Request::WriteObject {
-                id: [0; 16],
-                expected_revision: 0,
-                document: vec![],
-            },
-            Request::DeleteObject {
-                id: [0; 16],
-                expected_revision: 1,
-            },
             Request::LegacyInvalidate {
                 legacy_id: "x".into(),
             },
@@ -641,6 +722,59 @@ mod tests {
             // a gateway's token is no website's business
             Request::GatewayStatus,
         ]
+        .into_iter()
+        .chain(objects())
+        .chain(claimed_by_the_client())
+        .chain(moved_by_the_client())
+        .collect()
+    }
+
+    /// A native session's own objects.
+    fn objects() -> [Request; 5] {
+        [
+            Request::CreateObject,
+            Request::ReadObject { id: [0; 16] },
+            Request::ListObjects { after: None },
+            Request::WriteObject {
+                id: [0; 16],
+                expected_revision: 0,
+                document: vec![],
+            },
+            Request::DeleteObject {
+                id: [0; 16],
+                expected_revision: 1,
+            },
+        ]
+    }
+
+    /// The client's half of a pairing, which only the native listener serves.
+    fn claimed_by_the_client() -> [Request; 3] {
+        [
+            Request::PairClaim {
+                handle: token(),
+                public_key: vec![],
+                challenge: vec![],
+                mac: vec![],
+            },
+            Request::PairPoll { handle: token() },
+            Request::PairRedeem {
+                handle: token(),
+                verifier: vec![],
+            },
+        ]
+    }
+
+    /// The legacy store's sign-in and move, which only the native listener
+    /// serves.
+    fn moved_by_the_client() -> [Request; 3] {
+        [
+            Request::LegacyLogin {
+                username: "synthetic".into(),
+                password: central_api::legacy::LegacyPassword::new("synthetic".into()),
+            },
+            Request::LegacyExport,
+            Request::LegacyLink { digest: [0; 32] },
+        ]
     }
 
     #[test]
@@ -657,14 +791,14 @@ mod tests {
                 text[start..].split('"').next().unwrap().to_owned()
             })
             .collect();
-        assert_eq!(named.len(), 50, "every operation is in one of the lists");
+        assert_eq!(named.len(), 62, "every operation is in one of the lists");
     }
 
     #[test]
     fn the_native_listener_refuses_the_websites_own_operations() {
         let (served, _) = (served(), refused());
         let only: Vec<&Request> = served.iter().filter(|r| browser_only(r)).collect();
-        assert_eq!(only.len(), 6);
+        assert_eq!(only.len(), 10);
         // An account's own area is the website's alone, as administration is.
         assert!(browser_only(&Request::Owner {
             request: central_api::owner::OwnerRequest::Gateways,

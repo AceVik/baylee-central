@@ -1,11 +1,14 @@
 //! The official gateway's row (migration 000009): listed and approved by the
 //! operator, without owner or credential, so the bridge stays its only
 //! authority; its heartbeat, which the bridge sends, moves that row alone.
+//! It answers at several origins once it moved (`OFFICIAL_ALIASES`).
+use super::super::terms::{texts, version};
 use super::{AccountStore, DatabaseConnection, Error, TicketPurpose, Token, approval, metadata};
-use central_api::{LEGACY_ORIGIN, gateway::GatewayMetadata};
+use central_api::{LEGACY_ORIGIN, OFFICIAL_ORIGIN, gateway::GatewayMetadata};
 use sea_orm::{ConnectionTrait, DbBackend, Statement, prelude::Uuid};
 
-/// The operator's statements of `docs/operations.md` §"The official gateway".
+/// The operator's statements of `docs/operations.md` §"The official gateway", as the
+/// row stood before the move: the old address, which the fixture then moves.
 const LIST: &str =
     "INSERT INTO central_identity.gateways (official, origin, name, version, website)
     VALUES (true, 'https://baylee.acevik.de', 'Baylee', '0', 'https://baylee.acevik.de/')";
@@ -51,7 +54,7 @@ async fn listed(store: &AccountStore, gateway: [u8; 16]) -> Option<(String, Stri
 
 async fn heartbeat(store: &AccountStore, origin: &str, development: bool) -> Result<(), Error> {
     store
-        .official_heartbeat(origin, &beat(origin), development)
+        .official_heartbeat(&[origin], &beat(origin), development)
         .await
 }
 
@@ -61,25 +64,33 @@ pub(super) async fn run(
     session: &Token,
     registered: [u8; 16],
 ) {
-    // The bridge's origin is never registered, in either mode, and says why:
+    // The bridge's origins are never registered, in either mode, and say why:
     // a conflict, not the owner's full quota.
-    for development in [false, true] {
-        let result = store
-            .register_gateway(
-                session,
-                LEGACY_ORIGIN,
-                &metadata(LEGACY_ORIGIN),
-                &Token::generate().unwrap(),
-                &Token::generate().unwrap(),
-                development,
-            )
-            .await;
-        assert!(matches!(result, Err(Error::Conflict)));
+    for origin in [OFFICIAL_ORIGIN, LEGACY_ORIGIN] {
+        for development in [false, true] {
+            let result = store
+                .register_gateway(
+                    session,
+                    origin,
+                    &metadata(origin),
+                    &Token::generate().unwrap(),
+                    &Token::generate().unwrap(),
+                    development,
+                )
+                .await;
+            assert!(matches!(result, Err(Error::Conflict)), "{origin}");
+            let added = store
+                .add_gateway(session, origin, "Not it", development)
+                .await;
+            assert!(matches!(added, Err(Error::Conflict)), "{origin}");
+        }
     }
     let official = list(store, operator).await;
     let untouched = row(operator, registered).await;
     beat_for_it(store, operator, session, official).await;
     // The official row only: the registered gateway is as it was.
+    assert_eq!(row(operator, registered).await, untouched);
+    moved(store, operator, session, official).await;
     assert_eq!(row(operator, registered).await, untouched);
     elsewhere(store, operator, official).await;
     assert_eq!(row(operator, registered).await, untouched);
@@ -144,7 +155,11 @@ async fn beat_for_it(
     // Metadata on another origin, or another origin in a live store, is refused.
     assert!(
         store
-            .official_heartbeat(LEGACY_ORIGIN, &beat("https://registry-one.invalid"), false)
+            .official_heartbeat(
+                &[LEGACY_ORIGIN],
+                &beat("https://registry-one.invalid"),
+                false
+            )
             .await
             .is_err()
     );
@@ -183,6 +198,155 @@ async fn beat_for_it(
                 .is_err()
         );
     }
+}
+
+/// The official gateway moved (`OFFICIAL_ORIGIN`, its old address an alias):
+/// its heartbeat keeps the row under either origin and a website on either.
+async fn moved(
+    store: &AccountStore,
+    operator: &DatabaseConnection,
+    session: &Token,
+    official: [u8; 16],
+) {
+    let set = [OFFICIAL_ORIGIN, LEGACY_ORIGIN];
+    let back = "UPDATE central_identity.gateways SET last_seen = last_seen - interval '10 seconds' WHERE official";
+    operator.execute_unprepared(back).await.unwrap();
+    // a live set holds the compiled origins only
+    assert!(matches!(
+        store
+            .official_heartbeat(
+                &[OFFICIAL_ORIGIN, "https://registry-one.invalid"],
+                &beat(OFFICIAL_ORIGIN),
+                false
+            )
+            .await,
+        Err(Error::Rejected)
+    ));
+    // the row still at the old origin, the website there too
+    store
+        .official_heartbeat(&set, &beat(LEGACY_ORIGIN), false)
+        .await
+        .unwrap();
+    // the operator moves the row; the gateway still names its old website
+    operator
+        .execute_unprepared(&format!(
+            "UPDATE central_identity.gateways SET origin = '{OFFICIAL_ORIGIN}', website = '{OFFICIAL_ORIGIN}/',
+             last_seen = last_seen - interval '10 seconds' WHERE official"
+        ))
+        .await
+        .unwrap();
+    store
+        .official_heartbeat(&set, &beat(LEGACY_ORIGIN), false)
+        .await
+        .unwrap();
+    assert_eq!(
+        listed(store, official).await,
+        Some((
+            OFFICIAL_ORIGIN.into(),
+            "Synthetic official gateway".into(),
+            true
+        ))
+    );
+    aliased(store, operator, session).await;
+    operator.execute_unprepared(back).await.unwrap();
+}
+
+/// A ticket an installed client asks for the old address is redeemed and its
+/// lease checked under the whole set, and keeps the address it was for; a
+/// player who accepted the gateway's terms there has accepted them.
+async fn aliased(store: &AccountStore, operator: &DatabaseConnection, session: &Token) {
+    let set = [OFFICIAL_ORIGIN, LEGACY_ORIGIN];
+    // the session holds the 32 leases of the cap test (`limits`); free them
+    operator
+        .execute_raw(Statement::from_sql_and_values(
+            DbBackend::Postgres,
+            "DELETE FROM central_identity.gateway_leases WHERE session_digest = $1",
+            vec![session.digest().to_vec().into()],
+        ))
+        .await
+        .unwrap();
+    // its terms, accepted under the old address before the move
+    let words = texts("Official");
+    let terms = version("official-1", &words);
+    store
+        .publish_gateway_terms(LEGACY_ORIGIN, &terms, &words)
+        .await
+        .unwrap();
+    store
+        .accept_gateway_terms(session, LEGACY_ORIGIN, &terms)
+        .await
+        .unwrap();
+    for asked in set {
+        let ticket = Token::generate().unwrap();
+        let lease = Token::generate().unwrap();
+        store
+            .gateway_ticket(session, asked, &ticket, TicketPurpose::Admit)
+            .await
+            .unwrap();
+        store
+            .redeem_lease(&ticket, &set, TicketPurpose::Admit, None, Some(&lease))
+            .await
+            .unwrap();
+        // the lease is for the address asked, under the set
+        let other = if asked == OFFICIAL_ORIGIN {
+            LEGACY_ORIGIN
+        } else {
+            OFFICIAL_ORIGIN
+        };
+        assert!(
+            store
+                .gateway_session(&lease, &set, None, TicketPurpose::Admit)
+                .await
+                .is_ok()
+        );
+        assert!(
+            store
+                .gateway_session(&lease, &[asked], None, TicketPurpose::Admit)
+                .await
+                .is_ok()
+        );
+        assert!(
+            store
+                .gateway_session(&lease, &[other], None, TicketPurpose::Admit)
+                .await
+                .is_err(),
+            "{asked}"
+        );
+        let (_, _, _, accepted) = store
+            .gateway_authorize(&lease, &set, None, TicketPurpose::Admit, None, Some(&terms))
+            .await
+            .unwrap();
+        assert!(accepted, "accepted under the old address, for {asked}");
+    }
+    // a lease for the new address alone does not see the old acceptance
+    let ticket = Token::generate().unwrap();
+    let lease = Token::generate().unwrap();
+    store
+        .gateway_ticket(session, OFFICIAL_ORIGIN, &ticket, TicketPurpose::Admit)
+        .await
+        .unwrap();
+    store
+        .redeem_lease(
+            &ticket,
+            &[OFFICIAL_ORIGIN],
+            TicketPurpose::Admit,
+            None,
+            Some(&lease),
+        )
+        .await
+        .unwrap();
+    let (_, _, _, accepted) = store
+        .gateway_authorize(
+            &lease,
+            &[OFFICIAL_ORIGIN],
+            None,
+            TicketPurpose::Admit,
+            None,
+            Some(&terms),
+        )
+        .await
+        .unwrap();
+    assert!(!accepted);
 }
 
 /// It is the official gateway only while its origin is the bridge's: moved to

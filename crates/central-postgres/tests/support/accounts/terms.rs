@@ -8,7 +8,7 @@ use central_api::{
 use central_postgres::MAX_GATEWAY_VERSIONS;
 use sea_orm::{ConnectionTrait, DbBackend, Statement};
 
-fn texts(title: &str) -> Vec<TermsText> {
+pub(super) fn texts(title: &str) -> Vec<TermsText> {
     vec![TermsText {
         lang: "en".into(),
         updated: None,
@@ -16,7 +16,7 @@ fn texts(title: &str) -> Vec<TermsText> {
     }]
 }
 
-fn version(name: &str, texts: &[TermsText]) -> TermsVersion {
+pub(super) fn version(name: &str, texts: &[TermsText]) -> TermsVersion {
     TermsVersion {
         version: name.into(),
         digest: terms::digest(texts),

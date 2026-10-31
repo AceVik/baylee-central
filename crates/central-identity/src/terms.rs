@@ -91,6 +91,10 @@ pub(super) fn needs_acceptance(request: &Request) -> bool {
             | Request::SetDisplayName { .. }
             | Request::ChangePasswordStart { .. }
             | Request::Admin { .. }
+            // A move's export and close wait for the terms, as the gateway
+            // tickets before them did (`docs/native-login.md` §"Legacy login").
+            | Request::LegacyExport
+            | Request::LegacyLink { .. }
     ) || matches!(
         // An account's own area: making something needs the terms; reading
         // its sessions and gateways, ending a session and revoking a token
@@ -130,7 +134,18 @@ impl IdentityService {
     }
 
     fn origin(&self, origin: &str) -> Result<(), Error> {
-        validate_origin(origin, !self.legacy_discovery)
+        validate_origin(origin, self.development)
+    }
+
+    /// Where a gateway's terms are kept: the official gateway publishes under
+    /// its canonical origin, and a client that knows it by an alias reads and
+    /// accepts those.
+    fn terms_origin<'a>(&'a self, origin: &'a str) -> &'a str {
+        if self.is_official(origin) {
+            self.canonical()
+        } else {
+            origin
+        }
     }
 
     pub(super) async fn terms_request(
@@ -146,7 +161,7 @@ impl IdentityService {
             Request::GatewayTerms { origin } => {
                 self.origin(&origin)?;
                 Ok(Response::Terms {
-                    terms: self.store.gateway_terms(&origin).await?,
+                    terms: self.store.gateway_terms(self.terms_origin(&origin)).await?,
                 })
             }
             Request::TermsStatus => Ok(Response::TermsStatus {
@@ -180,14 +195,15 @@ impl IdentityService {
                             return Err(Error::Rejected);
                         }
                         self.store
-                            .accept_gateway_terms(session, &origin, &accepted)
+                            .accept_gateway_terms(session, self.terms_origin(&origin), &accepted)
                             .await?;
                     }
                 }
                 Ok(Response::Done)
             }
             Request::PublishGatewayTerms { version, texts } => {
-                let (_, origin) = self.gateway_authority(bearer).await?;
+                let (_, origins) = self.gateway_authority(bearer).await?;
+                let origin = &origins[0];
                 if !terms::valid_version(&version) {
                     return Err(Error::Rejected);
                 }
@@ -197,7 +213,7 @@ impl IdentityService {
                     digest: terms::digest(&texts),
                 };
                 self.store
-                    .publish_gateway_terms(&origin, &published, &texts)
+                    .publish_gateway_terms(origin, &published, &texts)
                     .await?;
                 Ok(Response::TermsPublished {
                     digest: published.digest,
@@ -208,12 +224,12 @@ impl IdentityService {
                 purpose,
                 terms,
             } => {
-                let (gateway, origin) = self.gateway_authority(bearer).await?;
+                let (gateway, origins) = self.gateway_authority(bearer).await?;
                 let (identity, expires_at, central_terms, gateway_terms) = self
                     .store
                     .gateway_authorize(
                         &lease,
-                        &origin,
+                        &origins,
                         gateway,
                         purpose,
                         self.current(),

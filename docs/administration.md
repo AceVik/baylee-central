@@ -102,9 +102,11 @@ writes its audit event in its transaction; reads do not.
   `RegisterGateway` credential pair. `Gateway { gateway }` adds its latest 20
   tokens (name, scopes, times; never a token or digest).
 - `SetGatewayApproval { gateway, enabled }`: approve or enable again
-  (`gateway.approved`), or disable (`gateway.disabled`). Approval stays a
-  person's decision after checking outside Central who runs the origin; the
-  page says so in its dialog. Disabling hides the gateway from the directory
+  (`gateway.approved`), or disable (`gateway.disabled`). Approval puts the
+  gateway in the public directory; its tokens sign players in without it
+  (owner, 30.10.2026; [gateway registry](gateway-registry.md) §"Gateway
+  tokens"). It stays a person's decision after checking outside Central who
+  runs the origin; the page says so in its dialog. Disabling hides the gateway from the directory
   at once, stops its credentials and tokens (the joins that authenticate
   them), and deletes its leases, so each of its sessions fails at its next
   check. The official gateway's row can be disabled too, which hides it; its
@@ -149,9 +151,9 @@ restarts when a new one fails, runs unchanged over it.
 ## The sweep
 
 `central-service --sweep-stdin` with the migration document deletes audit
-events older than three years, as the privacy notice allows, and (since
-step 2b) the digests of expired reset codes, in one transaction, and prints
-both counts on standard error. A daily systemd timer runs it ([operations](operations.md)
+events older than three years, as the privacy notice allows, (since
+step 2b) the digests of expired reset codes and (since the pairing) expired
+pairings, in one transaction, and prints the three counts on standard error. A daily systemd timer runs it ([operations](operations.md)
 §"Administration"). The runtime cannot.
 
 ## Departures from the design

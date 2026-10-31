@@ -1,13 +1,18 @@
 //! Experimental cryptographic integration for native clients.
 //!
-//! No HTTP, persistence, sessions, password-reset policy or migration is provided.
+//! No HTTP, persistence, sessions or password-reset policy is provided; the
+//! one server-side password check, the legacy store's (`legacy`, behind
+//! `server`), derives and leaves the comparison and the policy to its caller.
 //! TLS, trusted issuer configuration and account ownership remain mandatory.
 //! Server key material is behind the opt-in `server` feature. Independent protocol
 //! review and published-vector validation are release gates, not completed claims.
 #![forbid(unsafe_code)]
 
 mod context;
+#[cfg(feature = "server")]
+pub mod legacy;
 pub mod opaque;
+pub mod pairing;
 pub mod vault;
 
 pub use context::Context;

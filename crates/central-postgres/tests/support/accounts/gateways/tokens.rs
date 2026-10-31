@@ -87,6 +87,14 @@ pub(super) async fn run(store: &AccountStore, operator: &DatabaseConnection, key
     let (other, _, stranger) = moved(store, keys, "token-stranger").await;
     let gateway = registration(store, operator, &browser, &native, &stranger).await;
     let token = minting(store, operator, owner.account, &browser, &stranger, gateway).await;
+    // admission needs no approval: a player is admitted while it is pending
+    let pending = admitted(store, &native, &browser, gateway).await;
+    assert!(
+        store
+            .gateway_session(&pending, &[ORIGIN], Some(gateway), TicketPurpose::Admit)
+            .await
+            .is_ok()
+    );
     authentication(store, operator, &browser, gateway, &token).await;
     let admin = administration(store, operator, keys, gateway, &native, &browser).await;
     tags(store, operator, admin, owner.account, other.account).await;
@@ -292,7 +300,8 @@ async fn capacity(store: &AccountStore, browser: &Token, stranger: &Token, gatew
     }
 }
 
-/// A token authenticates its gateway while it is approved, for its scopes.
+/// A token authenticates its gateway, for its scopes, before the approval as
+/// after it: only the directory waits for the approval.
 async fn authentication(
     store: &AccountStore,
     operator: &DatabaseConnection,
@@ -300,14 +309,20 @@ async fn authentication(
     gateway: [u8; 16],
     token: &Token,
 ) {
-    // pending: nothing authenticates, but the console may ask its status
+    // pending: the token signs players in and beats; the directory waits
     assert_eq!(
-        store.authenticate_gateway(token).await.err(),
-        Some(Error::Rejected)
+        store.authenticate_gateway(token).await.unwrap(),
+        (gateway, ORIGIN.into())
     );
-    assert_eq!(
-        store.gateway_heartbeat(token, &beat()).await.err(),
-        Some(Error::Rejected)
+    store.gateway_heartbeat(token, &beat()).await.unwrap();
+    assert!(
+        store
+            .gateway_directory(None)
+            .await
+            .unwrap()
+            .iter()
+            .all(|g| g.id != gateway),
+        "not listed before the approval"
     );
     let (id, origin, _, state, scopes, _) = store.gateway_status(token).await.unwrap();
     assert_eq!(
@@ -319,7 +334,6 @@ async fn authentication(
         store.authenticate_gateway(token).await.unwrap(),
         (gateway, ORIGIN.into())
     );
-    store.gateway_heartbeat(token, &beat()).await.unwrap();
     assert!(
         store
             .gateway_directory(None)
@@ -443,7 +457,7 @@ async fn administration(
     );
     assert_eq!(
         store
-            .gateway_session(&lease, ORIGIN, Some(gateway), TicketPurpose::Admit)
+            .gateway_session(&lease, &[ORIGIN], Some(gateway), TicketPurpose::Admit)
             .await
             .err(),
         Some(Error::Rejected),
@@ -509,7 +523,7 @@ async fn admitted(
     store
         .redeem_lease(
             &ticket,
-            ORIGIN,
+            &[ORIGIN],
             TicketPurpose::Admit,
             Some(gateway),
             Some(&lease),
@@ -533,9 +547,18 @@ async fn disabled_status(
 ) -> GatewayState {
     let token = Token::generate().unwrap();
     store
-        .create_gateway_token(owner_browser, gateway, "While disabled", SSO, 1, &token)
+        .create_gateway_token(owner_browser, gateway, "While disabled", BOTH, 1, &token)
         .await
         .unwrap();
+    // a disabled gateway's token signs nobody in and keeps no entry
+    assert_eq!(
+        store.authenticate_gateway(&token).await.err(),
+        Some(Error::Rejected)
+    );
+    assert_eq!(
+        store.gateway_heartbeat(&token, &beat()).await.err(),
+        Some(Error::Rejected)
+    );
     store.gateway_status(&token).await.unwrap().3
 }
 

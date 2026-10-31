@@ -1,6 +1,7 @@
-//! The fixture's roles: a migration login and a runtime login with random
-//! passwords, a `NOINHERIT` login that is a member of the migrator (to prove
-//! membership grants nothing), and two databases closed to `PUBLIC`.
+//! The fixture's roles: a migration login, a runtime login and the legacy
+//! store's login with random passwords, a `NOINHERIT` login that is a member
+//! of the migrator (to prove membership grants nothing), and two databases
+//! closed to `PUBLIC`.
 
 use super::Fixture;
 use super::container::docker;
@@ -13,6 +14,7 @@ pub(super) struct Secrets {
     pub(super) admin: String,
     pub(super) migrator: String,
     pub(super) runtime: String,
+    pub(super) legacy: String,
 }
 
 impl Secrets {
@@ -21,6 +23,7 @@ impl Secrets {
             admin: random::hex(32)?,
             migrator: random::hex(32)?,
             runtime: random::hex(32)?,
+            legacy: random::hex(32)?,
         })
     }
 }
@@ -41,6 +44,8 @@ CREATE ROLE central_runtime LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE
 CREATE ROLE central_inherited LOGIN NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE
   NOREPLICATION NOBYPASSRLS PASSWORD '{runtime}';
 GRANT central_migrator TO central_inherited;
+CREATE ROLE central_legacy LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE
+  NOREPLICATION NOBYPASSRLS PASSWORD '{legacy}';
 CREATE DATABASE central_test OWNER central_migrator;
 CREATE DATABASE central_native_test OWNER central_migrator;
 \\connect central_native_test
@@ -52,6 +57,7 @@ REVOKE CREATE ON SCHEMA public FROM PUBLIC;
 ",
             migrator = secrets.migrator,
             runtime = secrets.runtime,
+            legacy = secrets.legacy,
         );
         let failure = "Fixture role bootstrap failed (diagnostics withheld)";
         let output = process::feed(

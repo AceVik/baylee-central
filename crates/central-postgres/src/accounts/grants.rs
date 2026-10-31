@@ -27,8 +27,9 @@ impl AccountStore {
              ('terms_acceptances', ARRAY['SELECT','INSERT'], NULL),
              ('beta_keys', ARRAY['SELECT'], ARRAY['uses_left']),
              ('account_roles', ARRAY['SELECT','INSERT','DELETE'], NULL),
-             ('audit_events', ARRAY['SELECT','INSERT'], NULL))
-             SELECT count(*) = 16 AND bool_and(
+             ('audit_events', ARRAY['SELECT','INSERT'], NULL),
+             ('pairings', ARRAY['SELECT','INSERT','UPDATE','DELETE'], NULL))
+             SELECT count(*) = 17 AND bool_and(
                NOT pg_catalog.pg_has_role(c.relowner, 'USAGE')
                AND (SELECT bool_and(pg_catalog.has_table_privilege(c.oid, p)) FROM unnest(r.privileges) p)
                AND NOT pg_catalog.has_table_privilege(c.oid, 'TRUNCATE, REFERENCES, TRIGGER, MAINTAIN, SELECT WITH GRANT OPTION, INSERT WITH GRANT OPTION, UPDATE WITH GRANT OPTION, DELETE WITH GRANT OPTION')

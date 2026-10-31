@@ -49,6 +49,8 @@ pub(super) async fn run(store: &AccountStore, operator: &DatabaseConnection, key
     let identity = enroll(store, keys, "renewal", "renewal").await;
     let session = login(store, keys, identity).await;
     store.confirm_restore(&session, 1).await.unwrap();
+    // The bridge admits a moved account once its move is closed.
+    store.close_legacy("renewal", identity).await.unwrap();
     let ticket = Token::generate().unwrap();
     store
         .gateway_ticket(&session, "official", &ticket, TicketPurpose::Admit)
@@ -58,7 +60,7 @@ pub(super) async fn run(store: &AccountStore, operator: &DatabaseConnection, key
     store
         .redeem_lease(
             &ticket,
-            "official",
+            &["official"],
             TicketPurpose::Admit,
             None,
             Some(&lease),
@@ -85,7 +87,7 @@ pub(super) async fn run(store: &AccountStore, operator: &DatabaseConnection, key
         1
     );
     let (_, until) = store
-        .gateway_session(&lease, "official", None, TicketPurpose::Admit)
+        .gateway_session(&lease, &["official"], None, TicketPurpose::Admit)
         .await
         .unwrap();
     assert_eq!(until, renewed, "the gateway learns the new expiry");

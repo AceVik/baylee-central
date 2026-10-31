@@ -1,8 +1,8 @@
 // `/account/gateways`: the gateways this account registered, to host for
 // others (docs/gateway-registry.md §"Gateway tokens"). Three steps: register
-// the gateway's address here; a Central administrator approves it; make a
-// token and paste it into the gateway's admin console, which then signs its
-// players in through Central and keeps its entry in the public list.
+// the gateway's address here; make a token and paste it into the gateway's
+// admin console, which then signs its players in through Central; a Central
+// administrator approves it for the public list, where its token keeps it.
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 

@@ -4,7 +4,7 @@ The public part of milestone M4 in the accounts and web roadmap
 (`docs/roadmap-accounts-web.md`, PR #5):
 what Baylee is, the download, the card status, the gateway directory,
 contact, the legal notice and the privacy notice. It replaces Baylee's static
-`web/site` (served at baylee.acevik.de), whose words it keeps and whose
+`web/site` (served on the official gateway's old address), whose words it keeps and whose
 layout it redraws. Registration, sign-in and the account page
 (`docs/web-accounts.md`, for 0.1.0-beta.8a) are lazily loaded pages of this
 same app; administration comes later.
@@ -264,7 +264,7 @@ Build-time, through Vite's environment (`VITE_…`), each with a default:
 
 | variable | default | what |
 | --- | --- | --- |
-| `VITE_FEEDBACK_ORIGIN` | `https://feedback.baylee.acevik.de` | the feedback service the contact form posts to |
+| `VITE_FEEDBACK_ORIGIN` | `https://feedback.baylee.app` | the feedback service the contact form posts to |
 | `VITE_CENTRAL_API` | `/api` | Central's API on this origin, for the directory |
 | `VITE_DEEP_LINKS` | off | `on` gives each gateway card "Open in Baylee" (`baylee://gateway/add`); stays off until a client release reads gateway links, and copying the address is the first action until then |
 
@@ -305,7 +305,7 @@ a link only after those checks, with `rel="noopener noreferrer nofollow"`.
 
 The official gateway comes first with an "Official" mark, the rest in
 Central's order. The page knows it by its origin, `OFFICIAL_GATEWAY` in
-`src/config.ts` (the bridge's, `https://baylee.acevik.de`), never by a name
+`src/config.ts` (the bridge's canonical origin, `https://gateway.baylee.app`), never by a name
 or anything else an operator sends; only what is drawn moves, so the next page still starts after
 Central's last id. Central lists it once the operator has
 (`docs/operations.md` §"The official gateway"); it shows online once the

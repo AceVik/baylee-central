@@ -18,7 +18,7 @@ export function onLoopback(hostname: string = window.location.hostname): boolean
 }
 
 /** The feedback service of Baylee's repository (`docs/feedback.md`), for the contact form. */
-export const FEEDBACK_ORIGIN = import.meta.env.VITE_FEEDBACK_ORIGIN ?? "https://feedback.baylee.acevik.de";
+export const FEEDBACK_ORIGIN = import.meta.env.VITE_FEEDBACK_ORIGIN ?? "https://feedback.baylee.app";
 /** Where a page on this machine finds a local feedback service. */
 export const FEEDBACK_LOCAL = "http://127.0.0.1:28780";
 
@@ -49,10 +49,11 @@ export const CENTRAL_API = import.meta.env.VITE_CENTRAL_API ?? "/api";
 
 /**
  * The official gateway's origin, which the directory marks and lists first:
- * the bridge's, compiled into Central as `central_api::LEGACY_ORIGIN`. It
- * moves only together with that (to `https://gateway.baylee.app`, roadmap M5).
+ * the bridge's canonical one, compiled into Central as
+ * `central_api::OFFICIAL_ORIGIN`, and moved only together with that. Its old
+ * address is an alias Central answers for, never listed.
  */
-export const OFFICIAL_GATEWAY = "https://baylee.acevik.de";
+export const OFFICIAL_GATEWAY = "https://gateway.baylee.app";
 
 /** The card status (`npm run content`), fetched lazily. */
 export const DATA_BASE = "/data/";

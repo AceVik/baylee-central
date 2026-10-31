@@ -23,14 +23,14 @@ impl IdentityService {
                 gateways: self.store.owner_gateways(cookie).await?,
             },
             OwnerRequest::AddGateway { origin, name } => {
-                // the official gateway's origin is the bridge's alone
-                if origin == self.gateway {
+                // the official gateway's origins are the bridge's alone
+                if self.is_official(&origin) {
                     return Err(Error::Conflict);
                 }
                 OwnerAnswer::GatewayAdded {
                     gateway: self
                         .store
-                        .add_gateway(cookie, &origin, &name, !self.legacy_discovery)
+                        .add_gateway(cookie, &origin, &name, self.development)
                         .await?,
                 }
             }

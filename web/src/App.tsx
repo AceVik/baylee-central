@@ -31,6 +31,7 @@ const AdminUsers = lazy(() => import("./admin/UsersPage"));
 const AdminUser = lazy(() => import("./admin/UserPage"));
 const AdminGateways = lazy(() => import("./admin/GatewaysPage"));
 const AdminAudit = lazy(() => import("./admin/AuditPage"));
+const AdminLegacy = lazy(() => import("./admin/LegacyPage"));
 
 function Loading() {
   return (
@@ -78,6 +79,8 @@ function PageView({ page }: { page: Page | null }) {
       return <AdminGateways />;
     case "adminAudit":
       return <AdminAudit />;
+    case "adminLegacy":
+      return <AdminLegacy />;
     case null:
       return <NotFound />;
   }

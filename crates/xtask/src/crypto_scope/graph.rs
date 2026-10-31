@@ -25,11 +25,20 @@ pub(super) fn verify(metadata: &Value) -> Result<&str> {
     let voprf = package(packages, "voprf", "0.5.0", Some(REGISTRY))?;
     let elliptic = package(packages, "elliptic-curve", "0.13.8", Some(REGISTRY))?;
     let bigint = package(packages, "crypto-bigint", "0.5.5", Some(REGISTRY))?;
-    let dalek = package(packages, "curve25519-dalek", "4.1.3", Some(REGISTRY))?;
+    // Two generations of curve25519-dalek, each behind its own callers:
+    // 4.1.3 for the Ristretto suite, 5.0.0 for the pairing's X25519
+    // (docs/dependency-proposal/hpke.md), reached only through hpke.
+    let [dalek, dalek_x25519] = generations(packages, "curve25519-dalek", ["4.1.3", "5.0.0"])?;
+    let hpke = package(packages, "hpke", "0.15.1", Some(REGISTRY))?;
+    let x25519 = package(packages, "x25519-dalek", "3.0.0", Some(REGISTRY))?;
     callers(nodes, opaque, &[central])?;
     callers(nodes, voprf, &[opaque])?;
     callers(nodes, elliptic, &[opaque, voprf])?;
     callers(nodes, bigint, &[elliptic])?;
+    callers(nodes, dalek, &[opaque, voprf])?;
+    callers(nodes, hpke, &[central])?;
+    callers(nodes, x25519, &[hpke])?;
+    callers(nodes, dalek_x25519, &[hpke, x25519])?;
     features(nodes, opaque, &["argon2", "ristretto255"])?;
     features(
         nodes,
@@ -52,6 +61,9 @@ pub(super) fn verify(metadata: &Value) -> Result<&str> {
     )?;
     features(nodes, bigint, &["generic-array", "rand_core", "zeroize"])?;
     features(nodes, dalek, &["rand_core", "zeroize"])?;
+    features(nodes, hpke, &["alloc", "chacha", "hkdfsha2", "x25519"])?;
+    features(nodes, x25519, &["static_secrets", "zeroize"])?;
+    features(nodes, dalek_x25519, &["zeroize"])?;
     packages
         .iter()
         .find(|p| p["id"].as_str() == Some(central))
@@ -75,6 +87,34 @@ fn package<'a>(
         return Err(Fail::new(FAILURE));
     }
     package["id"].as_str().or_fail(FAILURE)
+}
+
+/// The ids of exactly these versions of `name`, each once, all from the
+/// registry; any other version of it, or a missing one, fails.
+fn generations<'a, const N: usize>(
+    packages: &'a [Value],
+    name: &str,
+    versions: [&str; N],
+) -> Result<[&'a str; N]> {
+    let matching: Vec<&Value> = packages
+        .iter()
+        .filter(|p| p["name"].as_str() == Some(name))
+        .collect();
+    if matching.len() != N {
+        return Err(Fail::new(FAILURE));
+    }
+    let mut ids = [""; N];
+    for (id, version) in ids.iter_mut().zip(versions) {
+        let mut found = matching
+            .iter()
+            .filter(|p| p["version"].as_str() == Some(version));
+        let package = found.next().or_fail(FAILURE)?;
+        if found.next().is_some() || package["source"].as_str() != Some(REGISTRY) {
+            return Err(Fail::new(FAILURE));
+        }
+        *id = package["id"].as_str().or_fail(FAILURE)?;
+    }
+    Ok(ids)
 }
 
 fn node<'a>(nodes: &'a [Value], id: &str) -> Result<&'a Value> {
