@@ -24,6 +24,7 @@ mod password;
 mod profiles;
 mod recovery;
 mod registration;
+mod reports;
 mod reset;
 mod sessions;
 mod terms;
@@ -34,6 +35,7 @@ pub use migration::Status;
 pub use pairing::{Approval, Claim, MAX_POLLS, OPEN_IN_ALL, OPEN_PER_ACCOUNT, Redeemed};
 pub use profiles::{Profile, TAG_DRAWS, TagDraw};
 pub use recovery::Summary;
+pub use reports::Filer;
 pub use sessions::{Issued, Session};
 pub use terms::MAX_GATEWAY_VERSIONS;
 

@@ -4,7 +4,9 @@
 //! administrator roles, appends to the audit, which it cannot rewrite or
 //! delete, and approves, enables and disables gateways as an administrator
 //! decides (`docs/administration.md`), never deleting an approval. It stores
-//! gateway tokens and may set only when one was revoked or last used.
+//! gateway tokens and may set only when one was revoked or last used. It
+//! files reports and their parts once, triages a report by column and
+//! deletes reports; it never changes a report's words, a part or its history.
 use super::{AccountStore, statement};
 use sea_orm::ConnectionTrait;
 
@@ -28,8 +30,14 @@ impl AccountStore {
              ('beta_keys', ARRAY['SELECT'], ARRAY['uses_left']),
              ('account_roles', ARRAY['SELECT','INSERT','DELETE'], NULL),
              ('audit_events', ARRAY['SELECT','INSERT'], NULL),
-             ('pairings', ARRAY['SELECT','INSERT','UPDATE','DELETE'], NULL))
-             SELECT count(*) = 17 AND bool_and(
+             ('pairings', ARRAY['SELECT','INSERT','UPDATE','DELETE'], NULL),
+             ('reports', ARRAY['SELECT','INSERT','DELETE'], ARRAY['status','issue_number','assignee','priority','labels','duplicate_of','revision','done_at','deleted_at','updated_at']),
+             ('report_parts', ARRAY['SELECT','INSERT','DELETE'], NULL),
+             ('report_notes', ARRAY['SELECT','INSERT','DELETE'], NULL),
+             ('report_audit', ARRAY['SELECT','INSERT'], NULL),
+             ('report_views', ARRAY['SELECT','INSERT','DELETE'], ARRAY['query']),
+             ('report_seen', ARRAY['SELECT','INSERT','DELETE'], NULL))
+             SELECT count(*) = 23 AND bool_and(
                NOT pg_catalog.pg_has_role(c.relowner, 'USAGE')
                AND (SELECT bool_and(pg_catalog.has_table_privilege(c.oid, p)) FROM unnest(r.privileges) p)
                AND NOT pg_catalog.has_table_privilege(c.oid, 'TRUNCATE, REFERENCES, TRIGGER, MAINTAIN, SELECT WITH GRANT OPTION, INSERT WITH GRANT OPTION, UPDATE WITH GRANT OPTION, DELETE WITH GRANT OPTION')

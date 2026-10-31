@@ -155,3 +155,13 @@ change. They touch different files but two: the manifest, where each adds
 its own dependencies (`argon2` with `zeroize`; `hmac`, `hpke` and
 `getrandom`'s `sys_rng`), and `lib.rs`, where each adds its own module.
 Both reviews stand as written. Fingerprint `36dc9ccf…`.
+
+### 31 October 2026: the crate keeps the AGPL under the new workspace licence
+
+The source-available workspace licence (PR #9) does not apply to
+`central-crypto`, which the Baylee client links: its manifest replaces
+`license.workspace = true` with `license = "AGPL-3.0-only"` and a comment
+saying why. Merged onto the pairing and the legacy store (fingerprint
+`36dc9ccf…`), those two manifest lines are the only difference in the crate
+tree. No source, dependency, feature or graph edge changed, and the reviews
+above stand. Fingerprint `6db63ad9…`.

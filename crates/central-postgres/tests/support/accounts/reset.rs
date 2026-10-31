@@ -587,7 +587,8 @@ async fn ended(
         Ok(Swept {
             events: 0,
             codes: 1,
-            pairings: 0
+            pairings: 0,
+            reports: 0
         })
     );
     assert!(!state(operator, moved).await.code);

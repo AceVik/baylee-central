@@ -29,6 +29,17 @@ GRANT SELECT, INSERT ON central_identity.audit_events TO central_runtime;
 -- Pairings (Baylee's deep links): the runtime starts, claims, approves and
 -- redeems them, and deletes each when it is used or over.
 GRANT SELECT, INSERT, UPDATE, DELETE ON central_identity.pairings TO central_runtime;
+-- Reports (docs/reports.md): the runtime files them and their parts once,
+-- triages them by column, and deletes them (the trash's purge and the
+-- sweep); it never changes a report's words, a part or the history.
+GRANT SELECT, INSERT, DELETE ON central_identity.reports TO central_runtime;
+GRANT UPDATE (status, issue_number, assignee, priority, labels, duplicate_of, revision,
+  done_at, deleted_at, updated_at) ON central_identity.reports TO central_runtime;
+GRANT SELECT, INSERT, DELETE ON central_identity.report_parts, central_identity.report_notes,
+  central_identity.report_seen TO central_runtime;
+GRANT SELECT, INSERT ON central_identity.report_audit TO central_runtime;
+GRANT SELECT, INSERT, DELETE ON central_identity.report_views TO central_runtime;
+GRANT UPDATE (query) ON central_identity.report_views TO central_runtime;
 -- The legacy store (docs/operations.md §"The legacy store"): its own role,
 -- which reads its accounts, deletes a row when its move closes and counts the
 -- lockout, and nothing else; the runtime role gets nothing in the schema.

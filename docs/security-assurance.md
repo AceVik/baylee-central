@@ -1999,7 +1999,6 @@ password reset needs an administrator's reset code as well
 the clipboard after a secret was copied would also clear whatever the person
 copied next, so it stays theirs. Trusted Types need a browser run against
 the WebAssembly glue and wait. Engineering review, not an audit.
-||||||| parent of 1f0ec51 (Sign-in capacity sized to the budget; no invisible characters in names)
 
 ## Sign-in capacity and invisible characters in names, 31 October 2026
 
@@ -2051,3 +2050,46 @@ identity for unknown names (derived with a server key) would end the
 enumeration but needs its own design with the legacy discovery. The native
 listener still sees one address behind the proxy. Engineering review, not an
 audit.
+
+## Reports in Central, 31 October 2026
+
+Design pass ([reports](reports.md) passes 1 to 3; the owner's go on
+31.10.2026, with "the feedback traffic should be sent gzipped"). Assets: what
+players write and attach (their words, the client's details with the
+window's picture, a game's record), the reporter's pseudonymity, and the
+administrators' decisions. Callers: a gateway with the bridge's credential
+or an approved gateway's `sso` token (a pending one files nothing, so a
+stranger cannot use Central as a dropbox), and an administrator's browser
+session. Invariants: no column joins a report to an account; the heavy
+parts are gzip that Central never unpacks (no decompressor, no bomb, no new
+crate), checked against the announced length and SHA-256 in constant time;
+a stored report's words and parts are never rewritten (the runtime holds no
+such grant); every triage change is a line of the report's history.
+
+Implementation pass:
+- The intake is bounded JSON (`deny_unknown_fields`, 64 KiB, every field's
+  bounds, no invisible formatting characters in what another person
+  reads), within the public budget and 120 reports a gateway an hour.
+  `direct` is the bridge's alone.
+- A part's upload: credential and announcement first, then the declared
+  length must be the announced one, then one of two slots, then exactly
+  that many bytes within 60 s; written once (`Conflict` again), within an
+  hour of its report.
+- Triage: the filter is typed and becomes fixed SQL with numbered values;
+  the administrator is checked in each statement's transaction; the
+  feedback service's rules (revision `Conflict`, one duplicate level,
+  assignees who are administrators); a purge needs a fresh password and
+  releases the duplicates of what goes; the sweep runs before every list and
+  in the operator's daily sweep.
+- The browser's part route has every proof of `POST /api/v1`, an
+  administrator's cookie and a budget of its own; it answers the gzip as
+  stored, which the page unpacks with a bound.
+
+Adversarial pass: the tests named in [reports](reports.md) §"Pass 3", among
+them a pending gateway's token, another gateway's report, a forged hash, a
+wrong length and wrong magic, a part twice, a stranger's session on every
+read, a stale session's purge, a second duplicate level, another admin's
+note, the runtime trying to rewrite a report's words, a part or the history,
+and each wider or missing grant refusing startup. Not covered here: the
+website's section (its own pull request) and the gateways' switch (Baylee,
+landed by the PM). Engineering review, not an audit.

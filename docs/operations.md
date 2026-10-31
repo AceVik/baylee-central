@@ -442,6 +442,32 @@ refuses the move, after a correct password, with the same answer as a wrong
 one; the listing shows them. Ten failed sign-ins in a row lock an account out
 for an hour (the listing shows until when).
 
+## Reports (migration 000018)
+
+Bug and crash reports ([reports](reports.md)) arrive on the native listener
+beside `/v1/native`, from the bridge (the official gateway) or an approved
+gateway's token with the `sso` scope:
+
+- `POST /v1/reports`, JSON at most 64 KiB: `201 {"report_id": "<32 hex>"}`.
+- `PUT /v1/reports/{id}/client` and `…/record`, `application/gzip` with a
+  `Content-Length` (`411` without, `413` past 64 MiB): the credential and
+  the report's announcement are checked before the body is read, which must
+  be exactly the announced length; at most two uploads at once, each within
+  60 seconds (the native listener's connections may last that long; every
+  other request keeps its 5 seconds); `204`.
+
+The browser listener adds `POST /api/v1/reports/{id}/client|record` for an
+administrator's page, with every check of `POST /api/v1`, 120 a minute per
+address; the answer is the gzip as stored. The proxy compresses the JSON
+answers; the gzip parts it passes as they are.
+
+The runtime's grants (`ops/grants.sql`, checked at startup like the
+others): `SELECT, INSERT, DELETE` on `reports` and `UPDATE` of its triage
+columns only; `SELECT, INSERT, DELETE` on `report_parts`, `report_notes`,
+`report_seen` and `report_views` (with `UPDATE (query)`); `SELECT, INSERT`
+on `report_audit`. The daily sweep (`--sweep-stdin`) deletes reports past
+their retention and says how many. No secret and no setting is new.
+
 ## Secrets
 
 Run `umask 077; central-service --generate-secrets > secrets.json` once and merge

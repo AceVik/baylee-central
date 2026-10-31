@@ -37,6 +37,8 @@ pub(super) struct Limits {
     control: Window,
     pairing: Window,
     peers: BTreeMap<([u8; 32], bool), Window>,
+    /// Reports each gateway filed in the current hour.
+    reports: BTreeMap<[u8; 16], (Instant, u32)>,
 }
 
 #[derive(Default)]
@@ -159,6 +161,23 @@ impl Limits {
         }
         *used += 1;
         self.legacy_names.entry(name).or_insert((now, 0)).1 += 1;
+        Ok(())
+    }
+
+    /// Spend one of the gateway's [`central_api::reports::PER_GATEWAY_HOUR`]
+    /// reports an hour. Nothing is spent when it is used up.
+    pub(super) fn report(&mut self, gateway: [u8; 16], now: Instant) -> Result<(), Error> {
+        let hour = Duration::from_secs(3_600);
+        self.reports
+            .retain(|_, (start, _)| now.duration_since(*start) < hour);
+        if !self.reports.contains_key(&gateway) && self.reports.len() >= 1024 {
+            return Err(Error::Busy);
+        }
+        let (_, used) = self.reports.entry(gateway).or_insert((now, 0));
+        if *used >= central_api::reports::PER_GATEWAY_HOUR {
+            return Err(Error::Busy);
+        }
+        *used += 1;
         Ok(())
     }
 

@@ -11,6 +11,9 @@ use hyper_util::{
 use tokio::{net::TcpListener, task::JoinSet};
 use tower::ServiceExt;
 
+/// How long one connection may last: a request and its answer.
+const CONNECTION: Duration = Duration::from_secs(10);
+
 /// A bound local-only server. Drop before running to release the listener.
 /// Runtime connections are owned by a join set and aborted when the run future drops.
 pub struct DevelopmentServer {
@@ -52,7 +55,7 @@ impl DevelopmentServer {
         let authority = HeaderValue::from_str(&self.address.to_string())
             .map_err(|_| io::Error::other("invalid local authority"))?;
         let app = super::boundary::router(authority, self.config.request_bytes().get());
-        self.run_router(app, shutdown).await
+        self.run_router(app, CONNECTION, shutdown).await
     }
 
     /// Serve the native account API through the same bounded loopback transport.
@@ -88,7 +91,9 @@ impl DevelopmentServer {
             self.config.request_bytes().get(),
             super::native::router(identity),
         );
-        self.run_router(app, shutdown).await
+        // a report part may take its upload's time
+        self.run_router(app, super::boundary::UPLOAD_TIME + CONNECTION, shutdown)
+            .await
     }
 
     /// Serve the website's browser listener (`docs/web-accounts.md`): one
@@ -111,13 +116,16 @@ impl DevelopmentServer {
                 "browser listener requires its fixed body capacity",
             ));
         }
-        self.run_router(super::browser::router(identity, site), shutdown)
+        self.run_router(super::browser::router(identity, site), CONNECTION, shutdown)
             .await
     }
 
+    /// Serve `app`, each connection for at most `connection` (one request
+    /// each: no keep-alive), its headers within three seconds.
     async fn run_router(
         self,
         app: axum::Router,
+        connection: Duration,
         shutdown: impl Future<Output = ()>,
     ) -> io::Result<()> {
         let mut connections = JoinSet::new();
@@ -147,6 +155,7 @@ impl DevelopmentServer {
                             request
                         },
                     );
+                    let limit = connection;
                     connections.spawn(async move {
                         let mut builder = http1::Builder::new();
                         builder
@@ -155,11 +164,11 @@ impl DevelopmentServer {
                             .max_buf_size(16_384)
                             .timer(TokioTimer::new())
                             .header_read_timeout(Duration::from_secs(3));
-                        let connection = builder.serve_connection(
+                        let served = builder.serve_connection(
                             TokioIo::new(stream),
                             TowerToHyperService::new(app),
                         );
-                        let _ = tokio::time::timeout(Duration::from_secs(10), connection).await;
+                        let _ = tokio::time::timeout(limit, served).await;
                     });
                 }
             }
