@@ -366,7 +366,7 @@ async fn reads(
         .flatten()
     {
         let sql = format!(
-            "SELECT count(*) FROM central_identity.accounts WHERE id = '{}'",
+            "SELECT count(*) AS value FROM central_identity.accounts WHERE id = '{}'",
             sea_orm::prelude::Uuid::from_bytes(id)
         );
         if count(operator, &sql).await == 1 && !named.contains(&id) {
@@ -385,16 +385,21 @@ async fn overview(store: &AccountStore, operator: &DatabaseConnection, cookie: &
         |sql: &'static str| async move { u64::try_from(count(operator, sql).await).unwrap() };
     assert_eq!(
         seen.accounts,
-        counted("SELECT count(*) FROM central_identity.accounts WHERE credential IS NOT NULL")
-            .await
+        counted(
+            "SELECT count(*) AS value FROM central_identity.accounts WHERE credential IS NOT NULL"
+        )
+        .await
     );
     assert_eq!(
         seen.admins,
-        counted("SELECT count(*) FROM central_identity.account_roles WHERE role = 'admin'").await
+        counted(
+            "SELECT count(*) AS value FROM central_identity.account_roles WHERE role = 'admin'"
+        )
+        .await
     );
     assert_eq!(
         seen.pending + seen.approved + seen.disabled,
-        counted("SELECT count(*) FROM central_identity.gateways WHERE NOT official").await
+        counted("SELECT count(*) AS value FROM central_identity.gateways WHERE NOT official").await
     );
     assert!(seen.accounts_week <= seen.accounts && seen.moved <= seen.accounts);
     assert!(seen.admins >= 1, "the reader is one");
