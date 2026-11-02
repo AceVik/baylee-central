@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { T, useLang, useTitle } from "../i18n";
 import { when } from "../app/format";
-import { AdminFrame } from "./shared";
+import { AdminFrame, useAdminApi } from "./shared";
 import { reportsApi, type Reports } from "./reports-api";
 const read = reportsApi();
 function Inbox() {
@@ -26,5 +26,6 @@ function Inbox() {
 }
 export default function ReportsPage() {
   useTitle("adm.reports");
-  return <AdminFrame page="adminReports" title={<T id="adm.reports" />} lead={<T id="adm.reportsLead" />}>{({ summary }) => <Inbox key={summary.identity.account.join()} />}</AdminFrame>;
+  const api = useAdminApi();
+  return <AdminFrame api={api} page="adminReports" title={<T id="adm.reports" />} lead={<T id="adm.reportsLead" />}>{({ summary }) => <Inbox key={summary.identity.account.join()} />}</AdminFrame>;
 }

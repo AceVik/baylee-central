@@ -3,9 +3,10 @@
 // way a change is run (the password again when the sign-in is stale), and
 // how an account is named.
 
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 
 import type { AccountSummary } from "../account/api";
+import { useAccount } from "../account/session";
 import { handle } from "../account/names";
 import { AppFrame, SignedOut } from "../app/AppFrame";
 import { Reauth } from "../app/Reauth";
@@ -32,6 +33,38 @@ export interface AdminContext {
   recount(): void;
 }
 
+/** Keep administration counts within the current authentication and newest request. */
+function useOverview(api: AdminApi, admin: boolean, generation: number) {
+  // the counts (for the navigation's "awaiting approval", the filters and
+  // the first view) are read once an administrator is known, never for anyone else
+  const [result, setResult] = useState<{ owner: number; overview: Overview | null; uncounted: boolean } | null>(null);
+  const lifecycle = useRef({ live: false, owner: generation, request: 0 });
+  const current = admin && result?.owner === generation ? result : null;
+  const overview = current?.overview ?? null;
+  const uncounted = current?.uncounted ?? false;
+  const recount = useCallback(() => {
+    const scope = lifecycle.current;
+    if (!scope.live || scope.owner !== generation) return;
+    const request = ++scope.request;
+    api.overview().then(
+      (counts) => {
+        if (scope.live && scope.owner === generation && request === scope.request) setResult({ owner: generation, overview: counts, uncounted: false });
+      },
+      () => {
+        if (scope.live && scope.owner === generation && request === scope.request) setResult({ owner: generation, overview: null, uncounted: true });
+      },
+    );
+  }, [api, generation]);
+  useEffect(() => {
+    const scope = lifecycle.current;
+    scope.live = admin;
+    scope.owner = generation;
+    if (admin) recount();
+    return () => { scope.live = false; scope.request += 1; };
+  }, [admin, generation, recount]);
+  return { overview, uncounted, recount };
+}
+
 export function AdminFrame({
   page,
   api,
@@ -45,24 +78,10 @@ export function AdminFrame({
   lead?: ReactNode;
   children: (ctx: AdminContext) => ReactNode;
 }) {
+  const { generation } = useAccount();
   const { state, replace } = useSummary();
   const admin = state.at === "ready" && state.summary.admin;
-  // the counts (for the navigation's "awaiting approval", the filters and
-  // the first view) are read once an administrator is known, never for anyone else
-  const [overview, setOverview] = useState<Overview | null>(null);
-  const [uncounted, setUncounted] = useState(false);
-  const recount = useCallback(() => {
-    api.overview().then(
-      (counts) => {
-        setOverview(counts);
-        setUncounted(false);
-      },
-      () => setUncounted(true),
-    );
-  }, [api]);
-  useEffect(() => {
-    if (admin) recount();
-  }, [admin, recount]);
+  const { overview, uncounted, recount } = useOverview(api, admin, generation);
   const badges = overview === null ? undefined : { adminGateways: overview.pending };
   return (
     <AppFrame page={page} admin={admin} {...(badges === undefined ? {} : { badges })} eyebrow="app.admin" title={title} {...(lead === undefined ? {} : { lead })}>
