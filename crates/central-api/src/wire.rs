@@ -45,6 +45,12 @@ pub struct Identity {
 #[serde(tag = "operation", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Request {
     /// Contacts and encrypted chat shared by native and browser sessions.
+    /// Browser notification preferences and subscriptions.
+    Notifications {
+        /// Closed notification operation.
+        request: crate::notifications::NotificationRequest,
+    },
+    /// Account contacts and encrypted conversations.
     Social {
         /// A closed social operation; account ownership comes only from the session.
         request: crate::social::SocialRequest,
@@ -593,6 +599,12 @@ pub enum MigrationState {
 #[serde(tag = "result", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Response {
     /// The answer to an authenticated social operation.
+    /// Browser notification settings.
+    Notifications {
+        /// Current account-scoped settings.
+        state: crate::notifications::NotificationState,
+    },
+    /// Account contacts and encrypted conversations.
     Social {
         /// Closed social reply, without credentials or private login names.
         response: crate::social::SocialResponse,

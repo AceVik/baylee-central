@@ -11,6 +11,7 @@ description = "Thin executable for Baylee Central: local development and deploye
 workspace = true
 
 [dependencies]
+central-push = { path = "../central-push", version = "=0.1.0" }
 central-api = { path = "../central-api", version = "=0.1.0" }
 central-crypto = { path = "../central-crypto", version = "=0.1.0", features = ["server"] }
 central-identity = { path = "../central-identity", version = "=0.1.0" }
@@ -21,7 +22,7 @@ serde_json = "=1.0.154"
 zeroize = { version = "=1.9.1", features = ["alloc", "derive"] }
 central-policy = { path = "../central-policy", version = "=0.1.0" }
 central-http = { path = "../central-http", version = "=0.1.0" }
-tokio = { version = "=1.53.3", default-features = false, features = ["macros", "rt-multi-thread", "signal", "sync"] }
+tokio = { version = "=1.53.3", default-features = false, features = ["macros", "rt-multi-thread", "signal", "sync", "time"] }
 
 [dev-dependencies]
 tokio = { version = "=1.53.3", default-features = false, features = ["macros", "rt-multi-thread", "signal", "sync", "time"] }

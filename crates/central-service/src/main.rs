@@ -10,6 +10,7 @@ mod accounts;
 mod legacy;
 mod listeners;
 mod production;
+mod push;
 mod reports_import;
 
 const USAGE: &str = "usage: central-service --dev | --dev-accounts-stdin | --accounts-stdin | --migrate-stdin | --issue-beta-keys-stdin | --appoint-admin-stdin | --sweep-stdin | --legacy-import-stdin | --legacy-deadline-stdin | --import-reports-stdin | --generate-secrets";

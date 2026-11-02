@@ -51,6 +51,7 @@ impl IdentityService {
             self.require_terms(bearer, surface).await?;
         }
         match request {
+            Request::Notifications { request } => self.notifications(request, bearer).await,
             Request::Social { request } => Ok(Response::Social {
                 response: self.store.social(surface.session(bearer)?, request).await?,
             }),
@@ -134,6 +135,26 @@ impl IdentityService {
             | Request::WriteDocument { .. }
             | Request::ConfirmRestore { .. }) => self.document_request(request, bearer).await,
         }
+    }
+
+    async fn notifications(
+        &self,
+        request: central_api::notifications::NotificationRequest,
+        bearer: Option<&Token>,
+    ) -> Result<Response, Error> {
+        if matches!(
+            &request,
+            central_api::notifications::NotificationRequest::Subscribe { .. }
+        ) && self.push_key.is_none()
+        {
+            return Err(Error::Unavailable);
+        }
+        let mut state = self
+            .store
+            .notifications(bearer.ok_or(Error::Rejected)?, request)
+            .await?;
+        state.public_key.clone_from(&self.push_key);
+        Ok(Response::Notifications { state })
     }
 
     /// The session's own requests, on either listener: its status, its

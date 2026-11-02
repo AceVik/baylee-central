@@ -39,13 +39,17 @@ impl AccountStore {
              ('chat_deliveries', ARRAY['SELECT','INSERT','DELETE'], NULL),
              ('chat_groups', ARRAY['SELECT','INSERT','UPDATE','DELETE'], NULL),
              ('chat_members', ARRAY['SELECT','INSERT','UPDATE','DELETE'], NULL),
+             ('notification_preferences', ARRAY['SELECT','INSERT','UPDATE','DELETE'], NULL),
+             ('push_subscriptions', ARRAY['SELECT','INSERT','UPDATE','DELETE'], NULL),
+             ('push_jobs', ARRAY['SELECT','INSERT','UPDATE','DELETE'], NULL),
+             ('push_releases', ARRAY['SELECT','INSERT'], NULL),
              ('reports', ARRAY['SELECT','INSERT','DELETE'], ARRAY['status','issue_number','assignee','priority','labels','duplicate_of','revision','done_at','deleted_at','updated_at']),
              ('report_parts', ARRAY['SELECT','INSERT','DELETE'], NULL),
              ('report_notes', ARRAY['SELECT','INSERT','DELETE'], NULL),
              ('report_audit', ARRAY['SELECT','INSERT'], NULL),
              ('report_views', ARRAY['SELECT','INSERT','DELETE'], ARRAY['query']),
              ('report_seen', ARRAY['SELECT','INSERT','DELETE'], NULL))
-             SELECT count(*) = 31 AND bool_and(
+             SELECT count(*) = 35 AND bool_and(
                NOT pg_catalog.pg_has_role(c.relowner, 'USAGE')
                AND (SELECT bool_and(pg_catalog.has_table_privilege(c.oid, p)) FROM unnest(r.privileges) p)
                AND NOT pg_catalog.has_table_privilege(c.oid, 'TRUNCATE, REFERENCES, TRIGGER, MAINTAIN, SELECT WITH GRANT OPTION, INSERT WITH GRANT OPTION, UPDATE WITH GRANT OPTION, DELETE WITH GRANT OPTION')

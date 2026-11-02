@@ -18,6 +18,7 @@ mod gateways;
 mod kinds;
 mod legacy_store;
 mod migration;
+mod notifications;
 mod objects;
 mod pairing;
 mod password;
@@ -127,6 +128,7 @@ pub(crate) async fn run(operator: &DatabaseConnection) {
     reports::run(&store, operator, &keys).await;
     chat::run(&store, operator, &keys).await;
     social::run(&store, operator, &keys).await;
+    notifications::run(&store, operator, &keys).await;
     // Last: its sweep deletes every unenrolled legacy reservation.
     legacy_store::run(&store, operator, &keys).await;
     store.close().await.unwrap();

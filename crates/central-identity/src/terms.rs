@@ -76,11 +76,15 @@ pub(super) fn central() -> Result<Option<TermsDocument>, Error> {
 
 /// Operations a session whose account has not accepted the terms in force
 /// may still use: read its status, its summary and the terms, accept, read
-/// and export its own data, confirm a restore, sign out.
+/// and export its own data, confirm a restore, withdraw notification consent, sign out.
 pub(super) fn needs_acceptance(request: &Request) -> bool {
     matches!(
         request,
-        Request::Social { .. }
+        Request::Notifications {
+            request: central_api::notifications::NotificationRequest::Subscribe { .. }
+                | central_api::notifications::NotificationRequest::Set { enabled: true, .. }
+        }
+        | Request::Social { .. }
             | Request::CreateObject
             | Request::WriteObject { .. }
             | Request::DeleteObject { .. }
@@ -307,6 +311,20 @@ mod tests {
             Request::RenewSession,
             Request::Logout,
             Request::Terms,
+            Request::Notifications {
+                request: central_api::notifications::NotificationRequest::Read { endpoint: None },
+            },
+            Request::Notifications {
+                request: central_api::notifications::NotificationRequest::Unsubscribe {
+                    endpoint: "https://fcm.googleapis.com/test".into(),
+                },
+            },
+            Request::Notifications {
+                request: central_api::notifications::NotificationRequest::Set {
+                    category: central_api::notifications::Category::Chat,
+                    enabled: false,
+                },
+            },
             Request::TermsStatus,
             Request::ReadDocument,
             Request::ConfirmRestore { revision: 1 },
@@ -333,6 +351,12 @@ mod tests {
         ] {
             assert!(!needs_acceptance(&free));
         }
+        assert!(needs_acceptance(&Request::Notifications {
+            request: central_api::notifications::NotificationRequest::Set {
+                category: central_api::notifications::Category::Chat,
+                enabled: true
+            }
+        }));
         assert!(needs_acceptance(&Request::Owner {
             request: OwnerRequest::AddGateway {
                 origin: "https://gateway.invalid".into(),

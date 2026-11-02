@@ -34,7 +34,13 @@ pub(super) fn verify(metadata: &Value) -> Result<&str> {
     let x25519 = package(packages, "x25519-dalek", "3.0.0", Some(REGISTRY))?;
     let ed_dalek = package(packages, "ed25519-dalek", "3.0.0", Some(REGISTRY))?;
     let ed = package(packages, "ed25519", "3.0.0", Some(REGISTRY))?;
-    let signature = package(packages, "signature", "3.0.0", Some(REGISTRY))?;
+    // JWT uses only the signature 2 trait; its AWS-LC provider has no edge
+    // to RustCrypto elliptic-curve/bigint. Preserve every affected caller check.
+    let [jwt_signature, signature] = generations(packages, "signature", ["2.2.0", "3.0.0"])?;
+    let jwt = package(packages, "jsonwebtoken", "11.1.0", Some(REGISTRY))?;
+    callers(nodes, jwt_signature, &[jwt])?;
+    features(nodes, jwt_signature, &["alloc", "std"])?;
+    features(nodes, jwt, &[])?;
     callers(nodes, ed_dalek, &[central])?;
     callers(nodes, ed, &[ed_dalek])?;
     callers(nodes, signature, &[ed])?;
