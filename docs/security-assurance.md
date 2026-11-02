@@ -42,9 +42,17 @@ equivalence, published vectors, malformed/tampered messages, secret redaction
 and unwind wiping. The full Rust gate, real PostgreSQL enrollment/login and
 migration tests, HTTP boundary smoke, secret scan, crypto scope, audit and deny
 checks pass locally. Deliberate PostgreSQL/HTTP fixture failures also return
-their expected errors and remove their owned services. Canonical WASM/browser
-and remote platform checks remain required before merge. This is an engineering
-review, not an independent audit or a production release approval.
+their expected errors and remove their owned services. The canonical Linux WASM
+build and byte comparison pass. Web typecheck, lint, 373 unit tests, the
+production build and 58 browser smoke tests pass (76 existing opt-in cases
+skipped). Four real-service browser tests pass at desktop and phone widths:
+OPAQUE registration/unlock, contacts, encrypted direct/group chat, trust state,
+PWA installation, notification category consent after page closure and a public
+offline shell without cached account data. Provider delivery is injected through
+CDP; this does not claim a live third-party push-provider test. All owned test
+processes, ports, containers, VM and secret material were removed. Remote
+platform checks remain required before merge. This is an engineering review,
+not an independent audit or a production release approval.
 
 ## Foundation review
 

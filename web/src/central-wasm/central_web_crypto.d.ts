@@ -14,21 +14,21 @@ export class Chat {
      * # Errors
      * Unknown peers, malformed or stale confirmations.
      */
-    confirm(keys: Uint8Array): void;
+    confirm(keys: Uint8Array | number[]): void;
     /**
      * Validate a peer's keys and return its safety-number review as JSON.
      *
      * # Errors
      * Malformed, duplicated or substituted own-account keys.
      */
-    observe(keys: Uint8Array): Uint8Array;
+    observe(keys: Uint8Array | number[]): Uint8Array;
     /**
      * Authenticate and open a delivery for display.
      *
      * # Errors
      * Malformed, forged, misaddressed or unconfirmed messages.
      */
-    open(delivery: Uint8Array): Uint8Array;
+    open(delivery: Uint8Array | number[]): Uint8Array;
     /**
      * Public signed registration as JSON bytes.
      *
@@ -42,7 +42,7 @@ export class Chat {
      * # Errors
      * Wrong account, corruption, duplicates or size overflow.
      */
-    restore_trust(record: Uint8Array): void;
+    restore_trust(record: Uint8Array | number[]): void;
     /**
      * Authenticated ciphertext for the browser's peer-key trust state.
      *
@@ -56,7 +56,7 @@ export class Chat {
      * # Errors
      * Invalid text/membership, changed keys or randomness failure.
      */
-    seal(conv: string, text: string, emote: boolean, members: Uint32Array, now: bigint): Uint8Array;
+    seal(conv: string, text: string, emote: boolean, members: Uint32Array | number[], now: bigint): Uint8Array;
     /**
      * Stable public device fingerprint.
      */
@@ -165,7 +165,7 @@ export function central_origin(): string;
  * # Errors
  * Rejects an invalid wrapper, identity or public tag.
  */
-export function chat_unlock(state: LoginKey, wrapped_master: Uint8Array, tag: number): Chat;
+export function chat_unlock(state: LoginKey, wrapped_master: Uint8Array | number[], tag: number): Chat;
 
 /**
  * Finish registering with `EnrollmentChallenge`'s message.
@@ -174,7 +174,7 @@ export function chat_unlock(state: LoginKey, wrapped_master: Uint8Array, tag: nu
  *
  * `rejected` for a malformed response, `unavailable` without randomness.
  */
-export function enrollment_finish(state: Enrollment, response: Uint8Array): Enrolled;
+export function enrollment_finish(state: Enrollment, response: Uint8Array | number[]): Enrolled;
 
 /**
  * Start registering: the `identity` of `Register`'s answer and the password.
@@ -184,7 +184,7 @@ export function enrollment_finish(state: Enrollment, response: Uint8Array): Enro
  * `rejected` for an empty or over-long password, an account that is not a
  * `UUIDv7` or epoch zero.
  */
-export function enrollment_start(password: string, account: Uint8Array, epoch: bigint): Enrollment;
+export function enrollment_start(password: string, account: Uint8Array | number[], epoch: bigint): Enrollment;
 
 /**
  * Check that `BrowserSession`'s `wrapped_master` opens, and keep nothing.
@@ -193,7 +193,7 @@ export function enrollment_start(password: string, account: Uint8Array, epoch: b
  *
  * `rejected` when it is malformed or does not open.
  */
-export function login_confirm(state: LoginKey, wrapped_master: Uint8Array): void;
+export function login_confirm(state: LoginKey, wrapped_master: Uint8Array | number[]): void;
 
 /**
  * Answer `LoginChallenge`'s KE2. A wrong password is `rejected` here.
@@ -202,7 +202,7 @@ export function login_confirm(state: LoginKey, wrapped_master: Uint8Array): void
  *
  * `rejected` for a wrong password or a malformed or foreign response.
  */
-export function login_finish(state: Login, response: Uint8Array): LoginKey;
+export function login_finish(state: Login, response: Uint8Array | number[]): LoginKey;
 
 /**
  * Start signing in: `Discover`'s identity and the password.
@@ -211,7 +211,7 @@ export function login_finish(state: Login, response: Uint8Array): LoginKey;
  *
  * As [`enrollment_start`].
  */
-export function login_start(password: string, account: Uint8Array, epoch: bigint): Login;
+export function login_start(password: string, account: Uint8Array | number[], epoch: bigint): Login;
 
 /**
  * In place of [`login_confirm`], for an account without a recovery code:
@@ -223,7 +223,7 @@ export function login_start(password: string, account: Uint8Array, epoch: bigint
  * `rejected` when the wrapper is malformed or does not open, `unavailable`
  * without randomness.
  */
-export function recovery_create(state: LoginKey, wrapped_master: Uint8Array): Recovered;
+export function recovery_create(state: LoginKey, wrapped_master: Uint8Array | number[]): Recovered;
 
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
 

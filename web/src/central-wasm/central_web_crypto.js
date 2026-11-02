@@ -25,7 +25,7 @@ export class Chat {
      *
      * # Errors
      * Unknown peers, malformed or stale confirmations.
-     * @param {Uint8Array} keys
+     * @param {Uint8Array | number[]} keys
      */
     confirm(keys) {
         const ptr0 = passArray8ToWasm0(keys, wasm.__wbindgen_malloc);
@@ -56,7 +56,7 @@ export class Chat {
      *
      * # Errors
      * Malformed, duplicated or substituted own-account keys.
-     * @param {Uint8Array} keys
+     * @param {Uint8Array | number[]} keys
      * @returns {Uint8Array}
      */
     observe(keys) {
@@ -75,7 +75,7 @@ export class Chat {
      *
      * # Errors
      * Malformed, forged, misaddressed or unconfirmed messages.
-     * @param {Uint8Array} delivery
+     * @param {Uint8Array | number[]} delivery
      * @returns {Uint8Array}
      */
     open(delivery) {
@@ -110,7 +110,7 @@ export class Chat {
      *
      * # Errors
      * Wrong account, corruption, duplicates or size overflow.
-     * @param {Uint8Array} record
+     * @param {Uint8Array | number[]} record
      */
     restore_trust(record) {
         const ptr0 = passArray8ToWasm0(record, wasm.__wbindgen_malloc);
@@ -144,24 +144,34 @@ export class Chat {
      * @param {string} conv
      * @param {string} text
      * @param {boolean} emote
-     * @param {Uint32Array} members
+     * @param {Uint32Array | number[]} members
      * @param {bigint} now
      * @returns {Uint8Array}
      */
     seal(conv, text, emote, members, now) {
-        const ptr0 = passStringToWasm0(conv, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-        const len0 = WASM_VECTOR_LEN;
-        const ptr1 = passStringToWasm0(text, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-        const len1 = WASM_VECTOR_LEN;
-        const ptr2 = passArray32ToWasm0(members, wasm.__wbindgen_malloc);
-        const len2 = WASM_VECTOR_LEN;
-        const ret = wasm.chat_seal(this.__wbg_ptr, ptr0, len0, ptr1, len1, emote, ptr2, len2, now);
+        const val4 = +emote;
+        const val5 = BigInt.asIntN(64, now);
+        let ptr0, len0, ptr1, len1, ptr2, len2;
+        try {
+            ptr0 = passStringToWasm0(conv, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+            len0 = WASM_VECTOR_LEN;
+            ptr1 = passStringToWasm0(text, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+            len1 = WASM_VECTOR_LEN;
+            ptr2 = passArray32ToWasm0(members, wasm.__wbindgen_malloc);
+            len2 = WASM_VECTOR_LEN;
+        } catch (e) {
+            if (ptr2) { wasm.__wbindgen_free(ptr2, len2 * 4, 4); }
+            if (ptr1) { wasm.__wbindgen_free(ptr1, len1 * 1, 1); }
+            if (ptr0) { wasm.__wbindgen_free(ptr0, len0 * 1, 1); }
+            throw e;
+        }
+        const ret = wasm.chat_seal(this.__wbg_ptr, ptr0, len0, ptr1, len1, val4, ptr2, len2, val5);
         if (ret[3]) {
             throw takeFromExternrefTable0(ret[2]);
         }
-        var v4 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
+        var v6 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
         wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
-        return v4;
+        return v6;
     }
 }
 if (Symbol.dispose) Chat.prototype[Symbol.dispose] = Chat.prototype.free;
@@ -406,16 +416,24 @@ export function central_origin() {
  * # Errors
  * Rejects an invalid wrapper, identity or public tag.
  * @param {LoginKey} state
- * @param {Uint8Array} wrapped_master
+ * @param {Uint8Array | number[]} wrapped_master
  * @param {number} tag
  * @returns {Chat}
  */
 export function chat_unlock(state, wrapped_master, tag) {
-    _assertClass(state, LoginKey);
-    var ptr0 = state.__destroy_into_raw();
-    const ptr1 = passArray8ToWasm0(wrapped_master, wasm.__wbindgen_malloc);
-    const len1 = WASM_VECTOR_LEN;
-    const ret = wasm.chat_unlock(ptr0, ptr1, len1, tag);
+    const val3 = +tag;
+    let ptr0, ptr1, len1;
+    try {
+        _assertClass(state, LoginKey);
+        ptr0 = state.__destroy_into_raw();
+        ptr1 = passArray8ToWasm0(wrapped_master, wasm.__wbindgen_malloc);
+        len1 = WASM_VECTOR_LEN;
+    } catch (e) {
+        if (ptr1) { wasm.__wbindgen_free(ptr1, len1 * 1, 1); }
+        if (ptr0) wasm.__wbg_loginkey_free(ptr0, 1);
+        throw e;
+    }
+    const ret = wasm.chat_unlock(ptr0, ptr1, len1, val3);
     if (ret[2]) {
         throw takeFromExternrefTable0(ret[1]);
     }
@@ -429,14 +447,21 @@ export function chat_unlock(state, wrapped_master, tag) {
  *
  * `rejected` for a malformed response, `unavailable` without randomness.
  * @param {Enrollment} state
- * @param {Uint8Array} response
+ * @param {Uint8Array | number[]} response
  * @returns {Enrolled}
  */
 export function enrollment_finish(state, response) {
-    _assertClass(state, Enrollment);
-    var ptr0 = state.__destroy_into_raw();
-    const ptr1 = passArray8ToWasm0(response, wasm.__wbindgen_malloc);
-    const len1 = WASM_VECTOR_LEN;
+    let ptr0, ptr1, len1;
+    try {
+        _assertClass(state, Enrollment);
+        ptr0 = state.__destroy_into_raw();
+        ptr1 = passArray8ToWasm0(response, wasm.__wbindgen_malloc);
+        len1 = WASM_VECTOR_LEN;
+    } catch (e) {
+        if (ptr1) { wasm.__wbindgen_free(ptr1, len1 * 1, 1); }
+        if (ptr0) wasm.__wbg_enrollment_free(ptr0, 1);
+        throw e;
+    }
     const ret = wasm.enrollment_finish(ptr0, ptr1, len1);
     if (ret[2]) {
         throw takeFromExternrefTable0(ret[1]);
@@ -452,16 +477,24 @@ export function enrollment_finish(state, response) {
  * `rejected` for an empty or over-long password, an account that is not a
  * `UUIDv7` or epoch zero.
  * @param {string} password
- * @param {Uint8Array} account
+ * @param {Uint8Array | number[]} account
  * @param {bigint} epoch
  * @returns {Enrollment}
  */
 export function enrollment_start(password, account, epoch) {
-    const ptr0 = passStringToWasm0(password, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    const len0 = WASM_VECTOR_LEN;
-    const ptr1 = passArray8ToWasm0(account, wasm.__wbindgen_malloc);
-    const len1 = WASM_VECTOR_LEN;
-    const ret = wasm.enrollment_start(ptr0, len0, ptr1, len1, epoch);
+    const val3 = BigInt.asIntN(64, epoch);
+    let ptr0, len0, ptr1, len1;
+    try {
+        ptr0 = passStringToWasm0(password, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        len0 = WASM_VECTOR_LEN;
+        ptr1 = passArray8ToWasm0(account, wasm.__wbindgen_malloc);
+        len1 = WASM_VECTOR_LEN;
+    } catch (e) {
+        if (ptr1) { wasm.__wbindgen_free(ptr1, len1 * 1, 1); }
+        if (ptr0) { wasm.__wbindgen_free(ptr0, len0 * 1, 1); }
+        throw e;
+    }
+    const ret = wasm.enrollment_start(ptr0, len0, ptr1, len1, val3);
     if (ret[2]) {
         throw takeFromExternrefTable0(ret[1]);
     }
@@ -475,13 +508,20 @@ export function enrollment_start(password, account, epoch) {
  *
  * `rejected` when it is malformed or does not open.
  * @param {LoginKey} state
- * @param {Uint8Array} wrapped_master
+ * @param {Uint8Array | number[]} wrapped_master
  */
 export function login_confirm(state, wrapped_master) {
-    _assertClass(state, LoginKey);
-    var ptr0 = state.__destroy_into_raw();
-    const ptr1 = passArray8ToWasm0(wrapped_master, wasm.__wbindgen_malloc);
-    const len1 = WASM_VECTOR_LEN;
+    let ptr0, ptr1, len1;
+    try {
+        _assertClass(state, LoginKey);
+        ptr0 = state.__destroy_into_raw();
+        ptr1 = passArray8ToWasm0(wrapped_master, wasm.__wbindgen_malloc);
+        len1 = WASM_VECTOR_LEN;
+    } catch (e) {
+        if (ptr1) { wasm.__wbindgen_free(ptr1, len1 * 1, 1); }
+        if (ptr0) wasm.__wbg_loginkey_free(ptr0, 1);
+        throw e;
+    }
     const ret = wasm.login_confirm(ptr0, ptr1, len1);
     if (ret[1]) {
         throw takeFromExternrefTable0(ret[0]);
@@ -495,14 +535,21 @@ export function login_confirm(state, wrapped_master) {
  *
  * `rejected` for a wrong password or a malformed or foreign response.
  * @param {Login} state
- * @param {Uint8Array} response
+ * @param {Uint8Array | number[]} response
  * @returns {LoginKey}
  */
 export function login_finish(state, response) {
-    _assertClass(state, Login);
-    var ptr0 = state.__destroy_into_raw();
-    const ptr1 = passArray8ToWasm0(response, wasm.__wbindgen_malloc);
-    const len1 = WASM_VECTOR_LEN;
+    let ptr0, ptr1, len1;
+    try {
+        _assertClass(state, Login);
+        ptr0 = state.__destroy_into_raw();
+        ptr1 = passArray8ToWasm0(response, wasm.__wbindgen_malloc);
+        len1 = WASM_VECTOR_LEN;
+    } catch (e) {
+        if (ptr1) { wasm.__wbindgen_free(ptr1, len1 * 1, 1); }
+        if (ptr0) wasm.__wbg_login_free(ptr0, 1);
+        throw e;
+    }
     const ret = wasm.login_finish(ptr0, ptr1, len1);
     if (ret[2]) {
         throw takeFromExternrefTable0(ret[1]);
@@ -517,16 +564,24 @@ export function login_finish(state, response) {
  *
  * As [`enrollment_start`].
  * @param {string} password
- * @param {Uint8Array} account
+ * @param {Uint8Array | number[]} account
  * @param {bigint} epoch
  * @returns {Login}
  */
 export function login_start(password, account, epoch) {
-    const ptr0 = passStringToWasm0(password, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    const len0 = WASM_VECTOR_LEN;
-    const ptr1 = passArray8ToWasm0(account, wasm.__wbindgen_malloc);
-    const len1 = WASM_VECTOR_LEN;
-    const ret = wasm.login_start(ptr0, len0, ptr1, len1, epoch);
+    const val3 = BigInt.asIntN(64, epoch);
+    let ptr0, len0, ptr1, len1;
+    try {
+        ptr0 = passStringToWasm0(password, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        len0 = WASM_VECTOR_LEN;
+        ptr1 = passArray8ToWasm0(account, wasm.__wbindgen_malloc);
+        len1 = WASM_VECTOR_LEN;
+    } catch (e) {
+        if (ptr1) { wasm.__wbindgen_free(ptr1, len1 * 1, 1); }
+        if (ptr0) { wasm.__wbindgen_free(ptr0, len0 * 1, 1); }
+        throw e;
+    }
+    const ret = wasm.login_start(ptr0, len0, ptr1, len1, val3);
     if (ret[2]) {
         throw takeFromExternrefTable0(ret[1]);
     }
@@ -543,14 +598,21 @@ export function login_start(password, account, epoch) {
  * `rejected` when the wrapper is malformed or does not open, `unavailable`
  * without randomness.
  * @param {LoginKey} state
- * @param {Uint8Array} wrapped_master
+ * @param {Uint8Array | number[]} wrapped_master
  * @returns {Recovered}
  */
 export function recovery_create(state, wrapped_master) {
-    _assertClass(state, LoginKey);
-    var ptr0 = state.__destroy_into_raw();
-    const ptr1 = passArray8ToWasm0(wrapped_master, wasm.__wbindgen_malloc);
-    const len1 = WASM_VECTOR_LEN;
+    let ptr0, ptr1, len1;
+    try {
+        _assertClass(state, LoginKey);
+        ptr0 = state.__destroy_into_raw();
+        ptr1 = passArray8ToWasm0(wrapped_master, wasm.__wbindgen_malloc);
+        len1 = WASM_VECTOR_LEN;
+    } catch (e) {
+        if (ptr1) { wasm.__wbindgen_free(ptr1, len1 * 1, 1); }
+        if (ptr0) wasm.__wbg_loginkey_free(ptr0, 1);
+        throw e;
+    }
     const ret = wasm.recovery_create(ptr0, ptr1, len1);
     if (ret[2]) {
         throw takeFromExternrefTable0(ret[1]);
@@ -560,95 +622,95 @@ export function recovery_create(state, wrapped_master) {
 function __wbg_get_imports() {
     const import0 = {
         __proto__: null,
-        __wbg_Error_30c8987f7c2ed4e2: function(arg0, arg1) {
+        __wbg_Error_208446807d0d1e30: function(arg0, arg1) {
             const ret = Error(getStringFromWasm0(arg0, arg1));
             return ret;
         },
-        __wbg___wbindgen_is_function_1f9d30630b8b1d3d: function(arg0) {
+        __wbg___wbindgen_is_function_741ff2bb612836f5: function(arg0) {
             const ret = typeof(arg0) === 'function';
             return ret;
         },
-        __wbg___wbindgen_is_object_3c45d4f2dde4e749: function(arg0) {
+        __wbg___wbindgen_is_object_8b968c3ab8e96595: function(arg0) {
             const val = arg0;
             const ret = typeof(val) === 'object' && val !== null;
             return ret;
         },
-        __wbg___wbindgen_is_string_90b56bc79aad6f6c: function(arg0) {
+        __wbg___wbindgen_is_string_fc456fee5d3317de: function(arg0) {
             const ret = typeof(arg0) === 'string';
             return ret;
         },
-        __wbg___wbindgen_is_undefined_8865fb403f8fe9d8: function(arg0) {
+        __wbg___wbindgen_is_undefined_be5b34249ff1fc15: function(arg0) {
             const ret = arg0 === undefined;
             return ret;
         },
-        __wbg___wbindgen_throw_41e9ee4f547fc59a: function(arg0, arg1) {
+        __wbg___wbindgen_throw_4c88d8bf264fd984: function(arg0, arg1) {
             throw new Error(getStringFromWasm0(arg0, arg1));
         },
-        __wbg_call_187d372bd5fdd4aa: function() { return handleError(function (arg0, arg1, arg2) {
+        __wbg_call_a410eb4b59ed5965: function() { return handleError(function (arg0, arg1, arg2) {
             const ret = arg0.call(arg1, arg2);
             return ret;
         }, arguments); },
-        __wbg_crypto_38df2bab126b63dc: function(arg0) {
+        __wbg_crypto_23f565a907d30078: function(arg0) {
             const ret = arg0.crypto;
             return ret;
         },
-        __wbg_getRandomValues_436a51d0629d84e1: function() { return handleError(function (arg0, arg1) {
+        __wbg_getRandomValues_8b6f1f663e6f188d: function() { return handleError(function (arg0, arg1) {
             globalThis.crypto.getRandomValues(getArrayU8FromWasm0(arg0, arg1));
         }, arguments); },
-        __wbg_getRandomValues_c44a50d8cfdaebeb: function() { return handleError(function (arg0, arg1) {
+        __wbg_getRandomValues_d2908e0b99612b91: function() { return handleError(function (arg0, arg1) {
             arg0.getRandomValues(arg1);
         }, arguments); },
-        __wbg_length_7f3c00c40364105e: function(arg0) {
+        __wbg_length_186163212ffe79c3: function(arg0) {
             const ret = arg0.length;
             return ret;
         },
-        __wbg_msCrypto_bd5a034af96bcba6: function(arg0) {
+        __wbg_msCrypto_d5f06fad6bf1409b: function(arg0) {
             const ret = arg0.msCrypto;
             return ret;
         },
-        __wbg_new_with_length_3da0ad195f6f63ba: function(arg0) {
+        __wbg_new_with_length_01b143a7e5dd5a3e: function(arg0) {
             const ret = new Uint8Array(arg0 >>> 0);
             return ret;
         },
-        __wbg_node_84ea875411254db1: function(arg0) {
+        __wbg_node_86166ff8ce1f2002: function(arg0) {
             const ret = arg0.node;
             return ret;
         },
-        __wbg_process_44c7a14e11e9f69e: function(arg0) {
+        __wbg_process_91f425a63f58e399: function(arg0) {
             const ret = arg0.process;
             return ret;
         },
-        __wbg_prototypesetcall_bc27214492979395: function(arg0, arg1, arg2) {
+        __wbg_prototypesetcall_13162965d1fe7aa3: function(arg0, arg1, arg2) {
             Uint8Array.prototype.set.call(getArrayU8FromWasm0(arg0, arg1), arg2);
         },
-        __wbg_randomFillSync_6c25eac9869eb53c: function() { return handleError(function (arg0, arg1) {
+        __wbg_randomFillSync_34b023059e3363de: function() { return handleError(function (arg0, arg1) {
             arg0.randomFillSync(arg1);
         }, arguments); },
-        __wbg_require_b4edbdcf3e2a1ef0: function() { return handleError(function () {
+        __wbg_require_9a7d8cc2e1d275c0: function() { return handleError(function () {
             const ret = module.require;
             return ret;
         }, arguments); },
-        __wbg_static_accessor_GLOBAL_266715b9d96ba635: function() {
-            const ret = typeof global === 'undefined' ? null : global;
+        __wbg_static_accessor_GLOBAL_THIS_003ee833af9699fc: function() {
+            const ret = typeof globalThis === 'undefined' ? undefined : globalThis;
             return isLikeNone(ret) ? 0 : addToExternrefTable0(ret);
         },
-        __wbg_static_accessor_GLOBAL_THIS_10fb7dc1ae063179: function() {
-            const ret = typeof globalThis === 'undefined' ? null : globalThis;
+        __wbg_static_accessor_GLOBAL_e4293fb22cbe77da: function() {
+            const ret = typeof global === 'undefined' ? undefined : global;
             return isLikeNone(ret) ? 0 : addToExternrefTable0(ret);
         },
-        __wbg_static_accessor_SELF_0b583911f537483a: function() {
-            const ret = typeof self === 'undefined' ? null : self;
+        __wbg_static_accessor_SELF_53bb20457401453d: function() {
+            const ret = typeof self === 'undefined' ? undefined : self;
             return isLikeNone(ret) ? 0 : addToExternrefTable0(ret);
         },
-        __wbg_static_accessor_WINDOW_d7f903d1508cbdc4: function() {
-            const ret = typeof window === 'undefined' ? null : window;
+        __wbg_static_accessor_WINDOW_b5e0810bfecb7feb: function() {
+            const ret = typeof window === 'undefined' ? undefined : window;
             return isLikeNone(ret) ? 0 : addToExternrefTable0(ret);
         },
-        __wbg_subarray_002b94d5e13d1411: function(arg0, arg1, arg2) {
+        __wbg_subarray_58f388a9247ac0bb: function(arg0, arg1, arg2) {
             const ret = arg0.subarray(arg1 >>> 0, arg2 >>> 0);
             return ret;
         },
-        __wbg_versions_276b2795b1c6a219: function(arg0) {
+        __wbg_versions_6e128a981b0df859: function(arg0) {
             const ret = arg0.versions;
             return ret;
         },
@@ -664,12 +726,11 @@ function __wbg_get_imports() {
         },
         __wbindgen_init_externref_table: function() {
             const table = wasm.__wbindgen_externrefs;
-            const offset = table.grow(4);
             table.set(0, undefined);
-            table.set(offset + 0, undefined);
-            table.set(offset + 1, null);
-            table.set(offset + 2, true);
-            table.set(offset + 3, false);
+            table.set(1024, undefined);
+            table.set(1025, null);
+            table.set(1026, true);
+            table.set(1027, false);
         },
     };
     return {
@@ -715,7 +776,8 @@ function getArrayU8FromWasm0(ptr, len) {
 }
 
 function getStringFromWasm0(ptr, len) {
-    return decodeText(ptr >>> 0, len);
+    ptr = ptr >>> 0;
+    return decodeText(getUint8ArrayMemory0().subarray(ptr, ptr + len));
 }
 
 let cachedUint32ArrayMemory0 = null;
@@ -804,18 +866,18 @@ function takeFromExternrefTable0(idx) {
     return value;
 }
 
-let cachedTextDecoder = new TextDecoder('utf-8', { ignoreBOM: true, fatal: true });
+let cachedTextDecoder = new TextDecoder('utf-8', { ignoreBOM: true });
 cachedTextDecoder.decode();
 const MAX_SAFARI_DECODE_BYTES = 2146435072;
 let numBytesDecoded = 0;
-function decodeText(ptr, len) {
-    numBytesDecoded += len;
+function decodeText(bytes) {
+    numBytesDecoded += bytes.length;
     if (numBytesDecoded >= MAX_SAFARI_DECODE_BYTES) {
-        cachedTextDecoder = new TextDecoder('utf-8', { ignoreBOM: true, fatal: true });
+        cachedTextDecoder = new TextDecoder('utf-8', { ignoreBOM: true });
         cachedTextDecoder.decode();
-        numBytesDecoded = len;
+        numBytesDecoded = bytes.length;
     }
-    return cachedTextDecoder.decode(getUint8ArrayMemory0().subarray(ptr, ptr + len));
+    return cachedTextDecoder.decode(bytes);
 }
 
 const cachedTextEncoder = new TextEncoder();
@@ -903,9 +965,17 @@ function initSync(module) {
     return __wbg_finalize_init(instance, module);
 }
 
+let __wbg_init_promise;
 async function __wbg_init(module_or_path) {
     if (wasm !== undefined) return wasm;
+    if (__wbg_init_promise === undefined) {
+        __wbg_init_promise = __wbg_init_once(module_or_path);
+        __wbg_init_promise.catch(() => { __wbg_init_promise = undefined; });
+    }
+    return __wbg_init_promise;
+}
 
+async function __wbg_init_once(module_or_path) {
 
     if (module_or_path !== undefined) {
         if (Object.getPrototypeOf(module_or_path) === Object.prototype) {
