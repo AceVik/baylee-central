@@ -2254,3 +2254,18 @@ real PostgreSQL fixture, smoke, secrets, pinned audit and deny checks pass. Cryp
 sources, dependency graph and the canonical Linux WASM artifacts are unchanged.
 This is an engineering review; production rollout and external push delivery
 remain separate checks.
+
+Final lifecycle review found a further issue: chat unlock performs a verified
+browser sign-in, replacing the cookie, while push subscriptions retained the old
+session digest. A later server-side logout could therefore miss that installation
+if the browser's separate unsubscribe failed. Browser login now atomically
+rebinds only subscriptions matching the verified account, credential revision and
+presented old browser-cookie digest. No cookie alone authorizes reauthentication;
+foreign-account and other-device consent remain separate. Regression coverage uses
+real PostgreSQL for device/account/session-kind boundaries and the actual HTTP
+listener with OPAQUE reauthentication and server-only logout.
+The HTTP regression also exposed the browser dispatch dropping that cookie before
+verification; it now forwards it as consent context while keeping the anonymous
+login budget. The regression failed before the complete fix and passes afterward.
+Both real PostgreSQL suites, the full Rust gate, smoke and secret checks pass on
+the corrected implementation. No dependency or cryptographic protocol changed.

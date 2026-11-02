@@ -75,7 +75,33 @@ impl AccountStore {
         credential: &Credential,
         session: impl Into<Session<'a>>,
     ) -> Result<Issued, Error> {
-        let session = session.into();
+        self.issue_session_inner(credential, session.into(), None)
+            .await
+    }
+
+    /// Issue a verified browser login, preserving this browser's explicit push consent.
+    /// Only subscriptions owned by this account and bound to the presented previous
+    /// cookie move to the new session. Other devices/accounts are left untouched.
+    /// An expired cookie may identify consent, but never authorizes this login.
+    ///
+    /// # Errors
+    /// Rejects stale verified credentials or database failure, atomically.
+    pub async fn issue_browser_session(
+        &self,
+        credential: &Credential,
+        token: &Token,
+        previous: Option<&Token>,
+    ) -> Result<Issued, Error> {
+        self.issue_session_inner(credential, Session::Browser(token), previous)
+            .await
+    }
+
+    async fn issue_session_inner(
+        &self,
+        credential: &Credential,
+        session: Session<'_>,
+        previous_browser: Option<&Token>,
+    ) -> Result<Issued, Error> {
         let transaction = self.db.begin().await.map_err(|_| Error::Unavailable)?;
         let row = transaction.query_one_raw(statement(
             "SELECT wrapped_master, username_key, source = 'registered' AND tag IS NULL AS untagged
@@ -142,6 +168,21 @@ impl AccountStore {
                 .try_get("", "expires_at")
                 .map_err(|_| Error::Unavailable)?,
         };
+        if let Some(previous) = previous_browser {
+            transaction
+                .execute_raw(statement(
+                    "UPDATE central_identity.push_subscriptions SET session_digest=$1
+                 WHERE account_id=$2 AND credential_revision=$3 AND session_digest=$4",
+                    vec![
+                        session.digest().to_vec().into(),
+                        uuid(credential.identity.account).into(),
+                        credential.revision.into(),
+                        Session::Browser(previous).digest().to_vec().into(),
+                    ],
+                ))
+                .await
+                .map_err(|_| Error::Unavailable)?;
+        }
         transaction.commit().await.map_err(|_| Error::Unavailable)?;
         Ok(issued)
     }

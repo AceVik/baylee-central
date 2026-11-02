@@ -35,9 +35,14 @@ changes and on queued delivery. Reading preferences and withdrawing consent rema
 available even before accepting newly published terms. An installation has a fresh random generation;
 the worker discards old-account or old-installation hints. Signing in to another
 account invalidates the old browser subscription. Logout revokes subscriptions
-bound to that session, also server-side. Reauthentication also retires the previous
-endpoint when it belongs to the same account, so repeated logins do not consume the
-device quota. Delayed worker registration cannot undo a newer local opt-out. Password/credential changes prevent any
+bound to that session, also server-side. Explicit device activation retires the
+previous endpoint when it belongs to the same account, so repeated activations do
+not consume the device quota. When an authenticated flow such as chat unlock verifies the password
+again, the login transaction moves only this account's subscriptions bound to the
+presented previous browser cookie to the new session. An expired cookie can identify
+existing consent but cannot authorize a login. This preserves notifications and
+server-side logout revocation without adopting another account's subscriptions or
+revoking another device's consent. Delayed worker registration cannot undo a newer local opt-out. Password/credential changes prevent any
 queued delivery to older revisions. Ordinary session expiry does not disable an
 explicitly opted-in device: notifications can arrive while the app is closed.
 Browser permission can still suppress delivery at any time.
