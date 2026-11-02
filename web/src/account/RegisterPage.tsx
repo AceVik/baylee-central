@@ -1,3 +1,4 @@
+import { disablePush } from "../pwa/client";
 // `/register` (docs/web-accounts.md §"Flows"): the form; then Central
 // reserves the name for the beta key with the display name and a tag drawn
 // for it, the crypto Worker enrols the password and wraps a new master key
@@ -50,7 +51,8 @@ export default function RegisterPage() {
       (code) => {
         // sign in now, so the password is let go while the code is read
         const session = signIn({ username: r.username, password: r.password }, { api, crypto }).then(
-          ({ session: s, summary }) => {
+          async ({ session: s, summary }) => {
+            try { await disablePush(); } catch { /* generic old hints stay disabled whenever local storage is available */ }
             const drawn = handleOf(summary);
             signedIn({ handle: drawn, expiresAt: s.expiresAt });
             setHandle(drawn);

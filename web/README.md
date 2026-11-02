@@ -377,6 +377,8 @@ baylee.app {
 		header @hashed Cache-Control "public, max-age=31536000, immutable"
 		@html path /index.html
 		header @html Cache-Control "no-cache"
+		@pwa path /sw.js /manifest.webmanifest
+		header @pwa Cache-Control "no-cache"
 		file_server
 	}
 	header {
@@ -529,3 +531,15 @@ nothing else under `web/`; a Cargo target inside it is refused, and the
 policy regressions prove both.
 
 - No automated accessibility audit (axe) yet: it would be a new dependency.
+
+
+### PWA and notifications
+
+The production build emits `sw.js` and `manifest.webmanifest`. Serve both from the
+origin root with their correct MIME types and no-cache; keep hashed assets immutable.
+The worker stores the public app only, never account/API responses or decrypted
+messages. Updates require a deliberate reload. See [notifications](../docs/notifications.md)
+for profile switches, device opt-in, supported providers, VAPID setup and tests.
+The local real-browser fixture passes `REAL_FRONT_SPKI` (base64 SHA-256 of its own
+TLS public key) so Chromium can install its worker without trusting unrelated
+certificates. No such exception belongs in production.

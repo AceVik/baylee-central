@@ -1,0 +1,13 @@
+.pwa-notice { display: flex; align-items: center; flex-wrap: wrap; gap: 1rem; margin: 1rem auto; padding: 1rem 1.5rem; max-width: 70rem; border: 1px solid var(--edge-soft); border-radius: 1rem; background: var(--panel); }
+.pwa-notice p { flex: 1 1 18rem; margin: 0; }
+.notification-settings { margin-block: 2rem; padding-block: 1.5rem; border-top: 1px solid var(--edge-soft); }
+.notification-settings fieldset { border: 0; margin: 1.5rem 0; padding: 0; }
+.notification-settings legend { font-weight: bold; margin-bottom: .75rem; }
+.notification-toggle { display: flex; justify-content: space-between; align-items: center; gap: 1rem; min-height: 3rem; max-width: 30rem; border-bottom: 1px solid var(--edge-soft); cursor: pointer; }
+.notification-toggle input { appearance: none; position: relative; flex: 0 0 auto; width: 2.75rem; height: 1.6rem; margin: .5rem 0; border: 1px solid var(--edge); border-radius: var(--pill); background: var(--panel-2); cursor: pointer; }
+.notification-toggle input::before { content: ""; display: block; width: 1.1rem; height: 1.1rem; margin: .18rem; border-radius: 50%; background: var(--ink-faint); transition: transform var(--dur-fast); }
+.notification-toggle input:checked { background: var(--gold); }
+.notification-toggle input:checked::before { background: var(--gold-ink); transform: translateX(1.1rem); }
+.notification-toggle input:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
+.notification-toggle input:disabled { opacity: .5; cursor: wait; }
+.report-excerpt { white-space: pre-wrap; overflow-wrap: anywhere; }

@@ -2,6 +2,7 @@ import { existsSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 import type { Plugin } from "vite";
+import { pwa } from "./pwa/build.ts";
 import { defineConfig } from "vitest/config";
 
 /**
@@ -32,7 +33,7 @@ function languagesForBoot(): Plugin {
 // the site's CSP (`script-src 'self'; style-src 'self'`) holds. `public/`
 // (fonts, our own pictures, boot.js, robots.txt) is copied as it is.
 export default defineConfig({
-  plugins: [languagesForBoot()],
+  plugins: [languagesForBoot(), pwa()],
   oxc: {
     jsx: { runtime: "automatic" },
   },

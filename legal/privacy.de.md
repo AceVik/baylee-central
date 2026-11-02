@@ -1,5 +1,5 @@
-<!-- version: 2026-10-28 -->
-<!-- updated: 2026-10-28 -->
+<!-- version: 2026-11-02 -->
+<!-- updated: 2026-11-02 -->
 
 # Datenschutzerklärung von Baylee Central
 
@@ -56,7 +56,7 @@ störungsfreie Betrieb. Anmeldeversuche werden gezählt, um das Erraten von
 Passwörtern zu bremsen; diese Zähler liegen nur im Arbeitsspeicher.
 
 Was du auf Gateways spielst, sieht Baylee Central nicht: Spiele, Decks auf
-Gateways, Chat-Zustellung und Replays verarbeitet das jeweilige Gateway nach
+Gateways, Spielchat-Zustellung und Replays verarbeitet das jeweilige Gateway nach
 seinen eigenen Datenschutzhinweisen, auch das Gateway, das wir selbst
 betreiben.
 
@@ -83,6 +83,34 @@ schützt sie sich ohne Cookie. Dafür braucht es keine Einwilligung (§ 25 Abs. 
 Sprach- und Darstellungswahl speichert der Browser lokal. Es gibt keine
 Tracking-Cookies und keine eingebundenen Dienste Dritter, die Daten über
 dich sammeln.
+
+## Optionale Chat- und Benachrichtigungsfunktionen
+
+Central speichert persönliche Kontakte, Blockierungen und Gruppenmitgliedschaften,
+öffentliche Geräteschlüssel sowie verschlüsselte persönliche Nachrichten und
+Zustellmetadaten. Chat-Texte werden erst auf deinem Gerät entschlüsselt. Persönliche
+Chats laufen über Central; Spielchats bleiben beim Gateway. Die aktuellen Grenzen
+pro Konto/Gerät lehnen neue Nachrichten bei vollem Speicher ab; diese Änderung
+führt keine automatische Löschung des Verlaufs ein.
+
+Wenn du Benachrichtigungen aktivierst, speichert Central den Push-Endpunkt dieses
+Browsers, seinen öffentlichen Schlüssel, ein Authentifizierungsgeheimnis, Sprache,
+eine zufällige Installationskennung und deine Kategorienauswahl. Der Push-Anbieter
+deines Browsers (Google, Mozilla oder Apple) transportiert verschlüsselte allgemeine
+Hinweise und sieht Transportmetadaten wie IP-Adressen, Zeitpunkte und Größen.
+Die Hinweise enthalten keine Chat-Texte, Namen oder Meldungsinhalte. Im Profil kannst
+du Kategorien oder dieses Gerät deaktivieren; Admin-Kategorien setzen aktuelle
+Admin-Rechte voraus. Abmelden entfernt die Abonnements dieser Sitzung; Kontolöschung
+entfernt alle Abonnements. Ausstehende Hinweise verfallen nach einem Tag. Abonnements
+über 90 Tage werden nicht mehr verwendet und bei der nächsten Anmeldung eines
+Push-Abonnements für dieses Konto entfernt.
+
+Die installierte Web-App speichert ihre öffentlichen Dateien und Schriften für den
+Offline-Start. Im Browser liegen außerdem Benachrichtigungseinstellungen und eine
+Installationskennung, keine Chat-Verläufe im Klartext. Das Löschen der Websitedaten
+entfernt diesen lokalen Zustand. Der Browser fragt erst nach deiner bewussten
+Aktivierung um Erlaubnis; Betriebssystem- und Browsereinstellungen können die
+Zustellung verhindern.
 
 ## 6. Empfänger
 

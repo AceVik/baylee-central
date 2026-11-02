@@ -4,6 +4,7 @@
 
 import { Suspense, lazy, useEffect, useRef } from "react";
 
+import { PwaNotice } from "./pwa/PwaNotice";
 import { AccountProvider } from "./account/session";
 import { Footer } from "./components/Footer";
 import { Header } from "./components/Header";
@@ -30,10 +31,12 @@ const LOAD = {
   accountSecurity: () => import("./account/SecurityPage"),
   accountGateways: () => import("./account/GatewaysPage"),
   accountContacts: () => import("./social/ContactsPage"),
+  accountChat: () => import("./chat/ChatPage"),
   admin: () => import("./admin/OverviewPage"),
   adminUsers: () => import("./admin/UsersPage"),
   adminUser: () => import("./admin/UserPage"),
   adminGateways: () => import("./admin/GatewaysPage"),
+  adminReports: () => import("./admin/ReportsPage"),
   adminAudit: () => import("./admin/AuditPage"),
   adminLegacy: () => import("./admin/LegacyPage"),
 } satisfies Record<Exclude<Page, "home">, () => Promise<unknown>>;
@@ -51,10 +54,12 @@ const Account = lazy(LOAD.account);
 const Security = lazy(LOAD.accountSecurity);
 const MyGateways = lazy(LOAD.accountGateways);
 const Contacts = lazy(LOAD.accountContacts);
+const Chat = lazy(LOAD.accountChat);
 const AdminOverview = lazy(LOAD.admin);
 const AdminUsers = lazy(LOAD.adminUsers);
 const AdminUser = lazy(LOAD.adminUser);
 const AdminGateways = lazy(LOAD.adminGateways);
+const AdminReports = lazy(LOAD.adminReports);
 const AdminAudit = lazy(LOAD.adminAudit);
 const AdminLegacy = lazy(LOAD.adminLegacy);
 
@@ -103,6 +108,8 @@ function PageView({ page }: { page: Page | null }) {
       return <Account />;
     case "accountSecurity":
       return <Security />;
+    case "accountChat":
+      return <Chat />;
     case "accountContacts":
       return <Contacts />;
     case "accountGateways":
@@ -115,6 +122,8 @@ function PageView({ page }: { page: Page | null }) {
       return <AdminUser />;
     case "adminGateways":
       return <AdminGateways />;
+    case "adminReports":
+      return <AdminReports />;
     case "adminAudit":
       return <AdminAudit />;
     case "adminLegacy":
@@ -210,6 +219,7 @@ export function App() {
       <WorldBackdrop companion={page === "signIn" || page === "register"} />
       <SkipLink />
       <Header page={page} />
+      <PwaNotice />
       <main id="main" tabIndex={-1} ref={main}>
         <Suspense fallback={<Loading />}>
           <PageView page={page} />

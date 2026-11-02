@@ -48,6 +48,7 @@ const FIELDS: Readonly<Record<string, readonly string[]>> = {
   accept_terms: ["subject", "version", "digest"],
   gateway_directory: ["after"],
   account_summary: [],
+  notifications: ["request"],
   set_recovery: ["recovery"],
   set_display_name: ["display_name"],
   owner: ["request"],
@@ -180,6 +181,12 @@ export async function mockCentral(page: Page, origin: string, opts: Options = {}
     if (wrongShape !== null) return bad(m, wrongShape, route);
 
     switch (op) {
+      case "notifications": {
+        if (m.signedIn === null) return refuse(route, 401);
+        const pushRequest = body["request"] as Record<string, unknown>;
+        if (Object.keys(pushRequest).sort().join() !== "command,endpoint" || pushRequest["command"] !== "read" || pushRequest["endpoint"] !== null) return bad(m, "unexpected notification request", route);
+        return json(route, { result: "notifications", state: { enabled: area?.accounts[area.me]?.admin ? 31 : 7, public_key: null, subscribed: false } });
+      }
       case "register": {
         if (body["beta_key"] !== KEY) return refuse(route, 401);
         const name = String(body["username"]);

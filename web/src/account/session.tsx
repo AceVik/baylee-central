@@ -4,12 +4,14 @@
 // so that after a reload it knows to ask Central (`AccountSummary`) whose
 // session it is; the handle shown (`Name#3fa2`, never the private sign-in
 // name) is always Central's, held in memory only. Signing out, an expired
-// session or Central's "no" forget it. Nothing else about the account stays
-// in the browser. While a page is open and in view, it renews the session
+// session or Central's "no" forget it. This provider stores only that marker;
+// chat separately persists encrypted peer trust and push an opaque installation
+// nonce. While a page is open and in view, it renews the session
 // (`RenewSession`), which Central caps at 12 hours after the sign-in.
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
+import { disablePush } from "../pwa/client";
 import { ApiError, api as defaultApi, type Api } from "./api";
 import { workerCrypto, type CryptoFactory } from "./crypto";
 import { handleOf } from "./flows";
@@ -68,6 +70,8 @@ interface AccountState {
   signedIn(account: { handle: string | null; expiresAt: number }): void;
   /** Extend only the current verified account after a same-account reauthentication. */
   refreshed(expiresAt: number): void;
+  /** Update the public name without replacing authentication. */
+  renamed(handle: string): void;
   /**
    * Ends the session at Central and forgets it here, also when Central
    * cannot be reached: `false` then, since the cookie lives until its end.
@@ -120,6 +124,7 @@ export function AccountProvider({
       return next;
     });
   }, []);
+  const renamed = useCallback((handle: string) => setAccount((current) => current === null ? null : { ...current, handle }), []);
   const signedIn = useCallback((next: { handle: string | null; expiresAt: number }) => change({ ...next, known: true }), [change]);
 
   // a session known only by its end is Central's to name, or to end
@@ -206,6 +211,7 @@ export function AccountProvider({
 
   const signOut = useCallback(async () => {
     change(null);
+    try { await disablePush(); } catch { /* logout below also revokes server-owned subscriptions */ }
     let ended = true;
     try {
       await api.logout();
@@ -216,7 +222,7 @@ export function AccountProvider({
     return ended;
   }, [api, change]);
 
-  const value = useMemo(() => ({ account, generation, api, crypto, signedIn, refreshed, signOut }), [account, generation, api, crypto, signedIn, refreshed, signOut]);
+  const value = useMemo(() => ({ account, generation, api, crypto, signedIn, refreshed, renamed, signOut }), [account, generation, api, crypto, signedIn, refreshed, renamed, signOut]);
   return <AccountContext value={value}>{children}</AccountContext>;
 }
 

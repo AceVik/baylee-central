@@ -26,7 +26,9 @@ changes and on queued delivery. Reading preferences and withdrawing consent rema
 available even before accepting newly published terms. An installation has a fresh random generation;
 the worker discards old-account or old-installation hints. Signing in to another
 account invalidates the old browser subscription. Logout revokes subscriptions
-bound to that session, also server-side. Password/credential changes prevent any
+bound to that session, also server-side. Reauthentication also retires the previous
+endpoint when it belongs to the same account, so repeated logins do not consume the
+device quota. Delayed worker registration cannot undo a newer local opt-out. Password/credential changes prevent any
 queued delivery to older revisions. Ordinary session expiry does not disable an
 explicitly opted-in device: notifications can arrive while the app is closed.
 Browser permission can still suppress delivery at any time.
@@ -98,7 +100,8 @@ release migration, legal and independent security-review gates still apply.
 - Web tests execute the actual worker source with deterministic cache/IDB adapters:
   consent, installation changes, hostile payloads, fixed click destinations, no API
   caching and retaining a previous build. Settings tests cover opt-in, all category
-  switches, denied/offline changes and unmounted-account races.
+  switches, denied/offline changes, failed consent storage, delayed registration,
+  reauthentication cleanup and unmounted-account races.
 - `web/e2e-real/pwa.spec.ts` uses an isolated HTTPS fixture and browser notifications;
   CDP injects delivery instead of contacting a real push provider. Full Chromium
   is used headlessly: the headless-shell binary denies notification permission

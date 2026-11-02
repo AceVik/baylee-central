@@ -1,12 +1,22 @@
 /* tslint:disable */
 /* eslint-disable */
 export const memory: WebAssembly.Memory;
+export const __wbg_chat_free: (a: number, b: number) => void;
 export const __wbg_enrolled_free: (a: number, b: number) => void;
 export const __wbg_enrollment_free: (a: number, b: number) => void;
 export const __wbg_login_free: (a: number, b: number) => void;
 export const __wbg_loginkey_free: (a: number, b: number) => void;
 export const __wbg_recovered_free: (a: number, b: number) => void;
 export const central_origin: () => [number, number];
+export const chat_confirm: (a: number, b: number, c: number) => [number, number];
+export const chat_device: (a: number) => [number, number];
+export const chat_observe: (a: number, b: number, c: number) => [number, number, number, number];
+export const chat_open: (a: number, b: number, c: number) => [number, number, number, number];
+export const chat_registration: (a: number) => [number, number, number, number];
+export const chat_restore_trust: (a: number, b: number, c: number) => [number, number];
+export const chat_save_trust: (a: number) => [number, number, number, number];
+export const chat_seal: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: bigint) => [number, number, number, number];
+export const chat_unlock: (a: number, b: number, c: number, d: number) => [number, number, number];
 export const enrolled_document: (a: number) => [number, number];
 export const enrolled_record: (a: number) => [number, number];
 export const enrolled_recovery: (a: number) => [number, number];
