@@ -2231,3 +2231,26 @@ transitions and no automatic permission/install prompt. Real desktop/phone worke
 push delivery and the public-only offline cache still pass with the canonical WASM.
 The owner's permission to reset existing live messages/contact links is recorded in
 central-chat.md; this follow-up executes no production deletion.
+
+## Integration review after the administration merge, 2026-11-02
+
+Design pass: retain main's administration overview and account panels while adding
+chat, contacts and push. Authentication generations must also isolate the new
+overview's asynchronous results and navigation badges.
+
+Implementation pass: rebased the seven feature milestones onto main, preserving
+both sets of routes and the generation-bound terms acceptance. Adapted the reports
+destination to the shared administration API. Found that a delayed overview read
+could repopulate counts after a different sign-in or overwrite a newer refresh.
+Counts now carry their authentication generation, with lifetime and request-order
+checks for success and failure. Separate Playwright output directories prevent
+the ordinary and real-service suites from removing one another's trace files.
+
+Adversarial pass: four regression tests cover pending/loaded counts crossing a
+sign-in and stale success/failure after a newer refresh. All four fail against the
+previous implementation and pass with the correction. The combined web check
+passes 373 tests, type checking, lint and production build. The rebased Rust gate,
+real PostgreSQL fixture, smoke, secrets, pinned audit and deny checks pass. Crypto
+sources, dependency graph and the canonical Linux WASM artifacts are unchanged.
+This is an engineering review; production rollout and external push delivery
+remain separate checks.

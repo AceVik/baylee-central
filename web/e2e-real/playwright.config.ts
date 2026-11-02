@@ -10,6 +10,8 @@ const FRONT = process.env["REAL_FRONT"] ?? "127.0.0.1:8443";
 
 export default defineConfig({
   testDir: ".",
+  // Ordinary and real-service suites must never delete each other's traces.
+  outputDir: "../test-results-real",
   fullyParallel: false,
   workers: 1,
   retries: 0,
