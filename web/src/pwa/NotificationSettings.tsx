@@ -22,6 +22,7 @@ export function NotificationSettings({ admin }: { admin: boolean }) {
       const next = await notifications({ command: "read", endpoint: subscription?.endpoint ?? null });
       if (life.current.generation !== generation) return;
       const enabled = available && Notification.permission === "granted" && next.subscribed && installation() !== null;
+      if (!enabled && installation() !== null) rememberInstallation(null);
       setState(next); setActive(enabled);
       if (available) await workerState(enabled ? installation() : null, enabled ? next.enabled : 0);
     }

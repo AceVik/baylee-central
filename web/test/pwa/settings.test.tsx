@@ -88,3 +88,12 @@ it("withdraws server consent even when the local worker cannot store the opt-out
   expect(chat.getAttribute("aria-checked")).toBe("false");
   expect(f.state).toHaveBeenLastCalledWith("a".repeat(32), 6);
 });
+
+it("forgets a stale local installation when the server no longer has the subscription", async () => {
+  vi.stubGlobal("Notification", { permission: "granted", requestPermission: permission });
+  f.installed.mockReturnValue("a".repeat(32));
+  show();
+  await waitFor(() => expect(f.remember).toHaveBeenCalledWith(null));
+  expect(screen.getByRole("switch", { name: "Notifications on this device" }).getAttribute("aria-checked")).toBe("false");
+  expect(f.state).toHaveBeenCalledWith(null, 0);
+});

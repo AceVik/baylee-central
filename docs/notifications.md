@@ -8,10 +8,19 @@ connection. Two public builds are retained so another open tab can still load it
 previous chunks. An update waits for the user to confirm reloading, including a
 warning about unsent input. No automatic update reload discards a draft.
 
+Browsers exposing [`beforeinstallprompt`](https://developer.mozilla.org/en-US/docs/Web/API/Window/beforeinstallprompt_event)
+show an explicit “Install Baylee” offer only after confirming installability. Its
+one-use `prompt()` is invoked directly by a click; installation is never automatic.
+Already installed apps hide the offer. Other browsers retain their own installation
+menu; the notification settings explain the iPhone/iPad Home Screen requirement.
+
 ## Consent and ownership
 
 A signed-in user is offered notification settings; browser permission is requested
-only by clicking the device switch. Profile settings have independent switches for
+only by clicking the device switch. The offer also appears when browser permission
+already exists but the previous sign-in's device subscription has been disconnected.
+An old permanent dismissal no longer hides this case. A deliberate opt-out suppresses
+the offer for the current page's sign-in; new authentication may offer it again. Profile settings have independent switches for
 chat, incoming contacts and versions. Administrators additionally have feedback
 and gateway applications. The category mask belongs to the account and updates
 one bit atomically, preserving other tabs' choices. The device switch separately
