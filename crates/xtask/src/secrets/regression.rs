@@ -7,6 +7,7 @@
 //! has no exclusions). Git runs with no system or user configuration, hooks
 //! or signing, and none of the caller's Git variables.
 
+use std::fmt::Write as _;
 use std::fs;
 use std::path::Path;
 use std::process::{Command, Stdio};
@@ -44,6 +45,12 @@ fn exercise(project: &Path, binary: &Path, fixture: &Path) -> Result<()> {
     let git = Git::isolated(fixture)?;
     let repo = fixture.join("repository");
     git.init(&repo)?;
+    let scanner = Scanner {
+        binary,
+        fixture,
+        repo: &repo,
+    };
+    canary_controls(project, &scanner, &repo)?;
     seed(&repo)?;
     git.run(
         &repo,
@@ -56,11 +63,6 @@ fn exercise(project: &Path, binary: &Path, fixture: &Path) -> Result<()> {
         "Secret-scanner fixture commit failed",
     )?;
 
-    let scanner = Scanner {
-        binary,
-        fixture,
-        repo: &repo,
-    };
     let working = scanner
         .scan("dir", &project.join(".gitleaks.toml"))
         .or_fail("Working-tree scanner missed its positive control")?;
@@ -93,12 +95,43 @@ fn exercise(project: &Path, binary: &Path, fixture: &Path) -> Result<()> {
     Ok(())
 }
 
-/// A random credential in each of the three paths.
+// The pinned generic-key rule ignores substrings such as DEAD and FEED; random
+// hex can therefore disappear from the positive control. Use its dedicated
+// GitHub-PAT rule, with a balanced prefix keeping entropy above 3 even when
+// every random suffix byte repeats. Synthetic only; never an issued credential.
+fn canary(suffix: &str) -> String {
+    format!("ghp_0123456789ABCDEF{suffix}")
+}
+
+fn canary_controls(project: &Path, scanner: &Scanner<'_>, repo: &Path) -> Result<()> {
+    let suffixes = "0123456789ABCDEF"
+        .chars()
+        .map(|digit| digit.to_string().repeat(20))
+        .chain(["DEAD".repeat(5), "FEED".repeat(5)]);
+    let mut examples = String::new();
+    for suffix in suffixes {
+        writeln!(&mut examples, "{{\"api_key\":\"{}\"}}", canary(&suffix)).or_fail(SEEDING)?;
+    }
+    fs::write(repo.join("source.txt"), examples).or_fail(SEEDING)?;
+    let findings = scanner
+        .scan("dir", &project.join(".gitleaks.toml"))
+        .or_fail("Secret scanner missed adversarial canary controls")?;
+    if findings.len() != 18
+        || findings
+            .iter()
+            .any(|file| relative(repo, file) != "source.txt")
+    {
+        return Err(Fail::new("Secret-scanner canary controls were incomplete"));
+    }
+    Ok(())
+}
+
+/// A synthetic token with an OS-random suffix in each of the three paths.
 fn seed(repo: &Path) -> Result<()> {
     for path in PATHS {
         let file = repo.join(path);
         fs::create_dir_all(file.parent().or_fail(SEEDING)?).or_fail(SEEDING)?;
-        let canary = random::hex(32)?.to_uppercase();
+        let canary = canary(&random::hex(10)?.to_uppercase());
         fs::write(&file, format!("{{\"api_key\":\"{canary}\"}}")).or_fail(SEEDING)?;
     }
     Ok(())
