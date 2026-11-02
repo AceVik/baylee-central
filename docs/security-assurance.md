@@ -2269,3 +2269,14 @@ verification; it now forwards it as consent context while keeping the anonymous
 login budget. The regression failed before the complete fix and passes afterward.
 Both real PostgreSQL suites, the full Rust gate, smoke and secret checks pass on
 the corrected implementation. No dependency or cryptographic protocol changed.
+
+The final CI then exposed a pre-existing randomized scanner-control failure:
+Gitleaks 8.30.1's generic-key allowlist ignores substrings such as `dead` and
+`feed`, which can occur in random hexadecimal canaries. A local batch reproduced
+misses in 4 of 2,000 synthetic values. The control now uses the pinned dedicated
+GitHub-PAT rule with a balanced prefix and an OS-random suffix. Its 18 adversarial
+controls include every repeated hex digit and both stopwords; a separate batch of
+2,016 values was fully detected. Working-tree path exclusions and complete-history
+scanning are unchanged, and neither scanner configuration gains an exemption.
+The actual scanner, including these controls and both repository scans, passes.
+Source: [pinned Gitleaks rules](https://github.com/gitleaks/gitleaks/blob/v8.30.1/config/gitleaks.toml).
