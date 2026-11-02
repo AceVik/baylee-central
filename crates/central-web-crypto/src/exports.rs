@@ -101,7 +101,7 @@ impl Login {
 /// handle checks the master key that answer brings.
 #[wasm_bindgen]
 pub struct LoginKey {
-    state: SignedIn,
+    pub(crate) state: SignedIn,
     message: Vec<u8>,
 }
 

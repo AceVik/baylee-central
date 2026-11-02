@@ -194,3 +194,19 @@ pub fn recovery_create(state: SignedIn, wrapped_master: &[u8]) -> Result<Recover
         recovery,
     })
 }
+
+/// Open the account's stable chat identity after OPAQUE, consuming the wrapping
+/// key and wiping the master key before returning. No secret leaves the worker.
+///
+/// # Errors
+/// Rejects a wrong master wrapper, account context or public tag.
+pub fn chat_unlock(
+    state: SignedIn,
+    wrapped_master: &[u8],
+    tag: u32,
+) -> Result<central_client::chat::Chat, CryptoError> {
+    let SignedIn { key, context } = state;
+    let master = key.unwrap(&WrappedMasterKey::from_bytes(wrapped_master)?)?;
+    let secrets = master.chat_identity(context)?;
+    central_client::chat::Chat::new(secrets, tag).map_err(|_| CryptoError::Invalid)
+}

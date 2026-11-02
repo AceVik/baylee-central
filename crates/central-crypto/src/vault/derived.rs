@@ -12,6 +12,9 @@ use sha2::Sha512;
 use std::fmt;
 use zeroize::Zeroizing;
 
+const CHAT_SALT: &[u8] = b"baylee-central/chat-identity/v1";
+const CHAT_DOMAIN: &[u8] = b"baylee-central/chat-identity/v1\0";
+
 const CHECK_SALT: &[u8] = b"baylee-central/key-check/v1";
 const CHECK_DOMAIN: &[u8] = b"baylee-central/key-check/v1\0";
 const VAULT_SALT: &[u8] = b"baylee-central/local-vault/v1";
@@ -66,6 +69,27 @@ impl LocalVaultKey {
 }
 
 impl MasterKey {
+    /// One stable chat identity for the account, issuer and epoch. Browser and
+    /// native installations share this identity; every message uses fresh random
+    /// keys/nonces and no shared mutable ratchet. Password changes preserve it.
+    /// The master key is never exported. All three derived secrets wipe on drop.
+    ///
+    /// # Errors
+    /// Only if HKDF refuses the fixed output length.
+    pub fn chat_identity(
+        &self,
+        context: Context,
+    ) -> Result<crate::chat::DeviceSecrets, CryptoError> {
+        let mut secrets = Zeroizing::new([0; crate::chat::SECRETS_LEN]);
+        Hkdf::<Sha512>::new(Some(CHAT_SALT), self.0.as_ref())
+            .expand(
+                &context.bound::<{ CHAT_DOMAIN.len() + 56 }>(CHAT_DOMAIN),
+                secrets.as_mut(),
+            )
+            .map_err(|_| CryptoError::Invalid)?;
+        Ok(crate::chat::DeviceSecrets::from_bytes(&secrets))
+    }
+
     /// The account's key check for `context` (its issuer, account and epoch).
     ///
     /// # Errors
@@ -104,6 +128,47 @@ impl MasterKey {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn chat_identity_is_stable_and_context_separated() {
+        let master = MasterKey(Zeroizing::new([42; 32]));
+        let context = Context::new(live(), account(), 1).unwrap();
+        let first = master.chat_identity(context).unwrap();
+        // Independent Python stdlib HMAC/SHA-512 HKDF known answer.
+        assert_eq!(
+            first.to_bytes().as_slice(),
+            hex(
+                "235145cba66e5bf907d5876c2cc460189beb0d08f917de9f8ec2998b5efd08a61b6d74cb17acc7c031f55c826e2a2ad1678527c65309ce654ed024919707384769459442dd4744080cec1cc514f6caf917bf5c0ad68c938cb9adb20be664bce0"
+            )
+        );
+        assert_eq!(
+            first.to_bytes().as_slice(),
+            master.chat_identity(context).unwrap().to_bytes().as_slice()
+        );
+        let changed = Context::new(live(), account(), 2).unwrap();
+        assert_ne!(
+            first.device_id(),
+            master.chat_identity(changed).unwrap().device_id()
+        );
+        let mut another = account();
+        another[15] ^= 1;
+        assert_ne!(
+            first.device_id(),
+            master
+                .chat_identity(Context::new(live(), another, 1).unwrap())
+                .unwrap()
+                .device_id()
+        );
+        assert_ne!(
+            first.vault_key(),
+            master
+                .local_vault_key(context, &[0; 32])
+                .unwrap()
+                .into_bytes()
+                .as_ref()
+        );
+        assert_ne!(first.ik(), first.dk());
+    }
 
     fn hex(text: &str) -> Vec<u8> {
         (0..text.len())

@@ -7,6 +7,7 @@
 //! committed under `web/src/central-wasm/` (`web/README.md`).
 #![forbid(unsafe_code)]
 
+mod chat_exports;
 mod exports;
 pub mod flow;
 

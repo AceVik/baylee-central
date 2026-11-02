@@ -3,7 +3,9 @@ use super::{AccountStore, Error, Session, statement};
 use central_api::social::{Contact, Person, Relation, SocialRequest, SocialResponse};
 use sea_orm::{ConnectionTrait, QueryResult, TransactionTrait, prelude::Uuid};
 
+mod chat;
 mod contacts;
+mod groups;
 mod limits;
 
 fn unavailable(_: impl Sized) -> Error {
@@ -78,6 +80,12 @@ impl AccountStore {
         let tx = self.db.begin().await.map_err(unavailable)?;
         let me = caller(&tx, session, false).await?;
         let response = match request {
+            SocialRequest::Group { request } => SocialResponse::Group {
+                response: groups::dispatch(&tx, session, me, request).await?,
+            },
+            SocialRequest::Chat { request } => SocialResponse::Chat {
+                response: chat::dispatch(&tx, session, me, request).await?,
+            },
             SocialRequest::Contacts => SocialResponse::Contacts {
                 contacts: snapshot(&tx, me).await?,
             },

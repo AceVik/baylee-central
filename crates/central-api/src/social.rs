@@ -65,6 +65,16 @@ pub enum ContactAction {
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "action", rename_all = "snake_case", deny_unknown_fields)]
 pub enum SocialRequest {
+    /// Private group membership and invitations.
+    Group {
+        /// Closed group command.
+        request: crate::groups::GroupRequest,
+    },
+    /// End-to-end encrypted chat on the same account-owned service.
+    Chat {
+        /// Closed encrypted-chat command.
+        request: crate::chat::ChatRequest,
+    },
     /// Read this account's complete, bounded contacts list.
     Contacts,
     /// Resolve one public tag. There is no account enumeration endpoint.
@@ -85,6 +95,16 @@ pub enum SocialRequest {
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum SocialResponse {
+    /// Private group result.
+    Group {
+        /// Closed group response.
+        response: crate::groups::GroupResponse,
+    },
+    /// End-to-end encrypted chat reply.
+    Chat {
+        /// Closed chat response.
+        response: crate::chat::ChatResponse,
+    },
     /// Private contacts owned by the authenticated caller.
     Contacts {
         /// Ordered by numeric public tag, with at most one entry per account.
