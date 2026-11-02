@@ -93,7 +93,8 @@ pub struct BrowserReply {
 #[must_use]
 pub fn browser_operation(request: &Request) -> bool {
     match request {
-        Request::Discover { .. }
+        Request::Social { .. }
+        | Request::Discover { .. }
         | Request::LoginStart { .. }
         | Request::LoginFinish { .. }
         | Request::Register { .. }
@@ -184,7 +185,8 @@ fn browser_only(request: &Request) -> bool {
 fn uses_session(request: &Request) -> bool {
     matches!(
         request,
-        Request::SessionStatus
+        Request::Social { .. }
+            | Request::SessionStatus
             | Request::RenewSession
             | Request::Logout
             | Request::TermsStatus
@@ -541,6 +543,9 @@ mod tests {
     fn served() -> Vec<Request> {
         let identity = IDENTITY;
         vec![
+            Request::Social {
+                request: central_api::social::SocialRequest::Contacts,
+            },
             Request::Discover {
                 username: "synthetic".into(),
             },
@@ -793,7 +798,7 @@ mod tests {
                 text[start..].split('"').next().unwrap().to_owned()
             })
             .collect();
-        assert_eq!(named.len(), 62, "every operation is in one of the lists");
+        assert_eq!(named.len(), 63, "every operation is in one of the lists");
     }
 
     #[test]

@@ -28,6 +28,7 @@ mod registration;
 mod reports;
 mod reset;
 mod sessions;
+mod social;
 mod terms;
 mod tokens;
 pub use admin::{AUDIT_YEARS, Action, Appointed, AuditPage, Swept, appoint_admin, sweep};

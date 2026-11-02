@@ -1,0 +1,10 @@
+/* The account palette and typography, with room for long public names. */
+.social-search, .social-row, .social-actions { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+.social-search { align-items: end; margin-block: 1rem; }
+.social-search .field { flex: 1; min-width: min(100%, 12rem); }
+.social-search input { width: 100%; }
+.social-contacts { list-style: none; margin: 0; padding: 0; }
+.social-row { justify-content: space-between; padding-block: 0.8rem; border-bottom: 1px solid var(--edge-soft); }
+.social-row:last-child { border-bottom: 0; }
+.social-row > bdi { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.social-actions { margin-inline-start: auto; }

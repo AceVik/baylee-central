@@ -21,6 +21,7 @@ export const PAGES = [
   "account",
   "accountSecurity",
   "accountGateways",
+  "accountContacts",
   "admin",
   "adminUsers",
   "adminUser",
@@ -44,6 +45,7 @@ export const PATHS: Record<Page, string> = {
   account: "/account",
   accountSecurity: "/account/security",
   accountGateways: "/account/gateways",
+  accountContacts: "/account/contacts",
   // the administration's first view: its counts (`admin/OverviewPage.tsx`)
   admin: "/admin",
   adminUsers: "/admin/users",

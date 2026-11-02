@@ -21,6 +21,7 @@ mod pairing;
 mod password;
 mod reset;
 mod session;
+mod social;
 mod terms;
 pub use central_crypto::pairing::PairingSecret;
 pub use deletion::Deletion;

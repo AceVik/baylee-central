@@ -44,6 +44,11 @@ pub struct Identity {
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "operation", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Request {
+    /// Contacts and encrypted chat shared by native and browser sessions.
+    Social {
+        /// A closed social operation; account ownership comes only from the session.
+        request: crate::social::SocialRequest,
+    },
     /// Check a live session without downloading personal ciphertext or extending its lifetime.
     SessionStatus,
     /// Renew a live session: it expires 30 minutes from now, never later than
@@ -587,6 +592,11 @@ pub enum MigrationState {
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "result", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Response {
+    /// The answer to an authenticated social operation.
+    Social {
+        /// Closed social reply, without credentials or private login names.
+        response: crate::social::SocialResponse,
+    },
     /// Live session metadata, checked against the current credential and exclusive login.
     SessionStatus {
         /// Identity bound to this session.

@@ -14,6 +14,7 @@ pub mod owner;
 pub mod profile;
 pub mod reports;
 pub mod reset_code;
+pub mod social;
 pub mod terms;
 mod token;
 pub mod wire;
