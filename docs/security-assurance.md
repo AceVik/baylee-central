@@ -2152,3 +2152,30 @@ names of an administrator's change over the browser listener; the wire tests
 refuse an unknown field in the overview and in a named audit page. The
 website: page tests with stand-ins, and the e2e mock's answers in the exact
 shapes. Engineering review, not an audit.
+
+## Account-owned chat and groups, 2026-11-02
+
+Design pass: personal relationships and ciphertext delivery belong to Central's
+account boundary, independent of gateway bearer credentials. Preserve the native
+wire crypto and make private key ownership explicit. Server-visible membership
+metadata is not claimed encrypted. Exact recipient sets, durable replay, session
+revocation, epoch reset, TOFU changes and bounded resource consumption are invariants.
+
+Implementation pass: ordered account locks serialize sends and contact transitions;
+group locks bind sends to committed membership. Native/browser session kinds are
+checked separately. No private key, plaintext message or bearer token is logged.
+The owner approved the exact Ed25519 additions and curve digest feature. Imported
+crypto sources, zeroization features, source fingerprints and graph boundaries were
+reviewed. First-party unsafe remains forbidden; accepted dependency internals are
+not claimed unsafe-free. Tag reassignment after chat enrollment is refused because
+signed device statements and historical conversation IDs bind the public tag.
+
+Adversarial pass: real PostgreSQL tests exercise forged registration, foreign inbox,
+wrong recipient sets, duplicate IDs, concurrent sends, blocks, epoch rotation,
+private invites, owner-only actions, simultaneous leave/send, and membership quotas.
+SDK tests check sticky key-change barriers across rollback/restart and injected
+own-account keys. Browser regressions cover stale account state, cookie-only
+transport, response bounds, acknowledgement identity and worker teardown. Full
+Rust gate passed including the group backend; final combined validation and native
+host/browser WASM integration remain in progress. See central-chat.md for the
+precise protocol, limitations and outstanding release checks.

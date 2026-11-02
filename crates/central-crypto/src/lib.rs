@@ -8,6 +8,7 @@
 //! review and published-vector validation are release gates, not completed claims.
 #![forbid(unsafe_code)]
 
+pub mod chat;
 mod context;
 #[cfg(feature = "server")]
 pub mod legacy;

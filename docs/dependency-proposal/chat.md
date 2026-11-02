@@ -41,5 +41,12 @@ recipient substitution and key erasure. Run the current advisory, licence and
 source/graph scope checks. This proposal is a source inspection, not an advisory
 clearance or an independent security audit.
 
-The account/contact backend and UI can be completed independently while this
-decision is pending. Gateways receive neither Central credentials nor plaintext.
+The owner accepted this scope on 2026-11-02. The pinned graph passes cargo-audit
+0.22.2 and cargo-deny 0.20.2. The imported 117 native crypto regressions and the
+account-derived chat identity tests pass. SHA-2/HMAC/HKDF zeroization enables safe
+zeroize calls in the already approved digest/block-buffer graph; no additional
+unsafe implementation was introduced by those features. The approved feature
+inventory and scoped source hash are updated. Canonical WASM vectors and the
+integrated browser/native host are still pending; native success alone is not a
+claim of browser interoperability. Gateways receive neither Central credentials
+nor plaintext. See central-chat.md.

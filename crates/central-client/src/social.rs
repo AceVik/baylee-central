@@ -45,7 +45,11 @@ impl Session {
         }
     }
 
-    fn social(
+    /// Execute an account-owned social operation with the native session.
+    ///
+    /// # Errors
+    /// Refuses another endpoint, expired sessions and unexpected responses.
+    pub fn social(
         &self,
         transport: &impl Transport,
         request: SocialRequest,

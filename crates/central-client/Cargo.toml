@@ -12,6 +12,8 @@ description = "Transport-independent native login and encrypted account synchron
 workspace = true
 
 [dependencies]
+serde = { version = "=1.0.229", features = ["derive"] }
+getrandom = "=0.4.3"
 central-api = { path = "../central-api", version = "=0.1.0" }
 central-crypto = { path = "../central-crypto", version = "=0.1.0" }
 zeroize = { version = "=1.9.1", features = ["alloc", "derive"] }

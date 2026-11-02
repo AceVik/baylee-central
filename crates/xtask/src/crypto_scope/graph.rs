@@ -26,19 +26,29 @@ pub(super) fn verify(metadata: &Value) -> Result<&str> {
     let elliptic = package(packages, "elliptic-curve", "0.13.8", Some(REGISTRY))?;
     let bigint = package(packages, "crypto-bigint", "0.5.5", Some(REGISTRY))?;
     // Two generations of curve25519-dalek, each behind its own callers:
-    // 4.1.3 for the Ristretto suite, 5.0.0 for the pairing's X25519
-    // (docs/dependency-proposal/hpke.md), reached only through hpke.
+    // 4.1.3 for the Ristretto suite, 5.0.0 for pairing and chat
+    // (docs/dependency-proposal/{hpke,chat}.md). Neither new chat curve
+    // path depends on elliptic-curve or crypto-bigint.
     let [dalek, dalek_x25519] = generations(packages, "curve25519-dalek", ["4.1.3", "5.0.0"])?;
     let hpke = package(packages, "hpke", "0.15.1", Some(REGISTRY))?;
     let x25519 = package(packages, "x25519-dalek", "3.0.0", Some(REGISTRY))?;
+    let ed_dalek = package(packages, "ed25519-dalek", "3.0.0", Some(REGISTRY))?;
+    let ed = package(packages, "ed25519", "3.0.0", Some(REGISTRY))?;
+    let signature = package(packages, "signature", "3.0.0", Some(REGISTRY))?;
+    callers(nodes, ed_dalek, &[central])?;
+    callers(nodes, ed, &[ed_dalek])?;
+    callers(nodes, signature, &[ed])?;
+    features(nodes, ed_dalek, &["zeroize"])?;
+    features(nodes, ed, &[])?;
+    features(nodes, signature, &[])?;
     callers(nodes, opaque, &[central])?;
     callers(nodes, voprf, &[opaque])?;
     callers(nodes, elliptic, &[opaque, voprf])?;
     callers(nodes, bigint, &[elliptic])?;
     callers(nodes, dalek, &[opaque, voprf])?;
     callers(nodes, hpke, &[central])?;
-    callers(nodes, x25519, &[hpke])?;
-    callers(nodes, dalek_x25519, &[hpke, x25519])?;
+    callers(nodes, x25519, &[central, hpke])?;
+    callers(nodes, dalek_x25519, &[ed_dalek, hpke, x25519])?;
     features(nodes, opaque, &["argon2", "ristretto255"])?;
     features(
         nodes,
@@ -63,7 +73,7 @@ pub(super) fn verify(metadata: &Value) -> Result<&str> {
     features(nodes, dalek, &["rand_core", "zeroize"])?;
     features(nodes, hpke, &["alloc", "chacha", "hkdfsha2", "x25519"])?;
     features(nodes, x25519, &["static_secrets", "zeroize"])?;
-    features(nodes, dalek_x25519, &["zeroize"])?;
+    features(nodes, dalek_x25519, &["digest", "zeroize"])?;
     packages
         .iter()
         .find(|p| p["id"].as_str() == Some(central))

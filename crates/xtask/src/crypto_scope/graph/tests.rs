@@ -7,7 +7,12 @@ const DALEK_X25519: &str = "curve25519-dalek@5";
 
 fn graph() -> Value {
     let rows = [
-        ("central-crypto", "0.1.0", vec!["opaque-ke", "hpke"], vec![]),
+        (
+            "central-crypto",
+            "0.1.0",
+            vec!["opaque-ke", "hpke", "x25519-dalek", "ed25519-dalek"],
+            vec![],
+        ),
         (
             "opaque-ke",
             "4.0.1",
@@ -42,7 +47,7 @@ fn graph() -> Value {
             vec!["generic-array", "rand_core", "zeroize"],
         ),
         (DALEK, "4.1.3", vec![], vec!["rand_core", "zeroize"]),
-        (DALEK_X25519, "5.0.0", vec![], vec!["zeroize"]),
+        (DALEK_X25519, "5.0.0", vec![], vec!["digest", "zeroize"]),
         (
             "hpke",
             "0.15.1",
@@ -55,6 +60,14 @@ fn graph() -> Value {
             vec![DALEK_X25519],
             vec!["static_secrets", "zeroize"],
         ),
+        (
+            "ed25519-dalek",
+            "3.0.0",
+            vec!["ed25519", DALEK_X25519],
+            vec!["zeroize"],
+        ),
+        ("ed25519", "3.0.0", vec!["signature"], vec![]),
+        ("signature", "3.0.0", vec![], vec![]),
     ];
     json!({
         "workspace_members": ["central-crypto"],
@@ -85,6 +98,9 @@ fn rejects_new_consumers_at_every_affected_boundary() {
         DALEK_X25519,
         "hpke",
         "x25519-dalek",
+        "ed25519-dalek",
+        "ed25519",
+        "signature",
     ] {
         let mut changed = graph();
         changed["resolve"]["nodes"]
@@ -99,7 +115,7 @@ fn rejects_new_consumers_at_every_affected_boundary() {
 
 #[test]
 fn rejects_changed_missing_and_duplicate_packages_and_nodes() {
-    for index in 0..9 {
+    for index in 0..12 {
         for key in ["source", "version"] {
             let mut changed = graph();
             changed["packages"][index][key] = json!("unreviewed");
@@ -128,7 +144,7 @@ fn rejects_changed_missing_and_duplicate_packages_and_nodes() {
 
 #[test]
 fn rejects_feature_expansion_removed_edges_and_nonworkspace_crypto() {
-    for index in 1..9 {
+    for index in 1..12 {
         let mut changed = graph();
         changed["resolve"]["nodes"][index]["features"]
             .as_array_mut()
@@ -138,7 +154,7 @@ fn rejects_feature_expansion_removed_edges_and_nonworkspace_crypto() {
     }
     // Every row with dependencies: central-crypto, opaque-ke, voprf,
     // elliptic-curve, hpke and x25519-dalek.
-    for index in [0, 1, 2, 3, 7, 8] {
+    for index in [0, 1, 2, 3, 7, 8, 9, 10] {
         let mut changed = graph();
         changed["resolve"]["nodes"][index]["dependencies"] = json!([]);
         assert!(verify(&changed).is_err());

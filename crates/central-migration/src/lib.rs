@@ -26,6 +26,8 @@ mod m20261030_000015_legacy_store;
 mod m20261030_000016_pairing;
 mod m20261031_000018_reports;
 mod m20261102_000019_social;
+mod m20261102_000020_chat;
+mod m20261102_000021_groups;
 
 use sea_orm_migration::{
     MigrationTrait, MigratorTrait,
@@ -57,6 +59,8 @@ impl MigratorTrait for Migrator {
             Box::new(m20261030_000016_pairing::Migration),
             Box::new(m20261031_000018_reports::Migration),
             Box::new(m20261102_000019_social::Migration),
+            Box::new(m20261102_000020_chat::Migration),
+            Box::new(m20261102_000021_groups::Migration),
         ]
     }
 }

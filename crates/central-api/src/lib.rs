@@ -5,9 +5,11 @@
 
 pub mod admin;
 pub mod beta_key;
+pub mod chat;
 mod endpoint;
 pub mod export;
 pub mod gateway;
+pub mod groups;
 pub mod legacy;
 pub mod object;
 pub mod owner;

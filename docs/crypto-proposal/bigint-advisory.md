@@ -165,3 +165,32 @@ saying why. Merged onto the pairing and the legacy store (fingerprint
 `36dc9ccf…`), those two manifest lines are the only difference in the crate
 tree. No source, dependency, feature or graph edge changed, and the reviews
 above stand. Fingerprint `6db63ad9…`.
+
+
+## Chat source and graph review, 2 November 2026
+
+The imported `central-crypto::chat` is Baylee's `baylee-seal` implementation:
+Ed25519 signatures, X25519 wraps, XChaCha20-Poly1305, SHA-256/SHA-512 and HKDF.
+The port changes module/import paths and a checked base64 index conversion;
+the 117 original vectors/adversarial tests pass unchanged in their expected bytes.
+The new account identity uses the existing HKDF-SHA-512 dependency, an independent
+domain, the master key, and the fixed issuer/account/epoch context. It is covered
+by an independent stdlib HMAC known answer and context-separation tests.
+
+Review of the lock and all-feature resolution shows no new caller of bigint or
+elliptic-curve and no change to the private OPAQUE suite. New paths are
+`central-crypto → ed25519-dalek 3.0.0 → curve25519-dalek 5.0.0` and direct
+`central-crypto → x25519-dalek 3.0.0`. Curve 5 has no elliptic-curve/bigint edge.
+Ed25519's `ed25519 → signature` type-trait edge also reaches neither. The guard
+now pins these packages' registry sources, versions, enabled features and exact
+reverse edges, with negative tests for each new boundary. The existing Ristretto
+4 path and its reviewed hash-expansion reachability remain unchanged. This is
+an author source/graph review, not an independent cryptographic audit.
+
+Existing SHA-2 0.11.1 and HMAC 0.13.0 enable their safe `zeroize` implementations;
+this also enables digest 0.11.3 and block-buffer 0.12.1 wiping. Source inspection
+of those feature-gated Drop/Zeroize implementations finds calls to the already
+approved zeroize API, no new unsafe blocks, native module or assembly. Existing
+unsafe buffer/CPU implementations remain covered by the prior package approvals.
+The expanded inventory records these exact features; the owner-approved new
+Ed25519 scope is recorded in `docs/dependency-proposal/chat.md`.

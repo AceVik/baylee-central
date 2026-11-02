@@ -54,6 +54,7 @@ struct Answer {
 
 impl Browser {
     fn post(&self, origin: &str, body: &[u8], cookie: Option<&Token>) -> Answer {
+        super::pace();
         let mut stream = TcpStream::connect_timeout(&self.address, Duration::from_secs(3)).unwrap();
         stream
             .set_read_timeout(Some(Duration::from_secs(10)))

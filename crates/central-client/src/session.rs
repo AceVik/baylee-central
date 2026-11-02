@@ -53,6 +53,16 @@ impl Session {
         self.identity
     }
 
+    /// The stable account chat identity shared by browser and native clients.
+    ///
+    /// # Errors
+    /// Refuses an invalid account context or failed key derivation.
+    pub fn chat_identity(&self) -> Result<central_crypto::chat::DeviceSecrets, Error> {
+        self.master
+            .chat_identity(context(&self.endpoint, self.identity)?)
+            .map_err(|_| Error::Rejected)
+    }
+
     /// The key of this device's local chat vault whose 32-byte scope is
     /// `scope` (Baylee's `password.vault`), derived one way from the master
     /// key (`docs/crypto-protocol.md` §"Derived from the master key"), so the

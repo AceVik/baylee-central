@@ -715,7 +715,8 @@ impl AccountStore {
     /// # Errors
     /// `Rejected` without a fresh administrator's browser session, for a tag
     /// out of range and for an unknown or unenrolled account; `Conflict` for a
-    /// tag another account holds; storage failure.
+    /// tag another account holds or an account already enrolled in Central chat;
+    /// storage failure. Existing chat identities keep their signed public tag.
     pub async fn set_tag(&self, browser: &Token, target: [u8; 16], tag: u32) -> Result<(), Error> {
         if !valid_tag(tag) {
             return Err(Error::Rejected);
@@ -747,6 +748,20 @@ impl AccountStore {
             .map_err(|_| Error::Unavailable)?
             .is_some();
         if taken {
+            return Err(Error::Conflict);
+        }
+        // Device statements, peer trust and signed conversation headers bind this
+        // public tag. Reassigning it after chat enrollment would strand history
+        // and make old signatures appear to name another account.
+        if tx
+            .query_one_raw(statement(
+                "SELECT 1 FROM central_identity.chat_devices WHERE account_id = $1 LIMIT 1",
+                vec![target.into()],
+            ))
+            .await
+            .map_err(|_| Error::Unavailable)?
+            .is_some()
+        {
             return Err(Error::Conflict);
         }
         // A tag taken by a concurrent change is the unique index's to refuse.

@@ -49,6 +49,7 @@ impl Transport for Http {
         &self.endpoint
     }
     fn exchange(&self, request: &Request, bearer: Option<&Token>) -> Result<Response, Error> {
+        pace();
         let bytes = central_api::encode(request)?;
         let mut stream = TcpStream::connect_timeout(&self.address, Duration::from_secs(3))
             .map_err(|_| Error::Unavailable)?;
@@ -101,4 +102,16 @@ impl Transport for Http {
         }
         central_api::decode(&response[split + 4..])
     }
+}
+
+/// Keep this long, mixed HTTP scenario below the global 32 requests/second
+/// public budget, regardless of CPU speed or where a one-second window starts.
+/// Exact budget exhaustion is asserted in dedicated boundary/limiter tests.
+pub(super) fn pace() {
+    static LAST: std::sync::Mutex<Option<std::time::Instant>> = std::sync::Mutex::new(None);
+    let mut last = LAST.lock().unwrap();
+    if let Some(previous) = *last {
+        std::thread::sleep(Duration::from_millis(35).saturating_sub(previous.elapsed()));
+    }
+    *last = Some(std::time::Instant::now());
 }
