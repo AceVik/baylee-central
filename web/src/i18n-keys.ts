@@ -943,6 +943,9 @@ export const KEYS = [
   "adm.reportsRefresh",
   "adm.reportsEmpty",
   "adm.reportsPrevious",
+  "pwa.installLead",
+  "pwa.install",
+  "pwa.installFailed",
 ] as const;
 
 export type Key = (typeof KEYS)[number];

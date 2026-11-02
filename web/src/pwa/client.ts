@@ -1,5 +1,6 @@
 import { notifications } from "./api";
 const LOCAL = "baylee-push-installation-v1";
+const CHANGED = "baylee:push-installation";
 let registration: Promise<ServiceWorkerRegistration> | null = null;
 let stateGeneration = 0;
 export function supported(): boolean { return "serviceWorker" in navigator && "PushManager" in window && "Notification" in window && window.isSecureContext; }
@@ -15,6 +16,14 @@ export function installation(): string | null {
 }
 export function rememberInstallation(nonce: string | null) {
   if (nonce === null) localStorage.removeItem(LOCAL); else localStorage.setItem(LOCAL, nonce);
+  window.dispatchEvent(new Event(CHANGED));
+}
+/** Observe this tab's consent changes as well as another tab's sign-in/out. */
+export function watchInstallation(changed: () => void): () => void {
+  const stored = (event: StorageEvent) => { if (event.key === LOCAL || event.key === null) changed(); };
+  window.addEventListener(CHANGED, changed);
+  window.addEventListener("storage", stored);
+  return () => { window.removeEventListener(CHANGED, changed); window.removeEventListener("storage", stored); };
 }
 export async function workerState(nonce: string | null, enabled: number): Promise<void> {
   const generation = ++stateGeneration;

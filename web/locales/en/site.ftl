@@ -1150,3 +1150,7 @@ adm-reportsLead = Recent feedback received by Central. Full details and triage a
 adm-reportsRefresh = Refresh reports
 adm-reportsEmpty = No feedback reports.
 adm-reportsPrevious = Previous page
+
+pwa-installLead = Install Baylee for quick access to your chats and contacts.
+pwa-install = Install Baylee
+pwa-installFailed = Installation could not be opened. You can try the install option in your browser menu.

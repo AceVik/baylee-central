@@ -2215,6 +2215,19 @@ smoke, secret scanner, cargo-audit 0.22.2 and cargo-deny 0.20.2 pass. Browser/na
 interop and desktop/phone chat plus persisted preference changes pass against the
 actual service using the final canonical Linux x86-64 WASM artifact. Its rebuild and
 byte comparison passed in an isolated VM with the pinned toolchain; the VM and
-all owned fixtures were cleaned up. The final web suite has 357 passing tests.
+all owned fixtures were cleaned up. The final web suite has 365 passing tests.
 Real external push and platform-specific installation remain staging checks. These are engineering reviews, not an independent
 audit or a production rollout approval.
+
+
+PWA activation follow-up, 2026-11-02: browser permission is not evidence of a live
+subscription. The offer now handles reauthentication after logout, ignores the old
+permanent prompt dismissal, observes local/cross-tab installation changes, and
+respects deliberate opt-out within the current page's authentication generation.
+A failed/expired subscription clears its stale local marker. Installation is offered
+only after a browser installability event; each prompt is consumed once by a click,
+with bounded component lifetime and handled rejection. Regression tests cover these
+transitions and no automatic permission/install prompt. Real desktop/phone worker
+push delivery and the public-only offline cache still pass with the canonical WASM.
+The owner's permission to reset existing live messages/contact links is recorded in
+central-chat.md; this follow-up executes no production deletion.
