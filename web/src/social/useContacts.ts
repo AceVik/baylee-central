@@ -50,6 +50,7 @@ export function useContacts(api: SocialApi, every = 10_000) {
     setBusy(true);
     try {
       await api.change(tag, action);
+      if (lifecycle.current.generation !== run) return false;
       const contacts = await api.contacts();
       if (lifecycle.current.generation !== run) return false;
       setItems(contacts); setError(false);

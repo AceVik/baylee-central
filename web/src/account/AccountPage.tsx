@@ -1,3 +1,5 @@
+import { useSummary } from "../app/useSummary";
+import { NotificationSettings } from "../pwa/NotificationSettings";
 // `/account`: whose account this browser is signed in to (the handle other
 // players see, and the private sign-in name small beneath it), until when,
 // where the account came from and whether it has a recovery code
@@ -39,7 +41,7 @@ type Making = { at: "password" } | { at: "code"; code: NewCode; name: string };
 
 /** "To make the code, sign in again": the password, then a sign-in that makes the code. */
 function SignInAgain({ name, onSignedIn, onCancel }: { name: string; onSignedIn(code: NewCode | null, summary: AccountSummary | null): void; onCancel(): void }) {
-  const { api, crypto, signedIn } = useAccount();
+  const { api, crypto, refreshed } = useAccount();
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<{ bad: boolean; key: Key } | null>(null);
@@ -60,7 +62,7 @@ function SignInAgain({ name, onSignedIn, onCancel }: { name: string; onSignedIn(
       ({ session, summary, code }) => {
         setPassword("");
         // the new sign-in replaced this browser's session
-        signedIn({ handle: handleOf(summary), expiresAt: session.expiresAt });
+        refreshed(session.expiresAt);
         onSignedIn(code, summary);
       },
       (error: unknown) => {
@@ -125,14 +127,18 @@ function Recovery({ summary, offer, onMake }: { summary: AccountSummary; offer: 
 export default function AccountPage() {
   useTitle("title.account");
   const lang = useLang();
-  const { account, api, signOut, signedIn } = useAccount();
+  const { account, generation, signOut, renamed } = useAccount();
+  const { state, replace: setSummary, reload: reread } = useSummary();
+  const summary = state.at === "ready" ? state.summary : null;
+  const unread = state.at === "failed";
   // when Central could not end the session: the time it ends by itself
   const [unconfirmed, setUnconfirmed] = useState<string | null>(null);
-  const [summary, setSummary] = useState<AccountSummary | null>(null);
-  const [unread, setUnread] = useState(false);
   // a code is offered once the terms are settled: storing one needs them accepted
-  const [settled, setSettled] = useState(false);
-  const [making, setMaking] = useState<Making | null>(null);
+  const [termsGeneration, setTermsGeneration] = useState<number | null>(null);
+  const settled = termsGeneration === generation;
+  const [draft, setDraft] = useState<{ generation: number; making: Making | null } | null>(null);
+  const making = draft?.generation === generation ? draft.making : null;
+  const setMaking = (next: Making | null) => setDraft({ generation, making: next });
   const time = (seconds: number) => new Date(seconds * 1000).toLocaleTimeString(localeOf(lang), { hour: "2-digit", minute: "2-digit" });
   const until = account === null ? "" : time(account.expiresAt);
   const leave = () => {
@@ -141,39 +147,17 @@ export default function AccountPage() {
     void signOut().then((ended) => setUnconfirmed(ended ? null : ends));
   };
 
-  const present = account !== null;
-  useEffect(() => {
-    if (!present) return;
-    let live = true;
-    api.accountSummary().then(
-      (s) => {
-        if (live) setSummary(s);
-      },
-      () => {
-        if (live) setUnread(true);
-      },
-    );
-    return () => {
-      live = false;
-    };
-  }, [api, present]);
-
-  // the header and this page show Central's handle as soon as it changes
-  const shown = handleOf(summary) ?? account?.handle ?? null;
-  // a name chosen elsewhere meanwhile refused this page's: read the account again
-  const reread = () => {
-    api.accountSummary().then(setSummary, () => setUnread(true));
-  };
+  const shown = handleOf(summary);
   const named = (name: string) => {
     if (summary === null || summary.tag === null || account === null) return;
     setSummary({ ...summary, displayName: name });
-    signedIn({ handle: handle(name, summary.tag), expiresAt: account.expiresAt });
+    renamed(handle(name, summary.tag));
   };
   useEffect(() => {
     if (account === null || summary === null) return;
     const drawn = handleOf(summary);
-    if (drawn !== null && drawn !== account.handle) signedIn({ handle: drawn, expiresAt: account.expiresAt });
-  }, [account, summary, signedIn]);
+    if (drawn !== null && drawn !== account.handle) renamed(drawn);
+  }, [account, summary, renamed]);
 
   const signedInAgain = (code: NewCode | null, now: AccountSummary | null) => {
     if (now !== null) setSummary(now);
@@ -199,7 +183,7 @@ export default function AccountPage() {
       ) : (
         <div className="account-grid">
           {/* the terms first, when Central has new ones to accept (it draws nothing otherwise) */}
-          <TermsStep onDone={() => setSettled(true)} />
+          <TermsStep key={generation} onDone={() => setTermsGeneration(generation)} />
           {/* then, once the terms are settled: choosing a name needs them accepted */}
           {settled && summary !== null && summary.displayName === null && summary.tag !== null && (
             <section className="card account-part account-wide reveal">
@@ -262,6 +246,7 @@ export default function AccountPage() {
           <p className="small account-wide account-later">
             <T id="account.later" elems={LINKS} />
           </p>
+          {summary !== null && <NotificationSettings key={summary.identity.account.join()} admin={summary.admin} />}
         </div>
       )}
     </AppFrame>

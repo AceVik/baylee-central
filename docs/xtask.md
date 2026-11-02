@@ -132,6 +132,21 @@ docker run --rm --platform linux/amd64 -v "$PWD":/work -w /work -e CARGO_TARGET_
 Linux host the container writes `target/linux-amd64` and the five files as
 root; give them back with `chown`.
 
+An isolated x86-64 Linux/glibc VM is an equivalent build host when container
+emulation is unavailable. Install the same pinned Rust and WASM target, transfer
+only the source/lockfile, run both `cargo xtask wasm` and `cargo xtask wasm --check`,
+and copy back only the four generated files plus `SHA256SUMS` after verifying the
+hashes. Keep credentials outside the VM and close its owned process/listener after
+building; there is no need to modify or restart unrelated container services.
+
+The 2026-11-02 chat bundle passed that build and byte comparison in an isolated
+QEMU 11.1.3 VM using the official [Ubuntu 24.04 amd64 image, 20261017](https://cloud-images.ubuntu.com/noble/20261017/),
+verified against its published SHA-256
+`04e8f2461a16a44e78a370284471f29616cdd9baf1893df25807b71f985b6c94`,
+and Rust 1.99.0. The resulting WASM SHA-256 is
+`c24adad5b8a4eaa4bed0f2ed1e44a3a2bd00505959b0737583b5962b50870c36`.
+The task's host restriction and byte comparison were not bypassed.
+
 ## What the tasks guarantee
 
 - No program runs through a shell; arguments are lists. A secret (a fixture

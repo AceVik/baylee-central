@@ -97,7 +97,9 @@ test.describe("accounts", () => {
     await openMenu(page, phone);
     await expect(page.getByRole("navigation", { name: "Sections" }).getByRole("link", { name: "Sign in" })).toBeVisible();
 
-    expect(central.operations.slice(0, 10)).toEqual([
+    const accountOperations = central.operations.filter((op) => op !== "notifications");
+    expect(central.operations.filter((op) => op === "notifications")).toHaveLength(2);
+    expect(accountOperations.slice(0, 10)).toEqual([
       "register",
       "enrollment_start",
       "enrollment_finish",
@@ -110,10 +112,10 @@ test.describe("accounts", () => {
       "accept_terms",
     ]);
     // on the account page, its terms step and its summary each ask once, in either order
-    expect(central.operations.slice(10, 12).sort()).toEqual(["account_summary", "terms_status"]);
+    expect(accountOperations.slice(10, 12).sort()).toEqual(["account_summary", "terms_status"]);
     // after the reload, the provider, the terms step and the summary each ask once, in any order
-    expect(central.operations.slice(12, 15).sort()).toEqual(["account_summary", "account_summary", "terms_status"]);
-    expect(central.operations.slice(15)).toEqual(["logout"]);
+    expect(accountOperations.slice(12, 15).sort()).toEqual(["account_summary", "account_summary", "terms_status"]);
+    expect(accountOperations.slice(15)).toEqual(["logout"]);
     expect(central.bodies.get("register")).toEqual({ operation: "register", username: "synthetic_name", beta_key: KEY, display_name: "Synthetic_Name" });
     expect(central.bodies.get("enrollment_finish")?.["document"]).toHaveLength(SEALED_DOCUMENT);
     expect(central.violations).toEqual([]);

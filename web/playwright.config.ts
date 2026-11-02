@@ -15,6 +15,9 @@ export default defineConfig({
   use: {
     baseURL: `http://127.0.0.1:${PORT}`,
     trace: "retain-on-failure",
+    // This suite intercepts network responses. Real service workers bypass those
+    // interceptions; their behavior is covered separately by e2e-real/pwa.spec.ts.
+    serviceWorkers: "block",
   },
   webServer: {
     command: `npm run build && node scripts/serve.ts --port ${PORT}`,

@@ -12,8 +12,8 @@ dependency. It is committed so that `npm run build` needs no Rust.
 | `central_web_crypto.d.ts`, `central_web_crypto_bg.wasm.d.ts` | its types |
 | `SHA256SUMS` | the SHA-256 of each of the four |
 
-Only the account pages' crypto Worker imports it: the module runs in a module
-Worker, never on the page's thread.
+Only the account and chat crypto workers import it: the module runs in module
+workers, never on the page's thread.
 
 ## Rebuilding
 

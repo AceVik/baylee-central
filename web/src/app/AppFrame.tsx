@@ -20,6 +20,7 @@ interface Item {
 
 const ACCOUNT: readonly Item[] = [
   { page: "account", label: "app.profile", icon: "user" },
+  { page: "accountChat", label: "chat.title", icon: "chat" },
   { page: "accountContacts", label: "social.title", icon: "people" },
   { page: "accountSecurity", label: "app.security", icon: "lock" },
   { page: "accountGateways", label: "app.gateways", icon: "server" },
@@ -29,6 +30,7 @@ const ADMIN: readonly Item[] = [
   { page: "admin", label: "app.overview", icon: "grid" },
   { page: "adminUsers", label: "app.users", icon: "people" },
   { page: "adminGateways", label: "app.adminGateways", icon: "globe" },
+  { page: "adminReports", label: "adm.reports", icon: "chat" },
   { page: "adminAudit", label: "app.audit", icon: "list" },
   { page: "adminLegacy", label: "app.legacy", icon: "key" },
 ];

@@ -1,0 +1,15 @@
+{
+  "id": "/",
+  "name": "Baylee Central",
+  "short_name": "Baylee",
+  "description": "Your Baylee account, contacts and encrypted conversations.",
+  "start_url": "/account",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#122c36",
+  "theme_color": "#122c36",
+  "icons": [
+    { "src": "/img/baylee-sunlight-icon.webp", "sizes": "192x192", "type": "image/webp", "purpose": "any" },
+    { "src": "/pwa-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

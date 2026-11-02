@@ -1,5 +1,5 @@
-<!-- version: 2026-10-28 -->
-<!-- updated: 2026-10-28 -->
+<!-- version: 2026-11-02 -->
+<!-- updated: 2026-11-02 -->
 
 # Baylee Central privacy policy
 
@@ -55,7 +55,7 @@ operation. Sign-in attempts are counted to slow down password guessing;
 these counters live only in memory.
 
 Baylee Central does not see what you play on gateways: games, decks on
-gateways, chat delivery and replays are processed by the gateway concerned
+gateways, game chat delivery and replays are processed by the gateway concerned
 under its own privacy notice, the gateway we run ourselves included.
 
 ## 4. What the Baylee app connects to by itself
@@ -79,6 +79,29 @@ while you are signed in, for at most 12 hours. It protects itself against
 forged requests without a cookie. This needs no consent (section 25(2) no. 2 TDDDG). Your choice of language and display is
 stored locally by your browser. There are no tracking cookies and no embedded
 third-party services that collect data about you.
+
+## Optional chat and notification features
+
+Central stores personal contacts, blocks and group memberships, device public keys,
+and encrypted personal-message envelopes and delivery metadata. Chat text is decrypted
+only on your device. Personal chat uses Central; game chat remains with the gateway.
+Current per-account/device message limits reject new sends when full; no automatic
+history deletion is introduced by this change.
+
+If you enable notifications, Central stores this browser's push endpoint, public key,
+authentication secret, language, a random installation generation and your category
+choices. Your browser's push provider (Google, Mozilla or Apple) carries encrypted
+generic hints and can see transport metadata such as IPs, times and sizes. Hints
+contain no chat text, names or report contents. You can disable each category or
+this device in your profile; administrator-only categories require current admin rights.
+Logout removes subscriptions bound to that session, and account deletion removes
+all subscriptions. Pending hints expire after one day. Subscriptions older than
+90 days are no longer used and are removed when the account next subscribes.
+
+The installed web app caches its public files and fonts for offline startup. Browser
+storage also holds notification consent and an installation generation, never plaintext
+chat history. Clearing site data removes that local state. Permission is requested
+only after you choose to enable notifications; OS/browser settings can block delivery.
 
 ## 6. Recipients
 

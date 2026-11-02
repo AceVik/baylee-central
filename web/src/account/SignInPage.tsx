@@ -1,3 +1,4 @@
+import { disablePush } from "../pwa/client";
 // `/signin` (docs/web-accounts.md §"Flows"): the name and the password,
 // then OPAQUE in the crypto Worker; Central sets its session cookie, the
 // page remembers only the end, and shows Central's handle for the account. Then the terms, where Central's
@@ -61,7 +62,8 @@ export default function SignInPage() {
     setWrong(null);
     setStatus({ bad: false, key: "signin.progress" });
     signIn({ username: name, password }, { api, crypto }).then(
-      ({ session, summary, code }) => {
+      async ({ session, summary, code }) => {
+        try { await disablePush(); } catch { /* generic old hints stay disabled whenever local storage is available */ }
         setPassword("");
         setBusy(false);
         setStatus(null);

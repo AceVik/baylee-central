@@ -22,11 +22,13 @@ export const PAGES = [
   "accountSecurity",
   "accountGateways",
   "accountContacts",
+  "accountChat",
   "admin",
   "adminUsers",
   "adminUser",
   "adminGateways",
   "adminAudit",
+  "adminReports",
   "adminLegacy",
 ] as const;
 export type Page = (typeof PAGES)[number];
@@ -46,6 +48,7 @@ export const PATHS: Record<Page, string> = {
   accountSecurity: "/account/security",
   accountGateways: "/account/gateways",
   accountContacts: "/account/contacts",
+  accountChat: "/account/chat",
   // the administration's first view: its counts (`admin/OverviewPage.tsx`)
   admin: "/admin",
   adminUsers: "/admin/users",
@@ -53,6 +56,7 @@ export const PATHS: Record<Page, string> = {
   adminUser: "/admin/users",
   adminGateways: "/admin/gateways",
   adminAudit: "/admin/audit",
+  adminReports: "/admin/reports",
   adminLegacy: "/admin/legacy",
 };
 

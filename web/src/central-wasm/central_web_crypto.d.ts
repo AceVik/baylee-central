@@ -2,6 +2,68 @@
 /* eslint-disable */
 
 /**
+ * Chat cryptography retained only for the lifetime of the unlocked worker.
+ */
+export class Chat {
+    private constructor();
+    free(): void;
+    [Symbol.dispose](): void;
+    /**
+     * Confirm exactly the public snapshot displayed to the person.
+     *
+     * # Errors
+     * Unknown peers, malformed or stale confirmations.
+     */
+    confirm(keys: Uint8Array): void;
+    /**
+     * Validate a peer's keys and return its safety-number review as JSON.
+     *
+     * # Errors
+     * Malformed, duplicated or substituted own-account keys.
+     */
+    observe(keys: Uint8Array): Uint8Array;
+    /**
+     * Authenticate and open a delivery for display.
+     *
+     * # Errors
+     * Malformed, forged, misaddressed or unconfirmed messages.
+     */
+    open(delivery: Uint8Array): Uint8Array;
+    /**
+     * Public signed registration as JSON bytes.
+     *
+     * # Errors
+     * Invalid binding or encoding.
+     */
+    registration(): Uint8Array;
+    /**
+     * Restore an authenticated account-bound trust state before reading new keys.
+     *
+     * # Errors
+     * Wrong account, corruption, duplicates or size overflow.
+     */
+    restore_trust(record: Uint8Array): void;
+    /**
+     * Authenticated ciphertext for the browser's peer-key trust state.
+     *
+     * # Errors
+     * Randomness, encoding or encryption failure.
+     */
+    save_trust(): Uint8Array;
+    /**
+     * Seal one message with fresh randomness and a new correlation ID.
+     *
+     * # Errors
+     * Invalid text/membership, changed keys or randomness failure.
+     */
+    seal(conv: string, text: string, emote: boolean, members: Uint32Array, now: bigint): Uint8Array;
+    /**
+     * Stable public device fingerprint.
+     */
+    readonly device: string;
+}
+
+/**
  * A finished registration: what `EnrollmentFinish` sends, and the
  * recovery code to show once. Free it once read; that wipes the code.
  */
@@ -98,6 +160,14 @@ export class Recovered {
 export function central_origin(): string;
 
 /**
+ * Consume an authenticated sign-in and derive the account's chat identity.
+ *
+ * # Errors
+ * Rejects an invalid wrapper, identity or public tag.
+ */
+export function chat_unlock(state: LoginKey, wrapped_master: Uint8Array, tag: number): Chat;
+
+/**
  * Finish registering with `EnrollmentChallenge`'s message.
  *
  * # Errors
@@ -159,12 +229,22 @@ export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembl
 
 export interface InitOutput {
     readonly memory: WebAssembly.Memory;
+    readonly __wbg_chat_free: (a: number, b: number) => void;
     readonly __wbg_enrolled_free: (a: number, b: number) => void;
     readonly __wbg_enrollment_free: (a: number, b: number) => void;
     readonly __wbg_login_free: (a: number, b: number) => void;
     readonly __wbg_loginkey_free: (a: number, b: number) => void;
     readonly __wbg_recovered_free: (a: number, b: number) => void;
     readonly central_origin: () => [number, number];
+    readonly chat_confirm: (a: number, b: number, c: number) => [number, number];
+    readonly chat_device: (a: number) => [number, number];
+    readonly chat_observe: (a: number, b: number, c: number) => [number, number, number, number];
+    readonly chat_open: (a: number, b: number, c: number) => [number, number, number, number];
+    readonly chat_registration: (a: number) => [number, number, number, number];
+    readonly chat_restore_trust: (a: number, b: number, c: number) => [number, number];
+    readonly chat_save_trust: (a: number) => [number, number, number, number];
+    readonly chat_seal: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: bigint) => [number, number, number, number];
+    readonly chat_unlock: (a: number, b: number, c: number, d: number) => [number, number, number];
     readonly enrolled_document: (a: number) => [number, number];
     readonly enrolled_record: (a: number) => [number, number];
     readonly enrolled_recovery: (a: number) => [number, number];

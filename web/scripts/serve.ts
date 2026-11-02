@@ -37,6 +37,7 @@ const TYPES: Record<string, string> = {
   ".ico": "image/x-icon",
   ".svg": "image/svg+xml",
   ".wasm": "application/wasm",
+  ".webmanifest": "application/manifest+json",
 };
 
 const policy = csp(["http://127.0.0.1:28780"]);

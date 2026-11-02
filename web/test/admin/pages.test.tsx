@@ -145,7 +145,7 @@ describe("the administration", () => {
     await user.type(field, "#1A2B");
     await user.click(screen.getByRole("button", { name: "Set the tag" }));
     const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByText(/earlier whisper conversations/)).toBeTruthy();
+    expect(within(dialog).getByText(/tag stays fixed.*earlier gateway-bound whisper history/)).toBeTruthy();
     await user.click(within(dialog).getByRole("button", { name: "Set the tag" }));
     await waitFor(() => expect(client.setTag).toHaveBeenCalledWith(OTHER, 0x1a2b));
     expect(await screen.findByText("The tag is set.")).toBeTruthy();

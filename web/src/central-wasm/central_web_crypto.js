@@ -1,6 +1,172 @@
 /* @ts-self-types="./central_web_crypto.d.ts" */
 
 /**
+ * Chat cryptography retained only for the lifetime of the unlocked worker.
+ */
+export class Chat {
+    static __wrap(ptr) {
+        const obj = Object.create(Chat.prototype);
+        obj.__wbg_ptr = ptr;
+        ChatFinalization.register(obj, obj.__wbg_ptr, obj);
+        return obj;
+    }
+    __destroy_into_raw() {
+        const ptr = this.__wbg_ptr;
+        this.__wbg_ptr = 0;
+        ChatFinalization.unregister(this);
+        return ptr;
+    }
+    free() {
+        const ptr = this.__destroy_into_raw();
+        wasm.__wbg_chat_free(ptr, 0);
+    }
+    /**
+     * Confirm exactly the public snapshot displayed to the person.
+     *
+     * # Errors
+     * Unknown peers, malformed or stale confirmations.
+     * @param {Uint8Array} keys
+     */
+    confirm(keys) {
+        const ptr0 = passArray8ToWasm0(keys, wasm.__wbindgen_malloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.chat_confirm(this.__wbg_ptr, ptr0, len0);
+        if (ret[1]) {
+            throw takeFromExternrefTable0(ret[0]);
+        }
+    }
+    /**
+     * Stable public device fingerprint.
+     * @returns {string}
+     */
+    get device() {
+        let deferred1_0;
+        let deferred1_1;
+        try {
+            const ret = wasm.chat_device(this.__wbg_ptr);
+            deferred1_0 = ret[0];
+            deferred1_1 = ret[1];
+            return getStringFromWasm0(ret[0], ret[1]);
+        } finally {
+            wasm.__wbindgen_free(deferred1_0, deferred1_1, 1);
+        }
+    }
+    /**
+     * Validate a peer's keys and return its safety-number review as JSON.
+     *
+     * # Errors
+     * Malformed, duplicated or substituted own-account keys.
+     * @param {Uint8Array} keys
+     * @returns {Uint8Array}
+     */
+    observe(keys) {
+        const ptr0 = passArray8ToWasm0(keys, wasm.__wbindgen_malloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.chat_observe(this.__wbg_ptr, ptr0, len0);
+        if (ret[3]) {
+            throw takeFromExternrefTable0(ret[2]);
+        }
+        var v2 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
+        wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
+        return v2;
+    }
+    /**
+     * Authenticate and open a delivery for display.
+     *
+     * # Errors
+     * Malformed, forged, misaddressed or unconfirmed messages.
+     * @param {Uint8Array} delivery
+     * @returns {Uint8Array}
+     */
+    open(delivery) {
+        const ptr0 = passArray8ToWasm0(delivery, wasm.__wbindgen_malloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.chat_open(this.__wbg_ptr, ptr0, len0);
+        if (ret[3]) {
+            throw takeFromExternrefTable0(ret[2]);
+        }
+        var v2 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
+        wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
+        return v2;
+    }
+    /**
+     * Public signed registration as JSON bytes.
+     *
+     * # Errors
+     * Invalid binding or encoding.
+     * @returns {Uint8Array}
+     */
+    registration() {
+        const ret = wasm.chat_registration(this.__wbg_ptr);
+        if (ret[3]) {
+            throw takeFromExternrefTable0(ret[2]);
+        }
+        var v1 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
+        wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
+        return v1;
+    }
+    /**
+     * Restore an authenticated account-bound trust state before reading new keys.
+     *
+     * # Errors
+     * Wrong account, corruption, duplicates or size overflow.
+     * @param {Uint8Array} record
+     */
+    restore_trust(record) {
+        const ptr0 = passArray8ToWasm0(record, wasm.__wbindgen_malloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.chat_restore_trust(this.__wbg_ptr, ptr0, len0);
+        if (ret[1]) {
+            throw takeFromExternrefTable0(ret[0]);
+        }
+    }
+    /**
+     * Authenticated ciphertext for the browser's peer-key trust state.
+     *
+     * # Errors
+     * Randomness, encoding or encryption failure.
+     * @returns {Uint8Array}
+     */
+    save_trust() {
+        const ret = wasm.chat_save_trust(this.__wbg_ptr);
+        if (ret[3]) {
+            throw takeFromExternrefTable0(ret[2]);
+        }
+        var v1 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
+        wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
+        return v1;
+    }
+    /**
+     * Seal one message with fresh randomness and a new correlation ID.
+     *
+     * # Errors
+     * Invalid text/membership, changed keys or randomness failure.
+     * @param {string} conv
+     * @param {string} text
+     * @param {boolean} emote
+     * @param {Uint32Array} members
+     * @param {bigint} now
+     * @returns {Uint8Array}
+     */
+    seal(conv, text, emote, members, now) {
+        const ptr0 = passStringToWasm0(conv, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ptr1 = passStringToWasm0(text, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len1 = WASM_VECTOR_LEN;
+        const ptr2 = passArray32ToWasm0(members, wasm.__wbindgen_malloc);
+        const len2 = WASM_VECTOR_LEN;
+        const ret = wasm.chat_seal(this.__wbg_ptr, ptr0, len0, ptr1, len1, emote, ptr2, len2, now);
+        if (ret[3]) {
+            throw takeFromExternrefTable0(ret[2]);
+        }
+        var v4 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
+        wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
+        return v4;
+    }
+}
+if (Symbol.dispose) Chat.prototype[Symbol.dispose] = Chat.prototype.free;
+
+/**
  * A finished registration: what `EnrollmentFinish` sends, and the
  * recovery code to show once. Free it once read; that wipes the code.
  */
@@ -232,6 +398,28 @@ export function central_origin() {
     } finally {
         wasm.__wbindgen_free(deferred1_0, deferred1_1, 1);
     }
+}
+
+/**
+ * Consume an authenticated sign-in and derive the account's chat identity.
+ *
+ * # Errors
+ * Rejects an invalid wrapper, identity or public tag.
+ * @param {LoginKey} state
+ * @param {Uint8Array} wrapped_master
+ * @param {number} tag
+ * @returns {Chat}
+ */
+export function chat_unlock(state, wrapped_master, tag) {
+    _assertClass(state, LoginKey);
+    var ptr0 = state.__destroy_into_raw();
+    const ptr1 = passArray8ToWasm0(wrapped_master, wasm.__wbindgen_malloc);
+    const len1 = WASM_VECTOR_LEN;
+    const ret = wasm.chat_unlock(ptr0, ptr1, len1, tag);
+    if (ret[2]) {
+        throw takeFromExternrefTable0(ret[1]);
+    }
+    return Chat.__wrap(ret[0]);
 }
 
 /**
@@ -490,6 +678,9 @@ function __wbg_get_imports() {
     };
 }
 
+const ChatFinalization = (typeof FinalizationRegistry === 'undefined')
+    ? { register: () => {}, unregister: () => {} }
+    : new FinalizationRegistry(ptr => wasm.__wbg_chat_free(ptr, 1));
 const EnrolledFinalization = (typeof FinalizationRegistry === 'undefined')
     ? { register: () => {}, unregister: () => {} }
     : new FinalizationRegistry(ptr => wasm.__wbg_enrolled_free(ptr, 1));
@@ -527,6 +718,14 @@ function getStringFromWasm0(ptr, len) {
     return decodeText(ptr >>> 0, len);
 }
 
+let cachedUint32ArrayMemory0 = null;
+function getUint32ArrayMemory0() {
+    if (cachedUint32ArrayMemory0 === null || cachedUint32ArrayMemory0.byteLength === 0) {
+        cachedUint32ArrayMemory0 = new Uint32Array(wasm.memory.buffer);
+    }
+    return cachedUint32ArrayMemory0;
+}
+
 let cachedUint8ArrayMemory0 = null;
 function getUint8ArrayMemory0() {
     if (cachedUint8ArrayMemory0 === null || cachedUint8ArrayMemory0.byteLength === 0) {
@@ -546,6 +745,13 @@ function handleError(f, args) {
 
 function isLikeNone(x) {
     return x === undefined || x === null;
+}
+
+function passArray32ToWasm0(arg, malloc) {
+    const ptr = malloc(arg.length * 4, 4) >>> 0;
+    getUint32ArrayMemory0().set(arg, ptr / 4);
+    WASM_VECTOR_LEN = arg.length;
+    return ptr;
 }
 
 function passArray8ToWasm0(arg, malloc) {
@@ -632,6 +838,7 @@ function __wbg_finalize_init(instance, module) {
     wasmInstance = instance;
     wasm = instance.exports;
     wasmModule = module;
+    cachedUint32ArrayMemory0 = null;
     cachedUint8ArrayMemory0 = null;
     wasm.__wbindgen_start();
     return wasm;

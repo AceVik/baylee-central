@@ -2176,9 +2176,9 @@ private invites, owner-only actions, simultaneous leave/send, and membership quo
 SDK tests check sticky key-change barriers across rollback/restart and injected
 own-account keys. Browser regressions cover stale account state, cookie-only
 transport, response bounds, acknowledgement identity and worker teardown. Full
-Rust gate passed including the group backend; final combined validation and native
-host/browser WASM integration remain in progress. See central-chat.md for the
-precise protocol, limitations and outstanding release checks.
+Rust gate passed including the group backend; final native transport and browser
+integration with the canonical Linux WASM build also pass. See central-chat.md for
+the precise protocol, limitations and outstanding release checks.
 
 
 Integration follow-up, 2026-11-02: the sibling's real migration fixture exposed
@@ -2193,9 +2193,9 @@ refused-before-close and accepted-after-close admission test.
 ## Browser chat and notifications — 2026-11-02
 
 Design pass: personal identity, ciphertext delivery and contacts belong to Central;
-game chat stays scoped to its gateway. Browser plaintext and keys stay in the
-unlocked worker, account generations invalidate delayed results, and trust changes
-need explicit comparison. Push is opt-in and separate from the encrypted chat
+game chat stays scoped to its gateway. Private keys stay in the unlocked worker;
+rendered plaintext stays in volatile page memory. Account generations invalidate
+delayed results, and trust changes need explicit comparison. Push is opt-in and separate from the encrypted chat
 transport: only generic category hints, explicit device ownership, current roles,
 no arbitrary webhook destination, no private API caching and no automatic reload.
 
@@ -2213,8 +2213,8 @@ vectors and tampering, concurrent delivery/lease replacement, ownership theft,
 revoked admin/credentials, offline opt-out and worker payload/cache tests. Rust gate,
 smoke, secret scanner, cargo-audit 0.22.2 and cargo-deny 0.20.2 pass. Browser/native
 interop and desktop/phone chat plus persisted preference changes pass against the
-actual service. The canonical Linux x86-64 WASM artifact remains an environment
-blocker; local browser validation uses a separately generated Mac-hosted build and
-does not claim reproducible canonical bytes. Real external push and platform-specific
-installation remain staging checks. These are engineering reviews, not an independent
+actual service using the final canonical Linux x86-64 WASM artifact. Its rebuild and
+byte comparison passed in an isolated VM with the pinned toolchain; the VM and
+all owned fixtures were cleaned up. The final web suite has 357 passing tests.
+Real external push and platform-specific installation remain staging checks. These are engineering reviews, not an independent
 audit or a production rollout approval.

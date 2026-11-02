@@ -1,3 +1,4 @@
+import { Link, PATHS } from "../router";
 import { T, type Key } from "../i18n";
 import { handleOf, type Change, type Contact, type Person, type Relation } from "./api";
 
@@ -13,6 +14,7 @@ export function ContactList({ items, busy, onChange }: { items: Contact[]; busy:
       <ul className="social-contacts">{contacts.map(({ person }) => <li key={person.tag} className="social-row">
         <bdi translate="no">{handleOf(person)}</bdi>
         <div className="social-actions">
+          {relation === "friend" && <Link className="button button-sm" to={`${PATHS.accountChat}?with=${person.tag.toString(16).padStart(4, "0")}`}><T id="chat.open" /></Link>}
           {relation === "incoming" && <button className="button button-sm" disabled={busy} onClick={() => onChange(person, "accept")}><T id="social.accept" /></button>}
           {relation === "blocked" ? <button className="button button-ghost button-sm" disabled={busy} onClick={() => onChange(person, "unblock")}><T id="social.unblock" /></button>
             : <>
