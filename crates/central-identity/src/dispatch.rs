@@ -51,6 +51,9 @@ impl IdentityService {
             self.require_terms(bearer, surface).await?;
         }
         match request {
+            Request::Social { request } => Ok(Response::Social {
+                response: self.store.social(surface.session(bearer)?, request).await?,
+            }),
             request @ (Request::Terms
             | Request::GatewayTerms { .. }
             | Request::TermsStatus

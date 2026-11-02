@@ -80,7 +80,8 @@ pub(super) fn central() -> Result<Option<TermsDocument>, Error> {
 pub(super) fn needs_acceptance(request: &Request) -> bool {
     matches!(
         request,
-        Request::CreateObject
+        Request::Social { .. }
+            | Request::CreateObject
             | Request::WriteObject { .. }
             | Request::DeleteObject { .. }
             | Request::WriteDocument { .. }

@@ -29,6 +29,7 @@ const LOAD = {
   account: () => import("./account/AccountPage"),
   accountSecurity: () => import("./account/SecurityPage"),
   accountGateways: () => import("./account/GatewaysPage"),
+  accountContacts: () => import("./social/ContactsPage"),
   admin: () => import("./admin/OverviewPage"),
   adminUsers: () => import("./admin/UsersPage"),
   adminUser: () => import("./admin/UserPage"),
@@ -49,6 +50,7 @@ const SignIn = lazy(LOAD.signIn);
 const Account = lazy(LOAD.account);
 const Security = lazy(LOAD.accountSecurity);
 const MyGateways = lazy(LOAD.accountGateways);
+const Contacts = lazy(LOAD.accountContacts);
 const AdminOverview = lazy(LOAD.admin);
 const AdminUsers = lazy(LOAD.adminUsers);
 const AdminUser = lazy(LOAD.adminUser);
@@ -101,6 +103,8 @@ function PageView({ page }: { page: Page | null }) {
       return <Account />;
     case "accountSecurity":
       return <Security />;
+    case "accountContacts":
+      return <Contacts />;
     case "accountGateways":
       return <MyGateways />;
     case "admin":

@@ -29,6 +29,7 @@ mod reports;
 mod reset;
 mod revocation_race;
 mod single_session;
+mod social;
 mod terms;
 
 fn context(identity: Identity) -> Context {
@@ -123,6 +124,7 @@ pub(crate) async fn run(operator: &DatabaseConnection) {
     deletion::run(&store, operator, &keys).await;
     pairing::run(&store, operator, &keys).await;
     reports::run(&store, operator, &keys).await;
+    social::run(&store, operator, &keys).await;
     // Last: its sweep deletes every unenrolled legacy reservation.
     legacy_store::run(&store, operator, &keys).await;
     store.close().await.unwrap();

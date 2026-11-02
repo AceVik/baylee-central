@@ -20,6 +20,7 @@ interface Item {
 
 const ACCOUNT: readonly Item[] = [
   { page: "account", label: "app.profile", icon: "user" },
+  { page: "accountContacts", label: "social.title", icon: "people" },
   { page: "accountSecurity", label: "app.security", icon: "lock" },
   { page: "accountGateways", label: "app.gateways", icon: "server" },
 ];

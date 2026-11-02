@@ -31,13 +31,16 @@ impl AccountStore {
              ('account_roles', ARRAY['SELECT','INSERT','DELETE'], NULL),
              ('audit_events', ARRAY['SELECT','INSERT'], NULL),
              ('pairings', ARRAY['SELECT','INSERT','UPDATE','DELETE'], NULL),
+             ('social_contacts', ARRAY['SELECT','INSERT','UPDATE','DELETE'], NULL),
+             ('social_blocks', ARRAY['SELECT','INSERT','DELETE'], NULL),
+             ('social_budgets', ARRAY['SELECT','INSERT','UPDATE'], NULL),
              ('reports', ARRAY['SELECT','INSERT','DELETE'], ARRAY['status','issue_number','assignee','priority','labels','duplicate_of','revision','done_at','deleted_at','updated_at']),
              ('report_parts', ARRAY['SELECT','INSERT','DELETE'], NULL),
              ('report_notes', ARRAY['SELECT','INSERT','DELETE'], NULL),
              ('report_audit', ARRAY['SELECT','INSERT'], NULL),
              ('report_views', ARRAY['SELECT','INSERT','DELETE'], ARRAY['query']),
              ('report_seen', ARRAY['SELECT','INSERT','DELETE'], NULL))
-             SELECT count(*) = 23 AND bool_and(
+             SELECT count(*) = 26 AND bool_and(
                NOT pg_catalog.pg_has_role(c.relowner, 'USAGE')
                AND (SELECT bool_and(pg_catalog.has_table_privilege(c.oid, p)) FROM unnest(r.privileges) p)
                AND NOT pg_catalog.has_table_privilege(c.oid, 'TRUNCATE, REFERENCES, TRIGGER, MAINTAIN, SELECT WITH GRANT OPTION, INSERT WITH GRANT OPTION, UPDATE WITH GRANT OPTION, DELETE WITH GRANT OPTION')
