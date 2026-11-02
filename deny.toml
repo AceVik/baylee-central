@@ -14,6 +14,8 @@ wildcards = "deny"
 # Only these exact reviewed versions are excluded from duplicate detection.
 # OPAQUE/Argon2 and current AEAD use different RustCrypto trait generations.
 skip = [
+  { name = "argon2", version = "=0.5.3", reason = "OPAQUE's previous KSF is a test-only compatibility oracle for Argon2 0.6" },
+  { name = "blake2", version = "=0.10.6", reason = "test-only Argon2 0.5 oracle vs runtime Argon2 0.6" },
   { name = "base64", version = "=0.22.1", reason = "ECE/JWT base64 API vs ureq 3.5" },
   { name = "signature", version = "=2.2.0", reason = "JWT provider trait vs Ed25519 signature 3" },
   { name = "shlex", version = "=1.3.0", reason = "bindgen 0.72 parser vs cc build adapter" },

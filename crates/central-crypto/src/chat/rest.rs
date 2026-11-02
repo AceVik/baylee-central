@@ -23,8 +23,8 @@
 
 use chacha20poly1305::XNonce;
 use chacha20poly1305::aead::{Aead, Payload};
-use chat_hkdf::Hkdf;
-use chat_sha2::{Digest, Sha256};
+use hkdf::Hkdf;
+use sha2::{Digest, Sha256};
 use zeroize::Zeroizing;
 
 use crate::chat::message::aead;

@@ -536,6 +536,14 @@ SystemCallFilter=@system-service
 
 ## Deploying with the gateway
 
+The 2 November 2026 preparation sets the service and website to
+`0.1.0-beta.9c`, the exact version confirmed by the owner. Shared library
+versions remain `0.1.0`; authentication, chat wire formats and persisted
+credentials remain compatible. This is lower in SemVer than the preceding
+`0.1.1-beta.9b`; native updater downgrade protection is unchanged. Preparation
+and merging do not authorize a production migration or deployment. The
+dependency review is in [beta9c.md](dependency-proposal/beta9c.md).
+
 For the 30 October 2026 release, the service executable and website package
 are versioned `0.1.1-beta.9b`. Reusable library versions and the authentication
 protocol are unchanged, and the wire changes since `0.1.1-beta.9a` are only

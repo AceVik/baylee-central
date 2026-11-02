@@ -4,8 +4,8 @@
 
 use std::fmt;
 
-use chat_sha2::{Digest, Sha256};
 use ed25519_dalek::{Signature, Signer, SigningKey, VerifyingKey};
+use sha2::{Digest, Sha256};
 use x25519_dalek::{PublicKey, StaticSecret};
 use zeroize::Zeroizing;
 

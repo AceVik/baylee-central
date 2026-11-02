@@ -7,6 +7,22 @@ reviewed **unreachable-code exception**, not a patched-library claim.
 
 ## Reachability review
 
+Rechecked for `0.1.0-beta.9c` on 2026-11-02: the private suite still fixes
+Ristretto255 for both OPRF and TripleDH. `opaque-sha2` explicitly names the
+same SHA-512 0.10.9 type required by opaque-ke; other application hashes/HMACs
+move to the current RustCrypto traits. Argon2 0.6 and Blake2 0.11 add no edge
+to elliptic-curve or bigint. The previous Argon2 integration is a test-only
+compatibility oracle. Upstream Ristretto implementations and their message
+expansion callers were inspected again; no generic suite selection or bigint
+arithmetic became reachable. Chat changes consolidate equivalent dependency
+aliases and update the test RNG trait; the existing known answers pass.
+
+The reviewed source fingerprint is
+`399770971518b98546ad6380b7579245b933489e12efd2cc1075b8b7fdb19946`.
+Source mutation/link checks and all exact caller/feature negative checks remain
+mandatory. The source fingerprint's SHA-256 hexadecimal encoding is unchanged
+by its migration to digest 0.11.
+
 `opaque-ke 4.0.1` and `voprf 0.5.0` require `elliptic-curve 0.13.8`, which
 requires bigint 0.5. An independent lockfile bump to the corrected >=0.7.6
 generation is incompatible. The published OPAQUE prerelease also retains the

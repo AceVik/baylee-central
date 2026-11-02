@@ -8,7 +8,7 @@
 //! from the operating system.
 
 use rand_chacha::ChaCha20Rng;
-use rand_chacha::rand_core::{RngCore, SeedableRng};
+use rand_chacha::rand_core::{Rng, SeedableRng};
 
 use central_crypto::chat::{DevicePublic, DeviceSecrets, Entropy};
 

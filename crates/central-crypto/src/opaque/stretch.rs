@@ -1,7 +1,7 @@
 //! Fixed Argon2 profile with explicit wiping of the caller-owned work buffer.
 
+use argon2::{Algorithm, Argon2, Block, Params, Version};
 use opaque_ke::{
-    argon2::{Algorithm, Argon2, Block, Params, Version},
     errors::InternalError,
     generic_array::{ArrayLength, GenericArray},
     ksf::Ksf,
@@ -54,10 +54,14 @@ mod tests {
     #[test]
     fn wiping_adapter_matches_upstream_profile() {
         let input = GenericArray::<u8, U64>::default();
-        assert_eq!(
-            FixedKsf.hash(input).unwrap(),
-            algorithm().unwrap().hash(input).unwrap(),
+        // Keep the older OPAQUE implementation as a compatibility oracle: the
+        // dependency migration must not change existing password records.
+        let previous = opaque_ke::argon2::Argon2::new(
+            opaque_ke::argon2::Algorithm::Argon2id,
+            opaque_ke::argon2::Version::V0x13,
+            opaque_ke::argon2::Params::new(65_536, 3, 4, Some(64)).unwrap(),
         );
+        assert_eq!(FixedKsf.hash(input).unwrap(), previous.hash(input).unwrap(),);
     }
 
     #[test]

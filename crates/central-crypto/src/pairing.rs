@@ -18,7 +18,7 @@
 use crate::vault::{KeyCheck, MasterKey};
 use crate::{Context, CryptoError};
 use getrandom::{SysRng, rand_core::UnwrapErr};
-use hmac::{Hmac, Mac};
+use hmac::{Hmac, KeyInit, Mac};
 use hpke::aead::ChaCha20Poly1305;
 use hpke::kdf::HkdfSha256;
 use hpke::kem::X25519HkdfSha256;
@@ -80,7 +80,7 @@ impl PairingSecret {
     }
 
     fn mac(&self) -> Hmac<Sha256> {
-        <Hmac<Sha256> as Mac>::new_from_slice(self.0.as_ref())
+        <Hmac<Sha256> as KeyInit>::new_from_slice(self.0.as_ref())
             .expect("HMAC takes a key of any length")
     }
 
@@ -309,7 +309,7 @@ fn approval_mac(
     challenge: &[u8; LEN],
     sealed: &[u8; SEALED_LEN],
 ) -> Hmac<Sha256> {
-    let mut mac = <Hmac<Sha256> as Mac>::new_from_slice(check.as_bytes())
+    let mut mac = <Hmac<Sha256> as KeyInit>::new_from_slice(check.as_bytes())
         .expect("HMAC takes a key of any length");
     mac.update(APPROVE_DOMAIN);
     mac.update(handle);

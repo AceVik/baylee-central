@@ -25,5 +25,5 @@ central-identity = { path = "../central-identity", version = "=0.1.0" }
 central-postgres = { path = "../central-postgres", version = "=0.1.0" }
 central-migration = { path = "../central-migration", version = "=0.1.0" }
 sea-orm = { version = "=2.0.4", default-features = false, features = ["sqlx-postgres", "runtime-tokio-rustls"] }
-tokio = { version = "=1.53.3", default-features = false, features = ["macros", "rt-multi-thread", "net", "sync", "time"] }
+tokio = { version = "=1.54.1", default-features = false, features = ["macros", "rt-multi-thread", "net", "sync", "time"] }
 
