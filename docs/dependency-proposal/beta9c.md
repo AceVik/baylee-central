@@ -1,4 +1,4 @@
-# Dependency upgrade candidate for 0.1.0-beta.9c
+# Dependency migration for 0.1.0-beta.9c
 
 Status: owner accepted this exact reviewed scope on 2026-11-02, subject to the complete gates. No whole-stack safety or external audit is claimed. First-party Rust remains forbidden from using unsafe/assembly.
 
@@ -88,8 +88,15 @@ Existing vetted algorithms remain preferable to implementing cryptography in
 this project. OPAQUE 4 still binds its TripleDH hash and RNG to older traits;
 those explicit compatibility versions cannot be upgraded independently.
 
-The full policy/integration gates, canonical Linux WASM rebuild and CI remain
-required before merging. Owner acceptance applies to the 45 listed package/
+The full local policy/integration gates and the canonical x86-64 Linux WASM
+build and byte comparison pass. The four copied artifacts match their SHA-256
+sums, and the owned build VM and its loopback listener were stopped. Web
+typecheck, strict lint, all 373 unit tests, the production build and 58 browser
+smoke tests pass (76 existing opt-in cases skipped). Four real Central/PostgreSQL
+browser tests pass at desktop and phone widths, including registration, contacts,
+encrypted chat/groups and PWA consent/offline behavior; push delivery is injected
+locally through CDP. Their owned services, ports and secrets were removed. CI
+remains required before merging. Owner acceptance applies to the 45 listed package/
 feature changes and their documented dependency internals, subject to those
 checks. First-party unsafe and assembly remain forbidden.
 
