@@ -32,7 +32,7 @@ never in argv or the environment. Unknown fields fail closed.
   migration login ([the legacy store](#the-legacy-store)).
 - `--import-reports-stdin` copies the feedback service's open reports once,
   under the migration login ([reports](#the-one-time-copy-of-the-feedback-services-reports)).
-- `--generate-secrets` writes a fresh `{"opaque_setup": [...], "bridge": [...]}`
+- `--generate-secrets` writes a fresh `{"opaque_setup": [...], "bridge": [...], "push": {"vapid_key": [...]}}`
   document to standard output and refuses when standard output is a terminal.
 - `--dev` and `--dev-accounts-stdin` are the local development modes described
   in [dev mode](dev-mode.md) and [native login](native-login.md).
@@ -501,7 +501,10 @@ already; run it again and every report is skipped.
 ## Secrets
 
 Run `umask 077; central-service --generate-secrets > secrets.json` once and merge
-the two values into the service configuration. The OPAQUE setup must never be
+the values into the service configuration. Optional `push.vapid_key` enables
+Web Push; preserve an existing OPAQUE setup, bridge and VAPID key. See
+[notifications](notifications.md) for build tools, migration/grants, network
+boundaries and subscription renewal. The OPAQUE setup must never be
 regenerated: replacing it locks every enrolled account out. Keep an offline
 copy. The bridge credential is shared only with the official gateway's
 `BAYLEE_CENTRAL_CONFIG_FILE`, and only when legacy migration is enabled.

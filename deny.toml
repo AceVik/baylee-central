@@ -14,6 +14,10 @@ wildcards = "deny"
 # Only these exact reviewed versions are excluded from duplicate detection.
 # OPAQUE/Argon2 and current AEAD use different RustCrypto trait generations.
 skip = [
+  { name = "base64", version = "=0.22.1", reason = "ECE/JWT base64 API vs ureq 3.5" },
+  { name = "signature", version = "=2.2.0", reason = "JWT provider trait vs Ed25519 signature 3" },
+  { name = "shlex", version = "=1.3.0", reason = "bindgen 0.72 parser vs cc build adapter" },
+  { name = "itertools", version = "=0.13.0", reason = "bindgen 0.72 adapter vs workspace tools" },
   # OPAQUE and SQLx use incompatible maintained crypto/RNG API generations.
   { name = "digest", version = "=0.10.7", reason = "OPAQUE digest API vs SQLx 0.9" },
   { name = "hkdf", version = "=0.12.4", reason = "OPAQUE HKDF API vs SQLx 0.9" },
@@ -36,6 +40,11 @@ skip = [
 [licenses]
 confidence-threshold = 0.95
 allow = ["MIT", "Apache-2.0", "BSD-3-Clause", "Unicode-3.0", "ISC", "Zlib", "CDLA-Permissive-2.0"]
+
+[[licenses.exceptions]]
+name = "ece"
+version = "=2.4.2"
+allow = ["MPL-2.0"]
 
 [licenses.private]
 ignore = true

@@ -11,6 +11,7 @@ pub mod export;
 pub mod gateway;
 pub mod groups;
 pub mod legacy;
+pub mod notifications;
 pub mod object;
 pub mod owner;
 pub mod profile;

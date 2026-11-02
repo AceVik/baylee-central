@@ -74,6 +74,15 @@ struct Service {
     /// sign-in.
     #[serde(default)]
     legacy: Option<Legacy>,
+    #[serde(default)]
+    push: Option<Push>,
+}
+
+/// Server-only persistent VAPID key, read with the other private configuration.
+#[derive(Deserialize, Zeroize, ZeroizeOnDrop)]
+#[serde(deny_unknown_fields)]
+struct Push {
+    vapid_key: Vec<u8>,
 }
 
 /// The legacy store's login: the `central_legacy` role, never the runtime's.
@@ -147,11 +156,7 @@ pub(super) async fn run_service() -> ExitCode {
     }
 }
 
-async fn serve() -> Result<(), ()> {
-    let bytes = read_settings()?;
-    let mut settings: Service = parse(&bytes)?;
-    drop(bytes);
-    let endpoint = Endpoint::live();
+fn listener_configs(settings: &Service) -> Result<(Config, Option<Config>), ()> {
     let request_bytes = MAX_WIRE_BYTES.to_string();
     let config = Config::from_pairs([
         ("BAYLEE_CENTRAL_LISTEN", settings.listen.as_str()),
@@ -170,6 +175,24 @@ async fn serve() -> Result<(), ()> {
         })
         .transpose()
         .map_err(|_| ())?;
+    Ok((config, browser))
+}
+
+async fn serve() -> Result<(), ()> {
+    let bytes = read_settings()?;
+    let mut settings: Service = parse(&bytes)?;
+    drop(bytes);
+    let push = settings
+        .push
+        .as_ref()
+        .map(|push| {
+            central_push::Sender::new(&push.vapid_key, "https://baylee.app/contact".into())
+                .map(Arc::new)
+        })
+        .transpose()
+        .map_err(|_| ())?;
+    let endpoint = Endpoint::live();
+    let (config, browser) = listener_configs(&settings)?;
     let keys = ServerKeys::from_secret_bytes(&settings.opaque_setup).map_err(|_| ())?;
     let database = settings.database.server()?;
     let legacy = settings
@@ -206,6 +229,10 @@ async fn serve() -> Result<(), ()> {
         Some(legacy) => identity.with_legacy(legacy.clone()),
         None => identity,
     });
+    let identity = identity.map(|identity| match &push {
+        Some(push) => identity.with_push_key(push.public_key().into()),
+        None => identity,
+    });
     drop(settings);
     let result = async {
         let identity = Arc::new(identity.map_err(|_| ())?);
@@ -227,9 +254,17 @@ async fn serve() -> Result<(), ()> {
         let native = server.run_with_identity(&endpoint, identity.clone(), stopped(&stop));
         let browser = browser
             .map(|browser| browser.run_browser(identity, BrowserOrigin::live(), stopped(&stop)));
-        together(&stop, native, browser, shutdown())
-            .await
-            .map_err(|_| ())
+        if push.is_some() {
+            store
+                .announce_release(env!("CARGO_PKG_VERSION"))
+                .await
+                .map_err(|_| ())?;
+        }
+        let (result, ()) = tokio::join!(
+            together(&stop, native, browser, shutdown()),
+            super::push::run(store.clone(), push, stop.subscribe())
+        );
+        result.map_err(|_| ())
     }
     .await;
     let closed = store.close().await.map_err(|_| ());
@@ -423,7 +458,12 @@ fn secrets_document() -> Result<Zeroizing<String>, ()> {
     push_bytes(&mut text, &setup);
     text.push_str(",\"bridge\":");
     push_bytes(&mut text, bridge.as_slice());
-    text.push_str("}\n");
+    text.push_str(",\"push\":{\"vapid_key\":");
+    push_bytes(
+        &mut text,
+        &central_push::Sender::generate_key().map_err(|_| ())?,
+    );
+    text.push_str("}}\n");
     Ok(text)
 }
 
@@ -628,12 +668,18 @@ mod tests {
         struct Secrets {
             opaque_setup: Vec<u8>,
             bridge: Token,
+            push: Push,
         }
         let first: Secrets = parse(secrets_document().unwrap().as_bytes()).unwrap();
         let second: Secrets = parse(secrets_document().unwrap().as_bytes()).unwrap();
         assert!(ServerKeys::from_secret_bytes(&first.opaque_setup).is_ok());
         assert_ne!(first.opaque_setup, second.opaque_setup);
         assert_ne!(first.bridge.digest(), second.bridge.digest());
+        assert_ne!(first.push.vapid_key, second.push.vapid_key);
+        assert!(
+            central_push::Sender::new(&first.push.vapid_key, "https://baylee.app/contact".into())
+                .is_ok()
+        );
     }
 
     #[test]

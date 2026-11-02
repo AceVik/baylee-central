@@ -194,3 +194,14 @@ approved zeroize API, no new unsafe blocks, native module or assembly. Existing
 unsafe buffer/CPU implementations remain covered by the prior package approvals.
 The expanded inventory records these exact features; the owner-approved new
 Ed25519 scope is recorded in `docs/dependency-proposal/chat.md`.
+
+## Web Push trait generation — 2026-11-02
+
+The reviewed push graph (docs/dependency-proposal/push.md) adds signature 2.2.0
+(`alloc,std`) solely for jsonwebtoken 11.1.0 (no features). The graph guard now
+pins both signature generations, their exact callers and features. AWS-LC is the
+provider; no new consumer reaches elliptic-curve, crypto-bigint or voprf. Every
+previous caller/feature check remains in force, as does the central-crypto source
+fingerprint. Negative tests reject enabling JWT's RustCrypto provider or adding
+an edge from JWT to any affected arithmetic boundary. This is a trait-inventory
+extension, not an extension of the advisory's reachable-code exception.

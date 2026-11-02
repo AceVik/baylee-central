@@ -93,7 +93,8 @@ pub struct BrowserReply {
 #[must_use]
 pub fn browser_operation(request: &Request) -> bool {
     match request {
-        Request::Social { .. }
+        Request::Notifications { .. }
+        | Request::Social { .. }
         | Request::Discover { .. }
         | Request::LoginStart { .. }
         | Request::LoginFinish { .. }
@@ -168,7 +169,8 @@ pub fn browser_operation(request: &Request) -> bool {
 fn browser_only(request: &Request) -> bool {
     matches!(
         request,
-        Request::Register { .. }
+        Request::Notifications { .. }
+            | Request::Register { .. }
             | Request::AccountSummary
             | Request::SetRecovery { .. }
             | Request::SetDisplayName { .. }
@@ -185,7 +187,8 @@ fn browser_only(request: &Request) -> bool {
 fn uses_session(request: &Request) -> bool {
     matches!(
         request,
-        Request::Social { .. }
+        Request::Notifications { .. }
+            | Request::Social { .. }
             | Request::SessionStatus
             | Request::RenewSession
             | Request::Logout
@@ -263,6 +266,7 @@ pub struct IdentityService {
     /// (`docs/native-login.md` §"Legacy login"); with it the bridge's own
     /// legacy operations are refused.
     legacy: Option<LegacyStore>,
+    push_key: Option<String>,
 }
 
 impl IdentityService {
@@ -305,7 +309,15 @@ impl IdentityService {
             workers: Arc::new(Semaphore::new(4)),
             terms: terms::central()?,
             legacy: None,
+            push_key: None,
         })
+    }
+
+    /// Advertise the configured public VAPID key; never private signing material.
+    #[must_use]
+    pub fn with_push_key(mut self, key: String) -> Self {
+        self.push_key = Some(key);
+        self
     }
 
     /// Serve the legacy sign-in from `store` (`docs/native-login.md`

@@ -2189,3 +2189,32 @@ official-bridge authority, audience/session binding and one-use deletion. The
 PostgreSQL regression checks open-move transfer, no delegated lease, wrong audience,
 wrong purpose, registered-gateway refusal and replay, alongside the existing
 refused-before-close and accepted-after-close admission test.
+
+## Browser chat and notifications — 2026-11-02
+
+Design pass: personal identity, ciphertext delivery and contacts belong to Central;
+game chat stays scoped to its gateway. Browser plaintext and keys stay in the
+unlocked worker, account generations invalidate delayed results, and trust changes
+need explicit comparison. Push is opt-in and separate from the encrypted chat
+transport: only generic category hints, explicit device ownership, current roles,
+no arbitrary webhook destination, no private API caching and no automatic reload.
+
+Implementation pass: checked state and cookie races, group membership immediately
+before sealing/retrying, bounded queues and device caps, worker termination, exact
+ciphertext retry, strict input/URL parsing, DNS filtering, disabled redirects/proxies,
+credential revision, session-bound logout, atomic preference bits and unique outbox
+leases. Fixed a late acknowledgement releasing its successor's lease, stale group
+membership sealing for an incomplete recipient set, and profile state surviving an
+account switch. The first push dependency graph was rejected because its old P-256
+made the bigint advisory reachable; the selected AWS-LC provider has no such edge.
+
+Adversarial pass: real PostgreSQL 18.6 and TLS browser/native integration, RFC crypto
+vectors and tampering, concurrent delivery/lease replacement, ownership theft,
+revoked admin/credentials, offline opt-out and worker payload/cache tests. Rust gate,
+smoke, secret scanner, cargo-audit 0.22.2 and cargo-deny 0.20.2 pass. Browser/native
+interop and desktop/phone chat plus persisted preference changes pass against the
+actual service. The canonical Linux x86-64 WASM artifact remains an environment
+blocker; local browser validation uses a separately generated Mac-hosted build and
+does not claim reproducible canonical bytes. Real external push and platform-specific
+installation remain staging checks. These are engineering reviews, not an independent
+audit or a production rollout approval.

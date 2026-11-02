@@ -328,13 +328,26 @@ impl AccountStore {
     /// # Errors
     /// Reports unavailable storage; does not claim success until the deletion commits.
     pub async fn logout<'a>(&self, session: impl Into<Session<'a>>) -> Result<(), Error> {
-        self.db
-            .execute_raw(statement(
-                "DELETE FROM central_identity.sessions WHERE digest = $1",
-                vec![session.into().digest().to_vec().into()],
-            ))
-            .await
-            .map_err(|_| Error::Unavailable)?;
-        Ok(())
+        let digest = session.into().digest().to_vec();
+        let tx = self.db.begin().await.map_err(|_| Error::Unavailable)?;
+        tx.query_all_raw(statement(
+            "SELECT digest FROM central_identity.sessions WHERE digest=$1 FOR UPDATE",
+            vec![digest.clone().into()],
+        ))
+        .await
+        .map_err(|_| Error::Unavailable)?;
+        tx.execute_raw(statement(
+            "DELETE FROM central_identity.push_subscriptions WHERE session_digest=$1",
+            vec![digest.clone().into()],
+        ))
+        .await
+        .map_err(|_| Error::Unavailable)?;
+        tx.execute_raw(statement(
+            "DELETE FROM central_identity.sessions WHERE digest=$1",
+            vec![digest.into()],
+        ))
+        .await
+        .map_err(|_| Error::Unavailable)?;
+        tx.commit().await.map_err(|_| Error::Unavailable)
     }
 }

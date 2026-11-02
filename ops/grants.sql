@@ -63,3 +63,8 @@ DO $legacy$ BEGIN
     GRANT SELECT ON central_legacy.settings TO central_legacy;
   END IF;
 END $legacy$;
+
+-- Cookie-owned push preferences, bounded subscriptions and coalesced delivery hints.
+GRANT SELECT, INSERT, UPDATE, DELETE ON central_identity.notification_preferences, central_identity.push_subscriptions, central_identity.push_jobs TO central_runtime;
+GRANT SELECT, INSERT ON central_identity.push_releases TO central_runtime;
+GRANT EXECUTE ON FUNCTION central_identity.queue_push(uuid,smallint), central_identity.push_event() TO central_runtime;
