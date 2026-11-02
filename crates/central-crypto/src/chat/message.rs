@@ -26,8 +26,8 @@
 
 use chacha20poly1305::aead::{Aead, KeyInit, Payload};
 use chacha20poly1305::{XChaCha20Poly1305, XNonce};
-use chat_hkdf::Hkdf;
-use chat_sha2::{Digest, Sha256};
+use hkdf::Hkdf;
+use sha2::{Digest, Sha256};
 use subtle::ConstantTimeEq;
 use x25519_dalek::{PublicKey, StaticSecret};
 use zeroize::Zeroizing;

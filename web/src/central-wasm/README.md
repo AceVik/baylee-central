@@ -2,7 +2,7 @@
 
 Generated: do not edit. `central-web-crypto` (`crates/central-web-crypto`,
 `docs/web-accounts.md` §"Browser crypto") built to WebAssembly and wrapped by
-wasm-bindgen 0.2.129, the version of the crate's own `wasm-bindgen`
+wasm-bindgen 0.2.130, the version of the crate's own `wasm-bindgen`
 dependency. It is committed so that `npm run build` needs no Rust.
 
 | file | what |
@@ -30,7 +30,7 @@ cargo xtask wasm
 
 builds the crate (profile `wasm`, target `wasm32-unknown-unknown`, the
 repository and Cargo's home remapped out of the module), installs the
-wasm-bindgen CLI at 0.2.129 on first use, and writes the four files and
+wasm-bindgen CLI at 0.2.130 on first use, and writes the four files and
 `SHA256SUMS` here. Commit them together with the Rust change that caused
 them.
 

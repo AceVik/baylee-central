@@ -27,7 +27,7 @@ use crate::{process, random, workspace};
 
 /// The version of the `wasm-bindgen` dependency and of the CLI that must
 /// match it.
-pub const BINDGEN: &str = "0.2.129";
+pub const BINDGEN: &str = "0.2.130";
 /// The committed files, relative to the repository.
 pub const OUTPUT: &str = "web/src/central-wasm";
 /// What wasm-bindgen writes for the crate, in the order the sums list them.
@@ -98,7 +98,14 @@ fn cli(target: &Path) -> Result<PathBuf> {
     if !version_matches(&program) {
         process::succeed(
             Command::new(workspace::cargo())
-                .args(["install", "--locked", "--force", "wasm-bindgen-cli"])
+                .args([
+                    "install",
+                    "--locked",
+                    "--force",
+                    "wasm-bindgen-cli",
+                    "--bin",
+                    "wasm-bindgen",
+                ])
                 .arg("--version")
                 .arg(format!("={BINDGEN}"))
                 .arg("--root")

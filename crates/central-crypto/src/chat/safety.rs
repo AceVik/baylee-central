@@ -7,7 +7,7 @@
 use std::cmp::Ordering;
 use std::fmt::Write as _;
 
-use chat_sha2::{Digest, Sha512};
+use sha2::{Digest, Sha512};
 
 use crate::chat::KEY_LEN;
 

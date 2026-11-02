@@ -20,6 +20,32 @@ These are engineering passes, not independent external audits. Separate agent
 reviews and their scope are recorded below. Release still needs independent review
 and operational/legal gates.
 
+## Dependency migration for 0.1.0-beta.9c, 2 November 2026
+
+Design pass: retain existing credentials, fixed Ristretto OPAQUE suite, chat
+known answers, protocol domains and resource limits while upgrading maintained
+dependencies. No application-specific cryptography or first-party unsafe is
+introduced. The owner accepted the 45 exact package/feature changes and their
+dependency-internal unsafe/native implementation scope in
+[the dependency review](dependency-proposal/beta9c.md), subject to gates.
+
+Implementation pass: consolidated duplicate SHA/HKDF/HMAC aliases onto the
+current zeroizing implementations, kept OPAQUE's required digest/RNG generation
+explicit, and migrated the wiped Argon2 work buffer to 0.6. The previous Argon2
+integration is enabled only for compatibility tests. Checked new HMAC key
+initialization, unchanged KDF parameters, and the bounded bigint reachability
+exception; neither its caller/feature checks nor its mutation tests were
+relaxed. Reviewed changed build scripts, package sources and licence results.
+
+Adversarial pass: all 168 crypto tests pass, including old/new Argon2 output
+equivalence, published vectors, malformed/tampered messages, secret redaction
+and unwind wiping. The full Rust gate, real PostgreSQL enrollment/login and
+migration tests, HTTP boundary smoke, secret scan, crypto scope, audit and deny
+checks pass locally. Deliberate PostgreSQL/HTTP fixture failures also return
+their expected errors and remove their owned services. Canonical WASM/browser
+and remote platform checks remain required before merge. This is an engineering
+review, not an independent audit or a production release approval.
+
 ## Foundation review
 
 Design pass: no production listener, password protocol or human replay intake;

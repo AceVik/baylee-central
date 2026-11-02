@@ -19,7 +19,7 @@ workspace = true
 central-client = { path = "../central-client", version = "=0.1.0" }
 central-api = { path = "../central-api", version = "=0.1.0" }
 central-crypto = { path = "../central-crypto", version = "=0.1.0" }
-wasm-bindgen = { version = "=0.2.129", default-features = false, features = ["std"] }
+wasm-bindgen = { version = "=0.2.130", default-features = false, features = ["std"] }
 zeroize = { version = "=1.9.1", features = ["alloc", "derive"] }
 
 # Randomness in the browser is the Web Crypto API's: getrandom 0.4 (the

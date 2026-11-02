@@ -101,9 +101,9 @@ makes it and proves it:
   with `--remap-path-prefix` for the repository (`/central`) and Cargo's home
   (`/cargo`), so the module holds no local path; a module that still names
   either fails the task.
-- The wasm-bindgen CLI at 0.2.129, the version of the crate's
+- The wasm-bindgen CLI at 0.2.130, the version of the crate's
   `wasm-bindgen` dependency, installed with `cargo install --locked` into
-  the target directory's `wasm-bindgen-cli/0.2.129` on first use and checked
+  the target directory's `wasm-bindgen-cli/0.2.130` on first use and checked
   by its `--version` on every run; `--target web`, with the name and
   producers sections removed.
 - The four files and `SHA256SUMS` (the SHA-256 of each) go to

@@ -1,12 +1,12 @@
 //! Fingerprint the reviewed crate, including new files, with portable LF text.
 
-use std::{collections::BTreeMap, fs, path::Path};
+use std::{collections::BTreeMap, fmt::Write, fs, path::Path};
 
 use sha2::{Digest, Sha256};
 
 use crate::fail::{Fail, OrFail, Result};
 
-const REVIEWED: &str = "dc888a48775be2adcdc5ece504a4b0c3683dc4d08dbd809b5f6071a7eb54b871";
+const REVIEWED: &str = "399770971518b98546ad6380b7579245b933489e12efd2cc1075b8b7fdb19946";
 const FAILURE: &str = "Crypto sources changed; review RUSTSEC-2026-0387 again";
 
 pub(super) fn verify(root: &Path) -> Result<()> {
@@ -26,7 +26,11 @@ fn fingerprint(root: &Path) -> Result<String> {
             hash.update(field);
         }
     }
-    Ok(format!("{:x}", hash.finalize()))
+    let mut hex = String::with_capacity(64);
+    for byte in hash.finalize() {
+        write!(hex, "{byte:02x}").or_fail(FAILURE)?;
+    }
+    Ok(hex)
 }
 
 fn read(path: &Path, relative: &str, files: &mut BTreeMap<String, String>) -> Result<()> {

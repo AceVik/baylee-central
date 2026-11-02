@@ -18,7 +18,7 @@ mod vector;
 struct ReferenceSuite;
 impl opaque_ke::CipherSuite for ReferenceSuite {
     type OprfCs = Ristretto255;
-    type KeyExchange = TripleDh<Ristretto255, sha2::Sha512>;
+    type KeyExchange = TripleDh<Ristretto255, opaque_sha2::Sha512>;
     type Ksf = Identity;
 }
 

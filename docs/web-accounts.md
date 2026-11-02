@@ -13,7 +13,7 @@ first. Every piece goes through the three passes of
   for. Password change, reset, e-mail, 2FA, profile and export come later (M1).
 - Registration hands out a **recovery code**, shown once.
 - Browser crypto is a WebAssembly crate built from `central-crypto`.
-  `wasm-bindgen` 0.2.129 as a direct dependency, getrandom 0.4.3 `wasm_js` and
+  `wasm-bindgen` 0.2.130 as a direct dependency, getrandom 0.4.3 `wasm_js` and
   0.2.17 `js`, and `'wasm-unsafe-eval'` in the site's CSP are approved.
   `#![forbid(unsafe_code)]` holds on the crate: rustc does not count the
   `unsafe` in `#[wasm_bindgen]`'s expansion against it (checked with a probe

@@ -34,7 +34,7 @@ fn transcript(context: &Context) -> [u8; TRANSCRIPT.len() + 8] {
 struct Suite;
 impl opaque_ke::CipherSuite for Suite {
     type OprfCs = opaque_ke::Ristretto255;
-    type KeyExchange = opaque_ke::TripleDh<opaque_ke::Ristretto255, sha2::Sha512>;
+    type KeyExchange = opaque_ke::TripleDh<opaque_ke::Ristretto255, opaque_sha2::Sha512>;
     type Ksf = stretch::FixedKsf;
 }
 

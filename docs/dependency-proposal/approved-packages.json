@@ -377,7 +377,52 @@
     "zerotrie@0.2.5",
     "zerovec-derive@0.11.6",
     "zerovec@0.11.8",
-    "zmij@1.0.23"
+    "zmij@1.0.23",
+    "argon2@0.6.0",
+    "arrow-arith@60.1.0",
+    "arrow-array@60.1.0",
+    "arrow-buffer@60.1.0",
+    "arrow-cast@60.1.0",
+    "arrow-cmp@60.1.0",
+    "arrow-data@60.1.0",
+    "arrow-ord@60.1.0",
+    "arrow-row@60.1.0",
+    "arrow-schema@60.1.0",
+    "arrow-select@60.1.0",
+    "arrow-string@60.1.0",
+    "arrow@60.1.0",
+    "blake2@0.11.0",
+    "cc@1.11.0",
+    "ctutils@0.4.7",
+    "icu_collections@2.4.0",
+    "icu_locale_core@2.4.0",
+    "icu_normalizer@2.4.0",
+    "icu_normalizer_data@2.4.0",
+    "icu_properties@2.4.0",
+    "icu_properties_data@2.4.0",
+    "icu_provider@2.4.0",
+    "inout@0.2.5",
+    "js-sys@0.3.107",
+    "log@0.4.35",
+    "rand_chacha@0.10.0",
+    "smallvec@1.16.4",
+    "tinystr@0.8.5",
+    "tokio@1.54.1",
+    "tower-http@0.7.1",
+    "unicode-properties@0.1.5",
+    "ureq-proto@0.7.1",
+    "ureq@3.5.1",
+    "utf8_iter@1.1.0",
+    "utf_types@1.0.0",
+    "uuid@1.29.0",
+    "wasm-bindgen-macro-support@0.2.130",
+    "wasm-bindgen-macro@0.2.130",
+    "wasm-bindgen-shared@0.2.130",
+    "wasm-bindgen@0.2.130",
+    "webpki-roots@1.0.11",
+    "yoke@0.8.4",
+    "zerovec-derive@0.11.7",
+    "zerovec@0.11.9"
   ],
   "scope": "Owner approved HTTP foundation via safe APIs after security checks; crypto and database excluded",
   "approved_on": "2026-10-19",
@@ -1786,6 +1831,122 @@
     "utf8-zero@0.8.1": [
       "default",
       "std"
+    ],
+    "argon2@0.6.0": [
+      "zeroize"
+    ],
+    "arrow-arith@60.1.0": [],
+    "arrow-array@60.1.0": [],
+    "arrow-buffer@60.1.0": [],
+    "arrow-cast@60.1.0": [],
+    "arrow-cmp@60.1.0": [],
+    "arrow-data@60.1.0": [],
+    "arrow-ord@60.1.0": [],
+    "arrow-row@60.1.0": [],
+    "arrow-schema@60.1.0": [],
+    "arrow-select@60.1.0": [],
+    "arrow-string@60.1.0": [],
+    "arrow@60.1.0": [],
+    "blake2@0.11.0": [],
+    "cc@1.11.0": [
+      "parallel"
+    ],
+    "ctutils@0.4.7": [],
+    "icu_collections@2.4.0": [],
+    "icu_locale_core@2.4.0": [
+      "zerovec"
+    ],
+    "icu_normalizer@2.4.0": [
+      "compiled_data"
+    ],
+    "icu_normalizer_data@2.4.0": [],
+    "icu_properties@2.4.0": [
+      "compiled_data"
+    ],
+    "icu_properties_data@2.4.0": [],
+    "icu_provider@2.4.0": [
+      "baked"
+    ],
+    "inout@0.2.5": [],
+    "js-sys@0.3.107": [
+      "default",
+      "std",
+      "unsafe-eval"
+    ],
+    "log@0.4.35": [],
+    "rand_chacha@0.10.0": [
+      "std"
+    ],
+    "smallvec@1.16.4": [
+      "const_generics",
+      "const_new",
+      "serde"
+    ],
+    "tinystr@0.8.5": [
+      "zerovec"
+    ],
+    "tokio@1.54.1": [
+      "bytes",
+      "default",
+      "fs",
+      "io-util",
+      "libc",
+      "macros",
+      "mio",
+      "net",
+      "rt",
+      "rt-multi-thread",
+      "signal",
+      "signal-hook-registry",
+      "socket2",
+      "sync",
+      "time",
+      "tokio-macros",
+      "windows-sys"
+    ],
+    "tower-http@0.7.1": [
+      "timeout"
+    ],
+    "unicode-properties@0.1.5": [
+      "default",
+      "emoji",
+      "general-category"
+    ],
+    "ureq-proto@0.7.1": [
+      "client"
+    ],
+    "ureq@3.5.1": [
+      "_ring",
+      "_rustls",
+      "_tls",
+      "rustls",
+      "rustls-no-provider",
+      "rustls-webpki-roots"
+    ],
+    "utf8_iter@1.1.0": [],
+    "utf_types@1.0.0": [],
+    "uuid@1.29.0": [
+      "default",
+      "serde",
+      "std"
+    ],
+    "wasm-bindgen-macro-support@0.2.130": [],
+    "wasm-bindgen-macro@0.2.130": [],
+    "wasm-bindgen-shared@0.2.130": [],
+    "wasm-bindgen@0.2.130": [
+      "default",
+      "serde",
+      "std"
+    ],
+    "webpki-roots@1.0.11": [],
+    "yoke@0.8.4": [
+      "derive",
+      "zerofrom"
+    ],
+    "zerovec-derive@0.11.7": [],
+    "zerovec@0.11.9": [
+      "derive",
+      "yoke"
     ]
   },
   "approvals": [
