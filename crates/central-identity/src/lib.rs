@@ -453,6 +453,7 @@ impl IdentityService {
         ticket: &Token,
         message: Vec<u8>,
         surface: Surface,
+        previous: Option<&Token>,
     ) -> Result<BrowserReply, Error> {
         // Consumption precedes validation, including invalid message size/proofs.
         let pending = self
@@ -484,10 +485,14 @@ impl IdentityService {
         .await
         .map_err(|_| Error::Unavailable)??;
         let token = Token::generate()?;
-        let issued = self
-            .store
-            .issue_session(&credential, surface.session(Some(&token))?)
-            .await?;
+        let issued = match surface {
+            Surface::Browser => {
+                self.store
+                    .issue_browser_session(&credential, &token, previous)
+                    .await?
+            }
+            Surface::Native => self.store.issue_session(&credential, &token).await?,
+        };
         Ok(signed_in(surface, credential.identity, issued, token))
     }
 
@@ -530,7 +535,14 @@ impl IdentityService {
             .lock()
             .map_err(|_| Error::Unavailable)?
             .request(&request, session, Instant::now())?;
-        self.dispatch(request, session, Surface::Browser).await
+        // Login keeps its anonymous budget and proof requirement. The old cookie
+        // identifies only existing push consent after that proof is verified.
+        let context = if matches!(&request, Request::LoginFinish { .. }) {
+            cookie
+        } else {
+            session
+        };
+        self.dispatch(request, context, Surface::Browser).await
     }
 }
 

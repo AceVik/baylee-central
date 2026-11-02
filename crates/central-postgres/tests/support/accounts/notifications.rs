@@ -151,6 +151,77 @@ pub(super) async fn run(store: &AccountStore, db: &DatabaseConnection, keys: &Se
     leases(store, db, me).await;
     consent(store, db, &alice, &bob, me).await;
     limits_and_logout(store, db, &alice, &bob, a).await;
+    reauthentication(store, db, a, b).await;
+}
+
+async fn reauthentication(
+    store: &AccountStore,
+    db: &DatabaseConnection,
+    alice: super::Identity,
+    bob: super::Identity,
+) {
+    let first = browser(store, alice).await;
+    subscribe(store, &first, "first-device").await;
+    let second = browser(store, alice).await;
+    subscribe(store, &second, "second-device").await;
+    let credential = store.credential(alice).await.unwrap().unwrap();
+    let refreshed = Token::generate().unwrap();
+    store
+        .issue_browser_session(&credential, &refreshed, Some(&second))
+        .await
+        .unwrap();
+    queue(db, Uuid::from_bytes(alice.account), Category::Chat).await;
+    assert_eq!(count(db, "push_jobs").await, 2);
+    store.logout(Session::Browser(&second)).await.unwrap();
+    assert_eq!(
+        count(db, "push_subscriptions").await,
+        2,
+        "the old cookie cannot revoke the renewed consent"
+    );
+    store.logout(Session::Browser(&refreshed)).await.unwrap();
+    assert_eq!(
+        count(db, "push_subscriptions").await,
+        1,
+        "logout after chat unlock still revokes that browser's consent"
+    );
+    assert_eq!(
+        count(db, "push_jobs").await,
+        1,
+        "another browser's queued hint survives"
+    );
+
+    let foreign = Token::generate().unwrap();
+    store
+        .issue_browser_session(
+            &store.credential(bob).await.unwrap().unwrap(),
+            &foreign,
+            Some(&first),
+        )
+        .await
+        .unwrap();
+    store.logout(Session::Browser(&foreign)).await.unwrap();
+    assert_eq!(
+        count(db, "push_subscriptions").await,
+        1,
+        "a previous cookie never moves consent to another account"
+    );
+
+    // The first device's session was replaced, but its explicit consent survives
+    // session expiry. A verified login with that old cookie reconnects only it.
+    let returned = Token::generate().unwrap();
+    store
+        .issue_browser_session(&credential, &returned, Some(&first))
+        .await
+        .unwrap();
+    store.logout(&returned).await.unwrap();
+    assert_eq!(
+        count(db, "push_subscriptions").await,
+        1,
+        "native logout cannot revoke browser consent"
+    );
+    store.logout(Session::Browser(&returned)).await.unwrap();
+    assert_eq!(count(db, "push_subscriptions").await, 0);
+    assert_eq!(count(db, "push_jobs").await, 0);
 }
 
 async fn contact_trigger(store: &AccountStore, db: &DatabaseConnection, bob: &Token) {

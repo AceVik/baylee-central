@@ -19,7 +19,7 @@ impl IdentityService {
             return Err(Error::Rejected);
         }
         if let Request::LoginFinish { attempt, message } = request {
-            return self.finish(&attempt, message, surface).await;
+            return self.finish(&attempt, message, surface, bearer).await;
         }
         if let Request::ChangePasswordFinish {
             attempt,
