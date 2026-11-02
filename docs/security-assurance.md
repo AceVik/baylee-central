@@ -2179,3 +2179,13 @@ transport, response bounds, acknowledgement identity and worker teardown. Full
 Rust gate passed including the group backend; final combined validation and native
 host/browser WASM integration remain in progress. See central-chat.md for the
 precise protocol, limitations and outstanding release checks.
+
+
+Integration follow-up, 2026-11-02: the sibling's real migration fixture exposed
+that the closed-move admission predicate also denied purpose-bound Export/Link
+tickets needed before the move can close. The store now exempts only those two
+nondelegating purposes. Design review retained the closed-move Admit gate,
+official-bridge authority, audience/session binding and one-use deletion. The
+PostgreSQL regression checks open-move transfer, no delegated lease, wrong audience,
+wrong purpose, registered-gateway refusal and replay, alongside the existing
+refused-before-close and accepted-after-close admission test.

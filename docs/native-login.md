@@ -141,9 +141,12 @@ row the deadline removed still closes. A closed move is never reopened, and
 refused: Central is the source, and the gateway changes no legacy password
 any more. The bridge's admission (`RedeemGateway` for `Admit`) of a legacy
 account whose move has not closed is refused, with or without the store, so a
-`legacy_id` in `GatewayIdentity` means a closed move: the official gateway fixes
+`legacy_id` in an admission `GatewayIdentity` means a closed move: the official gateway fixes
 the old id's link to the Central identity at that first admission (Baylee
-`docs/central-login.md` §"Legacy migration").
+`docs/central-login.md` §"Legacy migration"). Purpose-bound `Export`/`Link`
+tickets may still reconcile an unfinished gateway-source migration. Only the
+authenticated official bridge can redeem them, and they grant no session lease;
+wrong audiences, purposes, registered gateways and replay remain refused.
 
 **The deadline.** The owner's date, the end of 30.06.2027 in
 Europe/Berlin, set by migration 000015; the operator can move or clear it

@@ -147,6 +147,7 @@ async fn closed_move(
             .await
             .is_err()
     );
+    bridge_transfer_tickets(store, &session).await;
     store.close_legacy("legacy-one", identity).await.unwrap();
     let (_, legacy_id, _) = store
         .redeem_lease(
@@ -429,4 +430,54 @@ async fn deadline_and_sweep(legacy: &LegacyStore, operator: &DatabaseConnection)
         0
     );
     assert_eq!(set_legacy_deadline(operator, None).await.unwrap(), None);
+}
+
+/// A move must remain reconcilable before close, while admission stays denied.
+async fn bridge_transfer_tickets(store: &AccountStore, session: &Token) {
+    for purpose in [TicketPurpose::Export, TicketPurpose::Link] {
+        let ticket = Token::generate().unwrap();
+        store
+            .gateway_ticket(session, "official", &ticket, purpose)
+            .await
+            .unwrap();
+        assert!(
+            store
+                .redeem_lease(&ticket, &["wrong"], purpose, None, None)
+                .await
+                .is_err()
+        );
+        assert!(
+            store
+                .redeem_lease(
+                    &ticket,
+                    &["official"],
+                    TicketPurpose::Admit,
+                    None,
+                    Some(&Token::generate().unwrap())
+                )
+                .await
+                .is_err()
+        );
+        assert!(
+            store
+                .redeem_lease(&ticket, &["official"], purpose, Some([7; 16]), None)
+                .await
+                .is_err()
+        );
+        let (_, legacy, expires) = store
+            .redeem_lease(&ticket, &["official"], purpose, None, None)
+            .await
+            .unwrap();
+        assert_eq!(legacy.as_deref(), Some("legacy-one"));
+        assert!(
+            expires.is_none(),
+            "migration tickets never delegate a session"
+        );
+        assert!(
+            store
+                .redeem_lease(&ticket, &["official"], purpose, None, None)
+                .await
+                .is_err()
+        );
+    }
 }
