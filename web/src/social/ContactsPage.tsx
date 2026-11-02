@@ -35,12 +35,12 @@ function Contacts({ api, ownTag }: { api: SocialApi; ownTag: number }) {
 export default function ContactsPage({ client }: { client?: SocialApi }) {
   useTitle("title.accountContacts");
   const { state, reload } = useSummary();
-  const { account } = useAccount();
+  const { generation } = useAccount();
   const [api] = useState(() => client ?? socialApi());
   return <AppFrame page="accountContacts" admin={state.at === "ready" && state.summary.admin} eyebrow="app.account" title={<T id="social.title" />} lead={<T id="social.lead" />}>
     {state.at === "signedOut" ? <SignedOut /> : state.at === "failed" ? <Failed onRetry={reload} />
       : state.at === "loading" ? <output><T id="app.loading" /></output>
       : state.summary.tag === null || state.summary.displayName === null ? <p><Link to={PATHS.account}><T id="social.profileNeeded" /></Link></p>
-      : <Contacts key={`${state.summary.identity.account.join()}:${account?.expiresAt}`} api={api} ownTag={state.summary.tag} />}
+      : <Contacts key={`${state.summary.identity.account.join()}:${generation}`} api={api} ownTag={state.summary.tag} />}
   </AppFrame>;
 }

@@ -2,7 +2,7 @@
 // administration: who it is, whether it is an administrator, and when its
 // password sign-in was, which a change needs to be under 30 minutes old.
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { ApiError, type AccountSummary } from "../account/api";
 import { useAccount } from "../account/session";
@@ -22,28 +22,37 @@ export type SummaryState =
   | { at: "ready"; summary: AccountSummary };
 
 export function useSummary(): { state: SummaryState; reload(): void; replace(summary: AccountSummary): void } {
-  const { account, api } = useAccount();
-  const [state, setState] = useState<SummaryState>({ at: "loading" });
+  const { account, api, generation } = useAccount();
+  const [result, setResult] = useState<{ owner: number; value: SummaryState } | null>(null);
+  const lifecycle = useRef({ live: false, owner: generation, request: 0 });
   const present = account !== null;
   const read = useCallback(() => {
-    let live = true;
+    const scope = lifecycle.current;
+    if (!scope.live || scope.owner !== generation) return;
+    const request = ++scope.request;
     api.accountSummary().then(
       (summary) => {
-        if (live) setState({ at: "ready", summary });
+        if (scope.live && scope.owner === generation && request === scope.request) setResult({ owner: generation, value: { at: "ready", summary } });
       },
       (error: unknown) => {
-        if (!live) return;
-        setState(error instanceof ApiError && error.kind === "rejected" ? { at: "signedOut" } : { at: "failed" });
+        if (!scope.live || scope.owner !== generation || request !== scope.request) return;
+        setResult({ owner: generation, value: error instanceof ApiError && error.kind === "rejected" ? { at: "signedOut" } : { at: "failed" } });
       },
     );
-    return () => {
-      live = false;
-    };
-  }, [api]);
-  useEffect(() => (present ? read() : undefined), [present, read]);
-  const reload = useCallback(() => {
-    read();
-  }, [read]);
-  const replace = useCallback((summary: AccountSummary) => setState({ at: "ready", summary }), []);
-  return { state: present ? state : { at: "signedOut" }, reload, replace };
+  }, [api, generation]);
+  useEffect(() => {
+    const scope = lifecycle.current;
+    scope.owner = generation;
+    scope.live = present;
+    if (present) read();
+    return () => { scope.live = false; scope.request += 1; };
+  }, [present, read, generation]);
+  const replace = useCallback((summary: AccountSummary) => {
+    const scope = lifecycle.current;
+    if (!scope.live || scope.owner !== generation) return;
+    scope.request += 1;
+    setResult({ owner: generation, value: { at: "ready", summary } });
+  }, [generation]);
+  const state: SummaryState = !present ? { at: "signedOut" } : result?.owner === generation ? result.value : { at: "loading" };
+  return { state, reload: read, replace };
 }

@@ -8,7 +8,7 @@
 // in the browser. While a page is open and in view, it renews the session
 // (`RenewSession`), which Central caps at 12 hours after the sign-in.
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { ApiError, api as defaultApi, type Api } from "./api";
 import { workerCrypto, type CryptoFactory } from "./crypto";
@@ -58,12 +58,16 @@ function remember(account: Account | null): void {
 }
 
 interface AccountState {
+  /** Changes on authentication/account switches, never ordinary renewal. */
+  generation: number;
   account: Account | null;
   api: Api;
   /** A new flow's crypto: one Worker each. */
   crypto: CryptoFactory;
   /** A sign-in's answer, or a name just chosen: Central's handle for the account (or none yet) and the session's end. */
   signedIn(account: { handle: string | null; expiresAt: number }): void;
+  /** Extend only the current verified account after a same-account reauthentication. */
+  refreshed(expiresAt: number): void;
   /**
    * Ends the session at Central and forgets it here, also when Central
    * cannot be reached: `false` then, since the cookie lives until its end.
@@ -99,10 +103,22 @@ export function AccountProvider({
   children: ReactNode;
 }) {
   const [account, setAccount] = useState<Account | null>(() => remembered());
+  const serial = useRef(0);
+  const [generation, setGeneration] = useState(0);
 
   const change = useCallback((next: Account | null) => {
+    serial.current += 1;
+    setGeneration(serial.current);
     remember(next);
     setAccount(next);
+  }, []);
+  const refreshed = useCallback((expiresAt: number) => {
+    setAccount((current) => {
+      if (current === null) return null;
+      const next = { ...current, expiresAt };
+      remember(next);
+      return next;
+    });
   }, []);
   const signedIn = useCallback((next: { handle: string | null; expiresAt: number }) => change({ ...next, known: true }), [change]);
 
@@ -111,19 +127,20 @@ export function AccountProvider({
   useEffect(() => {
     if (!unnamed) return;
     let live = true;
+    const owner = generation;
     api.accountSummary().then(
       (summary) => {
-        if (live) change({ known: true, handle: handleOf(summary), expiresAt: summary.expiresAt });
+        if (live && owner === serial.current) change({ known: true, handle: handleOf(summary), expiresAt: summary.expiresAt });
       },
       (error: unknown) => {
         // no live session: forget it; Central unreachable: keep it, unnamed, until it ends
-        if (live && error instanceof ApiError && error.kind === "rejected") change(null);
+        if (live && owner === serial.current && error instanceof ApiError && error.kind === "rejected") change(null);
       },
     );
     return () => {
       live = false;
     };
-  }, [api, change, unnamed]);
+  }, [api, change, generation, unnamed]);
 
   // a named session renews while the page is in view: on a timer, and when the
   // page is shown again; Central's "no" means it is over, anything else waits
@@ -131,13 +148,14 @@ export function AccountProvider({
   useEffect(() => {
     if (!named) return;
     let live = true;
+    const owner = generation;
     let last = Date.now();
     const renew = () => {
       if (document.visibilityState !== "visible") return;
       last = Date.now();
       api.renewSession().then(
         (expiresAt) => {
-          if (!live) return;
+          if (!live || owner !== serial.current) return;
           setAccount((now) => {
             if (now === null) return now;
             const next = { ...now, expiresAt };
@@ -146,7 +164,7 @@ export function AccountProvider({
           });
         },
         (error: unknown) => {
-          if (live && error instanceof ApiError && error.kind === "rejected") change(null);
+          if (live && owner === serial.current && error instanceof ApiError && error.kind === "rejected") change(null);
         },
       );
     };
@@ -160,7 +178,7 @@ export function AccountProvider({
       window.clearInterval(timer);
       document.removeEventListener("visibilitychange", shown);
     };
-  }, [api, change, named, renewEvery]);
+  }, [api, change, generation, named, renewEvery]);
 
   // the session ends at its time without a word from Central
   useEffect(() => {
@@ -176,13 +194,18 @@ export function AccountProvider({
       if (e.key !== SESSION_KEY && e.key !== null) return;
       const next = remembered();
       // the same session keeps its name; another is Central's to name
-      setAccount((now) => (next !== null && now !== null && now.expiresAt === next.expiresAt ? now : next));
+      // Storage events may be another account in the same cookie jar. Invalidate
+      // pending reads/crypto immediately and ask Central to identify it afresh.
+      serial.current += 1;
+      setGeneration(serial.current);
+      setAccount(next);
     };
     window.addEventListener("storage", other);
     return () => window.removeEventListener("storage", other);
   }, []);
 
   const signOut = useCallback(async () => {
+    change(null);
     let ended = true;
     try {
       await api.logout();
@@ -190,11 +213,10 @@ export function AccountProvider({
       // a session Central no longer has is ended too; an unreachable one ends at its time
       ended = error instanceof ApiError && error.kind === "rejected";
     }
-    change(null);
     return ended;
   }, [api, change]);
 
-  const value = useMemo(() => ({ account, api, crypto, signedIn, signOut }), [account, api, crypto, signedIn, signOut]);
+  const value = useMemo(() => ({ account, generation, api, crypto, signedIn, refreshed, signOut }), [account, generation, api, crypto, signedIn, refreshed, signOut]);
   return <AccountContext value={value}>{children}</AccountContext>;
 }
 
