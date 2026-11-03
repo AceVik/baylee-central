@@ -644,7 +644,36 @@ fn session(browser: &Browser, http: &Http, bridge: &Token, cookie: &Token) {
         browser.answer(&Request::RenewSession, None).err(),
         Some(Error::Rejected)
     );
-    // Operations outside the browser listener's list are refused, with any token.
+    outside(browser, bridge, cookie);
+    // Central's terms are read and accepted on the website.
+    let Response::TermsStatus {
+        current: Some(current),
+        accepted: false,
+    } = browser.answer(&Request::TermsStatus, Some(cookie)).unwrap()
+    else {
+        panic!("terms to accept");
+    };
+    assert!(matches!(
+        browser
+            .answer(
+                &Request::AcceptTerms {
+                    subject: TermsSubject::Central,
+                    version: current.version.clone(),
+                    digest: current.digest,
+                },
+                Some(cookie),
+            )
+            .unwrap(),
+        Response::Done
+    ));
+    assert!(matches!(
+        browser.answer(&Request::TermsStatus, Some(cookie)).unwrap(),
+        Response::TermsStatus { accepted: true, .. }
+    ));
+}
+
+/// Operations outside the browser listener's list are refused, with any token.
+fn outside(browser: &Browser, bridge: &Token, cookie: &Token) {
     for (request, token) in [
         (Request::ReadDocument, cookie),
         (Request::CreateObject, cookie),
@@ -685,31 +714,6 @@ fn session(browser: &Browser, http: &Http, bridge: &Token, cookie: &Token) {
     ] {
         assert!(browser.refused(&request, Some(token)));
     }
-    // Central's terms are read and accepted on the website.
-    let Response::TermsStatus {
-        current: Some(current),
-        accepted: false,
-    } = browser.answer(&Request::TermsStatus, Some(cookie)).unwrap()
-    else {
-        panic!("terms to accept");
-    };
-    assert!(matches!(
-        browser
-            .answer(
-                &Request::AcceptTerms {
-                    subject: TermsSubject::Central,
-                    version: current.version.clone(),
-                    digest: current.digest,
-                },
-                Some(cookie),
-            )
-            .unwrap(),
-        Response::Done
-    ));
-    assert!(matches!(
-        browser.answer(&Request::TermsStatus, Some(cookie)).unwrap(),
-        Response::TermsStatus { accepted: true, .. }
-    ));
 }
 
 /// The public directory is read on the browser listener without a session,
