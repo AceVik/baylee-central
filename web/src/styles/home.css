@@ -153,6 +153,10 @@
   .strip .stat:nth-child(2n) {
     justify-self: end;
   }
+  /* the commit's age would run into the gateways beside it */
+  .strip .stat-commit .small {
+    display: none;
+  }
   .stat dt {
     font-size: 0.6rem;
     letter-spacing: 0.07em;
@@ -179,6 +183,7 @@
 .about-arch-grid {
   gap: 1rem;
   margin-bottom: 1rem;
+  align-items: stretch;
 }
 .about-arch-card {
   padding: 1.35rem 1.45rem;
@@ -544,3 +549,19 @@
 .lightbox-next {
   right: 0.6rem;
 }
+
+/* ---------------------------------------------------------------- the start page's gateways: rows of equal cards */
+.hgw-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--hgw-columns, 2), minmax(0, 1fr));
+  gap: var(--space-4);
+  list-style: none;
+  margin: 0 auto;
+  padding: 0;
+}
+.hgw-grid[data-count="1"] { --hgw-columns: 1; max-width: 24rem; }
+.hgw-grid[data-count="2"], .hgw-grid[data-count="4"] { max-width: 56rem; }
+.hgw-grid[data-count="3"] { --hgw-columns: 3; }
+@media (max-width: 860px) { .hgw-grid[data-count="3"] { --hgw-columns: 1; max-width: 26rem; } }
+@media (max-width: 600px) { .hgw-grid[data-count] { --hgw-columns: 1; max-width: 26rem; } }
+.hgw-count { display: block; text-align: center; margin-bottom: var(--space-4); }

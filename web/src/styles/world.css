@@ -10,7 +10,7 @@ main > .section-alt { background: var(--bg-alt); }
 .glass { border-color: var(--edge); }
 @media (min-width: 1000px) {
   .account-page { min-height: 88svh; }
-  .account-page .section-inner { width: min(48vw, 38rem); margin-left: max(var(--gutter), calc((100vw - var(--wrap)) / 2)); margin-right: auto; }
+  .account-page .section-inner { width: min(48vw, 38rem); margin-left: max(var(--gutter), calc((100% - var(--wrap)) / 2)); margin-right: auto; }
 }
 @media (max-width: 999px) {
   .world-companion { display: none; }

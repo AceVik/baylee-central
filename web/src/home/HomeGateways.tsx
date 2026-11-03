@@ -35,7 +35,7 @@ export function HomeGateways({ gateways, loading, failure, retry }: {
         {!loading && failure === null && gateways.length === 0 && t(lang, "gw.none")}
       </output>
       {shown.length > 0 && (
-        <ul className="gateways grid-cards grid-centred stagger">
+        <ul className="gateways hgw-grid stagger" data-count={shown.length}>
           {shown.map((g) => (
             <GatewayCard key={g.id} g={g} official={g.origin === OFFICIAL_GATEWAY} />
           ))}
