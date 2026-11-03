@@ -28,10 +28,13 @@ async function sweep(page: Page) {
   const box = await page.locator(".hero").boundingBox();
   if (box === null) throw new Error("no hero");
   await page.mouse.move(box.x + box.width * 0.04, box.y + box.height * 0.75);
-  for (let i = 1; i <= 24; i++) await page.mouse.move(box.x + box.width * (0.04 + 0.4 * (i / 24)), box.y + box.height * (0.75 - 0.1 * Math.sin((i / 24) * Math.PI)), { steps: 2 });
+  for (let i = 1; i <= 10; i++) await page.mouse.move(box.x + box.width * (0.04 + 0.4 * (i / 10)), box.y + box.height * (0.75 - 0.1 * Math.sin((i / 10) * Math.PI)));
 }
 
 test("the clouds draw, and the pointer stirs them", async ({ page }) => {
+  // the live air in software rendering: a small window, and time for it
+  test.slow();
+  await page.setViewportSize({ width: 800, height: 520 });
   const errors = watchErrors(page);
   const outside = await mock(page);
   await page.addInitScript(() => localStorage.setItem("baylee-clouds", "live"));

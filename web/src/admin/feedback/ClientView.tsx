@@ -7,7 +7,7 @@
 // is not unpacked here: it is handed to the browser as the `.gz` Central
 // keeps, read no further than its bound.
 
-import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
 
 import { ApiError } from "../../account/api";
 import { Failed } from "../../app/AppFrame";
@@ -141,22 +141,35 @@ export function RefText({ text, refs }: { text: string; refs: Refs | null }) {
   return <>{out}</>;
 }
 
-/** The window's picture through a `blob:` address of its checked bytes, given back when it goes. */
+/**
+ * The picture through a `blob:` address of its checked bytes, made as the
+ * image is attached and given back as it goes, so that each image (and
+ * React's second attach in development) has its own live address.
+ */
+function BlobImage({ shot, alt, lazy = false }: { shot: Screenshot; alt: string; lazy?: boolean }) {
+  const attach = useCallback((img: HTMLImageElement | null) => {
+    if (img === null) return;
+    const url = URL.createObjectURL(new Blob([shot.png.slice()], { type: "image/png" }));
+    img.src = url;
+    return () => URL.revokeObjectURL(url);
+  }, [shot]);
+  return <img ref={attach} alt={alt} width={shot.width} height={shot.height} {...(lazy ? { decoding: "async" as const } : {})} />;
+}
+
+/** The window's picture, large in a dialog on a press. */
 function Shot({ shot }: { shot: Screenshot }) {
   const lang = useLang();
   const [big, setBig] = useState(false);
-  const url = useMemo(() => URL.createObjectURL(new Blob([shot.png.slice()], { type: "image/png" })), [shot]);
-  useEffect(() => () => URL.revokeObjectURL(url), [url]);
   const alt = t(lang, "fb.shotAlt", { width: shot.width, height: shot.height });
   return (
     <>
       <button type="button" className="fb-shot" onClick={() => setBig(true)}>
-        <img src={url} alt={alt} width={shot.width} height={shot.height} decoding="async" />
+        <BlobImage shot={shot} alt={alt} lazy />
         <span className="vh">{t(lang, "fb.enlarge")}</span>
       </button>
       {big && (
         <Modal className="app-dialog fb-lightbox" label={t(lang, "fb.screenshot")} onClose={() => setBig(false)}>
-          <img src={url} alt={alt} width={shot.width} height={shot.height} />
+          <BlobImage shot={shot} alt={alt} />
           <div className="app-dialog-actions">
             <button type="button" className="button" onClick={() => setBig(false)}>
               {t(lang, "app.close")}

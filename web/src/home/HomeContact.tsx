@@ -2,15 +2,13 @@ import { DISCORD, ISSUES, WHATSAPP } from "../config";
 import { Icon } from "../components/icons";
 import { Section } from "../components/Section";
 import { ContactForm } from "../contact/ContactForm";
-import { T, useLang, type Elems } from "../i18n";
+import { T, type Elems } from "../i18n";
 import { Link, PATHS } from "../router";
 import "../styles/forms.css";
 
 const OPERATOR: Elems = { impressum: (words) => <Link to={PATHS.impressum}>{words}</Link> };
 
 export function HomeContact() {
-  const lang = useLang();
-  const de = lang === "de";
 
   return (
     <Section id="contact" alt eyebrow={<T id="contact.eyebrow" />} title={<T id="contact.title" />}>
@@ -40,7 +38,7 @@ export function HomeContact() {
                 <span>
                   WhatsApp
                   <small>
-                    {de ? "Community-Gruppe & schnelle Runden" : "Community group & quick matches"}
+                    <T id="contact.whatsappSub" />
                   </small>
                 </span>
               </a>
@@ -60,9 +58,9 @@ export function HomeContact() {
               <Link className="glass" to={PATHS.contact}>
                 <Icon name="chat" />
                 <span>
-                  {de ? "Berichte & Datenschutz" : "Reports & Privacy"}
+                  <T id="contact.reportsTitle" />
                   <small>
-                    {de ? "Details zu F8-Berichten & Daten" : "Details on F8 reports & data"}
+                    <T id="contact.reportsSub" />
                   </small>
                 </span>
               </Link>

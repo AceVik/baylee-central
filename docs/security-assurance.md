@@ -2427,3 +2427,48 @@ answer comes back, the contacts tab answers a request, and after a reload a
 wrong password is refused before the right one unlocks. Not run here: the real
 WebAssembly against a real Central (its `chat_unlock` and steps are the same
 exports the chat page used before). Engineering review, not an audit.
+
+## Review of the website overhaul (PR #62), 3 November 2026
+
+A review of the overhaul's commit before it reaches main. What it changed:
+
+- **No unverified endorsements.** The start page's gateway showcase was a
+  hard-coded list: three gateways on domains this project does not control,
+  with invented player counts, links to them and `baylee://gateway/connect`
+  links that the client does not handle. Anyone registering one of those
+  names would have had the official site send players there. The section
+  now shows the first gateways of Central's own directory through the
+  directory's card (an "Open in Baylee" link only behind the deep-link
+  switch), and `gatewayConnectLink` is gone. The self-hosting snippet no
+  longer names two environment variables no gateway reads.
+- **Nothing made up.** The status strip showed constant games and users, a
+  per-browser view counter, a "registered" figure computed from the
+  constants and an invented player list, and the footer and strip claimed
+  GDPR compliance. The strip now shows only what a source says (the release
+  and CI from GitHub, the gateways online and not from Central's
+  directory); the claims are removed (AGENTS.md: no compliance claim
+  without evidence).
+- **No half protocol.** The commit added `GatewayStats` to the heartbeat and
+  the directory listing of `central-api`, the crate the client links: player
+  handles with their presence for a public listing, "opted-in" asserted in a
+  comment without a consent mechanism, counts without bounds, accepted under
+  `Private`, validated and then dropped (never stored nor served), without
+  an entry in the gateway registry's documentation, and a `deny_unknown_fields`
+  break for older clients the day it would be filled. The crates are back to
+  main's; the feature can return as its own change with storage, consent,
+  bounds, documentation and a compatibility plan. The page's mirror of it
+  (`validGatewayStats`, the card's counts) went with it.
+- Smaller: the download and language lists give the keyboard back to their
+  switch on Escape and a choice, close when the keyboard leaves them and
+  name what they control; the download's live region is its line of facts,
+  not the list; leaving an anchor on the same page goes back to the top;
+  the feedback screenshot's `blob:` address is made per image as it is
+  attached (React's development double attach revoked a shared one); German
+  and English sentences written into components became Fluent messages;
+  dead code (an unrouted page, an API only its test used, a constant)
+  removed.
+
+Checked and left: the directory's parsing and its origin rules, text-only
+rendering of gateway strings, the CSV and GitHub guards, the router's click
+handling, the anchors the page scrolls to, and the polling's pauses.
+Engineering review, not an audit.

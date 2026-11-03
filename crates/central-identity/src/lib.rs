@@ -690,7 +690,6 @@ mod tests {
             },
             Request::GatewayHeartbeat {
                 metadata: metadata(),
-                stats: None,
             },
             Request::SetGatewayAdmins {
                 gateway: [0; 16],

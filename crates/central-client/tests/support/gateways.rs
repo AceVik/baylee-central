@@ -43,18 +43,14 @@ pub(crate) fn run(
     assert!(
         http.exchange(
             &Request::GatewayHeartbeat {
-                metadata: metadata.clone(),
-                stats: None,
+                metadata: metadata.clone()
             },
             Some(&registered.credential)
         )
         .is_err()
     );
     http.exchange(
-        &Request::GatewayHeartbeat {
-            metadata,
-            stats: None,
-        },
+        &Request::GatewayHeartbeat { metadata },
         Some(&registered.heartbeat),
     )
     .unwrap();
@@ -128,10 +124,7 @@ pub(crate) fn official(
             .err(),
         Some(Error::Conflict)
     );
-    let heartbeat = Request::GatewayHeartbeat {
-        metadata,
-        stats: None,
-    };
+    let heartbeat = Request::GatewayHeartbeat { metadata };
     assert_eq!(
         http.exchange(&heartbeat, Some(bridge)).err(),
         Some(Error::Rejected),

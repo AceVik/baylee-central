@@ -15,7 +15,7 @@ import { gatewayLink } from "../central/deeplink";
 import { Address } from "../app/Copy";
 import { Icon } from "../components/icons";
 import { deepLinks, onLoopback } from "../config";
-import { T, num, t, useLang } from "../i18n";
+import { T, t, useLang } from "../i18n";
 
 /** How long the copy button says "Copied" before it offers to copy again. */
 const COPIED_MS = 1600;
@@ -86,28 +86,6 @@ export function GatewayCard({ g, official = false }: { g: GatewayListing; offici
             <code translate="no">{g.metadata.version}</code>
           </dd>
         </div>
-        {g.stats && g.stats.privacy !== "private" && (
-          <div>
-            <dt>
-              <T id="status.games" />
-            </dt>
-            <dd className="gw-stats-dd num">
-              <span>
-                {num(lang, g.stats.running_games)} <T id="status.running" />
-              </span>
-              <span className="small"> · </span>
-              <span>
-                {num(lang, g.stats.players_online)} <T id="status.online" />
-              </span>
-              <span className="small">
-                {" "}
-                ({num(lang, g.stats.players_in_lobby)} <T id="status.inLobby" />,{" "}
-                {num(lang, g.stats.players_at_table)} <T id="status.atTable" />,{" "}
-                {num(lang, g.stats.players_in_game)} <T id="status.inGame" />)
-              </span>
-            </dd>
-          </div>
-        )}
       </dl>
       <div className="gw-actions">
         {link === null ? (

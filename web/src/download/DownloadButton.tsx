@@ -4,7 +4,7 @@
 // reach every other system/architecture installer directly. Every link goes
 // straight to GitHub.
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 import { RELEASES_PAGE } from "../config";
 import { dateText, mb } from "../github";
@@ -47,22 +47,32 @@ export function DownloadButton({ state, onDownloadPage }: { state: ReleaseState;
   const others = onDownloadPage === true ? "#platforms" : "/download#platforms";
   const [menuOpen, setMenuOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
+  const toggleRef = useRef<HTMLButtonElement>(null);
+  const menuId = useId();
 
+  // the list closes on a press outside, on Escape (the keyboard back on its
+  // toggle) and when the keyboard leaves it
   useEffect(() => {
-    if (!menuOpen) return;
+    const wrap = wrapRef.current;
+    if (!menuOpen || wrap === null) return;
     const onPointerDown = (e: PointerEvent) => {
-      if (e.target instanceof Node && !wrapRef.current?.contains(e.target)) {
-        setMenuOpen(false);
-      }
+      if (e.target instanceof Node && !wrap.contains(e.target)) setMenuOpen(false);
     };
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setMenuOpen(false);
+      if (e.key !== "Escape") return;
+      setMenuOpen(false);
+      toggleRef.current?.focus();
+    };
+    const onFocusOut = (e: FocusEvent) => {
+      if (e.relatedTarget instanceof Node && !wrap.contains(e.relatedTarget)) setMenuOpen(false);
     };
     document.addEventListener("pointerdown", onPointerDown);
     document.addEventListener("keydown", onKeyDown);
+    wrap.addEventListener("focusout", onFocusOut);
     return () => {
       document.removeEventListener("pointerdown", onPointerDown);
       document.removeEventListener("keydown", onKeyDown);
+      wrap.removeEventListener("focusout", onFocusOut);
     };
   }, [menuOpen]);
 
@@ -106,7 +116,7 @@ export function DownloadButton({ state, onDownloadPage }: { state: ReleaseState;
   const availablePlatforms = PLATFORMS.filter((p) => (files[p.id]?.length ?? 0) > 0);
 
   return (
-    <div className="dl" aria-live="polite">
+    <div className="dl">
       <div className="dl-split-wrap" ref={wrapRef}>
         <div className="dl-split">
           <a
@@ -123,10 +133,11 @@ export function DownloadButton({ state, onDownloadPage }: { state: ReleaseState;
           </a>
           {availablePlatforms.length > 0 && (
             <button
+              ref={toggleRef}
               type="button"
               className="button dl-split-toggle"
-              aria-haspopup="true"
               aria-expanded={menuOpen}
+              aria-controls={menuId}
               aria-label={t(lang, "dl.quickAccess")}
               title={t(lang, "dl.quickAccess")}
               onClick={() => setMenuOpen((o) => !o)}
@@ -136,7 +147,7 @@ export function DownloadButton({ state, onDownloadPage }: { state: ReleaseState;
           )}
         </div>
         {menuOpen && availablePlatforms.length > 0 && (
-          <section className="dl-menu" aria-label={t(lang, "dl.quickAccess")}>
+          <section id={menuId} className="dl-menu" aria-label={t(lang, "dl.quickAccess")}>
             <ul className="dl-menu-list">
               {availablePlatforms.map((p) => {
                 const pFiles = files[p.id] ?? [];
@@ -183,7 +194,7 @@ export function DownloadButton({ state, onDownloadPage }: { state: ReleaseState;
           </section>
         )}
       </div>
-      <p className="dl-meta">
+      <p className="dl-meta" aria-live="polite">
         {release.tag_name}
         {best && (
           <>

@@ -20,7 +20,7 @@ const FAILURE: Record<DirectoryFailure, Key> = {
   network: "gw.network",
 };
 
-function Failure({ kind, onRetry }: { kind: DirectoryFailure; onRetry: () => void }) {
+export function Failure({ kind, onRetry }: { kind: DirectoryFailure; onRetry: () => void }) {
   const lang = useLang();
   return (
     <div className="dir-failure glass">
@@ -38,7 +38,7 @@ function Failure({ kind, onRetry }: { kind: DirectoryFailure; onRetry: () => voi
  * drawn moves: the pages keep Central's order, whose last id is the next
  * page's cursor.
  */
-function officialFirst(gateways: readonly GatewayListing[]): GatewayListing[] {
+export function officialFirst(gateways: readonly GatewayListing[]): GatewayListing[] {
   return [...gateways.filter((g) => g.origin === OFFICIAL_GATEWAY), ...gateways.filter((g) => g.origin !== OFFICIAL_GATEWAY)];
 }
 
