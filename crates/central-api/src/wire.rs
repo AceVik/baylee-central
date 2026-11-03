@@ -117,6 +117,9 @@ pub enum Request {
     GatewayHeartbeat {
         /// Metadata must stay on the approved origin.
         metadata: crate::gateway::GatewayMetadata,
+        /// Optional live activity and table telemetry, respecting gateway privacy.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        stats: Option<crate::gateway::GatewayStats>,
     },
     /// Owner-authorized, revision-checked replacement of this gateway's administrator list.
     SetGatewayAdmins {

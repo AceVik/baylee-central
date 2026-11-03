@@ -7,6 +7,7 @@ export const GITHUB_API = `https://api.github.com/repos/${REPO}`;
 export const RELEASES_PAGE = `${GITHUB}/releases`;
 export const ISSUES = `${GITHUB}/issues`;
 export const DISCORD = "https://discord.gg/4pP3uAwgY";
+export const WHATSAPP = "https://chat.whatsapp.com/JsWHl71rnPPGEG74w48vk6";
 /** This web app's own source (AGPL-3.0, §13). */
 export const SITE_SOURCE = "https://github.com/AceVik/baylee-central/tree/main/web";
 /** Baylee Central's repository: public so anyone can check how it handles their data. */

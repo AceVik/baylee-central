@@ -25,7 +25,9 @@ export function FindContact({ api, ownTag, busy, onAdd }: { api: SocialApi; ownT
     finally { if (generation.current === run) setSearching(false); }
   };
   return <section className="card app-panel">
-    <h2><T id="social.add" /></h2>
+    <div className="app-panel-head">
+      <h2 className="app-panel-title"><T id="social.add" /></h2>
+    </div>
     <form onSubmit={(e) => { void search(e); }} className="social-search">
       <div className="field">
         <label htmlFor="contact-tag"><T id="social.tag" /></label>
@@ -34,10 +36,10 @@ export function FindContact({ api, ownTag, busy, onAdd }: { api: SocialApi; ownT
       </div>
       <button type="submit" className="button button-ghost" disabled={searching || busy}><T id="social.find" /></button>
     </form>
-    <output aria-live="polite">{searching ? <T id="app.loading" /> : message !== null ? <T id={message} /> : null}</output>
-    {found !== null && <div className="social-row">
+    <output className={`form-status${message === "social.badTag" || message === "social.failed" ? " bad" : ""}`} aria-live="polite">{searching ? <T id="app.loading" /> : message !== null ? <T id={message} /> : null}</output>
+    {found !== null && <div className="social-row social-found">
       <bdi translate="no">{handleOf(found)}</bdi>
-      <button className="button" disabled={busy} onClick={() => { void onAdd(found.tag).then((ok) => { if (ok) setFound(null); }); }}><T id="social.request" /></button>
+      <button type="button" className="button button-sm" disabled={busy} onClick={() => { void onAdd(found.tag).then((ok) => { if (ok) setFound(null); }); }}><T id="social.request" /></button>
     </div>}
   </section>;
 }

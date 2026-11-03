@@ -21,19 +21,195 @@ const NAV: { page: Page; label: Key }[] = [
   { page: "contact", label: "nav.contact" },
 ];
 
+const LANG_CODE: Readonly<Record<typeof OFFERED[number], string>> = {
+  en: "EN",
+  de: "DE",
+  fr: "FR",
+  it: "IT",
+  es: "ES",
+  pt: "PT",
+  ja: "JA",
+  ko: "KO",
+  ru: "RU",
+  zhs: "ZH",
+  zht: "ZH",
+};
+
+/** Decorated vector flag emblem for each supported language. */
+function LangFlag({ lang }: { lang: typeof OFFERED[number] }) {
+  return (
+    <span className="lang-flag-frame" aria-hidden="true">
+      <svg className="lang-flag-svg" viewBox="0 0 24 16" width="21" height="14" focusable="false">
+        {lang === "de" && (
+          <>
+            <rect width="24" height="5.34" y="0" fill="#18181b" />
+            <rect width="24" height="5.34" y="5.33" fill="#dc2626" />
+            <rect width="24" height="5.34" y="10.66" fill="#facc15" />
+          </>
+        )}
+        {lang === "en" && (
+          <>
+            <rect width="24" height="16" fill="#1e3a8a" />
+            <path d="M0 0L24 16M24 0L0 16" stroke="#ffffff" strokeWidth="3.2" />
+            <path d="M0 0L24 16M24 0L0 16" stroke="#dc2626" strokeWidth="1.6" />
+            <path d="M12 0V16M0 8H24" stroke="#ffffff" strokeWidth="5.2" />
+            <path d="M12 0V16M0 8H24" stroke="#dc2626" strokeWidth="3" />
+          </>
+        )}
+        {lang === "fr" && (
+          <>
+            <rect width="8" height="16" x="0" fill="#1d4ed8" />
+            <rect width="8" height="16" x="8" fill="#ffffff" />
+            <rect width="8" height="16" x="16" fill="#dc2626" />
+          </>
+        )}
+        {lang === "it" && (
+          <>
+            <rect width="8" height="16" x="0" fill="#15803d" />
+            <rect width="8" height="16" x="8" fill="#ffffff" />
+            <rect width="8" height="16" x="16" fill="#dc2626" />
+          </>
+        )}
+        {lang === "es" && (
+          <>
+            <rect width="24" height="4" y="0" fill="#dc2626" />
+            <rect width="24" height="8" y="4" fill="#facc15" />
+            <rect width="24" height="4" y="12" fill="#dc2626" />
+          </>
+        )}
+        {lang === "pt" && (
+          <>
+            <rect width="24" height="16" fill="#15803d" />
+            <polygon points="12,2 21,8 12,14 3,8" fill="#facc15" />
+            <circle cx="12" cy="8" r="3.2" fill="#1d4ed8" />
+          </>
+        )}
+        {lang === "ja" && (
+          <>
+            <rect width="24" height="16" fill="#ffffff" />
+            <circle cx="12" cy="8" r="4.5" fill="#dc2626" />
+          </>
+        )}
+        {lang === "ko" && (
+          <>
+            <rect width="24" height="16" fill="#ffffff" />
+            <circle cx="12" cy="8" r="4.2" fill="#dc2626" />
+            <path d="M7.8 8a4.2 4.2 0 0 0 8.4 0 2.1 2.1 0 0 0-4.2 0 2.1 2.1 0 0 1-4.2 0z" fill="#1d4ed8" />
+          </>
+        )}
+        {lang === "ru" && (
+          <>
+            <rect width="24" height="5.34" y="0" fill="#ffffff" />
+            <rect width="24" height="5.34" y="5.33" fill="#1d4ed8" />
+            <rect width="24" height="5.34" y="10.66" fill="#dc2626" />
+          </>
+        )}
+        {(lang === "zhs" || lang === "zht") && (
+          <>
+            <rect width="24" height="16" fill="#dc2626" />
+            <circle cx="6" cy="5.5" r="2.2" fill="#facc15" />
+          </>
+        )}
+        <rect
+          width="24"
+          height="16"
+          fill="none"
+          stroke="rgba(255, 255, 255, 0.28)"
+          strokeWidth="1.2"
+        />
+      </svg>
+    </span>
+  );
+}
+
 function LangSwitch() {
   const lang = useLang();
   const choose = useChooseLang();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const switcherLabel = OFFERED.map(wordOf).join(" / ");
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onPointerDown = (e: PointerEvent) => {
+      if (e.target instanceof Node && !wrapRef.current?.contains(e.target)) {
+        setMenuOpen(false);
+      }
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMenuOpen(false);
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [menuOpen]);
+
+  const currentCode = LANG_CODE[lang] ?? lang.toUpperCase();
+  const currentName = nameOf(lang);
+
   return (
-    <fieldset className="lang">
-      {/* the word in every offered language, for a visitor who reads none of the page's */}
-      <legend className="vh">{OFFERED.map(wordOf).join(" / ")}</legend>
-      {OFFERED.map((l) => (
-        <button key={l} type="button" className="lang-btn" lang={tagOf(l)} aria-pressed={lang === l} onClick={() => choose(l)}>
-          {nameOf(l)}
+    <div className="lang-split-wrap" ref={wrapRef}>
+      <fieldset className="lang-split" aria-label={switcherLabel}>
+        <button
+          type="button"
+          className="lang-main"
+          lang={tagOf(lang)}
+          aria-haspopup="true"
+          aria-expanded={menuOpen}
+          onClick={() => setMenuOpen((o) => !o)}
+          title={`${currentName} (${currentCode}) — ${switcherLabel}`}
+        >
+          <LangFlag lang={lang} />
+          <span className="lang-code">{currentCode}</span>
+          <span className="lang-current-name">{currentName}</span>
         </button>
-      ))}
-    </fieldset>
+        <button
+          type="button"
+          className="lang-split-toggle"
+          aria-haspopup="true"
+          aria-expanded={menuOpen}
+          aria-label={switcherLabel}
+          title={switcherLabel}
+          onClick={() => setMenuOpen((o) => !o)}
+        >
+          <Icon name="down" className={`lang-chevron${menuOpen ? " open" : ""}`} />
+        </button>
+      </fieldset>
+      {menuOpen && (
+        <div className="lang-menu">
+          <ul className="lang-menu-list">
+            {OFFERED.map((l) => {
+              const active = lang === l;
+              const code = LANG_CODE[l] ?? l.toUpperCase();
+              const name = nameOf(l);
+              return (
+                <li key={l} className="lang-menu-item">
+                  <button
+                    type="button"
+                    className={`lang-menu-btn${active ? " is-active" : ""}`}
+                    lang={tagOf(l)}
+                    aria-pressed={active}
+                    aria-label={name}
+                    onClick={() => {
+                      choose(l);
+                      setMenuOpen(false);
+                    }}
+                  >
+                    <LangFlag lang={l} />
+                    <span className="lang-code">{code}</span>
+                    <span className="lang-menu-name">{name}</span>
+                    {active && <Icon name="check" className="lang-menu-check" />}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -128,16 +304,16 @@ export function Header({ page }: { page: Page | null }) {
         </button>
         <nav className={`nav${open ? " open" : ""}`} id="nav" aria-label={t(lang, "nav.label")}>
           {NAV.map((item) => (
-            <Link key={item.page} to={PATHS[item.page]} aria-current={page === item.page ? "page" : undefined}>
+            <Link key={item.page} to={PATHS[item.page]} aria-current={page === item.page ? "page" : undefined} onClick={() => setOpenOn(null)}>
               {t(lang, item.label)}
             </Link>
           ))}
           {/* The community, in sight on every page (owner, 20.10.2026). */}
-          <a className="nav-discord" href={DISCORD} rel="noopener">
+          <a className="nav-discord" href={DISCORD} target="_blank" rel="noopener">
             Discord
           </a>
           {account === null ? (
-            <Link className="nav-account" to={PATHS.signIn} aria-current={page === "signIn" || page === "register" ? "page" : undefined}>
+            <Link className="nav-account" to={PATHS.signIn} aria-current={page === "signIn" || page === "register" ? "page" : undefined} onClick={() => setOpenOn(null)}>
               {t(lang, "nav.signIn")}
             </Link>
           ) : (
@@ -146,6 +322,7 @@ export function Header({ page }: { page: Page | null }) {
               to={PATHS.account}
               aria-label={account.handle === null ? undefined : t(lang, "nav.account", { name: account.handle })}
               aria-current={page !== null && (page.startsWith("account") || page.startsWith("admin")) ? "page" : undefined}
+              onClick={() => setOpenOn(null)}
             >
               {/* the handle others see, never the private sign-in name; until Central names it, "your account" */}
               {account.handle === null ? t(lang, "nav.accountUnnamed") : <bdi translate="no">{account.handle}</bdi>}

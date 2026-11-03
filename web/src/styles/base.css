@@ -7,6 +7,7 @@ html {
   font-size: clamp(100%, 0.6875rem + 0.5vw, 125%);
   -webkit-text-size-adjust: 100%;
   scroll-padding-top: calc(var(--top-h) + 0.8rem);
+  scroll-behavior: smooth;
   background: var(--bg);
 }
 body {
@@ -70,18 +71,18 @@ output { display: block; }
 
 
 /* ---------------------------------------------------------------- sections */
-.section { padding: clamp(3.5rem, 7vw, 6rem) 0; position: relative; }
+.section { padding: clamp(1.8rem, 3.2vw, 2.75rem) 0 clamp(2.4rem, 4.5vw, 3.6rem); position: relative; scroll-margin-top: var(--top-h); }
 .section-alt { background: var(--bg-alt); }
 .section-inner { max-width: var(--wrap); margin: 0 auto; padding: 0 var(--gutter); }
 .section > .section-inner > .eyebrow,
 .section > .section-inner > h2,
 .section > .section-inner > .section-lead { text-align: center; margin-left: auto; margin-right: auto; }
-.section > .section-inner > h2 { margin-bottom: 1.2em; }
+.section > .section-inner > h2 { margin-bottom: 0.55em; }
 .eyebrow {
-  font-family: var(--sans); font-weight: 700; font-size: 0.78rem; letter-spacing: 0.16em; text-transform: uppercase;
-  color: var(--violet); margin: 0 0 0.7rem;
+  font-family: var(--sans); font-weight: 700; font-size: 0.76rem; letter-spacing: 0.16em; text-transform: uppercase;
+  color: var(--violet); margin: 0 0 0.35rem;
 }
-.section-lead { max-width: 46rem; color: var(--ink-soft); font-size: 1.05rem; margin-bottom: 2rem; }
+.section-lead { max-width: 46rem; color: var(--ink-soft); font-size: 1.04rem; margin-bottom: 1.45rem; }
 .page-head { padding: calc(var(--top-h) + clamp(2.5rem, 6vw, 4.5rem)) 0 clamp(3rem, 6vw, 4.5rem); }
 .page-head .section-inner > .eyebrow, .page-head .section-inner > h1 { text-align: center; }
 .page-head .section-inner > h1 { margin-bottom: 0.6em; }
@@ -133,7 +134,7 @@ dialog[open] { animation: pop 200ms var(--ease); }
   box-shadow: var(--shadow); padding: var(--space-5);
   transition: transform var(--dur) var(--ease), box-shadow var(--dur) ease, border-color var(--dur) ease, opacity var(--dur-slow) ease;
 }
-.card-link:hover, .card-link:focus-within { transform: translateY(-2px); box-shadow: var(--shadow-lift); border-color: var(--edge); }
+.card-link:hover, .card-link:focus-within { box-shadow: var(--shadow-lift); border-color: var(--gold); }
 /* equal columns, and a row that is not full stands in the middle */
 .grid-cards {
   list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-4);

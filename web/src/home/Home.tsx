@@ -1,14 +1,18 @@
-// The start page: what Baylee is, what it looks like, who plays against
-// you, where online play stands and that it stays open source. The words are
-// the old landing page's (Baylee's web/site/index.html), the layout new.
+// The start page:
+// 1. StatusStrip (Repo Stats Bar) & Hero
+// 2. Am Tisch (#screens)
+// 3. Registrierte Gateways (#gateways)
+// 4. Was es ist & KI-Integration (#about / #ai)
+// 5. Kontakt (#contact)
+// 6. Quelloffen (#source)
 
 import { CI_PATH, COMMIT_PATH, parseCi, parseCommit, useGitHub } from "../github";
 import { useTitle } from "../i18n";
 import "../styles/home.css";
 import { About } from "./About";
 import { Hero } from "./Hero";
-import { Online } from "./Online";
-import { Opponents } from "./Opponents";
+import { HomeContact } from "./HomeContact";
+import { HomeGateways } from "./HomeGateways";
 import { Screens } from "./Screens";
 import { Source } from "./Source";
 import { StatusStrip } from "./StatusStrip";
@@ -19,12 +23,12 @@ export default function Home() {
   const commit = useGitHub(COMMIT_PATH, "commit", parseCommit);
   return (
     <>
+      <StatusStrip ci={ci} />
       <Hero />
-      <StatusStrip ci={ci} commit={commit} />
-      <About />
       <Screens />
-      <Opponents />
-      <Online />
+      <HomeGateways />
+      <About />
+      <HomeContact />
       <Source ci={ci} commit={commit} />
     </>
   );

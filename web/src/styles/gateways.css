@@ -25,6 +25,7 @@
 .gw-facts > div { display: grid; grid-template-columns: 5.5rem 1fr; gap: var(--space-3); align-items: center; }
 .gw-facts dt { color: var(--ink-faint); font-size: var(--text-sm); }
 .gw-facts dd { margin: 0; min-width: 0; }
+.gw-stats-dd { font-size: var(--text-sm); color: var(--ink); }
 .gw-address { display: flex; align-items: center; gap: var(--space-2); }
 /* the whole address, wrapped where it must: its end (a port, a path) is often what tells two apart */
 .gw-address code { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; font-size: var(--text-sm); }

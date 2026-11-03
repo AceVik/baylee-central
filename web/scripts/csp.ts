@@ -9,7 +9,10 @@
 // crypto's WebAssembly (owner, 21.10.2026); it allows no `eval` of
 // JavaScript and no inline script. GitHub is reachable only at Baylee's own
 // repository's paths, so a script that got in could not post to another
-// repository or gist through it; no picture is a `data:` URL.
+// repository or gist through it; no picture is a `data:` URL. `blob:` is a
+// picture the page made itself: the window's screenshot in a report's client
+// part, shown only after its PNG signature was checked
+// (src/admin/feedback/client.ts), its address given back when it goes.
 
 export const FEEDBACK_ORIGIN = "https://feedback.baylee.app";
 /** src/config.ts's REPO (that module reads Vite's settings, which Node has not); test/csp.test.ts holds the two together. */
@@ -33,7 +36,7 @@ export function csp(extraConnect: readonly string[] = []): string {
     "default-src 'self'",
     "script-src 'self' 'wasm-unsafe-eval'",
     "style-src 'self'",
-    "img-src 'self' https://cards.scryfall.io",
+    "img-src 'self' blob: https://cards.scryfall.io",
     "font-src 'self'",
     `connect-src ${connect}`,
     "worker-src 'self'",

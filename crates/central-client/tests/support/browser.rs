@@ -678,6 +678,7 @@ fn session(browser: &Browser, http: &Http, bridge: &Token, cookie: &Token) {
                     version: "test-1".into(),
                     website: format!("{GATEWAY}/"),
                 },
+                stats: None,
             },
             bridge,
         ),

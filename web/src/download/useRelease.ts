@@ -15,12 +15,15 @@ export interface ReleaseState {
   mine: Platform | null;
 }
 
+let cachedMachine: Machine | null = null;
+
 export function useRelease(): ReleaseState {
   const release = useGitHub(RELEASES_PATH, "releases", pickRelease);
-  const [machine, setMachine] = useState<Machine | null>(null);
+  const [machine, setMachine] = useState<Machine | null>(() => cachedMachine);
   useEffect(() => {
     let live = true;
     void detect().then((m) => {
+      cachedMachine = m;
       if (live) setMachine(m);
     });
     return () => {

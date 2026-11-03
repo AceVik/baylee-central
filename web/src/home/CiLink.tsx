@@ -6,7 +6,7 @@ export function CiLink({ run }: { run: CiRun }) {
   const ok = run.conclusion === "success";
   const cls = ok ? "ok" : run.conclusion === "failure" ? "bad" : "warn";
   return (
-    <a href={run.url} rel="noopener">
+    <a href={run.url} target="_blank" rel="noopener">
       <span className={`dot ${cls}`} aria-hidden="true" />
       {ok ? (
         <T id="ci.passing" />

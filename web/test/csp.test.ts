@@ -16,7 +16,9 @@ describe("the content security policy", () => {
   });
 
   it("takes no picture from a data: URL, no script but its own, and no frame", () => {
-    expect(directives.get("img-src")).toEqual(["'self'", "https://cards.scryfall.io"]);
+    // blob: is a picture the page made from bytes it checked (a report's screenshot, a PNG)
+    expect(directives.get("img-src")).toEqual(["'self'", "blob:", "https://cards.scryfall.io"]);
+    expect(csp()).not.toContain("data:");
     expect(directives.get("script-src")).toEqual(["'self'", "'wasm-unsafe-eval'"]);
     expect(directives.get("frame-ancestors")).toEqual(["'none'"]);
   });

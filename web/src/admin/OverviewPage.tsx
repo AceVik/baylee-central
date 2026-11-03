@@ -11,7 +11,7 @@ import { day } from "../app/format";
 import { T, num, t, useLang, useTitle, type Key } from "../i18n";
 import { useCountUp } from "../motion";
 import { Link, PATHS } from "../router";
-import type { AdminApi, LegacyStore, Overview } from "./admin-api";
+import type { AdminApi, LegacyStore, Overview, ReportsAtGlance } from "./admin-api";
 import { AdminFrame, useAdminApi } from "./shared";
 
 function Tile({ label, n, tone, children, to, go }: { label: Key; n: number; tone?: "warn"; children: ReactNode; to: string; go: Key }) {
@@ -33,9 +33,19 @@ function Tile({ label, n, tone, children, to, go }: { label: Key; n: number; ton
 
 type Legacy = { at: "loading" } | { at: "none" } | { at: "ready"; store: LegacyStore };
 
+/** The open reports and the new crashes: `undefined` while they are read, `null` when Central did not count them (the tile is left out). */
+function useReports(api: AdminApi): ReportsAtGlance | null | undefined {
+  const [reports, setReports] = useState<ReportsAtGlance | null | undefined>(undefined);
+  useEffect(() => {
+    api.reportsAtGlance().then(setReports, () => setReports(null));
+  }, [api]);
+  return reports;
+}
+
 function Tiles({ api, overview, uncounted, recount }: { api: AdminApi; overview: Overview | null; uncounted: boolean; recount(): void }) {
   const lang = useLang();
   const [legacy, setLegacy] = useState<Legacy>({ at: "loading" });
+  const reports = useReports(api);
   useEffect(() => {
     api.legacyAccounts().then(
       (store) => setLegacy({ at: "ready", store }),
@@ -62,6 +72,18 @@ function Tiles({ api, overview, uncounted, recount }: { api: AdminApi; overview:
       <Tile label="ov.pending" n={overview.pending} {...(overview.pending > 0 ? { tone: "warn" as const } : {})} to={PATHS.adminGateways} go="ov.pendingGo">
         {t(lang, overview.pending > 0 ? "ov.pendingSub" : "ov.pendingNone")}
       </Tile>
+      {reports === undefined && <div className="card skeleton stat-skeleton" aria-hidden="true" />}
+      {reports !== undefined && reports !== null && (
+        <Tile
+          label="ov.reports"
+          n={reports.open}
+          {...(reports.newCrashes > 0 ? { tone: "warn" as const } : {})}
+          to={reports.newCrashes > 0 ? `${PATHS.adminFeedback}?status=new&kind=crash` : `${PATHS.adminFeedback}?status=new,triaged,in_progress`}
+          go={reports.newCrashes > 0 ? "ov.crashesGo" : "ov.reportsGo"}
+        >
+          {reports.newCrashes > 0 ? t(lang, "ov.reportsCrashes", { n: reports.newCrashes }) : t(lang, "ov.reportsCalm")}
+        </Tile>
+      )}
       <Tile label="ov.gateways" n={overview.approved} to={`${PATHS.adminGateways}?state=approved`} go="ov.gatewaysGo">
         {t(lang, "ov.gatewaysSub", { online: overview.online, disabled: overview.disabled, tokens: overview.liveTokens })}
       </Tile>

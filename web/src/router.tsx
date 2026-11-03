@@ -28,8 +28,9 @@ export const PAGES = [
   "adminUser",
   "adminGateways",
   "adminAudit",
-  "adminReports",
   "adminLegacy",
+  "adminFeedback",
+  "adminReport",
 ] as const;
 export type Page = (typeof PAGES)[number];
 
@@ -56,8 +57,11 @@ export const PATHS: Record<Page, string> = {
   adminUser: "/admin/users",
   adminGateways: "/admin/gateways",
   adminAudit: "/admin/audit",
-  adminReports: "/admin/reports",
   adminLegacy: "/admin/legacy",
+  // bug and crash reports (`admin/feedback/`); one report's page is
+  // `/admin/feedback/<its id in hex>` (`reportAt`)
+  adminFeedback: "/admin/feedback",
+  adminReport: "/admin/feedback",
 };
 
 /** The administration's page of the account with the id `hex` (32 hex digits). */
@@ -68,12 +72,19 @@ export function userAt(pathname: string): string | null {
   return /^\/admin\/users\/([0-9a-f]{32})\/?$/.exec(pathname)?.[1] ?? null;
 }
 
+/** The report id in a report's page path, or null. */
+export function reportAt(pathname: string): string | null {
+  return /^\/admin\/(?:feedback|reports)\/([0-9a-f]{32})\/?$/.exec(pathname)?.[1] ?? null;
+}
+
 /** The page at `pathname`, or null for one this site does not have. */
 export function pageAt(pathname: string): Page | null {
   if (userAt(pathname) !== null) return "adminUser";
+  if (reportAt(pathname) !== null) return "adminReport";
   const path = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
   // `/admin/users` alone is the list; one account's page has its id after it
   if (path === PATHS.adminUsers) return "adminUsers";
+  if (path === PATHS.adminFeedback || path === "/admin/reports") return "adminFeedback";
   for (const page of PAGES) if (PATHS[page] === path) return page;
   return null;
 }
@@ -125,13 +136,31 @@ export function useLocation(): Location {
   const [location, setLocation] = useState(here);
   useEffect(() => {
     const update = () => setLocation(here());
+    const intercept = (e: globalThis.MouseEvent) => {
+      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      const a = e.target instanceof Element ? e.target.closest("a") : null;
+      if (a === null || a.target !== "" || a.hasAttribute("download") || a.getAttribute("aria-hidden") === "true") return;
+      const href = a.getAttribute("href");
+      if (href === null || href === "" || href.startsWith("#") || href.startsWith("mailto:") || href.startsWith("tel:")) return;
+      let url: URL;
+      try {
+        url = new URL(href, window.location.href);
+      } catch {
+        return;
+      }
+      if (url.origin !== window.location.origin || pageAt(url.pathname) === null) return;
+      e.preventDefault();
+      navigate(`${url.pathname}${url.search}${url.hash}`);
+    };
     window.addEventListener("popstate", update);
     window.addEventListener("hashchange", update);
     window.addEventListener(EVENT, update);
+    document.addEventListener("click", intercept);
     return () => {
       window.removeEventListener("popstate", update);
       window.removeEventListener("hashchange", update);
       window.removeEventListener(EVENT, update);
+      document.removeEventListener("click", intercept);
     };
   }, []);
   return location;

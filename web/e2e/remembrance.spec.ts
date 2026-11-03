@@ -12,9 +12,7 @@ for (const theme of ["light", "dark"]) {
     const open = page.getByRole("button", { name: "An Baylee erinnern · Fotoalbum öffnen" });
     await expect(open).toBeVisible();
     await expect.poll(() => page.locator(".hero-logo").evaluate((image: HTMLImageElement) => image.naturalWidth)).toBeGreaterThan(0);
-    await expect(page.locator(".baylee-cloud > img")).toHaveCSS("animation-name", "none");
-    await expect(page.locator(".baylee-cloud > img")).toHaveJSProperty("naturalWidth", 1200);
-    await page.locator(".baylee-cloud > img").evaluate((image: HTMLImageElement) => image.decode());
+    await expect(page.locator(".hero-logo")).toHaveCSS("animation-name", "none");
     await page.locator(".hero-logo").evaluate((image: HTMLImageElement) => image.decode());
     await page.screenshot({ path: `screens/sunlight-${info.project.name}-${theme}.png` });
     await open.click();
@@ -63,7 +61,7 @@ for (const theme of ["light", "dark"]) {
     await expect(dialog).not.toBeVisible();
     await expect(open).toBeFocused();
     await page.emulateMedia({ reducedMotion: "no-preference" });
-    await expect(page.locator(".baylee-cloud > img")).toHaveCSS("animation-name", "cloud-breath");
+    await expect(page.locator(".hero-logo")).toHaveCSS("animation-name", "cloud-breath");
     if (info.project.name === "desktop") {
       await open.hover();
       await expect(page.locator(".cloud-halo")).toHaveCSS("opacity", "1");

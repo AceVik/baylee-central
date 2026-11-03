@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 
-import { loadSets } from "./data";
+import { loadSets, peekSets } from "./data";
 import type { SetsDoc } from "./model";
 
 /** `undefined` while loading, `null` when it did not load. */
 export function useSetsDoc(enabled = true): SetsDoc | null | undefined {
-  const [doc, setDoc] = useState<SetsDoc | null | undefined>(undefined);
+  const [doc, setDoc] = useState<SetsDoc | null | undefined>(() => (enabled ? (peekSets() ?? undefined) : undefined));
   useEffect(() => {
     if (!enabled) return;
     let live = true;

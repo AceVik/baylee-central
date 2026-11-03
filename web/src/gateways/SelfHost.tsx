@@ -8,12 +8,12 @@ import { T, t, useLang, type Elems, type Lang } from "../i18n";
 /** The self-hosting guide in the README of `lang`'s language, and the protocol's reference. */
 const guides = (lang: Lang): Elems => ({
   guide: (words) => (
-    <a href={`${GITHUB}${t(lang, "link.readmeGateway")}`} rel="noopener">
+    <a href={`${GITHUB}${t(lang, "link.readmeGateway")}`} target="_blank" rel="noopener">
       {words}
     </a>
   ),
   protocol: (words) => (
-    <a href={`${GITHUB}/blob/main/docs/protocol.md`} rel="noopener">
+    <a href={`${GITHUB}/blob/main/docs/protocol.md`} target="_blank" rel="noopener">
       {words}
     </a>
   ),
@@ -35,10 +35,10 @@ export function SelfHost() {
             <T id="selfhost.proxy" />
           </p>
           <p>
-            <T id="selfhost.guide" elems={guides(lang)} />
+            <T id="selfhost.central" elems={ACCOUNT} />
           </p>
           <p>
-            <T id="selfhost.central" elems={ACCOUNT} />
+            <T id="selfhost.guide" elems={guides(lang)} />
           </p>
         </div>
         <div>
@@ -46,11 +46,15 @@ export function SelfHost() {
             <code>
               {`docker compose up -d
 export DATABASE_URL=postgres://baylee:baylee@127.0.0.1:5432/baylee
-cargo build --release -p baylee-gateway -p baylee-agent -p baylee-engine-server
+cargo build --release -p baylee-gateway \\
+  -p baylee-agent -p baylee-engine-server
 
 export BAYLEE_AGENT_TOKEN=$(openssl rand -hex 32)
-RUST_LOG=info BAYLEE_GATEWAY_NAME="My table" ./target/release/baylee-gateway
-RUST_LOG=info ./target/release/baylee-agent`}
+export BAYLEE_CENTRAL_TOKEN="bgt_..." # sso + listing
+export BAYLEE_CENTRAL_PRIVACY="full"  # full | counts_only | private
+
+BAYLEE_GATEWAY_NAME="My table" ./target/release/baylee-gateway
+./target/release/baylee-agent`}
             </code>
           </pre>
           <p className="small">

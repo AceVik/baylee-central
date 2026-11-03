@@ -1,6 +1,10 @@
 // The big button, on the start page and the download page: the file for this
-// machine when there is one, else the release; and beside it, plainly, what
-// could not be told about the machine. Every link goes straight to GitHub.
+// machine when there is one, else the release; subtly showing the version and
+// architecture inside the button, with a quick-access dropdown on the right to
+// reach every other system/architecture installer directly. Every link goes
+// straight to GitHub.
+
+import { useEffect, useRef, useState } from "react";
 
 import { RELEASES_PAGE } from "../config";
 import { dateText, mb } from "../github";
@@ -8,7 +12,7 @@ import { T, t, useLang, type Key } from "../i18n";
 import { Icon } from "../components/icons";
 import { Link } from "../router";
 import { archNote, type ArchNote } from "./machine";
-import type { ReleaseFile } from "./release";
+import { PLATFORMS, type Platform, type ReleaseFile } from "./release";
 import type { ReleaseState } from "./useRelease";
 import "../styles/download.css";
 
@@ -29,23 +33,57 @@ const NOTES: Record<NonNullable<ArchNote>, Key> = {
   "linux-unsure": "dl.noteLinuxUnsure",
 };
 
-/** The big button: the file for this machine when there is one, else the release. */
+function archText(platform: Platform | null): string | null {
+  if (!platform) return null;
+  if (platform.id === "mac-arm64") return "Apple Silicon (ARM64)";
+  if (platform.id === "mac-x64") return "Intel (x64)";
+  return platform.arch === "arm64" ? "ARM64" : "x64";
+}
+
+/** The big button: the file for this machine when there is one, else the release, plus a quick-access dropdown. */
 export function DownloadButton({ state, onDownloadPage }: { state: ReleaseState; onDownloadPage?: boolean }) {
   const lang = useLang();
   const { release, files, machine, mine } = state;
   const others = onDownloadPage === true ? "#platforms" : "/download#platforms";
+  const [menuOpen, setMenuOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onPointerDown = (e: PointerEvent) => {
+      if (e.target instanceof Node && !wrapRef.current?.contains(e.target)) {
+        setMenuOpen(false);
+      }
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMenuOpen(false);
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [menuOpen]);
+
   if (!release) {
     // asking, or GitHub did not answer: the releases page has every file.
     // While asking, the lines the answer adds are held empty, so nothing
     // below the button moves when it comes (no layout shift).
     const asking = release === undefined;
     const waitingNote = asking ? archNote(machine) : null;
+    const fallbackLabel = t(lang, "dl.button");
     return (
       <div className="dl" aria-live="polite" aria-busy={asking}>
-        <a className="button button-big" href={RELEASES_PAGE} rel="noopener">
-          <Icon name="download" className="button-icon" />
-          <T id="dl.button" />
-        </a>
+        <div className="dl-split">
+          <a className="button button-big dl-main" href={RELEASES_PAGE} rel="noopener" aria-label={fallbackLabel}>
+            <Icon name="download" className="button-icon" />
+            <span className="dl-btn-text">
+              <span className="dl-btn-title">{fallbackLabel}</span>
+              {mine && <span className="dl-btn-badge">{archText(mine)}</span>}
+            </span>
+          </a>
+        </div>
         <p className="dl-meta">
           <T id="dl.fallbackMeta" />
         </p>
@@ -58,17 +96,93 @@ export function DownloadButton({ state, onDownloadPage }: { state: ReleaseState;
       </div>
     );
   }
+
   const best: ReleaseFile | null = mine ? (files[mine.id]?.[0] ?? null) : null;
   // An Intel Mac's note says the release lacks its build; with the file at hand there is nothing to say.
   const note = archNote(machine) === "mac-intel" && best ? null : archNote(machine);
+  const mainLabel = best && mine ? t(lang, "dl.for", { system: t(lang, mine.name) }) : t(lang, "dl.button");
+  const archLabel = archText(mine);
+  const badgeText = archLabel ? `${release.tag_name} · ${archLabel}` : release.tag_name;
+  const availablePlatforms = PLATFORMS.filter((p) => (files[p.id]?.length ?? 0) > 0);
+
   return (
     <div className="dl" aria-live="polite">
-      <a className="button button-big" href={best ? best.asset.browser_download_url : release.html_url} rel="noopener">
-        <Icon name="download" className="button-icon" />
-        {best && mine
-          ? t(lang, "dl.for", { system: t(lang, mine.name) })
-          : t(lang, "dl.button")}
-      </a>
+      <div className="dl-split-wrap" ref={wrapRef}>
+        <div className="dl-split">
+          <a
+            className="button button-big dl-main"
+            href={best ? best.asset.browser_download_url : release.html_url}
+            rel="noopener"
+            aria-label={mainLabel}
+          >
+            <Icon name="download" className="button-icon" />
+            <span className="dl-btn-text">
+              <span className="dl-btn-title">{mainLabel}</span>
+              <span className="dl-btn-badge">{badgeText}</span>
+            </span>
+          </a>
+          {availablePlatforms.length > 0 && (
+            <button
+              type="button"
+              className="button dl-split-toggle"
+              aria-haspopup="true"
+              aria-expanded={menuOpen}
+              aria-label={t(lang, "dl.quickAccess")}
+              title={t(lang, "dl.quickAccess")}
+              onClick={() => setMenuOpen((o) => !o)}
+            >
+              <Icon name="down" className={`dl-chevron${menuOpen ? " open" : ""}`} />
+            </button>
+          )}
+        </div>
+        {menuOpen && availablePlatforms.length > 0 && (
+          <section className="dl-menu" aria-label={t(lang, "dl.quickAccess")}>
+            <ul className="dl-menu-list">
+              {availablePlatforms.map((p) => {
+                const pFiles = files[p.id] ?? [];
+                const primary = pFiles[0];
+                if (!primary) return null;
+                const isMine = mine?.id === p.id;
+                return (
+                  <li key={p.id} className={`dl-menu-item${isMine ? " is-mine" : ""}`}>
+                    <a
+                      className="dl-menu-link"
+                      href={primary.asset.browser_download_url}
+                      rel="noopener"
+                      onClick={() => setMenuOpen(false)}
+                    >
+                      <span className="dl-menu-plat">
+                        <span className="dl-menu-name">{t(lang, p.name)}</span>
+                        <span className="dl-menu-arch">{archText(p)}</span>
+                      </span>
+                      <span className="dl-menu-meta">
+                        <span>{t(lang, primary.label)}</span>
+                        <Sep />
+                        <span>{mb(primary.asset.size, lang)}</span>
+                      </span>
+                    </a>
+                  </li>
+                );
+              })}
+            </ul>
+            <div className="dl-menu-foot">
+              {onDownloadPage === true ? (
+                <a href={others} onClick={() => setMenuOpen(false)}>
+                  {t(lang, "dl.others")}
+                </a>
+              ) : (
+                <Link to={others} onClick={() => setMenuOpen(false)}>
+                  {t(lang, "dl.others")}
+                </Link>
+              )}
+              <Sep />
+              <a href={release.html_url} rel="noopener" onClick={() => setMenuOpen(false)}>
+                {t(lang, "dl.notes")}
+              </a>
+            </div>
+          </section>
+        )}
+      </div>
       <p className="dl-meta">
         {release.tag_name}
         {best && (

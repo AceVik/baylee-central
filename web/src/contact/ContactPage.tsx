@@ -29,7 +29,7 @@ export default function Contact() {
               </p>
               <ul className="channels">
                 <li>
-                  <a className="glass" href={DISCORD} rel="noopener">
+                  <a className="glass" href={DISCORD} target="_blank" rel="noopener">
                     <Icon name="chat" />
                     <span>
                       Discord
@@ -40,7 +40,7 @@ export default function Contact() {
                   </a>
                 </li>
                 <li>
-                  <a className="glass" href={ISSUES} rel="noopener">
+                  <a className="glass" href={ISSUES} target="_blank" rel="noopener">
                     <Icon name="github" />
                     <span>
                       <T id="contact.issues" />

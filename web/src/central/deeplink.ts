@@ -31,3 +31,13 @@ export function gatewayLink(origin: string, loopback = false): string | null {
   if (!local && !named) return null;
   return `${SCHEME}://gateway/add?origin=${encodeURIComponent(origin)}`;
 }
+
+/**
+ * Deep link that opens the Baylee client and connects directly to `origin`
+ * (or prompts sign-in first and then connects automatically).
+ */
+export function gatewayConnectLink(origin: string, loopback = false): string | null {
+  const addLink = gatewayLink(origin, loopback);
+  if (addLink === null) return null;
+  return `${SCHEME}://gateway/connect?origin=${encodeURIComponent(origin)}`;
+}

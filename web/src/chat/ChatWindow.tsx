@@ -75,41 +75,43 @@ export function ChatWindow({ session, ownTag, onLock }: { session: WindowSession
     if (ok || session.getSnapshot().pending?.text === body) setText("");
   }
   return <>
-    <div className="chat-tools"><p><T id="chat.private" /></p><button className="button button-ghost" onClick={onLock}><T id="chat.lock" /></button></div>
-    {(data.error || contacts.error) && <p role="alert"><T id="chat.failed" /> <button className="text-link" onClick={() => { void session.poll(); void contacts.reload(); }}><T id="chat.retry" /></button></p>}
-    {data.refused > 0 && <output><T id="chat.refused" /></output>}
-    {data.pending !== null && data.pending.conv !== conv && <p><button className="text-link" onClick={() => { if (data.pending !== null) choose(data.pending.conv); }}><T id="chat.pendingOther" /></button></p>}
-    <div className="chat-layout">
+    <div className="chat-tools"><p><T id="chat.private" /></p><button type="button" className="button button-ghost button-sm" onClick={onLock}><T id="chat.lock" /></button></div>
+    {(data.error || contacts.error) && <p className="form-status bad" role="alert"><T id="chat.failed" /> <button type="button" className="text-link" onClick={() => { void session.poll(); void contacts.reload(); }}><T id="chat.retry" /></button></p>}
+    {data.refused > 0 && <output className="small"><T id="chat.refused" /></output>}
+    {data.pending !== null && data.pending.conv !== conv && <p><button type="button" className="text-link" onClick={() => { if (data.pending !== null) choose(data.pending.conv); }}><T id="chat.pendingOther" /></button></p>}
+    <div className="card chat-layout">
       <aside className="chat-peers" aria-label={t(lang, "chat.conversations")}>
-        <h2><T id="chat.conversations" /></h2>
-        <Link to={PATHS.accountContacts} className="text-link"><T id="chat.manageContacts" /></Link>
-        {people.length === 0 && <p><T id="chat.noContacts" /></p>}
-        <ul>{people.map((p) => <li key={p.tag}><button aria-current={p.tag === peerTag ? "true" : undefined} onClick={() => choose(direct(ownTag, p.tag))}><bdi translate="no">{handleOf(p)}</bdi></button></li>)}</ul>
+        <div className="chat-peers-head">
+          <h2><T id="chat.conversations" /></h2>
+          <Link to={PATHS.accountContacts} className="text-link"><T id="chat.manageContacts" /></Link>
+        </div>
+        {people.length === 0 && <p className="small"><T id="chat.noContacts" /></p>}
+        <ul className="chat-peers-list">{people.map((p) => <li key={p.tag}><button type="button" aria-current={p.tag === peerTag ? "true" : undefined} onClick={() => choose(direct(ownTag, p.tag))}><bdi translate="no">{handleOf(p)}</bdi></button></li>)}</ul>
         <GroupList state={groups} ownTag={ownTag} selected={groupId} onChoose={(id) => choose(`grp:${id}`)} />
-        {oldGroups.length > 0 && <><h3><T id="chat.formerGroup" /></h3><ul>{oldGroups.map((id) => <li key={id}><button onClick={() => choose(id)} aria-current={id === conv ? "true" : undefined}>{id.slice(4)}</button></li>)}</ul></>}
+        {oldGroups.length > 0 && <><h3><T id="chat.formerGroup" /></h3><ul className="chat-peers-list">{oldGroups.map((id) => <li key={id}><button type="button" onClick={() => choose(id)} aria-current={id === conv ? "true" : undefined}>{id.slice(4)}</button></li>)}</ul></>}
       </aside>
       <section className="chat-conversation" aria-label={title}>
         {conv === null ? <p className="chat-placeholder"><T id="chat.choose" /></p> : <>
           <header><h2><bdi translate="no">{title}</bdi></h2></header>
           {group !== undefined && <GroupSettings key={group.id} group={group} ownTag={ownTag} friends={friends} state={groups} />}
-          {reviews.length > 0 && <details className="chat-safety"><summary><T id="chat.safety" /></summary><ul>{reviews.map((r) => <li key={r.tag}><button className="text-link" onClick={() => { setReview(r); setVerifyError(false); }}><bdi>{r.snapshot.handle}</bdi>{r.changed && " ⚠"}</button></li>)}</ul></details>}
-          {changed && <p role="alert"><T id="chat.keysChanged" /></p>}
+          {reviews.length > 0 && <details className="chat-safety"><summary><T id="chat.safety" /></summary><ul>{reviews.map((r) => <li key={r.tag}><button type="button" className="text-link" onClick={() => { setReview(r); setVerifyError(false); }}><bdi>{r.snapshot.handle}</bdi>{r.changed && " ⚠"}</button></li>)}</ul></details>}
+          {changed && <p className="form-status bad" role="alert"><T id="chat.keysChanged" /></p>}
           <div className="chat-messages" ref={scroll} onScroll={() => { const node = scroll.current; if (node !== null) follow.current = node.scrollHeight - node.scrollTop - node.clientHeight < 80; }} role="log" aria-label={t(lang, "chat.messages")} aria-live="polite" aria-relevant="additions">
-            {data.loading && <output><T id="app.loading" /></output>}
-            {messages.length > visible && <button className="text-link" onClick={() => { olderHeight.current = scroll.current?.scrollHeight ?? null; setVisible((n) => n + 100); }}><T id="chat.older" /></button>}
+            {data.loading && <output className="small"><T id="app.loading" /></output>}
+            {messages.length > visible && <button type="button" className="button button-ghost button-sm chat-older" onClick={() => { olderHeight.current = scroll.current?.scrollHeight ?? null; setVisible((n) => n + 100); }}><T id="chat.older" /></button>}
             {!data.loading && messages.length === 0 && <p className="app-empty"><T id="chat.empty" /></p>}
             {messages.slice(-visible).map((m) => <article key={m.id} className="chat-message" data-own={m.sender === ownTag}>
               {groupId !== null && <small><bdi>{data.people.find((p) => p.tag === m.sender)?.displayName ?? `#${m.sender.toString(16)}`}</bdi></small>}
               <p className={m.emote ? "chat-emote" : undefined}>{m.text}</p>
               <time dateTime={new Date(m.at).toISOString()}>{new Intl.DateTimeFormat(lang, { dateStyle: "short", timeStyle: "short" }).format(m.at)}</time>
             </article>)}
-            {data.pending?.conv === conv && <article className="chat-message chat-pending" data-own="true"><p>{data.pending.text}</p><span><T id={data.pending.failed ? "chat.notConfirmed" : "chat.sending"} /></span>{data.pending.failed && <><button disabled={data.busy || changed} onClick={() => { void session.retry(); }}><T id="chat.retry" /></button><button disabled={data.busy} onClick={() => setDiscard(data.pending?.sealed ?? null)}><T id="chat.discard" /></button></>}</article>}
+            {data.pending?.conv === conv && <article className="chat-message chat-pending" data-own="true"><p>{data.pending.text}</p><span><T id={data.pending.failed ? "chat.notConfirmed" : "chat.sending"} /></span>{data.pending.failed && <div className="action-row"><button type="button" className="button button-ghost button-sm" disabled={data.busy || changed} onClick={() => { void session.retry(); }}><T id="chat.retry" /></button><button type="button" className="button button-danger button-sm" disabled={data.busy} onClick={() => setDiscard(data.pending?.sealed ?? null)}><T id="chat.discard" /></button></div>}</article>}
           </div>
           {canSend ? <form className="chat-compose" onSubmit={(event) => { event.preventDefault(); void send(); }}>
             <label className="vh" htmlFor="chat-message"><T id="chat.message" /></label>
             <textarea id="chat-message" rows={3} maxLength={1000} value={text} disabled={data.busy || data.pending !== null} onChange={(event) => setText(event.target.value)} placeholder={t(lang, "chat.message")} />
-            <button className="button" disabled={data.busy || data.pending !== null || changed || text.trim().length === 0}><T id="chat.send" /></button>
-          </form> : <p><T id={groupId === null ? "chat.friendRequired" : "chat.groupLeft"} /></p>}
+            <button type="submit" className="button" disabled={data.busy || data.pending !== null || changed || text.trim().length === 0}><T id="chat.send" /></button>
+          </form> : <p className="small"><T id={groupId === null ? "chat.friendRequired" : "chat.groupLeft"} /></p>}
         </>}
       </section>
     </div>

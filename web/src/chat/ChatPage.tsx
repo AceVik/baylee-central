@@ -10,16 +10,36 @@ import { ChatSession } from "./session";
 import { ChatWindow } from "./ChatWindow";
 import "../styles/chat.css";
 
-function Unlock({ summary, api, ownTag }: { summary: AccountSummary; api: ChatApi; ownTag: number }) {
+let unlockedChat: { key: string; session: ChatSession } | null = null;
+
+function closeUnlockedChat() {
+  if (unlockedChat !== null) {
+    unlockedChat.session.close();
+    unlockedChat = null;
+  }
+}
+
+function Unlock({ sessionKey, summary, api, ownTag }: { sessionKey: string; summary: AccountSummary; api: ChatApi; ownTag: number }) {
   const account = useAccount();
   const lang = useLang();
   const [password, setPassword] = useState("");
-  const [active, setActive] = useState<ChatSession | null>(null);
+  const [active, setActive] = useState<ChatSession | null>(() => {
+    if (unlockedChat !== null && unlockedChat.key !== sessionKey) closeUnlockedChat();
+    return unlockedChat?.key === sessionKey ? unlockedChat.session : null;
+  });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
-  const owner = useRef<ChatSession | null>(null);
-  useEffect(() => () => { owner.current?.close(); owner.current = null; }, []);
-  const lock = () => { owner.current?.close(); owner.current = null; setActive(null); setPassword(""); };
+  const owner = useRef<ChatSession | null>(unlockedChat?.key === sessionKey ? unlockedChat.session : null);
+  useEffect(() => {
+    if (unlockedChat !== null && unlockedChat.key !== sessionKey) closeUnlockedChat();
+  }, [sessionKey]);
+  const lock = () => {
+    closeUnlockedChat();
+    owner.current?.close();
+    owner.current = null;
+    setActive(null);
+    setPassword("");
+  };
   async function unlock() {
     if (owner.current !== null || password.length === 0) return;
     const session = new ChatSession(api, account.api, summary);
@@ -27,7 +47,11 @@ function Unlock({ summary, api, ownTag }: { summary: AccountSummary; api: ChatAp
     const secret = password; setPassword("");
     try {
       const expiresAt = await session.unlock(secret, lock);
-      if (owner.current === session) { account.refreshed(expiresAt); setActive(session); }
+      if (owner.current === session) {
+        unlockedChat = { key: sessionKey, session };
+        account.refreshed(expiresAt);
+        setActive(session);
+      }
     } catch (cause) {
       session.close();
       if (owner.current === session) {
@@ -37,15 +61,19 @@ function Unlock({ summary, api, ownTag }: { summary: AccountSummary; api: ChatAp
     } finally { if (owner.current === session || owner.current === null) setBusy(false); }
   }
   if (active !== null) return <ChatWindow session={active} ownTag={ownTag} onLock={lock} />;
-  return <section className="chat-unlock">
-    <h2><T id="chat.unlockTitle" /></h2>
+  return <section className="card app-panel chat-unlock">
+    <h2 className="app-panel-title"><T id="chat.unlockTitle" /></h2>
     <p><T id="chat.unlockLead" /></p>
     <form onSubmit={(event) => { event.preventDefault(); void unlock(); }}>
-      <label htmlFor="chat-password"><T id="chat.password" /></label>
-      <input id="chat-password" type="password" autoComplete="current-password" value={password} maxLength={1024} disabled={busy} onChange={(event) => setPassword(event.target.value)} required />
-      <button className="button" disabled={busy || password.length === 0}>{busy ? t(lang, "app.loading") : t(lang, "chat.unlock")}</button>
+      <div className="field">
+        <label htmlFor="chat-password"><T id="chat.password" /></label>
+        <input id="chat-password" type="password" autoComplete="current-password" value={password} maxLength={1024} disabled={busy} onChange={(event) => setPassword(event.target.value)} required />
+      </div>
+      <div className="form-row">
+        <button className="button" disabled={busy || password.length === 0}>{busy ? t(lang, "app.loading") : t(lang, "chat.unlock")}</button>
+      </div>
     </form>
-    {error && <p role="alert"><T id="chat.unlockFailed" /></p>}
+    {error && <p className="field-error" role="alert"><T id="chat.unlockFailed" /></p>}
   </section>;
 }
 
@@ -54,10 +82,14 @@ export default function ChatPage({ client }: { client?: ChatApi }) {
   const { state, reload } = useSummary();
   const { generation } = useAccount();
   const [api] = useState(() => client ?? chatApi());
+  useEffect(() => {
+    if (state.at === "signedOut") closeUnlockedChat();
+  }, [state.at]);
+  const sessionKey = state.at === "ready" ? `${state.summary.identity.account.join()}:${generation}` : "";
   return <AppFrame page="accountChat" admin={state.at === "ready" && state.summary.admin} eyebrow="app.account" title={<T id="chat.title" />} lead={<T id="chat.lead" />}>
     {state.at === "signedOut" ? <SignedOut /> : state.at === "failed" ? <Failed onRetry={reload} />
-      : state.at === "loading" ? <output><T id="app.loading" /></output>
-      : state.summary.tag === null || state.summary.displayName === null ? <p><Link to={PATHS.account}><T id="social.profileNeeded" /></Link></p>
-      : <Unlock key={`${state.summary.identity.account.join()}:${generation}`} summary={state.summary} api={api} ownTag={state.summary.tag} />}
+      : state.at === "loading" ? <div className="card skeleton app-skeleton" aria-hidden="true"><span className="vh"><T id="app.loading" /></span></div>
+      : state.summary.tag === null || state.summary.displayName === null ? <div className="card app-panel"><p><Link to={PATHS.account}><T id="social.profileNeeded" /></Link></p></div>
+      : <Unlock key={sessionKey} sessionKey={sessionKey} summary={state.summary} api={api} ownTag={state.summary.tag} />}
   </AppFrame>;
 }

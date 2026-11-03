@@ -108,6 +108,7 @@ impl AccountStore {
                         website: row.try_get("", "website").map_err(|_| Error::Unavailable)?,
                     },
                     online: row.try_get("", "online").map_err(|_| Error::Unavailable)?,
+                    stats: None,
                 })
             })
             .collect()
