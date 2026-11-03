@@ -6,21 +6,29 @@
 import type { Chat } from "../central-wasm/central_web_crypto.js";
 import type { Message, Registration, Review, Sealed } from "./api";
 import type { Request, Result } from "./crypto";
+import { sealIdentity, storeKept } from "./kept";
 
 const encode = (v: unknown) => new TextEncoder().encode(JSON.stringify(v));
 const decode = <T>(v: Uint8Array): T => JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(v)) as T;
 
-/** The steps of an unlocked chat; signing in is the Worker's own. */
-export type ChatStep = Exclude<Request, { op: "start" | "finish" | "unlock" }>;
+/** The steps of an unlocked chat; signing in and resuming are the Worker's own. */
+export type ChatStep = Exclude<Request, { op: "start" | "finish" | "unlock" | "resume" }>;
 
 /** What an unlock answers: the device and its signed public registration. */
 export function unlocked(chat: Chat): { device: string; registration: Registration } {
   return { device: chat.device, registration: decode<Registration>(chat.registration()) };
 }
 
-export function chatStep(chat: Chat, r: ChatStep): Result {
+export async function chatStep(chat: Chat, r: ChatStep): Promise<Result> {
   switch (r.op) {
     case "restore": chat.restore_trust(r.trust); return { op: r.op };
+    case "keep": {
+      // sealed in this Worker under the browser's non-extractable key, then wiped here
+      // the module's copy in this Worker's own memory, never shared
+      const bytes = chat.keep() as Uint8Array<ArrayBuffer>;
+      try { await storeKept(await sealIdentity(bytes, r.owner)); } finally { bytes.fill(0); }
+      return { op: r.op };
+    }
     case "observe":
       return { op: r.op, reviews: r.keys.filter((k) => k.devices.length > 0).map((k) => decode<Review>(chat.observe(encode(k)))), trust: chat.save_trust() };
     case "confirm": chat.confirm(encode(r.snapshot)); return { op: r.op, trust: chat.save_trust() };
@@ -38,7 +46,7 @@ export function chatStep(chat: Chat, r: ChatStep): Result {
  * time; any other message is another protocol's. Errors leave as the few
  * words the page knows.
  */
-export function serveChat(step: (request: Request) => Result, ready: () => Promise<unknown>): void {
+export function serveChat(step: (request: Request) => Result | Promise<Result>, ready: () => Promise<unknown>): void {
   let queue: Promise<void> = Promise.resolve();
   self.addEventListener("message", (event: MessageEvent<unknown>) => {
     const data = event.data;
@@ -47,7 +55,7 @@ export function serveChat(step: (request: Request) => Result, ready: () => Promi
     queue = queue.then(async () => {
       try {
         await ready();
-        self.postMessage({ id, result: step(request) }, { transfer: [] });
+        self.postMessage({ id, result: await step(request) }, { transfer: [] });
       } catch (error) {
         const message = error instanceof Error ? error.message : "failed";
         const safe = ["rejected", "conflict", "busy", "unavailable"].includes(message) ? message : "failed";

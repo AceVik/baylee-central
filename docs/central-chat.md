@@ -54,22 +54,41 @@ a public tag unlocks the chat in the sign-in's own worker: `chat_unlock` opens
 the master key exactly as `login_confirm` would, so it proves the password the
 same way, derives the chat identity and wipes the master key; from then on the
 worker answers only the chat's steps (`web/src/chat/steps.ts`). The page keeps
-that worker (`web/src/chat/held.ts`) for as long as the sign-in: moving between
-pages keeps it; signing out, the session's end, Central's refusal and another
-account's sign-in (also in another tab) close it. Nothing of it is persisted, so
-a reload, a new tab or a closed page starts locked, and the chat page then asks
-for the password once, in a worker and sign-in of its own. An account without a
-recovery code makes its code at sign-in instead and unlocks the chat there the
-same way. A hidden page no longer locks after five minutes and page hide no
-longer locks: the keys live exactly as long as an open, signed-in page, whose
-memory also holds the session that reads the inbox. Only encrypted peer trust is
-stored in localStorage, scoped to the immutable account ID. Messages remain in
-memory and are replayed from encrypted delivery history. Local trust storage
-authenticates contents, not freshness: deletion or rollback of that storage can
-remove previous TOFU knowledge. A damaged trust record fails the chat's start
-closed (nothing is registered or read) without failing the sign-in. Closing the
-worker clears its state. JavaScript does not promise physical erasure of
-previously rendered text or password strings.
+that worker (`web/src/chat/held.ts`) while it is open.
+
+The owner decided on 3 November 2026 that a signed-in account sees its chats and
+contacts without unlocking anything, on the website as in the client. So the
+browser keeps the chat identity while the sign-in lasts (`web/src/chat/kept.ts`):
+right after `chat_unlock` the worker takes the identity's 96 secret bytes from
+the module (`Chat::keep`), seals them with AES-256-GCM through the Web Crypto
+API under a key generated non-extractable for that one record, with the
+account, epoch and tag in the associated data, stores key and ciphertext in
+IndexedDB and overwrites its copy of the bytes; they never reach the page. After
+a reload the chat's own worker opens the record for exactly that account, epoch
+and tag and rebuilds the identity from it (`chat_resume`); a record for anything
+else, or one that does not open, is deleted and the chat page falls back to the
+password once (a browser that never kept it, blocked storage). The browser holds
+one record: signing out, the session's end (also when it ended while no page
+was open), Central's refusal of the session, a sign-out in another tab and
+another account's chat forget it.
+
+What this costs: whoever can run script in this origin or read this browser
+profile while the record exists can obtain the chat identity, as they could
+the session and the page's memory before. It is no key to anything alone:
+message ciphertext lives only on Central and is read with a session; once the
+record is forgotten the browser holds neither. The non-extractable key keeps
+the raw secret out of reach of script that cannot run in this origin and of a
+copy of `localStorage`; it is no protection against the profile's owner. The
+wasm-bindgen copy of the bytes is freed but not overwritten. A password rewrap
+keeps the identity; a new vault epoch makes a record useless.
+
+Only encrypted peer trust is stored in localStorage, scoped to the immutable
+account ID. Messages remain in memory and are replayed from encrypted delivery
+history. Local trust storage authenticates contents, not freshness: deletion or
+rollback of that storage can remove previous TOFU knowledge. A damaged trust
+record fails the chat's start closed (nothing is registered or read) without
+failing the sign-in. Closing the worker clears its state. JavaScript does not
+promise physical erasure of previously rendered text or password strings.
 
 ## Authorization, concurrency and storage
 

@@ -25,8 +25,12 @@ export default defineConfig({
     reuseExistingServer: false,
     timeout: 60_000,
   },
+  // The hero's live air renders in software here and takes a CPU core while
+  // it runs: its spec waits until the others are done, so it slows nobody.
   projects: [
-    { name: "desktop", use: { ...devices["Desktop Chrome"], viewport: { width: 1366, height: 900 } } },
-    { name: "phone", use: { ...devices["Pixel 7"] } },
+    { name: "desktop", testIgnore: "clouds.spec.ts", use: { ...devices["Desktop Chrome"], viewport: { width: 1366, height: 900 } } },
+    { name: "phone", testIgnore: "clouds.spec.ts", use: { ...devices["Pixel 7"] } },
+    { name: "clouds-desktop", testMatch: "clouds.spec.ts", dependencies: ["desktop", "phone"], use: { ...devices["Desktop Chrome"], viewport: { width: 1366, height: 900 } } },
+    { name: "clouds-phone", testMatch: "clouds.spec.ts", dependencies: ["desktop", "phone"], use: { ...devices["Pixel 7"] } },
   ],
 });
