@@ -28,6 +28,8 @@ same app; administration comes later.
 | `/admin/users/<id>` | one account: its tag (changed, audited), the administrator role, a reset code, its gateways and audit |
 | `/admin/gateways` | every registered gateway by state: approve, disable, its tokens revoked |
 | `/admin/audit` | the audit log |
+| `/admin/feedback` | bug and crash reports: views with counts, search and filters in the address, crash groups, the last 30 days, saved lists, a selection's changes, the trash, CSV; a report beside the list from 1100 px |
+| `/admin/feedback/<id>` | one report, its triage, notes and history, what the client sent (the screenshot, the cards it names) and its record as a download; `k`/`j` step through the list it came from |
 
 English and German today, one at a time, and ready for every language Magic
 is printed in (§"The words"): `?lang=<code>` wins, then the choice made with
@@ -402,7 +404,9 @@ crypto, and allows no `eval` of JavaScript; owner, 21.10.2026),
 `connect-src 'self'` plus GitHub only at Baylee's repository
 (`https://api.github.com/repos/AceVik/baylee` and below it,
 `https://raw.githubusercontent.com/AceVik/baylee/`) and the feedback service,
-`img-src 'self' https://cards.scryfall.io`, `worker-src 'self'`. Beside it the
+`img-src 'self' blob: https://cards.scryfall.io` (`blob:` only for a picture
+the page made itself from bytes it checked: a report's screenshot in the
+administration, a PNG by its signature; never `data:`), `worker-src 'self'`. Beside it the
 site sends `Permissions-Policy` (`PERMISSIONS` in the same file: no camera,
 microphone, location, payment or device access) and
 `Cross-Origin-Opener-Policy: same-origin`.

@@ -243,10 +243,10 @@ export default function AccountPage() {
             )
           )}
           </section>
+          {summary !== null && <NotificationSettings key={summary.identity.account.join()} admin={summary.admin} />}
           <p className="small account-wide account-later">
             <T id="account.later" elems={LINKS} />
           </p>
-          {summary !== null && <NotificationSettings key={summary.identity.account.join()} admin={summary.admin} />}
         </div>
       )}
     </AppFrame>

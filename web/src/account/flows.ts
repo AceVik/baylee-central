@@ -6,6 +6,7 @@
 // person says they kept it (§"A recovery code after a sign-in"). An account
 // without a display name chooses one (§"Display name and tag").
 
+import { keepChat } from "../chat/held";
 import { ApiError, sameIdentity, type AccountSummary, type Api, type BrowserSession } from "./api";
 import { CryptoError, type CryptoFactory } from "./crypto";
 import { handle } from "./names";
@@ -129,12 +130,15 @@ export interface SignedIn {
  * Signs in: discovery, OPAQUE, then, while the Worker still holds the
  * sign-in, `AccountSummary`. For an account without a recovery code the
  * Worker opens the master key Central hands back and wraps it under a new
- * code (`recoveryCreate`); for any other, or when Central does not say, it
- * only checks that the key opens (`loginConfirm`). Either proves the
- * password; nothing reaches Central of the code yet. On a mismatch the new
- * session is ended at once. The cookie is Central's to set. The Worker
- * starts (and loads its WebAssembly) while Central looks the name up; it
- * sees the password only after that, and is closed on every way out.
+ * code (`recoveryCreate`); for one with a public tag it opens it and keeps
+ * the chat identity (`chatUnlock`), and the chat keeps the Worker
+ * (`keepChat`), so the chat needs no second password; for any other, or
+ * when Central does not say, it only checks that the key opens
+ * (`loginConfirm`). Each proves the password; nothing reaches Central of
+ * the code yet. On a mismatch the new session is ended at once. The cookie
+ * is Central's to set. The Worker starts (and loads its WebAssembly) while
+ * Central looks the name up; it sees the password only after that, and is
+ * closed on every way out but the chat's.
  */
 export async function signIn(
   input: { username: string; password: string },
@@ -170,6 +174,10 @@ export async function signIn(
       if (summary !== null && !summary.recovery) {
         const made = await flow.recoveryCreate(session.wrappedMaster);
         return { session, summary, code: { code: made.recoveryCode, wrapper: made.recovery } };
+      }
+      if (summary !== null && summary.tag !== null && flow.chatUnlock !== undefined) {
+        keepChat(summary, await flow.chatUnlock(session.wrappedMaster, summary.tag), api);
+        return { session, summary, code: null };
       }
       await flow.loginConfirm(session.wrappedMaster);
       return { session, summary, code: null };

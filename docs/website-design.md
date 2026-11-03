@@ -73,6 +73,7 @@ Tokens are named for what they mean, not for how they look:
 | `--focus` | the focus ring | `#ffe7a6` | `#235b66` |
 | `--ok`, `--warn`, `--bad`, `--off` | states: fine, attention, failure or danger, inactive | | |
 | `--edge`, `--edge-soft` | a border that matters, a border that only separates | | |
+| `--chart-reports`, `--chart-crashes` | the two series of the feedback section's 30-day chart, nowhere else | `#6f8ae8`, `#e0665a` | `#1b7fae`, `#b8402f` |
 
 Rules:
 
@@ -247,7 +248,14 @@ to feel slow and over the 60 ms where it reads as a snap.
   changes.
 - **Ambient**: the online dot breathes slowly (2.4 s); the painting drifts
   with the scroll; the hero's light and Baylee's cloud move slowly, and only
-  while the hero is on screen and no dialog covers it; the memorial's light
+  while the hero is on screen and no dialog covers it. The hero's clouds
+  (`HeroShader.tsx`, `clouds/`) drift on a slow wind and heal into their
+  banks; the pointer stirs the air they ride in, a small fluid on the GPU
+  (stable fluids with vorticity confinement on a 112-cell-high grid, the
+  clouds on a finer one, lit towards the sun), and a press sends a gust
+  outwards. Thinner behind the words, fuller towards the edges; a still
+  picture under reduced motion and where WebGL 2 renders in software, the
+  painting alone without WebGL 2. The memorial's light
   is its own (limited to 20 draws a second, its GPU context given back when
   the album closes). Nothing else moves by itself.
 - **Reduced motion** (`prefers-reduced-motion: reduce`): every transition,
@@ -291,18 +299,83 @@ WCAG 2.1 AA, mobile first:
 | area | paths | frame |
 | --- | --- | --- |
 | Public | `/`, `/download`, `/cards`, `/gateways`, `/contact`, legal pages | the bar, sections, the footer |
-| Account | `/account`, `/account/security`, `/account/gateways` | the app frame |
-| Administration | `/admin` (the overview), `/admin/users`, `/admin/users/<id>`, `/admin/gateways`, `/admin/audit`, `/admin/legacy` | the app frame, loaded only for an administrator |
+| Account | `/account`, `/account/chat`, `/account/contacts`, `/account/security`, `/account/gateways` | the app frame; the messenger on chat and contacts |
+| Administration | `/admin` (the overview), `/admin/feedback`, `/admin/feedback/<id>`, `/admin/users`, `/admin/users/<id>`, `/admin/gateways`, `/admin/audit`, `/admin/legacy` | the app frame, loaded only for an administrator |
 | Sign-in | `/signin`, `/register` | a centred card beside Baylee's cloud |
 
 The account area and the administration are loaded lazily and only after a
 sign-in; a visitor's first page fetches neither.
 
+### The messenger
+
+The chat and the contacts (`src/chat/`, `styles/chat.css`, [chat](central-chat.md))
+are one window, as in Baylee's client and any messenger, not panels of
+settings:
+
+- **Two panes.** From 760 px the conversations and contacts stand beside the
+  open conversation, the window as tall as the screen allows; below, one pane
+  at a time with a way back, and the page's heading only for screen readers.
+- **The side.** Who is signed in (an avatar of initials, six tints mixed from
+  the palette, the same for the same person everywhere), a new group and a new
+  contact as icons, and two tabs: *Chats* (group invitations, then every
+  conversation by its last line, its time and a count of what arrived unread,
+  newest first, with a search) and *Contacts* (adding by the exact handle,
+  requests to answer, friends who open their conversation, requests sent, the
+  blocked folded). Rare actions sit in a row's menu (⋮), never as a row of
+  buttons; whatever cannot be taken back asks first.
+- **The conversation.** A head with the avatar, the name and "End-to-end
+  encrypted" (a group's members), the safety number behind a shield that turns
+  to a warning when keys changed, a group's settings sliding in from the side;
+  the messages as bubbles, the own on the right in `--gold`, by day with a
+  divider, a run of one sender's lines closer together, the sender's name in a
+  group; the composer grows with its text, Enter sends and Shift+Enter starts a
+  line (a phone's keyboard keeps Enter for the line), the send button round.
+- **Locked.** A sign-in unlocks the chat; only after a reload the conversation
+  pane asks for the password once, while the contacts and groups stay usable.
+
+### The feedback section
+
+Bug and crash reports (`src/admin/feedback/`, `styles/feedback.css`,
+[reports](reports.md) §"The website's section") follow the components
+above, with these of their own:
+
+- **The list.** The views (inbox, open, mine, unassigned, done, all, trash)
+  are a row of chips with their counts; the search and every filter stand
+  in the address, the filters beyond the view as pills that take themselves
+  out ("Clear filters" once there are two). A report's first line is the
+  row's name, its labels, notes, record and issue under it; the columns
+  sort with `aria-sort`. An unread report has a dot, the word "Unread" for a
+  screen reader, and a heavier line. On a phone the first line wraps and the
+  rest of the row scrolls in the table's box.
+- **The drawer.** From 1100 px a report opens beside the list and the list
+  keeps the columns that matter (the report, when it came, its status);
+  below, a report opens on its own page, which carries the list's query, so
+  the way back and `k`/`j` go through the same list.
+- **What happened.** Every change says so in a notice at the foot of the
+  screen (its words in a live region of their own, so its buttons are not
+  read out), the trash's with "Undo" for ten seconds; a failure stays until
+  it is dismissed. New reports found by the 30-second refresh are announced
+  above the list and shown on a press: no row moves under the reader.
+- **Keys.** `?` lists them. They act only when no field has the keyboard,
+  and one switch, kept by the browser, turns every single key off (WCAG
+  2.1.4); Ctrl+K and the buttons always work.
+- **The 30 days.** Folded until asked for: a column a day, the crashes
+  (`--chart-crashes`) stacked on the other reports (`--chart-reports`) with
+  a gap of the surface between them, a legend in words with the totals, each
+  day's numbers on hover and in a table. The two tokens are checked for
+  colour vision against the panel in both schemes; in forced colours they
+  become the system's text and highlight.
+- **What the client sent.** The screenshot fills the column and opens large
+  in a dialog; a card the text names is a chip whose picture shows under
+  the pointer or the keyboard; the rest folds (the log, the system, the
+  settings, the whole object as a tree drawn only as it is unfolded).
+
 ## How it is held
 
 - `test/styles/contrast.test.ts`: the token pairs above in both schemes.
 - `test/csp.test.ts`: the policy names GitHub only at Baylee's repository,
-  takes no `data:` picture and switches off unused browser features.
+  takes no `data:` picture (`blob:` only for one the page made from bytes it
+  checked: a report's screenshot) and switches off unused browser features.
 - `test/styles/rules.test.ts`: no inline script or style in the shell, card
   pictures untouched, no raw colour outside `tokens.css`, a reduced-motion
   rule beside every animation.

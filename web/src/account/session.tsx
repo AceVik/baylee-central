@@ -7,10 +7,14 @@
 // session or Central's "no" forget it. This provider stores only that marker;
 // chat separately persists encrypted peer trust and push an opaque installation
 // nonce. While a page is open and in view, it renews the session
-// (`RenewSession`), which Central caps at 12 hours after the sign-in.
+// (`RenewSession`), which Central caps at 12 hours after the sign-in. The
+// chat a sign-in unlocked (chat/held.ts) ends with the session here, and the
+// chat identity this browser kept (chat/kept.ts) is forgotten with it.
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
+import { lockChat } from "../chat/held";
+import { forgetKept } from "../chat/kept";
 import { disablePush } from "../pwa/client";
 import { ApiError, api as defaultApi, type Api } from "./api";
 import { workerCrypto, type CryptoFactory } from "./crypto";
@@ -107,10 +111,13 @@ export function AccountProvider({
   children: ReactNode;
 }) {
   const [account, setAccount] = useState<Account | null>(() => remembered());
+  // a session that ended while no page was open leaves no kept chat behind
+  useEffect(() => { if (remembered() === null) void forgetKept(); }, []);
   const serial = useRef(0);
   const [generation, setGeneration] = useState(0);
 
   const change = useCallback((next: Account | null) => {
+    if (next === null) { lockChat(); void forgetKept(); }
     serial.current += 1;
     setGeneration(serial.current);
     remember(next);
@@ -135,7 +142,10 @@ export function AccountProvider({
     const owner = generation;
     api.accountSummary().then(
       (summary) => {
-        if (live && owner === serial.current) change({ known: true, handle: handleOf(summary), expiresAt: summary.expiresAt });
+        if (!live || owner !== serial.current) return;
+        const next = { known: true, handle: handleOf(summary), expiresAt: summary.expiresAt };
+        remember(next);
+        setAccount(next);
       },
       (error: unknown) => {
         // no live session: forget it; Central unreachable: keep it, unnamed, until it ends
@@ -201,6 +211,7 @@ export function AccountProvider({
       // the same session keeps its name; another is Central's to name
       // Storage events may be another account in the same cookie jar. Invalidate
       // pending reads/crypto immediately and ask Central to identify it afresh.
+      if (next === null) { lockChat(); void forgetKept(); }
       serial.current += 1;
       setGeneration(serial.current);
       setAccount(next);

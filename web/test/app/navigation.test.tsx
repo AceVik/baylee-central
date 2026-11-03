@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import { App } from "../../src/App";
 import { LangProvider } from "../../src/i18n";
-import { navigate } from "../../src/router";
+import { navigate, pageAt, reportAt } from "../../src/router";
 import { serve } from "../support/network";
 
 function app(lang: "en" | "de" = "en") {
@@ -57,5 +57,27 @@ describe("the pages", () => {
     expect(foot.textContent).toContain("Baylee is unofficial Fan Content permitted under the Fan Content Policy");
     expect(foot.textContent).toContain("Richtlinie für Fan-Inhalte");
     expect(foot.textContent).toContain("Baylee ist nicht mit Scryfall verbunden");
+  });
+
+  it("intercepts plain internal links and resolves feedback routes", async () => {
+    serve(() => undefined);
+    const user = userEvent.setup();
+    window.history.replaceState(null, "", "/");
+    app("en");
+    const raw = document.createElement("a");
+    raw.href = "/contact";
+    raw.textContent = "Raw contact link";
+    document.body.append(raw);
+    try {
+      await user.click(raw);
+      expect(await screen.findByRole("heading", { level: 1, name: "Write to us" })).toBeTruthy();
+      expect(window.location.pathname).toBe("/contact");
+    } finally {
+      raw.remove();
+    }
+    expect(pageAt("/admin/feedback")).toBe("adminFeedback");
+    expect(pageAt("/admin/reports")).toBe("adminFeedback");
+    expect(pageAt("/admin/feedback/0192d0c57b507a1f8c2d3e4f5a6b7c01")).toBe("adminReport");
+    expect(reportAt("/admin/feedback/0192d0c57b507a1f8c2d3e4f5a6b7c01")).toBe("0192d0c57b507a1f8c2d3e4f5a6b7c01");
   });
 });

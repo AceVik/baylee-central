@@ -1,15 +1,27 @@
 // One unlocked account's lifecycle. Network work is coalesced; every await is
 // followed by a lifetime check before its result can start another operation.
+// A sign-in unlocks it (account/flows.ts, `prepared`); after a reload it
+// resumes the identity this browser kept (`resume`, kept.ts), and only where
+// none is kept a password typed on the chat page unlocks it (`unlock`). It
+// lives until the sign-in ends: signing out, Central's refusal or another
+// account close it (held.ts), and the session's end forgets what was kept.
 import { ApiError, sameIdentity, type AccountSummary, type Api } from "../account/api";
 import type { Person } from "../social/api";
-import type { ChatApi, Keys, Message, Review, Sealed } from "./api";
+import type { ChatApi, Keys, Message, Registration, Review, Sealed } from "./api";
 import { chatCrypto, type ChatCrypto } from "./crypto";
+import type { Owner } from "./kept";
 import { trustStore, type TrustStore } from "./storage";
 import { groupApi, type GroupApi } from "./groups";
 
 export interface Pending { conv: string; text: string; sealed: Sealed; members: number[]; failed: boolean }
-export interface Snapshot { messages: Message[]; people: Person[]; reviews: Review[]; pending: Pending | null; loading: boolean; error: boolean; refused: number; denied: boolean; busy: boolean }
-const INITIAL: Snapshot = { messages: [], people: [], reviews: [], pending: null, loading: true, error: false, refused: 0, denied: false, busy: false };
+export interface Snapshot {
+  messages: Message[]; people: Person[]; reviews: Review[]; pending: Pending | null; loading: boolean; error: boolean; refused: number; denied: boolean; busy: boolean; started: boolean;
+  /** The newest message time looked at, by conversation: what the first complete read brought, then `markSeen`. Null before that read. */
+  seen: ReadonlyMap<string, number> | null;
+}
+const INITIAL: Snapshot = { messages: [], people: [], reviews: [], pending: null, loading: true, error: false, refused: 0, denied: false, busy: false, started: false, seen: null };
+/** An unlocked chat identity not yet registered with Central. */
+export interface Prepared { device: string; registration: Registration }
 
 export class ChatSession {
   private closed = false;
@@ -21,21 +33,24 @@ export class ChatSession {
   private keyWork: Promise<unknown> = Promise.resolve();
   private available = new Set<number>();
   private polling: Promise<boolean> | null = null;
+  private starting: Promise<void> | null = null;
+  private restored = false;
   private directory = new Map<string, string>();
   private listeners = new Set<() => void>();
   private snapshot: Snapshot = INITIAL;
   private mutation = false;
-  private hiddenAt: number | null = null;
   private locked: () => void = () => {};
   private timer: ReturnType<typeof setTimeout> | null = null;
   private delay = 2000;
 
   constructor(private api: ChatApi, private accountApi: Api, private summary: AccountSummary,
-    crypto: ChatCrypto = chatCrypto(), store: TrustStore = trustStore(summary.identity.account), private groups: GroupApi = groupApi()) {
+    crypto: ChatCrypto = chatCrypto(), store: TrustStore = trustStore(summary.identity.account), private groups: GroupApi = groupApi(),
+    private prepared: Prepared | null = null) {
     this.crypto = crypto; this.store = store;
   }
   getSnapshot = (): Snapshot => this.snapshot;
   subscribe = (listener: () => void): (() => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; };
+  isClosed = (): boolean => this.closed;
   private live() { if (this.closed) throw new Error("closed"); }
   private update(change: Partial<Snapshot>) {
     if (this.closed) return;
@@ -47,14 +62,12 @@ export class ChatSession {
     this.closed = true; this.crypto.close();
     if (this.timer !== null) clearTimeout(this.timer);
     document.removeEventListener("visibilitychange", this.visibility);
-    window.removeEventListener("pagehide", this.lock);
     this.directory.clear(); this.available.clear(); this.snapshot = INITIAL; this.listeners.clear();
   };
   private lock = () => { this.close(); this.locked(); };
+  // a page shown again reads at once; a hidden one does not read at all
   private visibility = () => {
-    if (document.visibilityState !== "visible") { this.hiddenAt = Date.now(); return; }
-    if (this.hiddenAt !== null && Date.now() - this.hiddenAt >= 5 * 60_000) { this.lock(); return; }
-    this.hiddenAt = null;
+    if (document.visibilityState !== "visible") return;
     if (this.timer !== null) clearTimeout(this.timer);
     this.schedule(0);
   };
@@ -62,16 +75,31 @@ export class ChatSession {
     if (this.closed) return;
     this.timer = setTimeout(() => {
       this.timer = null;
-      if (this.hiddenAt !== null && Date.now() - this.hiddenAt >= 5 * 60_000) { this.lock(); return; }
       const work = document.visibilityState === "visible" ? this.poll() : Promise.resolve(false);
       void work.then((more) => { this.schedule(more ? 0 : this.delay); });
     }, wait);
   }
 
+  /** Whose identity this is, as the kept record binds it. */
+  owner(): Owner | null {
+    const { identity, tag } = this.summary;
+    return tag === null ? null : { account: identity.account, epoch: identity.epoch, tag };
+  }
+
+  /** After a reload: the identity this browser kept, then `start`; fails where none is kept. */
+  async resume(onLock: () => void): Promise<void> {
+    this.live(); this.locked = onLock;
+    const owner = this.owner();
+    if (owner === null) throw new Error("profile");
+    const ready = await this.crypto.ask({ op: "resume", owner }); this.live();
+    this.prepared = { device: ready.device, registration: ready.registration };
+    await this.start(onLock);
+  }
+
+  /** Where nothing is kept: the password's own sign-in, the identity kept, then `start`. Returns the new session's end. */
   async unlock(password: string, onLock: () => void): Promise<number> {
     this.live(); this.locked = onLock;
     if (this.summary.tag === null) throw new Error("profile");
-    const trust = this.store.read();
     const start = await this.crypto.ask({ op: "start", password, identity: this.summary.identity }); this.live();
     const challenge = await this.accountApi.loginStart(this.summary.identity, start.message); this.live();
     const finish = await this.crypto.ask({ op: "finish", response: challenge.message }); this.live();
@@ -79,15 +107,52 @@ export class ChatSession {
     if (!sameIdentity(session.identity, this.summary.identity)) throw new Error("identity");
     const summary = await this.accountApi.accountSummary(); this.live();
     if (!sameIdentity(summary.identity, this.summary.identity) || summary.tag !== this.summary.tag) throw new Error("identity");
-    const ready = await this.crypto.ask({ op: "unlock", wrapped: session.wrappedMaster, tag: this.summary.tag, trust }); this.live();
-    const registered = await this.api.register(ready.registration); this.live();
-    if (registered !== ready.device) throw new Error("identity");
-    this.device = ready.device;
-    await this.keys([this.summary.tag]); this.live();
-    document.addEventListener("visibilitychange", this.visibility);
-    window.addEventListener("pagehide", this.lock);
-    this.schedule(0);
+    const ready = await this.crypto.ask({ op: "unlock", wrapped: session.wrappedMaster, tag: this.summary.tag }); this.live();
+    this.prepared = { device: ready.device, registration: ready.registration };
+    const owner = this.owner();
+    // best effort: where IndexedDB is missing the next reload asks again
+    if (owner !== null) void this.crypto.ask({ op: "keep", owner }).catch(() => {});
+    await this.start(onLock);
     return summary.expiresAt;
+  }
+
+  /**
+   * Restores the peer trust, registers the device and reads the own keys,
+   * then reads the inbox while the page is in view. Coalesced; after a
+   * failure the next call goes on where it stopped. Central's refusal locks.
+   */
+  start(onLock: () => void): Promise<void> {
+    if (this.closed) return Promise.reject(new Error("closed"));
+    this.locked = onLock;
+    if (this.snapshot.started) return Promise.resolve();
+    this.starting ??= this.begin().finally(() => { this.starting = null; });
+    return this.starting;
+  }
+  private async begin(): Promise<void> {
+    const prepared = this.prepared;
+    const tag = this.summary.tag;
+    if (prepared === null || tag === null) throw new Error("locked");
+    try {
+      if (!this.restored) {
+        const trust = this.store.read();
+        if (trust !== null) { await this.crypto.ask({ op: "restore", trust }); this.live(); }
+        this.restored = true;
+      }
+      const registered = await this.api.register(prepared.registration); this.live();
+      if (registered !== prepared.device) throw new Error("identity");
+      this.device = prepared.device;
+      await this.keys([tag]); this.live();
+    } catch (error) {
+      if (!this.closed) {
+        const denied = error instanceof ApiError && error.kind === "rejected";
+        this.update({ error: true, loading: false, denied });
+        if (denied) this.lock();
+      }
+      throw error;
+    }
+    this.update({ started: true, error: false });
+    document.addEventListener("visibilitychange", this.visibility);
+    this.schedule(0);
   }
 
   keys(tags: number[]): Promise<Review[]> {
@@ -122,7 +187,7 @@ export class ChatSession {
   }
 
   poll(): Promise<boolean> {
-    if (this.closed || this.snapshot.denied) return Promise.resolve(false);
+    if (this.closed || this.snapshot.denied || !this.snapshot.started) return Promise.resolve(false);
     if (this.polling !== null) return this.polling;
     this.polling = this.read().finally(() => { this.polling = null; });
     return this.polling;
@@ -147,7 +212,14 @@ export class ChatSession {
       for (const item of page.messages) people.set(item.sender.tag, { tag: item.sender.tag, displayName: item.sender.display_name });
       this.cursor = page.messages.at(-1)?.seq ?? this.cursor;
       this.delay = 2000;
-      this.update({ messages: [...messages.values()].sort((a, b) => a.at - b.at || a.id.localeCompare(b.id)).slice(-5000), people: [...people.values()], refused, loading: false, error: false });
+      const sorted = [...messages.values()].sort((a, b) => a.at - b.at || a.id.localeCompare(b.id)).slice(-5000);
+      let seen = this.snapshot.seen;
+      if (seen === null && !page.more) {
+        const first = new Map<string, number>();
+        for (const m of sorted) first.set(m.conv, m.at);
+        seen = first;
+      }
+      this.update({ messages: sorted, people: [...people.values()], refused, loading: false, error: false, seen });
       return page.more;
     } catch (error) {
       if (!this.closed) {
@@ -160,6 +232,14 @@ export class ChatSession {
     }
   }
 
+  /** The conversation's messages up to now count as read. */
+  markSeen(conv: string): void {
+    const seen = this.snapshot.seen;
+    if (this.closed || seen === null) return;
+    const last = this.snapshot.messages.findLast((m) => m.conv === conv)?.at ?? 0;
+    if (last > (seen.get(conv) ?? 0)) this.update({ seen: new Map(seen).set(conv, last) });
+  }
+
   private async recipients(conv: string, members: number[]): Promise<number[]> {
     if (!conv.startsWith("grp:")) return members;
     const snapshot = await this.groups.list(); this.live();
@@ -170,7 +250,7 @@ export class ChatSession {
 
   async send(conv: string, text: string, members: number[]): Promise<boolean> {
     this.live();
-    if (this.mutation || this.snapshot.pending !== null) return false;
+    if (this.mutation || this.snapshot.pending !== null || !this.snapshot.started) return false;
     this.mutation = true; this.update({ busy: true });
     try {
       members = await this.recipients(conv, members); this.live();

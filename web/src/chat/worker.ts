@@ -1,17 +1,19 @@
-// Secrets and plaintext work buffers stay in this worker's WASM instance.
-import init, { login_start, login_finish, chat_unlock, type Login, type LoginKey, type Chat } from "../central-wasm/central_web_crypto.js";
+// The chat's own Worker, for a page that reloaded: it resumes the identity
+// this browser kept (kept.ts), or, where none is kept, unlocks it with a
+// password typed on the chat page; a sign-in unlocks it in the sign-in's
+// Worker. Secrets and plaintext work buffers stay in this Worker.
+import init, { login_start, login_finish, chat_unlock, chat_resume, type Login, type LoginKey, type Chat } from "../central-wasm/central_web_crypto.js";
 import wasm from "../central-wasm/central_web_crypto_bg.wasm?url";
 import type { Request, Result } from "./crypto";
-import type { Message, Registration, Review, Sealed } from "./api";
+import { forgetKept, openIdentity, readKept } from "./kept";
+import { chatStep, serveChat, unlocked } from "./steps";
 
 const ready = init({ module_or_path: wasm });
-const encode = (v: unknown) => new TextEncoder().encode(JSON.stringify(v));
-const decode = <T>(v: Uint8Array): T => JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(v)) as T;
 let login: Login | null = null;
 let key: LoginKey | null = null;
 let chat: Chat | null = null;
 function take<T>(v: T | null): T { if (v === null) throw new Error("failed"); return v; }
-function step(r: Request): Result {
+async function step(r: Request): Promise<Result> {
   switch (r.op) {
     case "start": {
       if (login !== null || key !== null || chat !== null) throw new Error("failed");
@@ -19,38 +21,21 @@ function step(r: Request): Result {
       return { op: r.op, message: login.message };
     }
     case "finish": { const state = take(login); login = null; key = login_finish(state, r.response); return { op: r.op, message: key.message }; }
-    case "unlock": {
-      const state = take(key); key = null; chat = chat_unlock(state, r.wrapped, r.tag);
-      if (r.trust !== null) chat.restore_trust(r.trust);
-      return { op: r.op, device: chat.device, registration: decode<Registration>(chat.registration()) };
+    case "unlock": { const state = take(key); key = null; chat = chat_unlock(state, r.wrapped, r.tag); return { op: r.op, ...unlocked(chat) }; }
+    case "resume": {
+      if (login !== null || key !== null || chat !== null) throw new Error("failed");
+      const record = await readKept();
+      const bytes = record === null ? null : await openIdentity(record, r.owner);
+      if (bytes === null) {
+        // another account's, altered or unreadable: of no use to anybody
+        if (record !== null) await forgetKept();
+        throw new Error("unavailable");
+      }
+      try { chat = chat_resume(bytes, r.owner.tag); } finally { bytes.fill(0); }
+      return { op: r.op, ...unlocked(chat) };
     }
-    case "observe": {
-      const c = take(chat);
-      return { op: r.op, reviews: r.keys.filter((k) => k.devices.length > 0).map((k) => decode<Review>(c.observe(encode(k)))), trust: c.save_trust() };
-    }
-    case "confirm": { const c = take(chat); c.confirm(encode(r.snapshot)); return { op: r.op, trust: c.save_trust() }; }
-    case "seal": return { op: r.op, sealed: decode<Sealed>(take(chat).seal(r.conv, r.text, r.emote, Uint32Array.from(r.members), BigInt(r.now))) };
-    case "open": {
-      const c = take(chat);
-      return { op: r.op, messages: r.messages.map((m) => {
-        try { return { seq: m.seq, message: decode<Message>(c.open(encode(m))) }; }
-        catch { return { seq: m.seq, message: null }; }
-      }) };
-    }
+    default: return chatStep(take(chat), r);
   }
 }
 // The caller serializes requests; a worker also serializes initialization arrivals.
-let queue: Promise<void> = Promise.resolve();
-self.addEventListener("message", (event: MessageEvent<{ id: number; request: Request }>) => {
-  queue = queue.then(async () => {
-    const { id, request } = event.data;
-    try {
-      await ready;
-      self.postMessage({ id, result: step(request) }, { transfer: [] });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "failed";
-      const safe = ["rejected", "conflict", "busy", "unavailable"].includes(message) ? message : "failed";
-      self.postMessage({ id, error: safe }, { transfer: [] });
-    }
-  });
-});
+serveChat(step, () => ready);

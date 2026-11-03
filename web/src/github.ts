@@ -60,7 +60,10 @@ export function github(path: string, key: string): Promise<unknown> {
 
 /** `undefined` while asking, `null` when GitHub did not answer, else the parsed answer. */
 export function useGitHub<T>(path: string, key: string, parse: (raw: unknown) => T | null): T | null | undefined {
-  const [value, setValue] = useState<T | null | undefined>(undefined);
+  const [value, setValue] = useState<T | null | undefined>(() => {
+    const hit = cached(key, Date.now());
+    return hit === null ? undefined : parse(hit);
+  });
   useEffect(() => {
     let live = true;
     void github(path, key).then((raw) => {

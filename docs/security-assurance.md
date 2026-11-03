@@ -2187,6 +2187,68 @@ refuse an unknown field in the overview and in a named audit page. The
 website: page tests with stand-ins, and the e2e mock's answers in the exact
 shapes. Engineering review, not an audit.
 
+## The administration's feedback section, 31 October 2026
+
+Design pass. The website's side of bug and crash reports
+([reports](reports.md) §"The website's section"): `/admin/feedback` and a
+page per report, every triage request of `AdminRequest`, and the two raw
+part reads (`POST /api/v1/reports/{id}/client|record`). Assets: the
+players' words and pseudonyms, the client's details (a screenshot, the
+table, the log), a game's record, and the administrators' notes. Caller
+trust: an administrator's browser session, which Central checks on every
+read and change; the page asks only once the summary says administrator.
+Untrusted input: everything a report holds, including what a gateway says
+of itself, and the client part's gzip, which a modified client can shape.
+Not built here: Central's routes and their budgets (reviewed with #58).
+
+Implementation pass:
+- **Text only.** No report field, note, history line, gateway string or
+  client value is drawn as HTML; names are `<bdi>`, ids and versions
+  `<code>`, the player's words a text node (`dir="auto"`). A card the text
+  names is a link built from its Scryfall id alone (checked as a UUID), its
+  picture from `cards.scryfall.io` with `referrerPolicy="no-referrer"`.
+- **Shapes.** Every answer is parsed by its exact keys and central-api's
+  bounds (`admin/feedback/api.ts`); a filter is sent with its set parts only
+  and mirrors `ReportFilter::validate`, so an address with a bad part drops
+  that part instead of sending it.
+- **The client part.** At most 2 MiB of gzip are read (the body counted
+  while it streams, `Content-Length` checked first, gzip's magic required),
+  inflated through `DecompressionStream` and stopped past 16 MiB of output
+  while it streams (`MAX_CLIENT_JSON`, the design's bound), decoded as
+  strict UTF-8 and only then parsed. The JSON tree draws children only when
+  unfolded, 200 at a time, at most 32 levels deep.
+- **The screenshot.** Shown only when its base64 decodes to a PNG by its
+  eight-byte signature and an `IHDR` of 1 to 16,384 pixels a side; the
+  bytes become a `Blob` shown through `URL.createObjectURL`, revoked when
+  the view goes. `img-src` gains `blob:` for this and keeps `data:` out
+  (`scripts/csp.ts`, `test/csp.test.ts`).
+- **The record.** Never unpacked in the page: read with a 64 MiB bound and
+  handed to the browser as the `.gz` Central keeps; a client's record says
+  it is unverified.
+- **GitHub.** An issue link is `ISSUES/<n>` for Central's number (1 to
+  10,000,000); a new issue's form carries only the administrator's own
+  summary, a neutral category and a build that reads as a version.
+- **CSV.** Made in the browser; a cell starting with `=`, `+`, `-`, `@`, a
+  tab or a carriage return gets an apostrophe in front.
+- **Reauthentication.** Only a purge (one report's or a selection's) runs
+  through `useChange`, so a stale sign-in asks for the password first;
+  triage, notes, the trash, views and the unread mark go straight, as
+  `AdminRequest::fresh` rules.
+- **Requests.** The search waits for a pause in typing; facets are read once
+  per filter; the views' counts are two reads; the quiet refresh runs every
+  30 seconds only while the page is in view; the drawer reads a client part
+  only once the reader stops on a report.
+
+Adversarial pass: unit tests refuse answers with an unknown field, a bad
+label, signature, id or word, a control character in an excerpt and an
+oversized part; a gzip bomb stops at its bound; a GIF and broken base64 are
+no screenshot; a CSV cell starting a formula is defused; a pasted issue
+from another repository is refused. The e2e mock refuses any report
+request with a field too many or too few and checks the part route's
+headers and empty body; a spec shows the screenshot through `blob:` under
+the production policy with no console error. Engineering review, not an
+audit.
+
 ## Account-owned chat and groups, 2026-11-02
 
 Design pass: personal relationships and ciphertext delivery belong to Central's
@@ -2314,3 +2376,145 @@ controls include every repeated hex digit and both stopwords; a separate batch o
 scanning are unchanged, and neither scanner configuration gains an exemption.
 The actual scanner, including these controls and both repository scans, passes.
 Source: [pinned Gitleaks rules](https://github.com/gitleaks/gitleaks/blob/v8.30.1/config/gitleaks.toml).
+
+## The chat unlocked by the sign-in, 3 November 2026
+
+Design pass. The owner asked that a signed-in page's chat work without asking
+for the password again. Assets: the chat identity derived from the master key,
+the plaintext the page shows, the password. Caller trust: the page's own sign-in
+(OPAQUE, `__Host-central`). Options weighed: keeping a derived key at rest in the
+browser (localStorage, IndexedDB, also under a non-extractable WebCrypto key)
+would leave the chat key readable to whoever holds the browser profile after
+sign-out, and `docs/central-chat.md` keeps only encrypted peer trust at rest; a
+key split with Central needs a new protocol operation and a WebAssembly rebuild.
+Chosen: the sign-in's Worker, which opens the master key anyway, keeps the chat
+identity instead of discarding it (`chat_unlock` in place of `login_confirm`),
+and the page keeps that Worker for the sign-in's life. No new protocol, no new
+stored secret, the committed WebAssembly unchanged. Invariant: the chat is
+unlocked only by a password proven in this page, and closed when the sign-in
+ends; a reload asks once. (Superseded the same day for reloads by the owner's
+decision below: the identity is now kept, sealed, while the sign-in lasts.)
+
+Implementation pass:
+- `chat_unlock` consumes the sign-in exactly as `login_confirm` does and fails
+  the same way on a wrapper that does not open; the sign-in then fails as
+  `mismatch` and ends the new session. Accounts without a recovery code keep
+  `recovery_create`; an account without a tag keeps `login_confirm`.
+- The Worker leaves the flow only after `chat_unlock` answered; the flow's
+  `close` then no longer terminates it, and nothing of the sign-in's protocol
+  reaches it again (`account/crypto-worker.ts` answers the account protocol by
+  `op` and the chat's by `id`; the chat refuses the sign-in steps).
+- `chat/held.ts` keeps one chat, by account: another account's is never handed
+  out; another account's sign-in closes it; a same-account reauthentication
+  keeps the open one and closes the new Worker. `AccountProvider` locks it when
+  the session ends for any reason, including a sign-out in another tab.
+- The peer trust is restored as its own step after the unlock: a damaged
+  record fails the chat's start closed (no registration, no inbox, no seal)
+  without failing the sign-in, and a retry does not restore twice.
+- Before its start the session neither sends nor reads. The five-minute hidden
+  lock and the page-hide lock are gone: the keys live as long as the page and
+  its session, which a reader of the page's memory holds anyway.
+- The held chat keeps types only from the chat, so the first page's bundle
+  does not grow by the chat's code.
+
+Adversarial pass: unit tests for the Worker handover (closing the flow leaves
+the chat's Worker, closing the chat ends it), the sign-in keeping a chat only
+on success, the same-account and other-account cases, the start without a
+password (restore, register, own keys, inbox), damaged trust, Central's refusal
+at the start, a tab hidden for an hour, and the unread state. The e2e mock now
+answers the chat and the groups in their exact shapes with a stand-in Worker:
+a sign-in reaches the chat with no password field, a message goes out and its
+answer comes back, the contacts tab answers a request, and after a reload a
+wrong password is refused before the right one unlocks. Not run here: the real
+WebAssembly against a real Central (its `chat_unlock` and steps are the same
+exports the chat page used before). Engineering review, not an audit.
+
+## Review of the website overhaul (PR #62), 3 November 2026
+
+A review of the overhaul's commit before it reaches main. What it changed:
+
+- **No unverified endorsements.** The start page's gateway showcase was a
+  hard-coded list: three gateways on domains this project does not control,
+  with invented player counts, links to them and `baylee://gateway/connect`
+  links that the client does not handle. Anyone registering one of those
+  names would have had the official site send players there. The section
+  now shows the first gateways of Central's own directory through the
+  directory's card (an "Open in Baylee" link only behind the deep-link
+  switch), and `gatewayConnectLink` is gone. The self-hosting snippet no
+  longer names two environment variables no gateway reads.
+- **Nothing made up.** The status strip showed constant games and users, a
+  per-browser view counter, a "registered" figure computed from the
+  constants and an invented player list, and the footer and strip claimed
+  GDPR compliance. The strip now shows only what a source says (the release
+  and CI from GitHub, the gateways online and not from Central's
+  directory); the claims are removed (AGENTS.md: no compliance claim
+  without evidence).
+- **No half protocol.** The commit added `GatewayStats` to the heartbeat and
+  the directory listing of `central-api`, the crate the client links: player
+  handles with their presence for a public listing, "opted-in" asserted in a
+  comment without a consent mechanism, counts without bounds, accepted under
+  `Private`, validated and then dropped (never stored nor served), without
+  an entry in the gateway registry's documentation, and a `deny_unknown_fields`
+  break for older clients the day it would be filled. The crates are back to
+  main's; the feature can return as its own change with storage, consent,
+  bounds, documentation and a compatibility plan. The page's mirror of it
+  (`validGatewayStats`, the card's counts) went with it.
+- Smaller: the download and language lists give the keyboard back to their
+  switch on Escape and a choice, close when the keyboard leaves them and
+  name what they control; the download's live region is its line of facts,
+  not the list; leaving an anchor on the same page goes back to the top;
+  the feedback screenshot's `blob:` address is made per image as it is
+  attached (React's development double attach revoked a shared one); German
+  and English sentences written into components became Fluent messages;
+  dead code (an unrouted page, an API only its test used, a constant)
+  removed.
+
+Checked and left: the directory's parsing and its origin rules, text-only
+rendering of gateway strings, the CSV and GitHub guards, the router's click
+handling, the anchors the page scrolls to, and the polling's pauses.
+Engineering review, not an audit.
+
+## The chat identity kept while signed in, 3 November 2026
+
+Design pass. The owner, the same day: the chat should not have to be unlocked,
+not on the website and not in the client; a signed-in account sees its contacts
+and chats, full stop. That needs the chat identity across reloads without the
+password, so it is now kept in the browser while the sign-in lasts. Options
+weighed: raw bytes in `localStorage` (readable by any copy of it); a key split
+with Central (a new protocol operation, a migration and a per-session secret
+on the server, for little more: message ciphertext is only readable with a
+session anyway, and a compromised Central would hold its half); the identity
+sealed in IndexedDB under a non-extractable Web Crypto key bound to account,
+epoch and tag, forgotten with the session. Chosen: the last. No custom
+cryptography (AES-256-GCM from the Web Crypto API; the identity's derivation
+unchanged); the module gains `Chat::keep` and `chat_resume`, the identity's
+bytes going only from the module to Web Crypto inside the Worker.
+
+Implementation pass:
+- `flow::chat_unlock` keeps the 96 bytes beside the chat (`OpenChat`, wiped on
+  drop); `flow::chat_resume` takes exactly 96 bytes and a valid tag and
+  rebuilds the same identity. The Worker seals them at once with a fresh
+  non-extractable key, then overwrites its copy; resume overwrites the opened
+  bytes after `chat_resume`.
+- The record names its owner and the AAD binds it again: another account,
+  epoch or tag, an altered IV or ciphertext open nothing, and such a record is
+  deleted. One record per browser; storing replaces it.
+- Forgotten on sign-out, on every end of the session the page sees (expiry,
+  Central's "no" at renewal or summary, a sign-out in another tab) and at
+  start when no session is remembered. The chat page resumes once per mount,
+  shows "loading" meanwhile and asks for the password only when nothing opens;
+  a password unlock keeps the identity for the next reload.
+- The WebAssembly module was rebuilt with `cargo xtask wasm` on x86-64 Linux
+  (the pinned Rust image under Rosetta) and checked with `--check`.
+
+Adversarial pass: host tests that a kept identity resumes as the same device
+and registration, that the same sign-in derives the same bytes, that other
+lengths, tag 0 and another epoch give nothing alike; unit tests for the seal
+(non-exportable key, wrong owner, swapped claim, altered ciphertext and IV),
+the resume (no password, nothing registered when nothing is kept) and the keep
+after a sign-in and after a password; e2e: the chat opens after a reload with
+no password field, IndexedDB is empty after sign-out, and with nothing kept the
+password opens it once and the next reload needs none. Not run here: a real
+Central with the real module end to end. The native client is the client's own
+change. Engineering review, not an audit.
+

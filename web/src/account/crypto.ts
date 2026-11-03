@@ -1,9 +1,12 @@
 // The page's side of the crypto Worker (crypto-worker.ts): one Worker per
 // registration or sign-in, one request at a time, terminated when the flow
-// ends however it ends. The page never holds a state, a key or the module;
-// it hands the Worker the password and bytes, and gets bytes back (and a
-// recovery code to show once).
+// ends however it ends, unless the sign-in unlocked the chat: then the
+// Worker is the chat's (`chatUnlock`). The page never holds a state, a key
+// or the module; it hands the Worker the password and bytes, and gets bytes
+// back (and a recovery code to show once).
 
+import type { Registration } from "../chat/api";
+import { chatCrypto, type Unlocked } from "../chat/crypto";
 import type { Identity } from "./api";
 
 export type WorkerRequest =
@@ -12,7 +15,8 @@ export type WorkerRequest =
   | { op: "login_start"; password: string; account: Uint8Array; epoch: number }
   | { op: "login_finish"; response: Uint8Array }
   | { op: "login_confirm"; wrappedMaster: Uint8Array }
-  | { op: "recovery_create"; wrappedMaster: Uint8Array };
+  | { op: "recovery_create"; wrappedMaster: Uint8Array }
+  | { op: "chat_unlock"; wrappedMaster: Uint8Array; tag: number };
 
 export interface Enrolled {
   record: Uint8Array;
@@ -36,6 +40,7 @@ export type WorkerReply =
   | ({ op: "enrollment_finish" } & Enrolled)
   | { op: "login_confirm" }
   | ({ op: "recovery_create" } & Recovered)
+  | { op: "chat_unlock"; device: string; registration: Registration }
   | { op: "error"; error: CryptoFailure };
 
 /**
@@ -65,6 +70,12 @@ export interface Crypto {
    * opens the master key the same way, and wraps it under a new code.
    */
   recoveryCreate(wrappedMaster: Uint8Array): Promise<Recovered>;
+  /**
+   * In place of `loginConfirm`, for an account with a public tag: opens the
+   * master key the same way, derives the chat identity and hands the Worker
+   * to the chat, which closes it; `close` then leaves it alone.
+   */
+  chatUnlock?(wrappedMaster: Uint8Array, tag: number): Promise<Unlocked>;
   close(): void;
 }
 
@@ -129,6 +140,14 @@ export function workerCrypto(make: () => Worker = () => new Worker(new URL("./cr
       const reply = await ask({ op: "recovery_create", wrappedMaster }, "recovery_create");
       if (reply.op !== "recovery_create") throw new CryptoError("failed");
       return { recovery: reply.recovery, recoveryCode: reply.recoveryCode };
+    },
+    chatUnlock: async (wrappedMaster, tag) => {
+      const reply = await ask({ op: "chat_unlock", wrappedMaster, tag }, "chat_unlock");
+      const w = worker;
+      if (reply.op !== "chat_unlock" || w === null) throw new CryptoError("failed");
+      // the chat owns the Worker from here
+      worker = null;
+      return { crypto: chatCrypto(() => w), device: reply.device, registration: reply.registration };
     },
     close: () => {
       worker?.terminate();

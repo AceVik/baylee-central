@@ -24,7 +24,7 @@ export function NotificationSettings({ admin }: { admin: boolean }) {
       const enabled = available && Notification.permission === "granted" && next.subscribed && installation() !== null;
       if (!enabled && installation() !== null) rememberInstallation(null);
       setState(next); setActive(enabled);
-      if (available) await workerState(enabled ? installation() : null, enabled ? next.enabled : 0);
+      if (available) await workerState(enabled ? installation() : null, enabled ? next.enabled : 0).catch(() => {});
     }
     void load().catch(() => { if (life.current.generation === generation) setError("push.failed"); });
     return () => { ++scope.generation; };
@@ -85,17 +85,21 @@ export function NotificationSettings({ admin }: { admin: boolean }) {
     setBusy(true); setError(null);
     void disablePush().then(() => { if (life.current.generation === generation) setActive(false); }, () => { if (life.current.generation === generation) { setActive(false); setError("push.failed"); } }).finally(() => { if (life.current.generation === generation) setBusy(false); });
   }
-  return <section className="notification-settings" id="notifications" aria-labelledby="notification-title">
-    <h2 id="notification-title"><T id="push.title" /></h2>
+  return <section className="card account-part account-wide notification-settings reveal" id="notifications" aria-labelledby="notification-title">
+    <h2 id="notification-title" className="app-panel-title"><T id="push.title" /></h2>
     <p><T id="push.lead" /></p>
-    {!available && <p><T id="push.unsupported" /></p>}
-    {state !== null && state.publicKey === null && <p><T id="push.unconfigured" /></p>}
-    {error !== null && <p role="alert"><T id={error} /></p>}
-    <button type="button" className="button button-ghost" role="switch" aria-checked={active} disabled={busy || !available || state?.publicKey == null} onClick={active ? disable : enable}><T id="push.device" /></button>
-    <p className="small"><T id={active ? "push.on" : "push.off"} /></p>
+    {!available && <p className="small"><T id="push.unsupported" /></p>}
+    {state !== null && state.publicKey === null && <p className="small"><T id="push.unconfigured" /></p>}
+    {error !== null && <p className="form-status bad" role="alert"><T id={error} /></p>}
+    <div className="notification-device">
+      <button type="button" className="button button-ghost" role="switch" aria-checked={active} disabled={busy || !available || state?.publicKey == null} onClick={active ? disable : enable}><T id="push.device" /></button>
+      <p className="small"><T id={active ? "push.on" : "push.off"} /></p>
+    </div>
     <fieldset disabled={busy || state === null}>
       <legend><T id="push.categories" /></legend>
-      {categories.map((category) => <label key={category} className="notification-toggle"><span><T id={LABELS[category]} /></span><input type="checkbox" role="switch" aria-checked={state !== null && Boolean(state.enabled & BITS[category])} checked={state !== null && Boolean(state.enabled & BITS[category])} onChange={(e) => { void toggle(category, e.target.checked); }} /></label>)}
+      <div className="notification-list">
+        {categories.map((category) => <label key={category} className="notification-toggle"><span><T id={LABELS[category]} /></span><input type="checkbox" role="switch" aria-checked={state !== null && Boolean(state.enabled & BITS[category])} checked={state !== null && Boolean(state.enabled & BITS[category])} onChange={(e) => { void toggle(category, e.target.checked); }} /></label>)}
+      </div>
     </fieldset>
     <p className="small"><T id="push.scope" /></p>
   </section>;

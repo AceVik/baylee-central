@@ -147,6 +147,13 @@ and Rust 1.99.0. The resulting WASM SHA-256 is
 `c24adad5b8a4eaa4bed0f2ed1e44a3a2bd00505959b0737583b5962b50870c36`.
 The task's host restriction and byte comparison were not bypassed.
 
+The 2026-11-03 bundle (`Chat::keep`, `chat_resume`) was built with the command
+above, in the pinned Rust image on Apple Silicon under Docker Desktop's Rosetta
+emulation of x86-64 (QEMU emulation crashed `rustc`), and `cargo xtask wasm
+--check` passed in the same container. The resulting WASM SHA-256 is
+`7983d3ec71c4702ab124660038d92a0a0b3f76c40bfa644e440fcc8574f46025`; CI's
+`wasm` job checks it again on its own runner.
+
 ## What the tasks guarantee
 
 - No program runs through a shell; arguments are lists. A secret (a fixture

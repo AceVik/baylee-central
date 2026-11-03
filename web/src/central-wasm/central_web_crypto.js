@@ -52,6 +52,17 @@ export class Chat {
         }
     }
     /**
+     * The identity's secret bytes, for the Worker to seal at once under the
+     * browser's non-extractable key and wipe; never for the page.
+     * @returns {Uint8Array}
+     */
+    keep() {
+        const ret = wasm.chat_keep(this.__wbg_ptr);
+        var v1 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
+        wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
+        return v1;
+    }
+    /**
      * Validate a peer's keys and return its safety-number review as JSON.
      *
      * # Errors
@@ -408,6 +419,27 @@ export function central_origin() {
     } finally {
         wasm.__wbindgen_free(deferred1_0, deferred1_1, 1);
     }
+}
+
+/**
+ * The chat identity again from the bytes [`Chat::keep`] gave, once the
+ * Worker has opened them under the browser's key.
+ *
+ * # Errors
+ * Rejects bytes of another length or an invalid public tag.
+ * @param {Uint8Array | number[]} kept
+ * @param {number} tag
+ * @returns {Chat}
+ */
+export function chat_resume(kept, tag) {
+    const val2 = +tag;
+    const ptr0 = passArray8ToWasm0(kept, wasm.__wbindgen_malloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ret = wasm.chat_resume(ptr0, len0, val2);
+    if (ret[2]) {
+        throw takeFromExternrefTable0(ret[1]);
+    }
+    return Chat.__wrap(ret[0]);
 }
 
 /**

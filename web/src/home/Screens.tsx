@@ -53,7 +53,6 @@ export function Screens() {
   return (
     <Section
       id="screens"
-      alt
       eyebrow={<T id="shots.eyebrow" />}
       title={<T id="shots.title" />}
     >

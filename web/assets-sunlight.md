@@ -18,10 +18,10 @@ These are project-created visuals and owner-supplied photos, not Wizards assets.
 | `public/img/baylee-cloud.webp` | `scenes/baylee-cloud.png` | 1200 × 800, WebP quality 95, alpha quality 100 |
 | `public/img/baylee-sunlight-960.webp` | `brand/baylee-logo.png` | 960 × 400, WebP quality 95 |
 | `public/img/baylee-sunlight-480.webp` | `brand/baylee-logo.png` | 480 × 200, WebP quality 95 |
-| `public/img/baylee-sunlight-icon.webp` | `brand/baylee-icon.png` | 192 × 192, WebP quality 95 |
-| `public/favicon-32.png` | `brand/favicon-32.png` | Exact copy |
-| `public/apple-touch-icon.png` | `brand/apple-touch-icon.png` | Exact copy |
-| `public/favicon.ico` | `brand/baylee-icon.png` | Pillow, 16/32/48 px |
+| `public/img/baylee-sunlight-icon.webp` | `brand/baylee-icon.png` (`4fcd41de1^`) | 192 × 192, WebP quality 95 |
+| `public/favicon-32.png` | `brand/favicon-32.png` (`4fcd41de1^`) | Exact copy |
+| `public/apple-touch-icon.png` | `brand/apple-touch-icon.png` (`4fcd41de1^`) | Exact copy |
+| `public/favicon.ico` | `brand/baylee-icon.png` (`4fcd41de1^`) | Pillow, 16/32/48 px |
 | `public/img/og.jpg` | `scenes/baylees-world.png` | FFmpeg resize and centre crop to 1200 × 630 |
 | `public/img/memorial/baylee-{1..5}.jpg` | `memorial/baylee-{1..5}.jpg` | Exact copies of the existing metadata-stripped, maximum 1400 px derivatives |
 

@@ -5,6 +5,9 @@
 // read. Synthetic names and example.invalid addresses only. Changes are
 // remembered for the page's life, so a test sees what it did.
 
+import { chatAnswer, chatState, groupAnswer, type ChatState } from "./chat.ts";
+import { reportsAnswer, reportsState, type ReportsState } from "./reports.ts";
+
 /** A UUIDv7-shaped id whose last byte is `n`. */
 export const uid = (kind: number, n: number): number[] => [0x01, 0x92, 0xd0, 0xc5, 0x7b, kind, 0x7a, 0x1f, 0x8c, 0x2d, 0x3e, 0x4f, 0x5a, 0x6b, 0x7c, n];
 
@@ -54,7 +57,11 @@ export interface AreaState {
   audit: { id: number[]; at: number; actor: number[] | null; action: string; account: number[] | null; gateway: number[] | null; beta_key: null }[];
   /** Index of the signed-in account in `accounts`. */
   me: number;
+  /** Bug and crash reports (`reports.ts`). */
+  reports: ReportsState;
   nextToken: number;
+  /** The chat's deliveries and the groups (`chat.ts`). */
+  chat: ChatState;
 }
 
 export function areaState(admin: boolean): AreaState {
@@ -113,7 +120,10 @@ export function areaState(admin: boolean): AreaState {
     gateway: gateway === null ? null : uid(0x20, gateway as number),
     beta_key: null,
   }));
-  return { accounts, gateways, audit, me: 0, nextToken: 10 };
+  const admins = accounts.filter((a) => a.admin).map((a) => ({ id: a.id, display_name: a.display_name, tag: a.tag }));
+  const state: AreaState = { accounts, gateways, audit, me: 0, nextToken: 10, reports: reportsState(admins), chat: { seq: 0, deliveries: [], groups: [], invites: [], answered: new Set() } };
+  state.chat = chatState(state);
+  return state;
 }
 
 const same = (a: unknown, b: number[]) => Array.isArray(a) && a.join() === b.join();
@@ -149,7 +159,36 @@ function adminGateway(s: AreaState, g: Gateway) {
 
 const owner = (answer: string, rest: Record<string, unknown>) => ({ result: "owner", answer: { answer, ...rest } });
 const admin = (answer: string, rest: Record<string, unknown>) => ({ result: "admin", answer: { answer, ...rest } });
+const social = (kind: string, rest: Record<string, unknown>) => ({ result: "social", response: { kind, ...rest } });
 const DONE = { result: "done" };
+
+/** The answer to a `social` request, or a status to refuse it with. */
+export function socialAnswer(s: AreaState, request: Record<string, unknown>): unknown {
+  const people = s.accounts.filter((a, i) => i !== s.me && a.display_name !== null && a.tag !== null).map((a) => ({ tag: a.tag as number, display_name: a.display_name as string }));
+  switch (request["action"]) {
+    case "contacts":
+      return social("contacts", {
+        contacts: [
+          ...(people[0] ? [{ person: people[0], relation: "incoming" }] : []),
+          ...(people[1] ? [{ person: people[1], relation: "friend" }] : []),
+          ...(people[2] ? [{ person: people[2], relation: "friend" }] : []),
+          ...(people[3] ? [{ person: people[3], relation: "outgoing" }] : []),
+          ...(people[4] ? [{ person: people[4], relation: "blocked" }] : []),
+        ],
+      });
+    case "lookup": {
+      const found = people.find((p) => p.tag === request["tag"]) ?? null;
+      return social("person", { person: found });
+    }
+    case "contact":
+      return social("done", {});
+    case "chat":
+      return chatAnswer(s, s.chat, request["request"] as Record<string, unknown>);
+    case "group":
+      return groupAnswer(s, s.chat, request["request"] as Record<string, unknown>);
+  }
+  return 400;
+}
 
 /** The answer to an `owner` request, or a status to refuse it with. */
 export function ownerAnswer(s: AreaState, request: Record<string, unknown>): unknown {
@@ -297,5 +336,7 @@ export function adminAnswer(s: AreaState, request: Record<string, unknown>): unk
         },
       });
   }
+  const report = reportsAnswer(s.reports, request);
+  if (report !== undefined) return report;
   return 400;
 }

@@ -6,6 +6,7 @@
 use central_api::Endpoint;
 use central_crypto::{
     Context, CryptoError,
+    chat::{DeviceSecrets, SECRETS_LEN},
     opaque::{Enrollment, Login},
     vault::{MasterKey, ObjectContext, RecoveryCode, WrappedMasterKey, WrappingKey},
 };
@@ -195,8 +196,19 @@ pub fn recovery_create(state: SignedIn, wrapped_master: &[u8]) -> Result<Recover
     })
 }
 
+/// A chat identity opened in the browser, and its secret bytes, which the
+/// Worker seals under the browser's own non-extractable key so that the chat
+/// opens again after a reload without the password (`docs/central-chat.md`).
+pub struct OpenChat {
+    /// The chat bound to its public tag.
+    pub chat: central_client::chat::Chat,
+    /// The identity's secrets (signing seed, agreement seed, vault key); wiped on drop.
+    pub kept: Zeroizing<[u8; SECRETS_LEN]>,
+}
+
 /// Open the account's stable chat identity after OPAQUE, consuming the wrapping
-/// key and wiping the master key before returning. No secret leaves the worker.
+/// key and wiping the master key before returning. The identity's bytes stay
+/// in the Worker.
 ///
 /// # Errors
 /// Rejects a wrong master wrapper, account context or public tag.
@@ -204,9 +216,25 @@ pub fn chat_unlock(
     state: SignedIn,
     wrapped_master: &[u8],
     tag: u32,
-) -> Result<central_client::chat::Chat, CryptoError> {
+) -> Result<OpenChat, CryptoError> {
     let SignedIn { key, context } = state;
     let master = key.unwrap(&WrappedMasterKey::from_bytes(wrapped_master)?)?;
-    let secrets = master.chat_identity(context)?;
-    central_client::chat::Chat::new(secrets, tag).map_err(|_| CryptoError::Invalid)
+    open_chat(master.chat_identity(context)?, tag)
+}
+
+/// The chat identity again from the bytes [`chat_unlock`] kept, after the
+/// Worker opened them under the browser's key, which binds them to the
+/// account, epoch and tag.
+///
+/// # Errors
+/// Rejects bytes of another length and an invalid public tag.
+pub fn chat_resume(kept: &[u8], tag: u32) -> Result<OpenChat, CryptoError> {
+    let bytes: &[u8; SECRETS_LEN] = kept.try_into().map_err(|_| CryptoError::Invalid)?;
+    open_chat(DeviceSecrets::from_bytes(bytes), tag)
+}
+
+fn open_chat(secrets: DeviceSecrets, tag: u32) -> Result<OpenChat, CryptoError> {
+    let kept = secrets.to_bytes();
+    let chat = central_client::chat::Chat::new(secrets, tag).map_err(|_| CryptoError::Invalid)?;
+    Ok(OpenChat { chat, kept })
 }

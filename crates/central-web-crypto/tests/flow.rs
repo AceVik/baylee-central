@@ -10,8 +10,8 @@ use central_crypto::{
     vault::{MasterKey, ObjectContext, RecoveryCode, WrappedMasterKey},
 };
 use central_web_crypto::flow::{
-    self, DOCUMENT, Recovery, SignedIn, enrollment_finish, enrollment_start, login_confirm,
-    login_finish, login_start, recovery_create,
+    self, DOCUMENT, Recovery, SignedIn, chat_resume, chat_unlock, enrollment_finish,
+    enrollment_start, login_confirm, login_finish, login_start, recovery_create,
 };
 
 const ACCOUNT: [u8; 16] = [
@@ -311,4 +311,44 @@ fn a_sign_in_is_confirmed_or_makes_a_code_once() {
     let (record, wrapped, _) = moved(&server, 1);
     assert!(confirm(signed_in(&server, &record, 1), wrapped.as_bytes()).is_ok());
     assert!(create(signed_in(&server, &record, 1), wrapped.as_bytes()).is_ok());
+}
+
+#[test]
+fn a_kept_chat_identity_resumes_as_the_same_device_and_nothing_else_does() {
+    let server = ServerKeys::generate();
+    let (record, registered) = register(&server, 1);
+    let opened = chat_unlock(
+        signed_in(&server, &record, 1),
+        registered.wrapped_master.as_bytes(),
+        0x3fa2,
+    )
+    .unwrap();
+    let resumed = chat_resume(opened.kept.as_ref(), 0x3fa2).unwrap();
+    assert_eq!(resumed.chat.device(), opened.chat.device());
+    assert_eq!(*resumed.kept, *opened.kept);
+    assert_eq!(
+        central_api::encode(&resumed.chat.registration().unwrap()).unwrap(),
+        central_api::encode(&opened.chat.registration().unwrap()).unwrap()
+    );
+    // the same sign-in again derives the same identity: browser and client share it
+    let again = chat_unlock(
+        signed_in(&server, &record, 1),
+        registered.wrapped_master.as_bytes(),
+        0x3fa2,
+    )
+    .unwrap();
+    assert_eq!(*again.kept, *opened.kept);
+    // bytes of another length and an invalid tag are refused
+    assert!(chat_resume(&opened.kept[..95], 0x3fa2).is_err());
+    assert!(chat_resume(&[0; 97], 0x3fa2).is_err());
+    assert!(chat_resume(opened.kept.as_ref(), 0).is_err());
+    // another epoch's account is another identity
+    let (record2, registered2) = register(&server, 2);
+    let other = chat_unlock(
+        signed_in(&server, &record2, 2),
+        registered2.wrapped_master.as_bytes(),
+        0x3fa2,
+    )
+    .unwrap();
+    assert_ne!(other.chat.device(), opened.chat.device());
 }

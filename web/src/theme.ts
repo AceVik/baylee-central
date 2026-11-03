@@ -22,6 +22,17 @@ function shown(): Theme {
 function apply(theme: Theme): void {
   if (theme === "system") document.documentElement.removeAttribute("data-theme");
   else document.documentElement.setAttribute("data-theme", theme);
+  const meta = document.querySelector<HTMLMetaElement>('meta[name="color-scheme"]');
+  if (meta) meta.content = theme === "system" ? "dark light" : theme;
+}
+
+function resolveCurrent(): "light" | "dark" {
+  const attr = document.documentElement.getAttribute("data-theme");
+  if (attr === "light" || attr === "dark") return attr;
+  if (typeof window.matchMedia === "function" && window.matchMedia("(prefers-color-scheme: light)").matches) {
+    return "light";
+  }
+  return "dark";
 }
 
 function remember(theme: Theme): void {
@@ -52,4 +63,24 @@ export function useTheme(): [Theme, (theme: Theme) => void] {
     return () => window.removeEventListener("storage", follow);
   }, []);
   return [theme, choose];
+}
+
+/** The resolved light or dark appearance in effect right now, following both manual choice and live OS changes. */
+export function useResolvedTheme(): "light" | "dark" {
+  const [resolved, setResolved] = useState<"light" | "dark">(resolveCurrent);
+  useEffect(() => {
+    const update = () => setResolved(resolveCurrent());
+    const media = typeof window.matchMedia === "function" ? window.matchMedia("(prefers-color-scheme: light)") : null;
+    media?.addEventListener("change", update);
+    window.addEventListener("storage", update);
+    const observer = new MutationObserver(update);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+    update();
+    return () => {
+      media?.removeEventListener("change", update);
+      window.removeEventListener("storage", update);
+      observer.disconnect();
+    };
+  }, []);
+  return resolved;
 }

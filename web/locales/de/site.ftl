@@ -29,7 +29,7 @@ notFound-back = Zurück zur Startseite
 
 ## The tab's title, per page
 
-title-home = Baylee – ein Tisch, der die Regeln kennt
+title-home = Baylee – Decks bauen. Freunde einladen. Einfach spielen.
 title-download = Download – Baylee
 title-cards = Karten – Baylee
 title-gateways = Gateways – Baylee
@@ -48,6 +48,8 @@ title-adminUser = Ein Account – Verwaltung – Baylee
 title-adminGateways = Gateways – Verwaltung – Baylee
 title-adminAudit = Protokoll – Verwaltung – Baylee
 title-adminLegacy = Alte Konten – Verwaltung – Baylee
+title-adminFeedback = Feedback – Verwaltung – Baylee
+title-adminReport = Eine Meldung – Verwaltung – Baylee
 title-notFound = Nicht gefunden – Baylee
 
 ## The footer. foot-fanContent is Wizards' official German notice, word for
@@ -95,94 +97,100 @@ ci-failing = rot
 
 ## The start page
 
-hero-kicker = Geschlossene Beta · kostenlos · quelloffen · inoffizieller Fan-Inhalt
-hero-title = Ein Tisch, der <glow>die Regeln kennt.</glow>
-hero-lead = Baylee ist eine Regel-Engine und ein 3D-Spieltisch für Magic: The Gathering – mit Freunden oder gegen die Haus-KI. Die Engine setzt die Comprehensive Rules durch, damit es niemand am Tisch tun muss. Kostenlos, quelloffen unter der AGPL, und das bleibt so.
-hero-note = Offline gegen die Haus-KI geht ohne Account. Online auf dem Sanctuary-Gateway ist eine geschlossene Beta und braucht einen Schlüssel.
-hero-what = Was Baylee ist
+hero-kicker = Beta · Open Source · Für immer kostenfrei · Inoffizieller Fan-Inhalt
+hero-title = Decks bauen. Freunde einladen. <glow>Einfach spielen.</glow>
+hero-lead = Stelle deine Decks im umfangreichen Deckbuilder zusammen und spiele spannende Partien mit bis zu 8 Spielern gleichzeitig – im Duell, Jeder-gegen-jeden oder im Team. Vollständige Regelvalidierung sorgt automatisch für faire Züge, während du kostenfrei, komplett Open Source und garantiert ohne Paywall spielst.
+hero-note = Kompletter Offline-Modus für Solo-Partien und den Deckbuilder – sofort spielbar ohne Account. Zudem kannst du jederzeit <selfhost>eigene Gateways für deine Spielrunde selbst hosten</selfhost>.
+hero-signup = Noch kein Account für Online-Runden? <register>Jetzt Account anlegen</register> oder <signin>anmelden</signin>.
+hero-what = Projekt entdecken
 hero-cards = Stand der Karten
+hero-github = GitHub
+hero-discord = Discord-Community
+hero-whatsapp = WhatsApp-Community
 hero-scroll = Nach unten
 
 status-label = Projektstand
-status-build = Neuester Build
+status-build = Build
 status-releases = siehe Releases
-status-ci = CI auf main
+status-ci = CI
 status-onGitHub = auf GitHub ansehen
 status-commit = Letzter Commit
 status-gateways = Gateways
+status-online = online
+status-offline = offline
 status-directory = das Verzeichnis
-
 about-eyebrow = Was es ist
-about-title = Zwei Hälften, ein Spiel
-about-engineTitle = Eine Engine, die das Spiel durchsetzt
-about-engine = Priorität und Stapel, das Schichtensystem, Ersetzungseffekte, Trigger, zustandsbasierte Aktionen und Kampf: Die Engine wendet die Comprehensive Rules an und zählt bei jedem Schritt genau die Entscheidungen auf, die ein Spieler hat. Der Client bietet genau diese an und sonst nichts. Er entscheidet nie, was erlaubt ist.
-about-deterministic = Sie ist deterministisch: ein geseedeter Zufallsgenerator, keine Uhr und keine Hash-Map-Reihenfolge in den Regeln. Dasselbe Spiel mit denselben Antworten endet immer gleich. Jedes gehostete Spiel wird Zug für Zug aufgezeichnet und lässt sich auf denselben Zustand zurückspielen – das ist auch, was ein Bericht mitbringt.
-about-tableTitle = Ein 3D-Tisch auf Bevy
-about-table = Spielfeld, Hände, Stapel und Friedhöfe auf einem Tisch, den man auf einen Blick lesen kann, dazu eine Lobby für Accounts, Decks und Räume. Die Kartenbilder kommen beim Spielen von Scryfall; eine Textansicht zeichnet jede Karte stattdessen aus ihrem Regeltext, und <kbd>T</kbd> schaltet um.
-about-keys = Mit der Maus oder ganz über die Tastatur: <kbd>Leertaste</kbd> passt, <kbd>Tab</kbd> spult zur nächsten Phase vor, wobei jede Entscheidung bei dir bleibt, <kbd>L</kbd> öffnet ein Protokoll, das sich wie ein Chat liest. Jede Taste lässt sich umbelegen.
+about-title = Vollständige Regel-Engine & übersichtlicher 3D-Tisch
+about-engineTitle = Eine Engine, die jede Regel durchsetzt
+about-engine = Priorität, Stapel, Schichtensystem, Ersetzungseffekte, Trigger, zustandsbasierte Aktionen und Kampf: Die Rust-Engine wendet das gesamte Regelwerk an und berechnet bei jedem Schritt exakt die legalen Züge eines Spielers. Der Client zeigt ausschließlich diese gültigen Optionen an.
+about-deterministic = Dank geseedetem Zufallsgenerator ohne Uhrzeit- oder Hash-Reihenfolge-Abhängigkeiten verläuft jede Partie vollständig deterministisch und lässt sich Zug für Zug exakt reproduzieren.
+about-tableTitle = Ein klarer 3D-Tisch auf Basis von Bevy
+about-table = Spielfeld, Handkarten, Stapel, Exil und Friedhöfe auf einem aufgeräumten 3D-Tisch mit flüssigen Kampflinien und Kartenvorschau. Kartenbilder werden beim Spielen von Scryfall geladen; alternativ stellt eine präzise Regeltext-Ansicht jede Karte direkt aus ihrem aktuellen Oracle-Text dar.
+about-keys = Über die integrierte Lobby wechselst du ohne Umwege zwischen lokalem Deckbuilder, Solo-Partien und Mehrspieler-Runden auf Community-Gateways.
 
-feature-hiddenTitle = Verdeckte Information bleibt verdeckt
-feature-hidden = Dein Client bekommt nur, was du sehen darfst. Bibliotheken und fremde Hände kommen als Zahlen an, eine verdeckte Karte trägt keine Identität. Ein manipulierter Client kann nicht spicken, weil die Daten ihn nie erreichen.
-feature-seatsTitle = Zwei bis acht Plätze
-feature-seats = Duelle, Jeder-gegen-jeden und Teamtische. Der Gastgeber verteilt die Plätze auf Seiten, und die Seiten müssen nicht gleich groß sein. Teams haben eigene Züge und Lebenspunkte; Teamkollegen können sich gegenseitig die Hand zeigen.
-feature-commanderTitle = Commander und Freiform
-feature-commander = Ein Deck mit Commander spielt Commander, jedes andere spielt frei. Banlisten und Formatprüfungen gibt es noch nicht. Das ist eine Lücke, kein Feature.
-feature-aiTitle = Eine Haus-KI in fünf Stufen
-feature-ai = Anfänger, Locker, Solide, Scharf und Experte. Sie spielt aus derselben Sicht wie ein Mensch und sieht deine Hand genauso wenig.
-feature-processTitle = Ein Prozess pro Spiel
-feature-process = Jedes Spiel läuft in einem eigenen Engine-Prozess. Das Gateway für Accounts und Räume kennt keine Regeln, also ist ein kaputtes Spiel genau ein kaputtes Spiel.
-feature-languagesTitle = Kartentext in 19 Sprachen
-feature-languages = Hat das Gateway den Kartenkatalog, lesen sich Karten in deiner Sprache, sonst auf Englisch. Die Oberfläche selbst gibt es auf Englisch und Deutsch.
-feature-watchTitle = Einem laufenden Tisch zuschauen
-feature-watch = Der Button „Zuschauen“ in der Lobby setzt dich als Zuschauer an den Tisch. Du siehst, was der ganze Tisch sieht, und keine Hand. Ein Gastgeber kann Zuschauer für seinen Raum abschalten.
-feature-connectionTitle = Verbindung weg, Spiel nicht verloren
-feature-connection = Fällt ein Spieler heraus, zeigt der Tisch einen Countdown, solange sein Platz auf ihn wartet. Läuft die Zeit ab, spielt die Haus-KI für ihn, bis er zurück ist; sitzt sonst niemand am Tisch, pausiert das Spiel einfach.
-feature-tablesTitle = Tische nach deinen Regeln
-feature-tables = Ein Tisch „Gemischt“ setzt Decks jedes Formats zusammen, und vierzehn Entscheidungsuhren reichen von 15 Sekunden bis ohne Uhr. Startleben und Mulligans legt der Gastgeber fest.
+feature-hiddenTitle = Verdeckte Information bleibt geschützt
+feature-hidden = Dein Client erhält vom Server ausschließlich die Daten, die dein Platz sehen darf. Bibliotheken und fremde Hände werden nur als Anzahl übertragen – selbst ein veränderter Client kann verdeckte Karten nicht einsehen.
+feature-seatsTitle = Bis zu acht Spieler am selben Tisch
+feature-seats = Duelle, Jeder-gegen-jeden und Team-Partien (z. B. 2v2) mit bis zu 8 Plätzen. Teammitglieder teilen sich Züge und können sich gegenseitig ihre Handkarten zeigen.
+feature-commanderTitle = Freie Formate & eigene Tischregeln
+feature-commander = Stelle Decks für klassische 60-Karten-Duelle, Mehrspieler-Runden oder eigene Hausformate zusammen. Startlebenspunkte, Teamgrößen und Mulligan-Optionen legt der Gastgeber frei fest.
+feature-aiTitle = Deterministische Replays & F8-Bericht
+feature-ai = Jede Partie wird lückenlos aufgezeichnet. Fällt dir im Spiel eine fehlerhafte Regelinteraktion auf, sendest du mit F8 direkt aus dem Tisch heraus einen reproduzierbaren Spielstands-Bericht.
+feature-processTitle = Isolierter Server-Prozess pro Partie
+feature-process = Jedes laufende Spiel wird auf dem Gateway in einem eigenen, gekapselten Engine-Prozess ausgeführt. Das Gateway selbst verwaltet nur Lobby und Räume – ein Fehler stört niemals andere Tische.
+feature-languagesTitle = Kartentexte in 19 Sprachen
+feature-languages = Sobald ein Gateway den mehrsprachigen Kartenkatalog bereitstellt, liest du jede Karte in deiner Wunschsprache (mit Englisch als Fallback). Die Client-Oberfläche ist auf Deutsch und Englisch verfügbar.
+feature-watchTitle = Laufenden Partien live zuschauen
+feature-watch = Über den „Zuschauen"-Button in der Lobby nimmst du als Zuschauer am Tisch Platz: Du verfolgst das öffentliche Spielfeld in Echtzeit, während alle Spielerhände geschützt bleiben.
+feature-connectionTitle = Nahtloser Reconnect bei Verbindungsabbruch
+feature-connection = Bricht eine Verbindung kurzzeitig ab, hält der Tisch den Platz mit einem Countdown frei. Auf Wunsch pausiert die Partie oder lässt vorübergehend die Haus-KI einspringen.
+feature-tablesTitle = Vierzehn Bedenkzeit-Uhren
+feature-tables = Von schnellen 15-Sekunden-Zügen bis zu entspannten Runden ganz ohne Zeitlimit bestimmst du das Tempo für jeden Tisch individuell.
 
 shots-eyebrow = Am Tisch
-shots-title = So sieht es aus
-shots-lead = Die Bilder sind kurze Aufnahmen des Spiels, mit den Kartenbildern von Scryfall (© Wizards of the Coast). Entstanden sind sie mit 0.1.0-beta.8b auf einem lokalen Test-Gateway, mit erfundenen Spielern.
+shots-title = Einblicke ins Spielgeschehen
+shots-lead = Kurze Live-Aufnahmen direkt aus dem 3D-Client mit den Kartenbildern von Scryfall (© Wizards of the Coast) – vom Duell und der 4-Spieler-Runde über die verschlüsselte Lobby bis zum Deckbuilder.
 shots-credit = Kartenbilder: Scryfall · © Wizards of the Coast
 shots-showLarge = Groß zeigen: { $title }
 shots-dialog = Screenshot
 shots-previous = Zurück
 shots-next = Weiter
 shot-duelAlt = Ein Duell gegen die Haus-KI: Sechs Kreaturen greifen an, drei werden geblockt, und die geblockten gehen auf den Friedhof
-shot-duelTitle = Ein Duell
-shot-duelCaption = gegen die Haus-KI. Sechs Kreaturen greifen an, drei werden geblockt; die Linien zeigen, wer gegen wen kämpft.
+shot-duelTitle = Taktisches Duell
+shot-duelCaption = gegen die Haus-KI: Sechs Kreaturen greifen an, drei werden geblockt – klare Kampflinien zeigen jede Zuweisung auf einen Blick.
 shot-logAlt = Ein Duell mit offenem Protokoll: ein Land, Raging Goblin und Storm Seeker auf dem Stapel, ein Spieler als Ziel gewählt, das Protokoll füllt sich
-shot-logTitle = Das Protokoll
-shot-logCaption = (L) liest sich wie ein Chat und schreibt jeden Zug mit; jeder Kartenname öffnet die Vorschau.
+shot-logTitle = Interaktives Spielprotokoll
+shot-logCaption = dokumentiert jeden Schritt wie ein strukturierter Chat; ein Klick auf einen Kartennamen öffnet sofort die Großansicht.
 shot-ringAlt = Ein Tisch mit vier Plätzen im Ring um den Filz; je eine Karte auf drei anderen Spielfeldern wird groß gezeigt
-shot-ringTitle = Vier Plätze.
-shot-ringCaption = Größere Tische sitzen im Ring um den Filz; zeigst du auf eine Karte, siehst du sie groß.
+shot-ringTitle = Mehrspieler-Runde im Ring.
+shot-ringCaption = Größere Tische mit bis zu 8 Plätzen gruppieren sich übersichtlich um das Spielfeld – inklusive Schnellvorschau jeder Karte.
 shot-lobbyAlt = Die Lobby: Ein Flüstern und eine Tischeinladung einer Freundin kommen an, dann öffnet sich der private Chat
-shot-lobbyTitle = Die Lobby.
-shot-lobbyCaption = Offene Tische, deine Freunde und wo sie sind; ein Flüstern und eine Einladung kommen an, und der verschlüsselte Chat öffnet sich.
+shot-lobbyTitle = Lobby & verschlüsselter Chat.
+shot-lobbyCaption = Sieh offene Tische, aktive Freunde und deren Status, versende direkte Tischeinladungen und schreibe im Ende-zu-Ende-verschlüsselten Chat.
 shot-roomAlt = Ein Raum wird eingerichtet: Drei freie Plätze gehen an die Haus-KI in drei Stufen
-shot-roomTitle = Einen Tisch einrichten.
-shot-roomCaption = Der Gastgeber gibt freie Plätze der Haus-KI, jeden in einer eigenen Stufe, oder einem anderen Spieler oder einem Sprachmodell.
+shot-roomTitle = Tische flexibel besetzen.
+shot-roomCaption = Kombiniere menschliche Mitspieler, die heuristische Haus-KI in fünf Spielstärken sowie angebundene oder gehostete Sprachmodelle am selben Tisch.
 shot-builderAlt = Der Deckbauer: Die Eingabe angel serra engt den Pool ein, Serra Angel wird groß gezeigt und kommt ins Deck
-shot-builderTitle = Der Deckbauer.
-shot-builderCaption = Eine Suche über den ganzen Pool wird beim Tippen enger; zeigst du auf eine Karte, siehst du sie groß, und sie kommt ins Deck, nach Typ gruppiert.
+shot-builderTitle = Leistungsstarker Deckbuilder.
+shot-builderCaption = Durchsuche den gesamten Kartenpool in Echtzeit, filtere nach Typen und Manakosten und stelle deine Decks sofort spielbereit zusammen.
 
-ai-eyebrow = Gegner
-ai-title = Gegner: das Haus, oder ein Sprachmodell
-ai-houseTitle = Die Haus-KI
-ai-house = Fünf Stufen von Anfänger bis Experte, offline und an jedem Online-Tisch. Sie spielt aus derselben Sicht wie ein Mensch, verdeckte Information bleibt also auch vor ihr verdeckt. Sie spielt heuristisch, nicht trainiert: gut genug, um ein Deck dagegen zu lernen, kein Turniergegner.
-ai-modelTitle = Ein Platz für ein Sprachmodell
-ai-model = Eine Seat-Bridge lässt ein Modell als gewöhnlichen Spieler am Tisch sitzen: ein lokales Modell in LM Studio, eines hinter einer OpenAI-kompatiblen oder Anthropic-API oder ein Agent-CLI mit deinem eigenen Login. API-Schlüssel stehen nie in einer Datei; die Einstellungsdatei nennt die Umgebungsvariable, aus der sie kommen, und Tages- und Monatslimits gelten über alle Spiele. Wenn das Modell nicht antwortet oder etwas Unerlaubtes versucht, antwortet das Haus für diese Frage, und das Protokoll sagt es.
-ai-gateway = An einem Gateway-Tisch setzt der Gastgeber es im Raum hin: Jeder freie Platz bietet im Desktop-Client <i>Sprachmodell</i> an, und der Client startet die Seat-Bridge (sie liegt dem Spiel bei) mit deinen eigenen Einstellungen und deinem Schlüssel. Wo der Betreiber des Gateways gehostete Modelle anbietet, kann ein registrierter Gastgeber stattdessen eines davon wählen; es spielt auf dem Rechner des Betreibers, auf deinem braucht es dann weder Schlüssel noch Seat-Bridge.
-ai-setup = So richtest du es ein
+ai-eyebrow = KI-Mitspieler & Sprachmodelle
+ai-title = Haus-KI, LLM-Anbindung & eigene Baylee AI
+ai-houseTitle = Heuristische Haus-KI in fünf Spielstärken
+ai-house = Sofort spielbereit im Offline-Modus und an jedem Online-Tisch: Wähle zwischen Anfänger, Locker, Solide, Scharf und Experte. Die Haus-KI entscheidet lokal ohne Wartezeit und sieht ausschließlich dieselben öffentlichen Informationen wie ein menschlicher Spieler.
+ai-modelTitle = Sprachmodelle via Seat-Bridge am Tisch
+ai-model = Hole <b>Google Gemini, OpenAI ChatGPT, Anthropic Claude, DeepSeek</b> oder lokale Modelle über <b>LM Studio</b> direkt als Mitspieler an den Tisch. API-Schlüssel bleiben geschützt in Umgebungsvariablen mit Kostenlimits; bei Timeouts übernimmt nahtlos die Haus-KI.
+ai-gateway = <b>LLM-Spieler als Gateway-Host & eigene Baylee AI:</b> Als Gateway-Betreiber kannst du vorkonfigurierte LLM-Plätze auf deinem Server anbieten, sodass Gäste ohne eigenen API-Key gegen Sprachmodelle spielen. Zudem wird aktuell eine <b>eigene Baylee AI</b> trainiert, die direkt auf der Engine wie ein echter Spieler agiert.
+ai-setup = Anleitung zur LLM- & Seat-Bridge-Einrichtung
 
 beta-eyebrow = Online
-beta-title = Die geschlossene Beta
-beta-sanctuary = Das öffentliche Gateway <b>Baylee Sanctuary</b> ist der Ort für Online-Tische. Es ist eine geschlossene Beta: Du spielst dort mit einem Baylee-Account, den du hier auf der Website mit einem Schlüssel der Form <code>CENTRAL-XXXX-XXXX-XXXX-XXXX</code> anlegst, den der Projektinhaber vergibt.
+beta-title = Die Beta
+beta-sanctuary = Das öffentliche Gateway <b>Baylee Sanctuary</b> ist der Ort für Online-Tische in der Beta (in Vorbereitung auf die Open Beta): Du spielst dort mit einem Baylee-Account, den du hier auf der Website mit einem Schlüssel der Form <code>CENTRAL-XXXX-XXXX-XXXX-XXXX</code> anlegst, den der Projektinhaber vergibt.
 beta-signup = Die Registrierung fragt nach keiner E-Mail-Adresse: Ein Account ist ein Benutzername und ein Passwort, und den Benutzernamen siehst nur du. Auf einem Gateway sehen andere Spieler einen Anzeigenamen und ein kurzes Kürzel. Löschen lässt sich ein Account vorerst auf Anfrage über den Kontakt im Impressum.
 beta-keys = Schlüssel kommen vom Projektinhaber, <owner>@AceVik</owner> auf GitHub. Ohne Schlüssel spielt Baylee trotzdem offline gegen die Haus-KI, mit Deckbauer und eigenen Decks, und du kannst für deine Runde ein eigenes Gateway betreiben.
 beta-listTitle = Jedes Gateway in einer Liste
 beta-list = Sanctuary und die Gateways, die andere für ihre Runde betreiben: Das Verzeichnis zeigt von jedem Adresse, Version und ob es gerade online ist.
+home-gwLead = Online-Tische leben auf Gateways, Servern, die Baylee Central erst listet, nachdem der Betreiber geprüft hat, wer sie betreibt. Hier sind die ersten; das Verzeichnis zeigt alle.
 beta-open = Verzeichnis öffnen
 beta-own = Selbst betreiben
 
@@ -191,6 +199,7 @@ source-title = Quelloffen, und das bleibt so
 source-promise = Baylee bleibt immer quelloffen und kostenlos. Keine Bezahlschranke, keine kostenpflichtigen Funktionen, keine Werbung. Nicht jetzt, nicht später. Der Code steht unter der GNU Affero General Public License: Wer ein verändertes Gateway für andere betreibt, muss auch ihnen den Quellcode anbieten.
 source-rust = Geschrieben in Rust, das Projekt einer Person mit viel Hilfe von Coding-Agenten, und jede Änderung geht durch dasselbe Gate: Formatierung, Lints, die Testsuite und eine Prüfung jeder Karte gegen ihren gedruckten Text. Issues und Pull Requests sind willkommen; <agents>AGENTS.md</agents> und <claude>CLAUDE.md</claude> sind die Arbeitsregeln für Menschen und Agenten.
 source-discord = Community auf Discord
+source-whatsapp = Community auf WhatsApp
 source-architecture = Architektur
 source-repoTitle = Das Repository gerade jetzt
 source-stars = Sterne
@@ -202,6 +211,7 @@ source-note = Beim Laden aus GitHubs öffentlicher API gelesen und in diesem Tab
 dl-button = Baylee herunterladen
 dl-fallbackMeta = Windows · macOS (Apple Silicon) · Linux. Das neueste Release liegt auf GitHub.
 dl-for = Download für { $system }
+dl-quickAccess = Andere Systeme und Architekturen schnell auswählen
 dl-signature = Signatur
 dl-notes = Release-Notizen
 dl-others = andere Systeme
@@ -415,13 +425,13 @@ gw-openHint = Öffnet den Baylee-Client auf diesem Gateway, sobald dein Client G
 gw-copyShort = Kopieren
 gw-cardLabel = Gateway { $name }
 
-selfhost-eyebrow = Selbst hosten
+selfhost-eyebrow = Selbst hosten & Central-Anbindung
 selfhost-title = Ein eigenes Gateway betreiben
-selfhost-processes = Du brauchst unseren Server nicht. Ein Gateway sind drei Arten von Prozessen: <code>baylee-gateway</code> verwaltet Accounts, Decks, Räume und das Routing und braucht PostgreSQL; <code>baylee-agent</code> startet pro Spiel einen Engine-Prozess; <code>baylee-engine-server</code> ist ein Spiel. Die ersten beiden kennen keine Regeln.
-selfhost-proxy = Setz einen TLS-Proxy davor, setz <code>BAYLEE_REGISTRATION=invite</code>, wenn du einen eigenen geschlossenen Kreis willst, erzeuge Schlüssel mit <code>baylee-gateway invite create</code>, und die Eingangstür des Clients nimmt deine Adresse wie jede andere. Kartentext in 19 Sprachen ist ein optionaler Import von Scryfalls Bulk-Daten in dieselbe Datenbank.
-selfhost-guide = <guide>Die Anleitung</guide> geht alles durch; <protocol>docs/protocol.md</protocol> ist die Referenz.
-selfhost-central = Damit sich deine Spieler mit ihrem Baylee-Central-Account anmelden und dein Gateway in dieser Liste erscheint: Registriere seine Adresse unter <mine>Deine Gateways</mine>, warte auf die Freigabe durch einen Admin, erzeuge dort ein Token und füge es in der Admin-Konsole deines Gateways unter Baylee Central ein.
-selfhost-source = Jedes Gateway beantwortet <code>GET /source</code> mit Lizenz, Version und Commit, ohne Anmeldung. Die AGPL verlangt, dass du den Leuten, die deinen Server nutzen, den Quellcode anbietest; diese Route erledigt das für dich.
+selfhost-processes = Ein eigenes Gateway besteht aus drei schlanken Prozessen neben PostgreSQL 18+: <code>baylee-gateway</code> verwaltet Räume, Decks und das Routing; <code>baylee-agent</code> startet pro Partie einen isolierten <code>baylee-engine-server</code>-Prozess, sodass jedes Spiel sauber gekapselt läuft.
+selfhost-proxy = Setze einen TLS-Reverse-Proxy vor deine HTTPS-Adresse (z. B. <code>https://play.example.org</code>) und importiere optional Scryfalls Bulk-Daten für Kartentexte in 19 Sprachen – schon können Spieler deine Adresse direkt im Client eintragen.
+selfhost-guide = <guide>Vollständige Hosting-Anleitung lesen</guide> · <protocol>Protokoll- & Heartbeat-Referenz (docs/protocol.md)</protocol>
+selfhost-central = <b>Mit Baylee Central verbinden & Privatsphäre wählen:</b> Registriere deine HTTPS-Adresse unter <mine>Deine Gateways</mine> und erzeuge ein <code>bgt_…</code>-Token (Berechtigungen: <code>sso</code> für Single Sign-On, <code>listing</code> für Verzeichnis-Heartbeats & Live-Stats). In deiner Gateway-Konsole bestimmst du selbst die Telemetrie-Privatsphäre (<code>full</code> für laufende Spiele, Tisch-Settings & Opt-in-Spieler, <code>counts_only</code> nur für Gesamtzahlen oder <code>private</code> nur für den Online-Status).
+selfhost-source = Jedes Gateway beantwortet <code>GET /source</code> ohne Anmeldung mit Lizenz, Version und Commit – damit erfüllt dein Server automatisch die AGPL-Quellcodepflicht.
 
 ## Contact
 
@@ -807,6 +817,8 @@ copy-id = ID kopieren
 app-adminGateways = Gateways
 app-audit = Protokoll
 app-legacy = Alte Konten
+app-feedback = Feedback
+app-unread = ungelesen
 app-signedOut = Melde dich bei Baylee Central an, um diese Seite zu sehen.
 app-cancel = Abbrechen
 app-reauthTitle = Mit deinem Passwort bestätigen
@@ -921,6 +933,16 @@ ov-adminsGo = Protokoll
 ov-legacy = Noch umzuziehen
 ov-legacySub = Accounts des offiziellen Gateways, die noch nicht umgezogen sind, bis { $day }.
 ov-legacyGo = Alte Konten
+ov-reports = Offene Meldungen
+ov-reportsCrashes =
+
+    { $n ->
+        [one] Ein neuer Absturz wartet auf dich.
+       *[other] { $n } neue Abstürze warten auf dich.
+    }
+ov-reportsCalm = Kein neuer Absturz. Fehler, Ideen und Feedback der Spieler.
+ov-reportsGo = Meldungen sichten
+ov-crashesGo = Neue Abstürze
 adm-accounts = Accounts
 adm-search = Suchen
 adm-searchHint = Name oder #3fa2
@@ -1039,7 +1061,6 @@ aud-tokenRevoked = Gateway-Token widerrufen
 # Account contacts
 title-accountContacts = Kontakte · Baylee
 social-title = Kontakte
-social-lead = Deine Freunde und Anfragen, unabhängig davon, wo du spielst.
 social-add = Kontakt hinzufügen
 social-tag = Öffentlicher Handle oder Tag
 social-find = Suchen
@@ -1065,20 +1086,14 @@ social-profileNeeded = Vervollständige dein öffentliches Profil, bevor du Kont
 ## Account chat
 title-accountChat = Chat · Baylee
 chat-title = Chat
-chat-lead = Deine Gespräche, verbunden mit deinem Baylee-Konto.
 chat-unlockTitle = Chat entsperren
-chat-unlockLead = Dein Passwort öffnet die Nachrichtenschlüssel auf diesem Gerät. Es wird nicht an Central gesendet.
 chat-password = Kontopasswort
 chat-unlock = Entsperren
 chat-unlockFailed = Der Chat konnte nicht entsperrt werden. Prüfe dein Passwort, die Verbindung und ob die aktuellen Nutzungsbedingungen angenommen sind. Beschädigte gespeicherte Schlüssel werden nicht überschrieben.
-chat-private = Ende-zu-Ende-verschlüsselte Nachrichten
-chat-lock = Chat sperren
 chat-failed = Der Chat konnte nicht aktualisiert werden. Prüfe die Verbindung und die Empfängerschlüssel.
 chat-retry = Erneut versuchen
 chat-refused = Einige Nachrichten konnten nicht verifiziert werden und werden nicht angezeigt. Prüfe die Sicherheitsnummern bei geänderten Schlüsseln.
 chat-conversations = Gespräche
-chat-manageContacts = Kontakte verwalten
-chat-noContacts = Füge einen Kontakt hinzu, um ein Gespräch zu beginnen.
 chat-choose = Wähle ein Gespräch.
 chat-safety = Sicherheitsnummer
 chat-keysChanged = Die Schlüssel dieses Kontakts haben sich geändert. Vergleiche die Sicherheitsnummer, bevor du weitere Nachrichten sendest.
@@ -1089,12 +1104,11 @@ chat-sending = Wird gesendet …
 chat-message = Nachricht schreiben
 chat-send = Senden
 chat-friendRequired = Zum Senden müsst ihr als Kontakte verbunden sein.
-chat-storage = Der Verlauf wird verschlüsselt von Central geladen. Dieser Browser speichert nur verschlüsselte Schlüsselbestätigungen. Nach fünf Minuten im Hintergrund wird der Chat gesperrt.
+chat-storage = Der Verlauf wird verschlüsselt von Central geladen. Dieser Browser bewahrt deine Chat-Schlüssel versiegelt auf, solange du angemeldet bist, und vergisst sie beim Abmelden.
 chat-verify = Diese Schlüssel bestätigen
 chat-compare = Vergleicht diese Nummer über einen anderen vertrauenswürdigen Kanal. Beim ersten Kontakt wird dem Schlüsselverzeichnis vertraut; erst der Vergleich bestätigt die Identität.
 chat-open = Chat öffnen
 
-chat-groups = Gruppen
 chat-groupFailed = Die Gruppe konnte nicht aktualisiert werden. Prüfe Berechtigung, Mitgliederzahl und Verbindung.
 chat-groupInvites = Gruppeneinladungen
 chat-groupName = Gruppenname
@@ -1117,6 +1131,29 @@ chat-pendingOther = Eine unbestätigte Nachricht wartet in einem anderen Gesprä
 chat-older = Ältere Nachrichten anzeigen
 chat-discard = Sendeversuch verwerfen
 chat-discardConfirm = Diese Nachricht nicht erneut senden? Sie könnte bereits zugestellt worden sein. Das Verwerfen löscht keine zugestellte Nachricht. Kopiere den Text vorher, wenn du ihn behalten möchtest.
+chat-tabChats = Chats
+chat-tabContacts = Kontakte
+chat-search = Gespräche durchsuchen
+chat-newGroup = Neue Gruppe
+chat-noConversations = Noch keine Gespräche. Füge einen Kontakt über seinen Handle hinzu oder starte eine Gruppe.
+chat-noMatch = Nichts passt zu deiner Suche.
+chat-chooseLead = Wähle links einen Freund oder eine Gruppe, oder füge einen Kontakt über seinen öffentlichen Handle hinzu.
+chat-lockedLead = Dieser Browser hat deine Chat-Schlüssel noch nicht: Er behält sie ab einer Anmeldung hier. Gib dein Passwort einmal ein; danach öffnet sich der Chat von selbst, solange du angemeldet bist.
+chat-encrypted = Ende-zu-Ende-verschlüsselt
+chat-members =
+    { $count ->
+        [one] Ein Mitglied
+       *[other] { $count } Mitglieder
+    }
+chat-you = Du
+chat-sayHello = Noch keine Nachrichten
+chat-today = Heute
+chat-yesterday = Gestern
+chat-back = Zurück zu den Gesprächen
+chat-enterHint = Enter sendet, Umschalt+Enter beginnt eine neue Zeile.
+chat-unread = ungelesen
+social-tagHint = Handle, z. B. Mira#3fa2
+social-more = Weitere Aktionen
 
 push-title = Benachrichtigungen
 push-lead = Wähle, worüber Baylee dich benachrichtigen darf. Benachrichtigungen zeigen keine Nachrichtentexte, Namen oder Feedback-Inhalte.
@@ -1150,3 +1187,483 @@ adm-reportsPrevious = Vorherige Seite
 pwa-installLead = Installiere Baylee für schnellen Zugriff auf deine Chats und Kontakte.
 pwa-install = Baylee installieren
 pwa-installFailed = Die Installation konnte nicht geöffnet werden. Versuche es über die Installationsfunktion im Browsermenü.
+
+fb-title = Feedback
+fb-lead = Fehler- und Absturzmeldungen der Spieler, über ihre Gateways geschickt. Wer eine geschrieben hat, ist hier nur unter einem Pseudonym bekannt.
+fb-reportTitle = Eine Meldung
+fb-reports = Meldungen
+fb-refresh = Aktualisieren
+fb-views = Ansichten
+fb-viewInbox = Eingang
+fb-viewOpen = Offen
+fb-viewMine = Meine
+fb-viewUnassigned = Nicht zugewiesen
+fb-viewDone = Erledigt
+fb-viewAll = Alle
+fb-viewTrash = Papierkorb
+fb-search = Meldungen durchsuchen
+fb-searchHint = Wörter, eine Absturzmeldung oder eine ID
+fb-filters = Filter
+fb-filtersN =
+
+    { $n ->
+        [one] Ein Filter
+       *[other] { $n } Filter
+    }
+fb-status = Status
+fb-kind = Art
+fb-priority = Priorität
+fb-statusNew = Neu
+fb-statusTriaged = Gesichtet
+fb-statusInProgress = In Arbeit
+fb-statusResolved = Behoben
+fb-statusWontFix = Wird nicht behoben
+fb-statusDuplicate = Duplikat
+fb-kindBug = Fehler
+fb-kindImprovement = Verbesserung
+fb-kindFeedback = Feedback
+fb-kindCrash = Absturz
+fb-kindOther = Sonstiges
+fb-prioCritical = Kritisch
+fb-prioHigh = Hoch
+fb-prioNormal = Normal
+fb-prioLow = Niedrig
+fb-prioNone = Ohne Priorität
+fb-assignee = Zuständig
+fb-anyone = Alle
+fb-any = Alle
+fb-nobody = Niemand
+fb-me = Ich
+fb-label = Label
+fb-labels = Labels
+fb-gateway = Gateway
+fb-channel = Weg
+fb-channelGateway = Über ein Gateway
+fb-channelDirect = Direkt
+fb-record = Aufzeichnung
+fb-withRecord = Mit Aufzeichnung
+fb-withoutRecord = Ohne Aufzeichnung
+fb-reporter = Gemeldet von
+fb-from = Von
+fb-to = Bis
+fb-sort = Reihenfolge
+fb-ascending = aufsteigend
+fb-descending = absteigend
+fb-sortReceived = Eingang
+fb-sortChanged = Zuletzt geändert
+fb-sortPriority = Priorität
+fb-sortStatus = Status
+fb-sortKind = Art
+fb-sortReporter = Gemeldet von
+fb-sortGateway = Gateway
+fb-sortBy = , nach dieser Spalte sortieren
+fb-onlyUnread = Nur Meldungen, die ich noch nicht geöffnet habe
+fb-activeFilters = Aktive Filter
+fb-removeFilter = Diesen Filter entfernen
+fb-clearFilters = Filter zurücksetzen
+fb-crashGroup = Absturzgruppe
+fb-duplicatesOf = Duplikate von …{ $id }
+fb-trashHint = Eine Meldung im Papierkorb wird nach { $days } Tagen endgültig gelöscht.
+fb-errList = Baylee Central hat diese Liste abgelehnt. Setz die Filter zurück und versuch es noch einmal.
+fb-none = Keine Meldung passt.
+fb-range = { $from }–{ $to } von { $total }
+fb-unreadHere = { $n } ungelesen
+fb-colReport = Meldung
+fb-colReceived = Eingang
+fb-colKind = Art
+fb-colStatus = Status
+fb-colPriority = Priorität
+fb-colAssignee = Zuständig
+fb-colGateway = Gateway
+fb-colReporter = Gemeldet von
+fb-unread = Ungelesen
+fb-noText = (kein Text)
+fb-notes = Notizen
+fb-notesN =
+
+    { $n ->
+        [one] Eine Notiz
+       *[other] { $n } Notizen
+    }
+fb-dupOf = Duplikat von …{ $id }
+fb-recordMark = Aufzeichnung { $size }
+fb-byClientShort = Client
+fb-newTab = (öffnet sich in einem neuen Tab)
+fb-drawer = Die Meldung neben der Liste
+fb-openPage = Eigene Seite öffnen
+fb-closeDrawer = Meldung schließen
+fb-pages = Seiten
+fb-prevPage = Vorige Seite
+fb-nextPage = Nächste Seite
+fb-pageOf = Seite { $n } von { $total }
+fb-pageSize = Pro Seite
+fb-onlyBy = Nur Meldungen von { $who }
+fb-onlyLabel = Nur Meldungen mit dem Label { $label }
+fb-undo = Rückgängig
+fb-dismiss = Schließen
+fb-statusSet = Status auf „{ $status }“ gesetzt.
+fb-prioritySet = Priorität auf „{ $priority }“ gesetzt.
+fb-assignMe = Mir zuweisen
+fb-assignedSaid = { $name } zugewiesen.
+fb-unassignedSaid = Niemandem mehr zugewiesen.
+fb-removeLabel = Label { $label } entfernen
+fb-addLabel = Label hinzufügen
+fb-labelHint = etwa ui oder rules
+fb-labelsSet = Labels gespeichert.
+fb-badLabel = Ein Label hat 1 bis 32 Kleinbuchstaben, Ziffern und Bindestriche.
+fb-duplicateOf = Duplikat von
+fb-notDuplicate = Kein Duplikat
+fb-duplicateCleared = Kein Duplikat mehr.
+fb-markDuplicate = Duplikat einer anderen Meldung
+fb-duplicateHint = Ihre ID oder die Adresse ihrer Seite
+fb-mark = Markieren
+fb-duplicateSet = Als Duplikat markiert.
+fb-badDuplicate = Das ist nicht die ID einer anderen Meldung.
+fb-issue = GitHub-Issue
+fb-issueLinked = Mit Issue #{ $n } verknüpft.
+fb-unlink = Verknüpfung lösen
+fb-issueUnlinked = Mit keinem Issue mehr verknüpft.
+fb-issueLabel = Issue-Nummer
+fb-issueHint = #311 oder die Adresse des Issues
+fb-link = Verknüpfen
+fb-badIssue = Das ist kein Issue aus Baylees Repository: eine Nummer, #Nummer oder seine Adresse.
+fb-newIssue = Neues Issue anlegen
+fb-summaryLabel = Deine Zusammenfassung
+fb-summaryHint = In deinen eigenen, neutralen Worten: was passiert und wo. Das Issue ist öffentlich; die Worte aus der Meldung, das Pseudonym und die Details des Clients bleiben hier.
+fb-category = Kategorie
+fb-summaryFirst = Schreib zuerst die Zusammenfassung.
+fb-openIssue = GitHub-Formular öffnen
+fb-noNotes = Noch keine Notizen.
+fb-removeNote = Deine Notiz von { $time } entfernen
+fb-addNote = Eine Notiz für die Admins
+fb-noteHint = Nur Admins lesen sie. Strg+Enter speichert.
+fb-charsLeft =
+
+    { $n ->
+        [one] Noch ein Zeichen
+       *[other] Noch { $n } Zeichen
+    }
+fb-saveNote = Notiz speichern
+fb-noteSaid = Notiz gespeichert.
+fb-noteRemovedSaid = Notiz entfernt.
+fb-hFiled = eingereicht über
+fb-hStatus = Status
+fb-hIssue = Issue
+fb-hAssignee = zugewiesen an
+fb-hPriority = Priorität
+fb-hLabels = Labels
+fb-hDuplicate = Duplikat von
+fb-hTrashed = in den Papierkorb gelegt
+fb-hRestored = aus dem Papierkorb geholt
+fb-hPurged = endgültig gelöscht
+fb-hNote = Notiz
+fb-hSwept = nach Ablauf der Frist gelöscht
+fb-hNone = keine
+fb-hOriginalGone = keins: das Original ist gelöscht
+fb-hNoteAdded = hinzugefügt
+fb-hNoteRemoved = entfernt
+fb-hCentral = Baylee Central
+fb-noHistory = Noch kein Verlauf.
+fb-sameCrash = Derselbe Absturz
+fb-itsDuplicates = Ihre Duplikate
+fb-sameReporter = Mehr von dieser Person
+fb-sameKind = Alle Meldungen der Art „{ $kind }“
+fb-conflict = Jemand anderes hat diese Meldung inzwischen geändert. So steht sie jetzt; entscheide noch einmal.
+fb-errRefused = Baylee Central hat diese Änderung abgelehnt.
+fb-restoredOne = Die Meldung ist zurück aus dem Papierkorb.
+fb-trashedOne = Die Meldung liegt im Papierkorb.
+fb-purgedOne = Die Meldung ist endgültig gelöscht.
+fb-errReport = Diese Meldung ließ sich nicht lesen. Vielleicht ist sie gelöscht.
+fb-triage = Sichtung
+fb-trashNoTriage = Eine Meldung im Papierkorb wird erst wieder gesichtet, wenn sie zurückgeholt ist.
+fb-facts = Woher sie kommt
+fb-received = Eingegangen
+fb-changed = Zuletzt geändert
+fb-callsItself = nennt sich
+fb-gatewayBuild = Version des Gateways
+fb-clientBuild = Version des Clients
+fb-game = Spiel
+fb-recordPart = Aufzeichnung
+fb-noRecord = Keine
+fb-recordHere = { $size }, geschrieben vom { $who }, { $end }
+fb-recordAwaited = { $size }, geschrieben vom { $who }, { $end }: noch unterwegs
+fb-byGateway = Gateway
+fb-byClient = Client (ungeprüft)
+fb-recordComplete = bis zum Spielende
+fb-recordPartial = vor dem Spielende
+fb-clientPart = Client-Details
+fb-noClient = Keine
+fb-clientHere = { $size }
+fb-clientAwaited = { $size }, noch unterwegs
+fb-id = ID
+fb-copyId = ID kopieren
+fb-copyLink = Adresse der Seite kopieren
+fb-wrote = Was geschrieben wurde
+fb-crash = Der Absturz
+fb-related = Gehört zu
+fb-history = Verlauf
+fb-trash = Papierkorb
+fb-toTrash = In den Papierkorb
+fb-inTrashSince = Seit { $time } im Papierkorb. Sie wird { $days } Tage danach endgültig gelöscht.
+fb-restore = Zurückholen
+fb-purge = Endgültig löschen
+fb-purgeTitle = Diese Meldung endgültig löschen?
+fb-purgeText = Text, Notizen, Client-Details und Aufzeichnung verschwinden jetzt und lassen sich nicht zurückholen. Der Verlauf bleibt, ohne ihre Worte, und ihre Duplikate werden wieder geöffnet.
+fb-purgeGo = Endgültig löschen
+fb-steps = Diese Meldung in ihrer Liste
+fb-backToList = Zurück zur Liste
+fb-previous = Vorige Meldung
+fb-next = Nächste Meldung
+fb-position = { $n } von { $total }
+fb-notInList = Nicht in dieser Liste
+fb-selection = Die ausgewählten Meldungen
+fb-selected =
+
+    { $n ->
+        [one] Eine Meldung ausgewählt
+       *[other] { $n } Meldungen ausgewählt
+    }
+fb-deselect = Auswahl aufheben
+fb-selectAll = Alle Meldungen dieser Seite auswählen
+fb-selectOne = Auswählen: { $what }
+fb-setStatus = Status setzen
+fb-setPriority = Priorität setzen
+fb-assignTo = Zuweisen an
+fb-removeLabelAll = Ein Label entfernen
+fb-mergeInto = Duplikate von
+fb-markRead = Als gelesen markieren
+fb-markUnread = Als ungelesen markieren
+fb-copyIds = Ihre IDs kopieren
+fb-exportSelected =
+
+    { $n ->
+        [one] Als CSV exportieren
+       *[other] Diese { $n } als CSV exportieren
+    }
+fb-exportAll =
+
+    { $n ->
+        [one] Als CSV exportieren
+       *[other] Alle { $n } als CSV exportieren
+    }
+fb-exported =
+
+    { $n ->
+        [one] Eine Meldung exportiert.
+       *[other] { $n } Meldungen exportiert.
+    }
+fb-idsCopied =
+
+    { $n ->
+        [one] Ihre ID ist kopiert.
+       *[other] { $n } IDs kopiert.
+    }
+fb-linkCopied = Die Adresse der Meldung ist kopiert.
+fb-markedRead =
+
+    { $n ->
+        [one] Als gelesen markiert.
+       *[other] { $n } als gelesen markiert.
+    }
+fb-markedUnread =
+
+    { $n ->
+        [one] Als ungelesen markiert.
+       *[other] { $n } als ungelesen markiert.
+    }
+fb-bulkStatus =
+
+    { $n ->
+        [one] Status auf „{ $status }“ gesetzt.
+       *[other] { $n } Meldungen auf „{ $status }“ gesetzt.
+    }
+fb-bulkPriority =
+
+    { $n ->
+        [one] Priorität auf „{ $priority }“ gesetzt.
+       *[other] { $n } Meldungen auf „{ $priority }“ gesetzt.
+    }
+fb-bulkAssigned =
+
+    { $n ->
+        [one] { $name } zugewiesen.
+       *[other] { $n } Meldungen { $name } zugewiesen.
+    }
+fb-bulkMine =
+
+    { $n ->
+        [one] Dir zugewiesen.
+       *[other] { $n } Meldungen dir zugewiesen.
+    }
+fb-bulkUnassigned =
+
+    { $n ->
+        [one] Niemandem mehr zugewiesen.
+       *[other] { $n } Meldungen niemandem mehr zugewiesen.
+    }
+fb-bulkLabelled =
+
+    { $n ->
+        [one] Mit { $label } versehen.
+       *[other] { $n } Meldungen mit { $label } versehen.
+    }
+fb-bulkUnlabelled =
+
+    { $n ->
+        [one] Label { $label } entfernt.
+       *[other] Label { $label } von { $n } Meldungen entfernt.
+    }
+fb-bulkMerged =
+
+    { $n ->
+        [one] Als Duplikat von …{ $id } markiert.
+       *[other] { $n } Meldungen als Duplikate von …{ $id } markiert.
+    }
+fb-bulkTrashed =
+
+    { $n ->
+        [one] Die Meldung liegt im Papierkorb.
+       *[other] { $n } Meldungen liegen im Papierkorb.
+    }
+fb-bulkRestored =
+
+    { $n ->
+        [one] Die Meldung ist zurück aus dem Papierkorb.
+       *[other] { $n } Meldungen sind zurück aus dem Papierkorb.
+    }
+fb-bulkPurged =
+
+    { $n ->
+        [one] Die Meldung ist endgültig gelöscht.
+       *[other] { $n } Meldungen sind endgültig gelöscht.
+    }
+fb-purgeManyTitle =
+
+    { $n ->
+        [one] Diese Meldung endgültig löschen?
+       *[other] Diese { $n } Meldungen endgültig löschen?
+    }
+fb-arrived =
+
+    { $n ->
+        [one] Eine neue Meldung ist eingegangen.
+       *[other] { $n } neue Meldungen sind eingegangen.
+    }
+fb-showArrived = Anzeigen
+fb-shownAs = Anzeige als
+fb-asList = Liste
+fb-asGroups = Absturzgruppen
+fb-groups = Absturzgruppen
+fb-noGroups = Kein Absturz in dieser Liste.
+fb-colCrash = Absturz
+fb-colCount = Meldungen
+fb-colOpen = Offen
+fb-colFirst = Zuerst
+fb-colLast = Zuletzt
+fb-showGroup = Ihre Meldungen zeigen
+fb-chart = Die letzten 30 Tage
+fb-errChart = Baylee Central hat nicht gesagt, wie viele gekommen sind.
+fb-chartOthers = Andere Meldungen: { $n }
+fb-chartCrashes = Abstürze: { $n }
+fb-chartDay = { $day }: { $n } Meldungen, davon { $crashes } Abstürze
+fb-chartTable = Als Tabelle
+fb-chartDayHead = Tag
+fb-chartOthersHead = Andere Meldungen
+fb-chartCrashesHead = Abstürze
+fb-savedViews = Gespeicherte Listen
+fb-errViews = Deine gespeicherten Listen ließen sich nicht lesen.
+fb-noViews = Noch keine gespeicherte Liste. Speichere diese unter einem Namen.
+fb-viewName = Ein Name für diese Liste
+fb-saveView = Speichern
+fb-viewSaved = Als „{ $name }“ gespeichert.
+fb-viewRemoved = „{ $name }“ ist vergessen.
+fb-removeView = Die Liste „{ $name }“ vergessen
+fb-viewsFull = Du hast { $n } Listen, mehr gehen nicht. Vergiss eine, um eine andere zu speichern.
+fb-keysTitle = Tasten
+fb-keyMove = nächste oder vorige Meldung; die Seitenleiste folgt
+fb-keyOpen = Meldung neben der Liste öffnen
+fb-keyPage = eigene Seite der Meldung öffnen
+fb-keySelect = auswählen oder abwählen
+fb-keySelectAll = alle Meldungen der Seite auswählen, oder keine
+fb-keyStatus = neu, gesichtet, in Arbeit, behoben, wird nicht behoben
+fb-keyMine = mir zuweisen, oder niemandem
+fb-keyRead = als gelesen oder ungelesen markieren
+fb-keyTrash = in den Papierkorb, mit Rückgängig
+fb-keyPages = vorige oder nächste Seite
+fb-keySearch = suchen
+fb-keyRefresh = Liste neu lesen
+fb-keyCopy = Adresse der Meldung kopieren
+fb-keyExport = Auswahl oder Seite als CSV exportieren
+fb-keyClose = Seitenleiste schließen, dann die Auswahl aufheben
+fb-keyHelp = diese Tasten
+fb-keySteps = vorige oder nächste Meldung der Liste
+fb-keysOn = Einzelne Tasten auf dieser Seite
+fb-keysWhy = Ausgeschaltet wirken nur Strg+K und die Knöpfe; das hilft bei Spracheingabe. Dieser Browser merkt sich die Wahl.
+fb-clientSent = Was der Client geschickt hat
+fb-noClientPart = Der Client hat keine Details mitgeschickt.
+fb-errClientLarge = Die Details des Clients sind entpackt größer, als diese Seite liest (16 MiB). Nichts davon wird gezeigt.
+fb-errClientShape = Die Details des Clients ließen sich nicht lesen: Sie sind kein gzip eines JSON-Objekts.
+fb-noShot = Kein Bild des Fensters.
+fb-screenshot = Das Bild des Fensters
+fb-shotAlt = Das Fenster des Clients beim Schreiben der Meldung, { $width } × { $height } Pixel
+fb-enlarge = Groß zeigen
+fb-gameWhen = Im Spiel
+fb-gameTurn = Zug
+fb-gameOwnTurn = { $n }, der eigene
+fb-gameSeatTurn = { $n }, von Platz { $seat }
+fb-gameSeat = Platz
+fb-gameSeatOf = { $seat } von { $n } Spielern
+fb-gamePending = Gefragt war
+fb-gameNothing = nichts
+fb-backtrace = Der Backtrace
+fb-log =
+
+    { $n ->
+        [one] Das Protokoll, eine Zeile
+       *[other] Das Protokoll, { $n } Zeilen
+    }
+fb-system = Das System
+fb-sysPlatform = Plattform
+fb-sysCpus = Prozessoren
+fb-sysAdapter = Grafikkarte
+fb-sysBackend = Grafik-Backend
+fb-sysWindow = Fenster
+fb-sysScale = Skalierung
+fb-sysLang = Sprache
+fb-settings = Die Einstellungen
+fb-everything = Alles, was er geschickt hat, als Baum
+fb-jsonAll = alle { $n } Zeichen
+fb-jsonBase64 = ({ $n } Zeichen Base64)
+fb-jsonItems =
+
+    { $n ->
+        [one] ein Eintrag
+       *[other] { $n } Einträge
+    }
+fb-jsonKeys =
+
+    { $n ->
+        [one] ein Schlüssel
+       *[other] { $n } Schlüssel
+    }
+fb-jsonMore = die nächsten { $n } von { $left }
+fb-cardImage = Die Karte { $name }
+fb-scryfall = Bild: Scryfall
+fb-seat = Platz { $n }
+fb-downloadRecord = Aufzeichnung herunterladen (.gz)
+fb-downloadClientRecord = Aufzeichnung des Clients herunterladen (.gz, ungeprüft)
+fb-recordSaved = Die Aufzeichnung ist an deinen Browser übergeben.
+fb-recordSavedClient = Die Aufzeichnung des Clients ist an deinen Browser übergeben. Der Client hat sie geschrieben; niemand hat sie geprüft.
+foot-summary = Freies, quelloffenes Tabletop-Kartenspiel in Rust & Bevy – mit deterministischer Regel-Engine, lokalem Offline-Modus, Haus-KI, LLM-Anbindung und Community-Gateways.
+contact-whatsappSub = Community-Gruppe & schnelle Runden
+contact-reportsTitle = Berichte & Datenschutz
+contact-reportsSub = Details zu F8-Berichten & Daten
+ai-housePill = Offline & online
+ai-providers = Unterstützte Sprachmodelle
+ai-hostsPill = Für Gateway-Hosts
+ai-hostsTitle = LLM-Spieler als Gateway-Host anbieten
+ai-hosts = Als Gateway-Betreiber kannst du vorkonfigurierte Sprachmodelle direkt auf deinem Server bereitstellen. Deine Gäste wählen am Tisch einfach eines deiner gehosteten Modelle als Mitspieler aus – ganz ohne eigenen API-Key.
+ai-trainingPill = Aktuell im Training · Native Engine-KI
+ai-trainingTitle = Eigene Baylee AI – trainiert für echtes Spiel direkt auf der Engine
+ai-training = Parallel zur Haus-KI und der externen LLM-Anbindung wird eine eigene Baylee AI direkt auf der deterministischen Regel-Engine trainiert. Sie lernt, komplexe Spielzustände, Prioritätsfenster, Kampfreihenfolgen und Deck-Synergien wie ein erfahrener menschlicher Spieler einzuschätzen – ganz ohne externe API-Latenzen.
+ai-hostingLink = Gateway-Hosting & LLM-Setup

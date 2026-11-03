@@ -9,17 +9,17 @@ import { Link, PATHS } from "../router";
 
 const LINKS: Elems = {
   discord: (words) => (
-    <a href={DISCORD} rel="noopener">
+    <a href={DISCORD} target="_blank" rel="noopener">
       {words}
     </a>
   ),
   issues: (words) => (
-    <a href={ISSUES} rel="noopener">
+    <a href={ISSUES} target="_blank" rel="noopener">
       {words}
     </a>
   ),
   docs: (words) => (
-    <a href={`${GITHUB}/blob/main/docs/privacy.md`} rel="noopener">
+    <a href={`${GITHUB}/blob/main/docs/privacy.md`} target="_blank" rel="noopener">
       {words}
     </a>
   ),

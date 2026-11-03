@@ -108,6 +108,8 @@ function admin(overrides: Partial<AdminApi> = {}): AdminApi {
     revokeGatewayToken: vi.fn<AdminApi["revokeGatewayToken"]>(async () => {}),
     legacyAccounts: vi.fn<AdminApi["legacyAccounts"]>(async () => LEGACY),
     overview: vi.fn<AdminApi["overview"]>(async () => OVERVIEW),
+    reportsUnread: vi.fn<AdminApi["reportsUnread"]>(async () => 3),
+    reportsAtGlance: vi.fn<AdminApi["reportsAtGlance"]>(async () => ({ open: 9, newCrashes: 2 })),
     ...overrides,
   };
 }

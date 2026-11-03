@@ -1,4 +1,4 @@
-import { DISCORD, GITHUB, ISSUES } from "../config";
+import { DISCORD, GITHUB, ISSUES, WHATSAPP } from "../config";
 import { num, T, useLang, type Elems } from "../i18n";
 import { parseRepo, relTime, useGitHub, type CiRun, type Commit } from "../github";
 import { Section } from "../components/Section";
@@ -6,12 +6,12 @@ import { CiLink } from "./CiLink";
 
 const RULES: Elems = {
   agents: (words) => (
-    <a href={`${GITHUB}/blob/main/AGENTS.md`} rel="noopener">
+    <a href={`${GITHUB}/blob/main/AGENTS.md`} target="_blank" rel="noopener">
       {words}
     </a>
   ),
   claude: (words) => (
-    <a href={`${GITHUB}/blob/main/CLAUDE.md`} rel="noopener">
+    <a href={`${GITHUB}/blob/main/CLAUDE.md`} target="_blank" rel="noopener">
       {words}
     </a>
   ),
@@ -23,7 +23,6 @@ export function Source({ ci, commit }: { ci: CiRun | null | undefined; commit: C
   return (
     <Section
       id="source"
-      alt
       eyebrow={<T id="source.eyebrow" />}
       title={<T id="source.title" />}
     >
@@ -36,16 +35,19 @@ export function Source({ ci, commit }: { ci: CiRun | null | undefined; commit: C
             <T id="source.rust" elems={RULES} />
           </p>
           <p className="links-row">
-            <a className="button button-ghost" href={GITHUB} rel="noopener">
+            <a className="button button-ghost" href={GITHUB} target="_blank" rel="noopener">
               github.com/AceVik/baylee
             </a>
-            <a className="button button-ghost" href={DISCORD} rel="noopener">
+            <a className="button button-ghost" href={DISCORD} target="_blank" rel="noopener">
               <T id="source.discord" />
             </a>
-            <a className="button button-ghost" href={`${GITHUB}/blob/main/LICENSE`} rel="noopener">
+            <a className="button button-ghost" href={WHATSAPP} target="_blank" rel="noopener">
+              <T id="source.whatsapp" />
+            </a>
+            <a className="button button-ghost" href={`${GITHUB}/blob/main/LICENSE`} target="_blank" rel="noopener">
               AGPL-3.0
             </a>
-            <a className="button button-ghost" href={`${GITHUB}/blob/main/docs/architecture.md`} rel="noopener">
+            <a className="button button-ghost" href={`${GITHUB}/blob/main/docs/architecture.md`} target="_blank" rel="noopener">
               <T id="source.architecture" />
             </a>
           </p>
@@ -80,7 +82,7 @@ export function Source({ ci, commit }: { ci: CiRun | null | undefined; commit: C
               <dd>
                 {commit ? (
                   <>
-                    <a href={commit.url} rel="noopener">
+                    <a href={commit.url} target="_blank" rel="noopener">
                       {commit.sha.slice(0, 7)}
                     </a>{" "}
                     · {relTime(commit.when, lang)} · <span className="small">{commit.subject}</span>
@@ -96,7 +98,7 @@ export function Source({ ci, commit }: { ci: CiRun | null | undefined; commit: C
               </dt>
               <dd>
                 {repo ? (
-                  <a href={`${GITHUB}/stargazers`} rel="noopener">
+                  <a href={`${GITHUB}/stargazers`} target="_blank" rel="noopener">
                     {num(lang, repo.stars)}
                   </a>
                 ) : (
@@ -110,7 +112,7 @@ export function Source({ ci, commit }: { ci: CiRun | null | undefined; commit: C
               </dt>
               <dd>
                 {repo ? (
-                  <a href={ISSUES} rel="noopener">
+                  <a href={ISSUES} target="_blank" rel="noopener">
                     {num(lang, repo.openIssues)}
                   </a>
                 ) : (
