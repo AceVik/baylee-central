@@ -129,11 +129,26 @@ const b64 = (v) => btoa(String.fromCharCode(...new TextEncoder().encode(JSON.str
 const unb64 = (s) => JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(s.replace(/-/g, "+").replace(/_/g, "/")), (c) => c.charCodeAt(0))));
 const deviceOf = (tag) => (tag.toString(16).padStart(4, "0") + "d0d0d0d0d0d0").slice(0, 16);
 const registration = { ik: "A".repeat(43), dk: "B".repeat(43), dsig: "C".repeat(86), label: "Browser" };
+const ownerOf = (o) => [...o.account].map((b) => b.toString(16).padStart(2, "0")).join("") + ":" + o.epoch + ":" + o.tag;
+// the page's own store (src/chat/kept.ts), so that its forgetting clears this too
+const kept = (mode, work) => new Promise((resolve, reject) => {
+  const open = indexedDB.open("baylee-chat", 1);
+  open.onupgradeneeded = () => open.result.createObjectStore("kept");
+  open.onerror = () => reject(open.error);
+  open.onsuccess = () => {
+    const db = open.result;
+    const tx = db.transaction("kept", mode);
+    const request = work(tx.objectStore("kept"));
+    tx.oncomplete = () => { db.close(); resolve(request ? request.result : undefined); };
+    tx.onerror = () => { db.close(); reject(tx.error); };
+  };
+});
 const uuid7 = () => { const h = [...crypto.getRandomValues(new Uint8Array(16))].map((b) => b.toString(16).padStart(2, "0")).join(""); return h.slice(0, 8) + "-" + h.slice(8, 12) + "-7" + h.slice(13, 16) + "-8" + h.slice(17, 20) + "-" + h.slice(20, 32); };
-function chatStep(r) {
+async function chatStep(r) {
   if (chat === null) throw new Error("failed");
   switch (r.op) {
     case "restore": return { op: r.op };
+    case "keep": await kept("readwrite", (store) => { store.clear(); store.put({ owner: ownerOf(r.owner), stub: true }, "identity"); return null; }); return { op: r.op };
     case "observe": return { op: r.op, reviews: r.keys.filter((k) => k.devices.length > 0).map((k) => ({ tag: k.tag, number: "1".repeat(60), changed: false, snapshot: k })), trust: new Uint8Array([1]) };
     case "confirm": return { op: r.op, trust: new Uint8Array([1]) };
     case "seal": {

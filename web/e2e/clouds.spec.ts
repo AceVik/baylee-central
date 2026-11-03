@@ -34,7 +34,7 @@ async function sweep(page: Page) {
 test("the clouds draw, and the pointer stirs them", async ({ page }) => {
   // the live air in software rendering: a small window, and time for it
   test.slow();
-  await page.setViewportSize({ width: 800, height: 520 });
+  await page.setViewportSize({ width: 560, height: 360 });
   const errors = watchErrors(page);
   const outside = await mock(page);
   await page.addInitScript(() => localStorage.setItem("baylee-clouds", "live"));

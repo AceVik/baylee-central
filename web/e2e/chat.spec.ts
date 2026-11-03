@@ -50,8 +50,35 @@ test.describe("the messenger", () => {
     expect(outside.stray).toEqual([]);
   });
 
-  test("after a reload it asks once, then the chat is back", async ({ page, baseURL }) => {
+  test("after a reload the chat opens by itself, and signing out forgets it", async ({ page, baseURL }) => {
     await signIn(page, new URL(baseURL ?? "").origin);
+    await page.goto("/account/chat?lang=en");
+    const side = page.getByRole("complementary", { name: "Conversations" });
+    await side.getByRole("button", { name: /Tidepool/ }).click();
+    await expect(page.getByRole("log")).toContainText("Rematch on the weekend?");
+    await expect(page.getByLabel("Account password")).toHaveCount(0);
+    const kept = () => page.evaluate(() => new Promise<number>((resolve) => {
+      const open = indexedDB.open("baylee-chat", 1);
+      open.addEventListener("upgradeneeded", () => open.result.createObjectStore("kept"));
+      open.addEventListener("success", () => {
+        const q = open.result.transaction("kept").objectStore("kept").count();
+        q.addEventListener("success", () => { resolve(q.result); open.result.close(); });
+      });
+    }));
+    expect(await kept()).toBe(1);
+    await page.goto("/account?lang=en");
+    await page.getByRole("button", { name: "Sign out" }).click();
+    await expect(page.getByText(/You are not signed in/)).toBeVisible();
+    await expect.poll(kept).toBe(0);
+  });
+
+  test("where this browser kept nothing, the password opens it once", async ({ page, baseURL }) => {
+    await signIn(page, new URL(baseURL ?? "").origin);
+    await page.evaluate(() => new Promise<void>((resolve) => {
+      const r = indexedDB.deleteDatabase("baylee-chat");
+      r.addEventListener("success", () => resolve());
+      r.addEventListener("error", () => resolve());
+    }));
     await page.goto("/account/chat?lang=en");
     const password = page.getByLabel("Account password");
     await password.first().waitFor({ state: "attached" });
@@ -65,5 +92,9 @@ test.describe("the messenger", () => {
     await expect(password).toHaveCount(0);
     await page.getByRole("complementary").getByRole("button", { name: /Tidepool/ }).click();
     await expect(page.getByRole("log")).toContainText("Rematch on the weekend?");
+    // and from now on it is kept
+    await page.reload();
+    await expect(page.getByRole("complementary").getByRole("button", { name: /Tidepool/ })).toBeVisible();
+    await expect(page.getByLabel("Account password")).toHaveCount(0);
   });
 });

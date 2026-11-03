@@ -2392,7 +2392,8 @@ identity instead of discarding it (`chat_unlock` in place of `login_confirm`),
 and the page keeps that Worker for the sign-in's life. No new protocol, no new
 stored secret, the committed WebAssembly unchanged. Invariant: the chat is
 unlocked only by a password proven in this page, and closed when the sign-in
-ends; a reload asks once.
+ends; a reload asks once. (Superseded the same day for reloads by the owner's
+decision below: the identity is now kept, sealed, while the sign-in lasts.)
 
 Implementation pass:
 - `chat_unlock` consumes the sign-in exactly as `login_confirm` does and fails
@@ -2472,3 +2473,48 @@ Checked and left: the directory's parsing and its origin rules, text-only
 rendering of gateway strings, the CSV and GitHub guards, the router's click
 handling, the anchors the page scrolls to, and the polling's pauses.
 Engineering review, not an audit.
+
+## The chat identity kept while signed in, 3 November 2026
+
+Design pass. The owner, the same day: the chat should not have to be unlocked,
+not on the website and not in the client; a signed-in account sees its contacts
+and chats, full stop. That needs the chat identity across reloads without the
+password, so it is now kept in the browser while the sign-in lasts. Options
+weighed: raw bytes in `localStorage` (readable by any copy of it); a key split
+with Central (a new protocol operation, a migration and a per-session secret
+on the server, for little more: message ciphertext is only readable with a
+session anyway, and a compromised Central would hold its half); the identity
+sealed in IndexedDB under a non-extractable Web Crypto key bound to account,
+epoch and tag, forgotten with the session. Chosen: the last. No custom
+cryptography (AES-256-GCM from the Web Crypto API; the identity's derivation
+unchanged); the module gains `Chat::keep` and `chat_resume`, the identity's
+bytes going only from the module to Web Crypto inside the Worker.
+
+Implementation pass:
+- `flow::chat_unlock` keeps the 96 bytes beside the chat (`OpenChat`, wiped on
+  drop); `flow::chat_resume` takes exactly 96 bytes and a valid tag and
+  rebuilds the same identity. The Worker seals them at once with a fresh
+  non-extractable key, then overwrites its copy; resume overwrites the opened
+  bytes after `chat_resume`.
+- The record names its owner and the AAD binds it again: another account,
+  epoch or tag, an altered IV or ciphertext open nothing, and such a record is
+  deleted. One record per browser; storing replaces it.
+- Forgotten on sign-out, on every end of the session the page sees (expiry,
+  Central's "no" at renewal or summary, a sign-out in another tab) and at
+  start when no session is remembered. The chat page resumes once per mount,
+  shows "loading" meanwhile and asks for the password only when nothing opens;
+  a password unlock keeps the identity for the next reload.
+- The WebAssembly module was rebuilt with `cargo xtask wasm` on x86-64 Linux
+  (the pinned Rust image under Rosetta) and checked with `--check`.
+
+Adversarial pass: host tests that a kept identity resumes as the same device
+and registration, that the same sign-in derives the same bytes, that other
+lengths, tag 0 and another epoch give nothing alike; unit tests for the seal
+(non-exportable key, wrong owner, swapped claim, altered ciphertext and IV),
+the resume (no password, nothing registered when nothing is kept) and the keep
+after a sign-in and after a password; e2e: the chat opens after a reload with
+no password field, IndexedDB is empty after sign-out, and with nothing kept the
+password opens it once and the next reload needs none. Not run here: a real
+Central with the real module end to end. The native client is the client's own
+change. Engineering review, not an audit.
+

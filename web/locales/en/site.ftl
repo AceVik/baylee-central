@@ -1108,7 +1108,7 @@ chat-sending = Sending…
 chat-message = Write a message
 chat-send = Send
 chat-friendRequired = You must be connected as contacts to send messages.
-chat-storage = History is loaded encrypted from Central; this browser keeps only encrypted key confirmations. The chat stays unlocked until you sign out.
+chat-storage = History is loaded encrypted from Central. This browser keeps your chat keys sealed while you are signed in, and forgets them when you sign out.
 chat-verify = Confirm these keys
 chat-compare = Compare this number through another trusted channel. First contact trusts the key directory; comparing the number confirms the identity.
 chat-open = Open chat
@@ -1142,7 +1142,7 @@ chat-newGroup = New group
 chat-noConversations = No conversations yet. Add a contact by their handle, or start a group.
 chat-noMatch = Nothing matches your search.
 chat-chooseLead = Pick a friend or a group on the left, or add a contact by their public handle.
-chat-lockedLead = This page was reloaded, so its message keys are gone. Enter your password once to unlock the chat again; it then stays unlocked until you sign out.
+chat-lockedLead = This browser does not hold your chat keys yet: it keeps them from a sign-in here on. Enter your password once; after that the chat opens by itself for as long as you are signed in.
 chat-encrypted = End-to-end encrypted
 chat-members =
     { $count ->

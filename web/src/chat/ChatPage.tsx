@@ -1,8 +1,10 @@
 // /account/chat and /account/contacts: the messenger in the account area.
 // The chat a sign-in unlocked becomes its session here on the first visit
-// and stays for the page's life (held.ts); after a reload a password typed
-// here unlocks it again, once.
-import { useEffect, useState } from "react";
+// and stays for the page's life (held.ts); after a reload it resumes the
+// identity this browser kept (kept.ts). Only where none is kept (another
+// browser's storage cleared, or none to write to) a password typed here
+// unlocks it, once.
+import { useEffect, useRef, useState } from "react";
 
 import type { AccountSummary } from "../account/api";
 import { useAccount } from "../account/session";
@@ -22,6 +24,18 @@ function Chat({ summary, api, tab }: { summary: AccountSummary; api: ChatApi; ta
   const own = summary.identity.account;
   const held = heldChat(own);
   const session = held?.session ?? null;
+  // after a reload: the kept identity, once per page; only its absence asks for the password
+  const [resuming, setResuming] = useState(held === null);
+  const resumed = useRef(false);
+  useEffect(() => {
+    if (resumed.current || heldChat(own) !== null) return;
+    resumed.current = true;
+    const fresh = new ChatSession(api, account.api, summary);
+    fresh.resume(() => { if (heldChat(own)?.session === fresh) lockChat(); }).then(
+      () => { holdChat(own, fresh); setResuming(false); },
+      () => { fresh.close(); setResuming(false); },
+    );
+  }, [own, api, account.api, summary]);
   // a sign-in's unlocked chat becomes this page's session
   useEffect(() => {
     if (held === null || !held.kept) return;
@@ -47,7 +61,7 @@ function Chat({ summary, api, tab }: { summary: AccountSummary; api: ChatApi; ta
       return false;
     }
   };
-  return <Messenger ownTag={summary.tag ?? 0} ownName={summary.displayName ?? ""} session={session} initialTab={tab} onUnlock={unlock} />;
+  return <Messenger ownTag={summary.tag ?? 0} ownName={summary.displayName ?? ""} session={session} opening={session === null && (held?.kept === true || resuming)} initialTab={tab} onUnlock={unlock} />;
 }
 
 export function MessengerPage({ client, tab }: { client?: ChatApi; tab: Tab }) {

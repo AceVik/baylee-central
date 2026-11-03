@@ -52,8 +52,11 @@ function Unlock({ onUnlock, onBack }: { onUnlock(password: string): Promise<bool
   </div>;
 }
 
-export function Messenger({ ownTag, ownName, session, initialTab = "chats", onUnlock }: {
-  ownTag: number; ownName: string; session: WindowSession | null; initialTab?: Tab; onUnlock(password: string): Promise<boolean>;
+export function Messenger({ ownTag, ownName, session, opening = false, initialTab = "chats", onUnlock }: {
+  ownTag: number; ownName: string; session: WindowSession | null;
+  /** The kept chat is being opened: neither the conversation nor the lock yet. */
+  opening?: boolean;
+  initialTab?: Tab; onUnlock(password: string): Promise<boolean>;
 }) {
   const lang = useLang();
   const location = useLocation();
@@ -92,7 +95,7 @@ export function Messenger({ ownTag, ownName, session, initialTab = "chats", onUn
         <span className="chat-side-me"><bdi translate="no">{ownName}</bdi><span className="chat-row-tag" translate="no">#{ownTag.toString(16).padStart(4, "0")}</span></span>
         <SideTools onNewGroup={() => { setTab("chats"); setMaking((v) => !v); }} onAddContact={() => { setTab("contacts"); document.getElementById("contact-tag")?.focus(); }} />
       </header>
-      {session === null && <p className="chat-side-locked"><Icon name="lock" className="chat-head-lock" /><T id="chat.unlockTitle" /> <button type="button" className="button button-sm" onClick={() => setUnlocking(true)}><T id="chat.unlock" /></button></p>}
+      {session === null && !opening && <p className="chat-side-locked"><Icon name="lock" className="chat-head-lock" /><T id="chat.unlockTitle" /> <button type="button" className="button button-sm" onClick={() => setUnlocking(true)}><T id="chat.unlock" /></button></p>}
       <div className="chat-tabs" role="tablist" aria-label={t(lang, "chat.conversations")}>
         <button type="button" role="tab" id="chat-tab-chats" aria-selected={tab === "chats"} aria-controls="chat-panel" onClick={() => setTab("chats")}>
           <T id="chat.tabChats" />{unread > 0 && <span className="chat-badge num">{num(lang, unread)}</span>}
@@ -122,7 +125,8 @@ export function Messenger({ ownTag, ownName, session, initialTab = "chats", onUn
     <section className="chat-main" aria-label={current?.title ?? t(lang, "chat.choose")}>
       {(data.error || contacts.error) && session !== null && <p className="chat-banner bad" role="alert"><T id="chat.failed" /> <button type="button" className="text-link" onClick={() => { void session.poll(); void contacts.reload(); }}><T id="chat.retry" /></button></p>}
       {data.pending !== null && data.pending.conv !== selected && <p className="chat-banner"><button type="button" className="text-link" onClick={() => { if (data.pending !== null) choose(data.pending.conv); }}><T id="chat.pendingOther" /></button></p>}
-      {session === null ? <Unlock onUnlock={onUnlock} onBack={() => { setUnlocking(false); setSelected(null); }} />
+      {session === null && opening ? <div className="chat-welcome"><output className="chat-note"><T id="app.loading" /></output></div>
+        : session === null ? <Unlock onUnlock={onUnlock} onBack={() => { setUnlocking(false); setSelected(null); }} />
         : current === null ? <div className="chat-welcome">
           <span className="chat-lock-icon" aria-hidden="true"><Icon name="chat" /></span>
           <h2><T id="chat.choose" /></h2>

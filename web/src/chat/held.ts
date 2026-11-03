@@ -3,8 +3,9 @@
 // Worker here, which the chat page turns into a session on its first visit;
 // a password typed on the chat page after a reload keeps its session here.
 // Signing out, the session's end, Central's refusal and another account's
-// sign-in close it. Nothing of it is stored: a reload starts locked. Types
-// only from the chat, so the page's first bundle stays without it.
+// sign-in close it. The identity itself is kept sealed in this browser
+// (kept.ts), so after a reload the chat page resumes it. Types only from the
+// chat, so the page's first bundle stays without it.
 import { useSyncExternalStore } from "react";
 
 import type { AccountSummary, Api } from "../account/api";
@@ -32,6 +33,11 @@ export function keepChat(summary: AccountSummary, unlocked: Unlocked, accountApi
   const was = held;
   held = { account, kept: { summary, unlocked, accountApi }, session: null };
   close(was);
+  // this browser keeps the identity, so that a reload needs no password (kept.ts)
+  if (summary.tag !== null) {
+    const owner = { account: summary.identity.account, epoch: summary.identity.epoch, tag: summary.tag };
+    void unlocked.crypto.ask({ op: "keep", owner }).catch(() => {});
+  }
   emit();
 }
 

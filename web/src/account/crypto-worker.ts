@@ -129,6 +129,6 @@ scope.addEventListener("message", (e) => {
 });
 
 serveChat((request) => {
-  if (request.op === "start" || request.op === "finish" || request.op === "unlock") throw new Error("failed");
+  if (request.op === "start" || request.op === "finish" || request.op === "unlock" || request.op === "resume") throw new Error("failed");
   return chatStep(take(chat), request);
 }, () => ready ?? Promise.reject(new Error("failed")));

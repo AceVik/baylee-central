@@ -24,7 +24,8 @@ async function fixture(groups?: GroupApi, prepared: Prepared | null = null) {
     switch (request.op) {
       case "start": case "finish": return { op: request.op, message: new Uint8Array(3) };
       case "unlock": return { op: request.op, device: "a".repeat(16), registration: { ik: "b", dk: "c", dsig: "d", label: "Account" } };
-      case "restore": return { op: request.op };
+      case "restore": case "keep": return { op: request.op };
+      case "resume": return { op: request.op, device: "a".repeat(16), registration: { ik: "b", dk: "c", dsig: "d", label: "Account" } };
       case "observe": return { op: request.op, reviews: [], trust: new Uint8Array([11,12]) };
       case "confirm": return { op: request.op, trust: new Uint8Array([11,12]) };
       case "seal": return { op: request.op, sealed: envelope };
@@ -40,6 +41,32 @@ async function fixture(groups?: GroupApi, prepared: Prepared | null = null) {
 
 const message = (seq: number, at: number) => ({ id: `m${seq}`, conv: "dm:0007:0009", sender: 9, text: `line ${seq}`, emote: false, at });
 const PREPARED: Prepared = { device: "a".repeat(16), registration: { ik: "b", dk: "c", dsig: "d", label: "Account" } };
+
+describe("a chat after a reload", () => {
+  it("resumes the identity this browser kept for its owner, without a password", async () => {
+    const f = await fixture();
+    await f.session.resume(() => {});
+    expect(f.account.loginStart).not.toHaveBeenCalled();
+    expect(f.requests[0]).toEqual({ op: "resume", owner: { account: ACCOUNT, epoch: 1, tag: 7 } });
+    expect(f.api.register).toHaveBeenCalledTimes(1);
+    expect(f.session.getSnapshot().started).toBe(true);
+  });
+
+  it("registers nothing where nothing is kept", async () => {
+    const f = await fixture();
+    const original = f.ask.getMockImplementation(); if (original === undefined) throw new Error("fixture");
+    f.ask.mockImplementation((request) => request.op === "resume" ? Promise.reject(new Error("unavailable")) : original(request));
+    await expect(f.session.resume(() => {})).rejects.toThrow("unavailable");
+    expect(f.api.register).not.toHaveBeenCalled();
+  });
+
+  it("keeps the identity once a password unlocked it", async () => {
+    const f = await fixture();
+    await f.session.unlock("synthetic", () => {});
+    expect(f.requests.map((r) => r.op)).toContain("keep");
+    expect(f.requests.find((r) => r.op === "keep")).toEqual({ op: "keep", owner: { account: ACCOUNT, epoch: 1, tag: 7 } });
+  });
+});
 
 describe("a chat a sign-in unlocked", () => {
   it("starts without a password: restores the trust, registers, reads its keys, then the inbox", async () => {

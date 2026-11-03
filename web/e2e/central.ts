@@ -335,7 +335,10 @@ const SERVE = `
 self.addEventListener("message", (e) => {
   const d = e.data;
   if (typeof d !== "object" || d === null || !("id" in d)) return;
-  try { self.postMessage({ id: d.id, result: step(d.request) }); } catch { self.postMessage({ id: d.id, error: "failed" }); }
+  Promise.resolve().then(() => step(d.request)).then(
+    (result) => self.postMessage({ id: d.id, result }),
+    (e) => self.postMessage({ id: d.id, error: e && e.message === "unavailable" ? "unavailable" : "failed" }),
+  );
 });
 `;
 
@@ -374,6 +377,13 @@ function step(r) {
   if (r.op === "start") { password = r.password; return { op: r.op, message: fill(96, 8) }; }
   if (r.op === "finish") { if (password !== ${JSON.stringify(PASSWORD)}) throw new Error("rejected"); return { op: r.op, message: fill(64, 10) }; }
   if (r.op === "unlock") { if (!r.wrapped.every((b) => b === 2)) throw new Error("rejected"); chat = { tag: r.tag }; return { op: r.op, device: deviceOf(r.tag), registration }; }
+  if (r.op === "resume") {
+    return kept("readonly", (store) => store.get("identity")).then((record) => {
+      if (!record || record.owner !== ownerOf(r.owner)) throw new Error("unavailable");
+      chat = { tag: r.owner.tag };
+      return { op: r.op, device: deviceOf(r.owner.tag), registration };
+    });
+  }
   return chatStep(r);
 }
 ${SERVE}`;

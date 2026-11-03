@@ -1,12 +1,15 @@
 // One unlocked account's lifecycle. Network work is coalesced; every await is
 // followed by a lifetime check before its result can start another operation.
-// A sign-in unlocks it (account/flows.ts, `prepared`) or a password typed on
-// the chat page does (`unlock`); either way it lives until the sign-in ends:
-// signing out, Central's refusal or another account close it (held.ts).
+// A sign-in unlocks it (account/flows.ts, `prepared`); after a reload it
+// resumes the identity this browser kept (`resume`, kept.ts), and only where
+// none is kept a password typed on the chat page unlocks it (`unlock`). It
+// lives until the sign-in ends: signing out, Central's refusal or another
+// account close it (held.ts), and the session's end forgets what was kept.
 import { ApiError, sameIdentity, type AccountSummary, type Api } from "../account/api";
 import type { Person } from "../social/api";
 import type { ChatApi, Keys, Message, Registration, Review, Sealed } from "./api";
 import { chatCrypto, type ChatCrypto } from "./crypto";
+import type { Owner } from "./kept";
 import { trustStore, type TrustStore } from "./storage";
 import { groupApi, type GroupApi } from "./groups";
 
@@ -77,7 +80,23 @@ export class ChatSession {
     }, wait);
   }
 
-  /** After a reload: the password's own sign-in, then `start`. Returns the new session's end. */
+  /** Whose identity this is, as the kept record binds it. */
+  owner(): Owner | null {
+    const { identity, tag } = this.summary;
+    return tag === null ? null : { account: identity.account, epoch: identity.epoch, tag };
+  }
+
+  /** After a reload: the identity this browser kept, then `start`; fails where none is kept. */
+  async resume(onLock: () => void): Promise<void> {
+    this.live(); this.locked = onLock;
+    const owner = this.owner();
+    if (owner === null) throw new Error("profile");
+    const ready = await this.crypto.ask({ op: "resume", owner }); this.live();
+    this.prepared = { device: ready.device, registration: ready.registration };
+    await this.start(onLock);
+  }
+
+  /** Where nothing is kept: the password's own sign-in, the identity kept, then `start`. Returns the new session's end. */
   async unlock(password: string, onLock: () => void): Promise<number> {
     this.live(); this.locked = onLock;
     if (this.summary.tag === null) throw new Error("profile");
@@ -90,6 +109,9 @@ export class ChatSession {
     if (!sameIdentity(summary.identity, this.summary.identity) || summary.tag !== this.summary.tag) throw new Error("identity");
     const ready = await this.crypto.ask({ op: "unlock", wrapped: session.wrappedMaster, tag: this.summary.tag }); this.live();
     this.prepared = { device: ready.device, registration: ready.registration };
+    const owner = this.owner();
+    // best effort: where IndexedDB is missing the next reload asks again
+    if (owner !== null) void this.crypto.ask({ op: "keep", owner }).catch(() => {});
     await this.start(onLock);
     return summary.expiresAt;
   }

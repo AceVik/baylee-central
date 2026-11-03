@@ -16,6 +16,11 @@ export class Chat {
      */
     confirm(keys: Uint8Array | number[]): void;
     /**
+     * The identity's secret bytes, for the Worker to seal at once under the
+     * browser's non-extractable key and wipe; never for the page.
+     */
+    keep(): Uint8Array;
+    /**
      * Validate a peer's keys and return its safety-number review as JSON.
      *
      * # Errors
@@ -160,6 +165,15 @@ export class Recovered {
 export function central_origin(): string;
 
 /**
+ * The chat identity again from the bytes [`Chat::keep`] gave, once the
+ * Worker has opened them under the browser's key.
+ *
+ * # Errors
+ * Rejects bytes of another length or an invalid public tag.
+ */
+export function chat_resume(kept: Uint8Array | number[], tag: number): Chat;
+
+/**
  * Consume an authenticated sign-in and derive the account's chat identity.
  *
  * # Errors
@@ -238,10 +252,12 @@ export interface InitOutput {
     readonly central_origin: () => [number, number];
     readonly chat_confirm: (a: number, b: number, c: number) => [number, number];
     readonly chat_device: (a: number) => [number, number];
+    readonly chat_keep: (a: number) => [number, number];
     readonly chat_observe: (a: number, b: number, c: number) => [number, number, number, number];
     readonly chat_open: (a: number, b: number, c: number) => [number, number, number, number];
     readonly chat_registration: (a: number) => [number, number, number, number];
     readonly chat_restore_trust: (a: number, b: number, c: number) => [number, number];
+    readonly chat_resume: (a: number, b: number, c: number) => [number, number, number];
     readonly chat_save_trust: (a: number) => [number, number, number, number];
     readonly chat_seal: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: bigint) => [number, number, number, number];
     readonly chat_unlock: (a: number, b: number, c: number, d: number) => [number, number, number];

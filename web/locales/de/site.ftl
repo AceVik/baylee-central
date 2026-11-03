@@ -1104,7 +1104,7 @@ chat-sending = Wird gesendet …
 chat-message = Nachricht schreiben
 chat-send = Senden
 chat-friendRequired = Zum Senden müsst ihr als Kontakte verbunden sein.
-chat-storage = Der Verlauf wird verschlüsselt von Central geladen; dieser Browser speichert nur verschlüsselte Schlüsselbestätigungen. Der Chat bleibt entsperrt, bis du dich abmeldest.
+chat-storage = Der Verlauf wird verschlüsselt von Central geladen. Dieser Browser bewahrt deine Chat-Schlüssel versiegelt auf, solange du angemeldet bist, und vergisst sie beim Abmelden.
 chat-verify = Diese Schlüssel bestätigen
 chat-compare = Vergleicht diese Nummer über einen anderen vertrauenswürdigen Kanal. Beim ersten Kontakt wird dem Schlüsselverzeichnis vertraut; erst der Vergleich bestätigt die Identität.
 chat-open = Chat öffnen
@@ -1138,7 +1138,7 @@ chat-newGroup = Neue Gruppe
 chat-noConversations = Noch keine Gespräche. Füge einen Kontakt über seinen Handle hinzu oder starte eine Gruppe.
 chat-noMatch = Nichts passt zu deiner Suche.
 chat-chooseLead = Wähle links einen Freund oder eine Gruppe, oder füge einen Kontakt über seinen öffentlichen Handle hinzu.
-chat-lockedLead = Diese Seite wurde neu geladen, ihre Nachrichtenschlüssel sind deshalb weg. Gib dein Passwort einmal ein, um den Chat wieder zu entsperren; danach bleibt er entsperrt, bis du dich abmeldest.
+chat-lockedLead = Dieser Browser hat deine Chat-Schlüssel noch nicht: Er behält sie ab einer Anmeldung hier. Gib dein Passwort einmal ein; danach öffnet sich der Chat von selbst, solange du angemeldet bist.
 chat-encrypted = Ende-zu-Ende-verschlüsselt
 chat-members =
     { $count ->

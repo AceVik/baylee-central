@@ -1,6 +1,7 @@
 // One bounded, serial worker for an unlocked chat. Closing rejects pending work.
 import type { Identity } from "../account/api";
 import type { Delivery, Keys, Message, Registration, Review, Sealed } from "./api";
+import type { Owner } from "./kept";
 
 /** A chat a sign-in unlocked: its Worker, which now speaks only the chat's steps, and its device. */
 export interface Unlocked { crypto: ChatCrypto; device: string; registration: Registration }
@@ -10,6 +11,8 @@ export type Request =
   | { op: "finish"; response: Uint8Array }
   | { op: "unlock"; wrapped: Uint8Array; tag: number }
   | { op: "restore"; trust: Uint8Array }
+  | { op: "keep"; owner: Owner }
+  | { op: "resume"; owner: Owner }
   | { op: "observe"; keys: Keys[] }
   | { op: "confirm"; snapshot: Keys }
   | { op: "seal"; conv: string; text: string; emote: boolean; members: number[]; now: number }
@@ -17,7 +20,9 @@ export type Request =
 export type Result =
   | { op: "start" | "finish"; message: Uint8Array }
   | { op: "unlock"; device: string; registration: Registration }
+  | { op: "resume"; device: string; registration: Registration }
   | { op: "restore" }
+  | { op: "keep" }
   | { op: "observe"; reviews: Review[]; trust: Uint8Array }
   | { op: "confirm"; trust: Uint8Array }
   | { op: "seal"; sealed: Sealed }
