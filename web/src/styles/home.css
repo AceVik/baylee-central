@@ -141,7 +141,7 @@
   color: var(--gold);
 }
 @media (max-width: 1280px) {
-  .stat-context-inline {
+  .stat .stat-context-inline {
     display: none;
   }
 }
@@ -769,7 +769,7 @@
 
 @media (max-width: 980px) {
   .hgw-list {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 @media (max-width: 560px) {
