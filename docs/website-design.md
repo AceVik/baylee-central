@@ -248,7 +248,14 @@ to feel slow and over the 60 ms where it reads as a snap.
   changes.
 - **Ambient**: the online dot breathes slowly (2.4 s); the painting drifts
   with the scroll; the hero's light and Baylee's cloud move slowly, and only
-  while the hero is on screen and no dialog covers it; the memorial's light
+  while the hero is on screen and no dialog covers it. The hero's clouds
+  (`HeroShader.tsx`, `clouds/`) drift on a slow wind and heal into their
+  banks; the pointer stirs the air they ride in, a small fluid on the GPU
+  (stable fluids with vorticity confinement on a 112-cell-high grid, the
+  clouds on a finer one, lit towards the sun), and a press sends a gust
+  outwards. Thinner behind the words, fuller towards the edges; a still
+  picture under reduced motion and where WebGL 2 renders in software, the
+  painting alone without WebGL 2. The memorial's light
   is its own (limited to 20 draws a second, its GPU context given back when
   the album closes). Nothing else moves by itself.
 - **Reduced motion** (`prefers-reduced-motion: reduce`): every transition,
