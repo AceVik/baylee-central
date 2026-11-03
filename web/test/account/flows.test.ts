@@ -6,9 +6,10 @@
 // same bytes after a lost answer), and that every flow's Worker is closed
 // however the flow ends.
 
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import { FlowError, register, signIn, storeCode, type Progress } from "../../src/account/flows";
+import { heldChat, lockChat } from "../../src/chat/held";
 import { CODE, KEY, NEW_CODE, NEW_WRAPPER, fakeCentral, fakeCrypto, fill } from "../support/central";
 
 const PASSWORD = "synthetic passphrase";
@@ -67,6 +68,32 @@ async function registered(opts: Parameters<typeof fakeCentral>[0] = {}) {
 }
 
 describe("sign-in", () => {
+  afterEach(() => lockChat());
+
+  it("unlocks the chat of an account with a tag in its Worker and keeps it, instead of only checking the key", async () => {
+    const { api } = await registered();
+    const crypto = fakeCrypto(PASSWORD, { chat: true });
+    const { session, code } = await signIn({ username: NAME, password: PASSWORD }, { api, crypto: crypto.factory });
+    expect(code).toBeNull();
+    expect([crypto.confirmed, crypto.created, crypto.chats.length]).toEqual([0, 0, 1]);
+    expect(crypto.chats[0]).toEqual({ tag: 0x3fa2, closed: 0 });
+    expect(heldChat(session.identity.account)).toEqual({ session: null, kept: true });
+    // the same account signing in again keeps the chat it has and closes the new Worker
+    await signIn({ username: NAME, password: PASSWORD }, { api, crypto: crypto.factory });
+    expect(crypto.chats.map((c) => c.closed)).toEqual([0, 1]);
+    lockChat();
+    expect(crypto.chats.map((c) => c.closed)).toEqual([1, 1]);
+    expect(heldChat(session.identity.account)).toBeNull();
+  });
+
+  it("keeps no chat after a wrong password", async () => {
+    const { api } = await registered();
+    const crypto = fakeCrypto(PASSWORD, { chat: true });
+    expect(await kind(signIn({ username: NAME, password: "wrong passphrase" }, { api, crypto: crypto.factory }))).toBe("wrongLogin");
+    expect(crypto.chats).toEqual([]);
+    expect(crypto.opened).toBe(crypto.closed);
+  });
+
   it("discovers, runs OPAQUE and checks the master key, keeping the session", async () => {
     const { api, crypto } = await registered();
     const { session, summary, code } = await signIn({ username: NAME, password: PASSWORD }, { api, crypto: crypto.factory });

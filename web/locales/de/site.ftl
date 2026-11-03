@@ -1099,7 +1099,6 @@ aud-tokenRevoked = Gateway-Token widerrufen
 # Account contacts
 title-accountContacts = Kontakte · Baylee
 social-title = Kontakte
-social-lead = Deine Freunde und Anfragen, unabhängig davon, wo du spielst.
 social-add = Kontakt hinzufügen
 social-tag = Öffentlicher Handle oder Tag
 social-find = Suchen
@@ -1125,20 +1124,14 @@ social-profileNeeded = Vervollständige dein öffentliches Profil, bevor du Kont
 ## Account chat
 title-accountChat = Chat · Baylee
 chat-title = Chat
-chat-lead = Deine Gespräche, verbunden mit deinem Baylee-Konto.
 chat-unlockTitle = Chat entsperren
-chat-unlockLead = Dein Passwort öffnet die Nachrichtenschlüssel auf diesem Gerät. Es wird nicht an Central gesendet.
 chat-password = Kontopasswort
 chat-unlock = Entsperren
 chat-unlockFailed = Der Chat konnte nicht entsperrt werden. Prüfe dein Passwort, die Verbindung und ob die aktuellen Nutzungsbedingungen angenommen sind. Beschädigte gespeicherte Schlüssel werden nicht überschrieben.
-chat-private = Ende-zu-Ende-verschlüsselte Nachrichten
-chat-lock = Chat sperren
 chat-failed = Der Chat konnte nicht aktualisiert werden. Prüfe die Verbindung und die Empfängerschlüssel.
 chat-retry = Erneut versuchen
 chat-refused = Einige Nachrichten konnten nicht verifiziert werden und werden nicht angezeigt. Prüfe die Sicherheitsnummern bei geänderten Schlüsseln.
 chat-conversations = Gespräche
-chat-manageContacts = Kontakte verwalten
-chat-noContacts = Füge einen Kontakt hinzu, um ein Gespräch zu beginnen.
 chat-choose = Wähle ein Gespräch.
 chat-safety = Sicherheitsnummer
 chat-keysChanged = Die Schlüssel dieses Kontakts haben sich geändert. Vergleiche die Sicherheitsnummer, bevor du weitere Nachrichten sendest.
@@ -1149,12 +1142,11 @@ chat-sending = Wird gesendet …
 chat-message = Nachricht schreiben
 chat-send = Senden
 chat-friendRequired = Zum Senden müsst ihr als Kontakte verbunden sein.
-chat-storage = Der Verlauf wird verschlüsselt von Central geladen. Dieser Browser speichert nur verschlüsselte Schlüsselbestätigungen. Nach fünf Minuten im Hintergrund wird der Chat gesperrt.
+chat-storage = Der Verlauf wird verschlüsselt von Central geladen; dieser Browser speichert nur verschlüsselte Schlüsselbestätigungen. Der Chat bleibt entsperrt, bis du dich abmeldest.
 chat-verify = Diese Schlüssel bestätigen
 chat-compare = Vergleicht diese Nummer über einen anderen vertrauenswürdigen Kanal. Beim ersten Kontakt wird dem Schlüsselverzeichnis vertraut; erst der Vergleich bestätigt die Identität.
 chat-open = Chat öffnen
 
-chat-groups = Gruppen
 chat-groupFailed = Die Gruppe konnte nicht aktualisiert werden. Prüfe Berechtigung, Mitgliederzahl und Verbindung.
 chat-groupInvites = Gruppeneinladungen
 chat-groupName = Gruppenname
@@ -1177,6 +1169,29 @@ chat-pendingOther = Eine unbestätigte Nachricht wartet in einem anderen Gesprä
 chat-older = Ältere Nachrichten anzeigen
 chat-discard = Sendeversuch verwerfen
 chat-discardConfirm = Diese Nachricht nicht erneut senden? Sie könnte bereits zugestellt worden sein. Das Verwerfen löscht keine zugestellte Nachricht. Kopiere den Text vorher, wenn du ihn behalten möchtest.
+chat-tabChats = Chats
+chat-tabContacts = Kontakte
+chat-search = Gespräche durchsuchen
+chat-newGroup = Neue Gruppe
+chat-noConversations = Noch keine Gespräche. Füge einen Kontakt über seinen Handle hinzu oder starte eine Gruppe.
+chat-noMatch = Nichts passt zu deiner Suche.
+chat-chooseLead = Wähle links einen Freund oder eine Gruppe, oder füge einen Kontakt über seinen öffentlichen Handle hinzu.
+chat-lockedLead = Diese Seite wurde neu geladen, ihre Nachrichtenschlüssel sind deshalb weg. Gib dein Passwort einmal ein, um den Chat wieder zu entsperren; danach bleibt er entsperrt, bis du dich abmeldest.
+chat-encrypted = Ende-zu-Ende-verschlüsselt
+chat-members =
+    { $count ->
+        [one] Ein Mitglied
+       *[other] { $count } Mitglieder
+    }
+chat-you = Du
+chat-sayHello = Noch keine Nachrichten
+chat-today = Heute
+chat-yesterday = Gestern
+chat-back = Zurück zu den Gesprächen
+chat-enterHint = Enter sendet, Umschalt+Enter beginnt eine neue Zeile.
+chat-unread = ungelesen
+social-tagHint = Handle, z. B. Mira#3fa2
+social-more = Weitere Aktionen
 
 push-title = Benachrichtigungen
 push-lead = Wähle, worüber Baylee dich benachrichtigen darf. Benachrichtigungen zeigen keine Nachrichtentexte, Namen oder Feedback-Inhalte.

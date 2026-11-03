@@ -292,12 +292,39 @@ WCAG 2.1 AA, mobile first:
 | area | paths | frame |
 | --- | --- | --- |
 | Public | `/`, `/download`, `/cards`, `/gateways`, `/contact`, legal pages | the bar, sections, the footer |
-| Account | `/account`, `/account/security`, `/account/gateways` | the app frame |
+| Account | `/account`, `/account/chat`, `/account/contacts`, `/account/security`, `/account/gateways` | the app frame; the messenger on chat and contacts |
 | Administration | `/admin` (the overview), `/admin/feedback`, `/admin/feedback/<id>`, `/admin/users`, `/admin/users/<id>`, `/admin/gateways`, `/admin/audit`, `/admin/legacy` | the app frame, loaded only for an administrator |
 | Sign-in | `/signin`, `/register` | a centred card beside Baylee's cloud |
 
 The account area and the administration are loaded lazily and only after a
 sign-in; a visitor's first page fetches neither.
+
+### The messenger
+
+The chat and the contacts (`src/chat/`, `styles/chat.css`, [chat](central-chat.md))
+are one window, as in Baylee's client and any messenger, not panels of
+settings:
+
+- **Two panes.** From 760 px the conversations and contacts stand beside the
+  open conversation, the window as tall as the screen allows; below, one pane
+  at a time with a way back, and the page's heading only for screen readers.
+- **The side.** Who is signed in (an avatar of initials, six tints mixed from
+  the palette, the same for the same person everywhere), a new group and a new
+  contact as icons, and two tabs: *Chats* (group invitations, then every
+  conversation by its last line, its time and a count of what arrived unread,
+  newest first, with a search) and *Contacts* (adding by the exact handle,
+  requests to answer, friends who open their conversation, requests sent, the
+  blocked folded). Rare actions sit in a row's menu (⋮), never as a row of
+  buttons; whatever cannot be taken back asks first.
+- **The conversation.** A head with the avatar, the name and "End-to-end
+  encrypted" (a group's members), the safety number behind a shield that turns
+  to a warning when keys changed, a group's settings sliding in from the side;
+  the messages as bubbles, the own on the right in `--gold`, by day with a
+  divider, a run of one sender's lines closer together, the sender's name in a
+  group; the composer grows with its text, Enter sends and Shift+Enter starts a
+  line (a phone's keyboard keeps Enter for the line), the send button round.
+- **Locked.** A sign-in unlocks the chat; only after a reload the conversation
+  pane asks for the password once, while the contacts and groups stay usable.
 
 ### The feedback section
 
