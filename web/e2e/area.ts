@@ -5,6 +5,7 @@
 // read. Synthetic names and example.invalid addresses only. Changes are
 // remembered for the page's life, so a test sees what it did.
 
+import { chatAnswer, chatState, groupAnswer, type ChatState } from "./chat.ts";
 import { reportsAnswer, reportsState, type ReportsState } from "./reports.ts";
 
 /** A UUIDv7-shaped id whose last byte is `n`. */
@@ -59,6 +60,8 @@ export interface AreaState {
   /** Bug and crash reports (`reports.ts`). */
   reports: ReportsState;
   nextToken: number;
+  /** The chat's deliveries and the groups (`chat.ts`). */
+  chat: ChatState;
 }
 
 export function areaState(admin: boolean): AreaState {
@@ -118,7 +121,9 @@ export function areaState(admin: boolean): AreaState {
     beta_key: null,
   }));
   const admins = accounts.filter((a) => a.admin).map((a) => ({ id: a.id, display_name: a.display_name, tag: a.tag }));
-  return { accounts, gateways, audit, me: 0, nextToken: 10, reports: reportsState(admins) };
+  const state: AreaState = { accounts, gateways, audit, me: 0, nextToken: 10, reports: reportsState(admins), chat: { seq: 0, deliveries: [], groups: [], invites: [], answered: new Set() } };
+  state.chat = chatState(state);
+  return state;
 }
 
 const same = (a: unknown, b: number[]) => Array.isArray(a) && a.join() === b.join();
@@ -177,6 +182,10 @@ export function socialAnswer(s: AreaState, request: Record<string, unknown>): un
     }
     case "contact":
       return social("done", {});
+    case "chat":
+      return chatAnswer(s, s.chat, request["request"] as Record<string, unknown>);
+    case "group":
+      return groupAnswer(s, s.chat, request["request"] as Record<string, unknown>);
   }
   return 400;
 }

@@ -1103,7 +1103,6 @@ aud-tokenRevoked = Gateway token revoked
 # Account contacts
 title-accountContacts = Contacts · Baylee
 social-title = Contacts
-social-lead = Your friends and requests, wherever you play.
 social-add = Add a contact
 social-tag = Public handle or tag
 social-find = Find
@@ -1129,20 +1128,14 @@ social-profileNeeded = Complete your public profile before using contacts.
 ## Account chat
 title-accountChat = Chat · Baylee
 chat-title = Chat
-chat-lead = Your conversations, connected to your Baylee account.
 chat-unlockTitle = Unlock chat
-chat-unlockLead = Your password unlocks message keys on this device. It is never sent to Central.
 chat-password = Account password
 chat-unlock = Unlock
 chat-unlockFailed = Chat could not be unlocked. Check your password, connection and acceptance of the current terms. Damaged saved keys are never overwritten.
-chat-private = End-to-end encrypted messages
-chat-lock = Lock chat
 chat-failed = Chat could not be updated. Check the connection and recipient keys.
 chat-retry = Retry
 chat-refused = Some messages could not be verified and are not displayed. Check safety numbers for changed keys.
 chat-conversations = Conversations
-chat-manageContacts = Manage contacts
-chat-noContacts = Add a contact to start a conversation.
 chat-choose = Choose a conversation.
 chat-safety = Safety number
 chat-keysChanged = This contact’s keys have changed. Compare the safety number before sending more messages.
@@ -1153,12 +1146,11 @@ chat-sending = Sending…
 chat-message = Write a message
 chat-send = Send
 chat-friendRequired = You must be connected as contacts to send messages.
-chat-storage = History is loaded encrypted from Central. This browser stores only encrypted key confirmations. Chat locks after five minutes in the background.
+chat-storage = History is loaded encrypted from Central; this browser keeps only encrypted key confirmations. The chat stays unlocked until you sign out.
 chat-verify = Confirm these keys
 chat-compare = Compare this number through another trusted channel. First contact trusts the key directory; comparing the number confirms the identity.
 chat-open = Open chat
 
-chat-groups = Groups
 chat-groupFailed = The group could not be updated. Check your permissions, member limit and connection.
 chat-groupInvites = Group invitations
 chat-groupName = Group name
@@ -1181,6 +1173,29 @@ chat-pendingOther = An unconfirmed message is waiting in another conversation.
 chat-older = Show older messages
 chat-discard = Discard send attempt
 chat-discardConfirm = Stop retrying this message? It may already have been delivered. Discarding does not delete a delivered message. Copy the text first if you want to keep it.
+chat-tabChats = Chats
+chat-tabContacts = Contacts
+chat-search = Search conversations
+chat-newGroup = New group
+chat-noConversations = No conversations yet. Add a contact by their handle, or start a group.
+chat-noMatch = Nothing matches your search.
+chat-chooseLead = Pick a friend or a group on the left, or add a contact by their public handle.
+chat-lockedLead = This page was reloaded, so its message keys are gone. Enter your password once to unlock the chat again; it then stays unlocked until you sign out.
+chat-encrypted = End-to-end encrypted
+chat-members =
+    { $count ->
+        [one] One member
+       *[other] { $count } members
+    }
+chat-you = You
+chat-sayHello = No messages yet
+chat-today = Today
+chat-yesterday = Yesterday
+chat-back = Back to the conversations
+chat-enterHint = Enter sends, Shift+Enter starts a new line.
+chat-unread = unread
+social-tagHint = Handle, e.g. Mira#3fa2
+social-more = More actions
 
 push-title = Notifications
 push-lead = Choose what Baylee may notify you about. Notifications show no message text, names or report contents.

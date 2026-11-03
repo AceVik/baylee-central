@@ -83,6 +83,7 @@ export function AppFrame({
   eyebrow,
   title,
   lead,
+  wide = false,
   children,
 }: {
   page: Page;
@@ -91,6 +92,8 @@ export function AppFrame({
   eyebrow: Key;
   title: ReactNode;
   lead?: ReactNode;
+  /** The messenger: on a phone its window is the page, without the heading above it. */
+  wide?: boolean;
   children: ReactNode;
 }) {
   const lang = useLang();
@@ -104,7 +107,7 @@ export function AppFrame({
     current?.scrollIntoView?.({ block: "nearest", inline: "center" });
   }, [page, admin]);
   return (
-    <div className="app">
+    <div className={wide ? "app app-messenger" : "app"}>
       <div className="app-inner">
         <nav ref={nav} className="app-nav" aria-label={t(lang, "app.nav")}>
           <p className="app-nav-head">

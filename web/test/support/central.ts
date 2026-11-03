@@ -217,14 +217,15 @@ export interface FakeCrypto {
   opened: number;
   closed: number;
   passwords: string[];
-  /** Sign-ins that ended in `loginConfirm`, and in `recoveryCreate`. */
+  /** Sign-ins that ended in `loginConfirm`, in `recoveryCreate`, and in `chatUnlock`. */
   confirmed: number;
   created: number;
+  chats: { tag: number; closed: number }[];
 }
 
 /** Crypto that accepts `password` only, and only `WRAPPED` as the master key's wrapper. */
-export function fakeCrypto(password: string, opts: { failStart?: boolean } = {}): FakeCrypto {
-  const f: FakeCrypto = { factory: () => flow(), opened: 0, closed: 0, passwords: [], confirmed: 0, created: 0 };
+export function fakeCrypto(password: string, opts: { failStart?: boolean; chat?: boolean } = {}): FakeCrypto {
+  const f: FakeCrypto = { factory: () => flow(), opened: 0, closed: 0, passwords: [], confirmed: 0, created: 0, chats: [] };
   function flow(): Crypto {
     f.opened++;
     let given = "";
@@ -257,6 +258,18 @@ export function fakeCrypto(password: string, opts: { failStart?: boolean } = {})
         if (wrapped.join() !== WRAPPED.join()) throw new CryptoError("rejected");
         return { recovery: NEW_WRAPPER, recoveryCode: NEW_CODE };
       },
+      ...(opts.chat === true ? {
+        async chatUnlock(wrapped: Uint8Array, tag: number) {
+          if (wrapped.join() !== WRAPPED.join()) throw new CryptoError("rejected");
+          const chat = { tag, closed: 0 };
+          f.chats.push(chat);
+          return {
+            crypto: { ask: () => Promise.reject(new Error("closed")), close: () => { chat.closed++; } },
+            device: "a".repeat(16),
+            registration: { ik: "b", dk: "c", dsig: "d", label: "Browser" },
+          };
+        },
+      } : {}),
       close() {
         f.closed++;
       },

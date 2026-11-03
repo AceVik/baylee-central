@@ -49,13 +49,27 @@ needed to authenticate first contact against a malicious directory. Group
 membership is authorized by Central, not a cryptographically authenticated group
 transcript. The SDK refuses injected own-account devices even on first use.
 
-The website's separate worker owns the unlocked WASM keys. Only encrypted peer
-trust is stored in localStorage, scoped to the immutable account ID. Messages
-remain in memory and are replayed from encrypted delivery history. Local trust
-storage authenticates contents, not freshness: deletion or rollback of that
-storage can remove previous TOFU knowledge. Closing the worker clears its state;
-page hide and five minutes hidden lock the chat. JavaScript does not promise
-physical erasure of previously rendered text or password strings.
+The website's worker owns the unlocked WASM keys. A sign-in to an account with
+a public tag unlocks the chat in the sign-in's own worker: `chat_unlock` opens
+the master key exactly as `login_confirm` would, so it proves the password the
+same way, derives the chat identity and wipes the master key; from then on the
+worker answers only the chat's steps (`web/src/chat/steps.ts`). The page keeps
+that worker (`web/src/chat/held.ts`) for as long as the sign-in: moving between
+pages keeps it; signing out, the session's end, Central's refusal and another
+account's sign-in (also in another tab) close it. Nothing of it is persisted, so
+a reload, a new tab or a closed page starts locked, and the chat page then asks
+for the password once, in a worker and sign-in of its own. An account without a
+recovery code makes its code at sign-in instead and unlocks the chat there the
+same way. A hidden page no longer locks after five minutes and page hide no
+longer locks: the keys live exactly as long as an open, signed-in page, whose
+memory also holds the session that reads the inbox. Only encrypted peer trust is
+stored in localStorage, scoped to the immutable account ID. Messages remain in
+memory and are replayed from encrypted delivery history. Local trust storage
+authenticates contents, not freshness: deletion or rollback of that storage can
+remove previous TOFU knowledge. A damaged trust record fails the chat's start
+closed (nothing is registered or read) without failing the sign-in. Closing the
+worker clears its state. JavaScript does not promise physical erasure of
+previously rendered text or password strings.
 
 ## Authorization, concurrency and storage
 

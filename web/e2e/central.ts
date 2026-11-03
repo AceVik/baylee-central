@@ -18,6 +18,7 @@ import type { Page, Request, Route } from "@playwright/test";
 import { csp } from "../scripts/csp.ts";
 
 import { adminAnswer, areaState, ownerAnswer, socialAnswer, type AreaState } from "./area.ts";
+import { CHAT_STEPS } from "./chat.ts";
 import { reportPart, reportShape, reportsState } from "./reports.ts";
 
 export const KEY = "CENTRAL-TEST-0000-0000-0001";
@@ -329,12 +330,27 @@ export async function mockCentral(page: Page, origin: string, opts: Options = {}
   return m;
 }
 
-/** The crypto Worker's stand-in: the protocol of src/account/crypto.ts, knowing only `PASSWORD`. */
-const STUB = `
+/** The chat's messages (`{ id, request }`) in a stand-in Worker, after its unlock. */
+const SERVE = `
+self.addEventListener("message", (e) => {
+  const d = e.data;
+  if (typeof d !== "object" || d === null || !("id" in d)) return;
+  try { self.postMessage({ id: d.id, result: step(d.request) }); } catch { self.postMessage({ id: d.id, error: "failed" }); }
+});
+`;
+
+/**
+ * The crypto Worker's stand-in: the protocol of src/account/crypto.ts,
+ * knowing only `PASSWORD`; after `chat_unlock` the chat's steps (`chat.ts`).
+ */
+const STUB = `${CHAT_STEPS}
 const fill = (n, b) => new Uint8Array(n).fill(b);
 let password = null;
+const step = (r) => chatStep(r);
+${SERVE}
 self.addEventListener("message", (e) => {
   const m = e.data;
+  if (typeof m !== "object" || m === null || !("op" in m)) return;
   const reply = (r) => self.postMessage(r);
   if (m.op === "enrollment_start") { password = m.password; reply({ op: m.op, message: fill(32, 1) }); }
   else if (m.op === "enrollment_finish") reply({ op: m.op, record: fill(192, 3), wrappedMaster: fill(73, 2), recovery: fill(73, 4), document: fill(${SEALED_DOCUMENT}, 6), recoveryCode: ${JSON.stringify(CODE)} });
@@ -342,11 +358,34 @@ self.addEventListener("message", (e) => {
   else if (m.op === "login_finish") reply(password === ${JSON.stringify(PASSWORD)} ? { op: m.op, message: fill(64, 10) } : { op: "error", error: "rejected" });
   else if (m.op === "login_confirm") reply(m.wrappedMaster.every((b) => b === 2) ? { op: m.op } : { op: "error", error: "rejected" });
   else if (m.op === "recovery_create") reply(m.wrappedMaster.every((b) => b === 2) ? { op: m.op, recovery: fill(73, 11), recoveryCode: ${JSON.stringify(NEW_CODE)} } : { op: "error", error: "rejected" });
+  else if (m.op === "chat_unlock") {
+    if (!m.wrappedMaster.every((b) => b === 2)) { reply({ op: "error", error: "rejected" }); return; }
+    chat = { tag: m.tag };
+    reply({ op: m.op, device: deviceOf(m.tag), registration });
+  }
 });
 `;
+
+/** The chat's own Worker's stand-in (src/chat/worker.ts): a password typed on the chat page, then the chat's steps. */
+const CHAT_STUB = `${CHAT_STEPS}
+const fill = (n, b) => new Uint8Array(n).fill(b);
+let password = null;
+function step(r) {
+  if (r.op === "start") { password = r.password; return { op: r.op, message: fill(96, 8) }; }
+  if (r.op === "finish") { if (password !== ${JSON.stringify(PASSWORD)}) throw new Error("rejected"); return { op: r.op, message: fill(64, 10) }; }
+  if (r.op === "unlock") { if (!r.wrapped.every((b) => b === 2)) throw new Error("rejected"); chat = { tag: r.tag }; return { op: r.op, device: deviceOf(r.tag), registration }; }
+  return chatStep(r);
+}
+${SERVE}`;
 
 export async function stubCrypto(page: Page): Promise<void> {
   await page.route("**/assets/crypto-worker-*.js", (route) =>
     route.fulfill({ status: 200, contentType: "text/javascript; charset=utf-8", headers: { "Content-Security-Policy": csp() }, body: STUB }),
   );
+  // the chat's own Worker is one of the `worker-*.js`; the others stay as built
+  await page.route("**/assets/worker-*.js", async (route) => {
+    const response = await route.fetch();
+    if (!(await response.text()).includes("chat_unlock")) return route.fulfill({ response });
+    return route.fulfill({ status: 200, contentType: "text/javascript; charset=utf-8", headers: { "Content-Security-Policy": csp() }, body: CHAT_STUB });
+  });
 }

@@ -9,20 +9,27 @@
 // between two messages stay here; the page sends and receives bytes only.
 // A sign-in ends in `login_confirm` or, for an account without a recovery
 // code, in `recovery_create`, which opens the master key the same way and
-// wraps it under a new code: the master key never leaves this Worker.
+// wraps it under a new code: the master key never leaves this Worker. An
+// account with a public tag ends in `chat_unlock` instead, which opens the
+// master key the same way and keeps only the chat identity derived from it;
+// the Worker then answers the chat's steps (chat/steps.ts) and lives as long
+// as that chat, instead of ending with the sign-in.
 
 import init, {
+  chat_unlock,
   enrollment_finish,
   enrollment_start,
   login_confirm,
   login_finish,
   login_start,
   recovery_create,
+  type Chat,
   type Enrollment,
   type Login,
   type LoginKey,
 } from "../central-wasm/central_web_crypto.js";
 import wasm from "../central-wasm/central_web_crypto_bg.wasm?url";
+import { chatStep, serveChat, unlocked } from "../chat/steps";
 import type { WorkerReply, WorkerRequest } from "./crypto";
 
 interface Scope {
@@ -35,6 +42,7 @@ let ready: Promise<unknown> | null = null;
 let enrollment: Enrollment | null = null;
 let login: Login | null = null;
 let key: LoginKey | null = null;
+let chat: Chat | null = null;
 
 /** Takes the state a step consumes; a step out of order is `failed`. */
 function take<T>(state: T | null): T {
@@ -82,6 +90,12 @@ function step(m: WorkerRequest): WorkerReply {
       login_confirm(state, m.wrappedMaster);
       return { op: m.op };
     }
+    case "chat_unlock": {
+      const state = take(key);
+      key = null;
+      chat = chat_unlock(state, m.wrappedMaster, m.tag);
+      return { op: m.op, ...unlocked(chat) };
+    }
     case "recovery_create": {
       const state = take(key);
       key = null;
@@ -98,6 +112,8 @@ function step(m: WorkerRequest): WorkerReply {
 
 /* oxlint-disable unicorn/require-post-message-target-origin -- a worker's postMessage takes no target origin */
 scope.addEventListener("message", (e) => {
+  // the chat's messages, once `chat_unlock` made one, are serveChat's
+  if (typeof e.data !== "object" || e.data === null || !("op" in e.data)) return;
   ready ??= init({ module_or_path: wasm });
   ready.then(
     () => {
@@ -111,3 +127,8 @@ scope.addEventListener("message", (e) => {
     () => scope.postMessage({ op: "error", error: "failed" }),
   );
 });
+
+serveChat((request) => {
+  if (request.op === "start" || request.op === "finish" || request.op === "unlock") throw new Error("failed");
+  return chatStep(take(chat), request);
+}, () => ready ?? Promise.reject(new Error("failed")));

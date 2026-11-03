@@ -1,41 +1,24 @@
 import { useState } from "react";
 import { Confirm } from "../app/Confirm";
-import { T } from "../i18n";
+import { Icon } from "../components/icons";
+import { T, t, useLang } from "../i18n";
 import { handleOf, type Person } from "../social/api";
 import type { Group, GroupChange } from "./groups";
+import { Avatar, Menu } from "./pieces";
 import type { GroupState } from "./useGroups";
 
-export function GroupList({ state, selected, ownTag, onChoose }: { state: GroupState; selected: string | null; ownTag: number; onChoose(id: string): void }) {
-  const [name, setName] = useState("");
-  return <div className="chat-groups">
-    <h2><T id="chat.groups" /></h2>
-    {state.error && <p className="form-status bad" role="alert"><T id="chat.groupFailed" /> <button type="button" className="text-link" onClick={() => { void state.reload(); }}><T id="chat.retry" /></button></p>}
-    <ul className="chat-peers-list">{state.groups.map((g) => <li key={g.id}><button type="button" aria-current={selected === g.id ? "true" : undefined} onClick={() => onChoose(g.id)}><bdi>{g.name}</bdi></button></li>)}</ul>
-    {state.invites.length > 0 && <>
-      <h3><T id="chat.groupInvites" /></h3>
-      <ul className="chat-invite-list">{state.invites.map((i) => <li key={i.group}>
-        <div className="chat-invite-head"><bdi>{i.name}</bdi><small><bdi>{handleOf(i.inviter)}</bdi></small></div>
-        <div className="action-row">
-          <button type="button" className="button button-sm" disabled={state.busy} onClick={() => { void state.change(i.group, { change: "join" }).then((ok) => { if (ok !== false) onChoose(i.group); }); }}><T id="social.accept" /></button>
-          <button type="button" className="button button-ghost button-sm" disabled={state.busy} onClick={() => { void state.change(i.group, { change: "withdraw", tag: ownTag }); }}><T id="social.decline" /></button>
-        </div>
-      </li>)}</ul>
-    </>}
-    <form onSubmit={(event) => { event.preventDefault(); void state.create(name).then((id) => { if (typeof id === "string") { setName(""); onChoose(id); } }); }}>
-      <label htmlFor="new-group-name"><T id="chat.groupName" /></label>
-      <input id="new-group-name" value={name} maxLength={96} disabled={state.busy} onChange={(event) => setName(event.target.value)} required />
-      <button type="submit" className="button button-ghost button-sm" disabled={state.busy || name.trim().length === 0 || [...name].length > 48 || state.groups.length + state.invites.length >= 20}><T id="chat.groupCreate" /></button>
-    </form>
-  </div>;
-}
-
-export function GroupSettings({ group, ownTag, friends, state }: { group: Group; ownTag: number; friends: Person[]; state: GroupState }) {
+export function GroupSettings({ group, ownTag, friends, state, onClose }: { group: Group; ownTag: number; friends: Person[]; state: GroupState; onClose(): void }) {
+  const lang = useLang();
   const [name, setName] = useState(group.name);
   const [invite, setInvite] = useState("");
   const [confirm, setConfirm] = useState<{ change: GroupChange; person?: Person } | null>(null);
   const owner = group.members.some((m) => m.owner && m.person.tag === ownTag);
   const available = friends.filter((p) => !group.members.some((m) => m.person.tag === p.tag) && !group.invited.some((i) => i.tag === p.tag));
-  return <details className="chat-group-settings"><summary><T id="chat.groupManage" /> · {group.members.length}/50</summary>
+  return <section id="chat-group-settings" className="chat-group-settings" aria-labelledby="chat-group-settings-head">
+    <header className="chat-drawer-head">
+      <h3 id="chat-group-settings-head" className="chat-side-head"><T id="chat.groupManage" /> <span className="chat-count num">{group.members.length}/50</span></h3>
+      <button type="button" className="chat-icon-button" onClick={onClose} aria-label={t(lang, "app.close")} title={t(lang, "app.close")}><Icon name="close" /></button>
+    </header>
     <div className="chat-group-body">
       {owner && <form className="chat-inline-form" onSubmit={(event) => { event.preventDefault(); void state.change(group.id, { change: "rename", name }); }}>
         <label htmlFor="group-name"><T id="chat.groupName" /></label>
@@ -44,8 +27,11 @@ export function GroupSettings({ group, ownTag, friends, state }: { group: Group;
           <button type="submit" className="button button-ghost button-sm" disabled={state.busy || name.trim().length === 0 || [...name].length > 48}><T id="chat.groupRename" /></button>
         </div>
       </form>}
-      <ul>{group.members.map((m) => <li key={m.person.tag}><bdi>{handleOf(m.person)}</bdi>{m.owner && <span className="pill gold"><T id="chat.groupOwner" /></span>}
-        {owner && m.person.tag !== ownTag && <div className="action-row"><button type="button" className="button button-ghost button-sm" disabled={state.busy} onClick={() => setConfirm({ change: { change: "transfer", tag: m.person.tag }, person: m.person })}><T id="chat.groupTransfer" /></button><button type="button" className="button button-danger button-sm" disabled={state.busy} onClick={() => setConfirm({ change: { change: "remove", tag: m.person.tag }, person: m.person })}><T id="chat.groupRemove" /></button></div>}
+      <ul className="chat-people">{group.members.map((m) => <li key={m.person.tag} className="chat-person"><span className="chat-person-main"><Avatar name={m.person.displayName} seed={String(m.person.tag)} size="sm" /><span className="chat-person-name"><bdi translate="no">{handleOf(m.person)}</bdi></span>{m.owner && <span className="pill gold"><T id="chat.groupOwner" /></span>}</span>
+        {owner && m.person.tag !== ownTag && <Menu label={`${t(lang, "social.more")}: ${handleOf(m.person)}`}>
+          <button type="button" disabled={state.busy} onClick={() => setConfirm({ change: { change: "transfer", tag: m.person.tag }, person: m.person })}><T id="chat.groupTransfer" /></button>
+          <button type="button" className="bad" disabled={state.busy} onClick={() => setConfirm({ change: { change: "remove", tag: m.person.tag }, person: m.person })}><T id="chat.groupRemove" /></button>
+        </Menu>}
       </li>)}</ul>
       <form className="chat-inline-form" onSubmit={(event) => { event.preventDefault(); const tag = Number(invite); if (!available.some((p) => p.tag === tag)) return; void state.change(group.id, { change: "invite", tag }).then((ok) => { if (ok !== false) setInvite(""); }); }}>
         <label htmlFor="group-invite"><T id="chat.groupInvite" /></label>
@@ -54,7 +40,7 @@ export function GroupSettings({ group, ownTag, friends, state }: { group: Group;
           <button type="submit" className="button button-ghost button-sm" disabled={state.busy || invite === "" || group.members.length + group.invited.length >= 50}><T id="chat.groupInvite" /></button>
         </div>
       </form>
-      {group.invited.length > 0 && <><h3><T id="chat.groupInvites" /></h3><ul>{group.invited.map((p) => <li key={p.tag}><bdi>{handleOf(p)}</bdi>{owner && <button type="button" className="button button-ghost button-sm" disabled={state.busy} onClick={() => { void state.change(group.id, { change: "withdraw", tag: p.tag }); }}><T id="social.cancel" /></button>}</li>)}</ul></>}
+      {group.invited.length > 0 && <><h3 className="chat-side-head"><T id="chat.groupInvites" /></h3><ul className="chat-people">{group.invited.map((p) => <li key={p.tag} className="chat-person"><span className="chat-person-main"><Avatar name={p.displayName} seed={String(p.tag)} size="sm" /><span className="chat-person-name"><bdi translate="no">{handleOf(p)}</bdi></span></span>{owner && <button type="button" className="button button-ghost button-sm" disabled={state.busy} onClick={() => { void state.change(group.id, { change: "withdraw", tag: p.tag }); }}><T id="social.cancel" /></button>}</li>)}</ul></>}
       <div className="action-row">
         <button type="button" className="button button-danger button-sm" disabled={state.busy} onClick={() => setConfirm({ change: owner ? { change: "delete" } : { change: "remove", tag: ownTag } })}><T id={owner ? "chat.groupDelete" : "chat.groupLeave"} /></button>
       </div>
@@ -64,5 +50,5 @@ export function GroupSettings({ group, ownTag, friends, state }: { group: Group;
       <p><T id={confirm.change.change === "delete" ? "chat.groupDeleteConfirm" : confirm.change.change === "transfer" ? "chat.groupTransferConfirm" : "chat.groupRemoveConfirm"} /></p>
       {state.error && <p role="alert"><T id="chat.groupFailed" /></p>}
     </Confirm>}
-  </details>;
+  </section>;
 }

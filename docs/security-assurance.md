@@ -2376,3 +2376,54 @@ controls include every repeated hex digit and both stopwords; a separate batch o
 scanning are unchanged, and neither scanner configuration gains an exemption.
 The actual scanner, including these controls and both repository scans, passes.
 Source: [pinned Gitleaks rules](https://github.com/gitleaks/gitleaks/blob/v8.30.1/config/gitleaks.toml).
+
+## The chat unlocked by the sign-in, 3 November 2026
+
+Design pass. The owner asked that a signed-in page's chat work without asking
+for the password again. Assets: the chat identity derived from the master key,
+the plaintext the page shows, the password. Caller trust: the page's own sign-in
+(OPAQUE, `__Host-central`). Options weighed: keeping a derived key at rest in the
+browser (localStorage, IndexedDB, also under a non-extractable WebCrypto key)
+would leave the chat key readable to whoever holds the browser profile after
+sign-out, and `docs/central-chat.md` keeps only encrypted peer trust at rest; a
+key split with Central needs a new protocol operation and a WebAssembly rebuild.
+Chosen: the sign-in's Worker, which opens the master key anyway, keeps the chat
+identity instead of discarding it (`chat_unlock` in place of `login_confirm`),
+and the page keeps that Worker for the sign-in's life. No new protocol, no new
+stored secret, the committed WebAssembly unchanged. Invariant: the chat is
+unlocked only by a password proven in this page, and closed when the sign-in
+ends; a reload asks once.
+
+Implementation pass:
+- `chat_unlock` consumes the sign-in exactly as `login_confirm` does and fails
+  the same way on a wrapper that does not open; the sign-in then fails as
+  `mismatch` and ends the new session. Accounts without a recovery code keep
+  `recovery_create`; an account without a tag keeps `login_confirm`.
+- The Worker leaves the flow only after `chat_unlock` answered; the flow's
+  `close` then no longer terminates it, and nothing of the sign-in's protocol
+  reaches it again (`account/crypto-worker.ts` answers the account protocol by
+  `op` and the chat's by `id`; the chat refuses the sign-in steps).
+- `chat/held.ts` keeps one chat, by account: another account's is never handed
+  out; another account's sign-in closes it; a same-account reauthentication
+  keeps the open one and closes the new Worker. `AccountProvider` locks it when
+  the session ends for any reason, including a sign-out in another tab.
+- The peer trust is restored as its own step after the unlock: a damaged
+  record fails the chat's start closed (no registration, no inbox, no seal)
+  without failing the sign-in, and a retry does not restore twice.
+- Before its start the session neither sends nor reads. The five-minute hidden
+  lock and the page-hide lock are gone: the keys live as long as the page and
+  its session, which a reader of the page's memory holds anyway.
+- The held chat keeps types only from the chat, so the first page's bundle
+  does not grow by the chat's code.
+
+Adversarial pass: unit tests for the Worker handover (closing the flow leaves
+the chat's Worker, closing the chat ends it), the sign-in keeping a chat only
+on success, the same-account and other-account cases, the start without a
+password (restore, register, own keys, inbox), damaged trust, Central's refusal
+at the start, a tab hidden for an hour, and the unread state. The e2e mock now
+answers the chat and the groups in their exact shapes with a stand-in Worker:
+a sign-in reaches the chat with no password field, a message goes out and its
+answer comes back, the contacts tab answers a request, and after a reload a
+wrong password is refused before the right one unlocks. Not run here: the real
+WebAssembly against a real Central (its `chat_unlock` and steps are the same
+exports the chat page used before). Engineering review, not an audit.

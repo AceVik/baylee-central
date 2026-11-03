@@ -34,6 +34,22 @@ async function kind(p: Promise<unknown>): Promise<string> {
 }
 
 describe("the crypto Worker's client", () => {
+  it("hands its Worker to the chat after `chatUnlock`, so that closing the flow leaves it running", async () => {
+    const registration = { ik: "b", dk: "c", dsig: "d", label: "Browser" };
+    const w = new FakeWorker((r) => (r.op === "chat_unlock" ? { op: r.op, device: "a".repeat(16), registration } : { op: "error", error: "failed" }));
+    const c = workerCrypto(() => w as unknown as Worker);
+    const chat = await c.chatUnlock?.(new Uint8Array(73), 0x3fa2);
+    expect(w.sent[0]).toEqual({ op: "chat_unlock", wrappedMaster: new Uint8Array(73), tag: 0x3fa2 });
+    expect(chat?.device).toBe("a".repeat(16));
+    expect(chat?.registration).toEqual(registration);
+    c.close();
+    expect(w.terminated).toBe(false);
+    // the flow is over: nothing more of it reaches the Worker
+    expect(await kind(c.loginStart("synthetic", ID))).toBe("failed");
+    chat?.crypto.close();
+    expect(w.terminated).toBe(true);
+  });
+
   it("sends the password and identity, and returns the module's bytes", async () => {
     const w = new FakeWorker((r) => (r.op === "login_start" ? { op: r.op, message: new Uint8Array(96) } : { op: "login_confirm" }));
     const c = workerCrypto(() => w as unknown as Worker);
