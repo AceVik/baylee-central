@@ -45,9 +45,6 @@ pub fn gateway_directory(
             transport.endpoint().origin().starts_with("http://"),
         )?;
         gateway.metadata.validate(&gateway.origin)?;
-        if let Some(stats) = &gateway.stats {
-            stats.validate()?;
-        }
         previous = Some(gateway.id);
     }
     Ok(gateways)

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isUuidV7, uuidBytes, uuidText, validGatewayStats, validMetadata, validOrigin } from "../../src/central/validate";
+import { isUuidV7, uuidBytes, uuidText, validMetadata, validOrigin } from "../../src/central/validate";
 import { idBytes } from "../fixtures/directory";
 
 describe("ids", () => {
@@ -76,50 +76,5 @@ describe("origins and metadata", () => {
     expect(validMetadata({ ...ok, name: "é".repeat(40) }, "https://g.invalid")).toBe(true);
     expect(validMetadata({ ...ok, version: "1.0 beta" }, "https://g.invalid")).toBe(false);
     expect(validMetadata({ ...ok, version: "x".repeat(65) }, "https://g.invalid")).toBe(false);
-  });
-
-  it("validates gateway telemetry and enforces privacy levels", () => {
-    const base = {
-      privacy: "full",
-      running_games: 2,
-      open_tables: 1,
-      players_online: 8,
-      players_in_lobby: 2,
-      players_at_table: 2,
-      players_in_game: 4,
-      spectators: 0,
-      ai_opponents: 1,
-      games_completed_today: 12,
-      hidden_players: 2,
-      tables: [
-        {
-          format: "Free-for-all",
-          seats_occupied: 4,
-          seats_total: 4,
-          ai_seats: 1,
-          clock: "Standard (60s)",
-          turn: 6,
-          spectators: 0,
-          private_table: false,
-        },
-      ],
-      players: [
-        {
-          handle: "Maren#4f12",
-          state: "in_game",
-          context: "Table 1 · Free-for-all (Turn 6)",
-          games_today: 3,
-        },
-      ],
-    };
-    expect(validGatewayStats(base)).toBe(true);
-    expect(validGatewayStats({ ...base, privacy: "counts_only" })).toBe(false);
-    expect(validGatewayStats({ ...base, privacy: "counts_only", tables: [], players: [] })).toBe(true);
-    expect(
-      validGatewayStats({
-        ...base,
-        tables: [{ ...base.tables[0], seats_occupied: 5 }],
-      }),
-    ).toBe(false);
   });
 });

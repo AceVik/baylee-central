@@ -146,7 +146,6 @@ export function parseRepo(raw: unknown): Repo | null {
 }
 
 export const CI_PATH = "/actions/workflows/ci.yml/runs?branch=main&event=push&status=completed&per_page=1";
-export const RELEASE_CI_PATH = "/actions/workflows/release.yml/runs?event=push&status=completed&per_page=1";
 export const COMMIT_PATH = "/commits?sha=main&per_page=1";
 export const RELEASES_PATH = "/releases?per_page=6";
 

@@ -5,7 +5,7 @@
 // each in its own name. Over the start page's hero it is clear; once the
 // page moves, or on any other page, it frosts.
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 import { useAccount } from "../account/session";
 import { DISCORD } from "../config";
@@ -127,23 +127,33 @@ function LangSwitch() {
   const choose = useChooseLang();
   const [menuOpen, setMenuOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
+  const mainRef = useRef<HTMLButtonElement>(null);
+  const menuId = useId();
   const switcherLabel = OFFERED.map(wordOf).join(" / ");
 
+  // the list closes on a press outside, on Escape and on a choice (the
+  // keyboard back on the switch), and when the keyboard leaves it
   useEffect(() => {
-    if (!menuOpen) return;
+    const wrap = wrapRef.current;
+    if (!menuOpen || wrap === null) return;
     const onPointerDown = (e: PointerEvent) => {
-      if (e.target instanceof Node && !wrapRef.current?.contains(e.target)) {
-        setMenuOpen(false);
-      }
+      if (e.target instanceof Node && !wrap.contains(e.target)) setMenuOpen(false);
     };
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setMenuOpen(false);
+      if (e.key !== "Escape") return;
+      setMenuOpen(false);
+      mainRef.current?.focus();
+    };
+    const onFocusOut = (e: FocusEvent) => {
+      if (e.relatedTarget instanceof Node && !wrap.contains(e.relatedTarget)) setMenuOpen(false);
     };
     document.addEventListener("pointerdown", onPointerDown);
     document.addEventListener("keydown", onKeyDown);
+    wrap.addEventListener("focusout", onFocusOut);
     return () => {
       document.removeEventListener("pointerdown", onPointerDown);
       document.removeEventListener("keydown", onKeyDown);
+      wrap.removeEventListener("focusout", onFocusOut);
     };
   }, [menuOpen]);
 
@@ -154,11 +164,13 @@ function LangSwitch() {
     <div className="lang-split-wrap" ref={wrapRef}>
       <fieldset className="lang-split" aria-label={switcherLabel}>
         <button
+          ref={mainRef}
           type="button"
           className="lang-main"
           lang={tagOf(lang)}
-          aria-haspopup="true"
           aria-expanded={menuOpen}
+          aria-controls={menuId}
+          aria-label={switcherLabel}
           onClick={() => setMenuOpen((o) => !o)}
           title={`${currentName} (${currentCode}) — ${switcherLabel}`}
         >
@@ -166,12 +178,12 @@ function LangSwitch() {
           <span className="lang-code">{currentCode}</span>
           <span className="lang-current-name">{currentName}</span>
         </button>
+        {/* the same switch for the pointer; the keyboard has the one before it */}
         <button
           type="button"
           className="lang-split-toggle"
-          aria-haspopup="true"
-          aria-expanded={menuOpen}
-          aria-label={switcherLabel}
+          tabIndex={-1}
+          aria-hidden="true"
           title={switcherLabel}
           onClick={() => setMenuOpen((o) => !o)}
         >
@@ -179,7 +191,7 @@ function LangSwitch() {
         </button>
       </fieldset>
       {menuOpen && (
-        <div className="lang-menu">
+        <div id={menuId} className="lang-menu">
           <ul className="lang-menu-list">
             {OFFERED.map((l) => {
               const active = lang === l;
@@ -196,6 +208,7 @@ function LangSwitch() {
                     onClick={() => {
                       choose(l);
                       setMenuOpen(false);
+                      mainRef.current?.focus();
                     }}
                   >
                     <LangFlag lang={l} />

@@ -44,7 +44,6 @@ function Column({ head, children }: { head: Key; children: ReactNode }) {
 
 export function Footer() {
   const lang = useLang();
-  const de = lang === "de";
 
   return (
     <footer className="foot">
@@ -58,9 +57,7 @@ export function Footer() {
               <T id="baylee.dedication" />
             </p>
             <p className="foot-summary">
-              {de
-                ? "Freies, quelloffenes Tabletop-Kartenspiel in Rust & Bevy – mit deterministischer Regel-Engine, lokalem Offline-Modus, Haus-KI, LLM-Anbindung und Community-Gateways."
-                : "Free, open-source tabletop card game built in Rust & Bevy — with a deterministic rules engine, full offline mode, House AI, LLM bridge, and community gateways."}
+              <T id="foot.summary" />
             </p>
             <div className="foot-social">
               <a className="foot-social-pill" href={DISCORD} target="_blank" rel="noopener">
@@ -187,7 +184,6 @@ export function Footer() {
             <div className="foot-badges" aria-hidden="true">
               <span className="foot-badge">AGPL-3.0</span>
               <span className="foot-badge">Rust &amp; Bevy</span>
-              <span className="foot-badge">{de ? "DSGVO-konform" : "GDPR-compliant"}</span>
             </div>
           </div>
         </div>

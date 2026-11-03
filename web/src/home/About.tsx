@@ -15,7 +15,6 @@ const LLM_PROVIDERS = [
 
 export function About() {
   const lang = useLang();
-  const de = lang === "de";
 
   return (
     <Section id="about" eyebrow={<T id="about.eyebrow" />} title={<T id="about.title" />}>
@@ -89,7 +88,7 @@ export function About() {
                 <Icon name="chip" />
               </span>
               <span className="pill">
-                {de ? "Offline & Online" : "Offline & Online"}
+                <T id="ai.housePill" />
               </span>
             </div>
             <h3>
@@ -113,16 +112,13 @@ export function About() {
             <p>
               <T id="ai.model" />
             </p>
-            <div
-              className="ai-provider-badges"
-              aria-label={de ? "Unterstützte Sprachmodelle" : "Supported language models"}
-            >
+            <ul className="ai-provider-badges" aria-label={t(lang, "ai.providers")}>
               {LLM_PROVIDERS.map((p) => (
-                <span key={p} className="ai-provider-chip">
+                <li key={p} className="ai-provider-chip">
                   {p}
-                </span>
+                </li>
               ))}
-            </div>
+            </ul>
           </div>
 
           <div className="ai-card glass">
@@ -131,18 +127,14 @@ export function About() {
                 <Icon name="server" />
               </span>
               <span className="pill">
-                {de ? "Für Gateway-Hosts" : "For Gateway Hosts"}
+                <T id="ai.hostsPill" />
               </span>
             </div>
             <h3>
-              {de
-                ? "LLM-Spieler als Gateway-Host anbieten"
-                : "Offer Hosted LLM Seats on Your Gateway"}
+              <T id="ai.hostsTitle" />
             </h3>
             <p>
-              {de
-                ? "Als Gateway-Betreiber kannst du vorkonfigurierte Sprachmodelle direkt auf deinem Server bereitstellen. Deine Gäste wählen am Tisch einfach eines deiner gehosteten Modelle als Mitspieler aus – ganz ohne eigenen API-Key."
-                : "As a gateway operator, you can provide pre-configured language models directly on your server. Guests at a table simply pick one of your hosted models as an opponent—with no API key needed."}
+              <T id="ai.hosts" />
             </p>
           </div>
         </div>
@@ -151,17 +143,13 @@ export function About() {
           <div className="ai-training-badge-col">
             <span className="pill ok ai-training-pill">
               <span className="dot ok live" aria-hidden="true" />
-              {de ? "Aktuell im Training · Native Engine-KI" : "In Training · Native Engine AI"}
+              <T id="ai.trainingPill" />
             </span>
             <h3>
-              {de
-                ? "Eigene Baylee AI – trainiert für echtes Spiel direkt auf der Engine"
-                : "Native Baylee AI — trained to play directly on the engine like a real player"}
+              <T id="ai.trainingTitle" />
             </h3>
             <p>
-              {de
-                ? "Parallel zur Haus-KI und der externen LLM-Anbindung wird aktuell eine eigene Baylee AI direkt auf der deterministischen Regel-Engine trainiert. Sie lernt, komplexe Spielzustände, Prioritätsfenster, Kampfreihenfolgen und Deck-Synergien wie ein erfahrener menschlicher Spieler einzuschätzen – ganz ohne externe API-Latenzen."
-                : "Alongside the House AI and external LLM bridge, a dedicated native Baylee AI is actively being trained directly on the deterministic rules engine. It learns to evaluate board states, priority windows, combat math, and deck synergies like an experienced human player—with zero external API latency."}
+              <T id="ai.training" />
             </p>
           </div>
           <div className="ai-training-actions">
@@ -179,7 +167,7 @@ export function About() {
             <Link className="button button-ghost" to={`${PATHS.gateways}#selfhost`}>
               <Icon name="server" />
               <span>
-                {de ? "Gateway-Hosting & LLM-Setup" : "Gateway Hosting & LLM Setup"}
+                <T id="ai.hostingLink" />
               </span>
             </Link>
           </div>

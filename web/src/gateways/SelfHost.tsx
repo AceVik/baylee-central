@@ -50,11 +50,8 @@ cargo build --release -p baylee-gateway \\
   -p baylee-agent -p baylee-engine-server
 
 export BAYLEE_AGENT_TOKEN=$(openssl rand -hex 32)
-export BAYLEE_CENTRAL_TOKEN="bgt_..." # sso + listing
-export BAYLEE_CENTRAL_PRIVACY="full"  # full | counts_only | private
-
-BAYLEE_GATEWAY_NAME="My table" ./target/release/baylee-gateway
-./target/release/baylee-agent`}
+RUST_LOG=info BAYLEE_GATEWAY_NAME="My table" ./target/release/baylee-gateway
+RUST_LOG=info ./target/release/baylee-agent`}
             </code>
           </pre>
           <p className="small">

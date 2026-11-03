@@ -97,7 +97,8 @@ test.describe("accounts", () => {
     await openMenu(page, phone);
     await expect(page.getByRole("navigation", { name: "Sections" }).getByRole("link", { name: "Sign in" })).toBeVisible();
 
-    const accountOperations = central.operations.filter((op) => op !== "notifications");
+    // the start page reads the public gateway directory too; that is no account's operation
+    const accountOperations = central.operations.filter((op) => op !== "notifications" && op !== "gateway_directory");
     expect(central.operations.filter((op) => op === "notifications")).toHaveLength(2);
     expect(accountOperations.slice(0, 10)).toEqual([
       "register",

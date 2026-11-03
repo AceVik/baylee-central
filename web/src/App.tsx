@@ -142,18 +142,15 @@ export function App() {
   const page = pageAt(location.pathname);
   const main = useRef<HTMLElement>(null);
   const shownPath = useRef<string | null>(null);
-  const hash = useRef(location.hash);
-  useEffect(() => {
-    hash.current = location.hash;
-  });
 
   // the old site's links to one set (`/#set-lea`) live on at /cards
   useEffect(() => {
     if (page === "home" && location.hash.startsWith("#set-")) navigate(`/cards${location.hash}`, true);
   }, [page, location.hash]);
 
-  // a new page starts at its top (or its anchor), and the keyboard and a
-  // screen reader start at its main content
+  // a new page starts at its top (or its anchor), also on the first load, and
+  // the keyboard and a screen reader start at its main content; leaving an
+  // anchor on the same page (the brand from /#gateways) goes back to the top
   const { pathname, hash: currentHash } = location;
   useEffect(() => {
     try {
@@ -172,10 +169,9 @@ export function App() {
     const id = currentHash.slice(1);
     if (!isFirst && !samePath) main.current?.focus({ preventScroll: true });
     if (id === "") {
-      if (samePath && !isFirst) return;
       const scrollTopNow = () => {
         if (typeof window.scrollTo !== "function") return;
-        if ( isFirst && window.scrollY === 0 && document.documentElement.scrollTop === 0) return;
+        if (isFirst && window.scrollY === 0 && document.documentElement.scrollTop === 0) return;
         try {
           window.scrollTo({ top: 0, left: 0, behavior: "instant" });
         } catch {
