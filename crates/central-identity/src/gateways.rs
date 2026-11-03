@@ -81,7 +81,10 @@ impl IdentityService {
             Request::GatewayDirectory { after } => Ok(Response::GatewayDirectory {
                 gateways: self.store.gateway_directory(after).await?,
             }),
-            Request::GatewayHeartbeat { metadata } => {
+            Request::GatewayHeartbeat { metadata, stats } => {
+                if let Some(stats) = &stats {
+                    stats.validate()?;
+                }
                 self.heartbeat(&metadata, bearer).await?;
                 Ok(Response::Done)
             }

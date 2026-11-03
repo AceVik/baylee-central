@@ -83,6 +83,10 @@
   --warn: #f0c076;
   --untested: #8fcfe0;
   --bad: #f39c92;
+  /* the feedback section's 30-day chart: two series, checked for colour
+     vision and against the panel (the dataviz validator, 31.10.2026) */
+  --chart-reports: #6f8ae8;
+  --chart-crashes: #e0665a;
   --off: #93a0bb;
   --veil-top: rgba(8, 14, 28, 0.30);
   --veil-mid: rgba(11, 19, 34, 0.55);
@@ -91,7 +95,9 @@
   --mist: rgba(190, 210, 240, 0.10);
   --shadow: 0 24px 50px -30px rgba(0, 0, 0, 0.75);
   --shadow-lift: 0 30px 60px -28px rgba(0, 0, 0, 0.85), 0 0 0 1px var(--edge);
-  --top-bg: rgba(14, 25, 43, 0.92);
+  --bar-shadow-top: 0 10px 24px -8px rgba(0, 0, 0, 0.62), 0 2px 6px rgba(0, 0, 0, 0.36);
+  --bar-shadow-stats: 0 12px 28px -10px rgba(0, 0, 0, 0.68), 0 3px 8px rgba(0, 0, 0, 0.34);
+  --top-bg: rgba(14, 25, 43, 0.94);
   --code-bg: #0a1222;
   --code-ink: #e6ebf5;
   --kbd-bg: #1b2740;
@@ -128,6 +134,8 @@
     --warn: #8a5a05;
     --untested: #1f6f6a;
     --bad: #a1332a;
+    --chart-reports: #1b7fae;
+    --chart-crashes: #b8402f;
     --off: #5d6779;
     --veil-top: rgba(222, 231, 244, 0.40);
     --veil-mid: rgba(232, 238, 247, 0.74);
@@ -136,7 +144,9 @@
     --mist: rgba(255, 255, 255, 0.22);
     --shadow: 0 24px 50px -30px rgba(20, 30, 60, 0.38);
     --shadow-lift: 0 30px 60px -28px rgba(20, 30, 60, 0.45), 0 0 0 1px var(--edge);
-    --top-bg: rgba(251, 248, 236, 0.94);
+    --bar-shadow-top: 0 8px 20px -8px rgba(20, 38, 45, 0.22), 0 2px 5px rgba(20, 38, 45, 0.12);
+    --bar-shadow-stats: 0 10px 24px -10px rgba(20, 38, 45, 0.24), 0 3px 7px rgba(20, 38, 45, 0.12);
+    --top-bg: rgba(251, 248, 236, 0.96);
     --code-bg: #233e43;
     --kbd-bg: #e3e8f1;
     --field-bg: rgba(255, 255, 255, 0.9);
@@ -171,6 +181,8 @@
   --warn: #8a5a05;
   --untested: #1f6f6a;
   --bad: #a1332a;
+  --chart-reports: #1b7fae;
+  --chart-crashes: #b8402f;
   --off: #5d6779;
   --veil-top: rgba(222, 231, 244, 0.40);
   --veil-mid: rgba(232, 238, 247, 0.74);
@@ -179,7 +191,9 @@
   --mist: rgba(255, 255, 255, 0.22);
   --shadow: 0 24px 50px -30px rgba(20, 30, 60, 0.38);
   --shadow-lift: 0 30px 60px -28px rgba(20, 30, 60, 0.45), 0 0 0 1px var(--edge);
-  --top-bg: rgba(251, 248, 236, 0.94);
+  --bar-shadow-top: 0 8px 20px -8px rgba(20, 38, 45, 0.22), 0 2px 5px rgba(20, 38, 45, 0.12);
+  --bar-shadow-stats: 0 10px 24px -10px rgba(20, 38, 45, 0.24), 0 3px 7px rgba(20, 38, 45, 0.12);
+  --top-bg: rgba(251, 248, 236, 0.96);
   --code-bg: #233e43;
   --kbd-bg: #e3e8f1;
   --field-bg: rgba(255, 255, 255, 0.9);

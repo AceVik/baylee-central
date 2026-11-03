@@ -36,9 +36,10 @@ const LOAD = {
   adminUsers: () => import("./admin/UsersPage"),
   adminUser: () => import("./admin/UserPage"),
   adminGateways: () => import("./admin/GatewaysPage"),
-  adminReports: () => import("./admin/ReportsPage"),
   adminAudit: () => import("./admin/AuditPage"),
   adminLegacy: () => import("./admin/LegacyPage"),
+  adminFeedback: () => import("./admin/feedback/FeedbackPage"),
+  adminReport: () => import("./admin/feedback/ReportPage"),
 } satisfies Record<Exclude<Page, "home">, () => Promise<unknown>>;
 
 const Download = lazy(LOAD.download);
@@ -59,9 +60,10 @@ const AdminOverview = lazy(LOAD.admin);
 const AdminUsers = lazy(LOAD.adminUsers);
 const AdminUser = lazy(LOAD.adminUser);
 const AdminGateways = lazy(LOAD.adminGateways);
-const AdminReports = lazy(LOAD.adminReports);
 const AdminAudit = lazy(LOAD.adminAudit);
 const AdminLegacy = lazy(LOAD.adminLegacy);
+const AdminFeedback = lazy(LOAD.adminFeedback);
+const AdminReport = lazy(LOAD.adminReport);
 
 // a link pointed at or focused fetches its page's code ahead, unless the
 // visitor asked their browser to save data
@@ -122,12 +124,14 @@ function PageView({ page }: { page: Page | null }) {
       return <AdminUser />;
     case "adminGateways":
       return <AdminGateways />;
-    case "adminReports":
-      return <AdminReports />;
     case "adminAudit":
       return <AdminAudit />;
     case "adminLegacy":
       return <AdminLegacy />;
+    case "adminFeedback":
+      return <AdminFeedback />;
+    case "adminReport":
+      return <AdminReport />;
     case null:
       return <NotFound />;
   }
@@ -149,17 +153,40 @@ export function App() {
   }, [page, location.hash]);
 
   // a new page starts at its top (or its anchor), and the keyboard and a
-  // screen reader start at its main content; the first load keeps the
-  // browser's own scroll restoration
-  const { pathname } = location;
+  // screen reader start at its main content
+  const { pathname, hash: currentHash } = location;
+  useEffect(() => {
+    try {
+      if ("scrollRestoration" in window.history) {
+        window.history.scrollRestoration = "manual";
+      }
+    } catch {
+      // ignore if unsupported
+    }
+  }, []);
+
   useEffect(() => {
     const isFirst = shownPath.current === null;
-    if (shownPath.current === pathname) return;
+    const samePath = shownPath.current === pathname;
     shownPath.current = pathname;
-    const id = hash.current.slice(1);
-    if (!isFirst) main.current?.focus({ preventScroll: true });
+    const id = currentHash.slice(1);
+    if (!isFirst && !samePath) main.current?.focus({ preventScroll: true });
     if (id === "") {
-      if (!isFirst) window.scrollTo(0, 0);
+      if (samePath && !isFirst) return;
+      const scrollTopNow = () => {
+        if (typeof window.scrollTo !== "function") return;
+        if ( isFirst && window.scrollY === 0 && document.documentElement.scrollTop === 0) return;
+        try {
+          window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+        } catch {
+          window.scrollTo(0, 0);
+        }
+      };
+      scrollTopNow();
+      if (isFirst) {
+        const raf = requestAnimationFrame(scrollTopNow);
+        return () => cancelAnimationFrame(raf);
+      }
       return;
     }
     // a set's link is the card status's to follow (it opens the set first)
@@ -169,12 +196,12 @@ export function App() {
     let tries = 0;
     const find = () => {
       const target = document.getElementById(id);
-      if (target) target.scrollIntoView({ behavior: reducedMotion() || isFirst ? "auto" : "smooth" });
+      if (target) target.scrollIntoView({ behavior: reducedMotion() ? "auto" : "smooth", block: "start" });
       else if (tries++ < 120) frame = requestAnimationFrame(find);
     };
     find();
     return () => cancelAnimationFrame(frame);
-  }, [pathname]);
+  }, [pathname, currentHash]);
 
   useReveal(main);
 

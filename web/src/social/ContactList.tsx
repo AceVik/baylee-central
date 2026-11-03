@@ -10,7 +10,10 @@ export function ContactList({ items, busy, onChange }: { items: Contact[]; busy:
     const contacts = items.filter((c) => c.relation === relation);
     if (contacts.length === 0) return null;
     return <section key={relation} className="card app-panel">
-      <h2><T id={WORDS[relation]} /> <span className="num">({contacts.length})</span></h2>
+      <div className="app-panel-head">
+        <h2 className="app-panel-title"><T id={WORDS[relation]} /></h2>
+        <span className="pill num">{contacts.length}</span>
+      </div>
       <ul className="social-contacts">{contacts.map(({ person }) => <li key={person.tag} className="social-row">
         <bdi translate="no">{handleOf(person)}</bdi>
         <div className="social-actions">

@@ -18,6 +18,7 @@ interface Source {
 }
 
 let sets: Promise<SetsDoc> | null = null;
+let loadedSets: SetsDoc | null = null;
 let source: Source | null = null;
 const cardsBySet = new Map<string, Promise<Card[]>>();
 
@@ -49,12 +50,19 @@ async function load(): Promise<SetsDoc> {
 }
 
 export function loadSets(): Promise<SetsDoc> {
-  sets ??= load();
+  sets ??= load().then((doc) => {
+    loadedSets = doc;
+    return doc;
+  });
   // a failure may be asked again later
   sets.catch(() => {
     sets = null;
   });
   return sets;
+}
+
+export function peekSets(): SetsDoc | null {
+  return loadedSets;
 }
 
 export function loadCards(code: string): Promise<Card[]> {
@@ -77,6 +85,7 @@ export function loadCards(code: string): Promise<Card[]> {
 /** For tests: forget what was fetched. */
 export function forgetLoaded(): void {
   sets = null;
+  loadedSets = null;
   source = null;
   cardsBySet.clear();
 }

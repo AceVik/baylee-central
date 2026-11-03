@@ -23,7 +23,7 @@ export function Logo({
         width={960}
         height={400}
         alt={alt}
-        decoding="async"
+        decoding={priority === true ? "sync" : "async"}
         loading={lazy === true ? "lazy" : "eager"}
         fetchPriority={priority === true ? "high" : "auto"}
       />

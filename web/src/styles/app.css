@@ -116,7 +116,7 @@
 /* the administration's first view: a grid of calm tiles, a count each,
    the one that asks for attention in the state colour and in words */
 .stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: var(--space-4); }
-.stat { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-5); }
+.stats .stat, .card.stat { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-5); }
 .stat-label { margin: 0; font: 700 var(--text-xs) var(--sans); letter-spacing: 0.16em; text-transform: uppercase; color: var(--violet); }
 .stat-n { margin: 0; font: 600 var(--text-xl) var(--serif); line-height: 1.05; color: var(--title); font-variant-numeric: tabular-nums lining-nums; }
 .stat-sub { margin: 0; flex: 1; color: var(--ink-soft); }
@@ -126,7 +126,8 @@
 .stat-skeleton { min-height: 11rem; }
 
 /* a value with a copy button beside it (src/app/Copy.tsx) */
-.copyable { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-2); max-width: 100%; }
+.copyable { display: inline-flex; align-items: center; gap: var(--space-2); max-width: 100%; min-width: 0; }
+.copyable > code { min-width: 0; overflow-wrap: anywhere; }
 .copy-btn { width: 44px; height: 44px; flex: none; }
 .copy-btn .icon { width: 1.05em; height: 1.05em; }
 .copy-btn[data-copied] { color: var(--ok); border-color: var(--ok); }
@@ -134,5 +135,8 @@ code.address { overflow-wrap: anywhere; }
 
 /* the steps of hosting, folded away once a gateway is registered */
 .steps-more { font-family: var(--sans); }
-.steps-more > summary { display: inline-flex; align-items: center; min-height: 44px; cursor: pointer; color: var(--link); font-weight: 700; }
+.steps-more > summary { display: inline-flex; align-items: center; gap: var(--space-2); min-height: 44px; cursor: pointer; color: var(--link); font-weight: 700; list-style: none; }
+.steps-more > summary::-webkit-details-marker { display: none; }
+.steps-more > summary::before { content: "▸"; color: var(--ink-faint); transition: transform var(--dur-fast) ease; }
+.steps-more[open] > summary::before { transform: rotate(90deg); }
 .steps-more > summary:hover { color: var(--link-hover); }

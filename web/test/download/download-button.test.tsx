@@ -2,7 +2,7 @@
 // browser this test runs in, whose user agent names the host's system
 // (jsdom writes "linux" on a Linux runner and "darwin" on a Mac).
 
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { DownloadButton } from "../../src/download/DownloadButton";
@@ -62,5 +62,13 @@ describe("the download button", () => {
   it("points to the releases page while GitHub has not answered", () => {
     show(state(LINUX, null));
     expect(screen.getByRole("link", { name: "Download Baylee" }).getAttribute("href")).toBe("https://github.com/AceVik/baylee/releases");
+  });
+
+  it("shows version and architecture inside the button and opens the quick-access dropdown", () => {
+    const { container } = show(state(LINUX));
+    expect(container.querySelector(".dl-btn-badge")?.textContent).toContain("x64");
+    const toggle = screen.getByRole("button", { name: "Quick-select other systems and architectures" });
+    fireEvent.click(toggle);
+    expect(container.querySelectorAll(".dl-menu-link").length).toBeGreaterThan(1);
   });
 });

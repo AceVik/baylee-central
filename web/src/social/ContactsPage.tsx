@@ -22,8 +22,8 @@ function Contacts({ api, ownTag }: { api: SocialApi; ownTag: number }) {
   return <>
     <FindContact api={api} ownTag={ownTag} busy={busy} onAdd={(tag) => change(tag, "request")} />
     {error && <Failed reason="social.failed" onRetry={() => { void reload(); }} />}
-    {items === null ? !error && <output><T id="app.loading" /></output>
-      : items.length === 0 ? <p className="app-empty"><T id="social.empty" /></p>
+    {items === null ? !error && <output className="card app-panel app-skeleton skeleton"><span className="vh"><T id="app.loading" /></span></output>
+      : items.length === 0 ? <div className="card app-panel app-empty"><p><T id="social.empty" /></p></div>
       : <ContactList items={items} busy={busy} onChange={act} />}
     {confirm !== null && <Confirm title={<bdi translate="no">{handleOf(confirm.person)}</bdi>} action={confirm.change === "block" ? "social.block" : "social.remove"}
       busy={busy} onCancel={() => { if (!busy) setConfirm(null); }} onConfirm={() => { if (!busy) void change(confirm.person.tag, confirm.change).then((ok) => { if (ok) setConfirm(null); }); }}>
@@ -39,8 +39,8 @@ export default function ContactsPage({ client }: { client?: SocialApi }) {
   const [api] = useState(() => client ?? socialApi());
   return <AppFrame page="accountContacts" admin={state.at === "ready" && state.summary.admin} eyebrow="app.account" title={<T id="social.title" />} lead={<T id="social.lead" />}>
     {state.at === "signedOut" ? <SignedOut /> : state.at === "failed" ? <Failed onRetry={reload} />
-      : state.at === "loading" ? <output><T id="app.loading" /></output>
-      : state.summary.tag === null || state.summary.displayName === null ? <p><Link to={PATHS.account}><T id="social.profileNeeded" /></Link></p>
+      : state.at === "loading" ? <output className="card app-panel app-skeleton skeleton"><span className="vh"><T id="app.loading" /></span></output>
+      : state.summary.tag === null || state.summary.displayName === null ? <div className="card app-panel app-empty"><p><Link to={PATHS.account}><T id="social.profileNeeded" /></Link></p></div>
       : <Contacts key={`${state.summary.identity.account.join()}:${generation}`} api={api} ownTag={state.summary.tag} />}
   </AppFrame>;
 }

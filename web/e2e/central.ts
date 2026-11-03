@@ -17,7 +17,8 @@ import type { Page, Request, Route } from "@playwright/test";
 
 import { csp } from "../scripts/csp.ts";
 
-import { adminAnswer, areaState, ownerAnswer, type AreaState } from "./area.ts";
+import { adminAnswer, areaState, ownerAnswer, socialAnswer, type AreaState } from "./area.ts";
+import { reportPart, reportShape, reportsState } from "./reports.ts";
 
 export const KEY = "CENTRAL-TEST-0000-0000-0001";
 export const PASSWORD = "violet lantern harbour quietly";
@@ -51,6 +52,7 @@ const FIELDS: Readonly<Record<string, readonly string[]>> = {
   notifications: ["request"],
   set_recovery: ["recovery"],
   set_display_name: ["display_name"],
+  social: ["request"],
   owner: ["request"],
   admin: ["request"],
 };
@@ -158,6 +160,8 @@ export async function mockCentral(page: Page, origin: string, opts: Options = {}
     signedInAt = Math.floor(Date.now() / 1000) - 600;
   }
   const area: AreaState | null = opts.area === undefined ? null : areaState(opts.area.admin);
+  // the signed-in administrator is the session's account (`ACCOUNT`), as Central's reports name it
+  if (area !== null) area.reports = reportsState(area.reports.admins.map((a, i) => (i === 0 ? { ...a, id: ACCOUNT } : a)));
   const tickets = new Map<string, { name: string; displayName: string }>();
   let attempt: string | null = null;
   const terms = opts.terms ?? null;
@@ -290,12 +294,15 @@ export async function mockCentral(page: Page, origin: string, opts: Options = {}
         m.accepted = { version: version.version, digest: body["digest"] as number[] };
         return json(route, { result: "done" });
       }
+      case "social":
       case "owner":
       case "admin": {
         if (m.signedIn === null || area === null) return refuse(route, 401);
         const asked = body["request"] as Record<string, unknown>;
         if (op === "admin" && area.accounts[area.me]?.admin !== true) return refuse(route, 401);
-        const answer = op === "owner" ? ownerAnswer(area, asked) : adminAnswer(area, asked);
+        const wrongReport = op === "admin" ? reportShape(asked) : null;
+        if (wrongReport !== null) return bad(m, wrongReport, route);
+        const answer = op === "social" ? socialAnswer(area, asked) : op === "owner" ? ownerAnswer(area, asked) : adminAnswer(area, asked);
         return typeof answer === "number" ? refuse(route, answer) : json(route, answer);
       }
       case "gateway_directory":
@@ -303,6 +310,21 @@ export async function mockCentral(page: Page, origin: string, opts: Options = {}
         return route.fallback();
     }
     return bad(m, `unhandled ${op}`, route);
+  });
+  // a report's part (crates/central-http browser.rs `report_part`): the same
+  // proofs as `/api/v1`, an empty body, an administrator's session, the gzip as stored
+  await page.route(/\/api\/v1\/reports\/[^/]+\/[^/]+$/, async (route) => {
+    const request = route.request();
+    const wrongHeaders = headersOk(request, origin, await request.allHeaders());
+    if (wrongHeaders !== null) return bad(m, `part: ${wrongHeaders}`, route);
+    if ((request.postData() ?? "") !== "") return bad(m, "part: a body", route);
+    const [, hex = "", part = ""] = /\/reports\/([^/]+)\/([^/]+)$/.exec(new URL(request.url()).pathname) ?? [];
+    m.operations.push(`part:${part}`);
+    if (!/^[0-9a-f]{32}$/.test(hex) || (part !== "client" && part !== "record")) return bad(m, `part: ${hex}/${part}`, route);
+    if (m.signedIn === null || area === null || area.accounts[area.me]?.admin !== true) return refuse(route, 401);
+    const found = reportPart(area.reports, hex, part);
+    if (found === null) return refuse(route, 401);
+    return route.fulfill({ status: 200, headers: { "Content-Type": "application/gzip", "Cache-Control": "no-store", ...(found.origin === null ? {} : { "X-Record-Origin": found.origin }) }, body: found.gzip });
   });
   return m;
 }

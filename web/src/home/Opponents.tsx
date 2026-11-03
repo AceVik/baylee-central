@@ -26,7 +26,7 @@ export function Opponents() {
             <T id="ai.gateway" />
           </p>
           <p className="small">
-            <a href={`${GITHUB}${t(lang, "link.readmeModel")}`} rel="noopener">
+            <a href={`${GITHUB}${t(lang, "link.readmeModel")}`} target="_blank" rel="noopener">
               <T id="ai.setup" />
             </a>
           </p>

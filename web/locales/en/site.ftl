@@ -32,7 +32,7 @@ notFound-back = Back to the start page
 
 ## The tab's title, per page
 
-title-home = Baylee – a table that knows the rules
+title-home = Baylee – Build your decks. Gather your friends. Just play.
 title-download = Download – Baylee
 title-cards = Cards – Baylee
 title-gateways = Gateways – Baylee
@@ -51,6 +51,8 @@ title-adminUser = An account – Administration – Baylee
 title-adminGateways = Gateways – Administration – Baylee
 title-adminAudit = Audit log – Administration – Baylee
 title-adminLegacy = Legacy accounts – Administration – Baylee
+title-adminFeedback = Feedback – Administration – Baylee
+title-adminReport = A report – Administration – Baylee
 title-notFound = Not found – Baylee
 
 ## The footer. The Fan Content Policy's notice is Wizards' own wording: the
@@ -99,90 +101,134 @@ ci-failing = failing
 
 ## The start page
 
-hero-kicker = Closed beta · free · open source · unofficial fan content
-hero-title = A table that <glow>knows the rules.</glow>
-hero-lead = Baylee is a rules engine and a 3D table for playing Magic: The Gathering with friends or against the house AI. The engine enforces the Comprehensive Rules, so nobody has to. Free, open source under the AGPL, and it stays that way.
-hero-note = Plays offline against the house AI without an account. Online play on the Sanctuary gateway is a closed beta and needs a key.
-hero-what = What Baylee is
+hero-kicker = Beta · Open Source · Forever Free · Unofficial Fan Content
+hero-title = Build your decks. Gather your friends. <glow>Just play.</glow>
+hero-lead = Craft your decks in a comprehensive deck builder and jump into matches with up to 8 players at once—in duels, free-for-all, or team games. Full rules validation keeps every turn fair and effortless, completely free, open source, and never behind a paywall.
+hero-note = Full offline mode for solo matches and the deck builder—play right away without an account, or <selfhost>host your own gateways for your playgroup</selfhost> anytime.
+hero-signup = New to online play? <register>Create an account</register> or <signin>sign in</signin>.
+hero-what = Discover Baylee
 hero-cards = Where the cards stand
+hero-github = GitHub
+hero-discord = Discord Community
+hero-whatsapp = WhatsApp Community
 hero-scroll = Scroll down
 
 status-label = Project status
-status-build = Latest build
+status-build = Build
 status-releases = see releases
-status-ci = CI on main
+status-releaseCi = Release tests
+status-ci = CI
 status-onGitHub = see on GitHub
 status-commit = Last commit
+status-views = Views
+status-users = Users
+status-onlineUsers = signed in
+status-registered = registered
 status-gateways = Gateways
+status-online = online
+status-offline = offline
 status-directory = the directory
+status-games = Games
+status-running = running
+status-openTables = open
+status-inLobby = lobby
+status-atTable = table
+status-inGame = playing
+status-spectating = watching
+status-detailsBtn = Live gateway & table context
+status-panelTitle = Live Gateway Telemetry & Table Context (GDPR-compliant)
+status-privacyBadge = GDPR-compliant anonymized
+status-privacyNote = For data protection (GDPR), only anonymized aggregate counts and table formats are shown publicly. Individual player handles are only visible to authorized administrators.
+status-secPresence = Anonymized Player Presence (GDPR)
+status-secTables = Running Games & Table Settings
+status-kpiLobby = In lobby
+status-kpiTable = At table
+status-kpiInGame = In game
+status-kpiSpectators = Spectators
+status-kpiAi = AI / model seats
+status-kpiToday = Games today
+status-playersList = Aggregated distribution by area
+status-playersNone = No players with public status right now.
+status-hiddenCount = { $n } active players (identities protected under GDPR)
+status-tablesNone = No active public tables reported right now.
+status-tablePrivate = Private table (settings hidden by gateway)
+status-tableTurn = Turn { $n }
+status-tableWaiting = Seating
+status-tableSeats = { $occ }/{ $total } seats
+status-tableAi = +{ $n } AI
+status-tableSpec = { $n } watching
+status-playerToday = { $n } today
+status-privacyFull = Full context
+status-privacyCounts = Counts only
+status-privacyPrivate = Private
 
 about-eyebrow = What it is
-about-title = Two halves, one game
-about-engineTitle = An engine that enforces the game
-about-engine = Priority and the stack, the layer system, replacement effects, triggers, state-based actions and combat: the engine applies the Comprehensive Rules and lists, at every step, exactly the choices a player has. The client offers those and nothing else. It never decides what is legal.
-about-deterministic = It is deterministic: a seeded random-number generator, no clock and no hash-map order in the rules, so the same game with the same answers always ends the same way. Every hosted game is recorded move by move and can be replayed to the same state, which is also what a bug report carries.
-about-tableTitle = A 3D table built with Bevy
-about-table = Battlefield, hands, stack and graveyards on a table you can read at a glance, plus a lobby for accounts, decks and rooms. Card images come from Scryfall while you play; a text view draws every card from its rules text instead, and <kbd>T</kbd> switches between the two.
-about-keys = You can play with the mouse or entirely from the keyboard: <kbd>Space</kbd> passes, <kbd>Tab</kbd> fast-forwards to the next phase while every decision stays yours, <kbd>L</kbd> opens a game log that reads like a chat. Every key can be rebound.
+about-title = Complete Rules Engine & Clear 3D Table
+about-engineTitle = An engine that enforces every rule
+about-engine = Priority, the stack, layers, replacement effects, triggers, state-based actions, and combat: the Rust engine applies the complete ruleset and computes the exact legal choices at every step. The client presents only those valid actions.
+about-deterministic = Powered by a seeded random generator with zero wall-clock or hash-order dependencies, every match is strictly deterministic and reproducible move by move.
+about-tableTitle = A clean 3D table built with Bevy
+about-table = Battlefield, hands, stack, exile, and graveyards on an uncluttered 3D table with clear combat lines and instant card previews. Card art streams from Scryfall while you play, or switches to a crisp oracle-text view anytime.
+about-keys = From the integrated lobby you move effortlessly between the local deck builder, solo matches, and multiplayer tables on community gateways.
 
-feature-hiddenTitle = Hidden information stays hidden
-feature-hidden = Your client is sent only what you may see. Libraries and other hands arrive as counts, a face-down card carries no identity. A modified client cannot peek, because the data never reaches it.
-feature-seatsTitle = Two to eight seats
-feature-seats = Duels, free-for-all and team tables. The host puts chairs on sides, and the sides need not be even. Teams keep separate turns and life totals; teammates can choose to show each other their hands.
-feature-commanderTitle = Commander and freeform
-feature-commander = A deck that names a commander plays Commander; any other deck plays freeform. Banlists and format-legality checks do not exist yet. That is a gap, not a feature.
-feature-aiTitle = A house AI at five levels
-feature-ai = Novice, casual, steady, sharp and expert. It plays from the same view a human gets, so it cannot see your hand either.
-feature-processTitle = One process per game
-feature-process = Each game runs in its own engine process. The gateway that handles accounts and rooms runs no rules at all, so one broken game is one broken game.
+feature-hiddenTitle = Hidden information stays private
+feature-hidden = Your client receives only the data your seat is allowed to see. Libraries and opponents' hands arrive strictly as counts—even a modified client cannot inspect hidden cards.
+feature-seatsTitle = Up to eight players at one table
+feature-seats = Duels, free-for-all, and team matches (such as 2v2) for up to 8 seats. Teammates share turns and can reveal their hand cards to one another.
+feature-commanderTitle = Flexible formats & custom house rules
+feature-commander = Assemble decks for classic 60-card duels, multiplayer rings, or custom house formats. Starting life totals, team layouts, and mulligan rules are freely set by the host.
+feature-aiTitle = Deterministic replays & F8 reports
+feature-ai = Every match is recorded move by move. If you spot a rules interaction issue during play, press F8 right at the table to send a reproducible state report.
+feature-processTitle = Isolated server process per match
+feature-process = Every active game runs in its own sandboxed engine process on the gateway. The gateway itself only manages lobby and rooms—an error never affects other tables.
 feature-languagesTitle = Card text in 19 languages
-feature-languages = When the gateway carries the card catalog, cards read in your language with English as the fallback. The interface itself is in English and German.
-feature-watchTitle = Watch a running table
-feature-watch = The lobby's Watch button seats you as a spectator. You see what the whole table sees and nobody's hand. A host can switch spectators off for a room.
-feature-connectionTitle = A lost connection is not a lost game
-feature-connection = When a player drops, the table shows a countdown while their chair waits for them. If time runs out, the house AI plays for them until they are back; with nobody else at the table, the game simply pauses.
-feature-tablesTitle = Tables your way
-feature-tables = A Mixed table seats decks of any format together, and fourteen decision clocks run from a 15-second bullet to untimed. Starting life and mulligans are the host's to set.
+feature-languages = Whenever a gateway provides the multilingual card catalog, cards read in your preferred language with English as fallback. The client UI is available in German and English.
+feature-watchTitle = Spectate live matches
+feature-watch = The lobby's Watch button seats you at the table as a live spectator: follow the public battlefield in real time while all player hands remain hidden.
+feature-connectionTitle = Seamless reconnect on drop
+feature-connection = If a connection drops briefly, the table holds the seat with a countdown and can pause the match or let the House AI step in temporarily.
+feature-tablesTitle = Fourteen decision clocks
+feature-tables = From brisk 15-second turns to relaxed untimed tables, configure the pace individually for every room.
 
 shots-eyebrow = At the table
-shots-title = What it looks like
-shots-lead = These pictures are short recordings of the game, with Scryfall's card images (© Wizards of the Coast). They were made with 0.1.0-beta.8b on a local test gateway, with made-up players.
+shots-title = Inside the game
+shots-lead = Short live recordings captured directly from the 3D client with card images from Scryfall (© Wizards of the Coast)—from duels and 4-player rings to the encrypted lobby and deck builder.
 shots-credit = Card images: Scryfall · © Wizards of the Coast
 shots-showLarge = Show large: { $title }
 shots-dialog = Screenshot
 shots-previous = Previous
 shots-next = Next
 shot-duelAlt = A duel against the house AI: six creatures attack, three are blocked, and the blocked ones go to the graveyard
-shot-duelTitle = A duel
-shot-duelCaption = against the house AI. Six creatures attack and three are blocked; the lines show who fights whom.
+shot-duelTitle = Tactical duel
+shot-duelCaption = against the house AI: six creatures attack and three are blocked—clear combat lines show every assignment at a glance.
 shot-logAlt = A duel with the game log open: a land, Raging Goblin and Storm Seeker on the stack, a player chosen as the target, the log filling
-shot-logTitle = The game log
-shot-logCaption = (L) reads like a chat and writes down every move; every card name opens its preview.
+shot-logTitle = Interactive game log
+shot-logCaption = documents every step like a structured chat; clicking any card name immediately opens its full preview.
 shot-ringAlt = A four-seat table in a ring around the felt; a card on each of three other boards is shown large
-shot-ringTitle = Four seats.
-shot-ringCaption = Larger tables sit in a ring around the felt; pointing at a card shows it large.
+shot-ringTitle = Multiplayer ring table.
+shot-ringCaption = Larger tables with up to 8 seats arrange cleanly around the battlefield—complete with instant card zoom on hover.
 shot-lobbyAlt = The lobby: a friend's whisper and her table invitation arrive, then the private chat opens
-shot-lobbyTitle = The lobby.
-shot-lobbyCaption = Open tables, your friends and where they are; a whisper and a table invitation arrive, and the encrypted chat opens.
+shot-lobbyTitle = Lobby & encrypted chat.
+shot-lobbyCaption = Browse open tables, see active friends and their status, send direct table invitations, and chat end-to-end encrypted.
 shot-roomAlt = A room being arranged: three empty chairs go to the house AI at three levels
-shot-roomTitle = Arranging a table.
-shot-roomCaption = The host gives empty chairs to the house AI, each at its own level, or to another player or a language model.
+shot-roomTitle = Flexible table seating.
+shot-roomCaption = Combine human players, the heuristic house AI across five skill levels, and connected or gateway-hosted language models at the same table.
 shot-builderAlt = The deck builder: typing angel serra narrows the pool, Serra Angel is shown large, and it goes into the deck
-shot-builderTitle = The deck builder.
-shot-builderCaption = A search over the whole pool narrows as you type; pointing at a card shows it large, and it goes into the deck, grouped by type.
+shot-builderTitle = Comprehensive deck builder.
+shot-builderCaption = Search the entire card pool in real time, filter by types and mana cost, and assemble your decks ready for play.
 
-ai-eyebrow = Opponents
-ai-title = Opponents: the house, or a language model
-ai-houseTitle = The house AI
-ai-house = Five levels from novice to expert, available offline and at any online table. It plays from the same view a human gets, so hidden information stays hidden from it too. It is a heuristic player, not a trained one: good enough to learn a deck against, not a tournament opponent.
-ai-modelTitle = A chair for a language model
-ai-model = A seat bridge lets a model sit at the table as an ordinary player: a local model in LM Studio, one behind an OpenAI-compatible or Anthropic API, or an agent CLI on your own login. API keys never go in a file; a settings file names the environment variable they come from, and daily and monthly spending caps hold across games. When the model times out or answers something illegal, the house answers that question and the transcript says so.
-ai-gateway = At a gateway table the host seats one from the room: any open chair offers <i>language model</i> on a desktop client, which starts the bridge (it ships beside the game) with your own settings and key. Where the gateway's operator runs hosted models, a registered host can also pick one of those instead, and it plays on the operator's machine, so no key or bridge is needed on yours.
-ai-setup = How to set it up
+ai-eyebrow = AI Opponents & Language Models
+ai-title = House AI, LLM Bridge & Native Baylee AI
+ai-houseTitle = Heuristic House AI in five skill levels
+ai-house = Ready to play offline and at any online table: choose between Novice, Casual, Steady, Sharp, and Expert. The House AI decides locally with zero wait time and sees only the same public state as a human player.
+ai-modelTitle = Language models at the table via Seat-Bridge
+ai-model = Seat <b>Google Gemini, OpenAI ChatGPT, Anthropic Claude, DeepSeek</b>, or local models via <b>LM Studio</b> right at your table. API keys stay protected in environment variables with spending caps; on timeouts, the House AI steps in seamlessly.
+ai-gateway = <b>Host LLM Seats on Your Gateway & Native Baylee AI:</b> Gateway operators can offer pre-configured LLM seats directly on their server so guests can play against language models without their own API key. Meanwhile, a <b>native Baylee AI</b> is in training to play directly on the engine like a human player.
+ai-setup = LLM & Seat-Bridge setup guide
 
 beta-eyebrow = Online
-beta-title = The closed beta
-beta-sanctuary = The public gateway, <b>Baylee Sanctuary</b>, is where online tables live. It is a closed beta: you play there with a Baylee account, which you create on this site with a key of the form <code>CENTRAL-XXXX-XXXX-XXXX-XXXX</code>, handed out by the project owner.
+beta-title = The beta
+beta-sanctuary = The public gateway, <b>Baylee Sanctuary</b>, is where online tables live in the beta (preparing for the open beta): you play there with a Baylee account, which you create on this site with a key of the form <code>CENTRAL-XXXX-XXXX-XXXX-XXXX</code>, handed out by the project owner.
 beta-signup = Signing up asks for no e-mail address: an account is a username and a password, and only you see the username. On a gateway, other players see a display name and a short tag. For now an account is deleted on request, through the contact in the legal notice.
 beta-keys = Keys come from the project owner, <owner>@AceVik</owner> on GitHub. Without one, Baylee still plays offline against the house AI, with the deck builder and your own decks, and you can run a gateway of your own for your group.
 beta-listTitle = Every gateway, in one list
@@ -195,6 +241,7 @@ source-title = Open source, and it stays that way
 source-promise = Baylee will always be open source and free. No paywall, no paid features, no ads. Not now, not later. The code is under the GNU Affero General Public License, which means anyone who runs a modified gateway for other people must offer them its source too.
 source-rust = It is written in Rust, one person's project with a lot of help from coding agents, and every change goes through the same gate: formatting, lints, the test suite, and a validation of every card against its printed text. Issues and pull requests are welcome; <agents>AGENTS.md</agents> and <claude>CLAUDE.md</claude> are the working rules for people and agents alike.
 source-discord = Community on Discord
+source-whatsapp = Community on WhatsApp
 source-architecture = Architecture
 source-repoTitle = The repository right now
 source-stars = Stars
@@ -206,6 +253,7 @@ source-note = Read from GitHub's public API when the page loads, cached in this 
 dl-button = Download Baylee
 dl-fallbackMeta = Windows · macOS (Apple silicon) · Linux. The latest release is on GitHub.
 dl-for = Download for { $system }
+dl-quickAccess = Quick-select other systems and architectures
 dl-signature = signature
 dl-notes = release notes
 dl-others = other systems
@@ -419,13 +467,13 @@ gw-openHint = Opens the Baylee client on this gateway, once your client knows ga
 gw-copyShort = Copy
 gw-cardLabel = Gateway { $name }
 
-selfhost-eyebrow = Self-hosting
+selfhost-eyebrow = Self-hosting & Central Integration
 selfhost-title = Run your own gateway
-selfhost-processes = You do not need our server. A gateway is three kinds of process: <code>baylee-gateway</code> handles accounts, decks, rooms and routing and needs PostgreSQL; <code>baylee-agent</code> starts one engine process per game; <code>baylee-engine-server</code> is one game. The first two run no rules at all.
-selfhost-proxy = Put a TLS proxy in front, set <code>BAYLEE_REGISTRATION=invite</code> if you want your own closed circle, create keys with <code>baylee-gateway invite create</code>, and the client's front door takes your address like any other. Card text in 19 languages is an optional ingest of Scryfall's bulk data into the same database.
-selfhost-guide = <guide>The self-hosting guide</guide> walks through it; <protocol>docs/protocol.md</protocol> is the reference.
-selfhost-central = To sign your players in with their Baylee Central accounts and to appear in this list: register your gateway's address under <mine>Your gateways</mine>, wait for an administrator's approval, make a token there and paste it into your gateway's admin console, under Baylee Central.
-selfhost-source = Every gateway answers <code>GET /source</code> with its licence, version and commit, without sign-in. The AGPL asks you to offer your source to the people who use your server; that route does it for you.
+selfhost-processes = A self-hosted gateway runs three lightweight processes alongside PostgreSQL 18+: <code>baylee-gateway</code> manages rooms, decks, and routing; <code>baylee-agent</code> spawns one isolated <code>baylee-engine-server</code> process per match so every table is sandboxed.
+selfhost-proxy = Put a TLS reverse proxy in front of your HTTPS origin (e.g. <code>https://play.example.org</code>), optionally import Scryfall's bulk catalog for card text in 19 languages, and players can connect directly via your address in the client.
+selfhost-guide = <guide>Read the complete self-hosting guide</guide> · <protocol>Protocol & heartbeat reference (docs/protocol.md)</protocol>
+selfhost-central = <b>Link with Baylee Central & configure privacy:</b> Register your HTTPS origin under <mine>Your gateways</mine> and mint a <code>bgt_…</code> token (scopes: <code>sso</code> for single sign-on, <code>listing</code> for directory heartbeats & live telemetry). In your gateway's console, choose your telemetry privacy level (<code>full</code> for running games, table settings & opted-in players, <code>counts_only</code> for totals only, or <code>private</code> for liveness only).
+selfhost-source = Every gateway answers <code>GET /source</code> with its licence, version and commit without sign-in, fulfilling the AGPL source-disclosure requirement automatically.
 
 ## Contact
 
@@ -811,6 +859,8 @@ copy-id = Copy the id
 app-adminGateways = Gateways
 app-audit = Audit log
 app-legacy = Legacy accounts
+app-feedback = Feedback
+app-unread = unread
 app-signedOut = Sign in to Baylee Central to see this page.
 app-cancel = Cancel
 app-reauthTitle = Confirm with your password
@@ -925,6 +975,16 @@ ov-adminsGo = Audit log
 ov-legacy = Left to move
 ov-legacySub = Accounts of the official gateway that have not moved yet, until { $day }.
 ov-legacyGo = Legacy accounts
+ov-reports = Open reports
+ov-reportsCrashes =
+
+    { $n ->
+        [one] One new crash waits for you.
+       *[other] { $n } new crashes wait for you.
+    }
+ov-reportsCalm = No new crash. Bugs, ideas and feedback from the players.
+ov-reportsGo = Triage reports
+ov-crashesGo = New crashes
 adm-accounts = Accounts
 adm-search = Search
 adm-searchHint = Name, or #3fa2
@@ -1154,3 +1214,470 @@ adm-reportsPrevious = Previous page
 pwa-installLead = Install Baylee for quick access to your chats and contacts.
 pwa-install = Install Baylee
 pwa-installFailed = Installation could not be opened. You can try the install option in your browser menu.
+
+fb-title = Feedback
+fb-lead = Bug and crash reports from the players, sent through their gateways. Whoever wrote one is known here only by a pseudonym.
+fb-reportTitle = A report
+fb-reports = Reports
+fb-refresh = Refresh
+fb-views = Views
+fb-viewInbox = Inbox
+fb-viewOpen = Open
+fb-viewMine = Mine
+fb-viewUnassigned = Unassigned
+fb-viewDone = Done
+fb-viewAll = All
+fb-viewTrash = Trash
+fb-search = Search reports
+fb-searchHint = Words, a crash's message or an id
+fb-filters = Filters
+fb-filtersN =
+
+    { $n ->
+        [one] One filter
+       *[other] { $n } filters
+    }
+fb-status = Status
+fb-kind = Kind
+fb-priority = Priority
+fb-statusNew = New
+fb-statusTriaged = Triaged
+fb-statusInProgress = In progress
+fb-statusResolved = Resolved
+fb-statusWontFix = Won't fix
+fb-statusDuplicate = Duplicate
+fb-kindBug = Bug
+fb-kindImprovement = Improvement
+fb-kindFeedback = Feedback
+fb-kindCrash = Crash
+fb-kindOther = Other
+fb-prioCritical = Critical
+fb-prioHigh = High
+fb-prioNormal = Normal
+fb-prioLow = Low
+fb-prioNone = No priority
+fb-assignee = Assignee
+fb-anyone = Anyone
+fb-any = Any
+fb-nobody = Nobody
+fb-me = Me
+fb-label = Label
+fb-labels = Labels
+fb-gateway = Gateway
+fb-channel = Way in
+fb-channelGateway = Through a gateway
+fb-channelDirect = Direct
+fb-record = Record
+fb-withRecord = With a record
+fb-withoutRecord = Without a record
+fb-reporter = Reporter
+fb-from = From
+fb-to = To
+fb-sort = Order
+fb-ascending = ascending
+fb-descending = descending
+fb-sortReceived = Received
+fb-sortChanged = Last changed
+fb-sortPriority = Priority
+fb-sortStatus = Status
+fb-sortKind = Kind
+fb-sortReporter = Reporter
+fb-sortGateway = Gateway
+fb-sortBy = , sort by this column
+fb-onlyUnread = Only reports I have not opened
+fb-activeFilters = Active filters
+fb-removeFilter = Remove this filter
+fb-clearFilters = Clear filters
+fb-crashGroup = Crash group
+fb-duplicatesOf = Duplicates of …{ $id }
+fb-trashHint = A report in the trash is deleted for good after { $days } days.
+fb-errList = Baylee Central refused this list. Clear the filters and try again.
+fb-none = No report matches.
+fb-range = { $from }–{ $to } of { $total }
+fb-unreadHere = { $n } unread
+fb-colReport = Report
+fb-colReceived = Received
+fb-colKind = Kind
+fb-colStatus = Status
+fb-colPriority = Priority
+fb-colAssignee = Assignee
+fb-colGateway = Gateway
+fb-colReporter = Reporter
+fb-unread = Unread
+fb-noText = (no text)
+fb-notes = Notes
+fb-notesN =
+
+    { $n ->
+        [one] One note
+       *[other] { $n } notes
+    }
+fb-dupOf = duplicate of …{ $id }
+fb-recordMark = record { $size }
+fb-byClientShort = client
+fb-newTab = (opens in a new tab)
+fb-drawer = The report beside the list
+fb-openPage = Open its page
+fb-closeDrawer = Close the report
+fb-pages = Pages
+fb-prevPage = Previous page
+fb-nextPage = Next page
+fb-pageOf = Page { $n } of { $total }
+fb-pageSize = Per page
+fb-onlyBy = Only reports by { $who }
+fb-onlyLabel = Only reports labelled { $label }
+fb-undo = Undo
+fb-dismiss = Dismiss
+fb-statusSet = Status set to { $status }.
+fb-prioritySet = Priority set to { $priority }.
+fb-assignMe = Assign to me
+fb-assignedSaid = Assigned to { $name }.
+fb-unassignedSaid = Assigned to nobody.
+fb-removeLabel = Remove the label { $label }
+fb-addLabel = Add label
+fb-labelHint = such as ui or rules
+fb-labelsSet = Labels saved.
+fb-badLabel = A label is 1 to 32 lowercase letters, digits and dashes.
+fb-duplicateOf = Duplicate of
+fb-notDuplicate = Not a duplicate
+fb-duplicateCleared = No longer a duplicate.
+fb-markDuplicate = Duplicate of another report
+fb-duplicateHint = Its id or its page's address
+fb-mark = Mark
+fb-duplicateSet = Marked as a duplicate.
+fb-badDuplicate = That is not another report's id.
+fb-issue = GitHub issue
+fb-issueLinked = Linked to issue #{ $n }.
+fb-unlink = Unlink
+fb-issueUnlinked = No longer linked to an issue.
+fb-issueLabel = Issue number
+fb-issueHint = #311 or the issue's address
+fb-link = Link
+fb-badIssue = That is no issue of Baylee's repository: a number, #number or its address.
+fb-newIssue = File a new issue
+fb-summaryLabel = Your summary
+fb-summaryHint = In your own neutral words: what happens, and where. The issue is public; the report's words, the pseudonym and the client's details stay here.
+fb-category = Category
+fb-summaryFirst = Write the summary first.
+fb-openIssue = Open GitHub's form
+fb-noNotes = No notes yet.
+fb-removeNote = Remove your note of { $time }
+fb-addNote = A note for the administrators
+fb-noteHint = Only administrators read it. Ctrl+Enter saves.
+fb-charsLeft =
+
+    { $n ->
+        [one] One character left
+       *[other] { $n } characters left
+    }
+fb-saveNote = Save note
+fb-noteSaid = Note saved.
+fb-noteRemovedSaid = Note removed.
+fb-hFiled = filed through
+fb-hStatus = status
+fb-hIssue = issue
+fb-hAssignee = assigned to
+fb-hPriority = priority
+fb-hLabels = labels
+fb-hDuplicate = duplicate of
+fb-hTrashed = moved to the trash
+fb-hRestored = restored from the trash
+fb-hPurged = deleted for good
+fb-hNote = note
+fb-hSwept = deleted when its time was up
+fb-hNone = none
+fb-hOriginalGone = none: its original is gone
+fb-hNoteAdded = added
+fb-hNoteRemoved = removed
+fb-hCentral = Baylee Central
+fb-noHistory = No history yet.
+fb-sameCrash = The same crash
+fb-itsDuplicates = Its duplicates
+fb-sameReporter = More from this reporter
+fb-sameKind = Every report of the kind { $kind }
+fb-conflict = Someone else changed this report meanwhile. Here it is as it is now; decide again.
+fb-errRefused = Baylee Central refused this change.
+fb-restoredOne = The report is back from the trash.
+fb-trashedOne = The report is in the trash.
+fb-purgedOne = The report is deleted for good.
+fb-errReport = This report could not be read. It may be gone.
+fb-triage = Triage
+fb-trashNoTriage = A report in the trash is decided once it is restored.
+fb-facts = Where it came from
+fb-received = Received
+fb-changed = Last changed
+fb-callsItself = calls itself
+fb-gatewayBuild = Gateway's build
+fb-clientBuild = Client's build
+fb-game = Game
+fb-recordPart = Record
+fb-noRecord = None
+fb-recordHere = { $size }, written by { $who }, { $end }
+fb-recordAwaited = { $size }, written by { $who }, { $end }: still on its way
+fb-byGateway = the gateway
+fb-byClient = the client (unverified)
+fb-recordComplete = to the game's end
+fb-recordPartial = before the game's end
+fb-clientPart = Client details
+fb-noClient = None
+fb-clientHere = { $size }
+fb-clientAwaited = { $size }, still on its way
+fb-id = Id
+fb-copyId = Copy the id
+fb-copyLink = Copy the page's address
+fb-wrote = What they wrote
+fb-crash = The crash
+fb-related = Belongs with
+fb-history = History
+fb-trash = Trash
+fb-toTrash = Move to the trash
+fb-inTrashSince = In the trash since { $time }. It is deleted for good { $days } days after it went in.
+fb-restore = Restore
+fb-purge = Delete for good
+fb-purgeTitle = Delete this report for good?
+fb-purgeText = Its text, notes, client details and record go now and cannot be brought back. Its history stays, without its words, and its duplicates are opened again.
+fb-purgeGo = Delete for good
+fb-steps = This report in its list
+fb-backToList = Back to the list
+fb-previous = Previous report
+fb-next = Next report
+fb-position = { $n } of { $total }
+fb-notInList = Not in this list
+fb-selection = The selected reports
+fb-selected =
+
+    { $n ->
+        [one] One report selected
+       *[other] { $n } reports selected
+    }
+fb-deselect = Select none
+fb-selectAll = Select every report on this page
+fb-selectOne = Select: { $what }
+fb-setStatus = Set the status
+fb-setPriority = Set the priority
+fb-assignTo = Assign to
+fb-removeLabelAll = Remove a label
+fb-mergeInto = Duplicates of
+fb-markRead = Mark read
+fb-markUnread = Mark unread
+fb-copyIds = Copy their ids
+fb-exportSelected =
+
+    { $n ->
+        [one] Export it as CSV
+       *[other] Export these { $n } as CSV
+    }
+fb-exportAll =
+
+    { $n ->
+        [one] Export it as CSV
+       *[other] Export all { $n } as CSV
+    }
+fb-exported =
+
+    { $n ->
+        [one] One report exported.
+       *[other] { $n } reports exported.
+    }
+fb-idsCopied =
+
+    { $n ->
+        [one] Its id is copied.
+       *[other] { $n } ids copied.
+    }
+fb-linkCopied = The report's address is copied.
+fb-markedRead =
+
+    { $n ->
+        [one] Marked read.
+       *[other] { $n } marked read.
+    }
+fb-markedUnread =
+
+    { $n ->
+        [one] Marked unread.
+       *[other] { $n } marked unread.
+    }
+fb-bulkStatus =
+
+    { $n ->
+        [one] Status set to { $status }.
+       *[other] { $n } reports set to { $status }.
+    }
+fb-bulkPriority =
+
+    { $n ->
+        [one] Priority set to { $priority }.
+       *[other] { $n } reports set to { $priority }.
+    }
+fb-bulkAssigned =
+
+    { $n ->
+        [one] Assigned to { $name }.
+       *[other] { $n } reports assigned to { $name }.
+    }
+fb-bulkMine =
+
+    { $n ->
+        [one] Assigned to you.
+       *[other] { $n } reports assigned to you.
+    }
+fb-bulkUnassigned =
+
+    { $n ->
+        [one] Assigned to nobody.
+       *[other] { $n } reports assigned to nobody.
+    }
+fb-bulkLabelled =
+
+    { $n ->
+        [one] Labelled { $label }.
+       *[other] { $n } reports labelled { $label }.
+    }
+fb-bulkUnlabelled =
+
+    { $n ->
+        [one] Label { $label } removed.
+       *[other] Label { $label } removed from { $n } reports.
+    }
+fb-bulkMerged =
+
+    { $n ->
+        [one] Marked as a duplicate of …{ $id }.
+       *[other] { $n } reports marked as duplicates of …{ $id }.
+    }
+fb-bulkTrashed =
+
+    { $n ->
+        [one] The report is in the trash.
+       *[other] { $n } reports are in the trash.
+    }
+fb-bulkRestored =
+
+    { $n ->
+        [one] The report is back from the trash.
+       *[other] { $n } reports are back from the trash.
+    }
+fb-bulkPurged =
+
+    { $n ->
+        [one] The report is deleted for good.
+       *[other] { $n } reports are deleted for good.
+    }
+fb-purgeManyTitle =
+
+    { $n ->
+        [one] Delete this report for good?
+       *[other] Delete these { $n } reports for good?
+    }
+fb-arrived =
+
+    { $n ->
+        [one] A new report came in.
+       *[other] { $n } new reports came in.
+    }
+fb-showArrived = Show them
+fb-shownAs = Shown as
+fb-asList = List
+fb-asGroups = Crash groups
+fb-groups = Crash groups
+fb-noGroups = No crash in this list.
+fb-colCrash = Crash
+fb-colCount = Reports
+fb-colOpen = Open
+fb-colFirst = First
+fb-colLast = Last
+fb-showGroup = Show its reports
+fb-chart = The last 30 days
+fb-errChart = Baylee Central did not say how many came.
+fb-chartOthers = Other reports: { $n }
+fb-chartCrashes = Crashes: { $n }
+fb-chartDay = { $day }: { $n } reports, { $crashes } of them crashes
+fb-chartTable = As a table
+fb-chartDayHead = Day
+fb-chartOthersHead = Other reports
+fb-chartCrashesHead = Crashes
+fb-savedViews = Saved lists
+fb-errViews = Your saved lists could not be read.
+fb-noViews = No saved list yet. Save this one under a name.
+fb-viewName = A name for this list
+fb-saveView = Save
+fb-viewSaved = Saved as { $name }.
+fb-viewRemoved = { $name } is forgotten.
+fb-removeView = Forget the list { $name }
+fb-viewsFull = You keep { $n } lists, the most there may be. Forget one to save another.
+fb-keysTitle = Keys
+fb-keyMove = the next or previous report; the drawer follows
+fb-keyOpen = open the report beside the list
+fb-keyPage = open the report's own page
+fb-keySelect = select or deselect it
+fb-keySelectAll = select every report on the page, or none
+fb-keyStatus = new, triaged, in progress, resolved, won't fix
+fb-keyMine = assign to me, or to nobody
+fb-keyRead = mark read or unread
+fb-keyTrash = move to the trash, with an undo
+fb-keyPages = the previous or next page
+fb-keySearch = search
+fb-keyRefresh = read the list again
+fb-keyCopy = copy the report's address
+fb-keyExport = export the selection, or the page, as CSV
+fb-keyClose = close the drawer, then the selection
+fb-keyHelp = these keys
+fb-keySteps = the previous or next report of the list
+fb-keysOn = Single keys on this page
+fb-keysWhy = Switched off, only Ctrl+K and the buttons act; that helps with speech input. This browser keeps the choice.
+fb-clientSent = What the client sent
+fb-noClientPart = The client sent no details with this report.
+fb-errClientLarge = The client's details unpack to more than this page reads (16 MiB). Nothing of them is shown.
+fb-errClientShape = The client's details could not be read: they are no gzip of a JSON object.
+fb-noShot = No picture of the window.
+fb-screenshot = The window's picture
+fb-shotAlt = The client's window when the report was written, { $width } × { $height } pixels
+fb-enlarge = Show it large
+fb-gameWhen = In the game
+fb-gameTurn = Turn
+fb-gameOwnTurn = { $n }, the reporter's own
+fb-gameSeatTurn = { $n }, seat { $seat }'s
+fb-gameSeat = Seat
+fb-gameSeatOf = { $seat } of { $n } players
+fb-gamePending = Asked for
+fb-gameNothing = nothing
+fb-backtrace = The backtrace
+fb-log =
+
+    { $n ->
+        [one] The log, one line
+       *[other] The log, { $n } lines
+    }
+fb-system = The system
+fb-sysPlatform = Platform
+fb-sysCpus = Processors
+fb-sysAdapter = Graphics adapter
+fb-sysBackend = Graphics backend
+fb-sysWindow = Window
+fb-sysScale = Scale
+fb-sysLang = Language
+fb-settings = The settings
+fb-everything = Everything it sent, as a tree
+fb-jsonAll = all { $n } characters
+fb-jsonBase64 = ({ $n } characters of base64)
+fb-jsonItems =
+
+    { $n ->
+        [one] one item
+       *[other] { $n } items
+    }
+fb-jsonKeys =
+
+    { $n ->
+        [one] one key
+       *[other] { $n } keys
+    }
+fb-jsonMore = the next { $n } of { $left }
+fb-cardImage = The card { $name }
+fb-scryfall = Picture: Scryfall
+fb-seat = seat { $n }
+fb-downloadRecord = Download the record (.gz)
+fb-downloadClientRecord = Download the client's record (.gz, unverified)
+fb-recordSaved = The record is handed to your browser.
+fb-recordSavedClient = The client's record is handed to your browser. The client wrote it; nobody checked it.

@@ -5,7 +5,7 @@ import { Link, PATHS } from "../router";
 
 const OWNER: Elems = {
   owner: (words) => (
-    <a href="https://github.com/AceVik" rel="noopener">
+    <a href="https://github.com/AceVik" target="_blank" rel="noopener">
       {words}
     </a>
   ),

@@ -16,12 +16,59 @@
 // is untrusted display text: the page renders it as text, never HTML, and
 // links a website only after these checks.
 
-import { compare, isByteArray, isUuidV7, uuidBytes, uuidText, validMetadata, validOrigin } from "./validate";
+import {
+  compare,
+  isByteArray,
+  isUuidV7,
+  uuidBytes,
+  uuidText,
+  validGatewayStats,
+  validMetadata,
+  validOrigin,
+} from "./validate";
 
 export interface GatewayMetadata {
   name: string;
   version: string;
   website: string;
+}
+
+export type GatewayPrivacy = "full" | "counts_only" | "private";
+
+export type PlayerPresenceState = "lobby" | "table" | "in_game" | "spectating";
+
+export interface GatewayPlayerStat {
+  handle: string;
+  state: PlayerPresenceState;
+  context?: string;
+  games_today: number;
+}
+
+export interface GatewayTableSetting {
+  format: string;
+  seats_occupied: number;
+  seats_total: number;
+  ai_seats: number;
+  clock: string;
+  turn?: number;
+  spectators: number;
+  private_table: boolean;
+}
+
+export interface GatewayStats {
+  privacy: GatewayPrivacy;
+  running_games: number;
+  open_tables: number;
+  players_online: number;
+  players_in_lobby: number;
+  players_at_table: number;
+  players_in_game: number;
+  spectators: number;
+  ai_opponents: number;
+  games_completed_today: number;
+  hidden_players: number;
+  tables?: GatewayTableSetting[];
+  players?: GatewayPlayerStat[];
 }
 
 export interface GatewayListing {
@@ -31,6 +78,8 @@ export interface GatewayListing {
   metadata: GatewayMetadata;
   /** Central accepted a heartbeat within the last 90 seconds; no availability guarantee. */
   online: boolean;
+  /** Optional live activity and table telemetry reported by the gateway. */
+  stats?: GatewayStats;
 }
 
 export const PAGE_SIZE = 100;
@@ -64,8 +113,14 @@ export function parsePage(raw: unknown, after: readonly number[] | null, develop
   let previous = after;
   const out: GatewayListing[] = [];
   for (const g of list) {
-    if (!isObject(g) || !exactKeys(g, ["id", "origin", "metadata", "online"])) throw bad();
-    const { id, origin, metadata, online } = g;
+    if (
+      !isObject(g) ||
+      (!exactKeys(g, ["id", "origin", "metadata", "online"]) &&
+        !exactKeys(g, ["id", "origin", "metadata", "online", "stats"]))
+    ) {
+      throw bad();
+    }
+    const { id, origin, metadata, online, stats } = g;
     if (!isByteArray(id) || !isUuidV7(id) || (previous !== null && compare(previous, id) >= 0)) throw bad();
     if (typeof origin !== "string" || !validOrigin(origin, development)) throw bad();
     if (typeof online !== "boolean" || !isObject(metadata) || !exactKeys(metadata, ["name", "version", "website"])) throw bad();
@@ -73,7 +128,10 @@ export function parsePage(raw: unknown, after: readonly number[] | null, develop
     if (typeof name !== "string" || typeof version !== "string" || typeof website !== "string") throw bad();
     const meta = { name, version, website };
     if (!validMetadata(meta, origin)) throw bad();
-    out.push({ id: uuidText(id), origin, metadata: meta, online });
+    if (stats !== undefined && stats !== null && !validGatewayStats(stats)) throw bad();
+    const entry: GatewayListing = { id: uuidText(id), origin, metadata: meta, online };
+    if (stats !== undefined && stats !== null) entry.stats = stats;
+    out.push(entry);
     previous = id;
   }
   return out;

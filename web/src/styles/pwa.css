@@ -1,13 +1,74 @@
-.pwa-notice { display: flex; align-items: center; flex-wrap: wrap; gap: 1rem; margin: 1rem auto; padding: 1rem 1.5rem; max-width: 70rem; border: 1px solid var(--edge-soft); border-radius: 1rem; background: var(--panel); }
-.pwa-notice p { flex: 1 1 18rem; margin: 0; }
-.notification-settings { margin-block: 2rem; padding-block: 1.5rem; border-top: 1px solid var(--edge-soft); }
-.notification-settings fieldset { border: 0; margin: 1.5rem 0; padding: 0; }
-.notification-settings legend { font-weight: bold; margin-bottom: .75rem; }
-.notification-toggle { display: flex; justify-content: space-between; align-items: center; gap: 1rem; min-height: 3rem; max-width: 30rem; border-bottom: 1px solid var(--edge-soft); cursor: pointer; }
-.notification-toggle input { appearance: none; position: relative; flex: 0 0 auto; width: 2.75rem; height: 1.6rem; margin: .5rem 0; border: 1px solid var(--edge); border-radius: var(--pill); background: var(--panel-2); cursor: pointer; }
-.notification-toggle input::before { content: ""; display: block; width: 1.1rem; height: 1.1rem; margin: .18rem; border-radius: 50%; background: var(--ink-faint); transition: transform var(--dur-fast); }
-.notification-toggle input:checked { background: var(--gold); }
+.pwa-notice {
+  position: fixed;
+  inset: auto var(--gutter) max(var(--space-4), env(safe-area-inset-bottom));
+  z-index: 25;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-3) var(--space-5);
+  margin: 0 auto;
+  padding: 0.95rem 1.45rem;
+  width: calc(100% - 2 * var(--gutter));
+  max-width: calc(var(--wrap) - 2 * var(--gutter));
+  box-sizing: border-box;
+  border: 1px solid color-mix(in srgb, var(--gold) 38%, var(--edge));
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--panel-solid) 94%, var(--bg-alt));
+  backdrop-filter: blur(16px) saturate(1.18);
+  -webkit-backdrop-filter: blur(16px) saturate(1.18);
+  box-shadow:
+    0 24px 56px -14px rgba(0, 0, 0, 0.72),
+    0 10px 26px -10px rgba(0, 0, 0, 0.48),
+    inset 0 1px 0 color-mix(in srgb, var(--gold) 24%, transparent);
+  font-family: var(--sans);
+  animation: pwa-notice-enter 420ms var(--ease) both;
+  transition:
+    border-color 260ms ease,
+    box-shadow 260ms ease,
+    background-color 260ms ease;
+}
+.pwa-notice:hover {
+  border-color: var(--gold);
+  box-shadow:
+    0 28px 64px -12px rgba(0, 0, 0, 0.78),
+    0 12px 30px -8px rgba(0, 0, 0, 0.52),
+    inset 0 1px 0 color-mix(in srgb, var(--gold) 38%, transparent);
+}
+@keyframes pwa-notice-enter {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 14px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+.pwa-notice + .pwa-notice { bottom: calc(max(var(--space-4), env(safe-area-inset-bottom)) + 4.75rem); }
+.pwa-notice p { flex: 1 1 20rem; margin: 0; font-size: var(--text-base); color: var(--ink); }
+.notification-settings { scroll-margin-top: calc(var(--top-h) + var(--space-4)); }
+.notification-device {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-4);
+  margin: var(--space-3) 0; padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--edge-soft); border-radius: var(--radius-md); background: var(--panel-solid);
+}
+.notification-device p { margin: 0; flex: 1 1 14rem; }
+.notification-settings fieldset { border: 0; margin: var(--space-4) 0; padding: 0; font-family: var(--sans); }
+.notification-settings legend { font: 700 var(--text-xs) var(--sans); letter-spacing: 0.14em; text-transform: uppercase; color: var(--violet); margin-bottom: var(--space-2); padding: 0; }
+.notification-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr)); gap: 0 var(--space-5); }
+.notification-toggle {
+  display: flex; justify-content: space-between; align-items: center; gap: var(--space-3);
+  min-height: 3.1rem; padding: var(--space-1) 0; border-bottom: 1px solid var(--edge-soft); cursor: pointer;
+}
+.notification-toggle input {
+  appearance: none; position: relative; flex: 0 0 auto; width: 2.75rem; height: 1.6rem; margin: 0.5rem 0;
+  border: 1px solid var(--edge); border-radius: var(--pill); background: var(--panel-2); cursor: pointer;
+  transition: background-color var(--dur-fast) ease, border-color var(--dur-fast) ease;
+}
+.notification-toggle input::before { content: ""; display: block; width: 1.1rem; height: 1.1rem; margin: 0.18rem; border-radius: 50%; background: var(--ink-faint); transition: transform var(--dur-fast) var(--ease), background-color var(--dur-fast) ease; }
+.notification-toggle input:checked { background: var(--gold); border-color: var(--gold); }
 .notification-toggle input:checked::before { background: var(--gold-ink); transform: translateX(1.1rem); }
 .notification-toggle input:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
-.notification-toggle input:disabled { opacity: .5; cursor: wait; }
+.notification-toggle input:disabled { opacity: 0.5; cursor: wait; }
 .report-excerpt { white-space: pre-wrap; overflow-wrap: anywhere; }

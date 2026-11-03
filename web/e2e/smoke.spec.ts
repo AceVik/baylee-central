@@ -12,7 +12,7 @@ test.describe("smoke", () => {
     const errors = watchErrors(page);
     const m = await mock(page);
     await page.goto("/?lang=en");
-    await expect(page.getByRole("heading", { level: 1 })).toHaveText("A table that knows the rules.");
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Build your decks. Gather your friends. Just play.");
     const download = page.locator(".hero .dl .button-big");
     await expect(download).toHaveAttribute("href", /^https:\/\/github\.com\/AceVik\/baylee\/releases\//);
     await expect(page.locator(".hero .dl-meta")).toContainText("v0.1.0-beta.8");
@@ -120,6 +120,7 @@ test.describe("smoke", () => {
     const errors = watchErrors(page);
     const m = await mock(page);
     await page.goto("/contact?lang=en");
+    await page.getByRole("button", { name: "Language / Sprache" }).click();
     await page.getByRole("button", { name: "Deutsch" }).click();
     await expect(page.getByRole("heading", { level: 1 })).toHaveText("Schreib uns");
     await page.getByLabel("Nachricht").fill("Eine synthetische Nachricht.");

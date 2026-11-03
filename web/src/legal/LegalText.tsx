@@ -5,6 +5,7 @@
 // `rel="noopener noreferrer nofollow"`.
 
 import type { ReactNode } from "react";
+import { Link, pageAt } from "../router";
 import { parse, type Block, type Span } from "./markdown";
 
 function spans(list: Span[]): ReactNode[] {
@@ -12,12 +13,16 @@ function spans(list: Span[]): ReactNode[] {
     let node: ReactNode = span.text;
     if (span.italic) node = <em>{node}</em>;
     if (span.bold) node = <strong>{node}</strong>;
-    if (span.href)
-      node = (
+    if (span.href) {
+      const internal = span.href.startsWith("/") && !span.href.startsWith("//") && pageAt(span.href.split(/[?#]/)[0] ?? "") !== null;
+      node = internal ? (
+        <Link to={span.href}>{node}</Link>
+      ) : (
         <a href={span.href} rel="noopener noreferrer nofollow">
           {node}
         </a>
       );
+    }
     return <span key={i}>{node}</span>;
   });
 }

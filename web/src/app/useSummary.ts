@@ -4,7 +4,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { ApiError, type AccountSummary } from "../account/api";
+import { ApiError, type AccountSummary, type Api } from "../account/api";
 import { useAccount } from "../account/session";
 
 /** central-identity's freshness for a change, less a minute's margin for the request on its way. */
@@ -21,9 +21,14 @@ export type SummaryState =
   | { at: "failed" }
   | { at: "ready"; summary: AccountSummary };
 
+const cached = new WeakMap<Api, { owner: number; value: SummaryState }>();
+
 export function useSummary(): { state: SummaryState; reload(): void; replace(summary: AccountSummary): void } {
   const { account, api, generation } = useAccount();
-  const [result, setResult] = useState<{ owner: number; value: SummaryState } | null>(null);
+  const [result, setResult] = useState<{ owner: number; value: SummaryState } | null>(() => {
+    const hit = cached.get(api);
+    return hit?.owner === generation ? hit : null;
+  });
   const lifecycle = useRef({ live: false, owner: generation, request: 0 });
   const present = account !== null;
   const read = useCallback(() => {
@@ -32,11 +37,19 @@ export function useSummary(): { state: SummaryState; reload(): void; replace(sum
     const request = ++scope.request;
     api.accountSummary().then(
       (summary) => {
-        if (scope.live && scope.owner === generation && request === scope.request) setResult({ owner: generation, value: { at: "ready", summary } });
+        if (!scope.live || scope.owner !== generation || request !== scope.request) return;
+        const next: { owner: number; value: SummaryState } = { owner: generation, value: { at: "ready", summary } };
+        cached.set(api, next);
+        setResult(next);
       },
       (error: unknown) => {
         if (!scope.live || scope.owner !== generation || request !== scope.request) return;
-        setResult({ owner: generation, value: error instanceof ApiError && error.kind === "rejected" ? { at: "signedOut" } : { at: "failed" } });
+        const next: { owner: number; value: SummaryState } = {
+          owner: generation,
+          value: error instanceof ApiError && error.kind === "rejected" ? { at: "signedOut" } : { at: "failed" },
+        };
+        cached.set(api, next);
+        setResult(next);
       },
     );
   }, [api, generation]);
@@ -44,15 +57,20 @@ export function useSummary(): { state: SummaryState; reload(): void; replace(sum
     const scope = lifecycle.current;
     scope.owner = generation;
     scope.live = present;
+    if (!present) cached.delete(api);
     if (present) read();
     return () => { scope.live = false; scope.request += 1; };
-  }, [present, read, generation]);
+  }, [api, present, read, generation]);
   const replace = useCallback((summary: AccountSummary) => {
     const scope = lifecycle.current;
     if (!scope.live || scope.owner !== generation) return;
     scope.request += 1;
-    setResult({ owner: generation, value: { at: "ready", summary } });
-  }, [generation]);
-  const state: SummaryState = !present ? { at: "signedOut" } : result?.owner === generation ? result.value : { at: "loading" };
+    const next: { owner: number; value: SummaryState } = { owner: generation, value: { at: "ready", summary } };
+    cached.set(api, next);
+    setResult(next);
+  }, [api, generation]);
+  const hit = cached.get(api);
+  const active = result?.owner === generation ? result : hit?.owner === generation ? hit : null;
+  const state: SummaryState = !present ? { at: "signedOut" } : active !== null ? active.value : { at: "loading" };
   return { state, reload: read, replace };
 }

@@ -135,7 +135,10 @@ export function AccountProvider({
     const owner = generation;
     api.accountSummary().then(
       (summary) => {
-        if (live && owner === serial.current) change({ known: true, handle: handleOf(summary), expiresAt: summary.expiresAt });
+        if (!live || owner !== serial.current) return;
+        const next = { known: true, handle: handleOf(summary), expiresAt: summary.expiresAt };
+        remember(next);
+        setAccount(next);
       },
       (error: unknown) => {
         // no live session: forget it; Central unreachable: keep it, unnamed, until it ends
