@@ -218,7 +218,13 @@
   .foot-map {
     grid-template-columns: 1fr 1fr;
   }
+  /* the third column below the two, its links in their two columns */
   .foot-map .foot-col:last-child {
     grid-column: 1 / -1;
+  }
+  .foot-map .foot-col:last-child .foot-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: var(--space-5);
   }
 }
