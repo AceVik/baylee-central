@@ -141,7 +141,7 @@ impl Session {
         metadata.validate(&origin)?;
         match transport.exchange(
             &Request::RegisterGateway { origin, metadata },
-            Some(&self.token),
+            Some((&self.token).into()),
         )? {
             Response::GatewayRegistered {
                 gateway,
@@ -184,7 +184,7 @@ impl Session {
                 expected_revision,
                 accounts,
             },
-            Some(&self.token),
+            Some((&self.token).into()),
         )? {
             Response::GatewayAdmins { revision } if revision == next => Ok(revision),
             _ => Err(Error::Rejected),

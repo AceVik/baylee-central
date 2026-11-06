@@ -50,7 +50,7 @@ impl Session {
             gateways,
         } = transport.exchange(
             &Request::DeleteAccountStart { login: message },
-            Some(&self.token),
+            Some((&self.token).into()),
         )?
         else {
             return Err(Error::Rejected);
@@ -90,7 +90,7 @@ impl Session {
                 attempt: deletion.attempt,
                 proof: deletion.proof,
             },
-            Some(&self.token),
+            Some((&self.token).into()),
         ) {
             Ok(Response::Done) => Ok(()),
             Ok(_) => Err(Error::Rejected),

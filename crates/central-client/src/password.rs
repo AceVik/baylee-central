@@ -46,7 +46,7 @@ impl Session {
                 login: login_message,
                 registration,
             },
-            Some(&self.token),
+            Some((&self.token).into()),
         )?
         else {
             return Err(Error::Rejected);
@@ -68,7 +68,7 @@ impl Session {
                 record: enrolled.upload,
                 wrapped_master: sent.clone(),
             },
-            Some(&self.token),
+            Some((&self.token).into()),
         );
         let (token, identity, wrapped_master) = match answer {
             Ok(Response::Session {
@@ -91,7 +91,7 @@ impl Session {
             || identity.epoch != self.identity.epoch
             || wrapped_master != sent
         {
-            let _ = transport.exchange(&Request::Logout, Some(&token));
+            let _ = transport.exchange(&Request::Logout, Some((&token).into()));
             return Err(Error::Rejected);
         }
         self.token = token;

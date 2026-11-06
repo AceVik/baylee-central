@@ -183,6 +183,25 @@ impl GatewayMetadata {
     }
 }
 
+/// The longest invalidate path a gateway may register.
+pub const MAX_INVALIDATE_PATH: usize = 128;
+
+/// Whether `path` may name a gateway's invalidate endpoint. It is a path and never a
+/// URL: scheme, host and port come only from the gateway's approved origin. Its
+/// alphabet has no `.`, `%`, `\`, `?`, `#`, `@` or `:`, so nothing in it can climb out
+/// of the path, change the host or be decoded into something else on the way.
+#[must_use]
+pub fn valid_invalidate_path(path: &str) -> bool {
+    path.len() <= MAX_INVALIDATE_PATH
+        && path.len() > 1
+        && path.starts_with('/')
+        && !path.contains("//")
+        && !path.ends_with('/')
+        && path
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'/' | b'_' | b'-'))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -352,5 +371,48 @@ mod tests {
             named(name).validate("https://gateway.invalid").unwrap();
             crate::owner::token_name(name).unwrap();
         }
+    }
+}
+
+#[cfg(test)]
+mod invalidate_path_tests {
+    use super::*;
+
+    #[test]
+    fn only_a_plain_absolute_path_is_taken() {
+        assert!(valid_invalidate_path("/auth/central/invalidate"));
+        assert!(valid_invalidate_path("/a"));
+        assert!(valid_invalidate_path(&format!(
+            "/{}",
+            "a".repeat(MAX_INVALIDATE_PATH - 1)
+        )));
+        for path in [
+            "",
+            "/",
+            "auth/invalidate",
+            "//evil.example/x",
+            "/a//b",
+            "/a/",
+            "/../admin",
+            "/a/../b",
+            "/%2e%2e/admin",
+            "/a%2fb",
+            "/a?b=c",
+            "/a#b",
+            "/a\\b",
+            "/a b",
+            "/a\r\nHost: evil.example",
+            "/a\u{0}b",
+            "/a@evil.example",
+            "/a:443",
+            "https://evil.example/x",
+            "/\u{e9}",
+        ] {
+            assert!(!valid_invalidate_path(path), "{path:?}");
+        }
+        assert!(!valid_invalidate_path(&format!(
+            "/{}",
+            "a".repeat(MAX_INVALIDATE_PATH)
+        )));
     }
 }

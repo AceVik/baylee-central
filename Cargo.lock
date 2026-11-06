@@ -696,6 +696,7 @@ dependencies = [
  "central-postgres",
  "subtle",
  "tokio",
+ "zeroize",
 ]
 
 [[package]]
@@ -715,6 +716,13 @@ name = "central-migration"
 version = "0.1.0"
 dependencies = [
  "sea-orm-migration",
+]
+
+[[package]]
+name = "central-outbound"
+version = "0.1.0"
+dependencies = [
+ "ureq",
 ]
 
 [[package]]
@@ -742,13 +750,13 @@ version = "0.1.0"
 dependencies = [
  "base64ct",
  "central-api",
+ "central-outbound",
  "ece",
  "jsonwebtoken",
  "jsonwebtoken-openssl",
  "openssl",
  "serde",
  "serde_json",
- "ureq",
  "zeroize",
 ]
 
@@ -762,6 +770,7 @@ dependencies = [
  "central-identity",
  "central-mail",
  "central-migration",
+ "central-outbound",
  "central-policy",
  "central-postgres",
  "central-push",

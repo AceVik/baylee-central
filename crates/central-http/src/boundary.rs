@@ -386,8 +386,11 @@ fn grow(whole: &mut Vec<u8>, more: usize, limit: usize) {
 pub(crate) async fn headers(request: Request, next: Next) -> Response {
     let mut response = next.run(request).await;
     let headers = response.headers_mut();
+    // Only a public document says otherwise; nothing that names a person is ever cached.
+    headers
+        .entry(header::CACHE_CONTROL)
+        .or_insert(HeaderValue::from_static("no-store"));
     for (name, value) in [
-        ("cache-control", "no-store"),
         ("x-content-type-options", "nosniff"),
         ("referrer-policy", "no-referrer"),
         (
@@ -408,6 +411,26 @@ pub(crate) async fn headers(request: Request, next: Next) -> Response {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn caching_is_refused_unless_a_route_chooses_it() {
+        use axum::{body::Body, http::HeaderValue};
+        let app = Router::new()
+            .route("/plain", get(|| async { "x" }))
+            .route(
+                "/public",
+                get(|| async { ([(header::CACHE_CONTROL, "public, max-age=300")], "x") }),
+            )
+            .layer(middleware::from_fn(headers));
+        for (path, expected) in [("/plain", "no-store"), ("/public", "public, max-age=300")] {
+            let request = axum::http::Request::get(path).body(Body::empty()).unwrap();
+            let response = app.clone().oneshot(request).await.unwrap();
+            assert_eq!(
+                response.headers().get(header::CACHE_CONTROL),
+                Some(&HeaderValue::from_static(expected))
+            );
+        }
+    }
     use tower::ServiceExt;
 
     fn app() -> Router {

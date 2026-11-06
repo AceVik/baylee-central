@@ -1,12 +1,11 @@
 //! Gateway tokens and the account area (migration 000014): a gateway
 //! registered on the website, its tokens minted only after a recent password,
 //! scoped, expiring and revocable, authenticating only while the gateway is
-//! approved; administrators approving and disabling (leases end), revoking a
+//! approved; administrators approving and disabling (its sessions end), revoking a
 //! token and changing a tag, each audited; an account's sessions and ending
 //! the client's.
 use super::{
-    AccountStore, DatabaseConnection, Error, ServerKeys, TicketPurpose, Token, approval, enroll,
-    login,
+    AccountStore, Admit, DatabaseConnection, Error, ServerKeys, Token, approval, enroll, login,
 };
 use central_api::LEGACY_ORIGIN;
 use central_api::gateway::{GatewayMetadata, GatewayState};
@@ -88,13 +87,7 @@ pub(super) async fn run(store: &AccountStore, operator: &DatabaseConnection, key
     let gateway = registration(store, operator, &browser, &native, &stranger).await;
     let token = minting(store, operator, owner.account, &browser, &stranger, gateway).await;
     // admission needs no approval: a player is admitted while it is pending
-    let pending = admitted(store, &native, &browser, gateway).await;
-    assert!(
-        store
-            .gateway_session(&pending, &[ORIGIN], Some(gateway), TicketPurpose::Admit)
-            .await
-            .is_ok()
-    );
+    admitted(store, &native, &browser).await;
     authentication(store, operator, &browser, gateway, &token).await;
     // a token is its gateway's owner's for the budgets; a session is nobody's
     super::counted(store, operator, gateway, &[&token], &[&browser, &native]).await;
@@ -406,7 +399,7 @@ async fn authentication(
     assert!(store.authenticate_gateway(token).await.is_ok());
 }
 
-/// Administrators approve, disable (its leases end) and revoke, each audited.
+/// Administrators approve, disable (its sessions end) and revoke, each audited.
 async fn administration(
     store: &AccountStore,
     operator: &DatabaseConnection,
@@ -436,7 +429,8 @@ async fn administration(
     );
     let (_, tokens) = store.admin_gateway(&cookie, gateway).await.unwrap();
     assert!(tokens.iter().any(|t| t.name == "Main"));
-    let lease = admitted(store, native, owner_browser, gateway).await;
+    let sid = admitted(store, native, owner_browser).await;
+    let before = store.last_revocation(ORIGIN).await.unwrap();
     let audit = |action: &'static str| {
         count(
             operator,
@@ -457,13 +451,11 @@ async fn administration(
         1,
         "the same state writes nothing"
     );
+    // Through the store's own path: the disabled gateway's sessions end, as a revocation.
     assert_eq!(
-        store
-            .gateway_session(&lease, &[ORIGIN], Some(gateway), TicketPurpose::Admit)
-            .await
-            .err(),
-        Some(Error::Rejected),
-        "its leases end"
+        store.revocation_page(ORIGIN, before).await.unwrap().sids,
+        vec![sid],
+        "its sessions end"
     );
     assert!(
         store
@@ -507,38 +499,21 @@ async fn administration(
     (cookie, admin.account)
 }
 
-/// A player admitted at the gateway: a lease, which the owner's session
-/// list names by the gateway's origin.
-async fn admitted(
-    store: &AccountStore,
-    native: &Token,
-    owner_browser: &Token,
-    gateway: [u8; 16],
-) -> Token {
-    // a player admitted there holds a lease until the gateway is disabled
-    let ticket = Token::generate().unwrap();
-    store
-        .registered_ticket(native, ORIGIN, &ticket, TicketPurpose::Admit)
+/// A player admitted at the gateway, while it is pending or after: a `sid`, which the owner's
+/// session list names by the gateway's origin.
+async fn admitted(store: &AccountStore, native: &Token, owner_browser: &Token) -> [u8; 16] {
+    let sid = store
+        .gateway_grant(native, &[ORIGIN], true, Admit, [70; 16])
         .await
-        .unwrap();
-    let lease = Token::generate().unwrap();
-    store
-        .redeem_lease(
-            &ticket,
-            &[ORIGIN],
-            TicketPurpose::Admit,
-            Some(gateway),
-            Some(&lease),
-        )
-        .await
-        .unwrap();
+        .unwrap()
+        .sid;
     let sessions = store.owner_sessions(owner_browser).await.unwrap();
     let client = sessions
         .iter()
         .find(|s| s.kind == SessionKind::Native)
         .unwrap();
     assert_eq!(client.gateways, vec![ORIGIN.to_owned()]);
-    lease
+    sid
 }
 
 /// What a disabled gateway's console learns with a new token.

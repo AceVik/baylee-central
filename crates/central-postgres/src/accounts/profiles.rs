@@ -1,15 +1,8 @@
 //! Display names and tags (migration 000011, `docs/web-accounts.md`
 //! §"Display name and tag"): the tag a registered account draws, the name it
-//! chooses, the name and tag the bridge carries from the official gateway,
-//! and what a gateway learns of the people who sign in there.
-use super::{
-    AccountStore, Error, Identity, NOT_DISABLED, Session, Token, any_origin, identity, origins,
-    statement,
-};
-use central_api::{
-    profile::{self, REGISTERED_TAG_FLOOR},
-    wire::TicketPurpose,
-};
+//! chooses and the name and tag the bridge carries from the official gateway.
+use super::{AccountStore, Error, Session, Token, statement};
+use central_api::profile::{self, REGISTERED_TAG_FLOOR};
 use sea_orm::{
     ConnectionTrait, DatabaseTransaction, QueryResult, SqlErr, Statement, TransactionTrait,
     prelude::Uuid,
@@ -37,16 +30,6 @@ impl Default for Tags {
             draw: Arc::new(profile::draw_tag),
         }
     }
-}
-
-/// A live lease's account as other players see it.
-pub struct Profile {
-    /// The account authenticated by the lease.
-    pub identity: Identity,
-    /// Its display name, if it has one.
-    pub display_name: Option<String>,
-    /// Its tag, if it has one.
-    pub tag: Option<u32>,
 }
 
 /// The display name and tag columns of `row`.
@@ -234,44 +217,6 @@ impl AccountStore {
             return Err(Error::Unavailable);
         }
         tx.commit().await.map_err(|_| Error::Unavailable)
-    }
-
-    /// The display name and tag of the account behind a live lease that
-    /// `gateway` (`None` for the bridge) holds for one of `audiences` and
-    /// `purpose`: exactly the lease check of `GatewaySession`.
-    ///
-    /// # Errors
-    /// Rejects an expired, revoked or foreign lease, another purpose and a
-    /// disabled gateway; reports storage failure.
-    pub async fn gateway_profile<S: AsRef<str> + Sync>(
-        &self,
-        lease: &Token,
-        audiences: &[S],
-        gateway: Option<[u8; 16]>,
-        purpose: TicketPurpose,
-    ) -> Result<Profile, Error> {
-        if !matches!(purpose, TicketPurpose::Admit | TicketPurpose::Admin)
-            || (gateway.is_none() && matches!(purpose, TicketPurpose::Admin))
-        {
-            return Err(Error::Rejected);
-        }
-        let row = self.db.query_one_raw(statement(
-            &format!("SELECT a.id,a.vault_epoch,a.display_name,a.tag
-             FROM central_identity.gateway_leases l JOIN central_identity.sessions s ON s.digest=l.session_digest
-             JOIN central_identity.accounts a ON a.id=s.account_id AND a.credential_revision=s.credential_revision
-             WHERE l.digest=$1 AND l.audience={} AND l.gateway_id IS NOT DISTINCT FROM $3::uuid AND l.purpose=$4
-             AND l.expires_at>pg_catalog.clock_timestamp() AND s.expires_at>pg_catalog.clock_timestamp() AND a.restored
-             AND ($3::uuid IS NULL OR EXISTS(SELECT 1 FROM central_identity.gateways g
-                 WHERE g.id=$3 AND g.origin=l.audience AND {NOT_DISABLED} AND ($4='admit' OR EXISTS
-                     (SELECT 1 FROM central_identity.gateway_admins m WHERE m.gateway_id=g.id AND m.account_id=a.id))))", any_origin(2)),
-            vec![lease.digest().to_vec().into(), origins(audiences)?, gateway.map(Uuid::from_bytes).into(), purpose.as_str().into()],
-        )).await.map_err(|_| Error::Unavailable)?.ok_or(Error::Rejected)?;
-        let (display_name, tag) = columns(&row)?;
-        Ok(Profile {
-            identity: identity(&row)?,
-            display_name,
-            tag,
-        })
     }
 }
 

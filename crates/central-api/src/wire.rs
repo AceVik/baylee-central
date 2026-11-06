@@ -1,30 +1,24 @@
 //! Closed version-one request/response vocabulary. No secret-bearing type implements Debug.
-use crate::Token;
 use crate::terms::{TermsDocument, TermsSubject, TermsText, TermsVersion};
+use crate::{SignedToken, Token};
 use serde::{Deserialize, Serialize};
 
-/// A gateway capability authorizes exactly one action, never a general account session.
-#[derive(Clone, Copy, Serialize, Deserialize)]
+/// What a gateway token admits to; it never grants a general account session.
+#[derive(Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum TicketPurpose {
-    /// Admit to gameplay using an already-linked account.
+pub enum GatewayPurpose {
+    /// Play at this gateway.
     Admit,
-    /// Read a source snapshot to resume interrupted migration.
-    Export,
-    /// Finalize the immutable account link after successful restore.
-    Link,
-    /// Authenticate a gateway administrator; current gateway membership is mandatory.
+    /// Administer this gateway; current membership is mandatory at issue.
     Admin,
 }
 
-impl TicketPurpose {
+impl GatewayPurpose {
     /// Stable database representation.
     #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Admit => "admit",
-            Self::Export => "export",
-            Self::Link => "link",
             Self::Admin => "admin",
         }
     }
@@ -147,18 +141,6 @@ pub enum Request {
         expected_revision: u64,
         /// At most 32 distinct central account IDs; the owner remains an administrator.
         accounts: Vec<[u8; 16]>,
-    },
-    /// Gateway-authenticated check of current administrator membership.
-    CheckGatewayAdmin {
-        /// Immutable central account ID.
-        account: [u8; 16],
-    },
-    /// Revalidate an opaque gateway-held lease against the live central session.
-    GatewaySession {
-        /// Lease returned only to the redeeming gateway, never its client.
-        lease: Token,
-        /// Exactly Admit or Admin; purposes cannot be promoted.
-        purpose: TicketPurpose,
     },
     /// Resolve a private login name. Unknown names receive the same legacy eligibility result.
     Discover {
@@ -320,19 +302,26 @@ pub enum Request {
         /// Original gateway account identifier.
         legacy_id: String,
     },
-    /// Issue a one-use ticket scoped to a configured gateway; never forward a central session.
-    GatewayTicket {
-        /// Exact canonical gateway origin.
+    /// Issue or refresh a token for one gateway. The same session, gateway and purpose keep
+    /// their `sid`. Never forward a Central token. Answered with [`Response::GatewayToken`].
+    GatewayToken {
+        /// Exact canonical gateway origin; it becomes the token's `aud`.
         gateway: String,
-        /// Single action authorized by this ticket.
-        purpose: TicketPurpose,
+        /// What the token admits to.
+        purpose: GatewayPurpose,
     },
-    /// Configured gateway redeems its own audience-bound ticket.
-    RedeemGateway {
-        /// One-use, short-lived ticket delivered by the native client.
-        ticket: Token,
-        /// Action enforced by the receiving gateway route.
-        purpose: TicketPurpose,
+    /// Name the path of this gateway's invalidate endpoint, under its SSO credential or
+    /// the bridge. A path and never a URL: scheme, host and port come from the approved
+    /// origin ([`crate::gateway::valid_invalidate_path`]).
+    RegisterInvalidate {
+        /// Absolute path on the gateway's own origin.
+        path: String,
+    },
+    /// Fetch the revocations after a number, under the SSO credential or the bridge.
+    /// Answered with [`Response::GatewayRevocations`].
+    GatewayRevocations {
+        /// The last number this gateway applied; 0 after a start.
+        after: u64,
     },
     /// Revoke the presented central session immediately.
     Logout,
@@ -363,15 +352,6 @@ pub enum Request {
         /// Its languages in ascending tag order.
         texts: Vec<TermsText>,
     },
-    /// [`Request::GatewaySession`] plus the account's terms state.
-    GatewayAuthorize {
-        /// Lease returned only to the redeeming gateway, never its client.
-        lease: Token,
-        /// Exactly Admit or Admin; purposes cannot be promoted.
-        purpose: TicketPurpose,
-        /// The gateway's own current terms, or none when it has none.
-        terms: Option<TermsVersion>,
-    },
     /// The browser session's account, for the account page: who, where it
     /// came from, whether it has a recovery code, and when the session's
     /// password sign-in was. Browser listener only; needs no accepted terms.
@@ -396,17 +376,6 @@ pub enum Request {
     SetDisplayName {
         /// The name, kept as typed: [`crate::profile::choosable`].
         display_name: String,
-    },
-    /// The display name and tag of the account behind a live lease the
-    /// asking gateway holds, under its redemption credential or the bridge,
-    /// as [`Request::GatewaySession`]: a gateway learns the names of the
-    /// people who sign in there, nobody else's. Answered with
-    /// [`Response::GatewayProfile`].
-    GatewayProfile {
-        /// Lease returned only to the redeeming gateway, never its client.
-        lease: Token,
-        /// Exactly Admit or Admin; purposes cannot be promoted.
-        purpose: TicketPurpose,
     },
     /// Begin changing the password of the session's account, on either
     /// listener, with Central's terms accepted: a fresh OPAQUE login with the
@@ -743,18 +712,6 @@ pub enum Response {
         /// New revision for later compare-and-swap updates.
         revision: u64,
     },
-    /// Current membership result, authenticated to the requesting gateway only.
-    GatewayAdmin {
-        /// True only for a current administrator of this approved gateway.
-        allowed: bool,
-    },
-    /// A gateway-held lease still has a live parent session and its original authority.
-    GatewaySession {
-        /// Account authenticated by this lease.
-        identity: Identity,
-        /// Absolute Unix-seconds expiry, never later than the parent central session.
-        expires_at: i64,
-    },
     /// Account lookup decision.
     Discovery {
         /// Closed decision type; never an arbitrary credential URL.
@@ -810,7 +767,7 @@ pub enum Response {
     /// Issued only after successful KE3 verification and current credential checks.
     Session {
         /// Short-lived revocable central bearer.
-        token: Token,
+        token: SignedToken,
         /// Account and epoch bound into the completed OPAQUE exchange.
         identity: Identity,
         /// Stored client-encrypted master key.
@@ -925,21 +882,26 @@ pub enum Response {
         /// Immutable central account mapping.
         identity: Identity,
     },
-    /// Client-delivered, audience-bound gateway ticket.
-    GatewayTicket {
-        /// One-use capability with a 30-second lifetime.
-        ticket: Token,
+    /// A token for one gateway ([`Request::GatewayToken`]).
+    GatewayToken {
+        /// The signed token, for that gateway alone.
+        token: SignedToken,
+        /// Absolute Unix-seconds expiry.
+        expires_at: i64,
     },
-    /// Gateway learns only the immutable identity it is permitted to admit.
-    GatewayIdentity {
-        /// Central account mapping.
-        identity: Identity,
-        /// Existing legacy account, when this is the migration gateway.
-        legacy_id: Option<String>,
-        /// Gateway-held delegation for Admit/Admin; absent for Export/Link.
-        lease: Option<Token>,
-        /// Absolute Unix-seconds expiry for the lease, otherwise absent.
-        expires_at: Option<i64>,
+    /// A heartbeat was taken; the answer names the revocations to catch up to.
+    GatewayHeartbeat {
+        /// The gateway's last revocation number; 0 when it has none.
+        last_revocation: u64,
+    },
+    /// A page of revocations ([`Request::GatewayRevocations`]).
+    GatewayRevocations {
+        /// One fresh signed message for the next numbers; none when up to date.
+        token: Option<SignedToken>,
+        /// The gateway's last revocation number.
+        last: u64,
+        /// The lowest number held, or `last + 1` when none is.
+        floor: u64,
     },
     /// Mutation committed. Lost replies require an authenticated read before retry.
     Done,
@@ -959,27 +921,6 @@ pub enum Response {
     TermsPublished {
         /// Central's digest of the published texts.
         digest: [u8; 32],
-    },
-    /// A live lease, as [`Response::GatewaySession`], with the account's terms state.
-    GatewayAuthorization {
-        /// Account authenticated by this lease.
-        identity: Identity,
-        /// Absolute Unix-seconds expiry, never later than the parent central session.
-        expires_at: i64,
-        /// The account accepted Central's terms in force, or none are in force.
-        central_terms: bool,
-        /// The account accepted the gateway's named terms, or it named none.
-        gateway_terms: bool,
-    },
-    /// A live lease's account as other players see it ([`Request::GatewayProfile`]).
-    GatewayProfile {
-        /// Account authenticated by this lease.
-        identity: Identity,
-        /// Its display name; none until the account chose one.
-        display_name: Option<String>,
-        /// Its tag; none for an account moved from the official gateway
-        /// whose tag the bridge has not carried yet.
-        tag: Option<u32>,
     },
     /// What an account's own request found or made ([`Request::Owner`]).
     Owner {
@@ -1064,7 +1005,7 @@ pub enum Response {
     /// the master key sealed to the client, together and once.
     PairSession {
         /// The new native session's bearer.
-        token: Token,
+        token: SignedToken,
         /// The account and epoch the seal is bound to.
         identity: Identity,
         /// The account's canonical username, for the client's question.
@@ -1412,46 +1353,92 @@ mod tests {
             )
             .is_err()
         );
+    }
+
+    #[test]
+    fn the_session_token_requests_have_the_agreed_shapes() {
         assert!(matches!(
             crate::decode::<Request>(
-                br#"{"operation":"gateway_profile","lease":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"purpose":"admit"}"#
+                br#"{"operation":"gateway_token","gateway":"https://gateway.example","purpose":"admit"}"#
             )
             .unwrap(),
-            Request::GatewayProfile {
-                purpose: TicketPurpose::Admit,
+            Request::GatewayToken {
+                purpose: GatewayPurpose::Admit,
                 ..
             }
         ));
-        let answer = Response::GatewayProfile {
-            identity: Identity {
-                account: [7; 16],
-                epoch: 1,
-            },
-            display_name: Some("Alice".into()),
-            tag: Some(0x3fa2),
-        };
-        let text = String::from_utf8(crate::encode(&answer).unwrap()).unwrap();
-        assert_eq!(
-            text,
-            r#"{"result":"gateway_profile","identity":{"account":[7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7],"epoch":1},"display_name":"Alice","tag":16290}"#
-        );
-        assert!(crate::decode::<Response>(text.as_bytes()).is_ok());
-        assert!(
-            crate::decode::<Response>(
-                text.replace(r#""tag":16290"#, r#""tag":16290,"role":"admin""#)
-                    .as_bytes()
+        assert!(matches!(
+            crate::decode::<Request>(
+                br#"{"operation":"register_invalidate","path":"/auth/central/invalidate"}"#
             )
-            .is_err()
-        );
-        // A gateway built before this answer decodes `GatewayIdentity` as it
-        // always did; the profile is an answer of its own.
-        assert!(
-            crate::decode::<Response>(
-                text.replace("gateway_profile", "gateway_identity")
-                    .as_bytes()
-            )
-            .is_err()
-        );
+            .unwrap(),
+            Request::RegisterInvalidate { .. }
+        ));
+        assert!(matches!(
+            crate::decode::<Request>(br#"{"operation":"gateway_revocations","after":7}"#).unwrap(),
+            Request::GatewayRevocations { after: 7 }
+        ));
+        let token = || SignedToken::new(zeroize::Zeroizing::new("a.b.c".to_owned())).unwrap();
+        for (answer, text) in [
+            (
+                Response::GatewayToken {
+                    token: token(),
+                    expires_at: 9,
+                },
+                r#"{"result":"gateway_token","token":"a.b.c","expires_at":9}"#,
+            ),
+            (
+                Response::GatewayHeartbeat { last_revocation: 4 },
+                r#"{"result":"gateway_heartbeat","last_revocation":4}"#,
+            ),
+            (
+                Response::GatewayRevocations {
+                    token: Some(token()),
+                    last: 3,
+                    floor: 1,
+                },
+                r#"{"result":"gateway_revocations","token":"a.b.c","last":3,"floor":1}"#,
+            ),
+            (
+                Response::GatewayRevocations {
+                    token: None,
+                    last: 3,
+                    floor: 4,
+                },
+                r#"{"result":"gateway_revocations","token":null,"last":3,"floor":4}"#,
+            ),
+        ] {
+            assert_eq!(
+                String::from_utf8(crate::encode(&answer).unwrap()).unwrap(),
+                text
+            );
+            assert!(crate::decode::<Response>(text.as_bytes()).is_ok());
+        }
+    }
+
+    #[test]
+    fn what_the_tokens_replaced_is_gone_from_the_wire() {
+        const LEASE: &str = "[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]";
+        for operation in [
+            r#"{"operation":"gateway_ticket","gateway":"https://g.example","purpose":"admit"}"#
+                .to_owned(),
+            format!(r#"{{"operation":"redeem_gateway","ticket":{LEASE},"purpose":"admit"}}"#),
+            format!(r#"{{"operation":"gateway_session","lease":{LEASE},"purpose":"admit"}}"#),
+            format!(r#"{{"operation":"gateway_profile","lease":{LEASE},"purpose":"admit"}}"#),
+            format!(
+                r#"{{"operation":"gateway_authorize","lease":{LEASE},"purpose":"admit","terms":null}}"#
+            ),
+            format!(r#"{{"operation":"check_gateway_admin","account":{LEASE}}}"#),
+            r#"{"operation":"gateway_token","gateway":"https://g.example","purpose":"export"}"#
+                .to_owned(),
+            r#"{"operation":"gateway_token","gateway":"https://g.example","purpose":"link"}"#
+                .to_owned(),
+        ] {
+            assert!(
+                crate::decode::<Request>(operation.as_bytes()).is_err(),
+                "{operation}"
+            );
+        }
     }
 
     const METADATA: &str =

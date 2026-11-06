@@ -97,6 +97,87 @@ impl Token {
     }
 }
 
+/// A signed token as it travels: a compact JWS. To a client it is an opaque string, which it
+/// stores and presents and never parses. Deliberately neither Clone nor Display; Debug
+/// always redacts it, and it is wiped when dropped.
+#[derive(Serialize, Deserialize, Zeroize, ZeroizeOnDrop)]
+#[serde(transparent)]
+pub struct SignedToken(String);
+
+impl std::fmt::Debug for SignedToken {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("SignedToken([REDACTED])")
+    }
+}
+
+impl SignedToken {
+    /// The longest token accepted from a peer.
+    pub const MAX_BYTES: usize = 16 * 1024;
+
+    /// Take a token just signed, or read from a privileged secret store.
+    ///
+    /// # Errors
+    /// Rejects text too long, or outside the compact form's alphabet.
+    pub fn new(mut token: Zeroizing<String>) -> Result<Self, Error> {
+        let well_formed = token.len() <= Self::MAX_BYTES
+            && !token.is_empty()
+            && token
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.'));
+        if !well_formed {
+            return Err(Error::Rejected);
+        }
+        Ok(Self(std::mem::take(&mut *token)))
+    }
+
+    /// The token's text, for the one peer it is meant for. Never log it.
+    #[must_use]
+    pub fn expose(&self) -> &str {
+        &self.0
+    }
+
+    /// Encode the bearer header into a zeroizing buffer; never log it.
+    #[must_use]
+    pub fn bearer(&self) -> Zeroizing<String> {
+        let mut out = Zeroizing::new(String::with_capacity(self.0.len() + 7));
+        out.push_str("Bearer ");
+        out.push_str(&self.0);
+        out
+    }
+}
+
+/// What a request presents: a gateway's random credential or a client's signed session.
+#[derive(Clone, Copy)]
+pub enum Bearer<'a> {
+    /// A gateway credential, a heartbeat credential or the bridge's.
+    Capability(&'a Token),
+    /// The client's Central token.
+    Signed(&'a SignedToken),
+}
+
+impl Bearer<'_> {
+    /// Encode the bearer header into a zeroizing buffer; never log it.
+    #[must_use]
+    pub fn header(self) -> Zeroizing<String> {
+        match self {
+            Self::Capability(token) => token.bearer(),
+            Self::Signed(token) => token.bearer(),
+        }
+    }
+}
+
+impl<'a> From<&'a Token> for Bearer<'a> {
+    fn from(token: &'a Token) -> Self {
+        Self::Capability(token)
+    }
+}
+
+impl<'a> From<&'a SignedToken> for Bearer<'a> {
+    fn from(token: &'a SignedToken) -> Self {
+        Self::Signed(token)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -139,5 +220,35 @@ mod tests {
         ] {
             assert!(Token::from_hex(text).is_err());
         }
+    }
+
+    fn signed(text: &str) -> Result<SignedToken, Error> {
+        SignedToken::new(Zeroizing::new(text.to_owned()))
+    }
+
+    #[test]
+    fn a_signed_token_prints_nothing_and_keeps_to_its_alphabet() {
+        let token = signed("aA0-_.bB1.cC2").unwrap();
+        assert_eq!(format!("{token:?}"), "SignedToken([REDACTED])");
+        assert_eq!(token.bearer().as_str(), "Bearer aA0-_.bB1.cC2");
+        assert_eq!(
+            Bearer::from(&token).header().as_str(),
+            "Bearer aA0-_.bB1.cC2"
+        );
+        assert_eq!(serde_json::to_string(&token).unwrap(), "\"aA0-_.bB1.cC2\"");
+        for text in ["", "a b", "a\nb", "a=b", "a/b", "a+b", "\u{e9}"] {
+            assert_eq!(signed(text).err(), Some(Error::Rejected), "{text:?}");
+        }
+        assert!(signed(&"a".repeat(SignedToken::MAX_BYTES)).is_ok());
+        assert!(signed(&"a".repeat(SignedToken::MAX_BYTES + 1)).is_err());
+    }
+
+    #[test]
+    fn a_capability_presents_its_own_bearer() {
+        let token = Token::generate().unwrap();
+        assert_eq!(
+            Bearer::from(&token).header().as_str(),
+            token.bearer().as_str()
+        );
     }
 }

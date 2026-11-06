@@ -30,6 +30,7 @@ mod m20261102_000020_chat;
 mod m20261102_000021_groups;
 mod m20261102_000022_notifications;
 mod m20261111_000023_open_registration;
+mod m20261111_000024_session_tokens;
 mod m20261111_000025_gateway_activity;
 mod m20261112_000026_email;
 
@@ -67,6 +68,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261102_000021_groups::Migration),
             Box::new(m20261102_000022_notifications::Migration),
             Box::new(m20261111_000023_open_registration::Migration),
+            Box::new(m20261111_000024_session_tokens::Migration),
             Box::new(m20261111_000025_gateway_activity::Migration),
             Box::new(m20261112_000026_email::Migration),
         ]

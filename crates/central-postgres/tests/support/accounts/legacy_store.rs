@@ -1,7 +1,7 @@
 //! The legacy store (`docs/native-login.md` §"Legacy login") under the real
 //! restricted roles: its role's contract and the runtime's, both ways; the
 //! import and each of its refusals; the lockout; the deadline and the sweep.
-use super::{AccountStore, ServerKeys, TicketPurpose, Token, config, enroll, login};
+use super::{AccountStore, Admit, ServerKeys, config, enroll, login};
 use central_api::legacy::LegacyProgress;
 use central_postgres::{
     ImportRefusal, LOCKOUT_FAILURES, LegacyRow, LegacyStore, StoreError, import_legacy,
@@ -127,39 +127,19 @@ async fn closed_move(
     let moving = store.legacy_move(&session).await.unwrap();
     assert_eq!(moving.legacy_id.as_deref(), Some("legacy-one"));
     assert!(moving.restored && !moving.closed);
-    // The bridge learns the legacy id only once the move is closed; the
-    // refused redemption spends nothing.
-    let ticket = Token::generate().unwrap();
-    store
-        .gateway_ticket(&session, "official", &ticket, TicketPurpose::Admit)
-        .await
-        .unwrap();
-    let lease = Token::generate().unwrap();
+    // The official gateway learns the legacy id only once the move is closed.
     assert!(
         store
-            .redeem_lease(
-                &ticket,
-                &["official"],
-                TicketPurpose::Admit,
-                None,
-                Some(&lease)
-            )
+            .gateway_grant(&session, &["official"], false, Admit, [55; 16])
             .await
             .is_err()
     );
-    bridge_transfer_tickets(store, &session).await;
     store.close_legacy("legacy-one", identity).await.unwrap();
-    let (_, legacy_id, _) = store
-        .redeem_lease(
-            &ticket,
-            &["official"],
-            TicketPurpose::Admit,
-            None,
-            Some(&lease),
-        )
+    let grant = store
+        .gateway_grant(&session, &["official"], false, Admit, [55; 16])
         .await
         .unwrap();
-    assert_eq!(legacy_id.as_deref(), Some("legacy-one"));
+    assert_eq!(grant.legacy_id.as_deref(), Some("legacy-one"));
     // The close's row deletion was lost here: the sweep catches it.
     let swept = sweep_legacy(operator).await.unwrap();
     assert_eq!((swept.moved, swept.expired, swept.reservations), (1, 0, 0));
@@ -430,54 +410,4 @@ async fn deadline_and_sweep(legacy: &LegacyStore, operator: &DatabaseConnection)
         0
     );
     assert_eq!(set_legacy_deadline(operator, None).await.unwrap(), None);
-}
-
-/// A move must remain reconcilable before close, while admission stays denied.
-async fn bridge_transfer_tickets(store: &AccountStore, session: &Token) {
-    for purpose in [TicketPurpose::Export, TicketPurpose::Link] {
-        let ticket = Token::generate().unwrap();
-        store
-            .gateway_ticket(session, "official", &ticket, purpose)
-            .await
-            .unwrap();
-        assert!(
-            store
-                .redeem_lease(&ticket, &["wrong"], purpose, None, None)
-                .await
-                .is_err()
-        );
-        assert!(
-            store
-                .redeem_lease(
-                    &ticket,
-                    &["official"],
-                    TicketPurpose::Admit,
-                    None,
-                    Some(&Token::generate().unwrap())
-                )
-                .await
-                .is_err()
-        );
-        assert!(
-            store
-                .redeem_lease(&ticket, &["official"], purpose, Some([7; 16]), None)
-                .await
-                .is_err()
-        );
-        let (_, legacy, expires) = store
-            .redeem_lease(&ticket, &["official"], purpose, None, None)
-            .await
-            .unwrap();
-        assert_eq!(legacy.as_deref(), Some("legacy-one"));
-        assert!(
-            expires.is_none(),
-            "migration tickets never delegate a session"
-        );
-        assert!(
-            store
-                .redeem_lease(&ticket, &["official"], purpose, None, None)
-                .await
-                .is_err()
-        );
-    }
 }

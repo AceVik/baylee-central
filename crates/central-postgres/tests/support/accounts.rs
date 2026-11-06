@@ -1,7 +1,7 @@
 use super::config;
 use central_api::{
     Endpoint, Error, Token,
-    wire::{Identity, MigrationState, TicketPurpose},
+    wire::{GatewayPurpose::Admit, Identity, MigrationState},
 };
 use central_crypto::{
     Context,
@@ -124,7 +124,7 @@ pub(crate) async fn run(operator: &DatabaseConnection) {
         first.account
     );
     assert!(store.discover("nobody").await.unwrap().is_none());
-    sessions(&store, &alice, &bob, first).await;
+    sessions(&store, &alice, &bob).await;
     expiry_and_revision(&store, operator, &keys, first).await;
     gateways::run(&store, operator, &keys).await;
     single_session::run(&store, &keys).await;
@@ -258,51 +258,25 @@ async fn login(store: &AccountStore, keys: &ServerKeys, identity: Identity) -> T
     token
 }
 
-async fn sessions(store: &AccountStore, alice: &Token, bob: &Token, first: Identity) {
+async fn sessions(store: &AccountStore, alice: &Token, bob: &Token) {
     assert!(store.document(&Token::generate().unwrap()).await.is_err());
     let (_, original) = store.document(alice).await.unwrap();
     let (_, bob_original) = store.document(bob).await.unwrap();
     assert_ne!(original, bob_original);
-    let ticket = Token::generate().unwrap();
+    // No token before the restore is confirmed.
     assert!(
         store
-            .gateway_ticket(alice, "synthetic-gateway", &ticket, TicketPurpose::Admit)
+            .gateway_grant(alice, &["synthetic-gateway"], false, Admit, [1; 16])
             .await
             .is_err()
     );
     assert!(store.confirm_restore(alice, 2).await.is_err());
     store.confirm_restore(alice, 1).await.unwrap();
     assert!(store.legacy_status("synthetic-a").await.unwrap().1 == MigrationState::Restored);
-    store
-        .gateway_ticket(alice, "synthetic-gateway", &ticket, TicketPurpose::Admit)
-        .await
-        .unwrap();
-    for purpose in [TicketPurpose::Export, TicketPurpose::Link] {
-        assert!(
-            store
-                .redeem_gateway(&ticket, "synthetic-gateway", purpose)
-                .await
-                .is_err()
-        );
-    }
+    // Restored, but the move is still open: no admission at the official gateway.
     assert!(
         store
-            .redeem_gateway(&ticket, "wrong-audience", TicketPurpose::Admit)
-            .await
-            .is_err()
-    );
-    assert_eq!(
-        store
-            .redeem_gateway(&ticket, "synthetic-gateway", TicketPurpose::Admit)
-            .await
-            .unwrap()
-            .0
-            .account,
-        first.account
-    );
-    assert!(
-        store
-            .redeem_gateway(&ticket, "synthetic-gateway", TicketPurpose::Admit)
+            .gateway_grant(alice, &["synthetic-gateway"], false, Admit, [1; 16])
             .await
             .is_err()
     );
@@ -316,19 +290,8 @@ async fn sessions(store: &AccountStore, alice: &Token, bob: &Token, first: Ident
     ));
     assert_eq!(store.document(alice).await.unwrap().0, 2);
     assert_eq!(store.document(bob).await.unwrap(), (1, bob_original));
-    let ticket = Token::generate().unwrap();
-    store
-        .gateway_ticket(alice, "synthetic-gateway", &ticket, TicketPurpose::Admit)
-        .await
-        .unwrap();
     store.logout(alice).await.unwrap();
     assert!(store.document(alice).await.is_err());
-    assert!(
-        store
-            .redeem_gateway(&ticket, "synthetic-gateway", TicketPurpose::Admit)
-            .await
-            .is_err()
-    );
     store.logout(alice).await.unwrap();
 }
 

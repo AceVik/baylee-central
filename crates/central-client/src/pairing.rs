@@ -162,7 +162,7 @@ impl Pairing {
         let master = match master {
             Ok(master) => master,
             Err(error) => {
-                let _ = transport.exchange(&Request::Logout, Some(&token));
+                let _ = transport.exchange(&Request::Logout, Some((&token).into()));
                 return Err(error);
             }
         };
@@ -199,7 +199,7 @@ impl Session {
     pub fn ensure_key_check(&self, transport: &impl Transport) -> Result<(), Error> {
         self.same_endpoint(transport)?;
         if matches!(
-            transport.exchange(&Request::KeyCheckStatus, Some(&self.token))?,
+            transport.exchange(&Request::KeyCheckStatus, Some((&self.token).into()))?,
             Response::KeyCheck { set: true }
         ) {
             return Ok(());
@@ -212,7 +212,7 @@ impl Session {
             &Request::SetKeyCheck {
                 check: check.as_bytes().to_vec(),
             },
-            Some(&self.token),
+            Some((&self.token).into()),
         ) {
             Ok(Response::Done) | Err(Error::Conflict) => Ok(()),
             Ok(_) => Err(Error::Rejected),

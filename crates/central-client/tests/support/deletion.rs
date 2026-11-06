@@ -11,7 +11,7 @@ use super::{
     password::{OLD, browser_sign_in, close, context, moved, register},
 };
 use central_api::{
-    Error, Token,
+    Error, SignedToken, Token,
     export::SessionKind,
     gateway::GatewayMetadata,
     wire::{AccountSource, Identity, Request, Response},
@@ -156,7 +156,7 @@ fn unaccepted(http: &Http, bridge: &Token) {
                 display_name: None,
                 tag: None,
             },
-            Some(bridge),
+            Some(bridge.into()),
         )
         .unwrap()
     else {
@@ -236,7 +236,7 @@ fn crossed(
     let (identity, session) = closed(http, bridge, "delete-crossed");
     let bearer = session_token(http, identity);
     let cookie = browser_sign_in(browser, identity, context(http, identity), OLD);
-    let native = |request: &Request| http.exchange(request, Some(&bearer));
+    let native = |request: &Request| http.exchange(request, Some((&bearer).into()));
     let website = |request: &Request| browser.answer(request, Some(&cookie));
     let finish =
         |(attempt, proof): (Token, Vec<u8>)| Request::DeleteAccountFinish { attempt, proof };
@@ -315,7 +315,7 @@ fn replaced(http: &Http, bridge: &Token) {
 }
 
 /// A fresh native sign-in by hand, for raw requests. One unit.
-fn session_token(http: &Http, identity: Identity) -> Token {
+fn session_token(http: &Http, identity: Identity) -> SignedToken {
     let (login, message) = Login::start(OLD.into(), context(http, identity)).unwrap();
     let Response::LoginChallenge { attempt, message } = http
         .exchange(&Request::LoginStart { identity, message }, None)
@@ -348,7 +348,7 @@ fn budget(http: &Http, bridge: &Token) {
         let (_, message) = Login::start(OLD.into(), context(http, identity)).unwrap();
         http.exchange(
             &Request::DeleteAccountStart { login: message },
-            Some(&bearer),
+            Some((&bearer).into()),
         )
     };
     for _ in 0..6 {
@@ -356,7 +356,7 @@ fn budget(http: &Http, bridge: &Token) {
     }
     assert_eq!(start().err(), Some(Error::Busy));
     assert!(matches!(
-        http.exchange(&Request::SessionStatus, Some(&bearer))
+        http.exchange(&Request::SessionStatus, Some((&bearer).into()))
             .unwrap(),
         Response::SessionStatus { .. }
     ));

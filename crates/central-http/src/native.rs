@@ -9,12 +9,16 @@ use axum::{
     Router,
     body::{Body, Bytes},
     extract::{Path, Request, State},
-    http::{Extensions, HeaderMap, StatusCode, header},
+    http::{Extensions, HeaderMap, HeaderValue, StatusCode, header},
+    middleware::{self, Next},
     response::{IntoResponse, Response},
-    routing::{post, put},
+    routing::{get, post, put},
 };
-use central_api::{Error, Token, reports::Part};
-use central_identity::{IdentityService, Place};
+use central_api::{
+    Error, PROTOCOL_HEADER, PROTOCOL_VERSION, Token, UPDATE_REQUIRED_BODY, UPDATE_REQUIRED_STATUS,
+    reports::Part,
+};
+use central_identity::{IdentityService, Place, Presented};
 use std::{
     sync::{Arc, Mutex},
     time::Instant,
@@ -44,6 +48,9 @@ pub(crate) fn router(identity: Arc<IdentityService>, deployed: bool) -> Router {
         // announced part as raw gzip.
         .route("/v1/reports", post(file))
         .route("/v1/reports/{report}/{part}", put(file_part))
+        // Above this line every route speaks the protocol; the key set below is public.
+        .layer(middleware::from_fn(protocol))
+        .route("/.well-known/jwks.json", get(jwks))
         .with_state(Native {
             identity,
             uploads: Uploads::default(),
@@ -66,9 +73,55 @@ impl Native {
     }
 }
 
+/// The answer to a build too old to be served: one fixed refusal a client can read. A
+/// build that cannot read it still sees a status it does not take for a refused password.
+pub(crate) fn update_required() -> Response {
+    let status = StatusCode::from_u16(UPDATE_REQUIRED_STATUS).unwrap_or(StatusCode::BAD_REQUEST);
+    (
+        status,
+        [
+            (header::CONTENT_TYPE, "application/json"),
+            // RFC 9110 asks a 426 to name what it requires.
+            (header::UPGRADE, "baylee-central/2"),
+        ],
+        UPDATE_REQUIRED_BODY,
+    )
+        .into_response()
+}
+
+/// Refuse any other protocol before the request is decoded: before its credential, its budget
+/// or the database. The boundary has read a small body by then, within its own bounds
+/// (`boundary.rs`); a report part's body is not read at all. An old client hears this at its
+/// first request, not as a failure to decode the answer to a sign-in that has already happened.
+async fn protocol(request: Request, next: Next) -> Response {
+    let mut values = request.headers().get_all(PROTOCOL_HEADER).iter();
+    if values.next().map(HeaderValue::as_bytes) == Some(PROTOCOL_VERSION.as_bytes())
+        && values.next().is_none()
+    {
+        return next.run(request).await;
+    }
+    update_required()
+}
+
+/// `GET /.well-known/jwks.json`: the keys tokens verify under. Public and made once.
+async fn jwks(State(native): State<Native>) -> Response {
+    match native.identity.jwks() {
+        Ok(document) => (
+            [
+                (header::CONTENT_TYPE, "application/jwk-set+json"),
+                (header::CACHE_CONTROL, "public, max-age=300"),
+            ],
+            document.to_vec(),
+        )
+            .into_response(),
+        Err(error) => failure(error),
+    }
+}
+
 /// Fixed public vocabulary; no parser/database/crypto diagnostics reach the peer.
 fn failure(error: Error) -> Response {
     let status = match error {
+        Error::UpdateRequired => return update_required(),
         Error::Rejected => StatusCode::UNAUTHORIZED,
         Error::Unavailable => StatusCode::SERVICE_UNAVAILABLE,
         Error::Conflict => StatusCode::CONFLICT,
@@ -135,8 +188,8 @@ async fn call(
     }
 }
 
-/// Exactly one `Content-Type`, this one, and at most one `Authorization`, as a bearer.
-fn credential(headers: &HeaderMap, content_type: &str) -> Result<Option<Token>, Error> {
+/// Exactly one `Content-Type`, this one, and at most one `Authorization`.
+fn single_headers(headers: &HeaderMap, content_type: &str) -> Result<(), Error> {
     if headers.get_all(header::CONTENT_TYPE).iter().count() != 1
         || headers
             .get(header::CONTENT_TYPE)
@@ -146,22 +199,38 @@ fn credential(headers: &HeaderMap, content_type: &str) -> Result<Option<Token>, 
     {
         return Err(Error::Rejected);
     }
+    Ok(())
+}
+
+/// A gateway's credential, on the routes that take nothing else.
+fn credential(headers: &HeaderMap, content_type: &str) -> Result<Option<Token>, Error> {
+    single_headers(headers, content_type)?;
     headers
         .get(header::AUTHORIZATION)
         .map(|h| Token::from_bearer(h.to_str().map_err(|_| Error::Rejected)?))
         .transpose()
 }
 
-/// One native request from `from`: its address's budget for the operation
-/// first (`addresses.rs`), then the service, which is told the address for
-/// its guesses at passwords and its share of the requests without a session.
+/// A credential or a signed session, on the route that takes both.
+fn presented(identity: &IdentityService, headers: &HeaderMap) -> Result<Option<Presented>, Error> {
+    single_headers(headers, "application/json")?;
+    headers
+        .get(header::AUTHORIZATION)
+        .map(|h| identity.present(h.to_str().map_err(|_| Error::Rejected)?))
+        .transpose()
+}
+
+/// One native request from `from`: its bearer read first (a signed session is verified
+/// under its own budget, `limits.rs`), then its address's budget for the operation
+/// (`addresses.rs`), then the service, which is told the address for its guesses at
+/// passwords and its share of the requests without a session.
 async fn process(
     native: &Native,
     from: Option<Client>,
     headers: &HeaderMap,
     body: &[u8],
 ) -> Result<Vec<u8>, Error> {
-    let token = credential(headers, "application/json")?;
+    let presented = presented(&native.identity, headers)?;
     let request = central_api::decode(body)?;
     if let Some(client) = from {
         // The guard is gone before anything is awaited.
@@ -176,7 +245,7 @@ async fn process(
     }
     let response = native
         .identity
-        .handle_from(request, token.as_ref(), from.map(Place::from))
+        .handle_from(request, presented.as_ref(), from.map(Place::from))
         .await?;
     central_api::encode(&response)
 }
@@ -266,6 +335,7 @@ mod tests {
     use super::*;
     use axum::body::to_bytes;
     use std::time::Duration;
+    use tower::ServiceExt;
 
     /// A body announced and never sent.
     struct Withheld;
@@ -340,5 +410,82 @@ mod tests {
         ] {
             assert!(unfinished(&answer));
         }
+    }
+
+    /// The refusal in front of a route that must not be reached.
+    fn guarded() -> Router {
+        Router::new()
+            .route("/v1/native", post(|| async { "reached" }))
+            .layer(middleware::from_fn(protocol))
+    }
+
+    async fn call(values: &[&str]) -> Response {
+        let mut request = axum::http::Request::post("/v1/native");
+        for value in values {
+            request = request.header(PROTOCOL_HEADER, *value);
+        }
+        guarded()
+            .oneshot(request.body(Body::empty()).unwrap())
+            .await
+            .unwrap()
+    }
+
+    #[tokio::test]
+    async fn the_protocol_of_this_build_reaches_the_route() {
+        let response = call(&[PROTOCOL_VERSION]).await;
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = to_bytes(response.into_body(), 64).await.unwrap();
+        assert_eq!(&body[..], b"reached");
+    }
+
+    #[tokio::test]
+    async fn any_other_protocol_is_told_to_update_and_reaches_nothing() {
+        for values in [
+            &[][..],
+            &["1"],
+            &["3"],
+            &["2 "],
+            &["02"],
+            &[""],
+            &["2", "2"],
+        ] {
+            let response = call(values).await;
+            assert_eq!(response.status().as_u16(), 426, "{values:?}");
+            assert_eq!(
+                response.headers().get(header::CONTENT_TYPE).unwrap(),
+                "application/json"
+            );
+            assert!(response.headers().contains_key(header::UPGRADE));
+            let body = to_bytes(response.into_body(), 64).await.unwrap();
+            assert_eq!(&body[..], UPDATE_REQUIRED_BODY.as_bytes(), "{values:?}");
+        }
+    }
+
+    #[test]
+    fn the_refusal_is_the_contracts_form() {
+        assert_eq!(
+            UPDATE_REQUIRED_BODY,
+            r#"{"refusal":{"code":"update_required"}}"#
+        );
+        assert_eq!(UPDATE_REQUIRED_STATUS, 426);
+    }
+
+    #[tokio::test]
+    async fn an_update_required_error_answers_as_the_refusal_does() {
+        let response = failure(Error::UpdateRequired);
+        assert_eq!(response.status().as_u16(), 426);
+        let body = to_bytes(response.into_body(), 64).await.unwrap();
+        assert_eq!(&body[..], UPDATE_REQUIRED_BODY.as_bytes());
+    }
+
+    #[test]
+    fn a_session_is_never_taken_where_only_a_credential_is() {
+        let mut headers = HeaderMap::new();
+        headers.insert(header::CONTENT_TYPE, "application/json".parse().unwrap());
+        headers.insert(header::AUTHORIZATION, "Bearer a.b.c".parse().unwrap());
+        assert!(matches!(
+            credential(&headers, "application/json"),
+            Err(Error::Rejected)
+        ));
     }
 }

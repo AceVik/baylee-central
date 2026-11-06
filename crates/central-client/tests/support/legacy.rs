@@ -7,12 +7,12 @@
 //! bridge's admission of a move that has not closed.
 use super::{Http, browser::Browser, config, password, terms};
 use central_api::{
-    Endpoint, Error, Token,
+    Endpoint, Error, SignedToken, Token,
     admin::{AdminAnswer, AdminRequest},
     gateway::GatewayMetadata,
     legacy::LegacyProgress,
     terms::TermsSubject,
-    wire::{Discovery, Request, Response, TicketPurpose},
+    wire::{Discovery, GatewayPurpose::Admit, Request, Response},
 };
 use central_client::{Session, Transport};
 use central_crypto::opaque::{Login, server::ServerKeys};
@@ -82,20 +82,11 @@ fn accept(http: &Http, session: &Session) {
         .unwrap();
 }
 
-/// The bridge's admission of the session's account at the official gateway:
-/// the legacy id it learns, or the refusal.
-fn admission(http: &Http, session: &Session, bridge: &Token) -> Result<Option<String>, Error> {
-    let ticket = session.gateway_ticket(http, GATEWAY.into())?;
-    match http.exchange(
-        &Request::RedeemGateway {
-            ticket,
-            purpose: TicketPurpose::Admit,
-        },
-        Some(bridge),
-    )? {
-        Response::GatewayIdentity { legacy_id, .. } => Ok(legacy_id),
-        _ => Err(Error::Rejected),
-    }
+/// The session's admission at the official gateway: the legacy id its token names, or the
+/// refusal.
+fn admission(http: &Http, session: &Session) -> Result<Option<String>, Error> {
+    let (token, _) = session.gateway_token(http, GATEWAY.into(), Admit)?;
+    Ok(http.gateway_claims(&token, GATEWAY).legacy_id)
 }
 
 /// Signed in and restored through the legacy store, terms accepted; the move
@@ -162,6 +153,7 @@ pub(crate) fn run(
             ServerKeys::generate(),
             &bridge,
             GATEWAY,
+            super::token_keys(),
         )
         .unwrap()
         .with_terms(Some(terms::central_document()))
@@ -180,13 +172,14 @@ pub(crate) fn run(
     let http = Http {
         endpoint,
         address,
+        identity: Arc::clone(&service),
         lose_write_reply: AtomicBool::new(false),
         lose_password_reply: AtomicBool::new(false),
         lose_delete_reply: AtomicBool::new(false),
     };
     let tested = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         good_path(&http, &bridge, runtime, operator);
-        open_move_is_not_admitted(&http, &bridge);
+        open_move_is_not_admitted(&http);
         budget_and_lockout(&http, runtime, operator);
         refusals(&http, original, &central_only);
         listing(
@@ -286,10 +279,7 @@ fn good_path(http: &Http, bridge: &Token, runtime: &Runtime, operator: &Database
         "a closed move has no legacy sign-in"
     );
     // The official gateway learns the link with the admission.
-    assert_eq!(
-        admission(http, &session, bridge),
-        Ok(Some("mover-id".into()))
-    );
+    assert_eq!(admission(http, &session), Ok(Some("mover-id".into())));
     // The bridge's own legacy operations are Central's now.
     for request in [
         Request::LegacyReserve {
@@ -310,7 +300,7 @@ fn good_path(http: &Http, bridge: &Token, runtime: &Runtime, operator: &Database
         },
     ] {
         assert_eq!(
-            http.exchange(&request, Some(bridge)).err(),
+            http.exchange(&request, Some(bridge.into())).err(),
             Some(Error::Rejected)
         );
     }
@@ -336,15 +326,12 @@ fn registers_a_loopback_gateway(http: &Http, session: &Session) {
 }
 
 /// The bridge learns a legacy id only for a closed move.
-fn open_move_is_not_admitted(http: &Http, bridge: &Token) {
+fn open_move_is_not_admitted(http: &Http) {
     let session = moved(http, "early");
-    assert_eq!(admission(http, &session, bridge), Err(Error::Rejected));
+    assert_eq!(admission(http, &session), Err(Error::Rejected));
     let snapshot = session.legacy_export(http).unwrap();
     session.legacy_link(http, snapshot.digest).unwrap();
-    assert_eq!(
-        admission(http, &session, bridge),
-        Ok(Some("early-id".into()))
-    );
+    assert_eq!(admission(http, &session), Ok(Some("early-id".into())));
     session.logout(http).unwrap();
 }
 
@@ -390,7 +377,7 @@ fn budget_and_lockout(http: &Http, runtime: &Runtime, operator: &DatabaseConnect
 
 /// A native session of a registered account, its terms accepted, as a bare
 /// bearer.
-fn native_session(original: &Http, account: &password::Registered) -> Token {
+fn native_session(original: &Http, account: &password::Registered) -> SignedToken {
     let (login, message) = Login::start(password::OLD.into(), account.context).unwrap();
     let Response::LoginChallenge { attempt, message } = original
         .exchange(
@@ -421,7 +408,7 @@ fn native_session(original: &Http, account: &password::Registered) -> Token {
         current: Some(current),
         accepted: false,
     } = original
-        .exchange(&Request::TermsStatus, Some(&token))
+        .exchange(&Request::TermsStatus, Some((&token).into()))
         .unwrap()
     {
         original
@@ -431,7 +418,7 @@ fn native_session(original: &Http, account: &password::Registered) -> Token {
                     version: current.version,
                     digest: current.digest,
                 },
-                Some(&token),
+                Some((&token).into()),
             )
             .unwrap();
     }
@@ -465,11 +452,13 @@ fn refusals(http: &Http, original: &Http, central_only: &password::Registered) {
         Request::LegacyLink { digest: [0; 32] },
     ] {
         assert_eq!(
-            http.exchange(&request, Some(&token)).err(),
+            http.exchange(&request, Some((&token).into())).err(),
             Some(Error::Rejected)
         );
     }
-    original.exchange(&Request::Logout, Some(&token)).unwrap();
+    original
+        .exchange(&Request::Logout, Some((&token).into()))
+        .unwrap();
     // An empty password is refused before anything is looked up.
     let request = Request::LegacyLogin {
         username: "limited".into(),

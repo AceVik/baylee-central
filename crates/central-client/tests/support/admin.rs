@@ -64,7 +64,7 @@ pub(crate) fn run(
     // The native listener serves none of it, with either token.
     for token in [&cookie, &Token::generate().unwrap()] {
         assert_eq!(
-            http.exchange(&accounts(), Some(token)).err(),
+            http.exchange(&accounts(), Some(token.into())).err(),
             Some(Error::Rejected)
         );
     }

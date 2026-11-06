@@ -55,7 +55,7 @@ impl Session {
         request: SocialRequest,
     ) -> Result<SocialResponse, Error> {
         self.same_endpoint(transport)?;
-        match transport.exchange(&Request::Social { request }, Some(&self.token))? {
+        match transport.exchange(&Request::Social { request }, Some((&self.token).into()))? {
             Response::Social { response } => Ok(response),
             _ => Err(Error::Rejected),
         }

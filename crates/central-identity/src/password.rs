@@ -160,6 +160,6 @@ impl IdentityService {
         // Whoever knew the old password has no place of the account's any
         // more; the one this change came from stays its own.
         self.changed(credential.identity.account, guess.place());
-        Ok(signed_in(surface, credential.identity, issued, token))
+        signed_in(self, surface, credential.identity, issued, token)
     }
 }

@@ -2,7 +2,7 @@ use super::Http;
 use central_api::{
     Error, Token,
     gateway::{GatewayActivity, GatewayFigures, GatewayMetadata},
-    wire::{Request, Response, TicketPurpose},
+    wire::{GatewayPurpose, Request, Response},
 };
 use central_client::{Session, Transport};
 use sea_orm::{ConnectionTrait, DatabaseConnection, DbBackend, Statement, prelude::Uuid};
@@ -45,13 +45,13 @@ pub(crate) fn run(
             &Request::GatewayHeartbeat {
                 metadata: metadata.clone()
             },
-            Some(&registered.credential)
+            Some((&registered.credential).into())
         )
         .is_err()
     );
     http.exchange(
         &Request::GatewayHeartbeat { metadata },
-        Some(&registered.heartbeat),
+        Some((&registered.heartbeat).into()),
     )
     .unwrap();
     assert!(central_client::gateway_directory(http, None).unwrap()[0].online);
@@ -67,40 +67,15 @@ pub(crate) fn run(
             .unwrap(),
         2
     );
-    let ticket = session
-        .gateway_capability(http, origin.into(), TicketPurpose::Admin)
+    let (token, _) = session
+        .gateway_token(http, origin.into(), GatewayPurpose::Admin)
         .unwrap();
-    let Response::GatewayIdentity {
-        legacy_id,
-        lease: Some(lease),
-        ..
-    } = http
-        .exchange(
-            &Request::RedeemGateway {
-                ticket,
-                purpose: TicketPurpose::Admin,
-            },
-            Some(&registered.credential),
-        )
-        .unwrap()
-    else {
-        panic!("admin lease expected");
-    };
+    let claims = http.gateway_claims(&token, origin);
     assert!(
-        legacy_id.is_none(),
+        claims.legacy_id.is_none(),
         "a registered gateway cannot learn the legacy identifier"
     );
-    assert!(matches!(
-        http.exchange(
-            &Request::GatewaySession {
-                lease,
-                purpose: TicketPurpose::Admin
-            },
-            Some(&registered.credential)
-        )
-        .unwrap(),
-        Response::GatewaySession { .. }
-    ));
+    assert!(claims.purpose == central_crypto::jwt::Purpose::Admin);
     super::reports::run(
         http,
         &registered.credential,
@@ -186,7 +161,10 @@ fn activity(
             metadata: metadata(),
             activity,
         };
-        assert_eq!(http.exchange(&request, bearer).err(), Some(Error::Rejected));
+        assert_eq!(
+            http.exchange(&request, bearer.map(Into::into)).err(),
+            Some(Error::Rejected)
+        );
     }
     assert_eq!(figures().gateways, []);
     former_shape(http, registered, origin);
@@ -219,7 +197,7 @@ fn activity(
         &Request::GatewayHeartbeat {
             metadata: metadata(),
         },
-        Some(&registered.heartbeat),
+        Some((&registered.heartbeat).into()),
     )
     .unwrap();
     assert_eq!(figures().gateways, []);
@@ -236,7 +214,7 @@ fn former_shape(http: &Http, registered: &central_client::GatewayRegistration, o
         let body = format!(
             r#"{{"operation":"gateway_pulse","metadata":{{"name":"Synthetic gateway","version":"test-2","website":"{origin}/status"}},"activity":{activity}}}"#
         );
-        http.raw(&body, Some(&registered.heartbeat))
+        http.written(&body, Some((&registered.heartbeat).into()))
     };
     assert_eq!(
         pulse(r#"{"players":12,"tables":3,"games":4}"#).err(),
@@ -248,7 +226,7 @@ fn former_shape(http: &Http, registered: &central_client::GatewayRegistration, o
     );
     assert!(matches!(
         pulse(r#"{"players":12,"playing":12,"tables":3,"games":4}"#),
-        Ok(Response::Done)
+        Ok(Response::GatewayHeartbeat { .. })
     ));
     let all = GatewayActivity {
         playing: COUNTED.players,
@@ -284,7 +262,7 @@ pub(crate) fn official(
     );
     let heartbeat = Request::GatewayHeartbeat { metadata };
     assert_eq!(
-        http.exchange(&heartbeat, Some(bridge)).err(),
+        http.exchange(&heartbeat, Some(bridge.into())).err(),
         Some(Error::Rejected),
         "nothing is listed for the bridge to beat for"
     );
@@ -311,18 +289,18 @@ pub(crate) fn official(
     };
     assert!(!entry(http).online);
     assert!(
-        http.exchange(&heartbeat, Some(&Token::generate().unwrap()))
+        http.exchange(&heartbeat, Some((&Token::generate().unwrap()).into()))
             .is_err()
     );
     assert!(matches!(
-        http.exchange(&heartbeat, Some(bridge)).unwrap(),
-        Response::Done
+        http.exchange(&heartbeat, Some(bridge.into())).unwrap(),
+        Response::GatewayHeartbeat { .. }
     ));
     let listed = entry(http);
     assert!(listed.online);
     assert_eq!(listed.metadata.name, "Synthetic official gateway");
     assert_eq!(
-        http.exchange(&heartbeat, Some(bridge)).err(),
+        http.exchange(&heartbeat, Some(bridge.into())).err(),
         Some(Error::Busy)
     );
     // The bridge's pulse reports for the official gateway, and no other

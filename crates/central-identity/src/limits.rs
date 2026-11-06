@@ -54,6 +54,11 @@ pub(super) const PENDING_SECONDS: u64 = 60;
 pub(super) const PENDING: usize = 4096;
 const _: () = assert!(PENDING as u64 > PUBLIC_PER_SECOND as u64 * PENDING_SECONDS);
 
+/// Central tokens verified a second: above the control and data budgets together, so that
+/// no honest load meets it.
+pub(super) const SIGNATURES_PER_SECOND: u32 = 1024;
+/// Reads of the key set a second. Each gateway reads it about every five minutes.
+pub(super) const JWKS_PER_SECOND: u32 = 256;
 /// Legacy sign-ins a minute, all names together: the store holds a handful
 /// of accounts, and each sign-in is one Argon2 derivation.
 pub(super) const LEGACY_PER_MINUTE: u32 = 30;
@@ -175,9 +180,8 @@ fn class(request: &Request) -> Class {
         request,
         Request::SessionStatus
             | Request::RenewSession
-            | Request::GatewaySession { .. }
-            | Request::GatewayProfile { .. }
-            | Request::GatewayAuthorize { .. }
+            | Request::GatewayToken { .. }
+            | Request::GatewayRevocations { .. }
             | Request::TermsStatus
             | Request::AccountSummary
             | Request::Logout
@@ -221,14 +225,12 @@ fn tells(request: &Request) -> Tells {
         | Request::DeleteObject { .. }
         | Request::ReadDocument
         | Request::WriteDocument { .. }
-        | Request::GatewayTicket { .. }
-        | Request::GatewaySession { .. }
-        | Request::GatewayProfile { .. }
-        | Request::RedeemGateway { .. }
+        | Request::GatewayToken { .. }
+        | Request::RegisterInvalidate { .. }
+        | Request::GatewayRevocations { .. }
         | Request::GatewayHeartbeat { .. }
         | Request::GatewayPulse { .. }
-        | Request::GatewayStatus
-        | Request::CheckGatewayAdmin { .. } => Tells::Proves,
+        | Request::GatewayStatus => Tells::Proves,
         // The first two are answered alike whoever asks; after the other
         // two the session that asked is gone.
         Request::Logout
@@ -241,31 +243,15 @@ fn tells(request: &Request) -> Tells {
 
 /// A request that is counted by the bearer it came with, kept from before
 /// it is served until it is answered ([`Limits::answered`]).
+///
+/// Every `Rejected` answer counts against the bearer: no request carries a
+/// second secret that is someone else's. A gateway checks a player's token
+/// by itself (`docs/gateway-registry.md` §"Session tokens") and asks
+/// Central nothing about one, so a player's made-up token never reaches
+/// the gateway's credential here.
 pub(super) struct Told {
     bearer: [u8; 32],
     tells: Tells,
-    /// Whether a refusal says something about the bearer
-    /// ([`refusal_is_the_bearer_s`]).
-    refusal_counts: bool,
-}
-
-/// Whether a `Rejected` answer to `request` may count against its bearer.
-/// Not where the request carries a second secret that is someone else's: a
-/// gateway asks these with its own credential about a lease or a ticket a
-/// player handed it, and Central refuses a made-up one with the same
-/// `Rejected` it has for a credential that ended. Counted, four bad
-/// tickets from any player would take a gateway's credential out of the
-/// vouched-for at will. Not counted, a credential that did end keeps its
-/// place until its last vouching answer is [`PROVEN_SECONDS`] old, and
-/// spends its own bearer's budget meanwhile.
-fn refusal_is_the_bearer_s(request: &Request) -> bool {
-    !matches!(
-        request,
-        Request::GatewaySession { .. }
-            | Request::GatewayProfile { .. }
-            | Request::GatewayAuthorize { .. }
-            | Request::RedeemGateway { .. }
-    )
 }
 
 /// What `request`'s answer will say about `bearer`; nothing for a request
@@ -276,7 +262,6 @@ pub(super) fn told(request: &Request, bearer: Option<&Token>) -> Option<Told> {
     matches!(class(request), Class::Control | Class::Data).then(|| Told {
         bearer: bearer.digest(),
         tells: tells(request),
-        refusal_counts: refusal_is_the_bearer_s(request),
     })
 }
 
@@ -467,6 +452,10 @@ pub(super) struct Limits {
     strangers: Places,
     /// Reports each gateway filed in the current hour.
     reports: BTreeMap<[u8; 16], (Instant, u32)>,
+    /// Signature checks of presented Central tokens.
+    signatures: Window,
+    /// Reads of the key set.
+    jwks: Window,
 }
 
 #[derive(Default)]
@@ -603,9 +592,7 @@ impl Limits {
     /// A request counted by its bearer was answered: `refused` is the
     /// error, if it was one. An answer to one of the requests in [`tells`]
     /// vouches for the bearer from now on; [`REFUSALS`] rejections in a
-    /// row, or the session's end, take that back. A rejection of a request
-    /// that carries someone else's secret is not counted
-    /// ([`refusal_is_the_bearer_s`]).
+    /// row, or the session's end, take that back.
     ///
     /// `true` when the answer vouches for a bearer that was not vouched
     /// for before: it is not yet, and the caller asks the store whose it
@@ -624,7 +611,7 @@ impl Limits {
             (None, Tells::Ends) => {
                 self.proven.known.remove(&told.bearer);
             }
-            (Some(Error::Rejected), _) if told.refusal_counts => {
+            (Some(Error::Rejected), _) => {
                 self.proven.refused(&told.bearer);
             }
             _ => {}
@@ -670,6 +657,16 @@ impl Limits {
         self.public.spend(place, now);
         self.light.spend(around, now);
         Ok(())
+    }
+
+    /// Spend one signature check, before the work: a made-up token costs what any other
+    /// request costs, and past this budget nothing is verified until the second is over.
+    pub(super) fn signature(&mut self, now: Instant) -> Result<(), Error> {
+        self.signatures.charge(now, SIGNATURES_PER_SECOND)
+    }
+    /// Spend one read of the key set.
+    pub(super) fn jwks(&mut self, now: Instant) -> Result<(), Error> {
+        self.jwks.charge(now, JWKS_PER_SECOND)
     }
 
     fn everyone(&mut self, now: Instant) -> Result<(), Error> {
@@ -917,7 +914,7 @@ mod tests {
                     for _ in 0..BEARER_CONTROL {
                         limits
                             .request(&check(), Some(credential), Some(place(7)), now)
-                            .expect("a gateway's check of a player");
+                            .expect("a gateway's catch-up");
                     }
                     for _ in 0..BEARER_DATA {
                         let asked = Request::GatewayStatus;
@@ -986,17 +983,15 @@ mod tests {
             for _ in 0..BEARER_CONTROL {
                 limits
                     .request(&check(), Some(&bridge), host, now)
-                    .expect("the bridge's check of a player");
+                    .expect("the bridge's catch-up");
             }
         }
     }
 
-    /// A gateway's check of one of its players' leases.
+    /// A gateway's control request: the sessions that ended since its
+    /// last number.
     fn check() -> Request {
-        Request::GatewaySession {
-            lease: Token::generate().unwrap(),
-            purpose: central_api::wire::TicketPurpose::Admit,
-        }
+        Request::GatewayRevocations { after: 0 }
     }
 
     /// The places' windows of the shared budgets live a second and are
@@ -1351,53 +1346,31 @@ mod tests {
         assert!(limits.answered(&status, None, now));
     }
 
-    /// A gateway asks about its players with its own credential, and a
-    /// player's made-up lease or ticket is refused with the `Rejected` a
-    /// dead credential gets. Such refusals do not count against the
-    /// gateway: no player takes its credential out of the vouched-for.
+    /// No request carries a player's secret any more: a gateway checks a
+    /// player's token by itself (`docs/gateway-registry.md` §"Session
+    /// tokens"). So each of a gateway's own requests, refused [`REFUSALS`]
+    /// times in a row, says its credential ended, and one fewer does not.
     #[test]
-    fn a_player_s_bad_ticket_is_not_held_against_the_gateway_that_asked() {
+    fn a_gateway_s_own_requests_refused_in_a_row_end_its_credential() {
         let now = Instant::now();
-        let mut limits = Limits::default();
-        let gateway = Token::generate().unwrap();
-        let of_a_player = || Token::generate().unwrap();
-        answer(&mut limits, &Request::GatewayStatus, &gateway, None);
-        assert!(vouched(&limits, &gateway, now));
-        for _ in 0..4 * REFUSALS {
-            for asked in [
-                Request::GatewaySession {
-                    lease: of_a_player(),
-                    purpose: central_api::wire::TicketPurpose::Admit,
-                },
-                Request::GatewayProfile {
-                    lease: of_a_player(),
-                    purpose: central_api::wire::TicketPurpose::Admit,
-                },
-                Request::GatewayAuthorize {
-                    lease: of_a_player(),
-                    purpose: central_api::wire::TicketPurpose::Admit,
-                    terms: None,
-                },
-                Request::RedeemGateway {
-                    ticket: of_a_player(),
-                    purpose: central_api::wire::TicketPurpose::Admit,
-                },
-            ] {
+        for asked in [
+            Request::GatewayStatus,
+            Request::GatewayRevocations { after: 0 },
+            Request::RegisterInvalidate {
+                path: "/auth/central/invalidate".into(),
+            },
+        ] {
+            let mut limits = Limits::default();
+            let gateway = Token::generate().unwrap();
+            answer(&mut limits, &Request::GatewayStatus, &gateway, None);
+            assert!(vouched(&limits, &gateway, now));
+            for _ in 0..REFUSALS - 1 {
                 answer(&mut limits, &asked, &gateway, Some(Error::Rejected));
             }
+            assert!(vouched(&limits, &gateway, now));
+            answer(&mut limits, &asked, &gateway, Some(Error::Rejected));
+            assert!(!vouched(&limits, &gateway, now));
         }
-        assert!(vouched(&limits, &gateway, now));
-        // What is the gateway's own still counts: its status, refused four
-        // times in a row, says the credential ended.
-        for _ in 0..REFUSALS {
-            answer(
-                &mut limits,
-                &Request::GatewayStatus,
-                &gateway,
-                Some(Error::Rejected),
-            );
-        }
-        assert!(!vouched(&limits, &gateway, now));
     }
 
     #[test]
@@ -1538,10 +1511,7 @@ mod tests {
         for _ in 0..2 * REFUSALS {
             answer(
                 &mut limits,
-                &Request::RedeemGateway {
-                    ticket: Token::generate().unwrap(),
-                    purpose: central_api::wire::TicketPurpose::Admit,
-                },
+                &Request::GatewayRevocations { after: 0 },
                 &bridge,
                 Some(Error::Rejected),
             );

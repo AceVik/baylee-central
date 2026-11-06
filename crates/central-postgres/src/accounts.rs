@@ -16,7 +16,6 @@ mod email;
 mod export;
 mod gateways;
 mod grants;
-mod leases;
 mod legacy;
 mod migration;
 mod notifications;
@@ -32,6 +31,7 @@ mod reports;
 mod reset;
 mod sessions;
 mod social;
+mod streams;
 pub use social::CHAT_SENDER_SHARE;
 mod terms;
 mod tokens;
@@ -40,7 +40,7 @@ pub use email::{EMAIL_FRESH_MINUTES, Email, MAIL_CODE_MINUTES, MAIL_CODE_TRIES, 
 pub use legacy::LegacyMove;
 pub use migration::Status;
 pub use pairing::{Approval, Claim, MAX_POLLS, OPEN_IN_ALL, OPEN_PER_ACCOUNT, Redeemed};
-pub use profiles::{Profile, TAG_DRAWS, TagDraw};
+pub use profiles::{TAG_DRAWS, TagDraw};
 pub use recovery::Summary;
 pub use reports::{
     ALL_STORED, Filer, GATEWAY_STORED, ImportedHistory, ImportedNote, ImportedReport,
@@ -50,6 +50,10 @@ pub use reset::{
     ISSUED_RESET_HOURS, MAILED_RESET_HOURS, MailedReset, RESET_MAIL_GAP_MINUTES, RESET_MAILS_A_DAY,
 };
 pub use sessions::{Issued, Session};
+pub use streams::{
+    GatewayGrant, GatewayPush, GatewayPushResult, MAX_SIDS_PER_SESSION, PUSH_ATTEMPTS,
+    REVOCATION_PAGE, RevocationPage,
+};
 pub use terms::MAX_GATEWAY_VERSIONS;
 
 /// An OPAQUE credential snapshot. It cannot issue sessions without proof verification.

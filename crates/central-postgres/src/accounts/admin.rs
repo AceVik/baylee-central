@@ -659,7 +659,8 @@ impl AccountStore {
         if changed {
             if !enabled {
                 tx.execute_raw(statement(
-                    "DELETE FROM central_identity.gateway_leases WHERE gateway_id = $1",
+                    "DELETE FROM central_identity.gateway_sids i USING central_identity.gateways g
+                     WHERE g.id = $1 AND i.stream = g.origin",
                     vec![gateway.into()],
                 ))
                 .await

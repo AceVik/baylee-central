@@ -6,7 +6,7 @@ use super::Http;
 use central_api::{
     Error, Token,
     terms::{self, TermsDocument, TermsSubject, TermsText, TermsVersion},
-    wire::{Request, Response, TicketPurpose},
+    wire::{GatewayPurpose::Admit, Request, Response},
 };
 use central_client::{Session, Transport};
 
@@ -49,7 +49,7 @@ pub(crate) fn central(http: &Http, session: &Session, official: &str) {
     assert!(!status.accepted);
     assert_eq!(status.current, Some(document.version.clone()));
     assert!(matches!(
-        session.gateway_ticket(http, official.into()),
+        session.gateway_token(http, official.into(), Admit),
         Err(Error::TermsRequired)
     ));
     assert!(matches!(
@@ -58,7 +58,10 @@ pub(crate) fn central(http: &Http, session: &Session, official: &str) {
     ));
     // A bearer that is no session learns nothing about terms.
     assert!(matches!(
-        http.exchange(&Request::CreateObject, Some(&Token::generate().unwrap())),
+        http.exchange(
+            &Request::CreateObject,
+            Some((&Token::generate().unwrap()).into())
+        ),
         Err(Error::Rejected)
     ));
     // Reading one's own data stays possible.
@@ -96,34 +99,16 @@ fn publish(
             version: name.into(),
             texts: texts.to_vec(),
         },
-        Some(bridge),
+        Some(bridge.into()),
     )
 }
 
-fn authorize(
-    http: &Http,
-    bridge: &Token,
-    lease: &Token,
-    terms: Option<TermsVersion>,
-) -> (bool, bool) {
-    let Response::GatewayAuthorization {
-        central_terms,
-        gateway_terms,
-        ..
-    } = http
-        .exchange(
-            &Request::GatewayAuthorize {
-                lease: Token::from_secret_bytes(lease.to_secret_bytes()),
-                purpose: TicketPurpose::Admit,
-                terms,
-            },
-            Some(bridge),
-        )
-        .unwrap()
-    else {
-        panic!("an authorization");
-    };
-    (central_terms, gateway_terms)
+/// This gateway's terms the session's account accepted last, as a fresh token says it.
+fn accepted_terms(http: &Http, session: &Session, official: &str) -> Option<String> {
+    let (token, _) = session.gateway_token(http, official.into(), Admit).unwrap();
+    http.gateway_claims(&token, official)
+        .terms
+        .map(|terms| terms.version)
 }
 
 /// The official gateway (the bridge's origin) publishes and its players accept.
@@ -190,29 +175,13 @@ fn published(http: &Http, bridge: &Token, official: &str) -> TermsVersion {
     first
 }
 
-/// Players accept the current version; the gateway learns per lease whether
-/// they accepted its own current one.
+/// Players accept the current version; each token tells the gateway what they accepted, and
+/// the gateway compares that with its own current version.
 fn accepted(http: &Http, session: &Session, bridge: &Token, official: &str, first: &TermsVersion) {
     let first = first.clone();
-    let ticket = session.gateway_ticket(http, official.into()).unwrap();
-    let Response::GatewayIdentity {
-        lease: Some(lease), ..
-    } = http
-        .exchange(
-            &Request::RedeemGateway {
-                ticket,
-                purpose: TicketPurpose::Admit,
-            },
-            Some(bridge),
-        )
-        .unwrap()
-    else {
-        panic!("a lease");
-    };
-    assert_eq!(authorize(http, bridge, &lease, None), (true, true));
     assert_eq!(
-        authorize(http, bridge, &lease, Some(first.clone())),
-        (true, false),
+        accepted_terms(http, session, official),
+        None,
         "not accepted yet"
     );
     let gateway = || TermsSubject::Gateway {
@@ -237,13 +206,8 @@ fn accepted(http: &Http, session: &Session, bridge: &Token, official: &str, firs
     );
     session.accept_terms(http, gateway(), &first).unwrap();
     assert_eq!(
-        authorize(http, bridge, &lease, Some(first.clone())),
-        (true, true)
-    );
-    assert_eq!(
-        authorize(http, bridge, &lease, Some(forged.clone())),
-        (true, false),
-        "the gateway's own version decides, digest included"
+        accepted_terms(http, session, official),
+        Some(first.version.clone())
     );
 
     // A new version is current at once; the old acceptance no longer covers it.
@@ -258,8 +222,9 @@ fn accepted(http: &Http, session: &Session, bridge: &Token, official: &str, firs
         second
     );
     assert_eq!(
-        authorize(http, bridge, &lease, Some(second.clone())),
-        (true, false)
+        accepted_terms(http, session, official),
+        Some(first.version.clone()),
+        "it still says the old one, which the gateway does not take for its current"
     );
     assert_eq!(
         session.accept_terms(http, gateway(), &first),
@@ -267,17 +232,8 @@ fn accepted(http: &Http, session: &Session, bridge: &Token, official: &str, firs
         "only the current version can be accepted"
     );
     session.accept_terms(http, gateway(), &second).unwrap();
-    assert_eq!(authorize(http, bridge, &lease, Some(second)), (true, true));
-    // The older lease check still works for gateways that do not know terms.
-    assert!(matches!(
-        http.exchange(
-            &Request::GatewaySession {
-                lease,
-                purpose: TicketPurpose::Admit
-            },
-            Some(bridge)
-        )
-        .unwrap(),
-        Response::GatewaySession { .. }
-    ));
+    assert_eq!(
+        accepted_terms(http, session, official),
+        Some(second.version)
+    );
 }

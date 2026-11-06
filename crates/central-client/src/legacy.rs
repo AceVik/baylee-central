@@ -82,7 +82,7 @@ impl Session {
     /// network calls.
     pub fn legacy_export(&self, transport: &impl Transport) -> Result<LegacySnapshot, Error> {
         self.same_endpoint(transport)?;
-        match transport.exchange(&Request::LegacyExport, Some(&self.token))? {
+        match transport.exchange(&Request::LegacyExport, Some((&self.token).into()))? {
             Response::LegacySnapshot { snapshot } if snapshot.verified() => Ok(snapshot),
             _ => Err(Error::Rejected),
         }
@@ -98,7 +98,7 @@ impl Session {
     /// (`TermsRequired`) and failed network calls.
     pub fn legacy_link(&self, transport: &impl Transport, digest: [u8; 32]) -> Result<(), Error> {
         self.same_endpoint(transport)?;
-        match transport.exchange(&Request::LegacyLink { digest }, Some(&self.token))? {
+        match transport.exchange(&Request::LegacyLink { digest }, Some((&self.token).into()))? {
             Response::Done => Ok(()),
             _ => Err(Error::Rejected),
         }

@@ -385,6 +385,7 @@ fn failure(error: Error) -> Response {
         Error::Conflict => StatusCode::CONFLICT,
         Error::Busy => StatusCode::TOO_MANY_REQUESTS,
         Error::TermsRequired => StatusCode::FORBIDDEN,
+        Error::UpdateRequired => return super::native::update_required(),
     };
     (status, "account request rejected\n").into_response()
 }
@@ -641,7 +642,7 @@ mod tests {
     use axum::http::HeaderValue;
     use central_api::{
         terms::TermsSubject,
-        wire::{Identity, Response as Answer, TicketPurpose},
+        wire::{GatewayPurpose, Identity, Response as Answer},
     };
     use std::net::IpAddr;
     use tower::ServiceExt;
@@ -1039,9 +1040,9 @@ mod tests {
             Request::ReadDocument,
             Request::CreateObject,
             Request::ConfirmRestore { revision: 1 },
-            Request::GatewayTicket {
+            Request::GatewayToken {
                 gateway: central_api::OFFICIAL_ORIGIN.into(),
-                purpose: TicketPurpose::Admit,
+                purpose: GatewayPurpose::Admit,
             },
             Request::LegacyReserve {
                 legacy_id: "x".into(),
@@ -1058,9 +1059,9 @@ mod tests {
                 display_name: Some("Synthetic".into()),
                 tag: 13,
             },
-            Request::GatewayProfile {
-                lease: Token::generate().unwrap(),
-                purpose: TicketPurpose::Admit,
+            Request::GatewayRevocations { after: 0 },
+            Request::RegisterInvalidate {
+                path: "/auth/central/invalidate".into(),
             },
             Request::AcceptTerms {
                 subject: TermsSubject::Gateway {

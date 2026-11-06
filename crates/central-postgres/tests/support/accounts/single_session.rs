@@ -1,4 +1,4 @@
-use super::{AccountStore, Credential, ServerKeys, TicketPurpose, Token, context, enroll, login};
+use super::{AccountStore, Admit, Credential, ServerKeys, Token, context, enroll, login};
 use central_crypto::opaque::Login;
 
 pub(super) async fn run(store: &AccountStore, keys: &ServerKeys) {
@@ -10,27 +10,12 @@ pub(super) async fn run(store: &AccountStore, keys: &ServerKeys) {
         .close_legacy("single-session", identity)
         .await
         .unwrap();
-    let ticket = Token::generate().unwrap();
-    store
-        .gateway_ticket(&first, "official", &ticket, TicketPurpose::Admit)
+    let stream = "https://single-session.example";
+    let sid = store
+        .gateway_grant(&first, &[stream], false, Admit, [41; 16])
         .await
-        .unwrap();
-    let lease = Token::generate().unwrap();
-    store
-        .redeem_lease(
-            &ticket,
-            &["official"],
-            TicketPurpose::Admit,
-            None,
-            Some(&lease),
-        )
-        .await
-        .unwrap();
-    let outstanding = Token::generate().unwrap();
-    store
-        .gateway_ticket(&first, "official", &outstanding, TicketPurpose::Admit)
-        .await
-        .unwrap();
+        .unwrap()
+        .sid;
 
     // Failed proof and stale credential revision never reach a successful replacement.
     let credential = store.credential(identity).await.unwrap().unwrap();
@@ -52,28 +37,20 @@ pub(super) async fn run(store: &AccountStore, keys: &ServerKeys) {
             .is_err()
     );
     store.document(&first).await.unwrap();
-    store
-        .gateway_session(&lease, &["official"], None, TicketPurpose::Admit)
-        .await
-        .unwrap();
+    assert_eq!(
+        store.last_revocation(stream).await.unwrap(),
+        0,
+        "nothing ended yet"
+    );
 
     let second = login(store, keys, identity).await;
     assert!(store.document(&first).await.is_err());
+    // The replacing sign-in told the gateway that held the session, and gets no token for it.
+    let page = store.revocation_page(stream, 0).await.unwrap();
+    assert_eq!(page.sids, vec![sid]);
     assert!(
         store
-            .gateway_session(&lease, &["official"], None, TicketPurpose::Admit)
-            .await
-            .is_err()
-    );
-    assert!(
-        store
-            .redeem_lease(
-                &outstanding,
-                &["official"],
-                TicketPurpose::Admit,
-                None,
-                Some(&Token::generate().unwrap())
-            )
+            .gateway_grant(&first, &[stream], false, Admit, [42; 16])
             .await
             .is_err()
     );

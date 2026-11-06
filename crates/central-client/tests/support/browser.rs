@@ -9,10 +9,10 @@
 //! recovery code the page makes for it.
 use super::Http;
 use central_api::{
-    Error, Token,
+    Bearer, Error, SignedToken, Token,
     profile::REGISTERED_TAG_FLOOR,
     terms::TermsSubject,
-    wire::{AccountSource, Discovery, Identity, Request, Response, TicketPurpose},
+    wire::{AccountSource, Discovery, GatewayPurpose, Identity, Request, Response},
 };
 use central_client::Transport;
 use central_crypto::{
@@ -327,7 +327,7 @@ pub(crate) fn run(
         browser.answer(&set(&other), Some(&cookie)).err(),
         Some(Error::Conflict)
     );
-    play(browser, http, bridge, &cookie);
+    play(browser, http, &cookie);
     moved(browser, http, bridge, runtime, operator);
 }
 
@@ -402,7 +402,7 @@ fn summary(
         Some(Error::Rejected)
     );
     assert!(
-        http.exchange(&Request::AccountSummary, Some(cookie))
+        http.exchange(&Request::AccountSummary, Some(cookie.into()))
             .is_err()
     );
     let set = Request::SetRecovery {
@@ -512,7 +512,8 @@ fn moved(
         browser.answer(&Request::Logout, Some(&cookie)).unwrap(),
         Response::Done
     ));
-    http.exchange(&Request::Logout, Some(&token)).unwrap();
+    http.exchange(&Request::Logout, Some((&token).into()))
+        .unwrap();
 }
 
 /// The cookie's account accepts Central's terms in force, which it had not.
@@ -663,6 +664,13 @@ fn sign_in(browser: &Browser, http: &Http, context: Context) -> Token {
     reply.session.expect("a session for the cookie")
 }
 
+/// The cookie is a browser session only: as a native bearer it is nothing.
+fn no_native_bearer(http: &Http, cookie: &Token) {
+    for request in [Request::SessionStatus, Request::RenewSession] {
+        assert!(http.exchange(&request, Some(cookie.into())).is_err());
+    }
+}
+
 /// Operations outside the browser listener's list are refused, with any token.
 fn outside(browser: &Browser, bridge: &Token, cookie: &Token) {
     let metadata = || central_api::gateway::GatewayMetadata {
@@ -674,9 +682,9 @@ fn outside(browser: &Browser, bridge: &Token, cookie: &Token) {
         (Request::ReadDocument, cookie),
         (Request::CreateObject, cookie),
         (
-            Request::GatewayTicket {
+            Request::GatewayToken {
                 gateway: GATEWAY.into(),
-                purpose: TicketPurpose::Admit,
+                purpose: GatewayPurpose::Admit,
             },
             cookie,
         ),
@@ -720,11 +728,7 @@ fn outside(browser: &Browser, bridge: &Token, cookie: &Token) {
 }
 
 fn session(browser: &Browser, http: &Http, bridge: &Token, cookie: &Token) {
-    // The cookie is a browser session only: as a native bearer it is nothing.
-    assert!(
-        http.exchange(&Request::SessionStatus, Some(cookie))
-            .is_err()
-    );
+    no_native_bearer(http, cookie);
     // The browser's status names the account, which the native one does not.
     let Response::BrowserStatus {
         username,
@@ -755,7 +759,6 @@ fn session(browser: &Browser, http: &Http, bridge: &Token, cookie: &Token) {
         renewed >= expires_at,
         "a renewal never shortens the session"
     );
-    assert!(http.exchange(&Request::RenewSession, Some(cookie)).is_err());
     assert_eq!(
         browser.answer(&Request::RenewSession, None).err(),
         Some(Error::Rejected)
@@ -857,7 +860,7 @@ fn directory(
 
 /// The same account plays natively beside its browser session; signing out of
 /// the website ends only the browser session.
-fn play(browser: &Browser, http: &Http, bridge: &Token, cookie: &Token) {
+fn play(browser: &Browser, http: &Http, cookie: &Token) {
     let Discovery::Central { identity } =
         central_client::discover(http, "web-player".into()).unwrap()
     else {
@@ -870,26 +873,12 @@ fn play(browser: &Browser, http: &Http, bridge: &Token, cookie: &Token) {
         .answer(&Request::SessionStatus, Some(cookie))
         .unwrap();
     session.confirm_restored(http).unwrap();
-    let ticket = session.gateway_ticket(http, GATEWAY.into()).unwrap();
-    let Response::GatewayIdentity {
-        identity: admitted,
-        legacy_id,
-        lease,
-        ..
-    } = http
-        .exchange(
-            &Request::RedeemGateway {
-                ticket,
-                purpose: TicketPurpose::Admit,
-            },
-            Some(bridge),
-        )
-        .unwrap()
-    else {
-        panic!("an admission");
-    };
-    assert_eq!((admitted.account, legacy_id), (identity.account, None));
-    assert!(lease.is_some());
+    let (token, _) = session
+        .gateway_token(http, GATEWAY.into(), GatewayPurpose::Admit)
+        .unwrap();
+    let admitted = http.gateway_claims(&token, GATEWAY);
+    assert_eq!(admitted.account(), Some(identity.account));
+    assert_eq!(admitted.legacy_id, None);
     assert!(matches!(
         browser.answer(&Request::Logout, Some(cookie)).unwrap(),
         Response::Done
@@ -926,7 +915,7 @@ fn moved_sign_in(
                 display_name: Some("Moved_Player".into()),
                 tag: Some(13),
             },
-            Some(bridge),
+            Some(bridge.into()),
         )
         .unwrap()
     else {
@@ -940,7 +929,7 @@ fn moved_sign_in(
             legacy_id: "moved-legacy".into(),
             identity,
         },
-        Some(bridge),
+        Some(bridge.into()),
     )
     .unwrap();
     session.logout(http).unwrap();
@@ -1013,7 +1002,7 @@ fn native_refuses(
     identity: Identity,
     cookie: &Token,
     set: &Request,
-) -> Token {
+) -> SignedToken {
     let (native, message) = Login::start(MOVED.into(), context).unwrap();
     let Response::LoginChallenge { attempt, message } = http
         .exchange(&Request::LoginStart { identity, message }, None)
@@ -1038,7 +1027,7 @@ fn native_refuses(
         display_name: "Moved_Player".into(),
     };
     for request in [&Request::AccountSummary, set, &name] {
-        for bearer in [&token, cookie] {
+        for bearer in [Bearer::from(&token), Bearer::from(cookie)] {
             assert_eq!(
                 http.exchange(request, Some(bearer)).err(),
                 Some(Error::Rejected)

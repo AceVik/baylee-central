@@ -63,8 +63,7 @@ impl IdentityService {
             | Request::GatewayTerms { .. }
             | Request::TermsStatus
             | Request::AcceptTerms { .. }
-            | Request::PublishGatewayTerms { .. }
-            | Request::GatewayAuthorize { .. }) => {
+            | Request::PublishGatewayTerms { .. }) => {
                 self.terms_request(request, bearer, surface).await
             }
             request @ (Request::CreateObject
@@ -96,11 +95,9 @@ impl IdentityService {
             | Request::GatewayPulse { .. }
             | Request::PublicFigures { .. }
             | Request::SetGatewayAdmins { .. }
-            | Request::CheckGatewayAdmin { .. }
-            | Request::GatewaySession { .. }
-            | Request::GatewayProfile { .. }
-            | Request::GatewayTicket { .. }
-            | Request::RedeemGateway { .. }
+            | Request::GatewayToken { .. }
+            | Request::RegisterInvalidate { .. }
+            | Request::GatewayRevocations { .. }
             | Request::GatewayStatus) => self.gateway_request(request, bearer).await,
             request @ (Request::AccountExport
             | Request::DeleteAccountStart { .. }
