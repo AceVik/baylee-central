@@ -1,6 +1,5 @@
 //! Exact runtime privileges: rewriting archives and issuing or revoking beta
-//! keys remain operator-only; the runtime only spends a key's uses and moves a
-//! lease's expiry with its renewed session. It grants and removes
+//! keys remain operator-only; the runtime only spends a key's uses. It grants and removes
 //! administrator roles, appends to the audit, which it cannot rewrite or
 //! delete, and approves, enables and disables gateways as an administrator
 //! decides (`docs/administration.md`), never deleting an approval. It stores
@@ -16,11 +15,12 @@ impl AccountStore {
             "WITH required(name, privileges, updatable) AS (VALUES
              ('accounts', ARRAY['SELECT','INSERT','UPDATE','DELETE'], NULL::text[]),
              ('sessions', ARRAY['SELECT','INSERT','UPDATE','DELETE'], NULL),
-             ('gateway_tickets', ARRAY['SELECT','INSERT','UPDATE','DELETE'], NULL),
              ('private_objects', ARRAY['SELECT','INSERT','UPDATE','DELETE'], NULL),
              ('gateways', ARRAY['SELECT','INSERT','UPDATE'], NULL),
              ('gateway_admins', ARRAY['SELECT','INSERT','DELETE'], NULL),
-             ('gateway_leases', ARRAY['SELECT','INSERT','DELETE'], ARRAY['expires_at']),
+             ('gateway_streams', ARRAY['SELECT','INSERT','UPDATE'], NULL),
+             ('gateway_sids', ARRAY['SELECT','INSERT','DELETE'], NULL),
+             ('gateway_revocations', ARRAY['SELECT','INSERT','DELETE'], NULL),
              ('gateway_approvals', ARRAY['SELECT','INSERT'], ARRAY['enabled']),
              ('gateway_tokens', ARRAY['SELECT','INSERT'], ARRAY['revoked_at','last_used_at']),
              ('migration_archives', ARRAY['SELECT','INSERT'], NULL),
@@ -49,7 +49,7 @@ impl AccountStore {
              ('report_audit', ARRAY['SELECT','INSERT'], NULL),
              ('report_views', ARRAY['SELECT','INSERT','DELETE'], ARRAY['query']),
              ('report_seen', ARRAY['SELECT','INSERT','DELETE'], NULL))
-             SELECT count(*) = 35 AND bool_and(
+             SELECT count(*) = 36 AND bool_and(
                NOT pg_catalog.pg_has_role(c.relowner, 'USAGE')
                AND (SELECT bool_and(pg_catalog.has_table_privilege(c.oid, p)) FROM unnest(r.privileges) p)
                AND NOT pg_catalog.has_table_privilege(c.oid, 'TRUNCATE, REFERENCES, TRIGGER, MAINTAIN, SELECT WITH GRANT OPTION, INSERT WITH GRANT OPTION, UPDATE WITH GRANT OPTION, DELETE WITH GRANT OPTION')

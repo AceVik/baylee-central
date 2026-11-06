@@ -91,13 +91,12 @@ pub(super) fn needs_acceptance(request: &Request) -> bool {
             | Request::WriteDocument { .. }
             | Request::RegisterGateway { .. }
             | Request::SetGatewayAdmins { .. }
-            | Request::GatewayTicket { .. }
+            | Request::GatewayToken { .. }
             | Request::SetRecovery { .. }
             | Request::SetDisplayName { .. }
             | Request::ChangePasswordStart { .. }
             | Request::Admin { .. }
-            // A move's export and close wait for the terms, as the gateway
-            // tickets before them did (`docs/native-login.md` §"Legacy login").
+            // A move's export and close wait for the terms, as gateway tokens (`docs/native-login.md` §"Legacy login").
             | Request::LegacyExport
             | Request::LegacyLink { .. }
     ) || matches!(
@@ -224,30 +223,6 @@ impl IdentityService {
                     digest: published.digest,
                 })
             }
-            Request::GatewayAuthorize {
-                lease,
-                purpose,
-                terms,
-            } => {
-                let (gateway, origins) = self.gateway_authority(bearer).await?;
-                let (identity, expires_at, central_terms, gateway_terms) = self
-                    .store
-                    .gateway_authorize(
-                        &lease,
-                        &origins,
-                        gateway,
-                        purpose,
-                        self.current(),
-                        terms.as_ref(),
-                    )
-                    .await?;
-                Ok(Response::GatewayAuthorization {
-                    identity,
-                    expires_at,
-                    central_terms,
-                    gateway_terms,
-                })
-            }
             _ => Err(Error::Rejected),
         }
     }
@@ -298,9 +273,9 @@ mod tests {
     #[test]
     fn only_using_operations_need_acceptance() {
         assert!(needs_acceptance(&Request::CreateObject));
-        assert!(needs_acceptance(&Request::GatewayTicket {
+        assert!(needs_acceptance(&Request::GatewayToken {
             gateway: "https://gateway.invalid".into(),
-            purpose: central_api::wire::TicketPurpose::Admit,
+            purpose: central_api::wire::GatewayPurpose::Admit,
         }));
         assert!(needs_acceptance(&Request::SetRecovery {
             recovery: vec![1; 73]

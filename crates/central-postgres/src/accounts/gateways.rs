@@ -5,7 +5,6 @@ use super::{
 use central_api::{
     gateway::{GatewayListing, GatewayMetadata, validate_origin},
     is_official_origin,
-    wire::TicketPurpose,
 };
 use sea_orm::{ConnectionTrait, DatabaseTransaction, TransactionTrait, prelude::Uuid};
 
@@ -149,7 +148,7 @@ impl AccountStore {
     /// The credential is a registered gateway's heartbeat token or a live
     /// gateway token with the `listing` scope (migration 000014), which this
     /// marks used. A token beats while its gateway awaits approval, so its
-    /// owner sees it seen; the directory lists approved gateways only.
+    /// owner sees it seen; the directory lists approved gateways only. Returns its origin.
     ///
     /// # Errors
     /// Rejects wrong credentials, disabled gateways, an unapproved heartbeat
@@ -159,7 +158,7 @@ impl AccountStore {
         &self,
         token: &Token,
         metadata: &GatewayMetadata,
-    ) -> Result<(), Error> {
+    ) -> Result<String, Error> {
         let row=self.db.query_one_raw(statement(
             &format!("SELECT g.id,g.origin,false AS by_token FROM central_identity.gateways g JOIN central_identity.gateway_approvals p
              ON p.gateway_id=g.id AND p.enabled WHERE g.heartbeat_digest=$1 AND NOT g.official
@@ -187,7 +186,7 @@ impl AccountStore {
         if updated.rows_affected() != 1 {
             return Err(Error::Busy);
         }
-        Ok(())
+        Ok(origin)
     }
 
     /// The official gateway's heartbeat, which its caller authenticated with the
@@ -287,52 +286,19 @@ impl AccountStore {
                 return Err(Error::Rejected);
             }
         }
+        // Whoever is no longer an administrator loses the token that said so, at once.
+        tx.execute_raw(statement(
+            "DELETE FROM central_identity.gateway_sids i USING central_identity.sessions s,
+                 central_identity.gateways g
+             WHERE g.id = $1 AND i.stream = g.origin AND i.purpose = 'admin'
+             AND s.digest = i.session_digest AND NOT EXISTS(
+                 SELECT 1 FROM central_identity.gateway_admins m
+                 WHERE m.gateway_id = g.id AND m.account_id = s.account_id)",
+            vec![uuid(gateway).into()],
+        ))
+        .await
+        .map_err(|_| Error::Unavailable)?;
         tx.commit().await.map_err(|_| Error::Unavailable)?;
         u64::try_from(expected + 1).map_err(|_| Error::Unavailable)
-    }
-
-    /// Check one account's current role on an already authenticated gateway.
-    ///
-    /// # Errors
-    /// Rejects invalid IDs or unavailable storage; a disabled gateway returns false.
-    pub async fn gateway_admin(&self, gateway: [u8; 16], account: [u8; 16]) -> Result<bool, Error> {
-        if !valid_id(gateway) || !valid_id(account) {
-            return Err(Error::Rejected);
-        }
-        let row=self.db.query_one_raw(statement(
-            &format!("SELECT EXISTS(SELECT 1 FROM central_identity.gateways g WHERE g.id=$1 AND {NOT_DISABLED} AND EXISTS
-             (SELECT 1 FROM central_identity.gateway_admins m WHERE m.gateway_id=g.id AND m.account_id=$2)) AS allowed"),
-            vec![uuid(gateway).into(),uuid(account).into()]
-        )).await.map_err(|_|Error::Unavailable)?.ok_or(Error::Unavailable)?;
-        row.try_get("", "allowed").map_err(|_| Error::Unavailable)
-    }
-
-    /// Resolve a registered audience that is not disabled and check Admin membership before
-    /// issuing a ticket. The official gateway's tickets are the bridge's ([`Self::gateway_ticket`]).
-    ///
-    /// # Errors
-    /// Rejects unknown/disabled origins, invalid sessions and foreign admin membership.
-    pub async fn registered_ticket(
-        &self,
-        session: &Token,
-        origin: &str,
-        ticket: &Token,
-        purpose: TicketPurpose,
-    ) -> Result<(), Error> {
-        if !matches!(purpose, TicketPurpose::Admit | TicketPurpose::Admin) {
-            return Err(Error::Rejected);
-        }
-        let row=self.db.query_one_raw(statement(
-            &format!("SELECT g.id FROM central_identity.gateways g JOIN central_identity.sessions s ON s.digest=$2
-             JOIN central_identity.accounts a ON a.id=s.account_id AND a.credential_revision=s.credential_revision
-             WHERE g.origin=$1 AND NOT g.official AND {NOT_DISABLED} AND s.expires_at>pg_catalog.clock_timestamp() AND a.restored
-             AND ($3='admit' OR EXISTS(SELECT 1 FROM central_identity.gateway_admins m
-                 WHERE m.gateway_id=g.id AND m.account_id=a.id))"),
-            vec![origin.into(),session.digest().to_vec().into(),purpose.as_str().into()]
-        )).await.map_err(|_|Error::Unavailable)?;
-        if row.is_none() {
-            return Err(Error::Rejected);
-        }
-        self.gateway_ticket(session, origin, ticket, purpose).await
     }
 }

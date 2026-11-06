@@ -1,13 +1,7 @@
-use super::{AccountStore, DatabaseConnection, Error, TicketPurpose, Token, metadata};
+use super::{AccountStore, DatabaseConnection, Error, Token, metadata};
 use sea_orm::ConnectionTrait;
 
-pub(super) async fn run(
-    store: &AccountStore,
-    operator: &DatabaseConnection,
-    session: &Token,
-    gateway: [u8; 16],
-    origin: &str,
-) {
+pub(super) async fn run(store: &AccountStore, operator: &DatabaseConnection, session: &Token) {
     for index in 1..=8 {
         let candidate = format!("https://quota-{index}.invalid");
         let result = store
@@ -38,27 +32,6 @@ pub(super) async fn run(
         )
         .await
         .unwrap();
-    for index in 0..=32 {
-        let ticket = Token::generate().unwrap();
-        store
-            .registered_ticket(session, origin, &ticket, TicketPurpose::Admit)
-            .await
-            .unwrap();
-        let result = store
-            .redeem_lease(
-                &ticket,
-                &[origin],
-                TicketPurpose::Admit,
-                Some(gateway),
-                Some(&Token::generate().unwrap()),
-            )
-            .await;
-        if index < 32 {
-            result.unwrap();
-        } else {
-            assert!(matches!(result, Err(Error::Busy)));
-        }
-    }
     constraints(store, operator).await;
 }
 

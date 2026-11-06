@@ -24,7 +24,18 @@ pub mod wire;
 pub use endpoint::{
     Endpoint, LEGACY_ORIGIN, LIVE_ORIGIN, OFFICIAL_ALIASES, OFFICIAL_ORIGIN, is_official_origin,
 };
-pub use token::Token;
+pub use token::{Bearer, SignedToken, Token};
+
+/// The header every native request carries, naming the protocol it speaks.
+pub const PROTOCOL_HEADER: &str = "Baylee-Central-Protocol";
+/// The protocol this build speaks. Central answers any other with
+/// [`UPDATE_REQUIRED_STATUS`] before it reads the request.
+pub const PROTOCOL_VERSION: &str = "2";
+/// The status of a client or gateway too old to be served: 426 Upgrade Required.
+pub const UPDATE_REQUIRED_STATUS: u16 = 426;
+/// That answer's body, in the refusal form clients read. It names no version: Central
+/// does not know client releases, and the update itself needs no sign-in.
+pub const UPDATE_REQUIRED_BODY: &str = r#"{"refusal":{"code":"update_required"}}"#;
 
 /// Maximum serialized native request or response, independently enforced by both transports.
 // A 256 KiB ciphertext may require four JSON bytes per byte, plus its AEAD
@@ -45,6 +56,8 @@ pub enum Error {
     /// The account has not accepted the terms in force; only reading and
     /// accepting them, exporting and signing out remain (`docs/terms.md`).
     TermsRequired,
+    /// This build is too old to be served; the update needs no sign-in.
+    UpdateRequired,
 }
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -54,6 +67,7 @@ impl std::fmt::Display for Error {
             Self::Conflict => "account data changed; reload required",
             Self::Busy => "account service busy; retry later",
             Self::TermsRequired => "terms of use must be accepted first",
+            Self::UpdateRequired => "client update required",
         })
     }
 }

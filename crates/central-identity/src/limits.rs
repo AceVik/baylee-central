@@ -20,6 +20,11 @@ pub(super) const PENDING_SECONDS: u64 = 60;
 pub(super) const PENDING: usize = 4096;
 const _: () = assert!(PENDING as u64 > GLOBAL_PER_SECOND as u64 * PENDING_SECONDS);
 
+/// Central tokens verified a second: above the control and data budgets together, so that
+/// no honest load meets it.
+pub(super) const SIGNATURES_PER_SECOND: u32 = 1024;
+/// Reads of the key set a second. Each gateway reads it about every five minutes.
+pub(super) const JWKS_PER_SECOND: u32 = 256;
 /// Legacy sign-ins a minute, all names together: the store holds a handful
 /// of accounts, and each sign-in is one Argon2 derivation.
 pub(super) const LEGACY_PER_MINUTE: u32 = 30;
@@ -39,6 +44,10 @@ pub(super) struct Limits {
     peers: BTreeMap<([u8; 32], bool), Window>,
     /// Reports each gateway filed in the current hour.
     reports: BTreeMap<[u8; 16], (Instant, u32)>,
+    /// Signature checks of presented Central tokens.
+    signatures: Window,
+    /// Reads of the key set.
+    jwks: Window,
 }
 
 #[derive(Default)]
@@ -99,9 +108,8 @@ impl Limits {
             request,
             Request::SessionStatus
                 | Request::RenewSession
-                | Request::GatewaySession { .. }
-                | Request::GatewayProfile { .. }
-                | Request::GatewayAuthorize { .. }
+                | Request::GatewayToken { .. }
+                | Request::GatewayRevocations { .. }
                 | Request::TermsStatus
                 | Request::AccountSummary
                 | Request::Logout
@@ -125,6 +133,15 @@ impl Limits {
             .entry(key)
             .or_default()
             .charge(now, if control { 128 } else { 64 })
+    }
+    /// Spend one signature check, before the work: a made-up token costs what any other
+    /// request costs, and past this budget nothing is verified until the second is over.
+    pub(super) fn signature(&mut self, now: Instant) -> Result<(), Error> {
+        self.signatures.charge(now, SIGNATURES_PER_SECOND)
+    }
+    /// Spend one read of the key set.
+    pub(super) fn jwks(&mut self, now: Instant) -> Result<(), Error> {
+        self.jwks.charge(now, JWKS_PER_SECOND)
     }
     pub(super) fn global(&mut self, now: Instant) -> Result<(), Error> {
         let (start, used) = self.global.get_or_insert((now, 0));

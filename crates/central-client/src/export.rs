@@ -16,7 +16,7 @@ impl Session {
     pub fn export(&self, transport: &impl Transport) -> Result<AccountExport, Error> {
         self.same_endpoint(transport)?;
         let Response::AccountExport { export } =
-            transport.exchange(&Request::AccountExport, Some(&self.token))?
+            transport.exchange(&Request::AccountExport, Some((&self.token).into()))?
         else {
             return Err(Error::Rejected);
         };

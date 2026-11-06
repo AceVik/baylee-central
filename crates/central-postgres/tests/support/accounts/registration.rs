@@ -1,6 +1,6 @@
 //! Migration 000007: beta keys, the account's source, and the legacy rules
 //! that apply to legacy accounts only.
-use super::{AccountStore, ServerKeys, TicketPurpose, Token, config, enroll, login};
+use super::{AccountStore, Admit, ServerKeys, Token, config, enroll, login};
 use central_api::beta_key::BetaKey;
 use central_postgres::{BetaKeyBatch, connect_dev};
 use sea_orm::{ConnectionTrait, DatabaseConnection, DbBackend, Statement};
@@ -286,36 +286,13 @@ async fn registered(store: &AccountStore, operator: &DatabaseConnection, keys: &
     let object = store.create_object(&session).await.unwrap();
     store.read_object(&session, object.id).await.unwrap();
     store.list_objects(&session, None).await.unwrap();
-    // The bridge learns that the account has no legacy ID, instead of failing.
-    let ticket = Token::generate().unwrap();
-    store
-        .gateway_ticket(&session, "official", &ticket, TicketPurpose::Admit)
+    // The official gateway's token says the account has no legacy ID, instead of failing.
+    let grant = store
+        .gateway_grant(&session, &["official"], false, Admit, [53; 16])
         .await
         .unwrap();
-    let (redeemed, legacy) = store
-        .redeem_gateway(&ticket, "official", TicketPurpose::Admit)
-        .await
-        .unwrap();
-    assert_eq!(redeemed.account, identity.account);
-    assert_eq!(legacy, None);
-    let ticket = Token::generate().unwrap();
-    store
-        .gateway_ticket(&session, "official", &ticket, TicketPurpose::Admit)
-        .await
-        .unwrap();
-    let lease = Token::generate().unwrap();
-    let (redeemed, legacy, expires) = store
-        .redeem_lease(
-            &ticket,
-            &["official"],
-            TicketPurpose::Admit,
-            None,
-            Some(&lease),
-        )
-        .await
-        .unwrap();
-    assert_eq!((redeemed.account, legacy), (identity.account, None));
-    assert!(expires.is_some());
+    assert_eq!(grant.account, identity.account);
+    assert_eq!(grant.legacy_id, None);
     // The bridge's legacy operations cannot reach it: it has no legacy ID to name.
     assert!(store.legacy_status("registered-one").await.is_err());
     store.logout(&session).await.unwrap();

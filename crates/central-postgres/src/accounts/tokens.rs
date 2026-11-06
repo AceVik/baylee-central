@@ -125,9 +125,8 @@ impl AccountStore {
                 "SELECT s.kind, s.digest = $2 AS current,
                      floor(extract(epoch FROM COALESCE(s.proven_at, s.created_at)))::bigint AS signed_in_at,
                      floor(extract(epoch FROM s.expires_at))::bigint AS expires_at,
-                     (SELECT string_agg(DISTINCT l.audience, ' ' ORDER BY l.audience)
-                      FROM central_identity.gateway_leases l
-                      WHERE l.session_digest = s.digest AND l.expires_at > pg_catalog.clock_timestamp())
+                     (SELECT string_agg(DISTINCT i.stream, ' ' ORDER BY i.stream)
+                      FROM central_identity.gateway_sids i WHERE i.session_digest = s.digest)
                      AS gateways
                  FROM central_identity.sessions s JOIN central_identity.accounts a
                  ON a.id = s.account_id AND a.credential_revision = s.credential_revision
@@ -170,7 +169,7 @@ impl AccountStore {
     }
 
     /// End the client (native) session of the account behind `browser`,
-    /// and with it its tickets and its leases at gateways.
+    /// and with it its tokens at gateways.
     ///
     /// # Errors
     /// `Rejected` without a live browser session; storage failure.

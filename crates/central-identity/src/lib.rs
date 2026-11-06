@@ -30,10 +30,14 @@ mod objects;
 mod owner;
 mod pairing;
 mod password;
+mod push;
+pub use push::{Delivery, GatewayDelivery};
 mod reports;
 pub use reports::PartUpload;
 mod reset;
 mod terms;
+mod tokens;
+pub use tokens::{Presented, TokenKeys, credential_operation};
 
 struct Pending {
     expires: Instant,
@@ -137,19 +141,16 @@ pub fn browser_operation(request: &Request) -> bool {
         | Request::RegisterGateway { .. }
         | Request::GatewayHeartbeat { .. }
         | Request::SetGatewayAdmins { .. }
-        | Request::CheckGatewayAdmin { .. }
-        | Request::GatewaySession { .. }
-        | Request::GatewayProfile { .. }
         | Request::LegacyReserve { .. }
         | Request::ReadDocument
         | Request::WriteDocument { .. }
         | Request::ConfirmRestore { .. }
         | Request::LegacyStatus { .. }
-        | Request::GatewayTicket { .. }
-        | Request::RedeemGateway { .. }
+        | Request::GatewayToken { .. }
+        | Request::RegisterInvalidate { .. }
+        | Request::GatewayRevocations { .. }
         | Request::GatewayTerms { .. }
         | Request::PublishGatewayTerms { .. }
-        | Request::GatewayAuthorize { .. }
         | Request::GatewayStatus
         | Request::LegacyLogin { .. }
         | Request::LegacyExport
@@ -213,18 +214,19 @@ fn uses_session(request: &Request) -> bool {
     )
 }
 
-/// The answer to a password proof that issued `token`: the native bearer in
+/// The answer to a password proof that issued `token`: the signed native bearer in
 /// the body, or the browser session apart from it, for the cookie.
 fn signed_in(
+    service: &IdentityService,
     surface: Surface,
     identity: Identity,
     issued: central_postgres::Issued,
     token: Token,
-) -> BrowserReply {
-    match surface {
+) -> Result<BrowserReply, Error> {
+    Ok(match surface {
         Surface::Native => BrowserReply {
             response: Response::Session {
-                token,
+                token: service.central_token(&token, identity.account)?,
                 identity,
                 wrapped_master: issued.wrapped_master,
             },
@@ -239,13 +241,17 @@ fn signed_in(
             },
             session: Some(token),
         },
-    }
+    })
 }
 
 /// Shared service state. Pending challenges are bounded, expiring and single-use.
 pub struct IdentityService {
     store: AccountStore,
     issuer: [u8; 32],
+    /// Central's own origin: every signed token's `iss`, and a Central token's `aud`.
+    origin: String,
+    /// The signing key and the keys the JWKS lists.
+    tokens: TokenKeys,
     keys: Arc<ServerKeys>,
     bridge_digest: [u8; 32],
     /// The official gateway's origins, canonical first (`Endpoint::official_origins`).
@@ -285,6 +291,7 @@ impl IdentityService {
         keys: ServerKeys,
         bridge: &Token,
         gateway: &str,
+        tokens: TokenKeys,
     ) -> Result<Self, Error> {
         let official = if endpoint.legacy_origin().is_some() {
             if gateway != central_api::OFFICIAL_ORIGIN {
@@ -298,6 +305,8 @@ impl IdentityService {
         Ok(Self {
             store,
             issuer: endpoint.issuer(),
+            origin: endpoint.origin().to_owned(),
+            tokens,
             keys: Arc::new(keys),
             bridge_digest: bridge.digest(),
             official,
@@ -493,7 +502,7 @@ impl IdentityService {
             }
             Surface::Native => self.store.issue_session(&credential, &token).await?,
         };
-        Ok(signed_in(surface, credential.identity, issued, token))
+        signed_in(self, surface, credential.identity, issued, token)
     }
 
     /// Process a typed native command. Authentication is checked for each operation.
@@ -503,8 +512,19 @@ impl IdentityService {
     pub async fn handle(
         &self,
         request: Request,
-        bearer: Option<&Token>,
+        presented: Option<&Presented>,
     ) -> Result<Response, Error> {
+        // A bare credential is a gateway's and a signed session a client's, whatever the
+        // store would make of the capability: see [`credential_operation`].
+        let allowed = match presented {
+            Some(Presented::Credential(_)) => credential_operation(&request),
+            Some(Presented::Session(_)) => !credential_operation(&request),
+            None => true,
+        };
+        if !allowed {
+            return Err(Error::Rejected);
+        }
+        let bearer = presented.map(Presented::token);
         self.limits
             .lock()
             .map_err(|_| Error::Unavailable)?
@@ -551,8 +571,7 @@ mod tests {
     use super::*;
     use central_api::{
         gateway::GatewayMetadata,
-        terms::TermsVersion,
-        wire::{Identity, TicketPurpose},
+        wire::{GatewayPurpose, Identity},
     };
 
     fn token() -> Token {
@@ -696,15 +715,6 @@ mod tests {
                 expected_revision: 1,
                 accounts: vec![],
             },
-            Request::CheckGatewayAdmin { account: [0; 16] },
-            Request::GatewaySession {
-                lease: token(),
-                purpose: TicketPurpose::Admit,
-            },
-            Request::GatewayProfile {
-                lease: token(),
-                purpose: TicketPurpose::Admit,
-            },
             Request::LegacyReserve {
                 legacy_id: "x".into(),
                 username: "synthetic".into(),
@@ -720,14 +730,14 @@ mod tests {
             Request::LegacyStatus {
                 legacy_id: "x".into(),
             },
-            Request::GatewayTicket {
+            Request::GatewayToken {
                 gateway: "https://gateway.invalid".into(),
-                purpose: TicketPurpose::Admit,
+                purpose: GatewayPurpose::Admit,
             },
-            Request::RedeemGateway {
-                ticket: token(),
-                purpose: TicketPurpose::Admit,
+            Request::RegisterInvalidate {
+                path: "/auth/central/invalidate".into(),
             },
+            Request::GatewayRevocations { after: 0 },
             Request::GatewayTerms {
                 origin: "https://gateway.invalid".into(),
             },
@@ -741,14 +751,6 @@ mod tests {
             Request::PublishGatewayTerms {
                 version: "1".into(),
                 texts: vec![],
-            },
-            Request::GatewayAuthorize {
-                lease: token(),
-                purpose: TicketPurpose::Admit,
-                terms: Some(TermsVersion {
-                    version: "1".into(),
-                    digest: [0; 32],
-                }),
             },
             // a gateway's token is no website's business
             Request::GatewayStatus,
@@ -822,7 +824,7 @@ mod tests {
                 text[start..].split('"').next().unwrap().to_owned()
             })
             .collect();
-        assert_eq!(named.len(), 63, "every operation is in one of the lists");
+        assert_eq!(named.len(), 60, "every operation is in one of the lists");
     }
 
     #[test]

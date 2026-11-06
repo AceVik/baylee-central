@@ -3,7 +3,7 @@
 
 use central_api::{
     Endpoint, Error, Token,
-    wire::{Discovery, Identity, Request, Response, TicketPurpose},
+    wire::{Discovery, GatewayPurpose::Admit, Identity, Request, Response},
 };
 use central_client::{Session, Transport};
 use central_crypto::opaque::{Login, server::ServerKeys};
@@ -60,10 +60,12 @@ fn real_native_login_restore_migration_and_adversarial_paths() {
             restored,
             &bridge,
             "http://127.0.0.1:28766",
+            support::token_keys(),
         )
         .unwrap()
         .with_terms(Some(support::terms::central_document())),
     );
+    let held = identity.clone();
     let (stop_browser, browser_stopped) = oneshot::channel();
     let browser_task =
         runtime.spawn(
@@ -83,6 +85,7 @@ fn real_native_login_restore_migration_and_adversarial_paths() {
     let http = Http {
         endpoint,
         address,
+        identity: held,
         lose_write_reply: AtomicBool::new(false),
         lose_password_reply: AtomicBool::new(false),
         lose_delete_reply: AtomicBool::new(false),
@@ -94,6 +97,7 @@ fn real_native_login_restore_migration_and_adversarial_paths() {
             client: "198.51.100.7",
         };
         support::browser::run(&browser, &http, &bridge, &runtime, &operator);
+        support::tokens::run(&http, &bridge, &runtime, &operator);
         support::password::run(&http, &browser, &bridge, &runtime, &operator);
         support::admin::run(&http, &browser, &bridge, &runtime, &operator);
         support::reset::run(&http, &browser, &bridge, &runtime, &operator);
@@ -154,10 +158,11 @@ fn run(http: &Http, bridge: &Token, runtime: &Runtime, operator: &DatabaseConnec
     .unwrap();
     assert!(http.exchange(&reserve, None).is_err());
     assert!(
-        http.exchange(&reserve, Some(&Token::generate().unwrap()))
+        http.exchange(&reserve, Some((&Token::generate().unwrap()).into()))
             .is_err()
     );
-    let Response::Enrollment { identity, ticket } = http.exchange(&reserve, Some(bridge)).unwrap()
+    let Response::Enrollment { identity, ticket } =
+        http.exchange(&reserve, Some(bridge.into())).unwrap()
     else {
         panic!("enrollment expected")
     };
@@ -176,7 +181,7 @@ fn run(http: &Http, bridge: &Token, runtime: &Runtime, operator: &DatabaseConnec
     )
     .unwrap();
     assert!(
-        http.exchange(&reserve, Some(bridge)).is_err(),
+        http.exchange(&reserve, Some(bridge.into())).is_err(),
         "legacy retries cannot replace credentials"
     );
     let Discovery::Central { identity: found } =
@@ -201,14 +206,14 @@ fn run(http: &Http, bridge: &Token, runtime: &Runtime, operator: &DatabaseConnec
     assert_eq!(first.document(), original);
     assert!(
         first
-            .gateway_ticket(http, "http://127.0.0.1:28766".into())
+            .gateway_token(http, "http://127.0.0.1:28766".into(), Admit)
             .is_err()
     );
     first.confirm_restored(http).unwrap();
     support::terms::central(http, &first, "http://127.0.0.1:28766");
     assert!(
         first
-            .gateway_ticket(http, "https://attacker.invalid".into())
+            .gateway_token(http, "https://attacker.invalid".into(), Admit)
             .is_err()
     );
     closed_then_admitted(http, &first, bridge, identity);
@@ -243,42 +248,27 @@ fn run(http: &Http, bridge: &Token, runtime: &Runtime, operator: &DatabaseConnec
     assert!(first.refresh(http).is_err());
 }
 
-/// The bridge admits a moved account only once its move is closed, and then
-/// as [`official_admission`] says.
+/// The official gateway admits a moved account only once its move is closed.
 fn closed_then_admitted(http: &Http, first: &Session, bridge: &Token, identity: Identity) {
-    let open = Request::RedeemGateway {
-        ticket: first
-            .gateway_ticket(http, "http://127.0.0.1:28766".into())
-            .unwrap(),
-        purpose: TicketPurpose::Admit,
-    };
-    assert!(http.exchange(&open, Some(bridge)).is_err());
+    assert!(
+        first
+            .gateway_token(http, "http://127.0.0.1:28766".into(), Admit)
+            .is_err()
+    );
     http.exchange(
         &Request::LegacyClose {
             legacy_id: "synthetic-legacy".into(),
             identity,
         },
-        Some(bridge),
+        Some(bridge.into()),
     )
     .unwrap();
-    official_admission(http, first, bridge);
-}
-
-/// Only the bridge redeems an official ticket, and only once.
-fn official_admission(http: &Http, session: &Session, bridge: &Token) {
-    let ticket = session
-        .gateway_ticket(http, "http://127.0.0.1:28766".into())
+    let (token, expires_at) = first
+        .gateway_token(http, "http://127.0.0.1:28766".into(), Admit)
         .unwrap();
-    let redeem = Request::RedeemGateway {
-        ticket,
-        purpose: TicketPurpose::Admit,
-    };
-    assert!(http.exchange(&redeem, None).is_err());
-    assert!(matches!(
-        http.exchange(&redeem, Some(bridge)).unwrap(),
-        Response::GatewayIdentity { .. }
-    ));
-    assert!(http.exchange(&redeem, Some(bridge)).is_err());
+    let claims = http.gateway_claims(&token, "http://127.0.0.1:28766");
+    assert_eq!(claims.exp, expires_at);
+    assert_eq!(claims.legacy_id.as_deref(), Some("synthetic-legacy"));
 }
 
 fn session_count(runtime: &Runtime, operator: &DatabaseConnection) -> i64 {

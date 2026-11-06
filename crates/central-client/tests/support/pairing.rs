@@ -38,7 +38,11 @@ impl Transport for Counting<'_> {
     fn endpoint(&self) -> &Endpoint {
         self.http.endpoint()
     }
-    fn exchange(&self, request: &Request, bearer: Option<&Token>) -> Result<Response, Error> {
+    fn exchange(
+        &self,
+        request: &Request,
+        bearer: Option<central_api::Bearer<'_>>,
+    ) -> Result<Response, Error> {
         if matches!(request, Request::Logout) && bearer.is_some() {
             self.logouts.set(self.logouts.get() + 1);
         }

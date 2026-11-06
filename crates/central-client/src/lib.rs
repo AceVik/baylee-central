@@ -2,7 +2,7 @@
 #![forbid(unsafe_code)]
 
 use central_api::{
-    Endpoint, Error, Token,
+    Bearer, Endpoint, Error, SignedToken, Token,
     wire::{Discovery, Identity, Request, Response},
 };
 use central_crypto::{
@@ -41,11 +41,13 @@ pub use terms::{TermsStatus, central_terms, gateway_terms};
 pub trait Transport {
     /// Endpoint selected by the client/operator configuration.
     fn endpoint(&self) -> &Endpoint;
-    /// Exchange exactly one protocol request. Errors must not authorize legacy fallback.
+    /// Exchange exactly one protocol request, with the [`central_api::PROTOCOL_HEADER`] header,
+    /// and answer [`Error::UpdateRequired`] to [`central_api::UPDATE_REQUIRED_STATUS`]. Errors
+    /// must not authorize legacy fallback.
     ///
     /// # Errors
     /// Returns redacted transport, authentication, conflict or capacity errors.
-    fn exchange(&self, request: &Request, bearer: Option<&Token>) -> Result<Response, Error>;
+    fn exchange(&self, request: &Request, bearer: Option<Bearer<'_>>) -> Result<Response, Error>;
 }
 
 fn context(endpoint: &Endpoint, identity: Identity) -> Result<Context, Error> {
@@ -115,7 +117,7 @@ pub fn login(
     let master = match master {
         Ok(master) => master,
         Err(error) => {
-            let _ = transport.exchange(&Request::Logout, Some(&token));
+            let _ = transport.exchange(&Request::Logout, Some((&token).into()));
             return Err(error);
         }
     };

@@ -15,9 +15,8 @@ use openssl::{
     pkey::PKey,
 };
 use serde::Serialize;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use zeroize::Zeroizing;
-mod transport;
 
 /// Provider outcome; no response body, endpoint or token is exposed.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -34,7 +33,7 @@ pub struct Sender {
     key: EncodingKey,
     public: String,
     contact: String,
-    http: ureq::Agent,
+    http: central_outbound::Agent,
 }
 #[derive(Serialize)]
 struct Claims<'a> {
@@ -89,7 +88,11 @@ impl Sender {
             key: EncodingKey::from_ec_der(der),
             public: Base64UrlUnpadded::encode_string(&public),
             contact,
-            http: transport::agent(),
+            http: central_outbound::agent(central_outbound::Limits {
+                port: Some(443),
+                total: Duration::from_secs(10),
+                connect: Duration::from_secs(3),
+            }),
         })
     }
     /// Public application server key supplied to PushManager.subscribe.

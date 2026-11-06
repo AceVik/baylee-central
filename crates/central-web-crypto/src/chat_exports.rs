@@ -8,7 +8,7 @@ fn refused(error: Error) -> JsError {
         Error::Conflict => "conflict",
         Error::Busy => "busy",
         Error::Unavailable => "unavailable",
-        Error::Rejected | Error::TermsRequired => "rejected",
+        Error::Rejected | Error::TermsRequired | Error::UpdateRequired => "rejected",
     })
 }
 

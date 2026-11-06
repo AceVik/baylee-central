@@ -106,7 +106,7 @@ impl IdentityService {
                     .redeem_pairing(&handle.digest(), &challenge, &token)
                     .await?;
                 Ok(Response::PairSession {
-                    token,
+                    token: self.central_token(&token, redeemed.identity.account)?,
                     identity: redeemed.identity,
                     username: redeemed.username,
                     display_name: redeemed.display_name,

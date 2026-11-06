@@ -3,7 +3,7 @@
 //! authority; its heartbeat, which the bridge sends, moves that row alone.
 //! It answers at several origins once it moved (`OFFICIAL_ALIASES`).
 use super::super::terms::{texts, version};
-use super::{AccountStore, DatabaseConnection, Error, TicketPurpose, Token, approval, metadata};
+use super::{AccountStore, Admin, Admit, DatabaseConnection, Error, Token, approval, metadata};
 use central_api::{LEGACY_ORIGIN, OFFICIAL_ORIGIN, gateway::GatewayMetadata};
 use sea_orm::{ConnectionTrait, DbBackend, Statement, prelude::Uuid};
 
@@ -183,17 +183,17 @@ async fn beat_for_it(
     );
     assert_eq!(row(operator, official).await[2], "0.1.0-test");
     // No registered credential reaches it: a heartbeat token finds no row, and
-    // no registered ticket is issued for its audience.
+    // no token is issued for its audience as a registered gateway's.
     assert!(
         store
             .gateway_heartbeat(&Token::generate().unwrap(), &beat(LEGACY_ORIGIN))
             .await
             .is_err()
     );
-    for purpose in [TicketPurpose::Admit, TicketPurpose::Admin] {
+    for purpose in [Admit, Admin] {
         assert!(
             store
-                .registered_ticket(session, LEGACY_ORIGIN, &Token::generate().unwrap(), purpose)
+                .gateway_grant(session, &[LEGACY_ORIGIN], true, purpose, [67; 16])
                 .await
                 .is_err()
         );
@@ -247,24 +247,14 @@ async fn moved(
             true
         ))
     );
-    aliased(store, operator, session).await;
+    aliased(store, session).await;
     operator.execute_unprepared(back).await.unwrap();
 }
 
-/// A ticket an installed client asks for the old address is redeemed and its
-/// lease checked under the whole set, and keeps the address it was for; a
-/// player who accepted the gateway's terms there has accepted them.
-async fn aliased(store: &AccountStore, operator: &DatabaseConnection, session: &Token) {
+/// A token for the old address is one stream with the new, and a player who accepted the
+/// gateway's terms there has accepted them.
+async fn aliased(store: &AccountStore, session: &Token) {
     let set = [OFFICIAL_ORIGIN, LEGACY_ORIGIN];
-    // the session holds the 32 leases of the cap test (`limits`); free them
-    operator
-        .execute_raw(Statement::from_sql_and_values(
-            DbBackend::Postgres,
-            "DELETE FROM central_identity.gateway_leases WHERE session_digest = $1",
-            vec![session.digest().to_vec().into()],
-        ))
-        .await
-        .unwrap();
     // its terms, accepted under the old address before the move
     let words = texts("Official");
     let terms = version("official-1", &words);
@@ -276,77 +266,18 @@ async fn aliased(store: &AccountStore, operator: &DatabaseConnection, session: &
         .accept_gateway_terms(session, LEGACY_ORIGIN, &terms)
         .await
         .unwrap();
-    for asked in set {
-        let ticket = Token::generate().unwrap();
-        let lease = Token::generate().unwrap();
-        store
-            .gateway_ticket(session, asked, &ticket, TicketPurpose::Admit)
-            .await
-            .unwrap();
-        store
-            .redeem_lease(&ticket, &set, TicketPurpose::Admit, None, Some(&lease))
-            .await
-            .unwrap();
-        // the lease is for the address asked, under the set
-        let other = if asked == OFFICIAL_ORIGIN {
-            LEGACY_ORIGIN
-        } else {
-            OFFICIAL_ORIGIN
-        };
-        assert!(
-            store
-                .gateway_session(&lease, &set, None, TicketPurpose::Admit)
-                .await
-                .is_ok()
-        );
-        assert!(
-            store
-                .gateway_session(&lease, &[asked], None, TicketPurpose::Admit)
-                .await
-                .is_ok()
-        );
-        assert!(
-            store
-                .gateway_session(&lease, &[other], None, TicketPurpose::Admit)
-                .await
-                .is_err(),
-            "{asked}"
-        );
-        let (_, _, _, accepted) = store
-            .gateway_authorize(&lease, &set, None, TicketPurpose::Admit, None, Some(&terms))
-            .await
-            .unwrap();
-        assert!(accepted, "accepted under the old address, for {asked}");
-    }
-    // a lease for the new address alone does not see the old acceptance
-    let ticket = Token::generate().unwrap();
-    let lease = Token::generate().unwrap();
-    store
-        .gateway_ticket(session, OFFICIAL_ORIGIN, &ticket, TicketPurpose::Admit)
+    let seen = store
+        .gateway_grant(session, &set, false, Admit, [68; 16])
         .await
         .unwrap();
-    store
-        .redeem_lease(
-            &ticket,
-            &[OFFICIAL_ORIGIN],
-            TicketPurpose::Admit,
-            None,
-            Some(&lease),
-        )
+    assert_eq!(seen.terms, Some(terms), "accepted under the old address");
+    // The new address alone does not see the old acceptance, and is the same stream.
+    let alone = store
+        .gateway_grant(session, &[OFFICIAL_ORIGIN], false, Admit, [69; 16])
         .await
         .unwrap();
-    let (_, _, _, accepted) = store
-        .gateway_authorize(
-            &lease,
-            &[OFFICIAL_ORIGIN],
-            None,
-            TicketPurpose::Admit,
-            None,
-            Some(&terms),
-        )
-        .await
-        .unwrap();
-    assert!(!accepted);
+    assert_eq!(alone.terms, None);
+    assert_eq!(alone.sid, seen.sid);
 }
 
 /// It is the official gateway only while its origin is the bridge's: moved to
