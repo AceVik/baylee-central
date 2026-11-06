@@ -221,3 +221,25 @@ previous caller/feature check remains in force, as does the central-crypto sourc
 fingerprint. Negative tests reject enabling JWT's RustCrypto provider or adding
 an edge from JWT to any affected arithmetic boundary. This is a trait-inventory
 extension, not an extension of the advisory's reachable-code exception.
+
+## Re-review for the token format, 6 November 2026
+
+`central-crypto` gained `src/jwt.rs` and `src/jwt/` behind a new feature `jwt`: the
+compact JWS of the session tokens, Ed25519 only. Signing also needs `server`. The new
+module imports `ed25519-dalek`, `sha2` 0.11, `base64ct`, `serde`, `serde_json`,
+`zeroize` and `getrandom`, all approved and already in the graph with the features
+used here, and nothing from `opaque`. No package is added. Nothing that existed
+changes except the module's declaration in `lib.rs` and the manifest: no suite, group,
+OPRF or key-exchange type is touched, and no `opaque` source differs.
+
+Checked by running, not only by reading: `cargo tree -i crypto-bigint` with all features
+still shows exactly `crypto-bigint <- elliptic-curve <- opaque-ke/voprf <- central-crypto`,
+and the graph guard, which runs before the source check, passes with its callers and
+features unchanged, `ed25519-dalek` keeping `central-crypto` as its only caller. The
+new path signs and verifies through `curve25519-dalek` 5.0.0, which has no edge to
+`elliptic-curve` or `crypto-bigint`. The affected arithmetic stays unreachable from it.
+
+The new reviewed source fingerprint is
+`54258d31bdfc59fae3624b7a2b8f01f79dda5f416686bff3819678e5c2ddfc67`.
+This is the implementing agent's review, not an independent audit. Any later change to
+the crate pins the fingerprint again and repeats this check.
