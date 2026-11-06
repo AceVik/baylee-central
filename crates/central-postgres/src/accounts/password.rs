@@ -45,8 +45,8 @@ impl AccountStore {
 
     /// Commit a password change whose current password the caller has just
     /// verified against `credential`: store `record` and `wrapped`, raise the
-    /// credential revision, end every session of the account (with their
-    /// tickets and leases) and issue `next`, of the same kind as `current`,
+    /// credential revision, end every session of the account (each revoked at
+    /// the gateways that held it) and issue `next`, of the same kind as `current`,
     /// in one transaction. `current` must still be live and `credential`
     /// still the account's, so a change racing another change or a sign-in
     /// that replaced `current` commits nothing. Central cannot see whether
@@ -136,7 +136,7 @@ impl AccountStore {
         let revision: i64 = changed
             .try_get("", "credential_revision")
             .map_err(|_| Error::Unavailable)?;
-        // Every session ends, of both kinds; their tickets and leases cascade.
+        // Every session ends, of both kinds; their `sid`s cascade, each one revoked.
         tx.execute_raw(statement(
             "DELETE FROM central_identity.sessions WHERE account_id = $1",
             vec![account.into()],

@@ -621,9 +621,8 @@ impl AccountStore {
 
     /// Approve or enable `gateway` (`enabled`), or disable it, for the
     /// administrator behind `browser`, whose password sign-in must be less
-    /// than 30 minutes old. Disabling ends every lease at that gateway, so
-    /// each of its sessions fails at its next check; its credentials and
-    /// tokens stop authenticating with the approval. The same state again
+    /// than 30 minutes old. Disabling ends every session at that gateway, each
+    /// revoked; its credentials and tokens stop authenticating with the approval. The same state again
     /// changes nothing; a change writes its audit event in the same
     /// transaction.
     ///

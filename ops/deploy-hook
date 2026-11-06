@@ -126,7 +126,10 @@ stage() {
         > "$STATE/grants.sql" || die "no ops/grants.sql in $rev"
     plain_sql "$STATE/grants.sql" || die "ops/grants.sql of $rev is empty or holds a backslash"
     say "building $rev"
-    as_builder bash -c "cd '$SRC' && cargo build -q --release --locked -p central-service -p central-web-server"
+    # Central and the website, each binary named: `--bin` limits the build to
+    # the binaries it names in every package given.
+    as_builder bash -c "cd '$SRC' && cargo build -q --release --locked -p central-service \
+        -p central-web-server --bin central-service --bin central-web"
     # the site, with the gateway's screenshots and fallback card status
     as_builder bash -c "cd '$SRC' && BAYLEE_SRC='$BAYLEE_SRC' cargo xtask site"
     rm -rf "$STAGED"
@@ -150,9 +153,16 @@ switch() {
         say "nothing staged"
         return
     fi
-    # Asked before anything is stopped, so a refusal changes nothing.
+    # Asked before anything is stopped, so a refusal changes nothing: the grants,
+    # their login, and whether the staged service accepts its configuration. Found
+    # out after the migration, a refused configuration would keep the service down,
+    # and the previous binary too, which needs what the migration changed.
     plain_sql "$STAGED/grants.sql" || die "the staged grants are empty or hold a backslash; nothing was changed"
     grantor_ready || die "$DB_GRANTOR does not reach $DB_NAME in $DB_CONTAINER, or is a superuser; nothing was changed"
+    systemd-run --wait --collect --quiet -p User=central -p Group=central \
+        -p StandardInput=file:/etc/baylee-central/central.json \
+        "$STAGED/central-service" --check-accounts-stdin \
+        || die "$rev does not accept the configuration; nothing was changed; docs/operations.md"
     systemctl stop "$UNIT"
     [[ -x $BIN/central-service ]] && install -m755 -o root -g root "$BIN/central-service" "$BIN/central-service.previous"
     install -m755 -o root -g root "$STAGED/central-service" "$BIN/central-service.new"

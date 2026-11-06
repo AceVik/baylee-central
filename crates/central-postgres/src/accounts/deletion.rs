@@ -1,7 +1,7 @@
 //! Deleting an account (`docs/account-deletion.md`, GDPR Art. 17): the
 //! identity service proves the password with a fresh OPAQUE login; this
 //! deletes the account row, and the foreign keys take every row naming it
-//! with it: sessions with their tickets and leases, objects, archives, the
+//! with it: sessions with their `sid`s, each revoked, objects, archives, the
 //! gateways it owns, its places on other gateways' lists, its terms and
 //! roles. No grant beyond `DELETE` on accounts is needed for that. The
 //! audit stays: it names ids only.

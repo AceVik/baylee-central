@@ -27,6 +27,7 @@ pub use replay::ReplayCache;
 use base64ct::{Base64UrlUnpadded, Encoding as _};
 use ed25519_dalek::Signature;
 use std::fmt;
+use zeroize::Zeroizing;
 
 /// Seconds of clock difference tolerated on `exp` and `nbf`.
 pub const LEEWAY_SECONDS: i64 = 30;
@@ -177,8 +178,13 @@ fn header_kid(bytes: &[u8], kind: Kind) -> Result<&str, JwtError> {
     std::str::from_utf8(key_id).map_err(|_| JwtError::Malformed)
 }
 
-/// Check everything but the claims' own meaning, and return the signed payload.
-fn verified_payload(token: &str, kind: Kind, keys: &KeySet) -> Result<Vec<u8>, JwtError> {
+/// Check everything but the claims' own meaning, and return the signed payload, which a
+/// Central token's secret capability is in, so it is wiped when dropped.
+fn verified_payload(
+    token: &str,
+    kind: Kind,
+    keys: &KeySet,
+) -> Result<Zeroizing<Vec<u8>>, JwtError> {
     if token.len() > kind.max_bytes() {
         return Err(JwtError::Malformed);
     }
@@ -203,7 +209,9 @@ fn verified_payload(token: &str, kind: Kind, keys: &KeySet) -> Result<Vec<u8>, J
     key.verifying()
         .verify_strict(signed.as_bytes(), &Signature::from_bytes(&signature))
         .map_err(|_| JwtError::Signature)?;
-    Base64UrlUnpadded::decode_vec(body).map_err(|_| JwtError::Malformed)
+    Base64UrlUnpadded::decode_vec(body)
+        .map(Zeroizing::new)
+        .map_err(|_| JwtError::Malformed)
 }
 
 /// Verify a token of `C`'s kind: size, header, key, signature, then the claims.

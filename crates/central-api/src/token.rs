@@ -101,8 +101,17 @@ impl Token {
 /// stores and presents and never parses. Deliberately neither Clone nor Display; Debug
 /// always redacts it, and it is wiped when dropped.
 #[derive(Serialize, Deserialize, Zeroize, ZeroizeOnDrop)]
-#[serde(transparent)]
+#[serde(try_from = "String")]
 pub struct SignedToken(String);
+
+impl TryFrom<String> for SignedToken {
+    type Error = Error;
+
+    /// A token read from the wire is held to what [`SignedToken::new`] holds one to.
+    fn try_from(text: String) -> Result<Self, Error> {
+        Self::new(Zeroizing::new(text))
+    }
+}
 
 impl std::fmt::Debug for SignedToken {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -236,6 +245,13 @@ mod tests {
             "Bearer aA0-_.bB1.cC2"
         );
         assert_eq!(serde_json::to_string(&token).unwrap(), "\"aA0-_.bB1.cC2\"");
+        // From the wire it keeps the same bounds.
+        assert!(serde_json::from_str::<SignedToken>("\"a.b.c\"").is_ok());
+        for text in ["\"\"", "\"a b\"", "\"a\\r\\nb\"", "\"a=b\""] {
+            assert!(serde_json::from_str::<SignedToken>(text).is_err(), "{text}");
+        }
+        let long = format!("\"{}\"", "a".repeat(SignedToken::MAX_BYTES + 1));
+        assert!(serde_json::from_str::<SignedToken>(&long).is_err());
         for text in ["", "a b", "a\nb", "a=b", "a/b", "a+b", "\u{e9}"] {
             assert_eq!(signed(text).err(), Some(Error::Rejected), "{text:?}");
         }
