@@ -573,23 +573,30 @@ SystemCallFilter=@system-service
 ## The session tokens release
 
 Migration 000023 and the token model go out together with a gateway and a client that speak them;
-older ones are refused (`426`), and no compatibility path exists. On a live Central, in this order:
+older ones are refused (`426`), and no compatibility path exists. The owner's order, as in Baylee
+`docs/central-login.md` §"Deploying this":
 
-1. **Before the gateway release that pins this revision.** Generate `token_keys`
-   (`--generate-secrets` holds one, or `--generate-token-key`'s `seed`) and add it to
-   `central.json`, with `official_address`. A gateway deploy installs the Central revision it links
-   ([below](#deploying-with-the-gateway)), and this revision refuses to start without `token_keys`.
-   The hook asks first (`--check-accounts-stdin`) and refuses the deploy while Central still runs.
-   Do not get past that check by hand: after the migration the new binary would not start, and
-   neither would the previous one, whose startup check needs the tables the migration drops.
-2. Stop the service, run `--migrate-stdin`, then `ops/grants.sql`, then start it: started before
-   the grants, it refuses to run. The migration drops `gateway_tickets` and `gateway_leases` and
-   ends every native session, so every client signs in again; browser sessions stay.
-3. Deploy the gateway that pins this revision, then the client. Until the gateway is updated, its
-   old requests are answered `426` and Central sign-ins there fail.
+1. **`central.json`, before step 3.** Generate `token_keys` (`--generate-secrets` holds one, or
+   `--generate-token-key`'s `seed`) and add it, with `official_address`
+   ([the official gateway](#the-official-gateway)). `token_keys` is required: this revision refuses
+   to start without it. `official_address` is optional, and without it the official gateway hears
+   of revocations by its public name or by catch-up.
+2. **The client release.** Publish it first, so that the updater finds it. Installed clients go on
+   working until step 3. A client already updated cannot sign in until then: the old Central answers
+   a bearer it cannot read. Keep this gap short.
+3. **Central and the gateway, together.** A gateway deploy installs the Central revision it links
+   ([below](#deploying-with-the-gateway)), so one deploy does both. The hook first asks the new build
+   (`--check-accounts-stdin`) and refuses the deploy while Central still runs. It then stops the
+   service, runs `--migrate-stdin` and `ops/grants.sql`, and starts it; started before the grants,
+   the service refuses to run. The migration drops `gateway_tickets` and `gateway_leases` and ends
+   every native session, so every client signs in again; browser sessions stay. Do not get past the
+   check by hand: after the migration the new binary would not start, and neither would the previous
+   one, whose startup check needs the tables the migration drops.
+4. **Clients update themselves.** The updater goes to GitHub Releases and needs no sign-in.
 
-Installed clients drop a refusal's body, so they show their own generic sign-in failure until the
-updater, which needs no sign-in, has replaced them.
+A client from before this release drops a refusal's body, so after step 3 it shows its own generic
+sign-in failure until the updater has replaced it.
+
 
 ## Deploying with the gateway
 
