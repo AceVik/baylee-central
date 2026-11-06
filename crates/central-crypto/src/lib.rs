@@ -10,6 +10,8 @@
 
 pub mod chat;
 mod context;
+#[cfg(feature = "jwt")]
+pub mod jwt;
 #[cfg(feature = "server")]
 pub mod legacy;
 pub mod opaque;
