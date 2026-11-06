@@ -246,13 +246,9 @@ async fn a_page_is_bounded_and_says_where_it_stands(store: &AccountStore, keys: 
     let page = store.revocation_page(STREAM, 1).await.unwrap();
     assert_eq!((page.last, page.floor, page.sids.len()), (1, 1, 0));
     // A number past the end, and one too large for storage.
-    assert!(
-        store
-            .revocation_page(STREAM, 9)
-            .await
-            .unwrap()
-            .sids
-            .is_empty()
+    assert_eq!(
+        store.revocation_page(STREAM, 9).await.unwrap().sids.len(),
+        0
     );
     assert!(store.revocation_page(STREAM, u64::MAX).await.is_err());
     assert_eq!(REVOCATION_PAGE, 256);
@@ -374,6 +370,7 @@ async fn attempts_are_bounded_and_a_crash_loses_nothing(
     keys: &ServerKeys,
 ) {
     const ORIGIN: &str = "http://127.0.0.1:29102";
+    const STUCK: &str = "http://127.0.0.1:29103";
     let id = gateway(store, keys, "push-retry", ORIGIN, 81).await;
     store
         .register_invalidate(ORIGIN, "/invalidate")
@@ -400,7 +397,6 @@ async fn attempts_are_bounded_and_a_crash_loses_nothing(
     );
 
     // A sender that dies mid-call at the last attempt must not stop this gateway for good.
-    const STUCK: &str = "http://127.0.0.1:29103";
     let id = gateway(store, keys, "push-stuck", STUCK, 82).await;
     store
         .register_invalidate(STUCK, "/invalidate")
@@ -441,7 +437,7 @@ async fn a_page_that_aged_out_needs_no_call(
     backdate(operator, ORIGIN, 1, "3 hours").await;
     store.sweep_revocations().await.unwrap();
     let push = store.claim_gateway_push().await.unwrap().unwrap();
-    assert!(push.sids.is_empty());
+    assert_eq!(push.sids.len(), 0);
     assert_eq!(push.through, 1, "the cursor can pass what aged out");
     store
         .finish_gateway_push(ORIGIN, push.through, GatewayPushResult::Delivered)
@@ -457,8 +453,8 @@ async fn a_removed_administrator_loses_the_admin_sid_only(
     keys: &ServerKeys,
 ) {
     const ORIGIN: &str = "http://127.0.0.1:29105";
-    let (owner, owner_account) = account(store, keys, "admin-owner").await;
-    let (member, member_account) = account(store, keys, "admin-member").await;
+    let (owner, owner_account) = account(store, keys, "sid-owner").await;
+    let (member, member_account) = account(store, keys, "sid-member").await;
     let id = store
         .register_gateway(
             &owner,
@@ -483,15 +479,15 @@ async fn a_removed_administrator_loses_the_admin_sid_only(
         .set_gateway_admins(&owner, id, 1, &[owner_account, member_account])
         .await
         .unwrap();
-    let admin = store
+    let administering = store
         .gateway_grant(&member, &[ORIGIN], true, Admin, sid(91))
         .await
         .unwrap();
-    let admit = store
+    let playing = store
         .gateway_grant(&member, &[ORIGIN], true, Admit, sid(92))
         .await
         .unwrap();
-    assert_ne!(admin.sid, admit.sid);
+    assert_ne!(administering.sid, playing.sid);
     store
         .set_gateway_admins(&owner, id, 2, &[owner_account])
         .await

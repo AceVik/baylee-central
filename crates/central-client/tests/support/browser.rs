@@ -604,12 +604,15 @@ fn sign_in(browser: &Browser, http: &Http, context: Context) -> Token {
     reply.session.expect("a session for the cookie")
 }
 
+/// The cookie is a browser session only: as a native bearer it is nothing.
+fn no_native_bearer(http: &Http, cookie: &Token) {
+    for request in [Request::SessionStatus, Request::RenewSession] {
+        assert!(http.exchange(&request, Some(cookie.into())).is_err());
+    }
+}
+
 fn session(browser: &Browser, http: &Http, bridge: &Token, cookie: &Token) {
-    // The cookie is a browser session only: as a native bearer it is nothing.
-    assert!(
-        http.exchange(&Request::SessionStatus, Some(cookie.into()))
-            .is_err()
-    );
+    no_native_bearer(http, cookie);
     // The browser's status names the account, which the native one does not.
     let Response::BrowserStatus {
         username,
@@ -639,10 +642,6 @@ fn session(browser: &Browser, http: &Http, bridge: &Token, cookie: &Token) {
     assert!(
         renewed >= expires_at,
         "a renewal never shortens the session"
-    );
-    assert!(
-        http.exchange(&Request::RenewSession, Some(cookie.into()))
-            .is_err()
     );
     assert_eq!(
         browser.answer(&Request::RenewSession, None).err(),

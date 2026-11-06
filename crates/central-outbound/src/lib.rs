@@ -5,8 +5,16 @@
 //! The address is checked and pinned in one step. A [`Resolver`]'s answer is exactly what
 //! the connector dials, so there is no second lookup a name could answer differently, and
 //! one private address among a name's answers refuses the whole name.
+//!
+//! There is one exception, and it is a named one: a [`Pin`] gives one exact host one address
+//! on this machine or its network, set by the operator. The URL, the name sent in TLS and the
+//! certificate check stay what they were, so it is the same verified HTTPS to another address.
+//! No other name reaches a private address, with or without a pin.
 #![forbid(unsafe_code)]
-use std::{net::IpAddr, time::Duration};
+use std::{
+    net::{IpAddr, SocketAddr},
+    time::Duration,
+};
 pub use ureq::{Agent, Error};
 use ureq::{
     config::Config,
@@ -17,8 +25,44 @@ use ureq::{
     },
 };
 
+/// One exact host, and the one address it is reached at.
+#[derive(Clone, Debug)]
+pub struct Pin {
+    host: String,
+    address: SocketAddr,
+}
+
+impl Pin {
+    /// Reach `host`, and no name like it, at `address`.
+    ///
+    /// # Errors
+    /// Refuses an address that is not loopback or private: a public address needs no pin, and
+    /// a link-local one is where a cloud host answers about itself. Refuses an empty host.
+    pub fn new(host: &str, address: SocketAddr) -> Result<Self, PinRefused> {
+        if host.is_empty() || !local(address.ip()) {
+            return Err(PinRefused);
+        }
+        Ok(Self {
+            host: host.to_owned(),
+            address,
+        })
+    }
+}
+
+/// The address cannot be pinned.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct PinRefused;
+
+/// Loopback, or private to this network, however it is spelled.
+fn local(ip: IpAddr) -> bool {
+    match ip.to_canonical() {
+        IpAddr::V4(ip) => ip.is_loopback() || ip.is_private(),
+        IpAddr::V6(ip) => ip.is_loopback() || ip.segments()[0] & 0xfe00 == 0xfc00,
+    }
+}
+
 /// The limits of one kind of call.
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct Limits {
     /// The only port allowed, or `None` for the port the URL names.
     pub port: Option<u16>,
@@ -26,12 +70,15 @@ pub struct Limits {
     pub total: Duration,
     /// The connection's limit.
     pub connect: Duration,
+    /// The one host reached at a set address, if any.
+    pub pin: Option<Pin>,
 }
 
 #[derive(Debug)]
 struct PublicResolver<R> {
     inner: R,
     port: Option<u16>,
+    pin: Option<Pin>,
 }
 
 impl<R: Resolver> Resolver for PublicResolver<R> {
@@ -41,6 +88,13 @@ impl<R: Resolver> Resolver for PublicResolver<R> {
         config: &Config,
         timeout: NextTimeout,
     ) -> Result<ResolvedSocketAddrs, Error> {
+        if let Some(pin) = &self.pin
+            && uri.host() == Some(pin.host.as_str())
+        {
+            let mut addresses = self.inner.empty();
+            addresses.push(pin.address);
+            return Ok(addresses);
+        }
         let addresses = self.inner.resolve(uri, config, timeout)?;
         if addresses.is_empty()
             || addresses
@@ -102,6 +156,7 @@ pub fn agent(limits: Limits) -> Agent {
         PublicResolver {
             inner: DefaultResolver::default(),
             port: limits.port,
+            pin: limits.pin,
         },
     )
 }
@@ -131,18 +186,30 @@ mod tests {
         }
     }
 
-    fn resolve(answers: &[&str], port: Option<u16>) -> Result<usize, Error> {
+    fn answered(
+        url: &str,
+        answers: &[&str],
+        port: Option<u16>,
+        pin: Option<Pin>,
+    ) -> Result<Vec<SocketAddr>, Error> {
         let resolver = PublicResolver {
             inner: Answers(answers.iter().map(|a| a.parse().unwrap()).collect()),
             port,
+            pin,
         };
-        let uri: Uri = "https://gateway.example/auth/central/invalidate"
-            .parse()
-            .unwrap();
+        let uri: Uri = url.parse().unwrap();
         let config = Agent::config_builder().build();
         resolver
             .resolve(&uri, &config, NextTimeout::default())
-            .map(|addresses| addresses.len())
+            .map(|addresses| addresses.iter().copied().collect())
+    }
+
+    fn resolve(answers: &[&str], port: Option<u16>) -> Result<usize, Error> {
+        answered("https://gateway.example/x", answers, port, None).map(|found| found.len())
+    }
+
+    fn pin() -> Pin {
+        Pin::new("gateway.example", "127.0.0.1:443".parse().unwrap()).unwrap()
     }
 
     #[test]
@@ -202,11 +269,85 @@ mod tests {
     }
 
     #[test]
+    fn the_pinned_host_goes_to_its_address_and_asks_no_name_server() {
+        // Whatever a name server would say about it, the operator's address is what is dialled.
+        let found = answered(
+            "https://gateway.example/auth/central/invalidate",
+            &["8.8.8.8:443", "10.9.9.9:443"],
+            None,
+            Some(pin()),
+        )
+        .unwrap();
+        assert_eq!(found, vec!["127.0.0.1:443".parse().unwrap()]);
+    }
+
+    #[test]
+    fn a_pin_opens_no_other_name() {
+        for url in [
+            "https://evil.example/x",
+            "https://gateway.example.evil.example/x",
+            "https://evil-gateway.example/x",
+            "https://sub.gateway.example/x",
+            "https://gateway.exampl/x",
+        ] {
+            // Each still answers to the rule, so a private answer still refuses the name.
+            assert!(
+                answered(url, &["127.0.0.1:443"], None, Some(pin())).is_err(),
+                "{url}"
+            );
+            assert!(
+                answered(url, &["10.0.0.1:443"], None, Some(pin())).is_err(),
+                "{url}"
+            );
+        }
+    }
+
+    #[test]
+    fn only_loopback_and_private_addresses_can_be_pinned() {
+        for address in [
+            "127.0.0.1:443",
+            "127.8.8.8:443",
+            "10.0.0.5:443",
+            "172.16.0.5:443",
+            "192.168.1.5:8443",
+            "[::1]:443",
+            "[fd00::5]:443",
+            "[::ffff:127.0.0.1]:443",
+        ] {
+            assert!(
+                Pin::new("gateway.example", address.parse().unwrap()).is_ok(),
+                "{address}"
+            );
+        }
+        for address in [
+            "8.8.8.8:443",
+            "169.254.169.254:80",
+            "0.0.0.0:443",
+            "224.0.0.1:443",
+            "100.64.0.1:443",
+            "[::]:443",
+            "[fe80::1]:443",
+            "[ff02::1]:443",
+            "[2606:4700:4700::1111]:443",
+            "[::ffff:169.254.169.254]:80",
+            "[::ffff:8.8.8.8]:443",
+        ] {
+            assert_eq!(
+                Pin::new("gateway.example", address.parse().unwrap()).err(),
+                Some(PinRefused),
+                "{address}"
+            );
+        }
+        assert!(Pin::new("", "127.0.0.1:443".parse().unwrap()).is_err());
+    }
+
+    #[test]
     fn an_agent_refuses_plain_http_and_a_literal_private_address_without_connecting() {
         let agent = agent(Limits {
             port: None,
             total: Duration::from_secs(2),
             connect: Duration::from_secs(1),
+            pin: None,
         });
         for url in ["http://8.8.8.8/x", "https://127.0.0.1/x", "https://[::1]/x"] {
             assert!(agent.post(url).send("x").is_err(), "{url}");

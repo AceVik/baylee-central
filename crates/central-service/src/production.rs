@@ -74,6 +74,10 @@ struct Service {
     bridge: Token,
     /// The key that signs Central's tokens and the keys listed beside it.
     token_keys: TokenKeyConfig,
+    /// The numeric address the official gateway answers at when it runs beside this service
+    /// (`docs/operations.md` §"The official gateway"); absent means by its public name.
+    #[serde(default)]
+    official_address: Option<String>,
     /// The legacy store's own login, from the cutover until its deadline
     /// (`docs/operations.md` §"The legacy store"); absent means no legacy
     /// sign-in.
@@ -199,6 +203,7 @@ async fn serve() -> Result<(), ()> {
     let endpoint = Endpoint::live();
     let (config, browser) = listener_configs(&settings)?;
     let keys = ServerKeys::from_secret_bytes(&settings.opaque_setup).map_err(|_| ())?;
+    let official = super::gateway_push::official_pin(settings.official_address.as_deref())?;
     let database = settings.database.server()?;
     let legacy = settings
         .legacy
@@ -258,7 +263,7 @@ async fn serve() -> Result<(), ()> {
         }
         let (stop, _) = watch::channel(false);
         let native = server.run_with_identity(&endpoint, identity.clone(), stopped(&stop));
-        let revocations = super::gateway_push::run(identity.clone(), stop.subscribe());
+        let revocations = super::gateway_push::run(identity.clone(), official, stop.subscribe());
         let browser = browser
             .map(|browser| browser.run_browser(identity, BrowserOrigin::live(), stopped(&stop)));
         if push.is_some() {

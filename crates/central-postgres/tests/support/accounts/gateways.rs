@@ -121,8 +121,7 @@ pub(super) async fn run(store: &AccountStore, operator: &DatabaseConnection, key
         operator,
         &owner_session,
         &member_session,
-        gateway,
-        origin,
+        (origin, gateway),
         owner.account,
         member.account,
     )
@@ -387,8 +386,7 @@ async fn admin_revocation(
     operator: &DatabaseConnection,
     owner_session: &Token,
     member_session: &Token,
-    gateway: [u8; 16],
-    origin: &str,
+    (origin, gateway): (&str, [u8; 16]),
     owner: [u8; 16],
     member: [u8; 16],
 ) {

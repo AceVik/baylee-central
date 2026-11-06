@@ -189,7 +189,6 @@ impl Http {
     /// A gateway token, verified as the gateway at `audience` verifies it.
     pub(super) fn gateway_claims(&self, token: &SignedToken, audience: &str) -> GatewayClaims {
         jwt::verify(token.expose(), &self.keys(), self.expected(audience))
-            .ok()
             .expect("a token this gateway accepts")
     }
 
@@ -210,7 +209,6 @@ impl Http {
         let sids = token.map_or_else(Vec::new, |token| {
             let claims: RevocationClaims =
                 jwt::verify(token.expose(), &self.keys(), self.expected(audience))
-                    .ok()
                     .expect("a message this gateway accepts");
             claims.sids
         });

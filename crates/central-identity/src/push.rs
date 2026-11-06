@@ -16,8 +16,8 @@ pub enum Delivery {
     Retry,
 }
 
-/// One call to a gateway. The live implementation holds to HTTPS and public addresses; the
-/// service has no other, so that no setting reaches a private address.
+/// One call to a gateway. The live implementation holds to verified HTTPS and public addresses,
+/// with one operator-set exception for the official gateway's own host (`central-outbound`).
 pub trait GatewayDelivery: Send + Sync {
     /// `POST` the message to this URL, built from the approved origin and registered path.
     fn deliver(&self, url: &str, message: &SignedToken) -> Delivery;

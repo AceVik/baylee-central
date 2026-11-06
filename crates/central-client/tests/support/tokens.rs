@@ -123,7 +123,7 @@ pub(crate) fn run(http: &Http, bridge: &Token, runtime: &Runtime, operator: &Dat
     revocations_reach_the_gateway(
         http,
         bridge,
-        session,
+        &session,
         &credential,
         &heartbeat,
         &other,
@@ -179,7 +179,7 @@ fn a_central_token_is_for_central_alone(http: &Http, central: &str) {
         audience,
         now: now(),
     };
-    let claims: CentralClaims = jwt::verify(central, &http.keys(), at(origin)).ok().unwrap();
+    let claims: CentralClaims = jwt::verify(central, &http.keys(), at(origin)).unwrap();
     assert_eq!(claims.aud, origin);
     // A gateway it reaches by mistake cannot take it for one of its own.
     assert_eq!(
@@ -200,7 +200,6 @@ fn a_copied_capability_opens_nothing(http: &Http, central: &str) {
             now: now(),
         },
     )
-    .ok()
     .unwrap();
     // The capability is in the token, and bare it is no session.
     for request in [
@@ -381,7 +380,7 @@ fn a_bearer_keeps_to_its_own_side(http: &Http, central: &str, credential: &Token
 fn revocations_reach_the_gateway(
     http: &Http,
     bridge: &Token,
-    session: Session,
+    session: &Session,
     credential: &Token,
     heartbeat: &Token,
     other: &Token,
@@ -452,7 +451,7 @@ fn revocations_reach_the_gateway(
         audience: ORIGIN,
         now: now(),
     };
-    let claims: RevocationClaims = jwt::verify(message, &http.keys(), expected).ok().unwrap();
+    let claims: RevocationClaims = jwt::verify(message, &http.keys(), expected).unwrap();
     assert_eq!(claims.sids, vec![sid]);
     assert_eq!((claims.from, claims.seq), (1, 1));
     // Addressed to one gateway, it is refused at another, and taken once.

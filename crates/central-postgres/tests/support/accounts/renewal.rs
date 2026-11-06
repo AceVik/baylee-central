@@ -38,6 +38,8 @@ pub(super) async fn run(store: &AccountStore, operator: &DatabaseConnection, key
     store.confirm_restore(&session, 1).await.unwrap();
     // The bridge admits a moved account once its move is closed.
     store.close_legacy("renewal", identity).await.unwrap();
+    // Twenty minutes in, ten left: renewed to 30 minutes from now.
+    made(operator, "20 minutes", "10 minutes").await;
     // A token's cap is the session's 12 hours, which no renewal moves.
     let cap = store
         .gateway_grant(
@@ -50,9 +52,6 @@ pub(super) async fn run(store: &AccountStore, operator: &DatabaseConnection, key
         .await
         .unwrap()
         .cap;
-
-    // Twenty minutes in, ten left: renewed to 30 minutes from now.
-    made(operator, "20 minutes", "10 minutes").await;
     let before = expiry(operator).await;
     let renewed = store.renew_session(&session).await.unwrap();
     assert!(renewed > before, "later than before");
