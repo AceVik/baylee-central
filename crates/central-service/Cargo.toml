@@ -13,7 +13,8 @@ workspace = true
 [dependencies]
 central-push = { path = "../central-push", version = "=0.1.0" }
 central-api = { path = "../central-api", version = "=0.1.0" }
-central-crypto = { path = "../central-crypto", version = "=0.1.0", features = ["server"] }
+central-crypto = { path = "../central-crypto", version = "=0.1.0", features = ["jwt", "server"] }
+central-outbound = { path = "../central-outbound", version = "=0.1.0" }
 central-identity = { path = "../central-identity", version = "=0.1.0" }
 central-postgres = { path = "../central-postgres", version = "=0.1.0" }
 central-migration = { path = "../central-migration", version = "=0.1.0" }

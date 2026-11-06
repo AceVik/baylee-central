@@ -73,7 +73,7 @@ impl Session {
     pub fn terms_status(&self, transport: &impl Transport) -> Result<TermsStatus, Error> {
         self.same_endpoint(transport)?;
         let Response::TermsStatus { current, accepted } =
-            transport.exchange(&Request::TermsStatus, Some(&self.token))?
+            transport.exchange(&Request::TermsStatus, Some((&self.token).into()))?
         else {
             return Err(Error::Rejected);
         };
@@ -111,7 +111,7 @@ impl Session {
                 version: version.version.clone(),
                 digest: version.digest,
             },
-            Some(&self.token),
+            Some((&self.token).into()),
         )? {
             Response::Done => Ok(()),
             _ => Err(Error::Rejected),

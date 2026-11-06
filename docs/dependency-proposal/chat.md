@@ -50,3 +50,11 @@ inventory and scoped source hash are updated. Canonical WASM vectors and the
 integrated browser/native host are still pending; native success alone is not a
 claim of browser interoperability. Gateways receive neither Central credentials
 nor plaintext. See central-chat.md.
+
+## Session tokens, 6 November 2026
+
+`ed25519-dalek` also signs and verifies Central's session tokens, in `central-crypto::jwt`, with
+the same version and the same `zeroize` feature, and `central-crypto` stays its only caller. No
+package or feature is added: `base64ct`, `serde` and `serde_json` were approved for the workspace
+and become optional dependencies of `central-crypto` behind its `jwt` feature. This use of the
+owner's Ed25519 approval is new and needs the owner's review.

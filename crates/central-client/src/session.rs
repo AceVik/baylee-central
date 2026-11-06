@@ -1,5 +1,5 @@
 use super::{
-    Document, Endpoint, Error, Identity, MasterKey, ObjectContext, Request, Response, Token,
+    Document, Endpoint, Error, Identity, MasterKey, ObjectContext, Request, Response, SignedToken,
     Transport, context,
 };
 use zeroize::Zeroizing;
@@ -8,7 +8,7 @@ use zeroize::Zeroizing;
 pub struct Session {
     pub(crate) endpoint: Endpoint,
     pub(crate) identity: Identity,
-    pub(crate) token: Token,
+    pub(crate) token: SignedToken,
     pub(crate) master: MasterKey,
     revision: u64,
     document: Document,
@@ -19,7 +19,7 @@ impl Session {
     pub(super) fn new(
         endpoint: Endpoint,
         identity: Identity,
-        token: Token,
+        token: SignedToken,
         master: MasterKey,
     ) -> Self {
         Self {
@@ -94,7 +94,7 @@ impl Session {
     /// Rejects revoked sessions, wrong identity and unavailable transport; never authorizes fallback.
     pub fn migration_closed(&self, transport: &impl Transport) -> Result<bool, Error> {
         self.same_endpoint(transport)?;
-        match transport.exchange(&Request::SessionStatus, Some(&self.token))? {
+        match transport.exchange(&Request::SessionStatus, Some((&self.token).into()))? {
             Response::SessionStatus {
                 identity,
                 expires_at,
@@ -120,7 +120,7 @@ impl Session {
     /// ends nothing by itself.
     pub fn renew(&self, transport: &impl Transport) -> Result<i64, Error> {
         self.same_endpoint(transport)?;
-        match transport.exchange(&Request::RenewSession, Some(&self.token))? {
+        match transport.exchange(&Request::RenewSession, Some((&self.token).into()))? {
             Response::Renewed { expires_at } if expires_at > 0 => Ok(expires_at),
             _ => Err(Error::Rejected),
         }
@@ -145,7 +145,7 @@ impl Session {
     pub fn refresh(&mut self, transport: &impl Transport) -> Result<(), Error> {
         self.same_endpoint(transport)?;
         let Response::Document { revision, document } =
-            transport.exchange(&Request::ReadDocument, Some(&self.token))?
+            transport.exchange(&Request::ReadDocument, Some((&self.token).into()))?
         else {
             return Err(Error::Rejected);
         };
@@ -171,7 +171,7 @@ impl Session {
             &Request::ConfirmRestore {
                 revision: self.revision,
             },
-            Some(&self.token),
+            Some((&self.token).into()),
         )? {
             Response::Done => {
                 self.confirmed = true;
@@ -198,7 +198,7 @@ impl Session {
                 expected_revision: self.revision,
                 document,
             },
-            Some(&self.token),
+            Some((&self.token).into()),
         )? {
             Response::Done => {
                 self.revision = revision;
@@ -209,37 +209,27 @@ impl Session {
         }
     }
 
-    /// Issue a one-use gateway capability after restoration, without exposing the central session.
-    ///
-    /// # Errors
-    /// Rejects unsupported gateways, unconfirmed restoration, expired sessions or transport failure.
-    pub fn gateway_ticket(
-        &self,
-        transport: &impl Transport,
-        gateway: String,
-    ) -> Result<Token, Error> {
-        self.gateway_capability(transport, gateway, central_api::wire::TicketPurpose::Admit)
-    }
-
-    /// Issue a one-use, audience- and action-bound gateway capability after restoration.
+    /// Ask for a token for one gateway after restoration, without exposing the Central token.
+    /// The same call refreshes it. The answer is the token and its absolute expiry in Unix
+    /// seconds; hand the token to that gateway and to no one else.
     ///
     /// # Errors
     /// Rejects unsupported gateways, unconfirmed restoration, expiry or transport failure.
-    pub fn gateway_capability(
+    pub fn gateway_token(
         &self,
         transport: &impl Transport,
         gateway: String,
-        purpose: central_api::wire::TicketPurpose,
-    ) -> Result<Token, Error> {
+        purpose: central_api::wire::GatewayPurpose,
+    ) -> Result<(SignedToken, i64), Error> {
         self.same_endpoint(transport)?;
         if !self.confirmed {
             return Err(Error::Rejected);
         }
         match transport.exchange(
-            &Request::GatewayTicket { gateway, purpose },
-            Some(&self.token),
+            &Request::GatewayToken { gateway, purpose },
+            Some((&self.token).into()),
         )? {
-            Response::GatewayTicket { ticket } => Ok(ticket),
+            Response::GatewayToken { token, expires_at } => Ok((token, expires_at)),
             _ => Err(Error::Rejected),
         }
     }
@@ -250,7 +240,7 @@ impl Session {
     /// Reports failure to confirm revocation; local disposal still remains available.
     pub fn logout(&self, transport: &impl Transport) -> Result<(), Error> {
         self.same_endpoint(transport)?;
-        match transport.exchange(&Request::Logout, Some(&self.token))? {
+        match transport.exchange(&Request::Logout, Some((&self.token).into()))? {
             Response::Done => Ok(()),
             _ => Err(Error::Rejected),
         }

@@ -9,10 +9,10 @@
 //! and other sessions are checked.
 use super::{Http, browser::Browser};
 use central_api::{
-    Error, Token,
+    Error, SignedToken, Token,
     beta_key::BetaKey,
     terms::TermsSubject,
-    wire::{Identity, Request, Response, TicketPurpose},
+    wire::{GatewayPurpose::Admit, Identity, Request, Response},
 };
 use central_client::{Session, Transport};
 use central_crypto::{
@@ -25,6 +25,8 @@ use sea_orm::{ConnectionTrait, DatabaseConnection};
 use std::sync::atomic::Ordering;
 use tokio::runtime::Runtime;
 
+/// The official gateway of this fixture.
+const OFFICIAL: &str = "http://127.0.0.1:28766";
 pub(crate) const OLD: &str = "synthetic first password";
 pub(crate) const NEW: &str = "synthetic second password";
 pub(crate) const DOCUMENT: &[u8] = br#"{"version":1,"gateways":[],"settings":{"password":true}}"#;
@@ -86,7 +88,7 @@ pub(crate) fn moved(http: &Http, bridge: &Token, legacy: &str) -> (Identity, Ses
                 display_name: None,
                 tag: None,
             },
-            Some(bridge),
+            Some(bridge.into()),
         )
         .unwrap()
     else {
@@ -105,14 +107,14 @@ pub(crate) fn close(http: &Http, bridge: &Token, legacy: &str, identity: Identit
             legacy_id: legacy.into(),
             identity,
         },
-        Some(bridge),
+        Some(bridge.into()),
     )
     .unwrap();
 }
 
 /// A moved account whose move is closed, signed in by hand: its identity,
 /// bearer and master key. Two units.
-fn closed(http: &Http, bridge: &Token, legacy: &str) -> (Identity, Token, MasterKey) {
+fn closed(http: &Http, bridge: &Token, legacy: &str) -> (Identity, SignedToken, MasterKey) {
     let (identity, session) = moved(http, bridge, legacy);
     close(http, bridge, legacy, identity);
     drop(session);
@@ -122,7 +124,7 @@ fn closed(http: &Http, bridge: &Token, legacy: &str) -> (Identity, Token, Master
 
 /// A raw native sign-in: its bearer, and the master key it opens, as a
 /// signed-in client holds it. One unit.
-fn sign_in(http: &Http, identity: Identity, password: &str) -> (Token, MasterKey) {
+fn sign_in(http: &Http, identity: Identity, password: &str) -> (SignedToken, MasterKey) {
     let context = context(http, identity);
     let (login, message) = Login::start(password.into(), context).unwrap();
     let Response::LoginChallenge { attempt, message } = http
@@ -356,7 +358,7 @@ fn replaced(http: &Http, bridge: &Token, runtime: &Runtime, operator: &DatabaseC
     let context = context(http, identity);
     // Units 3 and 4.
     let begun = begin(
-        &|request: &Request| http.exchange(request, Some(&bearer)),
+        &|request: &Request| http.exchange(request, Some((&bearer).into())),
         context,
         &master,
         OLD,
@@ -366,15 +368,17 @@ fn replaced(http: &Http, bridge: &Token, runtime: &Runtime, operator: &DatabaseC
     // Unit 5.
     let (replacement, _) = sign_in(http, identity, OLD);
     assert_eq!(
-        http.exchange(&begun.finish(), Some(&replacement)).err(),
+        http.exchange(&begun.finish(), Some((&replacement).into()))
+            .err(),
         Some(Error::Rejected)
     );
     assert_eq!(
-        http.exchange(&begun.finish(), Some(&bearer)).err(),
+        http.exchange(&begun.finish(), Some((&bearer).into())).err(),
         Some(Error::Rejected)
     );
     assert_eq!(revision(runtime, operator, identity), unchanged);
-    http.exchange(&Request::Logout, Some(&replacement)).unwrap();
+    http.exchange(&Request::Logout, Some((&replacement).into()))
+        .unwrap();
 }
 
 /// Attempts refused by hand, each consumed by the refusal and changing
@@ -384,7 +388,7 @@ fn crossed(http: &Http, bridge: &Token, runtime: &Runtime, operator: &DatabaseCo
     // Units 1 and 2.
     let (identity, bearer, master) = closed(http, bridge, "password-crossed");
     let context = context(http, identity);
-    let send = |request: &Request| http.exchange(request, Some(&bearer));
+    let send = |request: &Request| http.exchange(request, Some((&bearer).into()));
     let unchanged = revision(runtime, operator, identity);
     // Without a session, or with an unknown one, nothing starts or is spent.
     let start = Request::ChangePasswordStart {
@@ -393,14 +397,16 @@ fn crossed(http: &Http, bridge: &Token, runtime: &Runtime, operator: &DatabaseCo
     };
     assert_eq!(http.exchange(&start, None).err(), Some(Error::Rejected));
     assert_eq!(
-        http.exchange(&start, Some(&Token::generate().unwrap()))
+        http.exchange(&start, Some((&Token::generate().unwrap()).into()))
             .err(),
         Some(Error::Rejected)
     );
-    // Units 3 and 4: finished with another bearer, then (consumed) with its own and none.
+    // Units 3 and 4: finished under another account's live session, which reaches the
+    // attempt and is refused by its binding, then (consumed) with its own and none.
+    let (_, stranger, _) = closed(http, bridge, "password-stranger");
     let begun = begin(&send, context, &master, OLD, NEW).unwrap();
     assert_eq!(
-        http.exchange(&begun.finish(), Some(&Token::generate().unwrap()))
+        http.exchange(&begun.finish(), Some((&stranger).into()))
             .err(),
         Some(Error::Rejected)
     );
@@ -445,7 +451,7 @@ fn budget(http: &Http, bridge: &Token, runtime: &Runtime, operator: &DatabaseCon
     // Units 1 and 2.
     let (identity, bearer, master) = closed(http, bridge, "password-budget");
     let context = context(http, identity);
-    let send = |request: &Request| http.exchange(request, Some(&bearer));
+    let send = |request: &Request| http.exchange(request, Some((&bearer).into()));
     let unchanged = revision(runtime, operator, identity);
     // Units 3 and 4: a proof with one bit changed.
     let begun = begin(&send, context, &master, OLD, NEW).unwrap();
@@ -621,42 +627,21 @@ pub(crate) fn register(
     }
 }
 
-/// Unit 2: the native client plays; the official gateway holds a lease,
-/// whose check is answered.
-fn playing(http: &Http, bridge: &Token, identity: Identity) -> (Session, Request) {
-    let mut native = central_client::login(http, identity, OLD.into()).unwrap();
+/// Unit 2: the native client plays at the official gateway, which knows its `sid`.
+fn playing(http: &Http, bridge: &Token, identity: Identity) -> (Session, SignedToken, String, u64) {
+    let recording = super::tokens::Recording::new(http);
+    let mut native = central_client::login(&recording, identity, OLD.into()).unwrap();
+    let bearer = recording.taken();
     native.confirm_restored(http).unwrap();
-    let ticket = native
-        .gateway_ticket(http, "http://127.0.0.1:28766".into())
-        .unwrap();
-    let Response::GatewayIdentity {
-        lease: Some(lease), ..
-    } = http
-        .exchange(
-            &Request::RedeemGateway {
-                ticket,
-                purpose: TicketPurpose::Admit,
-            },
-            Some(bridge),
-        )
-        .unwrap()
-    else {
-        panic!("an admission with a lease");
-    };
-    let lease = Request::GatewaySession {
-        lease,
-        purpose: TicketPurpose::Admit,
-    };
-    assert!(matches!(
-        http.exchange(&lease, Some(bridge)).unwrap(),
-        Response::GatewaySession { .. }
-    ));
-    (native, lease)
+    let (token, _) = native.gateway_token(http, OFFICIAL.into(), Admit).unwrap();
+    let sid = http.gateway_claims(&token, OFFICIAL).sid;
+    let (_, last, _) = http.revoked(bridge, OFFICIAL, u64::MAX >> 1);
+    (native, bearer, sid, last)
 }
 
 /// The website's change on a registered account, while the native client
 /// plays at the official gateway: the cookie and the native session end,
-/// with the gateway's lease; a new cookie is set; the recovery code and the
+/// and the gateway is told; a new cookie is set; the recovery code and the
 /// document stay. Eight units.
 fn website(
     http: &Http,
@@ -681,18 +666,18 @@ fn website(
         Some(Error::TermsRequired)
     );
     super::browser::accept_terms(&browser, &cookie);
-    let (native, lease) = playing(http, bridge, identity);
+    let (native, bearer, sid, last) = playing(http, bridge, identity);
     // The cookie is no native bearer: nothing starts, nothing is spent.
-    let over_native = |request: &Request| http.exchange(request, Some(&cookie));
+    let over_native = |request: &Request| http.exchange(request, Some((&cookie).into()));
     assert_eq!(
         begin(&over_native, context, master, OLD, NEW).err(),
         Some(Error::Rejected)
     );
-    // Units 3 and 4: begun on the website, finished on the native listener with
-    // the same token: refused, and consumed.
+    // Units 3 and 4: begun on the website, finished on the native listener under the
+    // account's own live native session: refused, and consumed.
     let begun = begin(&over_browser, context, master, OLD, NEW).unwrap();
     assert_eq!(
-        http.exchange(&begun.finish(), Some(&cookie)).err(),
+        http.exchange(&begun.finish(), Some((&bearer).into())).err(),
         Some(Error::Rejected)
     );
     assert_eq!(
@@ -732,12 +717,10 @@ fn website(
         panic!("a summary");
     };
     assert!(has_code);
-    // The native session ended with it, and the gateway's lease.
+    // The native session ended with it, and the gateway is told.
+    let (sids, ..) = http.revoked(bridge, OFFICIAL, last);
+    assert!(sids.contains(&sid));
     assert_eq!(native.check_active(http), Err(Error::Rejected));
-    assert_eq!(
-        http.exchange(&lease, Some(bridge)).err(),
-        Some(Error::Rejected)
-    );
     afterwards(http, &browser, runtime, operator, &registered, &renewed);
 }
 

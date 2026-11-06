@@ -2,9 +2,7 @@
 //! (`docs/account-deletion.md`): who may delete, what one deletion takes with
 //! it under the runtime's own grants, what it leaves, the races it loses on
 //! purpose, and what an export holds.
-use super::{
-    AccountStore, Error, Identity, ServerKeys, TicketPurpose, Token, config, enroll, login,
-};
+use super::{AccountStore, Admit, Error, Identity, ServerKeys, Token, config, enroll, login};
 use central_api::{admin::AccountState, export::EXPORT_LIST, gateway::GatewayMetadata};
 use central_postgres::Session;
 use sea_orm::{
@@ -336,34 +334,23 @@ async fn fill(store: &AccountStore, operator: &DatabaseConnection, keys: &Server
         .issue_session(&credential, Session::Browser(&browser))
         .await
         .unwrap();
-    // Its own gateway, with the other account on its list and a lease on it.
+    // Its own gateway, with the other account on its list and a session at it.
     let own = gateway(store, operator, &native, "https://deletion-own.invalid").await;
     store
         .set_gateway_admins(&native, own, 1, &[other.account])
         .await
         .unwrap();
-    let ticket = Token::generate().unwrap();
     store
-        .registered_ticket(
+        .gateway_grant(
             &native,
-            "https://deletion-own.invalid",
-            &ticket,
-            TicketPurpose::Admit,
-        )
-        .await
-        .unwrap();
-    store
-        .redeem_lease(
-            &ticket,
             &["https://deletion-own.invalid"],
-            TicketPurpose::Admit,
-            Some(own),
-            Some(&Token::generate().unwrap()),
+            true,
+            Admit,
+            [51; 16],
         )
         .await
         .unwrap();
-    // The other account's gateway, with this one on its list and a ticket
-    // outstanding for it.
+    // The other account's gateway, with this one on its list and a session at it.
     let foreign = gateway(
         store,
         operator,
@@ -376,11 +363,12 @@ async fn fill(store: &AccountStore, operator: &DatabaseConnection, keys: &Server
         .await
         .unwrap();
     store
-        .registered_ticket(
+        .gateway_grant(
             &native,
-            "https://deletion-foreign.invalid",
-            &Token::generate().unwrap(),
-            TicketPurpose::Admit,
+            &["https://deletion-foreign.invalid"],
+            true,
+            Admit,
+            [52; 16],
         )
         .await
         .unwrap();
@@ -502,12 +490,10 @@ async fn everything(store: &AccountStore, operator: &DatabaseConnection, keys: &
         "gateway_tokens.gateway_id",
         "gateway_admins.account_id",
         "gateway_admins.gateway_id",
-        "gateway_leases.gateway_id",
         "private_objects.account_id",
         "migration_archives.account_id",
         "terms_acceptances.account_id",
-        "gateway_tickets.session_digest",
-        "gateway_leases.session_digest",
+        "gateway_sids.session_digest",
     ] {
         assert!(
             named.iter().any(|(name, n)| name == column && *n > 0),
@@ -579,11 +565,7 @@ async fn naming(
         .await;
         named.push((format!("{table}.{name}"), n));
     }
-    for (table, column) in [
-        ("sessions", "digest"),
-        ("gateway_tickets", "session_digest"),
-        ("gateway_leases", "session_digest"),
-    ] {
+    for (table, column) in [("sessions", "digest"), ("gateway_sids", "session_digest")] {
         let mut n = 0;
         for digest in digests {
             n += count(

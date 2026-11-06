@@ -29,8 +29,8 @@ pub const TOKEN_PREFIX: &str = "bgt_";
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct GatewayScopes {
-    /// Sign players in through Central: redeem their tickets and check their
-    /// leases, profiles, admin rights and terms.
+    /// Sign players in through Central: read its revocations, name its invalidate path and
+    /// publish its terms.
     pub sso: bool,
     /// Beat for the public gateway directory: its name, version, website and
     /// whether it is online.
@@ -117,8 +117,7 @@ pub struct SessionInfo {
     pub signed_in_at: i64,
     /// When it ends unless renewed, in Unix seconds.
     pub expires_at: i64,
-    /// The gateways it is signed in to now (the audiences of its live
-    /// leases), at most [`TOKENS_PER_GATEWAY`] times four, sorted.
+    /// The gateways it holds a token for (the streams of its `sid`s), at most [`TOKENS_PER_GATEWAY`] times four, sorted.
     pub gateways: Vec<String>,
 }
 

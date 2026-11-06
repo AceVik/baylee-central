@@ -1,11 +1,8 @@
 //! Migration 000008, renewable sessions: a live session renews to 30 minutes
-//! from now, never past 12 hours after its sign-in, and its leases follow; an
-//! expired, replaced or signed-out session renews nothing; a session renews
-//! only as its own kind; and the runtime may move a lease's expiry and nothing
-//! else of it.
-use super::{
-    AccountStore, Error, Identity, ServerKeys, TicketPurpose, Token, config, enroll, login,
-};
+//! from now, never past 12 hours after its sign-in; an expired, replaced or
+//! signed-out session renews nothing; a session renews only as its own kind.
+//! The runtime may add a revocation and never rewrite one.
+use super::{AccountStore, Admit, Error, Identity, ServerKeys, Token, config, enroll, login};
 use central_postgres::{Session, connect_dev};
 use sea_orm::{ConnectionTrait, DatabaseConnection};
 
@@ -16,30 +13,20 @@ async fn count(db: &impl ConnectionTrait, sql: &str) -> i64 {
     super::super::scalar(db, sql).await
 }
 
-/// The native session's expiry, or its one lease's, in Unix seconds.
-async fn expiry(operator: &DatabaseConnection, of_lease: bool) -> i64 {
-    let sql = if of_lease {
-        format!(
-            "SELECT floor(extract(epoch FROM l.expires_at))::bigint AS value
-             FROM central_identity.gateway_leases l WHERE l.session_digest = (SELECT s.digest {NATIVE})"
-        )
-    } else {
-        format!("SELECT floor(extract(epoch FROM s.expires_at))::bigint AS value {NATIVE}")
-    };
+/// The native session's expiry, in Unix seconds.
+async fn expiry(operator: &DatabaseConnection) -> i64 {
+    let sql = format!("SELECT floor(extract(epoch FROM s.expires_at))::bigint AS value {NATIVE}");
     count(operator, &sql).await
 }
 
-/// Moves the native session and its lease `ago` into the past (fixed
+/// Moves the native session `ago` into the past (fixed
 /// synthetic intervals, never user input): made then, expiring `left` from now.
 async fn made(operator: &DatabaseConnection, ago: &str, left: &str) {
     operator
         .execute_unprepared(&format!(
             "UPDATE central_identity.sessions SET created_at = pg_catalog.clock_timestamp() - interval '{ago}',
                  expires_at = pg_catalog.clock_timestamp() + interval '{left}'
-             WHERE digest = (SELECT s.digest {NATIVE});
-             UPDATE central_identity.gateway_leases SET created_at = pg_catalog.clock_timestamp() - interval '{ago}',
-                 expires_at = pg_catalog.clock_timestamp() + interval '{left}'
-             WHERE session_digest = (SELECT s.digest {NATIVE});"
+             WHERE digest = (SELECT s.digest {NATIVE});"
         ))
         .await
         .unwrap();
@@ -51,30 +38,24 @@ pub(super) async fn run(store: &AccountStore, operator: &DatabaseConnection, key
     store.confirm_restore(&session, 1).await.unwrap();
     // The bridge admits a moved account once its move is closed.
     store.close_legacy("renewal", identity).await.unwrap();
-    let ticket = Token::generate().unwrap();
-    store
-        .gateway_ticket(&session, "official", &ticket, TicketPurpose::Admit)
-        .await
-        .unwrap();
-    let lease = Token::generate().unwrap();
-    store
-        .redeem_lease(
-            &ticket,
-            &["official"],
-            TicketPurpose::Admit,
-            None,
-            Some(&lease),
+    // Twenty minutes in, ten left: renewed to 30 minutes from now.
+    made(operator, "20 minutes", "10 minutes").await;
+    // A token's cap is the session's 12 hours, which no renewal moves.
+    let cap = store
+        .gateway_grant(
+            &session,
+            &["https://renewal.example"],
+            false,
+            Admit,
+            [43; 16],
         )
         .await
-        .unwrap();
-
-    // Twenty minutes in, ten left: renewed to 30 minutes from now, the lease with it.
-    made(operator, "20 minutes", "10 minutes").await;
-    let before = expiry(operator, false).await;
+        .unwrap()
+        .cap;
+    let before = expiry(operator).await;
     let renewed = store.renew_session(&session).await.unwrap();
     assert!(renewed > before, "later than before");
-    assert_eq!(expiry(operator, false).await, renewed);
-    assert_eq!(expiry(operator, true).await, renewed, "the lease follows");
+    assert_eq!(expiry(operator).await, renewed);
     assert_eq!(
         count(
             operator,
@@ -86,11 +67,21 @@ pub(super) async fn run(store: &AccountStore, operator: &DatabaseConnection, key
         .await,
         1
     );
-    let (_, until) = store
-        .gateway_session(&lease, &["official"], None, TicketPurpose::Admit)
-        .await
-        .unwrap();
-    assert_eq!(until, renewed, "the gateway learns the new expiry");
+    assert_eq!(
+        store
+            .gateway_grant(
+                &session,
+                &["https://renewal.example"],
+                false,
+                Admit,
+                [44; 16]
+            )
+            .await
+            .unwrap()
+            .cap,
+        cap,
+        "a renewal does not move the cap"
+    );
 
     // Near the cap: renewed to 12 hours after the sign-in, and no further.
     made(operator, "11 hours 50 minutes", "5 minutes").await;
@@ -105,7 +96,6 @@ pub(super) async fn run(store: &AccountStore, operator: &DatabaseConnection, key
         .await,
         1
     );
-    assert_eq!(expiry(operator, true).await, capped);
     assert_eq!(
         store.renew_session(&session).await.unwrap(),
         capped,
@@ -114,13 +104,12 @@ pub(super) async fn run(store: &AccountStore, operator: &DatabaseConnection, key
 
     // Expired: nothing renews, and nothing moves.
     made(operator, "12 hours", "-1 second").await;
-    let expired = expiry(operator, false).await;
+    let expired = expiry(operator).await;
     assert_eq!(
         store.renew_session(&session).await.err(),
         Some(Error::Rejected)
     );
-    assert_eq!(expiry(operator, false).await, expired);
-    assert_eq!(expiry(operator, true).await, expired);
+    assert_eq!(expiry(operator).await, expired);
 
     kinds_and_endings(store, keys, identity).await;
     privileges(operator).await;
@@ -172,25 +161,13 @@ async fn privileges(operator: &DatabaseConnection) {
     let runtime = connect_dev(config("central_runtime", "CENTRAL_TEST_RUNTIME_PASSWORD"))
         .await
         .unwrap();
-    // Checked when the statement is planned, so no row has to change.
-    runtime
-        .execute_unprepared(
-            "UPDATE central_identity.gateway_leases SET expires_at = expires_at WHERE false",
-        )
-        .await
-        .unwrap();
-    for column in [
-        "digest",
-        "session_digest",
-        "gateway_id",
-        "audience",
-        "purpose",
-        "created_at",
-    ] {
+    // Checked when the statement is planned, so no row has to change. A revocation is
+    // added and aged out, and never rewritten.
+    for column in ["stream", "seq", "sid", "revoked_at"] {
         assert!(
             runtime
                 .execute_unprepared(&format!(
-                    "UPDATE central_identity.gateway_leases SET {column} = {column} WHERE false"
+                    "UPDATE central_identity.gateway_revocations SET {column} = {column} WHERE false"
                 ))
                 .await
                 .is_err(),
@@ -198,23 +175,21 @@ async fn privileges(operator: &DatabaseConnection) {
         );
     }
     runtime.close().await.unwrap();
-    // The store's startup check refuses a wider grant on leases, and a missing one.
-    let table = "central_identity.gateway_leases";
-    let restore = format!(
-        "REVOKE UPDATE ON {table} FROM central_runtime; GRANT UPDATE (expires_at) ON {table} TO central_runtime"
-    );
+    // The store's startup check refuses a wider grant, and a missing one.
+    let log = "central_identity.gateway_revocations";
+    let sids = "central_identity.gateway_sids";
     for (change, undo) in [
         (
-            format!("GRANT UPDATE (audience) ON {table} TO central_runtime"),
-            format!("REVOKE UPDATE (audience) ON {table} FROM central_runtime"),
+            format!("GRANT UPDATE (sid) ON {log} TO central_runtime"),
+            format!("REVOKE UPDATE (sid) ON {log} FROM central_runtime"),
         ),
         (
-            format!("GRANT UPDATE ON {table} TO central_runtime"),
-            restore.clone(),
+            format!("GRANT UPDATE ON {log} TO central_runtime"),
+            format!("REVOKE UPDATE ON {log} FROM central_runtime"),
         ),
         (
-            format!("REVOKE UPDATE (expires_at) ON {table} FROM central_runtime"),
-            restore.clone(),
+            format!("REVOKE DELETE ON {sids} FROM central_runtime"),
+            format!("GRANT DELETE ON {sids} TO central_runtime"),
         ),
     ] {
         // Fixed synthetic statements, never user input.

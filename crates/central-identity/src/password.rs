@@ -143,6 +143,6 @@ impl IdentityService {
                 surface.session(Some(&token))?,
             )
             .await?;
-        Ok(signed_in(surface, credential.identity, issued, token))
+        signed_in(self, surface, credential.identity, issued, token)
     }
 }

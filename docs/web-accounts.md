@@ -59,7 +59,7 @@ force are not accepted. `Logout` ends the session and clears the cookie.
 
 **Playing.** The native client signs in at Central for a gateway whose
 `/auth/config` says `central` (Baylee `docs/central-login.md`): discover, login,
-read and validate the document, `ConfirmRestore`, then a gateway ticket. The
+read and validate the document, `ConfirmRestore`, then a gateway token. The
 official gateway, in bridge mode, admits an identity with no legacy account by
 making it a local projection, as a registered gateway does (Baylee change G1).
 

@@ -7,9 +7,12 @@
 //! verified TLS ([`ServerConfig`]). A supervisor such as systemd opens the
 //! operator's root-owned configuration file and hands it over as standard input,
 //! so the service identity itself never needs read access to that file.
-use super::listeners::{stopped, together};
+use super::{
+    gateway_push::TokenKeyConfig,
+    listeners::{stopped, together},
+};
 use central_api::{Endpoint, MAX_WIRE_BYTES, OFFICIAL_ORIGIN, Token, beta_key::BetaKey};
-use central_crypto::opaque::server::ServerKeys;
+use central_crypto::{jwt::SigningKey, opaque::server::ServerKeys};
 use central_http::{BROWSER_REQUEST_BYTES, BrowserOrigin, DevelopmentServer};
 use central_identity::IdentityService;
 use central_policy::config::Config;
@@ -69,6 +72,12 @@ struct Service {
     database: Database,
     opaque_setup: Vec<u8>,
     bridge: Token,
+    /// The key that signs Central's tokens and the keys listed beside it.
+    token_keys: TokenKeyConfig,
+    /// The numeric address the official gateway answers at when it runs beside this service
+    /// (`docs/operations.md` §"The official gateway"); absent means by its public name.
+    #[serde(default)]
+    official_address: Option<String>,
     /// The legacy store's own login, from the cutover until its deadline
     /// (`docs/operations.md` §"The legacy store"); absent means no legacy
     /// sign-in.
@@ -194,6 +203,7 @@ async fn serve() -> Result<(), ()> {
     let endpoint = Endpoint::live();
     let (config, browser) = listener_configs(&settings)?;
     let keys = ServerKeys::from_secret_bytes(&settings.opaque_setup).map_err(|_| ())?;
+    let official = super::gateway_push::official_pin(settings.official_address.as_deref())?;
     let database = settings.database.server()?;
     let legacy = settings
         .legacy
@@ -224,6 +234,7 @@ async fn serve() -> Result<(), ()> {
         keys,
         &settings.bridge,
         OFFICIAL_ORIGIN,
+        settings.token_keys.keys()?,
     )
     .map(|identity| match &legacy {
         Some(legacy) => identity.with_legacy(legacy.clone()),
@@ -252,6 +263,7 @@ async fn serve() -> Result<(), ()> {
         }
         let (stop, _) = watch::channel(false);
         let native = server.run_with_identity(&endpoint, identity.clone(), stopped(&stop));
+        let revocations = super::gateway_push::run(identity.clone(), official, stop.subscribe());
         let browser = browser
             .map(|browser| browser.run_browser(identity, BrowserOrigin::live(), stopped(&stop)));
         if push.is_some() {
@@ -260,9 +272,10 @@ async fn serve() -> Result<(), ()> {
                 .await
                 .map_err(|_| ())?;
         }
-        let (result, ()) = tokio::join!(
+        let (result, (), ()) = tokio::join!(
             together(&stop, native, browser, shutdown()),
-            super::push::run(store.clone(), push, stop.subscribe())
+            super::push::run(store.clone(), push, stop.subscribe()),
+            revocations
         );
         result.map_err(|_| ())
     }
@@ -273,6 +286,37 @@ async fn serve() -> Result<(), ()> {
         None => Ok(()),
     };
     result.and(closed).and(legacy_closed)
+}
+
+/// Read a service document as [`serve`] would, and connect to nothing. Whatever would stop the
+/// service from starting stops this.
+fn configured(bytes: &[u8]) -> Result<(), ()> {
+    let mut settings: Service = parse(bytes)?;
+    if let Some(push) = &settings.push {
+        central_push::Sender::new(&push.vapid_key, "https://baylee.app/contact".into())
+            .map_err(|_| ())?;
+    }
+    listener_configs(&settings)?;
+    ServerKeys::from_secret_bytes(&settings.opaque_setup).map_err(|_| ())?;
+    super::gateway_push::official_pin(settings.official_address.as_deref())?;
+    settings.token_keys.keys()?;
+    settings.database.server()?;
+    if let Some(legacy) = settings.legacy.as_mut() {
+        legacy.database.server()?;
+    }
+    Ok(())
+}
+
+/// Whether this build can start under the document on standard input. The deploy hook asks
+/// before it stops anything: found out after a migration, no earlier binary would start either.
+pub(super) fn run_check() -> ExitCode {
+    if read_settings().and_then(|bytes| configured(&bytes)).is_ok() {
+        println!("central: configuration accepted");
+        ExitCode::SUCCESS
+    } else {
+        eprintln!("central: invalid configuration");
+        ExitCode::FAILURE
+    }
 }
 
 /// Apply pending migrations once, under the migration login, then exit.
@@ -458,12 +502,52 @@ fn secrets_document() -> Result<Zeroizing<String>, ()> {
     push_bytes(&mut text, &setup);
     text.push_str(",\"bridge\":");
     push_bytes(&mut text, bridge.as_slice());
-    text.push_str(",\"push\":{\"vapid_key\":");
+    text.push_str(",\"token_keys\":{\"active\":");
+    push_bytes(
+        &mut text,
+        SigningKey::generate_seed().map_err(|_| ())?.as_slice(),
+    );
+    text.push_str(",\"published\":[]},\"push\":{\"vapid_key\":");
     push_bytes(
         &mut text,
         &central_push::Sender::generate_key().map_err(|_| ())?,
     );
     text.push_str("}}\n");
+    Ok(text)
+}
+
+/// Write one new signing key for a rotation: its seed for `token_keys.active`, and its public
+/// half for `token_keys.published`, listed before it signs.
+pub(super) fn generate_token_key() -> ExitCode {
+    let mut stdout = std::io::stdout().lock();
+    if stdout.is_terminal() {
+        eprintln!("central: refusing to print secrets to a terminal; redirect to a 0600 file");
+        return ExitCode::FAILURE;
+    }
+    let Ok(document) = token_key_document() else {
+        eprintln!("central: secret generation failed");
+        return ExitCode::FAILURE;
+    };
+    if stdout
+        .write_all(document.as_bytes())
+        .and_then(|()| stdout.flush())
+        .is_err()
+    {
+        eprintln!("central: secret output failed");
+        return ExitCode::FAILURE;
+    }
+    ExitCode::SUCCESS
+}
+
+fn token_key_document() -> Result<Zeroizing<String>, ()> {
+    let seed = SigningKey::generate_seed().map_err(|_| ())?;
+    let public = SigningKey::from_seed(&seed).public().to_bytes();
+    let mut text = Zeroizing::new(String::with_capacity(512));
+    text.push_str("{\"seed\":");
+    push_bytes(&mut text, seed.as_slice());
+    text.push_str(",\"public\":");
+    push_bytes(&mut text, &public);
+    text.push_str("}\n");
     Ok(text)
 }
 
@@ -517,7 +601,7 @@ mod tests {
         let setup = serde_json::to_string(setup.as_slice()).unwrap();
         let bridge = serde_json::to_string(&[7_u8; 32]).unwrap();
         format!(
-            r#"{{"listen":"127.0.0.1:28790","database":{},"opaque_setup":{setup},"bridge":{bridge}{extra}}}"#,
+            r#"{{"listen":"127.0.0.1:28790","database":{},"opaque_setup":{setup},"bridge":{bridge},"token_keys":{{"active":[7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7]}}{extra}}}"#,
             database()
         )
     }
@@ -662,12 +746,51 @@ mod tests {
     }
 
     #[test]
+    fn the_check_refuses_what_would_stop_the_service() {
+        assert!(configured(service("").as_bytes()).is_ok());
+        assert!(configured(service(r#","official_address":"127.0.0.1:443""#).as_bytes()).is_ok());
+        // Each of these would otherwise be found out after a migration.
+        for extra in [
+            r#","official_address":"8.8.8.8:443""#,
+            r#","official_address":"gateway.baylee.app:443""#,
+            r#","unknown":1"#,
+        ] {
+            assert!(configured(service(extra).as_bytes()).is_err(), "{extra}");
+        }
+        let whole = service("");
+        let start = whole.find(r#","token_keys""#).unwrap();
+        let end = start + whole[start..].find('}').unwrap() + 1;
+        let without = format!("{}{}", &whole[..start], &whole[end..]);
+        assert!(configured(without.as_bytes()).is_err(), "no signing key");
+    }
+
+    #[test]
+    fn a_new_token_key_is_a_seed_and_its_public_half() {
+        #[derive(Deserialize)]
+        #[serde(deny_unknown_fields)]
+        struct NewKey {
+            seed: Vec<u8>,
+            public: Vec<u8>,
+        }
+        let key: NewKey = parse(token_key_document().unwrap().as_bytes()).unwrap();
+        let seed: [u8; 32] = key.seed.as_slice().try_into().unwrap();
+        let signing = SigningKey::from_seed(&Zeroizing::new(seed));
+        assert_eq!(
+            signing.public().to_bytes().as_slice(),
+            key.public.as_slice()
+        );
+        let other: NewKey = parse(token_key_document().unwrap().as_bytes()).unwrap();
+        assert_ne!(key.seed, other.seed);
+    }
+
+    #[test]
     fn generated_secrets_restore_and_differ_each_time() {
         #[derive(Deserialize)]
         #[serde(deny_unknown_fields)]
         struct Secrets {
             opaque_setup: Vec<u8>,
             bridge: Token,
+            token_keys: TokenKeyConfig,
             push: Push,
         }
         let first: Secrets = parse(secrets_document().unwrap().as_bytes()).unwrap();
@@ -675,6 +798,12 @@ mod tests {
         assert!(ServerKeys::from_secret_bytes(&first.opaque_setup).is_ok());
         assert_ne!(first.opaque_setup, second.opaque_setup);
         assert_ne!(first.bridge.digest(), second.bridge.digest());
+        // Each document holds a signing key of its own, and it restores.
+        let (one, two) = (
+            first.token_keys.keys().unwrap(),
+            second.token_keys.keys().unwrap(),
+        );
+        assert_ne!(one.jwks(), two.jwks());
         assert_ne!(first.push.vapid_key, second.push.vapid_key);
         assert!(
             central_push::Sender::new(&first.push.vapid_key, "https://baylee.app/contact".into())

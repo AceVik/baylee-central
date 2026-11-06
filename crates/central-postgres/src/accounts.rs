@@ -15,7 +15,6 @@ mod deletion;
 mod export;
 mod gateways;
 mod grants;
-mod leases;
 mod legacy;
 mod migration;
 mod notifications;
@@ -31,18 +30,23 @@ mod reports;
 mod reset;
 mod sessions;
 mod social;
+mod streams;
 mod terms;
 mod tokens;
 pub use admin::{AUDIT_YEARS, Action, Appointed, AuditPage, Swept, appoint_admin, sweep};
 pub use legacy::LegacyMove;
 pub use migration::Status;
 pub use pairing::{Approval, Claim, MAX_POLLS, OPEN_IN_ALL, OPEN_PER_ACCOUNT, Redeemed};
-pub use profiles::{Profile, TAG_DRAWS, TagDraw};
+pub use profiles::{TAG_DRAWS, TagDraw};
 pub use recovery::Summary;
 pub use reports::{
     Filer, ImportedHistory, ImportedNote, ImportedReport, ReportImport, ReportImportRefusal,
 };
 pub use sessions::{Issued, Session};
+pub use streams::{
+    GatewayGrant, GatewayPush, GatewayPushResult, MAX_SIDS_PER_SESSION, PUSH_ATTEMPTS,
+    REVOCATION_PAGE, RevocationPage,
+};
 pub use terms::MAX_GATEWAY_VERSIONS;
 
 /// An OPAQUE credential snapshot. It cannot issue sessions without proof verification.

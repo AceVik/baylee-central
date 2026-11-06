@@ -11,11 +11,11 @@ addresses, selected explicitly.
 The native client authenticates centrally before displaying saved gateways.
 OPAQUE registration/login, a random client master key and encrypted personal
 objects use central-crypto. The protocol/endpoint rules are reusable in
-central-api. Central sessions never go to a game gateway. Admission uses a
-separate one-use 30-second ticket, bound to the gateway that redeems it.
-Tickets also bind the operation: admission, migration export or final linking.
-The gateway route supplies the expected operation; a client cannot promote an
-admission ticket into permission to export or finalize migration.
+central-api. Central sessions never go to a game gateway. A native session's bearer is a signed
+Central token, which only Central reads; admission uses a separate token for one gateway, an
+hour long, which that gateway checks by itself ([gateway registry](gateway-registry.md#session-tokens)).
+Every native request names its protocol, and a build too old to be served is told so at its first
+request ([below](gateway-registry.md#a-client-too-old)).
 Neither a central transport error nor a failed OPAQUE proof is permission to
 send a plaintext password elsewhere. HTTP redirects must be disabled on both
 the central and the legacy credential transports.
@@ -127,7 +127,7 @@ same for a row and for none.
 
 **The move.** The client enrolls the snapshot, signs in through OPAQUE and
 confirms its restored document as before. With Central's terms accepted
-(`LegacyExport` and `LegacyLink` wait for them, as the gateway tickets did),
+(`LegacyExport` and `LegacyLink` wait for them, as gateway tokens do),
 `LegacyLink { digest }` closes it: the digest must be the stored snapshot's
 (`Conflict` otherwise; `LegacyExport` hands the snapshot again), the account
 must be restored, and then `legacy_closed` is set and the row deleted, in that
@@ -139,14 +139,10 @@ row the deadline removed still closes. A closed move is never reopened, and
 **The bridge.** With the store configured, the bridge's `LegacyReserve`,
 `LegacyInvalidate`, `LegacyClose`, `LegacyProfile` and `LegacyStatus` are
 refused: Central is the source, and the gateway changes no legacy password
-any more. The bridge's admission (`RedeemGateway` for `Admit`) of a legacy
-account whose move has not closed is refused, with or without the store, so a
-`legacy_id` in an admission `GatewayIdentity` means a closed move: the official gateway fixes
-the old id's link to the Central identity at that first admission (Baylee
-`docs/central-login.md` §"Legacy migration"). Purpose-bound `Export`/`Link`
-tickets may still reconcile an unfinished gateway-source migration. Only the
-authenticated official bridge can redeem them, and they grant no session lease;
-wrong audiences, purposes, registered gateways and replay remain refused.
+any more. A token for the official gateway is refused for a legacy account whose move has not closed, with
+or without the store, so a `legacy_id` in a token means a closed move: the official gateway fixes
+the old id's link to the Central identity at that first admission (Baylee `docs/central-login.md`
+§"Legacy migration").
 
 **The deadline.** The owner's date, the end of 30.06.2027 in
 Europe/Berlin, set by migration 000015; the operator can move or clear it
@@ -230,8 +226,8 @@ current password (ASVS 6.2.3, in OPAQUE's form), inside the exchange itself:
    at the credential revision the start read, checks again after the lock
    that the session is live (a sign-in may have replaced it while the lock
    was awaited), stores the record and wrapper, raises `credential_revision`,
-   deletes every session of the account (both kinds, with their gateway
-   tickets and leases) and inserts one new session of the caller's kind. The answer is
+   deletes every session of the account (both kinds, each revoked at the gateways that
+   held it) and inserts one new session of the caller's kind. The answer is
    the sign-in's: `Session { token, identity, wrapped_master }` natively,
    `BrowserSession` with the new `__Host-central` cookie on the website. The
    new session counts its 12 hours from the change, a fresh password proof.
@@ -280,9 +276,9 @@ The existing release gates and synthetic-data-only testing rules still apply.
 `central-service --dev-accounts-stdin` starts the real account protocol on an
 explicit numeric loopback address. It takes one bounded JSON configuration from
 standard input: `endpoint`, `gateway`, `database_port`, `database_user`,
-`database_name`, `database_password`, `opaque_setup` and `bridge`. The last two
-are byte arrays: the persisted versioned server setup and a random 32-byte bridge
-credential. An optional `browser` (`listen`, `origin`) starts the website's
+`database_name`, `database_password`, `opaque_setup`, `bridge` and `token_keys`. The middle
+two are byte arrays, the persisted versioned server setup and a random 32-byte bridge credential;
+`token_keys` is as in [operations](operations.md#rotating-the-signing-key). An optional `browser` (`listen`, `origin`) starts the website's
 browser listener for a page served on a loopback origin ([web
 accounts](web-accounts.md) §"Local runs"). Keep this configuration outside source control with owner-only file
 permissions; never pass credentials on the command line. A restart must reuse

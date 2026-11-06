@@ -5,7 +5,10 @@ use super::{
     AccountStore, Enrollment, Error, Identity, MasterKey, ObjectContext, ServerKeys, Token,
     context, enroll, login,
 };
-use central_api::{reset_code::ResetCode, wire::ResetVault, wire::TicketPurpose};
+use central_api::{
+    reset_code::ResetCode,
+    wire::{GatewayPurpose::Admit, ResetVault},
+};
 use central_crypto::vault::RecoveryCode;
 use central_postgres::{Credential, Session, Swept, appoint_admin, sweep};
 use sea_orm::{ConnectionTrait, DatabaseConnection};
@@ -468,21 +471,20 @@ async fn renewed_registered(
             code: false,
         }
     );
-    // The old identity finds nothing; the new one signs in, takes no ticket
-    // until it confirms, then does.
+    // The old identity finds nothing; the new one signs in, gets no gateway
+    // token until it confirms, then does.
     assert!(store.credential(identity).await.unwrap().is_none());
     let session = login(store, keys, next(identity)).await;
-    let ticket = || Token::generate().unwrap();
-    assert_eq!(
+    assert!(matches!(
         store
-            .gateway_ticket(&session, "official", &ticket(), TicketPurpose::Admit)
+            .gateway_grant(&session, &["official"], false, Admit, [54; 16])
             .await
             .err(),
         Some(Error::Rejected)
-    );
+    ));
     store.confirm_restore(&session, 1).await.unwrap();
     store
-        .gateway_ticket(&session, "official", &ticket(), TicketPurpose::Admit)
+        .gateway_grant(&session, &["official"], false, Admit, [54; 16])
         .await
         .unwrap();
 }

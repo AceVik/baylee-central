@@ -1,5 +1,8 @@
 //! Explicit synthetic development service; secret configuration arrives over stdin, never argv.
-use super::listeners::{stopped, together};
+use super::{
+    gateway_push::TokenKeyConfig,
+    listeners::{stopped, together},
+};
 use central_api::{Endpoint, Token};
 use central_crypto::opaque::server::ServerKeys;
 use central_http::{BROWSER_REQUEST_BYTES, BrowserOrigin, DevelopmentServer};
@@ -26,6 +29,8 @@ struct Settings {
     database_password: String,
     opaque_setup: Vec<u8>,
     bridge: Token,
+    /// The key that signs Central's tokens and the keys listed beside it.
+    token_keys: TokenKeyConfig,
     /// A browser listener for a page served locally; absent means off.
     #[serde(default)]
     browser: Option<Browser>,
@@ -151,6 +156,7 @@ async fn serve() -> Result<(), ()> {
         keys,
         &settings.bridge,
         &settings.gateway,
+        settings.token_keys.keys()?,
     )
     .and_then(|identity| identity.with_aliases(settings.gateway_aliases.clone()))
     .map(|identity| match &legacy {
@@ -207,7 +213,7 @@ mod tests {
             serde_json::to_string(ServerKeys::generate().to_secret_bytes().as_slice()).unwrap();
         let bridge = serde_json::to_string(&[7_u8; 32]).unwrap();
         format!(
-            r#"{{"endpoint":"http://127.0.0.1:28780","gateway":"http://127.0.0.1:28766","database_port":5432,"database_user":"central_runtime","database_name":"central_dev","database_password":"PRIVATE_DB_CANARY","opaque_setup":{setup},"bridge":{bridge}{extra}}}"#
+            r#"{{"endpoint":"http://127.0.0.1:28780","gateway":"http://127.0.0.1:28766","database_port":5432,"database_user":"central_runtime","database_name":"central_dev","database_password":"PRIVATE_DB_CANARY","opaque_setup":{setup},"bridge":{bridge},"token_keys":{{"active":[7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7]}}{extra}}}"#
         )
     }
 

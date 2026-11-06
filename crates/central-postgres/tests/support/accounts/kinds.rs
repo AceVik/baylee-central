@@ -1,5 +1,5 @@
 //! One session per account and kind; a browser session is no native bearer.
-use super::{AccountStore, Error, Identity, ServerKeys, TicketPurpose, Token, enroll, login};
+use super::{AccountStore, Admit, Error, Identity, ServerKeys, Token, enroll, login};
 use central_postgres::Session;
 use sea_orm::{ConnectionTrait, DatabaseConnection};
 
@@ -48,10 +48,10 @@ pub(super) async fn run(store: &AccountStore, operator: &DatabaseConnection, key
             .await
             .unwrap()
     );
-    let ticket = Token::generate().unwrap();
+    // A gateway token comes from a native session alone.
     assert!(
         store
-            .gateway_ticket(&browser, "official", &ticket, TicketPurpose::Admit)
+            .gateway_grant(&browser, &["official"], false, Admit, [71; 16])
             .await
             .is_err()
     );

@@ -11,6 +11,8 @@ description = "Experimental native-client OPAQUE and master-key wrapping, and th
 [features]
 default = []
 server = []
+# The token format of `src/jwt.rs`: Central and the gateways that verify its tokens.
+jwt = ["dep:base64ct", "dep:serde", "dep:serde_json"]
 
 [lints]
 workspace = true
@@ -42,6 +44,10 @@ ed25519-dalek = { version = "=3.0.0", default-features = false, features = ["zer
 x25519-dalek = { version = "=3.0.0", default-features = false, features = ["static_secrets", "zeroize"] }
 subtle = { version = "=2.6.1", default-features = false }
 thiserror = { version = "=2.0.21", default-features = false, features = ["std"] }
+# The token format (`src/jwt.rs`); all three are approved and already in the graph.
+base64ct = { version = "=1.8.3", features = ["alloc"], optional = true }
+serde = { version = "=1.0.229", features = ["derive"], optional = true }
+serde_json = { version = "=1.0.154", optional = true }
 
 [dev-dependencies]
 # OPAQUE's previous Argon2 integration is an independent compatibility oracle.

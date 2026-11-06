@@ -30,7 +30,7 @@ impl Session {
     pub fn create_object(&self, transport: &impl Transport) -> Result<ObjectState, Error> {
         self.same_endpoint(transport)?;
         let Response::ObjectState { state } =
-            transport.exchange(&Request::CreateObject, Some(&self.token))?
+            transport.exchange(&Request::CreateObject, Some((&self.token).into()))?
         else {
             return Err(Error::Rejected);
         };
@@ -55,7 +55,7 @@ impl Session {
         let Response::Object {
             state,
             document: Some(document),
-        } = transport.exchange(&Request::ReadObject { id }, Some(&self.token))?
+        } = transport.exchange(&Request::ReadObject { id }, Some((&self.token).into()))?
         else {
             return Err(Error::Rejected);
         };
@@ -96,7 +96,7 @@ impl Session {
                 expected_revision,
                 document,
             },
-            Some(&self.token),
+            Some((&self.token).into()),
         )?;
         Self::changed_object(&response, id, revision, false)
     }
@@ -119,7 +119,7 @@ impl Session {
                 id,
                 expected_revision,
             },
-            Some(&self.token),
+            Some((&self.token).into()),
         )?;
         Self::changed_object(&response, id, revision, true)
     }
@@ -156,7 +156,7 @@ impl Session {
     ) -> Result<Vec<ObjectState>, Error> {
         self.same_endpoint(transport)?;
         let Response::Objects { objects } =
-            transport.exchange(&Request::ListObjects { after }, Some(&self.token))?
+            transport.exchange(&Request::ListObjects { after }, Some((&self.token).into()))?
         else {
             return Err(Error::Rejected);
         };

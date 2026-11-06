@@ -608,9 +608,8 @@ impl AccountStore {
 
     /// Approve or enable `gateway` (`enabled`), or disable it, for the
     /// administrator behind `browser`, whose password sign-in must be less
-    /// than 30 minutes old. Disabling ends every lease at that gateway, so
-    /// each of its sessions fails at its next check; its credentials and
-    /// tokens stop authenticating with the approval. The same state again
+    /// than 30 minutes old. Disabling ends every session at that gateway, each
+    /// revoked; its credentials and tokens stop authenticating with the approval. The same state again
     /// changes nothing; a change writes its audit event in the same
     /// transaction.
     ///
@@ -647,7 +646,8 @@ impl AccountStore {
         if changed {
             if !enabled {
                 tx.execute_raw(statement(
-                    "DELETE FROM central_identity.gateway_leases WHERE gateway_id = $1",
+                    "DELETE FROM central_identity.gateway_sids i USING central_identity.gateways g
+                     WHERE g.id = $1 AND i.stream = g.origin",
                     vec![gateway.into()],
                 ))
                 .await

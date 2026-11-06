@@ -1,13 +1,32 @@
-use super::{
-    AccountStore, DatabaseConnection, Error, ServerKeys, TicketPurpose, Token, config, enroll,
-    login,
+use super::{AccountStore, DatabaseConnection, Error, ServerKeys, Token, config, enroll, login};
+use central_api::{
+    gateway::GatewayMetadata,
+    wire::GatewayPurpose::{Admin, Admit},
 };
-use central_api::gateway::GatewayMetadata;
 use sea_orm::{ConnectionTrait, DbBackend, Statement, prelude::Uuid};
 
 mod limits;
 mod official;
+mod streams;
 mod tokens;
+
+/// Whether an account is on a gateway's list, as the operator reads it.
+async fn listed(operator: &DatabaseConnection, gateway: [u8; 16], account: [u8; 16]) -> bool {
+    let row = operator
+        .query_one_raw(Statement::from_sql_and_values(
+            DbBackend::Postgres,
+            "SELECT EXISTS(SELECT 1 FROM central_identity.gateway_admins
+             WHERE gateway_id = $1 AND account_id = $2) AS listed",
+            vec![
+                Uuid::from_bytes(gateway).into(),
+                Uuid::from_bytes(account).into(),
+            ],
+        ))
+        .await
+        .unwrap()
+        .unwrap();
+    row.try_get("", "listed").unwrap()
+}
 
 fn metadata(origin: &str) -> GatewayMetadata {
     GatewayMetadata {
@@ -30,11 +49,14 @@ async fn approval(operator: &DatabaseConnection, gateway: [u8; 16], enabled: boo
 }
 
 pub(super) async fn run(store: &AccountStore, operator: &DatabaseConnection, keys: &ServerKeys) {
-    operator.execute_unprepared(
-        "GRANT SELECT,INSERT,UPDATE ON central_identity.gateways TO central_runtime;
+    operator
+        .execute_unprepared(
+            "GRANT SELECT,INSERT,UPDATE ON central_identity.gateways TO central_runtime;
          GRANT SELECT ON central_identity.gateway_approvals TO central_runtime;
-         GRANT SELECT,INSERT,DELETE ON central_identity.gateway_admins,central_identity.gateway_leases TO central_runtime"
-    ).await.unwrap();
+         GRANT SELECT,INSERT,DELETE ON central_identity.gateway_admins TO central_runtime",
+        )
+        .await
+        .unwrap();
     privilege_gate(operator).await;
     let owner = enroll(store, keys, "registry-owner", "registry-owner").await;
     let member = enroll(store, keys, "registry-member", "registry-member").await;
@@ -58,7 +80,7 @@ pub(super) async fn run(store: &AccountStore, operator: &DatabaseConnection, key
         .await
         .unwrap();
     approval(operator, foreign, true).await;
-    assert!(!store.gateway_admin(gateway, member.account).await.unwrap());
+    assert!(!listed(operator, gateway, member.account).await);
     assert!(
         store
             .set_gateway_admins(&member_session, gateway, 1, &[member.account])
@@ -89,159 +111,77 @@ pub(super) async fn run(store: &AccountStore, operator: &DatabaseConnection, key
             .await
             .is_err()
     );
-    assert!(!store.gateway_admin(gateway, owner.account).await.unwrap());
-    assert!(store.gateway_admin(gateway, member.account).await.unwrap());
-    assert!(!store.gateway_admin(foreign, owner.account).await.unwrap());
-    delegation(
-        store,
-        &member_session,
-        operator,
-        gateway,
-        origin,
-        foreign,
-        foreign_origin,
-    )
-    .await;
+    assert!(!listed(operator, gateway, owner.account).await);
+    assert!(listed(operator, gateway, member.account).await);
+    assert!(!listed(operator, foreign, owner.account).await);
+    delegation(store, &member_session, operator, gateway, origin).await;
 
     admin_revocation(
         store,
+        operator,
         &owner_session,
         &member_session,
-        gateway,
-        origin,
+        (origin, gateway),
         owner.account,
         member.account,
     )
     .await;
-    limits::run(store, operator, &owner_session, gateway, origin).await;
-    // The bridge admits a moved account once its move is closed, and the
-    // official gateway's tests redeem the owner's tickets there.
+    limits::run(store, operator, &owner_session).await;
+    // The official gateway admits a moved account once its move is closed.
     store.close_legacy("registry-owner", owner).await.unwrap();
     official::run(store, operator, &owner_session, gateway).await;
     tokens::run(store, operator, keys).await;
+    streams::run(store, operator, keys).await;
 }
 
+/// A registered gateway's token: no legacy id, the session's cap, and no token for an origin
+/// nobody registered.
 async fn delegation(
     store: &AccountStore,
     session: &Token,
     operator: &DatabaseConnection,
     gateway: [u8; 16],
     origin: &str,
-    foreign: [u8; 16],
-    foreign_origin: &str,
 ) {
-    let ticket = Token::generate().unwrap();
-    let lease = Token::generate().unwrap();
-    store
-        .registered_ticket(session, origin, &ticket, TicketPurpose::Admit)
+    let grant = store
+        .gateway_grant(session, &[origin], true, Admit, [61; 16])
         .await
         .unwrap();
-    for purpose in [
-        TicketPurpose::Export,
-        TicketPurpose::Link,
-        TicketPurpose::Admin,
-    ] {
-        assert!(
-            store
-                .redeem_lease(&ticket, &[origin], purpose, Some(gateway), Some(&lease))
-                .await
-                .is_err()
-        );
-    }
-    assert!(
+    assert!(grant.legacy_id.is_none(), "never to a registered gateway");
+    assert!(grant.cap > 0);
+    assert!(matches!(
         store
-            .redeem_lease(
-                &ticket,
-                &[foreign_origin],
-                TicketPurpose::Admit,
-                Some(foreign),
-                Some(&lease)
+            .gateway_grant(
+                session,
+                &["https://unregistered.invalid"],
+                true,
+                Admit,
+                [62; 16]
             )
             .await
-            .is_err()
-    );
-    let (_, legacy, expires) = store
-        .redeem_lease(
-            &ticket,
-            &[origin],
-            TicketPurpose::Admit,
-            Some(gateway),
-            Some(&lease),
-        )
-        .await
-        .unwrap();
-    assert!(legacy.is_none());
-    assert!(expires.unwrap() > 0);
-    assert!(
-        store
-            .redeem_lease(
-                &ticket,
-                &[origin],
-                TicketPurpose::Admit,
-                Some(gateway),
-                Some(&Token::generate().unwrap())
-            )
-            .await
-            .is_err()
-    );
-    profile(
-        store,
-        operator,
-        session,
-        &lease,
-        (origin, gateway),
-        (foreign_origin, foreign),
-    )
-    .await;
-    held(
-        store,
-        operator,
-        &lease,
-        (origin, gateway),
-        (foreign_origin, foreign),
-    )
-    .await;
+            .err(),
+        Some(Error::Rejected)
+    ));
+    profile(store, session, origin).await;
+    held(store, operator, session, gateway, origin).await;
 }
 
-/// The lease answers only its own gateway, purpose and authority, and ends
-/// when the gateway is disabled, which also hides it.
+/// A disabled gateway gets no token, and is hidden; enabled again it has the same `sid`.
 async fn held(
     store: &AccountStore,
     operator: &DatabaseConnection,
-    lease: &Token,
-    (origin, gateway): (&str, [u8; 16]),
-    (foreign_origin, foreign): (&str, [u8; 16]),
+    session: &Token,
+    gateway: [u8; 16],
+    origin: &str,
 ) {
-    assert!(
-        store
-            .gateway_session(
-                lease,
-                &[foreign_origin],
-                Some(foreign),
-                TicketPurpose::Admit
-            )
-            .await
-            .is_err()
-    );
-    assert!(
-        store
-            .gateway_session(lease, &[origin], Some(gateway), TicketPurpose::Admin)
-            .await
-            .is_err()
-    );
-    assert!(
-        store
-            .gateway_session(lease, &[origin], None, TicketPurpose::Admit)
-            .await
-            .is_err()
-    );
     approval(operator, gateway, false).await;
-    assert!(
+    assert!(matches!(
         store
-            .gateway_session(lease, &[origin], Some(gateway), TicketPurpose::Admit)
+            .gateway_grant(session, &[origin], true, Admit, [63; 16])
             .await
-            .is_err()
-    );
+            .err(),
+        Some(Error::Rejected)
+    ));
     assert!(
         store
             .gateway_directory(None)
@@ -251,94 +191,36 @@ async fn held(
             .all(|entry| entry.id != gateway)
     );
     approval(operator, gateway, true).await;
+    assert_eq!(
+        store
+            .gateway_grant(session, &[origin], true, Admit, [63; 16])
+            .await
+            .unwrap()
+            .sid,
+        [61; 16]
+    );
 }
 
-/// `GatewayProfile` answers only for a live lease the asking gateway holds,
-/// with the purpose it was given, while the gateway is approved: a moved
-/// account reserved before display names has neither name nor tag until the
-/// bridge carries them. An expired lease names nobody.
-async fn profile(
-    store: &AccountStore,
-    operator: &DatabaseConnection,
-    session: &Token,
-    lease: &Token,
-    (origin, gateway): (&str, [u8; 16]),
-    (foreign_origin, foreign): (&str, [u8; 16]),
-) {
-    let read = async |lease: &Token| {
-        store
-            .gateway_profile(lease, &[origin], Some(gateway), TicketPurpose::Admit)
-            .await
-    };
-    let (admitted, _) = store
-        .gateway_session(lease, &[origin], Some(gateway), TicketPurpose::Admit)
+/// A token names the account as others see it: a moved account reserved before display
+/// names has neither name nor tag until the bridge carries them, and a refresh picks them up.
+async fn profile(store: &AccountStore, session: &Token, origin: &str) {
+    let before = store
+        .gateway_grant(session, &[origin], true, Admit, [64; 16])
         .await
         .unwrap();
-    let before = read(lease).await.unwrap();
-    assert_eq!(before.identity.account, admitted.account);
     assert_eq!((before.display_name, before.tag), (None, None));
     store
         .legacy_profile("registry-member", Some("Registry_Member"), 0x331)
         .await
         .unwrap();
-    let after = read(lease).await.unwrap();
+    let after = store
+        .gateway_grant(session, &[origin], true, Admit, [64; 16])
+        .await
+        .unwrap();
     assert_eq!(
         (after.display_name.as_deref(), after.tag),
         (Some("Registry_Member"), Some(0x331))
     );
-    for (audience, asking, purpose) in [
-        (foreign_origin, Some(foreign), TicketPurpose::Admit),
-        (origin, Some(foreign), TicketPurpose::Admit),
-        (origin, Some(gateway), TicketPurpose::Admin),
-        (origin, Some(gateway), TicketPurpose::Export),
-        (origin, None, TicketPurpose::Admit),
-        (origin, None, TicketPurpose::Admin),
-    ] {
-        assert_eq!(
-            store
-                .gateway_profile(lease, &[audience], asking, purpose)
-                .await
-                .err(),
-            Some(Error::Rejected),
-            "{audience} {asking:?} {}",
-            purpose.as_str()
-        );
-    }
-    assert_eq!(
-        read(&Token::generate().unwrap()).await.err(),
-        Some(Error::Rejected)
-    );
-    approval(operator, gateway, false).await;
-    assert_eq!(read(lease).await.err(), Some(Error::Rejected), "disabled");
-    approval(operator, gateway, true).await;
-    // A second lease of the same session, expired.
-    let (ticket, expired) = (Token::generate().unwrap(), Token::generate().unwrap());
-    store
-        .registered_ticket(session, origin, &ticket, TicketPurpose::Admit)
-        .await
-        .unwrap();
-    store
-        .redeem_lease(
-            &ticket,
-            &[origin],
-            TicketPurpose::Admit,
-            Some(gateway),
-            Some(&expired),
-        )
-        .await
-        .unwrap();
-    assert!(read(&expired).await.is_ok());
-    operator
-        .execute_raw(Statement::from_sql_and_values(
-            DbBackend::Postgres,
-            "UPDATE central_identity.gateway_leases SET created_at = clock_timestamp() - interval '2 minutes',
-             expires_at = clock_timestamp() - interval '1 minute' WHERE digest = $1",
-            vec![expired.digest().to_vec().into()],
-        ))
-        .await
-        .unwrap();
-    assert_eq!(read(&expired).await.err(), Some(Error::Rejected), "expired");
-    assert!(read(lease).await.is_ok(), "the first lease still names it");
 }
 
 /// The runtime approves, enables and disables gateways (an administrator's
@@ -501,67 +383,33 @@ async fn directory(store: &AccountStore, gateway: [u8; 16], origin: &str, heartb
 
 async fn admin_revocation(
     store: &AccountStore,
+    operator: &DatabaseConnection,
     owner_session: &Token,
     member_session: &Token,
-    gateway: [u8; 16],
-    origin: &str,
+    (origin, gateway): (&str, [u8; 16]),
     owner: [u8; 16],
     member: [u8; 16],
 ) {
-    let admin_ticket = Token::generate().unwrap();
-    store
-        .registered_ticket(member_session, origin, &admin_ticket, TicketPurpose::Admin)
+    let sid = store
+        .gateway_grant(member_session, &[origin], true, Admin, [65; 16])
         .await
-        .unwrap();
-    let admin_lease = Token::generate().unwrap();
-    store
-        .redeem_lease(
-            &admin_ticket,
-            &[origin],
-            TicketPurpose::Admin,
-            Some(gateway),
-            Some(&admin_lease),
-        )
-        .await
-        .unwrap();
-    let pending_admin = Token::generate().unwrap();
-    store
-        .registered_ticket(member_session, origin, &pending_admin, TicketPurpose::Admin)
-        .await
-        .unwrap();
+        .unwrap()
+        .sid;
+    let before = store.last_revocation(origin).await.unwrap();
     store
         .set_gateway_admins(owner_session, gateway, 2, &[])
         .await
         .unwrap();
-    assert!(!store.gateway_admin(gateway, member).await.unwrap());
-    assert!(
+    assert!(!listed(operator, gateway, member).await);
+    // The gateway hears of it, and no new token says otherwise.
+    let page = store.revocation_page(origin, before).await.unwrap();
+    assert_eq!(page.sids, vec![sid]);
+    assert!(matches!(
         store
-            .gateway_session(&admin_lease, &[origin], Some(gateway), TicketPurpose::Admin)
+            .gateway_grant(member_session, &[origin], true, Admin, [66; 16])
             .await
-            .is_err()
-    );
-    assert!(
-        store
-            .redeem_lease(
-                &pending_admin,
-                &[origin],
-                TicketPurpose::Admin,
-                Some(gateway),
-                Some(&Token::generate().unwrap())
-            )
-            .await
-            .is_err()
-    );
-    assert!(
-        store
-            .registered_ticket(
-                member_session,
-                origin,
-                &Token::generate().unwrap(),
-                TicketPurpose::Admin
-            )
-            .await
-            .is_err()
-    );
-    assert!(!store.gateway_admin(gateway, owner).await.unwrap());
+            .err(),
+        Some(Error::Rejected)
+    ));
+    assert!(!listed(operator, gateway, owner).await);
 }

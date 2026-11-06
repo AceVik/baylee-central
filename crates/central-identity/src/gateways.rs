@@ -1,5 +1,5 @@
 use super::{Error, IdentityService, Request, Response, Token};
-use central_api::{gateway::GatewayMetadata, wire::TicketPurpose};
+use central_api::gateway::GatewayMetadata;
 
 impl IdentityService {
     /// The gateway behind `bearer` and the origins it answers for, canonical
@@ -52,21 +52,44 @@ impl IdentityService {
     }
 
     /// The bridge beats for the official gateway's row and no other; every
-    /// other credential is a registered gateway's heartbeat token.
+    /// other credential is a registered gateway's heartbeat token. The answer names the
+    /// gateway's last revocation, so that it can tell whether it missed one.
     async fn heartbeat(
         &self,
         metadata: &GatewayMetadata,
         bearer: Option<&Token>,
-    ) -> Result<(), Error> {
-        if self.bridge(bearer).is_ok() {
-            return self
-                .store
+    ) -> Result<Response, Error> {
+        let stream = if self.bridge(bearer).is_ok() {
+            self.store
                 .official_heartbeat(&self.official, metadata, self.development)
-                .await;
-        }
-        self.store
-            .gateway_heartbeat(bearer.ok_or(Error::Rejected)?, metadata)
-            .await
+                .await?;
+            self.official.first().ok_or(Error::Rejected)?.clone()
+        } else {
+            self.store
+                .gateway_heartbeat(bearer.ok_or(Error::Rejected)?, metadata)
+                .await?
+        };
+        Ok(Response::GatewayHeartbeat {
+            last_revocation: self.store.last_revocation(&stream).await?,
+        })
+    }
+
+    /// A page of what this gateway must learn, named by its own credential: the stream is
+    /// never chosen by the request.
+    async fn revocations(&self, after: u64, bearer: Option<&Token>) -> Result<Response, Error> {
+        let (_, origins) = self.gateway_authority(bearer).await?;
+        let stream = origins.first().ok_or(Error::Rejected)?;
+        let page = self.store.revocation_page(stream, after).await?;
+        let token = if page.sids.is_empty() {
+            None
+        } else {
+            Some(self.revocation_message(stream, page.from, &page.sids)?)
+        };
+        Ok(Response::GatewayRevocations {
+            token,
+            last: page.last,
+            floor: page.floor,
+        })
     }
 
     pub(super) async fn gateway_request(
@@ -81,10 +104,7 @@ impl IdentityService {
             Request::GatewayDirectory { after } => Ok(Response::GatewayDirectory {
                 gateways: self.store.gateway_directory(after).await?,
             }),
-            Request::GatewayHeartbeat { metadata } => {
-                self.heartbeat(&metadata, bearer).await?;
-                Ok(Response::Done)
-            }
+            Request::GatewayHeartbeat { metadata } => self.heartbeat(&metadata, bearer).await,
             Request::SetGatewayAdmins {
                 gateway,
                 expected_revision,
@@ -101,58 +121,17 @@ impl IdentityService {
                     .await?;
                 Ok(Response::GatewayAdmins { revision })
             }
-            Request::CheckGatewayAdmin { account } => {
-                let (gateway, _) = self
-                    .store
-                    .authenticate_gateway(bearer.ok_or(Error::Rejected)?)
-                    .await?;
-                Ok(Response::GatewayAdmin {
-                    allowed: self.store.gateway_admin(gateway, account).await?,
-                })
+            Request::GatewayToken { gateway, purpose } => {
+                self.gateway_token(&gateway, purpose, bearer).await
             }
-            Request::GatewaySession { lease, purpose } => {
-                let (gateway, origins) = self.gateway_authority(bearer).await?;
-                let (identity, expires_at) = self
-                    .store
-                    .gateway_session(&lease, &origins, gateway, purpose)
-                    .await?;
-                Ok(Response::GatewaySession {
-                    identity,
-                    expires_at,
-                })
+            Request::RegisterInvalidate { path } => {
+                let (_, origins) = self.gateway_authority(bearer).await?;
+                let stream = origins.first().ok_or(Error::Rejected)?;
+                self.store.register_invalidate(stream, &path).await?;
+                Ok(Response::Done)
             }
-            Request::GatewayProfile { lease, purpose } => {
-                let (gateway, origins) = self.gateway_authority(bearer).await?;
-                let profile = self
-                    .store
-                    .gateway_profile(&lease, &origins, gateway, purpose)
-                    .await?;
-                Ok(Response::GatewayProfile {
-                    identity: profile.identity,
-                    display_name: profile.display_name,
-                    tag: profile.tag,
-                })
-            }
-            Request::GatewayTicket { gateway, purpose } => {
-                let session = bearer.ok_or(Error::Rejected)?;
-                let ticket = Token::generate()?;
-                // a ticket for any of the official origins is the bridge's,
-                // bound to the origin the client asked for
-                if self.is_official(&gateway) && !matches!(purpose, TicketPurpose::Admin) {
-                    self.store
-                        .gateway_ticket(session, &gateway, &ticket, purpose)
-                        .await?;
-                } else {
-                    self.store
-                        .registered_ticket(session, &gateway, &ticket, purpose)
-                        .await?;
-                }
-                Ok(Response::GatewayTicket { ticket })
-            }
+            Request::GatewayRevocations { after } => self.revocations(after, bearer).await,
             Request::GatewayStatus => self.gateway_status(bearer).await,
-            Request::RedeemGateway { ticket, purpose } => {
-                self.redeem(&ticket, purpose, bearer).await
-            }
             _ => Err(Error::Rejected),
         }
     }
@@ -170,37 +149,6 @@ impl IdentityService {
             metadata,
             state,
             scopes,
-            expires_at,
-        })
-    }
-
-    /// A gateway redeems its player's ticket for an identity, and a lease for
-    /// admission and administration.
-    async fn redeem(
-        &self,
-        ticket: &Token,
-        purpose: TicketPurpose,
-        bearer: Option<&Token>,
-    ) -> Result<Response, Error> {
-        let (gateway, origins) = self.gateway_authority(bearer).await?;
-        // a sign-in is one of the uses a token's owner sees; a
-        // credential pair or the bridge is no token and is left alone
-        if gateway.is_some()
-            && let Some(bearer) = bearer
-        {
-            self.store.touch_gateway_token(bearer).await?;
-        }
-        let lease = matches!(purpose, TicketPurpose::Admit | TicketPurpose::Admin)
-            .then(Token::generate)
-            .transpose()?;
-        let (identity, legacy_id, expires_at) = self
-            .store
-            .redeem_lease(ticket, &origins, purpose, gateway, lease.as_ref())
-            .await?;
-        Ok(Response::GatewayIdentity {
-            identity,
-            legacy_id,
-            lease,
             expires_at,
         })
     }
