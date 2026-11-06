@@ -104,6 +104,12 @@ switch() {
         say "nothing staged"
         return
     fi
+    # Asked before anything stops: found out after the migration, the service would not
+    # start, and neither would the previous binary, which needs what the migration changed.
+    systemd-run --wait --collect --quiet -p User=central -p Group=central \
+        -p StandardInput=file:/etc/baylee-central/central.json \
+        "$STAGED/central-service" --check-accounts-stdin \
+        || die "$rev does not accept the configuration; docs/operations.md"
     systemctl stop "$UNIT"
     [[ -x $BIN/central-service ]] && install -m755 -o root -g root "$BIN/central-service" "$BIN/central-service.previous"
     install -m755 -o root -g root "$STAGED/central-service" "$BIN/central-service.new"

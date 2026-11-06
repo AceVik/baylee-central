@@ -240,6 +240,9 @@ new path signs and verifies through `curve25519-dalek` 5.0.0, which has no edge 
 `elliptic-curve` or `crypto-bigint`. The affected arithmetic stays unreachable from it.
 
 The new reviewed source fingerprint is
-`54258d31bdfc59fae3624b7a2b8f01f79dda5f416686bff3819678e5c2ddfc67`.
+`aea8b222bd01ea3e0faa2682007a2050ef89c34613e07b45b582d1462c7f4904`.
 This is the implementing agent's review, not an independent audit. Any later change to
 the crate pins the fingerprint again and repeats this check.
+
+Pinned once more the same day: a verified payload, which holds a Central token's capability, is
+now wiped when dropped. No import or dependency changed.

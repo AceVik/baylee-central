@@ -212,7 +212,7 @@ impl AccountStore {
         if changed.rows_affected() != 1 {
             return Err(Error::Unavailable);
         }
-        // Every session ends, of both kinds; their tickets and leases cascade.
+        // Every session ends, of both kinds; their `sid`s cascade, each one revoked.
         tx.execute_raw(statement(
             "DELETE FROM central_identity.sessions WHERE account_id = $1",
             vec![account.into()],

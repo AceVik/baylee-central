@@ -288,6 +288,37 @@ async fn serve() -> Result<(), ()> {
     result.and(closed).and(legacy_closed)
 }
 
+/// Read a service document as [`serve`] would, and connect to nothing. Whatever would stop the
+/// service from starting stops this.
+fn configured(bytes: &[u8]) -> Result<(), ()> {
+    let mut settings: Service = parse(bytes)?;
+    if let Some(push) = &settings.push {
+        central_push::Sender::new(&push.vapid_key, "https://baylee.app/contact".into())
+            .map_err(|_| ())?;
+    }
+    listener_configs(&settings)?;
+    ServerKeys::from_secret_bytes(&settings.opaque_setup).map_err(|_| ())?;
+    super::gateway_push::official_pin(settings.official_address.as_deref())?;
+    settings.token_keys.keys()?;
+    settings.database.server()?;
+    if let Some(legacy) = settings.legacy.as_mut() {
+        legacy.database.server()?;
+    }
+    Ok(())
+}
+
+/// Whether this build can start under the document on standard input. The deploy hook asks
+/// before it stops anything: found out after a migration, no earlier binary would start either.
+pub(super) fn run_check() -> ExitCode {
+    if read_settings().and_then(|bytes| configured(&bytes)).is_ok() {
+        println!("central: configuration accepted");
+        ExitCode::SUCCESS
+    } else {
+        eprintln!("central: invalid configuration");
+        ExitCode::FAILURE
+    }
+}
+
 /// Apply pending migrations once, under the migration login, then exit.
 pub(super) async fn run_migration() -> ExitCode {
     if migrate().await.is_ok() {
@@ -712,6 +743,25 @@ mod tests {
             let mut settings: Database = parse(database().replace(from, to).as_bytes()).unwrap();
             assert!(settings.server().is_err(), "{to}");
         }
+    }
+
+    #[test]
+    fn the_check_refuses_what_would_stop_the_service() {
+        assert!(configured(service("").as_bytes()).is_ok());
+        assert!(configured(service(r#","official_address":"127.0.0.1:443""#).as_bytes()).is_ok());
+        // Each of these would otherwise be found out after a migration.
+        for extra in [
+            r#","official_address":"8.8.8.8:443""#,
+            r#","official_address":"gateway.baylee.app:443""#,
+            r#","unknown":1"#,
+        ] {
+            assert!(configured(service(extra).as_bytes()).is_err(), "{extra}");
+        }
+        let whole = service("");
+        let start = whole.find(r#","token_keys""#).unwrap();
+        let end = start + whole[start..].find('}').unwrap() + 1;
+        let without = format!("{}{}", &whole[..start], &whole[end..]);
+        assert!(configured(without.as_bytes()).is_err(), "no signing key");
     }
 
     #[test]
