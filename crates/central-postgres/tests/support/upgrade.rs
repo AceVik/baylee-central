@@ -5,7 +5,8 @@
 //! accounts, then 000011 over the same, drawing the registered accounts'
 //! tags, then 000012's administration over all of it, then 000013's reset
 //! codes, then 000014's gateway tokens over the registered gateways, then
-//! 000023's open registration over all of it, then 000025's gateway activity
+//! 000023's open registration over all of it, then 000024's session tokens
+//! over live sessions, a ticket and a lease, then 000025's gateway activity
 //! over the gateways, then 000026's e-mail addresses over the accounts. All
 //! inside one transaction that is rolled back.
 use super::scalar;
@@ -38,6 +39,8 @@ const TOKENS: &str =
     include_str!("../../../central-migration/src/m20261030_000014_gateway_tokens.sql");
 const OPEN: &str =
     include_str!("../../../central-migration/src/m20261111_000023_open_registration.sql");
+const SESSION_TOKENS: &str =
+    include_str!("../../../central-migration/src/m20261111_000024_session_tokens.sql");
 const ACTIVITY: &str =
     include_str!("../../../central-migration/src/m20261111_000025_gateway_activity.sql");
 const EMAIL: &str = include_str!("../../../central-migration/src/m20261112_000026_email.sql");
@@ -128,6 +131,7 @@ pub(crate) async fn run(operator: &DatabaseConnection) {
     reset(&tx).await;
     tokens(&tx).await;
     open_registration(&tx).await;
+    session_tokens(&tx).await;
     activity(&tx).await;
     email(&tx).await;
     tx.rollback().await.unwrap();
@@ -688,6 +692,82 @@ async fn tokens(tx: &sea_orm::DatabaseTransaction) {
     ] {
         refused(tx, &sql).await;
     }
+}
+
+/// 000024 over what a running Central holds: a native bearer of the old form opens nothing
+/// any more, so its session ends; a browser session stays; tickets and leases go. The new
+/// trigger then numbers the end of a `sid` on the upgraded rows.
+async fn session_tokens(tx: &sea_orm::DatabaseTransaction) {
+    const ACCOUNT: &str = "(SELECT id FROM upgrade_probe.accounts ORDER BY id LIMIT 1)";
+    let count = async |sql: &str| scalar(tx, sql).await;
+    tx.execute_unprepared(&format!(
+        "DELETE FROM upgrade_probe.sessions WHERE account_id = {ACCOUNT};
+         INSERT INTO upgrade_probe.sessions
+             (digest, account_id, credential_revision, kind, created_at, expires_at)
+         SELECT decode(repeat(k.byte, 32), 'hex'), a.id, a.credential_revision, k.kind,
+             clock_timestamp(), clock_timestamp() + interval '10 minutes'
+         FROM upgrade_probe.accounts a,
+             (VALUES ('71', 'native'), ('72', 'browser')) AS k(byte, kind)
+         WHERE a.id = {ACCOUNT};
+         INSERT INTO upgrade_probe.gateway_tickets
+             (digest, session_digest, audience, purpose, created_at, expires_at)
+         VALUES (decode(repeat('73', 32), 'hex'), decode(repeat('71', 32), 'hex'), 'official',
+             'admit', clock_timestamp(), clock_timestamp() + interval '20 seconds');
+         INSERT INTO upgrade_probe.gateway_leases
+             (digest, session_digest, audience, purpose, expires_at)
+         VALUES (decode(repeat('74', 32), 'hex'), decode(repeat('71', 32), 'hex'), 'official',
+             'admit', clock_timestamp() + interval '10 minutes');"
+    ))
+    .await
+    .unwrap();
+
+    tx.execute_unprepared(&scratch(SESSION_TOKENS))
+        .await
+        .unwrap();
+
+    assert_eq!(
+        count("SELECT count(*)::bigint AS value FROM upgrade_probe.sessions WHERE kind = 'native'")
+            .await,
+        0,
+        "no bearer of the old form is left"
+    );
+    let browser = "SELECT count(*)::bigint AS value FROM upgrade_probe.sessions
+         WHERE digest = decode(repeat('72', 32), 'hex')";
+    assert_eq!(count(browser).await, 1, "a browser session stays signed in");
+    assert_eq!(
+        count(
+            "SELECT count(*)::bigint AS value FROM pg_catalog.pg_class c
+             JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+             WHERE n.nspname = 'upgrade_probe'
+             AND c.relname IN ('gateway_tickets', 'gateway_leases')"
+        )
+        .await,
+        0
+    );
+    // The trigger, on the rows that came through.
+    tx.execute_unprepared(
+        "INSERT INTO upgrade_probe.gateway_streams(origin) VALUES ('https://upgrade.example');
+         INSERT INTO upgrade_probe.gateway_sids(sid, session_digest, stream, purpose)
+         VALUES (decode(repeat('75', 16), 'hex'), decode(repeat('72', 32), 'hex'),
+             'https://upgrade.example', 'admit');
+         DELETE FROM upgrade_probe.sessions WHERE digest = decode(repeat('72', 32), 'hex');",
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        count(
+            "SELECT count(*)::bigint AS value FROM upgrade_probe.gateway_revocations
+             WHERE stream = 'https://upgrade.example' AND seq = 1
+             AND sid = decode(repeat('75', 16), 'hex')"
+        )
+        .await,
+        1,
+        "the end of the session is numbered"
+    );
+    assert_eq!(
+        count("SELECT last_seq AS value FROM upgrade_probe.gateway_streams").await,
+        1
+    );
 }
 
 /// 000026 over the accounts the earlier steps left: every account row is as

@@ -1,13 +1,13 @@
 //! Telling gateways what ended, and the keys that sign it.
 //!
-//! Live only: the delivery below reaches public HTTPS addresses and nothing else, and a
-//! development service runs no sender, so that no setting opens a way to a private address.
-use central_api::SignedToken;
+//! Live only: the delivery below reaches public HTTPS addresses, and the official gateway's
+//! one compiled host at the address the operator set. A development service runs no sender.
+use central_api::{OFFICIAL_ORIGIN, SignedToken};
 use central_crypto::jwt::{PublicKey, SigningKey};
 use central_identity::{Delivery, GatewayDelivery, IdentityService, TokenKeys};
-use central_outbound::{Agent, Limits, agent};
+use central_outbound::{Agent, Limits, Pin, agent};
 use serde::Deserialize;
-use std::{sync::Arc, time::Duration};
+use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tokio::sync::watch;
 use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
@@ -43,6 +43,19 @@ impl TokenKeyConfig {
         }
         TokenKeys::new(SigningKey::from_seed(&Zeroizing::new(seed)), others).map_err(|_| ())
     }
+}
+
+/// Where the official gateway is reached when it runs beside this service: its own compiled
+/// host, at the address the operator set. The call stays verified HTTPS to that name. Nothing
+/// else reaches a private address, and a value that cannot be read stops the service rather
+/// than silently leaving the official gateway to catch-up.
+pub(super) fn official_pin(address: Option<&str>) -> Result<Option<Pin>, ()> {
+    let Some(address) = address else {
+        return Ok(None);
+    };
+    let host = OFFICIAL_ORIGIN.strip_prefix("https://").ok_or(())?;
+    let address: SocketAddr = address.parse().map_err(|_| ())?;
+    Pin::new(host, address).map(Some).map_err(|_| ())
 }
 
 /// What a gateway's answer means. Only `204` is taken; anything unexpected, a redirect
@@ -104,11 +117,16 @@ async fn sweeper(identity: Arc<IdentityService>, mut stop: watch::Receiver<bool>
 }
 
 /// Run the senders and the sweep until `stop`. A sender finishes the call it is in.
-pub(super) async fn run(identity: Arc<IdentityService>, stop: watch::Receiver<bool>) {
+pub(super) async fn run(
+    identity: Arc<IdentityService>,
+    official: Option<Pin>,
+    stop: watch::Receiver<bool>,
+) {
     let delivery = Arc::new(HttpsDelivery(agent(Limits {
         port: None,
         total: Duration::from_secs(5),
         connect: Duration::from_secs(2),
+        pin: official,
     })));
     let mut tasks = tokio::task::JoinSet::new();
     for _ in 0..SENDERS {
@@ -135,6 +153,22 @@ mod tests {
 
     fn config(text: &str) -> Result<TokenKeyConfig, serde_json::Error> {
         serde_json::from_str(text)
+    }
+
+    #[test]
+    fn the_official_address_is_optional_numeric_and_local() {
+        assert!(official_pin(None).unwrap().is_none());
+        assert!(official_pin(Some("127.0.0.1:443")).unwrap().is_some());
+        for refused in [
+            "gateway.baylee.app:443",
+            "localhost:443",
+            "127.0.0.1",
+            "8.8.8.8:443",
+            "169.254.169.254:80",
+            "",
+        ] {
+            assert!(official_pin(Some(refused)).is_err(), "{refused}");
+        }
     }
 
     #[test]

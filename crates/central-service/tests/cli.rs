@@ -103,6 +103,8 @@ fn an_explicit_mode_is_required_and_extra_arguments_are_rejected() {
         &["--legacy-deadline-stdin", "--dev"],
         &["--import-reports-stdin", "PRIVATE_ARG_CANARY"],
         &["--generate-secrets", "PRIVATE_ARG_CANARY"],
+        &["--generate-token-key", "PRIVATE_ARG_CANARY"],
+        &["--check-accounts-stdin", "PRIVATE_ARG_CANARY"],
         &["--DEV"],
     ] {
         let output = run_invalid(arguments, None);
@@ -111,7 +113,7 @@ fn an_explicit_mode_is_required_and_extra_arguments_are_rejected() {
         assert!(!stderr.contains("PRIVATE_ARG_CANARY"));
         assert_eq!(
             stderr.trim(),
-            "usage: central-service --dev | --dev-accounts-stdin | --accounts-stdin | --migrate-stdin | --appoint-admin-stdin | --sweep-stdin | --legacy-import-stdin | --legacy-deadline-stdin | --import-reports-stdin | --generate-secrets"
+            "usage: central-service --dev | --dev-accounts-stdin | --accounts-stdin | --check-accounts-stdin | --migrate-stdin | --appoint-admin-stdin | --sweep-stdin | --legacy-import-stdin | --legacy-deadline-stdin | --import-reports-stdin | --generate-secrets | --generate-token-key"
         );
     }
 }

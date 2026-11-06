@@ -92,6 +92,7 @@ impl Sender {
                 port: Some(443),
                 total: Duration::from_secs(10),
                 connect: Duration::from_secs(3),
+                pin: None,
             }),
         })
     }
