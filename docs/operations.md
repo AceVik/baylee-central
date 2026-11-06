@@ -18,10 +18,14 @@ never in argv or the environment. Unknown fields fail closed.
   `OFFICIAL_ORIGIN` with its compiled aliases (`central_api::OFFICIAL_ALIASES`,
   its old address, which is also the legacy migration's); none is configurable.
   Input:
-  `listen`, `database`, `opaque_setup`, `bridge`, and optionally
-  `browser: {"listen": …}` for the browser listener (absent means off) and
-  `legacy: {"database": …}`, the legacy store's own login (absent means no
-  legacy sign-in; [the legacy store](#the-legacy-store)).
+  `listen`, `database`, `opaque_setup`, `bridge`, `token_keys`
+  ([below](#rotating-the-signing-key)), and optionally `browser: {"listen": …}` for the
+  browser listener (absent means off), `legacy: {"database": …}`, the legacy store's own
+  login (absent means no legacy sign-in; [the legacy store](#the-legacy-store)), and
+  `official_address` ([the official gateway](#the-official-gateway)'s address on this machine).
+- `--check-accounts-stdin` reads a service document as `--accounts-stdin` would, connects to
+  nothing and exits, so that a build can be asked whether it would start. The deploy hook asks
+  it before it stops anything.
 - `--migrate-stdin` applies pending migrations once under the migration login
   and exits. Input: `database` only. The service never migrates by itself.
 - `--issue-beta-keys-stdin` issues beta keys under the migration login (see
@@ -32,8 +36,10 @@ never in argv or the environment. Unknown fields fail closed.
   migration login ([the legacy store](#the-legacy-store)).
 - `--import-reports-stdin` copies the feedback service's open reports once,
   under the migration login ([reports](#the-one-time-copy-of-the-feedback-services-reports)).
-- `--generate-secrets` writes a fresh `{"opaque_setup": [...], "bridge": [...], "push": {"vapid_key": [...]}}`
+- `--generate-secrets` writes a fresh `{"opaque_setup": [...], "bridge": [...], "token_keys": {...}, "push": {"vapid_key": [...]}}`
   document to standard output and refuses when standard output is a terminal.
+- `--generate-token-key` writes one new signing key, `{"seed": [...], "public": [...]}`, for a
+  [rotation](#rotating-the-signing-key), and refuses a terminal the same way.
 - `--dev` and `--dev-accounts-stdin` are the local development modes described
   in [dev mode](dev-mode.md) and [native login](native-login.md).
 
@@ -317,11 +323,19 @@ Without `metadata` the entry stays listed and offline. A second official row is
 refused, as is an owner or a credential on it; `RegisterGateway` for the
 origin answers `Conflict`.
 
+**Reaching it from here.** Central calls a gateway only over HTTPS to public addresses, and the
+official gateway runs on this machine, where its public name may not lead back to it. Set
+`official_address` to the numeric address its TLS terminator answers at, usually
+`"127.0.0.1:443"`. It applies to the compiled `OFFICIAL_ORIGIN` host alone, and the URL, the name
+sent in TLS and the certificate check stay what they were, so the terminator must serve that
+name on that address. Only a loopback or private address is taken, and a value that cannot be read
+stops the service. Without the setting the name is resolved like any gateway's, and if it does not
+lead back here, revocations reach the official gateway by catch-up, in seconds rather than at once.
+
 **The move to `gateway.baylee.app` (30.10.2026).** The official gateway's
 canonical origin is `OFFICIAL_ORIGIN`, and its old address is an alias
-(`OFFICIAL_ALIASES`), both compiled: a ticket an installed client asks for the
-old address is the bridge's, bound to that address; the bridge redeems it and
-checks its leases under either; an acceptance of the gateway's terms under
+(`OFFICIAL_ALIASES`), both compiled: a token asked for the old address is the official
+gateway's, with that address as its `aud`; an acceptance of the gateway's terms under
 either counts; the old address cannot be registered. The heartbeat finds the
 row under either origin, so the operator moves the row in the deploy's window,
 after checking that no registered gateway holds the new origin:
@@ -502,7 +516,8 @@ already; run it again and every report is skipped.
 
 Run `umask 077; central-service --generate-secrets > secrets.json` once and merge
 the values into the service configuration. Optional `push.vapid_key` enables
-Web Push; preserve an existing OPAQUE setup, bridge and VAPID key. See
+Web Push; preserve an existing OPAQUE setup, bridge and VAPID key. `token_keys` signs every
+token; it may be rotated ([below](#rotating-the-signing-key)) and is required. See
 [notifications](notifications.md) for build tools, migration/grants, network
 boundaries and subscription renewal. The OPAQUE setup must never be
 regenerated: replacing it locks every enrolled account out. Keep an offline
@@ -511,6 +526,27 @@ copy. The bridge credential is shared only with the official gateway's
 
 The OPAQUE setup together with a copy of the credential table permits offline
 password guessing. Treat any backup that holds both as credential material.
+
+### Rotating the signing key
+
+`token_keys` is `{"active": [32 bytes], "published": [[32 bytes], ...]}`: the seed of the key
+that signs, and the public halves of the others the key set lists, at most eight keys in all. The
+seed stays in the configuration; a public key can go anywhere. A key is rotated in three restarts,
+so that nobody holds a token no key verifies:
+
+1. **Publish.** `umask 077; central-service --generate-token-key > new-key.json`. Add its `public`
+   to `published` and restart. Gateways read the key set every five minutes, and on a `kid` they do
+   not know, so wait at least ten minutes.
+2. **Sign.** Move `seed` to `active` and the old key's public half to `published`, and restart. The
+   old seed goes, and the old key stays listed.
+3. **Retire.** At least 12 hours and 30 seconds later, remove the old public key and restart: a
+   Central token lives to its session's cap, and a gateway token an hour.
+
+**A key that may have leaked** cannot wait for this. Replace `active`, drop the old key from
+`published` and restart. Central stops taking what it signed at once, which signs every native
+client out. A gateway goes on taking its tokens until it next reads the key set, up to five
+minutes later, and only then sends its players back to Central. A forged Central token needs a
+session's capability as well; a forged gateway token needs nothing else, so treat a leak as urgent.
 
 ## Supervision
 
@@ -533,6 +569,27 @@ RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
 MemoryDenyWriteExecute=yes
 SystemCallFilter=@system-service
 ```
+
+## The session tokens release
+
+Migration 000023 and the token model go out together with a gateway and a client that speak them;
+older ones are refused (`426`), and no compatibility path exists. On a live Central, in this order:
+
+1. **Before the gateway release that pins this revision.** Generate `token_keys`
+   (`--generate-secrets` holds one, or `--generate-token-key`'s `seed`) and add it to
+   `central.json`, with `official_address`. A gateway deploy installs the Central revision it links
+   ([below](#deploying-with-the-gateway)), and this revision refuses to start without `token_keys`.
+   The hook asks first (`--check-accounts-stdin`) and refuses the deploy while Central still runs.
+   Do not get past that check by hand: after the migration the new binary would not start, and
+   neither would the previous one, whose startup check needs the tables the migration drops.
+2. Stop the service, run `--migrate-stdin`, then `ops/grants.sql`, then start it: started before
+   the grants, it refuses to run. The migration drops `gateway_tickets` and `gateway_leases` and
+   ends every native session, so every client signs in again; browser sessions stay.
+3. Deploy the gateway that pins this revision, then the client. Until the gateway is updated, its
+   old requests are answered `426` and Central sign-ins there fail.
+
+Installed clients drop a refusal's body, so they show their own generic sign-in failure until the
+updater, which needs no sign-in, has replaced them.
 
 ## Deploying with the gateway
 
@@ -594,10 +651,9 @@ defaults are this deployment's. The website's site block is the one in
 
 A sign-in issues a session for 30 minutes. A live session renews
 (`RenewSession`, on both listeners) to 30 minutes from the renewal, but never
-past 12 hours after the password sign-in that issued it (`created_at`); its
-gateway leases move with it in the same transaction, so a game on a gateway
-lasts as long as the session (migration 000008). The game client renews every
-ten minutes while it runs, the website while a page is open and in view; after
+past 12 hours after the password sign-in that issued it (`created_at`; migration 000008). A
+renewal changes nothing in the bearer, whose `exp` is that cap, and nothing at a gateway. The game
+client renews every ten minutes while it runs, the website while a page is open and in view; after
 the 12 hours the password is needed again. An expired, replaced or revoked
 session renews nothing, and a renewal needs no accepted terms. The browser
 cookie lives the 12 hours of the cap: an expired session's cookie finds no

@@ -65,12 +65,12 @@ The person, on the website or in the native client (`central-client`):
    `keep` or `new { document, recovery }`. In one transaction, with the
    account locked and the code checked again: the code is spent; the record
    and wrapper stored; the credential revision raised; every session ended
-   (with tickets and leases). For `new`: the epoch raised, the document
+   (each revoked at the gateways that held it). For `new`: the epoch raised, the document
    replaced at revision 1, the recovery wrapper replaced (required for a
    registered account, optional for a moved one), every private object
    deleted (encrypted under a key nobody has) and the object quota emptied
    (`object_bytes`), and a registered account's `restored` cleared, so it
-   takes no gateway ticket until a native client confirms the new document.
+   gets no gateway token until a native client confirms the new document.
    A moved account keeps `restored`: migration 000005's
    `account_closed_enrolled` requires it once the move is closed, and that
    move's restore, which the flag guards, is long done. `Done`; the person

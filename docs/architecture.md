@@ -27,13 +27,12 @@ for ciphertext and separately permissioned training datasets. Exact libraries,
 versions, hosting and service accounts are selected in M1 after review. Personal
 content is encrypted client-side; TLS and storage encryption still apply.
 
-The owner's exclusive-session requirement takes priority over continuing
-authenticated play during a Central outage. Gateway HTTP requests and game input
-perform live lease checks and fail closed when Central is unavailable. Idle
-authenticated sockets recheck within five seconds and close on failure. This
-trades availability for prompt revocation; no cached success extends permission.
-Already authorized work may finish before a replacement login commits. See
-gateway-registry.md for the concrete lease contract and current development bounds.
+A gateway checks a player by itself, from a token Central signed for it alone, so play goes on
+through a Central outage until the token expires, an hour at most. Revocation stays prompt without
+a question per request: Central tells the gateway when a session ends, and every number it missed
+is there to fetch. A gateway Central cannot reach learns within seconds of its next heartbeat; one
+that loses Central for good loses its players when their tokens expire. Already authorized work
+may finish before a replacement login commits. See gateway-registry.md §"Session tokens".
 
 ## Authentication and vault decision gate
 
