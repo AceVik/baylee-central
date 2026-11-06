@@ -406,6 +406,15 @@ macOS ARM64/Intel, PostgreSQL, dependency and secret checks):
 https://github.com/AceVik/baylee-central/actions/runs/39272471661
 This is test evidence, not independent security review or production readiness.
 
+## Session tokens, 6 November 2026
+
+Branch `c42/session-tokens`, not merged and not deployed. Tickets and leases are replaced by signed
+tokens a gateway checks by itself, numbered revocations with catch-up, and a bounded push to approved
+origins ([gateway registry](gateway-registry.md#session-tokens)). The Central token is a signed JWT;
+the website's cookie stays an opaque capability. An independent review of the new crypto and outbound
+paths has not happened yet, and neither has a run against a real gateway. Deploying needs migration
+000023, `token_keys` and the order in [operations](operations.md#the-session-tokens-release).
+
 ## Remaining implementation and release gates
 
 A deployed launcher (`--accounts-stdin`, `--migrate-stdin`, `--generate-secrets`)

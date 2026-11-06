@@ -1,10 +1,10 @@
 # Gateway registry and delegated sessions
 
 The native API separates four authorities: a central account session, a gateway's
-redemption credential, its heartbeat credential, and the official migration
-bridge credential. Tokens are independent random capabilities; PostgreSQL stores
-only their SHA-256 digests. A gateway never receives a user's central bearer or
-OPAQUE password material.
+SSO credential, its heartbeat credential, and the official migration bridge credential.
+Credentials are independent random capabilities; PostgreSQL stores only their SHA-256
+digests. A session's bearer is a signed token ([below](#session-tokens)). A gateway never
+receives a user's central bearer or OPAQUE password material.
 
 ## Registration and operator approval
 
@@ -16,7 +16,7 @@ gateway. Each owner can reserve at most eight origins. The official gateway's
 origins (the bridge's: `OFFICIAL_ORIGIN` and its aliases in a live service,
 `central_api::is_official_origin`) are never registered: `RegisterGateway` for
 one answers `Conflict`, since a registered credential for that audience could
-redeem the bridge's tickets a second time. Before the first approval,
+read the official gateway's revocations. Before the first approval,
 the same authenticated owner may repeat registration to recover a lost response;
 this rotates both pending credentials. An approved or disabled origin cannot be
 rotated this way, nor can another account claim an existing origin.
@@ -36,10 +36,12 @@ needs; the operator's SQL below stays the fallback. It is a deliberate
 administrative action, not an automatic network probe. Coordinate the approval transaction by
 locking the relevant `gateways` row `FOR UPDATE`, verifying the current ownership
 record, and inserting approval before commit. Disabling approval immediately
-hides the entry and rejects credential authentication, new admission and lease
-introspection. Never approve solely because registration succeeded. The service
-does not fetch registered URLs, follow redirects, or accept callback challenges
-that could create SSRF.
+hides the entry, rejects credential authentication and new admission, and ends the
+gateway's sessions. Never approve solely because registration succeeded. The service
+probes nothing at registration. It calls a gateway only to push a revocation, only once
+it is approved, and only under the rules of [the push](#revocations): a person's
+approval of the origin is what makes that call safe to make.
+
 
 The runtime may use these registry privileges without grant options:
 
@@ -47,11 +49,13 @@ The runtime may use these registry privileges without grant options:
 GRANT SELECT, INSERT, UPDATE ON central_identity.gateways TO central_runtime;
 GRANT SELECT, INSERT, UPDATE (enabled) ON central_identity.gateway_approvals TO central_runtime;
 GRANT SELECT, INSERT, UPDATE (revoked_at, last_used_at) ON central_identity.gateway_tokens TO central_runtime;
-GRANT SELECT, INSERT, DELETE ON central_identity.gateway_admins,
-    central_identity.gateway_leases TO central_runtime;
+GRANT SELECT, INSERT, DELETE ON central_identity.gateway_admins TO central_runtime;
+GRANT SELECT, INSERT, UPDATE ON central_identity.gateway_streams TO central_runtime;
+GRANT SELECT, INSERT, DELETE ON central_identity.gateway_sids,
+    central_identity.gateway_revocations TO central_runtime;
 ```
 
-Existing native account/session/ticket permissions remain necessary. The runtime
+Existing native account and session permissions remain necessary. The runtime
 also requires the [private object and archive grants](private-objects.md).
 The reusable SDK exposes `gateway_directory`, `public_figures`,
 `gateway_pulse`, `Session::register_gateway` and
@@ -91,10 +95,9 @@ Central for its players' sign-ins and its entry in the gateway list.
     none of the invisible characters that change how text reads, such as a
     direction override; `central_api::gateway::shown_char`, the rule of a
     gateway's own name as well);
-  - **scopes**: `sso` (redeem its players' tickets; check their leases,
-    profiles, admin rights and terms; publish its terms) and `listing` (its
-    directory heartbeat, and its pulse if it reports its activity), at least
-    one;
+  - **scopes**: `sso` (read its revocations, name its invalidate path, publish its
+    terms) and `listing` (its directory heartbeat, and its pulse if it reports its
+    activity), at least one;
   - an **expiry**, 1 to 366 days (the table's CHECK holds both ends);
   - a **revocation**, by its owner or an administrator, at once.
 - **Minting** needs a password sign-in less than 30 minutes old, as an
@@ -109,17 +112,15 @@ Central for its players' sign-ins and its entry in the gateway list.
   revoked at once; a credential pair, which its owner cannot revoke, still
   needs the approval. A disabled gateway's token authenticates nothing, and
   a revoked or expired one fails at once: the check is in the
-  authenticating query, not a cache. Redemption, lease checks, profiles,
-  admin checks and tickets for a registered origin follow the same rule
-  (not disabled). A gateway with another live token keeps its players'
-  leases when one token is revoked; disabling the gateway ends them.
+  authenticating query, not a cache. A token for a player follows the same rule
+  (not disabled). Revoking one gateway token ends no player's session; disabling
+  the gateway does.
 - **Status.** `GatewayStatus`, under a live token whatever the approval,
   answers the gateway's id, origin, metadata and state, and the token's
   scopes and expiry, so a console can say "waits for approval" before it is
   listed. It is refused on the browser listener.
-- **Last use.** A heartbeat, a redemption (an admission or an admin sign-in)
-  and a status check mark the token used, at most once a minute; the
-  per-request lease checks do not, so no hot path writes.
+- **Last use.** A heartbeat and a status check mark the token used, at most once a
+  minute.
 - **Owner's view.** `Owner { Gateways }` lists the account's gateways with
   their state, liveness and tokens (live ones, and those revoked or expired
   in the last 30 days), never a token or digest.
@@ -162,23 +163,22 @@ other.
 **Its old address** (30.10.2026). The official gateway moved from
 `https://baylee.acevik.de` (`LEGACY_ORIGIN`, which migrated account documents
 keep naming) to `https://gateway.baylee.app` (`OFFICIAL_ORIGIN`). The old address
-is a compiled alias (`OFFICIAL_ALIASES`), so installed clients keep working:
-`GatewayTicket` for any official origin is the bridge's, bound to the origin the
-client asked for; the bridge redeems it and checks leases, profiles and terms
-under the whole set, and a lease keeps its ticket's origin; `GatewayTerms` for
-an alias answers the canonical origin's publication, and an acceptance sent for
-an alias is kept under the canonical one, while one kept under the alias before
-the move still counts. The wire is unchanged. Dropping the alias is a release.
+is a compiled alias (`OFFICIAL_ALIASES`): `GatewayToken` for any official origin is the
+official gateway's, with the origin the client asked for as its `aud`, and revocations
+have one stream under the canonical origin; `GatewayTerms` for an alias answers the
+canonical origin's publication, and an acceptance sent for an alias is kept under the
+canonical one, while one kept under the alias before the move still counts. Dropping the
+alias is a release.
 
 `SetGatewayAdmins { gateway, expected_revision, accounts }` requires the owner's
 central session and replaces at most 32 explicit administrator UUIDs with a
 revision compare-and-swap (initial revision 1). All listed accounts must be
 enrolled. Registration starts with an empty list. Ownership permits changing this
 list but grants no implicit backend access: the owner must also be explicitly
-listed and loses backend access upon removal. A redemption credential can ask
-`CheckGatewayAdmin { account }` only about its own gateway. Heartbeats never carry
-administrator claims, and neither does a pulse. Removed members lose existing
-admin leases as well as the ability to redeem previously issued admin tickets.
+listed and loses backend access upon removal. Heartbeats never carry administrator
+claims, and neither does a pulse. A token for the `admin` purpose needs current membership,
+and a removed member's `admin` `sid` is revoked in the same transaction, while their `admit`
+`sid` stays.
 
 ## Activity and the public figures
 
@@ -203,7 +203,8 @@ the heartbeat credential or a live token with `listing` (never the redemption
 credential or an `sso`-only token), the bridge credential for the official
 gateway's row and no other, metadata on the gateway's origin, one beat per
 five seconds (`Busy`, and the counts stay as they were), the same budgets,
-the native route only, and the heartbeat's answer. A count above the bound,
+the native route only, and the heartbeat's answer, which names the gateway's last
+revocation ([below](#revocations)). A count above the bound,
 or more `playing` than `players`, is `Rejected` before anything is read or
 written, so not even the token is marked used.
 
@@ -270,85 +271,177 @@ sum of claims ([threat model](threat-model.md)).
 
 **SDK.** `central_client::gateway_pulse` and `central_client::public_figures`
 check what they send and what they read (the bound, no more `playing` than
-`players`, well-formed ascending ids, at most 100). A Central built before
+`players`, well-formed ascending ids, at most 100); `gateway_pulse` returns the
+last revocation number the heartbeat's answer names. A Central built before
 000025 does not know either operation and answers an unknown operation as it
 answers a wrong credential,
 `Rejected` (HTTP 401): a gateway that is refused a pulse sends its plain
 heartbeat instead, and if that is accepted it keeps to plain heartbeats and
 tries the pulse again later.
 
-## SSO and revocation
+## Session tokens
 
-The client requests `GatewayTicket { gateway: origin, purpose }` using its central
-session. Tickets expire after 30 seconds, are single use and bind the exact
-audience and purpose. Registered gateways support `admit` and `admin`; admin
-tickets require current membership. `export` and `link` are restricted to the
-official bridge and never reveal legacy IDs to registered third-party gateways.
+*6.11.2026, migration 000024.* A gateway checks a player by itself, locally and without
+the network; Central's sign-outs still reach it at once. This replaces tickets and leases.
+The wire contract with Baylee is the section below and `central_crypto::jwt`, which both
+sides use, so that neither writes a second verifier.
 
-The gateway posts `RedeemGateway { ticket, purpose }` using its own redemption
-credential. For admission and administration, `GatewayIdentity` includes a
-gateway-held `lease` and `expires_at` in absolute Unix seconds. Foreign gateways
-receive only the central identity; `legacy_id` is absent. The official bridge
-may receive its legacy mapping. Export/link do not mint leases.
+**Three tokens.** All are compact JWS, Ed25519 only.
 
-Store a lease only server-side. Every protected gateway request and existing
-WebSocket authorization recheck must call `GatewaySession { lease, purpose }`
-with that gateway's credential and fail closed if Central rejects or cannot be
-reached. A previous successful response is not authorization for later requests.
-The response is bound to the same identity and expires no later than its parent
-central session. A lease from another gateway or purpose cannot be substituted.
-Central rechecks that the gateway is not disabled, and admin membership, on both
-redemption and use.
+| Token | `typ` | Audience | Lives |
+| --- | --- | --- | --- |
+| Central token | `baylee-central+jwt` | Central alone | to the session's 12-hour cap; its row says whether it is live |
+| Gateway token | `baylee-gateway+jwt` | exactly one gateway | an hour, never past that cap |
+| Revocation message | `baylee-revocation+jwt` | exactly one gateway | a minute |
 
-`GatewayProfile { lease, purpose }`, under the same authority as
-`GatewaySession` (a gateway's redemption credential, or the bridge for the
-official origin), answers `Response::GatewayProfile { identity, display_name:
-Option<String>, tag: Option<u32> }`: the display name and tag of the account
-behind the lease ([web accounts](web-accounts.md) §"Display name and tag"),
-`null` while the account has none. It runs exactly `GatewaySession`'s lease
-check (that gateway's lease, that audience and purpose, both expiries, a
-gateway not disabled, an admin's membership for `admin`), so a gateway learns the
-names of the people who sign in there, nobody else's, and an expired or
-foreign lease is `Rejected`. It is a request of its own (added 23.10.2026)
-because a field on `GatewayIdentity` would break every gateway built before
-it; gateways start asking it with the accounts design's step 4. It counts
-with the control requests and is refused on the browser listener.
+**The format.** A header is compared with the exact bytes `central_crypto::jwt` writes,
+`{"alg":"EdDSA","typ":"<kind>","kid":"<id>"}`, so nothing in a token selects an algorithm or
+a key, and an extra header field is a refusal by construction. The key comes from the
+verifier's own key set, by `kid`, which is the key's RFC 7638 thumbprint. `iss`, `aud`, `exp`
+and `nbf` are required and always checked against what the verifier is configured with, with
+30 seconds of tolerance. `aud` is one string. Unknown and duplicate claims are refused, and
+each kind has a longest size (2 KiB, and 16 KiB for a message) and a longest `exp - iat`.
+Signatures verify with `verify_strict`.
 
-Exactly **one** central session is active per account, even on the same device. A successfully verified
-new login atomically deletes earlier sessions and their tickets/leases before
-inserting the new session under an account row lock. Concurrent successful
-logins leave the last committed session active. Incorrect password proofs or
-stale credential revisions do not revoke the current session. A session lasts
-30 minutes and renews to 30 minutes from each renewal, at most 12 hours after its
-sign-in; its leases expire with it, renewed in the same transaction. A gateway
-therefore learns a later expiry on its next check and must accept it (no earlier
-one). Explicit logout also cascades to all delegated leases. There
-are at most eight outstanding tickets and 32 leases per session. These caps bound
-capability storage; account ciphertext and device metadata are not deleted by
-login replacement or logout.
+**The Central token** never leaves the path between the client and Central. Its `sid` is the
+session's random capability, of which Central keeps only a digest, so that the signing key
+alone forges no session. That capability opens nothing bare either:
+`central_identity::credential_operation` names, for every operation, whether it is a
+gateway's or a client's, so a bare credential opens no client operation and a signed session
+no gateway operation. Renewal changes nothing in the token. A website's session stays its
+`__Host-central` cookie, which only Central ever reads.
+
+**A gateway token.** `GatewayToken { gateway, purpose }`, under the session, answers
+`GatewayToken { token, expires_at }`. It is refused for Central's terms not accepted, an
+unfinished move, a disabled or unknown gateway, an `admin` purpose without current
+membership. The official gateway has no Central administrators, and admits a moved account
+once its move is closed. `purpose` is `admit` or `admin`. Other claims: `sub`, `sid`, `jti`,
+`iat`, `nbf`, `exp`, and, while there is one, `name` and `tag` (a gateway learns the names of
+the people who sign in there, nobody else's), `legacy_id` (the official gateway, closed moves
+only) and `terms` (the newest of this gateway's terms the account accepted, which the gateway
+compares with its own). Central's own terms are a condition of issue, so no claim says them.
+Asking again refreshes: `exp` moves, `name`, `tag` and `terms` are read again, `sid` stays.
+
+**`sid`.** Sixteen random bytes per session, gateway and purpose, in
+`central_identity.gateway_sids`, at most 32 per session (`Busy`; a refresh is no new one). Two
+gateways cannot tell they saw the same session. `exp` is capped by the 12-hour cap rather than
+the session's 30-minute expiry, which would make every token half an hour: a session the client
+stops renewing leaves its token valid until `exp`, an hour at most, and it cannot be refreshed.
+
+**Keys.** `GET /.well-known/jwks.json` is public: RFC 8037 OKP keys, at most eight and 16 KiB,
+`application/jwk-set+json`, `Cache-Control: public, max-age=300`, 256 reads a second in all,
+then `429`. A gateway refreshes every five minutes and on an unknown `kid`, at most once a
+minute, only from its configured Central URL over verified TLS, and keeps what it holds when a
+read fails. Rotation is an operator's ([operations](operations.md#rotating-the-signing-key)).
+
+## Revocations
+
+Every end of a `sid` is a revocation, whichever statement ended it: the trigger on
+`gateway_sids` numbers it, in the same transaction, in `gateway_revocations`. So sign-out, a
+replacing sign-in, a password change, a reset, a deleted account, a removed administrator and a
+disabled gateway all reach the gateway, and no path can forget. "One active session per
+account" is the second of those: the replacing sign-in deletes the old session, and the gateway
+that held it hears.
+
+**The numbers** are per gateway, under its canonical origin, from 1, without holes: `last_seq`
+moves in the transaction that ends the session and rolls back with it. A session's streams are
+locked in one order before any is touched, so two ending sessions cannot deadlock. Central keeps
+each number for two hours, by age alone, which is longer than any token lives, so a gateway
+reading from 0 after a start finds every revocation still in force. The sweep removes a prefix of
+each stream, so a clock step cannot leave a hole. Growth is bounded by the sign-in budget.
+
+**The message** names only `sid`s that gateway was given, never a token and never why: `iss`,
+`aud` (the canonical origin), `jti`, `iat`, `nbf`, `exp`, `from`, `seq` and `sids` (1 to 256, one
+for each number from `from` to `seq`). It is signed afresh for each send, so a retry has a new
+`jti` and the same numbers. A gateway applies its `sids` whatever the numbers, since a revocation
+can only end sessions, takes each `jti` once (`central_crypto::jwt::ReplayCache`), and moves its
+applied number only when `from <= applied + 1`.
+
+**Catch-up** is what makes a revocation certain, and also what serves a gateway Central cannot
+reach. `GatewayHeartbeat`, and a `GatewayPulse` likewise, answers
+`GatewayHeartbeat { last_revocation }`.
+`GatewayRevocations { after }`, under the SSO credential or the bridge, answers `{ token, last,
+floor }`: one fresh message for the next numbers, or none; the last number; the lowest held, or
+`last + 1`. The stream is the credential's, never the request's. With `after + 1 < floor` a
+gateway may have missed something it cannot learn, and ends every Central session it holds.
+
+**The push** is what makes a revocation prompt. `RegisterInvalidate { path }`, under the SSO
+credential or the bridge, is sent when a gateway links and at a sign-in until it has been
+answered. It names a **path, never a URL** (`central_api::gateway::valid_invalidate_path`, held by
+the table as well): at most 128 bytes of `A-Za-z0-9/_-`, so nothing in it can climb out of the
+path or be decoded into something else. Scheme, host and port come only from the approved origin.
+Only an approved, enabled gateway with a path is called; a pending gateway catches up. Central
+sends `POST {origin}{path}`, the compact token as the body, `Content-Type: application/jwt`. `204`
+is taken, `429` and `5xx` are retried, and anything else is refused and not asked again.
+
+**The call** is `central-outbound`'s, Central's one way out, shared with Web Push: HTTPS only, no
+proxy, no redirect, two seconds to connect and five in all, and only the status of the answer is
+read. A name resolves once, and what it resolved to is what is dialled, so it cannot answer
+differently the second time; one private, loopback, link-local, multicast, reserved or
+documentation address among its answers refuses the whole name, however the address is spelled.
+A development service runs no sender.
+
+**One exception.** The official gateway runs on Central's machine, where its public name may not
+lead back to it. `official_address` in the service's configuration names one loopback or private
+address for that one compiled host, and nothing else: the URL, the name sent in TLS and the
+certificate check stay what they were, so it is the same verified HTTPS to another address. Any
+other name reaches no private address, with the setting or without it. A public, link-local or
+multicast address is refused, and a value that cannot be read stops the service.
+
+**The queue** is the log and one cursor per gateway, so it holds no more than the log. A claim
+counts an attempt and sets the next, one second doubling to sixteen; a sender that dies mid-call
+loses nothing. After five attempts, or a refusal, the numbers are left to catch-up and the gateway
+rests a minute, so one that never answers costs a few calls a minute however many sessions end.
+Four senders run at once, so one that hangs for its whole limit holds up one of them.
+
+## A client too old
+
+Every request to `/v1/native` and `/v1/reports*` carries `Baylee-Central-Protocol: 2`
+(`central_api::PROTOCOL_HEADER`). Without exactly that the answer is `426 Upgrade Required` with
+the body `{"refusal":{"code":"update_required"}}`, before the request is decoded and before its
+credential, its budget or the database: an old client hears it at its first request, not as a
+failure to decode the answer to a sign-in. It names no version, because Central does not know
+client releases. `central_api::Error::UpdateRequired` is that answer in the SDK. The key set and
+the browser listener need no header. The client's updater goes to GitHub Releases and needs no
+sign-in, so Central is not on its path.
+
+## One session per account
+
+Exactly **one** central session of each kind is active per account, even on the same device. A
+successfully verified new login atomically deletes the earlier session before inserting the new one
+under an account row lock, which revokes its `sid`s. Concurrent successful logins leave the last
+committed session active. Incorrect password proofs or stale credential revisions do not revoke the
+current session. A session lasts 30 minutes and renews to 30 minutes from each renewal, at most 12
+hours after its sign-in. Explicit logout revokes in the same way. Account ciphertext and device
+metadata are not deleted by login replacement or logout.
 
 ## Verification
 
-`central-api` unit tests cover canonical origin and metadata restrictions.
-The owned PostgreSQL fixture of `cargo xtask postgres` exercises pending
+`central-crypto` tests every refusal of the format, each by its exact reason: wrong `aud` and
+`iss`, expired and not yet valid at the edge of the tolerance, every other algorithm, a header
+with anything more, an unknown `kid`, a key named by another `kid`, a changed payload or
+signature, one kind read as another, unknown and duplicate claims, a replayed message, and the
+RFC 8037 vectors. `central-outbound` tests the address rules, a name with one private answer,
+and that a pin opens no other name. `central-api` unit tests cover canonical origin and metadata
+restrictions and the invalidate path. The owned PostgreSQL fixture of `cargo xtask postgres` exercises pending
 registration, credential separation, approval privilege rejection, directory
 and heartbeat behavior, the official row (one at most, without owner or
 credentials; the bridge's heartbeat moves it alone; no registered credential
-or ticket reaches it; listed when approved, hidden when disabled; the upgrade
-over registered gateways), owner isolation, administrator CAS and revocation,
-audience/purpose/replay isolation, absence of foreign legacy IDs, central
-single-session replacement including concurrent logins, and `GatewayProfile`
-(the lease's account's name and tag; another gateway's lease, the bridge
-asking for a registered gateway's, another purpose, a disabled gateway, an
-unknown and an expired lease are refused). No production accounts
-or credentials are used. CI must also validate the shared Rust implementation
+reaches it; listed when approved, hidden when disabled; the upgrade over registered
+gateways), owner isolation, administrator CAS and revocation, absence of foreign legacy IDs,
+central single-session replacement including concurrent logins, `sid`s (stable, separate,
+bounded), the numbering (every end of a session, no hole after a rollback, no deadlock between
+two ending sessions, the sweep's prefix), the push queue (only approved gateways with a path,
+bounded attempts, a sender dying mid-call, a page that aged out) and migration 000024 over live
+rows. Over real HTTP it exercises the old client's refusal, a gateway token offered at Central
+and at another gateway, a capability copied out of a token, a changed token, a token whose session
+ended, each bearer on the other's side, catch-up and a push. No production accounts or credentials
+are used. CI must also validate the shared Rust implementation
 on Windows, Linux and macOS before release.
 
 ## Terms of use
 
-A gateway publishes its terms with `PublishGatewayTerms` under its redemption
-credential (the bridge for the official origin), and checks its players with
-`GatewayAuthorize`, which is `GatewaySession` plus their acceptance of
-Central's and its own current terms. Published versions are immutable. See
-[terms](terms.md).
+A gateway publishes its terms with `PublishGatewayTerms` under its SSO credential (the bridge
+for the official origin), and reads a player's acceptance from the token's `terms`. Published
+versions are immutable. See [terms](terms.md).
 

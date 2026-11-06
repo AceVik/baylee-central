@@ -20,6 +20,32 @@ These are engineering passes, not independent external audits. Separate agent
 reviews and their scope are recorded below. Release still needs independent review
 and operational/legal gates.
 
+## Session tokens, 6 November 2026
+
+Design pass: assets are the Ed25519 signing key, the Central token and each session's capability.
+Hostile callers considered: a gateway, a client with a real token, a holder of a copied token, an
+old client, a gateway operator choosing its own address. Invariants: nothing in a token selects an
+algorithm or key; a token is good for one audience; no path that ends a session can forget to
+revoke it; a revocation lost in transit is not lost; a destination that comes from outside reaches
+no private address. Implementation pass: the header is compared with fixed bytes; every end of a
+`sid` is a trigger rather than a call; the push queue is the log and a cursor, so it holds no more
+than the log; address checking and dialling are one step; a bearer keeps to its side by an exhaustive
+match, so a new operation does not compile until it is decided. No package was added.
+
+Adversarial pass, what it found and what changed. A capability copied out of a Central token opened
+the session bare, which made the signature decorative: bare credentials are now refused for client
+operations. A stream left at the attempt limit by a crash was never claimed again; a page that aged
+out was never passed; a clock step could leave a hole no message could cover: each is fixed and has a
+test. Tests that used a random bearer as a session stopped reaching the checks they were written for
+once the gate answered first; they now use real sessions on the wrong side, and a token whose session
+ended has its own test. `SignedToken` read from the wire skipped its bounds. A decoded payload holding
+a capability was not wiped. A missing `token_keys` at a gateway deploy would have left Central down
+after the migration, with the previous binary unable to start either; the hook now asks first.
+
+This is the implementing agent's engineering review. It is not an independent audit, and the owner's
+release gates still apply. No real gateway has been called, and `official_address` has not been
+exercised against the real host.
+
 ## Dependency migration for 0.1.0-beta.9c, 2 November 2026
 
 Design pass: retain existing credentials, fixed Ristretto OPAQUE suite, chat

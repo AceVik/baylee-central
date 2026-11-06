@@ -29,10 +29,9 @@ information, not a contract, and is never "accepted".
   version, or a test fails. Publishing a version is a reviewed commit that
   replaces `draft` by a real version.
 - **A gateway's terms** are published by that gateway:
-  `PublishGatewayTerms { version, texts }`, authenticated by its redemption
-  credential (or by the migration bridge for the official origin). Central keys
-  them by the gateway's canonical origin, the same audience its tickets and
-  leases use, so the official gateway (which has no registry row while it is
+  `PublishGatewayTerms { version, texts }`, authenticated by its SSO credential (or
+  by the migration bridge for the official origin). Central keys them by the
+  gateway's canonical origin, the same key its revocations use, so the official gateway (which has no registry row while it is
   the migration bridge) and registered gateways are handled alike. A version is
   immutable: publishing it again with the same texts is `Done`, with other
   texts `Conflict`. The newest published version is current.
@@ -62,8 +61,7 @@ information, not a contract, and is never "accepted".
   and records the acceptance with `AcceptTerms` on the browser surface after
   the first sign-in, before the account can do anything that needs it.
 - A migrating legacy account accepts in the migration flow: after its first
-  central login the client shows the sheet before it asks for the export and
-  link tickets. Restoring (`ConfirmRestore`) stays allowed meanwhile, so an
+  central login the client shows the sheet before `LegacyExport` and `LegacyLink`. Restoring (`ConfirmRestore`) stays allowed meanwhile, so an
   acceptance before or after it both work.
 - Central has no account deletion yet (M1). Until then the Central sheet offers
   *accept* and *later*; *delete* appears with M1.
@@ -74,23 +72,20 @@ information, not a contract, and is never "accepted".
   accepted the current version, that session may only read its status and the
   terms, accept, read its own documents and objects (export), confirm a
   restore, and log out.
-  Everything else, gateway tickets included, is refused with a distinct error
+  Everything else, gateway tokens included, is refused with a distinct error
   (`TermsRequired`, HTTP 403) so the client can show the sheet instead of a
   generic failure.
-- **Gateways.** `GatewayAuthorize { lease, purpose, terms }` replaces
-  `GatewaySession` for gateways that know it: the same live recheck in the
-  same statement, plus whether the account accepted Central's terms in force
-  and whether it accepted exactly the version and digest the gateway names as
-  its own current one. The gateway refuses a stale session everything but
-  reading its terms, signing out and deleting its own data there, and says
-  why.
-  `GatewaySession` stays, unchanged, for gateways not yet updated, because
-  responses refuse unknown fields.
-- A change of version takes effect at once: Central's at the next request of
-  every session; a gateway's as soon as it has published the new one. The
-  gateway applies the refusal at its HTTP routes and when a socket opens; a
-  seat, watch or social socket that is already open is ended only by the lease
-  check, so running games finish. Baylee's `docs/protocol.md` names the routes.
+- **Gateways.** Central's own terms are a condition of a gateway token, so a token proves
+  them at its `iat`. Its `terms` claim names the newest of this gateway's terms the account
+  accepted, and the gateway compares version and digest with its own current ones, without
+  asking Central. It refuses a stale session everything but reading its terms, signing out
+  and deleting its own data there, and says why.
+- A change of version takes effect at Central at the next request of every session. At a
+  gateway it takes effect at the next token: a token in hand says what was true when it was
+  issued, so a new Central version reaches a player already there within the hour, when the
+  refresh is refused, and a gateway's own new version at the player's next refresh. This is
+  the price of a gateway that checks by itself. The gateway applies the refusal at its HTTP
+  routes and when a socket opens, so running games finish. Baylee's `docs/protocol.md` names the routes.
 
 ## Reads
 
@@ -109,7 +104,7 @@ information, not a contract, and is never "accepted".
 - A gateway cannot rewrite what players accepted: published versions are
   immutable and acceptances name the digest.
 - One account cannot read another's acceptances: only `TermsStatus` for the
-  session's own account and `GatewayAuthorize` for a lease the gateway holds.
+  session's own account, and a gateway learns only what a token for it says.
 - One query: the terms check before a gated session operation is one
   statement (live session, account, acceptance of the exact version and
   digest), run only while terms are in force, and a database error is
@@ -119,7 +114,7 @@ information, not a contract, and is never "accepted".
   document fits the wire limit even when every byte needs escaping), at most
   256 published versions per gateway (`Rejected` past it), and the public
   reads `Terms` and `GatewayTerms` fall under the global request limit like
-  `Discover`; `GatewayAuthorize` and `TermsStatus` are control requests.
+  `Discover`; `GatewayToken` and `TermsStatus` are control requests.
 - Only an approved, enabled gateway (or the bridge, for the official origin)
   publishes, and only for its own origin. Central serves a stored version only
   if its texts still hash to its digest; tampered rows are `Unavailable`.
@@ -129,9 +124,7 @@ information, not a contract, and is never "accepted".
 ## Deployment order
 
 1. Central with these operations, terms still `draft`.
-2. Gateways that publish their terms and use `GatewayAuthorize`. Against an
-   older Central `GatewayAuthorize` is `Rejected` and the gateway fails
-   closed, so Central always ships first.
+2. Gateways that publish their terms and read them from the token.
 3. Clients that know both sheets.
 4. Only then a reviewed commit puts Central's terms in force, and gateways
    enforce theirs.

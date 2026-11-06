@@ -138,8 +138,7 @@ writes its audit event in its transaction; reads do not.
   tokens"). It stays a person's decision after checking outside Central who
   runs the origin; the page says so in its dialog. Disabling hides the gateway from the directory
   at once, stops its credentials and tokens (the joins that authenticate
-  them), and deletes its leases, so each of its sessions fails at its next
-  check. The official gateway's row can be disabled too, which hides it; its
+  them), and ends its sessions, each revoked. The official gateway's row can be disabled too, which hides it; its
   bridge is no approval's to stop. The same state again writes nothing.
 - `RevokeGatewayToken { token }` (`gateway.token_revoked`, with the gateway's
   id): the token stops at once. Revoked already is `Done`.
