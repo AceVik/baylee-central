@@ -109,16 +109,22 @@ put the front before it instead of `dist/`:
 `node e2e-real/front.ts --tls <its folder> --site 28792`. Then
 
 ```bash
-REAL_KEYS=<keys file> REAL_OUT=<empty folder> npx playwright test -c e2e-real/playwright.config.ts e2e-real/site-chat.spec.ts
+REAL_FRONT_SPKI=<pin> REAL_KEYS=<keys file> REAL_OUT=<empty folder> npx playwright test -c e2e-real/playwright.config.ts e2e-real/site-chat.spec.ts
 ```
+
+`REAL_FRONT_SPKI` is the base64 SHA-256 of the throwaway certificate's
+public key (`openssl x509 -in cert.pem -pubkey -noout | openssl pkey -pubin
+-outform der | openssl dgst -sha256 -binary | base64`): Chromium registers
+no service worker on an untrusted certificate, and the pages register one.
 
 registers two accounts at each width, makes them contacts by handle, has
 them write to each other (markup in a message stays text), reloads one page
 and finds the chat open again without a password (the identity the sign-in
 kept in this browser), compares the safety number on both sides, creates a
 group, invites, joins, writes to it and leaves it (the history stays, the
-composer goes), and checks that localStorage holds neither a message nor the
-password. Central allows five registrations an hour per address: start it
+composer goes), switches a notification category off and on across a reload
+(the device's own Web Push needs a push service and is not run), and checks
+that localStorage holds neither a message nor the password. Central allows five registrations an hour per address: start it
 afresh between runs.
 
 ## Tearing down

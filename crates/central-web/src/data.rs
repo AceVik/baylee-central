@@ -406,17 +406,20 @@ pub enum Section {
     Privacy,
     /// `/account/gateways`: registered gateways and their tokens.
     Gateways,
+    /// `/account/notifications`: Web Push on this device.
+    Notifications,
 }
 
 impl Section {
     /// Every section, in the navigation's order.
-    pub const ALL: [Section; 7] = [
+    pub const ALL: [Section; 8] = [
         Section::Home,
         Section::Chat,
         Section::Contacts,
         Section::Profile,
         Section::Security,
         Section::Privacy,
+        Section::Notifications,
         Section::Gateways,
     ];
 
@@ -431,6 +434,7 @@ impl Section {
             Section::Security => "account/security",
             Section::Privacy => "account/privacy",
             Section::Gateways => "account/gateways",
+            Section::Notifications => "account/notifications",
         }
     }
 }

@@ -74,6 +74,19 @@ test("two accounts write to each other, keep the chat across a reload and share 
   try {
     const alice = await register(page, `sa_${info.project.name}_${stamp}`, "Site_Alice");
     const bob = await register(other, `sb_${info.project.name}_${stamp}`, "Site_Bob");
+
+    // the account's notification categories are Central's: kept across a reload
+    await page.goto("/en/account/notifications");
+    const requests = page.getByRole("switch", { name: "Contact requests", exact: true });
+    await expect(requests).toBeEnabled({ timeout: 30_000 });
+    const before = await requests.isChecked();
+    await requests.click();
+    await expect(requests).toBeChecked({ checked: !before });
+    await page.reload();
+    await expect(requests).toBeEnabled({ timeout: 30_000 });
+    await expect(requests).toBeChecked({ checked: !before });
+    await requests.click();
+    await expect(requests).toBeChecked({ checked: before });
     const [aliceName, bobName] = [alice.split("#")[0] ?? "", bob.split("#")[0] ?? ""];
 
     // contacts: a request by handle, accepted on the other side

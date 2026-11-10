@@ -41,7 +41,7 @@ pub fn csp(https: bool) -> String {
         "default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self'; \
          font-src 'self'; connect-src 'self'; worker-src 'self'; manifest-src 'self'; form-action 'none'; \
          base-uri 'none'; frame-ancestors 'none'; object-src 'none'; \
-         require-trusted-types-for 'script'; trusted-types baylee",
+         require-trusted-types-for 'script'; trusted-types baylee baylee-sw",
     );
     if https {
         policy.push_str("; upgrade-insecure-requests");

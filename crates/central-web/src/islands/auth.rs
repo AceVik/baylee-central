@@ -460,6 +460,8 @@ pub fn SignIn(lang: Lang, worker: String) -> impl IntoView {
         step.set(Step::Working);
         let worker = worker.clone();
         leptos::task::spawn_local(async move {
+            // another account's notifications never reach this one
+            let _ = super::push::disable().await;
             let next = match sign_in(&worker, &username, secret).await {
                 Ok(done) => after_sign_in(lang, done).await,
                 Err(problem) => Step::Failed(problem),
@@ -652,6 +654,7 @@ pub fn Register(lang: Lang, worker: String) -> impl IntoView {
         step.set(Step::Working);
         let worker = worker.clone();
         leptos::task::spawn_local(async move {
+            let _ = super::push::disable().await;
             match register(&worker, f).await {
                 Ok((code, signed)) => {
                     // The code first: it is shown once, before anything

@@ -61,6 +61,14 @@ pub fn write(key: &str, value: &str) {
     }
 }
 
+/// Forgets what localStorage keeps under `key`.
+#[cfg(target_arch = "wasm32")]
+pub fn remove(key: &str) {
+    if let Some(storage) = storage() {
+        let _ = storage.remove_item(key);
+    }
+}
+
 /// Sends the browser to `path` on this site.
 #[cfg(target_arch = "wasm32")]
 pub fn go(path: &str) {
@@ -97,6 +105,10 @@ pub fn read(_key: &str) -> Option<String> {
 /// On the server nothing is kept.
 #[cfg(not(target_arch = "wasm32"))]
 pub fn write(_key: &str, _value: &str) {}
+
+/// On the server nothing is kept.
+#[cfg(not(target_arch = "wasm32"))]
+pub fn remove(_key: &str) {}
 
 /// On the server nobody is sent anywhere.
 #[cfg(not(target_arch = "wasm32"))]

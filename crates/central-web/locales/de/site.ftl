@@ -756,3 +756,33 @@ people-unblock = Freigeben
 people-keep = Behalten
 people-confirm-remove = { $who } aus deinen Kontakten entfernen? Eure Nachrichten bleiben.
 people-confirm-block = { $who } blockieren? Diese Person kann dich dann nicht mehr als Kontakt anfragen oder dir schreiben.
+
+## Offline, Aktualisierungen, Installieren
+
+title-offline = Offline
+offline-title = Du bist offline
+offline-lead = Diese Seite braucht eine Verbindung. Nichts geht verloren: Central hebt deine Nachrichten auf, bis du zurück bist.
+offline-again = Erneut versuchen
+update-ready = Eine neue Version von baylee.app ist bereit.
+update-unsent = Du hast hier Text, der noch nicht gesendet ist. Trotzdem neu laden?
+update-reload = Neu laden
+install-app = Als App installieren
+
+## Benachrichtigungen
+
+push-title = Benachrichtigungen
+push-lead = Wähle, worüber Baylee dich benachrichtigen darf. Benachrichtigungen zeigen keine Nachrichtentexte, Namen oder Feedback-Inhalte.
+push-device = Benachrichtigungen auf diesem Gerät
+push-categories = Benachrichtige mich über
+push-chat = Chat-Nachrichten
+push-contacts = Kontaktanfragen
+push-updates = Neue Versionen
+push-feedback = Feedback-Meldungen (Administration)
+push-gateways = Gateway-Aufnahmeanfragen (Administration)
+push-on = Auf diesem Gerät aktiviert. Nur die ausgewählten Kategorien werden zugestellt.
+push-off = Auf diesem Gerät deaktiviert. Deine Kategorie-Auswahl bleibt gespeichert.
+push-scope = Die Kategorie-Auswahl gilt für dein Konto. Die Gerätefreigabe gilt pro Browser. Abmelden trennt dieses Gerät.
+push-failed = Die Änderung konnte nicht bestätigt werden. Bitte versuche es erneut.
+push-denied = Benachrichtigungen sind gesperrt. Du kannst sie in den Browser- oder Geräteeinstellungen erlauben und es erneut versuchen.
+push-unsupported = Dieser Browser bietet hier kein Web Push an. Füge Baylee auf iPhone und iPad zum Home-Bildschirm hinzu und öffne es dort.
+push-unconfigured = Hintergrund-Benachrichtigungen sind auf diesem Server noch nicht verfügbar. Deine Auswahl kannst du bereits speichern.
