@@ -7,16 +7,12 @@ use std::collections::BTreeMap;
 use leptos::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use crate::data::{CardStatus, Gateway, Machine, Release, Repo};
+use crate::data::{CardStatus, Gateway, Machine, Release, Repo, Section};
 use crate::words::Lang;
 
-mod format;
 pub mod icons;
-mod markdown;
 mod pages;
 mod shell;
-
-pub use markdown::render as markdown_blocks;
 
 /// A page of the site, by its path under the language prefix.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -39,6 +35,12 @@ pub enum Page {
     Terms,
     /// `/{lang}/fan-content`.
     FanContent,
+    /// `/{lang}/signin`.
+    SignIn,
+    /// `/{lang}/register`.
+    Register,
+    /// `/{lang}/account…`: the signed-in area.
+    Account(Section),
     /// Any path the site does not have (404).
     NotFound,
     /// A path the site had and removed for good (410).
@@ -65,6 +67,9 @@ impl Page {
     pub const fn slug(self) -> &'static str {
         match self {
             Page::Home | Page::NotFound | Page::Gone => "",
+            Page::SignIn => "signin",
+            Page::Register => "register",
+            Page::Account(section) => section.slug(),
             Page::Download => "download",
             Page::Gateways => "gateways",
             Page::Faq => "faq",
@@ -79,13 +84,26 @@ impl Page {
     /// The page at a slug.
     #[must_use]
     pub fn from_slug(slug: &str) -> Option<Page> {
-        Page::LISTED.into_iter().find(|page| page.slug() == slug)
+        Page::LISTED
+            .into_iter()
+            .chain([Page::SignIn, Page::Register])
+            .chain(Section::ALL.map(Page::Account))
+            .find(|page| page.slug() == slug)
     }
 
-    /// Whether search engines may index it (the Impressum is not, as before).
+    /// Whether search engines may index it: not the Impressum (as before),
+    /// not the forms and the signed-in area, not the error pages.
     #[must_use]
     pub const fn indexed(self) -> bool {
-        !matches!(self, Page::Impressum | Page::NotFound | Page::Gone)
+        !matches!(
+            self,
+            Page::Impressum
+                | Page::NotFound
+                | Page::Gone
+                | Page::SignIn
+                | Page::Register
+                | Page::Account(_)
+        )
     }
 
     /// The page's absolute path in `lang`, `/de/download`.

@@ -1,5 +1,15 @@
-//! Requests from the browser to this origin: same-origin, without the
-//! cookie, without a referrer, never following a redirect, never cached.
+//! Requests from the browser to this origin: same-origin, without a
+//! referrer, never following a redirect, never cached; only Central's
+//! account requests carry the session cookie.
+
+/// Whether a request carries the session cookie.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Credentials {
+    /// No cookie: public endpoints (the contact form, the Impressum).
+    Omit,
+    /// The `__Host-central` cookie: Central's browser surface.
+    SameOrigin,
+}
 
 /// An answer: its status and its body as text.
 pub type Answer = (u16, String);
@@ -16,6 +26,7 @@ pub async fn request(
     url: &str,
     body: Option<&str>,
     headers: &[(&str, &str)],
+    credentials: Credentials,
 ) -> Result<Answer, Unsent> {
     use wasm_bindgen::{JsCast, JsValue};
     use wasm_bindgen_futures::JsFuture;
@@ -25,7 +36,10 @@ pub async fn request(
 
     let init = RequestInit::new();
     init.set_method(method);
-    init.set_credentials(RequestCredentials::Omit);
+    init.set_credentials(match credentials {
+        Credentials::Omit => RequestCredentials::Omit,
+        Credentials::SameOrigin => RequestCredentials::SameOrigin,
+    });
     init.set_redirect(RequestRedirect::Error);
     init.set_referrer_policy(ReferrerPolicy::NoReferrer);
     init.set_cache(RequestCache::NoStore);
@@ -61,6 +75,7 @@ pub fn request(
     _url: &str,
     _body: Option<&str>,
     _headers: &[(&str, &str)],
+    _credentials: Credentials,
 ) -> std::future::Ready<Result<Answer, Unsent>> {
     std::future::ready(Err(Unsent))
 }

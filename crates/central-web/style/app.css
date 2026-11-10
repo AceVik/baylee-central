@@ -1,2 +1,256 @@
-/* The signed-in area and the chat (docs/proposals/frontend-rewrite.md §6.2,
-   §6.3): their frame and components follow with the account pages. */
+/* Signing in and the signed-in area (docs/proposals/frontend-rewrite.md
+   §6.2): the forms beside the cloud, the frame with its navigation, the
+   steps that show a secret once. */
+
+/* ---- Signing in and registering ------------------------------------------ */
+
+.auth-grid {
+  display: grid;
+  gap: var(--space-6);
+  align-items: start;
+}
+
+.auth-form {
+  inline-size: 100%;
+  max-inline-size: 30rem;
+}
+
+.auth-cloud {
+  display: none;
+}
+
+@media (min-width: 48rem) {
+  .auth-grid {
+    grid-template-columns: minmax(0, 30rem) minmax(0, 1fr);
+  }
+
+  .auth-cloud {
+    display: block;
+    inline-size: 100%;
+    max-inline-size: 28rem;
+    margin-block-start: var(--space-6);
+  }
+}
+
+.with-tool {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.with-tool input {
+  flex: 1;
+  min-inline-size: 0;
+}
+
+.check {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: start;
+  gap: var(--space-3);
+}
+
+.check input {
+  inline-size: 1.5rem;
+  block-size: 1.5rem;
+  margin-block-start: 0.1rem;
+  accent-color: var(--accent);
+}
+
+.check label {
+  min-block-size: var(--target);
+}
+
+.form select {
+  min-block-size: var(--target);
+  padding-inline: 0.75em;
+  border: var(--hairline) solid var(--edge);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+}
+
+.working {
+  padding: var(--space-5);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--ink-soft);
+}
+
+.step {
+  display: grid;
+  gap: var(--space-3);
+}
+
+/* A secret shown once: monospace, selectable, wrapped anywhere. */
+.secret {
+  padding: var(--space-4);
+  border: var(--hairline) dashed var(--edge);
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+  font-family: var(--font-mono);
+  font-size: var(--text-lg);
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
+.terms-text {
+  max-block-size: 50dvh;
+  overflow-y: auto;
+  padding: var(--space-4);
+  border: var(--hairline) solid var(--edge-soft);
+  border-radius: var(--radius-sm);
+  background: var(--ground);
+}
+
+/* ---- The signed-in frame ---------------------------------------------------- */
+
+.frame {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-5);
+  max-inline-size: var(--frame);
+  margin-inline: auto;
+  padding: var(--space-5) var(--gutter) var(--space-7);
+}
+
+.frame-nav {
+  min-inline-size: 0;
+}
+
+.frame-nav ul {
+  display: flex;
+  gap: var(--space-1);
+  padding: 0;
+  overflow-x: auto;
+  list-style: none;
+}
+
+.frame-nav a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+  min-block-size: var(--target);
+  padding-inline: 0.85em;
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.frame-nav a:hover {
+  background: var(--surface-raised);
+}
+
+.frame-nav [aria-current="page"] {
+  background: var(--surface);
+  color: var(--title);
+  box-shadow: inset 0.1875rem 0 0 var(--action);
+}
+
+.frame-main {
+  display: grid;
+  align-content: start;
+  gap: var(--space-5);
+  min-inline-size: 0;
+}
+
+.frame-main h1::after {
+  content: "";
+  display: block;
+  inline-size: min(10rem, 50%);
+  block-size: 0.1875rem;
+  margin-block-start: var(--space-3);
+  border-radius: var(--radius-full);
+  background: linear-gradient(to right, var(--action), transparent);
+}
+
+@media (min-width: 64rem) {
+  .frame {
+    grid-template-columns: 15rem minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .frame-nav {
+    position: sticky;
+    inset-block-start: calc(var(--bar-height) + var(--space-4));
+  }
+
+  .frame-nav ul {
+    flex-direction: column;
+    overflow: visible;
+  }
+}
+
+.account-who .handle {
+  color: var(--title);
+  font-family: var(--font-prose);
+  font-size: var(--text-xl);
+  font-weight: 700;
+}
+
+.tiles {
+  margin-block-start: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tiles h2 {
+  font-size: var(--text-lg);
+}
+
+.needs ul {
+  margin-block-start: var(--space-2);
+}
+
+.needs a,
+.tiles h2 a {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: var(--target);
+}
+
+.sessions,
+.tokens {
+  display: grid;
+  gap: var(--space-3);
+  padding: 0;
+  list-style: none;
+}
+
+.sessions h3 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.token {
+  display: grid;
+  gap: var(--space-1);
+  padding-block: var(--space-3);
+  border-block-start: var(--hairline) solid var(--edge-soft);
+}
+
+.gateway-own h4 {
+  margin-block: var(--space-4) var(--space-2);
+  color: var(--title);
+  font-size: var(--text-md);
+}
+
+.gateway-own .form {
+  margin-block-start: var(--space-4);
+}
+
+.danger-zone {
+  border-color: var(--bad);
+}
+
+.danger-zone h2 {
+  color: var(--bad);
+}
+
+.secret-box {
+  border-inline-start: 0.25rem solid var(--action);
+}

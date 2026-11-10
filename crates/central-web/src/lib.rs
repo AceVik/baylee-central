@@ -8,9 +8,11 @@
 #![forbid(unsafe_code)]
 
 pub mod data;
+mod format;
 pub mod words;
 
 mod islands;
+mod markdown;
 mod rich;
 
 #[cfg(not(target_arch = "wasm32"))]

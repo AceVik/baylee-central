@@ -253,7 +253,9 @@ fn solve(_: &str, _: &Challenge, _: RwSignal<State>) -> std::future::Ready<Optio
 async fn fetch(worker: &str, state: RwSignal<State>) -> Option<Details> {
     for _ in 0..2 {
         let url = format!("/site/impressum/challenge?s={}", browser_bits());
-        let (status, text) = net::request("GET", &url, None, &[]).await.ok()?;
+        let (status, text) = net::request("GET", &url, None, &[], net::Credentials::Omit)
+            .await
+            .ok()?;
         if status != 200 {
             return None;
         }
@@ -264,9 +266,15 @@ async fn fetch(worker: &str, state: RwSignal<State>) -> Option<Details> {
             "expires": challenge.expires, "sig": challenge.sig, "counters": counters,
         })
         .to_string();
-        let (status, blob) = net::request("POST", "/site/impressum", Some(&answer), &[])
-            .await
-            .ok()?;
+        let (status, blob) = net::request(
+            "POST",
+            "/site/impressum",
+            Some(&answer),
+            &[],
+            net::Credentials::Omit,
+        )
+        .await
+        .ok()?;
         match status {
             200 => return decode(&blob),
             409 | 410 => {}

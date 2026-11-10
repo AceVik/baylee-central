@@ -1,7 +1,23 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page, test } from "@playwright/test";
 
-const PAGES = ["", "download", "gateways", "faq", "contact", "impressum", "privacy", "terms", "fan-content", "nope"];
+const PAGES = [
+  "",
+  "download",
+  "gateways",
+  "faq",
+  "contact",
+  "impressum",
+  "privacy",
+  "terms",
+  "fan-content",
+  "signin",
+  "register",
+  "account",
+  "account/security",
+  "account/privacy",
+  "nope",
+];
 const LANGS = ["en", "de"];
 const WIDTHS = [320, 375, 768, 1024, 1440, 2560];
 
@@ -44,9 +60,16 @@ async function targets(page: Page): Promise<string[]> {
       const rect = element.getBoundingClientRect();
       if (rect.width === 0 || rect.height === 0 || getComputedStyle(element).visibility === "hidden") continue;
       // WCAG 2.5.8's inline exception: a link in a sentence.
-      if (element.matches("a") && element.closest("p, li, dd, td, figcaption, blockquote") && !element.matches(".button, .tool")) {
-        const block = element.closest("p, li, dd, td, figcaption, blockquote");
+      const sentence = "p, li, dd, td, figcaption, blockquote, label";
+      if (element.matches("a") && element.closest(sentence) && !element.matches(".button, .tool")) {
+        const block = element.closest(sentence);
         if (block && block.textContent && block.textContent.trim() !== element.textContent?.trim()) continue;
+      }
+      // A checkbox's target is the box and its label together.
+      if (element.matches("input[type=checkbox], input[type=radio]") && element.id) {
+        const label = document.querySelector<HTMLElement>(`label[for="${element.id}"]`);
+        const area = label?.getBoundingClientRect();
+        if (area && area.height >= 44 - 0.5) continue;
       }
       if (element.closest(".trap")) continue;
       if (rect.width < 44 - 0.5 || rect.height < 44 - 0.5) {

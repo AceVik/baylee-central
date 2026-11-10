@@ -466,3 +466,171 @@ baylee-photo7 = Snuggled up in her red recovery suit.
 baylee-photo8 = A sunny spot in a cardboard box.
 baylee-photo9 = Tucked in and completely relaxed.
 baylee-photo10 = Her favourite place: right beside us.
+
+## Errors shared by the forms
+
+error-busy = Too many attempts just now. Wait a minute and try again.
+error-unavailable = Baylee Central does not answer just now. Try again in a moment.
+error-network = No connection. Check your network and try again.
+error-failed = Something went wrong. Try again; if it keeps happening, tell us.
+error-again = Try again
+password-show = Show
+
+## Signing in
+
+signin-title = Sign in
+signin-lead = Your Baylee account, for online tables, contacts and the chat.
+signin-name = Sign-in name
+signin-password = Password
+signin-submit = Sign in
+signin-missing = Enter your sign-in name and password.
+signin-working = Securing your password … this takes a moment and happens only in your browser.
+signin-wrong = That sign-in name and password do not match. Check both and try again.
+signin-not-moved = This account has not moved to Baylee Central yet. Sign in once with the Baylee client; it moves your account.
+signin-no-account = No account yet? <register>Create one</register>.
+signin-noscript = Signing in needs JavaScript: your password is processed in your browser and never sent to us.
+
+## Registering
+
+register-title = Create an account
+register-lead = For online tables, contacts and the chat. You need a beta key while Baylee is in its beta.
+register-key = Beta key
+register-key-hint = As you received it, like CENTRAL-XXXX-XXXX-XXXX-XXXX.
+register-name = Sign-in name
+register-name-hint = Private, only for signing in: 3 to 24 lowercase letters, digits, dots, dashes or underscores.
+register-display = Display name
+register-display-hint = How other players see you: 3 to 16 letters, digits, - and _. Your tag is drawn for you.
+register-password = Password
+register-password-hint = 8 characters at least. A long sentence is easy to remember and hard to guess.
+register-repeat = Password again
+register-repeat-hint = The same once more, to catch a typo.
+register-age = I am 16 or older.
+register-consent = I accept the <terms>terms of use</terms> and have read the <privacy>privacy notice</privacy>.
+register-submit = Create account
+register-error-key = Enter your beta key.
+register-error-key-refused = This beta key is not valid, used up or expired.
+register-error-name = The sign-in name needs 3 to 24 lowercase letters, digits, dots, dashes or underscores.
+register-error-display = The display name needs 3 to 16 letters or digits; - and _ only inside.
+register-error-reserved = This display name is reserved. Choose another.
+register-error-short = The password needs 8 characters at least.
+register-error-long = The password is too long.
+register-error-repeat = The two passwords are not the same.
+register-error-age = You need to be 16 or older to have an account.
+register-error-consent = Accept the terms of use to create an account.
+register-error-taken = This sign-in name is taken. Choose another.
+
+## The recovery code
+
+code-title = Your recovery code
+code-handle = Your handle: { $handle }
+code-lead = This code is your only way back in if you forget your password. We cannot reset your password for you. Keep it somewhere safe, away from this device.
+code-shown-once = Shown only now
+code-download = Save as a text file
+code-kept = I have saved my recovery code
+code-not-kept = Save the code first, then confirm it.
+code-continue = Continue
+code-later = Not now
+
+## Central's terms
+
+terms-step-title = New terms of use
+terms-step-lead = Baylee Central's terms changed. Read them and accept them to use your account; you can also decline and sign out.
+terms-accept = Accept
+terms-decline = Decline and sign out
+
+## The signed-in area
+
+account-lead = Your Baylee account: profile, security, privacy and gateways.
+account-nav = Your account
+account-home = Overview
+account-profile = Profile
+account-profile-lead = Your handle, your display name and your recovery code.
+account-security = Security
+account-security-lead = Where you are signed in, and signing out.
+account-privacy = Privacy and data
+account-privacy-lead = Export your data or delete your account.
+account-gateways = Gateways and tokens
+account-gateways-lead = Gateways you registered and the tokens they sign in with.
+account-loading = Loading …
+account-signed-out = You are not signed in.
+account-unnamed = Your account
+account-signin-name = Sign-in name: { $name }
+account-until = Signed in until { $time }
+account-needs-title = Needs you
+account-needs-code = Make a recovery code
+account-needs-name = Choose your display name
+account-admin = Administration
+
+reauth-lead = This needs a recent sign-in. Enter your sign-in name and password once more.
+reauth-submit = Sign in again
+
+profile-who-title = Who you are
+profile-handle = Handle
+profile-signin-name = Sign-in name
+profile-source = Account
+profile-source-moved = Moved from the official gateway
+profile-source-registered = Registered on this site
+profile-choose-title = Choose your display name
+profile-choose-submit = Save display name
+profile-name-taken = This account has a display name already.
+profile-code-title = Recovery code
+profile-code-kept = Your account has a recovery code. Keep it safe; it is the only way back in without your password.
+profile-code-missing = Your account has no recovery code yet. Make one: it needs your password once more.
+profile-code-make = Make a recovery code
+
+security-sessions = Where you are signed in
+security-lead = Baylee Central keeps one session for this website and one for the game client; it knows no devices.
+security-kind-browser = This website
+security-kind-client = The Baylee client
+security-this = This one
+security-signed-in = Signed in
+security-ends = Ends
+security-gateways = At gateways
+security-end-client = Sign the client out
+security-client-ended = The client is signed out.
+security-sign-out = Sign out here
+security-password-title = Password
+security-password-later = Changing your password on the website comes with the next step; until then, change it in the Baylee client.
+
+privacy-export-title = Export your data
+privacy-export-lead = Everything Baylee Central stores about your account, as a JSON file. It needs a sign-in less than 30 minutes old.
+privacy-export-make = Prepare the export
+privacy-export-save = Save the export
+privacy-delete-title = Delete your account
+privacy-delete-lead = Your account, its data, its sessions and the gateways you own are deleted at once and for good. Messages you sent stay with those who received them.
+privacy-delete-start = Delete my account
+privacy-delete-password = Your password, to confirm
+privacy-delete-prove = Continue
+privacy-delete-last = Last step: this cannot be undone. You have one minute.
+privacy-delete-gateways = These gateways you own are deleted with it:
+privacy-delete-confirm = Delete account for good
+privacy-delete-cancel = Keep my account
+privacy-deleted = Your account is deleted.
+
+gateways-none = You have not registered a gateway. Most players never need one.
+gateways-add-title = Register a gateway
+gateways-origin = Its address
+gateways-origin-hint = The gateway's https address, like https://play.example.org.
+gateways-name = Its name
+gateways-add = Register gateway
+gateways-added = The gateway is registered and waits for an administrator's approval.
+gateways-taken = This address is registered already.
+gateways-invalid = Enter an https address without a path, and a name.
+gateways-approved = Approved
+gateways-pending = Awaiting approval
+gateways-disabled = Disabled
+tokens-title = Tokens
+tokens-name = Token name
+tokens-days = Days it lives
+tokens-sso = Signs players in
+tokens-listing = Lists the gateway
+tokens-both = signs players in and lists the gateway
+tokens-make = Make a token
+tokens-revoke = Revoke
+tokens-revoked = Revoked
+tokens-revoked-now = The token is revoked.
+tokens-until = Until { $time }
+tokens-invalid = Give the token a name and at least one thing it allows.
+tokens-shown-title = Your new token
+tokens-kept = I have kept it
+tokens-again = Signed in again. Make the token once more.

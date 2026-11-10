@@ -389,6 +389,44 @@ pub struct Gateway {
     pub official: bool,
 }
 
+/// A page of the signed-in area (`/{lang}/account/…`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum Section {
+    /// `/account`: the handle and what needs the person.
+    Home,
+    /// `/account/profile`: the display name and the recovery code.
+    Profile,
+    /// `/account/security`: the sessions, signing out.
+    Security,
+    /// `/account/privacy`: the export and the deletion.
+    Privacy,
+    /// `/account/gateways`: registered gateways and their tokens.
+    Gateways,
+}
+
+impl Section {
+    /// Every section, in the navigation's order.
+    pub const ALL: [Section; 5] = [
+        Section::Home,
+        Section::Profile,
+        Section::Security,
+        Section::Privacy,
+        Section::Gateways,
+    ];
+
+    /// The path after `/{lang}/`.
+    #[must_use]
+    pub const fn slug(self) -> &'static str {
+        match self {
+            Section::Home => "account",
+            Section::Profile => "account/profile",
+            Section::Security => "account/security",
+            Section::Privacy => "account/privacy",
+            Section::Gateways => "account/gateways",
+        }
+    }
+}
+
 /// The repository's state for the home page's status strip.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Repo {

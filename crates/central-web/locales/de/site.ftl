@@ -467,3 +467,171 @@ baylee-photo7 = Geborgen im roten Body.
 baylee-photo8 = Ein Sonnenplatz im Karton.
 baylee-photo9 = Eingekuschelt und ganz entspannt.
 baylee-photo10 = Ihr Lieblingsplatz: ganz nah bei uns.
+
+## Fehler, die die Formulare teilen
+
+error-busy = Gerade zu viele Versuche. Warte eine Minute und versuch es noch einmal.
+error-unavailable = Baylee Central antwortet gerade nicht. Versuch es gleich noch einmal.
+error-network = Keine Verbindung. Prüf dein Netz und versuch es noch einmal.
+error-failed = Etwas ist schiefgegangen. Versuch es noch einmal; wenn es bleibt, sag uns Bescheid.
+error-again = Noch einmal versuchen
+password-show = Zeigen
+
+## Anmelden
+
+signin-title = Anmelden
+signin-lead = Dein Baylee-Account, für Online-Tische, Kontakte und den Chat.
+signin-name = Anmeldename
+signin-password = Passwort
+signin-submit = Anmelden
+signin-missing = Gib deinen Anmeldenamen und dein Passwort ein.
+signin-working = Dein Passwort wird gesichert … das dauert einen Moment und passiert nur in deinem Browser.
+signin-wrong = Anmeldename und Passwort passen nicht zusammen. Prüfe beides und versuch es noch einmal.
+signin-not-moved = Dieser Account ist noch nicht zu Baylee Central umgezogen. Melde dich einmal im Baylee-Client an; er zieht deinen Account um.
+signin-no-account = Noch keinen Account? <register>Leg einen an</register>.
+signin-noscript = Anmelden braucht JavaScript: Dein Passwort wird in deinem Browser verarbeitet und nie an uns gesendet.
+
+## Registrieren
+
+register-title = Account anlegen
+register-lead = Für Online-Tische, Kontakte und den Chat. Solange Baylee in der Beta ist, brauchst du einen Beta-Key.
+register-key = Beta-Key
+register-key-hint = So, wie du ihn bekommen hast, etwa CENTRAL-XXXX-XXXX-XXXX-XXXX.
+register-name = Anmeldename
+register-name-hint = Privat, nur zum Anmelden: 3 bis 24 Kleinbuchstaben, Ziffern, Punkte, Binde- oder Unterstriche.
+register-display = Anzeigename
+register-display-hint = So sehen dich andere Spieler: 3 bis 16 Buchstaben, Ziffern, - und _. Dein Tag wird für dich gezogen.
+register-password = Passwort
+register-password-hint = Mindestens 8 Zeichen. Ein langer Satz ist leicht zu merken und schwer zu erraten.
+register-repeat = Passwort wiederholen
+register-repeat-hint = Dasselbe noch einmal, gegen Tippfehler.
+register-age = Ich bin mindestens 16 Jahre alt.
+register-consent = Ich akzeptiere die <terms>Nutzungsbedingungen</terms> und habe die <privacy>Datenschutzerklärung</privacy> gelesen.
+register-submit = Account anlegen
+register-error-key = Gib deinen Beta-Key ein.
+register-error-key-refused = Dieser Beta-Key ist ungültig, aufgebraucht oder abgelaufen.
+register-error-name = Der Anmeldename braucht 3 bis 24 Kleinbuchstaben, Ziffern, Punkte, Binde- oder Unterstriche.
+register-error-display = Der Anzeigename braucht 3 bis 16 Buchstaben oder Ziffern; - und _ nur innen.
+register-error-reserved = Dieser Anzeigename ist reserviert. Wähle einen anderen.
+register-error-short = Das Passwort braucht mindestens 8 Zeichen.
+register-error-long = Das Passwort ist zu lang.
+register-error-repeat = Die beiden Passwörter sind nicht gleich.
+register-error-age = Für einen Account musst du mindestens 16 sein.
+register-error-consent = Akzeptiere die Nutzungsbedingungen, um einen Account anzulegen.
+register-error-taken = Dieser Anmeldename ist vergeben. Wähle einen anderen.
+
+## Der Wiederherstellungscode
+
+code-title = Dein Wiederherstellungscode
+code-handle = Dein Handle: { $handle }
+code-lead = Dieser Code ist dein einziger Weg zurück, wenn du dein Passwort vergisst. Wir können dein Passwort nicht für dich zurücksetzen. Bewahre ihn sicher auf, nicht auf diesem Gerät.
+code-shown-once = Nur jetzt sichtbar
+code-download = Als Textdatei speichern
+code-kept = Ich habe meinen Wiederherstellungscode gesichert
+code-not-kept = Sichere zuerst den Code und bestätige es dann.
+code-continue = Weiter
+code-later = Nicht jetzt
+
+## Die Nutzungsbedingungen von Central
+
+terms-step-title = Neue Nutzungsbedingungen
+terms-step-lead = Die Nutzungsbedingungen von Baylee Central haben sich geändert. Lies sie und akzeptiere sie, um deinen Account zu nutzen; du kannst auch ablehnen und dich abmelden.
+terms-accept = Akzeptieren
+terms-decline = Ablehnen und abmelden
+
+## Der Account-Bereich
+
+account-lead = Dein Baylee-Account: Profil, Sicherheit, Datenschutz und Gateways.
+account-nav = Dein Account
+account-home = Übersicht
+account-profile = Profil
+account-profile-lead = Dein Handle, dein Anzeigename und dein Wiederherstellungscode.
+account-security = Sicherheit
+account-security-lead = Wo du angemeldet bist, und abmelden.
+account-privacy = Datenschutz und Daten
+account-privacy-lead = Exportiere deine Daten oder lösche deinen Account.
+account-gateways = Gateways und Tokens
+account-gateways-lead = Gateways, die du registriert hast, und die Tokens, mit denen sie anmelden.
+account-loading = Wird geladen …
+account-signed-out = Du bist nicht angemeldet.
+account-unnamed = Dein Account
+account-signin-name = Anmeldename: { $name }
+account-until = Angemeldet bis { $time }
+account-needs-title = Braucht dich
+account-needs-code = Wiederherstellungscode anlegen
+account-needs-name = Anzeigenamen wählen
+account-admin = Administration
+
+reauth-lead = Dafür braucht es eine frische Anmeldung. Gib deinen Anmeldenamen und dein Passwort noch einmal ein.
+reauth-submit = Erneut anmelden
+
+profile-who-title = Wer du bist
+profile-handle = Handle
+profile-signin-name = Anmeldename
+profile-source = Account
+profile-source-moved = Vom offiziellen Gateway umgezogen
+profile-source-registered = Auf dieser Seite registriert
+profile-choose-title = Wähle deinen Anzeigenamen
+profile-choose-submit = Anzeigenamen speichern
+profile-name-taken = Dieser Account hat schon einen Anzeigenamen.
+profile-code-title = Wiederherstellungscode
+profile-code-kept = Dein Account hat einen Wiederherstellungscode. Bewahre ihn sicher auf; er ist ohne Passwort der einzige Weg zurück.
+profile-code-missing = Dein Account hat noch keinen Wiederherstellungscode. Leg einen an: Dafür brauchst du dein Passwort noch einmal.
+profile-code-make = Wiederherstellungscode anlegen
+
+security-sessions = Wo du angemeldet bist
+security-lead = Baylee Central führt eine Sitzung für diese Website und eine für den Spiel-Client; Geräte kennt es nicht.
+security-kind-browser = Diese Website
+security-kind-client = Der Baylee-Client
+security-this = Diese hier
+security-signed-in = Angemeldet
+security-ends = Endet
+security-gateways = Bei Gateways
+security-end-client = Client abmelden
+security-client-ended = Der Client ist abgemeldet.
+security-sign-out = Hier abmelden
+security-password-title = Passwort
+security-password-later = Das Passwort auf der Website zu ändern kommt mit dem nächsten Schritt; bis dahin änderst du es im Baylee-Client.
+
+privacy-export-title = Deine Daten exportieren
+privacy-export-lead = Alles, was Baylee Central über deinen Account speichert, als JSON-Datei. Dafür braucht es eine Anmeldung, die weniger als 30 Minuten her ist.
+privacy-export-make = Export vorbereiten
+privacy-export-save = Export speichern
+privacy-delete-title = Deinen Account löschen
+privacy-delete-lead = Dein Account, seine Daten, seine Sitzungen und die Gateways, die dir gehören, werden sofort und endgültig gelöscht. Nachrichten, die du gesendet hast, bleiben bei denen, die sie erhalten haben.
+privacy-delete-start = Meinen Account löschen
+privacy-delete-password = Dein Passwort, zur Bestätigung
+privacy-delete-prove = Weiter
+privacy-delete-last = Letzter Schritt: Das lässt sich nicht rückgängig machen. Du hast eine Minute.
+privacy-delete-gateways = Diese Gateways, die dir gehören, werden mit gelöscht:
+privacy-delete-confirm = Account endgültig löschen
+privacy-delete-cancel = Account behalten
+privacy-deleted = Dein Account ist gelöscht.
+
+gateways-none = Du hast kein Gateway registriert. Die meisten Spieler brauchen nie eins.
+gateways-add-title = Ein Gateway registrieren
+gateways-origin = Seine Adresse
+gateways-origin-hint = Die https-Adresse des Gateways, etwa https://play.example.org.
+gateways-name = Sein Name
+gateways-add = Gateway registrieren
+gateways-added = Das Gateway ist registriert und wartet auf die Freigabe durch einen Administrator.
+gateways-taken = Diese Adresse ist schon registriert.
+gateways-invalid = Gib eine https-Adresse ohne Pfad und einen Namen ein.
+gateways-approved = Freigegeben
+gateways-pending = Wartet auf Freigabe
+gateways-disabled = Abgeschaltet
+tokens-title = Tokens
+tokens-name = Name des Tokens
+tokens-days = Gültig für Tage
+tokens-sso = Meldet Spieler an
+tokens-listing = Führt das Gateway im Verzeichnis
+tokens-both = meldet Spieler an und führt das Gateway im Verzeichnis
+tokens-make = Token erstellen
+tokens-revoke = Widerrufen
+tokens-revoked = Widerrufen
+tokens-revoked-now = Der Token ist widerrufen.
+tokens-until = Bis { $time }
+tokens-invalid = Gib dem Token einen Namen und mindestens eine Sache, die er erlaubt.
+tokens-shown-title = Dein neuer Token
+tokens-kept = Ich habe ihn gesichert
+tokens-again = Erneut angemeldet. Erstelle den Token noch einmal.

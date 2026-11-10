@@ -5,6 +5,7 @@ use leptos::prelude::*;
 use super::shell::{self, Meta};
 use super::{Context, Page};
 
+mod account;
 mod download;
 mod errors;
 mod home;
@@ -23,6 +24,9 @@ pub fn document(page: Page, cx: &Context<'_>) -> impl IntoView + use<> {
         Page::Privacy => legal::privacy(cx),
         Page::Terms => legal::terms(cx),
         Page::FanContent => legal::fan_content(cx),
+        Page::SignIn => account::sign_in(cx),
+        Page::Register => account::register(cx),
+        Page::Account(section) => account::area(cx, section),
         Page::NotFound => errors::not_found(cx),
         Page::Gone => errors::gone(cx),
     };
