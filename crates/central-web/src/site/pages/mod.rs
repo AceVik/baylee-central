@@ -29,6 +29,7 @@ pub fn document(page: Page, cx: &Context<'_>) -> impl IntoView + use<> {
         Page::Account(section) => account::area(cx, section),
         Page::NotFound => errors::not_found(cx),
         Page::Gone => errors::gone(cx),
+        Page::Offline => errors::offline(cx),
     };
     shell::document(page, cx, &meta, body)
 }

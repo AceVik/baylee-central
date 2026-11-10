@@ -1,12 +1,21 @@
 // baylee.app's service worker, at the origin's root so its scope stays "/"
-// and an installed app stays the same app (docs/notifications.md).
+// and an installed app stays the same app (docs/notifications.md,
+// docs/proposals/frontend-rewrite.md §7).
 //
-// It caches nothing yet (the offline page and the update prompt come with
-// the chat; docs/proposals/frontend-rewrite.md §7) and removes the previous
-// site's caches ("baylee-public-*"). It keeps the push protocol exactly:
-// a push carries only {v:1, kind, nonce, lang}; it is shown only while this
-// browser's opt-in (IndexedDB "baylee-push"/"settings", written by the page
-// with PUSH_STATE) names the same random nonce and the kind is switched on.
+// It keeps one cache per build ("baylee-site-<build>", written by
+// `cargo xtask site` over the two placeholders below): the offline page in
+// both languages and the hashed files it needs, then every hashed asset as
+// it is fetched. Hashed files never change, so they come from the cache
+// first; pages always come from the network, and only when there is none
+// the offline page answers in the address's language. /api and /site are
+// never touched. A new build waits until a page says to go ahead
+// (SKIP_WAITING, after the visitor chose to reload); the previous site's
+// caches ("baylee-public-*") and older builds' go when it starts.
+//
+// It keeps the push protocol exactly: a push carries only
+// {v:1, kind, nonce, lang}; it is shown only while this browser's opt-in
+// (IndexedDB "baylee-push"/"settings", written by the page with
+// PUSH_STATE) names the same random nonce and the kind is switched on.
 // Text is fixed per kind; no name or message ever arrives here.
 "use strict";
 
@@ -67,22 +76,57 @@ function state(write, value) {
   });
 }
 
+const BUILD = "__BUILD__";
+const CACHE = `baylee-site-${BUILD}`;
+const OFFLINE = ["/en/offline", "/de/offline"];
+const ASSETS = /* the offline page's files */ [];
+const HASHED = /^\/assets\/(?:[\w-]+\/)*[\w.-]+\.[0-9a-f]{12}\.[a-z0-9]+$/;
+
 self.addEventListener("install", (event) => {
-  event.waitUntil(self.skipWaiting());
+  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll([...OFFLINE, ...ASSETS])));
 });
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     (async () => {
       const keys = await caches.keys();
-      await Promise.all(keys.filter((key) => key.startsWith("baylee-public-")).map((key) => caches.delete(key)));
+      const old = keys.filter((key) => key.startsWith("baylee-public-") || (key.startsWith("baylee-site-") && key !== CACHE));
+      await Promise.all(old.map((key) => caches.delete(key)));
       await self.clients.claim();
     })(),
   );
 });
 
+self.addEventListener("fetch", (event) => {
+  const request = event.request;
+  if (request.method !== "GET") return;
+  const url = new URL(request.url);
+  if (url.origin !== self.location.origin) return;
+  if (request.mode === "navigate") {
+    const offline = url.pathname.startsWith("/de/") || url.pathname === "/de" ? "/de/offline" : "/en/offline";
+    event.respondWith(
+      fetch(request).catch(async () => (await caches.match(offline, { cacheName: CACHE })) ?? Response.error()),
+    );
+    return;
+  }
+  if (!HASHED.test(url.pathname)) return;
+  event.respondWith(
+    caches.open(CACHE).then(async (cache) => {
+      const kept = await cache.match(request);
+      if (kept) return kept;
+      const answer = await fetch(request);
+      if (answer.ok && answer.type === "basic") await cache.put(request, answer.clone());
+      return answer;
+    }),
+  );
+});
+
 self.addEventListener("message", (event) => {
   if (!event.source || new URL(event.source.url).origin !== self.location.origin) return;
+  if (event.data?.type === "SKIP_WAITING") {
+    event.waitUntil(self.skipWaiting());
+    return;
+  }
   if (event.data?.type !== "PUSH_STATE") return;
   const { nonce, enabled } = event.data;
   if (

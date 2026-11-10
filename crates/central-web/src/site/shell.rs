@@ -177,6 +177,7 @@ fn head(page: Page, cx: &Context<'_>, meta: &Meta) -> impl IntoView + use<> {
             {font("fonts/Faustina.woff2")}
             <link rel="stylesheet" href=assets.url("site.css") integrity=assets.integrity("site.css") />
             <script src=assets.url("boot.js") integrity=assets.integrity("boot.js")></script>
+            <script type="module" src=assets.url("pwa.js") integrity=assets.integrity("pwa.js")></script>
             {islands}
             <link rel="icon" href="/favicon.ico" sizes="32x32" />
             <link rel="icon" href=assets.url("img/icon.svg") type="image/svg+xml" />
@@ -217,6 +218,7 @@ pub fn document(page: Page, cx: &Context<'_>, meta: &Meta, body: AnyView) -> imp
                     {footer(page, cx)}
                 </div>
                 {dock(page, cx)}
+                {update(lang)}
             </body>
         </html>
     }
@@ -225,7 +227,7 @@ pub fn document(page: Page, cx: &Context<'_>, meta: &Meta, body: AnyView) -> imp
 /// The address of the same page in `lang`.
 fn translated(page: Page, lang: Lang) -> String {
     match page {
-        Page::NotFound | Page::Gone => Page::Home.path(lang),
+        Page::NotFound | Page::Gone | Page::Offline => Page::Home.path(lang),
         _ => page.path(lang),
     }
 }
@@ -427,5 +429,18 @@ fn dock(page: Page, cx: &Context<'_>) -> impl IntoView + use<> {
                 <li><a href=Page::FanContent.path(lang)>{words::title_fan_content(lang)}</a></li>
             </ul>
         </div>
+    }
+}
+
+/// The update offer: hidden until `pwa.js` finds a new version waiting.
+/// The polite status beside it says so once.
+fn update(lang: Lang) -> impl IntoView + use<> {
+    view! {
+        <div id="update" class="update" hidden>
+            <p>{words::update_ready(lang)}</p>
+            <p class="update-unsent" hidden>{words::update_unsent(lang)}</p>
+            <button type="button" class="button primary" data-update>{words::update_reload(lang)}</button>
+        </div>
+        <p id="update-said" class="visually-hidden" role="status" data-said=words::update_ready(lang)></p>
     }
 }

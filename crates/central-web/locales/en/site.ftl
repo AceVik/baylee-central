@@ -755,3 +755,33 @@ people-unblock = Unblock
 people-keep = Keep
 people-confirm-remove = Remove { $who } from your contacts? Your messages stay.
 people-confirm-block = Block { $who }? They can no longer ask to be your contact or write to you.
+
+## Offline, updates, installing
+
+title-offline = Offline
+offline-title = You are offline
+offline-lead = This page needs a connection. Nothing is lost: Central keeps your messages until you are back.
+offline-again = Try again
+update-ready = A new version of baylee.app is ready.
+update-unsent = You have text here that is not sent yet. Reload anyway?
+update-reload = Reload
+install-app = Install as an app
+
+## Notifications
+
+push-title = Notifications
+push-lead = Choose what Baylee may notify you about. Notifications show no message text, names or report contents.
+push-device = Notifications on this device
+push-categories = Notify me about
+push-chat = Chat messages
+push-contacts = Contact requests
+push-updates = New versions
+push-feedback = Feedback reports (administrators)
+push-gateways = Gateway applications (administrators)
+push-on = Enabled on this device. Only the selected categories are delivered.
+push-off = Disabled on this device. Your category choices are kept.
+push-scope = Category choices apply to your account. Device permission is separate on each browser. Signing out disconnects this device.
+push-failed = The change could not be confirmed. Please try again.
+push-denied = Notifications are blocked. You can allow them in your browser or device settings and try again.
+push-unsupported = This browser does not offer Web Push here. On iPhone and iPad, add Baylee to the Home Screen and open it there.
+push-unconfigured = Background notifications are not available on this server yet. Your preferences can already be saved.

@@ -39,7 +39,7 @@ pub const STYLES: [&str; 7] = [
 ];
 
 /// The scripts served under hashed names.
-const SCRIPTS: [&str; 2] = ["boot.js", "pow-worker.js"];
+const SCRIPTS: [&str; 3] = ["boot.js", "pwa.js", "pow-worker.js"];
 
 const TARGET: &str = "wasm32-unknown-unknown";
 const PROFILE: &str = "islands";
@@ -87,7 +87,8 @@ pub(crate) fn run(root: &Path) -> Result<()> {
         fs::copy(web.join("assets").join(name), out.join(name))
             .or_fail("a root file is missing")?;
     }
-    fs::copy(web.join("js/sw.js"), out.join("sw.js")).or_fail("the service worker is missing")?;
+    let worker = service_worker(&web.join("js/sw.js"), &site.files)?;
+    fs::write(out.join("sw.js"), worker).or_fail("sw.js could not be written")?;
     fs::write(out.join("notices.txt"), notices(root)?)
         .or_fail("notices.txt could not be written")?;
     compress(&out)?;
@@ -153,6 +154,56 @@ impl Site {
         out.push_str(rest);
         Ok(out)
     }
+}
+
+/// The service worker with this build's stamp and the files the offline
+/// page needs: the stylesheet, the scripts every page loads, the fonts and
+/// the icon. The stamp is the digest of every asset's address, so a build
+/// that changes any file installs as a new service worker.
+fn service_worker(source: &Path, files: &BTreeMap<String, Value>) -> Result<String> {
+    let text = fs::read_to_string(source).or_fail("the service worker is missing")?;
+    let url = |name: &str| -> Result<String> {
+        files
+            .get(name)
+            .and_then(|f| f.get("url"))
+            .and_then(Value::as_str)
+            .map(str::to_owned)
+            .or_fail("an asset the offline page needs is missing")
+    };
+    let mut offline = vec![
+        url("site.css")?,
+        url("boot.js")?,
+        url("pwa.js")?,
+        url("img/icon.svg")?,
+    ];
+    let font = |name: &&String| {
+        name.starts_with("fonts/")
+            && Path::new(name.as_str())
+                .extension()
+                .is_some_and(|e| e.eq_ignore_ascii_case("woff2"))
+    };
+    for name in files.keys().filter(font) {
+        offline.push(url(name)?);
+    }
+    let every: String = files
+        .values()
+        .filter_map(|f| f.get("url").and_then(Value::as_str))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let build = &random::to_hex(&Sha256::digest(every.as_bytes()))[..16];
+    let assets =
+        serde_json::to_string(&offline).or_fail("the offline list could not be written")?;
+    let stamped = text
+        .replacen("\"__BUILD__\"", &format!("\"{build}\""), 1)
+        .replacen(
+            "/* the offline page's files */ []",
+            &format!("/* the offline page's files */ {assets}"),
+            1,
+        );
+    if stamped.contains("__BUILD__") || !stamped.contains(&assets) {
+        return Err(Fail::new("the service worker's placeholders changed"));
+    }
+    Ok(stamped)
 }
 
 fn base64(bytes: &[u8]) -> String {

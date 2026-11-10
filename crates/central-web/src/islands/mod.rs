@@ -13,6 +13,7 @@ mod contact;
 mod crypto;
 mod impressum;
 pub(crate) mod net;
+mod push;
 mod session;
 #[cfg(target_arch = "wasm32")]
 mod trusted;

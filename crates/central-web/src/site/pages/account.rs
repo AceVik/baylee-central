@@ -83,6 +83,7 @@ fn section_name(lang: Lang, section: Section) -> (&'static str, &'static str) {
         Section::Security => (words::account_security(lang), icons::SHIELD),
         Section::Privacy => (words::account_privacy(lang), icons::FILE_TEXT),
         Section::Gateways => (words::account_gateways(lang), icons::SERVER),
+        Section::Notifications => (words::push_title(lang), icons::BELL),
     }
 }
 
@@ -121,6 +122,12 @@ pub fn area(cx: &Context<'_>, section: Section) -> Built {
         <div class="frame" class:frame-messenger=messenger>
             <nav class="frame-nav" aria-label=words::account_nav(lang)>
                 <ul>{links}</ul>
+                // shown by pwa.js where the browser offers to install the app
+                <p class="install" data-install-box hidden>
+                    <button type="button" class="button" data-install>
+                        {icon(icons::DOWNLOAD)}<span>{words::install_app(lang)}</span>
+                    </button>
+                </p>
             </nav>
             <div class="frame-main">
                 <h1 class=messenger.then_some("visually-hidden")>{title}</h1>

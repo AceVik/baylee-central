@@ -45,6 +45,8 @@ pub enum Page {
     NotFound,
     /// A path the site had and removed for good (410).
     Gone,
+    /// `/{lang}/offline`: what the service worker shows without a network.
+    Offline,
 }
 
 impl Page {
@@ -67,6 +69,7 @@ impl Page {
     pub const fn slug(self) -> &'static str {
         match self {
             Page::Home | Page::NotFound | Page::Gone => "",
+            Page::Offline => "offline",
             Page::SignIn => "signin",
             Page::Register => "register",
             Page::Account(section) => section.slug(),
@@ -86,7 +89,7 @@ impl Page {
     pub fn from_slug(slug: &str) -> Option<Page> {
         Page::LISTED
             .into_iter()
-            .chain([Page::SignIn, Page::Register])
+            .chain([Page::SignIn, Page::Register, Page::Offline])
             .chain(Section::ALL.map(Page::Account))
             .find(|page| page.slug() == slug)
     }
@@ -100,6 +103,7 @@ impl Page {
             Page::Impressum
                 | Page::NotFound
                 | Page::Gone
+                | Page::Offline
                 | Page::SignIn
                 | Page::Register
                 | Page::Account(_)

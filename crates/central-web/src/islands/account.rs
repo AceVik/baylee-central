@@ -101,6 +101,8 @@ fn when(lang: Lang, seconds: i64) -> String {
 /// Signs out here: Central ends the session and clears the cookie, the
 /// browser forgets the session's end and the chat's kept identity.
 async fn sign_out(worker: &str, lang: Lang) {
+    // this device stops getting the account's notifications first
+    let _ = super::push::disable().await;
     let _ = call(&Request::Logout).await;
     session::forget();
     if let Some(crypto) = Crypto::start(worker) {
@@ -804,6 +806,146 @@ fn gateways(lang: Lang, worker: String) -> AnyView {
     .into_any()
 }
 
+/// The account's categories, each a switch.
+fn push_switches(
+    lang: Lang,
+    admin: bool,
+    now: RwSignal<Option<Result<super::push::Now, Problem>>>,
+    busy: RwSignal<bool>,
+    error: RwSignal<Option<&'static str>>,
+) -> AnyView {
+    use super::push;
+
+    let switches = push::categories(admin)
+        .into_iter()
+        .map(|category| {
+            let id = format!("push-{}", push::bit(category));
+            let on = move || now.with(|n| matches!(n, Some(Ok(n)) if n.enabled & push::bit(category) != 0));
+            let change = move |event: leptos::ev::Event| {
+                let wanted = event_target_checked(&event);
+                let Some(Ok(current)) = now.get_untracked() else {
+                    return;
+                };
+                busy.set(true);
+                error.set(None);
+                leptos::task::spawn_local(async move {
+                    match push::set(&current, category, wanted).await {
+                        Ok(enabled) => now.update(|n| {
+                            if let Some(Ok(n)) = n {
+                                n.enabled = enabled;
+                            }
+                        }),
+                        Err(_) => error.set(Some(words::push_failed(lang))),
+                    }
+                    busy.set(false);
+                });
+            };
+            let name = match category {
+                central_api::notifications::Category::Chat => words::push_chat(lang),
+                central_api::notifications::Category::Contacts => words::push_contacts(lang),
+                central_api::notifications::Category::Updates => words::push_updates(lang),
+                central_api::notifications::Category::Feedback => words::push_feedback(lang),
+                central_api::notifications::Category::Gateways => words::push_gateways(lang),
+            };
+            view! {
+                <div class="check">
+                    <input id=id.clone() type="checkbox" role="switch" prop:checked=on on:change=change
+                        disabled=move || busy.get() || now.with(|n| !matches!(n, Some(Ok(_)))) />
+                    <label for=id>{name}</label>
+                </div>
+            }
+        })
+        .collect_view();
+    switches.into_any()
+}
+
+/// Web Push on this device and the account's categories.
+fn notifications(lang: Lang, admin: bool) -> AnyView {
+    use super::push::{self, Refusal};
+
+    let now = RwSignal::new(None::<Result<push::Now, Problem>>);
+    let busy = RwSignal::new(false);
+    let error = RwSignal::new(None::<&'static str>);
+    Effect::new(move |_| {
+        leptos::task::spawn_local(async move {
+            now.set(Some(push::load().await.map_err(Problem::from)));
+        });
+    });
+    let supported = push::browser::supported();
+    let active = move || now.with(|n| matches!(n, Some(Ok(n)) if n.active));
+    let key = move || {
+        now.with(|n| {
+            n.as_ref()
+                .and_then(|n| n.as_ref().ok())
+                .and_then(|n| n.public_key.clone())
+        })
+    };
+    let device = move |_| {
+        if busy.get_untracked() || !supported {
+            return;
+        }
+        error.set(None);
+        if active() {
+            busy.set(true);
+            leptos::task::spawn_local(async move {
+                if push::disable().await.is_err() {
+                    error.set(Some(words::push_failed(lang)));
+                }
+                now.update(|n| {
+                    if let Some(Ok(n)) = n {
+                        n.active = false;
+                    }
+                });
+                busy.set(false);
+            });
+            return;
+        }
+        let Some(public_key) = key() else {
+            return;
+        };
+        // the browser asks inside the click, before anything is awaited
+        let asked = push::browser::ask();
+        busy.set(true);
+        leptos::task::spawn_local(async move {
+            match push::enable(asked, lang, &public_key).await {
+                Ok(enabled) => now.update(|n| {
+                    if let Some(Ok(n)) = n {
+                        n.enabled = enabled;
+                        n.active = true;
+                    }
+                }),
+                Err(Refusal::Denied) => error.set(Some(words::push_denied(lang))),
+                Err(Refusal::Failed) => error.set(Some(words::push_failed(lang))),
+            }
+            busy.set(false);
+        });
+    };
+    let switches = push_switches(lang, admin, now, busy, error);
+    view! {
+        <section class="card" aria-labelledby="push-title">
+            <h2 id="push-title">{words::push_title(lang)}</h2>
+            <p>{words::push_lead(lang)}</p>
+            {(!supported).then(|| view! { <p class="meta">{words::push_unsupported(lang)}</p> })}
+            {move || matches!(now.get(), Some(Ok(ref n)) if n.public_key.is_none())
+                .then(|| view! { <p class="meta">{words::push_unconfigured(lang)}</p> })}
+            {move || matches!(now.get(), Some(Err(_))).then(|| view! { <p class="error" role="alert">{words::push_failed(lang)}</p> })}
+            <p class="error" role="alert">{move || error.get()}</p>
+            <div class="push-device">
+                <button type="button" class="button" role="switch" aria-checked=move || active().to_string()
+                    aria-disabled=move || (busy.get() || !supported || key().is_none()).then_some("true")
+                    on:click=device>{words::push_device(lang)}</button>
+                <p class="meta">{move || if active() { words::push_on(lang) } else { words::push_off(lang) }}</p>
+            </div>
+            <fieldset class="push-categories">
+                <legend>{words::push_categories(lang)}</legend>
+                {switches}
+            </fieldset>
+            <p class="meta">{words::push_scope(lang)}</p>
+        </section>
+    }
+    .into_any()
+}
+
 #[island]
 pub fn Account(lang: Lang, section: Section, worker: String) -> impl IntoView {
     let state = RwSignal::new(Load::Loading);
@@ -834,6 +976,7 @@ pub fn Account(lang: Lang, section: Section, worker: String) -> impl IntoView {
             Section::Security => security(lang, worker.clone()),
             Section::Privacy => privacy(lang, worker.clone()),
             Section::Gateways => gateways(lang, worker.clone()),
+            Section::Notifications => notifications(lang, summary.admin),
             // the messenger is its own island
             Section::Chat | Section::Contacts => ().into_any(),
         },

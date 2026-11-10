@@ -17,6 +17,7 @@ const PAGES = [
   "account/security",
   "account/chat",
   "account/contacts",
+  "account/notifications",
   "account/privacy",
   "nope",
 ];
