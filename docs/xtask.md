@@ -16,6 +16,7 @@ the gate starts never replace the running executable, which Windows refuses.
 | `cargo xtask smoke [--exercise-failure]` | the development listener's HTTP boundary ([dev mode](dev-mode.md)); build `--release` first | `scripts/smoke-dev.ps1` |
 | `cargo xtask secrets` | the secret scan of the tree and the full history, after the scanner's own regressions | `scripts/scan-secrets.ps1`, `scripts/test-secret-scanner.ps1` |
 | `cargo xtask wasm [--check]` | `central-web-crypto` built to WebAssembly with its wasm-bindgen glue, written to `web/src/central-wasm/`; `--check` requires the committed files to equal a fresh build | (new, 2026-10-21) |
+| `cargo xtask site` | the server-rendered site's assets into `target/site/` ([below](#the-sites-assets-site)) | (new, 2026-11-10) |
 
 `cargo xtask` is an alias (`.cargo/config.toml`) for
 `cargo run --locked --quiet -p xtask --`. The policy's regressions are
@@ -153,6 +154,38 @@ emulation of x86-64 (QEMU emulation crashed `rustc`), and `cargo xtask wasm
 --check` passed in the same container. The resulting WASM SHA-256 is
 `7983d3ec71c4702ab124660038d92a0a0b3f76c40bfa644e440fcc8574f46025`; CI's
 `wasm` job checks it again on its own runner.
+
+## The site's assets (`site`)
+
+The server-rendered website (`crates/central-web`, [the proposal](proposals/frontend-rewrite.md))
+is served by `central-web` from `target/site/`, which this task writes:
+
+- the islands: `central-web-islands` built for `wasm32-unknown-unknown`
+  under the `islands` profile (size-optimised, one codegen unit, LTO,
+  `panic = "abort"`), paths remapped as `wasm` remaps them (a module that
+  still names the repository or Cargo's home fails), then the pinned
+  wasm-bindgen CLI (the same 0.2.130 install as `wasm`); and
+  `crates/central-web/js/islands.js`, the bootstrap, with the hashed
+  addresses of the glue and the module written in;
+- the stylesheet: `crates/central-web/style/` joined in the order of
+  `site::STYLES`, every `url("/assets/<name>")` rewritten to the hashed
+  file (a missing one fails);
+- `boot.js` and `pow-worker.js`, the fonts and pictures of
+  `crates/central-web/assets/`;
+- every file under `/assets/<name>.<sha-256 prefix>.<ext>` and recorded in
+  `manifest.json` with its address and a `sha384-` Subresource Integrity
+  value; `/sw.js`, `/favicon.ico` and `/apple-touch-icon.png` at the root;
+- `notices.txt`: the fonts' and icons' licences and every crate in the
+  islands' module with its licence files, each text once;
+- Brotli and gzip copies of every text file where `brotli` and `gzip` are
+  on the `PATH` (without them, Caddy compresses);
+- with `BAYLEE_SRC` set to a Baylee checkout (the deploy hook has one), the
+  client's screenshots (`web/site/img/shot-*`) and a fallback card status
+  (`fallback/cards.json` from `web/site/data/sets.json` and the newest tag).
+  Both carry Wizards' material and never enter this repository.
+
+Unlike `wasm`, the output is not committed and not checked byte for byte:
+it is built where it is deployed.
 
 ## What the tasks guarantee
 

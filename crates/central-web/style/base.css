@@ -1,0 +1,189 @@
+/* The page itself: reset, type, links, focus, and the promises every page
+   keeps (reduced motion, forced colours, 320 px). */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+* {
+  margin: 0;
+}
+
+html {
+  /* Narrower viewports scroll sideways rather than breaking the layout;
+     at 320 px (WCAG's reflow width) nothing needs to. */
+  min-width: 320px;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  scroll-padding-block-start: calc(var(--bar-height) + var(--space-4));
+  background: var(--ground);
+}
+
+body {
+  min-block-size: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: var(--text-md);
+  line-height: var(--leading);
+  font-variant-numeric: oldstyle-nums proportional-nums;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+.page {
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
+}
+
+main {
+  flex: 1 0 auto;
+  outline: none;
+}
+
+h1,
+h2,
+h3 {
+  color: var(--title);
+  font-family: var(--font-prose);
+  font-weight: 600;
+  line-height: var(--leading-tight);
+  text-wrap: balance;
+}
+
+h1 {
+  font-size: var(--text-2xl);
+}
+
+h2 {
+  font-size: var(--text-xl);
+}
+
+h3 {
+  font-size: var(--text-lg);
+}
+
+p,
+li,
+dd {
+  text-wrap: pretty;
+}
+
+img,
+svg,
+picture {
+  display: block;
+  max-inline-size: 100%;
+  block-size: auto;
+}
+
+a {
+  color: var(--accent);
+  text-decoration-thickness: 0.08em;
+  text-underline-offset: 0.18em;
+}
+
+a:hover {
+  text-decoration-thickness: 0.14em;
+}
+
+code,
+kbd {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+}
+
+kbd {
+  padding: 0.05em 0.4em;
+  border: var(--hairline) solid var(--edge);
+  border-block-end-width: 0.125em;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+ul,
+ol {
+  padding-inline-start: 1.25em;
+}
+
+.num {
+  font-variant-numeric: lining-nums tabular-nums;
+}
+
+/* One focus ring everywhere: a gap in the ground, then the ring, 3:1 on
+   every surface including the gold button. */
+:focus-visible {
+  outline: 0.1875rem solid var(--focus);
+  outline-offset: 0.125rem;
+  box-shadow: 0 0 0 0.125rem var(--ground);
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--ground);
+}
+
+.skip {
+  position: absolute;
+  inset-inline-start: var(--space-4);
+  inset-block-start: var(--space-2);
+  z-index: 100;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-sm);
+  background: var(--action);
+  color: var(--on-action);
+  font-weight: 700;
+  transform: translateY(-200%);
+}
+
+.skip:focus-visible {
+  transform: none;
+}
+
+.visually-hidden {
+  position: absolute !important;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+/* Stillness (WCAG 2.3.3): no movement for those who asked for none. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0s !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0s !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Windows' high contrast: borders and the ring stay visible. */
+@media (forced-colors: active) {
+  :focus-visible {
+    outline-color: Highlight;
+  }
+
+  .button,
+  .card,
+  .pill,
+  .notice {
+    border: var(--hairline) solid CanvasText;
+  }
+
+  [aria-current="page"] {
+    outline: 0.125rem solid Highlight;
+  }
+}

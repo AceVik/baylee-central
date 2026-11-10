@@ -1,0 +1,548 @@
+//! The public data the pages show, read by the server (GitHub, Central's
+//! directory) and handed to the views: what a release offers, which file
+//! suits the visitor's machine, the card status, the gateways.
+
+use serde::{Deserialize, Serialize};
+
+/// A platform Baylee's client is built for.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+pub enum Platform {
+    /// Windows on x86-64.
+    WindowsX64,
+    /// Windows on ARM64.
+    WindowsArm64,
+    /// macOS on Apple silicon.
+    MacArm64,
+    /// macOS on an Intel processor.
+    MacX64,
+    /// Linux on x86-64.
+    LinuxX64,
+    /// Linux on ARM64.
+    LinuxArm64,
+}
+
+impl Platform {
+    /// Every platform, in the order the download page lists them.
+    pub const ALL: [Platform; 6] = [
+        Platform::WindowsX64,
+        Platform::WindowsArm64,
+        Platform::MacArm64,
+        Platform::MacX64,
+        Platform::LinuxX64,
+        Platform::LinuxArm64,
+    ];
+
+    /// A stable identifier for anchors and tests: `windows-x64`, `mac-arm64`.
+    #[must_use]
+    pub const fn slug(self) -> &'static str {
+        match self {
+            Platform::WindowsX64 => "windows-x64",
+            Platform::WindowsArm64 => "windows-arm64",
+            Platform::MacArm64 => "mac-arm64",
+            Platform::MacX64 => "mac-x64",
+            Platform::LinuxX64 => "linux-x64",
+            Platform::LinuxArm64 => "linux-arm64",
+        }
+    }
+
+    /// The operating system's family.
+    #[must_use]
+    pub const fn os(self) -> Os {
+        match self {
+            Platform::WindowsX64 | Platform::WindowsArm64 => Os::Windows,
+            Platform::MacArm64 | Platform::MacX64 => Os::Mac,
+            Platform::LinuxX64 | Platform::LinuxArm64 => Os::Linux,
+        }
+    }
+}
+
+/// An operating system family.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Os {
+    /// Windows.
+    Windows,
+    /// macOS.
+    Mac,
+    /// Linux.
+    Linux,
+}
+
+/// What kind of file a release asset is, in the order offered.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub enum Kind {
+    /// An installer (`.exe`, `.dmg`, `.AppImage`).
+    Installer,
+    /// A Debian package.
+    Deb,
+    /// An archive to unpack (`.zip`, `.tar.gz`).
+    Archive,
+    /// An archive built for processors without AVX2 (`-v2`), Baylee's
+    /// fallback for older x86-64 CPUs (Baylee `docs/releasing.md`).
+    Fallback,
+}
+
+/// Which platform and kind an asset's file name is, by Baylee's release
+/// names (Baylee `docs/releasing.md` §"Installers", `release.rs`); anything
+/// else, checksums and signatures included, is `None`.
+#[must_use]
+pub fn classify(name: &str) -> Option<(Platform, Kind)> {
+    let base = |prefix: &str, suffix: &str| {
+        name.strip_prefix(prefix)
+            .and_then(|rest| rest.strip_suffix(suffix))
+            .is_some_and(|middle| !middle.is_empty() && middle.bytes().all(version_byte))
+    };
+    let rules: [(&str, &str, Platform, Kind); 16] = [
+        (
+            "Baylee-Setup-",
+            "-x64.exe",
+            Platform::WindowsX64,
+            Kind::Installer,
+        ),
+        (
+            "Baylee-Setup-",
+            "-arm64.exe",
+            Platform::WindowsArm64,
+            Kind::Installer,
+        ),
+        (
+            "Baylee-",
+            "-aarch64.dmg",
+            Platform::MacArm64,
+            Kind::Installer,
+        ),
+        ("Baylee-", "-x86_64.dmg", Platform::MacX64, Kind::Installer),
+        (
+            "Baylee-",
+            "-x86_64.AppImage",
+            Platform::LinuxX64,
+            Kind::Installer,
+        ),
+        (
+            "Baylee-",
+            "-aarch64.AppImage",
+            Platform::LinuxArm64,
+            Kind::Installer,
+        ),
+        ("baylee_", "_amd64.deb", Platform::LinuxX64, Kind::Deb),
+        ("baylee_", "_arm64.deb", Platform::LinuxArm64, Kind::Deb),
+        (
+            "baylee-client-",
+            "-x86_64-pc-windows-msvc-v2.zip",
+            Platform::WindowsX64,
+            Kind::Fallback,
+        ),
+        (
+            "baylee-client-",
+            "-x86_64-apple-darwin-v2.zip",
+            Platform::MacX64,
+            Kind::Fallback,
+        ),
+        (
+            "baylee-client-",
+            "-x86_64-unknown-linux-gnu-v2.tar.gz",
+            Platform::LinuxX64,
+            Kind::Fallback,
+        ),
+        (
+            "baylee-client-",
+            "-x86_64-pc-windows-msvc.zip",
+            Platform::WindowsX64,
+            Kind::Archive,
+        ),
+        (
+            "baylee-client-",
+            "-aarch64-pc-windows-msvc.zip",
+            Platform::WindowsArm64,
+            Kind::Archive,
+        ),
+        (
+            "baylee-client-",
+            "-aarch64-apple-darwin.zip",
+            Platform::MacArm64,
+            Kind::Archive,
+        ),
+        (
+            "baylee-client-",
+            "-x86_64-apple-darwin.zip",
+            Platform::MacX64,
+            Kind::Archive,
+        ),
+        (
+            "baylee-client-",
+            "-x86_64-unknown-linux-gnu.tar.gz",
+            Platform::LinuxX64,
+            Kind::Archive,
+        ),
+    ];
+    if base("baylee-client-", "-aarch64-unknown-linux-gnu.tar.gz") {
+        return Some((Platform::LinuxArm64, Kind::Archive));
+    }
+    rules
+        .into_iter()
+        .find(|(prefix, suffix, _, _)| base(prefix, suffix))
+        .map(|(_, _, platform, kind)| (platform, kind))
+}
+
+/// A byte of a `SemVer` version as Baylee names its files.
+fn version_byte(byte: u8) -> bool {
+    byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'-' | b'+')
+}
+
+/// One file of a release.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReleaseFile {
+    /// The file name.
+    pub name: String,
+    /// Its platform.
+    pub platform: Platform,
+    /// Its kind.
+    pub kind: Kind,
+    /// Its size in bytes.
+    pub size: u64,
+    /// GitHub's download address (`https://github.com/…`).
+    pub url: String,
+    /// The `.sha256` beside it, if the release has one.
+    pub checksum: Option<String>,
+    /// The `.sig` beside it, if the release has one.
+    pub signature: Option<String>,
+}
+
+/// The newest release of Baylee's client, as the download page shows it.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Release {
+    /// The tag, `v0.1.1-beta.9b`.
+    pub tag: String,
+    /// The release page on GitHub.
+    pub page: String,
+    /// When it was published, `YYYY-MM-DD`.
+    pub date: String,
+    /// Whether GitHub marks it a pre-release (every beta is one).
+    pub prerelease: bool,
+    /// Its client files, by platform and kind.
+    pub files: Vec<ReleaseFile>,
+}
+
+impl Release {
+    /// The file to offer first for `platform`: an installer, then a Debian
+    /// package, then an archive; a fallback build only when nothing else is.
+    #[must_use]
+    pub fn best(&self, platform: Platform) -> Option<&ReleaseFile> {
+        self.files
+            .iter()
+            .filter(|file| file.platform == platform)
+            .min_by_key(|file| file.kind)
+    }
+
+    /// Every file for `platform`, in the order offered.
+    #[must_use]
+    pub fn for_platform(&self, platform: Platform) -> Vec<&ReleaseFile> {
+        let mut files: Vec<&ReleaseFile> = self
+            .files
+            .iter()
+            .filter(|file| file.platform == platform)
+            .collect();
+        files.sort_by_key(|file| file.kind);
+        files
+    }
+}
+
+/// What the request says about the visitor's machine: the user agent,
+/// corrected by client hints where the browser sends them. What cannot be
+/// told is said, never guessed.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Machine {
+    /// The platform to offer first, if one can be named.
+    pub platform: Option<Platform>,
+    /// The architecture was read (client hints), not assumed.
+    pub sure: bool,
+    /// A phone or tablet: the client does not run there.
+    pub mobile: bool,
+}
+
+/// The machine from a request's `User-Agent` and its client hints
+/// (`Sec-CH-UA-Platform`, `Sec-CH-UA-Arch`, `Sec-CH-UA-Bitness`), each as
+/// sent (hints are quoted strings).
+#[must_use]
+pub fn machine(
+    agent: &str,
+    platform: Option<&str>,
+    arch: Option<&str>,
+    bitness: Option<&str>,
+) -> Machine {
+    let unquote =
+        |value: Option<&str>| value.map(|v| v.trim().trim_matches('"').to_ascii_lowercase());
+    let (hint_os, hint_arch, hint_bits) = (unquote(platform), unquote(arch), unquote(bitness));
+    let ua = agent.to_ascii_lowercase();
+    let mobile = ua.contains("android")
+        || ua.contains("iphone")
+        || ua.contains("ipad")
+        || ua.contains("ipod");
+    let os = match hint_os.as_deref() {
+        Some("windows") => Some(Os::Windows),
+        Some("macos") => Some(Os::Mac),
+        Some("linux") => Some(Os::Linux),
+        Some("android" | "ios" | "chrome os" | "chromeos") => None,
+        _ if mobile || ua.contains("cros") => None,
+        _ if ua.contains("windows") => Some(Os::Windows),
+        _ if ua.contains("mac os x") || ua.contains("macintosh") => Some(Os::Mac),
+        _ if ua.contains("linux") || ua.contains("x11") => Some(Os::Linux),
+        _ => None,
+    };
+    let hinted = match (hint_arch.as_deref(), hint_bits.as_deref()) {
+        (Some("arm"), _) => Some(true),
+        (Some("x86"), Some("64")) => Some(false),
+        _ => None,
+    };
+    let ua_arm = ua.contains("arm64") || ua.contains("aarch64");
+    let mobile = mobile || matches!(hint_os.as_deref(), Some("android" | "ios"));
+    let (platform, sure) = match (os, hinted) {
+        (Some(Os::Windows), Some(arm)) => (
+            Some(if arm {
+                Platform::WindowsArm64
+            } else {
+                Platform::WindowsX64
+            }),
+            true,
+        ),
+        (Some(Os::Windows), None) => (
+            Some(if ua_arm {
+                Platform::WindowsArm64
+            } else {
+                Platform::WindowsX64
+            }),
+            false,
+        ),
+        (Some(Os::Mac), Some(arm)) => (
+            Some(if arm {
+                Platform::MacArm64
+            } else {
+                Platform::MacX64
+            }),
+            true,
+        ),
+        // Safari and Firefox say "Intel Mac OS X" on every Mac.
+        (Some(Os::Mac), None) => (Some(Platform::MacArm64), false),
+        (Some(Os::Linux), Some(arm)) => (
+            Some(if arm {
+                Platform::LinuxArm64
+            } else {
+                Platform::LinuxX64
+            }),
+            true,
+        ),
+        (Some(Os::Linux), None) => (
+            Some(if ua_arm {
+                Platform::LinuxArm64
+            } else {
+                Platform::LinuxX64
+            }),
+            ua.contains("x86_64") || ua_arm,
+        ),
+        (None, _) => (None, false),
+    };
+    Machine {
+        platform: if mobile { None } else { platform },
+        sure,
+        mobile,
+    }
+}
+
+/// The card status of the newest release (Baylee's `sets.json` totals).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CardStats {
+    /// Cards implemented and tested.
+    pub implemented: u64,
+    /// Cards implemented by the generator, not yet tested.
+    pub generated: u64,
+    /// Cards that work in part.
+    pub partial: u64,
+    /// Every card there is (the ledger's rows).
+    pub total: u64,
+}
+
+/// Where the card status was read and of when.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CardStatus {
+    /// The numbers.
+    pub stats: CardStats,
+    /// The release tag the numbers belong to.
+    pub tag: String,
+    /// When Baylee's tool wrote them, `YYYY-MM-DD`.
+    pub date: String,
+}
+
+/// A gateway of Central's public directory, checked as `central-client`
+/// checks it.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Gateway {
+    /// Its canonical origin.
+    pub origin: String,
+    /// The name its operator gave it.
+    pub name: String,
+    /// The version it reports.
+    pub version: String,
+    /// Its website, on its own origin.
+    pub website: String,
+    /// A heartbeat arrived within the last 90 seconds.
+    pub online: bool,
+    /// Baylee's own gateway, known by its origin only.
+    pub official: bool,
+}
+
+/// The repository's state for the home page's status strip.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Repo {
+    /// The newest run of the CI workflow on `main` passed, failed, or is unknown.
+    pub ci: Option<bool>,
+    /// The newest commit on `main`: its short id and date.
+    pub commit: Option<(String, String)>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn release_names() {
+        let cases = [
+            (
+                "Baylee-Setup-0.1.1-beta.9b-x64.exe",
+                Some((Platform::WindowsX64, Kind::Installer)),
+            ),
+            (
+                "Baylee-0.2.0-aarch64.dmg",
+                Some((Platform::MacArm64, Kind::Installer)),
+            ),
+            (
+                "Baylee-0.2.0-x86_64.AppImage",
+                Some((Platform::LinuxX64, Kind::Installer)),
+            ),
+            (
+                "baylee_0.2.0-beta.o1_arm64.deb",
+                Some((Platform::LinuxArm64, Kind::Deb)),
+            ),
+            (
+                "baylee-client-0.2.0-x86_64-pc-windows-msvc.zip",
+                Some((Platform::WindowsX64, Kind::Archive)),
+            ),
+            (
+                "baylee-client-0.2.0-x86_64-pc-windows-msvc-v2.zip",
+                Some((Platform::WindowsX64, Kind::Fallback)),
+            ),
+            (
+                "baylee-client-0.2.0-aarch64-unknown-linux-gnu.tar.gz",
+                Some((Platform::LinuxArm64, Kind::Archive)),
+            ),
+            (
+                "baylee-client-0.2.0-x86_64-apple-darwin-v2.zip",
+                Some((Platform::MacX64, Kind::Fallback)),
+            ),
+            (
+                "baylee-client-0.2.0-x86_64-pc-windows-msvc.zip.sha256",
+                None,
+            ),
+            ("Baylee-Setup--x64.exe", None),
+            ("Baylee-Setup-1 2-x64.exe", None),
+            ("evil-Baylee-0.2.0-aarch64.dmg", None),
+        ];
+        for (name, want) in cases {
+            assert_eq!(classify(name), want, "{name}");
+        }
+    }
+
+    #[test]
+    fn machines() {
+        let mac_safari = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15";
+        assert_eq!(
+            machine(mac_safari, None, None, None),
+            Machine {
+                platform: Some(Platform::MacArm64),
+                sure: false,
+                mobile: false
+            }
+        );
+        assert_eq!(
+            machine(
+                mac_safari,
+                Some("\"macOS\""),
+                Some("\"x86\""),
+                Some("\"64\"")
+            )
+            .platform,
+            Some(Platform::MacX64)
+        );
+        let win = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Safari/537.36";
+        assert_eq!(
+            machine(win, Some("\"Windows\""), Some("\"arm\""), Some("\"64\"")),
+            Machine {
+                platform: Some(Platform::WindowsArm64),
+                sure: true,
+                mobile: false
+            }
+        );
+        assert_eq!(
+            machine(win, None, None, None).platform,
+            Some(Platform::WindowsX64)
+        );
+        let android = "Mozilla/5.0 (Linux; Android 15; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Mobile Safari/537.36";
+        assert_eq!(
+            machine(android, None, None, None),
+            Machine {
+                platform: None,
+                sure: false,
+                mobile: true
+            }
+        );
+        let linux = "Mozilla/5.0 (X11; Linux x86_64; rv:140.0) Gecko/20100101 Firefox/140.0";
+        assert_eq!(
+            machine(linux, None, None, None),
+            Machine {
+                platform: Some(Platform::LinuxX64),
+                sure: true,
+                mobile: false
+            }
+        );
+    }
+
+    #[test]
+    fn best_file_prefers_installers_and_never_a_fallback_first() {
+        let file = |name: &str| {
+            let (platform, kind) = classify(name).expect("a release name");
+            ReleaseFile {
+                name: name.into(),
+                platform,
+                kind,
+                size: 1,
+                url: String::new(),
+                checksum: None,
+                signature: None,
+            }
+        };
+        let release = Release {
+            tag: "v1".into(),
+            page: String::new(),
+            date: String::new(),
+            prerelease: false,
+            files: vec![
+                file("baylee-client-1-x86_64-unknown-linux-gnu-v2.tar.gz"),
+                file("baylee-client-1-x86_64-unknown-linux-gnu.tar.gz"),
+                file("baylee_1_amd64.deb"),
+                file("Baylee-1-x86_64.AppImage"),
+            ],
+        };
+        assert_eq!(
+            release.best(Platform::LinuxX64).map(|f| f.kind),
+            Some(Kind::Installer)
+        );
+        let kinds: Vec<Kind> = release
+            .for_platform(Platform::LinuxX64)
+            .iter()
+            .map(|f| f.kind)
+            .collect();
+        assert_eq!(
+            kinds,
+            [Kind::Installer, Kind::Deb, Kind::Archive, Kind::Fallback]
+        );
+        assert!(release.best(Platform::MacArm64).is_none());
+    }
+}

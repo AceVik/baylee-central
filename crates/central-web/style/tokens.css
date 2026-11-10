@@ -1,0 +1,212 @@
+/*
+ * The fonts are the game's (SIL OFL 1.1, no reserved name), subset to
+ * Latin-1 and the punctuation the site writes; `unicode-range` says so, so
+ * any other character falls back to a system font.
+ *
+ * Design tokens (docs/website-design.md): every colour, size, radius,
+ * shadow and duration of the site, named by meaning. No other stylesheet
+ * names a raw colour. Light is "sunlight", dark is "the blue hour"; both
+ * come from the same names. The contrast of every pair a page draws is
+ * measured by crates/central-web/tests/contrast.rs.
+ */
+
+@font-face {
+  font-family: "Alegreya Sans";
+  src: url("/assets/fonts/AlegreyaSans-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0020-007E, U+00A0-00FF, U+0152-0153, U+0160-0161, U+0178, U+017D-017E, U+2010-2014,
+    U+2018-201E, U+2022, U+2026, U+2030, U+2039-203A, U+20AC, U+2122, U+2212;
+}
+
+@font-face {
+  font-family: "Alegreya Sans";
+  src: url("/assets/fonts/AlegreyaSans-Medium.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0020-007E, U+00A0-00FF, U+0152-0153, U+0160-0161, U+0178, U+017D-017E, U+2010-2014,
+    U+2018-201E, U+2022, U+2026, U+2030, U+2039-203A, U+20AC, U+2122, U+2212;
+}
+
+@font-face {
+  font-family: "Alegreya Sans";
+  src: url("/assets/fonts/AlegreyaSans-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0020-007E, U+00A0-00FF, U+0152-0153, U+0160-0161, U+0178, U+017D-017E, U+2010-2014,
+    U+2018-201E, U+2022, U+2026, U+2030, U+2039-203A, U+20AC, U+2122, U+2212;
+}
+
+@font-face {
+  font-family: "Faustina";
+  src: url("/assets/fonts/Faustina.woff2") format("woff2");
+  font-weight: 300 800;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0020-007E, U+00A0-00FF, U+0152-0153, U+0160-0161, U+0178, U+017D-017E, U+2010-2014,
+    U+2018-201E, U+2022, U+2026, U+2030, U+2039-203A, U+20AC, U+2122, U+2212;
+}
+
+@font-face {
+  font-family: "Faustina";
+  src: url("/assets/fonts/Faustina-Italic.woff2") format("woff2");
+  font-weight: 300 800;
+  font-style: italic;
+  font-display: swap;
+  unicode-range: U+0020-007E, U+00A0-00FF, U+0152-0153, U+0160-0161, U+0178, U+017D-017E, U+2010-2014,
+    U+2018-201E, U+2022, U+2026, U+2030, U+2039-203A, U+20AC, U+2122, U+2212;
+}
+
+:root {
+  color-scheme: light;
+
+  /* Sunlight */
+  --ground: #f7f3ea;
+  --ground-alt: #ecefe6;
+  --surface: #fffdf7;
+  --surface-raised: #f0eee3;
+  --bubble-own: #dcebe6;
+  --ink: #1f3a40;
+  --ink-soft: #3f5a5d;
+  --ink-faint: #52696a;
+  --title: #143840;
+  --action: #e9c46a;
+  --action-hover: #dcb04c;
+  --on-action: #2a1d04;
+  --action-edge: #8a5a05;
+  --accent: #1a5f6e;
+  --focus: #1f5c68;
+  --edge: #6f8583;
+  --edge-soft: rgb(31 58 64 / 0.12);
+  --ok: #1c7245;
+  --warn: #9a4700;
+  --bad: #a3302a;
+  --ok-tint: #e2f1e6;
+  --warn-tint: #fae9d8;
+  --bad-tint: #f9e3df;
+  --veil: rgb(247 243 234 / 0);
+  --shade: rgb(31 58 64 / 0.06);
+  --shade-strong: rgb(31 58 64 / 0.18);
+  --shade-deep: rgb(31 58 64 / 0.28);
+
+  /* Type: rem for size, a fluid middle for the reading sizes. */
+  --font-ui: "Alegreya Sans", "Segoe UI", system-ui, sans-serif;
+  --font-prose: "Faustina", Georgia, "Times New Roman", serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  --text-xs: 0.8125rem;
+  --text-sm: 0.9375rem;
+  --text-md: clamp(1.0625rem, 1.02rem + 0.2vw, 1.1875rem);
+  --text-lg: clamp(1.25rem, 1.15rem + 0.45vw, 1.5rem);
+  --text-xl: clamp(1.5rem, 1.25rem + 1.1vw, 2.125rem);
+  --text-2xl: clamp(1.875rem, 1.4rem + 2.1vw, 2.875rem);
+  --text-3xl: clamp(2.25rem, 1.5rem + 3.4vw, 3.75rem);
+  --leading-tight: 1.2;
+  --leading: 1.5;
+  --leading-prose: 1.65;
+
+  /* One spacing scale. */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+  --space-8: 4rem;
+  --space-9: 6rem;
+  --gutter: clamp(1rem, 0.5rem + 2.5vw, 2rem);
+  --space-section: clamp(3rem, 2rem + 5vw, 6rem);
+
+  /* Measures. */
+  --measure: 38rem;
+  --page: 72rem;
+  --frame: 100rem;
+  --target: 2.75rem;
+  --bar-height: 4rem;
+  --dock-height: 4.25rem;
+
+  /* Shape and depth. */
+  --radius-sm: 0.5rem;
+  --radius-md: 0.875rem;
+  --radius-lg: 1.25rem;
+  --radius-full: 999rem;
+  --hairline: 1px;
+  --elevation-1: 0 1px 2px var(--shade), 0 2px 8px var(--shade);
+  --elevation-2: 0 8px 24px -8px var(--shade-strong);
+  --elevation-3: 0 24px 48px -16px var(--shade-deep);
+
+  /* Motion: settles in a frame or two, never decorates. */
+  --dur-fast: 120ms;
+  --dur: 180ms;
+  --dur-sheet: 240ms;
+  --dur-slow: 320ms;
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+}
+
+/* The blue hour: the device asks for dark and nobody chose light, or
+   somebody chose dark. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --ground: #0f1b2d;
+    --ground-alt: #13223a;
+    --surface: #182943;
+    --surface-raised: #213556;
+    --bubble-own: #24406a;
+    --ink: #eef1f8;
+    --ink-soft: #cbd5ea;
+    --ink-faint: #a5b4d1;
+    --title: #fff6e2;
+    --action: #e6c27f;
+    --action-hover: #f2d9a2;
+    --on-action: #1a1306;
+    --action-edge: #e6c27f;
+    --accent: #a9c4ff;
+    --focus: #ffe7a6;
+    --edge: #7488ad;
+    --edge-soft: rgb(238 241 248 / 0.14);
+    --ok: #7fd3a1;
+    --warn: #f5a35c;
+    --bad: #f5a097;
+    --ok-tint: #17382f;
+    --warn-tint: #3d2a1c;
+    --bad-tint: #40242a;
+    --shade: rgb(0 0 0 / 0.2);
+    --shade-strong: rgb(0 0 0 / 0.35);
+    --shade-deep: rgb(0 0 0 / 0.5);
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ground: #0f1b2d;
+  --ground-alt: #13223a;
+  --surface: #182943;
+  --surface-raised: #213556;
+  --bubble-own: #24406a;
+  --ink: #eef1f8;
+  --ink-soft: #cbd5ea;
+  --ink-faint: #a5b4d1;
+  --title: #fff6e2;
+  --action: #e6c27f;
+  --action-hover: #f2d9a2;
+  --on-action: #1a1306;
+  --action-edge: #e6c27f;
+  --accent: #a9c4ff;
+  --focus: #ffe7a6;
+  --edge: #7488ad;
+  --edge-soft: rgb(238 241 248 / 0.14);
+  --ok: #7fd3a1;
+  --warn: #f5a35c;
+  --bad: #f5a097;
+  --ok-tint: #17382f;
+  --warn-tint: #3d2a1c;
+  --bad-tint: #40242a;
+  --shade: rgb(0 0 0 / 0.2);
+  --shade-strong: rgb(0 0 0 / 0.35);
+  --shade-deep: rgb(0 0 0 / 0.5);
+}

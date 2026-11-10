@@ -422,7 +422,89 @@
     "webpki-roots@1.0.11",
     "yoke@0.8.4",
     "zerovec-derive@0.11.7",
-    "zerovec@0.11.9"
+    "zerovec@0.11.9",
+    "any_spawner@0.3.0",
+    "anyhow@1.0.104",
+    "async-lock@3.5.0",
+    "async-once-cell@0.5.4",
+    "attribute-derive-macro@0.11.0",
+    "attribute-derive@0.11.0",
+    "base16@0.2.1",
+    "camino@1.2.6",
+    "codee@0.3.5",
+    "collection_literals@1.0.3",
+    "config@0.15.27",
+    "const-str@1.1.0",
+    "const_format@0.2.37",
+    "const_format_proc_macros@0.2.37",
+    "const_str_slice_concat@0.1.0",
+    "convert_case@0.11.0",
+    "convert_case@0.6.0",
+    "convert_case_extras@0.2.0",
+    "drain_filter_polyfill@0.1.3",
+    "either_of@0.1.9",
+    "erased@0.1.2",
+    "event-listener-strategy@0.5.4",
+    "futures-macro@0.3.34",
+    "futures@0.3.34",
+    "gloo-net@0.6.0",
+    "gloo-utils@0.2.0",
+    "guardian@1.3.0",
+    "html-escape@0.2.15",
+    "hydration_context@0.3.2",
+    "interpolator@0.5.0",
+    "inventory@0.3.25",
+    "konst@0.2.20",
+    "konst_macro_rules@0.2.19",
+    "leptos@0.8.23",
+    "leptos_config@0.8.10",
+    "leptos_dom@0.8.8",
+    "leptos_hot_reload@0.8.7",
+    "leptos_macro@0.8.20",
+    "leptos_server@0.8.8",
+    "manyhow-macros@0.14.1",
+    "manyhow@0.14.1",
+    "next_tuple@0.1.0",
+    "oco_ref@0.2.1",
+    "or_poisoned@0.1.0",
+    "paste@1.0.15",
+    "pathdiff@0.2.3",
+    "pin-project-internal@1.1.13",
+    "pin-project@1.1.13",
+    "prettyplease@0.3.0",
+    "proc-macro-utils@0.10.0",
+    "proc-macro2-diagnostics@0.11.0",
+    "quote-use-macros@0.9.0",
+    "quote-use@0.9.0",
+    "reactive_graph@0.2.16",
+    "reactive_stores@0.4.4",
+    "reactive_stores_macro@0.4.4",
+    "rstml@0.13.1",
+    "same-file@1.0.6",
+    "send_wrapper@0.6.0",
+    "serde_qs@0.15.0",
+    "serde_spanned@1.1.3",
+    "server_fn@0.8.13",
+    "server_fn_macro@0.8.12",
+    "server_fn_macro_default@0.8.6",
+    "slotmap@1.1.1",
+    "tachys@0.2.19",
+    "thiserror-impl@1.0.69",
+    "thiserror@1.0.69",
+    "throw_error@0.3.1",
+    "toml@1.2.0+spec-1.1.0",
+    "toml_writer@1.2.0+spec-1.1.0",
+    "typed-builder-macro@0.23.2",
+    "typed-builder@0.23.2",
+    "unicode-segmentation@1.13.3",
+    "walkdir@2.5.0",
+    "wasm-bindgen-futures@0.4.80",
+    "wasm-streams@0.5.0",
+    "wasm_split_helpers@0.2.3",
+    "wasm_split_macros@0.2.2",
+    "web-sys@0.3.107",
+    "winapi-util@0.1.11",
+    "xxhash-rust@0.8.19"
   ],
   "scope": "Owner approved HTTP foundation via safe APIs after security checks; crypto and database excluded",
   "approved_on": "2026-10-19",
@@ -542,7 +624,6 @@
       "std"
     ],
     "windows-sys@0.61.2": [
-      "default",
       "Wdk",
       "Wdk_Foundation",
       "Wdk_Storage",
@@ -551,11 +632,11 @@
       "Wdk_System_IO",
       "Win32",
       "Win32_Foundation",
-      "Win32_Networking",
-      "Win32_Networking_WinSock",
       "Win32_NetworkManagement",
       "Win32_NetworkManagement_IpHelper",
       "Win32_NetworkManagement_Ndis",
+      "Win32_Networking",
+      "Win32_Networking_WinSock",
       "Win32_Security",
       "Win32_Storage",
       "Win32_Storage_FileSystem",
@@ -566,11 +647,13 @@
       "Win32_System_Diagnostics_Debug",
       "Win32_System_IO",
       "Win32_System_Pipes",
+      "Win32_System_SystemInformation",
       "Win32_System_SystemServices",
       "Win32_System_Threading",
       "Win32_System_WindowsProgramming",
       "Win32_UI",
-      "Win32_UI_Shell"
+      "Win32_UI_Shell",
+      "default"
     ],
     "signal-hook-registry@1.4.8": [],
     "tracing@0.1.44": [
@@ -627,7 +710,9 @@
     ],
     "proc-macro2@1.0.107": [
       "default",
-      "proc-macro"
+      "nightly",
+      "proc-macro",
+      "span-locations"
     ],
     "percent-encoding@2.3.2": [
       "alloc",
@@ -642,7 +727,13 @@
     ],
     "futures-util@0.3.34": [
       "alloc",
+      "async-await",
+      "async-await-macro",
+      "channel",
+      "default",
+      "futures-channel",
       "futures-io",
+      "futures-macro",
       "futures-sink",
       "io",
       "memchr",
@@ -1014,13 +1105,15 @@
     ],
     "futures-channel@0.3.34": [
       "alloc",
+      "default",
       "futures-sink",
       "sink",
       "std"
     ],
     "futures-executor@0.3.34": [
       "default",
-      "std"
+      "std",
+      "thread-pool"
     ],
     "futures-intrusive@0.5.0": [
       "alloc",
@@ -1927,8 +2020,10 @@
     "utf_types@1.0.0": [],
     "uuid@1.29.0": [
       "default",
+      "rng",
       "serde",
-      "std"
+      "std",
+      "v4"
     ],
     "wasm-bindgen-macro-support@0.2.130": [],
     "wasm-bindgen-macro@0.2.130": [],
@@ -1947,6 +2042,404 @@
     "zerovec@0.11.9": [
       "derive",
       "yoke"
+    ],
+    "any_spawner@0.3.0": [
+      "futures-executor",
+      "wasm-bindgen"
+    ],
+    "anyhow@1.0.104": [
+      "default",
+      "std"
+    ],
+    "async-lock@3.5.0": [
+      "default",
+      "std"
+    ],
+    "async-once-cell@0.5.4": [],
+    "attribute-derive@0.11.0": [
+      "syn-full"
+    ],
+    "attribute-derive-macro@0.11.0": [],
+    "base16@0.2.1": [
+      "alloc",
+      "default",
+      "std"
+    ],
+    "camino@1.2.6": [],
+    "codee@0.3.5": [
+      "json_serde"
+    ],
+    "collection_literals@1.0.3": [],
+    "config@0.15.27": [
+      "convert-case",
+      "convert_case",
+      "toml"
+    ],
+    "const-str@1.1.0": [
+      "default"
+    ],
+    "const_format@0.2.37": [
+      "default"
+    ],
+    "const_format_proc_macros@0.2.37": [
+      "default"
+    ],
+    "const_str_slice_concat@0.1.0": [],
+    "convert_case@0.6.0": [],
+    "convert_case@0.11.0": [],
+    "convert_case_extras@0.2.0": [],
+    "drain_filter_polyfill@0.1.3": [],
+    "either_of@0.1.9": [
+      "default",
+      "no_std"
+    ],
+    "erased@0.1.2": [],
+    "event-listener-strategy@0.5.4": [
+      "std"
+    ],
+    "futures@0.3.34": [
+      "alloc",
+      "async-await",
+      "default",
+      "executor",
+      "futures-executor",
+      "std",
+      "thread-pool"
+    ],
+    "futures-macro@0.3.34": [],
+    "gloo-net@0.6.0": [
+      "default",
+      "eventsource",
+      "futures-channel",
+      "futures-core",
+      "futures-sink",
+      "http",
+      "json",
+      "pin-project",
+      "serde",
+      "serde_json",
+      "websocket"
+    ],
+    "gloo-utils@0.2.0": [
+      "serde"
+    ],
+    "guardian@1.3.0": [],
+    "html-escape@0.2.15": [
+      "default",
+      "std"
+    ],
+    "hydration_context@0.3.2": [
+      "browser"
+    ],
+    "interpolator@0.5.0": [
+      "iter"
+    ],
+    "inventory@0.3.25": [],
+    "konst@0.2.20": [
+      "rust_1_51",
+      "rust_1_55",
+      "rust_1_56",
+      "rust_1_57",
+      "rust_1_61",
+      "rust_1_64"
+    ],
+    "konst_macro_rules@0.2.19": [
+      "rust_1_51",
+      "rust_1_55",
+      "rust_1_56",
+      "rust_1_57",
+      "rust_1_61"
+    ],
+    "leptos@0.8.23": [
+      "hydrate",
+      "hydration",
+      "islands",
+      "ssr"
+    ],
+    "leptos_config@0.8.10": [],
+    "leptos_dom@0.8.8": [
+      "default",
+      "hydration"
+    ],
+    "leptos_hot_reload@0.8.7": [],
+    "leptos_macro@0.8.20": [
+      "__internal_erase_components",
+      "hydrate",
+      "islands",
+      "ssr"
+    ],
+    "leptos_server@0.8.8": [
+      "hydration",
+      "ssr",
+      "tachys"
+    ],
+    "manyhow@0.14.1": [
+      "default",
+      "macros",
+      "syn"
+    ],
+    "manyhow-macros@0.14.1": [],
+    "next_tuple@0.1.0": [],
+    "oco_ref@0.2.1": [],
+    "or_poisoned@0.1.0": [],
+    "paste@1.0.15": [],
+    "pathdiff@0.2.3": [],
+    "pin-project@1.1.13": [],
+    "pin-project-internal@1.1.13": [],
+    "prettyplease@0.3.0": [],
+    "proc-macro-utils@0.10.0": [
+      "default",
+      "parser",
+      "proc-macro",
+      "proc-macro2",
+      "quote",
+      "smallvec"
+    ],
+    "proc-macro2-diagnostics@0.11.0": [
+      "nightly"
+    ],
+    "quote-use@0.9.0": [],
+    "quote-use-macros@0.9.0": [],
+    "reactive_graph@0.2.16": [
+      "effects",
+      "hydration",
+      "serde"
+    ],
+    "reactive_stores@0.4.4": [
+      "default"
+    ],
+    "reactive_stores_macro@0.4.4": [],
+    "rstml@0.13.1": [
+      "default"
+    ],
+    "same-file@1.0.6": [],
+    "send_wrapper@0.6.0": [
+      "futures",
+      "futures-core"
+    ],
+    "serde_qs@0.15.0": [
+      "default"
+    ],
+    "serde_spanned@1.1.3": [
+      "alloc",
+      "std"
+    ],
+    "server_fn@0.8.13": [
+      "browser",
+      "form-redirects",
+      "inventory",
+      "ssr"
+    ],
+    "server_fn_macro@0.8.12": [
+      "ssr"
+    ],
+    "server_fn_macro_default@0.8.6": [],
+    "slotmap@1.1.1": [
+      "default",
+      "std"
+    ],
+    "tachys@0.2.19": [
+      "default",
+      "hydrate",
+      "oco",
+      "reactive_graph",
+      "reactive_stores",
+      "ssr",
+      "testing"
+    ],
+    "thiserror@1.0.69": [],
+    "thiserror-impl@1.0.69": [],
+    "throw_error@0.3.1": [],
+    "toml@1.2.0+spec-1.1.0": [
+      "parse",
+      "std"
+    ],
+    "toml_writer@1.2.0+spec-1.1.0": [
+      "alloc",
+      "std"
+    ],
+    "typed-builder@0.23.2": [],
+    "typed-builder-macro@0.23.2": [],
+    "unicode-segmentation@1.13.3": [],
+    "walkdir@2.5.0": [],
+    "wasm-bindgen-futures@0.4.80": [
+      "default",
+      "std"
+    ],
+    "wasm-streams@0.5.0": [],
+    "wasm_split_helpers@0.2.3": [],
+    "wasm_split_macros@0.2.2": [],
+    "web-sys@0.3.107": [
+      "AbortController",
+      "AbortSignal",
+      "AddEventListenerOptions",
+      "AnimationEvent",
+      "BeforeUnloadEvent",
+      "BinaryType",
+      "Blob",
+      "CharacterData",
+      "ClipboardEvent",
+      "CloseEvent",
+      "CloseEventInit",
+      "Comment",
+      "CompositionEvent",
+      "CssStyleDeclaration",
+      "CustomEvent",
+      "DeviceMotionEvent",
+      "DeviceOrientationEvent",
+      "Document",
+      "DocumentFragment",
+      "DomStringMap",
+      "DomTokenList",
+      "DragEvent",
+      "Element",
+      "ErrorEvent",
+      "Event",
+      "EventSource",
+      "EventTarget",
+      "FileReader",
+      "FocusEvent",
+      "FormData",
+      "GamepadEvent",
+      "HashChangeEvent",
+      "Headers",
+      "History",
+      "HtmlAnchorElement",
+      "HtmlAreaElement",
+      "HtmlAudioElement",
+      "HtmlBaseElement",
+      "HtmlBodyElement",
+      "HtmlBrElement",
+      "HtmlButtonElement",
+      "HtmlCanvasElement",
+      "HtmlCollection",
+      "HtmlDListElement",
+      "HtmlDataElement",
+      "HtmlDataListElement",
+      "HtmlDetailsElement",
+      "HtmlDialogElement",
+      "HtmlDivElement",
+      "HtmlElement",
+      "HtmlEmbedElement",
+      "HtmlFieldSetElement",
+      "HtmlFormElement",
+      "HtmlHeadElement",
+      "HtmlHeadingElement",
+      "HtmlHrElement",
+      "HtmlHtmlElement",
+      "HtmlIFrameElement",
+      "HtmlImageElement",
+      "HtmlInputElement",
+      "HtmlLabelElement",
+      "HtmlLegendElement",
+      "HtmlLiElement",
+      "HtmlLinkElement",
+      "HtmlMapElement",
+      "HtmlMediaElement",
+      "HtmlMenuElement",
+      "HtmlMetaElement",
+      "HtmlMeterElement",
+      "HtmlModElement",
+      "HtmlOListElement",
+      "HtmlObjectElement",
+      "HtmlOptGroupElement",
+      "HtmlOptionElement",
+      "HtmlOutputElement",
+      "HtmlParagraphElement",
+      "HtmlParamElement",
+      "HtmlPictureElement",
+      "HtmlPreElement",
+      "HtmlProgressElement",
+      "HtmlQuoteElement",
+      "HtmlScriptElement",
+      "HtmlSelectElement",
+      "HtmlSlotElement",
+      "HtmlSourceElement",
+      "HtmlSpanElement",
+      "HtmlStyleElement",
+      "HtmlTableCaptionElement",
+      "HtmlTableCellElement",
+      "HtmlTableColElement",
+      "HtmlTableElement",
+      "HtmlTableRowElement",
+      "HtmlTableSectionElement",
+      "HtmlTemplateElement",
+      "HtmlTextAreaElement",
+      "HtmlTimeElement",
+      "HtmlTitleElement",
+      "HtmlTrackElement",
+      "HtmlUListElement",
+      "HtmlVideoElement",
+      "InputEvent",
+      "KeyboardEvent",
+      "Location",
+      "MessageEvent",
+      "MouseEvent",
+      "Navigator",
+      "Node",
+      "ObserverCallback",
+      "PageTransitionEvent",
+      "PointerEvent",
+      "PopStateEvent",
+      "ProgressEvent",
+      "PromiseRejectionEvent",
+      "QueuingStrategy",
+      "ReadableByteStreamController",
+      "ReadableStream",
+      "ReadableStreamByobReader",
+      "ReadableStreamByobRequest",
+      "ReadableStreamDefaultController",
+      "ReadableStreamDefaultReader",
+      "ReadableStreamGetReaderOptions",
+      "ReadableStreamReadResult",
+      "ReadableStreamReaderMode",
+      "ReadableStreamType",
+      "ReadableWritablePair",
+      "ReferrerPolicy",
+      "Request",
+      "RequestCache",
+      "RequestCredentials",
+      "RequestInit",
+      "RequestMode",
+      "RequestRedirect",
+      "Response",
+      "ResponseInit",
+      "ResponseType",
+      "SecurityPolicyViolationEvent",
+      "ShadowRoot",
+      "ShadowRootInit",
+      "ShadowRootMode",
+      "StorageEvent",
+      "StreamPipeOptions",
+      "SubmitEvent",
+      "SvgElement",
+      "Text",
+      "TouchEvent",
+      "TransformStream",
+      "TransformStreamDefaultController",
+      "Transformer",
+      "TransitionEvent",
+      "UiEvent",
+      "UnderlyingSink",
+      "UnderlyingSource",
+      "Url",
+      "UrlSearchParams",
+      "WebSocket",
+      "WheelEvent",
+      "Window",
+      "Worker",
+      "WorkerOptions",
+      "WorkerType",
+      "WritableStream",
+      "WritableStreamDefaultController",
+      "WritableStreamDefaultWriter",
+      "console",
+      "default",
+      "std"
+    ],
+    "winapi-util@0.1.11": [],
+    "xxhash-rust@0.8.19": [
+      "const_xxh64"
     ]
   },
   "approvals": [
@@ -2000,6 +2493,18 @@
         "The five existing-package feature additions in push.md"
       ],
       "implied": "The review documents AWS-LC C/assembly, dependency FFI and native build tooling. No advisory ignore is expanded; first-party unsafe remains forbidden."
+    },
+    {
+      "approved_on": "2026-11-10",
+      "reason": "owner approved 10.11.2026 in the frontend session (\"1. Ja wählen.\"), choosing Leptos with the three gate exceptions over the framework-free fallback",
+      "for": "baylee.app rebuilt as server-rendered Leptos islands (docs/proposals/frontend-rewrite.md, docs/dependency-proposal/leptos.md)",
+      "entries": [
+        "leptos@0.8.23 (islands; ssr on the host, hydrate on wasm32) and the 81 further packages of docs/dependency-proposal/leptos.md, exactly as measured against the lock file",
+        "wasm-bindgen-futures@0.4.80, js-sys@0.3.107 and web-sys@0.3.107 with the features Leptos and the islands use",
+        "new features on approved packages: futures-channel@0.3.34/default, futures-executor@0.3.34/thread-pool, futures-util@0.3.34 async-await, async-await-macro, channel, default, futures-channel, futures-macro, proc-macro2@1.0.107 nightly and span-locations, uuid@1.29.0 rng and v4, windows-sys@0.61.2/Win32_System_SystemInformation",
+        "gate exceptions: paste@1.0.15 unmaintained (RUSTSEC-2024-0436), xxhash-rust@0.8.19 BSL-1.0, base16@0.2.1 CC0-1.0"
+      ],
+      "implied": "Dependency-internal unsafe code, generated web bindings and one never-compiled C file (walkdir's compare/nftw.c) were disclosed; first-party unsafe stays forbidden. Not a third-party source audit."
     }
   ]
 }

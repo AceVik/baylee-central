@@ -42,3 +42,12 @@ inherits = "release"
 lto = true
 codegen-units = 1
 panic = "abort"
+
+# `cargo xtask site` (docs/xtask.md): the website's islands, optimised for
+# size, since every interactive page downloads them.
+[profile.islands]
+inherits = "release"
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"

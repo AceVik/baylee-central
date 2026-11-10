@@ -9,14 +9,15 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p . && tsc --noEmit -p e2e",
-    "lint": "oxlint --deny-warnings src test e2e e2e-real scripts pwa",
+    "lint": "oxlint --deny-warnings src test e2e e2e-real scripts pwa e2e-site",
     "test": "vitest run",
     "build": "vite build",
     "check": "npm run typecheck && npm run lint && npm run test && npm run build",
     "serve": "node scripts/serve.ts",
     "content": "node scripts/content.mjs",
     "e2e": "playwright test",
-    "screens": "SCREENS=1 playwright test e2e/screens.spec.ts"
+    "screens": "SCREENS=1 playwright test e2e/screens.spec.ts",
+    "e2e:site": "playwright test -c e2e-site/playwright.config.ts"
   },
   "dependencies": {
     "@fluent/bundle": "0.19.1",
@@ -24,6 +25,7 @@
     "react-dom": "19.3.0"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.14.0",
     "@playwright/test": "1.64.0",
     "@testing-library/react": "16.3.3",
     "@testing-library/user-event": "14.6.8",

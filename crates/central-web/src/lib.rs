@@ -1,0 +1,17 @@
+//! baylee.app's pages and islands (`docs/proposals/frontend-rewrite.md`).
+//!
+//! The same crate is compiled twice: for the server, where Leptos renders
+//! every page to HTML (`site`), and for the browser, where only the islands
+//! (`islands`) are hydrated. Which half Leptos builds follows the target, not
+//! a feature, so building the workspace with every feature never mixes them.
+//! Public pages carry no island and load no WebAssembly.
+#![forbid(unsafe_code)]
+
+pub mod data;
+pub mod words;
+
+mod islands;
+mod rich;
+
+#[cfg(not(target_arch = "wasm32"))]
+pub mod site;
