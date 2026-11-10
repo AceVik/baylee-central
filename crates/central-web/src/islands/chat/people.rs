@@ -50,7 +50,7 @@ pub fn contacts_panel(
                     .collect_view();
                 view! {
                     <section class="people">
-                        <h3>{title}</h3>
+                        <h2>{title}</h2>
                         <ul>{items}</ul>
                     </section>
                 }
@@ -332,7 +332,7 @@ pub fn invites(lang: Lang, own: u32, ctl: Ctl, choose: Callback<String>) -> impl
                 .collect_view();
             view! {
                 <section class="people">
-                    <h3>{words::chat_invites(lang)}</h3>
+                    <h2>{words::chat_invites(lang)}</h2>
                     <ul>{items}</ul>
                 </section>
             }
