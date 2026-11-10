@@ -69,6 +69,14 @@
   --surface: #fffdf7;
   --surface-raised: #f0eee3;
   --bubble-own: #dcebe6;
+  /* avatars: six tints under light initials */
+  --avatar-0: #1a5f6e;
+  --avatar-1: #7a4b12;
+  --avatar-2: #3d5a1e;
+  --avatar-3: #6b3a63;
+  --avatar-4: #2c4a86;
+  --avatar-5: #8a3b2e;
+  --on-avatar: #fffdf7;
   --ink: #1f3a40;
   --ink-soft: #3f5a5d;
   --ink-faint: #52696a;
@@ -157,6 +165,14 @@
     --surface: #182943;
     --surface-raised: #213556;
     --bubble-own: #24406a;
+    /* avatars: six tints under light initials */
+    --avatar-0: #1a5f6e;
+    --avatar-1: #7a4b12;
+    --avatar-2: #3d5a1e;
+    --avatar-3: #6b3a63;
+    --avatar-4: #2c4a86;
+    --avatar-5: #8a3b2e;
+    --on-avatar: #fffdf7;
     --ink: #eef1f8;
     --ink-soft: #cbd5ea;
     --ink-faint: #a5b4d1;
@@ -188,6 +204,14 @@
   --surface: #182943;
   --surface-raised: #213556;
   --bubble-own: #24406a;
+  /* avatars: six tints under light initials */
+  --avatar-0: #1a5f6e;
+  --avatar-1: #7a4b12;
+  --avatar-2: #3d5a1e;
+  --avatar-3: #6b3a63;
+  --avatar-4: #2c4a86;
+  --avatar-5: #8a3b2e;
+  --on-avatar: #fffdf7;
   --ink: #eef1f8;
   --ink-soft: #cbd5ea;
   --ink-faint: #a5b4d1;

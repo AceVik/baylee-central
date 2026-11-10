@@ -49,6 +49,17 @@
     }
   };
 
+  // The chat identity kept in this browser lives only as long as the
+  // sign-in (docs/central-chat.md): with no live session, it goes.
+  if (!signedIn() && typeof indexedDB?.databases === "function") {
+    indexedDB
+      .databases()
+      .then((all) => {
+        if (all.some((db) => db.name === "baylee-chat")) indexedDB.deleteDatabase("baylee-chat");
+      })
+      .catch(() => {});
+  }
+
   const ready = () => {
     for (const button of document.querySelectorAll("[data-theme-switch]")) {
       button.hidden = false;

@@ -834,6 +834,8 @@ pub fn Account(lang: Lang, section: Section, worker: String) -> impl IntoView {
             Section::Security => security(lang, worker.clone()),
             Section::Privacy => privacy(lang, worker.clone()),
             Section::Gateways => gateways(lang, worker.clone()),
+            // the messenger is its own island
+            Section::Chat | Section::Contacts => ().into_any(),
         },
     }
     }

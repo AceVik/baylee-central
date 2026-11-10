@@ -46,6 +46,21 @@ pub fn remembered() -> Option<i64> {
     (ends > now).then_some(ends)
 }
 
+/// The text localStorage keeps under `key`.
+#[cfg(target_arch = "wasm32")]
+#[must_use]
+pub fn read(key: &str) -> Option<String> {
+    storage()?.get_item(key).ok().flatten()
+}
+
+/// Keeps `value` in localStorage under `key`, where the browser allows it.
+#[cfg(target_arch = "wasm32")]
+pub fn write(key: &str, value: &str) {
+    if let Some(storage) = storage() {
+        let _ = storage.set_item(key, value);
+    }
+}
+
 /// Sends the browser to `path` on this site.
 #[cfg(target_arch = "wasm32")]
 pub fn go(path: &str) {
@@ -71,6 +86,17 @@ pub fn forget() {}
 pub fn remembered() -> Option<i64> {
     None
 }
+
+/// On the server nothing is kept.
+#[cfg(not(target_arch = "wasm32"))]
+#[must_use]
+pub fn read(_key: &str) -> Option<String> {
+    None
+}
+
+/// On the server nothing is kept.
+#[cfg(not(target_arch = "wasm32"))]
+pub fn write(_key: &str, _value: &str) {}
 
 /// On the server nobody is sent anywhere.
 #[cfg(not(target_arch = "wasm32"))]

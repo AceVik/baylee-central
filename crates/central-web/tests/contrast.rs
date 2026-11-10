@@ -47,7 +47,7 @@ fn ratio(a: [f64; 3], b: [f64; 3]) -> f64 {
 }
 
 /// Text on grounds: 4.5:1.
-const TEXT: [(&str, &str); 29] = [
+const TEXT: [(&str, &str); 39] = [
     ("--ink", "--ground"),
     ("--ink", "--ground-alt"),
     ("--ink", "--surface"),
@@ -77,6 +77,18 @@ const TEXT: [(&str, &str); 29] = [
     ("--warn", "--surface"),
     ("--bad", "--ground"),
     ("--bad", "--surface"),
+    // the messenger: badges, times in one's own bubbles, a changed key's
+    // mark, and initials on the six avatar tints
+    ("--surface", "--accent"),
+    ("--ink-faint", "--bubble-own"),
+    ("--bad", "--bad-tint"),
+    ("--on-avatar", "--avatar-0"),
+    ("--on-avatar", "--avatar-1"),
+    ("--on-avatar", "--avatar-2"),
+    ("--on-avatar", "--avatar-3"),
+    ("--on-avatar", "--avatar-4"),
+    ("--on-avatar", "--avatar-5"),
+    ("--ink-faint", "--ground-alt"),
 ];
 
 /// Non-text that carries meaning (the focus ring, field borders, the gold

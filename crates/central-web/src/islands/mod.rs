@@ -6,7 +6,9 @@
 
 mod account;
 mod auth;
+mod b64;
 mod central;
+mod chat;
 mod contact;
 mod crypto;
 mod impressum;
@@ -21,6 +23,8 @@ mod trusted;
 pub(crate) use account::Account;
 #[cfg(not(target_arch = "wasm32"))]
 pub(crate) use auth::{Register, SignIn};
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) use chat::Messenger;
 #[cfg(not(target_arch = "wasm32"))]
 pub(crate) use contact::ContactForm;
 #[cfg(not(target_arch = "wasm32"))]

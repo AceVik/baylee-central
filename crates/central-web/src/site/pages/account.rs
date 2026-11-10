@@ -6,7 +6,7 @@ use leptos::prelude::*;
 
 use super::Built;
 use crate::data::Section;
-use crate::islands::{Account, Register, SignIn};
+use crate::islands::{Account, Messenger, Register, SignIn};
 use crate::rich::icon;
 use crate::site::icons;
 use crate::site::shell::Meta;
@@ -77,6 +77,8 @@ pub fn register(cx: &Context<'_>) -> Built {
 fn section_name(lang: Lang, section: Section) -> (&'static str, &'static str) {
     match section {
         Section::Home => (words::account_home(lang), icons::HOUSE),
+        Section::Chat => (words::account_chat(lang), icons::MESSAGE_CIRCLE),
+        Section::Contacts => (words::account_contacts(lang), icons::USERS),
         Section::Profile => (words::account_profile(lang), icons::USER),
         Section::Security => (words::account_security(lang), icons::SHIELD),
         Section::Privacy => (words::account_privacy(lang), icons::FILE_TEXT),
@@ -109,14 +111,20 @@ pub fn area(cx: &Context<'_>, section: Section) -> Built {
         })
         .collect_view();
     let worker = cx.assets.url("crypto-worker.js");
+    let messenger = matches!(section, Section::Chat | Section::Contacts);
+    let island = if messenger {
+        view! { <Messenger lang=lang section=section worker=worker /> }.into_any()
+    } else {
+        view! { <Account lang=lang section=section worker=worker /> }.into_any()
+    };
     let body = view! {
-        <div class="frame">
+        <div class="frame" class:frame-messenger=messenger>
             <nav class="frame-nav" aria-label=words::account_nav(lang)>
                 <ul>{links}</ul>
             </nav>
             <div class="frame-main">
-                <h1>{title}</h1>
-                <Account lang=lang section=section worker=worker />
+                <h1 class=messenger.then_some("visually-hidden")>{title}</h1>
+                {island}
             </div>
         </div>
     }

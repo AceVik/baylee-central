@@ -10,6 +10,10 @@
 // leaves this Worker; the page sends and receives bytes and words only.
 // Terminating the Worker discards the module's memory.
 //
+// "unlocked" answers the device and registration of the identity a
+// sign-in in this Worker unlocked (the chat page's way back when nothing
+// was kept in this browser).
+//
 // Protocol: the page posts JSON `{id, op, ...}`; the Worker answers JSON
 // `{id, ok: {...}}` or `{id, error}` with error one of "rejected",
 // "unavailable", "failed". Bytes travel as arrays of numbers, as on
@@ -186,6 +190,9 @@ async function step(m) {
     case "resume":
       if (login !== null || key !== null || chat !== null) throw new Error("failed");
       await resume(owner(m));
+      return unlocked();
+    case "unlocked":
+      take(chat);
       return unlocked();
     case "keep":
       await keep(owner(m));
