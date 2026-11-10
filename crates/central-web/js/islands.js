@@ -3,9 +3,16 @@
 // the reactive system, then hydrates every <leptos-island> in document
 // order. What Leptos' inline hydration script does, as a file of its own,
 // so the pages need no inline script and no nonce.
-import init, * as islands from "./islands-glue.js";
+//
+// It starts once the page has loaded: the WebAssembly then never competes
+// with the text, the fonts and the pictures the visitor sees first, and the
+// server-rendered page is whole until the islands take it over.
+if (document.readyState !== "complete") {
+  await new Promise((resolve) => window.addEventListener("load", resolve, { once: true }));
+}
+const islands = await import("./islands-glue.js");
 
-await init({ module_or_path: "./islands.wasm" });
+await islands.default({ module_or_path: "./islands.wasm" });
 islands.hydrate();
 
 async function hydrate(element) {

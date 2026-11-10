@@ -170,11 +170,16 @@ is served by `central-web` from `target/site/`, which this task writes:
 - the stylesheet: `crates/central-web/style/` joined in the order of
   `site::STYLES`, every `url("/assets/<name>")` rewritten to the hashed
   file (a missing one fails);
-- `boot.js` and `pow-worker.js`, the fonts and pictures of
-  `crates/central-web/assets/`;
+- `boot.js`, `pwa.js` and `pow-worker.js`, the crypto Worker with the
+  committed `central-web-crypto` module (checked against its `SHA256SUMS`),
+  the fonts and pictures of `crates/central-web/assets/`;
 - every file under `/assets/<name>.<sha-256 prefix>.<ext>` and recorded in
   `manifest.json` with its address and a `sha384-` Subresource Integrity
-  value; `/sw.js`, `/favicon.ico` and `/apple-touch-icon.png` at the root;
+  value; `/favicon.ico` and `/apple-touch-icon.png` at the root;
+- `/sw.js` at the root with this build's stamp (the digest of every
+  asset's address, so any changed file makes a new service worker) and the
+  hashed files the offline page needs written over its two placeholders
+  (a changed placeholder fails);
 - `notices.txt`: the fonts' and icons' licences and every crate in the
   islands' module with its licence files, each text once;
 - Brotli and gzip copies of every text file where `brotli` and `gzip` are

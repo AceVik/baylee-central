@@ -52,6 +52,9 @@ pub fn impressum(cx: &Context<'_>) -> Built {
     let body = view! {
         {head(words::impressum_title(lang), words::impressum_lead(lang))}
         <div class="wrap narrow prose">
+            // what the puzzle is for, in the page itself: the island holds
+            // only the button and what it finds
+            <p>{words::impressum_why(lang)}</p>
             <Impressum lang=lang worker=cx.assets.url("pow-worker.js") />
             <noscript><p class="notice">{words::impressum_noscript(lang)}</p></noscript>
             <p>{words::impressum_responsible(lang)}</p>

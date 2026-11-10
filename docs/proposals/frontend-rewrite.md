@@ -631,6 +631,36 @@ Not changed here; listed for the owner:
 8. **Fan Content notice in an open conversation on a phone:** in the
    conversation's details, "nicely and not bulky".
 
+Relayed later the same day by the parent session:
+
+9. **Leptos 0.9 if viable, else 0.8.23.** 0.9.0 exists only as
+   `0.9.0-rc1` (31.10.2026), a pre-release whose notes announce "a wide
+   variety of semver-breaking changes" and ask for reports of breakage,
+   with changes to hydration; `0.8.23` of the same day is the release
+   marked latest and still receives backports. So **0.8.23 stays**, with
+   the three gate exceptions as approved. 0.9.0 follows as a step of its own
+   once released: a new inventory of the graph, the owner's approval, the
+   same tests. The owner's condition on server functions is met
+   trivially: the site has none (no `leptos_axum`, no server functions);
+   `central-web` answers `GET` and `HEAD` for pages, hashed assets and
+   generated files only, and every form posts to Central or, through Caddy,
+   to the feedback service.
+10. **Open beta.** The site speaks of the open beta: register freely,
+    download, play; no keys, invitation codes or closed beta in it. The
+    owner allowed removing the closed beta's keys from Central too, on
+    conditions: the API stays compatible for the client and the gateway;
+    what goes is listed here and in the PR; data changes only by a
+    migration that deletes nothing else; and the replacement protection
+    is in place before the key stops being one. The replacement is the
+    owner's design of 28.10.2026 (`docs/registration-abuse.md`): Central's
+    own proof of work, harder as registrations flood in, the per-address
+    budgets with a daily one, a honeypot and a minimum fill time. The
+    game repository's part (the gateway's `invite` mode, the feedback
+    console, `baylee-ops invite`) is another session's.
+11. **See it running.** After each phase the site runs locally (a local
+    database and test accounts, never production) in the browser pane
+    until the owner has finished looking.
+
 ## 11. As built: phase 2 (server and content pages)
 
 - `crates/central-web` (pages, islands, the words), `central-web-server`
@@ -716,3 +746,105 @@ address (staging).
   Central (`web/e2e-real` describes that setup: PostgreSQL 18 with TLS,
   Central in its deployed mode, a TLS stand-in for baylee.app). It is the
   first thing to run on staging before this replaces the old pages.
+  *Done in phase 4*: `web/e2e-real/site-chat.spec.ts` (§13).
+
+## 13. As built: phase 4 (the messenger and the app)
+
+**The messenger** is one island for `/{lang}/account/chat` and
+`/account/contacts` (`crates/central-web/src/islands/chat/`), so moving
+between conversations and contacts never restarts the Worker or replays
+the inbox.
+
+- *Opening.* The Worker resumes the identity the sign-in kept
+  (`resume`); where nothing is kept, a sign-in inside the chat's own Worker
+  opens it (`sign_in_with`, then `unlocked`), which also works without
+  IndexedDB. `boot.js` deletes `baylee-chat` whenever no session is live.
+- *Work.* One job at a time (start, inbox, keys, send, try again, confirm),
+  as the previous site's serial Worker; the inbox every 2 s in view, at once
+  while `more`, backing off to 30 s; a quiet read changes nothing on the
+  page. Central's 401 ends the chat and forgets the kept identity.
+- *Checks* beyond `central-api`'s strict types, ported from `chat/api.ts`,
+  `social/api.ts` and `chat/groups.ts`: base64 lengths and alphabets, at
+  most a page, a cursor that only moves forward, keys only for the tags
+  asked, an acceptance naming the sent id and conversation (the signed
+  header), contacts and groups bounded and unique. A message that differs
+  from one already shown under its id is refused, never replaced.
+- *Sending* keeps the sealed envelope for "Try again" after re-checking
+  members and keys; Conflict gives the text back to the composer; changed
+  keys replace the composer until the safety number (groups of five) is
+  compared and confirmed.
+- *Keyboard.* The list is one tab stop (arrows, Home, End, Enter, real
+  links), Ctrl/Cmd+K finds, Escape closes the details or returns from the
+  composer to the list, Back returns to the row it came from, Enter sends
+  (Ctrl/Cmd+Enter always; on touch keyboards Enter breaks the line). Days
+  are headings, each message has a hidden "who, when", and one polite
+  region announces arrivals at most every 3 s.
+- *Not built from §6.3*: the single-key shortcuts and the Alt pairs (they
+  were to ship only after a check with NVDA and VoiceOver, which this branch
+  could not make; WCAG 2.1.4 favours shipping none), the "3 new messages"
+  pill, the unread divider, and hiding the bottom bar while a conversation
+  is open on a phone (the bar stays; the conversation fills the rest).
+- *The Fan Content notice* (owner, 10.11.2026: "nicely and not bulky"): one
+  quiet line with a link at the foot of a conversation's details.
+- Icons in islands are drawn element by element: Trusted Types allow no
+  `innerHTML` in the browser, and an island's view runs there.
+
+**The app.**
+
+- `/sw.js` keeps one cache per build (`baylee-site-<stamp>`; `cargo xtask
+  site` stamps it from every asset's address): the offline page in both
+  languages and the files it needs, then hashed assets as fetched. Pages
+  come from the network, and only without one the offline page answers in
+  the address's language. `/api` and `/site` are untouched. A new build
+  waits for the visitor; `baylee-public-*` caches go.
+- `pwa.js` (a module with SRI on every page, the fifth script beside §2.3's
+  four) registers it through a Trusted Types policy of its own,
+  `baylee-sw`, that vouches for `/sw.js` alone (the CSP now names
+  `trusted-types baylee baylee-sw`). It offers a waiting version, warns once
+  about unsent text before reloading, and shows "Install as an app" in the
+  account area after `beforeinstallprompt`.
+- `/{lang}/offline` (200, not indexed) and
+  `/{lang}/account/notifications`: Web Push on this device and the
+  account's categories, the protocol, bits, nonce and storage names
+  unchanged. The browser's push interfaces are reached through
+  `js_sys::Reflect`, so no `web-sys` feature was added. Sign-in,
+  registration and sign-out turn this device's push off first, as before,
+  and that never waits for a service worker the browser refused.
+- The islands start after the page's `load` event, so their WebAssembly
+  (2.75 MB, about 600 KB with Brotli, with the messenger) never competes
+  with the first paint of the text.
+
+**Found and fixed on the way.** A new account's recovery code is shown
+before Central's terms again (phase 3 had them first, so declining lost the
+code). Signed in, the bar's "Your account" pushed every page sideways
+between 60 and 72rem. The contacts' section headings skipped a level.
+Rendering the whole messenger on every inbox read (it lost composer text
+and focus, and trapped in WebAssembly) became memos that pass only
+changes.
+
+**Tests.**
+
+- Native units: model, wire checks, base64, times, push.
+- `web/e2e-site/chat.spec.ts`: a stand-in Central and a canned Worker.
+  Covers hostile markup kept as text, axe and 44 px with a conversation and
+  its details open, the keyboard, changed keys and 320 px.
+- `web/e2e-site/pwa.spec.ts`: offline in German, the cache's contents, and
+  an update served by a server of its own. The update waits, warns, then
+  reloads into the new cache.
+- `web/e2e-real/site-chat.spec.ts` against a real Central, PostgreSQL 18
+  and the committed crypto module, desktop and phone, the service worker
+  registered. Two accounts register, become contacts by handle, write both
+  ways, reload without a password, compare equal safety numbers, share,
+  write to and leave a group, and keep a notification switch across a
+  reload; localStorage holds no message and no password. Device Web Push
+  itself needs a push service and was not run.
+
+**Open.**
+
+- The pairing page (owner decision 6, "build it now"). The client's half is
+  done on Baylee's `c41/pair-link`. The page needs three new exports in the
+  committed `central-web-crypto` module (the key check, the HPKE seal to the
+  client's key, the approval proof), hence that module's own three-pass
+  review and the canonical Linux rebuild.
+- Password change and reset on the website (new exports too).
+- The administration still comes from the old build (§11, Caddy `/admin*`).
