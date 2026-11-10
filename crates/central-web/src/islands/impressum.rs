@@ -349,7 +349,6 @@ pub fn Impressum(lang: Lang, worker: String) -> impl IntoView {
                         }
                     });
                     view! {
-                        <p>{words::impressum_why(lang)}</p>
                         <button type="button" class="button primary" on:click=show.clone()>{words::impressum_show(lang)}</button>
                         {failed}
                     }

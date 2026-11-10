@@ -9,10 +9,12 @@
 }
 
 /* the frame's column is the container: a container query styles what is
-   inside it, never the container itself */
+   inside it, never the container itself; it holds the messenger's height
+   from the first paint, so nothing moves when the messenger opens */
 .frame-messenger .frame-main {
   container: messenger / inline-size;
   gap: 0;
+  min-block-size: max(28rem, calc(100dvh - var(--bar-height) - var(--space-8)));
 }
 
 .messenger {
@@ -32,6 +34,10 @@
 
   .messenger {
     block-size: max(26rem, calc(100dvh - var(--bar-height) - var(--dock-height) - var(--space-9)));
+  }
+
+  .frame-messenger .frame-main {
+    min-block-size: max(26rem, calc(100dvh - var(--bar-height) - var(--dock-height) - var(--space-9)));
   }
 }
 
