@@ -6,7 +6,11 @@
 // to the client, as Caddy does without trusted_proxies (it replaces whatever
 // the client sent). Loopback only; nothing here is for production.
 //
-//   node e2e-real/front.ts --tls <dir with cert.pem, key.pem> [--port 8443] [--listener 47921] [--dir dist]
+//   node e2e-real/front.ts --tls <dir with cert.pem, key.pem> [--port 8443] [--listener 47921] [--dir dist] [--site <port>]
+//
+// With --site, every other request goes to the server-rendered site
+// (crates/central-web) on 127.0.0.1:<port> instead of dist/, without the
+// cookie, as the Caddy block in ../docs/operations.md does.
 
 import { createReadStream, existsSync, readFileSync, statSync } from "node:fs";
 import { request } from "node:http";
@@ -24,6 +28,7 @@ const port = Number(arg("port", "8443"));
 const listener = Number(arg("listener", "47921"));
 const root = resolve(arg("dir", "dist"));
 const tls = arg("tls", "");
+const site = Number(arg("site", "0"));
 const policy = csp();
 const LIMIT = 65_536;
 
@@ -81,6 +86,21 @@ const server = createServer({ key: readFileSync(join(tls, "key.pem")), cert: rea
       upstream.on("error", () => res.writeHead(502).end());
       upstream.end(body);
     });
+    return;
+  }
+  if (site > 0) {
+    // header_up -Cookie: the site never sees the session
+    const headers = { ...req.headers, "x-forwarded-for": req.socket.remoteAddress ?? "" };
+    delete headers.cookie;
+    const upstream = request({ host: "127.0.0.1", port: site, method: req.method, path: req.url, headers }, (answer) => {
+      res.writeHead(answer.statusCode ?? 502, answer.headers);
+      answer.pipe(res);
+    });
+    upstream.on("error", () => {
+      if (!res.headersSent) res.writeHead(502);
+      res.end();
+    });
+    req.pipe(upstream);
     return;
   }
   if (req.method !== "GET" && req.method !== "HEAD") {

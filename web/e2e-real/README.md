@@ -99,6 +99,28 @@ The rows Central stored, the native client's sign-in to such an account and
 the recovery code's use were checked from outside the page; the run of
 21.10.2026 is in `../docs/security-assurance.md` §"Account pages".
 
+## The new site (`crates/central-web`)
+
+The same Central serves the server-rendered site
+(`../docs/proposals/frontend-rewrite.md`). Build it with `cargo xtask site`,
+start `target/debug/central-web --dev target/site
+crates/central-web-server/tests/data` (it listens on `127.0.0.1:28792`), and
+put the front before it instead of `dist/`:
+`node e2e-real/front.ts --tls <its folder> --site 28792`. Then
+
+```bash
+REAL_KEYS=<keys file> REAL_OUT=<empty folder> npx playwright test -c e2e-real/playwright.config.ts e2e-real/site-chat.spec.ts
+```
+
+registers two accounts at each width, makes them contacts by handle, has
+them write to each other (markup in a message stays text), reloads one page
+and finds the chat open again without a password (the identity the sign-in
+kept in this browser), compares the safety number on both sides, creates a
+group, invites, joins, writes to it and leaves it (the history stays, the
+composer goes), and checks that localStorage holds neither a message nor the
+password. Central allows five registrations an hour per address: start it
+afresh between runs.
+
 ## Tearing down
 
 Stop `front.ts` and Central (SIGTERM; their ports must refuse), remove the

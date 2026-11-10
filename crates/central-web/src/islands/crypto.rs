@@ -109,6 +109,18 @@ impl Crypto {
     pub fn close(self) {
         drop(self);
     }
+
+    /// Ends the Worker now for a holder that shares it; every step still
+    /// waiting fails.
+    pub fn end(&self) {
+        use wasm_bindgen::JsValue;
+
+        self.worker.terminate();
+        for (id, resolve) in self.waiting.borrow_mut().drain() {
+            let reply = serde_json::json!({"id": id, "error": "failed"}).to_string();
+            let _ = resolve.call1(&JsValue::NULL, &JsValue::from_str(&reply));
+        }
+    }
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -138,6 +150,11 @@ impl Crypto {
     /// Never on the server.
     pub fn close(self) {
         let Crypto = self;
+    }
+
+    /// Never on the server.
+    pub fn end(&self) {
+        let &Crypto = self;
     }
 }
 

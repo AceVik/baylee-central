@@ -1,4 +1,4 @@
-import AxeBuilder from "@axe-core/playwright";
+import { AxeBuilder } from "@axe-core/playwright";
 import { expect, type Page, test } from "@playwright/test";
 
 const PAGES = [
@@ -15,6 +15,8 @@ const PAGES = [
   "register",
   "account",
   "account/security",
+  "account/chat",
+  "account/contacts",
   "account/privacy",
   "nope",
 ];

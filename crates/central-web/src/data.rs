@@ -394,6 +394,10 @@ pub struct Gateway {
 pub enum Section {
     /// `/account`: the handle and what needs the person.
     Home,
+    /// `/account/chat`: the messenger's conversations.
+    Chat,
+    /// `/account/contacts`: the messenger's contacts.
+    Contacts,
     /// `/account/profile`: the display name and the recovery code.
     Profile,
     /// `/account/security`: the sessions, signing out.
@@ -406,8 +410,10 @@ pub enum Section {
 
 impl Section {
     /// Every section, in the navigation's order.
-    pub const ALL: [Section; 5] = [
+    pub const ALL: [Section; 7] = [
         Section::Home,
+        Section::Chat,
+        Section::Contacts,
         Section::Profile,
         Section::Security,
         Section::Privacy,
@@ -419,6 +425,8 @@ impl Section {
     pub const fn slug(self) -> &'static str {
         match self {
             Section::Home => "account",
+            Section::Chat => "account/chat",
+            Section::Contacts => "account/contacts",
             Section::Profile => "account/profile",
             Section::Security => "account/security",
             Section::Privacy => "account/privacy",

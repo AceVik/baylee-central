@@ -87,6 +87,20 @@ pub struct SignedIn {
 /// What went wrong.
 pub async fn sign_in(worker: &str, username: &str, password: String) -> Result<SignedIn, Problem> {
     let crypto = Crypto::start(worker).ok_or(Problem::Failed)?;
+    sign_in_with(&crypto, username, password).await
+}
+
+/// [`sign_in`] in a Worker the caller keeps: after an account with a tag
+/// signed in, it holds the chat's identity (the chat page's way back when
+/// this browser kept none).
+///
+/// # Errors
+/// What went wrong.
+pub async fn sign_in_with(
+    crypto: &Crypto,
+    username: &str,
+    password: String,
+) -> Result<SignedIn, Problem> {
     let username = username.trim().to_ascii_lowercase();
     if !valid_username(&username) {
         return Err(Problem::WrongLogin);
@@ -141,7 +155,7 @@ pub async fn sign_in(worker: &str, username: &str, password: String) -> Result<S
         return Err(Problem::Failed);
     }
     session::remember(expires_at);
-    match finish_sign_in(&crypto, &identity, wrapped_master).await {
+    match finish_sign_in(crypto, &identity, wrapped_master).await {
         Ok(done) => Ok(done),
         Err(problem) => {
             let _ = call(&Request::Logout).await;
@@ -265,9 +279,13 @@ enum Step {
     Failed(Problem),
 }
 
-/// After a sign-in: the terms first (storing a code needs them), then the
-/// code, then the account.
+/// After a sign-in: a new account's code first (it is stored already, and
+/// declining the terms must not lose it); otherwise the terms first (storing
+/// a moved account's new code needs them), then the code, then the account.
 async fn after_sign_in(lang: Lang, done: SignedIn) -> Step {
+    if let Some(code) = done.new_code.as_ref().filter(|code| !code.optional) {
+        return Step::Code(code.clone(), done.handle);
+    }
     match terms_due().await {
         Ok(Some(document)) => Step::Terms(document, done.new_code, done.handle),
         Ok(None) => {
@@ -314,8 +332,15 @@ fn code_view(
                     }
                 }
             }
-            session::go(&format!("/{}/account", lang.code()));
-            step.set(Step::Working);
+            // a new account meets Central's terms after its code
+            match terms_due().await {
+                Ok(Some(document)) => step.set(Step::Terms(document, None, None)),
+                Ok(None) => {
+                    session::go(&format!("/{}/account", lang.code()));
+                    step.set(Step::Working);
+                }
+                Err(problem) => error.set(Some(problem_text(lang, problem))),
+            }
         });
     };
     let later = optional.then(|| {
@@ -629,12 +654,9 @@ pub fn Register(lang: Lang, worker: String) -> impl IntoView {
         leptos::task::spawn_local(async move {
             match register(&worker, f).await {
                 Ok((code, signed)) => {
-                    // The code first: it is shown once, before anything else.
-                    let handle = signed.handle.clone();
-                    match terms_due().await {
-                        Ok(Some(document)) => step.set(Step::Terms(document, Some(code), handle)),
-                        _ => step.set(Step::Code(code, handle)),
-                    }
+                    // The code first: it is shown once, before anything
+                    // else; Central's terms follow it (`code_view`).
+                    step.set(Step::Code(code, signed.handle));
                 }
                 Err((_, Some("key"))) => {
                     error.set(Some(words::register_error_key_refused(lang)));

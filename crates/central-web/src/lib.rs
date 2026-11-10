@@ -6,6 +6,9 @@
 //! a feature, so building the workspace with every feature never mixes them.
 //! Public pages carry no island and load no WebAssembly.
 #![forbid(unsafe_code)]
+// Leptos types a view by its whole element tree; the messenger's
+// conversation is deeper than the compiler's default of 128 allows.
+#![recursion_limit = "256"]
 
 pub mod data;
 mod format;
