@@ -331,7 +331,7 @@
 
 /* ---- People --------------------------------------------------------------- */
 
-.people h3,
+.people h2,
 .group-panel h4 {
   margin: var(--space-2) 0 var(--space-1);
   color: var(--ink-soft);

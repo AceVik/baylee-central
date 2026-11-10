@@ -233,7 +233,10 @@
   }
 }
 
-@media (min-width: 40rem) {
+/* The words beside the account link where the bar has room for them: not
+   while the navigation first moves into the bar (60 to 72rem), where a
+   signed-in "Your account" would push the bar past the window. */
+@media (min-width: 40rem) and (max-width: 59.99rem), (min-width: 72rem) {
   .tools .sign-in span {
     position: static;
     inline-size: auto;
