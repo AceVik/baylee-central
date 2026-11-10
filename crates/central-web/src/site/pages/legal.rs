@@ -4,10 +4,10 @@
 use leptos::prelude::*;
 
 use super::Built;
+use crate::format;
 use crate::islands::Impressum;
+use crate::markdown;
 use crate::rich::{plain, rich};
-use crate::site::format;
-use crate::site::markdown;
 use crate::site::shell::{Meta, policy_url};
 use crate::site::{Context, Page};
 use crate::words::{self, Lang};

@@ -384,3 +384,36 @@ async fn only_get_and_head() {
         .expect("response");
     assert_eq!(response.status(), StatusCode::OK);
 }
+
+#[tokio::test]
+async fn forms_and_the_account_area_are_islands_and_not_indexed() {
+    let app = app(false);
+    for path in [
+        "/en/signin",
+        "/de/register",
+        "/en/account",
+        "/de/account/profile",
+        "/en/account/security",
+        "/en/account/privacy",
+        "/de/account/gateways",
+    ] {
+        let (status, headers, html) = get(&app, path, &[]).await;
+        assert_eq!(status, StatusCode::OK, "{path}");
+        assert_eq!(count(&html, "<h1"), 1, "{path}: one h1");
+        assert!(html.contains("<leptos-island"), "{path}: an island");
+        assert!(
+            html.contains("<script type=\"module\" src=\"/assets/islands.js\""),
+            "{path}: the islands' script"
+        );
+        assert!(
+            html.contains("<meta name=\"robots\" content=\"noindex"),
+            "{path}: not indexed"
+        );
+        assert_eq!(headers["x-robots-tag"], "noindex, noarchive, nosnippet");
+        assert!(!html.contains(" style=\""), "{path}: no inline style");
+        assert!(
+            html.contains("/assets/crypto-worker.js"),
+            "{path}: the crypto Worker's address"
+        );
+    }
+}

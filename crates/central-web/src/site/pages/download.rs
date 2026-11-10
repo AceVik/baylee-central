@@ -8,8 +8,8 @@ use serde_json::{Value, json};
 
 use super::Built;
 use crate::data::{Kind, Platform, ReleaseFile};
+use crate::format;
 use crate::rich::{icon, plain, rich};
-use crate::site::format;
 use crate::site::icons;
 use crate::site::shell::{Meta, REPOSITORY};
 use crate::site::{Context, Page};

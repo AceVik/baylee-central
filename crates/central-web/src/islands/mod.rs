@@ -4,14 +4,23 @@
 //! live in this private module: `#[island]` generates an undocumented props
 //! struct that must not become public.
 
+mod account;
+mod auth;
+mod central;
 mod contact;
+mod crypto;
 mod impressum;
 pub(crate) mod net;
+mod session;
 #[cfg(target_arch = "wasm32")]
 mod trusted;
 
 // The pages use the islands on the server; in the browser they are reached
 // through their WebAssembly exports only.
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) use account::Account;
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) use auth::{Register, SignIn};
 #[cfg(not(target_arch = "wasm32"))]
 pub(crate) use contact::ContactForm;
 #[cfg(not(target_arch = "wasm32"))]

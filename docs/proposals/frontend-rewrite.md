@@ -671,3 +671,48 @@ encodes):**
 Mobile is Lighthouse's simulated slow 4G; the start page's LCP is the
 painting. CLS ≤ 0.014 everywhere. The Rich Results Test needs a public
 address (staging).
+
+## 12. As built: phase 3 (sign-in and the signed-in area)
+
+- **Islands** `SignIn`, `Register`, `Account` (one per section page:
+  overview, profile, security, privacy and data, gateways and tokens). The
+  server renders the frame, the headings and the navigation and never sees
+  the session; the islands talk to `/api/v1` with `central-api`'s own
+  request and response types (strict parsing, refusals by status only).
+- **Crypto**: `crates/central-web/js/crypto-worker.js`, a module Worker
+  (started only through the Trusted Types policy) that loads the committed
+  `central-web-crypto` module unchanged; `cargo xtask site` checks its bytes
+  against `SHA256SUMS` before shipping them. The page sends the password
+  and bytes and receives bytes and words; the master key stays in the
+  Worker. The kept chat identity (IndexedDB `baylee-chat`/`kept`) and its
+  format are unchanged.
+- **Flows**: sign-in (discovery, OPAQUE, the master key opened in the
+  Worker: checked, or a recovery code made for a moved account, or the chat
+  identity kept), registration (beta key, names checked with central-api's
+  rules, enrolment, the recovery code shown once with a download and "I have
+  saved it", then a sign-in), Central's terms (texts must hash to the
+  version's digest before "Accept" is offered), choosing the display name,
+  sessions and signing the client out, signing out (forgetting the kept
+  identity), the data export (JSON download, re-sign-in when the last one is
+  older than 30 minutes), account deletion (the password proven in the
+  Worker with the existing `login_start`/`login_finish`, then a last
+  confirmation within Central's 60 seconds), gateways (register, tokens
+  made after a fresh sign-in and shown once, revoked).
+- **Not yet** (each needs new exports in `central-web-crypto`, i.e. a
+  change to the committed, byte-checked module with its own review and the
+  canonical rebuild): password change on the website, reset with a recovery
+  or reset code, and approving a pairing. The security page says that
+  password changes stay in the client for now. Notification settings come
+  with the PWA (phase 4).
+- **Tests**: unit tests of the form rules and term selection; server tests
+  that every form and account page is an island page, `noindex`, one `h1`;
+  `web/e2e-site/account.spec.ts` drives a sign-in through the real
+  WebAssembly in its Worker against a stand-in Central that cannot answer
+  OPAQUE truthfully (the Worker must refuse, the page must say "wrong
+  sign-in", the password must appear in no request), the registration's
+  early refusals and the signed-out account area; axe-core and the 44 px
+  check now cover the forms and the account pages too.
+- **Not verified here**: a full sign-in and registration against a real
+  Central (`web/e2e-real` describes that setup: PostgreSQL 18 with TLS,
+  Central in its deployed mode, a TLS stand-in for baylee.app). It is the
+  first thing to run on staging before this replaces the old pages.

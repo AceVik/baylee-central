@@ -71,6 +71,7 @@ pub(crate) fn run(root: &Path) -> Result<()> {
         site.add(name, &bytes)?;
     }
     islands(root, &target, &mut site)?;
+    crypto(root, &mut site)?;
     let mut css = String::new();
     for name in STYLES {
         css.push_str(
@@ -330,6 +331,43 @@ fn islands(root: &Path, target: &Path, site: &mut Site) -> Result<()> {
     Ok(())
 }
 
+/// The committed browser crypto (`web/src/central-wasm`, which `wasm
+/// --check` proves to be what the source builds), checked against its
+/// `SHA256SUMS`, and the Worker that loads it.
+fn crypto(root: &Path, site: &mut Site) -> Result<()> {
+    let dir = root.join(wasm::OUTPUT);
+    let sums =
+        fs::read_to_string(dir.join(wasm::SUMS)).or_fail("the crypto's SHA256SUMS is missing")?;
+    let read = |name: &str| -> Result<Vec<u8>> {
+        let bytes = fs::read(dir.join(name)).or_fail("a crypto file is missing")?;
+        let want = sums
+            .lines()
+            .find_map(|line| line.strip_suffix(name).map(str::trim))
+            .or_fail("SHA256SUMS does not name a crypto file")?;
+        if random::to_hex(&Sha256::digest(&bytes)) != want {
+            return Err(Fail::new(format!("{name} does not match SHA256SUMS")));
+        }
+        Ok(bytes)
+    };
+    let glue = read("central_web_crypto.js")?;
+    let module = read("central_web_crypto_bg.wasm")?;
+    let glue_url = site.add("crypto-glue.js", &glue)?;
+    let module_url = site.add("crypto.wasm", &module)?;
+    let template = fs::read_to_string(root.join(WEB).join("js/crypto-worker.js"))
+        .or_fail("js/crypto-worker.js is missing")?;
+    let worker = template
+        .replace("\"./central_web_crypto.js\"", &format!("\"{glue_url}\""))
+        .replace(
+            "\"./central_web_crypto_bg.wasm\"",
+            &format!("\"{module_url}\""),
+        );
+    if worker == template {
+        return Err(Fail::new("js/crypto-worker.js names neither crypto file"));
+    }
+    site.add("crypto-worker.js", worker.as_bytes())?;
+    Ok(())
+}
+
 /// Brotli and gzip copies of the text files, where the tools exist; a
 /// missing tool is no failure (Caddy compresses then).
 fn compress(out: &Path) -> Result<()> {
@@ -451,9 +489,14 @@ fn notices(root: &Path) -> Result<String> {
         ("Lucide", "LICENSE-lucide.txt"),
     ] {
         let body = fs::read_to_string(assets.join(file)).or_fail("a licence text is missing")?;
-        let _ = write!(text, "\n----------------------------------------------------------------\n{title}\n\n{body}\n");
+        let _ = write!(
+            text,
+            "\n----------------------------------------------------------------\n{title}\n\n{body}\n"
+        );
     }
-    text.push_str("\nThe crates' licence texts follow, each once, with the crates it belongs to.\n");
+    text.push_str(
+        "\nThe crates' licence texts follow, each once, with the crates it belongs to.\n",
+    );
     for (body, owners) in texts {
         let _ = write!(
             text,

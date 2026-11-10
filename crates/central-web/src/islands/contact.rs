@@ -99,7 +99,15 @@ fn submit(lang: Lang, form: Form, event: &leptos::ev::SubmitEvent) {
         lang,
     );
     leptos::task::spawn_local(async move {
-        let outcome = match net::request("POST", "/site/contact", Some(&json), &[]).await {
+        let outcome = match net::request(
+            "POST",
+            "/site/contact",
+            Some(&json),
+            &[],
+            net::Credentials::Omit,
+        )
+        .await
+        {
             Ok((201, _)) => State::Sent,
             Ok((429, _)) => State::Busy,
             Ok((400 | 413, _)) => State::Refused,

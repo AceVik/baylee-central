@@ -52,6 +52,7 @@ pub fn date(lang: Lang, iso: &str) -> String {
 }
 
 /// A size in bytes as megabytes with one decimal: `12.3` or `12,3`.
+#[cfg(not(target_arch = "wasm32"))]
 #[must_use]
 pub fn megabytes(lang: Lang, bytes: u64) -> String {
     let tenths = bytes.saturating_add(50_000) / 100_000;

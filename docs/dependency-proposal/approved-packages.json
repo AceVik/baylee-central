@@ -2409,6 +2409,7 @@
       "ShadowRoot",
       "ShadowRootInit",
       "ShadowRootMode",
+      "Storage",
       "StorageEvent",
       "StreamPipeOptions",
       "SubmitEvent",
