@@ -85,12 +85,12 @@ fn canonical_host() -> bool {
 
 /// Cargo's target directory: `CARGO_TARGET_DIR` (a container's own, so it
 /// never replaces the host's binaries), else `target`.
-fn target_dir(root: &Path) -> PathBuf {
+pub(crate) fn target_dir(root: &Path) -> PathBuf {
     env::var_os("CARGO_TARGET_DIR").map_or_else(|| root.join("target"), |dir| root.join(dir))
 }
 
 /// The pinned wasm-bindgen CLI, installed on first use.
-fn cli(target: &Path) -> Result<PathBuf> {
+pub(crate) fn cli(target: &Path) -> Result<PathBuf> {
     let dir = target.join("wasm-bindgen-cli").join(BINDGEN);
     let program = dir
         .join("bin")
@@ -130,7 +130,7 @@ fn version_matches(program: &Path) -> bool {
 }
 
 /// Cargo's home, whose registry sources the module would otherwise name.
-fn cargo_home() -> Result<PathBuf> {
+pub(crate) fn cargo_home() -> Result<PathBuf> {
     if let Some(home) = env::var_os("CARGO_HOME") {
         return Ok(PathBuf::from(home));
     }
@@ -140,7 +140,7 @@ fn cargo_home() -> Result<PathBuf> {
 }
 
 /// The remapping flags, as `CARGO_ENCODED_RUSTFLAGS` (separated by 0x1f).
-fn remap_flags(root: &Path, home: &Path) -> OsString {
+pub(crate) fn remap_flags(root: &Path, home: &Path) -> OsString {
     let mut flags = OsString::from("--remap-path-prefix=");
     flags.push(home);
     flags.push("=/cargo\u{1f}--remap-path-prefix=");

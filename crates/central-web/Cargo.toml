@@ -1,0 +1,46 @@
+[package]
+name = "central-web"
+version = "0.1.0"
+description = "baylee.app's pages and islands: server-rendered Leptos, hydrated where interactive"
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+license.workspace = true
+build = "build.rs"
+
+[dependencies]
+central-api = { path = "../central-api", version = "=0.1.0" }
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = "=1.0.154"
+sha2 = { version = "=0.11.1", default-features = false }
+
+# Leptos renders on the server and hydrates the islands in the browser; the
+# target, never a feature of ours, picks the half (docs/proposals/frontend-rewrite.md
+# §3), so the gate's --all-features builds one half at a time.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+leptos = { version = "=0.8.23", default-features = false, features = ["islands", "hydrate"] }
+wasm-bindgen = { version = "=0.2.130", default-features = false, features = ["std"] }
+wasm-bindgen-futures = "=0.4.80"
+js-sys = "=0.3.107"
+web-sys = { version = "=0.3.107", features = [
+    "Event",
+    "Headers",
+    "MessageEvent",
+    "Navigator",
+    "ReferrerPolicy",
+    "Request",
+    "RequestCache",
+    "RequestCredentials",
+    "RequestInit",
+    "RequestRedirect",
+    "Response",
+    "Window",
+    "Worker",
+] }
+getrandom = { version = "=0.4.3", features = ["wasm_js"] }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+leptos = { version = "=0.8.23", default-features = false, features = ["islands", "ssr"] }
+
+[lints]
+workspace = true

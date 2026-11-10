@@ -9,9 +9,9 @@ the decisions the owner has to take before code that needs them lands. It is
 the contract for the branch `claude/frontend-leptos-af71a6`; a change of plan
 changes this file first.
 
-Status: **proposal**. Nothing here is accepted until the owner says so. The
-dependency graph it needs is in [dependency-proposal/leptos.md](../dependency-proposal/leptos.md)
-and is **not** in `approved-packages.json`.
+Status: **accepted** by the owner on 10.11.2026 with the decisions of §10;
+the dependency graph of [dependency-proposal/leptos.md](../dependency-proposal/leptos.md)
+and its three gate exceptions are approved.
 
 ## 1. What exists today (inventory at `4f5e471`)
 
@@ -424,10 +424,9 @@ first-paint faces preloaded, the licences beside them and in the notices.
   once by that redirect.
 - **hreflang** names both languages and `x-default` (the English page);
   canonical is the page itself.
-- **Map:** `/{lang}/` home; `download`; `cards`, `cards/<set>` (each set its
-  own server-rendered page, searchable without script through `?q=`);
-  `gateways`, `gateways/host`; `baylee` (the remembrance as a page; its
-  presentation needs the family's agreement again); `faq`; `contact`;
+- **Map:** `/{lang}/` home (with the card numbers and the album behind the
+  big logo, §10); `download`; `gateways` (with how to host one); `faq`;
+  `contact`;
   `impressum`, `privacy`, `terms`, `fan-content`; `signin`, `register`,
   `reset`; `account` and its sections (§6.2); `pair`; `admin…` as today.
 - **Old fragments:** a set used to be `/cards#set-<code>`. A fragment never
@@ -609,24 +608,66 @@ Not changed here; listed for the owner:
   listener).
 - **Attachments** in the chat.
 
-## 10. Owner decisions
+## 10. Owner decisions (10.11.2026)
 
-1. **Accept the dependency graph** of [leptos.md](../dependency-proposal/leptos.md)
-   with the three exceptions (`paste` unmaintained, `xxhash-rust` BSL-1.0,
-   `base16` CC0-1.0) — or choose the framework-free fallback (§2.2).
-2. **Impressum:** plain server-rendered text from deploy configuration
-   (proposed), or keep the proof of work (not WCAG AA, needs script).
-3. **Card images:** none, with links to Scryfall (proposed), or an exception
-   to the no-third-party rule for `cards.scryfall.io`.
-4. **The hero's WebGL cloud simulation:** a still painting (proposed), or
-   kept as an enhancement with a pause button.
-5. **Contact form** through `/site/contact` on this origin: needs
-   `https://baylee.app` in the feedback service's `FEEDBACK_CONTACT_ORIGINS`
-   and a Caddy route (deployment, Baylee repository).
-6. **Pairing UI:** build the page now (it cannot be used until the client
-   parses `baylee://pair`), or wait for the client.
-7. **The remembrance as its own page** (`/{lang}/baylee`): its presentation
-   changes, which needs the family's agreement.
-8. **The Fan Content notice inside an open conversation on a phone:** in the
-   conversation's details, one tap away (proposed), or a one-line strip
-   under its head.
+1. **Leptos with the three exceptions: yes** ("1. Ja wählen.").
+2. **Impressum:** the proof of work stays (it is not what conflicts with
+   WCAG); what changed is the drawing: once solved, the details are ordinary,
+   accessible text. The data stays where it was, in the feedback service's
+   deploy-time blob.
+3. **Cards:** the card lists and pictures go entirely. Only the numbers
+   remain: fully implemented, generated, partly implemented and all cards,
+   each with an explanation (a toggletip, no script). `/cards` and its
+   sets send to the start page's numbers.
+4. **The WebGL cloud simulation goes**: a still painting (why it could have
+   stayed: it needs script or its own WebAssembly, runs on the main thread
+   all the time, and needs a pause control under WCAG 2.2.2).
+5. **Contact form:** "do what is right": through `/site/contact` on this
+   origin, as `/site/impressum` already is; no request to another origin.
+6. **Pairing:** build the page now and teach Baylee's client the link (a
+   separate session in the Baylee repository).
+7. **No separate remembrance page:** the album opens when the big logo is
+   pressed (a dialog, as before).
+8. **Fan Content notice in an open conversation on a phone:** in the
+   conversation's details, "nicely and not bulky".
+
+## 11. As built: phase 2 (server and content pages)
+
+- `crates/central-web` (pages, islands, the words), `central-web-server`
+  (the binary), `central-web-islands` (the module); `cargo xtask site`.
+- The words: `locales/<lang>/site.ftl` turned into typed functions by
+  `build.rs` (332 messages each; a missing message, an argument English does
+  not have, or other tags than English fail the build).
+- Phones: below 40rem only the page scrolls and the bottom bar sits below
+  it, so it never covers a control (axe's target-size rule found that a
+  sticky bar does); 40–60rem: a menu button in the bar opens the same sheet.
+- Fonts subset further to Latin-1 and the punctuation used (−35 % for
+  Alegreya Sans), declared with `unicode-range`.
+- Trusted Types are enforced (`trusted-types baylee`): the islands start
+  Workers only through the `baylee` policy, which vouches for the site's own
+  hashed scripts alone.
+- The theme switch, the invoker-command fallback and the account link's
+  name are `boot.js`; dialogs, menus and explanations are HTML
+  (`<dialog>`, `popover`, invoker commands) and work without script.
+- Tests: `central-web` (words, markdown, data, contrast of every token pair
+  in both schemes), `central-web-server` (every page in both languages:
+  one `h1`, canonical, hreflang, OpenGraph, JSON-LD that parses, no inline
+  style or script, sized pictures, the Fan Content notice, nothing from
+  elsewhere; addresses and status codes; the download by machine), and
+  `web/e2e-site` (Playwright, CI job `site`).
+
+**Measured (10.11.2026, local, Lighthouse 13.5.0, behind gzip as Caddy
+encodes):**
+
+| Page | Mobile perf. | LCP (mobile) | Desktop perf. | A11y | Best pr. | SEO |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `/en/` | 96 | 2.8 s | 100 | 100 | 100 | 100 |
+| `/en/download` | 99 | 1.8 s | 100 | 100 | 100 | 100 |
+| `/de/contact` | 97 | 2.4 s | 100 | 100 | 100 | 100 |
+| `/en/gateways` | 99 | 1.8 s | 100 | 100 | 100 | 100 |
+| `/de/faq` | 99 | 1.9 s | 100 | 100 | 100 | 100 |
+| `/de/impressum` | 97 | 2.6 s | 100 | 100 | 100 | 69 (`noindex` on purpose) |
+
+Mobile is Lighthouse's simulated slow 4G; the start page's LCP is the
+painting. CLS ≤ 0.014 everywhere. The Rich Results Test needs a public
+address (staging).

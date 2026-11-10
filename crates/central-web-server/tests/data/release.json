@@ -1,0 +1,17 @@
+{
+  "tag": "v0.2.0-beta.o1",
+  "page": "https://github.com/AceVik/baylee/releases/tag/v0.2.0-beta.o1",
+  "date": "2026-11-08",
+  "prerelease": true,
+  "files": [
+    {"name": "Baylee-Setup-0.2.0-beta.o1-x64.exe", "platform": "WindowsX64", "kind": "Installer", "size": 48213504, "url": "https://github.com/AceVik/baylee/releases/download/v0.2.0-beta.o1/Baylee-Setup-0.2.0-beta.o1-x64.exe", "checksum": "https://github.com/AceVik/baylee/releases/download/v0.2.0-beta.o1/Baylee-Setup-0.2.0-beta.o1-x64.exe.sha256", "signature": null},
+    {"name": "baylee-client-0.2.0-beta.o1-x86_64-pc-windows-msvc.zip", "platform": "WindowsX64", "kind": "Archive", "size": 52428800, "url": "https://github.com/AceVik/baylee/releases/download/v0.2.0-beta.o1/baylee-client-0.2.0-beta.o1-x86_64-pc-windows-msvc.zip", "checksum": "https://github.com/AceVik/baylee/releases/download/v0.2.0-beta.o1/baylee-client-0.2.0-beta.o1-x86_64-pc-windows-msvc.zip.sha256", "signature": "https://github.com/AceVik/baylee/releases/download/v0.2.0-beta.o1/baylee-client-0.2.0-beta.o1-x86_64-pc-windows-msvc.zip.sig"},
+    {"name": "baylee-client-0.2.0-beta.o1-x86_64-pc-windows-msvc-v2.zip", "platform": "WindowsX64", "kind": "Fallback", "size": 52011008, "url": "https://github.com/AceVik/baylee/releases/download/v0.2.0-beta.o1/baylee-client-0.2.0-beta.o1-x86_64-pc-windows-msvc-v2.zip", "checksum": null, "signature": null},
+    {"name": "Baylee-Setup-0.2.0-beta.o1-arm64.exe", "platform": "WindowsArm64", "kind": "Installer", "size": 45088768, "url": "https://github.com/AceVik/baylee/releases/download/v0.2.0-beta.o1/Baylee-Setup-0.2.0-beta.o1-arm64.exe", "checksum": null, "signature": null},
+    {"name": "Baylee-0.2.0-beta.o1-aarch64.dmg", "platform": "MacArm64", "kind": "Installer", "size": 61865984, "url": "https://github.com/AceVik/baylee/releases/download/v0.2.0-beta.o1/Baylee-0.2.0-beta.o1-aarch64.dmg", "checksum": null, "signature": null},
+    {"name": "Baylee-0.2.0-beta.o1-x86_64.dmg", "platform": "MacX64", "kind": "Installer", "size": 63963136, "url": "https://github.com/AceVik/baylee/releases/download/v0.2.0-beta.o1/Baylee-0.2.0-beta.o1-x86_64.dmg", "checksum": null, "signature": null},
+    {"name": "Baylee-0.2.0-beta.o1-x86_64.AppImage", "platform": "LinuxX64", "kind": "Installer", "size": 70254592, "url": "https://github.com/AceVik/baylee/releases/download/v0.2.0-beta.o1/Baylee-0.2.0-beta.o1-x86_64.AppImage", "checksum": null, "signature": null},
+    {"name": "baylee_0.2.0-beta.o1_amd64.deb", "platform": "LinuxX64", "kind": "Deb", "size": 49283072, "url": "https://github.com/AceVik/baylee/releases/download/v0.2.0-beta.o1/baylee_0.2.0-beta.o1_amd64.deb", "checksum": null, "signature": null},
+    {"name": "Baylee-0.2.0-beta.o1-aarch64.AppImage", "platform": "LinuxArm64", "kind": "Installer", "size": 67108864, "url": "https://github.com/AceVik/baylee/releases/download/v0.2.0-beta.o1/Baylee-0.2.0-beta.o1-aarch64.AppImage", "checksum": null, "signature": null}
+  ]
+}

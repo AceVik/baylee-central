@@ -1,0 +1,21 @@
+[package]
+name = "central-web-islands"
+version = "0.1.0"
+description = "baylee.app's islands as one WebAssembly module (cargo xtask site builds it)"
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+central-web = { path = "../central-web", version = "=0.1.0" }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+leptos = { version = "=0.8.23", default-features = false, features = ["islands", "hydrate"] }
+wasm-bindgen = { version = "=0.2.130", default-features = false, features = ["std"] }
+
+[lints]
+workspace = true

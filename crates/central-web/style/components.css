@@ -1,0 +1,417 @@
+/* Components: buttons, icons, cards, facts, pills, notices, fields, the
+   card numbers with their explanations. Sizes that follow their own text
+   are in em; targets are 44 px at least. */
+
+.icon {
+  flex: none;
+  inline-size: 1.25em;
+  block-size: 1.25em;
+}
+
+/* ---- Buttons ----------------------------------------------------------- */
+
+.button,
+.tool {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5em;
+  min-block-size: var(--target);
+  font: inherit;
+  font-weight: 700;
+  line-height: 1.2;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease),
+    transform var(--dur-fast) var(--ease);
+}
+
+.button {
+  padding: 0.6em 1.15em;
+  border: var(--hairline) solid var(--edge);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.button:hover {
+  background: var(--surface-raised);
+}
+
+.button:active {
+  transform: scale(0.98);
+}
+
+/* The one thing to do: gold, once per view. */
+.button.primary {
+  border-color: var(--action-edge);
+  background: var(--action);
+  color: var(--on-action);
+}
+
+.button.primary:hover {
+  background: var(--action-hover);
+}
+
+.button.quiet {
+  border-color: transparent;
+  background: transparent;
+  color: var(--accent);
+}
+
+.button.quiet:hover {
+  background: var(--surface-raised);
+}
+
+.button.danger {
+  color: var(--bad);
+}
+
+.button[aria-disabled="true"] {
+  cursor: progress;
+  opacity: 0.75;
+}
+
+.tool {
+  min-inline-size: var(--target);
+  padding: 0.5em;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--ink);
+}
+
+.tool:hover {
+  background: var(--surface-raised);
+}
+
+.tool.lang {
+  gap: 0.4em;
+  padding-inline: 0.75em;
+  border-radius: var(--radius-sm);
+  font-weight: 500;
+}
+
+/* The colour switch shows the icon of the scheme in use. */
+.theme [class^="when-"] {
+  display: none;
+}
+
+.theme[data-state="system"] .when-system,
+.theme[data-state="light"] .when-light,
+.theme[data-state="dark"] .when-dark {
+  display: inline-flex;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  margin-block-start: var(--space-5);
+}
+
+/* ---- Surfaces ---------------------------------------------------------- */
+
+.card {
+  padding: var(--space-5);
+  border: var(--hairline) solid var(--edge-soft);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+.card > .icon:first-child {
+  inline-size: 1.75rem;
+  block-size: 1.75rem;
+  margin-block-end: var(--space-3);
+  color: var(--accent);
+}
+
+.card h3 {
+  margin-block-end: var(--space-2);
+}
+
+.card p + p {
+  margin-block-start: var(--space-2);
+}
+
+.cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 18rem), 1fr));
+  gap: var(--space-4);
+  margin-block-start: var(--space-6);
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: var(--space-2) var(--space-4);
+  margin-block-start: var(--space-3);
+  font-size: var(--text-sm);
+}
+
+.facts dt {
+  color: var(--ink-faint);
+}
+
+.facts dd {
+  min-inline-size: 0;
+  overflow-wrap: anywhere;
+}
+
+.facts dd > a {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: var(--target);
+}
+
+@container (max-width: 22rem) {
+  .facts {
+    grid-template-columns: 1fr;
+    gap: var(--space-1);
+  }
+
+  .facts dd + dt {
+    margin-block-start: var(--space-2);
+  }
+}
+
+.cards-grid > .card {
+  container-type: inline-size;
+}
+
+.address {
+  overflow-wrap: anywhere;
+}
+
+/* ---- Words of state ------------------------------------------------------ */
+
+.pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  padding: 0.15em 0.65em;
+  border: var(--hairline) solid var(--edge-soft);
+  border-radius: var(--radius-full);
+  background: var(--surface-raised);
+  color: var(--ink-soft);
+  font-size: var(--text-xs);
+  font-weight: 700;
+}
+
+.pill .icon {
+  inline-size: 1.1em;
+  block-size: 1.1em;
+}
+
+.pill .dot {
+  inline-size: 0.55em;
+  block-size: 0.55em;
+  border-radius: var(--radius-full);
+  background: currentcolor;
+}
+
+.pill.ok {
+  color: var(--ok);
+}
+
+.pill.off {
+  color: var(--ink-faint);
+}
+
+.pill.accent {
+  color: var(--accent);
+}
+
+.notice {
+  margin-block-start: var(--space-4);
+  padding: var(--space-4);
+  border-inline-start: 0.25rem solid var(--warn);
+  border-radius: var(--radius-sm);
+  background: var(--warn-tint);
+  color: var(--ink);
+}
+
+.hint,
+.meta {
+  margin-block-start: var(--space-2);
+  color: var(--ink-faint);
+  font-size: var(--text-sm);
+}
+
+.error {
+  color: var(--bad);
+  font-weight: 500;
+}
+
+.error:empty {
+  display: none;
+}
+
+/* ---- Forms --------------------------------------------------------------- */
+
+.form {
+  display: grid;
+  gap: var(--space-5);
+}
+
+.field {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.field label {
+  color: var(--title);
+  font-weight: 700;
+}
+
+.field input,
+.field textarea {
+  inline-size: 100%;
+  min-block-size: var(--target);
+  padding: 0.6em 0.75em;
+  border: var(--hairline) solid var(--edge);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+}
+
+.field textarea {
+  resize: vertical;
+}
+
+.field [aria-invalid="true"] {
+  border-color: var(--bad);
+  box-shadow: 0 0 0 var(--hairline) var(--bad);
+}
+
+.hint.near {
+  color: var(--warn);
+}
+
+/* The honeypot: never seen, never reached by Tab. */
+.trap {
+  position: absolute;
+  inset-inline-start: -100vw;
+}
+
+.done {
+  border-inline-start: 0.25rem solid var(--ok);
+}
+
+/* ---- The card numbers ----------------------------------------------------- */
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  gap: var(--space-4);
+  margin-block-start: var(--space-6);
+}
+
+.stat {
+  position: relative;
+  padding: var(--space-5);
+  border: var(--hairline) solid var(--edge-soft);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+.stat-value {
+  color: var(--title);
+  font-family: var(--font-prose);
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.stat-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-block-start: var(--space-1);
+  color: var(--ink-soft);
+}
+
+.tip {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: var(--target);
+  block-size: var(--target);
+  margin-block: calc(var(--space-3) * -1);
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.tip:hover {
+  background: var(--surface-raised);
+}
+
+/* The explanation: a popover, opened by the button (and by hover where the
+   browser has interest invokers); Escape and a tap elsewhere close it. */
+.tip-body {
+  max-inline-size: min(22rem, calc(100vw - 2 * var(--gutter)));
+  margin: auto;
+  padding: var(--space-4);
+  border: var(--hairline) solid var(--edge);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: var(--text-sm);
+  box-shadow: var(--elevation-2);
+}
+
+@supports (position-anchor: --a) {
+  .tip-body {
+    margin: 0;
+    position-area: block-end;
+    position-try-fallbacks: flip-block;
+    margin-block: var(--space-2);
+  }
+}
+
+.share {
+  margin-block-start: var(--space-5);
+  color: var(--ink);
+  font-size: var(--text-lg);
+}
+
+/* ---- Pictures ---------------------------------------------------------------- */
+
+figure img {
+  border: var(--hairline) solid var(--edge-soft);
+  border-radius: var(--radius-lg);
+}
+
+figcaption {
+  margin-block-start: var(--space-2);
+  color: var(--ink-soft);
+  font-size: var(--text-sm);
+}
+
+progress {
+  inline-size: 100%;
+  block-size: 0.5rem;
+  accent-color: var(--accent);
+}
+
+/* A count that heads a list: a heading for the outline, quiet to the eye. */
+h2.count {
+  color: var(--ink-faint);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}

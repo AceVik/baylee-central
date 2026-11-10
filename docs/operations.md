@@ -534,6 +534,65 @@ MemoryDenyWriteExecute=yes
 SystemCallFilter=@system-service
 ```
 
+## The server-rendered website (`central-web`)
+
+*Added 10.11.2026, not deployed* ([proposal](proposals/frontend-rewrite.md)).
+Until the owner switches Caddy over, `baylee.app` keeps serving the static
+build of `web/` as before; nothing here changes production by being merged.
+
+- **Build** (as the build user, beside `central-service`):
+  `cargo build --release --locked -p central-web-server` and, with
+  `BAYLEE_SRC=/opt/baylee/src` for the screenshots and the fallback card
+  status, `cargo xtask site` ([xtask](xtask.md#the-sites-assets-site)).
+  Stage `target/release/central-web` and `target/site/`.
+- **Run** as an unprivileged user of its own (no database, no secret, no
+  write access anywhere), `central-web --config-stdin` with
+  `StandardInput=file:/etc/baylee-app/web.json`:
+
+  ```json
+  {"listen": "127.0.0.1:28794", "origin": "https://baylee.app",
+   "site": "/opt/baylee-app/site", "central": "127.0.0.1:28791",
+   "github": true, "fallback": "/opt/baylee-app/site/fallback"}
+  ```
+
+  `verification` may carry a search console's verification value (never
+  committed). The process asks `api.github.com` and
+  `raw.githubusercontent.com` (Baylee's repository only, every ten minutes)
+  and Central's browser listener on loopback (every minute): outbound HTTPS
+  to GitHub must be allowed. It logs nothing about requests.
+- **Caddy**: `/api/*` stays as it is (Central's browser listener);
+  `/site/impressum*` and, new, `/site/contact` go to the feedback service
+  (which needs `https://baylee.app` in `FEEDBACK_CONTACT_ORIGINS`);
+  everything else to `central-web`, with the `Cookie` header removed (it
+  never needs the session) and `encode zstd gzip`:
+
+  ```caddyfile
+  baylee.app {
+  	@feedback path /site/impressum /site/impressum/* /site/contact
+  	handle @feedback {
+  		request_body {
+  			max_size 32KiB
+  		}
+  		reverse_proxy <feedback service>
+  	}
+  	handle /api/* {
+  		reverse_proxy 127.0.0.1:28791
+  	}
+  	handle {
+  		reverse_proxy 127.0.0.1:28794 {
+  			header_up -Cookie
+  		}
+  	}
+  	encode zstd gzip
+  }
+  ```
+
+  The security headers (CSP, Permissions-Policy, COOP, CORP, HSTS) come from
+  `central-web` itself; Caddy adds none.
+- **Until the administration is rebuilt** (phase 5 of the proposal),
+  `/admin*` can keep being served from the old build: a `handle /admin*`
+  with the old `file_server` block in front of the `central-web` handle.
+
 ## Deploying with the gateway
 
 The 2 November 2026 preparation sets the service and website to

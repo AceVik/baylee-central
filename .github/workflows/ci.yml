@@ -146,3 +146,32 @@ jobs:
       - run: npm run check
       - run: npx playwright install --with-deps chromium
       - run: npm run e2e
+
+  # The server-rendered site (docs/proposals/frontend-rewrite.md): the
+  # islands linted for the browser's target, the assets built as a deployment
+  # builds them, then every page in a real browser: axe-core (WCAG 2.2 AA) in
+  # both colour schemes, 44 px targets, no sideways scrolling from 320 to
+  # 2560 px, no request to another origin, keyboard paths and the islands.
+  site:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: rustup toolchain install 1.99.0 --profile minimal --target wasm32-unknown-unknown --component clippy
+      - name: Clippy for the browser's half
+        run: cargo clippy --locked -p central-web -p central-web-islands --target wasm32-unknown-unknown --lib -- -D warnings
+      - run: cargo build --locked -p central-web-server
+      - run: cargo xtask site
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24.21.0
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci --no-audit --no-fund
+        working-directory: web
+      - run: npx playwright install --with-deps chromium
+        working-directory: web
+      - run: npm run e2e:site
+        working-directory: web

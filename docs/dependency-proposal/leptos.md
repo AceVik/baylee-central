@@ -1,8 +1,9 @@
 # Leptos for the website: dependency proposal
 
-Status: **proposed 10.11.2026, not accepted.** Nothing here is in
-`approved-packages.json`; the owner's acceptance is required before adoption
-(AGENTS.md, "Safety and dependencies"). Context and the alternatives are in
+Status: **accepted by the owner on 10.11.2026** ("1. Ja wählen.", in the
+frontend session), with the three gate exceptions below, over the
+framework-free fallback. Recorded in `approved-packages.json`, `deny.toml`
+and `.cargo/audit.toml`. Context and the alternatives are in
 [the frontend proposal](../proposals/frontend-rewrite.md) §2.
 
 ## What is proposed
@@ -157,7 +158,9 @@ the owner's decision; none is made by this proposal.
    list. Used by `wasm_split_macros`.
 
 `deny.toml` also needs `skip` entries for the duplicate versions this graph
-introduces (`convert_case` 0.6.0 and 0.11.0, `thiserror` 1.0.69 beside 2.x).
+introduces: `convert_case` 0.6.0 beside 0.11.0, `thiserror` and
+`thiserror-impl` 1.0.69 beside 2.x, `prettyplease` 0.3.0 beside 0.2.37 and
+`proc-macro2-diagnostics` 0.11.0 beside 0.10.1.
 
 ## Integration constraints
 

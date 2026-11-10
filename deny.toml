@@ -4,7 +4,13 @@ all-features = true
 [advisories]
 # Bound by cargo xtask crypto-scope in the gate and dependency job.
 # See docs/crypto-proposal/bigint-advisory.md for the unreachable arithmetic.
-ignore = ["RUSTSEC-2026-0387"]
+# RUSTSEC-2024-0436: paste 1.0.15 is unmaintained; a compile-time proc macro
+# of Leptos (owner, 10.11.2026, docs/dependency-proposal/leptos.md). Remove
+# when Leptos drops it.
+ignore = [
+  "RUSTSEC-2026-0387",
+  { id = "RUSTSEC-2024-0436", reason = "paste: Leptos' compile-time proc macro, owner-accepted 10.11.2026; remove when Leptos drops it" },
+]
 unmaintained = "all"
 unsound = "all"
 
@@ -37,6 +43,12 @@ skip = [
   { name = "syn", version = "=2.0.119", reason = "Dalek/zeroize proc macros still require syn 2" },
   { name = "curve25519-dalek", version = "=4.1.3", reason = "OPAQUE (opaque-ke 4) vs the pairing's HPKE X25519 (x25519-dalek 3); no shared types" },
   { name = "fiat-crypto", version = "=0.2.9", reason = "curve25519-dalek 4.1.3's fiat backend; built by neither (cfg never set)" },
+  # Leptos (docs/dependency-proposal/leptos.md, owner 10.11.2026).
+  { name = "convert_case", version = "=0.6.0", reason = "Leptos' config crate vs leptos_macro's convert_case 0.11" },
+  { name = "thiserror", version = "=1.0.69", reason = "Leptos' server_fn and config vs the workspace's thiserror 2" },
+  { name = "thiserror-impl", version = "=1.0.69", reason = "thiserror 1.0.69's derive" },
+  { name = "prettyplease", version = "=0.3.0", reason = "leptos_macro (syn 3) vs bindgen 0.72's prettyplease 0.2" },
+  { name = "proc-macro2-diagnostics", version = "=0.11.0", reason = "Leptos' rstml (syn 3) vs the workspace's 0.10" },
 ]
 
 [licenses]
@@ -47,6 +59,17 @@ allow = ["MIT", "Apache-2.0", "BSD-3-Clause", "Unicode-3.0", "ISC", "Zlib", "CDL
 name = "ece"
 version = "=2.4.2"
 allow = ["MPL-2.0"]
+
+# Leptos' dependencies (owner, 10.11.2026, docs/dependency-proposal/leptos.md).
+[[licenses.exceptions]]
+name = "xxhash-rust"
+version = "=0.8.19"
+allow = ["BSL-1.0"]
+
+[[licenses.exceptions]]
+name = "base16"
+version = "=0.2.1"
+allow = ["CC0-1.0"]
 
 [licenses.private]
 ignore = true
