@@ -3611,7 +3611,8 @@ stored.
   now marked only after the store issued the session or stored the new
   password (unit test; real HTTP and PostgreSQL: a stale finish is
   `Rejected`, and its place is refused with the strangers while home is
-  served).
+  served; with the mark put back before the store's call that scenario
+  fails at this assertion, run once and restored).
 - *Asking what the counts know*: with an address's or an account's count
   spent, a start is answered only at an own place, so whoever sends from
   an address learns whether a given account signed in from it. Not
