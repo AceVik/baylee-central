@@ -6,9 +6,9 @@ use serde_json::json;
 use super::Built;
 use super::home::{contact_columns, gateway_card};
 use crate::data::Gateway;
-use crate::rich::{plain, rich};
+use crate::rich::{icon, plain, rich};
 use crate::site::shell::{DISCORD, Meta, REPOSITORY};
-use crate::site::{Context, Page};
+use crate::site::{Context, Page, icons};
 use crate::words::{self, Lang, Piece};
 
 fn head<L: IntoView + 'static>(
@@ -48,9 +48,103 @@ pub fn gateways(cx: &Context<'_>) -> Built {
     (meta, body)
 }
 
-/// Every gateway Central lists, the official one first; finding one by
-/// name or address, or only those online, is `directory.js`'s (without
-/// it every card shows).
+/// The directory in numbers: how many gateways are listed and online, and
+/// what the online ones say is happening on them, added up (only while one
+/// says so).
+fn directory_stats(lang: Lang, all: &[Gateway]) -> impl IntoView + use<> {
+    let count = |n: usize| u64::try_from(n).unwrap_or(u64::MAX);
+    let tile = |glyph: &'static str, label: &'static str, value: u64, live: bool| {
+        view! {
+            <div class="dir-stat glass" class:is-live=live>
+                <dt>{icon(glyph)}<span>{label}</span></dt>
+                <dd class="num">{words::number(lang, value)}</dd>
+            </div>
+        }
+    };
+    let online = all.iter().filter(|gateway| gateway.online).count();
+    let now = crate::data::activity_of(all).map(|(players, tables, games)| {
+        view! {
+            {tile(icons::USERS, words::gw_stat_players(lang), players, false)}
+            {tile(icons::LAYOUT_DASHBOARD, words::gw_stat_tables(lang), tables, false)}
+            {tile(icons::GAMEPAD_2, words::gw_stat_games(lang), games, false)}
+        }
+    });
+    view! {
+        <dl class="dir-stats" aria-label=words::gw_stats(lang)>
+            {tile(icons::SERVER, words::gw_stat_listed(lang), count(all.len()), false)}
+            {tile(icons::GLOBE, words::gw_stat_online(lang), count(online), online > 0)}
+            {now}
+        </dl>
+    }
+}
+
+/// Finding, narrowing, sorting and laying out the directory: all of it is
+/// `directory.js`'s over the cards the server wrote, so the bar is hidden
+/// until that script shows it.
+fn directory_tools(lang: Lang, all: &[Gateway]) -> impl IntoView + use<> {
+    let count = |n: usize| words::number(lang, u64::try_from(n).unwrap_or(u64::MAX));
+    let online = all.iter().filter(|gateway| gateway.online).count();
+    let official = all.iter().filter(|gateway| gateway.official).count();
+    let tables = all
+        .iter()
+        .filter(|gateway| gateway.online && gateway.activity.is_some_and(|now| now.tables > 0))
+        .count();
+    // a chip that would show nothing is not offered
+    let chip = |show: &'static str, label: &'static str, n: usize, dot: bool| {
+        (show.is_empty() || n > 0).then(|| {
+            view! {
+                <button type="button" class="chip-btn" aria-pressed=if show.is_empty() { "true" } else { "false" } data-show=show>
+                    {dot.then(|| view! { <span class="dot ok" aria-hidden="true"></span> })}
+                    <span>{label}</span>
+                    <span class="chip-n num">{count(n)}</span>
+                </button>
+            }
+        })
+    };
+    let sort = |value: &'static str, label: &'static str| view! { <option value=value>{label}</option> };
+    view! {
+        <div class="dir-tools" hidden=true data-find-bar="">
+            <div class="dir-row">
+                <div class="dir-search">
+                    <span class="dir-search-mark">{icon(icons::SEARCH)}</span>
+                    <label class="visually-hidden" for="dir-find">{words::gw_find(lang)}</label>
+                    <input id="dir-find" type="search" placeholder=words::gw_find_hint(lang) maxlength="80"
+                        autocomplete="off" spellcheck="false" aria-keyshortcuts="Control+K Meta+K" />
+                    <kbd class="dir-key" aria-hidden="true" data-key="">"Ctrl K"</kbd>
+                </div>
+                <div class="dir-sort">
+                    <label for="dir-sort">{icon(icons::ARROW_UP_DOWN)}<span class="visually-hidden">{words::gw_sort(lang)}</span></label>
+                    <select id="dir-sort" data-sort="">
+                        {sort("", words::gw_sort_best(lang))}
+                        {sort("name", words::gw_sort_name(lang))}
+                        {sort("players", words::gw_sort_players(lang))}
+                        {sort("tables", words::gw_sort_tables(lang))}
+                        {sort("version", words::gw_sort_version(lang))}
+                    </select>
+                </div>
+                <div class="dir-view" role="group" aria-label=words::gw_view(lang)>
+                    <button type="button" class="round-btn" aria-pressed="true" data-view="" aria-label=words::gw_view_cards(lang) title=words::gw_view_cards(lang)>
+                        {icon(icons::LAYOUT_GRID)}
+                    </button>
+                    <button type="button" class="round-btn" aria-pressed="false" data-view="list" aria-label=words::gw_view_list(lang) title=words::gw_view_list(lang)>
+                        {icon(icons::LIST)}
+                    </button>
+                </div>
+            </div>
+            <div class="dir-chips" role="group" aria-label=words::gw_show(lang)>
+                {chip("", words::gw_show_every(lang), all.len(), false)}
+                {chip("online", words::gw_show_online(lang), online, true)}
+                {chip("official", words::gw_show_official(lang), official, false)}
+                {chip("tables", words::gw_show_tables(lang), tables, false)}
+            </div>
+        </div>
+    }
+}
+
+/// Every gateway Central lists, the official one first: the directory in
+/// numbers, then the cards. Finding one by name or address, narrowing to
+/// those online, official or with open tables, sorting and the list view
+/// are `directory.js`'s (without it every card shows, in this order).
 fn directory(lang: Lang, all: Option<&[Gateway]>) -> impl IntoView + use<> {
     let Some(all) = all else {
         return view! { <p class="notice dir-failure glass">{words::gws_failed(lang)}</p> }
@@ -65,25 +159,15 @@ fn directory(lang: Lang, all: Option<&[Gateway]>) -> impl IntoView + use<> {
         u64::try_from(all.len()).unwrap_or(u64::MAX),
         &words::number(lang, u64::try_from(online).unwrap_or(u64::MAX)),
     );
-    let find = (all.len() > 1).then(|| {
-        view! {
-            <div class="dir-find" hidden=true data-find-bar="">
-                <label class="visually-hidden" for="dir-find">{words::gw_find(lang)}</label>
-                <input id="dir-find" type="search" placeholder=words::gw_find_hint(lang) maxlength="80"
-                    autocomplete="off" spellcheck="false" aria-keyshortcuts="Control+K Meta+K" />
-                <button type="button" class="chip-btn" aria-pressed="false" data-online-only="">
-                    <span class="dot ok" aria-hidden="true"></span>{words::gw_online_only(lang)}
-                </button>
-            </div>
-        }
-    });
+    let tools = (all.len() > 1).then(|| directory_tools(lang, all));
     let cards = all
         .iter()
         .map(|gateway| gateway_card(lang, gateway, true))
         .collect_view();
     view! {
         <div class="directory">
-            {find}
+            {directory_stats(lang, all)}
+            {tools}
             <output class="small dir-count" data-dir-count="" data-shown=words::gw_shown(lang, "{n}", "{all}")>{count}</output>
             <p class="dir-none" hidden=true data-no-match="">
                 {words::gw_no_match(lang)}" "
