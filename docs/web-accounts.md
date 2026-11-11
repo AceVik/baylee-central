@@ -28,7 +28,8 @@ first. Every piece goes through the three passes of
 
 **Registration** (website, no session yet):
 
-1. `RegisterChallengeFor { signals }` (or `RegisterChallenge`), then
+1. `RegisterChallengeFor { signals }` → `RegisterWork { nonce, parts,
+   difficulty, memory, passes, expires_at }`, then
    `Register { username, display_name, nonce, counters }` →
    `Enrollment { identity, ticket }` while registration is open. The proof of work is checked and spent first
    ([registration abuse](registration-abuse.md)); the username must be
@@ -261,20 +262,30 @@ history, and adds `registration`, the administrators' switch
 
 **Wire.**
 
-- `Request::RegisterChallenge` → `Response::RegisterChallenge { nonce,
-  parts, difficulty, expires_at }` (11.11.2026, browser listener only): the
-  proof of work of `docs/registration-abuse.md`, which `Register` carries
-  as `nonce` and `counters` and Central checks and spends before anything
-  else.
-- `Request::RegisterChallengeFor { signals }` → the same answers
-  (11.11.2026, browser listener only): the challenge asked by a page that
-  reports what it saw of its own browser, one bit each
+- `Request::RegisterChallengeFor { signals }` → `Response::RegisterWork {
+  nonce, parts, difficulty, memory, passes, expires_at }`, or
+  `RegistrationClosed` (11.11.2026, browser listener only): the proof of
+  work of `docs/registration-abuse.md` §"A proof that costs memory", which
+  `Register` carries as `nonce` and `counters`. For each of `parts` parts
+  the page finds a counter whose Argon2id output (`memory` KiB, `passes`
+  passes; `central_crypto::proof`, the one function for the page and for
+  Central) begins with `difficulty` zero bits. Central asks 16,384 KiB,
+  one pass, eight parts and 4 to 10 bits; `expires_at` is five to twenty
+  minutes away, longer for a harder challenge. The page refuses a price
+  above `central_api::register`'s ceilings (each field, and
+  `WORK_MAX_COST` for the whole) before it works on it. `signals` is what
+  the page saw of its own browser, one bit each
   (`central_api::register::SIGNALS`: 1 `navigator.webdriver`, 2 no
-  `navigator.languages`; other bits are ignored). The report and the
-  request's headers only make the challenge harder, by up to four bits; the
-  older request is weighed by the same headers
-  (`docs/registration-abuse.md` §"Hardened"). `difficulty` is 16 to 22 and
-  `expires_at` five to twenty minutes away, longer for a harder challenge.
+  `navigator.languages`; other bits are ignored); the report and the
+  request's headers only make the challenge harder, by up to four bits
+  (`docs/registration-abuse.md` §"Hardened").
+- `Request::RegisterChallenge` → `Response::RegistrationClosed`, always
+  (browser listener; `Rejected` natively). It asked for the SHA-256 proof
+  of the first build of 11.11.2026, `Response::RegisterChallenge { nonce,
+  parts, difficulty, expires_at }`, which this Central neither hands out
+  nor takes. Both shapes stay in `central-api`: a page of this build that
+  meets a Central from before asks this way and solves that proof
+  (`pow-worker.js`).
 - `Request::Register { username, display_name, nonce, counters }`
   (the name since 23.10.2026, optional on the wire; the key until 11.11.2026) → `Response::Enrollment`. It needs
   no credential, shares the unauthenticated budget and takes a per-address
@@ -287,12 +298,20 @@ history, and adds `registration`, the administrators' switch
   clients pinned before the change still decode, and a legacy enrollment is sent
   exactly as before. It is required for registered accounts and refused for
   legacy ones; the schema holds the same rule.
+- `Register` is checked in this order: the address's budgets (the
+  listener), a worker of the service's four (`Busy` without one; the
+  challenge stays, and the page sends the same solution once more), then
+  the challenge leaves the table (one use), then the counters are checked
+  off the executor, part by part, ending at the first that does not hold.
+  A wrong answer to a living challenge costs Central one evaluation of
+  16 MiB, a right one eight.
 - A missing, spent, expired or wrong proof of work is `Rejected`, and so is
   every `Register` while registration is closed, before the name is looked
   at. Only with a valid proof does a taken name answer `Conflict`, so the page
   can say so. (Until 11.11.2026 the beta key held that place.) What stays:
   whoever solves a proof learns whether one sign-in name is free; each answer
-  costs a proof (two seconds and more, rising while registrations flood in)
+  costs a proof (a second of a laptop's processor and more, rising while
+  registrations flood in)
   and spends the address's budgets (5 an hour, 10 a day), and sign-in names
   are private, never shown to other players. A malformed name is `Rejected`.
 - A name is taken by any enrolled account, any legacy account (also one whose
@@ -580,6 +599,14 @@ call is the page's.
   under a new code; freeing it wipes the code (§"A recovery code after a
   sign-in", added 22.10.2026)
 - `central_origin()`, the Central the module is bound to (the live one)
+- `work_start(nonce, memory, passes, parts, difficulty)` → a `Work` state,
+  and `Work.search(part, from, tries)` → the first of `tries` counters
+  from `from` that solves the part, or nothing: registration's proof of
+  work (11.11.2026), `central_crypto::proof`, the function Central checks
+  with. `work_start` refuses a price above the ceilings before it takes
+  memory. The Worker searches in turns of eight counters, so the page can
+  show how far it is, and frees the state (`work_end`) before the password
+  is stretched.
 
 *Changed 21.10.2026 while building it:* `login_finish` first took
 `wrapped_master` too, but that only arrives in the answer to the KE3
@@ -589,7 +616,9 @@ exported objects rather than fields of plain objects, which would have needed
 JavaScript object, and an error is `rejected` or `unavailable`.
 
 A state is opaque, consumed by the step that takes it and wiped when dropped,
-also when the page frees it unused. Argon2id (64 MiB) runs in a module
+also when the page frees it unused. Argon2id (64 MiB for the password;
+before it, 16 MiB for each evaluation of registration's proof, given back
+first) runs in a module
 Worker, one per flow, terminated at the flow's end. The JS glue is made by
 `wasm-bindgen` (CLI, the same version) and committed under
 `web/src/central-wasm/` with its SHA-256 sums, so `npm run build` needs no

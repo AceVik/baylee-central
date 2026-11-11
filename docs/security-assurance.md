@@ -3730,3 +3730,147 @@ promise "a minute"; counting requests with a bearer only after the bearer
 is known, per address before that.
 
 Engineering review, not an audit.
+
+## A registration proof that costs memory, 11 November 2026
+
+The owner accepted Argon2id in SHA-256's place for registration's proof of
+work on 11.11.2026; the question and the answer are quoted in
+[the crypto protocol](crypto-protocol.md) §"Registration's proof of work".
+The reason was a measurement from the hardening before
+(§"Registration hardened"): one core solved the SHA-256 proof thirteen
+times as fast for a script as for the page.
+[Registration abuse](registration-abuse.md) §"A proof that costs memory"
+has the numbers in force and the measurements.
+
+**Pass 1, design.** Read: `central-identity`'s `challenge.rs`,
+`dispatch.rs` and `lib.rs` (the workers, and how sign-in's finish takes one
+before it consumes its attempt), `central-crypto`'s `legacy.rs` and
+`opaque/stretch.rs` (how Argon2 is called there), `central-api`'s
+`register.rs` and `wire.rs`, `central-web-crypto`, the page's `auth.rs` and
+both Workers, the crypto scope check and its record. Decided:
+
+1. *One function for both sides*, in `central-crypto`, where the Argon2
+   dependency is. `central-api`, from which the page reads its ceilings,
+   has none and gets none. No dependency, feature or lockfile change.
+2. *A fixed label as the salt separates the domain*; the nonce, the part
+   and the counter follow in fixed widths, so no two inputs are the same
+   bytes and no output means anything elsewhere.
+3. *Central sets the price and keeps it with the nonce.* The page takes it
+   up to ceilings both know when they are compiled, each field and the
+   whole.
+4. *An answer of its own* (`RegisterWork`): the older answer refuses a
+   field it does not know. `Register` stays as it is.
+5. *The old request is answered "paused"* and not refused: a page from
+   before has words for the one and would show the other as a registration
+   that failed.
+6. *A worker first, then the nonce.* A `Busy` must not cost a solved
+   challenge. The check runs off the executor and ends at the first part
+   that does not hold.
+7. *The numbers by measurement*: 16 MiB, one pass, eight parts, 4 to 10
+   bits.
+
+Decided against:
+- **A second implementation of the hash** (JavaScript in the page): two
+  functions drift, and the page's would be the slow one again.
+- **A function made for proofs of work**: a new dependency, and less read
+  than Argon2id.
+- **More memory**: Central's cost for each check, and phones.
+- **Keeping the SHA-256 request alive beside the new one**: the cheap way
+  would stay open to whoever asks the old way.
+- **Charging `Register`'s budget only for a good proof** (the hand-over's
+  open point): not decided by the owner, and with this change it would let
+  one address make Central compute without a bound.
+
+**Pass 2, implementation.** `central-crypto`: `proof.rs` (new; the safe
+`argon2` interface on memory the caller owns, as `legacy.rs` uses it).
+`central-api`: the ceilings, `work_cost`, `work_acceptable`,
+`Response::RegisterWork`. `central-web-crypto`: `work_start` and
+`Work.search`, and asserts that hold the two crates' ceilings equal; the
+committed module rebuilt in the pinned container. `central-identity`:
+`challenge.rs` (the price kept with the nonce; `prove`), `dispatch.rs`
+(the new answer, the old request, `Register`'s order),
+`with_registration_challenge` with a memory. The page: `auth.rs` and
+`crypto-worker.js` (the price checked before any work, the search in
+turns, the older way at an older Central, one more try on `Busy`). No
+migration, grant, setting, log line or stored datum is new; `Cargo.toml`
+and `Cargo.lock` are untouched. The crypto scope's fingerprint was pinned
+again after the documented source and graph review, by the author alone:
+`Review: pending` in `docs/crypto-proposal/bigint-advisory.md`.
+
+**Pass 3, an attacker's view, and what was tested.**
+- *The cheap way back.* The old request gets no nonce, and a SHA-256
+  solution is judged by the new function like any other counters. Over the
+  real listener and PostgreSQL (`registration.rs`, `older`): "paused" for
+  a person's headers and a script's, `Rejected` for a SHA-256 solution to a
+  made-up nonce and to an issued one, no account afterwards. Unit:
+  `a_sha_256_solution_is_not_taken`.
+- *Less than was asked.* The price is the one kept with the nonce; the
+  client sends none. A solution found at a lower difficulty or with less
+  memory does not hold (`central-crypto` and `challenge.rs` tests; over
+  the listener as before).
+- *A proof used twice, raced, or made up.* As before: the challenge leaves
+  the table under its lock before anything is judged, and now after a
+  worker is held. The listener's tests for these run on the new proof.
+- *A price that exhausts the page.* Whoever answers in Central's place and
+  asks for more than the ceilings gets no work: the page refuses before it
+  starts (site test: one bit above the most, and a kibibyte above 64 MiB,
+  with nothing handed in), and the module refuses again in `work_start`
+  before it takes memory.
+- *Making Central compute.* Only a `Register` that passed the address's
+  budget, found a worker and names a living challenge after its three
+  seconds is computed for: one evaluation for a wrong answer, eight for a
+  right one. A wrong count of counters is refused before any. The bound
+  is in the document; it was calculated from the measured evaluation, not
+  driven as a flood.
+- *Taking the workers, or losing someone's solution.* Without a worker
+  the answer is `Busy` and the challenge stays; the same solution is taken
+  afterwards (`a_busy_service_keeps_the_challenge_for_its_solution`), and
+  the page sends it once more (site test: 429, then the same counters
+  again).
+- *The name.* A wrong, late or early solution is refused before the name
+  is looked at, the same for a taken and a free one (the listener's test
+  from before, on the new proof).
+- *The test knob.* It only lowers and nothing a client or an operator
+  sends reaches it (`the_knob_only_lowers`; the launch does not call it).
+- *Two builds drifting apart.* One pinned vector, checked natively,
+  through the function the Worker calls, and in Chromium with the
+  committed module; its bytes also come out of OpenSSL's Argon2id.
+- *What the memory holds.* The inputs are public and the output is
+  compared with zero, so nothing secret is in the proof's memory and no
+  constant time is needed. The password's 64 MiB are taken after the
+  proof's 16 are given back.
+- *The other listener.* The native listener refuses `Register` and both
+  challenge requests, as before.
+
+Found on the way:
+1. `central-client`'s fixture used one address (`203.0.113.50`) in two
+   tests, registration's haste and the sign-in's guessing, on the commit
+   this work began from (`757e41a`), so the second found the address's
+   twenty challenges of the hour spent. Seen by reading on that commit and
+   as a failure on this branch; not run on `757e41a` itself. The haste
+   test moved to an address of its own.
+2. Chromium's throttle does not slow a Worker (measured, and refused on
+   the Worker's own session), so the brief's stand-in for a phone was
+   replaced by stopping and continuing the renderer in turns. The
+   document says how, and that no phone was measured.
+
+**What stays possible** (for the owner; the document's "What stays" has
+the numbers):
+- A script solves about as fast as a person's page on one core, and uses
+  all its cores where the page uses one. The proof is a price, not a wall.
+- Code with vector instructions, and graphics cards, were not measured.
+- Central computes for answers now. The bound holds within the budgets;
+  it was not measured on the serving machine, and the workers are
+  sign-in's too.
+- A register page from before, in a tab left open, cannot register until
+  it is reloaded; so the site is deployed first
+  ([operations](operations.md#registration)).
+- A device several times slower than the measured quarter can run out of
+  the hardest challenge's twenty minutes.
+- The privacy notice's sentence about the puzzle is older than this and
+  the hardening before it (five minutes, nothing about what the difficulty
+  depends on, nothing about Central computing); the wording is the
+  owner's and is handed over, not changed here.
+- A second reviewer has not read `proof.rs`.
+
+Engineering review, not an audit.

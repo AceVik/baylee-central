@@ -184,6 +184,84 @@ the MACs and code against `tests/pairing-vectors.py` (the standard library's
 HMAC and SHA-256); refusals of other secrets, fields and lengths; redacted
 `Debug`.
 
+## Registration's proof of work
+
+*Added 11.11.2026.* Not part of the login protocol and no key derivation: a
+proof that a browser spent memory and time before `Register`.
+[Registration abuse](registration-abuse.md) §"A proof that costs memory" has
+the service's side, the reasons for the numbers and the measurements.
+
+**The owner's acceptance.** Asked on 11.11.2026: "Rätsel mit Speicherkosten:
+Der Fork empfiehlt, das Registrierungsrätsel auf Argon2id umzustellen, weil
+ein Skript das jetzige etwa 13-mal schneller löst als die Seite im Browser.
+Das ist noch nicht gebaut." Answered the same day: "Beide Entscheidungen
+meiner Seits beantworte ich mit: ja". It accepts Argon2id as the proof's
+function. No dependency came with it: the `argon2` release, its one feature
+and `Cargo.lock` are as they were
+([the source and graph review](crypto-proposal/bigint-advisory.md)).
+
+**The function** is `central_crypto::proof`, on every build of the crate:
+the page's Worker reaches it through `central-web-crypto`, Central through
+`central-identity`. There is no second implementation. For a challenge's
+nonce, a part `p` and a counter `c`:
+
+```text
+Argon2id, version 0x13, one lane, m KiB, t passes, 32 bytes of output
+  salt     = "baylee-central/registration-proof/argon2id/v1"
+  password = nonce (its 64 lowercase hexadecimal digits, as sent)
+             ‖ p (one byte) ‖ c (eight bytes, big-endian)      73 bytes
+  no secret, no associated data
+```
+
+A counter solves its part when the output begins with at least
+`difficulty` zero bits; a challenge is solved by one such counter for each
+part, in the parts' order. The salt separates the domain: a fixed label
+naming the purpose, the function and a version, so an output means nothing
+where Argon2id is used otherwise (the password stretch inside OPAQUE and
+the legacy check have other parameters, lengths and inputs). Every input is
+public, and the output is compared with zero and dropped: no key and no
+secret comes of it, and nothing here needs constant time.
+
+**The parameters.** Central asks 16,384 KiB, one pass, eight parts and 4 to
+10 bits. Both sides refuse a price beyond fixed ceilings before they take
+memory (8 to 65,536 KiB, 4 passes, 16 parts, 16 bits; `central-api` and
+`central-crypto` each hold them, and a compile-time assert holds them
+equal). The page also keeps the whole (memory × passes × parts ×
+2^difficulty) to what Central asks at its most, which another assert ties
+to Central's own numbers. These numbers are a price and protect no
+password: nothing secret is stretched, so RFC 9106's choices for passwords
+and the fixed profile above are not their measure. Their measure is that
+one evaluation costs a script about what it costs the page, and Central
+one evaluation where the sender paid sixteen or more.
+
+**Why this and nothing of our own.** The choices were the SHA-256 puzzle
+that was there (measured thirteen times cheaper for a script than for the
+page, and far cheaper on a graphics card), a construction of our own, or a
+function made for proofs of work, which would have been a new dependency.
+Argon2id is the reviewed, standardized function whose cost is memory
+(RFC 9106), it is in this crate's accepted graph already, and it runs in
+that Worker and in Central already. The project takes no custom primitive:
+the module writes the 73 bytes, calls the crate's
+`hash_password_into_with_memory` on memory it owns and counts zero bits.
+Ours is only the frame (label, encoding, parts, the zero bits), and it is
+the frame the SHA-256 puzzle had.
+
+**Evidence.** A pinned vector (`proof.rs`, `the_pinned_vector_holds`): the
+nonce `000102…1e1f`, 64 KiB, one pass, four parts and three bits give the
+counters `[7, 25, 2, 7]` and, for part 0, 32 pinned bytes. OpenSSL 4.1.0's
+Argon2id, which shares no code with the crate, gives the same bytes
+(`openssl kdf -keylen 32 -kdfopt hexpass:… -kdfopt hexsalt:… -kdfopt
+lanes:1 -kdfopt memcost:64 -kdfopt iter:1 ARGON2ID`), and one output is
+compared with the Argon2 that `opaque-ke` brings. The same counters come
+from the function the Worker calls (`central-web-crypto`, `tests/flow.rs`)
+and from the committed WebAssembly module in Chromium
+(`web/e2e-site/account.spec.ts`), so either side drifting fails a test.
+Also tested: a solution for a lower price is refused, a search in turns
+finds what one search finds, the ceilings and the nonce's shape are refused
+before any work. Not done: a second reviewer has not read the module
+(`Review: pending` in the advisory record), and nothing was measured on
+tuned or graphics hardware.
+
 ## Evidence and remaining gates
 
 - RFC 9807 Appendix C.1.1 registration upload, KE2/KE3, export key and both peers'

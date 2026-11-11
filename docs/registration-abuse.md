@@ -4,7 +4,10 @@
 11.11.2026 ("As built" below): the proof of work (5), the budgets (6) and
 the honeypot and fill time (7). The owner's decisions of 10 and 11.11.2026
 replaced the modes, keys and invitations (1 to 4): registration is open, the
-closed beta's keys are gone, and an administrator's switch is the brake.*
+closed beta's keys are gone, and an administrator's switch is the brake. The
+owner's decision of 11.11.2026 put a proof that costs memory in the SHA-256
+proof's place ("A proof that costs memory", the last section): its function,
+its numbers and Central's part in it are the ones in force.*
 
 The owner made strong captcha and spam protection for registration an
 open-beta blocker (28.10.2026): privacy-friendly, no Google reCAPTCHA, the
@@ -162,7 +165,8 @@ The owner asked for registration's protection to be reviewed and
 strengthened as the Impressum's is. First a review as an attacker who reads
 the source and speaks the listener's protocol directly; then what changed.
 Where the numbers below differ from "As built", these are the ones in
-force.
+force; the hash, the base and the ceiling changed once more the same day
+("A proof that costs memory").
 
 ### What the review found
 
@@ -316,7 +320,8 @@ seconds: a line with the share done and a bar, announced politely
 
 ### What stays
 
-- SHA-256 is cheap for a program that is not a page. On the laptop above,
+- *(The reason for "A proof that costs memory", which replaced this proof
+  the same day.)* SHA-256 is cheap for a program that is not a page. On the laptop above,
   native code hashes about thirteen times as fast as the page's JavaScript
   (7 million a second on one core by `openssl speed`, against 0.55 million),
   so the hardest challenge is five seconds of one core for a script and a
@@ -332,3 +337,260 @@ seconds: a line with the share done and a bar, announced politely
   customer does. It is never a refusal, and it ends at the four bits a
   request's look can cost.
 - The counts are in memory and start again with the service.
+
+## A proof that costs memory (11.11.2026)
+
+The first point of "What stays" above was the reason: one core solved the
+SHA-256 proof thirteen times as fast for a script as for the page. The
+owner was asked on 11.11.2026, in these words: "Rätsel mit Speicherkosten:
+Der Fork empfiehlt, das Registrierungsrätsel auf Argon2id umzustellen, weil
+ein Skript das jetzige etwa 13-mal schneller löst als die Seite im Browser.
+Das ist noch nicht gebaut.", and answered: "Beide Entscheidungen meiner
+Seits beantworte ich mit: ja". This is what was built for it. As under
+"Hardened": the flood's rise, the price of a request's look, the budgets,
+the lifetimes, the three seconds and the table. New: the function, the base
+and the ceiling, the answer on the wire, and what Central does with
+`Register`.
+
+### The function
+
+One Rust function, `central_crypto::proof`, compiled natively into Central
+and to WebAssembly into the page's crypto Worker (`central-web-crypto`:
+`work_start`, `Work.search`). Nothing in JavaScript computes it. For a part
+`p` and a counter `c` it is Argon2id (RFC 9106, version 0x13, one lane, 32
+bytes of output) through the safe interface of the `argon2` release that
+stretches the passwords here already, with nothing built around it:
+
+- salt: the label `baylee-central/registration-proof/argon2id/v1`;
+- password: the nonce's 64 hexadecimal digits as Central sent them, the
+  part's index (one byte) and the counter (eight bytes, big-endian), 73
+  bytes;
+- memory and passes: the challenge's.
+
+A counter solves its part when the output begins with `difficulty` zero
+bits. The page finds the smallest; Central takes any that holds. The
+[crypto protocol](crypto-protocol.md) §"Registration's proof of work" has
+the owner's acceptance, why this is the vetted primitive and nothing of our
+own, and the pinned vector that holds the two builds together: one nonce,
+price and set of counters is checked natively, through the function the
+Worker calls, and in Chromium with the committed module
+(`web/e2e-site/account.spec.ts`), and OpenSSL's Argon2id gives the vector's
+bytes too.
+
+### The numbers in force
+
+| | |
+| --- | --- |
+| Memory for one evaluation | 16 MiB (16,384 KiB) |
+| Passes | 1 |
+| Parts | 8 |
+| Difficulty while registrations are few | 4 bits a part: 128 evaluations on average |
+| Difficulty at the most (flood and look together, six bits, as before) | 10 bits a part: 8,192 evaluations on average |
+| Lifetime | 5 minutes up to 8 bits, 10 minutes at 9, 20 minutes at 10 |
+| Soonest | 3 seconds after the challenge |
+| Table | 40,000 challenges |
+
+Central sets the price. Memory, passes, parts and difficulty are kept with
+the nonce and are the only ones a solution is checked against. They travel
+in the answer; `Register` carries nonce and counters only, as before. The
+page refuses a price above compile-time ceilings before it works on it
+(`central_api::register`): each field (8 KiB to 64 MiB, 4 passes, 16 parts,
+16 bits) and the whole, `WORK_MAX_COST`, which is memory × passes × parts ×
+2^difficulty at exactly the most Central asks. So the page never works on
+what it could not hand in or what a phone could not hold. Asserts at
+compile time hold Central's constants to that ceiling, the field ceilings
+of `central-api` and `central-crypto` equal, and the table and the
+lifetimes to the shared budget as before.
+
+Why these:
+
+- **16 MiB.** The same Worker takes 64 MiB for the password right
+  afterwards, on every device that can register at all, so a quarter of
+  that is known to fit; the proof's memory is given back before the
+  password's is asked for. Central holds four checks at once at the most:
+  64 MiB. More would cost Central more for each check and make the page's
+  steps coarser; less buys less against hardware that runs many
+  evaluations side by side.
+- **One pass.** A second doubles everyone's time, Central's too, and
+  changes nothing about who is faster.
+- **Eight parts.** The time to solve is the sum of eight chances and
+  spreads far less than one chance would, and Central is done with a wrong
+  answer after one evaluation.
+- **Four bits** cost the laptop below about a second, what sixteen bits of
+  SHA-256 cost it. **Ten bits** cost it about a minute, what 22 bits of
+  SHA-256 cost it.
+
+The numbers are a price and protect no password, so what RFC 9106
+recommends for passwords is not their measure.
+
+### On the wire
+
+`RegisterChallengeFor { signals }` is answered with an answer of its own,
+`RegisterWork { nonce, parts, difficulty, memory, passes, expires_at }`
+(`{"result":"register_work", …}`): the older answer cannot gain a field,
+and the request had not been deployed. `Register` is unchanged.
+`RegisterChallenge`, the request for the SHA-256 proof, is answered with
+`RegistrationClosed` whether registration is open or not, and no nonce
+comes of it. Wire tests hold every shape (`central-api`, `wire.rs`).
+
+### No cheap way left
+
+A Central of this build hands no SHA-256 challenge to any request and takes
+no SHA-256 solution: every `Register` is judged by the one function above
+at the price kept with its nonce. Over the real listener and PostgreSQL
+(`crates/central-client/tests/support/registration.rs`, `older`): the old
+request gets `RegistrationClosed`, with a person's headers and with a
+script's; a SHA-256 solution is `Rejected`, for a made-up nonce and for one
+this Central issued; no account of that name exists afterwards. Counters
+sent without any work hold with a chance of one in 2^32 at the base, within
+five tries an hour.
+
+What each side sees across the change:
+
+- **A register page from before** (it asks `RegisterChallenge`) at this
+  Central: "Registration is paused right now. Try again later."
+  (`register-closed`) until the page is loaded again. A tab left open
+  cannot register until then. That answer was chosen because the page has
+  words for it; a refusal it would have shown as a registration that
+  failed.
+- **This page at a Central from before**: `RegisterChallengeFor` is refused
+  there, or answered with the older challenge; either way the page goes on
+  the older way and solves the SHA-256 proof in `pow-worker.js`, which
+  stays anyway for the Impressum's puzzle (the game repository's service,
+  SHA-256, not ours to change). So the site goes out first and Central
+  after it, without a gap ([operations](operations.md#registration)).
+- A page built from the commits in between (it asks `RegisterChallengeFor`
+  and knows only the older answer) cannot read `register_work` and shows
+  its general error. None was deployed.
+
+### What Central does with `Register`
+
+1. The listener, as before: the address's budget (5 an hour, 10 a day) and
+   the budgets all callers share.
+2. A worker of the service's four, the ones sign-in uses. Without one the
+   answer is `Busy` and the challenge stays in the table: the solution is
+   not lost, and the page sends it once more a second and a half later.
+3. The challenge leaves the table under the table's lock, one use. An
+   unknown, expired or too early one is refused here, before anything is
+   computed.
+4. The counters are checked off the executor (`spawn_blocking`), part by
+   part, ending at the first that does not hold. Then the name.
+
+The order is one function without the store (`challenge::prove`), so a unit
+test shows it: with every worker taken the answer is `Busy`, and the same
+solution is taken afterwards.
+
+**What this bounds.** At once: four checks, 64 MiB. One address: five
+checks an hour and ten a day, one evaluation for a wrong answer and eight
+for a right one, so 80 evaluations a day at the most, about half a second of
+one core of the laptop below; and each right answer cost its sender 128 to
+8,192 evaluations. Everybody together: the 32 requests a second that all
+callers without a session share. Were every one of them a wrong answer to
+a living challenge, that is 32 evaluations a second, a fifth of one core
+of that laptop; and each needs a challenge of its own (20 an hour per
+address) and a unit of its address's five an hour. Central computes only
+for an answer that names a living challenge after its three seconds.
+
+### Measured (11.11.2026, Apple M1 Max)
+
+One evaluation at 16 MiB and one pass:
+
+| Where | One evaluation |
+| --- | --- |
+| Native: the Rust crate as Central runs it, release build, one core | 6.0 ms (median of 400; 5.6 the least, 6.1 the mean) |
+| The page: the committed WebAssembly module in its Worker, Chromium | 7.9 ms (median of 9 runs of 40 evaluations; the runs 7.8 to 8.1) |
+| The same Worker with a quarter of the processor's time | 34 ms (5 runs of 24; 32 to 35) |
+| OpenSSL 4.1.0's Argon2id (portable C), native | 7.9 ms (200 in 1.58 s) |
+
+**The page is 1.3 times as slow as native code on the same core. For
+SHA-256 it was thirteen times.** That ratio is the point of the change.
+The two stay as close at other sizes (native and page, in ms: 8 MiB 2.8 and 3.9, 19 MiB 7.2 and 9.5, 32 MiB 12.9 and 16.7, 64 MiB 27.6 and 35.4). Central's whole check, with taking and giving back its 16 MiB:
+48 ms for a right answer (eight evaluations), 6.3 ms for a wrong one, 0.3 ms of it the memory (medians of 40).
+
+A whole challenge in the Worker, as the page solves it (each part in turns
+of eight counters):
+
+| Bits a part | Evaluations expected | Evaluations taken: mean (least to most) | Seconds: median (least to most) | Runs |
+| --- | --- | --- | --- | --- |
+| 4 | 128 | 122 (59 to 230) | 0.88 (0.48 to 1.84) | 25 |
+| 6 | 512 | 531 (301 to 919) | 4.11 (2.42 to 7.38) | 9 |
+| 8 | 2,048 | 2,095 (1,437 to 2,692) | 16.95 (11.70 to 21.86) | 5 |
+| 10 | 8,192 | 6,766 (1,664 to 10,970) | 45.42 (13.65 to 91.06) | 5 |
+| 4, with a quarter of the time | 128 | 130 (62 to 198) | 4.66 (2.22 to 6.65) | 9 |
+| 10, with a quarter of the time | 8,192 | 8,770 (3,868 to 11,499) | 373.88 (132.54 to 388.30) | 3 |
+
+Through the page itself (the form, the page's code, the Worker; a stand-in
+for Central at Central's price), from the challenge's arrival to the
+`Register` that carries its solution, which is never sooner than three
+seconds:
+
+| Bits a part | Seconds: median (least to most) | Runs |
+| --- | --- | --- |
+| 4 | 3.21 (all three: the three seconds) | 3 |
+| 6 | 5.66 (3.46 to 6.52) | 5 |
+| 8 | 11.33 (9.93 to 22.39) | 3 |
+| 10 | 60.91 and 73.32 | 2 |
+| 4, with a quarter of the time | 4.40 (3.22 to 4.65) | 3 |
+| 10, with a quarter of the time | 466.96 | 1 |
+
+The spread is the puzzle's own: eight parts, each found by chance, so the
+evaluations taken scatter around their mean by about a third of it (one
+over the root of eight), and one challenge in a thousand takes more than
+two and a half times the mean. The runs above fit that but for one: a ten-bit challenge solved in 1,664 evaluations, a fifth of the mean, which this reckoning expects once in about 3,400 challenges. So the module and the native function were set side by side past the output's first byte: at ten bits and 64 KiB, for 24 fixed nonces, the module in Chromium and the native build found the same 192 counters, and 120 native challenges at ten bits took 8,045 evaluations on average (2,299 to 18,948). It was luck. A ten-bit challenge lives twenty
+minutes, eighteen times what the laptop needs on average; the runs with a quarter of the time used between a ninth and two fifths of it.
+
+**How the quarter was made, and where this leaves the brief.** The brief
+was Chromium's own throttle (`Emulation.setCPUThrottlingRate`, rate 4) as
+the stand-in for a mid-range phone. It does not reach a Worker: sent to the
+page it left the Worker's evaluation as it was (a factor of 1.04,
+measured), and a Worker's own session refuses it ("Operation is only
+supported for pages, not workers"). So the browser's renderer was stopped
+and continued in turns from outside (20 ms running, 60 ms stopped), which
+is what that throttle does to a thread; one evaluation then took 4.16
+times as long. It stands for a slower processor and not for a phone, whose
+memory is slower too. No phone was measured.
+
+### Tests ask little
+
+`IdentityService::with_registration_challenge(base, memory, minimum)` only
+lowers: each value is capped at Central's own, and neither a setting nor a
+request reaches it (the launch never calls it; `the_knob_only_lowers`). The
+PostgreSQL fixture runs at one bit and 64 KiB, the unit tests at 64 KiB;
+the site's suite checks the pinned vector at 64 KiB in the real module and
+plays Central for the rest. `web/e2e-real` meets the real service at the
+real price: against a throwaway Central of this tree (release build, 11.11.2026) Chromium under Playwright was asked 6 bits, two over the base for the `navigator.webdriver` it reports, at 16 MiB, one pass and eight parts, with five minutes to live. Two timed registrations handed their solutions in 3.2 seconds after the challenge, which is the three seconds' floor (six bits take four seconds on average, so both were a little lucky); Central answered `Register` in 67 and 72 ms, its eight evaluations and the store's work together; the recovery code was on the page 3.9 seconds after the click. `site-chat.spec.ts` passed with two more registrations (29 seconds). So the project's driven registrations pay four times the base, as before, and do not crawl.
+
+### What stays
+
+- **A script is still faster than a person**, by the 1.3 above on one
+  core, and by its cores: the page solves in one Worker, a script on every
+  core it has. Solving the parts in several Workers, at 16 MiB each, would
+  close that; not built. Code with vector instructions and graphics cards
+  were not measured. What the function is made for is that every
+  evaluation running at the same time needs its own 16 MiB, so such
+  hardware is bounded by its memory and that memory's speed and not by how
+  many hashes it could do side by side.
+- **What a flood costs.** At the base a registration is about 0.8 seconds of
+  one core for a script, and five an hour per address. From 1,920
+  registrations an hour on each costs about 50 seconds of one core: about 26 cores for as
+  long as it lasts, and 384 addresses. That is a price, and someone with
+  machines and addresses pays it. Against them stand the budgets, the
+  count of the block and the administrators' switch, as before.
+- **Central computes now.** A wrong answer to a living challenge costs it
+  one evaluation, and nothing that sender did beyond asking for the
+  challenge. It is bounded as above, by the address's five an hour and by
+  the budget all share, and not measured on the machine that serves
+  `baylee.app`.
+- **The workers are sign-in's too.** While four checks run, a sign-in or a
+  registration that needs a worker is told `Busy`. Within the budgets that
+  takes more right answers at once than the price makes likely; it was not
+  driven in a test over the listener.
+- **A second `Busy`** shows the page's "too many attempts" line, and each
+  try spent a unit of the address's five an hour.
+- **A device far slower than the measured quarter** can run out of a
+  ten-bit challenge's twenty minutes in the unlucky cases, and is then
+  refused like a wrong answer. Ten bits are asked only in a flood or of a
+  request that looks automated.
+- **A tab of a page from before** cannot register until it is reloaded.
+- The points of "What stays" above that are not about SHA-256 stand: many
+  addresses in many blocks, the block's shared count, the counts in memory.
