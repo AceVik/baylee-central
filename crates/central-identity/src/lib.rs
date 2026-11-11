@@ -551,6 +551,9 @@ impl IdentityService {
             }
             Surface::Native => self.store.issue_session(&credential, &token).await?,
         };
+        // Only now is the place the account's own: an attempt begun before
+        // a password change proves the old one, and the store refused it.
+        self.accepted(&guess);
         Ok(signed_in(surface, credential.identity, issued, token))
     }
 
@@ -590,15 +593,24 @@ impl IdentityService {
             .response)
     }
 
-    /// A start's password was proven: its guess comes back, and its place
-    /// is the account's own from now on (`guesses.rs`).
+    /// A start's password was proven: its guess comes back (`guesses.rs`).
     fn proved(&self, guess: &guesses::Guess) -> Result<(), Error> {
         self.limits
             .lock()
             .map_err(|_| Error::Unavailable)?
             .guesses
-            .proved(guess, Instant::now());
+            .proved(guess);
         Ok(())
+    }
+
+    /// The store issued the session a proof was for, so the credential
+    /// proven is the account's as it stands: the proof's place is the
+    /// account's own from now on (`guesses.rs`). Never a refusal: what the
+    /// store committed is answered as done.
+    fn accepted(&self, guess: &guesses::Guess) {
+        if let Ok(mut limits) = self.limits.lock() {
+            limits.guesses.accepted(guess, Instant::now());
+        }
     }
 
     /// The store committed another password for `account`, or its

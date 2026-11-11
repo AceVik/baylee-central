@@ -528,6 +528,87 @@ pub(crate) fn browser_sign_in(
         .expect("a session for the cookie")
 }
 
+/// A sign-in begun before a password change and finished after it proves
+/// the old password and gets no session. Its place must not be the
+/// account's own afterwards, or whoever knew the old password would keep a
+/// place where the account's count does not hold them
+/// (`docs/native-login.md` §"Guessing a password online"). Natively, with
+/// the hops a proxy appends.
+pub(crate) fn stale(http: &Http, browser: &Browser) {
+    const HOME: &str = "203.0.113.70";
+    const FORMER: &str = "203.0.113.80";
+    const STRANGER: &str = "203.0.113.81";
+    let home = Browser {
+        address: browser.address,
+        client: HOME,
+    };
+    let account = register("changed-under", http, &home);
+    let (identity, context) = (account.identity, account.context);
+    // A password is changed only once the terms are accepted.
+    let cookie = browser_sign_in(&home, identity, context, OLD);
+    super::browser::accept_terms(&home, &cookie);
+    home.answer(&Request::Logout, Some(&cookie)).unwrap();
+    let from = |hop: &str, bearer: Option<&Token>, request: &Request| {
+        http.sent(request, bearer, Some(hop))
+    };
+    let start = |hop: &str, password: &str| {
+        let (login, message) = Login::start(password.into(), context).unwrap();
+        from(hop, None, &Request::LoginStart { identity, message }).map(|response| {
+            let Response::LoginChallenge { attempt, message } = response else {
+                panic!("a challenge");
+            };
+            (attempt, login, message)
+        })
+    };
+    let sign_in = |hop: &str, password: &str| {
+        let (attempt, login, message) = start(hop, password).unwrap();
+        let message = login.finish(&message).unwrap().finalization;
+        let finish = Request::LoginFinish { attempt, message };
+        let Response::Session { token, .. } = from(hop, None, &finish).unwrap() else {
+            panic!("a session");
+        };
+        token
+    };
+    // Whoever knows the password signs in from an address of theirs, which
+    // is the account's own from then on, and begins another sign-in there.
+    let known = sign_in(FORMER, OLD);
+    let (attempt, login, challenge) = start(FORMER, OLD).unwrap();
+    // The holder sets another password at home.
+    let bearer = sign_in(HOME, OLD);
+    let begun = begin(
+        &|request: &Request| from(HOME, Some(&bearer), request),
+        context,
+        &account.master,
+        OLD,
+        NEW,
+    )
+    .unwrap();
+    from(HOME, Some(&bearer), &begun.finish()).unwrap();
+    // The sign-in begun before it proves the old password, which is gone.
+    let message = login.finish(&challenge).unwrap().finalization;
+    assert_eq!(
+        from(FORMER, None, &Request::LoginFinish { attempt, message }).err(),
+        Some(Error::Rejected)
+    );
+    assert_eq!(
+        from(FORMER, Some(&known), &Request::SessionStatus).err(),
+        Some(Error::Rejected),
+        "the change ended the other sessions"
+    );
+    // A stranger spends what is left of the account's evaluations this
+    // minute (eight, from the places that are not its own).
+    let mut served = 0;
+    while start(STRANGER, "synthetic wrong guess").is_ok() {
+        served += 1;
+        assert!(served <= 8, "eight a minute");
+    }
+    // The former place is a stranger's now and refused with them; home,
+    // where the new password was set, is served.
+    assert_eq!(start(FORMER, NEW).err(), Some(Error::Busy));
+    let fresh = sign_in(HOME, NEW);
+    from(HOME, Some(&fresh), &Request::Logout).unwrap();
+}
+
 /// A registered account, as the website's registration leaves it.
 pub(crate) struct Registered {
     pub(crate) identity: Identity,

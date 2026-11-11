@@ -3604,7 +3604,14 @@ stored.
   set another one, each with 30 guesses a day of its own beside the
   account's hundred, for 30 days. Found in the review of the first two
   commits and closed: a change or a reset leaves only the place it was
-  made from, a deletion none (unit test).
+  made from, a deletion none (unit test). The review of that fix found
+  its own way round: a sign-in begun before the change and finished after
+  it still proved the old password, and the proof made its place the
+  account's own again although the store refused the session. A place is
+  now marked only after the store issued the session or stored the new
+  password (unit test; real HTTP and PostgreSQL: a stale finish is
+  `Rejected`, and its place is refused with the strangers while home is
+  served).
 - *Asking what the counts know*: with an address's or an account's count
   spent, a start is answered only at an own place, so whoever sends from
   an address learns whether a given account signed in from it. Not
@@ -3622,12 +3629,13 @@ stored.
   it and service for the others, on every request that draws on the
   shared budget, a report's routes included (unit tests).
 
-Run on this change, on its last code commit: `cargo xtask postgres`
-(PostgreSQL 18.6; the whole existing scenario unchanged, and the guessing
-steps after it), `cargo xtask smoke` and `smoke --exercise-failure`,
-`cargo xtask secrets` and `cargo deny check` pass. `cargo audit --deny
-warnings` reports RUSTSEC-2026-0459 (`libsqlite3-sys` 0.37.0), as it did
-before; `Cargo.toml`, `Cargo.lock` and `deny.toml` are untouched here.
+Run on this change and passing: `cargo xtask postgres` on its last code
+commit, the fourth (PostgreSQL 18.6; the whole existing scenario
+unchanged, and the guessing steps after it); `cargo xtask smoke` and
+`smoke --exercise-failure` on the third; `cargo xtask secrets` on the
+last; `cargo deny check`. `cargo audit --deny warnings` reports
+RUSTSEC-2026-0459 (`libsqlite3-sys` 0.37.0), as it did before;
+`Cargo.toml`, `Cargo.lock` and `deny.toml` are untouched here.
 
 **`cargo xtask gate` did not pass.** Its format, policy, crypto-scope and
 clippy steps passed (the workspace, all targets and features, warnings
@@ -3640,10 +3648,12 @@ whoever edits the locales. Every other test of the workspace passed
 (`cargo test --workspace --all-targets --all-features --no-fail-fast`),
 and the two steps the gate did not reach were run on their own and
 passed: the doc tests and the release build. The gate and the workspace's
-tests ran on the second of the three code commits; after the third,
-clippy and the tests ran again for the three crates it touches
-(`central-identity`, `central-http`, `central-client`), and the doc tests
-and the release build for the workspace.
+tests ran on the second of the four code commits, the doc tests, the
+release build, the smoke test and the secret scan on the third; after
+the fourth, which touches `central-identity` and `central-client`'s
+tests, clippy and the unit tests ran again for `central-identity`,
+`central-http` and `central-client`, and `cargo xtask postgres` for the
+whole.
 
 Not run: the game's client and gateway suites against this build (the
 game repository pins another Central branch, `c42/session-tokens`); a
