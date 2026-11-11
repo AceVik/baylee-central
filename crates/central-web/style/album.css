@@ -1,0 +1,743 @@
+/* Baylee's album, as the old site made it: a book of parchment and ink.
+   Her photographs on the left, her story on the right, a page that turns
+   between chapters, and the full photograph to zoom into. The textures
+   stay still beneath the writing; the light in the masthead drifts. */
+
+.book {
+  --ink: #443020;
+  --ink-soft: #71563d;
+  --title: #38271d;
+  --link: #825a28;
+  --edge: #ad8b535e;
+  --edge-soft: #ad8b5333;
+  --gold: #d5b576;
+  --gold-ink: #372613;
+  --paper: #f7f0df;
+  --panel-solid: var(--paper);
+  --focus: #795022;
+  max-width: none;
+  padding: 1rem;
+  overflow: hidden;
+  border: 1px solid #b5965f;
+  border-radius: 10px;
+  background:
+    radial-gradient(ellipse at 0 100%, #bc944421, transparent 38%),
+    radial-gradient(ellipse at 100% 0, #b0925124, transparent 40%),
+    repeating-linear-gradient(4deg, #b39e7610 0, transparent 1px, transparent 5px),
+    var(--paper);
+  box-shadow:
+    0 28px 90px #0006,
+    inset 0 0 0 7px #f7f0df,
+    inset 0 0 0 8px #bc9b5d66,
+    inset 0 0 0 12px #f7f0df,
+    inset 0 0 0 13px #bc9b5d33;
+  color: var(--ink);
+}
+
+.album {
+  width: min(74rem, calc(100vw - 2rem));
+  height: min(55rem, 92svh);
+  max-height: 92svh;
+}
+
+.book[open] {
+  display: flex;
+  flex-direction: column;
+  animation: book-open 350ms var(--ease);
+}
+
+@keyframes book-open {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ---- the masthead ---------------------------------------------------------- */
+
+.album-masthead {
+  position: relative;
+  isolation: isolate;
+  flex-shrink: 0;
+  padding: 0.8rem 4rem 1rem 9.5rem;
+  border-bottom: 1px solid var(--edge);
+  text-align: center;
+}
+
+.album-cloud {
+  position: absolute;
+  top: 0.6rem;
+  left: 0.5rem;
+  width: 8.5rem;
+  height: calc(100% - 1.2rem);
+  object-fit: contain;
+  pointer-events: none;
+}
+
+.album-masthead h2 {
+  margin: 0 0 0.08em;
+  color: var(--title);
+  font-size: 2.8rem;
+  font-style: italic;
+}
+
+.album-masthead .eyebrow {
+  margin: 0 0 0.3rem;
+  color: var(--ink-soft);
+  font-size: 0.64rem;
+}
+
+.album-love {
+  margin: 0;
+  color: var(--ink);
+  font-size: 1.15rem;
+  font-style: italic;
+}
+
+.album-dates {
+  margin: 0.35rem 0 0;
+  color: var(--ink-soft);
+  font: italic 0.9rem var(--serif);
+}
+
+.album-dismiss {
+  position: absolute;
+  top: 0.7rem;
+  right: 0.4rem;
+}
+
+/* motes of warm light drifting through the margin of the masthead, and a
+   beam that leans slowly across it */
+.album-light {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.album-light::before,
+.album-light::after {
+  content: "";
+  position: absolute;
+  inset: -40% -10%;
+}
+
+.album-light::before {
+  background:
+    radial-gradient(circle at 58% 70%, #ffca6670 0 2px, transparent 7px),
+    radial-gradient(circle at 66% 30%, #ffd77d66 0 1.5px, transparent 6px),
+    radial-gradient(circle at 74% 62%, #ffc96a60 0 2px, transparent 7px),
+    radial-gradient(circle at 81% 38%, #ffd88a66 0 1.6px, transparent 6px),
+    radial-gradient(circle at 88% 74%, #ffca6660 0 2px, transparent 7px),
+    radial-gradient(circle at 93% 26%, #ffd77d5a 0 1.4px, transparent 6px),
+    radial-gradient(circle at 70% 48%, #ffe1a050 0 1.2px, transparent 5px),
+    radial-gradient(circle at 62% 52%, #ffd27850 0 1.4px, transparent 5px),
+    radial-gradient(circle at 85% 56%, #ffe0a04a 0 1.2px, transparent 5px);
+  animation: motes-rise 26s linear infinite;
+}
+
+.album-light::after {
+  background: linear-gradient(105deg, transparent 52%, #ffca6614 60%, transparent 68%, #ffd78a10 80%, transparent 88%);
+  animation: beam-lean 18s ease-in-out infinite alternate;
+}
+
+@keyframes motes-rise {
+  from {
+    transform: translate3d(0, 12%, 0);
+  }
+
+  to {
+    transform: translate3d(0, -12%, 0);
+  }
+}
+
+@keyframes beam-lean {
+  from {
+    opacity: 0.5;
+    transform: translate3d(-3%, 0, 0);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate3d(3%, 0, 0);
+  }
+}
+
+/* ---- the two pages ------------------------------------------------------------ */
+
+.album-layout {
+  display: grid;
+  flex: 1;
+  grid-template-columns: minmax(14rem, 0.7fr) minmax(0, 1.4fr);
+  min-height: 0;
+  padding-top: 1rem;
+}
+
+.album-photo {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1rem;
+  min-height: 0;
+  margin: 0;
+  padding: 1.2rem 1.4rem;
+  border-right: 1px solid var(--edge);
+}
+
+.album-photo-open {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  padding: 0.6rem 0.6rem 2.2rem;
+  border: 1px solid #ac8c546b;
+  border-radius: 16px;
+  background: #fffcf1;
+  box-shadow:
+    0 5px 14px #49331816,
+    inset 0 0 0 3px #f0e6ce;
+  cursor: zoom-in;
+  transition:
+    border-color 240ms,
+    box-shadow 240ms;
+}
+
+.album-photo-open:hover {
+  border-color: #9d702d;
+  box-shadow:
+    0 5px 20px #74562632,
+    inset 0 0 0 3px #efe1bc;
+}
+
+.photo-preview {
+  position: relative;
+  isolation: isolate;
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 12px;
+}
+
+.photo-preview::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(ellipse at center, transparent 38%, #261b1526 100%);
+  box-shadow: inset 0 0 0 1px #50382220;
+  pointer-events: none;
+}
+
+.photo-preview img {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  max-inline-size: none;
+  object-fit: cover;
+  animation: photo-slide 300ms var(--ease);
+}
+
+.photo-preview img.back {
+  animation-name: photo-slide-back;
+}
+
+/* where each photograph's subject sits, so the frame keeps her in view */
+.focal-1 { object-position: 50% 57%; }
+.focal-2 { object-position: 50% 60%; }
+.focal-3 { object-position: 47% 53%; }
+.focal-4 { object-position: 48% 50%; }
+.focal-5 { object-position: 50% 56%; }
+.focal-6 { object-position: 45% 50%; }
+.focal-7 { object-position: 61% 54%; }
+.focal-8 { object-position: 43% 64%; }
+.focal-9 { object-position: 50% 58%; }
+.focal-10 { object-position: 50% 54%; }
+
+@keyframes photo-slide {
+  from {
+    opacity: 0.25;
+    transform: translateX(12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes photo-slide-back {
+  from {
+    opacity: 0.25;
+    transform: translateX(-12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.photo-open-hint {
+  position: absolute;
+  right: 0.4rem;
+  bottom: 0.6rem;
+  left: 0.4rem;
+  color: var(--ink-soft);
+  font: italic 0.85rem var(--serif);
+  text-align: center;
+}
+
+.album-photo-caption {
+  flex-shrink: 0;
+}
+
+.album-photo figcaption {
+  color: var(--ink);
+  font: italic 1.05rem / 1.4 var(--serif);
+  text-align: center;
+}
+
+.album-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 0.65rem;
+  font: italic 0.95rem var(--serif);
+}
+
+.album-photo-note {
+  margin: 0.7rem 0 0;
+  color: var(--ink-soft);
+  font: italic 0.9rem var(--serif);
+  text-align: center;
+}
+
+.album-reading {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  padding-left: 1rem;
+}
+
+.chapter-nav {
+  display: flex;
+  flex-shrink: 0;
+  justify-content: center;
+  gap: 0.4rem;
+  overflow-x: auto;
+  padding: 0.1rem 0.2rem 0.65rem;
+}
+
+.chapter-nav button {
+  appearance: none;
+  flex-shrink: 0;
+  min-width: var(--target);
+  min-height: var(--target);
+  border: 1px solid var(--edge);
+  border-radius: 5px 5px 8px 8px;
+  background: #e9dab355;
+  color: var(--ink);
+  cursor: pointer;
+  font: italic 1rem var(--serif);
+  transition:
+    background 220ms,
+    border-color 220ms,
+    box-shadow 220ms;
+}
+
+.chapter-nav button:hover {
+  border-color: #a68041;
+  background: #fff7e3;
+  box-shadow: inset 0 -3px #b88a4144;
+}
+
+.chapter-nav button[aria-selected="true"] {
+  background: var(--gold);
+  box-shadow: inset 0 -3px #976d3933;
+  color: var(--gold-ink);
+}
+
+.story-leaves {
+  position: relative;
+  isolation: isolate;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  perspective: 1600px;
+}
+
+.story-page {
+  height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 1.15rem clamp(1rem, 2.7vw, 2.5rem);
+  scroll-padding: 1rem;
+  scrollbar-color: #b39b6b #b39b6b18;
+}
+
+.story-page:focus-visible {
+  outline-offset: -4px;
+}
+
+.story-ink {
+  font: italic 500 1.12rem / 1.75 var(--serif);
+  text-align: center;
+  text-shadow: 0 0.35px #80521a26;
+}
+
+.story-ink h3 {
+  margin: 0 0 1.1rem;
+  color: var(--title);
+  font-size: clamp(1.6rem, 2.2vw, 2.15rem);
+  font-style: italic;
+}
+
+.story-ink p {
+  margin: 0 0 1.05rem;
+  line-height: 1.75;
+}
+
+.story-ink .eyebrow {
+  margin-bottom: 0.65rem;
+  color: var(--ink-soft);
+  font: 600 0.65rem var(--sans);
+  letter-spacing: 0.1em;
+  text-shadow: none;
+}
+
+.story-flower {
+  padding: 0.2rem;
+  color: var(--link);
+  font-size: 2.2rem;
+  text-align: center;
+}
+
+/* the page that turns: a copy of the chapter just left, folding away over
+   the new one */
+.story-turning-leaf {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  overflow: hidden;
+  padding: 1.15rem clamp(1rem, 2.7vw, 2.5rem);
+  background:
+    linear-gradient(90deg, #c0a46b24, transparent 15%, #fff9ed 80%, #d7bf8b77),
+    var(--paper);
+  box-shadow: 8px 0 25px #47301e24;
+  pointer-events: none;
+  transform-origin: left center;
+  backface-visibility: hidden;
+  animation: leaf-forward 720ms cubic-bezier(0.45, 0.05, 0.2, 1) both;
+}
+
+.story-turning-leaf::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 55%, #71512936 88%, #fffdf0b0);
+  pointer-events: none;
+}
+
+.story-turning-leaf.backward {
+  transform-origin: right center;
+  animation-name: leaf-backward;
+}
+
+@keyframes leaf-forward {
+  from {
+    transform: rotateY(0deg);
+  }
+
+  to {
+    transform: rotateY(-100deg);
+  }
+}
+
+@keyframes leaf-backward {
+  from {
+    transform: rotateY(0deg);
+  }
+
+  to {
+    transform: rotateY(100deg);
+  }
+}
+
+.chapter-footer {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.65rem 0.3rem 0;
+  border-top: 1px solid var(--edge-soft);
+}
+
+.chapter-footer .button {
+  gap: 0.35rem;
+  padding: 0.5rem 0.7rem;
+  font-size: 0.85rem;
+}
+
+.chapter-count {
+  color: var(--ink-soft);
+  font: italic 0.95rem var(--serif);
+  white-space: nowrap;
+}
+
+/* without the script every chapter stands one after the other, and the
+   controls that would turn them are not offered */
+.album:not([data-ready]) .chapter-nav,
+.album:not([data-ready]) .chapter-footer,
+.album:not([data-ready]) .album-controls,
+.album:not([data-ready]) .photo-open-hint {
+  display: none;
+}
+
+/* ---- the book's buttons -------------------------------------------------------- */
+
+.book .round-btn,
+.book .button {
+  border: 1px solid var(--edge);
+  border-radius: 6px;
+  background: #e9dab34d;
+  box-shadow: none;
+  color: var(--ink);
+  transition:
+    background 220ms,
+    border-color 220ms,
+    box-shadow 220ms;
+}
+
+.book .button::after {
+  display: none;
+}
+
+.book .round-btn:hover,
+.book .button:hover {
+  border-color: #a68041;
+  background: #fff7e3;
+  box-shadow:
+    0 4px 10px #5e421b1c,
+    inset 0 -2px #b88a4144;
+  color: var(--ink);
+}
+
+.book button:active {
+  background-color: #d8bd86;
+  box-shadow: inset 0 2px 8px #82632d32;
+}
+
+.book button:disabled {
+  opacity: 0.4;
+  box-shadow: none;
+  cursor: default;
+}
+
+.book button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+}
+
+/* ---- the full photograph ------------------------------------------------------- */
+
+.photo-viewer {
+  width: min(90rem, 96vw);
+  height: 94svh;
+  max-height: 94svh;
+}
+
+.photo-viewer[open] {
+  gap: 0.7rem;
+  animation-duration: 300ms;
+}
+
+.photo-viewer-header,
+.photo-viewer-tools {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+}
+
+.photo-viewer-header p {
+  margin: 0;
+  font: italic 1.1rem var(--serif);
+}
+
+.photo-viewport {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  overflow: hidden;
+  background: #202827;
+  touch-action: none;
+  user-select: none;
+}
+
+.photo-viewport[data-zoomed] {
+  cursor: grab;
+}
+
+.photo-viewport[data-zoomed]:active {
+  cursor: grabbing;
+}
+
+.photo-viewport img {
+  flex-shrink: 0;
+  width: 100%;
+  height: 100%;
+  max-inline-size: none;
+  object-fit: contain;
+  pointer-events: none;
+  transition: transform 120ms ease-out;
+}
+
+.photo-viewport[data-dragging] img {
+  transition: none;
+}
+
+.photo-step-controls,
+.photo-zoom-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
+}
+
+.photo-viewer-tools output,
+.photo-step-controls span {
+  min-width: 3.3rem;
+  text-align: center;
+}
+
+@media (max-width: 650px) {
+  .album {
+    width: calc(100vw - 0.7rem);
+    height: 96svh;
+    max-height: 96svh;
+    padding: 0.65rem;
+  }
+
+  .album-masthead {
+    padding: 0.5rem 3.1rem 0.65rem 0.5rem;
+  }
+
+  .album-masthead h2 {
+    font-size: 2rem;
+  }
+
+  .album-cloud,
+  .album-masthead .eyebrow {
+    display: none;
+  }
+
+  .album-love {
+    font-size: 0.95rem;
+  }
+
+  .album-dates {
+    font-size: 0.75rem;
+  }
+
+  .album-dismiss {
+    top: 0.3rem;
+    right: 0.2rem;
+  }
+
+  .album-layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
+    padding-top: 0;
+  }
+
+  .album-photo {
+    display: grid;
+    grid-template-columns: 86px minmax(0, 1fr);
+    gap: 0.8rem;
+    padding: 0.7rem 0.5rem;
+    border-right: 0;
+    border-bottom: 1px solid var(--edge);
+  }
+
+  .album-photo-open {
+    height: 108px;
+    padding: 0.25rem;
+  }
+
+  .photo-open-hint,
+  .album-photo-note {
+    display: none;
+  }
+
+  .album-photo figcaption {
+    font-size: 0.9rem;
+  }
+
+  .album-controls {
+    margin-top: 0.3rem;
+  }
+
+  .album-reading {
+    padding-left: 0;
+  }
+
+  .chapter-nav {
+    justify-content: start;
+    gap: 0.2rem;
+    padding: 0.4rem 0;
+  }
+
+  .story-page,
+  .story-turning-leaf {
+    padding: 0.8rem 0.75rem;
+  }
+
+  .story-ink {
+    font-size: 1.05rem;
+  }
+
+  .chapter-footer {
+    padding: 0.4rem 0.4rem 0;
+  }
+
+  .chapter-footer .button span:not([aria-hidden]) {
+    display: none;
+  }
+
+  .chapter-footer .button {
+    min-width: 56px;
+  }
+
+  .photo-viewer {
+    width: 98vw;
+    height: 96svh;
+    max-height: 96svh;
+    padding: 0.8rem;
+  }
+
+  .photo-viewer-tools {
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  .photo-viewer-header p {
+    font-size: 0.95rem;
+  }
+}

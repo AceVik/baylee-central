@@ -100,8 +100,28 @@ test("the big logo opens Baylee's album, Escape closes it and focus returns", as
   await page.keyboard.press("Enter");
   const album = page.locator("dialog#album");
   await expect(album).toBeVisible();
-  await expect(album.locator("h2")).toHaveText("For Baylee. Forever in the sunlight.");
+  await expect(album.locator("h2")).toHaveText("Baylee");
   expect(await axe(page)).toEqual([]);
+  // one chapter at a time: the tabs and the arrows turn the pages
+  await expect(album.locator('[role="tabpanel"]:visible')).toHaveCount(1);
+  await album.locator("#chapter-tab-3").click();
+  await expect(album.locator("#chapter-3")).toBeVisible();
+  await expect(album.locator("#chapter-1")).toBeHidden();
+  await page.keyboard.press("ArrowRight");
+  await expect(album.locator("#chapter-tab-4")).toBeFocused();
+  await expect(album.locator("[data-chapter-count]")).toHaveText("4 / 8");
+  // one photograph at a time, its words beneath it
+  await album.locator('[data-photo-step="1"]').first().click();
+  await expect(album.locator("[data-caption]")).toHaveText("Baylee looking out from the flowered duvet.");
+  // the full photograph, to zoom into; Escape closes it, then the album
+  await album.locator(".album-photo-open").click();
+  const viewer = page.locator("dialog#photo-viewer");
+  await expect(viewer).toBeVisible();
+  await expect(viewer.locator("[data-viewer-image]")).toHaveAttribute("src", /memorial\/full\/baylee-2/);
+  await viewer.locator('[data-zoom="1"]').click();
+  await expect(viewer.locator("[data-zoom-level]")).toHaveText("150 %");
+  await page.keyboard.press("Escape");
+  await expect(viewer).toBeHidden();
   await page.keyboard.press("Escape");
   await expect(album).toBeHidden();
   await expect(logo).toBeFocused();

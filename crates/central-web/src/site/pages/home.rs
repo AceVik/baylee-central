@@ -448,66 +448,179 @@ fn open(lang: Lang) -> impl IntoView + use<> {
     }
 }
 
-/// Baylee's album: a dialog the big logo opens (no page of its own, owner
-/// 10.11.2026). Photographs load only once it is open (lazy images in a
-/// closed dialog are not fetched); everything works without script in a
-/// browser with invoker commands, `boot.js` opens it in the others.
+/// Baylee's album: a book the big logo opens (no page of its own, owner
+/// 10.11.2026), as the old site drew it: her photographs on the left, her
+/// story on the right, one chapter at a time. The server writes the whole
+/// book; `album.js` turns its pages (without it every chapter stands one
+/// after the other). Photographs load only once the album is open: lazy
+/// images in a closed dialog are not fetched.
 fn album(cx: &Context<'_>) -> impl IntoView + use<> {
     let lang = cx.lang;
     let assets = cx.assets;
+    let count = CHAPTERS.len();
     let photos = PHOTOS
         .iter()
-        .map(|(n, caption, width, height)| {
-            let src = assets.url(&format!("img/memorial/baylee-{n}.jpg"));
+        .enumerate()
+        .map(|(at, (n, caption, width, height))| {
+            let later = at > 0;
             view! {
-                <figure class="photo">
-                    <img src=src width=width.to_string() height=height.to_string() alt=caption(lang) loading="lazy" decoding="async" />
-                    <figcaption>{caption(lang)}</figcaption>
-                </figure>
+                <img
+                    class=format!("focal-{n}")
+                    src=assets.url(&format!("img/memorial/baylee-{n}.jpg"))
+                    data-full=assets.url(&format!("img/memorial/full/baylee-{n}.jpg"))
+                    width=width.to_string()
+                    height=height.to_string()
+                    alt=caption(lang)
+                    loading="lazy"
+                    decoding="async"
+                    hidden=later
+                />
             }
         })
         .collect_view();
-    let contents = CHAPTERS
+    let (tabs, chapters) = story(lang);
+    view! {
+        <dialog id="album" class="book album" aria-labelledby="album-title" data-photos=PHOTOS.len().to_string()>
+            <header class="album-masthead">
+                <div class="album-light" aria-hidden="true"></div>
+                <img class="album-cloud" src=assets.url("img/cloud-600.webp") width="600" height="400" alt="" loading="lazy" decoding="async" />
+                <div class="album-heading">
+                    <p class="eyebrow">{words::baylee_eyebrow(lang)}</p>
+                    <h2 id="album-title">{words::site_name(lang)}</h2>
+                    <p class="album-love">{words::baylee_story_title(lang)}</p>
+                    <p class="album-dates">{words::baylee_together(lang)}</p>
+                </div>
+                <form method="dialog">
+                    <button type="submit" class="round-btn album-dismiss" aria-label=words::baylee_close(lang)>
+                        <span aria-hidden="true">"×"</span>
+                    </button>
+                </form>
+            </header>
+            <div class="album-layout">
+                <figure class="album-photo">
+                    <button type="button" class="album-photo-open" commandfor="photo-viewer" command="show-modal" aria-haspopup="dialog">
+                        <span class="photo-preview">{photos}</span>
+                        <span class="photo-open-hint">{words::baylee_photo_open(lang)}" ↗"</span>
+                    </button>
+                    <div class="album-photo-caption">
+                        <figcaption aria-live="polite" data-caption="">{words::baylee_photo1(lang)}</figcaption>
+                        <div class="album-controls">
+                            <button type="button" class="round-btn" data-photo-step="-1" aria-label=words::baylee_previous(lang)>
+                                <span aria-hidden="true">"←"</span>
+                            </button>
+                            <span class="num" aria-hidden="true" data-photo-count="">{format!("1 / {}", PHOTOS.len())}</span>
+                            <button type="button" class="round-btn" data-photo-step="1" aria-label=words::baylee_next(lang)>
+                                <span aria-hidden="true">"→"</span>
+                            </button>
+                        </div>
+                        <p class="album-photo-note">{words::baylee_photos(lang)}</p>
+                    </div>
+                </figure>
+                <div class="album-reading">
+                    <div class="chapter-nav" role="tablist" aria-label=words::baylee_chapters(lang)>{tabs}</div>
+                    <div class="story-leaves">
+                        <article class="story-page" tabindex="0">{chapters}</article>
+                    </div>
+                    <footer class="chapter-footer">
+                        <button type="button" class="button button-ghost" data-chapter-step="-1" disabled=true aria-label=words::baylee_chapter_previous(lang)>
+                            <span aria-hidden="true">"← "</span>
+                            <span>{words::baylee_chapter_previous(lang)}</span>
+                        </button>
+                        <span class="chapter-count num" aria-live="polite" data-chapter-count="">{format!("1 / {count}")}</span>
+                        <button type="button" class="button button-ghost" data-chapter-step="1" aria-label=words::baylee_chapter_next(lang)>
+                            <span>{words::baylee_chapter_next(lang)}</span>
+                            <span aria-hidden="true">" →"</span>
+                        </button>
+                    </footer>
+                </div>
+            </div>
+        </dialog>
+        {viewer(lang)}
+    }
+}
+
+/// The story's tabs and its chapters, every chapter written out.
+fn story(lang: Lang) -> (impl IntoView + use<>, impl IntoView + use<>) {
+    let count = CHAPTERS.len();
+    let tabs = CHAPTERS
         .iter()
         .enumerate()
         .map(|(at, (title, _))| {
-            let href = format!("#chapter-{}", at + 1);
-            view! { <li><a href=href>{title(lang)}</a></li> }
+            let first = at == 0;
+            view! {
+                <button
+                    type="button"
+                    role="tab"
+                    id=format!("chapter-tab-{}", at + 1)
+                    aria-controls=format!("chapter-{}", at + 1)
+                    aria-selected=if first { "true" } else { "false" }
+                    tabindex=if first { "0" } else { "-1" }
+                    aria-label=format!("{:02} · {}", at + 1, title(lang))
+                    title=title(lang)
+                >
+                    {format!("{:02}", at + 1)}
+                </button>
+            }
         })
         .collect_view();
     let chapters = CHAPTERS
         .iter()
         .enumerate()
         .map(|(at, (title, body))| {
-            let id = format!("chapter-{}", at + 1);
-            let label = id.clone();
             view! {
-                <section class="chapter" aria-labelledby=label>
-                    <h3 id=id>{title(lang)}</h3>
+                <section
+                    class="story-ink"
+                    id=format!("chapter-{}", at + 1)
+                    role="tabpanel"
+                    aria-labelledby=format!("chapter-tab-{}", at + 1)
+                >
+                    <p class="eyebrow">{format!("{} · {} / {count}", words::baylee_chapters(lang), at + 1)}</p>
+                    <h3>{title(lang)}</h3>
                     {paragraphs(body(lang))}
+                    <p class="story-flower" aria-hidden="true">"❧"</p>
                 </section>
             }
         })
         .collect_view();
+    (tabs, chapters)
+}
+
+/// The full photograph, larger, to zoom into and move about.
+fn viewer(lang: Lang) -> impl IntoView + use<> {
     view! {
-        <dialog id="album" class="album" aria-labelledby="album-title">
-            <div class="album-head">
-                <img src=assets.url("img/cloud-600.webp") width="600" height="400" alt="" loading="lazy" decoding="async" />
-                <div>
-                    <h2 id="album-title">{words::baylee_story_title(lang)}</h2>
-                    <p class="meta">{words::baylee_together(lang)}</p>
-                </div>
+        <dialog id="photo-viewer" class="book photo-viewer" aria-label=words::baylee_photos(lang)>
+            <header class="photo-viewer-header">
+                <p data-viewer-caption="">{words::baylee_photo1(lang)}</p>
                 <form method="dialog">
-                    <button type="submit" class="tool" aria-label=words::memorial_close(lang)>{icon(icons::X)}</button>
+                    <button type="submit" class="round-btn" aria-label=words::baylee_photo_close(lang)>
+                        <span aria-hidden="true">"×"</span>
+                    </button>
                 </form>
+            </header>
+            <div class="photo-viewport" data-viewport="">
+                <img src="" alt="" draggable="false" data-viewer-image="" />
             </div>
-            <div class="album-body">
-                <div class="photos" tabindex="0" role="group" aria-label=words::baylee_photos(lang)>{photos}</div>
-                <nav class="album-contents" aria-label=words::baylee_chapters(lang)>
-                    <ol>{contents}</ol>
-                </nav>
-                <div class="story">{chapters}</div>
-            </div>
+            <footer class="photo-viewer-tools">
+                <div class="photo-step-controls">
+                    <button type="button" class="round-btn" data-photo-step="-1" aria-label=words::baylee_previous(lang)>
+                        <span aria-hidden="true">"←"</span>
+                    </button>
+                    <span class="num" data-photo-count="">"1 / 10"</span>
+                    <button type="button" class="round-btn" data-photo-step="1" aria-label=words::baylee_next(lang)>
+                        <span aria-hidden="true">"→"</span>
+                    </button>
+                </div>
+                <div class="photo-zoom-controls">
+                    <button type="button" class="round-btn" data-zoom="-1" aria-label=words::baylee_zoom_out(lang) disabled=true>
+                        <span aria-hidden="true">"−"</span>
+                    </button>
+                    <output class="num" aria-live="polite" data-zoom-level="">"100 %"</output>
+                    <button type="button" class="round-btn" data-zoom="1" aria-label=words::baylee_zoom_in(lang)>
+                        <span aria-hidden="true">"+"</span>
+                    </button>
+                    <button type="button" class="button button-ghost" data-zoom="0">{words::baylee_fit(lang)}</button>
+                </div>
+            </footer>
         </dialog>
     }
 }
