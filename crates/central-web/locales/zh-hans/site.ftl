@@ -254,14 +254,14 @@ privacy-short-title = 简而言之
 privacy-short = 没有追踪，没有广告，没有分析，除非你登录否则没有 Cookie，也不从其他服务器加载任何内容：字体、图片和脚本全部来自 baylee.app。你的密码不会到达我们这里，你的聊天消息和私人数据在发送之前已在你的浏览器中加密。
 privacy-hosting-title = 访问本站
 privacy-hosting = 本站运行在我们向德国 netcup GmbH 租用的服务器上。当你打开页面时，你的浏览器会发送每个请求都带有的信息：你的 IP 地址、所请求的地址、时间、浏览器的语言及其标识（user agent）。服务器需要这些信息来作出响应；它根据语言选择语言版本，下载页面则根据 user agent 推荐合适的文件。网络服务器不保留访问日志，因此这些请求不会被存储。服务器自身的运行信息（系统日志）在少数出错的情况下可能包含 IP 地址；它们最迟在 14 天后删除。法律依据：GDPR 第 6 条第 1 款 (f) 项；我们的合法利益是安全、可靠地提供本站。
-privacy-views-title = Counting page views
-privacy-views = The website counts how often its pages are opened: one single number for all pages and all visitors together, shown on the start page. A page opened in a browser adds one to it. Nothing about you is stored for this: no IP address, no cookie, no identifier, not even which page it was.
+privacy-views-title = 统计页面浏览量
+privacy-views = 本站会统计其页面被打开的次数：所有页面、所有访客合在一起只有一个数字，显示在起始页面上。在浏览器中打开一个页面，就会使它加一。为此不会存储任何关于你的信息：没有 IP 地址，没有 Cookie，没有标识符，也不存储是哪个页面。
 privacy-device-title = 你的浏览器保存什么
 privacy-device = 在你登录之前，本站不设置任何 Cookie。你的浏览器会在你的设备上保存以下内容，并且仅在启用 JavaScript 时：如果你做过选择，则保存你的配色选择（<code>baylee-site-theme</code>）；在你登录期间，保存会话何时结束（<code>baylee-central-session</code>）、你的聊天密钥以及联系人的受信任密钥（见“聊天”）；如果你开启了通知，则保存本设备的一个随机数（<code>baylee-push-installation-v1</code>、<code>baylee-push</code>）；并且，仅当你已登录、将本站安装为应用或开启了通知时，保存本站公开文件（页面外壳、字体、脚本）的一份副本，使本站无需网络连接即可启动，也使通知能够送达。如果这三种情况都不再适用，该副本会在你下次打开本站时被移除。除非下文某一节另有说明，这些内容都不会发送给我们。聊天和会话相关的条目会在你退出登录时删除；其余所有内容，你可以通过清除浏览器中本站的数据来移除。法律依据：TDDDG 第 25 条第 2 款第 2 项（对你所使用的功能而言是严格必需的）；对于通知所用的随机数，则是你的同意（TDDDG 第 25 条第 1 款）。
 privacy-github-title = GitHub
 privacy-github = 下载页面和起始页面会显示最新版本、测试状态和牌张数字。是我们的服务器向 GitHub 请求这些信息，而不是你的浏览器；GitHub 不会因此得知任何关于你的信息。只有当你点击下载链接或 GitHub 链接时，你的浏览器才会连接到 GitHub（GitHub, Inc.，美国），并向它发送你的 IP 地址以及每个请求都带有的信息；此后适用 GitHub 自己的隐私声明。
 privacy-directory-title = Gateway 目录
-privacy-directory = 我们的服务器从 Baylee Central 读取 Gateway 目录并加以显示；这不涉及关于你的任何信息。Gateway 可以告诉 Central 它此刻有多少玩家、开放牌桌和对局，Central 也会统计其账号数量；本站会显示这些数字。它们只是数量，绝不是名字，而 Gateway 的数字是其运营者自己的陈述。
+privacy-directory = 我们的服务器从 Baylee Central 读取 Gateway 目录并加以显示；这不涉及关于你的任何信息。Gateway 可以告诉 Central 它此刻有多少玩家已连接、其中有多少人在对局中，以及有多少开放牌桌和对局，Central 也会统计其账号数量；本站会显示这些数字。它们只是数量，绝不是名字，而 Gateway 的数字是其运营者自己的陈述。
 privacy-account-title = 你的账号
 privacy-account = 对于一个账号，Baylee Central 会存储：你的账号 ID、你的登录名、你的显示名及其标签、账号创建的时间和方式、一条 OPAQUE 密码记录（它让你可以证明自己知道密码，而我们的服务器始终不会得知密码）、被你的密码和你的恢复码各加密一次的主密钥、你的加密账号文档和你的加密对象（我们无法读取；我们只看得到大小、修订号和时间）、你接受了哪个版本的条款以及接受的时间、你上次登录的时间、你的会话、管理员角色（如果你有的话），以及你注册的 Gateways 及其令牌。其他玩家看到的是你的显示名和标签，而不是你的登录名。如果管理员给你一个重置码，我们只存储它的摘要，直到该重置码被使用或已过期。管理员对某个账号或 Gateway 所做的操作会记录在案并保存三年（谁、做了什么、涉及哪个账号或 Gateway、何时）。法律依据：GDPR 第 6 条第 1 款 (b) 项（你所请求的账号）；对于上次登录的时间和该记录，则是 GDPR 第 6 条第 1 款 (f) 项（我们在安全、可追溯的运营方面的合法利益）。没有登录名和密码就没有账号；你不需要电子邮件地址。你从 16 岁起可以创建账号。保存到你删除账号为止；删除后，数据会立即从运行中的系统中移除，并最迟在 12 个月内从备份中移除。会话在 30 分钟未使用后结束，最迟在登录 12 小时后结束。
 privacy-cookie-title = 会话 Cookie
@@ -271,7 +271,7 @@ privacy-chat = 消息在你的设备上针对每位收件人的设备加密；Ba
 privacy-push-title = 通知
 privacy-push = 如果你在浏览器中开启通知，你的浏览器会向其推送服务注册，Central 会存储该服务针对此浏览器的地址、浏览器的公钥和身份验证密钥、你的语言、本设备的一个随机数以及你选择的类别。推送服务属于你的浏览器厂商：Google（Firebase Cloud Messaging）、Mozilla 或 Apple，均位于美国。一条通知经加密后只携带其种类（例如“新消息”）和你的语言，绝不包含姓名或文字；推送服务能看到地址、时间和大小等连接数据。当你在本设备上关闭通知、退出登录或删除账号时，这些信息会被删除；90 天未更新的地址不再使用，等待中的通知在一天后过期。法律依据：GDPR 第 6 条第 1 款 (a) 项和 TDDDG 第 25 条第 1 款（你的同意）。你可以随时在账号设置中撤回同意；在此之前所做的处理仍然合法。
 privacy-counters-title = 防止滥用
-privacy-counters = 为了防止猜测密码和过载，Central 按 IP 地址统计某些请求（注册、登录尝试、密码重置、读取目录），只在内存中进行：注册和未以正确密码完成的登录尝试最长保留一天，其余的最长保留一小时。以正确密码登录后，Central 会在内存中记住 30 天（同样只在内存中）你的账号曾从该地址登录（一个 IPv4 地址，或 IPv6 地址的前半部分；每个账号最多八个），这样别人对你账号的尝试就不会把你挡在那里。使用同一地址且知道你登录名的人，可以从 Central 的回应中看出你的账号曾从该地址登录。设置新密码会忘记这些地址，只保留你设置密码时所用的那个；删除账号会全部忘记，重启服务也一样。注册之前，你的浏览器还会解一道需要内存和计算时间的谜题；它由随机数字组成，不含任何关于你的信息，最迟二十分钟后即被忘记。Central 会重新计算其中一小部分，以检查你浏览器的答案。难度取决于正在创建多少个账号，以及请求是否像来自程序：是否带有每个浏览器都会发送的标头，你的浏览器是否表明有程序在控制它，以及你的地址及其周围的网段（IPv4 地址的前三个数字，IPv6 地址的前 48 位）在过去一小时内请求了多少道谜题。对此，Central 只保留计数，存放在内存中，最长一小时。Central 按账号统计联系请求和对其他玩家的搜索，以免有人用请求淹没别人。法律依据：GDPR 第 6 条第 1 款 (f) 项；我们的合法利益是保护账号和服务免遭滥用。
+privacy-counters = 为了防止猜测密码和过载，Central 按 IP 地址统计请求（注册、登录尝试、密码重置、读取目录，以及更一般地，一个地址一分钟内发送多少请求），只在内存中进行：注册和未以正确密码完成的登录尝试最长保留一天，其余的最长保留一小时。以正确密码登录后，Central 会在内存中记住 30 天（同样只在内存中）你的账号曾从该地址登录（一个 IPv4 地址，或 IPv6 地址的前半部分；每个账号最多八个），这样别人对你账号的尝试就不会把你挡在那里。使用同一地址且知道你登录名的人，可以从 Central 的回应中看出你的账号曾从该地址登录。设置新密码会忘记这些地址，只保留你设置密码时所用的那个；删除账号会全部忘记，重启服务也一样。注册之前，你的浏览器还会解一道需要内存和计算时间的谜题；它由随机数字组成，不含任何关于你的信息，最迟二十分钟后即被忘记。Central 会重新计算其中一小部分，以检查你浏览器的答案。难度取决于正在创建多少个账号，以及请求是否像来自程序：是否带有每个浏览器都会发送的标头，你的浏览器是否表明有程序在控制它，以及你的地址及其周围的网段（IPv4 地址的前三个数字，IPv6 地址的前 48 位）在过去一小时内请求了多少道谜题。对此，Central 只保留计数，存放在内存中，最长一小时。Central 按账号统计联系请求和对其他玩家的搜索，以免有人用请求淹没别人。法律依据：GDPR 第 6 条第 1 款 (f) 项；我们的合法利益是保护账号和服务免遭滥用。
 privacy-contact-title = 联系表单
 privacy-contact = 表单会把你的留言、页面的语言和时间发送到同一台服务器上的 Baylee 反馈服务，仅在你填写时才会发送你的姓名和电子邮件地址；两者都是选填。该服务还会记录这条留言是否已处理。你的 IP 地址不会被存储；它只在内存中计数一小时，以阻止大量留言涌入。只有法律声明中所列之人会阅读这些留言；不会转交给任何人。留言在处理完毕 90 天后删除，最迟一年后删除，如果你要求，也可以更早删除。法律依据：GDPR 第 6 条第 1 款 (f) 项（我们回复留言的合法利益），或者在你的留言涉及你的账号时，为 (b) 项。
 privacy-impressum-title = 法律声明的谜题
@@ -437,7 +437,7 @@ error-unavailable = Baylee Central 暂时没有响应。请稍后再试。
 error-network = 没有网络连接。请检查网络后再试。
 error-failed = 出了点问题。请重试；如果问题持续出现，请告诉我们。
 error-again = 重试
-password-show-label = Show the password
+password-show-label = 显示密码
 
 ## Signing in
 
@@ -451,8 +451,8 @@ signin-working = 正在保护你的密码 …… 这需要片刻，并且只在�
 signin-wrong = 该登录名和密码不匹配。请检查两者后再试。
 signin-not-moved = 此账号尚未迁移到 Baylee Central。请先用 Baylee 客户端登录一次；它会迁移你的账号。
 signin-no-account = 还没有账号？<register>创建一个</register>。
-register-have-account = Already have an account? <signin>Sign in</signin>.
-dialog-close = Close
+register-have-account = 已经有账号了？<signin>登录</signin>。
+dialog-close = 关闭
 signin-noscript = 登录需要 JavaScript：你的密码在你的浏览器中处理，绝不会发送给我们。
 
 ## Registering
@@ -776,10 +776,9 @@ strip-cards-unit = 张牌
 strip-stars = GitHub 星标
 strip-accounts = Baylee Central 上的账号
 strip-live = 各 Gateway 此刻的上报数据
-strip-views = Page views since { $date }
+strip-views = 自 { $date } 起的页面浏览量
 live-views = { $n ->
-    [one] { $n } view
-   *[other] { $n } views
+   *[other] { $n } 次浏览
 }
 live-accounts = { $n ->
    *[other] { $n } 个账号
@@ -788,8 +787,7 @@ live-players = { $n ->
    *[other] { $n } 位玩家
 }
 live-playing = { $n ->
-    [one] { $n } in a game
-   *[other] { $n } in a game
+   *[other] { $n } 位对局中
 }
 live-tables = { $n ->
    *[other] { $n } 张开放牌桌
@@ -898,27 +896,27 @@ gw-findHint = 名称或地址
 gw-shown = 显示 { $n } / { $all }
 gw-noMatch = 到目前为止加载的 Gateway 中没有匹配项。
 gw-showAll = 显示全部
-gw-stats = The directory in numbers
-gw-stat-listed = Gateways listed
-gw-stat-online = Online now
-gw-stat-players = Players online
-gw-stat-playing = Of them in a game
-gw-stat-tables = Open tables
-gw-stat-games = Games running
-gw-show = Show
-gw-show-every = All
-gw-show-online = Online
-gw-show-official = Official
-gw-show-tables = With open tables
-gw-sort = Sort by
-gw-sort-best = Recommended
-gw-sort-name = Name (A–Z)
-gw-sort-players = Most players
-gw-sort-tables = Most open tables
-gw-sort-version = Newest version
-gw-view = View
-gw-view-cards = Cards
-gw-view-list = List
+gw-stats = 目录概况
+gw-stat-listed = 已列出的 Gateway
+gw-stat-online = 当前在线
+gw-stat-players = 在线玩家
+gw-stat-playing = 其中对局中
+gw-stat-tables = 开放牌桌
+gw-stat-games = 进行中的对局
+gw-show = 显示
+gw-show-every = 全部
+gw-show-online = 在线
+gw-show-official = 官方
+gw-show-tables = 有开放牌桌
+gw-sort = 排序
+gw-sort-best = 推荐
+gw-sort-name = 按名称
+gw-sort-players = 玩家最多
+gw-sort-tables = 开放牌桌最多
+gw-sort-version = 最新版本
+gw-view = 视图
+gw-view-cards = 网格
+gw-view-list = 列表
 link-readmeGateway = #running-your-own-gateway
 selfhost-eyebrow = 自托管与 Central 集成
 selfhost-title = 运行你自己的 Gateway
