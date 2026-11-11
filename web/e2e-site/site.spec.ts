@@ -264,30 +264,81 @@ test("the start page fetches no WebAssembly until its form comes near, then the 
   await expect(page.locator("#contact-error")).not.toBeEmpty();
 });
 
-test("the gateway directory finds by name or address, and online only", async ({ page }) => {
+test("the gateway directory finds by name or address, narrows, sorts and lays out, and its address says what is shown", async ({ page }) => {
   await page.goto("/en/gateways");
   const field = page.getByRole("searchbox", { name: "Find a gateway" });
   const cards = page.locator("[data-directory] > li:visible");
   const count = page.locator("[data-dir-count]");
+  const every = page.getByRole("button", { name: /^All/ });
+  const online = page.getByRole("button", { name: /^Online/ });
   await expect(cards).toHaveCount(2);
+  // the directory in numbers, from the server
+  await expect(page.locator(".dir-stat")).toHaveCount(5);
+  await expect(page.locator(".dir-stat").first()).toContainText("2");
+  // each chip says how many it would show
+  await expect(every).toHaveText(/2$/);
+  await expect(online).toHaveText(/1$/);
   await field.fill("kitchen");
   await expect(cards).toHaveCount(1);
   await expect(count).toHaveText("1 of 2 shown");
+  await expect(page).toHaveURL(/\/en\/gateways\?q=kitchen$/);
   await field.press("Escape");
   await expect(cards).toHaveCount(2);
-  await page.getByRole("button", { name: "Online only" }).click();
-  await expect(page.getByRole("button", { name: "Online only" })).toHaveAttribute("aria-pressed", "true");
+  await online.click();
+  await expect(online).toHaveAttribute("aria-pressed", "true");
+  await expect(every).toHaveAttribute("aria-pressed", "false");
   await expect(cards).toHaveCount(1);
+  await expect(page).toHaveURL(/\?show=online$/);
   await field.fill("kitchen");
   await expect(page.locator("[data-no-match]")).toBeVisible();
   await page.getByRole("button", { name: "Show all" }).click();
   await expect(cards).toHaveCount(2);
   await expect(field).toBeFocused();
   await expect(count).toHaveText("2 gateways listed, 1 online.");
+  await expect(every).toHaveAttribute("aria-pressed", "true");
+  await expect(page).toHaveURL(/\/en\/gateways$/);
+  // a pressed chip pressed again shows all
+  await online.click();
+  await online.click();
+  await expect(cards).toHaveCount(2);
+  // by name Kitchen comes first; recommended is the server's order again
+  const sort = page.getByLabel("Sort by");
+  await sort.selectOption("name");
+  await expect(cards.first()).toContainText("Kitchen");
+  await expect(page).toHaveURL(/\?sort=name$/);
+  await sort.selectOption("players");
+  await expect(cards.first()).toContainText("Sanctuary");
+  await sort.selectOption("");
+  await expect(cards.first()).toContainText("Sanctuary");
+  // the list, where a row has the room for it
+  const list = page.getByRole("button", { name: "List", exact: true });
+  if (await list.isVisible()) {
+    await list.click();
+    await expect(list).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator("[data-directory]")).toHaveAttribute("data-view", "list");
+    await expect(page).toHaveURL(/\?view=list$/);
+    expect(await axe(page)).toEqual([]);
+    expect(await targets(page)).toEqual([]);
+    await page.getByRole("button", { name: "Cards", exact: true }).click();
+    await expect(page.locator("[data-directory]")).not.toHaveAttribute("data-view", /.*/);
+  }
   // Ctrl+K finds the field from anywhere on the page
   await page.locator("h1").click();
   await page.keyboard.press("Control+k");
   await expect(field).toBeFocused();
+
+  // the address asks for a view, and gets it
+  await page.goto("/en/gateways?q=sanc&show=official&sort=name");
+  await expect(cards).toHaveCount(1);
+  await expect(field).toHaveValue("sanc");
+  await expect(page.getByRole("button", { name: /^Official/ })).toHaveAttribute("aria-pressed", "true");
+  await expect(sort).toHaveValue("name");
+  // what it asks for and the page does not offer is left out
+  await page.goto("/en/gateways?show=nothing&sort=%3Cscript%3E&view=sideways");
+  await expect(cards).toHaveCount(2);
+  await expect(every).toHaveAttribute("aria-pressed", "true");
+  await expect(sort).toHaveValue("");
+  await expect(page).toHaveURL(/\/en\/gateways$/);
 });
 
 test("what is typed before the islands run stays when they take the forms over", async ({ page }) => {

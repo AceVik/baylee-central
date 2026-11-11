@@ -742,6 +742,9 @@ pub fn gateway_card(lang: Lang, gateway: &Gateway, h2: bool) -> impl IntoView + 
         }
     });
     let find = format!("{} {}", gateway.name, gateway.origin).to_lowercase();
+    // what the directory sorts and narrows by (`directory.js`)
+    let flag = |on: bool| if on { "true" } else { "false" };
+    let counted = gateway.activity.filter(|_| gateway.online);
     let name = gateway.name.clone();
     let name = if h2 {
         view! { <h2 class="gw-name"><bdi>{name}</bdi></h2> }.into_any()
@@ -749,7 +752,9 @@ pub fn gateway_card(lang: Lang, gateway: &Gateway, h2: bool) -> impl IntoView + 
         view! { <h3 class="gw-name"><bdi>{name}</bdi></h3> }.into_any()
     };
     view! {
-        <li class=class data-find=find data-online=if gateway.online { "true" } else { "false" }>
+        <li class=class data-find=find data-online=flag(gateway.online) data-official=flag(gateway.official)
+            data-name=gateway.name.clone() data-version=gateway.version.clone()
+            data-players=counted.map(|a| a.players.to_string()) data-tables=counted.map(|a| a.tables.to_string())>
             <div class="gw-head">
                 {name}
                 {official}
