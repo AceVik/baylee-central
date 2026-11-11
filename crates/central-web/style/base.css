@@ -1,5 +1,5 @@
-/* The page itself: reset, type, links, focus, and the promises every page
-   keeps (reduced motion, forced colours, 320 px). */
+/* The page itself: elements, type, links, focus, the shared small pieces,
+   and the promises every page keeps (stillness, forced colours, 320 px). */
 
 *,
 *::before,
@@ -7,32 +7,34 @@
   box-sizing: border-box;
 }
 
-* {
-  margin: 0;
-}
-
 html {
-  /* Narrower viewports scroll sideways rather than breaking the layout;
-     at 320 px (WCAG's reflow width) nothing needs to. */
+  /* 16 to 20 px at the browser's usual size, and with it when a reader
+     sets it larger */
+  font-size: clamp(100%, 0.6875rem + 0.5vw, 125%);
   min-width: 320px;
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
-  scroll-padding-block-start: calc(var(--bar-height) + var(--space-4));
-  background: var(--ground);
+  scroll-padding-block-start: calc(var(--top-h) + 0.8rem);
+  scroll-behavior: smooth;
+  background: var(--bg);
 }
 
 body {
-  min-block-size: 100dvh;
+  margin: 0;
+  min-block-size: 100svh;
   display: flex;
   flex-direction: column;
-  background: var(--ground);
+  background: var(--bg);
   color: var(--ink);
-  font-family: var(--font-ui);
-  font-size: var(--text-md);
-  line-height: var(--leading);
-  font-variant-numeric: oldstyle-nums proportional-nums;
+  font-family: var(--serif);
+  line-height: var(--leading-prose);
+  font-feature-settings: "kern", "liga", "onum";
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
+  overflow-x: clip;
+  /* a phone on its side keeps the notch's strip free */
+  padding-inline: env(safe-area-inset-left) env(safe-area-inset-right);
+  isolation: isolate;
 }
 
 .page {
@@ -46,103 +48,174 @@ main {
   outline: none;
 }
 
-h1,
-h2,
-h3 {
-  color: var(--title);
-  font-family: var(--font-prose);
-  font-weight: 600;
-  line-height: var(--leading-tight);
-  text-wrap: balance;
+a {
+  color: var(--link);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
+  transition: color var(--dur-fast) ease;
 }
 
-h1 {
-  font-size: var(--text-2xl);
+a:hover {
+  color: var(--link-hover);
 }
 
-h2 {
-  font-size: var(--text-xl);
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
+  border-radius: 6px;
 }
 
-h3 {
-  font-size: var(--text-lg);
-}
-
-p,
-li,
-dd {
-  text-wrap: pretty;
+::selection {
+  background: var(--gold);
+  color: var(--gold-ink);
 }
 
 img,
 svg,
-picture {
+picture,
+video {
   display: block;
   max-inline-size: 100%;
   block-size: auto;
 }
 
-a {
-  color: var(--accent);
-  text-decoration-thickness: 0.08em;
-  text-underline-offset: 0.18em;
+h1,
+h2,
+h3,
+h4 {
+  margin: 0 0 0.5em;
+  color: var(--title);
+  font-family: var(--serif);
+  line-height: var(--leading-tight);
+  letter-spacing: -0.01em;
+  text-wrap: balance;
 }
 
-a:hover {
-  text-decoration-thickness: 0.14em;
+h1 {
+  font-size: var(--text-2xl);
+  font-weight: 600;
+  letter-spacing: -0.02em;
 }
 
-code,
-kbd {
-  font-family: var(--font-mono);
-  font-size: 0.9em;
+h2 {
+  font-size: var(--text-xl);
+  font-weight: 600;
 }
 
-kbd {
-  padding: 0.05em 0.4em;
-  border: var(--hairline) solid var(--edge);
-  border-block-end-width: 0.125em;
-  border-radius: var(--radius-sm);
-  background: var(--surface);
+h3 {
+  margin-block-start: 0;
+  font-size: var(--text-lg);
+  font-weight: 600;
+}
+
+h4 {
+  color: var(--ink-faint);
+  font: 700 0.82rem var(--sans);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+p {
+  margin: 0 0 1em;
+  text-wrap: pretty;
+}
+
+li,
+dd {
+  text-wrap: pretty;
 }
 
 ul,
 ol {
+  margin-block: 0 1em;
   padding-inline-start: 1.25em;
 }
 
+dl,
+dd,
+figure,
+blockquote {
+  margin: 0;
+}
+
+code,
+pre,
+kbd {
+  font-family: var(--mono);
+  font-size: 0.86em;
+}
+
+code {
+  padding: 0.05em 0.35em;
+  border: 1px solid var(--edge-soft);
+  border-radius: 5px;
+  background: var(--panel-2);
+  overflow-wrap: anywhere;
+}
+
+kbd {
+  display: inline-block;
+  min-width: 1.6em;
+  padding: 0 0.4em;
+  border: 1px solid var(--edge-soft);
+  border-bottom-width: 2px;
+  border-radius: 6px;
+  background: var(--kbd-bg);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 0.85em;
+  font-weight: 500;
+  line-height: 1.5;
+  text-align: center;
+}
+
+fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
 .num {
-  font-variant-numeric: lining-nums tabular-nums;
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings: "tnum", "lnum";
 }
 
-/* One focus ring everywhere: a gap in the ground, then the ring, 3:1 on
-   every surface including the gold button. */
-:focus-visible {
-  outline: 0.1875rem solid var(--focus);
-  outline-offset: 0.125rem;
-  box-shadow: 0 0 0 0.125rem var(--ground);
+.small {
+  color: var(--ink-faint);
+  font-size: var(--text-sm);
 }
 
-::selection {
-  background: var(--accent);
-  color: var(--ground);
+.icon {
+  width: 1.25em;
+  height: 1.25em;
+  flex: none;
 }
 
 .skip {
   position: absolute;
-  inset-inline-start: var(--space-4);
-  inset-block-start: var(--space-2);
-  z-index: 100;
-  padding: var(--space-3) var(--space-4);
-  border-radius: var(--radius-sm);
-  background: var(--action);
-  color: var(--on-action);
+  inset-inline-start: 1rem;
+  inset-block-start: -4rem;
+  z-index: 60;
+  padding: 0.6em 1em;
+  border-radius: 10px;
+  background: var(--gold);
+  color: var(--gold-ink);
+  font-family: var(--sans);
   font-weight: 700;
-  transform: translateY(-200%);
+  text-decoration: none;
 }
 
-.skip:focus-visible {
-  transform: none;
+.skip:focus {
+  inset-block-start: 1rem;
 }
 
 .visually-hidden {
@@ -158,32 +231,115 @@ ol {
   display: none !important;
 }
 
+/* status dots: the online one breathes, slowly */
+.dot {
+  display: inline-block;
+  width: 0.6em;
+  height: 0.6em;
+  margin-inline-end: 0.4em;
+  border-radius: 50%;
+  background: var(--ink-faint);
+  vertical-align: 0.05em;
+}
+
+.dot.ok,
+.ok > .dot {
+  background: var(--ok);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 22%, transparent);
+}
+
+.dot.bad,
+.bad > .dot {
+  background: var(--bad);
+}
+
+.dot.off,
+.off > .dot {
+  background: var(--off);
+}
+
+.dot.live {
+  position: relative;
+}
+
+.dot.live::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: inherit;
+  animation: breathe 2.4s ease-out infinite;
+}
+
+@keyframes breathe {
+  from {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+
+  to {
+    opacity: 0;
+    transform: scale(2.6);
+  }
+}
+
+dialog::backdrop {
+  background: var(--backdrop);
+  backdrop-filter: blur(4px);
+}
+
+dialog[open] {
+  animation: pop 200ms var(--ease);
+}
+
+@keyframes pop {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 /* Stillness (WCAG 2.3.3): no movement for those who asked for none. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
-    animation-duration: 0s !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0s !important;
+    animation: none !important;
+    transition: none !important;
     scroll-behavior: auto !important;
   }
 }
 
-/* Windows' high contrast: borders and the ring stay visible. */
+/* Windows' high contrast keeps outlines and borders but drops shadows and
+   fills: what a fill marks gets an outline in the system's colours. */
 @media (forced-colors: active) {
   :focus-visible {
     outline-color: Highlight;
   }
 
+  [aria-current="page"],
+  [aria-pressed="true"] {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+
   .button,
   .card,
   .pill,
-  .notice {
-    border: var(--hairline) solid CanvasText;
+  .notice,
+  .round-btn {
+    border: 1px solid CanvasText;
   }
+}
 
-  [aria-current="page"] {
-    outline: 0.125rem solid Highlight;
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(1.5rem);
   }
 }

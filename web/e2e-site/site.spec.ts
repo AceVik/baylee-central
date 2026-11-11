@@ -77,7 +77,7 @@ test("nor while signed in, where the bar names the account (German)", async ({ p
     await page.setViewportSize({ width, height: width < 1024 ? 812 : 900 });
     for (const slug of ["", "download", "account", "account/chat"]) {
       await page.goto(`/de/${slug}`);
-      await expect(page.locator("a.sign-in")).toHaveAttribute("href", "/de/account");
+      await expect(page.locator("a.nav-account")).toHaveAttribute("href", "/de/account");
       const wide = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
       expect(wide, `${slug} at ${width}`).toBeLessThanOrEqual(0);
     }
@@ -164,14 +164,41 @@ test("the Impressum's puzzle fails gracefully without the feedback service", asy
   await expect(page.getByRole("button", { name: "Angaben anzeigen" })).toBeFocused();
 });
 
-test("the phone's More sheet opens, holds the rest and closes with Escape", async ({ page, isMobile }) => {
+test("on a phone the menu button opens the sections, and Escape closes them", async ({ page, isMobile }) => {
   test.skip(!isMobile, "phones only");
   await page.goto("/de/");
-  const more = page.locator(".dock button[popovertarget=more]");
-  await more.click();
-  const sheet = page.locator("#more");
-  await expect(sheet).toBeVisible();
-  await expect(sheet.getByRole("link", { name: "Kontakt" })).toBeVisible();
+  const nav = page.locator("#nav");
+  await expect(nav).toBeHidden();
+  const button = page.locator(".menu-btn");
+  await button.click();
+  await expect(nav).toBeVisible();
+  await expect(nav.getByRole("link", { name: "Kontakt" })).toBeVisible();
   await page.keyboard.press("Escape");
-  await expect(sheet).toBeHidden();
+  await expect(nav).toBeHidden();
+  await expect(button).toBeFocused();
+});
+
+test("the language menu opens from the bar, offers this page in German, and closes with Escape", async ({ page }) => {
+  await page.goto("/en/download");
+  const menu = page.locator("details.lang");
+  await menu.locator("summary").click();
+  const german = menu.getByRole("link", { name: /Deutsch/ });
+  await expect(german).toBeVisible();
+  await expect(german).toHaveAttribute("href", "/de/download");
+  await page.keyboard.press("Escape");
+  await expect(german).toBeHidden();
+  await expect(menu.locator("summary")).toBeFocused();
+});
+
+test("the download offers every other system from its menu", async ({ page }) => {
+  await page.goto("/en/");
+  const more = page.locator(".dl-more");
+  await more.locator("summary").click();
+  await expect(more.locator(".menu-item")).not.toHaveCount(0);
+  for (const href of await more.locator(".menu-item").evaluateAll((all) => all.map((a) => a.getAttribute("href")))) {
+    expect(href).toMatch(/^https:\/\/github\.com\//);
+  }
+  // a press outside closes it
+  await page.locator("h1").click();
+  await expect(more.locator(".menu")).toBeHidden();
 });

@@ -20,3 +20,6 @@ mod rich;
 
 #[cfg(not(target_arch = "wasm32"))]
 pub mod site;
+// the islands draw their own glyphs for now (islands/chat/glyph.rs)
+#[cfg(not(target_arch = "wasm32"))]
+mod solid;

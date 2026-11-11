@@ -36,7 +36,7 @@ foot-central-source = Quellcode dieser Seite
 foot-dedication = Für Baylee. Für immer im Sonnenlicht.
 fan-content = Baylee ist ein inoffizieller Fan-Inhalt im Rahmen der <policy>Richtlinie für Fan-Inhalte</policy>. Nicht von Wizards gefördert/gesponsert. Bestandteile des enthaltenen Materials sind Eigentum von Wizards of the Coast. ©Wizards of the Coast LLC.
 fan-content-short = Inoffizieller Fan-Inhalt · <more>was das heißt</more>
-foot-colophon = Schriften: Alegreya Sans und Faustina (SIL Open Font License), Icons: Lucide (ISC), alles von dieser Seite geladen. <notices>Hinweise</notices>
+foot-colophon = Schriften: Faustina und Alegreya Sans, SIL Open Font License 1.1, von dieser Seite ausgeliefert. Das Gemälde und das Logo sind unsere eigenen. <notices>Hinweise</notices>
 
 ## Titel und Beschreibungen
 
@@ -67,7 +67,7 @@ breadcrumb-home = Start
 ## Start
 
 hero-kicker = Offene Beta · Kostenlos · Open Source · Inoffizieller Fan-Content
-hero-title = Bau deine Decks. Hol deine Freunde. Einfach spielen.
+hero-title = Decks bauen. Freunde einladen. <glow>Einfach spielen.</glow>
 hero-lead = Ein umfassender Deckbuilder, Partien für bis zu acht Spieler – im Duell, jeder gegen jeden oder im Team – und eine Regel-Engine, die jeden Schritt prüft. So bleibt jeder Zug fair, ohne dass jemand etwas nachschlagen muss.
 hero-offline = Solopartien und der Deckbuilder funktionieren offline, ohne Account. Online-Tische laufen auf Gateways; <host>du kannst dein eigenes betreiben</host>.
 hero-account = Online spielen? <register>Leg ein Konto an</register>, kostenlos und in der offenen Beta für alle offen, oder <signin>melde dich an</signin>.
@@ -792,3 +792,25 @@ admin-registration-closed = Geschlossen: Niemand kann ein Konto anlegen, bis du 
 admin-registration-lead = Schließe die Registrierung bei einem Angriff und öffne sie von Hand wieder. Jede Änderung steht im Prüfprotokoll.
 admin-registration-close = Registrierung schließen
 admin-registration-reopen = Registrierung wieder öffnen
+hero-discord = Discord-Community
+hero-whatsapp = WhatsApp-Community
+hero-github = GitHub
+nav-menu = Menü
+foot-project = Projekt
+foot-source = Quellcode (AGPL-3.0)
+foot-central = Baylee Central (Quellcode einsehbar)
+foot-summary = Freies, quelloffenes Tabletop-Kartenspiel in Rust & Bevy – mit deterministischer Regel-Engine, lokalem Offline-Modus, Haus-KI, LLM-Anbindung und Community-Gateways.
+strip-build = Build
+strip-ci = CI
+strip-commit = Letzter Commit
+strip-gateways = Gateways
+strip-online = online
+strip-offline = offline
+strip-releases = siehe Releases
+strip-on-github = auf GitHub ansehen
+strip-directory = das Verzeichnis
+ci-passing = grün
+ci-failing = rot
+dl-button = Baylee herunterladen
+dl-quick = Andere Systeme und Architekturen
+dl-others = andere Systeme

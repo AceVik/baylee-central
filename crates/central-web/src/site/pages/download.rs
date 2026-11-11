@@ -7,12 +7,13 @@ use leptos::prelude::*;
 use serde_json::{Value, json};
 
 use super::Built;
-use crate::data::{Kind, Platform, ReleaseFile};
+use crate::data::{Kind, Platform, Release, ReleaseFile};
 use crate::format;
 use crate::rich::{icon, plain, rich};
 use crate::site::icons;
 use crate::site::shell::{Meta, REPOSITORY};
 use crate::site::{Context, Page};
+use crate::solid;
 use crate::words::{self, Lang};
 
 /// A platform's name and its line beneath.
@@ -49,37 +50,177 @@ fn releases_link(tag: &str) -> Option<String> {
     (tag == "releases").then(|| format!("{REPOSITORY}/releases"))
 }
 
-/// The primary download button for the visitor's machine, or a link to
-/// the download page when there is no file to name.
-pub fn best_link(cx: &Context<'_>) -> impl IntoView + use<> {
-    let lang = cx.lang;
-    let best = cx
-        .data
-        .release
-        .as_ref()
-        .zip(cx.machine.platform)
-        .and_then(|(release, platform)| {
-            release.best(platform).map(|file| (platform, file.clone()))
-        });
-    match best {
-        Some((platform, file)) => {
-            let (system, _) = platform_name(lang, platform);
-            view! {
-                <a class="button primary" href=file.url.clone() rel="noopener noreferrer">
-                    {icon(icons::DOWNLOAD)}
-                    <span>{words::dl_for(lang, system)}</span>
-                </a>
-            }
-            .into_any()
-        }
-        None => view! {
-            <a class="button primary" href=Page::Download.path(lang)>
-                {icon(icons::DOWNLOAD)}
-                <span>{words::nav_download(lang)}</span>
-            </a>
-        }
-        .into_any(),
+/// What a platform's build runs on, as the old site wrote it.
+fn arch(platform: Platform) -> &'static str {
+    match platform {
+        Platform::MacArm64 => "Apple Silicon (ARM64)",
+        Platform::MacX64 => "Intel (x64)",
+        Platform::WindowsArm64 | Platform::LinuxArm64 => "ARM64",
+        Platform::WindowsX64 | Platform::LinuxX64 => "x64",
     }
+}
+
+/// What to say about the visitor's machine, if anything.
+pub fn machine_note(cx: &Context<'_>) -> Option<&'static str> {
+    let lang = cx.lang;
+    match (cx.machine.mobile, cx.machine.platform, cx.machine.sure) {
+        (true, _, _) => Some(words::dl_mobile(lang)),
+        (false, None, _) => Some(words::dl_unknown(lang)),
+        (false, Some(Platform::MacArm64), false) => Some(words::dl_mac_unsure(lang)),
+        (false, Some(Platform::WindowsX64), false) => Some(words::dl_windows_unsure(lang)),
+        (false, Some(Platform::LinuxX64), false) => Some(words::dl_linux_unsure(lang)),
+        _ => None,
+    }
+}
+
+fn sep() -> impl IntoView + use<> {
+    view! { <span class="sep" aria-hidden="true">"·"</span> }
+}
+
+/// The download menu's rows: each system's first file.
+fn menu_items(lang: Lang, release: &Release, mine: Option<Platform>) -> impl IntoView + use<> {
+    Platform::ALL
+        .into_iter()
+        .filter_map(|platform| release.best(platform).map(|file| (platform, file.clone())))
+        .map(|(platform, file)| {
+            let (name, _) = platform_name(lang, platform);
+            let is_mine = mine == Some(platform);
+            view! {
+                <li>
+                    <a class="menu-item" class:is-mine=is_mine href=file.url.clone() rel="noopener noreferrer">
+                        <span class="dl-plat">
+                            <strong>{name}</strong>
+                            <span>{arch(platform)}</span>
+                        </span>
+                        <span class="dl-file num">
+                            {kind_name(lang, file.kind)}
+                            {sep()}
+                            {words::dl_size(lang, &format::megabytes(lang, file.size))}
+                        </span>
+                    </a>
+                </li>
+            }
+        })
+        .collect_view()
+}
+
+/// The big button, on the start page and the download page: the file for
+/// this machine when there is one, else the release; its version and
+/// architecture inside it, every other system in a menu beside it, and the
+/// checksum, signature and release notes below. Every link goes straight to
+/// GitHub. Without a release, the releases page.
+/// The lines below the button: the release, the file and its size and
+/// date; the checksum, the signature, the notes and the other systems.
+fn lines(
+    lang: Lang,
+    release: &Release,
+    file: Option<&ReleaseFile>,
+    others: String,
+) -> impl IntoView + use<> {
+    let meta = file.map(|file| {
+        view! {
+            {sep()}
+            {kind_name(lang, file.kind)}
+            {sep()}
+            <span class="num">{words::dl_size(lang, &format::megabytes(lang, file.size))}</span>
+        }
+    });
+    let checksum = file.and_then(|file| file.checksum.clone()).map(|url| {
+        view! { <a href=url rel="noopener noreferrer">{words::dl_checksum(lang)}</a>{sep()} }
+    });
+    let signature = file.and_then(|file| file.signature.clone()).map(|url| {
+        view! { <a href=url rel="noopener noreferrer">{words::dl_signature(lang)}</a>{sep()} }
+    });
+    view! {
+        <p class="dl-meta">
+            <span translate="no">{release.tag.clone()}</span>
+            {meta}
+            {sep()}
+            {format::date(lang, &release.date)}
+        </p>
+        <p class="dl-sub">
+            {checksum}
+            {signature}
+            <a href=release.page.clone() rel="noopener noreferrer">{words::dl_notes(lang)}</a>
+            {sep()}
+            <a href=others>{words::dl_others(lang)}</a>
+        </p>
+    }
+}
+
+pub fn download_block(cx: &Context<'_>, on_page: bool) -> impl IntoView + use<> {
+    let lang = cx.lang;
+    let others = if on_page {
+        "#platforms".to_owned()
+    } else {
+        format!("{}#platforms", Page::Download.path(lang))
+    };
+    let Some(release) = cx.data.release.as_ref() else {
+        let fallback = words::dl_button(lang);
+        return view! {
+            <div class="dl">
+                <div class="dl-split">
+                    <a class="button button-big dl-main" href=format!("{REPOSITORY}/releases") rel="noopener noreferrer">
+                        {solid::icon(solid::DOWNLOAD)}
+                        <span class="dl-text"><span class="dl-title">{fallback}</span></span>
+                    </a>
+                </div>
+                <p class="dl-meta">{rich(words::dl_none(lang), releases_link)}</p>
+            </div>
+        }
+        .into_any();
+    };
+    let mine = cx.machine.platform;
+    let best =
+        mine.and_then(|platform| release.best(platform).map(|file| (platform, file.clone())));
+    let (href, title, badge) = match &best {
+        Some((platform, file)) => (
+            file.url.clone(),
+            words::dl_for(lang, platform_name(lang, *platform).0),
+            format!("{} · {}", release.tag, arch(*platform)),
+        ),
+        None => (
+            release.page.clone(),
+            words::dl_button(lang).to_owned(),
+            release.tag.clone(),
+        ),
+    };
+    let items = menu_items(lang, release, mine);
+    let archive = best
+        .as_ref()
+        .filter(|(_, file)| file.kind == Kind::Fallback)
+        .map(|_| view! { <p class="dl-arch">{words::dl_fallback_help(lang)}</p> });
+    let note = machine_note(cx).map(|note| view! { <p class="dl-arch">{note}</p> });
+    view! {
+        <div class="dl">
+            <div class="dl-split">
+                <a class="button button-big dl-main" href=href rel="noopener noreferrer">
+                    {solid::icon(solid::DOWNLOAD)}
+                    <span class="dl-text">
+                        <span class="dl-title">{title}</span>
+                        <span class="dl-badge">{badge}</span>
+                    </span>
+                </a>
+                <details class="dl-more" data-menu="">
+                    <summary class="button" aria-label=words::dl_quick(lang) title=words::dl_quick(lang)>
+                        {solid::icon_as(solid::DOWN, "chevron")}
+                    </summary>
+                    <div class="menu">
+                        <ul>{items}</ul>
+                        <p class="menu-foot">
+                            <a href=others.clone()>{words::dl_others(lang)}</a>
+                            {sep()}
+                            <a href=release.page.clone() rel="noopener noreferrer">{words::dl_notes(lang)}</a>
+                        </p>
+                    </div>
+                </details>
+            </div>
+            {lines(lang, release, best.as_ref().map(|(_, file)| file), others)}
+            {note}
+            {archive}
+        </div>
+    }
+    .into_any()
 }
 
 /// Structured data for the game itself.
@@ -156,7 +297,7 @@ fn install(lang: Lang) -> impl IntoView + use<> {
 }
 
 /// The release's files, or why there are none.
-fn release_view(cx: &Context<'_>, note: Option<&'static str>) -> AnyView {
+fn release_view(cx: &Context<'_>) -> AnyView {
     let lang = cx.lang;
     match &cx.data.release {
         Some(release) => {
@@ -201,11 +342,7 @@ fn release_view(cx: &Context<'_>, note: Option<&'static str>) -> AnyView {
                         <code translate="no">{words::dl_release(lang, &release.tag, &format::date(lang, &release.date))}</code>
                         {prerelease}
                     </p>
-                    <div class="actions">
-                        {best_link(cx)}
-                        <a class="button quiet" href=release.page.clone() rel="noopener noreferrer">{icon(icons::EXTERNAL_LINK)}{words::dl_notes(lang)}</a>
-                    </div>
-                    {note.map(|note| view! { <p class="hint">{note}</p> })}
+                    {download_block(cx, true)}
                     {missing}
                 </div>
                 <h2 class="visually-hidden">{words::dl_all(lang)}</h2>
@@ -229,22 +366,14 @@ pub fn page(cx: &Context<'_>) -> Built {
     meta.trail
         .push((words::nav_download(lang).to_owned(), Page::Download));
     meta.data.push(software(cx));
-    let note = match (cx.machine.mobile, cx.machine.platform, cx.machine.sure) {
-        (true, _, _) => Some(words::dl_mobile(lang)),
-        (false, None, _) => Some(words::dl_unknown(lang)),
-        (false, Some(Platform::MacArm64), false) => Some(words::dl_mac_unsure(lang)),
-        (false, Some(Platform::WindowsX64), false) => Some(words::dl_windows_unsure(lang)),
-        (false, Some(Platform::LinuxX64), false) => Some(words::dl_linux_unsure(lang)),
-        _ => None,
-    };
-    let body = release_view(cx, note);
+    let body = release_view(cx);
     let body = view! {
         <section class="page-head wrap">
             <p class="eyebrow">{words::dl_eyebrow(lang)}</p>
             <h1>{words::dl_title(lang)}</h1>
             <p class="lead">{words::dl_lead(lang)}</p>
         </section>
-        <section class="wrap" aria-label=words::dl_all(lang)>{body}</section>
+        <section class="wrap" id="platforms" aria-label=words::dl_all(lang)>{body}</section>
         {install(lang)}
     }
     .into_any();

@@ -442,6 +442,20 @@ below are this proposal's, recorded with their reasons.
 
 ### 6.1 Visual language: "one garden, two hours"
 
+*Superseded on 11.11.2026.* The owner, having seen the result: "Mir hat das
+Design der alten React Webseite deutlich besser gefallen." The site now
+takes the old site's look and its functions again, and the code is
+rewritten, not copied:
+- the logo, the header with its dropdowns, the hero with the split
+  download button, the glass panels, the pill buttons and the footer;
+- the chat in the old look, with the new and better UX;
+- Font Awesome allowed;
+- animations welcome, but no hover changes an element's size or place (a
+  test over the stylesheets checks this).
+
+What follows was the redesign this replaced, kept as the record of the
+change.
+
 Kept: sunlight by day and the blue hour by night, the owner-approved
 painting, the game's two typefaces. Changed: from glass panels, deep shadows,
 pill buttons and centred symmetry to calm paper-like surfaces separated by

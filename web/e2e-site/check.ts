@@ -25,6 +25,8 @@ export async function targets(page: Page): Promise<string[]> {
     for (const element of document.querySelectorAll<HTMLElement>("a[href], button, input, textarea, select, summary")) {
       const rect = element.getBoundingClientRect();
       if (rect.width === 0 || rect.height === 0 || getComputedStyle(element).visibility === "hidden") continue;
+      // Content of a closed <details> keeps a layout size but is never drawn or reached.
+      if (!element.checkVisibility({ contentVisibilityAuto: true, visibilityProperty: true })) continue;
       // WCAG 2.5.8's inline exception: a link in a sentence.
       const sentence = "p, li, dd, td, figcaption, blockquote, label";
       if (element.matches("a") && element.closest(sentence) && !element.matches(".button, .tool")) {

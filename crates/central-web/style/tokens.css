@@ -3,13 +3,13 @@
  * Latin-1 and the punctuation the site writes; `unicode-range` says so, so
  * any other character falls back to a system font.
  *
- * Design tokens (docs/website-design.md): every colour, size, radius,
- * shadow and duration of the site, named by meaning. No other stylesheet
- * names a raw colour. Light is "sunlight", dark is "the blue hour"; both
- * come from the same names. The contrast of every pair a page draws is
- * measured by crates/central-web/tests/contrast.rs.
+ * Design tokens: the old site's look (owner, 11.11.2026: "das Design das
+ * Aussehen etc. übernimm von der alten"), Baylee in sunlight by day and the
+ * blue hour by night. Every colour, size, radius, shadow and duration the
+ * pages use is named here; no other stylesheet names a raw colour except
+ * the artwork's own. The contrast of every pair a page draws is measured by
+ * crates/central-web/tests/contrast.rs.
  */
-
 @font-face {
   font-family: "Alegreya Sans";
   src: url("/assets/fonts/AlegreyaSans-Regular.woff2") format("woff2");
@@ -60,16 +60,56 @@
     U+2018-201E, U+2022, U+2026, U+2030, U+2039-203A, U+20AC, U+2122, U+2212;
 }
 
+/* The blue hour: the default, and the device's choice of dark. */
 :root {
-  color-scheme: light;
+  color-scheme: dark;
+  --bg: #0f1b2d;
+  --bg-alt: #13223a;
+  --panel: rgb(23 39 65 / 0.94);
+  --panel-solid: #172741;
+  --panel-2: #1f3253;
+  --edge: rgb(227 192 126 / 0.3);
+  --edge-soft: rgb(160 185 230 / 0.16);
+  --field-edge: #647593;
+  --ink: #eef1f8;
+  --ink-soft: #cdd6ea;
+  --ink-faint: #a3b3d1;
+  --title: #fff7e4;
+  --gold: #e3c07e;
+  --gold-2: #f3dca6;
+  --gold-ink: #1a1306;
+  --violet: #aebfff;
+  --violet-soft: rgb(147 166 255 / 0.14);
+  --link: #ebcd8f;
+  --link-hover: #f8e6b9;
+  --focus: #ffe7a6;
+  --ok: #7fd3a1;
+  --warn: #f0c076;
+  --bad: #f39c92;
+  --off: #93a0bb;
+  --ok-tint: #17382f;
+  --warn-tint: #3d2f1c;
+  --bad-tint: #40242a;
+  --bubble-own: #24406a;
+  --hero-shadow: 0 1px 2px rgb(0 0 0 / 0.5), 0 2px 22px rgb(0 0 0 / 0.45);
+  --shadow: 0 24px 50px -30px rgb(0 0 0 / 0.75);
+  --shadow-lift: 0 30px 60px -28px rgb(0 0 0 / 0.85), 0 0 0 1px var(--edge);
+  --bar-shadow: 0 10px 24px -8px rgb(0 0 0 / 0.62), 0 2px 6px rgb(0 0 0 / 0.36);
+  --top-bg: rgb(14 25 43 / 0.94);
+  --code-bg: #0a1222;
+  --code-ink: #e6ebf5;
+  --kbd-bg: #1b2740;
+  --field-bg: rgb(9 18 33 / 0.85);
+  --scene-veil: rgb(15 27 45 / 0.94);
+  --bar-ink: #eef1f7;
+  --tool-bg: rgb(8 14 28 / 0.3);
+  --photo-ground: #05080f;
+  --backdrop: rgb(4 8 16 / 0.72);
+  --shade: rgb(0 0 0 / 0.2);
+  --shade-strong: rgb(0 0 0 / 0.35);
+  --shade-deep: rgb(0 0 0 / 0.5);
 
-  /* Sunlight */
-  --ground: #f7f3ea;
-  --ground-alt: #ecefe6;
-  --surface: #fffdf7;
-  --surface-raised: #f0eee3;
-  --bubble-own: #dcebe6;
-  /* avatars: six tints under light initials */
+  /* Avatars: six tints under light initials, the same in both schemes. */
   --avatar-0: #1a5f6e;
   --avatar-1: #7a4b12;
   --avatar-2: #3d5a1e;
@@ -77,160 +117,182 @@
   --avatar-4: #2c4a86;
   --avatar-5: #8a3b2e;
   --on-avatar: #fffdf7;
-  --ink: #1f3a40;
-  --ink-soft: #3f5a5d;
-  --ink-faint: #52696a;
-  --title: #143840;
-  --action: #e9c46a;
-  --action-hover: #dcb04c;
-  --on-action: #2a1d04;
-  --action-edge: #8a5a05;
-  --accent: #1a5f6e;
-  --focus: #1f5c68;
-  --edge: #6f8583;
-  --edge-soft: rgb(31 58 64 / 0.12);
-  --ok: #1c7245;
-  --warn: #9a4700;
-  --bad: #a3302a;
-  --ok-tint: #e2f1e6;
-  --warn-tint: #fae9d8;
-  --bad-tint: #f9e3df;
-  --veil: rgb(247 243 234 / 0);
-  --shade: rgb(31 58 64 / 0.06);
-  --shade-strong: rgb(31 58 64 / 0.18);
-  --shade-deep: rgb(31 58 64 / 0.28);
 
-  /* Type: rem for size, a fluid middle for the reading sizes. */
-  --font-ui: "Alegreya Sans", "Segoe UI", system-ui, sans-serif;
-  --font-prose: "Faustina", Georgia, "Times New Roman", serif;
-  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
-  --text-xs: 0.8125rem;
-  --text-sm: 0.9375rem;
-  --text-md: clamp(1.0625rem, 1.02rem + 0.2vw, 1.1875rem);
-  --text-lg: clamp(1.25rem, 1.15rem + 0.45vw, 1.5rem);
-  --text-xl: clamp(1.5rem, 1.25rem + 1.1vw, 2.125rem);
-  --text-2xl: clamp(1.875rem, 1.4rem + 2.1vw, 2.875rem);
-  --text-3xl: clamp(2.25rem, 1.5rem + 3.4vw, 3.75rem);
-  --leading-tight: 1.2;
+  /* Type: the serif for reading, the sans for every control. */
+  --serif: "Faustina", Georgia, "Times New Roman", serif;
+  --sans: "Alegreya Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  --text-xs: 0.78rem;
+  --text-sm: 0.9rem;
+  --text-md: 1rem;
+  --text-lg: clamp(1.12rem, 1rem + 0.4vw, 1.32rem);
+  --text-xl: clamp(1.7rem, 1.2rem + 1.7vw, 2.6rem);
+  --text-2xl: clamp(2.2rem, 1.4rem + 3.4vw, 4rem);
+  --leading-tight: 1.12;
   --leading: 1.5;
-  --leading-prose: 1.65;
+  --leading-prose: 1.6;
 
-  /* One spacing scale. */
+  /* One step is a quarter rem. */
   --space-1: 0.25rem;
   --space-2: 0.5rem;
   --space-3: 0.75rem;
   --space-4: 1rem;
   --space-5: 1.5rem;
   --space-6: 2rem;
-  --space-7: 3rem;
-  --space-8: 4rem;
-  --space-9: 6rem;
-  --gutter: clamp(1rem, 0.5rem + 2.5vw, 2rem);
-  --space-section: clamp(3rem, 2rem + 5vw, 6rem);
+  --space-7: 2.5rem;
+  --space-8: 3rem;
+  --space-9: 4rem;
+  --space-10: 5rem;
+  --space-12: 6rem;
+  --prose: 46rem;
+  --wrap: 72rem;
+  --wrap-app: 80rem;
+  --gutter: 1rem;
+  --top-h: 3.9rem;
+  --target: 44px;
 
-  /* Measures. */
-  --measure: 38rem;
-  --page: 72rem;
-  --frame: 100rem;
-  --target: 2.75rem;
-  --bar-height: 4rem;
-  --dock-height: 4.25rem;
+  /* Shape. */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius: 18px;
+  --pill: 999px;
 
-  /* Shape and depth. */
-  --radius-sm: 0.5rem;
-  --radius-md: 0.875rem;
-  --radius-lg: 1.25rem;
-  --radius-full: 999rem;
-  --hairline: 1px;
-  --elevation-1: 0 1px 2px var(--shade), 0 2px 8px var(--shade);
-  --elevation-2: 0 8px 24px -8px var(--shade-strong);
-  --elevation-3: 0 24px 48px -16px var(--shade-deep);
-
-  /* Motion: settles in a frame or two, never decorates. */
+  /* Motion: a control settles in about 120 ms; colour, opacity and
+     transforms inside an element only, never its size or place on hover. */
   --dur-fast: 120ms;
   --dur: 180ms;
-  --dur-sheet: 240ms;
   --dur-slow: 320ms;
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-in: cubic-bezier(0.4, 0, 1, 1);
+
+  /* The names the pages not yet moved to the old look still use. */
+  --ground: var(--bg);
+  --ground-alt: var(--bg-alt);
+  --surface: var(--panel-solid);
+  --surface-raised: var(--panel-2);
+  --action: var(--gold);
+  --action-hover: var(--gold-2);
+  --on-action: var(--gold-ink);
+  --action-edge: var(--gold);
+  --accent: var(--violet);
+  --font-ui: var(--sans);
+  --font-prose: var(--serif);
+  --font-mono: var(--mono);
+  --text-3xl: var(--text-2xl);
+  --measure: 38rem;
+  --page: var(--wrap);
+  --frame: 100rem;
+  --bar-height: var(--top-h);
+  --dock-height: 0rem;
+  --radius-lg: var(--radius);
+  --radius-full: var(--pill);
+  --hairline: 1px;
+  --space-section: clamp(2.4rem, 4.5vw, 3.6rem);
+  --elevation-1: 0 1px 2px var(--shade), 0 2px 8px var(--shade);
+  --elevation-2: 0 8px 24px -8px var(--shade-strong);
+  --elevation-3: var(--shadow-lift);
+  --dur-sheet: 240ms;
+  --veil: transparent;
 }
 
-/* The blue hour: the device asks for dark and nobody chose light, or
-   somebody chose dark. */
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    color-scheme: dark;
-    --ground: #0f1b2d;
-    --ground-alt: #13223a;
-    --surface: #182943;
-    --surface-raised: #213556;
-    --bubble-own: #24406a;
-    /* avatars: six tints under light initials */
-    --avatar-0: #1a5f6e;
-    --avatar-1: #7a4b12;
-    --avatar-2: #3d5a1e;
-    --avatar-3: #6b3a63;
-    --avatar-4: #2c4a86;
-    --avatar-5: #8a3b2e;
-    --on-avatar: #fffdf7;
-    --ink: #eef1f8;
-    --ink-soft: #cbd5ea;
-    --ink-faint: #a5b4d1;
-    --title: #fff6e2;
-    --action: #e6c27f;
-    --action-hover: #f2d9a2;
-    --on-action: #1a1306;
-    --action-edge: #e6c27f;
-    --accent: #a9c4ff;
-    --focus: #ffe7a6;
-    --edge: #7488ad;
-    --edge-soft: rgb(238 241 248 / 0.14);
-    --ok: #7fd3a1;
-    --warn: #f5a35c;
-    --bad: #f5a097;
-    --ok-tint: #17382f;
-    --warn-tint: #3d2a1c;
-    --bad-tint: #40242a;
-    --shade: rgb(0 0 0 / 0.2);
-    --shade-strong: rgb(0 0 0 / 0.35);
-    --shade-deep: rgb(0 0 0 / 0.5);
+/* Sunlight: the device asks for light and nobody chose dark, or somebody
+   chose light. */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    color-scheme: light;
+    --bg: #f5f2e9;
+    --bg-alt: #e9eee8;
+    --panel: rgb(255 253 246 / 0.96);
+    --panel-solid: #fffdf5;
+    --panel-2: #eceee5;
+    --edge: rgb(140 104 40 / 0.3);
+    --edge-soft: rgb(40 60 100 / 0.15);
+    --field-edge: #6f7f8f;
+    --ink: #233e43;
+    --ink-soft: #415c5e;
+    --ink-faint: #536c6b;
+    --title: #173c43;
+    --gold: #235b66;
+    --gold-2: #174955;
+    --gold-ink: #fffaf0;
+    --violet: #326b75;
+    --violet-soft: rgb(50 107 117 / 0.1);
+    --link: #76511c;
+    --link-hover: #583b11;
+    --focus: #235b66;
+    --ok: #1e7a4a;
+    --warn: #8a5a05;
+    --bad: #a1332a;
+    --off: #5d6779;
+    --ok-tint: #e2f1e6;
+    --warn-tint: #faecd2;
+    --bad-tint: #f9e3df;
+    --bubble-own: #dcebe6;
+    --hero-shadow: 0 1px 2px rgb(255 255 255 / 0.6), 0 2px 18px rgb(255 255 255 / 0.55);
+    --shadow: 0 24px 50px -30px rgb(20 30 60 / 0.38);
+    --shadow-lift: 0 30px 60px -28px rgb(20 30 60 / 0.45), 0 0 0 1px var(--edge);
+    --bar-shadow: 0 8px 20px -8px rgb(20 38 45 / 0.22), 0 2px 5px rgb(20 38 45 / 0.12);
+    --top-bg: rgb(251 248 236 / 0.96);
+    --code-bg: #233e43;
+    --code-ink: #f3f6f4;
+    --kbd-bg: #e3e8f1;
+    --field-bg: rgb(255 255 255 / 0.9);
+    --scene-veil: rgb(250 247 232 / 0.96);
+    --bar-ink: #233e43;
+    --tool-bg: rgb(255 255 255 / 0.65);
+    --photo-ground: #05080f;
+    --backdrop: rgb(23 40 45 / 0.55);
+    --shade: rgb(31 58 64 / 0.06);
+    --shade-strong: rgb(31 58 64 / 0.18);
+    --shade-deep: rgb(31 58 64 / 0.28);
   }
 }
 
-:root[data-theme="dark"] {
-  color-scheme: dark;
-  --ground: #0f1b2d;
-  --ground-alt: #13223a;
-  --surface: #182943;
-  --surface-raised: #213556;
-  --bubble-own: #24406a;
-  /* avatars: six tints under light initials */
-  --avatar-0: #1a5f6e;
-  --avatar-1: #7a4b12;
-  --avatar-2: #3d5a1e;
-  --avatar-3: #6b3a63;
-  --avatar-4: #2c4a86;
-  --avatar-5: #8a3b2e;
-  --on-avatar: #fffdf7;
-  --ink: #eef1f8;
-  --ink-soft: #cbd5ea;
-  --ink-faint: #a5b4d1;
-  --title: #fff6e2;
-  --action: #e6c27f;
-  --action-hover: #f2d9a2;
-  --on-action: #1a1306;
-  --action-edge: #e6c27f;
-  --accent: #a9c4ff;
-  --focus: #ffe7a6;
-  --edge: #7488ad;
-  --edge-soft: rgb(238 241 248 / 0.14);
-  --ok: #7fd3a1;
-  --warn: #f5a35c;
-  --bad: #f5a097;
-  --ok-tint: #17382f;
-  --warn-tint: #3d2a1c;
-  --bad-tint: #40242a;
-  --shade: rgb(0 0 0 / 0.2);
-  --shade-strong: rgb(0 0 0 / 0.35);
-  --shade-deep: rgb(0 0 0 / 0.5);
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f5f2e9;
+  --bg-alt: #e9eee8;
+  --panel: rgb(255 253 246 / 0.96);
+  --panel-solid: #fffdf5;
+  --panel-2: #eceee5;
+  --edge: rgb(140 104 40 / 0.3);
+  --edge-soft: rgb(40 60 100 / 0.15);
+  --field-edge: #6f7f8f;
+  --ink: #233e43;
+  --ink-soft: #415c5e;
+  --ink-faint: #536c6b;
+  --title: #173c43;
+  --gold: #235b66;
+  --gold-2: #174955;
+  --gold-ink: #fffaf0;
+  --violet: #326b75;
+  --violet-soft: rgb(50 107 117 / 0.1);
+  --link: #76511c;
+  --link-hover: #583b11;
+  --focus: #235b66;
+  --ok: #1e7a4a;
+  --warn: #8a5a05;
+  --bad: #a1332a;
+  --off: #5d6779;
+  --ok-tint: #e2f1e6;
+  --warn-tint: #faecd2;
+  --bad-tint: #f9e3df;
+  --bubble-own: #dcebe6;
+  --hero-shadow: 0 1px 2px rgb(255 255 255 / 0.6), 0 2px 18px rgb(255 255 255 / 0.55);
+  --shadow: 0 24px 50px -30px rgb(20 30 60 / 0.38);
+  --shadow-lift: 0 30px 60px -28px rgb(20 30 60 / 0.45), 0 0 0 1px var(--edge);
+  --bar-shadow: 0 8px 20px -8px rgb(20 38 45 / 0.22), 0 2px 5px rgb(20 38 45 / 0.12);
+  --top-bg: rgb(251 248 236 / 0.96);
+  --code-bg: #233e43;
+  --code-ink: #f3f6f4;
+  --kbd-bg: #e3e8f1;
+  --field-bg: rgb(255 255 255 / 0.9);
+  --scene-veil: rgb(250 247 232 / 0.96);
+  --bar-ink: #233e43;
+  --tool-bg: rgb(255 255 255 / 0.65);
+  --photo-ground: #05080f;
+  --backdrop: rgb(23 40 45 / 0.55);
+  --shade: rgb(31 58 64 / 0.06);
+  --shade-strong: rgb(31 58 64 / 0.18);
+  --shade-deep: rgb(31 58 64 / 0.28);
 }
