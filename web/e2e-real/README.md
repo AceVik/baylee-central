@@ -135,7 +135,11 @@ that localStorage holds neither a message nor the password.
 
 Central allows five registrations an hour and ten a day per address, and
 counts them in memory: one run registers four, so start Central afresh
-between runs.
+between runs. Since 11.11.2026 it also counts sign-ins that were not
+completed with the right password (30 an hour from one address, 10 an hour
+at one account from one address; `docs/native-login.md` §"Guessing a
+password online"), and every local run comes from one address: a Central
+started afresh has counted none.
 
 ## Tearing down
 
