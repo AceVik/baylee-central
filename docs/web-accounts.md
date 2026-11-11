@@ -308,7 +308,10 @@ takes the same tagged `Request` JSON. Only these operations are allowed:
 `AcceptTerms` for Central's terms (a gateway's terms are accepted from the
 client), `GatewayDirectory`,
 the public gateway directory of the `/gateways` page ([gateway
-registry](gateway-registry.md)), since 28.10.2026 `ChangePasswordStart`
+registry](gateway-registry.md)), and since 11.11.2026 `PublicFigures`, the
+numbers read beside it ([gateway
+registry](gateway-registry.md#activity-and-the-public-figures); both
+listeners, no session), since 28.10.2026 `ChangePasswordStart`
 and `ChangePasswordFinish` ([native login](native-login.md) §"Password
 change"; served on both listeners, the page's form comes with M4), and
 `Admin`, an administrator's requests ([administration](administration.md);
@@ -325,7 +328,8 @@ operation does not compile until it is decided there. The cookie's token is
 used only by `SessionStatus`, `RenewSession`, `Logout`, `TermsStatus`,
 `AcceptTerms`, `AccountSummary`, `SetRecovery`, `SetDisplayName` and the
 password change's two requests (whose finish sets a new cookie, as
-`LoginFinish` does), `Admin`, `Owner`, and the export and the deletion's two; the directory uses none, and
+`LoginFinish` does), `Admin`, `Owner`, and the export and the deletion's two; the directory and the
+figures use none, and
 the page sends it with `credentials: "omit"`.
 
 - `AccountSummary` (the cookie's session; no accepted terms needed) answers
@@ -390,7 +394,7 @@ room, so a crowd of addresses cannot lock new ones out.
 | `RegisterChallenge` | 20 an hour |
 | `Discover` | 30 a minute |
 | `LoginStart` | 30 a minute, apart from `Discover` |
-| `GatewayDirectory` | 60 a minute, apart from the others |
+| `GatewayDirectory` and `PublicFigures` | 60 a minute for the two together, apart from the others |
 | `ResetStart` | 10 an hour |
 
 The global budgets of the native surface apply as well: `AccountSummary`

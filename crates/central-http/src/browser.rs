@@ -480,8 +480,11 @@ impl Budgets {
             Request::Discover { .. } => self.discover.charge(client, now, 30, MINUTE),
             Request::LoginStart { .. } => self.login.charge(client, now, 30, MINUTE),
             // The public directory needs no session; a page reads it a few
-            // times, so a minute's budget leaves room for paging.
-            Request::GatewayDirectory { .. } => self.directory.charge(client, now, 60, MINUTE),
+            // times, so a minute's budget leaves room for paging. The public
+            // figures are read beside it and spend from the same budget.
+            Request::GatewayDirectory { .. } | Request::PublicFigures { .. } => {
+                self.directory.charge(client, now, 60, MINUTE)
+            }
             // A reset needs a code; a few tries an hour leave room for typing it.
             Request::ResetStart { .. } => self.reset.charge(client, now, 10, HOUR),
             // A pairing is a click on "Play in Baylee"; its page asks for the
@@ -1329,6 +1332,70 @@ mod tests {
         }
         assert!(!budgets.charge(&request, client, now + Duration::from_secs(59)));
         assert!(budgets.charge(&request, client, now + MINUTE));
+    }
+
+    #[tokio::test]
+    async fn the_figures_are_served_without_a_session_from_the_directory_s_budget() {
+        let (app, mock) = listener();
+        let from = |address: &str| with("x-forwarded-for", &[address]);
+        let figures = body(&Request::PublicFigures { after: None });
+        assert_eq!(figures, r#"{"operation":"public_figures","after":null}"#);
+        let directory = body(&Request::GatewayDirectory { after: None });
+        let sent = send(&app, &from("198.51.100.50"), figures.clone()).await;
+        assert_eq!(sent.status, StatusCode::OK);
+        assert!(sent.headers.get(header::SET_COOKIE).is_none());
+        assert_eq!(
+            mock.calls.lock().unwrap()[0],
+            ("public_figures".to_owned(), None)
+        );
+        // Without the page's marks they are refused like every other operation.
+        let mut unmarked = from("198.51.100.50");
+        unmarked.retain(|(name, _)| *name != "x-baylee-central");
+        assert_eq!(
+            send(&app, &unmarked, figures.clone()).await.status,
+            StatusCode::FORBIDDEN
+        );
+        // One budget of 60 a minute for the two public reads of an address:
+        // 30 of each spend it, and then neither is served.
+        for sent in 1..60 {
+            let next = if sent % 2 == 0 { &figures } else { &directory };
+            assert_eq!(
+                send(&app, &from("198.51.100.50"), next.clone())
+                    .await
+                    .status,
+                StatusCode::OK
+            );
+        }
+        for refused in [&figures, &directory] {
+            let sent = send(&app, &from("198.51.100.50"), refused.clone()).await;
+            assert_eq!(sent.status, StatusCode::TOO_MANY_REQUESTS);
+            assert_eq!(sent.body, "account request rejected\n");
+        }
+        // The other budgets and the other addresses are untouched.
+        assert_eq!(
+            send(&app, &from("198.51.100.50"), discover()).await.status,
+            StatusCode::OK
+        );
+        assert_eq!(
+            send(&app, &from("198.51.100.51"), figures).await.status,
+            StatusCode::OK
+        );
+        assert_eq!(calls(&mock), 60 + 1 + 1);
+        // The window ends after a minute, for both together.
+        let mut budgets = Budgets::default();
+        let client = Client::from("198.51.100.52".parse::<IpAddr>().unwrap());
+        let now = Instant::now();
+        let read = Request::PublicFigures { after: None };
+        for _ in 0..60 {
+            assert!(budgets.charge(&read, client, now));
+        }
+        assert!(!budgets.charge(&read, client, now + Duration::from_secs(59)));
+        assert!(!budgets.charge(
+            &Request::GatewayDirectory { after: None },
+            client,
+            now + Duration::from_secs(59)
+        ));
+        assert!(budgets.charge(&read, client, now + MINUTE));
     }
 
     #[test]

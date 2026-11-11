@@ -87,6 +87,8 @@ impl IdentityService {
             request @ (Request::RegisterGateway { .. }
             | Request::GatewayDirectory { .. }
             | Request::GatewayHeartbeat { .. }
+            | Request::GatewayPulse { .. }
+            | Request::PublicFigures { .. }
             | Request::SetGatewayAdmins { .. }
             | Request::CheckGatewayAdmin { .. }
             | Request::GatewaySession { .. }
