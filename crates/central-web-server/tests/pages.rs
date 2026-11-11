@@ -555,7 +555,7 @@ async fn a_visit_counts_once_and_never_changes_the_page_it_gets() {
     // the second visit counts, and gets the very same page
     let (_, again_headers, again) = get(&app, "/en/", &visit).await;
     assert_eq!(views.now().count, 43);
-    assert!(first == again);
+    assert!(first == again, "a visit changed the page");
     assert_eq!(first_headers.get("etag"), again_headers.get("etag"));
     // a revalidation that finds the page unchanged is a visit too
     let tag = first_headers
