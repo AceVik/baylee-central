@@ -219,3 +219,42 @@ pub fn recovery_create(state: LoginKey, wrapped_master: &[u8]) -> Result<Recover
         .map(Recovered)
         .map_err(refused)
 }
+
+/// A registration's proof of work under way: the challenge at its price
+/// and the memory its evaluations work in. Free it when the last part is
+/// found; that gives the memory back to the module before the password
+/// stretch asks for its own.
+#[wasm_bindgen]
+pub struct Work(central_crypto::proof::Proof);
+
+#[wasm_bindgen]
+impl Work {
+    /// Looks for `part`'s counter among the `tries` counters from `from`
+    /// on: the first that solves the part, or nothing when none of them
+    /// does and the page asks again from `from + tries`.
+    ///
+    /// # Errors
+    ///
+    /// `rejected` for a part the challenge does not have.
+    pub fn search(&mut self, part: u8, from: u64, tries: u32) -> Result<Option<u64>, JsError> {
+        self.0.search(part, from, tries).map_err(refused)
+    }
+}
+
+/// Start on `Response::RegisterWork`'s challenge.
+///
+/// # Errors
+///
+/// `rejected` for a nonce of another shape or a price above the ceilings.
+#[wasm_bindgen]
+pub fn work_start(
+    nonce: &str,
+    memory: u32,
+    passes: u32,
+    parts: u8,
+    difficulty: u8,
+) -> Result<Work, JsError> {
+    flow::work_start(nonce, memory, passes, parts, difficulty)
+        .map(Work)
+        .map_err(refused)
+}

@@ -18,7 +18,7 @@ arithmetic became reachable. Chat changes consolidate equivalent dependency
 aliases and update the test RNG trait; the existing known answers pass.
 
 The reviewed source fingerprint is
-`399770971518b98546ad6380b7579245b933489e12efd2cc1075b8b7fdb19946`.
+`52af94eaea7f01607ce337dd40e5e2a9866cca43bba51dee5b49278c1f2d10e2`.
 Source mutation/link checks and all exact caller/feature negative checks remain
 mandatory. The source fingerprint's SHA-256 hexadecimal encoding is unchanged
 by its migration to digest 0.11.
@@ -181,6 +181,33 @@ saying why. Merged onto the pairing and the legacy store (fingerprint
 `36dc9ccf…`), those two manifest lines are the only difference in the crate
 tree. No source, dependency, feature or graph edge changed, and the reviews
 above stand. Fingerprint `6db63ad9…`.
+
+
+### 11 November 2026: registration's proof of work with a cost in memory
+
+`src/proof.rs` is new and `lib.rs` names it (`pub mod proof;`, on every
+build, not behind `server`: the page's Worker searches with it and Central
+checks with it, [registration abuse](../registration-abuse.md) §"A proof
+that costs memory"; the owner accepted the change on 11 November 2026,
+[crypto protocol](../crypto-protocol.md) §"Registration's proof of work").
+The module calls four items of `argon2` 0.6.0, already the crate's direct
+dependency with its one feature (`zeroize`): `Params::new`, `Argon2::new`,
+`Block::default` and `hash_password_into_with_memory`, the calls
+`legacy.rs` and the OPAQUE stretch make. Its inputs are public (a label,
+Central's nonce, a part's index, a counter) and it derives no key. Its test
+compares one output with the Argon2 that `opaque-ke` brings, the
+development dependency `opaque/stretch.rs` already used as its oracle, and
+its pinned output was reproduced with OpenSSL 4.1.0's Argon2id.
+
+Neither the manifest nor the lockfile changed: no package, feature or graph
+edge is new, and `argon2`, `blake2`, `password-hash` and `base64ct` still
+neither depend on nor mention bigint or elliptic-curve. The module shares no
+type with `opaque::Suite`, its group, the OPRF or the key exchange, which
+are unchanged; reverse dependencies stay `crypto-bigint ← elliptic-curve ←
+opaque-ke/voprf ← central-crypto`. The reachability above is unchanged.
+Fingerprint `52af94ea…`. This is the author's source and graph review
+(one agent pass, the one that wrote the module); a second reviewer has not
+read it (`Review: pending`).
 
 
 ## Chat source and graph review, 2 November 2026

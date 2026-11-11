@@ -3,14 +3,28 @@
 //! host's tests drive against `central-crypto`'s server side. Every network
 //! call is the page's.
 
-use central_api::Endpoint;
+use central_api::{Endpoint, register};
 use central_crypto::{
     Context, CryptoError,
     chat::{DeviceSecrets, SECRETS_LEN},
     opaque::{Enrollment, Login},
+    proof::{self, Proof, Work},
     vault::{MasterKey, ObjectContext, RecoveryCode, WrappedMasterKey, WrappingKey},
 };
 use zeroize::Zeroizing;
+
+// The page reads a challenge's ceilings from `central-api`, this module
+// and Central compute with `central-crypto`'s: one set of numbers, held
+// equal here, where the two meet in the browser (and in the identity
+// service's `challenge`, where they meet in Central).
+const _: () = assert!(
+    register::WORK_MIN_MEMORY == proof::MIN_MEMORY
+        && register::WORK_MAX_MEMORY == proof::MAX_MEMORY
+        && register::WORK_MAX_PASSES == proof::MAX_PASSES
+        && register::WORK_MAX_PARTS == proof::MAX_PARTS
+        && register::WORK_MAX_DIFFICULTY == proof::MAX_DIFFICULTY
+        && register::NONCE_LEN == proof::NONCE_LEN
+);
 
 /// The plaintext sealed as a new account's document (object 1), byte for
 /// byte as `docs/web-accounts.md` gives it: Baylee's `AccountData::read`
@@ -237,4 +251,31 @@ fn open_chat(secrets: DeviceSecrets, tag: u32) -> Result<OpenChat, CryptoError> 
     let kept = secrets.to_bytes();
     let chat = central_client::chat::Chat::new(secrets, tag).map_err(|_| CryptoError::Invalid)?;
     Ok(OpenChat { chat, kept })
+}
+
+/// Registration's memory-hard proof of work for the challenge `nonce` at
+/// the price `Response::RegisterWork` named
+/// (`docs/registration-abuse.md` §"A proof that costs memory"): the memory
+/// its evaluations work in, allocated once. The search is
+/// [`Proof::search`], the function Central checks the answer with.
+///
+/// # Errors
+/// Rejects a nonce of another shape and a price above the ceilings, before
+/// any memory is taken.
+pub fn work_start(
+    nonce: &str,
+    memory: u32,
+    passes: u32,
+    parts: u8,
+    difficulty: u8,
+) -> Result<Proof, CryptoError> {
+    Proof::new(
+        nonce,
+        Work {
+            memory,
+            passes,
+            parts,
+            difficulty,
+        },
+    )
 }

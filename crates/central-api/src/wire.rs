@@ -237,16 +237,20 @@ pub enum Request {
         /// Its tag at the official gateway.
         tag: u32,
     },
-    /// A proof-of-work challenge for one registration, on the browser
-    /// listener only (`docs/registration-abuse.md`), answered with
-    /// [`Response::RegisterChallenge`], or [`Response::RegistrationClosed`]
-    /// while an administrator closed registration.
+    /// The request for the older, SHA-256 proof of work
+    /// ([`Response::RegisterChallenge`]), on the browser listener only. A
+    /// Central of this build issues no such challenge: it answers
+    /// [`Response::RegistrationClosed`] whether registration is open or
+    /// not, and the registering side asks with
+    /// [`Request::RegisterChallengeFor`]
+    /// (`docs/registration-abuse.md` §"A proof that costs memory").
     RegisterChallenge,
-    /// The same challenge, asked by a page that says what it saw of its own
+    /// A proof-of-work challenge for one registration, on the browser
+    /// listener only, asked by a page that says what it saw of its own
     /// browser (`docs/registration-abuse.md` §"Hardened"): the answer is
-    /// [`Response::RegisterChallenge`] or [`Response::RegistrationClosed`]
-    /// as for [`Request::RegisterChallenge`], and a browser that looks
-    /// driven by a program gets a harder challenge, never a refusal.
+    /// [`Response::RegisterWork`], or [`Response::RegistrationClosed`]
+    /// while an administrator closed registration, and a browser that
+    /// looks driven by a program gets a harder challenge, never a refusal.
     RegisterChallengeFor {
         /// [`crate::register::SIGNALS`]; bits Central does not know are
         /// ignored.
@@ -260,9 +264,10 @@ pub enum Request {
     Register {
         /// Wanted username, canonicalized by the service's versioned name policy.
         username: String,
-        /// The challenge's nonce ([`Response::RegisterChallenge`]).
+        /// The challenge's nonce ([`Response::RegisterWork`]).
         nonce: String,
-        /// One counter per part ([`crate::register`]).
+        /// One counter per part ([`crate::register`]). The price they are
+        /// checked against is the one Central kept with the nonce.
         counters: Vec<u64>,
         /// The display name other players see, chosen now; a malformed or
         /// reserved one is `Rejected`, after the proof is spent. `None` chooses it
@@ -726,10 +731,11 @@ pub enum Response {
         /// Closed decision type; never an arbitrary credential URL.
         discovery: Discovery,
     },
-    /// A registration's proof of work ([`crate::register`]): find, for each
-    /// of `parts`, a counter with `difficulty` leading zero bits, and send
-    /// them with `Register` no sooner than three seconds from now and before
-    /// `expires_at`.
+    /// A registration's older proof of work, SHA-256 ([`crate::register`]):
+    /// find, for each of `parts`, a counter with `difficulty` leading zero
+    /// bits, and send them with `Register` no sooner than three seconds
+    /// from now and before `expires_at`. What a Central from before
+    /// answers; one of this build never does.
     RegisterChallenge {
         /// 32 random bytes in hex, used once.
         nonce: String,
@@ -740,8 +746,30 @@ pub enum Response {
         /// Absolute Unix seconds after which it is not taken.
         expires_at: i64,
     },
+    /// A registration's proof of work with a cost in memory
+    /// ([`crate::register`]): find, for each of `parts`, the smallest
+    /// counter whose Argon2id output at `memory` and `passes` has
+    /// `difficulty` leading zero bits, and send them with `Register` no
+    /// sooner than three seconds from now and before `expires_at`. The
+    /// price is Central's, kept with the nonce.
+    RegisterWork {
+        /// 32 random bytes in hex, used once.
+        nonce: String,
+        /// Parts to solve.
+        parts: u8,
+        /// Leading zero bits each part needs.
+        difficulty: u8,
+        /// Memory of one evaluation, in KiB.
+        memory: u32,
+        /// Passes over the memory.
+        passes: u32,
+        /// Absolute Unix seconds after which it is not taken.
+        expires_at: i64,
+    },
     /// Registration is closed: an administrator stopped it during an
-    /// attack; the answer to `RegisterChallenge` until it opens again.
+    /// attack, and this is the answer to `RegisterChallengeFor` until it
+    /// opens again. It is also what `RegisterChallenge`, the request for
+    /// the older proof, always gets.
     RegistrationClosed,
     /// OPAQUE KE2 plus a one-use attempt capability.
     LoginChallenge {
@@ -1245,6 +1273,85 @@ mod tests {
                 br#"{"result":"register_challenge","nonce":"n","parts":8,"difficulty":20,"expires_at":1,"points":4}"#
             )
             .is_err()
+        );
+    }
+
+    #[test]
+    fn the_memory_hard_challenge_is_an_answer_of_its_own() {
+        let work = Response::RegisterWork {
+            nonce: "n".into(),
+            parts: 8,
+            difficulty: 4,
+            memory: 19_456,
+            passes: 1,
+            expires_at: 1,
+        };
+        assert_eq!(
+            String::from_utf8(crate::encode(&work).unwrap()).unwrap(),
+            r#"{"result":"register_work","nonce":"n","parts":8,"difficulty":4,"memory":19456,"passes":1,"expires_at":1}"#
+        );
+        let Response::RegisterWork {
+            nonce,
+            parts,
+            difficulty,
+            memory,
+            passes,
+            expires_at,
+        } = crate::decode(
+            br#"{"result":"register_work","nonce":"n","parts":8,"difficulty":4,"memory":19456,"passes":1,"expires_at":1}"#,
+        )
+        .unwrap()
+        else {
+            panic!("a challenge");
+        };
+        assert_eq!((nonce.as_str(), parts, difficulty), ("n", 8, 4));
+        assert_eq!((memory, passes, expires_at), (19_456, 1, 1));
+        for refused in [
+            // every field is the price or the nonce: none may be missing
+            &br#"{"result":"register_work","nonce":"n","parts":8,"difficulty":4,"passes":1,"expires_at":1}"#[..],
+            br#"{"result":"register_work","nonce":"n","parts":8,"difficulty":4,"memory":19456,"expires_at":1}"#,
+            br#"{"result":"register_work","nonce":"n","difficulty":4,"memory":19456,"passes":1,"expires_at":1}"#,
+            br#"{"result":"register_work","nonce":"n","parts":8,"memory":19456,"passes":1,"expires_at":1}"#,
+            // none out of its type's range, none of another type
+            br#"{"result":"register_work","nonce":"n","parts":256,"difficulty":4,"memory":19456,"passes":1,"expires_at":1}"#,
+            br#"{"result":"register_work","nonce":"n","parts":8,"difficulty":-1,"memory":19456,"passes":1,"expires_at":1}"#,
+            br#"{"result":"register_work","nonce":"n","parts":8,"difficulty":4,"memory":4294967296,"passes":1,"expires_at":1}"#,
+            br#"{"result":"register_work","nonce":"n","parts":8,"difficulty":4,"memory":"19456","passes":1,"expires_at":1}"#,
+            // and none beside them
+            br#"{"result":"register_work","nonce":"n","parts":8,"difficulty":4,"memory":19456,"passes":1,"expires_at":1,"lanes":1}"#,
+        ] {
+            assert!(crate::decode::<Response>(refused).is_err());
+        }
+        // Why it is an answer of its own: the older one takes no field
+        // more, so a page from before could not have been told a memory.
+        assert!(
+            crate::decode::<Response>(
+                br#"{"result":"register_challenge","nonce":"n","parts":8,"difficulty":4,"memory":19456,"passes":1,"expires_at":1}"#
+            )
+            .is_err()
+        );
+        // The registration that follows is the one it was, byte for byte:
+        // nonce and counters say everything, the price stays with Central.
+        let register = Request::Register {
+            username: "synthetic".into(),
+            nonce: "n".into(),
+            counters: vec![1, 2],
+            display_name: None,
+        };
+        assert_eq!(
+            String::from_utf8(crate::encode(&register).unwrap()).unwrap(),
+            r#"{"operation":"register","username":"synthetic","nonce":"n","counters":[1,2]}"#
+        );
+        for refused in [
+            &br#"{"operation":"register","username":"synthetic","nonce":"n","counters":[1],"memory":8}"#[..],
+            br#"{"operation":"register","username":"synthetic","nonce":"n","counters":[1],"difficulty":0}"#,
+        ] {
+            assert!(crate::decode::<Request>(refused).is_err());
+        }
+        // What the older request always gets from this build.
+        assert_eq!(
+            crate::encode(&Response::RegistrationClosed).unwrap(),
+            br#"{"result":"registration_closed"}"#
         );
     }
 
