@@ -3858,6 +3858,37 @@ Found on the way:
    replaced by stopping and continuing the renderer in turns. The
    document says how, and that no phone was measured.
 
+Run on this change and passing, on its last code commit (`701f285`):
+`cargo xtask gate` ("Gate passed: format, policy, clippy, tests, doc tests
+and release build."), `cargo xtask crypto-scope`, `cargo xtask secrets`,
+`cargo deny check` ("advisories ok, bans ok, licenses ok, sources ok"),
+`cargo xtask smoke` and `cargo xtask postgres` (PostgreSQL 18: the
+registration attacks on the new proof, the older request, and the
+sign-in's guessing after them). The same six passed on the documents'
+commit before it (`6341223`). `cargo xtask wasm --check` in the pinned
+container, on `6341223`: the committed module and glue match a fresh
+build, and nothing the module is built from changed after it. The site
+suite's account spec on a port of its own: 22 passed. `web/e2e-real`
+against a throwaway Central of this tree, release build, three runs: a
+timed registration at each width and `site-chat.spec.ts` on the desktop,
+twelve accounts in all. The calibration and the native measurement were a
+temporary spec and a temporary example, neither committed.
+
+`cargo audit --deny warnings` fails as it did before this change, on
+RUSTSEC-2026-0459 (`libsqlite3-sys` 0.37.0); `Cargo.toml`, `Cargo.lock`
+and `deny.toml` are untouched here.
+
+Not run: a phone, or any machine but one laptop; a flood over the listener
+(the bound is reckoned from the measured evaluation); the machine that
+serves `baylee.app`; code with vector instructions or a graphics card;
+this page against a real binary of an older Central (the older way is
+shown against a stand-in, and that the older listener answers an operation
+it does not know with the refusal the page waits for was read in its
+source); the game's client and gateway against this build (the game
+repository pins an older revision and, by a search, matches none of
+registration's answers); the site's and the real suite's other specs; the
+browser's own figure for a Worker's memory.
+
 **What stays possible** (for the owner; the document's "What stays" has
 the numbers):
 - A script solves about as fast as a person's page on one core, and uses
