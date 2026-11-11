@@ -63,6 +63,9 @@ async fn shutdown() {
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 4)]
 async fn main() -> ExitCode {
+    // A panic says that it happened and nothing of what it held: no
+    // request line, no header, no path of this machine.
+    std::panic::set_hook(Box::new(|_| eprintln!("central-web: internal failure")));
     let config = match settings() {
         Ok(config) => config,
         Err(message) => {

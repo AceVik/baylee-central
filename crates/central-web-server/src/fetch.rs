@@ -34,6 +34,8 @@ const API: &str = "https://api.github.com/repos/AceVik/baylee";
 const RAW: &str = "https://raw.githubusercontent.com/AceVik/baylee";
 /// Where a release's files must be downloaded from.
 const DOWNLOADS: &str = "https://github.com/AceVik/baylee/releases/download/";
+/// A release's own page: this and the tag.
+const RELEASE_PAGES: &str = "https://github.com/AceVik/baylee/releases/tag/";
 /// The largest answer read from GitHub.
 const LIMIT: u64 = 4 * 1024 * 1024;
 
@@ -127,11 +129,35 @@ struct GhRelease {
     assets: Vec<GhAsset>,
 }
 
+/// A tag or a file's name as one plain segment of an address: letters,
+/// digits and `. - + _`, and not a segment that climbs (`.` or `..`).
 fn plain_tag(tag: &str) -> bool {
     (1..=64).contains(&tag.len())
+        && tag != "."
+        && tag != ".."
         && tag
             .bytes()
             .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'-' | b'+' | b'_'))
+}
+
+/// Whether `url` is `prefix` and then exactly `segments` plain segments
+/// (a percent-encoded octet counts as plain): an address that begins as
+/// Baylee's and climbs out of it (`…/download/../../../other/…`), or
+/// carries a query, is none of ours, whoever sent it.
+fn below(url: &str, prefix: &str, segments: usize) -> bool {
+    let Some(rest) = url.strip_prefix(prefix) else {
+        return false;
+    };
+    rest.len() <= 512
+        && rest.split('/').count() == segments
+        && rest.split('/').all(|segment| {
+            !segment.is_empty()
+                && segment != "."
+                && segment != ".."
+                && segment.bytes().all(|b| {
+                    b.is_ascii_alphanumeric() || matches!(b, b'.' | b'-' | b'+' | b'_' | b'%')
+                })
+        })
 }
 
 /// The newest release that is not a draft and offers at least one client
@@ -141,13 +167,11 @@ fn pick(releases: Vec<GhRelease>) -> Option<Release> {
     releases.into_iter().find_map(|release| {
         if release.draft
             || !plain_tag(&release.tag_name)
-            || !release
-                .html_url
-                .starts_with("https://github.com/AceVik/baylee/")
+            || !below(&release.html_url, RELEASE_PAGES, 1)
         {
             return None;
         }
-        let on_github = |asset: &GhAsset| asset.browser_download_url.starts_with(DOWNLOADS);
+        let on_github = |asset: &GhAsset| below(&asset.browser_download_url, DOWNLOADS, 2);
         let beside = |name: &str| {
             release
                 .assets
@@ -727,5 +751,45 @@ mod tests {
         assert!(plain_tag("v0.1.1-beta.9b"));
         assert!(!plain_tag("v1/../../x"));
         assert!(!plain_tag(""));
+        assert!(!plain_tag("."));
+        assert!(!plain_tag(".."));
+    }
+
+    /// A link is Baylee's only when nothing in it climbs out of Baylee's
+    /// releases: a prefix alone says little, `..` resolves in the browser.
+    #[test]
+    fn a_release_s_links_stay_below_baylee_s_releases() {
+        for url in [
+            "https://github.com/AceVik/baylee/releases/download/v0.1.1-beta.9b/Baylee-0.1.1-beta.9b-arm64.dmg",
+            "https://github.com/AceVik/baylee/releases/download/v1/baylee_1.0.0%2Bbuild_amd64.deb",
+        ] {
+            assert!(below(url, DOWNLOADS, 2), "{url}");
+        }
+        for url in [
+            "https://github.com/AceVik/baylee/releases/download/../../../../other/repo/x.exe",
+            "https://github.com/AceVik/baylee/releases/download/v1/../x.exe",
+            "https://github.com/AceVik/baylee/releases/download/v1/x.exe?to=elsewhere",
+            "https://github.com/AceVik/baylee/releases/download/v1/x.exe#part",
+            "https://github.com/AceVik/baylee/releases/download/v1/a/b.exe",
+            "https://github.com/AceVik/baylee/releases/download/v1/",
+            "https://github.com/AceVik/baylee/releases/download/v1",
+            "https://github.com/AceVik/baylee/releases/download//x.exe",
+            "https://github.com/AceVik/baylee/releases/download/v1\\x.exe/y",
+            "https://github.com/AceVik/baylee-other/releases/download/v1/x.exe",
+        ] {
+            assert!(!below(url, DOWNLOADS, 2), "{url}");
+        }
+        assert!(below(
+            "https://github.com/AceVik/baylee/releases/tag/v0.1.1-beta.9b",
+            RELEASE_PAGES,
+            1
+        ));
+        for url in [
+            "https://github.com/AceVik/baylee/releases/tag/..",
+            "https://github.com/AceVik/baylee/releases/tag/v1/../../..",
+            "https://github.com/AceVik/baylee/../../other",
+        ] {
+            assert!(!below(url, RELEASE_PAGES, 1), "{url}");
+        }
     }
 }

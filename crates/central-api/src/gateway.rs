@@ -76,7 +76,9 @@ pub enum GatewayState {
 /// Validate a canonical live HTTPS or explicitly selected loopback development origin.
 ///
 /// # Errors
-/// Rejects credentials, paths, aliases, queries, fragments and noncanonical spellings.
+/// Rejects credentials, paths, aliases, queries, fragments and noncanonical
+/// spellings, among them a host written with the root's trailing dot: it is
+/// the same host under a second spelling, and would be a second origin.
 pub fn validate_origin(value: &str, development: bool) -> Result<(), Error> {
     if value.len() > 256 {
         return Err(Error::Rejected);
@@ -88,7 +90,7 @@ pub fn validate_origin(value: &str, development: bool) -> Result<(), Error> {
     }
     let url = Url::parse(value).map_err(|_| Error::Rejected)?;
     if url.scheme() != "https"
-        || url.host_str().is_none()
+        || url.host_str().is_none_or(|host| host.ends_with('.'))
         || !url.username().is_empty()
         || url.password().is_some()
         || url.path() != "/"
@@ -192,9 +194,13 @@ mod tests {
             "https://gateway.invalid/",
             "https://GATEWAY.invalid",
             "https://gateway.invalid/path",
+            // the same host under a second spelling
+            "https://gateway.invalid.",
+            "https://gateway.invalid.:8443",
         ] {
-            assert!(validate_origin(origin, false).is_err());
+            assert!(validate_origin(origin, false).is_err(), "{origin}");
         }
+        validate_origin("https://gateway.invalid:8443", false).unwrap();
         validate_origin("https://gateway.invalid", false).unwrap();
         validate_origin("http://127.0.0.1:9876", true).unwrap();
         assert!(validate_origin("https://gateway.invalid", true).is_err());
