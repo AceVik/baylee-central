@@ -405,6 +405,52 @@ export class Recovered {
 if (Symbol.dispose) Recovered.prototype[Symbol.dispose] = Recovered.prototype.free;
 
 /**
+ * A registration's proof of work under way: the challenge at its price
+ * and the memory its evaluations work in. Free it when the last part is
+ * found; that gives the memory back to the module before the password
+ * stretch asks for its own.
+ */
+export class Work {
+    static __wrap(ptr) {
+        const obj = Object.create(Work.prototype);
+        obj.__wbg_ptr = ptr;
+        WorkFinalization.register(obj, obj.__wbg_ptr, obj);
+        return obj;
+    }
+    __destroy_into_raw() {
+        const ptr = this.__wbg_ptr;
+        this.__wbg_ptr = 0;
+        WorkFinalization.unregister(this);
+        return ptr;
+    }
+    free() {
+        const ptr = this.__destroy_into_raw();
+        wasm.__wbg_work_free(ptr, 0);
+    }
+    /**
+     * Looks for `part`'s counter among the `tries` counters from `from`
+     * on: the first that solves the part, or nothing when none of them
+     * does and the page asks again from `from + tries`.
+     *
+     * # Errors
+     *
+     * `rejected` for a part the challenge does not have.
+     * @param {number} part
+     * @param {bigint} from
+     * @param {number} tries
+     * @returns {bigint | undefined}
+     */
+    search(part, from, tries) {
+        const ret = wasm.work_search(this.__wbg_ptr, part, from, tries);
+        if (ret[3]) {
+            throw takeFromExternrefTable0(ret[2]);
+        }
+        return ret[0] === 0 ? undefined : BigInt.asUintN(64, ret[1]);
+    }
+}
+if (Symbol.dispose) Work.prototype[Symbol.dispose] = Work.prototype.free;
+
+/**
  * The origin of the Central this module is bound to: the live one.
  * @returns {string}
  */
@@ -651,6 +697,33 @@ export function recovery_create(state, wrapped_master) {
     }
     return Recovered.__wrap(ret[0]);
 }
+
+/**
+ * Start on `Response::RegisterWork`'s challenge.
+ *
+ * # Errors
+ *
+ * `rejected` for a nonce of another shape or a price above the ceilings.
+ * @param {string} nonce
+ * @param {number} memory
+ * @param {number} passes
+ * @param {number} parts
+ * @param {number} difficulty
+ * @returns {Work}
+ */
+export function work_start(nonce, memory, passes, parts, difficulty) {
+    const val2 = +memory;
+    const val3 = +passes;
+    const val4 = +parts;
+    const val5 = +difficulty;
+    const ptr0 = passStringToWasm0(nonce, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ret = wasm.work_start(ptr0, len0, val2, val3, val4, val5);
+    if (ret[2]) {
+        throw takeFromExternrefTable0(ret[1]);
+    }
+    return Work.__wrap(ret[0]);
+}
 function __wbg_get_imports() {
     const import0 = {
         __proto__: null,
@@ -789,6 +862,9 @@ const LoginKeyFinalization = (typeof FinalizationRegistry === 'undefined')
 const RecoveredFinalization = (typeof FinalizationRegistry === 'undefined')
     ? { register: () => {}, unregister: () => {} }
     : new FinalizationRegistry(ptr => wasm.__wbg_recovered_free(ptr, 1));
+const WorkFinalization = (typeof FinalizationRegistry === 'undefined')
+    ? { register: () => {}, unregister: () => {} }
+    : new FinalizationRegistry(ptr => wasm.__wbg_work_free(ptr, 1));
 
 function addToExternrefTable0(obj) {
     const idx = wasm.__externref_table_alloc();
