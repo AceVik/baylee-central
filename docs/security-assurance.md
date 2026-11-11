@@ -4279,3 +4279,53 @@ Adversarial pass, on PostgreSQL 18 (`cargo xtask postgres`,
   designed.
 
 Engineering review, not an audit.
+
+## One session and the budget all sessions share, 11 November 2026
+
+Second finding of the same review.
+
+Design pass. A request with a session is counted twice
+(`central-identity/src/limits.rs`, `Limits::request`): against a window all
+sessions share (512 control requests a second, 256 data) and against its
+bearer's own (128 and 64). The shared window was charged first. A bearer
+past its own budget was refused, as intended, but each refused request had
+already taken one of everyone's. One session asking for `SessionStatus`
+512 times a second was itself served 128 times and left nothing: every
+other client's status, renewal and logout, and every gateway's check of
+its players, answered `Busy` for as long as it kept asking. Medium: it
+needs one registered account (or, with the next section's finding, none)
+and one address, and stops everything that needs a session, though not
+sign-in.
+- **The answer** is the order: the bearer's own budget is looked at
+  first, without spending; only a request that fits it draws on the shared
+  window, and then on its own. A refusal spends nothing anywhere, as the
+  budgets for callers without a session already do.
+- **The wire** is unchanged: the refusal is the same `Busy`, for the same
+  requests of the same bearer, in the same second.
+- **What it does not answer:** four bearers that each keep within their
+  own budget spend a shared window between them (4 × 128 = 512, 4 × 64 =
+  256). That is the next section and the review's open points.
+
+Implementation pass:
+- `Window::fits` reads a window without spending. `Limits::request`
+  forgets the bearers of earlier seconds, as before, refuses a bearer
+  whose own window is spent or for whom the table of bearers has no room,
+  then charges the shared window, then the bearer's own.
+- Nothing else moved: which requests are control and which data, the
+  numbers, and the requests that never count as a session's.
+
+Adversarial pass (`limits.rs`,
+`one_bearer_past_its_own_budget_spends_no_one_else_s`), for both kinds of
+request:
+- One bearer asks for a whole shared window in one second. It is served
+  its own budget and no more; three other bearers are then served their
+  whole budgets in the same second; a fifth is refused, the window being
+  spent by requests that were served.
+- Before the fix the same test failed at the first other bearer:
+  `another session is served: Busy`.
+- The module's earlier tests pass unchanged.
+
+**What stays possible:** four bearers, as above; and a bearer nobody
+issued still counted as a session (the next section).
+
+Engineering review, not an audit.

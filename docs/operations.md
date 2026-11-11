@@ -940,7 +940,13 @@ counted by address: they draw on the windows all sessions share (512 control
 and 256 data requests a second, and a table of 1,024 bearers a second that
 refuses newcomers when full), so a flood of them can keep signed-in clients
 and gateways at `Busy` while sign-in goes on (recorded on 11.11.2026, not
-changed). The table of unfinished sign-ins is larger than the shared budget
+changed). One bearer alone no longer can: its own budget (128 control and
+64 data requests a second) is looked at before the shared windows are drawn
+on, so what it asks beyond that is refused and spends nothing of anyone
+else's (11.11.2026; before, the shared window was charged first, and one
+session asking 512 times a second kept every other at `Busy`). Four
+bearers that each keep up their own budget still spend a shared window.
+The table of unfinished sign-ins is larger than the shared budget
 can fill (4096 against 32 a second for 60 seconds), so it is never the cheaper
 target (31.10.2026; before, 128 entries filled at two requests a second).
 Whoever knows an account's identity can still keep its password sign-in at
