@@ -41,7 +41,10 @@ existing eight login starts per account/minute), data operations (256 per second
 All buckets remain bounded and dispatch still authenticates every capability.
 A bearer's own budget is checked before the shared one is drawn on, so a
 bearer that asks for more than its own spends nothing of the others'
-(11.11.2026).
+(11.11.2026). A bearer counts as a session's for these budgets only once an
+answer has vouched for it; any other bearer's requests share 64 a second
+and 600 a minute an address
+([native login](native-login.md#a-bearer-nobody-issued)).
 Since 11.11.2026 guesses at passwords are also counted per account by the
 hour and day, per client address and per account at an address, and each
 address has a share of the unauthenticated budget

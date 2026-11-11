@@ -4329,3 +4329,166 @@ request:
 issued still counted as a session (the next section).
 
 Engineering review, not an audit.
+
+## A bearer nobody issued, 11 November 2026
+
+Third finding of the same review. [Operations](operations.md) had recorded
+it that day as known and unchanged; this changes it. The document is
+[native login](native-login.md#a-bearer-nobody-issued).
+
+Design pass. A request that needs a session is counted before it is
+served, and the store is asked about its token only when it is served.
+That order is right: the count is what bounds the store's work. But the
+count took every token for a session's. Any request with a made-up token
+drew on the windows all sessions share (512 control requests a second, 256
+data) and took a place in the table of 1,024 bearers a second.
+- **Who can ask.** Anyone, without an account. On the website's listener
+  the requests that act on the cookie's session have no budget by address
+  (an address has four in flight, nothing more); on the account listener
+  they have none either. One address sending `SessionStatus` with a new
+  made-up cookie each time spent a window in a fraction of a second, every
+  second. Sign-in went on, having a budget of its own; a signed-in client
+  could do nothing with its session, the website's account pages failed,
+  and a gateway's checks of its players were refused. Medium: no account
+  and one address, and it stops everything behind a session.
+- **The answer** is to remember what the store has already said. A bearer
+  is counted as a session's once an answer has vouched for it: the sign-in,
+  password change or pairing that issued it, or an answered request that
+  the store refuses for any token it does not know. Every other bearer is
+  served as before, since it may be a session Central has not heard from
+  since a restart, but out of a second of its own: 64 requests for all of
+  them together, 600 a minute for one place. It spends nothing of the
+  sessions' windows, takes no place among their bearers, and nothing of
+  the sign-ins' 32 a second either.
+- **It fails closed.** The requests that vouch are a short list, each read
+  in `central-postgres` to refuse an unknown token; a request that is not
+  on it, and any request added later, vouches for nothing until someone
+  puts it there. Two requests are answered alike for any token (`Logout`,
+  `PairCancel`): they vouch for nothing and end it.
+- **It is taken back.** A session that was replaced, ended or expired was
+  vouched for once. Four `Rejected` answers in a row take that back, so
+  each such token has four requests among the sessions and no more; a
+  logout, a password change's finish and a deletion's finish take it back
+  at once; and it lapses 30 minutes after the last answer that vouched.
+- **It grants nothing.** The list is read by the count alone. Dispatch and
+  the store check every request exactly as before; a token on the list
+  that the store no longer knows is refused like any other.
+- **The numbers.** 64 a second is what the book of places is sized for
+  (`PLACES`, asserted). 600 a minute for a place is the share a place
+  already has of the sign-ins' budget. After a restart each session needs
+  one request among the strangers; 64 a second serves 3,840 sessions a
+  minute. 30 minutes is a session's life between two renewals, and the
+  client renews every ten. 16,384 bearers are about a megabyte.
+- **The released client and gateway** send and receive what they did. A
+  `Busy` they did not get before is possible only for a bearer that is not
+  vouched for, when more than 64 such requests arrive in one second or
+  more than 600 in a minute from its address: without a flood, a restart
+  with thousands of clients asking in the same second. The client asks a
+  `Busy` again three times within about a second. With a flood of made-up
+  bearers, that bearer waits where before the flood every bearer did.
+- **Addresses.** One more count by client address, in memory, for a
+  minute: the requests whose bearer is not vouched for. It is the kind of
+  count a place's 600 a minute without a session already is. The privacy
+  notice's sentence lists what is counted by address in a bracket that
+  names neither (nor the pairing and report budgets the website's listener
+  has had); whether that sentence wants another word is the owner's.
+- Decided against: counting such requests against the sign-ins' budget (a
+  flood of made-up tokens would then stop sign-in, and every restart would
+  set all sessions against those signing in); a share per address of the
+  sessions' windows for every bearer (a gateway makes all its calls from
+  one address: a limit that can keep a gateway out, so the owner's, and
+  listed as open); asking the store before counting (the work the count
+  bounds); letting every answered request vouch (a request added later
+  that answers alike for any token would vouch for made-up ones).
+
+Implementation pass:
+- `central-identity/src/limits.rs`: `class` holds the three lists that
+  were in `Limits::request`, unchanged; `tells` is the list of requests
+  that vouch and the four that end; `Proven` is the table (digest, time of
+  the last vouching answer, refusals in a row; swept once a minute; full,
+  it forgets the one whose last such answer is the oldest; the bridge's
+  digest is kept apart, compared in constant time, and never forgotten).
+  `Limits::request` sends a bearer that is not held to the strangers'
+  window and its place's share, and nothing else changed for one that is.
+  `told` is asked before a request is served and `answered` after it.
+- `central-identity/src/lib.rs`: both entry points
+  (`handle_from`, `handle_browser_from`) call `told` before the budgets and
+  `answered` after dispatch, with the same token the budgets counted (on
+  the website's listener that is the cookie only for a request that acts
+  on a session). `issued` reads a session out of the answer itself
+  (`Session`, `PairSession`, the browser reply's cookie), so every path
+  that hands out a session is covered in one place. A poisoned lock
+  changes no answer.
+- Only digests are held, in memory; nothing is logged.
+
+Adversarial pass.
+- With a clock of its own (`limits.rs`): 2,000 made-up bearers in a second
+  from one place pass 64 times, and nothing more passes from 198 other
+  places or from none; a session beside them is served its whole 128 and
+  64, the table of bearers holds its two entries only, and those signing
+  in have their whole 32. One place passes 600 in a minute and no more,
+  while another place, a request without a place, a sign-in from the same
+  place and a session there are served. An answer vouches only when it is
+  one on the list and not a refusal; three refusals leave a bearer, a
+  vouching answer starts the count again, the fourth in a row takes it
+  back; other errors count for nothing; each of the four endings takes it
+  back at once; a public request or a pairing's says nothing about a token
+  sent along. The half hour, to the second, and that a lapsed session is
+  served as a stranger and vouched for again by its answer. The bridge:
+  from the start, through refusals, a logout and ten half hours. The
+  table: full, a known bearer needs no room, one more forgets the oldest;
+  half an hour on everything is swept.
+- On PostgreSQL 18 through the service the listeners serve
+  (`central-client/tests/support/strangers.rs`): an account's website and
+  native sessions, signed in over the real listeners and never yet
+  answered; then 900 made-up bearers from one address in one instant (600
+  control, 300 data, on both listeners) and after them the two sessions'
+  four requests. All four are answered; no made-up bearer is answered
+  anything; a sign-in's request is served beside it. Each request on the
+  list, with a token nobody issued, is `Rejected` by the store (18 on the
+  account listener, 6 on the website's; a pulse is the heartbeat's path).
+  A second service on the same store stands for Central after a restart:
+  the website session's first request is served and vouches for it, then
+  900 made-up bearers from sixteen addresses leave its two requests
+  answered, while the native session, not heard since the restart, is
+  `Busy` in that second and served in the next. Four sessions replaced by
+  later sign-ins are refused four times each; then each asks for its whole
+  128 in one instant and the live session is served beside them.
+- Seen failing first, on the tree before this change: `the holder's
+  request 0 beside the flood: Some(Busy)` at `strangers.rs:246`.
+- That the fixture watches the wiring and not only the count was tried
+  by switching off one piece at a time and running it again; each run
+  failed where that piece is needed: no vouching at issue, at `the
+  holder's request 0 beside the flood: Some(Busy)`; no vouching by an
+  answer, at `the session that was heard`; no count of refusals, at `the
+  live session beside four ended ones: Some(Busy)`.
+- Tried and held: a public request with a token cannot vouch for it (it is
+  not counted by the token, so it tells nothing); a native bearer shown as
+  a cookie, or a cookie as a bearer, is refused by the store and vouches
+  for nothing; signing in again and again to collect tokens that were
+  vouched for once gives each four requests; filling the table needs
+  16,384 sessions that the store issued within half an hour, which the
+  sign-in budgets hold to 30 a minute an address, and a session pushed out
+  is vouched for again by its next answer.
+
+**What stays possible** (for the owner; the review's last section has the
+options):
+- An account is enough again: four vouched-for bearers that each keep up
+  their own budget fill a shared window, and one account can hold more
+  than four (two sessions, and up to eight gateways with eight tokens
+  each, which `GatewayStatus` answers while the gateway awaits approval).
+  From one address. This is narrower than the finding, not its end.
+- Seven addresses of made-up bearers fill the strangers' second all the
+  time, one alone for nine or ten seconds of each minute. A session that
+  is not vouched for then waits: after a restart, after half an hour
+  without a request, after four refusals in a row. A gateway whose players
+  present bad tickets while nobody else plays there can be made a stranger
+  by those players; it is served as one, and waits only while such a flood
+  lasts. The official gateway's bridge cannot.
+- A request that reaches the account listener without a proxy's address
+  has no place: it meets the 64 a second alone.
+- A restart forgets the list; every session is a stranger once.
+- Central was not flooded over a socket here; the fixture asks the service
+  directly, so the listeners' own limits are not part of what was shown.
+
+Engineering review, not an audit.
