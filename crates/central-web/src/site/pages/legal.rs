@@ -30,9 +30,14 @@ fn header<'a>(text: &'a str, key: &str) -> Option<&'a str> {
         })
 }
 
-fn head<L: IntoView + 'static>(title: &'static str, lead: L) -> impl IntoView + use<L> {
+fn head<L: IntoView + 'static>(
+    eyebrow: &'static str,
+    title: &'static str,
+    lead: L,
+) -> impl IntoView + use<L> {
     view! {
-        <section class="page-head wrap narrow">
+        <section class="page-head wrap reading">
+            <p class="eyebrow">{eyebrow}</p>
             <h1>{title}</h1>
             <p class="lead">{lead}</p>
         </section>
@@ -50,13 +55,15 @@ pub fn impressum(cx: &Context<'_>) -> Built {
         .push((words::impressum_title(lang).to_owned(), Page::Impressum));
     meta.islands = true;
     let body = view! {
-        {head(words::impressum_title(lang), words::impressum_lead(lang))}
-        <div class="wrap narrow prose">
+        {head(words::imp_eyebrow(lang), words::impressum_title(lang), words::impressum_lead(lang))}
+        <div class="wrap reading prose">
             // what the puzzle is for, in the page itself: the island holds
             // only the button and what it finds
-            <p>{words::impressum_why(lang)}</p>
-            <Impressum lang=lang worker=cx.assets.url("pow-worker.js") />
-            <noscript><p class="notice">{words::impressum_noscript(lang)}</p></noscript>
+            <div class="legal-box glass">
+                <p class="small">{words::impressum_why(lang)}</p>
+                <Impressum lang=lang worker=cx.assets.url("pow-worker.js") />
+                <noscript><p class="notice">{words::impressum_noscript(lang)}</p></noscript>
+            </div>
             <p>{words::impressum_responsible(lang)}</p>
             <p>{words::impressum_dispute(lang)}</p>
         </div>
@@ -64,6 +71,9 @@ pub fn impressum(cx: &Context<'_>) -> Built {
     .into_any();
     (meta, body)
 }
+
+/// A line of the privacy notice's contents: the part's anchor, its title.
+type Part = (&'static str, fn(Lang) -> &'static str);
 
 /// A privacy section of plain text: its anchor, its title, its text.
 type Section = (
@@ -113,17 +123,40 @@ pub fn privacy(cx: &Context<'_>) -> Built {
     ];
     let section = |id: &'static str, title: &'static str, body: AnyView| {
         view! {
-            <section aria-labelledby=id>
+            <section class="legal-part" aria-labelledby=id>
                 <h2 id=id>{title}</h2>
                 <p>{body}</p>
             </section>
         }
     };
+    // the contents, in the order the parts stand
+    let parts: [Part; 15] = [
+        ("controller", words::privacy_controller_title),
+        ("short", words::privacy_short_title),
+        ("hosting", words::privacy_hosting_title),
+        ("device", words::privacy_device_title),
+        ("github", words::privacy_github_title),
+        ("directory", words::privacy_directory_title),
+        ("account", words::privacy_account_title),
+        ("cookie", words::privacy_cookie_title),
+        ("chat", words::privacy_chat_title),
+        ("push", words::privacy_push_title),
+        ("counters", words::privacy_counters_title),
+        ("contact", words::privacy_contact_title),
+        ("impressum", words::privacy_impressum_title),
+        ("recipients", words::privacy_recipients_title),
+        ("rights", words::privacy_rights_title),
+    ];
+    let contents = parts
+        .iter()
+        .map(|(id, title)| view! { <li><a href=format!("#{id}")>{title(lang)}</a></li> })
+        .collect_view();
     let [hosting, github, directory, push, counters, contact, puzzle] =
         simple.map(|(id, title, text)| section(id, title(lang), text(lang).into_any()));
     let body = view! {
-        {head(words::privacy_title(lang), words::privacy_lead(lang))}
-        <div class="wrap narrow prose">
+        {head(words::privacy_eyebrow(lang), words::privacy_title(lang), words::privacy_lead(lang))}
+        <div class="wrap reading prose">
+            <nav class="toc glass" aria-label=words::privacy_contents(lang)><ol>{contents}</ol></nav>
             <p class="meta">{words::privacy_updated(lang)}</p>
             {section("controller", words::privacy_controller_title(lang),
                 rich(words::privacy_controller(lang), move |tag| (tag == "impressum").then(|| impressum.clone())))}
@@ -169,8 +202,8 @@ pub fn terms(cx: &Context<'_>) -> Built {
         view! { <p class="meta">{words::terms_version(lang, version, &updated)}</p> }.into_any()
     };
     let body = view! {
-        {head(words::terms_title(lang), "")}
-        <div class="wrap narrow prose">
+        {head(words::terms_eyebrow(lang), words::terms_title(lang), "")}
+        <div class="wrap reading prose legal-text">
             {state}
             {markdown::render(text)}
         </div>
@@ -196,8 +229,8 @@ pub fn fan_content(cx: &Context<'_>) -> Built {
         (tag == "policy").then(|| policy.to_owned())
     });
     let body = view! {
-        {head(words::fc_title(lang), words::fc_lead(lang))}
-        <div class="wrap narrow prose">
+        {head(words::fc_eyebrow(lang), words::fc_title(lang), words::fc_lead(lang))}
+        <div class="wrap reading prose">
             <h2>{words::fc_notice_title(lang)}</h2>
             <blockquote class="quote"><p>{notice}</p></blockquote>
             <h2>{words::fc_means_title(lang)}</h2>

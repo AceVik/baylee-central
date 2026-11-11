@@ -192,7 +192,7 @@ pub fn faq(cx: &Context<'_>) -> Built {
             let id = format!("q{}", at + 1);
             let label = id.clone();
             view! {
-                <section class="qa" aria-labelledby=label>
+                <section class="qa glass reveal" aria-labelledby=label>
                     <h2 id=id>{question}</h2>
                     <p>{rich(answer, link)}</p>
                 </section>
@@ -201,7 +201,7 @@ pub fn faq(cx: &Context<'_>) -> Built {
         .collect_view();
     let body = view! {
         {head(Some(words::faq_eyebrow(lang)), words::faq_title(lang), "")}
-        <div class="wrap narrow faq">{items}</div>
+        <div class="wrap reading faq">{items}</div>
     }
     .into_any();
     (meta, body)

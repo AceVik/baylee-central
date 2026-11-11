@@ -230,6 +230,7 @@ impressum-dispute = Wir sind weder verpflichtet noch bereit, an Streitbeilegungs
 ## Fan-Inhalt
 
 fc-title = Inoffizieller Fan-Inhalt
+fc-eyebrow = Fan-Inhalt
 fc-lead = Baylee ist ein Fanprojekt. Es ist im Rahmen der Richtlinie für Fan-Inhalte von Wizards of the Coast erlaubt, deren Regeln es folgt.
 fc-notice-title = Der Hinweis auf jeder Seite
 fc-means-title = Was das heißt
@@ -876,3 +877,11 @@ release-all = Alle Releases
 # The download page's head, as the old site wrote it
 dlPage-title = Download
 dlPage-lead = Jeder Download geht direkt zur Datei auf GitHub, nichts dazwischen. Wo ein Release Installer hat, sind sie der einfache Weg; die Archive enthalten dasselbe Spiel zum Entpacken an beliebiger Stelle. Ein installiertes Baylee aktualisiert sich selbst aus den signierten Archiven, wo es seinen eigenen Ordner beschreiben darf. Jedes Paket enthält neben dem Spiel die Seat-Bridge für Sprachmodelle.
+
+# The reading pages' eyebrows, as the old site set them
+imp-eyebrow = Impressum
+terms-eyebrow = Nutzungsbedingungen
+privacy-eyebrow = Datenschutz
+
+# The privacy notice's contents, as the old site named them
+privacy-contents = Inhalt

@@ -230,6 +230,7 @@ impressum-dispute = We are neither obliged nor willing to take part in dispute r
 ## Fan content
 
 fc-title = Unofficial Fan Content
+fc-eyebrow = Fan content
 fc-lead = Baylee is a fan project. It is permitted under Wizards of the Coast's Fan Content Policy, which sets the rules it follows.
 fc-notice-title = The notice on every page
 fc-means-title = What this means
@@ -875,3 +876,11 @@ release-all = All releases
 # The download page's head, as the old site wrote it
 dlPage-title = Download
 dlPage-lead = Every download goes straight to the file on GitHub, nothing in between. Where a release has installers, they are the easy way; the archives hold the same game to unpack anywhere. An installed Baylee updates itself from the signed archives wherever it may write its own folder. Every package carries the seat bridge for language models beside the game.
+
+# The reading pages' eyebrows, as the old site set them
+imp-eyebrow = Legal notice
+terms-eyebrow = Terms of use
+privacy-eyebrow = Privacy
+
+# The privacy notice's contents, as the old site named them
+privacy-contents = Contents
