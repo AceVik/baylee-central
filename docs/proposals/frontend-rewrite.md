@@ -1077,3 +1077,64 @@ deployed first and Central after it
 open register page unable to register until it is reloaded. The privacy
 page says what the puzzle costs, what its difficulty depends on and that
 Central computes part of it again.
+
+## 15. As built: the owner's second round of 11.11.2026
+
+What the owner asked for after the first round, and what came of it. Each
+point names where it is held.
+
+**The strip under the bar.** Beside what it had, it shows how many players
+are connected, how many of them are in a game, the open tables and the
+running games (added up from the gateways that report; the pulse got its
+fourth count for this, [gateway registry](../gateway-registry.md)), and how
+often the site's pages were opened. That last number is the site's own: a
+deployment that names a file (`views`) counts browser navigations into it,
+one number for all pages and visitors and nothing about a request
+([operations](../operations.md), [security
+assurance](../security-assurance.md)); without the setting nothing is
+counted or shown, and the privacy notice has its section only where it is
+counted. On a phone four counts stand two and two.
+
+**Menus.** The download's menu and the language menu lie on a layered
+shade, come in with their rows one after the other and leave as they came
+(`boot.js` holds a menu open for its leaving animation; without motion it
+closes at once). The download's rows name their files, and the menu's head
+names the release.
+
+**Signing in and registering** open as dialogs over the page that asked,
+where script runs; the pages stay, and are where a link leads without
+script or with a modifier key. The dialogs hold the pages' own islands,
+taken over only when a dialog first opens, so a visitor who never opens
+one loads no WebAssembly. A form in an island that is not yet taken over
+does not submit (`data-hydrated`). Fields carry a glyph, and a password's
+field an eye inside it (`islands/field.rs`). `dialogs.spec.ts` holds it.
+
+**Light.** The light scheme was set anew in its two blocks: a ground the
+cards rise from, bands that differ, edges that show, and every shade in
+the scheme's own ink. `tests/contrast.rs` holds AA for it as for the dark.
+
+**Baylee's album.** A page turns as paper does: the leaf is a copy of the
+chapter cut into ten strips, each hinged on the one before, so it bends
+while its edge lifts, throws a shade on the page below and lies flat where
+it lands; going back, the earlier chapter is laid down over the one being
+left. A photograph is laid on the one before it. A finger's sideways
+stroke turns the chapter or the photograph. With less motion asked for,
+page and photograph change at once (`home.js`, `album.css`).
+
+**The gateway directory** has its numbers as tiles (listed, online,
+players, of them in a game, open tables, running games), a search over
+name and address (Ctrl or ⌘ + K), chips that say how many each would show,
+a sort (as listed, name, players, open tables, version), cards or a list,
+and an address that says what is shown (`?q=&show=&sort=&view=`), so a
+view can be passed on. All of it is `directory.js` over the cards the
+server wrote; nothing is stored.
+
+**Movement.** Where the browser can show one state giving way to another
+(view transitions): pages fade over as before, a new colour scheme spreads
+from its switch, and the directory's cards glide to their places on a
+chip, a sort or a change of layout. All of it only where nobody asked for
+less motion, and no hover moves or resizes an element as a whole.
+
+**Something for those who look.** Typing "baylee" outside a field lets a
+cat walk across the foot of the window (`hint.js`): paw prints, hidden
+from a screen reader, in nobody's way, gone after a few seconds.
