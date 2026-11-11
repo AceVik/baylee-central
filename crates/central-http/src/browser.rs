@@ -135,7 +135,10 @@ const BODY_TIME: Duration = Duration::from_secs(2);
 /// How long the service may take to answer once the body is read.
 const ANSWER_TIME: Duration = Duration::from_secs(5);
 /// Requests one client address may have in flight at once, its body's
-/// wait included; a page sends one at a time (the chat strictly in turn).
+/// wait included. A page's islands ask one thing when they start (the
+/// account summary) and the chat works strictly in turn, so four leave
+/// room for a few tabs; an address shared by many people meets the limit
+/// sooner, as it meets the budgets.
 const IN_FLIGHT: u8 = 4;
 /// Most addresses with a request in flight; the listener's connection cap
 /// (at most 128) keeps the table far below it.
