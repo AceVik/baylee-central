@@ -487,11 +487,12 @@ session's first after half an hour without one.
 options):
 
 - Bearers that are vouched for can still spend what they share: four that
-  each keep up their own budget fill a window (4 x 128, 4 x 64). An account
-  has one session of each kind, but up to eight gateways with eight tokens
-  each, every one a bearer of its own. So one account from one address can
-  still keep the other sessions at `Busy`. It needs an account now, where
-  it needed nothing.
+  each keep up their own budget fill a window (4 x 128, 4 x 64). Two
+  accounts have four sessions between them, and one account alone has up
+  to eight gateways with eight tokens each, every one a bearer of its own.
+  So two accounts, or one with gateways, from one address can still keep
+  the other sessions at `Busy`. It needs an account now, where it needed
+  nothing.
 - Seven addresses that each keep up their 600 a minute fill the strangers'
   second all the time; one alone fills it for nine or ten seconds of each
   minute. A session that is not vouched for then waits: after a restart,

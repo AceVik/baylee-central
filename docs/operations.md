@@ -974,7 +974,8 @@ session's for these counts once an answer has vouched for it; its own
 budget is looked at before the shared windows are drawn on, so what it asks
 beyond that spends nothing of anyone else's. What stays: four bearers that
 are vouched for and each keep up their own budget still spend a shared
-window, and one account can hold that many (its gateways' tokens); and
+window, and two accounts hold that many (their four sessions), as one
+alone can (its gateways' tokens); and
 seven addresses of made-up bearers fill the strangers' second, which a
 session meets with its first request after a restart or after half an hour
 without one. Each restart, so each deploy, forgets which bearers were
