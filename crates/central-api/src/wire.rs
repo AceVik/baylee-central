@@ -1282,13 +1282,13 @@ mod tests {
             nonce: "n".into(),
             parts: 8,
             difficulty: 4,
-            memory: 19_456,
+            memory: 16_384,
             passes: 1,
             expires_at: 1,
         };
         assert_eq!(
             String::from_utf8(crate::encode(&work).unwrap()).unwrap(),
-            r#"{"result":"register_work","nonce":"n","parts":8,"difficulty":4,"memory":19456,"passes":1,"expires_at":1}"#
+            r#"{"result":"register_work","nonce":"n","parts":8,"difficulty":4,"memory":16384,"passes":1,"expires_at":1}"#
         );
         let Response::RegisterWork {
             nonce,
@@ -1298,27 +1298,27 @@ mod tests {
             passes,
             expires_at,
         } = crate::decode(
-            br#"{"result":"register_work","nonce":"n","parts":8,"difficulty":4,"memory":19456,"passes":1,"expires_at":1}"#,
+            br#"{"result":"register_work","nonce":"n","parts":8,"difficulty":4,"memory":16384,"passes":1,"expires_at":1}"#,
         )
         .unwrap()
         else {
             panic!("a challenge");
         };
         assert_eq!((nonce.as_str(), parts, difficulty), ("n", 8, 4));
-        assert_eq!((memory, passes, expires_at), (19_456, 1, 1));
+        assert_eq!((memory, passes, expires_at), (16_384, 1, 1));
         for refused in [
             // every field is the price or the nonce: none may be missing
             &br#"{"result":"register_work","nonce":"n","parts":8,"difficulty":4,"passes":1,"expires_at":1}"#[..],
-            br#"{"result":"register_work","nonce":"n","parts":8,"difficulty":4,"memory":19456,"expires_at":1}"#,
-            br#"{"result":"register_work","nonce":"n","difficulty":4,"memory":19456,"passes":1,"expires_at":1}"#,
-            br#"{"result":"register_work","nonce":"n","parts":8,"memory":19456,"passes":1,"expires_at":1}"#,
+            br#"{"result":"register_work","nonce":"n","parts":8,"difficulty":4,"memory":16384,"expires_at":1}"#,
+            br#"{"result":"register_work","nonce":"n","difficulty":4,"memory":16384,"passes":1,"expires_at":1}"#,
+            br#"{"result":"register_work","nonce":"n","parts":8,"memory":16384,"passes":1,"expires_at":1}"#,
             // none out of its type's range, none of another type
-            br#"{"result":"register_work","nonce":"n","parts":256,"difficulty":4,"memory":19456,"passes":1,"expires_at":1}"#,
-            br#"{"result":"register_work","nonce":"n","parts":8,"difficulty":-1,"memory":19456,"passes":1,"expires_at":1}"#,
+            br#"{"result":"register_work","nonce":"n","parts":256,"difficulty":4,"memory":16384,"passes":1,"expires_at":1}"#,
+            br#"{"result":"register_work","nonce":"n","parts":8,"difficulty":-1,"memory":16384,"passes":1,"expires_at":1}"#,
             br#"{"result":"register_work","nonce":"n","parts":8,"difficulty":4,"memory":4294967296,"passes":1,"expires_at":1}"#,
-            br#"{"result":"register_work","nonce":"n","parts":8,"difficulty":4,"memory":"19456","passes":1,"expires_at":1}"#,
+            br#"{"result":"register_work","nonce":"n","parts":8,"difficulty":4,"memory":"16384","passes":1,"expires_at":1}"#,
             // and none beside them
-            br#"{"result":"register_work","nonce":"n","parts":8,"difficulty":4,"memory":19456,"passes":1,"expires_at":1,"lanes":1}"#,
+            br#"{"result":"register_work","nonce":"n","parts":8,"difficulty":4,"memory":16384,"passes":1,"expires_at":1,"lanes":1}"#,
         ] {
             assert!(crate::decode::<Response>(refused).is_err());
         }
@@ -1326,7 +1326,7 @@ mod tests {
         // more, so a page from before could not have been told a memory.
         assert!(
             crate::decode::<Response>(
-                br#"{"result":"register_challenge","nonce":"n","parts":8,"difficulty":4,"memory":19456,"passes":1,"expires_at":1}"#
+                br#"{"result":"register_challenge","nonce":"n","parts":8,"difficulty":4,"memory":16384,"passes":1,"expires_at":1}"#
             )
             .is_err()
         );

@@ -1,7 +1,13 @@
 //! Registration's proof of work (`docs/registration-abuse.md`): Central
-//! issues a random nonce, keeps it in memory with the difficulty it asked
-//! for, and takes a solution once, no sooner than three seconds after it
-//! was issued and checked against that difficulty alone.
+//! issues a random nonce, keeps it in memory with the price it asked, and
+//! takes a solution once, no sooner than three seconds after it was issued
+//! and checked against that price alone.
+//!
+//! The work costs memory: Argon2id at [`MEMORY`] and [`PASSES`] for every
+//! try (`central_crypto::proof`, the one function the page's Worker
+//! searches with and [`prove`] checks with), so a program that is not a
+//! page gains little over the page. Central pays for that too, one
+//! evaluation for each part of an answer; [`prove`] says what bounds it.
 //!
 //! The difficulty grows two ways, and never past six bits over the base
 //! (64 times the work), so no person is locked out. A flood adds one bit
@@ -14,14 +20,17 @@
 //! longest still hands its solution in.
 //!
 //! Nothing about the person is kept: the nonce is random, the counts are
-//! counts, and of what was seen only the difficulty stays, until the
-//! challenge ends. This crate logs nothing.
+//! counts, and of what was seen only the price stays, until the challenge
+//! ends. This crate logs nothing.
 
 use std::collections::{BTreeMap, VecDeque};
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-use central_api::register::{self, MAX_DIFFICULTY, SIGNAL_NO_LANGUAGES, SIGNAL_WEBDRIVER};
+use central_api::register::{self, SIGNAL_NO_LANGUAGES, SIGNAL_WEBDRIVER};
 use central_api::{Error, Token};
+use central_crypto::proof::{self, Work};
+use tokio::sync::Semaphore;
 
 use super::limits::GLOBAL_PER_SECOND;
 
@@ -36,32 +45,60 @@ pub(crate) const MINIMUM: Duration = Duration::from_secs(3);
 /// however many ask, no challenge makes room for another before its own
 /// time is over.
 pub(crate) const HELD: usize = 40_000;
-/// The difficulty when registrations are few: about two seconds of a
-/// mid-range phone's JavaScript for all parts together.
-pub(crate) const BASE: u8 = 16;
+/// Memory of one evaluation, in KiB: 16 MiB, a quarter of what the
+/// password stretch takes in the page's Worker, and less than the legacy
+/// store's check takes through the same workers here.
+pub(crate) const MEMORY: u32 = 16_384;
+/// Passes over that memory.
+pub(crate) const PASSES: u32 = 1;
+/// Parts of every challenge: eight keep the time close to its average, and
+/// are what Central computes to check a right answer.
+pub(crate) const PARTS: u8 = 8;
+/// The difficulty when registrations are few: 128 evaluations on average
+/// for all parts together, about a second of a laptop's browser and four
+/// of a browser slowed four times, what the SHA-256 proof of sixteen bits
+/// cost before it (measured, `docs/registration-abuse.md` §"A proof that
+/// costs memory").
+pub(crate) const BASE: u8 = 4;
 /// Registrations an hour that cost no more than the base.
 pub(crate) const BASELINE: usize = 30;
 /// Bits a flood adds at most: from 1,920 registrations an hour on.
 pub(crate) const RISE: u8 = 6;
 /// Bits a request's own look adds at most.
 pub(crate) const SUSPICION: u8 = 4;
-/// Bits over the base at most, the flood's and the look's together: about
-/// two minutes of that phone, one of a laptop (measured,
-/// `docs/registration-abuse.md` §"Hardened").
+/// Bits over the base at most, the flood's and the look's together: 64
+/// times the base work, about a minute of that laptop and four to five of
+/// the slowed browser.
 pub(crate) const MOST: u8 = 6;
 /// Bits over the base a challenge may have and still live [`LIFETIME`].
 const PATIENT: u8 = 4;
 const HOUR: Duration = Duration::from_secs(3_600);
 /// How often the table is searched for challenges whose time is over.
 const SWEEP: Duration = Duration::from_secs(1);
-const _: () = assert!(BASE + MOST == MAX_DIFFICULTY);
+// What a page takes is what Central asks at its most, and not one unit
+// more: the page's ceiling (`central-api`) is this crate's.
+const _: () = assert!(
+    register::work_cost(MEMORY, PASSES, PARTS, BASE + MOST) == register::WORK_MAX_COST
+        && register::work_acceptable(MEMORY, PASSES, PARTS, BASE + MOST)
+);
+// The page reads its ceilings from `central-api`; the function that
+// computes has its own (`central-crypto`). One set of numbers.
+const _: () = assert!(
+    register::WORK_MIN_MEMORY == proof::MIN_MEMORY
+        && register::WORK_MAX_MEMORY == proof::MAX_MEMORY
+        && register::WORK_MAX_PASSES == proof::MAX_PASSES
+        && register::WORK_MAX_PARTS == proof::MAX_PARTS
+        && register::WORK_MAX_DIFFICULTY == proof::MAX_DIFFICULTY
+        && register::NONCE_LEN == proof::NONCE_LEN
+);
 const _: () = assert!(RISE <= MOST && SUSPICION <= MOST && PATIENT <= MOST);
 // One more second for the window the global budget counts in.
 const _: () = assert!(HELD as u64 > GLOBAL_PER_SECOND as u64 * (lifetime(MOST).as_secs() + 1));
 
 /// How long a challenge of `extra` bits over the base lives: [`LIFETIME`],
-/// doubled for each bit past [`PATIENT`], as the work doubles. That is
-/// about nine times what the phone of [`BASE`] needs on average.
+/// doubled for each bit past [`PATIENT`], as the work doubles
+/// (`docs/registration-abuse.md` §"A proof that costs memory" has what a
+/// slowed browser needed of it).
 const fn lifetime(extra: u8) -> Duration {
     Duration::from_secs(LIFETIME.as_secs() << extra.saturating_sub(PATIENT))
 }
@@ -120,24 +157,25 @@ pub(crate) fn points(seen: Seen, signals: u8) -> u8 {
 pub(crate) struct Issued {
     /// The nonce, 32 random bytes in hex.
     pub nonce: String,
-    /// Leading zero bits each part needs.
-    pub difficulty: u8,
+    /// Its price: memory, passes, parts and the zero bits each part needs.
+    pub work: Work,
     /// When it ends, Unix seconds.
     pub expires_at: i64,
 }
 
 /// A challenge waiting for its solution: when it was issued, when it ends,
-/// and the difficulty it was issued with, the only one its solution is
-/// checked against.
+/// and the price it was issued with, the only one its solution is checked
+/// against.
 struct Held {
     at: Instant,
     until: Instant,
-    difficulty: u8,
+    work: Work,
 }
 
 /// The challenges issued and the last hour's registrations.
 pub(crate) struct Challenges {
     base: u8,
+    memory: u32,
     minimum: Duration,
     held: BTreeMap<String, Held>,
     swept: Option<Instant>,
@@ -146,7 +184,7 @@ pub(crate) struct Challenges {
 
 impl Default for Challenges {
     fn default() -> Self {
-        Challenges::new(BASE, MINIMUM)
+        Challenges::new(BASE, MEMORY, MINIMUM)
     }
 }
 
@@ -171,11 +209,13 @@ pub(crate) fn rise(count: usize) -> u8 {
 }
 
 impl Challenges {
-    /// With `base` bits when registrations are few and `minimum` before a
-    /// solution counts (tests ask little).
-    pub(crate) fn new(base: u8, minimum: Duration) -> Challenges {
+    /// With `base` bits when registrations are few, `memory` KiB for each
+    /// evaluation and `minimum` before a solution counts. Tests ask little;
+    /// neither number can be more than the service's own.
+    pub(crate) fn new(base: u8, memory: u32, minimum: Duration) -> Challenges {
         Challenges {
-            base: base.min(MAX_DIFFICULTY - MOST),
+            base: base.min(BASE),
+            memory: memory.clamp(proof::MIN_MEMORY, MEMORY),
             minimum,
             held: BTreeMap::new(),
             swept: None,
@@ -216,7 +256,12 @@ impl Challenges {
     pub(crate) fn issue(&mut self, now: Instant, points: u8) -> Result<Issued, Error> {
         self.forget(now);
         let extra = (rise(self.registrations.len()) + points.min(SUSPICION)).min(MOST);
-        let difficulty = self.base + extra;
+        let work = Work {
+            memory: self.memory,
+            passes: PASSES,
+            parts: PARTS,
+            difficulty: self.base + extra,
+        };
         let lifetime = lifetime(extra);
         if self.held.len() >= HELD {
             self.sweep(now);
@@ -239,38 +284,30 @@ impl Challenges {
             Held {
                 at: now,
                 until: now + lifetime,
-                difficulty,
+                work,
             },
         );
         Ok(Issued {
             nonce,
-            difficulty,
+            work,
             expires_at: unix(SystemTime::now() + lifetime),
         })
     }
 
-    /// Takes the solution of `nonce`, once, whatever it is: a challenge it
-    /// does not know, one too young or too old, or counters that do not
-    /// solve it at the difficulty it was issued with are `Rejected`, and
-    /// the challenge is gone before any of that is judged.
+    /// Takes the challenge `nonce` out of the table, once, whatever answer
+    /// came with it, and says the price that answer is to be checked
+    /// against: a challenge it does not know, one too young or one too old
+    /// is `Rejected`, and gone all the same.
     ///
     /// # Errors
     /// `Rejected`.
-    pub(crate) fn spend(
-        &mut self,
-        nonce: &str,
-        counters: &[u64],
-        now: Instant,
-    ) -> Result<(), Error> {
+    pub(crate) fn take(&mut self, nonce: &str, now: Instant) -> Result<Work, Error> {
         self.forget(now);
         let held = self.held.remove(nonce).ok_or(Error::Rejected)?;
-        if now >= held.until
-            || now.duration_since(held.at) < self.minimum
-            || !register::solved(nonce, held.difficulty, counters)
-        {
+        if now >= held.until || now.duration_since(held.at) < self.minimum {
             return Err(Error::Rejected);
         }
-        Ok(())
+        Ok(held.work)
     }
 
     /// Counts a registration that went through.
@@ -280,12 +317,80 @@ impl Challenges {
     }
 }
 
+/// Takes the solution of `nonce`, once, whatever it is: a challenge the
+/// table does not know, one too young or too old, or counters that do not
+/// solve it at the price it was issued with are `Rejected`, and the
+/// challenge is gone before the counters are judged.
+///
+/// The order, and what it bounds. A worker first: checking costs memory
+/// and time, so it runs on one of the service's few workers, off the
+/// executor, and without a free one the answer is `Busy` while the
+/// challenge stays for the same solution to be sent again. Then the nonce
+/// leaves the table. Then the counters are checked, part by part, and the
+/// first that does not hold ends it: a wrong answer costs one evaluation,
+/// a right one [`PARTS`]. So at any moment the checks hold at most the
+/// workers' number times [`MEMORY`]; an address can make Central check as
+/// often as the browser listener lets it send `Register`, and all callers
+/// together as often as the shared budget lets them
+/// ([`GLOBAL_PER_SECOND`]).
+///
+/// # Errors
+/// `Busy` without a worker, `Rejected` as above, `Unavailable` when the
+/// table or the worker failed.
+pub(crate) async fn prove(
+    challenges: &Mutex<Challenges>,
+    workers: &Arc<Semaphore>,
+    nonce: &str,
+    counters: &[u64],
+    now: Instant,
+) -> Result<(), Error> {
+    let permit = workers
+        .clone()
+        .try_acquire_owned()
+        .map_err(|_| Error::Busy)?;
+    let work = challenges
+        .lock()
+        .map_err(|_| Error::Unavailable)?
+        .take(nonce, now)?;
+    // Before anything is copied or allocated for it.
+    if counters.len() != usize::from(work.parts) {
+        return Err(Error::Rejected);
+    }
+    let (nonce, counters) = (nonce.to_owned(), counters.to_vec());
+    let solved = tokio::task::spawn_blocking(move || {
+        let _permit = permit;
+        proof::solved(&nonce, work, &counters)
+    })
+    .await
+    .map_err(|_| Error::Unavailable)?;
+    if solved { Ok(()) } else { Err(Error::Rejected) }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    /// Tests ask for little memory, so that a search costs no time here.
+    const LITTLE: u32 = 64;
+
     fn solve(issued: &Issued) -> Vec<u64> {
-        register::solve(&issued.nonce, register::PARTS, issued.difficulty).expect("solved")
+        proof::solve(&issued.nonce, issued.work).expect("solved")
+    }
+
+    /// What [`prove`] does with an answer, without its worker: the nonce
+    /// leaves the table, then the counters are judged.
+    fn spend(
+        challenges: &mut Challenges,
+        nonce: &str,
+        counters: &[u64],
+        now: Instant,
+    ) -> Result<(), Error> {
+        let work = challenges.take(nonce, now)?;
+        if proof::solved(nonce, work, counters) {
+            Ok(())
+        } else {
+            Err(Error::Rejected)
+        }
     }
 
     #[test]
@@ -348,8 +453,9 @@ mod tests {
     }
 
     /// No person is ever locked out: whatever is seen and however many
-    /// register, a challenge asks at most [`MAX_DIFFICULTY`], which a page
-    /// takes, and lives as long as its difficulty needs.
+    /// register, a challenge asks a price a page takes
+    /// (`register::work_acceptable`), and lives as long as its difficulty
+    /// needs.
     #[test]
     fn every_combination_gets_a_challenge_a_page_takes() {
         let start = Instant::now();
@@ -360,11 +466,23 @@ mod tests {
             }
             for seen_points in 0..=u8::MAX {
                 let issued = challenges.issue(start, seen_points).expect("issued");
-                assert!(issued.difficulty >= BASE);
-                assert!(issued.difficulty <= MAX_DIFFICULTY, "{registered}");
+                let Work {
+                    memory,
+                    passes,
+                    parts,
+                    difficulty,
+                } = issued.work;
+                assert_eq!((memory, passes, parts), (MEMORY, PASSES, PARTS));
+                assert!(difficulty >= BASE);
+                assert!(difficulty <= BASE + MOST, "{registered}");
+                assert!(
+                    register::work_acceptable(memory, passes, parts, difficulty),
+                    "{registered}"
+                );
+                assert!(issued.work.acceptable());
                 let held = &challenges.held[&issued.nonce];
-                assert_eq!(held.until - held.at, lifetime(issued.difficulty - BASE));
-                assert_eq!(held.difficulty, issued.difficulty);
+                assert_eq!(held.until - held.at, lifetime(difficulty - BASE));
+                assert_eq!(held.work, issued.work);
             }
         }
     }
@@ -376,20 +494,25 @@ mod tests {
         }
         assert_eq!(lifetime(5), Duration::from_mins(10));
         assert_eq!(lifetime(6), Duration::from_mins(20));
-        let mut challenges = Challenges::new(1, MINIMUM);
+        let mut challenges = Challenges::new(1, LITTLE, MINIMUM);
         let start = Instant::now();
         for _ in 0..1_920 {
             challenges.registered(start);
         }
         let hard = challenges.issue(start, 0).expect("issued");
-        assert_eq!(hard.difficulty, 1 + MOST);
+        assert_eq!(hard.work.difficulty, 1 + MOST);
         let counters = solve(&hard);
         let late = start + (lifetime(MOST).saturating_sub(Duration::from_secs(1)));
-        assert_eq!(challenges.spend(&hard.nonce, &counters, late), Ok(()));
+        assert_eq!(spend(&mut challenges, &hard.nonce, &counters, late), Ok(()));
         let hard = challenges.issue(start, 0).expect("issued");
         let counters = solve(&hard);
         assert_eq!(
-            challenges.spend(&hard.nonce, &counters, start + lifetime(MOST)),
+            spend(
+                &mut challenges,
+                &hard.nonce,
+                &counters,
+                start + lifetime(MOST)
+            ),
             Err(Error::Rejected),
             "its time is over"
         );
@@ -397,40 +520,49 @@ mod tests {
 
     #[test]
     fn a_solution_counts_once_and_not_too_soon() {
-        let mut challenges = Challenges::new(4, MINIMUM);
+        let mut challenges = Challenges::new(2, LITTLE, MINIMUM);
         let start = Instant::now();
         let issued = challenges.issue(start, 0).expect("issued");
-        assert_eq!(issued.difficulty, 4);
+        assert_eq!(issued.work.difficulty, 2);
+        assert_eq!(issued.work.memory, LITTLE);
         assert!(register::valid_nonce(&issued.nonce));
         let counters = solve(&issued);
         assert_eq!(
-            challenges.spend(&issued.nonce, &counters, start + Duration::from_secs(1)),
+            spend(
+                &mut challenges,
+                &issued.nonce,
+                &counters,
+                start + Duration::from_secs(1)
+            ),
             Err(Error::Rejected),
             "too soon"
         );
         assert_eq!(
-            challenges.spend(&issued.nonce, &counters, start + MINIMUM),
+            spend(&mut challenges, &issued.nonce, &counters, start + MINIMUM),
             Err(Error::Rejected),
             "and gone with the try"
         );
         let again = challenges.issue(start, 0).expect("issued");
         let counters = solve(&again);
         let later = start + MINIMUM;
-        assert_eq!(challenges.spend(&again.nonce, &counters, later), Ok(()));
         assert_eq!(
-            challenges.spend(&again.nonce, &counters, later),
+            spend(&mut challenges, &again.nonce, &counters, later),
+            Ok(())
+        );
+        assert_eq!(
+            spend(&mut challenges, &again.nonce, &counters, later),
             Err(Error::Rejected),
             "once"
         );
         let old = challenges.issue(start, 0).expect("issued");
         let counters = solve(&old);
         assert_eq!(
-            challenges.spend(&old.nonce, &counters, start + LIFETIME),
+            spend(&mut challenges, &old.nonce, &counters, start + LIFETIME),
             Err(Error::Rejected),
             "expired"
         );
         assert_eq!(
-            challenges.spend("unknown", &[], later),
+            spend(&mut challenges, "unknown", &[], later),
             Err(Error::Rejected)
         );
     }
@@ -440,21 +572,25 @@ mod tests {
     /// challenge is gone with it.
     #[test]
     fn a_solution_for_less_than_was_asked_is_refused() {
-        let mut challenges = Challenges::new(2, Duration::ZERO);
+        let mut challenges = Challenges::new(2, LITTLE, Duration::ZERO);
         let start = Instant::now();
         let hard = challenges.issue(start, SUSPICION).expect("issued");
-        assert_eq!(hard.difficulty, 2 + SUSPICION);
+        assert_eq!(hard.work.difficulty, 2 + SUSPICION);
         // What the base would have asked. That it also solves six bits in
         // every part has a chance of 2^-32.
-        let easy = register::solve(&hard.nonce, register::PARTS, 2).expect("solved");
-        assert!(register::solved(&hard.nonce, 2, &easy));
-        assert!(!register::solved(&hard.nonce, hard.difficulty, &easy));
+        let base = Work {
+            difficulty: 2,
+            ..hard.work
+        };
+        let easy = proof::solve(&hard.nonce, base).expect("solved");
+        assert!(proof::solved(&hard.nonce, base, &easy));
+        assert!(!proof::solved(&hard.nonce, hard.work, &easy));
         assert_eq!(
-            challenges.spend(&hard.nonce, &easy, start),
+            spend(&mut challenges, &hard.nonce, &easy, start),
             Err(Error::Rejected)
         );
         assert_eq!(
-            challenges.spend(&hard.nonce, &solve(&hard), start),
+            spend(&mut challenges, &hard.nonce, &solve(&hard), start),
             Err(Error::Rejected),
             "spent by the wrong answer"
         );
@@ -462,13 +598,13 @@ mod tests {
         // open the hard one's nonce.
         let hard = challenges.issue(start, SUSPICION).expect("issued");
         let plain = challenges.issue(start, 0).expect("issued");
-        assert_eq!(plain.difficulty, 2);
+        assert_eq!(plain.work.difficulty, 2);
         assert_eq!(
-            challenges.spend(&hard.nonce, &solve(&plain), start),
+            spend(&mut challenges, &hard.nonce, &solve(&plain), start),
             Err(Error::Rejected)
         );
         assert_eq!(
-            challenges.spend(&plain.nonce, &solve(&plain), start),
+            spend(&mut challenges, &plain.nonce, &solve(&plain), start),
             Ok(())
         );
     }
@@ -477,12 +613,15 @@ mod tests {
     fn registrations_raise_the_difficulty_and_the_hour_lowers_it() {
         let mut challenges = Challenges::default();
         let start = Instant::now();
-        assert_eq!(challenges.issue(start, 0).expect("issued").difficulty, BASE);
+        assert_eq!(
+            challenges.issue(start, 0).expect("issued").work.difficulty,
+            BASE
+        );
         for _ in 0..BASELINE * 2 {
             challenges.registered(start);
         }
         assert_eq!(
-            challenges.issue(start, 0).expect("issued").difficulty,
+            challenges.issue(start, 0).expect("issued").work.difficulty,
             BASE + 1
         );
         // thousands an hour: six bits, and no more however many
@@ -491,7 +630,7 @@ mod tests {
             challenges.registered(flood);
         }
         assert_eq!(
-            challenges.issue(flood, 0).expect("issued").difficulty,
+            challenges.issue(flood, 0).expect("issued").work.difficulty,
             BASE + RISE
         );
         // the first sixty leave the hour, the flood stays for its own
@@ -499,6 +638,7 @@ mod tests {
             challenges
                 .issue(start + HOUR, 0)
                 .expect("issued")
+                .work
                 .difficulty,
             BASE + RISE
         );
@@ -506,6 +646,7 @@ mod tests {
             challenges
                 .issue(flood + HOUR, 0)
                 .expect("issued")
+                .work
                 .difficulty,
             BASE
         );
@@ -516,7 +657,11 @@ mod tests {
         let mut challenges = Challenges::default();
         let start = Instant::now();
         let asked = |challenges: &mut Challenges, points| {
-            challenges.issue(start, points).expect("issued").difficulty
+            challenges
+                .issue(start, points)
+                .expect("issued")
+                .work
+                .difficulty
         };
         assert_eq!(asked(&mut challenges, 1), BASE + 1);
         assert_eq!(asked(&mut challenges, SUSPICION), BASE + SUSPICION);
@@ -538,7 +683,7 @@ mod tests {
     /// before a flood keeps its price for its five minutes, and no longer.
     #[test]
     fn a_challenge_from_before_the_rise_keeps_its_price_for_its_lifetime_only() {
-        let mut challenges = Challenges::new(1, Duration::ZERO);
+        let mut challenges = Challenges::new(1, LITTLE, Duration::ZERO);
         let start = Instant::now();
         let early = challenges.issue(start, 0).expect("issued");
         let kept = challenges.issue(start, 0).expect("issued");
@@ -546,23 +691,28 @@ mod tests {
             challenges.registered(start);
         }
         assert_eq!(
-            challenges.issue(start, 0).expect("issued").difficulty,
+            challenges.issue(start, 0).expect("issued").work.difficulty,
             1 + RISE
         );
-        assert_eq!(early.difficulty, 1);
+        assert_eq!(early.work.difficulty, 1);
         assert_eq!(
-            challenges.spend(&early.nonce, &solve(&early), start),
+            spend(&mut challenges, &early.nonce, &solve(&early), start),
             Ok(())
         );
         assert_eq!(
-            challenges.spend(&kept.nonce, &solve(&kept), start + LIFETIME),
+            spend(
+                &mut challenges,
+                &kept.nonce,
+                &solve(&kept),
+                start + LIFETIME
+            ),
             Err(Error::Rejected)
         );
     }
 
     #[test]
     fn a_full_table_makes_room() {
-        let mut challenges = Challenges::new(4, MINIMUM);
+        let mut challenges = Challenges::new(2, LITTLE, MINIMUM);
         let start = Instant::now();
         let first = challenges.issue(start, 0).expect("issued");
         for _ in 1..HELD {
@@ -586,13 +736,13 @@ mod tests {
     /// table never reached its bound.
     #[test]
     fn a_crowd_at_the_global_budget_evicts_no_challenge_before_its_end() {
-        let mut challenges = Challenges::new(1, MINIMUM);
+        let mut challenges = Challenges::new(1, LITTLE, MINIMUM);
         let start = Instant::now();
         for _ in 0..1_920 {
             challenges.registered(start);
         }
         let first = challenges.issue(start, 0).expect("issued");
-        assert_eq!(first.difficulty, 1 + MOST);
+        assert_eq!(first.work.difficulty, 1 + MOST);
         let counters = solve(&first);
         let seconds = lifetime(MOST).as_secs() - 1;
         let mut most = 0;
@@ -605,17 +755,133 @@ mod tests {
         }
         assert!(most < HELD, "{most}");
         let late = start + Duration::from_secs(seconds);
-        assert_eq!(challenges.spend(&first.nonce, &counters, late), Ok(()));
+        assert_eq!(
+            spend(&mut challenges, &first.nonce, &counters, late),
+            Ok(())
+        );
     }
 
     #[test]
     fn challenges_whose_time_is_over_are_forgotten() {
-        let mut challenges = Challenges::new(1, MINIMUM);
+        let mut challenges = Challenges::new(1, LITTLE, MINIMUM);
         let start = Instant::now();
         for _ in 0..100 {
             challenges.issue(start, 0).expect("issued");
         }
         challenges.issue(start + LIFETIME, 0).expect("issued");
         assert_eq!(challenges.held.len(), 1);
+    }
+
+    /// The older proof is no answer here: SHA-256 counters for the same
+    /// nonce, at the base the page of before was asked, are refused like
+    /// any wrong answer, and the challenge is gone with them.
+    #[test]
+    fn a_sha_256_solution_is_not_taken() {
+        let mut challenges = Challenges::new(1, LITTLE, Duration::ZERO);
+        let start = Instant::now();
+        let issued = challenges.issue(start, 0).expect("issued");
+        let older = register::solve(&issued.nonce, register::PARTS, 8).expect("solved");
+        assert!(register::solved(&issued.nonce, 8, &older));
+        // Its eight counters are of the right number, so they are judged.
+        assert_eq!(older.len(), usize::from(PARTS));
+        assert_eq!(
+            spend(&mut challenges, &issued.nonce, &older, start),
+            Err(Error::Rejected)
+        );
+        assert_eq!(
+            spend(&mut challenges, &issued.nonce, &solve(&issued), start),
+            Err(Error::Rejected),
+            "spent"
+        );
+    }
+
+    /// Tests may ask for less, never for more: the knob cannot raise what
+    /// the service asks of a person.
+    #[test]
+    fn the_knob_only_lowers() {
+        let start = Instant::now();
+        let mut more = Challenges::new(u8::MAX, u32::MAX, Duration::ZERO);
+        let issued = more.issue(start, 0).expect("issued");
+        assert_eq!(issued.work.difficulty, BASE);
+        assert_eq!(issued.work.memory, MEMORY);
+        let mut less = Challenges::new(0, 0, Duration::ZERO);
+        let issued = less.issue(start, 0).expect("issued");
+        assert_eq!(issued.work.difficulty, 0);
+        assert_eq!(issued.work.memory, proof::MIN_MEMORY);
+        assert!(issued.work.acceptable());
+    }
+
+    fn wait<T>(work: impl Future<Output = T>) -> T {
+        tokio::runtime::Builder::new_current_thread()
+            .build()
+            .expect("a runtime")
+            .block_on(work)
+    }
+
+    /// [`prove`]'s order: without a worker the answer is `Busy` and the
+    /// challenge stays, so the same solution counts when it is sent again;
+    /// with one, a wrong answer spends the challenge.
+    #[test]
+    fn a_busy_service_keeps_the_challenge_for_its_solution() {
+        let challenges = Mutex::new(Challenges::new(1, LITTLE, Duration::ZERO));
+        let workers = Arc::new(Semaphore::new(2));
+        let start = Instant::now();
+        let issue = || {
+            challenges
+                .lock()
+                .expect("a table")
+                .issue(start, 0)
+                .expect("issued")
+        };
+        let issued = issue();
+        let counters = solve(&issued);
+        let prove = |nonce: &str, counters: &[u64]| {
+            wait(super::prove(&challenges, &workers, nonce, counters, start))
+        };
+        let held = [
+            workers.clone().try_acquire_owned().expect("a worker"),
+            workers.clone().try_acquire_owned().expect("a worker"),
+        ];
+        for _ in 0..3 {
+            assert_eq!(prove(&issued.nonce, &counters), Err(Error::Busy));
+        }
+        // Nothing was looked at: an unknown nonce is `Busy` as well.
+        assert_eq!(prove("unknown", &[]), Err(Error::Busy));
+        assert!(
+            challenges
+                .lock()
+                .expect("a table")
+                .held
+                .contains_key(&issued.nonce)
+        );
+        drop(held);
+        assert_eq!(prove(&issued.nonce, &counters), Ok(()));
+        assert_eq!(
+            prove(&issued.nonce, &counters),
+            Err(Error::Rejected),
+            "once"
+        );
+        // The worker is given back after every check, right or wrong.
+        assert_eq!(workers.available_permits(), 2);
+        let wrong = issue();
+        let mut answer = solve(&wrong);
+        answer[7] += 1;
+        while proof::solved(&wrong.nonce, wrong.work, &answer) {
+            answer[7] += 1;
+        }
+        assert_eq!(prove(&wrong.nonce, &answer), Err(Error::Rejected));
+        assert_eq!(
+            prove(&wrong.nonce, &solve(&wrong)),
+            Err(Error::Rejected),
+            "spent by the wrong answer"
+        );
+        // Counters of another number are refused before a worker computes,
+        // and spend the challenge all the same.
+        let short = issue();
+        let answer = solve(&short);
+        assert_eq!(prove(&short.nonce, &answer[..7]), Err(Error::Rejected));
+        assert_eq!(prove(&short.nonce, &answer), Err(Error::Rejected));
+        assert_eq!(prove("unknown", &[]), Err(Error::Rejected));
+        assert_eq!(workers.available_permits(), 2);
     }
 }

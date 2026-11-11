@@ -129,7 +129,7 @@ impl IdentityService {
                 self.credential_request(request, bearer, surface, place)
                     .await
             }
-            Request::RegisterChallenge => self.register_challenge(surface, seen, 0).await,
+            Request::RegisterChallenge => Self::older_challenge(surface),
             Request::RegisterChallengeFor { signals } => {
                 self.register_challenge(surface, seen, signals).await
             }
@@ -267,8 +267,8 @@ impl IdentityService {
     /// A proof-of-work challenge for one registration
     /// (`docs/registration-abuse.md`), or word that an administrator closed
     /// registration. What the listener saw of the request and what the page
-    /// reported of its browser (`signals`) only make it harder: both ways
-    /// to ask are weighed alike, and neither is ever refused for its look.
+    /// reported of its browser (`signals`) only make it harder: no request
+    /// is ever refused for its look.
     async fn register_challenge(
         &self,
         surface: Surface,
@@ -286,12 +286,26 @@ impl IdentityService {
             .lock()
             .map_err(|_| Error::Unavailable)?
             .issue(Instant::now(), challenge::points(seen, signals))?;
-        Ok(Response::RegisterChallenge {
+        Ok(Response::RegisterWork {
             nonce: issued.nonce,
-            parts: central_api::register::PARTS,
-            difficulty: issued.difficulty,
+            parts: issued.work.parts,
+            difficulty: issued.work.difficulty,
+            memory: issued.work.memory,
+            passes: issued.work.passes,
             expires_at: issued.expires_at,
         })
+    }
+
+    /// The request for the older, SHA-256 proof: this service issues none,
+    /// so no nonce comes of it and nothing is kept. The answer is the one
+    /// a page from before has words for, registration is paused; a page of
+    /// this build never asks this of a Central that answers its own
+    /// request (`docs/registration-abuse.md` §"A proof that costs memory").
+    fn older_challenge(surface: Surface) -> Result<Response, Error> {
+        if surface != Surface::Browser {
+            return Err(Error::Rejected);
+        }
+        Ok(Response::RegistrationClosed)
     }
 
     async fn register(
@@ -308,11 +322,15 @@ impl IdentityService {
         }
         // The proof of work is checked and spent first, whatever follows,
         // before the name is looked at; the store refuses while registration
-        // is closed.
-        self.challenges
-            .lock()
-            .map_err(|_| Error::Unavailable)?
-            .spend(nonce, counters, Instant::now())?;
+        // is closed. `Busy` without a worker spends nothing.
+        challenge::prove(
+            &self.challenges,
+            &self.workers,
+            nonce,
+            counters,
+            Instant::now(),
+        )
+        .await?;
         let ticket = Token::generate()?;
         let identity = self.store.register(username, display_name, &ticket).await?;
         self.challenges

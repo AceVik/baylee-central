@@ -334,14 +334,16 @@ impl IdentityService {
         })
     }
 
-    /// Registration's proof of work at `base` bits and taken `minimum` after
-    /// it was issued, for tests that register many accounts; the service's
-    /// own launch never calls this and keeps `docs/registration-abuse.md`'s
-    /// sixteen bits and three seconds.
+    /// Registration's proof of work at `base` bits and `memory` KiB for
+    /// each evaluation, taken `minimum` after it was issued, for tests that
+    /// register many accounts. It only lowers: more than the service's own
+    /// numbers is cut to them. The service's own launch never calls this
+    /// and keeps `docs/registration-abuse.md`'s price and its three
+    /// seconds; no configuration and no request reaches it.
     #[must_use]
-    pub fn with_registration_challenge(self, base: u8, minimum: Duration) -> Self {
+    pub fn with_registration_challenge(self, base: u8, memory: u32, minimum: Duration) -> Self {
         if let Ok(mut challenges) = self.challenges.lock() {
-            *challenges = challenge::Challenges::new(base, minimum);
+            *challenges = challenge::Challenges::new(base, memory, minimum);
         }
         self
     }

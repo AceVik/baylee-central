@@ -2,20 +2,23 @@
 //! protocol would attack it (`docs/registration-abuse.md` §"Hardened"),
 //! over the real browser listener, the identity service and PostgreSQL:
 //! a proof used twice, raced, solved for less than was asked or made up;
-//! a way to an account around the proof; and what a request that looks
-//! automated, an address that asks often and a block of addresses pay.
+//! the older, SHA-256 proof, which leads to no account any more; a way to
+//! an account around the proof; and what a request that looks automated,
+//! an address that asks often and a block of addresses pay.
 //!
-//! The fixture's service asks one bit at its base and takes a solution at
-//! once (`with_registration_challenge`), so the checks cost no time here;
-//! the three seconds and the sixteen bits have the identity service's own
+//! The fixture's service asks one bit at its base and 64 KiB for each
+//! evaluation, and takes a solution at once
+//! (`with_registration_challenge`), so the checks cost no time here; the
+//! three seconds and the service's own price have the identity service's
 //! tests.
 use super::{Http, browser::Browser};
 use central_api::{
     Error, Token,
-    register::{PARTS, SIGNAL_NO_LANGUAGES, SIGNAL_WEBDRIVER, solve, solved},
+    register::{self, SIGNAL_NO_LANGUAGES, SIGNAL_WEBDRIVER},
     wire::{Request, Response},
 };
 use central_client::Transport;
+use central_crypto::proof::{Work, solve, solved};
 use sea_orm::{ConnectionTrait, DatabaseConnection};
 use std::net::SocketAddr;
 use tokio::runtime::Runtime;
@@ -30,22 +33,34 @@ const SCRIPT: &str = "";
 /// The fixture's base difficulty and the most over it.
 const BASE: u8 = 1;
 const MOST: u8 = 6;
+/// The fixture's memory for one evaluation, in KiB.
+const MEMORY: u32 = 64;
 
 fn at(address: SocketAddr, client: &'static str) -> Browser {
     Browser { address, client }
 }
 
-/// A challenge asked with `headers`: its nonce and difficulty.
-fn challenge(browser: &Browser, request: &Request, headers: &str) -> (String, u8) {
-    match browser.answer_as(request, headers, true) {
-        Ok(Response::RegisterChallenge {
+/// A challenge asked with `headers`: its nonce and its price, which is
+/// the service's but for what the fixture lowered.
+fn challenge(browser: &Browser, signals: u8, headers: &str) -> (String, Work) {
+    match browser.answer_as(&reported(signals), headers, true) {
+        Ok(Response::RegisterWork {
             nonce,
             parts,
             difficulty,
+            memory,
+            passes,
             ..
         }) => {
-            assert_eq!(parts, PARTS);
-            (nonce, difficulty)
+            assert_eq!((memory, passes, parts), (MEMORY, 1, 8));
+            assert!(register::work_acceptable(memory, passes, parts, difficulty));
+            let work = Work {
+                memory,
+                passes,
+                parts,
+                difficulty,
+            };
+            (nonce, work)
         }
         other => panic!("a challenge, not {:?}", other.map(|_| "another answer")),
     }
@@ -72,66 +87,69 @@ pub(crate) fn run(
 ) {
     // The flood's rise so far in this run (registrations in the last hour),
     // read off a person's challenge; every expectation below adds to it.
-    let (_, plain) = challenge(&at(address, "192.0.2.10"), &reported(0), PERSON);
-    let rise = plain - BASE;
+    let (_, plain) = challenge(&at(address, "192.0.2.10"), 0, PERSON);
+    let rise = plain.difficulty - BASE;
     let with = |points: u8| BASE + (rise + points).min(MOST);
     looks(address, &with);
     spent(address);
+    older(address, runtime, operator);
     raced(address, runtime, operator);
     around(address, http);
     haste(address, &with);
     block(address, &with);
 }
 
-/// What a request looks like sets its price, the same for both ways to
-/// ask, and nothing is refused for its look.
+/// What a request looks like sets its price, and nothing is refused for
+/// its look.
 fn looks(address: SocketAddr, with: &dyn Fn(u8) -> u8) {
     let person = at(address, "192.0.2.11");
-    let asked = |request: &Request, headers: &str| challenge(&person, request, headers).1;
-    assert_eq!(asked(&reported(0), PERSON), with(0));
-    assert_eq!(asked(&Request::RegisterChallenge, PERSON), with(0));
+    let asked = |signals: u8, headers: &str| challenge(&person, signals, headers).1.difficulty;
+    assert_eq!(asked(0, PERSON), with(0));
     // What the page reports of its browser: driven by a program, no
     // languages; bits Central does not know say nothing.
-    assert_eq!(asked(&reported(SIGNAL_WEBDRIVER), PERSON), with(2));
-    assert_eq!(asked(&reported(SIGNAL_NO_LANGUAGES), PERSON), with(1));
-    assert_eq!(asked(&reported(0b1111_1100), PERSON), with(0));
+    assert_eq!(asked(SIGNAL_WEBDRIVER, PERSON), with(2));
+    assert_eq!(asked(SIGNAL_NO_LANGUAGES, PERSON), with(1));
+    assert_eq!(asked(0b1111_1100, PERSON), with(0));
     let script = at(address, "192.0.2.12");
-    let asked = |request: &Request, headers: &str| challenge(&script, request, headers).1;
+    let asked = |signals: u8, headers: &str| challenge(&script, signals, headers).1.difficulty;
     // A tool that names itself.
-    assert_eq!(asked(&reported(0), TOOL), with(2));
-    // No user agent and no language: the older way to ask is weighed like
-    // the newer one, so asking the old way saves nothing.
-    assert_eq!(asked(&Request::RegisterChallenge, SCRIPT), with(3));
-    assert_eq!(asked(&reported(0), SCRIPT), with(3));
+    assert_eq!(asked(0, TOOL), with(2));
+    // No user agent and no language.
+    assert_eq!(asked(0, SCRIPT), with(3));
     // Every sign together stops at four bits.
-    assert_eq!(asked(&reported(u8::MAX), SCRIPT), with(4));
+    assert_eq!(asked(u8::MAX, SCRIPT), with(4));
 }
 
 /// A challenge is gone with the first answer to it, whatever the answer
 /// was, and only a spent one tells whether a name is taken.
 fn spent(address: SocketAddr) {
     let browser = at(address, "192.0.2.13");
-    let ask = || challenge(&browser, &Request::RegisterChallenge, SCRIPT);
+    let ask = || challenge(&browser, 0, SCRIPT);
     let send = |request: &Request| browser.answer_as(request, SCRIPT, true).err();
     // Solved for less than was asked: refused, and the right answer after
     // it finds the challenge gone.
-    let (nonce, difficulty) = ask();
-    assert!(difficulty >= BASE + 3);
-    let easy = solve(&nonce, PARTS, BASE).unwrap();
-    assert!(!solved(&nonce, difficulty, &easy), "2^-24 at the least");
+    let (nonce, work) = ask();
+    assert!(work.difficulty >= BASE + 3);
+    let base = Work {
+        difficulty: BASE,
+        ..work
+    };
+    let easy = solve(&nonce, base).unwrap();
+    assert!(solved(&nonce, base, &easy));
+    assert!(!solved(&nonce, work, &easy), "2^-24 at the least");
     assert_eq!(
         send(&register("spent-less", &nonce, &easy)),
         Some(Error::Rejected)
     );
-    let right = solve(&nonce, PARTS, difficulty).unwrap();
+    let right = solve(&nonce, work).unwrap();
     assert_eq!(
         send(&register("spent-less", &nonce, &right)),
         Some(Error::Rejected),
         "spent by the wrong answer"
     );
     // A good proof with a taken name is a conflict, and is spent by it.
-    let (nonce, difficulty) = ask();
-    let right = solve(&nonce, PARTS, difficulty).unwrap();
+    let (nonce, work) = ask();
+    let right = solve(&nonce, work).unwrap();
     assert_eq!(
         send(&register("web-player", &nonce, &right)),
         Some(Error::Conflict)
@@ -151,7 +169,7 @@ fn spent(address: SocketAddr) {
     // refusal says nothing about the name.
     let elsewhere = at(address, "192.0.2.16");
     let forged = "5a".repeat(32);
-    let counters = solve(&forged, PARTS, difficulty).unwrap();
+    let counters = solve(&forged, work).unwrap();
     for name in ["web-player", "spent-forged"] {
         assert_eq!(
             elsewhere
@@ -163,12 +181,70 @@ fn spent(address: SocketAddr) {
     }
 }
 
+/// Accounts whose name starts with `prefix`, as the store has them.
+fn reserved(runtime: &Runtime, operator: &DatabaseConnection, prefix: &str) -> i64 {
+    assert!(prefix.bytes().all(|b| b.is_ascii_lowercase() || b == b'-'));
+    runtime
+        .block_on(operator.query_one_raw(sea_orm::Statement::from_string(
+            sea_orm::DbBackend::Postgres,
+            format!(
+                "SELECT count(*) AS reserved FROM central_identity.accounts WHERE username_key LIKE '{prefix}%'"
+            ),
+        )))
+        .unwrap()
+        .unwrap()
+        .try_get("", "reserved")
+        .unwrap()
+}
+
+/// The older, SHA-256 proof leads to no account: its request gets no
+/// challenge, from a person's browser or a script, and its solution for a
+/// nonce this service did issue is refused like any wrong answer.
+fn older(address: SocketAddr, runtime: &Runtime, operator: &DatabaseConnection) {
+    let browser = at(address, "192.0.2.17");
+    // What a page from before sends first: no nonce comes back, only the
+    // word it shows as "registration is paused".
+    for headers in [PERSON, SCRIPT] {
+        assert!(matches!(
+            browser.answer_as(&Request::RegisterChallenge, headers, true),
+            Ok(Response::RegistrationClosed)
+        ));
+    }
+    let send = |request: &Request| browser.answer_as(request, PERSON, true).err();
+    // A nonce it made up, solved the older way.
+    let made_up = "a5".repeat(32);
+    let counters = register::solve(&made_up, register::PARTS, 8).unwrap();
+    assert!(register::solved(&made_up, 8, &counters));
+    assert_eq!(
+        send(&register("older-made-up", &made_up, &counters)),
+        Some(Error::Rejected)
+    );
+    // A nonce of this service, asked for the new way and solved the older
+    // way: eight counters, the right number, and none of them an answer.
+    let (nonce, work) = challenge(&browser, 0, PERSON);
+    let counters = register::solve(&nonce, register::PARTS, 8).unwrap();
+    assert!(register::solved(&nonce, 8, &counters));
+    assert_eq!(counters.len(), usize::from(work.parts));
+    assert!(!solved(&nonce, work, &counters), "2^-8 at the least");
+    assert_eq!(
+        send(&register("older-issued", &nonce, &counters)),
+        Some(Error::Rejected)
+    );
+    // And the nonce is gone with it, so the right answer is too late.
+    let right = solve(&nonce, work).unwrap();
+    assert_eq!(
+        send(&register("older-issued", &nonce, &right)),
+        Some(Error::Rejected)
+    );
+    assert_eq!(reserved(runtime, operator, "older-"), 0);
+}
+
 /// Three registrations with one solved challenge at the same moment: one
 /// account, whichever came first.
 fn raced(address: SocketAddr, runtime: &Runtime, operator: &DatabaseConnection) {
     let browser = at(address, "192.0.2.14");
-    let (nonce, difficulty) = challenge(&browser, &Request::RegisterChallenge, SCRIPT);
-    let counters = solve(&nonce, PARTS, difficulty).unwrap();
+    let (nonce, work) = challenge(&browser, 0, SCRIPT);
+    let counters = solve(&nonce, work).unwrap();
     let start = std::sync::Barrier::new(3);
     let outcomes: Vec<Result<Response, Error>> = std::thread::scope(|scope| {
         let racers: Vec<_> = ["raced-a", "raced-b", "raced-c"]
@@ -193,16 +269,7 @@ fn raced(address: SocketAddr, runtime: &Runtime, operator: &DatabaseConnection) 
         .filter(|outcome| matches!(outcome, Err(Error::Rejected)))
         .count();
     assert_eq!((won, refused), (1, 2));
-    let reserved: i64 = runtime
-        .block_on(operator.query_one_raw(sea_orm::Statement::from_string(
-            sea_orm::DbBackend::Postgres,
-            "SELECT count(*) AS reserved FROM central_identity.accounts WHERE username_key LIKE 'raced-%'",
-        )))
-        .unwrap()
-        .unwrap()
-        .try_get("", "reserved")
-        .unwrap();
-    assert_eq!(reserved, 1);
+    assert_eq!(reserved(runtime, operator, "raced-"), 1);
 }
 
 /// No way to an account around a spent challenge: the native listener has
@@ -251,18 +318,24 @@ fn around(address: SocketAddr, http: &Http) {
     }
 }
 
-/// An address that asks often pays more with every five challenges, and
-/// is refused only where its budget of twenty an hour ends.
+/// An address that asks often pays more with every five requests for a
+/// challenge, and is refused only where its budget of twenty an hour
+/// ends. The request for the older proof draws on the same budget and
+/// counts as haste the same, though no challenge comes of it.
 fn haste(address: SocketAddr, with: &dyn Fn(u8) -> u8) {
-    let browser = at(address, "203.0.113.50");
+    // An address of its own block: the budget it uses up here is no other
+    // test's (`guessing.rs` registers from 203.0.113.50).
+    let browser = at(address, "2001:db8:7:1::1");
     for index in 0..20u8 {
-        let request = if index % 2 == 0 {
-            reported(0)
-        } else {
-            Request::RegisterChallenge
-        };
-        let (_, difficulty) = challenge(&browser, &request, PERSON);
-        assert_eq!(difficulty, with(index / 5), "challenge {}", index + 1);
+        if index % 4 == 3 {
+            assert!(matches!(
+                browser.answer_as(&Request::RegisterChallenge, PERSON, true),
+                Ok(Response::RegistrationClosed)
+            ));
+            continue;
+        }
+        let (_, work) = challenge(&browser, 0, PERSON);
+        assert_eq!(work.difficulty, with(index / 5), "request {}", index + 1);
     }
     for request in [reported(0), Request::RegisterChallenge] {
         assert_eq!(
@@ -301,11 +374,11 @@ fn block(address: SocketAddr, with: &dyn Fn(u8) -> u8) {
     ];
     let asked: Vec<u8> = SUBNETS
         .iter()
-        .map(|client| challenge(&at(address, client), &reported(0), PERSON).1)
+        .map(|client| challenge(&at(address, client), 0, PERSON).1.difficulty)
         .collect();
     assert!(asked[..20].iter().all(|difficulty| *difficulty == with(0)));
     assert_eq!(asked[20], with(1));
     // The block next to it has asked for nothing yet.
     let next = at(address, "2001:db8:6:1::1");
-    assert_eq!(challenge(&next, &reported(0), PERSON).1, with(0));
+    assert_eq!(challenge(&next, 0, PERSON).1.difficulty, with(0));
 }
