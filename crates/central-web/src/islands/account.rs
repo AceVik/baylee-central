@@ -114,6 +114,8 @@ async fn sign_out(worker: &str, lang: Lang) {
 /// The password form that signs in again before a change that needs a
 /// fresh sign-in (making a token, exporting).
 fn reauth(lang: Lang, worker: String, done: Callback<()>) -> impl IntoView {
+    // only an action asks for it, so it takes the focus
+    super::focus::when_shown("#reauth-name");
     let password = RwSignal::new(String::new());
     let error = RwSignal::new(None::<&'static str>);
     let busy = RwSignal::new(false);
@@ -200,6 +202,7 @@ fn registration_switch(lang: Lang, worker: String) -> AnyView {
     };
     let signed_again = Callback::new(move |()| {
         again.set(false);
+        super::focus::after_render("#registration-switch");
         change();
     });
     view! {
@@ -216,13 +219,14 @@ fn registration_switch(lang: Lang, worker: String) -> AnyView {
                 if again.get() {
                     reauth(lang, worker.clone(), signed_again).into_any()
                 } else {
-                    let label = if open.get() == Some(false) {
+                    // the label follows the state; the button stays, and the focus on it
+                    let label = move || if open.get() == Some(false) {
                         words::admin_registration_reopen(lang)
                     } else {
                         words::admin_registration_close(lang)
                     };
                     view! {
-                        <p><button type="button" class="button" aria-disabled=move || (busy.get() || open.get().is_none()).then_some("true")
+                        <p><button type="button" class="button" id="registration-switch" aria-disabled=move || (busy.get() || open.get().is_none()).then_some("true")
                             on:click=move |_| if !busy.get_untracked() { change() }>{label}</button></p>
                     }
                     .into_any()
@@ -298,7 +302,13 @@ fn home(lang: Lang, summary: &Summary, worker: &str) -> AnyView {
     .into_any()
 }
 
-fn profile(lang: Lang, worker: &str, summary: &Summary, reload: Callback<()>) -> AnyView {
+fn profile(
+    lang: Lang,
+    worker: &str,
+    summary: &Summary,
+    reload: Callback<()>,
+    focus_next: StoredValue<Option<&'static str>>,
+) -> AnyView {
     let chosen = RwSignal::new(String::new());
     let error = RwSignal::new(None::<&'static str>);
     let choose = summary.display_name.is_none().then(|| {
@@ -311,7 +321,11 @@ fn profile(lang: Lang, worker: &str, summary: &Summary, reload: Callback<()>) ->
             }
             leptos::task::spawn_local(async move {
                 match call(&Request::SetDisplayName { display_name: name }).await {
-                    Ok(_) => reload.run(()),
+                    Ok(_) => {
+                        // the form goes with the reload; the new handle takes the focus
+                        focus_next.set_value(Some("#profile-who"));
+                        reload.run(());
+                    }
                     Err(Failure::Conflict) => error.set(Some(words::profile_name_taken(lang))),
                     Err(failure) => error.set(Some(problem_text(lang, failure.into()))),
                 }
@@ -352,7 +366,7 @@ fn profile(lang: Lang, worker: &str, summary: &Summary, reload: Callback<()>) ->
     view! {
         {choose}
         <section class="card" aria-labelledby="profile-who">
-            <h2 id="profile-who">{words::profile_who_title(lang)}</h2>
+            <h2 id="profile-who" tabindex="-1">{words::profile_who_title(lang)}</h2>
             <dl class="facts">
                 <dt>{words::profile_handle(lang)}</dt>
                 <dd translate="no">{summary.handle().unwrap_or_else(|| "–".to_owned())}</dd>
@@ -475,7 +489,7 @@ fn download_link(lang: Lang, json: &str) -> impl IntoView + use<> {
             let _ = write!(href, "%{byte:02X}");
         }
     }
-    view! { <a class="button primary" href=href download="baylee-account.json">{words::privacy_export_save(lang)}</a> }
+    view! { <a class="button primary" id="export-save" href=href download="baylee-account.json">{words::privacy_export_save(lang)}</a> }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -508,8 +522,14 @@ fn export_view(lang: Lang, worker: String) -> impl IntoView {
             <h2 id="export-title">{words::privacy_export_title(lang)}</h2>
             <p>{words::privacy_export_lead(lang)}</p>
             {move || match export.get() {
-                Some(Ok(json)) => download_link(lang, &json).into_any(),
-                Some(Err(problem)) => view! { <p class="error" role="alert">{problem_text(lang, problem)}</p> }.into_any(),
+                Some(Ok(json)) => {
+                    super::focus::when_shown("#export-save");
+                    download_link(lang, &json).into_any()
+                }
+                Some(Err(problem)) => {
+                    super::focus::when_shown("#export-error");
+                    view! { <p class="error" id="export-error" role="alert" tabindex="-1">{problem_text(lang, problem)}</p> }.into_any()
+                }
                 None => view! { <button type="button" class="button" on:click=move |_| run_export()>{words::privacy_export_make(lang)}</button> }.into_any(),
             }}
             <Show when=move || needs_reauth.get()>
@@ -562,6 +582,7 @@ fn deletion_view(lang: Lang, worker: String) -> impl IntoView {
                 Err(failure) => {
                     error.set(Some(problem_text(lang, failure.into())));
                     deletion.set(Deletion::Idle);
+                    super::focus::after_render("#delete-start");
                 }
             }
         });
@@ -573,35 +594,46 @@ fn deletion_view(lang: Lang, worker: String) -> impl IntoView {
             <p>{words::privacy_delete_lead(lang)}</p>
             {move || match deletion.get() {
                 Deletion::Idle => view! {
-                    <button type="button" class="button danger" on:click=move |_| deletion.set(Deletion::Asking)>{words::privacy_delete_start(lang)}</button>
+                    <button type="button" class="button danger" id="delete-start" on:click=move |_| deletion.set(Deletion::Asking)>{words::privacy_delete_start(lang)}</button>
                 }.into_any(),
-                Deletion::Asking => view! {
-                    <form class="form" method="post" novalidate=true on:submit=prove.clone()>
-                        <div class="field">
-                            <label for="delete-password">{words::privacy_delete_password(lang)}</label>
-                            <input id="delete-password" type="password" autocomplete="current-password" on:input=move |ev| password.set(event_target_value(&ev)) />
-                        </div>
-                        <button type="submit" class="button danger">{words::privacy_delete_prove(lang)}</button>
-                    </form>
-                }.into_any(),
+                Deletion::Asking => {
+                    super::focus::when_shown("#delete-password");
+                    view! {
+                        <form class="form" method="post" novalidate=true on:submit=prove.clone()>
+                            <div class="field">
+                                <label for="delete-password">{words::privacy_delete_password(lang)}</label>
+                                <input id="delete-password" type="password" autocomplete="current-password" on:input=move |ev| password.set(event_target_value(&ev)) />
+                            </div>
+                            <button type="submit" class="button danger">{words::privacy_delete_prove(lang)}</button>
+                        </form>
+                    }.into_any()
+                }
                 Deletion::Proven { gateways } => {
                     let owned = (!gateways.is_empty()).then(|| {
                         let list = gateways.into_iter().map(|origin| view! { <li><code translate="no">{origin}</code></li> }).collect_view();
                         view! { <p>{words::privacy_delete_gateways(lang)}</p><ul>{list}</ul> }
                     });
+                    // the last word before the end, not the button that ends it
+                    super::focus::when_shown("#delete-last");
                     view! {
-                        <p class="notice" role="alert">{words::privacy_delete_last(lang)}</p>
+                        <p class="notice" id="delete-last" role="alert" tabindex="-1">{words::privacy_delete_last(lang)}</p>
                         {owned}
                         <p class="actions">
                             <button type="button" class="button danger" on:click=delete.clone()>{words::privacy_delete_confirm(lang)}</button>
-                            <button type="button" class="button quiet" on:click=move |_| deletion.set(Deletion::Idle)>{words::privacy_delete_cancel(lang)}</button>
+                            <button type="button" class="button quiet" on:click=move |_| {
+                                deletion.set(Deletion::Idle);
+                                super::focus::after_render("#delete-start");
+                            }>{words::privacy_delete_cancel(lang)}</button>
                         </p>
                     }.into_any()
                 }
-                Deletion::Deleted => view! {
-                    <p role="status">{words::privacy_deleted(lang)}</p>
-                    <p><a class="button" href=format!("/{code}/")>{words::error_home(lang)}</a></p>
-                }.into_any(),
+                Deletion::Deleted => {
+                    super::focus::when_shown("#deleted");
+                    view! {
+                        <p role="status" id="deleted" tabindex="-1">{words::privacy_deleted(lang)}</p>
+                        <p><a class="button" href=format!("/{code}/")>{words::error_home(lang)}</a></p>
+                    }.into_any()
+                }
             }}
             <p class="error" role="alert">{move || error.get()}</p>
         </section>
@@ -653,10 +685,18 @@ async fn prove_deletion(
     ))
 }
 
+/// A gateway's part of element ids: its id in hex, unique on the page.
+fn gateway_key(id: &[u8; 16]) -> String {
+    id.iter().fold(String::with_capacity(32), |mut out, byte| {
+        let _ = write!(out, "{byte:02x}");
+        out
+    })
+}
+
 fn gateway_card(
     lang: Lang,
     gateway: &MyGateway,
-    revoke: Callback<[u8; 16]>,
+    revoke: Callback<([u8; 16], [u8; 16])>,
     mint: Callback<([u8; 16], String, u16, GatewayScopes)>,
 ) -> impl IntoView + use<> {
     let state = match gateway.state {
@@ -664,6 +704,7 @@ fn gateway_card(
         central_api::gateway::GatewayState::Pending => words::gateways_pending(lang),
         central_api::gateway::GatewayState::Disabled => words::gateways_disabled(lang),
     };
+    let gateway_id = gateway.id;
     let tokens = gateway
         .tokens
         .iter()
@@ -676,7 +717,7 @@ fn gateway_card(
                 _ => words::tokens_listing(lang),
             };
             let action = live.then(|| view! {
-                <button type="button" class="button danger" on:click=move |_| revoke.run(id)>{words::tokens_revoke(lang)}</button>
+                <button type="button" class="button danger" on:click=move |_| revoke.run((gateway_id, id))>{words::tokens_revoke(lang)}</button>
             });
             view! {
                 <li class="token">
@@ -706,10 +747,10 @@ fn gateway_card(
             },
         ));
     };
-    let form_id = format!("token-{}", gateway.origin.len());
+    let form_id = format!("token-{}", gateway_key(&gateway.id));
     view! {
         <article class="card gateway-own">
-            <h3><bdi>{gateway.metadata.name.clone()}</bdi></h3>
+            <h3 id=format!("{form_id}-title") tabindex="-1"><bdi>{gateway.metadata.name.clone()}</bdi></h3>
             <p class="pills"><span class="pill">{state}</span>{gateway.online.then(|| view! { <span class="pill ok">{words::gws_online(lang)}</span> })}</p>
             <p><code class="address" translate="no">{gateway.origin.clone()}</code></p>
             <h4>{words::tokens_title(lang)}</h4>
@@ -795,12 +836,39 @@ fn add_form(
     }
 }
 
+/// A new token, shown once; kept, the focus goes back to its gateway.
+fn token_box(
+    lang: Lang,
+    shown: RwSignal<Option<String>>,
+    minting: StoredValue<Option<[u8; 16]>>,
+) -> impl IntoView {
+    view! {
+        <Show when=move || shown.with(Option::is_some)>
+            <section class="card secret-box" role="alert" aria-labelledby="token-shown">
+                <h2 id="token-shown" tabindex="-1">{words::tokens_shown_title(lang)}</h2>
+                <p class="eyebrow">{words::code_shown_once(lang)}</p>
+                <p class="secret" translate="no"><code>{move || shown.get().unwrap_or_default()}</code></p>
+                <button type="button" class="button primary" on:click=move |_| {
+                    shown.set(None);
+                    if let Some(gateway) = minting.get_value() {
+                        super::focus::after_render(format!("#token-{}-title", gateway_key(&gateway)));
+                    }
+                }>{words::tokens_kept(lang)}</button>
+            </section>
+        </Show>
+    }
+}
+
 fn gateways(lang: Lang, worker: String) -> AnyView {
     let list = RwSignal::new(None::<Result<Vec<MyGateway>, Problem>>);
     let notice = RwSignal::new(None::<&'static str>);
     let shown = RwSignal::new(None::<String>);
     let needs_reauth = RwSignal::new(false);
-    let load = move || {
+    // the gateway a token is being made for, to come back to
+    let minting = StoredValue::new(None::<[u8; 16]>);
+    // A reload draws the cards anew, the focused control among them:
+    // `then` names where the focus goes once they are drawn.
+    let load = move |then: Option<String>| {
         leptos::task::spawn_local(async move {
             let found = match call(&Request::Owner {
                 request: OwnerRequest::Gateways,
@@ -814,10 +882,13 @@ fn gateways(lang: Lang, worker: String) -> AnyView {
                 Err(failure) => Err(failure.into()),
             };
             list.set(Some(found));
+            if let Some(then) = then {
+                super::focus::after_render(then);
+            }
         });
     };
-    Effect::new(move |_| load());
-    let revoke = Callback::new(move |token: [u8; 16]| {
+    Effect::new(move |_| load(None));
+    let revoke = Callback::new(move |(gateway, token): ([u8; 16], [u8; 16])| {
         leptos::task::spawn_local(async move {
             match call(&Request::Owner {
                 request: OwnerRequest::RevokeToken { token },
@@ -826,7 +897,7 @@ fn gateways(lang: Lang, worker: String) -> AnyView {
             {
                 Ok(_) => {
                     notice.set(Some(words::tokens_revoked_now(lang)));
-                    load();
+                    load(Some(format!("#token-{}-title", gateway_key(&gateway))));
                 }
                 Err(failure) => notice.set(Some(problem_text(lang, failure.into()))),
             }
@@ -838,6 +909,7 @@ fn gateways(lang: Lang, worker: String) -> AnyView {
                 notice.set(Some(words::tokens_invalid(lang)));
                 return;
             }
+            minting.set_value(Some(gateway));
             leptos::task::spawn_local(async move {
                 match call(&Request::Owner {
                     request: OwnerRequest::CreateToken {
@@ -853,7 +925,8 @@ fn gateways(lang: Lang, worker: String) -> AnyView {
                         answer: OwnerAnswer::TokenCreated { token, .. },
                     }) => {
                         shown.set(Some(token_text(&token).to_string()));
-                        load();
+                        super::focus::after_render("#token-shown");
+                        load(None);
                     }
                     Ok(_) => notice.set(Some(problem_text(lang, Problem::Failed))),
                     Err(Failure::Rejected) => needs_reauth.set(true),
@@ -863,16 +936,16 @@ fn gateways(lang: Lang, worker: String) -> AnyView {
         },
     );
     view! {
-        <Show when=move || shown.with(Option::is_some)>
-            <section class="card secret-box" role="alert" aria-labelledby="token-shown">
-                <h2 id="token-shown">{words::tokens_shown_title(lang)}</h2>
-                <p class="eyebrow">{words::code_shown_once(lang)}</p>
-                <p class="secret" translate="no"><code>{move || shown.get().unwrap_or_default()}</code></p>
-                <button type="button" class="button primary" on:click=move |_| shown.set(None)>{words::tokens_kept(lang)}</button>
-            </section>
-        </Show>
+        {token_box(lang, shown, minting)}
         <Show when=move || needs_reauth.get()>
-            {reauth(lang, worker.clone(), Callback::new(move |()| { needs_reauth.set(false); notice.set(Some(words::tokens_again(lang))); }))}
+            {reauth(lang, worker.clone(), Callback::new(move |()| {
+                needs_reauth.set(false);
+                notice.set(Some(words::tokens_again(lang)));
+                // signed in again: back to the form that asks to make it again
+                if let Some(gateway) = minting.get_value() {
+                    super::focus::after_render(format!("#token-{}-name", gateway_key(&gateway)));
+                }
+            }))}
         </Show>
         <p class="meta" role="status">{move || notice.get()}</p>
         {move || list.with(|found| match found {
@@ -881,7 +954,7 @@ fn gateways(lang: Lang, worker: String) -> AnyView {
             Some(Ok(all)) if all.is_empty() => view! { <p>{words::gateways_none(lang)}</p> }.into_any(),
             Some(Ok(all)) => all.iter().map(|gateway| gateway_card(lang, gateway, revoke, mint)).collect_view().into_any(),
         })}
-        {add_form(lang, notice, Callback::new(move |()| load()))}
+        {add_form(lang, notice, Callback::new(move |()| load(None)))}
     }
     .into_any()
 }
@@ -906,6 +979,11 @@ fn push_switches(
                 let Some(Ok(current)) = now.get_untracked() else {
                     return;
                 };
+                if busy.get_untracked() {
+                    // one change at a time: this one is undone
+                    event_target::<leptos::web_sys::HtmlInputElement>(&event).set_checked(!wanted);
+                    return;
+                }
                 busy.set(true);
                 error.set(None);
                 leptos::task::spawn_local(async move {
@@ -930,7 +1008,8 @@ fn push_switches(
             view! {
                 <div class="check">
                     <input id=id.clone() type="checkbox" role="switch" prop:checked=on on:change=change
-                        disabled=move || busy.get() || now.with(|n| !matches!(n, Some(Ok(_)))) />
+                        aria-disabled=move || busy.get().then_some("true")
+                        disabled=move || now.with(|n| !matches!(n, Some(Ok(_)))) />
                     <label for=id>{name}</label>
                 </div>
             }
@@ -1029,6 +1108,8 @@ fn notifications(lang: Lang, admin: bool) -> AnyView {
 #[island]
 pub fn Account(lang: Lang, section: Section, worker: String) -> impl IntoView {
     let state = RwSignal::new(Load::Loading);
+    // where the focus goes once a reload an action asked for is drawn
+    let focus_next = StoredValue::new(None::<&'static str>);
     let reload = Callback::new(move |()| {
         leptos::task::spawn_local(async move { state.set(summary().await) });
     });
@@ -1050,16 +1131,21 @@ pub fn Account(lang: Lang, section: Section, worker: String) -> impl IntoView {
             <p><button type="button" class="button" on:click=move |_| reload.run(())>{words::error_again(lang)}</button></p>
         }
         .into_any(),
-        Load::Ready(summary) => match section {
+        Load::Ready(summary) => {
+            if let Some(target) = focus_next.try_update_value(Option::take).flatten() {
+                super::focus::after_render(target);
+            }
+            match section {
             Section::Home => home(lang, &summary, &worker),
-            Section::Profile => profile(lang, &worker, &summary, reload),
+            Section::Profile => profile(lang, &worker, &summary, reload, focus_next),
             Section::Security => security(lang, worker.clone()),
             Section::Privacy => privacy(lang, worker.clone()),
             Section::Gateways => gateways(lang, worker.clone()),
             Section::Notifications => notifications(lang, summary.admin),
             // the messenger is its own island
             Section::Chat | Section::Contacts => ().into_any(),
-        },
+            }
+        }
     }
     }
 }
