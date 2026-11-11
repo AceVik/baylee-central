@@ -81,10 +81,9 @@ pub(crate) fn run(root: &Path) -> Result<()> {
     crypto(root, &mut site)?;
     let mut css = String::new();
     for name in STYLES {
-        css.push_str(
+        css.push_str(&lean_css(
             &fs::read_to_string(web.join("style").join(name)).or_fail("a stylesheet is missing")?,
-        );
-        css.push('\n');
+        )?);
     }
     let css = site.rewrite(&css)?;
     site.add("site.css", css.as_bytes())?;
@@ -320,6 +319,58 @@ fn content(site: &mut Site, baylee: &Path) -> Result<()> {
 }
 
 /// The islands' module and glue, and the bootstrap that loads them.
+/// A stylesheet without its comments, blank lines and indentation: a
+/// fifth less to send before the first paint. Strings are kept as written
+/// (a comment's opening inside one is text); a string broken over a line
+/// is refused, since its indentation would be part of it.
+fn lean_css(css: &str) -> Result<String> {
+    let mut out = String::with_capacity(css.len());
+    let mut chars = css.chars().peekable();
+    let mut quote: Option<char> = None;
+    while let Some(c) = chars.next() {
+        match quote {
+            Some(q) => {
+                out.push(c);
+                if c == '\\' {
+                    match chars.next() {
+                        Some('\n') | None => {
+                            return Err(Fail::new("a stylesheet's string runs over a line"));
+                        }
+                        Some(next) => out.push(next),
+                    }
+                } else if c == '\n' {
+                    return Err(Fail::new("a stylesheet's string is not closed"));
+                } else if c == q {
+                    quote = None;
+                }
+            }
+            None if c == '/' && chars.peek() == Some(&'*') => {
+                chars.next();
+                let mut last = '\0';
+                loop {
+                    match chars.next() {
+                        Some('/') if last == '*' => break,
+                        Some(next) => last = next,
+                        None => return Err(Fail::new("a stylesheet's comment is not closed")),
+                    }
+                }
+            }
+            None => {
+                if c == '"' || c == '\'' {
+                    quote = Some(c);
+                }
+                out.push(c);
+            }
+        }
+    }
+    let mut lean = String::with_capacity(out.len());
+    for line in out.lines().map(str::trim).filter(|line| !line.is_empty()) {
+        lean.push_str(line);
+        lean.push('\n');
+    }
+    Ok(lean)
+}
+
 fn islands(root: &Path, target: &Path, site: &mut Site) -> Result<()> {
     let bindgen = wasm::cli(target)?;
     let home = wasm::cargo_home()?;
@@ -601,4 +652,22 @@ fn islands_graph(metadata: &Value) -> std::collections::BTreeSet<String> {
         }
     }
     seen
+}
+
+#[cfg(test)]
+mod tests {
+    use super::lean_css;
+
+    #[test]
+    fn a_lean_stylesheet_keeps_rules_and_strings() {
+        let css = "/* a note\n   on two lines */\n.a {\n  content: \"/* not a comment */\";\n  color: red; /* why */\n}\n\n\n.b{quotes:'\\'' '\\''}\n";
+        assert_eq!(
+            lean_css(css).expect("lean"),
+            ".a {\ncontent: \"/* not a comment */\";\ncolor: red;\n}\n.b{quotes:'\\'' '\\''}\n"
+        );
+        assert_eq!(lean_css("/*/ still */.c{}").expect("lean"), ".c{}\n");
+        assert!(lean_css(".a{content:\"x\\\ny\"}").is_err());
+        assert!(lean_css(".a{content:\"x\n\"}").is_err());
+        assert!(lean_css(".a{} /* open").is_err());
+    }
 }

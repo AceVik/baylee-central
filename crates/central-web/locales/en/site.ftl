@@ -306,7 +306,11 @@ gone-lead = What was here has been removed. The start page shows where to go on.
 error-home = To the start page
 
 ## Baylee's remembrance (approved by her family on 27 October 2026; keep word for word)
+baylee-dedication = For Baylee. Forever in the sunlight.
+baylee-invitation = Meet the little soul behind this world
+baylee-open = Remember Baylee · open her photo album
 baylee-eyebrow = The heart of this project
+baylee-date = In loving memory · 26 October 2026
 baylee-close = Back to her world
 baylee-previous = Previous photograph
 baylee-next = Next photograph
@@ -322,6 +326,7 @@ baylee-chapters = Her story
 baylee-chapterPrevious = Previous chapter
 baylee-chapterNext = Next chapter
 baylee-photos = Our memories
+baylee-read = Scroll to read
 
 baylee-chapter1Title = A home for Baylee
 baylee-chapter1Body =

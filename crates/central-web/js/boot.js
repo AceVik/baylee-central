@@ -101,14 +101,20 @@
       };
       for (const button of document.querySelectorAll("button[data-copy]")) {
         let back = 0;
+        const label = button.querySelector("span");
+        const words = label?.textContent ?? "";
         button.hidden = false;
         button.addEventListener("click", () => {
           navigator.clipboard.writeText(button.dataset.copy ?? "").then(
             () => {
               button.dataset.copied = "";
+              if (label) label.textContent = button.dataset.copiedLabel ?? words;
               say(button.dataset.copiedSaid);
               clearTimeout(back);
-              back = setTimeout(() => delete button.dataset.copied, 1600);
+              back = setTimeout(() => {
+                delete button.dataset.copied;
+                if (label) label.textContent = words;
+              }, 1600);
             },
             () => say(button.dataset.copyFailed),
           );

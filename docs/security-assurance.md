@@ -2651,8 +2651,15 @@ Implementation pass:
 - `boot.js` shows a gateway's copy button only in a secure context with
   `navigator.clipboard.writeText`, and writes only the origin the server
   put on the button (Central's directory checked it), on a click.
-- `home.js` builds `<source>` elements and copies the figure's caption with
-  `cloneNode`; no markup strings, nothing for a Trusted Types policy.
+- `home.js` draws each screenshot (`<picture>`, `<img>`, `<source>` made
+  with `createElement`, their addresses from the server's `data-`
+  attributes) once its card comes near, and copies a figure's caption into
+  the dialog with `cloneNode`; no markup strings, nothing for a Trusted
+  Types policy. Without script a `<noscript>` picture shows the still.
+- The built stylesheet loses its comments, blank lines and indentation
+  (`lean_css` in `xtask/src/site.rs`, with a test); strings are copied as
+  written and a string broken over a line fails the build. The SRI hash
+  is taken of what is served.
 
 Adversarial pass: browser tests check that the start page fetches no
 WebAssembly until the form comes near and that the form then refuses an

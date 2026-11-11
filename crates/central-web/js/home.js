@@ -2,8 +2,8 @@
 // server writes the whole book; this turns it into one chapter and one
 // photograph at a time, turns the page between chapters, and opens a
 // photograph full size to zoom into and move about. The screenshots: each
-// starts moving once it comes into view, and opens large (#shot-viewer),
-// where the arrow keys step. Plain DOM, no
+// is drawn, and starts moving, once it comes near, and opens large
+// (#shot-viewer), where the arrow keys step. Plain DOM, no
 // markup strings: nothing here needs a Trusted Types policy. Without it
 // the book still reads, every chapter after the other.
 
@@ -210,11 +210,10 @@ if (album instanceof HTMLDialogElement && viewer instanceof HTMLDialogElement) {
   album.dataset.ready = "";
 }
 
-// ---- the screenshots: their recordings, and each one large -------------------
+// ---- the screenshots: drawn as they come near, and each one large -----------
 
 // A recording (an animated AVIF) for those who did not ask for less motion,
-// added to a picture once it is near the window: the still stands until
-// then, and without script.
+// put before a picture's still.
 const MOVING = "(prefers-reduced-motion: no-preference)";
 const animate = (picture, srcset, sizes) => {
   let source = picture.querySelector("source[data-moving-source]");
@@ -229,19 +228,39 @@ const animate = (picture, srcset, sizes) => {
   source.srcset = srcset;
 };
 
-const pictures = [...document.querySelectorAll(".shot-open picture[data-moving]")];
-if (pictures.length > 0 && typeof IntersectionObserver === "function") {
+// A card's picture, made once the card is within a little of the window
+// (the server sent it only for browsers without script).
+const draw = (button) => {
+  if (button.querySelector("picture")) return;
+  const picture = document.createElement("picture");
+  const image = document.createElement("img");
+  image.width = 1200;
+  image.height = 703;
+  image.alt = button.dataset.alt ?? "";
+  image.decoding = "async";
+  image.sizes = button.dataset.sizes ?? "";
+  image.srcset = button.dataset.stills ?? "";
+  image.src = button.dataset.still ?? "";
+  picture.append(image);
+  animate(picture, button.dataset.movings ?? "", button.dataset.sizes ?? "");
+  button.prepend(picture);
+};
+
+const cards = [...document.querySelectorAll("button.shot-open[data-stills]")];
+if (typeof IntersectionObserver === "function") {
   const near = new IntersectionObserver(
     (entries) => {
       for (const entry of entries) {
         if (!entry.isIntersecting) continue;
         near.unobserve(entry.target);
-        animate(entry.target, entry.target.dataset.moving ?? "", entry.target.dataset.sizes ?? "");
+        draw(entry.target);
       }
     },
-    { rootMargin: "200px 0px" },
+    { rootMargin: "300px 0px" },
   );
-  for (const picture of pictures) near.observe(picture);
+  for (const card of cards) near.observe(card);
+} else {
+  for (const card of cards) draw(card);
 }
 
 const shotViewer = document.getElementById("shot-viewer");
@@ -259,7 +278,7 @@ if (shotViewer instanceof HTMLDialogElement) {
     if (picture) animate(picture, shot.dataset.moving ?? "", "");
     if (image instanceof HTMLImageElement) {
       image.src = shot.dataset.still ?? "";
-      image.alt = shot.querySelector("img")?.alt ?? "";
+      image.alt = shot.dataset.alt ?? "";
     }
     const caption = shot.closest("figure")?.querySelector("figcaption");
     if (words && caption) words.replaceChildren(...[...caption.childNodes].map((node) => node.cloneNode(true)));
