@@ -2649,6 +2649,11 @@ Implementation pass:
   island without a box, or a page without one, starts at once. The submit
   guard of the previous entry holds the start page's form back until then,
   and the CSP's `form-action 'none'` holds it back anyway.
+- Text typed before the islands ran (the password among it) is read from
+  the page's own fields into the islands' signals when they start
+  (`islands/early.rs`); it stays in the page as typed text does, nothing is
+  sent before the form is submitted, and the earlier guard still holds a
+  submit back until the islands are ready.
 - `boot.js` shows a gateway's copy button only in a secure context with
   `navigator.clipboard.writeText`, and writes only the origin the server
   put on the button (Central's directory checked it), on a click.
