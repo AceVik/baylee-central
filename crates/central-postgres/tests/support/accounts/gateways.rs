@@ -5,6 +5,7 @@ use super::{
 use central_api::gateway::GatewayMetadata;
 use sea_orm::{ConnectionTrait, DbBackend, Statement, prelude::Uuid};
 
+mod activity;
 mod limits;
 mod official;
 mod tokens;
@@ -119,6 +120,7 @@ pub(super) async fn run(store: &AccountStore, operator: &DatabaseConnection, key
     store.close_legacy("registry-owner", owner).await.unwrap();
     official::run(store, operator, &owner_session, gateway).await;
     tokens::run(store, operator, keys).await;
+    activity::run(store, operator, keys).await;
 }
 
 async fn delegation(
