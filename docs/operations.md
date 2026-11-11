@@ -785,7 +785,9 @@ build of `web/` as before; nothing here changes production by being merged.
 - **Build** (as the build user, beside `central-service`):
   `cargo build --release --locked -p central-web-server` and, with
   `BAYLEE_SRC=/opt/baylee/src` for the screenshots and the fallback card
-  status, `cargo xtask site` ([xtask](xtask.md#the-sites-assets-site)).
+  status, `cargo xtask site` ([xtask](xtask.md#the-sites-assets-site));
+  it reads the locked graph offline, so on a machine that has not built
+  the whole workspace `cargo fetch --locked` comes first.
   Stage `target/release/central-web` and `target/site/`.
 - **Run** as an unprivileged user of its own (no database, no secret, no
   write access anywhere), `central-web --config-stdin` with

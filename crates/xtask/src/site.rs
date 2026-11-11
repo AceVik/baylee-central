@@ -652,6 +652,14 @@ fn notices(root: &Path) -> Result<String> {
             .current_dir(root),
         "cargo metadata failed",
     )?;
+    // Offline on purpose: a build reaches for nothing. A cache that lacks a
+    // locked package (a job that built only this site) ends here, not at a
+    // parser that is handed nothing.
+    if !output.status.success() {
+        return Err(Fail::new(
+            "cargo metadata failed offline: run `cargo fetch --locked` first",
+        ));
+    }
     let metadata: Value =
         serde_json::from_slice(&output.stdout).or_fail("cargo metadata is malformed")?;
     let reachable = islands_graph(&metadata);
