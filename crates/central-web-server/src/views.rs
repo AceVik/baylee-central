@@ -235,10 +235,8 @@ mod tests {
 
     /// A file of this test's own in the system's temporary folder.
     fn scratch(name: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!(
-            "central-web-views-{}-{name}",
-            std::process::id()
-        ));
+        let dir =
+            std::env::temp_dir().join(format!("central-web-views-{}-{name}", std::process::id()));
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).expect("a scratch folder");
         dir.join("views.json")
@@ -259,7 +257,10 @@ mod tests {
 
     #[test]
     fn only_a_browser_opening_a_page_is_a_visit() {
-        let visit = [("sec-fetch-mode", "navigate"), ("sec-fetch-dest", "document")];
+        let visit = [
+            ("sec-fetch-mode", "navigate"),
+            ("sec-fetch-dest", "document"),
+        ];
         assert!(is_visit(&headers(&visit)));
         // a script's fetch, a crawler without the headers, a frame
         assert!(!is_visit(&headers(&[])));
@@ -285,7 +286,10 @@ mod tests {
         assert_eq!(views.now().since, today());
         // written at once: the file is there before anything was counted
         assert!(file.exists());
-        let visit = headers(&[("sec-fetch-mode", "navigate"), ("sec-fetch-dest", "document")]);
+        let visit = headers(&[
+            ("sec-fetch-mode", "navigate"),
+            ("sec-fetch-dest", "document"),
+        ]);
         views.count(&visit);
         views.count(&visit);
         views.count(&headers(&[]));
