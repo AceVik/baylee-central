@@ -349,6 +349,7 @@ none before 11.11.2026 (`central-http`'s `addresses.rs`):
 | `LoginStart` | 30 a minute, apart from `Discover` |
 | `LegacyLogin` | 10 a minute |
 | `ResetStart` | 10 an hour |
+| `GatewayDirectory` and `PublicFigures` | 60 a minute for the two together, as on the browser listener (since the review of 11.11.2026; before, only the place's 600 a minute) |
 
 On both listeners every request that needs no session (the ones that draw
 on the 32 a second all clients share, a report's two routes included)

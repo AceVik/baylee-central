@@ -194,7 +194,8 @@ second together and 600 a minute a place; the 30 minutes an answer vouches
 for a bearer, the 16,384 held at once and the four refusals that take it
 back), `central-http/src/addresses.rs` (the native
 listener's `Discover` 30 and `LoginStart` 30 a minute, `LegacyLogin` 10 a
-minute, `ResetStart` 10 an hour) and `central-http/src/browser.rs` (the
+minute, `ResetStart` 10 an hour, the directory and the public figures 60 a
+minute together) and `central-http/src/browser.rs` (the
 browser listener's). Lower numbers slow guessing and make it cheaper to
 keep someone out; higher ones the reverse. Changing one needs a build and a
 deploy; none is in `central.json`.
