@@ -69,13 +69,19 @@ impl DevelopmentServer {
     pub async fn run(self, shutdown: impl Future<Output = ()>) -> io::Result<()> {
         let authority = HeaderValue::from_str(&self.address.to_string())
             .map_err(|_| io::Error::other("invalid local authority"))?;
-        let app = super::boundary::router(authority, self.config.request_bytes().get());
+        let app = super::boundary::router(
+            authority,
+            self.config.request_bytes().get(),
+            self.config.concurrent_requests().get(),
+        );
         self.run_router(app, CONNECTION, shutdown).await
     }
 
     /// Serve the native account API through the same bounded loopback transport.
     /// Live mode requires an external TLS reverse proxy preserving the canonical Host.
-    /// No forwarded headers confer identity or change credential destinations.
+    /// No forwarded headers confer identity or change credential destinations; the
+    /// proxy's `X-Forwarded-For` hop only shares out the places of late and large
+    /// bodies (`boundary.rs`).
     ///
     /// # Errors
     /// Rejects mismatched development endpoints, inadequate body capacity or listener failures.
@@ -104,6 +110,7 @@ impl DevelopmentServer {
         let app = super::boundary::with_routes(
             authority,
             self.config.request_bytes().get(),
+            self.config.concurrent_requests().get(),
             super::native::router(identity),
         );
         // a report part may take its upload's time
@@ -163,9 +170,9 @@ impl DevelopmentServer {
                         drop(stream);
                         continue;
                     }
-                    // Each request learns its connection's peer; only the
-                    // browser listener reads it (its forwarded address counts
-                    // only from the loopback proxy).
+                    // Each request learns its connection's peer: a forwarded
+                    // address counts only from the loopback proxy, for the
+                    // browser listener's budgets and both listeners' places.
                     let app = app.clone().map_request(
                         move |mut request: axum::http::Request<hyper::body::Incoming>| {
                             request.extensions_mut().insert(super::browser::Peer(peer));
