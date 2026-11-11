@@ -1120,7 +1120,7 @@ pub fn Account(lang: Lang, section: Section, worker: String) -> impl IntoView {
         match state.get() {
         Load::Loading => view! { <p role="status" class="meta">{words::account_loading(lang)}</p> }.into_any(),
         Load::SignedOut => view! {
-            <section class="card">
+            <section class="card app-empty">
                 <p>{words::account_signed_out(lang)}</p>
                 <p><a class="button primary" href=format!("/{code}/signin")>{words::nav_sign_in(lang)}</a></p>
             </section>

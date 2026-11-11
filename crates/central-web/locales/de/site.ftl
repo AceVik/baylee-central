@@ -885,3 +885,9 @@ privacy-eyebrow = Datenschutz
 
 # The privacy notice's contents, as the old site named them
 privacy-contents = Inhalt
+
+# The account pages' eyebrow, as the old site set it
+acct-eyebrow = Baylee Central
+
+# The account area's navigation, as the old site named it
+app-account = Dein Account

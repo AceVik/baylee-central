@@ -580,7 +580,7 @@ pub fn Messenger(lang: Lang, section: Section, worker: String) -> impl IntoView 
         match who_is.get() {
         Who::Loading => view! { <p role="status" class="meta">{words::account_loading(lang)}</p> }.into_any(),
         Who::SignedOut => view! {
-            <section class="card">
+            <section class="card app-empty">
                 <p>{words::account_signed_out(lang)}</p>
                 <p><a class="button primary" href=format!("/{code}/signin")>{words::nav_sign_in(lang)}</a></p>
             </section>
