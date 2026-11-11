@@ -18,7 +18,7 @@ sha2 = { version = "=0.11.1", default-features = false }
 # target, never a feature of ours, picks the half (docs/proposals/frontend-rewrite.md
 # §3), so the gate's --all-features builds one half at a time.
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-leptos = { version = "=0.8.23", default-features = false, features = ["islands", "hydrate"] }
+leptos = { version = "=0.9.0-rc1", default-features = false, features = ["islands", "hydrate"] }
 wasm-bindgen = { version = "=0.2.130", default-features = false, features = ["std"] }
 wasm-bindgen-futures = "=0.4.80"
 js-sys = "=0.3.107"
@@ -41,7 +41,7 @@ web-sys = { version = "=0.3.107", features = [
 getrandom = { version = "=0.4.3", features = ["wasm_js"] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-leptos = { version = "=0.8.23", default-features = false, features = ["islands", "ssr"] }
+leptos = { version = "=0.9.0-rc1", default-features = false, features = ["islands", "ssr"] }
 
 [lints]
 workspace = true

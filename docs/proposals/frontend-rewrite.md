@@ -158,7 +158,8 @@ end only), `baylee-push-installation-v1`, `baylee-chat-trust:v1:<acct>`,
 
 ### 2.1 Decision (proposed)
 
-**Leptos 0.8.23** (the newest stable; 0.9 is a release candidate) in
+**Leptos 0.8.23** (the newest stable; 0.9 is a release candidate; since
+11.11.2026 0.9.0-rc1 on the owner's word, §10 item 9) in
 **islands** mode, rendered on the server with `to_html()` inside handlers of
 the already approved **Axum 0.8.9** — without `leptos_axum`,
 `leptos_router`, `leptos_meta`, server functions or `cargo-leptos`. Routing,
@@ -637,10 +638,12 @@ Relayed later the same day by the parent session:
    `0.9.0-rc1` (31.10.2026), a pre-release whose notes announce "a wide
    variety of semver-breaking changes" and ask for reports of breakage,
    with changes to hydration; `0.8.23` of the same day is the release
-   marked latest and still receives backports. So **0.8.23 stays**, with
-   the three gate exceptions as approved. 0.9.0 follows as a step of its own
-   once released: a new inventory of the graph, the owner's approval, the
-   same tests. The owner's condition on server functions is met
+   marked latest and still receives backports. So **0.8.23 stayed**, with
+   the three gate exceptions as approved. *Superseded on 11.11.2026:* the
+   owner said "upgrade auf leptos 0.9 (auch wenn es noch ein rc ist)", and
+   the site now runs on `0.9.0-rc1`. The new graph, its inventory and the
+   changes it needed are in `../dependency-proposal/leptos.md`
+   §"0.9.0-rc1". The owner's condition on server functions is met
    trivially: the site has none (no `leptos_axum`, no server functions);
    `central-web` answers `GET` and `HEAD` for pages, hashed assets and
    generated files only, and every form posts to Central or, through Caddy,

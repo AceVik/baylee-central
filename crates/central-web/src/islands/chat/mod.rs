@@ -553,7 +553,7 @@ pub fn Messenger(lang: Lang, section: Section, worker: String) -> impl IntoView 
                     leptos::task::spawn_local(open(worker.get_value(), me.clone(), ctl));
                     // contacts every 10 s and groups every 5 s while in view
                     let refresh = |every: u64, what: fn(Ctl)| {
-                        set_interval(
+                        let _ = set_interval(
                             move || {
                                 if !document().hidden() {
                                     what(ctl);

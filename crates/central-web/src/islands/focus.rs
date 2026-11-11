@@ -5,13 +5,18 @@
 
 use leptos::prelude::*;
 use leptos::wasm_bindgen::JsCast;
+use leptos::wasm_bindgen::closure::Closure;
 use leptos::web_sys;
 
 /// Once the browser drew the change, focuses the first element `selector`
 /// finds (one that takes no Tab stop carries `tabindex="-1"`).
+///
+/// The frame is asked of the window itself, not through Leptos: Leptos
+/// (0.9) cancels a frame its owner asked for when that owner goes, and the
+/// part that asks for the focus is often the one being replaced.
 pub(crate) fn after_render(selector: impl Into<String>) {
     let selector = selector.into();
-    request_animation_frame(move || {
+    let callback = Closure::once_into_js(move || {
         let target = document()
             .query_selector(&selector)
             .ok()
@@ -21,6 +26,7 @@ pub(crate) fn after_render(selector: impl Into<String>) {
             let _ = element.focus();
         }
     });
+    let _ = window().request_animation_frame(callback.unchecked_ref());
 }
 
 /// For a part that only an action shows (never the page's first render):

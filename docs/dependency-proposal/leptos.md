@@ -185,3 +185,95 @@ an `approvals` entry quoting the owner; `deny.toml` and `.cargo/audit.toml`
 gain the three exceptions with their removal conditions. Dependency-internal
 unsafe code and generated bindings are disclosed here; first-party unsafe
 code stays forbidden. This is not a third-party source audit.
+
+## 0.9.0-rc1 (owner, 11.11.2026)
+
+The owner, in the frontend session: "upgrade auf leptos 0.9 (auch wenn es
+noch ein rc ist)". `leptos` goes from 0.8.23 to `=0.9.0-rc1` in
+`central-web` and `central-web-islands`.
+
+**Resolved graph.** `cargo metadata --all-features` at the upgrade:
+- 21 packages change version, and `itertools` 0.15.0 joins beside the
+  approved 0.13.0 and 0.14.0.
+- `web-sys` 0.3.107 gains the features `EventSourceInit` and `ToggleEvent`.
+- Everything leaving the graph is a 0.8 version of a package listed here.
+- `wasm-bindgen` 0.2.130, `js-sys` and `web-sys` 0.3.107 do not move, so the
+  committed browser crypto module (`web/src/central-wasm/`, byte-checked) is
+  untouched.
+
+Marker counts are the same textual inventory as above (files with an unsafe
+block, function, impl, trait or extern, or an assembly macro, tests and
+benches included). The previous version's count is in brackets.
+
+| Package | Was | Licence | Kind | Files with markers (was) | Build script | Native sources |
+| --- | --- | --- | --- | --- | --- | --- |
+| convert_case 0.12.0 | 0.11.0 | MIT | lib | 0 (0) | no | — |
+| gloo-net 0.7.0 | 0.6.0 | MIT OR Apache-2.0 | lib | 0 (0) | no | — |
+| gloo-utils 0.3.0 | 0.2.0 | MIT OR Apache-2.0 | lib | 0 (0) | no | — |
+| html-escape 0.3.1 | 0.2.15 | MIT | lib | 8 (6) | no | — |
+| hydration_context 0.4.0-rc1 | 0.3.2 | MIT | lib | 0 (0) | no | — |
+| itertools 0.15.0 | new | MIT OR Apache-2.0 | lib | 3 (—) | no | — |
+| leptos 0.9.0-rc1 | 0.8.23 | MIT | lib | 1 (1) | yes | — |
+| leptos_config 0.9.0-rc1 | 0.8.10 | MIT | lib | 0 (0) | no | — |
+| leptos_dom 0.9.0-rc1 | 0.8.8 | MIT | lib | 0 (0) | no | — |
+| leptos_hot_reload 0.9.0-rc1 | 0.8.7 | MIT | lib | 0 (0) | no | — |
+| leptos_macro 0.9.0-rc1 | 0.8.20 | MIT | proc-macro | 0 (0) | yes | — |
+| leptos_server 0.9.0-rc1 | 0.8.8 | MIT | lib | 0 (0) | no | — |
+| reactive_graph 0.3.0-rc1 | 0.2.16 | MIT | lib | 2 (1) | yes | — |
+| reactive_stores 0.5.0-rc1 | 0.4.4 | MIT | lib | 0 (0) | no | — |
+| reactive_stores_macro 0.5.0-rc1 | 0.4.4 | MIT | proc-macro | 0 (0) | no | — |
+| serde_qs 1.1.3 | 0.15.0 | MIT/Apache-2.0 | lib | 1 (0) | no | — |
+| server_fn 0.9.0-rc1 | 0.8.13 | MIT | lib | 0 (0) | yes | — |
+| server_fn_macro 0.9.0-rc1 | 0.8.12 | MIT | lib | 0 (0) | yes | — |
+| server_fn_macro_default 0.9.0-rc1 | 0.8.6 | MIT | proc-macro | 0 (0) | no | — |
+| tachys 0.3.0-rc1 | 0.2.19 | MIT | lib | 1 (1) | yes | — |
+| throw_error 0.4.0-rc1 | 0.3.1 | MIT | lib | 0 (0) | no | — |
+| wasm-streams 0.7.1 | 0.5.0 | MIT OR Apache-2.0 | lib | 0 (0) | no | — |
+
+No package brings C, C++ or assembly sources, and no licence is new. Where
+the markers grew:
+- **`reactive_graph` 0.3.0-rc1**: `src/signal_fn.rs` lets a signal be called
+  as a function (`signal()`). It hands out the closure behind `Deref`
+  through `MaybeUninit::as_ptr`, a layout trick for zero-sized types. This
+  is new in kind. The site calls `.get()` and `.set()`, but the impls are
+  compiled in.
+- **`html-escape` 0.3.1**: two more files of the same kind as its existing
+  six (`from_utf8_unchecked` after its own byte checks), in the quoted-value
+  encoder and decoder.
+- **`serde_qs` 1.1.3**: one `from_utf8_unchecked` in its query parser,
+  which only server functions use. The site has none.
+- **`itertools` 0.15.0**: the same three files as the approved 0.14.0.
+
+**Gate exceptions, re-derived on the new graph.** All three still apply:
+- `paste` 1.0.15 (RUSTSEC-2024-0436), through `either_of`, `leptos`,
+  `tachys` and `reactive_graph`;
+- `xxhash-rust` 0.8.19 (BSL-1.0), through `server_fn`;
+- `base16` 0.2.1 (CC0-1.0), through `wasm_split_macros`.
+
+In `deny.toml`, the skips for `thiserror` and `thiserror-impl` 1.0.69 go,
+because Leptos 0.9 left them. `itertools` 0.14.0 (SeaORM 2) is skipped
+beside `leptos_macro`'s 0.15.0. The `convert_case` 0.6.0 skip now stands
+beside 0.12.0.
+
+**What changed in our code:**
+- `set_timeout_with_handle` is `set_timeout`.
+- `request_animation_frame` and `set_interval` return a `Result`. A failure
+  to schedule is ignored where nothing else can be done.
+- Leptos 0.9 ties a timer, a frame and a window listener to the reactive
+  owner current when it is set, and cancels them when that owner goes.
+  Focus moves after a part is replaced therefore ask the window for their
+  frame directly (`islands/focus.rs`). The chat's poll timer and its
+  visibility listener run under the engine's own root owner, which lives
+  as long as the engine.
+- The inert-element rule (`tests/inert.rs`) changed only from `bind` to
+  `bind:`; the scan stays the stricter of the two.
+- The islands' bootstrap contract (`default`, `hydrate()`, an export per
+  island) is unchanged.
+
+**Evidence:**
+- `cargo xtask gate`, `policy`, `secrets`, `cargo deny` and `cargo audit`
+  (only the libsqlite3-sys advisory already on `main` fails);
+- clippy for wasm32;
+- `npm run e2e:site` (188 passed, desktop and Pixel 7);
+- `web/e2e-real/site-chat.spec.ts` against a real Central on desktop and
+  phone.
