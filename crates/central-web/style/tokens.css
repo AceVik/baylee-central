@@ -168,6 +168,12 @@
   --shadow-lift:
     0 2px 4px rgb(0 0 0 / 0.34), 0 22px 44px -20px rgb(0 0 0 / 0.8), 0 44px 80px -48px rgb(0 0 0 / 0.7),
     0 0 0 1px var(--edge);
+  /* a menu or a dialog floats: a firm line at its edge, a close shade, two
+     far ones and the lamp's own colour far below it */
+  --shadow-menu:
+    inset 0 1px 0 var(--sheen), 0 0 0 1px rgb(0 0 0 / 0.3), 0 3px 8px -2px rgb(0 0 0 / 0.45),
+    0 18px 38px -14px rgb(0 0 0 / 0.72), 0 44px 84px -34px rgb(0 0 0 / 0.8),
+    0 26px 70px -36px rgb(227 192 126 / 0.34);
   --sheen: rgb(255 255 255 / 0.06);
   --shade: rgb(0 0 0 / 0.16);
   --bar-shadow: 0 10px 24px -8px rgb(0 0 0 / 0.62), 0 2px 6px rgb(0 0 0 / 0.36);
@@ -312,6 +318,10 @@
     --shadow-lift:
       0 2px 4px rgb(20 30 60 / 0.1), 0 22px 44px -20px rgb(20 30 60 / 0.34), 0 44px 80px -48px rgb(20 30 60 / 0.3),
       0 0 0 1px var(--edge);
+    --shadow-menu:
+      inset 0 1px 0 var(--sheen), 0 0 0 1px rgb(20 38 45 / 0.05), 0 3px 8px -2px rgb(20 38 45 / 0.12),
+      0 18px 38px -14px rgb(20 38 45 / 0.26), 0 44px 84px -34px rgb(20 38 45 / 0.3),
+      0 26px 70px -36px rgb(35 91 102 / 0.3);
     --sheen: rgb(255 255 255 / 0.75);
     --shade: rgb(20 38 45 / 0.05);
     --bar-shadow: 0 8px 20px -8px rgb(20 38 45 / 0.22), 0 2px 5px rgb(20 38 45 / 0.12);
@@ -366,6 +376,10 @@
   --shadow-lift:
     0 2px 4px rgb(20 30 60 / 0.1), 0 22px 44px -20px rgb(20 30 60 / 0.34), 0 44px 80px -48px rgb(20 30 60 / 0.3),
     0 0 0 1px var(--edge);
+  --shadow-menu:
+    inset 0 1px 0 var(--sheen), 0 0 0 1px rgb(20 38 45 / 0.05), 0 3px 8px -2px rgb(20 38 45 / 0.12),
+    0 18px 38px -14px rgb(20 38 45 / 0.26), 0 44px 84px -34px rgb(20 38 45 / 0.3),
+    0 26px 70px -36px rgb(35 91 102 / 0.3);
   --sheen: rgb(255 255 255 / 0.75);
   --shade: rgb(20 38 45 / 0.05);
   --bar-shadow: 0 8px 20px -8px rgb(20 38 45 / 0.22), 0 2px 5px rgb(20 38 45 / 0.12);
