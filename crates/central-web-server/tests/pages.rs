@@ -504,6 +504,108 @@ async fn the_figures_are_shown_only_while_a_source_reports_them() {
     }
 }
 
+/// The count of page views: shown in the strip and told in the privacy
+/// notice only where a deployment counts (here the fixture stands in for
+/// one), and nowhere else.
+#[tokio::test]
+async fn page_views_are_shown_and_told_only_where_they_are_counted() {
+    let counted = app(true);
+    let (_, _, home) = get(&counted, "/de/", &[]).await;
+    assert_eq!(count(&home, "48.213 Aufrufe"), 1);
+    assert!(home.contains("Seitenaufrufe seit 1. November 2026"));
+    let (_, _, english) = get(&counted, "/en/", &[]).await;
+    assert_eq!(count(&english, "48,213 views"), 1);
+    let (_, _, privacy) = get(&counted, "/de/privacy", &[]).await;
+    assert_eq!(count(&privacy, "id=\"views\""), 1);
+    assert_eq!(count(&privacy, "href=\"#views\""), 1);
+    assert!(privacy.contains("keine IP-Adresse, kein Cookie, keine Kennung"));
+
+    let silent = app(false);
+    for path in ["/de/", "/en/", "/de/privacy", "/en/privacy"] {
+        let (_, _, html) = get(&silent, path, &[]).await;
+        for never in ["Aufruf", " views<", "id=\"views\"", "#views"] {
+            assert!(!html.contains(never), "{path}: {never}");
+        }
+    }
+}
+
+/// Counting itself: a browser opening a page that exists adds one; a
+/// script's fetch, a page fetched ahead, a missing page and a file do not.
+/// The page shows the number as it stood when the data was last installed,
+/// never per request: its bytes and its entity tag stay the same between
+/// two visits.
+#[tokio::test]
+async fn a_visit_counts_once_and_never_changes_the_page_it_gets() {
+    let folder = site();
+    let file = folder.join("views.json");
+    std::fs::write(&file, "{\"views\":41,\"since\":\"2026-11-01\"}").expect("the count");
+    let mut config = Config::development(site(), None);
+    config.origin = "https://baylee.app".into();
+    config.views = Some(file.clone());
+    let state = central_web_server::app(config).expect("app");
+    let app = router(Arc::clone(&state));
+    let views = state.views.clone().expect("counting");
+    assert_eq!(views.now().count, 41);
+
+    let visit = [("sec-fetch-mode", "navigate"), ("sec-fetch-dest", "document")];
+    let (status, first_headers, first) = get(&app, "/en/", &visit).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(views.now().count, 42);
+    assert_eq!(count(&first, "41 views"), 1);
+    // the second visit counts, and gets the very same page
+    let (_, again_headers, again) = get(&app, "/en/", &visit).await;
+    assert_eq!(views.now().count, 43);
+    assert!(first == again);
+    assert_eq!(first_headers.get("etag"), again_headers.get("etag"));
+    // a revalidation that finds the page unchanged is a visit too
+    let tag = first_headers
+        .get("etag")
+        .and_then(|tag| tag.to_str().ok())
+        .expect("an entity tag")
+        .to_owned();
+    let mut revisit = visit.to_vec();
+    revisit.push(("if-none-match", &tag));
+    let (status, _, _) = get(&app, "/en/", &revisit).await;
+    assert_eq!(status, StatusCode::NOT_MODIFIED);
+    assert_eq!(views.now().count, 44);
+
+    // not a person opening a page
+    get(&app, "/en/", &[]).await;
+    get(&app, "/en/faq", &[("sec-fetch-mode", "cors"), ("sec-fetch-dest", "empty")]).await;
+    let mut ahead = visit.to_vec();
+    ahead.push(("sec-purpose", "prefetch"));
+    get(&app, "/en/faq", &ahead).await;
+    let (status, _, _) = get(&app, "/en/nope", &visit).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    get(&app, "/robots.txt", &visit).await;
+    get(&app, "/sitemap.xml", &visit).await;
+    assert_eq!(views.now().count, 44);
+
+    // installed, the pages show it; saved, the file holds it and no more
+    install(&state.data, |snapshot| snapshot.views = Some(views.now()));
+    let (_, _, later) = get(&app, "/en/", &[]).await;
+    assert_eq!(count(&later, "44 views"), 1);
+    views.save();
+    assert_eq!(
+        std::fs::read_to_string(&file).expect("the file").trim(),
+        "{\"views\":44,\"since\":\"2026-11-01\"}"
+    );
+}
+
+/// A views file that is not the count's stops the server at start.
+#[test]
+fn a_views_file_that_cannot_be_used_stops_the_start() {
+    let folder = site();
+    let file = folder.join("views.json");
+    std::fs::write(&file, "not the count").expect("written");
+    let mut config = Config::development(site(), None);
+    config.views = Some(file);
+    let Err(broken) = central_web_server::app(config) else {
+        panic!("a malformed views file was accepted");
+    };
+    assert_eq!(broken.0, "the views file is malformed");
+}
+
 /// The Impressum as the server writes it holds none of the operator's
 /// details and no way to them but the puzzle, and the bait for robots that
 /// the rewrite once lost: one link no person sees, hears or reaches, on this

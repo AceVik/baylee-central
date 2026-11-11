@@ -254,6 +254,8 @@ privacy-short-title = 요약
 privacy-short = 추적도, 광고도, 분석도 없고, 로그인하지 않으면 쿠키도 없으며, 다른 서버에서 불러오는 것도 없어요. 글꼴, 그림, 스크립트가 모두 baylee.app에서 제공돼요. 비밀번호는 우리에게 도달하지 않으며, 채팅 메시지와 개인 데이터는 전송되기 전에 브라우저에서 암호화돼요.
 privacy-hosting-title = 사이트 방문
 privacy-hosting = 이 사이트는 독일 netcup GmbH에서 임대한 서버에서 운영돼요. 페이지를 열면 브라우저가 모든 요청에 담기는 정보를 보내요. 곧 IP 주소, 요청한 주소, 시각, 브라우저 언어, 브라우저 식별 정보(user agent)예요. 서버는 응답하기 위해 이 정보가 필요해요. 서버는 언어 정보로 언어 버전을 고르고, 다운로드 페이지는 user agent로 알맞은 파일을 제안해요. 웹 서버는 접속 로그를 남기지 않으므로 이 요청들은 저장되지 않아요. 서버 자체의 운영 메시지(시스템 저널)에는 드문 오류 상황에서 IP 주소가 들어갈 수 있으며, 늦어도 14일 후에 삭제돼요. 법적 근거: GDPR 제6조 제1항 (f)호. 우리의 정당한 이익은 사이트를 안전하고 안정적으로 제공하는 것이에요.
+privacy-views-title = Counting page views
+privacy-views = The website counts how often its pages are opened: one single number for all pages and all visitors together, shown on the start page. A page opened in a browser adds one to it. Nothing about you is stored for this: no IP address, no cookie, no identifier, not even which page it was.
 privacy-device-title = 브라우저에 저장되는 것
 privacy-device = 이 사이트는 로그인하기 전에는 쿠키를 설정하지 않아요. 브라우저가 기기에 저장하는 것은 다음과 같고, JavaScript를 쓸 때만 해당돼요. 색상을 선택했다면 그 선택(<code>baylee-site-theme</code>), 로그인한 동안에는 세션이 끝나는 시각(<code>baylee-central-session</code>), 채팅 키, 연락처의 신뢰한 키(채팅 항목 참고), 알림을 켰다면 이 기기의 임의 번호(<code>baylee-push-installation-v1</code>, <code>baylee-push</code>), 그리고 로그인했거나 사이트를 앱으로 설치했거나 알림을 켠 경우에 한해 사이트의 공개 파일(페이지 틀, 글꼴, 스크립트)의 사본이에요. 이 사본이 있으면 연결 없이도 시작되고 알림을 받을 수 있어요. 세 가지가 모두 더는 해당하지 않으면 다음에 사이트를 열 때 사본이 제거돼요. 아래 항목에서 달리 말하지 않는 한, 이 중 어떤 것도 우리에게 전송되지 않아요. 채팅과 세션 항목은 로그아웃하면 삭제되며, 나머지는 브라우저에서 사이트 데이터를 지우면 제거할 수 있어요. 법적 근거: TDDDG § 25 제2항 제2호(사용하는 기능에 꼭 필요한 경우). 알림의 임의 번호에 대해서는 동의(TDDDG § 25 제1항).
 privacy-github-title = GitHub
@@ -774,6 +776,11 @@ strip-cards-unit = 장
 strip-stars = GitHub 스타
 strip-accounts = Baylee Central의 계정
 strip-live = 지금 Gateways가 보고한 수치
+strip-views = Page views since { $date }
+live-views = { $n ->
+    [one] { $n } view
+   *[other] { $n } views
+}
 live-accounts = { $n ->
    *[other] 계정 { $n }개
 }

@@ -11,7 +11,7 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 use central_web_server::config::Config;
-use central_web_server::{app, fetch, routes};
+use central_web_server::{app, fetch, routes, views};
 
 fn settings() -> Result<Config, String> {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -79,15 +79,23 @@ async fn main() -> ExitCode {
         }
     };
     fetch::spawn(&app.config, &app.data);
+    let counted = app.views.clone();
+    if let Some(counted) = &counted {
+        views::spawn(counted, &app.data);
+    }
     let Ok(listener) = tokio::net::TcpListener::bind(listen).await else {
         eprintln!("central-web: cannot listen on {listen}");
         return ExitCode::FAILURE;
     };
     println!("central-web: listening on {listen}");
-    match axum::serve(listener, routes::router(app))
+    let served = axum::serve(listener, routes::router(app))
         .with_graceful_shutdown(shutdown())
-        .await
-    {
+        .await;
+    // what was counted since the last minute
+    if let Some(counted) = counted {
+        counted.save();
+    }
+    match served {
         Ok(()) => ExitCode::SUCCESS,
         Err(_) => ExitCode::FAILURE,
     }

@@ -425,6 +425,16 @@ pub fn activity_of(gateways: &[Gateway]) -> Option<(u64, u64, u64)> {
     }))
 }
 
+/// How often the site's pages were opened: one number for all of them and
+/// every visitor together, and the day the count began.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Views {
+    /// The pages opened since `since`.
+    pub count: u64,
+    /// The day the count began, `YYYY-MM-DD`.
+    pub since: String,
+}
+
 /// A page of the signed-in area (`/{lang}/account/…`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Section {

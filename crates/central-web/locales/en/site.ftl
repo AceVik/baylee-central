@@ -254,6 +254,8 @@ privacy-short-title = In short
 privacy-short = No tracking, no advertising, no analytics, no cookie unless you sign in, and nothing loaded from other servers: fonts, pictures and scripts all come from baylee.app. Your password never reaches us, and your chat messages and private data are encrypted in your browser before they are sent.
 privacy-hosting-title = Visiting the site
 privacy-hosting = The site runs on a server we rent from netcup GmbH in Germany. When you open a page, your browser sends what every request carries: your IP address, the address asked for, the time, your browser's language and its identification (user agent). The server needs this to answer; it picks the language version from the language, and the download page uses the user agent to suggest the right file. The web server keeps no access log, so these requests are not stored. The server's own operating messages (its system journal) can, in rare error cases, contain an IP address; they are deleted after 14 days at the latest. Legal basis: Art. 6(1)(f) GDPR; our legitimate interest is delivering the site safely and reliably.
+privacy-views-title = Counting page views
+privacy-views = The website counts how often its pages are opened: one single number for all pages and all visitors together, shown on the start page. A page opened in a browser adds one to it. Nothing about you is stored for this: no IP address, no cookie, no identifier, not even which page it was.
 privacy-device-title = What your browser keeps
 privacy-device = This site sets no cookie until you sign in. What your browser keeps on your device, and only with JavaScript: your colour choice if you made one (<code>baylee-site-theme</code>); while you are signed in, when your session ends (<code>baylee-central-session</code>), your chat key and your contacts' trusted keys (see Chat); if you turned on notifications, a random number for this device (<code>baylee-push-installation-v1</code>, <code>baylee-push</code>); and, only once you have signed in, installed the site as an app or turned on notifications, a copy of the site's public files (page shell, fonts, scripts), so that it starts without a connection and notifications can arrive. If none of the three applies any more, the copy is removed the next time you open the site. None of this is sent to us unless a section below says so. The chat and session entries are deleted when you sign out; you remove everything else by clearing the site's data in your browser. Legal basis: § 25(2) no. 2 TDDDG (strictly necessary for the function you use); for the notifications' random number, your consent (§ 25(1) TDDDG).
 privacy-github-title = GitHub
@@ -776,6 +778,11 @@ strip-cards-unit = cards
 strip-stars = Stars on GitHub
 strip-accounts = Accounts at Baylee Central
 strip-live = Right now on the gateways, as they report it
+strip-views = Page views since { $date }
+live-views = { $n ->
+    [one] { $n } view
+   *[other] { $n } views
+}
 live-accounts = { $n ->
     [one] { $n } account
    *[other] { $n } accounts
