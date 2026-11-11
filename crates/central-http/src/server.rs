@@ -1,4 +1,13 @@
-use std::{future::Future, io, net::SocketAddr, time::Duration};
+use std::{
+    future::Future,
+    io,
+    net::SocketAddr,
+    sync::{
+        Arc,
+        atomic::{AtomicU64, Ordering},
+    },
+    time::Duration,
+};
 
 use super::browser::BrowserOrigin;
 use axum::http::HeaderValue;
@@ -8,7 +17,10 @@ use hyper_util::{
     rt::{TokioIo, TokioTimer},
     service::TowerToHyperService,
 };
-use tokio::{net::TcpListener, task::JoinSet};
+use tokio::{
+    net::TcpListener,
+    task::{JoinError, JoinSet},
+};
 use tower::ServiceExt;
 
 /// How long one connection may last: a request and its answer.
@@ -20,6 +32,8 @@ pub struct DevelopmentServer {
     listener: TcpListener,
     config: Config,
     address: SocketAddr,
+    /// Connection tasks that panicked since the listener was bound.
+    panics: Arc<AtomicU64>,
 }
 
 impl DevelopmentServer {
@@ -35,6 +49,7 @@ impl DevelopmentServer {
             listener,
             config,
             address,
+            panics: Arc::default(),
         })
     }
 
@@ -121,8 +136,10 @@ impl DevelopmentServer {
     }
 
     /// Serve `app`, each connection for at most `connection` (one request
-    /// each: no keep-alive), its headers within three seconds.
-    async fn run_router(
+    /// each: no keep-alive), its headers within three seconds. A connection
+    /// task that panics ends its own connection only (`ended`); the
+    /// listener goes on.
+    pub(crate) async fn run_router(
         self,
         app: axum::Router,
         connection: Duration,
@@ -135,8 +152,8 @@ impl DevelopmentServer {
                 biased;
                 () = &mut shutdown => break,
                 result = connections.join_next(), if !connections.is_empty() => {
-                    if result.is_some_and(|result| result.is_err()) {
-                        return Err(io::Error::other("connection task failed"));
+                    if let Some(Err(error)) = result {
+                        ended(&error, &self.panics)?;
                     }
                 }
                 result = self.listener.accept() => {
@@ -176,8 +193,8 @@ impl DevelopmentServer {
         drop(self.listener);
         let drained = tokio::time::timeout(Duration::from_secs(3), async {
             while let Some(result) = connections.join_next().await {
-                if result.is_err() {
-                    return Err(io::Error::other("connection task failed"));
+                if let Err(error) = result {
+                    ended(&error, &self.panics)?;
                 }
             }
             Ok(())
@@ -191,6 +208,22 @@ impl DevelopmentServer {
             Ok(())
         }
     }
+}
+
+/// A connection task that did not finish: one that panicked is counted and
+/// reported with a fixed line (never its payload or anything of the
+/// request; the launcher's panic hook prints none either), and the listener
+/// goes on; any other failure (a cancelled task) stops the listener as before.
+fn ended(error: &JoinError, panics: &AtomicU64) -> io::Result<()> {
+    if !error.is_panic() {
+        return Err(io::Error::other("connection task failed"));
+    }
+    let before = panics.fetch_add(1, Ordering::Relaxed);
+    eprintln!(
+        "central: a connection task failed and was dropped ({} since start)",
+        before.saturating_add(1)
+    );
+    Ok(())
 }
 
 #[cfg(test)]
@@ -239,6 +272,75 @@ mod tests {
         assert!(
             std::net::TcpStream::connect_timeout(&address, Duration::from_millis(200)).is_err()
         );
+    }
+
+    fn exchange(address: SocketAddr, path: &str) -> String {
+        let mut connection =
+            std::net::TcpStream::connect_timeout(&address, Duration::from_secs(2)).unwrap();
+        connection
+            .set_read_timeout(Some(Duration::from_secs(4)))
+            .unwrap();
+        write!(connection, "GET {path} HTTP/1.1\r\nHost: {address}\r\n\r\n").unwrap();
+        let mut response = Vec::new();
+        // A connection whose task panicked is closed, maybe reset.
+        let _ = connection.take(4096).read_to_end(&mut response);
+        String::from_utf8_lossy(&response).into_owned()
+    }
+
+    #[tokio::test]
+    async fn a_panicking_connection_ends_alone_and_the_listener_goes_on() {
+        let bound = server().await;
+        let address = bound.local_addr();
+        let panics = Arc::clone(&bound.panics);
+        let app = axum::Router::new()
+            .route(
+                "/panic",
+                axum::routing::get(|| async {
+                    assert!(!std::hint::black_box(true), "synthetic connection failure");
+                    "unreachable\n"
+                }),
+            )
+            .route("/health/live", axum::routing::get(|| async { "alive\n" }));
+        let (stop, stopped) = oneshot::channel();
+        let running = tokio::spawn(bound.run_router(app, CONNECTION, async {
+            let _ = stopped.await;
+        }));
+        let (failed, served, again) = tokio::task::spawn_blocking(move || {
+            (
+                exchange(address, "/panic"),
+                exchange(address, "/health/live"),
+                exchange(address, "/health/live"),
+            )
+        })
+        .await
+        .unwrap();
+        assert!(!failed.contains("unreachable") && !failed.contains("synthetic"));
+        assert!(served.starts_with("HTTP/1.1 200"), "{served}");
+        assert!(again.starts_with("HTTP/1.1 200"), "{again}");
+        stop.send(()).unwrap();
+        tokio::time::timeout(Duration::from_secs(4), running)
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap();
+        assert_eq!(panics.load(Ordering::Relaxed), 1);
+    }
+
+    #[tokio::test]
+    async fn only_a_panic_lets_the_listener_go_on() {
+        let panics = AtomicU64::new(0);
+        let panicked = tokio::spawn(async {
+            assert!(!std::hint::black_box(true), "synthetic connection failure");
+        })
+        .await
+        .unwrap_err();
+        assert!(ended(&panicked, &panics).is_ok());
+        assert_eq!(panics.load(Ordering::Relaxed), 1);
+        let cancelled = tokio::spawn(std::future::pending::<()>());
+        cancelled.abort();
+        let cancelled = cancelled.await.unwrap_err();
+        assert!(ended(&cancelled, &panics).is_err());
+        assert_eq!(panics.load(Ordering::Relaxed), 1);
     }
 
     #[tokio::test]
