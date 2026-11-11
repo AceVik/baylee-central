@@ -3710,9 +3710,14 @@ requests all arrive as one address.
   eight per account, and for up to a day which addresses made unproven
   sign-in attempts at which account. Another password forgets the
   addresses but the one it was set from, a deletion all of them. Nothing
-  of it is written to disk or logged. The privacy notice must say so
-  before this is deployed, with what someone at the same address can
-  learn (above); the wording is the owner's.
+  of it is written to disk or logged. The owner accepted this trade on
+  11.11.2026, asked in these terms: Central remembers for 30 days, in
+  memory only, from which address an account signed in, and someone at the
+  same address who knows the user name can read from the answers that it
+  did. The privacy page says both since then (`privacy-counters`), the
+  security page what guessing still finds and who can keep whom out
+  (`sec-signin-guess`, rows A12 and A13 of `docs/security-page.md`), and
+  the message for a refusal no longer promises a minute (`error-busy`).
 - **Every local, preview and end-to-end run is one address.**
 
 **Recommended, not built.** A device token and a proof of work for sign-in
