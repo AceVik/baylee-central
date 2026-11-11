@@ -39,16 +39,26 @@ const CLEARED: &str = "__Host-central=; Path=/; Secure; HttpOnly; SameSite=Stric
 /// A registration's proof of work, asked for on `browser`'s listener and
 /// solved here: the nonce and the counters `Register` carries.
 pub(crate) fn proof(browser: &Browser) -> (String, Vec<u64>) {
-    let Response::RegisterChallenge {
+    let Response::RegisterWork {
         nonce,
         parts,
         difficulty,
+        memory,
+        passes,
         ..
-    } = browser.answer(&Request::RegisterChallenge, None).unwrap()
+    } = browser
+        .answer(&Request::RegisterChallengeFor { signals: 0 }, None)
+        .unwrap()
     else {
         panic!("a challenge");
     };
-    let counters = central_api::register::solve(&nonce, parts, difficulty).unwrap();
+    let work = central_crypto::proof::Work {
+        memory,
+        passes,
+        parts,
+        difficulty,
+    };
+    let counters = central_crypto::proof::solve(&nonce, work).unwrap();
     (nonce, counters)
 }
 

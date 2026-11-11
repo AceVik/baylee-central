@@ -53,11 +53,13 @@ pub const WORK_MAX_PARTS: u8 = 16;
 /// The most leading zero bits a part of it may be asked for.
 pub const WORK_MAX_DIFFICULTY: u8 = 16;
 /// The most a whole memory-hard challenge may cost ([`work_cost`]): what
-/// Central asks at its ceiling, and not one unit more. Each number above
-/// bounds one field; this bounds their product, so a page never starts on
-/// a challenge it could not hand in within its lifetime. The identity
-/// service's `challenge` asserts that its ceiling is exactly this.
-pub const WORK_MAX_COST: u64 = work_cost(19_456, 1, 8, 10);
+/// Central asks at its ceiling, and not one unit more: 16 MiB for each
+/// evaluation, one pass, eight parts and ten bits, 64 times the work it
+/// asks when registrations are few. Each number above bounds one field;
+/// this bounds their product, so a page never starts on a challenge it
+/// could not hand in within its lifetime. The identity service's
+/// `challenge` asserts that its ceiling is exactly this.
+pub const WORK_MAX_COST: u64 = work_cost(16_384, 1, 8, 10);
 
 /// What a memory-hard challenge costs its solver on average, in KiB of
 /// memory filled: every evaluation fills `memory` KiB `passes` times, and
@@ -184,14 +186,14 @@ mod tests {
 
     #[test]
     fn a_price_is_taken_up_to_each_ceiling_and_up_to_the_whole() {
-        assert!(work_acceptable(19_456, 1, 8, 10));
-        assert_eq!(work_cost(19_456, 1, 8, 10), WORK_MAX_COST);
+        assert!(work_acceptable(16_384, 1, 8, 10));
+        assert_eq!(work_cost(16_384, 1, 8, 10), WORK_MAX_COST);
         // the same cost in another shape is taken, one bit more is not
-        assert!(work_acceptable(9_728, 2, 8, 10));
-        assert!(work_acceptable(19_456, 1, 4, 11));
-        assert!(!work_acceptable(19_456, 1, 8, 11));
-        assert!(!work_acceptable(19_456, 2, 8, 10));
-        assert!(!work_acceptable(19_457, 1, 8, 10));
+        assert!(work_acceptable(8_192, 2, 8, 10));
+        assert!(work_acceptable(16_384, 1, 4, 11));
+        assert!(!work_acceptable(16_384, 1, 8, 11));
+        assert!(!work_acceptable(16_384, 2, 8, 10));
+        assert!(!work_acceptable(16_385, 1, 8, 10));
         // each field's own ceiling, however cheap the rest
         assert!(work_acceptable(WORK_MIN_MEMORY, 1, 1, 0));
         assert!(!work_acceptable(WORK_MIN_MEMORY - 1, 1, 1, 0));
