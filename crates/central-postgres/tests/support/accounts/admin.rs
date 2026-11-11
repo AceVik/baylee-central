@@ -59,7 +59,74 @@ pub(super) async fn run(store: &AccountStore, operator: &DatabaseConnection, key
     brake(store, operator, first, &cookie, &other).await;
     together(store, operator, first, second).await;
     sign_in_time(store, operator, keys, first).await;
+    crowd(store, keys, first).await;
     swept(operator).await;
+}
+
+/// A change asked by many at once takes one connection of the pool each and
+/// no second one. Each used to hold its transaction's connection while it
+/// asked the pool for another to check the role: as many requests at once
+/// as the pool has connections, from any signed-in account, kept every one
+/// of them and so the whole store waiting until the pool's three seconds
+/// were over, and were answered `Unavailable`.
+async fn crowd(store: &AccountStore, keys: &ServerKeys, first: Identity) {
+    use std::sync::Arc;
+    let outsider = enroll(store, keys, "admin-crowd", "admin-crowd").await;
+    let stranger = Arc::new(browser(store, outsider).await);
+    let started = std::time::Instant::now();
+    let mut asking = tokio::task::JoinSet::new();
+    // Twice the pool's connections, each of the five changes among them.
+    for turn in 0..8_u8 {
+        let (store, stranger) = (store.clone(), stranger.clone());
+        asking.spawn(async move {
+            match turn % 5 {
+                0 => store.set_admin(&stranger, first.account, false).await,
+                1 => store.set_registration(&stranger, false).await,
+                2 => store.set_tag(&stranger, first.account, 7).await,
+                3 => store.set_gateway_approval(&stranger, [7; 16], true).await,
+                _ => store.admin_revoke_gateway_token(&stranger, [7; 16]).await,
+            }
+        });
+    }
+    // Someone else's request meanwhile: it is served, not kept waiting.
+    let summary = store.account_summary(&stranger).await;
+    while let Some(answer) = asking.join_next().await {
+        assert_eq!(
+            answer.unwrap(),
+            Err(Error::Rejected),
+            "refused, not unavailable"
+        );
+    }
+    assert!(summary.is_ok_and(|summary| !summary.admin));
+    assert!(
+        started.elapsed() < Duration::from_secs(2),
+        "the pool was held for {:?}",
+        started.elapsed()
+    );
+    // An administrator's own changes at once: each is done or refused by
+    // its rule, none for want of a connection.
+    let acting = Arc::new(browser(store, first).await);
+    let mut changing = tokio::task::JoinSet::new();
+    for turn in 0..8_u8 {
+        let (store, acting) = (store.clone(), acting.clone());
+        changing.spawn(async move {
+            if turn % 2 == 0 {
+                store.set_registration(&acting, true).await
+            } else {
+                // One's own role is never removed.
+                store.set_admin(&acting, first.account, false).await
+            }
+        });
+    }
+    let (mut done, mut refused) = (0, 0);
+    while let Some(answer) = changing.join_next().await {
+        match answer.unwrap() {
+            Ok(()) => done += 1,
+            Err(Error::Rejected) => refused += 1,
+            other => panic!("a change failed for want of a connection: {other:?}"),
+        }
+    }
+    assert_eq!((done, refused), (4, 4));
 }
 
 /// The runtime takes exactly its new privileges, and refuses to start with
