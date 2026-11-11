@@ -451,3 +451,96 @@
     }
   }
 }
+
+/* ---- on paper ---------------------------------------------------------------
+   A legal text, an answer or the security page is printed or kept as a PDF:
+   the words in ink on white, without the site's furniture. A link's address
+   stands behind it, since paper cannot follow it. The three :root raise
+   this over either colour scheme's own rules. */
+@media print {
+  :root:root:root {
+    color-scheme: light;
+    --bg: #fff;
+    --bg-alt: #fff;
+    --panel: #fff;
+    --panel-solid: #fff;
+    --panel-2: #fff;
+    --ink: #000;
+    --ink-soft: #1c1c1c;
+    --ink-faint: #333;
+    --title: #000;
+    --link: #000;
+    --link-hover: #000;
+    --violet: #222;
+    --gold: #222;
+    --gold-2: #000;
+    --gold-ink: #fff;
+    --edge: #999;
+    --edge-soft: #bbb;
+    --shadow: none;
+    --shadow-lift: none;
+    --shadow-menu: none;
+    --hero-shadow: none;
+    --sheen: transparent;
+    --shade: transparent;
+  }
+
+  .top,
+  .strip,
+  .skip,
+  .crumbs,
+  .world,
+  .foot-map,
+  .update,
+  .link-hint,
+  .paws,
+  dialog,
+  [popover],
+  [data-theme-switch],
+  [data-find-bar] {
+    display: none !important;
+  }
+
+  body {
+    background: #fff;
+    font-size: 11pt;
+  }
+
+  .band,
+  .band.alt,
+  .page-head,
+  .glass {
+    background: none;
+    box-shadow: none;
+  }
+
+  .page-head::before,
+  .page-head::after {
+    display: none;
+  }
+
+  h1,
+  h2,
+  h3 {
+    break-after: avoid;
+  }
+
+  p,
+  li,
+  .qa {
+    orphans: 3;
+    widows: 3;
+  }
+
+  .qa,
+  .glass,
+  figure {
+    break-inside: avoid;
+  }
+
+  main a[href^="http"]::after {
+    content: " (" attr(href) ")";
+    font-size: 0.85em;
+    overflow-wrap: anywhere;
+  }
+}

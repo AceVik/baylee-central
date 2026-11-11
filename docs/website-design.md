@@ -57,14 +57,14 @@ Tokens are named for what they mean, not for how they look:
 
 | token | meaning | dark (blue hour) | light (sunlight) |
 | --- | --- | --- | --- |
-| `--bg` | the page ground | `#0f1b2d` | `#f5f2e9` |
-| `--bg-alt` | every other section's ground | `#13223a` | `#e9eee8` |
-| `--panel-solid` | a panel, card or field ground | `#172741` | `#fffdf5` |
-| `--panel` | the same, translucent over the painting | `rgba(23 39 65 / 0.94)` | `rgba(255 253 246 / 0.96)` |
-| `--panel-2` | a raised or hovered surface inside a panel | `#1f3253` | `#eceee5` |
+| `--bg` | the page ground | `#0f1b2d` | `#f2efe4` |
+| `--bg-alt` | every other section's ground | `#13223a` | `#e4ebe5` |
+| `--panel-solid` | a panel, card or field ground | `#172741` | `#fffefa` |
+| `--panel` | the same, translucent over the painting | `rgba(23 39 65 / 0.94)` | `rgba(255 254 250 / 0.97)` |
+| `--panel-2` | a raised or hovered surface inside a panel | `#1f3253` | `#e8ebe1` |
 | `--ink` | body text | `#eef1f8` | `#233e43` |
 | `--ink-soft` | secondary text | `#cdd6ea` | `#415c5e` |
-| `--ink-faint` | captions, labels, meta | `#a3b3d1` | `#536c6b` |
+| `--ink-faint` | captions, labels, meta | `#a3b3d1` | `#506968` |
 | `--title` | headings | `#fff7e4` | `#173c43` |
 | `--gold` | the primary action, the selected choice | `#e3c07e` | `#235b66` |
 | `--gold-ink` | text on `--gold` | `#1a1306` | `#fffaf0` |
@@ -156,7 +156,12 @@ The scale (`--text-*`, rem at a root of 16–20 px by viewport):
   small panels), `--radius` 18 px (cards, panels, dialogs), and pills for
   buttons.
 - Depth: `--shadow` for a resting panel, `--shadow-lift` for one under the
-  pointer. Glass (`.glass`) only where a panel stands over the painting.
+  pointer (a deeper shade, the panel itself stays where it is),
+  `--shadow-menu` for what floats over the page (a menu, a dialog's card):
+  a sheen at its top edge, a hairline, and four shades from close to far,
+  the farthest in the accent's colour. In the light scheme every shade is
+  the scheme's own ink. Glass (`.glass`) only where a panel stands over the
+  painting.
 
 ## Components
 
@@ -197,7 +202,7 @@ Each lives in one stylesheet named after it and one component under
   follows the field after a short pause, the newest answer winning, and
   stands in the address (`?q=`).
 - **Panels and cards** (`.glass`, `.card`): 18 px radius, one soft border,
-  `--shadow`. A card that is a link lifts under the pointer.
+  `--shadow`. A card that is a link deepens its shade under the pointer.
 - **Pills** (`.pill`): a state in words, coloured by the state token,
   `--text-xs`, never alone without the word.
 - **Tables** (`tables.css`): for administration only. Header row in the
@@ -250,8 +255,10 @@ to feel slow and over the 60 ms where it reads as a snap.
 
 - **Only `opacity` and `transform`** animate, and the colours of a control.
   Nothing animates layout (width, height, top, margin).
-- **Hover** lifts a card by 2 px and deepens its shadow; a button lightens.
-  **Press** scales a button to 0.98. A row of text does not grow.
+- **Hover** deepens a card's shadow and lights its edge; a button lightens.
+  Nothing moves or changes size as a whole under the pointer (owner,
+  11.11.2026). **Press** sinks a button into its own shade. A row of text
+  does not grow.
 - **Arriving**: a section rises 14 px and fades in once as it is first read
   (`useReveal`); what is on screen at load never waits. The cards of a grid
   follow each other by `--stagger`.
@@ -270,6 +277,20 @@ to feel slow and over the 60 ms where it reads as a snap.
   painting alone without WebGL 2. The memorial's light
   is its own (limited to 20 draws a second, its GPU context given back when
   the album closes). Nothing else moves by itself.
+- **One state giving way to another** (owner's second round, 11.11.2026),
+  through the same View Transitions API and only where it exists: a new
+  colour scheme spreads in a circle from its switch (560 ms), and the
+  gateway directory's cards glide to their new places when a chip, the sort
+  or the layout is pressed (360 ms); typing in the search does not wait for
+  it. A menu comes in with its rows one after the other (260 ms) and
+  leaves as it came (150 ms).
+- **Baylee's album**: a page turns as paper does (920 ms): the leaf is cut
+  into ten strips, each hinged on the one before, so it bends while its
+  edge lifts and lies flat where it lands, with its shade on the page
+  below; a photograph is laid on the one before it (460 ms). A finger's
+  sideways stroke turns either.
+- **For those who look**: typing "baylee" outside a field lets paw prints
+  cross the foot of the window once.
 - **Reduced motion** (`prefers-reduced-motion: reduce`): every transition,
   animation, drift and count-up stops, and content is shown at once
   (`base.css` §"stillness", `motion.ts`). This is WCAG 2.3.3 and the same
