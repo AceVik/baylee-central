@@ -609,21 +609,37 @@ fn handover_wait(answered: u64, now: u64) -> u32 {
     u32::try_from(HANDOVER_MS.saturating_sub(now.saturating_sub(answered))).unwrap_or(u32::MAX)
 }
 
-/// Central's proof of work for one registration (`docs/registration-abuse.md`),
-/// solved in the Worker at `pow`; handed over no sooner than Central takes
-/// it, three seconds after the challenge. The page says what it saw of its
-/// own browser, which only ever makes the challenge harder. `solving`
-/// follows the work, and shows it once it takes long.
+/// A registration's challenge as the page takes it.
+enum Challenge {
+    /// The proof that costs memory (`Response::RegisterWork`), at Central's
+    /// price: what a Central of this build asks.
+    Work {
+        nonce: String,
+        memory: u32,
+        passes: u32,
+        parts: u8,
+        difficulty: u8,
+    },
+    /// The older, SHA-256 proof (`Response::RegisterChallenge`): what a
+    /// Central from before asks.
+    Older {
+        nonce: String,
+        parts: u8,
+        difficulty: u8,
+    },
+}
+
+/// Asks Central for a registration's challenge. The page says what it saw
+/// of its own browser, which only ever makes the challenge harder. A price
+/// above what this page and Central agreed on at build time
+/// (`central_api::register`) is refused before any work, so the page never
+/// starts on what it could not hand in or what would exhaust a phone.
 ///
 /// # Errors
 /// The problem, tagged `closed` while an administrator closed registration.
-async fn proof(
-    pow: &str,
-    solving: RwSignal<Solving>,
-) -> Result<(String, Vec<u64>), (Problem, Option<&'static str>)> {
-    use central_api::register::{MAX_DIFFICULTY, PARTS, valid_nonce};
+async fn challenge() -> Result<Challenge, (Problem, Option<&'static str>)> {
+    use central_api::register::{MAX_DIFFICULTY, PARTS, valid_nonce, work_acceptable};
 
-    let fail = |failure: Failure| (Problem::from(failure), None);
     let reported = Request::RegisterChallengeFor {
         signals: super::pow::browser_signals(),
     };
@@ -632,20 +648,102 @@ async fn proof(
         Err(Failure::Rejected) => call(&Request::RegisterChallenge).await,
         answer => answer,
     };
-    let answered = super::pow::now_ms();
-    let (nonce, parts, difficulty) = match answer.map_err(fail)? {
+    let challenge = match answer.map_err(|failure| (Problem::from(failure), None))? {
+        Response::RegisterWork {
+            nonce,
+            parts,
+            difficulty,
+            memory,
+            passes,
+            ..
+        } if valid_nonce(&nonce) && work_acceptable(memory, passes, parts, difficulty) => {
+            Challenge::Work {
+                nonce,
+                memory,
+                passes,
+                parts,
+                difficulty,
+            }
+        }
+        // a Central from before the proof cost memory
         Response::RegisterChallenge {
             nonce,
             parts,
             difficulty,
             ..
-        } => (nonce, parts, difficulty),
+        } if valid_nonce(&nonce) && parts == PARTS && difficulty <= MAX_DIFFICULTY => {
+            Challenge::Older {
+                nonce,
+                parts,
+                difficulty,
+            }
+        }
         Response::RegistrationClosed => return Err((Problem::Failed, Some("closed"))),
         _ => return Err((Problem::Failed, None)),
     };
-    if !valid_nonce(&nonce) || parts != PARTS || difficulty > MAX_DIFFICULTY {
-        return Err((Problem::Failed, None));
+    Ok(challenge)
+}
+
+/// Counters one request to the Worker tries: a few evaluations, so that a
+/// slow device answers within a moment and the Worker can be ended between
+/// two of them.
+const WORK_TRIES: u32 = 8;
+
+/// Solves a memory-hard challenge in the crypto Worker: for each part, the
+/// module's own search (`central_crypto::proof`, the function Central
+/// checks with) in turns of [`WORK_TRIES`], telling `progress` the share
+/// of parts done. The memory is given back before the answer returns, so
+/// the password stretch that follows in the same Worker finds it free.
+async fn work(
+    crypto: &Crypto,
+    nonce: &str,
+    (memory, passes, parts, difficulty): (u32, u32, u8, u8),
+    progress: impl Fn(u32),
+) -> Option<Vec<u64>> {
+    let price = json!({
+        "nonce": nonce, "memory": memory, "passes": passes, "parts": parts, "difficulty": difficulty,
+    });
+    crypto.ask("work_start", price).await.ok()?;
+    // A part needs 2^difficulty tries on average. One that found nothing
+    // in 64 times that is not unlucky (e^-64): the search is broken.
+    let most = 64_u64 << difficulty.min(32);
+    let mut counters = Vec::with_capacity(usize::from(parts));
+    for part in 0..parts {
+        let mut from = 0_u64;
+        let counter = loop {
+            let turn = json!({ "part": part, "from": from, "tries": WORK_TRIES });
+            let answer = crypto.ask("work_search", turn).await.ok()?;
+            match answer.get("counter")? {
+                serde_json::Value::Null => from += u64::from(WORK_TRIES),
+                found => break found.as_u64()?,
+            }
+            if from > most {
+                return None;
+            }
+        };
+        counters.push(counter);
+        progress(u32::from(part + 1) * 100 / u32::from(parts));
     }
+    crypto.ask("work_end", json!({})).await.ok()?;
+    Some(counters)
+}
+
+/// Central's proof of work for one registration (`docs/registration-abuse.md`),
+/// solved off the page's thread: the proof that costs memory in the crypto
+/// Worker `crypto`, the older one of a Central from before in the Worker
+/// at `pow`. It is handed over no sooner than Central takes it, three
+/// seconds after the challenge. `solving` follows the work, and shows it
+/// once it takes long.
+///
+/// # Errors
+/// The problem, tagged `closed` while an administrator closed registration.
+async fn proof(
+    crypto: &Crypto,
+    pow: &str,
+    solving: RwSignal<Solving>,
+) -> Result<(String, Vec<u64>), (Problem, Option<&'static str>)> {
+    let challenge = challenge().await?;
+    let answered = super::pow::now_ms();
     solving.set(Solving::Quiet(0));
     leptos::task::spawn_local(async move {
         super::pow::wait(SLOW_MS).await;
@@ -662,14 +760,28 @@ async fn proof(
             Solving::Idle => {}
         });
     };
-    let counters = super::pow::solve(
-        pow,
-        &nonce,
-        u32::from(parts),
-        u32::from(difficulty),
-        progress,
-    )
-    .await;
+    let (nonce, counters) = match challenge {
+        Challenge::Work {
+            nonce,
+            memory,
+            passes,
+            parts,
+            difficulty,
+        } => {
+            let price = (memory, passes, parts, difficulty);
+            let counters = work(crypto, &nonce, price, progress).await;
+            (nonce, counters)
+        }
+        Challenge::Older {
+            nonce,
+            parts,
+            difficulty,
+        } => {
+            let (parts, difficulty) = (u32::from(parts), u32::from(difficulty));
+            let counters = super::pow::solve(pow, &nonce, parts, difficulty, progress).await;
+            (nonce, counters)
+        }
+    };
     solving.set(Solving::Idle);
     let counters = counters.ok_or((Problem::Failed, None))?;
     let wait = handover_wait(answered, super::pow::now_ms());
@@ -678,6 +790,10 @@ async fn proof(
     }
     Ok((nonce, counters))
 }
+
+/// How long the page waits before it sends a registration once more that
+/// Central answered with `Busy`, in milliseconds.
+const BUSY_MS: u32 = 1_500;
 
 /// Registers an account and signs it in: `Register`, the OPAQUE enrolment
 /// with a new master key and recovery code in the Worker, then a sign-in
@@ -690,14 +806,22 @@ async fn register(
 ) -> Result<(NewCode, SignedIn), (Problem, Option<&'static str>)> {
     let username = f.username.trim().to_ascii_lowercase();
     let crypto = Crypto::start(worker).ok_or((Problem::Failed, None))?;
-    let (nonce, counters) = proof(pow, solving).await?;
-    let answer = call(&Request::Register {
+    let (nonce, counters) = proof(&crypto, pow, solving).await?;
+    let request = Request::Register {
         username: username.clone(),
         display_name: Some(f.display.clone()),
         nonce,
         counters,
-    })
-    .await;
+    };
+    let answer = match call(&request).await {
+        // Central had no worker free to check the proof and kept the
+        // challenge for it: the same solution once more, a moment later.
+        Err(Failure::Busy) => {
+            super::pow::wait(BUSY_MS).await;
+            call(&request).await
+        }
+        answer => answer,
+    };
     let (identity, ticket): (Identity, [u8; 32]) = match answer {
         Ok(Response::Enrollment { identity, ticket }) if uuid_v7(&identity.account) => {
             (identity, token_bytes(&ticket))
