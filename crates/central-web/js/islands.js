@@ -12,7 +12,11 @@
 // wait until the reader comes within a screen of one, or reaches into one
 // with the keyboard or a pointer: a page read only at its top never
 // fetches the half megabyte. An island without a box of its own cannot be
-// watched, so it starts at once.
+// watched, so it starts at once; one in a dialog that is not open (the
+// sign-in and the registration every page can show over itself) has none
+// until the dialog opens, and waits for that. Such an island is taken over
+// when its dialog first opens, not before: its form counts its time from
+// the moment a person can see it.
 if (document.readyState !== "complete") {
   await new Promise((resolve) => window.addEventListener("load", resolve, { once: true }));
 }
@@ -41,7 +45,7 @@ await new Promise((resolve) => {
   if (
     all.length === 0 ||
     typeof IntersectionObserver !== "function" ||
-    all.some((island) => island.getClientRects().length === 0)
+    all.some((island) => island.getClientRects().length === 0 && !island.closest("dialog:not([open])"))
   ) {
     resolve();
     return;
@@ -71,14 +75,30 @@ await islands.default({ module_or_path: "./islands.wasm" });
 islands.hydrate();
 
 async function hydrate(element) {
+  if ("hydrated" in element.dataset) return;
   const run = islands[element.dataset.component ?? ""];
   if (typeof run !== "function") return;
   const done = run(element);
   if (done && typeof done.then === "function") await done;
+  // `boot.js` holds a form's submit back until its island says this
+  element.dataset.hydrated = "";
 }
+
+// a closed dialog's islands wait for it to open
+const waiting = new MutationObserver((changes) => {
+  for (const change of changes) {
+    if (change.target instanceof HTMLDialogElement && change.target.open) void walk(change.target);
+  }
+});
 
 async function walk(node) {
   for (const child of node.children) {
+    if (child instanceof HTMLDialogElement && !child.open) {
+      if (child.querySelector("leptos-island:not([data-hydrated])")) {
+        waiting.observe(child, { attributes: true, attributeFilter: ["open"] });
+      }
+      continue;
+    }
     if (child.localName === "leptos-island") await hydrate(child);
     await walk(child);
   }

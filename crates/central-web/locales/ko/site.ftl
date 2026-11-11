@@ -435,7 +435,7 @@ error-unavailable = Baylee Central이 지금은 응답하지 않아요. 잠시 �
 error-network = 연결되지 않았어요. 네트워크를 확인하고 다시 시도해 주세요.
 error-failed = 문제가 생겼어요. 다시 시도해 보고, 계속되면 알려 주세요.
 error-again = 다시 시도
-password-show = 보기
+password-show-label = Show the password
 
 ## Signing in
 
@@ -449,6 +449,8 @@ signin-working = 비밀번호를 안전하게 처리하는 중 … 잠시 걸리
 signin-wrong = 로그인 이름과 비밀번호가 일치하지 않아요. 둘 다 확인하고 다시 시도해 주세요.
 signin-not-moved = 이 계정은 아직 Baylee Central로 옮겨지지 않았어요. Baylee 클라이언트로 한 번 로그인해 주세요. 그러면 계정이 옮겨져요.
 signin-no-account = 아직 계정이 없나요? <register>계정 만들기</register>.
+register-have-account = Already have an account? <signin>Sign in</signin>.
+dialog-close = Close
 signin-noscript = 로그인하려면 JavaScript가 필요해요. 비밀번호는 브라우저에서 처리되며 우리에게 전송되지 않아요.
 
 ## Registering

@@ -435,7 +435,7 @@ error-unavailable = Baylee Central сейчас не отвечает. Попр�
 error-network = Нет соединения. Проверьте сеть и попробуйте снова.
 error-failed = Что-то пошло не так. Попробуйте снова; если это повторяется, сообщите нам.
 error-again = Повторить
-password-show = Показать
+password-show-label = Show the password
 
 ## Signing in
 
@@ -449,6 +449,8 @@ signin-working = Защищаем ваш пароль … это занимае�
 signin-wrong = Это имя для входа и пароль не подходят друг к другу. Проверьте оба и попробуйте снова.
 signin-not-moved = Этот аккаунт ещё не перенесён в Baylee Central. Войдите один раз через клиент Baylee; он перенесёт ваш аккаунт.
 signin-no-account = Ещё нет аккаунта? <register>Создайте его</register>.
+register-have-account = Already have an account? <signin>Sign in</signin>.
+dialog-close = Close
 signin-noscript = Для входа нужен JavaScript: ваш пароль обрабатывается в вашем браузере и никогда не отправляется нам.
 
 ## Registering

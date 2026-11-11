@@ -435,7 +435,7 @@ error-unavailable = Baylee Central 暂时没有响应。请稍后再试。
 error-network = 没有网络连接。请检查网络后再试。
 error-failed = 出了点问题。请重试；如果问题持续出现，请告诉我们。
 error-again = 重试
-password-show = 显示
+password-show-label = Show the password
 
 ## Signing in
 
@@ -449,6 +449,8 @@ signin-working = 正在保护你的密码 …… 这需要片刻，并且只在�
 signin-wrong = 该登录名和密码不匹配。请检查两者后再试。
 signin-not-moved = 此账号尚未迁移到 Baylee Central。请先用 Baylee 客户端登录一次；它会迁移你的账号。
 signin-no-account = 还没有账号？<register>创建一个</register>。
+register-have-account = Already have an account? <signin>Sign in</signin>.
+dialog-close = Close
 signin-noscript = 登录需要 JavaScript：你的密码在你的浏览器中处理，绝不会发送给我们。
 
 ## Registering

@@ -74,6 +74,39 @@ pub const MESSAGE: &[Shape] = &[Path(
 )];
 /// `plus`.
 pub const PLUS: &[Shape] = &[Path("M5 12h14"), Path("M12 5v14")];
+/// `user`.
+pub const USER: &[Shape] = &[
+    Path("M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"),
+    Circle("12", "7", "4"),
+];
+/// `id-card`.
+pub const ID_CARD: &[Shape] = &[
+    Path("M16 10h2"),
+    Path("M16 14h2"),
+    Path("M6.17 15a3 3 0 0 1 5.66 0"),
+    Circle("9", "11", "2"),
+    Rect("20", "14", "2", "5", "2"),
+];
+/// `lock-keyhole`.
+pub const LOCK_KEYHOLE: &[Shape] = &[
+    Circle("12", "16", "1"),
+    Rect("18", "12", "3", "10", "2"),
+    Path("M7 10V7a5 5 0 0 1 10 0v3"),
+];
+/// `eye`.
+pub const EYE: &[Shape] = &[
+    Path(
+        "M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0",
+    ),
+    Circle("12", "12", "3"),
+];
+/// `eye-off`.
+pub const EYE_OFF: &[Shape] = &[
+    Path("M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49"),
+    Path("M14.084 14.158a3 3 0 0 1-4.242-4.242"),
+    Path("M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143"),
+    Path("m2 2 20 20"),
+];
 
 /// The icon, hidden from assistive technology: its control names itself.
 pub fn glyph(shapes: &'static [Shape]) -> AnyView {
