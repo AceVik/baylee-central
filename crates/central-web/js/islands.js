@@ -8,7 +8,7 @@
 // WebAssembly then never competes with the text, the fonts and the pictures
 // the visitor sees first, and the server-rendered page is whole until the
 // islands take it over. A hidden tab draws no frames; there the half second
-// starts it. Islands far down the page (the start page's contact form)
+// starts it, and after the largest paint. Islands far down the page (the start page's contact form)
 // wait until the reader comes within a screen of one, or reaches into one
 // with the keyboard or a pointer: a page read only at its top never
 // fetches the half megabyte. An island without a box of its own cannot be
@@ -19,6 +19,22 @@ if (document.readyState !== "complete") {
 await new Promise((resolve) => {
   requestAnimationFrame(() => setTimeout(resolve, 0));
   setTimeout(resolve, 500);
+});
+// ... and once the page's largest paint is on screen, so the half
+// megabyte never holds it back; a browser that does not report it (or a
+// page that never paints one) waits a second at most.
+await new Promise((resolve) => {
+  const types = typeof PerformanceObserver === "function" ? PerformanceObserver.supportedEntryTypes : undefined;
+  if (!types?.includes("largest-contentful-paint")) {
+    resolve();
+    return;
+  }
+  const painted = new PerformanceObserver(() => {
+    painted.disconnect();
+    requestAnimationFrame(() => setTimeout(resolve, 0));
+  });
+  painted.observe({ type: "largest-contentful-paint", buffered: true });
+  setTimeout(resolve, 1000);
 });
 await new Promise((resolve) => {
   const all = [...document.querySelectorAll("leptos-island")];

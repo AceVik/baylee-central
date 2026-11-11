@@ -2643,9 +2643,10 @@ Implementation pass:
   message into its first line: control characters dropped, at most 120
   characters. Leptos writes it as a text node inside `<bdi>`, so markup or
   a direction override in a subject stays text and stays in its box.
-- The islands' loader waits, after the load and the first frame, until an
-  island is within a screen of the window or a pointer or the keyboard
-  reaches into one; an island without a box starts at once. The submit
+- The islands' loader waits, after the load and the first frame, for the
+  page's largest paint (a second at most), then until an island is within
+  a screen of the window or a pointer or the keyboard reaches into one; an
+  island without a box, or a page without one, starts at once. The submit
   guard of the previous entry holds the start page's form back until then,
   and the CSP's `form-action 'none'` holds it back anyway.
 - `boot.js` shows a gateway's copy button only in a secure context with

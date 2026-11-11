@@ -888,6 +888,50 @@ the overview (CLS 0.134):
   until the messenger opens, so the largest paint never waits for the
   WebAssembly.
 
+**The old site's look (11.11.2026, owner decision of that day; §6.1).**
+Every page was ported to the old React site's design, rewritten rather
+than copied: the start page (status strip, hero with the memorial logo,
+screenshots with their dialog, gateways, what Baylee is, the opponents,
+the card numbers, the contact form, the open-source promise), Baylee's
+album as the old book, the download page with its platform cards, the
+gateway directory with finding and "Run your own", the contact page with
+"Found something wrong?", the reading pages with their eyebrows and the
+privacy notice's contents, sign-in and register beside Baylee's cloud,
+and the account frame. The old texts came along word for word where the
+old pages had them. Motion was added where it does not move a box on
+hover (tests/hover.rs): cards rise into view on a scroll timeline, a
+sheen slides across a card under the pointer, the cloud floats.
+
+What that cost and how it was won back:
+- The islands now also wait for the page's largest paint (a
+  `PerformanceObserver`, a second at most), and islands far down a page
+  (the start page's form) for the reader to come within a screen of one,
+  or to reach into one. The start page fetches no WebAssembly at all
+  until then.
+- The start page's screenshots are drawn by `home.js` as their cards come
+  near (a `<noscript>` picture without script): six stills inside the
+  browser's lazy-loading reach delayed a phone's painting by about 250 ms.
+  Their recordings (animated AVIF) load the same way.
+- The stylesheet is built without comments, blank lines and indentation
+  (24.5 to 19.1 kB gzip).
+
+**Measured (11.11.2026, the old site's look, same setup):**
+
+| Page | Mobile perf. | LCP (mobile) | Desktop perf. | SEO |
+| --- | ---: | ---: | ---: | ---: |
+| `/en/` | 96–98 | 2.3–2.6 s | 100 | 100 |
+| `/en/download`, `/en/gateways`, `/en/privacy` | 98–100 | 1.6–2.1 s | 100 | 100 |
+| `/en/contact` | 98–99 | 2.1–2.3 s | — | 100 |
+| `/en/signin` | 98–99 | 2.1–2.3 s | 100 | 66 (`noindex`) |
+| `/en/account` | 98 | 2.1 s | — | 66 (`noindex`) |
+
+Accessibility and Best Practices are 100 on every page measured; CLS at
+most 0.046 (the start page on a desktop, as the download button's faces
+arrive), TBT at most 85 ms. The start page's mobile LCP sits around
+Lighthouse's 2.5 s line from run to run (the painting itself, 51 kB of
+AVIF, behind the HTML, the stylesheet and three faces on simulated slow
+4G).
+
 **Tests.**
 
 - Native units: model, wire checks, base64, times, push.
