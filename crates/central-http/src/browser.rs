@@ -3,6 +3,7 @@
 //! `Host` header unchanged. Default-deny: every refusal here happens before the
 //! identity service is called, and no CORS header is ever sent. The session
 //! token travels only in the `__Host-central` cookie.
+use super::in_flight::{Client, InFlight, Permit, forwarded};
 use axum::{
     Router,
     body::{Body, Bytes},
@@ -21,8 +22,8 @@ use central_identity::{BrowserReply, IdentityService, browser_operation};
 use std::{
     collections::BTreeMap,
     future::Future,
-    net::{IpAddr, SocketAddr},
-    sync::{Arc, Mutex, PoisonError},
+    net::SocketAddr,
+    sync::{Arc, Mutex},
     time::{Duration, Instant},
 };
 use tower_http::timeout::TimeoutLayer;
@@ -149,8 +150,13 @@ pub(crate) fn router<A: Accounts>(accounts: Arc<A>, site: BrowserOrigin) -> Rout
         accounts,
         site,
         budgets: Mutex::default(),
-        in_flight: InFlight::default(),
+        in_flight: in_flight(),
     }))
+}
+
+/// An empty table of the places in flight.
+fn in_flight() -> InFlight {
+    InFlight::new(IN_FLIGHT_ADDRESSES, usize::MAX)
 }
 
 fn routes<A: Accounts>(state: Arc<Browser<A>>) -> Router {
@@ -219,8 +225,11 @@ fn admit<'a, A>(state: &'a Browser<A>, parts: &Parts) -> Result<Permit<'a>, Refu
     if !local || !permitted(&parts.uri, &parts.headers, &state.site) {
         return Err(Refusal::NotPermitted);
     }
-    let client = client(&parts.headers).ok_or(Refusal::NoClient)?;
-    state.in_flight.admit(client).ok_or(Refusal::Busy)
+    let client = forwarded(&parts.headers).ok_or(Refusal::NoClient)?;
+    state
+        .in_flight
+        .admit(client, IN_FLIGHT)
+        .ok_or(Refusal::Busy)
 }
 
 /// The body, within [`REQUEST_BYTES`] and [`BODY_TIME`].
@@ -397,19 +406,6 @@ fn permitted(uri: &Uri, headers: &HeaderMap, site: &BrowserOrigin) -> bool {
         && !headers.contains_key(header::AUTHORIZATION)
 }
 
-/// The client's address: the last `X-Forwarded-For` hop, which the local proxy
-/// appended. IPv6 counts by its /64, the block one subscriber usually holds.
-fn client(headers: &HeaderMap) -> Option<Client> {
-    let last = headers.get_all("x-forwarded-for").iter().next_back()?;
-    let hop = last
-        .to_str()
-        .ok()?
-        .rsplit(',')
-        .next()?
-        .trim_matches([' ', '\t']);
-    Some(Client::from(hop.parse::<IpAddr>().ok()?))
-}
-
 /// The session cookie, when exactly one well-formed `__Host-central` is sent;
 /// anything else is no session.
 fn cookie(headers: &HeaderMap) -> Option<Token> {
@@ -443,89 +439,6 @@ fn set_cookie(response: &mut Response, token: Option<&Token>) {
     if let Ok(mut value) = HeaderValue::from_str(&text) {
         value.set_sensitive(true);
         response.headers_mut().insert(header::SET_COOKIE, value);
-    }
-}
-
-/// A client address as the budgets count it.
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-enum Client {
-    V4([u8; 4]),
-    V6([u8; 8]),
-}
-
-impl From<IpAddr> for Client {
-    fn from(ip: IpAddr) -> Self {
-        match ip.to_canonical() {
-            IpAddr::V4(ip) => Self::V4(ip.octets()),
-            IpAddr::V6(ip) => {
-                let mut prefix = [0; 8];
-                prefix.copy_from_slice(&ip.octets()[..8]);
-                Self::V6(prefix)
-            }
-        }
-    }
-}
-
-/// The requests in flight per client address (at most [`IN_FLIGHT`] each),
-/// in memory only; an address leaves the table with its last request.
-#[derive(Default)]
-struct InFlight(Mutex<BTreeMap<Client, u8>>);
-
-/// One request's place among its address's requests in flight; dropping it,
-/// however the request ends (answered, refused, timed out, its connection
-/// gone), gives the place back.
-struct Permit<'a> {
-    table: &'a InFlight,
-    client: Client,
-}
-
-impl InFlight {
-    /// A place for one more request of `client`, unless it has
-    /// [`IN_FLIGHT`] already or the table is full. A place held is never
-    /// taken away: a full table refuses newcomers rather than evict.
-    fn admit(&self, client: Client) -> Option<Permit<'_>> {
-        // Nothing panics while the table is held; a poisoned one is still whole.
-        let mut table = self.0.lock().unwrap_or_else(PoisonError::into_inner);
-        if let Some(count) = table.get_mut(&client) {
-            if *count >= IN_FLIGHT {
-                return None;
-            }
-            *count += 1;
-        } else {
-            if table.len() >= IN_FLIGHT_ADDRESSES {
-                return None;
-            }
-            table.insert(client, 1);
-        }
-        Some(Permit {
-            table: self,
-            client,
-        })
-    }
-
-    /// The requests `client` has in flight.
-    #[cfg(test)]
-    fn count(&self, client: Client) -> u8 {
-        let table = self.0.lock().unwrap_or_else(PoisonError::into_inner);
-        table.get(&client).copied().unwrap_or(0)
-    }
-
-    /// The addresses with a request in flight.
-    #[cfg(test)]
-    fn addresses(&self) -> usize {
-        self.0.lock().unwrap_or_else(PoisonError::into_inner).len()
-    }
-}
-
-impl Drop for Permit<'_> {
-    fn drop(&mut self) {
-        let mut table = self.table.0.lock().unwrap_or_else(PoisonError::into_inner);
-        if let Some(count) = table.get_mut(&self.client) {
-            *count = count.saturating_sub(1);
-            if *count == 0 {
-                table.remove(&self.client);
-            }
-        }
     }
 }
 
@@ -633,6 +546,7 @@ mod tests {
         terms::TermsSubject,
         wire::{Identity, Response as Answer, TicketPurpose},
     };
+    use std::net::IpAddr;
     use tower::ServiceExt;
 
     /// Records each call; answers `Done`, or a browser session for `LoginFinish`.
@@ -1525,7 +1439,7 @@ mod tests {
             accounts: Arc::new(mock),
             site: BrowserOrigin::live(),
             budgets: Mutex::default(),
-            in_flight: InFlight::default(),
+            in_flight: in_flight(),
         });
         (state.clone(), routes(state))
     }
@@ -1661,24 +1575,24 @@ mod tests {
 
     #[test]
     fn a_full_table_refuses_newcomers_and_never_evicts_a_place() {
-        let table = InFlight::default();
+        let table = in_flight();
         let mut held = Vec::new();
         for index in 0..u32::try_from(IN_FLIGHT_ADDRESSES).unwrap() {
             let client = Client::from(IpAddr::from(std::net::Ipv4Addr::from(0x0a00_0000 + index)));
-            held.push(table.admit(client).expect("a place"));
+            held.push(table.admit(client, IN_FLIGHT).expect("a place"));
         }
         let newcomer = client_of("198.51.100.7");
-        assert!(table.admit(newcomer).is_none());
+        assert!(table.admit(newcomer, IN_FLIGHT).is_none());
         // An address already in the table still has its other places.
         let first = Client::from(IpAddr::from(std::net::Ipv4Addr::from(0x0a00_0000)));
         for _ in 1..IN_FLIGHT {
-            held.push(table.admit(first).expect("its own place"));
+            held.push(table.admit(first, IN_FLIGHT).expect("its own place"));
         }
-        assert!(table.admit(first).is_none());
+        assert!(table.admit(first, IN_FLIGHT).is_none());
         assert_eq!(table.count(first), IN_FLIGHT);
         drop(held);
         assert_eq!(table.addresses(), 0);
-        assert!(table.admit(newcomer).is_some());
+        assert!(table.admit(newcomer, IN_FLIGHT).is_some());
     }
 
     /// A request over a real socket from the loopback proxy, its headers
