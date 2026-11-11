@@ -1,7 +1,10 @@
 # Abuse protection for registration
 
-*Design, 28.10.2026; the owner's decisions of the same day below. Not built
-yet.* The owner made strong captcha and spam protection for registration an
+*Design, 28.10.2026; the owner's decisions of the same day below. The proof
+of work (5) and the budgets (6, 7) are built (11.11.2026, "As built"
+below); the owner's decisions of 10 and 11.11.2026 replace the modes,
+keys and invitations (1 to 4) by open registration with an administrator's
+switch.* The owner made strong captcha and spam protection for registration an
 open-beta blocker (28.10.2026): privacy-friendly, no Google reCAPTCHA, the
 design first. A new dependency or a third-party service needs the owner's
 approval; this design needs neither.
@@ -112,3 +115,27 @@ until it is used, revoked or expires.
 
 Built after M1 step 3 (deletion and export), before the open beta; the
 native client's part (solving the proof, entering an invitation) is M6.
+
+## As built (11.11.2026)
+
+- **The proof of work** is the puzzle the website's Impressum already
+  solves (`central_api::register`): for each of eight parts, the smallest
+  counter whose SHA-256 over `nonce:part:counter` has `difficulty` leading
+  zero bits. `RegisterChallenge` (browser listener, 20 an hour per address)
+  answers a random nonce (32 bytes from the same generator as every token,
+  in hex) that Central keeps in memory: at most 10,000 at once, the oldest
+  making room; five minutes; one use. `Register` carries `nonce` and
+  `counters`; Central spends the challenge first, whatever the outcome, and
+  takes a solution only three seconds after its challenge at the soonest.
+  The page solves it in `pow-worker.js` and waits out the three seconds.
+- **Difficulty** 16 bits per part (about two seconds of a mid-range
+  phone's JavaScript for all eight), one more bit for each doubling of the
+  last hour's registrations from 60 on (a baseline of 30), three at most.
+  The identity service logs nothing; the difficulty a challenge carries
+  shows the rise. Tests build the service with an easy base
+  (`with_registration_challenge`), which the service's own launch never
+  calls.
+- **Budgets per address**: `Register` 5 an hour and 10 a day; a refused one
+  spends no daily unit.
+- Nothing about the person is processed for the proof: the nonce is random,
+  the counts are counts.

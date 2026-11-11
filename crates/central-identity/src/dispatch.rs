@@ -3,6 +3,7 @@ use super::{
     browser_only, browser_operation,
 };
 use central_api::beta_key::BetaKey;
+use std::time::Instant;
 
 impl IdentityService {
     pub(super) async fn dispatch(
@@ -119,13 +120,23 @@ impl IdentityService {
             | Request::ChangePasswordFinish { .. }) => {
                 self.credential_request(request, bearer, surface).await
             }
+            Request::RegisterChallenge => self.register_challenge(surface),
             Request::Register {
                 username,
                 beta_key,
                 display_name,
+                nonce,
+                counters,
             } => {
-                self.register(&username, &beta_key, display_name.as_deref(), surface)
-                    .await
+                let proof = (nonce.as_str(), counters.as_slice());
+                self.register(
+                    &username,
+                    &beta_key,
+                    display_name.as_deref(),
+                    proof,
+                    surface,
+                )
+                .await
             }
             Request::EnrollmentStart { ticket, message } => {
                 self.enrollment_challenge(&ticket, message).await
@@ -248,11 +259,31 @@ impl IdentityService {
         Ok(Response::Discovery { discovery })
     }
 
+    /// A proof-of-work challenge for one registration
+    /// (`docs/registration-abuse.md`).
+    fn register_challenge(&self, surface: Surface) -> Result<Response, Error> {
+        if surface != Surface::Browser {
+            return Err(Error::Rejected);
+        }
+        let issued = self
+            .challenges
+            .lock()
+            .map_err(|_| Error::Unavailable)?
+            .issue(Instant::now())?;
+        Ok(Response::RegisterChallenge {
+            nonce: issued.nonce,
+            parts: central_api::register::PARTS,
+            difficulty: issued.difficulty,
+            expires_at: issued.expires_at,
+        })
+    }
+
     async fn register(
         &self,
         username: &str,
         beta_key: &str,
         display_name: Option<&str>,
+        (nonce, counters): (&str, &[u64]),
         surface: Surface,
     ) -> Result<Response, Error> {
         // Registration has the browser listener's per-address budget; the
@@ -260,13 +291,22 @@ impl IdentityService {
         if surface != Surface::Browser {
             return Err(Error::Rejected);
         }
-        // A malformed key is refused before the name is looked at.
+        // The proof of work is checked and spent first, whatever follows; a
+        // malformed key is refused before the name is looked at.
+        self.challenges
+            .lock()
+            .map_err(|_| Error::Unavailable)?
+            .spend(nonce, counters, Instant::now())?;
         let key = BetaKey::parse(beta_key)?;
         let ticket = Token::generate()?;
         let identity = self
             .store
             .register(username, display_name, &key.digest(), &ticket)
             .await?;
+        self.challenges
+            .lock()
+            .map_err(|_| Error::Unavailable)?
+            .registered(Instant::now());
         Ok(Response::Enrollment { identity, ticket })
     }
 

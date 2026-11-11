@@ -38,6 +38,22 @@ const DOCUMENT: &[u8] = br#"{"version":1,"gateways":["http://127.0.0.1:28766"],"
 const SET: &str = "; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=43200";
 const CLEARED: &str = "__Host-central=; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=0";
 
+/// A registration's proof of work, asked for on `browser`'s listener and
+/// solved here: the nonce and the counters `Register` carries.
+pub(crate) fn proof(browser: &Browser) -> (String, Vec<u64>) {
+    let Response::RegisterChallenge {
+        nonce,
+        parts,
+        difficulty,
+        ..
+    } = browser.answer(&Request::RegisterChallenge, None).unwrap()
+    else {
+        panic!("a challenge");
+    };
+    let counters = central_api::register::solve(&nonce, parts, difficulty).unwrap();
+    (nonce, counters)
+}
+
 /// The page's `fetch`, as `baylee.app`'s Caddy passes it to the listener.
 pub(crate) struct Browser {
     pub(crate) address: SocketAddr,
@@ -190,10 +206,15 @@ pub(crate) fn run(
                 .issue(operator),
         )
         .unwrap();
-    let named = |name: &str, display_name: &str| Request::Register {
-        username: name.into(),
-        beta_key: key.display().as_str().to_lowercase(),
-        display_name: Some(display_name.into()),
+    let named = |name: &str, display_name: &str| {
+        let (nonce, counters) = proof(browser);
+        Request::Register {
+            username: name.into(),
+            beta_key: key.display().as_str().to_lowercase(),
+            display_name: Some(display_name.into()),
+            nonce,
+            counters,
+        }
     };
     let register = |name: &str| named(name, "Web_Player");
     refusals(browser, http, &named);
@@ -504,10 +525,15 @@ fn budgets(browser: &Browser, key: &BetaKey) {
         );
     }
     // Two registrations so far from this address; three more with a wrong key.
-    let wrong = |name: &str| Request::Register {
-        username: name.into(),
-        beta_key: "CENTRAL-0000-0000-0000-0000".into(),
-        display_name: None,
+    let wrong = |name: &str| {
+        let (nonce, counters) = proof(browser);
+        Request::Register {
+            username: name.into(),
+            beta_key: "CENTRAL-0000-0000-0000-0000".into(),
+            display_name: None,
+            nonce,
+            counters,
+        }
     };
     for _ in 0..3 {
         assert_eq!(
@@ -515,10 +541,15 @@ fn budgets(browser: &Browser, key: &BetaKey) {
             Some(Error::Rejected)
         );
     }
-    let right = |name: &str| Request::Register {
-        username: name.into(),
-        beta_key: key.display().as_str().into(),
-        display_name: None,
+    let right = |name: &str| {
+        let (nonce, counters) = proof(browser);
+        Request::Register {
+            username: name.into(),
+            beta_key: key.display().as_str().into(),
+            display_name: None,
+            nonce,
+            counters,
+        }
     };
     assert_eq!(
         browser.answer(&right("budget-probe"), None).err(),

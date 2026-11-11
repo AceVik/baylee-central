@@ -15,6 +15,7 @@ pub mod notifications;
 pub mod object;
 pub mod owner;
 pub mod profile;
+pub mod register;
 pub mod reports;
 pub mod reset_code;
 pub mod social;

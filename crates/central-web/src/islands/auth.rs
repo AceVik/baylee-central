@@ -559,16 +559,49 @@ fn token(bytes: [u8; 32]) -> Token {
 /// Registers an account and signs it in: `Register`, the OPAQUE enrolment
 /// with a new master key and recovery code in the Worker, then a sign-in
 /// with the same password, which is let go after it.
+/// Central's proof of work for one registration (`docs/registration-abuse.md`),
+/// solved in the Worker at `pow`; handed over no sooner than Central takes
+/// it, three seconds after the challenge.
+async fn proof(pow: &str) -> Result<(String, Vec<u64>), Problem> {
+    use central_api::register::{MAX_DIFFICULTY, PARTS, valid_nonce};
+
+    let asked = super::pow::now_ms();
+    let Response::RegisterChallenge {
+        nonce,
+        parts,
+        difficulty,
+        ..
+    } = call(&Request::RegisterChallenge).await?
+    else {
+        return Err(Problem::Failed);
+    };
+    if !valid_nonce(&nonce) || parts != PARTS || difficulty > MAX_DIFFICULTY {
+        return Err(Problem::Failed);
+    }
+    let counters = super::pow::solve(pow, &nonce, u32::from(parts), u32::from(difficulty), |_| {})
+        .await
+        .ok_or(Problem::Failed)?;
+    let spent = super::pow::now_ms().saturating_sub(asked);
+    if spent < 3_200 {
+        super::pow::wait(u32::try_from(3_200 - spent).unwrap_or(3_200)).await;
+    }
+    Ok((nonce, counters))
+}
+
 async fn register(
     worker: &str,
+    pow: &str,
     f: RegisterFields,
 ) -> Result<(NewCode, SignedIn), (Problem, Option<&'static str>)> {
     let username = f.username.trim().to_ascii_lowercase();
     let crypto = Crypto::start(worker).ok_or((Problem::Failed, None))?;
+    let (nonce, counters) = proof(pow).await.map_err(|problem| (problem, None))?;
     let answer = call(&Request::Register {
         username: username.clone(),
         beta_key: f.key.trim().to_owned(),
         display_name: Some(f.display.clone()),
+        nonce,
+        counters,
     })
     .await;
     let (identity, ticket): (Identity, [u8; 32]) = match answer {
@@ -635,7 +668,7 @@ async fn register(
 }
 
 #[island]
-pub fn Register(lang: Lang, worker: String) -> impl IntoView {
+pub fn Register(lang: Lang, worker: String, pow: String) -> impl IntoView {
     let step = RwSignal::new(Step::Form);
     let fields = RwSignal::new(RegisterFields::default());
     let error = RwSignal::new(None::<&'static str>);
@@ -652,10 +685,10 @@ pub fn Register(lang: Lang, worker: String) -> impl IntoView {
         });
         error.set(None);
         step.set(Step::Working);
-        let worker = worker.clone();
+        let (worker, pow) = (worker.clone(), pow.clone());
         leptos::task::spawn_local(async move {
             let _ = super::push::disable().await;
-            match register(&worker, f).await {
+            match register(&worker, &pow, f).await {
                 Ok((code, signed)) => {
                     // The code first: it is shown once, before anything
                     // else; Central's terms follow it (`code_view`).

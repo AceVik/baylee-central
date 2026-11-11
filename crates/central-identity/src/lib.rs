@@ -21,6 +21,7 @@ use subtle::ConstantTimeEq;
 use tokio::sync::Semaphore;
 
 mod admin;
+mod challenge;
 mod deletion;
 mod dispatch;
 mod gateways;
@@ -98,6 +99,7 @@ pub fn browser_operation(request: &Request) -> bool {
         | Request::Discover { .. }
         | Request::LoginStart { .. }
         | Request::LoginFinish { .. }
+        | Request::RegisterChallenge
         | Request::Register { .. }
         | Request::EnrollmentStart { .. }
         | Request::EnrollmentFinish { .. }
@@ -170,6 +172,7 @@ fn browser_only(request: &Request) -> bool {
     matches!(
         request,
         Request::Notifications { .. }
+            | Request::RegisterChallenge
             | Request::Register { .. }
             | Request::AccountSummary
             | Request::SetRecovery { .. }
@@ -259,6 +262,8 @@ pub struct IdentityService {
     development: bool,
     pending: Mutex<BTreeMap<[u8; 32], Pending>>,
     resets: Mutex<BTreeMap<[u8; 32], reset::PendingReset>>,
+    /// Registration's proofs of work and the last hour's registrations.
+    challenges: Mutex<challenge::Challenges>,
     limits: Mutex<limits::Limits>,
     workers: Arc<Semaphore>,
     terms: Option<central_api::terms::TermsDocument>,
@@ -305,12 +310,25 @@ impl IdentityService {
             development: endpoint.legacy_origin().is_none(),
             pending: Mutex::default(),
             resets: Mutex::default(),
+            challenges: Mutex::default(),
             limits: Mutex::default(),
             workers: Arc::new(Semaphore::new(4)),
             terms: terms::central()?,
             legacy: None,
             push_key: None,
         })
+    }
+
+    /// Registration's proof of work at `base` bits and taken `minimum` after
+    /// it was issued, for tests that register many accounts; the service's
+    /// own launch never calls this and keeps `docs/registration-abuse.md`'s
+    /// sixteen bits and three seconds.
+    #[must_use]
+    pub fn with_registration_challenge(self, base: u8, minimum: Duration) -> Self {
+        if let Ok(mut challenges) = self.challenges.lock() {
+            *challenges = challenge::Challenges::new(base, minimum);
+        }
+        self
     }
 
     /// Advertise the configured public VAPID key; never private signing material.
@@ -581,10 +599,13 @@ mod tests {
                 attempt: token(),
                 message: vec![],
             },
+            Request::RegisterChallenge,
             Request::Register {
                 username: "synthetic".into(),
                 beta_key: String::new(),
                 display_name: Some("Synthetic".into()),
+                nonce: String::new(),
+                counters: Vec::new(),
             },
             Request::EnrollmentStart {
                 ticket: token(),
@@ -822,14 +843,14 @@ mod tests {
                 text[start..].split('"').next().unwrap().to_owned()
             })
             .collect();
-        assert_eq!(named.len(), 63, "every operation is in one of the lists");
+        assert_eq!(named.len(), 64, "every operation is in one of the lists");
     }
 
     #[test]
     fn the_native_listener_refuses_the_websites_own_operations() {
         let (served, _) = (served(), refused());
         let only: Vec<&Request> = served.iter().filter(|r| browser_only(r)).collect();
-        assert_eq!(only.len(), 10);
+        assert_eq!(only.len(), 11);
         // An account's own area is the website's alone, as administration is.
         assert!(browser_only(&Request::Owner {
             request: central_api::owner::OwnerRequest::Gateways,
@@ -892,6 +913,9 @@ mod tests {
             username: "synthetic".into(),
             beta_key: String::new(),
             display_name: None,
+            nonce: String::new(),
+            counters: Vec::new(),
         }));
+        assert!(!uses_session(&Request::RegisterChallenge));
     }
 }

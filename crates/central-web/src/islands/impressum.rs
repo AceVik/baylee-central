@@ -168,84 +168,9 @@ fn browser_bits() -> u32 {
     bits
 }
 
-/// Solves the puzzle in `pow-worker.js`, telling `progress` the share done.
-#[cfg(target_arch = "wasm32")]
-async fn solve(
-    worker_url: &str,
-    challenge: &Challenge,
-    progress: RwSignal<State>,
-) -> Option<Vec<u64>> {
-    use std::cell::RefCell;
-    use std::rc::Rc;
-    use wasm_bindgen::JsCast;
-    use wasm_bindgen::JsValue;
-    use wasm_bindgen::closure::Closure;
-
-    #[derive(Deserialize)]
-    struct Message {
-        progress: Option<u32>,
-        counters: Option<Vec<u64>>,
-    }
-
-    let worker = super::trusted::module_worker(worker_url)?;
-    let slot: Rc<RefCell<Option<(js_sys::Function, js_sys::Function)>>> = Rc::default();
-    let promise = js_sys::Promise::new(&mut |resolve, reject| {
-        *slot.borrow_mut() = Some((resolve, reject));
-    });
-    let settle = {
-        let slot = Rc::clone(&slot);
-        move |ok: bool, value: &JsValue| {
-            if let Some((resolve, reject)) = slot.borrow_mut().take() {
-                let _ = if ok {
-                    resolve.call1(&JsValue::NULL, value)
-                } else {
-                    reject.call0(&JsValue::NULL)
-                };
-            }
-        }
-    };
-    let on_message = {
-        let settle = settle.clone();
-        Closure::<dyn FnMut(web_sys::MessageEvent)>::new(move |event: web_sys::MessageEvent| {
-            let text = event.data().as_string().unwrap_or_default();
-            match serde_json::from_str::<Message>(&text) {
-                Ok(Message {
-                    counters: Some(_), ..
-                }) => settle(true, &JsValue::from_str(&text)),
-                Ok(Message {
-                    progress: Some(percent),
-                    ..
-                }) => progress.set(State::Solving(percent.min(100))),
-                _ => settle(false, &JsValue::NULL),
-            }
-        })
-    };
-    let on_error = Closure::<dyn FnMut(web_sys::Event)>::new(move |_event: web_sys::Event| {
-        settle(false, &JsValue::NULL);
-    });
-    worker.set_onmessage(Some(on_message.as_ref().unchecked_ref()));
-    worker.set_onerror(Some(on_error.as_ref().unchecked_ref()));
-    let request = serde_json::json!({"nonce": challenge.nonce, "parts": challenge.parts, "difficulty": challenge.difficulty});
-    let posted = worker.post_message(&JsValue::from_str(&request.to_string()));
-    let outcome = if posted.is_ok() {
-        wasm_bindgen_futures::JsFuture::from(promise).await.ok()
-    } else {
-        None
-    };
-    worker.terminate();
-    drop((on_message, on_error));
-    let text = outcome?.as_string()?;
-    serde_json::from_str::<Message>(&text).ok()?.counters
-}
-
 #[cfg(not(target_arch = "wasm32"))]
 fn browser_bits() -> u32 {
     0
-}
-
-#[cfg(not(target_arch = "wasm32"))]
-fn solve(_: &str, _: &Challenge, _: RwSignal<State>) -> std::future::Ready<Option<Vec<u64>>> {
-    std::future::ready(None)
 }
 
 /// One round with the feedback service: a challenge, solved, answered;
@@ -260,7 +185,14 @@ async fn fetch(worker: &str, state: RwSignal<State>) -> Option<Details> {
             return None;
         }
         let challenge: Challenge = serde_json::from_str(&text).ok().filter(Challenge::valid)?;
-        let counters = solve(worker, &challenge, state).await?;
+        let counters = super::pow::solve(
+            worker,
+            &challenge.nonce,
+            challenge.parts,
+            challenge.difficulty,
+            move |percent| state.set(State::Solving(percent)),
+        )
+        .await?;
         let answer = serde_json::json!({
             "nonce": challenge.nonce, "parts": challenge.parts, "difficulty": challenge.difficulty,
             "expires": challenge.expires, "sig": challenge.sig, "counters": counters,
