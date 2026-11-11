@@ -92,11 +92,18 @@ Rules:
 
 | role | family | where |
 | --- | --- | --- |
-| Display and prose | Faustina (serif, variable 300–800, italic) | headings, paragraphs, the memorial |
-| Interface | Alegreya Sans (400, 500, 700) | buttons, navigation, labels, tables, pills, forms |
+| Display and prose | Literata (serif, variable, italic) | headings, paragraphs, the memorial |
+| Interface | Inter (sans, variable) | buttons, navigation, labels, tables, pills, forms |
 | Codes | the system monospace | addresses, versions, tokens, keys, recovery codes |
 
-Both fonts are SIL OFL 1.1 and served from this site (`public/fonts/`).
+Both fonts are SIL OFL 1.1 and served from this site
+(`crates/central-web/assets/fonts/`, each beside its licence text; the
+Latin, extended Latin and Cyrillic subsets of `@fontsource-variable` 5.3.0,
+chosen by `unicode-range`, so a page loads only the scripts it shows).
+Japanese, Korean and Chinese are drawn with the reader's own system fonts
+(`:root:lang(…)` in `base.css` names them per language): a web font for
+them weighs megabytes, and the system's is the one its readers know. A
+weight a font lacks is not synthesised.
 
 The scale (`--text-*`, rem at a root of 16–20 px by viewport):
 
@@ -107,15 +114,20 @@ The scale (`--text-*`, rem at a root of 16–20 px by viewport):
 | `--text-md` | 1rem | body, buttons, fields |
 | `--text-lg` | 1.12–1.32rem | card titles (`h3`) |
 | `--text-xl` | 1.7–2.6rem | section titles (`h2`) |
-| `--text-2xl` | 2.2–4rem | page titles (`h1`) |
+| `--text-2xl` | 1.6–4rem | page titles (`h1`; the low end is a 320 px phone, where a long German title still stands whole) |
 
 - Nothing smaller than 12 px on any screen.
 - Prose uses old-style figures (`onum`); tables, counters, dates and times
   use tabular lining figures (`.num`, `font-variant-numeric: tabular-nums
   lining-nums`), so columns of numbers line up.
-- Headings balance (`text-wrap: balance`), paragraphs avoid orphans
-  (`text-wrap: pretty`). A line of prose stays under 70 characters
-  (`--prose`).
+- Headings and leads balance (`text-wrap: balance`), paragraphs avoid
+  orphans (`text-wrap: pretty`). A line of prose stays under 70 characters
+  (`--prose`). A heading breaks inside a word only when the word alone is
+  wider than the screen (`overflow-wrap: break-word`).
+- What belongs together stays together: the words mark it (`<nb>…</nb>` in
+  a message becomes `.keep`, one unbreakable piece, as each sentence of the
+  start page's title is), and a compound that begins with a figure is
+  written with non-breaking hyphens (`64‑Bit`, `4‑Spieler‑Runde`).
 - A name a person chose (a display name, a gateway's name) is drawn in
   `<bdi>`, never translated (`translate="no"` on handles), and cut with an
   ellipsis rather than wrapped in tight places.
@@ -265,8 +277,14 @@ to feel slow and over the 60 ms where it reads as a snap.
 
 ## Words
 
-The words are Fluent messages (`web/README.md` §"The words"). The reader is
-*du* in German. A button says what it does, as a verb ("Create token",
+The words are Fluent messages, one file per language in
+`crates/central-web/locales/<code>/site.ftl`; the build refuses a language
+that lacks a message, a variable, a tag or a plural form the English has.
+English and German are written by hand; French, Italian, Spanish, Brazilian
+Portuguese, Russian, Japanese, Korean and both Chinese scripts are machine
+translations: every such page says so in its footer, and a legal page adds
+that the German and the English text apply where its translation differs.
+The reader is *du* in German. A button says what it does, as a verb ("Create token",
 "Revoke"), and a question asks in the words of the button that answers it.
 An error says what happened and what to do next; it never blames, and it
 never shows a server's diagnostic.

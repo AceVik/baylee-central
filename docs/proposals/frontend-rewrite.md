@@ -982,3 +982,56 @@ AVIF, behind the HTML, the stylesheet and three faces on simulated slow
   review and the canonical Linux rebuild.
 - Password change and reset on the website (new exports too).
 - The administration still comes from the old build (§11, Caddy `/admin*`).
+
+## 14. As built: the owner's round of 11.11.2026
+
+What the owner asked for after seeing the old look back, and what came of
+it. Each point names where it is held.
+
+**Look.**
+
+- Type: Literata for titles and prose, Inter for the interface, both
+  variable, with Cyrillic; Japanese, Korean and Chinese in the reader's
+  system fonts ([design](../website-design.md#typography)).
+- Links are underlined once the pointer or the keyboard is on them, and
+  where one leads is shown in the window's lower left corner (`hint.js`).
+- The hero: what Baylee is as badges, Wizards' Fan Content notice at its
+  foot, the old site's clouds (`clouds.js`, started when the page is idle,
+  not sent to phones). Sections stand closer; panels have layered shadows.
+- The bar folds into the menu button up to 1080 px and unfolds from 1081
+  px: six sections do not fit beside each other below that in most of the
+  eleven languages. From 1081 to 1279 px the language button shows its code
+  without the name. `languages.spec.ts` holds one row at 1080, 1081, 1140,
+  1279 and 1280 px in every language.
+- Titles: the start page's title is one sentence a line (`<nb>` in the
+  words), leads balance, and compounds that begin with a figure do not
+  break ([design](../website-design.md#typography)).
+
+**Eleven languages.** English, German, French, Italian, Spanish, Brazilian
+Portuguese, Russian, Japanese, Korean, Simplified and Traditional Chinese:
+the languages Magic is printed in. English and German are written by hand,
+the other nine by a machine, which every such page says. The build refuses
+a language that lacks anything the English has; a test in `xtask` refuses
+a language whose text is still English in 12 % of its messages or more. The legal
+texts apply in German and English; Central's terms exist in those two only.
+
+**The security page** (`/{lang}/security`, in the bar, the footer and as
+four cards on the start page): signing in, keys in memory, chat encryption
+and pairing as diagrams in steps, drawn by the server and moved by the
+stylesheet alone. Every sentence has a row in
+[its evidence table](../security-page.md); a second reader's ten
+corrections are in. A test refuses words that promise ("secure", "safe",
+"guarantee") in any language.
+
+**The figures.** Gateways may tell Central how many players, open tables
+and games they have (`GatewayPulse`), and Central publishes those counts
+and its number of accounts without a credential (`PublicFigures`;
+[gateway registry](../gateway-registry.md)). The site's server reads them
+with the directory once a minute; the strip under the bar adds them up and
+a gateway's card shows its own. A number is drawn only while a source
+reports it, and nothing is kept past the minute it was read in. The
+gateway's half is Baylee's (a brief is with the project's notes); until a
+gateway reports, the strip shows the accounts, the cards, the stars and
+the gateways online.
+
+**The Impressum** is in §10, point 2.

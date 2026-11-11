@@ -593,7 +593,7 @@ pub fn teaser(lang: Lang) -> impl IntoView + use<> {
             <div class="wrap">
                 <p class="eyebrow">{words::sec_eyebrow(lang)}</p>
                 <h2 id="security-way-title">{words::sec_title(lang)}</h2>
-                <p class="lead">{words::sec_lead(lang)}</p>
+                <p class="lead">{words::sec_teaser_lead(lang)}</p>
                 <ul class="sec-ways stagger">{flows}{limits}</ul>
                 <p class="sec-ways-more">
                     <a class="button button-ghost" href=page.clone()>{words::sec_teaser_more(lang)}</a>

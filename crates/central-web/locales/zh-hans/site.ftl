@@ -277,7 +277,7 @@ privacy-impressum = The legal notice is shown only after your browser has solved
 privacy-recipients-title = 接收方和国家
 privacy-recipients = 我们不出售数据，也不为广告而向他人提供数据。接收方有：netcup GmbH（德国的托管服务，依据 GDPR 第 28 条作为处理者）；Baylee Central 的管理员，他们为管理之需会看到你的登录名、你的显示名及其标签、你账号的来源、创建时间和上次登录时间，以及你的 Gateways，但绝不会看到你的加密数据；你用账号登录的 Gateway（它会收到你的账号 ID、显示名和标签，不会收到你的密码）；你的联系人和你所在群组的成员（显示名、标签和你的消息）；仅在法律要求我们提供时才提供给主管机关。欧洲经济区以外的国家：只有当你开启通知时，你浏览器的推送服务（Google、Mozilla 或 Apple，美国）才会承载通知。他人运营的 Gateways 可能位于任何国家；是否在那里登录由你决定。除此之外，我们不向欧洲经济区以外的国家传输任何数据。
 privacy-rights-title = 你的权利
-privacy-rights = 你有权访问（GDPR 第 15 条）、更正（第 16 条）、删除（第 17 条）、限制处理（第 18 条）和数据可携（第 20 条）。你可以随时基于与你的具体情况有关的理由，反对基于我们的合法利益（第 6 条第 1 款 (f) 项）进行的处理（第 21 条）。你可以随时撤回同意，对未来生效（第 7 条第 3 款）。你可以在账号设置中导出账号数据并删除账号；对于其他一切，通过联系表单或发送到法律声明中的地址的一条消息就足够了。你有权向数据保护监管机关投诉（第 77 条），例如你居住地的监管机关，或北莱茵-威斯特法伦州数据保护和信息自由事务专员。没有任何法律或合同要求你向我们提供数据；但是，没有登录名和密码就没有账号。不存在自动化决策，也不存在画像（第 22 条）。
+privacy-rights = You have the right of access (Art. 15 GDPR), rectification (Art. 16), erasure (Art. 17), restriction of processing (Art. 18) and data portability (Art. 20). You can object at any time, on grounds relating to your particular situation, to processing based on our legitimate interests under Art. 6(1)(f) (Art. 21). You can withdraw a consent at any time for the future (Art. 7(3)). Your account's data can be exported and the account deleted in your account's settings; for everything else, a message through the contact form or to the address in the legal notice is enough. You may lodge a complaint with a data protection supervisory authority (Art. 77), for example the one where you live or the State Commissioner for Data Protection and Freedom of Information of North Rhine-Westphalia. No law or contract obliges you to give us data; without a sign-in name and a password, however, there is no account. There is no automated decision-making and no profiling (Art. 22).
 privacy-objection-title = 你的反对权
 privacy-objection = 凡是我们基于 GDPR 第 6 条第 1 款 (f) 项处理数据的情形（提供本站、防止滥用、联系表单、法律声明的谜题、你上次登录的时间、管理记录、错误报告和使用计数），你都可以随时基于与你的具体情况有关的理由提出反对（GDPR 第 21 条）。此后我们会停止处理这些数据，除非我们能证明存在压倒你的利益的、令人信服的合法理由，或者该处理是为了确立、行使或抗辩法律上的主张。通过联系表单或发送到法律声明中的地址的一条非正式消息就足够了。
 privacy-links-title = 指向其他服务的链接
@@ -1063,5 +1063,6 @@ sec-docs = The details are in the project's documents: <protocol>crypto protocol
 faq-security-q = How does Baylee handle my password and my chats?
 faq-security-a = When you sign in, your device uses the OPAQUE protocol to prove that it knows the password without sending it; chat messages are encrypted on your device. The <security>security page</security> shows each step as a diagram, with the one exception and the limits.
 sec-signin-link = What happens to your password when you sign in: <security>Security</security>
+sec-teaser-lead = Step by step: what leaves your device, what Baylee Central sees and what it does not, and the limits each flow has.
 sec-teaser-more = See each step in a diagram
 # ==== end of the security page =================================================
