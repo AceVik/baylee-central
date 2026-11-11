@@ -2849,3 +2849,29 @@ each new animation), and `tests/hover.rs` still holds: nothing moves or
 grows as a whole under the pointer. **Not evidence of legal compliance:** the
 texts were reviewed by a model, not a lawyer; what is the owner's to confirm
 stands in `docs/proposals/website-text-review.md`.
+
+## The service worker only for those who use it, 11 November 2026
+
+**Pass 1, what changed.** `pwa.js` registered the service worker for every
+visitor with JavaScript, which put a copy of the site's public files on the
+device of someone who only read a page. It now registers it only when the
+browser remembers a live sign-in (`baylee-central-session`), runs the
+installed app (`display-mode`), or has notifications on for this device
+(`baylee-push-installation-v1`, since notifications arrive through the
+worker). Otherwise it unregisters a worker left from earlier and deletes the
+`baylee-site-*` and `baylee-public-*` caches. The owner chose this on
+11 November 2026; the privacy page's "What your browser keeps" says it.
+
+**Pass 2, an attacker's view.** Nothing is granted by the three signs: they
+decide only whether this origin's own, integrity-checked `/sw.js` is
+registered, through the same Trusted Types policy as before. A script that
+could write localStorage could already register the worker. Removing the
+worker cannot lose data: its cache holds public files, and the push state it
+keeps is cleared by sign-out before the sign leaves.
+
+**Pass 3, what was tested.** `e2e-site/pwa.spec.ts`: a reader has no
+registration and no cache; after a sign-in the worker and cache exist, and
+the first page after the sign is gone removes both; a device with
+notifications on keeps the worker without a sign-in; the offline page and the
+waiting update still work signed in. Not tested: an installed app on a real
+phone (the `display-mode` branch is exercised by no test).
