@@ -152,6 +152,7 @@ fn questions(lang: Lang) -> Vec<(&'static str, Vec<Piece>)> {
         (words::faq_cost_q(lang), text(words::faq_cost_a(lang))),
         (words::faq_account_q(lang), text(words::faq_account_a(lang))),
         (words::faq_data_q(lang), words::faq_data_a(lang)),
+        (words::faq_security_q(lang), words::faq_security_a(lang)),
         (
             words::faq_password_q(lang),
             text(words::faq_password_a(lang)),
@@ -170,6 +171,7 @@ pub fn faq(cx: &Context<'_>) -> Built {
         .push((words::faq_title(lang).to_owned(), Page::Faq));
     let link = move |tag: &str| match tag {
         "privacy" => Some(Page::Privacy.path(lang)),
+        "security" => Some(Page::Security.path(lang)),
         "gateways" => Some(Page::Gateways.path(lang)),
         "contact" => Some(Page::Contact.path(lang)),
         _ => None,

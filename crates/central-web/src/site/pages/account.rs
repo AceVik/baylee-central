@@ -7,7 +7,7 @@ use leptos::prelude::*;
 use super::Built;
 use crate::data::Section;
 use crate::islands::{Account, Messenger, Register, SignIn};
-use crate::rich::icon;
+use crate::rich::{icon, rich};
 use crate::site::icons;
 use crate::site::shell::Meta;
 use crate::site::{Context, Page};
@@ -37,6 +37,14 @@ fn form_page(
         cx.assets.url("img/cloud-600.webp"),
         cx.assets.url("img/cloud-1200.webp")
     );
+    // signing in says where its password goes
+    let more = (page == Page::SignIn).then(|| {
+        let security = Page::Security.path(lang);
+        let link = rich(words::sec_signin_link(lang), move |tag| {
+            (tag == "security").then(|| security.clone())
+        });
+        view! { <p class="hint">{link}</p> }
+    });
     let body = view! {
         <div class="wrap auth">
             <section class="page-head auth-head" aria-labelledby="auth-title">
@@ -47,6 +55,7 @@ fn form_page(
                     {form}
                     {noscript(lang)}
                 </div>
+                {more}
             </section>
             <img class="auth-cloud" src=cx.assets.url("img/cloud-600.webp") srcset=cloud sizes="min(40vw, 40rem)"
                 width="600" height="400" alt="" loading="lazy" decoding="async" />

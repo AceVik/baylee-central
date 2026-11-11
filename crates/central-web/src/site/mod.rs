@@ -25,6 +25,8 @@ pub enum Page {
     Gateways,
     /// `/{lang}/faq`.
     Faq,
+    /// `/{lang}/security`.
+    Security,
     /// `/{lang}/contact`.
     Contact,
     /// `/{lang}/impressum`.
@@ -51,11 +53,12 @@ pub enum Page {
 
 impl Page {
     /// Every page with an address, in the sitemap's order.
-    pub const LISTED: [Page; 9] = [
+    pub const LISTED: [Page; 10] = [
         Page::Home,
         Page::Download,
         Page::Gateways,
         Page::Faq,
+        Page::Security,
         Page::Contact,
         Page::Impressum,
         Page::Privacy,
@@ -76,6 +79,7 @@ impl Page {
             Page::Download => "download",
             Page::Gateways => "gateways",
             Page::Faq => "faq",
+            Page::Security => "security",
             Page::Contact => "contact",
             Page::Impressum => "impressum",
             Page::Privacy => "privacy",
