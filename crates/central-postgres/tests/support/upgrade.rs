@@ -5,8 +5,8 @@
 //! accounts, then 000011 over the same, drawing the registered accounts'
 //! tags, then 000012's administration over all of it, then 000013's reset
 //! codes, then 000014's gateway tokens over the registered gateways, then
-//! 000023's open registration over all of it. All inside one transaction
-//! that is rolled back.
+//! 000023's open registration over all of it, then 000025's gateway activity
+//! over the gateways. All inside one transaction that is rolled back.
 use super::scalar;
 use sea_orm::{ConnectionTrait, DatabaseConnection, TransactionTrait};
 
@@ -37,6 +37,8 @@ const TOKENS: &str =
     include_str!("../../../central-migration/src/m20261030_000014_gateway_tokens.sql");
 const OPEN: &str =
     include_str!("../../../central-migration/src/m20261111_000023_open_registration.sql");
+const ACTIVITY: &str =
+    include_str!("../../../central-migration/src/m20261111_000025_gateway_activity.sql");
 
 fn scratch(sql: &str) -> String {
     sql.replace("central_identity", "upgrade_probe")
@@ -124,6 +126,7 @@ pub(crate) async fn run(operator: &DatabaseConnection) {
     reset(&tx).await;
     tokens(&tx).await;
     open_registration(&tx).await;
+    activity(&tx).await;
     tx.rollback().await.unwrap();
     assert_eq!(
         scalar(
@@ -682,6 +685,116 @@ async fn tokens(tx: &sea_orm::DatabaseTransaction) {
     ] {
         refused(tx, &sql).await;
     }
+}
+
+/// 000025 over the gateways the earlier steps left, a registered one that
+/// was seen and the official one that never was: each keeps every column and
+/// reports nothing; the prior binary's heartbeat still works and leaves the
+/// activity alone; an activity is whole or absent, and each count is within
+/// its bound.
+async fn activity(tx: &sea_orm::DatabaseTransaction) {
+    // The prior binary's heartbeat, which names none of the new columns.
+    let earlier = "UPDATE upgrade_probe.gateways g SET name='Tokens',version='2',
+        website='https://tokens.invalid/',last_seen=pg_catalog.clock_timestamp()
+        WHERE origin='https://tokens.invalid' AND NOT official";
+    let changed = |sql: String| async move {
+        assert_eq!(
+            tx.execute_unprepared(&sql).await.unwrap().rows_affected(),
+            1,
+            "{sql}"
+        );
+    };
+    changed(earlier.into()).await;
+    for (expected, sql) in [
+        (
+            1,
+            "SELECT count(*)::bigint AS value FROM upgrade_probe.gateways
+             WHERE origin='https://tokens.invalid' AND NOT official AND last_seen IS NOT NULL",
+        ),
+        (
+            1,
+            "SELECT count(*)::bigint AS value FROM upgrade_probe.gateways
+             WHERE official AND last_seen IS NULL",
+        ),
+    ] {
+        assert_eq!(scalar(tx, sql).await, expected, "{sql}");
+    }
+    let kept = "SELECT pg_catalog.md5(pg_catalog.string_agg(g::text, '|' ORDER BY g.id)) AS value
+        FROM (SELECT id, owner_id, origin, name, version, website, credential_digest,
+            heartbeat_digest, admin_revision, last_seen, created_at, official
+            FROM upgrade_probe.gateways) g";
+    let text = |sql: &'static str| async move {
+        tx.query_one_raw(sea_orm::Statement::from_string(
+            sea_orm::DbBackend::Postgres,
+            sql,
+        ))
+        .await
+        .unwrap()
+        .unwrap()
+        .try_get::<String>("", "value")
+        .unwrap()
+    };
+    let gateways = scalar(
+        tx,
+        "SELECT count(*)::bigint AS value FROM upgrade_probe.gateways",
+    )
+    .await;
+    assert!(gateways >= 2, "{gateways}");
+    let before = text(kept).await;
+    tx.execute_unprepared(&scratch(ACTIVITY)).await.unwrap();
+    assert_eq!(text(kept).await, before);
+    assert_eq!(
+        scalar(
+            tx,
+            "SELECT count(*)::bigint AS value FROM upgrade_probe.gateways
+             WHERE activity_players IS NULL AND activity_tables IS NULL
+             AND activity_games IS NULL AND activity_at IS NULL"
+        )
+        .await,
+        gateways
+    );
+    // This binary's pulse, at both ends of the bound; the prior binary's
+    // heartbeat after it leaves what was reported.
+    for count in [0, 100_000] {
+        changed(format!(
+            "UPDATE upgrade_probe.gateways SET activity_players={count}, activity_tables={count},
+                 activity_games={count}, activity_at=pg_catalog.clock_timestamp()
+             WHERE origin='https://tokens.invalid'"
+        ))
+        .await;
+    }
+    changed(earlier.into()).await;
+    assert_eq!(
+        scalar(
+            tx,
+            "SELECT count(*)::bigint AS value FROM upgrade_probe.gateways
+             WHERE origin='https://tokens.invalid' AND activity_players=100000
+             AND activity_tables=100000 AND activity_games=100000 AND activity_at IS NOT NULL"
+        )
+        .await,
+        1
+    );
+    for sql in [
+        // Part of an activity, in either direction.
+        "UPDATE upgrade_probe.gateways SET activity_players=1 WHERE official",
+        "UPDATE upgrade_probe.gateways SET activity_at=pg_catalog.clock_timestamp()
+         WHERE official",
+        "UPDATE upgrade_probe.gateways SET activity_games=NULL WHERE origin='https://tokens.invalid'",
+        "UPDATE upgrade_probe.gateways SET activity_at=NULL WHERE origin='https://tokens.invalid'",
+        // A count outside its bound.
+        "UPDATE upgrade_probe.gateways SET activity_players=100001 WHERE origin='https://tokens.invalid'",
+        "UPDATE upgrade_probe.gateways SET activity_tables=-1 WHERE origin='https://tokens.invalid'",
+        "UPDATE upgrade_probe.gateways SET activity_games=2147483647 WHERE origin='https://tokens.invalid'",
+    ] {
+        refused(tx, sql).await;
+    }
+    // This binary's plain heartbeat.
+    changed(
+        "UPDATE upgrade_probe.gateways SET activity_players=NULL, activity_tables=NULL,
+             activity_games=NULL, activity_at=NULL WHERE origin='https://tokens.invalid'"
+            .into(),
+    )
+    .await;
 }
 
 /// 000023 over all of it (the owner's decisions of 10 and 11.11.2026): the
