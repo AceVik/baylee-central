@@ -577,14 +577,33 @@ impl Budgets {
     }
 }
 
+/// One budget: each address's window (its start and the units spent), and
+/// when the windows that had passed were last forgotten.
 #[derive(Default)]
-struct Book(BTreeMap<Client, (Instant, u32)>);
+struct Book(BTreeMap<Client, (Instant, u32)>, Option<Instant>);
 
 impl Book {
     fn charge(&mut self, client: Client, now: Instant, limit: u32, period: Duration) -> bool {
-        self.0
-            .retain(|_, (start, _)| now.duration_since(*start) < period);
-        if !self.0.contains_key(&client) && self.0.len() >= ADDRESSES {
+        // The caller's own window, once passed, starts again.
+        if self
+            .0
+            .get(&client)
+            .is_some_and(|(start, _)| now.duration_since(*start) >= period)
+        {
+            self.0.remove(&client);
+        }
+        let known = self.0.contains_key(&client);
+        // Every other passed window is forgotten once a period, and whenever
+        // a newcomer finds the book full; not on every request.
+        let due = self
+            .1
+            .is_none_or(|swept| now.duration_since(swept) >= period);
+        if due || (!known && self.0.len() >= ADDRESSES) {
+            self.0
+                .retain(|_, (start, _)| now.duration_since(*start) < period);
+            self.1 = Some(now);
+        }
+        if !known && self.0.len() >= ADDRESSES {
             let oldest = self
                 .0
                 .iter()
@@ -1756,6 +1775,39 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(calls(&state.accounts), 1);
+    }
+
+    #[test]
+    fn a_caller_s_own_passed_window_starts_again_between_sweeps() {
+        let now = Instant::now();
+        let mut book = Book::default();
+        let client = |last: u8| Client::from(IpAddr::from([198, 51, 100, last]));
+        let (first, quiet, late, other) = (client(1), client(2), client(3), client(4));
+        // The first request sweeps and stamps the book.
+        assert!(book.charge(first, now, 5, HOUR));
+        assert!(book.charge(quiet, now + HOUR * 2 / 5, 5, HOUR));
+        let opened = now + HOUR / 2;
+        for _ in 0..5 {
+            assert!(book.charge(late, opened, 5, HOUR));
+        }
+        assert!(!book.charge(late, opened, 5, HOUR));
+        // A period after the stamp the next request sweeps: only the first
+        // window has passed.
+        assert!(book.charge(other, now + HOUR, 5, HOUR));
+        assert!(!book.0.contains_key(&first));
+        assert!(book.0.contains_key(&quiet));
+        assert!(!book.charge(late, now + HOUR, 5, HOUR));
+        // Before the next sweep is due, the late window passes: its own
+        // address finds it passed and starts again, though nothing swept.
+        let passed = opened + HOUR;
+        assert!(book.charge(late, passed, 5, HOUR));
+        assert_eq!(book.0.get(&late), Some(&(passed, 1)));
+        // The quiet address's window has passed too and waits for the sweep.
+        assert!(book.0.contains_key(&quiet));
+        assert!(book.charge(other, now + HOUR * 2, 5, HOUR));
+        assert!(!book.0.contains_key(&quiet));
+        assert_eq!(book.0.len(), 2);
+        assert_eq!(book.0.get(&other), Some(&(now + HOUR * 2, 1)));
     }
 
     fn site(host: &str, origin: &str) -> Vec<(&'static str, String)> {
