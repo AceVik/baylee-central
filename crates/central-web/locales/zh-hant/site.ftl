@@ -269,7 +269,7 @@ privacy-chat = 訊息在你的裝置上為每位收件人的裝置分別加密�
 privacy-push-title = 通知
 privacy-push = 如果你在瀏覽器中開啟通知，你的瀏覽器會向其推播服務註冊，而 Central 會儲存該服務針對這個瀏覽器的位址、瀏覽器的公開金鑰與驗證密鑰、你的語言、一組代表這台裝置的隨機數字，以及你選擇的類別。推播服務屬於你瀏覽器的開發商：Google（Firebase Cloud Messaging）、Mozilla 或 Apple，皆設於美國。通知經加密後，只帶有它的種類（例如「新訊息」）與你的語言，絕不含姓名或內文；推播服務會看到位址、時間與大小等連線資料。當你在這台裝置上關閉通知、登出，或刪除帳號時，這些資料就會刪除；90 天未更新的位址不再使用，等待中的通知在一天後失效。法律基礎：GDPR 第 6 條第 1 項 (a) 款與 TDDDG 第 25 條第 1 項（你的同意）。你可以隨時在帳號設定中撤回同意；在此之前所做的處理仍屬合法。
 privacy-counters-title = 防止濫用
-privacy-counters = To stop password guessing and overload, Central counts certain requests per IP address (registrations, sign-in attempts, password resets, reading the directory), only in memory: registrations, and sign-in attempts that were not completed with the right password, for up to a day, everything else for at most one hour. After a sign-in with the right password, Central remembers for 30 days, again only in memory, that your account signed in from that address (an IPv4 address, or the first half of an IPv6 address; at most eight per account), so that other people's attempts on your account do not keep you out there. Someone who uses the same address and knows your user name can tell from Central's answers that your account signed in from it. A new password forgets these addresses except the one you set it from, deleting the account forgets them all, and so does a restart of the service. Before a registration your browser also solves a puzzle that takes memory and computing time; it consists of random numbers, holds nothing about you and is forgotten after twenty minutes at the latest. Central computes a small part of it again to check your browser's answer. How hard it is depends on how many accounts are being created and on whether the request looks like a program's: whether it carries the headers every browser sends, whether your browser says a program is driving it, and how many puzzles your address and the network block around it (the first three numbers of an IPv4 address, the first 48 bits of an IPv6 address) asked for in the last hour. Of this Central keeps only the counts, in memory, for at most an hour. Per account, Central counts contact requests and searches for other players, so that nobody floods others with requests. Legal basis: Art. 6(1)(f) GDPR; our legitimate interest is protecting the accounts and the service against abuse.
+privacy-counters = 為了防止猜測密碼和過載，Central 依 IP 位址統計某些請求（註冊、登入嘗試、密碼重設、讀取目錄），只在記憶體中進行：註冊和未以正確密碼完成的登入嘗試最長保留一天，其餘的最長保留一小時。以正確密碼登入後，Central 會在記憶體中記住 30 天（同樣只在記憶體中）你的帳號曾從該位址登入（一個 IPv4 位址，或 IPv6 位址的前半段；每個帳號最多八個），這樣別人對你帳號的嘗試就不會把你擋在那裡。使用同一位址且知道你登入名稱的人，可以從 Central 的回應看出你的帳號曾從該位址登入。設定新密碼會忘記這些位址，只保留你設定密碼時所用的那個；刪除帳號會全部忘記，重新啟動服務也一樣。註冊之前，你的瀏覽器還會解一道需要記憶體和運算時間的謎題；它由隨機數字構成，不含任何關於你的資料，最遲二十分鐘後即被遺忘。Central 會重新計算其中一小部分，以檢查你瀏覽器的答案。難度取決於正在建立多少個帳號，以及請求是否像來自程式：是否帶有每個瀏覽器都會送出的標頭，你的瀏覽器是否表明有程式在控制它，以及你的位址及其周圍的網段（IPv4 位址的前三個數字，IPv6 位址的前 48 位元）在過去一小時內要求了多少道謎題。對此，Central 只保留計數，存放在記憶體中，最長一小時。Central 依帳號統計聯絡請求和對其他玩家的搜尋，以免有人用請求淹沒別人。法律基礎：GDPR 第 6 條第 1 項 (f) 款；我們的正當利益是保護帳號和服務免遭濫用。
 privacy-contact-title = 聯絡表單
 privacy-contact = 表單會把你的訊息、頁面的語言和時間，送到同一台伺服器上 Baylee 的意見回饋服務；你的名字與電子郵件地址只有在你填寫時才會送出，兩者都是選填。該服務也會記下這則訊息是否已處理。你的 IP 位址不會儲存；它只在記憶體中計數一小時，用來阻止訊息氾濫。只有法律聲明中列名的人會讀這些訊息；不會轉交給任何人。訊息在處理完畢 90 天後刪除，最遲一年後刪除，或在你要求時提早刪除。法律基礎：GDPR 第 6 條第 1 項 (f) 款（我們回覆訊息的正當利益），或在你的訊息與你的帳號有關時，為 (b) 款。
 privacy-impressum-title = 法律聲明的謎題
@@ -430,7 +430,7 @@ baylee-photo10 = 她最愛的位置：就在我們身邊。
 
 ## Errors shared by the forms
 
-error-busy = Too many attempts. Try again later; after several wrong passwords this can take an hour, at most a day.
+error-busy = 嘗試次數過多。請稍後再試；連續輸錯幾次密碼後，可能需要一小時，最長一天。
 error-unavailable = Baylee Central 目前沒有回應。請稍後再試。
 error-network = 沒有連線。請檢查網路後再試一次。
 error-failed = 發生了問題。請再試一次；若持續發生，請告訴我們。
@@ -981,7 +981,7 @@ sec-signin-s5 = 回來的有工作階段（在瀏覽器中是頁面本身讀不�
 sec-signin-register = <b>註冊</b>使用同一套協定。你的裝置抽出一把隨機的主金鑰（256 位元），用你的密碼包裝一次、用你的救援碼再包裝一次，並只送出這些包裝。Central 儲存的是一筆 OPAQUE 紀錄和這些包裝，絕不儲存金鑰本身。
 sec-signin-legacy = <b>一個例外：</b>尚未移轉到 Central 的舊官方 Gateway 帳號。在這類帳號移轉完成之前，Baylee 用戶端中的每次登入嘗試，都會把輸入的密碼透過已驗證的 TLS 連線送到 Central，由 Central 對照舊的雜湊值檢查，並且既不儲存也不記錄。移轉成功後，該帳號就會如上所示登入。本網站不會讓這類帳號登入，而是引導你使用用戶端。這個例外隨移轉所訂的期限結束。
 sec-signin-limit = <b>仍然存在的情況：</b>任何人只要取得 Central 的資料庫連同它的金鑰，就可以一個一個嘗試密碼；每次嘗試都要花一次 Argon2id 運算。以這種方式找出的密碼，能打開該帳號的加密資料與已儲存的聊天。一組很長、而且你在其他地方都沒用過的密碼仍然很重要。
-sec-signin-guess = <b>Guessing through the sign-in</b> is slowed, not stopped. Central counts attempts that are not completed with the right password: at most 100 a day on one account from addresses it has not signed in from, and at most 100 a day from one address on all accounts together. Past that it answers that there were too many attempts, until the hour or the day ends. A common password is still found that way. And whoever knows your user name can use up your account's attempts: until the day ends you then sign in only from an address your account signed in from in the last 30 days (Central remembers those addresses only until it restarts).
+sec-signin-guess = <b>透過登入來猜測密碼</b>只會被減慢，不會被阻止。Central 統計未以正確密碼完成的嘗試：對同一個帳號，來自該帳號未曾登入過的位址的嘗試，每天最多 100 次；來自同一個位址、針對所有帳號合計的嘗試，每天最多 100 次。超過後，Central 會回應嘗試次數過多，直到這一小時或這一天結束。常見的密碼這樣仍會被找到。而且，知道你登入名稱的人可以用光你帳號的嘗試次數：此後到當天結束為止，你只能從你的帳號在最近 30 天內登入過的位址登入（Central 只會記住這些位址，直到它重新啟動）。
 
 sec-memory-eyebrow = 在記憶體中
 sec-memory-title = 登入後，記憶體中還留著什麼
@@ -1064,4 +1064,4 @@ sec-teaser-lead = 逐步說明：什麼會離開你的裝置，Baylee Central �
 sec-teaser-more = 以圖示查看每個步驟
 # ==== end of the security page =================================================
 # ==== registration: the proof of work, while it takes long =====================
-register-solving = Your browser is solving a puzzle that keeps robots out. When many accounts are being created, this can take a few minutes … { $percent } %
+register-solving = 你的瀏覽器正在解一道把機器人擋在外面的謎題。建立帳號的人很多時，這可能需要幾分鐘 …… { $percent } %
