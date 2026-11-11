@@ -139,6 +139,8 @@ test("a conversation reads as text, passes axe, and sends from the keyboard", as
   await page.goto(`/en/account/chat?c=${CONV}`);
   const log = page.locator(".conv-msgs");
   await expect(log.getByText("Hello Erika")).toBeVisible({ timeout: 15_000 });
+  // the server's lead gives way to the open messenger
+  await expect(page.locator(".msgr-lead")).toBeHidden();
   // markup in a message is text: shown as written, never an element
   await expect(log.getByText(HOSTILE, { exact: true })).toBeVisible();
   expect(await page.locator(".conv img").count()).toBe(0);

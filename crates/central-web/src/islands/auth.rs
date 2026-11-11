@@ -487,13 +487,13 @@ pub fn SignIn(lang: Lang, worker: String) -> impl IntoView {
             <form class="form" method="post" novalidate=true on:submit=submit.clone()>
                 <div class="field">
                     <label for="signin-name">{words::signin_name(lang)}</label>
-                    <input id="signin-name" name="username" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="64" required=true
+                    <input id="signin-name" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="64" required=true
                         on:input=move |ev| name.set(event_target_value(&ev)) prop:value=move || name.get() />
                 </div>
                 <div class="field">
                     <label for="signin-password">{words::signin_password(lang)}</label>
                     <div class="with-tool">
-                        <input id="signin-password" name="password" autocomplete="current-password" maxlength="1024" required=true
+                        <input id="signin-password" autocomplete="current-password" maxlength="1024" required=true
                             type=move || if shown.get() { "text" } else { "password" }
                             on:input=move |ev| password.set(event_target_value(&ev)) prop:value=move || password.get() />
                         <button type="button" class="button quiet" aria-pressed=move || if shown.get() { "true" } else { "false" }

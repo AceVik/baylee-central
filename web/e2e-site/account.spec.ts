@@ -169,3 +169,65 @@ test("signed in, each action puts the focus where its result is", async ({ page 
   await page.getByRole("button", { name: "Delete my account" }).click();
   await expect(page.locator("#delete-password")).toBeFocused();
 });
+
+test.describe("before the islands run", () => {
+  // the service worker would fetch the WebAssembly past the page's routes
+  test.use({ serviceWorkers: "block" });
+
+  test("a sign-in sends nothing: the password stays in the page", async ({ page }) => {
+    const posted: string[] = [];
+    page.on("request", (request) => {
+      if (request.method() !== "GET" && request.method() !== "HEAD") posted.push(`${request.method()} ${request.url()} ${request.postData() ?? ""}`);
+    });
+    // the WebAssembly never arrives: the islands never take the form over
+    await page.route("**/assets/islands.*.wasm", (route) => route.abort());
+    await page.goto("/en/signin");
+    await expect(page.locator("#signin-password")).not.toHaveAttribute("name", /.*/);
+    await expect(page.locator("#signin-name")).not.toHaveAttribute("name", /.*/);
+    await page.locator("#signin-name").fill("erika");
+    await page.locator("#signin-password").fill("violet lantern harbour");
+    await page.locator("#signin-password").press("Enter");
+    // and a submit by script, as a second press would make it
+    await page.locator("#signin-password").evaluate((field: HTMLInputElement) => field.form?.requestSubmit());
+    await page.waitForTimeout(500);
+    await expect(page).toHaveURL(/\/en\/signin$/);
+    expect(posted).toEqual([]);
+  });
+});
+
+test("an administrator closes registration, signs in again when asked, and keeps the focus", async ({ page }) => {
+  let open = true;
+  let fresh = false;
+  await page.addInitScript(() => localStorage.setItem("baylee-central-session", JSON.stringify({ expiresAt: 4_102_444_800 })));
+  await page.route("**/api/v1", (route) => {
+    const body = JSON.parse(route.request().postData() ?? "{}");
+    const json = (value: unknown) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(value) });
+    if (body.operation === "account_summary") {
+      return json({
+        result: "account_summary", identity: { account: ACCOUNT, epoch: 1 }, username: "erika", display_name: "Erika", tag: 0x1a2b,
+        source: "registered", recovery: true, admin: true, signed_in_at: 1_794_000_000, expires_at: 4_102_444_800,
+      });
+    }
+    if (body.operation === "admin" && body.request?.action === "registration") {
+      return json({ result: "admin", answer: { answer: "registration", open, changed_at: null } });
+    }
+    if (body.operation === "admin" && body.request?.action === "set_registration") {
+      // the first change goes through; the second wants a fresh sign-in
+      if (fresh) return route.fulfill({ status: 401, body: "rejected\n" });
+      fresh = true;
+      open = body.request.open;
+      return json({ result: "done" });
+    }
+    return route.fulfill({ status: 401, body: "rejected\n" });
+  });
+  await page.goto("/en/account");
+  await expect(page.locator("html")).toHaveAttribute("data-islands", "ready");
+  const status = page.getByText("Open: anyone may create an account, with the proof of work.");
+  await expect(status).toBeVisible();
+  await page.getByRole("button", { name: "Close registration" }).click();
+  await expect(page.getByText("Closed: nobody can create an account until you open it again.")).toBeVisible();
+  // the same button, its label changed, the focus still on it
+  await expect(page.getByRole("button", { name: "Open registration again" })).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(page.locator("#reauth-name")).toBeFocused();
+});

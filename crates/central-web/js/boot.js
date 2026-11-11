@@ -87,4 +87,18 @@
   };
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", ready, { once: true });
   else ready();
+
+  // An island's form works only once the islands run. Until then the
+  // browser's own submit would send its fields to the page's address, and
+  // the sign-in's password must never leave the crypto Worker, so it is
+  // held back. The islands' fields carry no names either, so even a submit
+  // let through sends nothing.
+  document.addEventListener(
+    "submit",
+    (event) => {
+      const form = event.target instanceof Element ? event.target : null;
+      if (root.dataset.islands !== "ready" && form?.closest("leptos-island")) event.preventDefault();
+    },
+    true,
+  );
 })();

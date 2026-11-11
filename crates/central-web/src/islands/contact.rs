@@ -156,7 +156,7 @@ pub fn ContactForm(lang: Lang) -> impl IntoView {
                     <form class="form" method="post" novalidate=true on:submit=send>
                         <div class="field">
                             <label for="contact-name">{words::contact_name(lang)}</label>
-                            <input id="contact-name" name="name" type="text" autocomplete="name" maxlength="100"
+                            <input id="contact-name" type="text" autocomplete="name" maxlength="100"
                                 aria-describedby="contact-name-hint"
                                 on:input=move |ev| name.set(event_target_value(&ev))
                                 prop:value=move || name.get() />
@@ -164,7 +164,7 @@ pub fn ContactForm(lang: Lang) -> impl IntoView {
                         </div>
                         <div class="field">
                             <label for="contact-email">{words::contact_email(lang)}</label>
-                            <input id="contact-email" name="email" type="email" autocomplete="email" maxlength="254"
+                            <input id="contact-email" type="email" autocomplete="email" maxlength="254"
                                 aria-describedby="contact-email-hint contact-error"
                                 aria-invalid=move || field_error(State::Email)().then_some("true")
                                 on:input=move |ev| email.set(event_target_value(&ev))
@@ -173,7 +173,7 @@ pub fn ContactForm(lang: Lang) -> impl IntoView {
                         </div>
                         <div class="field">
                             <label for="contact-message">{words::contact_message(lang)}</label>
-                            <textarea id="contact-message" name="message" rows="7" maxlength=MAX_MESSAGE.to_string() required=true
+                            <textarea id="contact-message" rows="7" maxlength=MAX_MESSAGE.to_string() required=true
                                 aria-describedby="contact-count contact-error"
                                 aria-invalid=move || field_error(State::Empty)().then_some("true")
                                 on:input=move |ev| message.set(event_target_value(&ev))
@@ -184,7 +184,7 @@ pub fn ContactForm(lang: Lang) -> impl IntoView {
                         </div>
                         <div class="trap" aria-hidden="true">
                             <label for="contact-website">{"Website"}</label>
-                            <input id="contact-website" name="website" type="text" tabindex="-1" autocomplete="off"
+                            <input id="contact-website" type="text" tabindex="-1" autocomplete="off"
                                 on:input=move |ev| trap.set(event_target_value(&ev)) />
                         </div>
                         <p class="error" id="contact-error" role="alert">{problem}</p>
