@@ -563,19 +563,50 @@ body:has(dialog[open]) .wave {
 /* every system under its mark; a row a file, the visitor's own in gold */
 .dl .menu {
   inset-inline: 50% auto;
-  width: min(25rem, calc(100vw - 2 * var(--gutter)));
-  max-height: min(31rem, 72dvh);
+  width: min(26rem, calc(100vw - 2 * var(--gutter)));
+  max-height: min(33rem, 72dvh);
   padding: 0.5rem;
   border-radius: var(--radius);
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--panel-2) 70%, transparent), transparent 9rem),
-    var(--panel-solid);
-  box-shadow:
-    inset 0 1px 0 var(--sheen),
-    var(--shadow-lift);
   translate: -50% 0;
   text-align: start;
   transform-origin: top center;
+}
+
+/* the open menu's button is lit, the whole of it */
+.dl-split:has(.dl-more[open]:not([data-closing])) {
+  box-shadow:
+    0 0 0 4px color-mix(in srgb, var(--gold) 26%, transparent),
+    0 10px 24px -12px color-mix(in srgb, var(--gold) 72%, transparent);
+}
+
+.menu-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.2rem 0.75rem;
+  margin: 0.15rem 0.5rem 0.45rem;
+}
+
+.menu-head .menu-title {
+  margin: 0;
+}
+
+.menu-release {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--ink-faint);
+  font: 500 0.74rem var(--sans);
+}
+
+.menu-release code {
+  padding: 0.12rem 0.42rem;
+  border: 1px solid color-mix(in srgb, var(--gold) 45%, var(--edge-soft));
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--gold) 14%, var(--panel-2));
+  color: var(--title);
+  font: 600 0.72rem var(--mono);
 }
 
 .menu-title {
@@ -588,6 +619,11 @@ body:has(dialog[open]) .wave {
 
 .menu .menu-groups {
   gap: 0.35rem;
+}
+
+/* a long file name is cut short, it never widens its row */
+.dl .menu ul {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .menu-group + .menu-group {
@@ -635,6 +671,15 @@ body:has(dialog[open]) .wave {
   font: 500 0.76rem var(--sans);
 }
 
+/* the file's own name, as it will lie in the downloads folder */
+.dl-name {
+  overflow: hidden;
+  color: var(--ink-faint);
+  font: 500 0.7rem var(--mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .dl-item .dl-get {
   flex: none;
   width: 1.05rem;
@@ -672,16 +717,37 @@ body:has(dialog[open]) .wave {
 
 /* the systems arrive one after the other as the menu opens */
 @media (prefers-reduced-motion: no-preference) {
-  .dl-more[open] .menu-group {
-    animation: badge-in 300ms var(--ease) both;
+  .dl-more[open]:not([data-closing]) .menu-group,
+  .dl-more[open]:not([data-closing]) .menu-foot {
+    animation: menu-row-in 320ms var(--ease) both;
   }
 
-  .dl-more[open] .menu-group:nth-child(2) {
-    animation-delay: 50ms;
+  .dl-more .menu-group:nth-child(1) {
+    animation-delay: 40ms;
   }
 
-  .dl-more[open] .menu-group:nth-child(3) {
-    animation-delay: 100ms;
+  .dl-more .menu-group:nth-child(2) {
+    animation-delay: 95ms;
+  }
+
+  .dl-more .menu-group:nth-child(3) {
+    animation-delay: 150ms;
+  }
+
+  .dl-more .menu-foot {
+    animation-delay: 205ms;
+  }
+
+  /* the arrow dips into its tray; the row stays where it is */
+  .dl-item:hover .dl-get,
+  .dl-item:focus-visible .dl-get {
+    animation: get-dip 520ms var(--ease);
+  }
+}
+
+@keyframes get-dip {
+  40% {
+    transform: translateY(3px);
   }
 }
 

@@ -144,6 +144,7 @@ fn menu_items(lang: Lang, release: &Release, mine: Option<Platform>) -> impl Int
                                         {sep()}
                                         {words::dl_size(lang, &format::megabytes(lang, file.size))}
                                     </span>
+                                    <span class="dl-name" translate="no">{file.name.clone()}</span>
                                 </span>
                                 {yours}
                                 {solid::icon_as(solid::DOWNLOAD, "dl-get")}
@@ -266,7 +267,13 @@ pub fn download_block(cx: &Context<'_>, on_page: bool) -> impl IntoView + use<> 
                         {solid::icon_as(solid::DOWN, "chevron")}
                     </summary>
                     <div class="menu">
-                        <p class="menu-title">{words::dl_menu_title(lang)}</p>
+                        <div class="menu-head">
+                            <p class="menu-title">{words::dl_menu_title(lang)}</p>
+                            <p class="menu-release">
+                                <code translate="no">{release.tag.clone()}</code>
+                                <span class="dl-date">{format::date(lang, &release.date)}</span>
+                            </p>
+                        </div>
                         <ul class="menu-groups">{items}</ul>
                         <p class="menu-foot">
                             <a href=others.clone()>{words::dl_others(lang)}</a>

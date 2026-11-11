@@ -156,30 +156,58 @@
   // The dropdowns (the language menu, the download's other systems) are
   // <details data-menu>: they open without script; with it, one at a time,
   // and they close on a press outside, on Escape (the keyboard back on
-  // their button) and when the keyboard leaves them.
+  // their button) and when the keyboard leaves them. A menu leaves the way
+  // it came: `data-closing` plays its way out, then `open` falls.
+  const calm = matchMedia("(prefers-reduced-motion: reduce)");
   const menus = () => document.querySelectorAll("details[data-menu][open]");
+  const gone = (menu) => {
+    if (!("closing" in menu.dataset)) return;
+    delete menu.dataset.closing;
+    menu.open = false;
+  };
+  const close = (menu) => {
+    if (!menu.open || "closing" in menu.dataset) return;
+    if (calm.matches || !menu.querySelector(":scope > .menu")) {
+      menu.open = false;
+      return;
+    }
+    menu.dataset.closing = "";
+    setTimeout(gone, 240, menu);
+  };
+  document.addEventListener("animationend", (event) => {
+    const menu = event.target instanceof Element && event.target.matches(".menu") ? event.target.parentElement : null;
+    if (menu instanceof HTMLDetailsElement) gone(menu);
+  });
   document.addEventListener(
     "toggle",
     (event) => {
       const opened = event.target;
       if (!(opened instanceof HTMLDetailsElement) || !opened.open || !opened.matches("[data-menu]")) return;
-      for (const other of menus()) if (other !== opened) other.open = false;
+      for (const other of menus()) if (other !== opened) close(other);
     },
     true,
   );
+  document.addEventListener("click", (event) => {
+    const summary = event.target instanceof Element ? event.target.closest("details[data-menu] > summary") : null;
+    const menu = summary?.parentElement;
+    if (!(menu instanceof HTMLDetailsElement) || !menu.open) return;
+    // its own button closes an open menu; a second press while it leaves does nothing
+    event.preventDefault();
+    close(menu);
+  });
   document.addEventListener("pointerdown", (event) => {
-    for (const menu of menus()) if (!(event.target instanceof Node && menu.contains(event.target))) menu.open = false;
+    for (const menu of menus()) if (!(event.target instanceof Node && menu.contains(event.target))) close(menu);
   });
   document.addEventListener("keydown", (event) => {
     if (event.key !== "Escape") return;
     for (const menu of menus()) {
-      menu.open = false;
       menu.querySelector("summary")?.focus();
+      close(menu);
     }
   });
   document.addEventListener("focusout", (event) => {
     const menu = event.target instanceof Element ? event.target.closest("details[data-menu][open]") : null;
-    if (menu && !(event.relatedTarget instanceof Node && menu.contains(event.relatedTarget))) menu.open = false;
+    if (menu && !(event.relatedTarget instanceof Node && menu.contains(event.relatedTarget))) close(menu);
   });
 
   // An island's form works only once the islands run. Until then the
