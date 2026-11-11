@@ -5,10 +5,10 @@
 //! token travels only in the `__Host-central` cookie.
 use axum::{
     Router,
-    body::to_bytes,
+    body::{Body, Bytes},
     extract::{Path, Request as HttpRequest, State},
-    http::{HeaderMap, HeaderName, HeaderValue, StatusCode, Uri, header},
-    middleware::{self, Next},
+    http::{HeaderMap, HeaderName, HeaderValue, StatusCode, Uri, header, request::Parts},
+    middleware,
     response::{IntoResponse, Response},
     routing::post,
 };
@@ -22,7 +22,7 @@ use std::{
     collections::BTreeMap,
     future::Future,
     net::{IpAddr, SocketAddr},
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, PoisonError},
     time::{Duration, Instant},
 };
 use tower_http::timeout::TimeoutLayer;
@@ -126,54 +126,122 @@ struct Browser<A> {
     accounts: Arc<A>,
     site: BrowserOrigin,
     budgets: Mutex<Budgets>,
+    in_flight: InFlight,
 }
 
+/// How long a request's body may take to arrive once its headers passed;
+/// the page's bodies are small, so a slow one is a stalled one.
+const BODY_TIME: Duration = Duration::from_secs(2);
+/// How long the service may take to answer once the body is read.
+const ANSWER_TIME: Duration = Duration::from_secs(5);
+/// Requests one client address may have in flight at once, its body's
+/// wait included; a page sends one at a time (the chat strictly in turn).
+const IN_FLIGHT: u8 = 4;
+/// Most addresses with a request in flight; the listener's connection cap
+/// (at most 128) keeps the table far below it.
+const IN_FLIGHT_ADDRESSES: usize = 1_024;
+
 pub(crate) fn router<A: Accounts>(accounts: Arc<A>, site: BrowserOrigin) -> Router {
-    let state = Arc::new(Browser {
+    routes(Arc::new(Browser {
         accounts,
         site,
         budgets: Mutex::default(),
-    });
+        in_flight: InFlight::default(),
+    }))
+}
+
+fn routes<A: Accounts>(state: Arc<Browser<A>>) -> Router {
     Router::new()
         .route("/api/v1", post(call::<A>))
         .route("/api/v1/reports/{report}/{part}", post(report_part::<A>))
+        // Nothing of a request to another path or with another method is read.
         .fallback(|| async { (StatusCode::NOT_FOUND, "not found\n") })
         .with_state(state)
-        .layer(middleware::from_fn(bounded))
+        // A backstop only: the body and the answer each have their own
+        // deadline, the body's after the checks on the headers alone.
         .layer(TimeoutLayer::with_status_code(
             StatusCode::REQUEST_TIMEOUT,
-            Duration::from_secs(5),
+            BODY_TIME.saturating_add(ANSWER_TIME),
         ))
         // Outermost: refusals and timeouts also receive the security headers.
         .layer(middleware::from_fn(super::boundary::headers))
-}
-
-async fn bounded(request: HttpRequest, next: Next) -> Response {
-    super::boundary::bounded(request, REQUEST_BYTES, next).await
 }
 
 fn refused() -> Response {
     (StatusCode::FORBIDDEN, "request not permitted\n").into_response()
 }
 
-async fn call<A: Accounts>(State(state): State<Arc<Browser<A>>>, request: HttpRequest) -> Response {
-    let (parts, body) = request.into_parts();
-    let headers = &parts.headers;
+fn timed_out() -> Response {
+    (StatusCode::REQUEST_TIMEOUT, "request timed out\n").into_response()
+}
+
+/// Why a request is refused before the service is asked.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Refusal {
+    /// Not the site's own page through its proxy (403).
+    NotPermitted,
+    /// No well-formed client address (400).
+    NoClient,
+    /// The address has [`IN_FLIGHT`] requests in flight already, or the
+    /// table is full (429).
+    Busy,
+    /// The body is too large or broken (413 or 400).
+    Body(StatusCode),
+    /// The body did not arrive within [`BODY_TIME`] (408).
+    TimedOut,
+}
+
+impl IntoResponse for Refusal {
+    fn into_response(self) -> Response {
+        match self {
+            Self::NotPermitted => refused(),
+            Self::NoClient => (StatusCode::BAD_REQUEST, "invalid request\n").into_response(),
+            Self::Busy => failure(Error::Busy),
+            Self::Body(status) => (status, "request rejected\n").into_response(),
+            Self::TimedOut => timed_out(),
+        }
+    }
+}
+
+/// What a request must pass on its headers alone, before its body is read
+/// or the service is asked: the loopback proxy as the peer, the site's exact
+/// headers, the client's address, and a place among that address's
+/// requests in flight, held until the request ends however it ends.
+fn admit<'a, A>(state: &'a Browser<A>, parts: &Parts) -> Result<Permit<'a>, Refusal> {
     // Only the local proxy reaches this listener; its forwarded address counts.
     let local = parts
         .extensions
         .get::<Peer>()
         .is_some_and(|Peer(peer)| peer.ip().is_loopback());
-    if !local || !permitted(&parts.uri, headers, &state.site) {
-        return refused();
+    if !local || !permitted(&parts.uri, &parts.headers, &state.site) {
+        return Err(Refusal::NotPermitted);
     }
-    // Already read whole, within the bound, by `bounded`.
-    let Ok(body) = to_bytes(body, REQUEST_BYTES).await else {
-        return (StatusCode::PAYLOAD_TOO_LARGE, "request rejected\n").into_response();
+    let client = client(&parts.headers).ok_or(Refusal::NoClient)?;
+    state.in_flight.admit(client).ok_or(Refusal::Busy)
+}
+
+/// The body, within [`REQUEST_BYTES`] and [`BODY_TIME`].
+async fn read_body(parts: &Parts, body: Body) -> Result<Bytes, Refusal> {
+    tokio::time::timeout(
+        BODY_TIME,
+        super::boundary::read(&parts.headers, body, REQUEST_BYTES),
+    )
+    .await
+    .map_err(|_| Refusal::TimedOut)?
+    .map_err(Refusal::Body)
+}
+
+async fn call<A: Accounts>(State(state): State<Arc<Browser<A>>>, request: HttpRequest) -> Response {
+    let (parts, body) = request.into_parts();
+    let permit = match admit(&state, &parts) {
+        Ok(permit) => permit,
+        Err(refusal) => return refusal.into_response(),
     };
-    let Some(client) = client(headers) else {
-        return (StatusCode::BAD_REQUEST, "invalid request\n").into_response();
+    let body = match read_body(&parts, body).await {
+        Ok(body) => body,
+        Err(refusal) => return refusal.into_response(),
     };
+    let headers = &parts.headers;
     let Ok(request) = central_api::decode::<Request>(&body) else {
         return failure(Error::Rejected);
     };
@@ -182,7 +250,7 @@ async fn call<A: Accounts>(State(state): State<Arc<Browser<A>>>, request: HttpRe
     }
     // The guard is gone before anything is awaited.
     let charged = match state.budgets.lock() {
-        Ok(mut budgets) => budgets.charge(&request, client, Instant::now()),
+        Ok(mut budgets) => budgets.charge(&request, permit.client, Instant::now()),
         Err(_) => return failure(Error::Unavailable),
     };
     if !charged {
@@ -191,7 +259,14 @@ async fn call<A: Accounts>(State(state): State<Arc<Browser<A>>>, request: HttpRe
     let logout = matches!(request, Request::Logout);
     let deletion = matches!(request, Request::DeleteAccountFinish { .. });
     let cookie = cookie(headers);
-    let result = state.accounts.browser(request, cookie.as_ref()).await;
+    let Ok(result) = tokio::time::timeout(
+        ANSWER_TIME,
+        state.accounts.browser(request, cookie.as_ref()),
+    )
+    .await
+    else {
+        return timed_out();
+    };
     // A deleted account's session is gone with it.
     let deleted = deletion && result.is_ok();
     let mut response = match result.and_then(|reply| {
@@ -217,41 +292,38 @@ async fn call<A: Accounts>(State(state): State<Arc<Browser<A>>>, request: HttpRe
 
 /// A report's part for an administrator's page (`docs/reports.md`): the
 /// same proofs as `POST /api/v1` (the local proxy, the site's exact headers,
-/// a client address, its budget), an administrator's cookie, and the gzip as
-/// stored. The page unpacks it; nothing here does.
+/// a client address, its place in flight, its budget), an administrator's
+/// cookie, and the gzip as stored. The page unpacks it; nothing here does.
 async fn report_part<A: Accounts>(
     State(state): State<Arc<Browser<A>>>,
     Path((report, part)): Path<(String, String)>,
     request: HttpRequest,
 ) -> Response {
-    let (parts, _) = request.into_parts();
-    let headers = &parts.headers;
-    let local = parts
-        .extensions
-        .get::<Peer>()
-        .is_some_and(|Peer(peer)| peer.ip().is_loopback());
-    if !local || !permitted(&parts.uri, headers, &state.site) {
-        return refused();
-    }
-    let Some(client) = client(headers) else {
-        return (StatusCode::BAD_REQUEST, "invalid request\n").into_response();
+    let (parts, body) = request.into_parts();
+    let permit = match admit(&state, &parts) {
+        Ok(permit) => permit,
+        Err(refusal) => return refusal.into_response(),
     };
+    // Nothing is asked of the body, but it keeps the listener's bounds.
+    if let Err(refusal) = read_body(&parts, body).await {
+        return refusal.into_response();
+    }
     let (Some(report), Ok(part)) = (hex_id(&report), Part::from_stored(&part)) else {
         return failure(Error::Rejected);
     };
     let charged = match state.budgets.lock() {
-        Ok(mut budgets) => budgets.parts.charge(client, Instant::now(), 120, MINUTE),
+        Ok(mut budgets) => budgets
+            .parts
+            .charge(permit.client, Instant::now(), 120, MINUTE),
         Err(_) => return failure(Error::Unavailable),
     };
     if !charged {
         return failure(Error::Busy);
     }
-    match state
-        .accounts
-        .report_part(cookie(headers).as_ref(), report, part)
-        .await
-    {
-        Ok((gzip, origin)) => {
+    let cookie = cookie(&parts.headers);
+    let answer = state.accounts.report_part(cookie.as_ref(), report, part);
+    match tokio::time::timeout(ANSWER_TIME, answer).await {
+        Ok(Ok((gzip, origin))) => {
             let mut response = ([(header::CONTENT_TYPE, "application/gzip")], gzip).into_response();
             if let Some(origin) = origin {
                 response.headers_mut().insert(
@@ -261,7 +333,8 @@ async fn report_part<A: Accounts>(
             }
             response
         }
-        Err(error) => failure(error),
+        Ok(Err(error)) => failure(error),
+        Err(_) => timed_out(),
     }
 }
 
@@ -390,6 +463,69 @@ impl From<IpAddr> for Client {
     }
 }
 
+/// The requests in flight per client address (at most [`IN_FLIGHT`] each),
+/// in memory only; an address leaves the table with its last request.
+#[derive(Default)]
+struct InFlight(Mutex<BTreeMap<Client, u8>>);
+
+/// One request's place among its address's requests in flight; dropping it,
+/// however the request ends (answered, refused, timed out, its connection
+/// gone), gives the place back.
+struct Permit<'a> {
+    table: &'a InFlight,
+    client: Client,
+}
+
+impl InFlight {
+    /// A place for one more request of `client`, unless it has
+    /// [`IN_FLIGHT`] already or the table is full. A place held is never
+    /// taken away: a full table refuses newcomers rather than evict.
+    fn admit(&self, client: Client) -> Option<Permit<'_>> {
+        // Nothing panics while the table is held; a poisoned one is still whole.
+        let mut table = self.0.lock().unwrap_or_else(PoisonError::into_inner);
+        if let Some(count) = table.get_mut(&client) {
+            if *count >= IN_FLIGHT {
+                return None;
+            }
+            *count += 1;
+        } else {
+            if table.len() >= IN_FLIGHT_ADDRESSES {
+                return None;
+            }
+            table.insert(client, 1);
+        }
+        Some(Permit {
+            table: self,
+            client,
+        })
+    }
+
+    /// The requests `client` has in flight.
+    #[cfg(test)]
+    fn count(&self, client: Client) -> u8 {
+        let table = self.0.lock().unwrap_or_else(PoisonError::into_inner);
+        table.get(&client).copied().unwrap_or(0)
+    }
+
+    /// The addresses with a request in flight.
+    #[cfg(test)]
+    fn addresses(&self) -> usize {
+        self.0.lock().unwrap_or_else(PoisonError::into_inner).len()
+    }
+}
+
+impl Drop for Permit<'_> {
+    fn drop(&mut self) {
+        let mut table = self.table.0.lock().unwrap_or_else(PoisonError::into_inner);
+        if let Some(count) = table.get_mut(&self.client) {
+            *count = count.saturating_sub(1);
+            if *count == 0 {
+                table.remove(&self.client);
+            }
+        }
+    }
+}
+
 /// Most addresses one budget remembers; past it the oldest window goes, so a
 /// crowd of addresses cannot lock new ones out.
 const ADDRESSES: usize = 4_096;
@@ -482,6 +618,8 @@ mod tests {
     struct Mock {
         calls: Mutex<Vec<(String, Option<[u8; 32]>)>>,
         fail: Option<Error>,
+        /// Never answer, as a service that hangs.
+        stall: bool,
     }
 
     const SESSION: [u8; 32] = [0xab; 32];
@@ -515,7 +653,13 @@ mod tests {
                     session: None,
                 }),
             };
-            std::future::ready(reply)
+            let stall = self.stall;
+            async move {
+                if stall {
+                    std::future::pending::<()>().await;
+                }
+                reply
+            }
         }
 
         fn report_part(
@@ -1336,6 +1480,282 @@ mod tests {
         // The oldest window made room; the newest are kept.
         let oldest = Client::from(IpAddr::from(std::net::Ipv4Addr::from(0x0a00_0000)));
         assert!(!book.0.contains_key(&oldest));
+    }
+
+    /// A body that never sends a byte: a client that stops after its headers.
+    struct Stalled;
+
+    impl hyper::body::Body for Stalled {
+        type Data = Bytes;
+        type Error = std::convert::Infallible;
+
+        fn poll_frame(
+            self: std::pin::Pin<&mut Self>,
+            _: &mut std::task::Context<'_>,
+        ) -> std::task::Poll<Option<Result<hyper::body::Frame<Bytes>, Self::Error>>> {
+            std::task::Poll::Pending
+        }
+    }
+
+    /// The listener's state and its routes, so a test can see the table.
+    fn listener_with(mock: Mock) -> (Arc<Browser<Mock>>, Router) {
+        let state = Arc::new(Browser {
+            accounts: Arc::new(mock),
+            site: BrowserOrigin::live(),
+            budgets: Mutex::default(),
+            in_flight: InFlight::default(),
+        });
+        (state.clone(), routes(state))
+    }
+
+    fn from(address: &str) -> Vec<(&'static str, String)> {
+        with("x-forwarded-for", &[address])
+    }
+
+    fn client_of(address: &str) -> Client {
+        Client::from(address.parse::<IpAddr>().unwrap())
+    }
+
+    /// A request whose body never comes, sent in the background.
+    fn stall(app: &Router, address: &str) -> tokio::task::JoinHandle<StatusCode> {
+        let mut builder = HttpRequest::builder()
+            .method("POST")
+            .uri("/api/v1")
+            .extension(Peer(LOOPBACK.parse().unwrap()));
+        for (name, value) in from(address) {
+            builder = builder.header(name, value);
+        }
+        let request = builder.body(Body::new(Stalled)).unwrap();
+        let app = app.clone();
+        tokio::spawn(async move { app.oneshot(request).await.unwrap().status() })
+    }
+
+    async fn until(what: impl Fn() -> bool) {
+        tokio::time::timeout(Duration::from_secs(2), async {
+            while !what() {
+                tokio::time::sleep(Duration::from_millis(5)).await;
+            }
+        })
+        .await
+        .expect("in time");
+    }
+
+    #[tokio::test]
+    async fn a_stalled_body_holds_no_more_than_its_address_s_places() {
+        let (state, app) = listener_with(Mock::default());
+        let stalled = "198.51.100.7";
+        let waiting: Vec<_> = (0..IN_FLIGHT).map(|_| stall(&app, stalled)).collect();
+        until(|| state.in_flight.count(client_of(stalled)) == IN_FLIGHT).await;
+        // One more from the same address is refused at once, before its body
+        // is read, the service asked or a budget charged.
+        let started = Instant::now();
+        let refused = send(&app, &from(stalled), discover()).await;
+        assert_eq!(refused.status, StatusCode::TOO_MANY_REQUESTS);
+        assert!(started.elapsed() < BODY_TIME);
+        assert_eq!(state.in_flight.count(client_of(stalled)), IN_FLIGHT);
+        // Another address is served meanwhile.
+        let other = send(&app, &from("198.51.100.8"), discover()).await;
+        assert_eq!(other.status, StatusCode::OK);
+        assert_eq!(state.in_flight.count(client_of("198.51.100.8")), 0);
+        // The stalled bodies time out on their own deadline and give their places back.
+        for waiting in waiting {
+            assert_eq!(waiting.await.unwrap(), StatusCode::REQUEST_TIMEOUT);
+        }
+        assert_eq!(state.in_flight.addresses(), 0);
+        let again = send(&app, &from(stalled), discover()).await;
+        assert_eq!(again.status, StatusCode::OK);
+        assert_eq!(
+            calls(&state.accounts),
+            2,
+            "the stalled requests asked nothing"
+        );
+        let budgets = state.budgets.lock().unwrap();
+        assert_eq!(
+            budgets
+                .discover
+                .0
+                .get(&client_of(stalled))
+                .map(|(_, used)| *used),
+            Some(1),
+            "only the served request spent a unit"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_place_in_flight_is_given_back_however_the_request_ends() {
+        let (state, app) = listener_with(Mock::default());
+        let address = "198.51.100.9";
+        let register = body(&Request::Register {
+            username: "synthetic".into(),
+            nonce: String::new(),
+            counters: Vec::new(),
+            display_name: None,
+        });
+        // answered, malformed, not a browser operation, too large, over budget
+        let mut statuses = Vec::new();
+        for text in [
+            discover(),
+            "{".to_owned(),
+            body(&Request::ReadDocument),
+            " ".repeat(REQUEST_BYTES + 1),
+        ] {
+            statuses.push(send(&app, &from(address), text).await.status);
+            assert_eq!(state.in_flight.addresses(), 0);
+        }
+        for _ in 0..6 {
+            statuses.push(send(&app, &from(address), register.clone()).await.status);
+            assert_eq!(state.in_flight.addresses(), 0);
+        }
+        assert_eq!(
+            statuses[..4],
+            [
+                StatusCode::OK,
+                StatusCode::UNAUTHORIZED,
+                StatusCode::FORBIDDEN,
+                StatusCode::PAYLOAD_TOO_LARGE
+            ]
+        );
+        assert_eq!(statuses[9], StatusCode::TOO_MANY_REQUESTS);
+        // More requests than places, one after another: none is refused for a
+        // place an earlier one kept.
+        for _ in 0..(usize::from(IN_FLIGHT) * 3) {
+            assert_eq!(
+                send(&app, &from(address), discover()).await.status,
+                StatusCode::OK
+            );
+        }
+        // The service's own deadline: an answer that never comes times out
+        // and gives the place back too.
+        let (state, app) = listener_with(Mock {
+            stall: true,
+            ..Mock::default()
+        });
+        let started = Instant::now();
+        let hung = send(&app, &from(address), discover()).await;
+        assert_eq!(hung.status, StatusCode::REQUEST_TIMEOUT);
+        assert!(started.elapsed() >= ANSWER_TIME);
+        assert_eq!(state.in_flight.addresses(), 0);
+    }
+
+    #[test]
+    fn a_full_table_refuses_newcomers_and_never_evicts_a_place() {
+        let table = InFlight::default();
+        let mut held = Vec::new();
+        for index in 0..u32::try_from(IN_FLIGHT_ADDRESSES).unwrap() {
+            let client = Client::from(IpAddr::from(std::net::Ipv4Addr::from(0x0a00_0000 + index)));
+            held.push(table.admit(client).expect("a place"));
+        }
+        let newcomer = client_of("198.51.100.7");
+        assert!(table.admit(newcomer).is_none());
+        // An address already in the table still has its other places.
+        let first = Client::from(IpAddr::from(std::net::Ipv4Addr::from(0x0a00_0000)));
+        for _ in 1..IN_FLIGHT {
+            held.push(table.admit(first).expect("its own place"));
+        }
+        assert!(table.admit(first).is_none());
+        assert_eq!(table.count(first), IN_FLIGHT);
+        drop(held);
+        assert_eq!(table.addresses(), 0);
+        assert!(table.admit(newcomer).is_some());
+    }
+
+    /// A request over a real socket from the loopback proxy, its headers
+    /// as the page's, from `address`, declaring `length` bytes and sending `sent`.
+    fn raw(address: &str, length: usize, sent: &str) -> String {
+        use std::fmt::Write as _;
+        let mut text = String::from("POST /api/v1 HTTP/1.1\r\n");
+        for (name, value) in from(address) {
+            let _ = write!(text, "{name}: {value}\r\n");
+        }
+        let _ = write!(text, "content-length: {length}\r\n\r\n{sent}");
+        text
+    }
+
+    fn answer(socket: &mut std::net::TcpStream) -> String {
+        use std::io::Read as _;
+        let mut answer = Vec::new();
+        let _ = socket.read_to_end(&mut answer);
+        String::from_utf8_lossy(&answer).into_owned()
+    }
+
+    #[tokio::test]
+    async fn stalled_bodies_cannot_take_the_listener_s_connections() {
+        use std::io::Write as _;
+        let config = central_policy::config::Config::from_pairs([
+            ("BAYLEE_CENTRAL_LISTEN", "127.0.0.1:0"),
+            ("BAYLEE_CENTRAL_CONCURRENT_REQUESTS", "8"),
+        ])
+        .unwrap();
+        let bound = super::super::DevelopmentServer::bind(config).await.unwrap();
+        let address = bound.local_addr();
+        let (state, app) = listener_with(Mock::default());
+        let (stop, stopped) = tokio::sync::oneshot::channel::<()>();
+        let running = tokio::spawn(bound.run_router(app, Duration::from_secs(10), async {
+            let _ = stopped.await;
+        }));
+        let connect = move || {
+            let socket =
+                std::net::TcpStream::connect_timeout(&address, Duration::from_secs(2)).unwrap();
+            socket
+                .set_read_timeout(Some(Duration::from_secs(5)))
+                .unwrap();
+            socket
+        };
+        // Four stalled bodies from one address, and one that goes away.
+        let mut stalled: Vec<_> = (0..IN_FLIGHT)
+            .map(|_| {
+                let mut socket = connect();
+                socket
+                    .write_all(raw("203.0.113.5", 64, "{").as_bytes())
+                    .unwrap();
+                socket
+            })
+            .collect();
+        let stalled_client = client_of("203.0.113.5");
+        until(|| state.in_flight.count(stalled_client) == IN_FLIGHT).await;
+        let (served, refused) = tokio::task::spawn_blocking(move || {
+            let mut gone = connect();
+            gone.write_all(raw("203.0.113.6", 64, "{").as_bytes())
+                .unwrap();
+            drop(gone);
+            // The fifth from the stalled address is answered at once.
+            let started = Instant::now();
+            let mut fifth = connect();
+            fifth
+                .write_all(raw("203.0.113.5", 64, "").as_bytes())
+                .unwrap();
+            let refused = (answer(&mut fifth), started.elapsed());
+            // Another address is served while the four wait.
+            let body = discover();
+            let mut other = connect();
+            other
+                .write_all(raw("203.0.113.7", body.len(), &body).as_bytes())
+                .unwrap();
+            (answer(&mut other), refused)
+        })
+        .await
+        .unwrap();
+        assert!(refused.0.starts_with("HTTP/1.1 429"), "{}", refused.0);
+        assert!(refused.1 < BODY_TIME, "{:?}", refused.1);
+        assert!(served.starts_with("HTTP/1.1 200"), "{served}");
+        // The one whose connection went away has given its place back.
+        until(|| state.in_flight.count(client_of("203.0.113.6")) == 0).await;
+        // The stalled ones end on the body's deadline, not the connection's.
+        let answers =
+            tokio::task::spawn_blocking(move || stalled.iter_mut().map(answer).collect::<Vec<_>>())
+                .await
+                .unwrap();
+        for answer in answers {
+            assert!(answer.starts_with("HTTP/1.1 408"), "{answer}");
+        }
+        assert_eq!(state.in_flight.addresses(), 0);
+        stop.send(()).unwrap();
+        tokio::time::timeout(Duration::from_secs(5), running)
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap();
+        assert_eq!(calls(&state.accounts), 1);
     }
 
     fn site(host: &str, origin: &str) -> Vec<(&'static str, String)> {

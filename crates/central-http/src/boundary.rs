@@ -2,9 +2,9 @@ use std::{error::Error, future::Future, sync::Arc, time::Duration};
 
 use axum::{
     Router,
-    body::{Body, to_bytes},
+    body::{Body, Bytes, to_bytes},
     extract::{Request, State},
-    http::{HeaderValue, Method, StatusCode, header},
+    http::{HeaderMap, HeaderValue, Method, StatusCode, header},
     middleware::{self, Next},
     response::{IntoResponse, Response},
     routing::get,
@@ -92,38 +92,44 @@ async fn timed(limit: Duration, response: impl Future<Output = Response>) -> Res
 
 /// Read the whole body, at most `limit` bytes, before `next` runs.
 pub(crate) async fn bounded(request: Request, limit: usize, next: Next) -> Response {
+    let (parts, body) = request.into_parts();
+    match read(&parts.headers, body, limit).await {
+        Ok(bytes) => {
+            next.run(Request::from_parts(parts, Body::from(bytes)))
+                .await
+        }
+        Err(status) => (status, "request rejected\n").into_response(),
+    }
+}
+
+/// The whole body of a request with `headers`, at most `limit` bytes, or
+/// the status that refuses it (413, or 400 for a broken one).
+pub(crate) async fn read(
+    headers: &HeaderMap,
+    body: Body,
+    limit: usize,
+) -> Result<Bytes, StatusCode> {
     // Reject declared oversize before waiting for an attacker to send a body.
     // Streaming/chunked bodies are still bounded independently below.
-    if request
-        .headers()
-        .get(header::CONTENT_LENGTH)
-        .is_some_and(|value| {
-            value
-                .to_str()
-                .ok()
-                .and_then(|value| value.parse::<u64>().ok())
-                .is_none_or(|length| length > limit as u64)
-        })
-    {
-        return (StatusCode::PAYLOAD_TOO_LARGE, "request rejected\n").into_response();
+    if headers.get(header::CONTENT_LENGTH).is_some_and(|value| {
+        value
+            .to_str()
+            .ok()
+            .and_then(|value| value.parse::<u64>().ok())
+            .is_none_or(|length| length > limit as u64)
+    }) {
+        return Err(StatusCode::PAYLOAD_TOO_LARGE);
     }
-    let (parts, body) = request.into_parts();
-    let bytes = match to_bytes(body, limit).await {
-        Ok(bytes) => bytes,
-        Err(error) => {
-            let status = if error
-                .source()
-                .is_some_and(<dyn Error>::is::<http_body_util::LengthLimitError>)
-            {
-                StatusCode::PAYLOAD_TOO_LARGE
-            } else {
-                StatusCode::BAD_REQUEST
-            };
-            return (status, "request rejected\n").into_response();
+    to_bytes(body, limit).await.map_err(|error| {
+        if error
+            .source()
+            .is_some_and(<dyn Error>::is::<http_body_util::LengthLimitError>)
+        {
+            StatusCode::PAYLOAD_TOO_LARGE
+        } else {
+            StatusCode::BAD_REQUEST
         }
-    };
-    next.run(Request::from_parts(parts, Body::from(bytes)))
-        .await
+    })
 }
 
 pub(crate) async fn headers(request: Request, next: Next) -> Response {

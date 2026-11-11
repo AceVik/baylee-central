@@ -28,6 +28,12 @@ use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 /// Upper bound on one configuration document; the CA bundle is most of it.
 const MAX_SETTINGS: usize = 131_072;
 
+/// The browser listener's connections at once: the policy's most. Each holds
+/// at most a 64 KiB body, one address at most four of them
+/// (`central_http`'s places in flight), so a stalled body takes no more than
+/// its own address's share; the native listener keeps the default.
+const BROWSER_CONNECTIONS: &str = "128";
+
 /// One deployed database login. The address must be a loopback or private IP
 /// literal and the certificate authority a PEM bundle (see [`ServerConfig`]).
 #[derive(Deserialize, Zeroize, ZeroizeOnDrop)]
@@ -158,6 +164,7 @@ fn listener_configs(settings: &Service) -> Result<(Config, Option<Config>), ()> 
             Config::from_pairs([
                 ("BAYLEE_CENTRAL_LISTEN", browser.listen.as_str()),
                 ("BAYLEE_CENTRAL_REQUEST_BYTES", browser_bytes.as_str()),
+                ("BAYLEE_CENTRAL_CONCURRENT_REQUESTS", BROWSER_CONNECTIONS),
             ])
         })
         .transpose()
@@ -514,6 +521,14 @@ mod tests {
         for listen in ["0.0.0.0:28791", "192.168.1.2:28791", "baylee.app:443"] {
             assert!(config(listen).is_err(), "{listen}");
         }
+        // The deployed listeners: the browser one takes the policy's most
+        // connections, the native one the default.
+        let (native, browser) = listener_configs(&settings).unwrap();
+        let browser = browser.unwrap();
+        assert_eq!(browser.concurrent_requests().get(), 128);
+        assert_eq!(browser.request_bytes().get(), BROWSER_REQUEST_BYTES);
+        assert_eq!(native.concurrent_requests().get(), 32);
+        assert_eq!(native.request_bytes().get(), MAX_WIRE_BYTES);
         for extra in [
             r#","browser":{"listen":"127.0.0.1:28791","origin":"https://evil.example"}"#,
             r#","browser":{}"#,
