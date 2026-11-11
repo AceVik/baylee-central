@@ -342,6 +342,8 @@
 }
 
 .impressum-details {
+  /* a label on its value's first line, also beside a button's height */
+  align-items: first baseline;
   margin-block: var(--space-4);
   font-family: var(--font-ui);
   font-size: var(--text-md);
@@ -349,6 +351,21 @@
 
 .impressum-details address {
   font-style: normal;
+}
+
+/* An address and its button: beside each other, the button below when the
+   line is short. */
+.impressum-details dd:has(.impressum-value) {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+}
+
+/* The Impressum's bait (legal.rs): for robots only. `hidden` hides it even
+   without this sheet; this holds should a rule ever give links a display. */
+.bait {
+  display: none !important;
 }
 
 .error-page {
