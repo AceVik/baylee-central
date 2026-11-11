@@ -3489,3 +3489,228 @@ by the owner's choice.
 the browser suite on pages with and without figures. Not tested: a real
 gateway's pulse (none sends one yet), and the strip with six-digit numbers
 in every language at every width (checked by eye in German and English).
+
+## Guessing a password online, 11 November 2026
+
+The owner asked for the sign-in to be protected against brute force as far
+as it goes, without breaking the released client or gateway.
+
+**Pass 1, design: what was there and what replaces it.** Read: the whole
+sign-in path on both listeners (`central-http`'s `native.rs`, `browser.rs`,
+`boundary.rs`, `in_flight.rs`; `central-identity`'s `lib.rs`, `dispatch.rs`,
+`limits.rs`, `password.rs`, `deletion.rs`, `reset.rs`, `legacy.rs`,
+`reports.rs`), the released client's transport in the game repository
+(read only) and the documents. Every place a secret can be guessed online:
+the password through `LoginStart`, `ChangePasswordStart` (two guesses) and
+`DeleteAccountStart`; the legacy password through `LegacyLogin`; a reset
+code (160 random bits) and the pairing and session tokens (256), which
+guessing does not reach. Found, in the order of what they cost:
+
+1. The native listener counted no client address at all
+   (`native.rs`, `process`): one address could send as many sign-in starts
+   as the 32 requests a second all clients share let through, at as many
+   accounts as it liked, and by doing so alone keep every sign-in at
+   `Busy`. The browser listener allowed one address 30 starts a minute
+   (43,200 a day) at any accounts.
+2. One account's password could be guessed 8 times a minute, 11,520 times
+   a day, from anywhere (`limits.rs`, `account`): the only count per
+   account was a minute's.
+3. That count's table held 1,024 entries, was keyed by whatever id a start
+   presented, and refused newcomers when full: about 17 starts a second
+   with made-up ids kept every real sign-in at `Busy`.
+4. Whoever knew an account's id kept its holder out everywhere with eight
+   requests a minute, the holder's own devices included (recorded on
+   31.10.2026 as the owner's trade-off).
+5. A start was counted before a worker was taken, and the three finishes
+   consumed their attempt before taking one: under load a start spent a
+   unit for nothing, and a right proof was lost with its attempt.
+6. On the browser listener, requests without a session other than the
+   budgeted ones (`Terms` or `LoginFinish`, say) had no address budget, and a
+   report's two native routes drew on the shared 32 a second before the
+   credential was looked at: one address could spend everyone's sign-ins
+   through either.
+7. Not changed, recorded: requests with a bearer nobody issued draw on the
+   windows all sessions share (512 and 256 a second) and on a table of
+   1,024 bearers a second that refuses newcomers when full, so a flood of
+   them keeps signed-in clients and gateways at `Busy`; sign-in itself goes
+   on. The page's only password rule is eight characters. `Discover` says
+   whether a name is enrolled (known, `native-login.md`).
+
+The design ([native login](native-login.md) §"Guessing a password online"
+has the numbers): a start is a guess until its proof. Counted per account
+over all places that are not its own, per account at a place, per place
+over all accounts, per IPv6 /48; a proof gives the guess back and makes the
+place the account's own for 30 days, where only its own count applies,
+until another password is set or the account is deleted; made-up ids
+together are one account and take no entry; a reset's start
+keeps the minute only; bounded tables that forget and never refuse; address
+budgets on the native listener, and a share per address of the requests
+without a session on both. Decided against:
+- **A lockout** (N failures close the account): it hands the lock to
+  whoever knows the id, for as long as they like, at every place. The
+  counts above do that only where the account never proved its password.
+- **Counting by account and address alone**: many addresses then guess
+  without a bound; the account's own count over all places stays.
+- **A proof of work or a device token for sign-in**: a released client can
+  send neither, and requiring one would lock it out. What a later client
+  needs is in the document.
+- **Writing the counts or the own places to the database**: a migration
+  and a store of who signed in from where; the owner's decision (below).
+- **A new answer or a `Retry-After` header**: the released client reads a
+  429 as `Busy` and asks again; nothing new is sent.
+
+**Pass 2, implementation.** `central-identity`: `guesses.rs` (new: the
+counts, the own places, the tables; no place has a `Debug`, so none is
+printed by accident), `limits.rs` (the per-place share of the shared
+windows), the starts and finishes in `lib.rs`, `password.rs`,
+`deletion.rs`, `legacy.rs` (worker first, then the count; the proof gives
+back), `reset.rs` (a finish forgets the account's own places but its own),
+`reports.rs` (a place for the two routes). `central-http`:
+`addresses.rs` (new: the native budgets), `boundary.rs` (the address
+attached to each request: the proxy's last hop from a loopback peer, none
+without one), `native.rs`, `browser.rs` (the address handed to the
+service). No wire shape, status, text, migration, grant or dependency
+changed; `IdentityService::handle` and `handle_browser` keep their
+signatures, with `handle_from` and `handle_browser_from` beside them;
+`file_report` and `report_upload` take the place. Nothing new is logged or
+stored.
+
+**Pass 3, an attacker's view, and what was tested.**
+- *One address, many accounts* (spraying, stuffing): 30 unproven guesses an
+  hour, 100 a day over all accounts; the /64s of one /48 share four
+  places' counts. Unit tests with their own clock.
+- *Many addresses, one account*: 30 an hour and 100 a day whatever the
+  number of addresses, 10 an hour from any one. Unit tests; over real
+  HTTP and PostgreSQL the seven evaluations a minute left after the
+  holder's sign-in, then `Busy` from three other addresses and natively.
+- *Filling the tables*: made-up ids take no account entry and share one
+  count; a full table forgets the entry that spent least, so 16,384
+  single guesses do not make it forget the account guessed at most.
+  Unit tests.
+- *Refunds as a way to guess more*: a proof returns exactly what its own
+  start spent, only into the window it was spent in, and an attempt is
+  consumed once; proving one's own account from an address frees nothing
+  for guesses at others from it. Unit tests
+  (`a_later_window_gets_nothing_back`, `a_proven_start_was_no_guess`).
+- *Choosing one's address*: the last hop is the proxy's; a forged earlier
+  hop changes nothing (tests on both listeners). A process on the host can
+  send its own hop and so spend, or use, another address's counts; it is
+  the operator's machine.
+- *Keeping someone out*: the holder at an own place is served while the
+  account's count is spent from elsewhere (unit test and real HTTP: eleven
+  right sign-ins in a row during it, more than a place's ten an hour).
+- *An own place as a way in*: whoever knew a password and proved it from
+  their own addresses kept those as the account's own after the holder
+  set another one, each with 30 guesses a day of its own beside the
+  account's hundred, for 30 days. Found in the review of the first two
+  commits and closed: a change or a reset leaves only the place it was
+  made from, a deletion none (unit test).
+- *Asking what the counts know*: with an address's or an account's count
+  spent, a start is answered only at an own place, so whoever sends from
+  an address learns whether a given account signed in from it. Not
+  closed; under "What stays possible".
+- *The account listener behind its proxy*: with the hop a proxy appends,
+  over real HTTP: the holder's address is served while a guesser's and a
+  request without a hop are refused; 30 discoveries a minute from one
+  address, then `Busy` for it alone, a forged earlier hop included, and
+  none for a request without a hop.
+- *An unknown name treated as a known one*: the same answer of the same
+  size after the same work, counted at its place as an account is; all
+  made-up ids share one account's count (unit test; real HTTP: answered,
+  and refused by the eleventh start at the latest).
+- *One address spending everyone's budget*: 600 a minute, then `Busy` for
+  it and service for the others, on every request that draws on the
+  shared budget, a report's routes included (unit tests).
+
+Run on this change, on its last code commit: `cargo xtask postgres`
+(PostgreSQL 18.6; the whole existing scenario unchanged, and the guessing
+steps after it), `cargo xtask smoke` and `smoke --exercise-failure`,
+`cargo xtask secrets` and `cargo deny check` pass. `cargo audit --deny
+warnings` reports RUSTSEC-2026-0459 (`libsqlite3-sys` 0.37.0), as it did
+before; `Cargo.toml`, `Cargo.lock` and `deny.toml` are untouched here.
+
+**`cargo xtask gate` did not pass.** Its format, policy, crypto-scope and
+clippy steps passed (the workspace, all targets and features, warnings
+denied); its test step stops at `xtask`'s
+`site::tests::no_language_is_english_under_another_name` ("es: 150 of 836
+messages are the English ones"). That test reads
+`crates/central-web/locales`, which this change does not touch and which
+is the same as at the commit it began from (`95e6185`); it belongs to
+whoever edits the locales. Every other test of the workspace passed
+(`cargo test --workspace --all-targets --all-features --no-fail-fast`),
+and the two steps the gate did not reach were run on their own and
+passed: the doc tests and the release build. The gate and the workspace's
+tests ran on the second of the three code commits; after the third,
+clippy and the tests ran again for the three crates it touches
+(`central-identity`, `central-http`, `central-client`), and the doc tests
+and the release build for the workspace.
+
+Not run: the game's client and gateway suites against this build (the
+game repository pins another Central branch, `c42/session-tokens`); a
+real proxy in front of the account listener (Caddy's last hop is taken
+from the earlier review above); the page's end-to-end suite, whose
+requests all arrive as one address.
+
+**What stays possible** (residual risks, for the owner):
+- **Guessing.** 100 guesses a day at one account from many addresses,
+  36,500 a year, and 30 more a day for whoever shares one of its own
+  addresses. That finds a common password. Nothing here checks what
+  password is chosen; the page asks for eight characters.
+- **Keeping someone out.** 100 requests a day from four addresses close an
+  account's password sign-in everywhere it has not proved its password in
+  the last 30 days, since the last restart; before, eight a minute from
+  one address closed it everywhere. Someone at the holder's own address
+  (a household, a campus, a carrier's shared address) closes it there too,
+  with 10 an hour. Every restart, so every deploy, forgets the own places:
+  a guesser who keeps asking then keeps the holder out again, an
+  administrator included, until the guessing addresses are kept away at
+  the proxy. Sessions that exist go on.
+- **A shared address** that spent its count (30 wrong passwords an hour
+  from anyone behind it) refuses its newcomers; those who signed in there
+  before are served.
+- **Many addresses** are bound by each account's count only: a botnet, or
+  an IPv6 provider's range, sprays as widely as the 32 requests a second
+  allow, and four addresses at 600 a minute each still spend those for
+  everyone. The share is counted by /64 with nothing wider above it, so
+  one IPv6 subscriber with a /56 is 256 addresses for it. Rate limits at
+  the proxy or the network must answer a flood.
+- **What the counts tell.** Whoever sends from an address (a household,
+  an office, a campus, a carrier's shared address, a VPN's exit) and knows
+  an account's id can find out whether that account proved its password
+  from that address in the last 30 days: with the address's hour spent,
+  which 30 unfinished starts do, a start at the account is answered there
+  only if the place is its own. Nothing about other addresses, and
+  nothing to anyone elsewhere. It comes with own places kept by address
+  and goes with a device token.
+- **Made-up ids cost a worker.** A start at one that only nobody's count
+  refuses has taken a worker and a statement before the refusal; the
+  address's 30 starts a minute and the shared 32 a second bound them.
+- **The counts tell a made-up id from an account's**: eight starts at a
+  made-up id, then one at the id in question, is refused only if that one
+  is nobody's too. `Discover` says as much for a name; it matters the day
+  discovery stops saying it.
+- **One process's memory.** A second instance would count on its own.
+  Above 16,384 accounts signing in within 30 days the least recent lose
+  their own places early.
+- **Without the proxy's header** the account listener counts per account
+  only; the runbook has the check.
+- **Privacy.** For up to 30 days the service's memory holds from which
+  address (an IPv4 address or an IPv6 /64) an account signed in, at most
+  eight per account, and for up to a day which addresses made unproven
+  sign-in attempts at which account. Another password forgets the
+  addresses but the one it was set from, a deletion all of them. Nothing
+  of it is written to disk or logged. The privacy notice must say so
+  before this is deployed, with what someone at the same address can
+  learn (above); the wording is the owner's.
+- **Every local, preview and end-to-end run is one address.**
+
+**Recommended, not built.** A device token and a proof of work for sign-in
+in a later client version, and the device token as a cookie on the website
+now; the own places kept across restarts (a table of account and a keyed
+digest of the address, with its own privacy decision); a check of chosen
+passwords against a list of common ones on the page, where the password is
+typed; `Retry-After` on a `Busy` answer, and words on the page that do not
+promise "a minute"; counting requests with a bearer only after the bearer
+is known, per address before that.
+
+Engineering review, not an audit.

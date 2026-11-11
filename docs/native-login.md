@@ -104,7 +104,9 @@ enrolled, unknown ones included, as before. `LegacyLogin { username, password }`
 
 1. spends the global request budget, then one of 30 legacy sign-ins a minute
    for all names and one of five a minute for this name (as typed,
-   lowercased); past either it is `Busy` and spends nothing;
+   lowercased), and since 11.11.2026 one guess of its place's (§"Guessing a
+   password online"; the proof gives it back); past any of them it is `Busy`
+   and spends nothing;
 2. reads the row for the canonical name, unless it is locked out or the
    deadline has passed;
 3. derives on the worker pool, against the row's salt or against a fixed one
@@ -209,7 +211,9 @@ current password (ASVS 6.2.3, in OPAQUE's form), inside the exchange itself:
    the session live, the account's move finished (registered, or the legacy
    move closed: while it is open the bridge's `LegacyInvalidate` is the reset
    authority) and Central's terms accepted. It charges the account's login
-   budget (eight OPRF evaluations a minute, shared with `LoginStart`) twice:
+   budget (eight OPRF evaluations a minute, shared with `LoginStart`, and
+   since 11.11.2026 the hours and days of §"Guessing a password online")
+   twice:
    the registration response is an evaluation of the account's OPRF key as
    KE2 is, and with it a guessed password unmasks KE2's envelope, so one
    start can test two guesses. Charged double, a stolen session guesses no
@@ -262,6 +266,167 @@ browser page has no change form yet (M4): it keeps no master key after a
 sign-in, so its form will sign in and change inside one Worker, with a
 `central-web-crypto` export like `recovery_create`. The native client's form
 is M6.
+
+## Guessing a password online
+
+*Added 11.11.2026.* A sign-in's start hands out KE2, and with KE2 a guessed
+password is checked on the guesser's own machine. So each `LoginStart` is one
+guess, whether a finish follows or not; a `ChangePasswordStart` is two
+(above) and a `DeleteAccountStart` one. Central cannot tell a typing mistake
+from a guess: it counts starts, and gives a start back when its proof
+verifies. The counts are `central-identity`'s (`guesses.rs`, `limits.rs`),
+in memory only, never written down or logged; every refusal is the `Busy`
+the client and the page already know (429 with the route's fixed text), and
+a start that a count refuses spends nothing. No request or response changed.
+
+A **place** is the client address as the listener counts it: an IPv4
+address, or an IPv6 address's /64.
+
+| Counted | An hour | A day | Besides |
+| --- | --- | --- | --- |
+| One account, from every place that is not its own | 30 | 100 | 8 a minute, as before |
+| One account at one place | 10 | 30 | |
+| One place, at all accounts it is not an own place of | 30 | 100 | |
+| One IPv6 /48, over its /64s | 120 | 400 | |
+
+- **A proof gives the guess back.** A start whose proof verifies gets its
+  hour and day back wherever they were counted; the minute stays, since the
+  evaluation happened. Signing in with the right password spends nothing,
+  however often.
+- **An account's own places.** A place an account proved its password from
+  (a sign-in, a change or a deletion) is its own for 30 days, at most eight
+  for one account; a ninth takes the place of the one that would end
+  first. At an own place a start draws on that account's count at that
+  place and on nothing else. So what everyone else guesses at an account
+  does not keep its holder out where the holder signs in, and the sign-ins
+  of a household or an office do not spend their address's count. Another
+  password ends them: after a change or a reset only the place it was made
+  from is the account's own, so whoever knew the old password guesses at
+  the new one as a stranger does, and a deletion leaves none.
+- **Ids that are nobody's** (made up, or an account without a credential
+  for the epoch asked) are answered as before, with OPAQUE's stand-in
+  record after the same work. All of them together count as one account (8
+  a minute, 30 an hour, 100 a day), besides the place's own counts, and
+  take no entry among the accounts.
+- **A reset's start** needs a valid reset code before anything is
+  evaluated. It spends one of the account's eight evaluations a minute and
+  nothing of its hour or day, so guessers who spent those do not keep a
+  holder with a code from the reset ([account reset](account-reset.md)).
+- **The legacy sign-in** keeps its own budgets and lockout (above) and
+  counts one guess at its place as well, given back by the proof.
+- **Order.** A start whose place's counts or whose account's are spent is
+  refused before a worker is taken or the store is asked. Whether an id is
+  nobody's shows only once the store was asked: a start at a made-up id
+  that nobody's count alone refuses has taken a worker and one statement
+  first, as many of them as its address's 30 starts a minute and the
+  shared 32 a second let through. The worker is taken before a start is
+  counted and before a pending attempt is consumed, so a busy moment
+  spends no guess and loses no right proof.
+- **Bounds.** Four tables of 16,384 entries each: accounts, accounts at
+  places, places, and accounts with places of their own. A full one forgets
+  what has passed, then the entry that spent least of its day (the oldest
+  of those), so filling a table with single guesses never makes it forget
+  the account guessed at most; the table of own places gives up the account
+  whose last proof is oldest. None refuses a newcomer. Once more than
+  16,384 accounts sign in within 30 days, the least recent lose their own
+  places early: the number must grow with the service. (Before 11.11.2026
+  one table of 1,024 held whatever id a start presented and refused
+  newcomers when full, so about 17 starts a second with made-up ids kept
+  every real sign-in at `Busy`.)
+- A restart forgets all of it, the own places too.
+
+**Requests per address.** Besides the guesses, each address has a budget
+for the operations a guesser or a collector of names repeats. The browser
+listener's are in [web accounts](web-accounts.md); the native listener had
+none before 11.11.2026 (`central-http`'s `addresses.rs`):
+
+| Native operation | Budget per address |
+| --- | --- |
+| `Discover` | 30 a minute |
+| `LoginStart` | 30 a minute, apart from `Discover` |
+| `LegacyLogin` | 10 a minute |
+| `ResetStart` | 10 an hour |
+
+On both listeners every request that needs no session (the ones that draw
+on the 32 a second all clients share, a report's two routes included)
+first draws on its place's share, 600 a minute, and the client's pairing
+requests (`PairClaim`, `PairPoll`, `PairRedeem`) on 240 a minute of the
+64 a second they share. One address can therefore no longer spend what
+everyone signs in with; four that keep it up together still can. An IPv6
+address counts by its /64 here and nothing wider: a subscriber whose
+provider hands out a /56 holds 256 of them and is those four alone.
+
+**The native listener's address** is the last `X-Forwarded-For` hop of a
+request that comes from loopback, which the proxy sets, or the peer itself
+if it is not loopback. A loopback request without a well-formed hop has no
+place: it meets each account's own counts (30 an hour, 100 a day) and the
+shared budgets, and no place's. That is deliberate. A proxy that sent no
+header would otherwise make every client one address, and one address's
+count would keep everyone out. The browser listener refuses such a request
+(400), as before. Nothing but these counts follows from an address: no
+identity, no credential, and no log line.
+
+**What it bounds.**
+
+- Everyone together guesses at one account at most 100 times a day from
+  places that are not its own (36,500 a year), and whoever shares one of
+  its own places 30 times a day there (at most eight such places). Before:
+  8 a minute, 11,520 a day.
+- One address guesses at all accounts together at most 30 times an hour and
+  100 a day, the accounts it signs in to itself left out. Before: 30 starts
+  a minute on the website (43,200 a day), and on the native listener as
+  many as the shared budget let through.
+- It does not make a weak password safe. A password among the hundred most
+  common is still found within a day; the page asks for eight characters
+  and nothing else.
+
+**What it costs: keeping someone out.** Whoever knows an account's id
+(`Discover` gives it for a name) can spend the account's count: 30 starts in
+an hour from three addresses, or 100 in a day from four, and until that
+window ends the account's password sign-in is `Busy` at every place that is
+not its own. Before, eight requests a minute from one address did the same
+everywhere, the holder's own devices included. Now the holder's own places
+are served: wherever the account proved its password in the last 30 days,
+since the last restart. After a restart no place is anyone's own until the
+first proof from it. Someone at one of the holder's own addresses (a
+household, a campus, a carrier's shared address) can still keep the holder
+out there, with 10 starts an hour or 30 a day. Sessions that exist go on,
+and pairing a client from a signed-in website needs no password
+([web accounts](web-accounts.md)).
+
+**What it tells.** Whoever sends from an address can find out whether a
+given account proved its password from that address in the last 30 days,
+since the last restart: once the address's hour is spent (30 unfinished
+starts, which anyone there can make), or the account's, a start at that
+account from there is answered only if the place is the account's own, and
+refused otherwise. It takes the account's id (`Discover` gives it for a
+name) and the same IPv4 address or IPv6 /64: a household, an office, a
+campus, a carrier's shared address, a VPN's exit. It tells nothing about
+any other address and nothing to anyone elsewhere. It is the price of
+serving the holder where strangers are refused, as long as a place is an
+address; the device token below would end it.
+
+**The released client** asks a `Busy` request again three times within
+about a second (never a legacy sign-in) and then shows that the service is
+busy; it cannot say for how long, and the answer does not tell it (no
+`Retry-After` yet).
+
+**What a later client version would need** (not built, since a released
+client cannot do either):
+
+- A proof of work for sign-in, as registration has on the website: a
+  challenge request before `LoginStart` and the solution inside it, required
+  only once an account or a place has spent part of its count. It needs a
+  new request and a new field, so a protocol version the client announces
+  and an answer that sends old clients to update. The session-token branch
+  (`c42/session-tokens`) adds both, a `Baylee-Central-Protocol` header and
+  status 426; neither is on this branch.
+- A device token (OWASP's "device cookie"): issued after a proof, kept by
+  the client beside its session and presented with `LoginStart`, so that a
+  known device has its own count and neither a shared address nor a
+  spent account count keeps it out, and an own place survives a restart
+  and a change of address. On the website it could be a second `__Host-`
+  cookie today, without any change to the client.
 
 ## Implementation status
 
