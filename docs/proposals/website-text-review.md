@@ -14,11 +14,13 @@ final version.
 
 The reviewer's notes, in German as written.
 
+- ZUM STAND DIESER DATEI: Die erste Fassung wurde bereits übernommen (Commit 6818fb9, 'The site's words proofread; the privacy notice says more'). Diese Fassung enthält nur noch, was gegenüber dem jetzigen Stand zu ändern ist: Korrekturen an meiner ersten Fassung (privacy-rights nennt den Widerspruch wieder selbst; privacy-hosting ohne die unbelegten 14 Tage; privacy-links ohne unbelegte Aussagen zu USA und Telefonnummer; install-first, faq-data-a, faq-open-a, shot-log, people-unblock, privacy-export-lead, privacy-account, privacy-recipients, privacy-device, faq-password-a), dazu privacy-lead (noch nicht übernommen, Eigentümer-Entscheidung) und alle legal/*.md-Änderungen (noch nicht übernommen). Die Commit-Nachricht nennt 'the log's 14 days': diese Frist ist nicht belegt und sollte wieder heraus, bis der Eigentümer sie bestätigt.
+
 - Zwei Datenschutzerklärungen: Die Website zeigt die privacy-*-Texte aus site.ftl (legal.rs), daneben gibt es legal/privacy.de.md/.en.md (Version 2026-11-02, laut legal/README.md 'binding'). Sie widersprechen sich (Serverprotokolle: 'kein Zugriffsprotokoll' gegen '14 Tage Protokolle'; Drittländer; Sprachwahl im Browser gespeichert; Umfang). Welche gilt? Empfehlung: ein einziger Text, aus dem beide Stellen gespeist werden. legal/README.md nennt außerdem Version 2026-10-28, die Datei 2026-11-02.
 
 - Impressum hinter Rechenrätsel und JavaScript: § 5 DDG verlangt 'leicht erkennbar, unmittelbar erreichbar und ständig verfügbar'. Ohne JavaScript gibt es gar keine Angaben, und die Datenschutzerklärung nennt den Verantwortlichen (Art. 13 Abs. 1 lit. a DSGVO) nur durch Verweis dorthin. Das ist ein echtes Abmahn- und Bußgeldrisiko und sollte ein Anwalt entscheiden. Gilt § 5 DDG überhaupt (rein privat, nicht geschäftsmäßig)? Wenn nicht, bliebe § 18 Abs. 1 MStV (Name und Anschrift) - auch der kennt kein Rätsel.
 
-- Verfahren beim Reset-Code: Wie prüft ein Administrator ohne E-Mail-Adresse, dass die anfragende Person der Account gehört? Die Texte (faq-password-a, Bedingungen §3) versprechen den Reset; das Verfahren sollte feststehen, bevor es öffentlich zugesagt wird. Gibt es auf der neuen Website schon eine Seite, auf der man den Reset-Code einlöst?
+- Verfahren beim Reset-Code: Wie prüft ein Administrator ohne E-Mail-Adresse, dass die anfragende Person der Account gehört? Die Texte (faq-password-a, Bedingungen §3) versprechen den Reset; das Verfahren sollte feststehen, bevor es öffentlich zugesagt wird. Die neue Website hat keine Seite zum Einlösen eines Reset-Codes (kein ResetStart in crates/central-web); der alte FAQ-Satz 'mit dem Wiederherstellungscode setzt du ein neues' stimmt laut docs/account-reset.md nicht (ein neues Passwort braucht immer den Reset-Code, der Wiederherstellungscode rettet nur die Daten). faq-password-a, code-lead, profile-code-kept und Bedingungen §3 bitte daran messen, was Website und Client wirklich anbieten.
 
 - Kontenlöschung und Nachrichten: chat_messages.sender hat ON DELETE CASCADE, Central löscht also die gesendeten Nachrichten samt Zustellungen bei den Empfängern. Der bisherige Satz 'Nachrichten ... bleiben bei denen, die sie erhalten haben' stimmt nur für Kopien auf Geräten. Bitte bestätigen, was Empfänger nach der Löschung noch sehen, und was mit Gruppen geschieht, deren Eigentümer der gelöschte Account war.
 
@@ -26,7 +28,7 @@ The reviewer's notes, in German as written.
 
 - Speicherdauer des Chats: Nachrichten und Metadaten bleiben bis zur Kontolöschung; docs/central-chat.md nennt die automatische Löschfrist eine offene Eigentümer-Entscheidung. Für Art. 5 Abs. 1 lit. e DSGVO (Speicherbegrenzung) wäre eine Frist besser begründbar.
 
-- Serverprotokolle: Führt der Webserver/Reverse-Proxy wirklich kein Zugriffsprotokoll, und ist das Systemjournal auf höchstens 14 Tage begrenzt? Ich habe 14 Tage aus legal/privacy §7 und docs/account-deletion.md übernommen; in ops/ steht keine Journal-Konfiguration, die das belegt.
+- Serverprotokolle: Führt der Webserver/Reverse-Proxy wirklich kein Zugriffsprotokoll, und ist das Systemjournal auf höchstens 14 Tage begrenzt? legal/privacy §7 und docs/account-deletion.md sagen 14 Tage, die Website sagt 'solange das Journal sie hält' (keine Frist im Sinn von Art. 13 Abs. 2 lit. a); in ops/ steht keine Journal-Konfiguration. Ich habe privacy-hosting dort unverändert gelassen; bitte die echte Frist eintragen.
 
 - netcup: Ist ein Auftragsverarbeitungsvertrag (Art. 28 DSGVO) abgeschlossen? Die Erklärung nennt netcup als Auftragsverarbeiter. Gibt es weitere Dienstleister (Backup-Speicher, DNS/CDN, E-Mail-Postfach für Antworten auf das Kontaktformular und die Impressum-Adresse)? Antworten per E-Mail laufen über einen Mailanbieter, der nirgends genannt ist.
 
@@ -40,17 +42,17 @@ The reviewer's notes, in German as written.
 
 - Mindestalter 16: Die Bedingungen verlangen bei Minderjährigen zusätzlich die Zustimmung der Eltern; das Formular fragt nur 'mindestens 16'. Reicht dir das? Für die Push-Einwilligung passt 16 zu Art. 8 DSGVO.
 
-- Neue Fassung der Bedingungen: Jede Änderung an legal/terms.*.md ist laut legal/README.md eine neue Version, die jeder Account neu annehmen muss. Die vorgeschlagenen Änderungen (§3 Reset, §7.1 Löschen, §8 Fan-Hinweis, ein Komma) am besten bündeln. Die deutschen Bedingungen sagen durchgehend 'Konto', die Website laut Kopfkommentar 'Account'; ich habe die Rechtstexte nicht umgestellt.
+- Neue Fassung der Bedingungen: Jede Änderung an legal/terms.*.md ist laut legal/README.md eine neue Version, die jeder Account neu annehmen muss. Die vorgeschlagenen Änderungen (§3 Reset, §7.1 Löschen, §8 Fan-Hinweis, ein Komma) am besten bündeln. Auch jede Änderung an legal/privacy.*.md braucht in beiden Sprachen eine neue Version und ein neues Datum im Kopf. Die deutschen Bedingungen sagen durchgehend 'Konto', die Website laut Kopfkommentar 'Account'; ich habe die Rechtstexte nicht umgestellt.
 
 - Streitbeilegungshinweis (impressum-dispute, Bedingungen §11.2): § 36 VSBG trifft Unternehmer; auf einer ausdrücklich privaten, nicht kommerziellen Seite ist er überflüssig und kann als Indiz für geschäftsmäßiges Handeln gelesen werden. Behalten oder streichen? Ebenso 'Verantwortlich für den Inhalt' (§ 18 Abs. 2 MStV gilt nur für journalistisch-redaktionelle Angebote).
 
 - Meldeweg (Bedingungen §6): 'Meldefunktion im Client oder auf der Website' - gibt es auf der Website eine Meldefunktion für Namen, Gruppen oder Nachrichten? Ich habe keine gefunden; sonst bleibt nur das Kontaktformular.
 
-- Zusagen ohne Beleg, die ich nicht geändert habe (Altseiten-Texte, Eigentümer 11.11.2026): 'Vollständige Regel-Engine' / 'Eine Engine, die jede Regel durchsetzt' neben 'teilweise umgesetzt'; 'ein Fehler stört niemals andere Tische'; 'Jede Partie wird lückenlos aufgezeichnet'; 'bleibt immer quelloffen und kostenlos ... Nicht jetzt, nicht später'; 'Anonyme Nutzungszahl' (die IP-Adresse erreicht den Server trotzdem; besser 'ohne Account und Gerätekennung'); 'API-Schlüssel bleiben geschützt'. Bitte entscheiden, ob sie so bleiben.
+- Zusagen ohne Beleg, die ich nicht geändert habe (Altseiten-Texte, Eigentümer 11.11.2026): 'Vollständige Regel-Engine' / 'Eine Engine, die jede Regel durchsetzt' neben 'teilweise umgesetzt'; 'ein Fehler stört niemals andere Tische'; 'Jede Partie wird lückenlos aufgezeichnet'; title-home (DE) sagt 'Bau deine Decks. Hol deine Freunde. Einfach spielen.', hero-title (DE) 'Decks bauen. Freunde einladen. Einfach spielen.', im Englischen sind beide gleich - Absicht? 'bleibt immer quelloffen und kostenlos ... Nicht jetzt, nicht später'; 'Anonyme Nutzungszahl' (die IP-Adresse erreicht den Server trotzdem; besser 'ohne Account und Gerätekennung'); 'API-Schlüssel bleiben geschützt'. Bitte entscheiden, ob sie so bleiben.
 
 - Fan Content Policy: Der deutsche Hinweis im Fuß entspricht dem offiziellen Wortlaut, soweit ich ihn kenne; bitte einmal gegen die deutsche Richtlinienseite prüfen. Die Richtlinie verlangt freien Zugang ohne Zahlung, Abo oder E-Mail-Registrierung; ein Pflicht-Account für Online-Tische (ohne E-Mail) und die Verwendung von Kartenbildern, Manasymbolen und Regeltexten in einem Spiel-Client liegen im Graubereich der Richtlinie. Das ist eine Risikoentscheidung des Eigentümers, kein Textproblem.
 
-- Discord und WhatsApp: Wer verwaltet die beiden Communities? Als Administrator sieht der Betreiber dort Namen und bei WhatsApp Telefonnummern; ich habe das im neuen Abschnitt privacy-links nur allgemein erwähnt. Stimmt die Aussage zur Sichtbarkeit der Telefonnummer für die verlinkte WhatsApp-Community?
+- Discord und WhatsApp: Wer verwaltet die beiden Communities? Als Administrator sieht der Betreiber dort Namen und bei WhatsApp Telefonnummern; ich habe das im neuen Abschnitt privacy-links nur allgemein erwähnt. Soll der Abschnitt ausdrücklich sagen, dass in der WhatsApp-Community die Telefonnummer für andere sichtbar sein kann? Das konnte ich nicht belegen und habe es weggelassen.
 
 - privacy-lead nannte die Erklärung einen 'Entwurf', den noch ein Anwalt prüft. Ich habe den Satz gestrichen, weil eine geltende Erklärung kein Entwurf sein kann. Wenn du den Hinweis behalten willst, dann als 'Stand'-Zeile ohne das Wort Entwurf. privacy-updated ('Stand: 10. November 2026') muss beim Übernehmen der Änderungen auf das neue Datum gesetzt werden; ich habe es nicht geändert, weil das Datum deins ist.
 
@@ -65,7 +67,7 @@ The reviewer's notes, in German as written.
 `legal/terms.*.md` is compiled into `central-service` and versioned: a change
 is a new version every account accepts again (`legal/README.md`,
 `docs/terms.md`). `legal/privacy.*.md` and the notice on the site disagree in
-places (first question above); which one binds is the owner's call.
+places; which one binds is the owner's call.
 
 ### `legal/terms.de.md`
 
