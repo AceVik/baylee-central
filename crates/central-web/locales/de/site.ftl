@@ -160,6 +160,7 @@ gws-official = Offiziell
 gws-online = Online
 gws-offline = Offline
 gws-version = Version
+gws-now = Gerade
 gws-website = Website
 gws-address = Adresse
 gws-copy = Adresse kopieren
@@ -258,7 +259,7 @@ privacy-device = Diese Seite setzt kein Cookie, bis du dich anmeldest. Was dein 
 privacy-github-title = GitHub
 privacy-github = Die Download-Seite und die Startseite zeigen das neueste Release, den Teststand und die Kartenzahlen. Danach fragt unser Server GitHub, nicht dein Browser; GitHub erfährt dabei nichts über dich. Erst wenn du einen Download- oder GitHub-Link anklickst, verbindet sich dein Browser mit GitHub (GitHub, Inc., USA) und überträgt dorthin deine IP-Adresse und was jede Anfrage enthält; dann gilt GitHubs eigene Datenschutzerklärung.
 privacy-directory-title = Das Gateway-Verzeichnis
-privacy-directory = Unser Server liest das Verzeichnis der Gateways bei Baylee Central und zeigt es an; nichts über dich ist daran beteiligt.
+privacy-directory = Unser Server liest das Verzeichnis der Gateways von Baylee Central und zeigt es an; über dich ist dabei nichts im Spiel. Ein Gateway kann Central mitteilen, wie viele Spieler, offene Tische und Partien es gerade hat, und Central zählt seine Konten; die Website zeigt diese Zahlen. Es sind reine Anzahlen, nie Namen, und die Zahlen eines Gateways sind die Angabe seines Betreibers.
 privacy-account-title = Dein Account
 privacy-account = Für einen Account speichert Baylee Central: deine Account-ID, deinen Anmeldenamen, deinen Anzeigenamen mit seinem Tag, wann und wie der Account entstanden ist, einen OPAQUE-Passwortdatensatz (mit dem du dein Passwort beweist, ohne dass unser Server es je erfährt), deinen Hauptschlüssel zweimal verschlüsselt (mit deinem Passwort und mit deinem Wiederherstellungscode), dein verschlüsseltes Account-Dokument und deine verschlüsselten Ablagen (für uns unlesbar; wir sehen nur Größe, Stand und Zeit), welche Fassung der Nutzungsbedingungen du wann angenommen hast, den Zeitpunkt deiner letzten Anmeldung, deine Sitzungen, eine Administratorrolle, falls du eine hast, und die Gateways, die du registrierst, mit ihren Tokens. Andere Spieler sehen deinen Anzeigenamen und dein Tag, nie deinen Anmeldenamen. Gibt dir ein Administrator einen Reset-Code, speichern wir nur dessen Hashwert, bis der Code benutzt wird oder abgelaufen ist. Was Administratoren an einem Account oder Gateway tun, steht drei Jahre in einem Protokoll (wer, was, welcher Account oder welches Gateway, wann). Rechtsgrundlage: Art. 6 Abs. 1 lit. b DSGVO (der Account, den du wolltest); für den Zeitpunkt der letzten Anmeldung und das Protokoll Art. 6 Abs. 1 lit. f DSGVO (unser berechtigtes Interesse an einem sicheren, nachvollziehbaren Betrieb). Ohne Anmeldenamen und Passwort gibt es keinen Account; eine E-Mail-Adresse brauchst du nicht. Einen Account darfst du ab 16 Jahren anlegen. Gespeichert, bis du den Account löschst; dann wird er sofort aus dem laufenden System entfernt, aus Sicherungen spätestens nach 12 Monaten. Sitzungen enden nach 30 Minuten ohne Nutzung und spätestens 12 Stunden nach der Anmeldung.
 privacy-cookie-title = Das Sitzungscookie
@@ -772,6 +773,24 @@ strip-directory = das Verzeichnis
 strip-cards = Spielbare Karten
 strip-cards-unit = Karten
 strip-stars = Sterne auf GitHub
+strip-accounts = Konten bei Baylee Central
+strip-live = Gerade auf den Gateways, wie sie es melden
+live-accounts = { $n ->
+    [one] { $n } Konto
+   *[other] { $n } Konten
+}
+live-players = { $n ->
+    [one] { $n } Spieler
+   *[other] { $n } Spieler
+}
+live-tables = { $n ->
+    [one] { $n } offener Tisch
+   *[other] { $n } offene Tische
+}
+live-games = { $n ->
+    [one] { $n } Partie
+   *[other] { $n } Partien
+}
 hero-badges = Auf einen Blick
 hero-badge-beta = Offene Beta
 hero-badge-free = Kostenlos

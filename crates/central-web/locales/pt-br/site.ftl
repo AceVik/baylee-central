@@ -160,6 +160,7 @@ gws-official = Oficial
 gws-online = Online
 gws-offline = Offline
 gws-version = Versão
+gws-now = Right now
 gws-website = Site
 gws-address = Endereço
 gws-copy = Copiar endereço
@@ -258,7 +259,7 @@ privacy-device = Este site não define nenhum cookie até você entrar. O que o 
 privacy-github-title = GitHub
 privacy-github = A página de download e a página inicial mostram a versão mais recente, o estado dos testes e os números dos cards. Nosso servidor os pede ao GitHub, não o seu navegador; com isso, o GitHub não fica sabendo nada sobre você. Somente quando você clica em um link de download ou do GitHub o seu navegador se conecta ao GitHub (GitHub, Inc., EUA) e lhe envia seu endereço IP e o que toda requisição carrega; a partir daí vale o aviso de privacidade do próprio GitHub.
 privacy-directory-title = O diretório de gateways
-privacy-directory = Nosso servidor lê o diretório de gateways do Baylee Central e o exibe; nada sobre você está envolvido.
+privacy-directory = Our server reads the directory of gateways from Baylee Central and shows it; nothing about you is involved. A gateway may tell Central how many players, open tables and games it has at the moment, and Central counts its accounts; the site shows these numbers. They are counts only, never names, and a gateway's numbers are its operator's own statement.
 privacy-account-title = Sua conta
 privacy-account = Para uma conta, o Baylee Central armazena: o ID da sua conta, seu nome de entrada, seu nome de exibição com a sua tag, quando e como a conta foi criada, um registro de senha OPAQUE (que permite que você prove sua senha sem que nosso servidor jamais a conheça), sua chave mestra criptografada duas vezes (pela sua senha e pelo seu código de recuperação), o documento criptografado da sua conta e seus objetos criptografados (ilegíveis para nós; vemos apenas o tamanho, a revisão e a hora), qual versão dos termos você aceitou e quando, a hora da sua última entrada, suas sessões, uma função de administrador, se você tiver uma, e os gateways em que você se registra, com seus tokens. Outros jogadores veem seu nome de exibição e sua tag, nunca o seu nome de entrada. Se um administrador lhe entregar um código de redefinição, armazenamos somente o resumo (digest) dele até que o código seja usado ou expire. O que os administradores fazem em uma conta ou em um gateway é mantido em um registro por três anos (quem, o quê, qual conta ou gateway, quando). Base legal: art. 6.º, n.º 1, alínea b), do RGPD (a conta que você pediu); para a hora da última entrada e para o registro, art. 6.º, n.º 1, alínea f), do RGPD (nosso interesse legítimo em uma operação segura e rastreável). Sem um nome de entrada e uma senha não há conta; você não precisa de endereço de e-mail. Você pode criar uma conta a partir dos 16 anos. Mantida até você excluir a conta; ela é então removida do sistema em funcionamento de imediato, e dos backups em 12 meses, no máximo. As sessões terminam após 30 minutos sem uso e, no máximo, 12 horas depois da entrada.
 privacy-cookie-title = O cookie de sessão
@@ -771,6 +772,24 @@ strip-directory = o diretório
 strip-cards = Cards jogáveis
 strip-cards-unit = cards
 strip-stars = Estrelas no GitHub
+strip-accounts = Accounts at Baylee Central
+strip-live = Right now on the gateways, as they report it
+live-accounts = { $n ->
+    [one] { $n } account
+   *[other] { $n } accounts
+}
+live-players = { $n ->
+    [one] { $n } player
+   *[other] { $n } players
+}
+live-tables = { $n ->
+    [one] { $n } open table
+   *[other] { $n } open tables
+}
+live-games = { $n ->
+    [one] { $n } game
+   *[other] { $n } games
+}
 hero-badges = Resumo
 hero-badge-beta = Beta aberto
 hero-badge-free = Gratuito

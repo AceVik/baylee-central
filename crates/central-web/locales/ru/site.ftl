@@ -160,6 +160,7 @@ gws-official = Официальный
 gws-online = Онлайн
 gws-offline = Офлайн
 gws-version = Версия
+gws-now = Right now
 gws-website = Сайт
 gws-address = Адрес
 gws-copy = Копировать адрес
@@ -258,7 +259,7 @@ privacy-device = Этот сайт не устанавливает cookie, по�
 privacy-github-title = GitHub
 privacy-github = Страница загрузки и главная страница показывают последний релиз, состояние тестов и число карт. Их у GitHub запрашивает наш сервер, а не ваш браузер; GitHub при этом ничего о вас не узнаёт. Только когда вы нажимаете ссылку на загрузку или на GitHub, ваш браузер соединяется с GitHub (GitHub, Inc., США) и отправляет ему ваш IP-адрес и то, что несёт любой запрос; дальше действует собственная политика конфиденциальности GitHub.
 privacy-directory-title = Каталог Gateway
-privacy-directory = Наш сервер читает каталог Gateway из Baylee Central и показывает его; ваших данных это не касается.
+privacy-directory = Our server reads the directory of gateways from Baylee Central and shows it; nothing about you is involved. A gateway may tell Central how many players, open tables and games it has at the moment, and Central counts its accounts; the site shows these numbers. They are counts only, never names, and a gateway's numbers are its operator's own statement.
 privacy-account-title = Ваш аккаунт
 privacy-account = Для аккаунта Baylee Central хранит: идентификатор вашего аккаунта, ваше имя для входа, ваше отображаемое имя с тегом, когда и как был создан аккаунт, запись пароля OPAQUE (позволяющую доказать знание пароля, так что наш сервер его не узнаёт), ваш мастер-ключ в двойном шифровании (вашим паролем и вашим кодом восстановления), ваш зашифрованный документ аккаунта и ваши зашифрованные объекты (для нас нечитаемые; мы видим только размер, ревизию и время), какую версию условий вы приняли и когда, время вашего последнего входа, ваши сеансы, роль администратора, если она у вас есть, и Gateway, которые вы регистрируете, с их токенами. Другие игроки видят ваше отображаемое имя и тег, но не имя для входа. Если администратор выдаёт вам код сброса, мы храним только его дайджест, пока код не использован или не истёк. Действия администраторов с аккаунтом или Gateway записываются в журнал на три года (кто, что, какой аккаунт или Gateway, когда). Правовое основание: ст. 6(1)(b) GDPR (аккаунт, о котором вы просили); для времени последнего входа и журнала — ст. 6(1)(f) GDPR (наш законный интерес в безопасной и отслеживаемой работе). Без имени для входа и пароля аккаунта нет; адрес электронной почты не нужен. Создать аккаунт можно с 16 лет. Хранится, пока вы не удалите аккаунт; затем он сразу удаляется из работающей системы, а из резервных копий — не позднее чем через 12 месяцев. Сеансы заканчиваются через 30 минут без использования и не позднее чем через 12 часов после входа.
 privacy-cookie-title = Cookie сеанса
@@ -773,6 +774,32 @@ strip-directory = каталог
 strip-cards = Игровых карт
 strip-cards-unit = карт
 strip-stars = Звёзд на GitHub
+strip-accounts = Accounts at Baylee Central
+strip-live = Right now on the gateways, as they report it
+live-accounts = { $n ->
+    [one] { $n } account
+    [few] { $n } account
+    [many] { $n } account
+   *[other] { $n } accounts
+}
+live-players = { $n ->
+    [one] { $n } player
+    [few] { $n } player
+    [many] { $n } player
+   *[other] { $n } players
+}
+live-tables = { $n ->
+    [one] { $n } open table
+    [few] { $n } open table
+    [many] { $n } open table
+   *[other] { $n } open tables
+}
+live-games = { $n ->
+    [one] { $n } game
+    [few] { $n } game
+    [many] { $n } game
+   *[other] { $n } games
+}
 hero-badges = Коротко
 hero-badge-beta = Открытая бета
 hero-badge-free = Бесплатно

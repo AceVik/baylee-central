@@ -387,6 +387,42 @@ pub struct Gateway {
     pub online: bool,
     /// Baylee's own gateway, known by its origin only.
     pub official: bool,
+    /// What it says is happening on it right now, if it reports that
+    /// (Central's public figures): absent for a gateway that does not.
+    #[serde(default)]
+    pub activity: Option<Activity>,
+}
+
+/// A gateway's own counts as Central passes them on: its claim, which
+/// nobody can check, each bounded by Central (`GatewayActivity::MOST`).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Activity {
+    /// Players connected.
+    pub players: u32,
+    /// Tables open to join.
+    pub tables: u32,
+    /// Games running.
+    pub games: u32,
+}
+
+/// The gateways' reports added up, for the start page's strip: `None`
+/// while no online gateway reports anything (a number nobody reported is
+/// not shown as zero).
+#[must_use]
+pub fn activity_of(gateways: &[Gateway]) -> Option<(u64, u64, u64)> {
+    let mut reported = gateways
+        .iter()
+        .filter(|gateway| gateway.online)
+        .filter_map(|gateway| gateway.activity)
+        .peekable();
+    reported.peek()?;
+    Some(reported.fold((0, 0, 0), |sum, activity| {
+        (
+            sum.0 + u64::from(activity.players),
+            sum.1 + u64::from(activity.tables),
+            sum.2 + u64::from(activity.games),
+        )
+    }))
 }
 
 /// A page of the signed-in area (`/{lang}/account/…`).

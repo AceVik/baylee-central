@@ -1,4 +1,4 @@
 [
-  {"origin": "https://gateway.baylee.app", "name": "Sanctuary", "version": "0.2.0-beta.o1", "website": "https://gateway.baylee.app/", "online": true, "official": true},
+  {"origin": "https://gateway.baylee.app", "name": "Sanctuary", "version": "0.2.0-beta.o1", "website": "https://gateway.baylee.app/", "online": true, "official": true, "activity": {"players": 12, "tables": 3, "games": 4}},
   {"origin": "https://magic.example.org", "name": "Kitchen <Table>", "version": "0.1.1-beta.9b", "website": "https://magic.example.org/", "online": false, "official": false}
 ]

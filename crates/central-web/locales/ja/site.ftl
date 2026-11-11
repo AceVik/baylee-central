@@ -160,6 +160,7 @@ gws-official = 公式
 gws-online = オンライン
 gws-offline = オフライン
 gws-version = バージョン
+gws-now = Right now
 gws-website = ウェブサイト
 gws-address = アドレス
 gws-copy = アドレスをコピー
@@ -258,7 +259,7 @@ privacy-device = ログインするまで、このサイトはクッキーを設
 privacy-github-title = GitHub
 privacy-github = ダウンロードページとトップページには、最新のリリース、テストの状況、カードの数が表示されます。これらはブラウザーではなく私たちのサーバーが GitHub に問い合わせて取得するため、GitHub があなたについて知ることはありません。ダウンロードや GitHub へのリンクを押したときに限り、ブラウザーが GitHub（GitHub, Inc.、米国）に接続し、IPアドレスとすべてのリクエストに付くものを送ります。その後は GitHub 自身のプライバシー通知が適用されます。
 privacy-directory-title = Gateway 一覧
-privacy-directory = 私たちのサーバーは Baylee Central から Gateway の一覧を読み取って表示します。あなたに関することは含まれません。
+privacy-directory = Our server reads the directory of gateways from Baylee Central and shows it; nothing about you is involved. A gateway may tell Central how many players, open tables and games it has at the moment, and Central counts its accounts; the site shows these numbers. They are counts only, never names, and a gateway's numbers are its operator's own statement.
 privacy-account-title = アカウント
 privacy-account = アカウントについて、Baylee Central は次を保存します。アカウントID、ログイン名、タグ付きの表示名、アカウントがいつどのように作られたか、OPAQUE のパスワード記録（私たちのサーバーがパスワードを知ることなく、パスワードを証明できる仕組み）、パスワードと回復コードで二重に暗号化されたマスターキー、暗号化されたアカウント文書と暗号化されたオブジェクト（私たちには読めず、サイズ、リビジョン、時刻だけが見えます）、同意した利用規約のバージョンと時期、最後にログインした時刻、セッション、管理者の役割（ある場合）、登録した Gateway とそのトークン。ほかのプレイヤーに見えるのは表示名とタグで、ログイン名は見えません。管理者がリセットコードを渡した場合、私たちが保存するのは、コードが使われるか期限が切れるまで、そのダイジェストだけです。管理者がアカウントや Gateway に対して行った操作は、3年間、記録（誰が、何を、どのアカウントまたは Gateway に、いつ）として保管されます。法的根拠：GDPR第6条第1項(b)（ご希望のアカウント）。最後のログイン時刻と記録については、GDPR第6条第1項(f)（安全で追跡可能な運用という私たちの正当な利益）。ログイン名とパスワードがなければアカウントはありません。メールアドレスは不要です。アカウントを作成できるのは16歳からです。アカウントを削除するまで保管します。削除すると、稼働中のシステムからは直ちに、バックアップからは遅くとも12か月以内に削除されます。セッションは、使われないまま30分で、遅くともログインから12時間で終了します。
 privacy-cookie-title = セッションのクッキー
@@ -769,6 +770,24 @@ strip-directory = 一覧
 strip-cards = プレイ可能なカード
 strip-cards-unit = 枚
 strip-stars = GitHub のスター
+strip-accounts = Accounts at Baylee Central
+strip-live = Right now on the gateways, as they report it
+live-accounts = { $n ->
+    [one] { $n } account
+   *[other] { $n } accounts
+}
+live-players = { $n ->
+    [one] { $n } player
+   *[other] { $n } players
+}
+live-tables = { $n ->
+    [one] { $n } open table
+   *[other] { $n } open tables
+}
+live-games = { $n ->
+    [one] { $n } game
+   *[other] { $n } games
+}
 hero-badges = 概要
 hero-badge-beta = オープンベータ
 hero-badge-free = 無料
