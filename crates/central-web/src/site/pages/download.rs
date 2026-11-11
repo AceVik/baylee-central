@@ -311,11 +311,22 @@ fn platforms(cx: &Context<'_>, release: &Release) -> impl IntoView + use<> {
             let list = if files.is_empty() {
                 view! { <p class="plat-none">{words::plat_none(lang)}</p> }.into_any()
             } else {
-                let rows = files
-                    .into_iter()
-                    .map(|file| file_row(lang, file))
-                    .collect_view();
-                view! { <ul class="plat-files">{rows}</ul> }.into_any()
+                // the file most people want stands open; the others (archives,
+                // the build for older processors) fold under it, so that every
+                // card is as tall as its neighbours
+                let mut files = files.into_iter();
+                let first = files.next().map(|file| file_row(lang, file));
+                let rest = files.map(|file| file_row(lang, file)).collect::<Vec<_>>();
+                let more = (!rest.is_empty()).then(|| {
+                    let count = words::number(lang, rest.len() as u64);
+                    view! {
+                        <details class="plat-more">
+                            <summary>{words::dl_more_files(lang, &count)}</summary>
+                            <ul class="plat-files">{rest}</ul>
+                        </details>
+                    }
+                });
+                view! { <ul class="plat-files">{first}</ul>{more} }.into_any()
             };
             let mark =
                 yours.then(|| view! { <span class="mine-tag">{words::dl_yours(lang)}</span> });

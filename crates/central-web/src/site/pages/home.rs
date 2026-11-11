@@ -282,7 +282,7 @@ fn stat(
     let what = format!("{} – {label}", words::cards_help(lang));
     view! {
         <div class=format!("number glass reveal number-{id}")>
-            <dt class="num">{words::number(lang, value)}</dt>
+            <dt class="num" data-count=value.to_string()>{words::number(lang, value)}</dt>
             <dd>
                 {label}
                 <button type="button" class="tip" popovertarget=tip.clone() {..custom_attribute("interestfor", tip.clone())} aria-label=what>

@@ -52,7 +52,7 @@
 /* equal columns, and a row that is not full stands in the middle */
 .grid-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 22rem));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 28rem));
   justify-content: center;
   gap: var(--space-4);
   margin: 0;

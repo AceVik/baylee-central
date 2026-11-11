@@ -350,3 +350,78 @@
   justify-content: center;
 }
 
+
+/* the other files of a platform fold under its first: every card of a row
+   is then as tall as the next */
+.plat-more {
+  margin-top: 0.7rem;
+  border-top: 1px solid var(--edge-soft);
+  font-family: var(--sans);
+}
+
+.plat-more > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  min-height: var(--target);
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+  font-weight: 500;
+  list-style: none;
+  cursor: pointer;
+  transition: color var(--dur-fast) ease;
+}
+
+.plat-more > summary::-webkit-details-marker {
+  display: none;
+}
+
+.plat-more > summary::after {
+  content: "";
+  flex: none;
+  inline-size: 0.5rem;
+  block-size: 0.5rem;
+  margin-inline-end: 0.3rem;
+  border: solid currentcolor;
+  border-width: 0 2px 2px 0;
+  transform: translateY(-25%) rotate(45deg);
+  transition: transform var(--dur) var(--ease);
+}
+
+.plat-more[open] > summary::after {
+  transform: translateY(15%) rotate(225deg);
+}
+
+.plat-more > summary:hover {
+  color: var(--link-hover);
+}
+
+.plat-more .plat-files li:first-child {
+  padding-top: 0.2rem;
+  border-top: 0;
+}
+
+.plat .plat-files:first-of-type {
+  margin-block-end: auto;
+}
+
+@supports (interpolate-size: allow-keywords) {
+  @media (prefers-reduced-motion: no-preference) {
+    .plat-more {
+      interpolate-size: allow-keywords;
+    }
+
+    .plat-more::details-content {
+      block-size: 0;
+      overflow: clip;
+      transition:
+        block-size var(--dur-slow, 0.35s) var(--ease),
+        content-visibility var(--dur-slow, 0.35s) allow-discrete;
+    }
+
+    .plat-more[open]::details-content {
+      block-size: auto;
+    }
+  }
+}

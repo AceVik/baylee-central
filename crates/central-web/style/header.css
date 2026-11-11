@@ -669,3 +669,14 @@ body:has(dialog[open]) .top {
     display: none;
   }
 }
+
+/* the narrowest phones: one stat a line, nothing over anything */
+@media (max-width: 400px) {
+  .strip-inner {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .strip-stat:nth-child(2n) {
+    justify-self: start;
+  }
+}
