@@ -62,7 +62,7 @@ The reviewer's notes, in German as written.
 
 - Baylees Erinnerungsseite (baylee-*) habe ich wie vorgegeben nicht angefasst; mir ist dort nichts aufgefallen, was eine Korrektur bräuchte. Im englischen Teil der Altseiten-Texte bleiben Title Case ('AI Opponents & Language Models', 'Self-hosting & Central Integration'), 'House AI'/'house AI' und Gedankenstriche ohne Leerzeichen uneinheitlich; in gw-lead (DE) ist 'Baylee betreibt das als offiziell markierte; die anderen betreiben andere für ihre Runde' schwer lesbar. Soll ich diese Altseiten-Texte auch glätten?
 
-## Proposed changes to `legal/*.md` (not applied)
+## Changes to `legal/*.md` (applied on 11.11.2026 as version 2026-11-11)
 
 `legal/terms.*.md` is compiled into `central-service` and versioned: a change
 is a new version every account accepts again (`legal/README.md`,

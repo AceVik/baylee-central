@@ -242,7 +242,7 @@ fc-policy = Die <policy>Richtlinie für Fan-Inhalte</policy> von Wizards of the 
 ## Datenschutzerklärung
 
 privacy-title = Datenschutzerklärung
-privacy-lead = Was diese Seite und Baylee Central über dich verarbeiten, wozu, auf welcher Rechtsgrundlage und wie lange. Entwurf, am 10. November 2026 gegen den Code geprüft; vor der endgültigen Fassung prüft ihn ein Anwalt.
+privacy-lead = Was diese Seite und Baylee Central über dich verarbeiten, wozu, auf welcher Rechtsgrundlage und wie lange.
 privacy-updated = Stand: 11. November 2026
 privacy-controller-title = Wer verantwortlich ist
 privacy-controller = Verantwortlich im Sinne der DSGVO ist die im <impressum>Impressum</impressum> genannte Privatperson; dort stehen Name, Anschrift und E-Mail-Adresse. Fragen zum Datenschutz kannst du auch über das Kontaktformular stellen. Einen Datenschutzbeauftragten gibt es nicht; er ist nicht vorgeschrieben.
@@ -848,7 +848,7 @@ ai-training = Parallel zur Haus-KI und der externen LLM-Anbindung wird eine eige
 ai-hostingLink = Gateway-Hosting & LLM-Setup
 
 # The gateways and the contact page, as the old site wrote them (owner, 11.11.2026)
-gw-lead = Ein Gateway ist ein Server für Online-Tische: Accounts, Decks, Räume und ein Engine-Prozess pro Spiel. Hier stehen die bei Baylee Central registrierten, die dessen Administrator freigegeben hat. Baylee betreibt das als offiziell markierte; die anderen betreiben andere für ihre Runde, und dort gelten deren eigene Regeln. Ein Eintrag ist kein Versprechen darüber, was ein Gateway tut.
+gw-lead = Ein Gateway ist ein Server für Online-Tische: Accounts, Decks, Räume und ein Engine-Prozess pro Spiel. Hier stehen die bei Baylee Central registrierten, die dessen Administrator freigegeben hat. Das als offiziell markierte Gateway betreibt Baylee selbst; alle anderen gehören ihren Betreibern, und dort gelten deren Regeln. Ein Eintrag ist kein Versprechen darüber, was ein Gateway tut.
 gw-howTo = Um auf einem zu spielen, kopiere seine Adresse in die Eingangstür des Clients. Online heißt, Central hat in den letzten anderthalb Minuten von dem Gateway gehört; ein Versprechen, dass es antwortet, ist das nicht. Namen und Versionen sind die Angaben der Betreiber.
 gw-find = Gateway finden
 gw-findHint = Name oder Adresse

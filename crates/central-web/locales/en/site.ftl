@@ -242,7 +242,7 @@ fc-policy = Wizards of the Coast's <policy>Fan Content Policy</policy>
 ## Privacy notice
 
 privacy-title = Privacy notice
-privacy-lead = What this site and Baylee Central process about you, why, on which legal basis and for how long. Draft, reviewed against the code on 10 November 2026; it is checked by a lawyer before it is final.
+privacy-lead = What this site and Baylee Central process about you, why, on which legal basis and for how long.
 privacy-updated = As of 11 November 2026
 privacy-controller-title = Who is responsible
 privacy-controller = The controller under the GDPR is the private person named in the <impressum>legal notice</impressum>, which gives their name, postal address and e-mail address. You can also send privacy questions through the contact form. There is no data protection officer; none is required.

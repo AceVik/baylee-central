@@ -1,5 +1,5 @@
-<!-- version: 2026-11-02 -->
-<!-- updated: 2026-11-02 -->
+<!-- version: 2026-11-11 -->
+<!-- updated: 2026-11-11 -->
 
 # Datenschutzerklärung von Baylee Central
 
@@ -84,16 +84,20 @@ Sprach- und Darstellungswahl speichert der Browser lokal. Es gibt keine
 Tracking-Cookies und keine eingebundenen Dienste Dritter, die Daten über
 dich sammeln.
 
-## Optionale Chat- und Benachrichtigungsfunktionen
+## 5a. Chat und Benachrichtigungen
 
-Central speichert persönliche Kontakte, Blockierungen und Gruppenmitgliedschaften,
+Für den Chat (Art. 6 Abs. 1 lit. b DSGVO) speichert Central persönliche
+Kontakte, Kontaktanfragen, Blockierungen und Gruppenmitgliedschaften,
 öffentliche Geräteschlüssel sowie verschlüsselte persönliche Nachrichten und
 Zustellmetadaten. Chat-Texte werden erst auf deinem Gerät entschlüsselt. Persönliche
-Chats laufen über Central; Spielchats bleiben beim Gateway. Die aktuellen Grenzen
-pro Konto/Gerät lehnen neue Nachrichten bei vollem Speicher ab; diese Änderung
-führt keine automatische Löschung des Verlaufs ein.
+Chats laufen über Central; Spielchats bleiben beim Gateway. Je Absender und
+je Gerät speichert Central höchstens 5.000 Nachrichten; danach werden neue
+abgelehnt. Der Verlauf wird nicht automatisch gelöscht; er bleibt, bis du
+dein Konto löschst.
 
-Wenn du Benachrichtigungen aktivierst, speichert Central den Push-Endpunkt dieses
+Wenn du Benachrichtigungen aktivierst (Art. 6 Abs. 1 lit. a DSGVO, § 25 Abs. 1
+TDDDG: deine Einwilligung, im Profil jederzeit für die Zukunft widerrufbar),
+speichert Central den Push-Endpunkt dieses
 Browsers, seinen öffentlichen Schlüssel, ein Authentifizierungsgeheimnis, Sprache,
 eine zufällige Installationskennung und deine Kategorienauswahl. Der Push-Anbieter
 deines Browsers (Google, Mozilla oder Apple) transportiert verschlüsselte allgemeine
@@ -131,7 +135,10 @@ Zustellung verhindern.
 - **Behörden** erhalten Daten nur, wenn wir gesetzlich dazu verpflichtet sind.
 
 Eine Übermittlung in Länder außerhalb des Europäischen Wirtschaftsraums
-findet nicht statt.
+findet nur statt, wenn du Benachrichtigungen aktivierst: Dann überbringt
+sie der Push-Anbieter deines Browsers (Google, Mozilla oder Apple, USA).
+Gateways anderer Betreiber können in jedem Land stehen; ob du dich dort
+anmeldest, entscheidest du.
 
 ## 7. Wie lange wir Daten speichern
 
