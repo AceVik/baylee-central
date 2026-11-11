@@ -195,7 +195,7 @@ fn lines(
                 <span translate="no">{release.tag.clone()}</span>
                 {meta}
                 {sep()}
-                {format::date(lang, &release.date)}
+                <span class="dl-date">{format::date(lang, &release.date)}</span>
             </span>
             <span class="dl-sub">
                 {checksum}

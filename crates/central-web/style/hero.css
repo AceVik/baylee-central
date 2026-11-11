@@ -292,8 +292,8 @@ body:has(dialog[open]) .wave {
   border-radius: var(--pill);
   background: color-mix(in srgb, var(--panel-solid) 74%, transparent);
   box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.08),
-    0 8px 20px -12px rgb(0 0 0 / 0.55);
+    inset 0 1px 0 var(--sheen),
+    var(--shadow);
   color: var(--title);
   font: 600 0.74rem var(--sans);
   letter-spacing: 0.03em;
@@ -352,8 +352,8 @@ body:has(dialog[open]) .wave {
   border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--panel-solid) 70%, transparent);
   box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.05),
-    0 10px 26px -18px rgb(0 0 0 / 0.6);
+    inset 0 1px 0 var(--sheen),
+    var(--shadow);
   color: var(--ink-soft);
   font: 0.76rem / 1.45 var(--sans);
   text-align: start;
@@ -570,9 +570,8 @@ body:has(dialog[open]) .wave {
     linear-gradient(180deg, color-mix(in srgb, var(--panel-2) 70%, transparent), transparent 9rem),
     var(--panel-solid);
   box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.07),
-    0 30px 60px -18px rgb(0 0 0 / 0.78),
-    0 0 0 1px color-mix(in srgb, var(--gold) 10%, transparent);
+    inset 0 1px 0 var(--sheen),
+    var(--shadow-lift);
   translate: -50% 0;
   text-align: start;
   transform-origin: top center;
@@ -720,6 +719,11 @@ body:has(dialog[open]) .wave {
   align-items: center;
   justify-content: center;
   gap: 0 1.1rem;
+}
+
+/* a date never breaks between its day and its month */
+.dl-date {
+  white-space: nowrap;
 }
 
 .dl-sub a {

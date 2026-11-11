@@ -106,12 +106,17 @@
 
 /* the old site's panel: a nearly opaque glass with a gold edge (no
    backdrop blur: it would be redrawn on every scroll over the painting) */
+/* a raised panel: light on its upper edge, a shade in two layers below */
 .glass {
   position: relative;
   border: 1px solid var(--edge);
   border-radius: var(--radius);
-  background: var(--panel);
-  box-shadow: var(--shadow);
+  background:
+    linear-gradient(180deg, var(--sheen), transparent 5.5rem),
+    var(--panel);
+  box-shadow:
+    inset 0 1px 0 var(--sheen),
+    var(--shadow);
   transition:
     border-color var(--dur) ease,
     box-shadow var(--dur) ease,
