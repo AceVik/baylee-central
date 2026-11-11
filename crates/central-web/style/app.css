@@ -149,11 +149,15 @@
   box-shadow: inset 0.1875rem 0 0 var(--action);
 }
 
+/* the account's content arrives with the island, after the first paint: the
+   column holds the window's height from the start, so the footer below does
+   not jump into view when it comes */
 .frame-main {
   display: grid;
   align-content: start;
   gap: var(--space-5);
   min-inline-size: 0;
+  min-block-size: calc(100dvh - var(--bar-height));
 }
 
 .frame-main h1::after {

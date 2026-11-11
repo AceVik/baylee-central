@@ -570,7 +570,13 @@ pub fn Messenger(lang: Lang, section: Section, worker: String) -> impl IntoView 
         });
     });
     let code = lang.code();
-    move || {
+    // The server renders it, and it is the page's first sizeable text. It
+    // stays one element until the messenger itself opens (then it hides),
+    // so the page's largest paint never waits for the WebAssembly.
+    let opening = view! {
+        <p class="lead msgr-lead" hidden=move || matches!(who_is.get(), Who::Ready(_))>{words::chat_opening_lead(lang)}</p>
+    };
+    let state = move || {
         match who_is.get() {
         Who::Loading => view! { <p role="status" class="meta">{words::account_loading(lang)}</p> }.into_any(),
         Who::SignedOut => view! {
@@ -593,5 +599,6 @@ pub fn Messenger(lang: Lang, section: Section, worker: String) -> impl IntoView 
         .into_any(),
         Who::Ready(me) => talk::messenger(lang, &me, ctl, tab, selected, worker).into_any(),
     }
-    }
+    };
+    view! { {opening} {state} }
 }

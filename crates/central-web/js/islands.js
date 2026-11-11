@@ -4,12 +4,18 @@
 // order. What Leptos' inline hydration script does, as a file of its own,
 // so the pages need no inline script and no nonce.
 //
-// It starts once the page has loaded: the WebAssembly then never competes
-// with the text, the fonts and the pictures the visitor sees first, and the
-// server-rendered page is whole until the islands take it over.
+// It starts once the page has loaded and its first frame is drawn: the
+// WebAssembly then never competes with the text, the fonts and the pictures
+// the visitor sees first, and the server-rendered page is whole until the
+// islands take it over. A hidden tab draws no frames; there the half second
+// starts it.
 if (document.readyState !== "complete") {
   await new Promise((resolve) => window.addEventListener("load", resolve, { once: true }));
 }
+await new Promise((resolve) => {
+  requestAnimationFrame(() => setTimeout(resolve, 0));
+  setTimeout(resolve, 500);
+});
 const islands = await import("./islands-glue.js");
 
 await islands.default({ module_or_path: "./islands.wasm" });

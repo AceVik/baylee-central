@@ -660,6 +660,7 @@ chat-history-only = Kein Kontakt mehr.
 chat-today = Heute
 chat-yesterday = Gestern
 chat-encrypted = Ende-zu-Ende-verschlüsselt
+chat-opening-lead = Deine Unterhaltungen und Kontakte. Nachrichten werden auf deinen Geräten verschlüsselt, bevor sie sie verlassen, und Central leitet sie weiter, ohne sie lesen zu können.
 chat-new-from = Neue Nachricht von { $who }.
 chat-new-many = { $n } neue Nachrichten.
 chat-retry = Erneut versuchen

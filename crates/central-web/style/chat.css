@@ -17,6 +17,16 @@
   min-block-size: max(28rem, calc(100dvh - var(--bar-height) - var(--space-8)));
 }
 
+/* what the page says until the messenger opens: rendered by the server, so
+   the page's first sizeable text is there before the WebAssembly */
+.msgr-lead {
+  max-inline-size: var(--measure);
+  margin-block-end: var(--space-4);
+  color: var(--ink-soft);
+  font-size: var(--text-lg);
+  line-height: var(--leading);
+}
+
 .messenger {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
