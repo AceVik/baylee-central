@@ -556,7 +556,9 @@ fn ai(lang: Lang) -> impl IntoView + use<> {
 /// are the operator's words, shown as text; the official mark comes from
 /// the origin alone. Copying the address (`boot.js`, `[data-copy]`) shows
 /// only where the browser can copy.
-pub fn gateway_card(lang: Lang, gateway: &Gateway) -> impl IntoView + use<> {
+/// `h2` names the card with a second-level heading (the directory, right
+/// under the page's title), else a third (the start page's section).
+pub fn gateway_card(lang: Lang, gateway: &Gateway, h2: bool) -> impl IntoView + use<> {
     let state = if gateway.online {
         view! { <p class="gw-state pill ok"><span class="dot ok live" aria-hidden="true"></span>{words::gws_online(lang)}</p> }.into_any()
     } else {
@@ -571,10 +573,17 @@ pub fn gateway_card(lang: Lang, gateway: &Gateway) -> impl IntoView + use<> {
         "gw card card-link reveal"
     };
     let website = gateway.website.clone();
+    let find = format!("{} {}", gateway.name, gateway.origin).to_lowercase();
+    let name = gateway.name.clone();
+    let name = if h2 {
+        view! { <h2 class="gw-name"><bdi>{name}</bdi></h2> }.into_any()
+    } else {
+        view! { <h3 class="gw-name"><bdi>{name}</bdi></h3> }.into_any()
+    };
     view! {
-        <li class=class>
+        <li class=class data-find=find data-online=if gateway.online { "true" } else { "false" }>
             <div class="gw-head">
-                <h3 class="gw-name"><bdi>{gateway.name.clone()}</bdi></h3>
+                {name}
                 {official}
             </div>
             {state}
@@ -618,7 +627,7 @@ fn gateways(lang: Lang, all: Option<&[Gateway]>) -> impl IntoView + use<> {
     let grid = (n > 0).then(|| {
         let cards = shown
             .into_iter()
-            .map(|gateway| gateway_card(lang, gateway))
+            .map(|gateway| gateway_card(lang, gateway, false))
             .collect_view();
         view! { <ul class="gateways hgw-grid stagger" data-count=n.to_string()>{cards}</ul> }
     });
@@ -638,8 +647,10 @@ fn gateways(lang: Lang, all: Option<&[Gateway]>) -> impl IntoView + use<> {
     }
 }
 
-/// Writing to the people behind Baylee: the channels, and the form.
-fn contact(lang: Lang) -> impl IntoView + use<> {
+/// Writing to the people behind Baylee: the channels, and the form; on the
+/// start page and on the contact page. `reports` is where "Reports &
+/// privacy" leads.
+pub fn contact_columns(lang: Lang, reports: String) -> impl IntoView + use<> {
     let impressum = Page::Impressum.path(lang);
     let operator = rich(words::contact_operator(lang), move |tag| {
         (tag == "impressum").then(|| impressum.clone())
@@ -659,27 +670,33 @@ fn contact(lang: Lang) -> impl IntoView + use<> {
         }
     };
     view! {
+        <div class="two-col">
+            <div class="reveal">
+                <p>{words::contact_intro(lang)}</p>
+                <p>{plain(words::contact_f8(lang))}</p>
+                <ul class="channels">
+                    {channel(DISCORD.to_owned(), solid::DISCORD, "Discord", words::contact_discord(lang))}
+                    {channel(WHATSAPP.to_owned(), solid::WHATSAPP, "WhatsApp", words::contact_whatsapp_sub(lang))}
+                    {channel(format!("{REPOSITORY}/issues"), solid::GITHUB, words::contact_issues(lang), words::contact_issues_sub(lang))}
+                    {channel(reports, solid::CHAT, words::contact_reports_title(lang), words::contact_reports_sub(lang))}
+                </ul>
+                <p class="small">{operator}</p>
+            </div>
+            <div class="contact-card glass reveal">
+                <ContactForm lang=lang />
+                <noscript><p class="notice">{words::contact_noscript(lang)}</p></noscript>
+                <p class="small privacy-note">{note}</p>
+            </div>
+        </div>
+    }
+}
+
+fn contact(lang: Lang) -> impl IntoView + use<> {
+    view! {
         <section class="band alt" id="contact" aria-labelledby="contact-title">
             <div class="wrap">
                 {section_head(words::contact_eyebrow(lang), words::contact_title(lang), "contact-title")}
-                <div class="two-col">
-                    <div class="reveal">
-                        <p>{words::contact_intro(lang)}</p>
-                        <p>{plain(words::contact_f8(lang))}</p>
-                        <ul class="channels">
-                            {channel(DISCORD.to_owned(), solid::DISCORD, "Discord", words::contact_discord(lang))}
-                            {channel(WHATSAPP.to_owned(), solid::WHATSAPP, "WhatsApp", words::contact_whatsapp_sub(lang))}
-                            {channel(format!("{REPOSITORY}/issues"), solid::GITHUB, words::contact_issues(lang), words::contact_issues_sub(lang))}
-                            {channel(Page::Contact.path(lang), solid::CHAT, words::contact_reports_title(lang), words::contact_reports_sub(lang))}
-                        </ul>
-                        <p class="small">{operator}</p>
-                    </div>
-                    <div class="contact-card glass reveal">
-                        <ContactForm lang=lang />
-                        <noscript><p class="notice">{words::contact_noscript(lang)}</p></noscript>
-                        <p class="small privacy-note">{note}</p>
-                    </div>
-                </div>
+                {contact_columns(lang, format!("{}#reports", Page::Contact.path(lang)))}
             </div>
         </section>
     }

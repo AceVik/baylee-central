@@ -276,3 +276,29 @@ test("the start page fetches no WebAssembly until its form comes near, then the 
   await page.locator("#contact button[type=submit]").click();
   await expect(page.locator("#contact-error")).not.toBeEmpty();
 });
+
+test("the gateway directory finds by name or address, and online only", async ({ page }) => {
+  await page.goto("/en/gateways");
+  const field = page.getByRole("searchbox", { name: "Find a gateway" });
+  const cards = page.locator("[data-directory] > li:visible");
+  const count = page.locator("[data-dir-count]");
+  await expect(cards).toHaveCount(2);
+  await field.fill("kitchen");
+  await expect(cards).toHaveCount(1);
+  await expect(count).toHaveText("1 of 2 shown");
+  await field.press("Escape");
+  await expect(cards).toHaveCount(2);
+  await page.getByRole("button", { name: "Online only" }).click();
+  await expect(page.getByRole("button", { name: "Online only" })).toHaveAttribute("aria-pressed", "true");
+  await expect(cards).toHaveCount(1);
+  await field.fill("kitchen");
+  await expect(page.locator("[data-no-match]")).toBeVisible();
+  await page.getByRole("button", { name: "Show all" }).click();
+  await expect(cards).toHaveCount(2);
+  await expect(field).toBeFocused();
+  await expect(count).toHaveText("2 gateways listed, 1 online.");
+  // Ctrl+K finds the field from anywhere on the page
+  await page.locator("h1").click();
+  await page.keyboard.press("Control+k");
+  await expect(field).toBeFocused();
+});

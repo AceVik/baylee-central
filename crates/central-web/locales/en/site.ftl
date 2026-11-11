@@ -159,27 +159,17 @@ install-cpu = <b>Processor:</b> x86-64 builds need AVX2; an older processor take
 ## Gateways
 
 gws-title = Gateways
-gws-lead = A gateway is a server where online tables live. Central lists a gateway once its operator registered it and an administrator approved it; a listing is not a promise about what a gateway does.
-gws-count = { $n ->
-    [one] { $n } gateway listed
-   *[other] { $n } gateways listed
-}
 gws-official = Official
 gws-online = Online
 gws-offline = Offline
 gws-version = Version
 gws-website = Website
 gws-address = Address
-gws-copy-hint = In Baylee, add a gateway by its address.
 gws-copy = Copy address
 gws-copied = Address copied.
 gws-copied-short = Copied
 gws-copy-failed = Copying did not work.
-gws-none = No gateway is listed yet.
 gws-failed = The directory could not be read just now. Try again in a minute.
-host-title = Run your own gateway
-host-lead = A gateway is Baylee's server: one program and a database. You can run one for your playgroup, at home or on a rented server, and register it at Central so it can sign players in with their Baylee account.
-host-steps = Download the gateway from the newest release, follow the <guide>gateway guide</guide>, then register it under <account>your account's gateways</account>. Central lists it in this directory once an administrator approved it.
 
 ## Questions
 
@@ -208,7 +198,6 @@ faq-bug-a = In the game, press <kbd>F8</kbd> to send a report with what it needs
 
 contact-eyebrow = Contact
 contact-title = Write to us
-contact-lead = Questions, ideas or something that does not work: write here, and we answer by e-mail if you give us an address.
 contact-name = Your name
 contact-name-hint = Optional.
 contact-email = Your e-mail address
@@ -226,8 +215,6 @@ contact-error-refused = The message was not accepted. Check its length and try a
 contact-error-network = The message could not be sent. Check your connection and try again.
 contact-privacy = What you send is kept for answering it and deleted 90 days after we handled it, after a year at the latest. More in the <privacy>privacy notice</privacy>.
 contact-noscript = The form needs JavaScript. You can also reach us on Discord or on GitHub.
-contact-bugs-title = Reporting a bug
-contact-bugs = In the game, press <kbd>F8</kbd>: the report carries the log and your system, and you choose what else to send. Otherwise open an issue on GitHub.
 
 ## Legal notice
 
@@ -855,3 +842,28 @@ ai-trainingPill = In training · native engine AI
 ai-trainingTitle = Native Baylee AI — trained to play directly on the engine like a real player
 ai-training = Alongside the House AI and external LLM bridge, a dedicated native Baylee AI is being trained directly on the deterministic rules engine. It learns to evaluate board states, priority windows, combat math, and deck synergies like an experienced human player—with zero external API latency.
 ai-hostingLink = Gateway hosting & LLM setup
+
+# The gateways and the contact page, as the old site wrote them (owner, 11.11.2026)
+gw-lead = A gateway is a server where online tables live: accounts, decks, rooms and one engine process per game. These are the ones registered with Baylee Central, whose operator checked who runs each before listing it. Baylee runs Sanctuary; the others are run by other people for their groups, and their own rules apply there.
+gw-howTo = To play on one, copy its address into the client's front door. Online means Central heard from the gateway within the last minute and a half; it is no promise that it answers. Names and versions are what each operator reports.
+gw-find = Find a gateway
+gw-findHint = Name or address
+gw-onlineOnly = Online only
+gw-shown = { $n } of { $all } shown
+gw-noMatch = No gateway loaded so far matches.
+gw-showAll = Show all
+link-readmeGateway = #running-your-own-gateway
+selfhost-eyebrow = Self-hosting & Central Integration
+selfhost-title = Run your own gateway
+selfhost-processes = A self-hosted gateway runs three lightweight processes alongside PostgreSQL 18+: <code>baylee-gateway</code> manages rooms, decks, and routing; <code>baylee-agent</code> spawns one isolated <code>baylee-engine-server</code> process per match so every table is sandboxed.
+selfhost-proxy = Put a TLS reverse proxy in front of your HTTPS origin (e.g. <code>https://play.example.org</code>), optionally import Scryfall's bulk catalog for card text in 19 languages, and players can connect directly via your address in the client.
+selfhost-central = <b>Link with Baylee Central & configure privacy:</b> Register your HTTPS origin under <mine>Your gateways</mine> and mint a <code>bgt_…</code> token (scopes: <code>sso</code> for single sign-on, <code>listing</code> for directory heartbeats & live telemetry). In your gateway's console, choose your telemetry privacy level (<code>full</code> for running games, table settings & opted-in players, <code>counts_only</code> for totals only, or <code>private</code> for liveness only).
+selfhost-guide = <guide>Read the complete self-hosting guide</guide> · <protocol>Protocol & heartbeat reference (docs/protocol.md)</protocol>
+selfhost-source = Every gateway answers <code>GET /source</code> with its licence, version and commit without sign-in, fulfilling the AGPL source-disclosure requirement automatically.
+reports-eyebrow = Reports
+reports-title = Found something wrong? Tell us
+reports-f8 = Press <kbd>F8</kbd> at the table or in the lobby. A report carries its kind, your text, the client version and, at a table, the game's id. Everything more has a checkbox of its own, and every box starts ticked, so untick what you would rather keep before you press Send: system and hardware, the table as you see it, your log (other players renamed "Player A", "Player B", …), your settings, a picture of the Baylee window only, and at a table the game's whole record (every move and every seat's cards, no names). <i>Show what is sent</i> shows every byte. Session tokens are never sent.
+reports-usage = While you play offline, the client says once a minute that a game is running: no account, no device id, nothing about the game. <i>Send anonymous usage count</i> under Settings › Privacy & Data switches it off.
+reports-discord = Want to talk, find opponents or hear first about new builds? Join the <discord>Baylee community on Discord</discord>.
+reports-issues = Rules questions, wrong card behaviour, ideas: <issues>open an issue on GitHub</issues>. A card that resolved wrongly is the most useful report we can get, because every card has a test and yours becomes one.
+reports-privacy = <docs>docs/privacy.md</docs> lists everything the client, the gateway and the feedback service keep. This site keeps nothing about you: no cookies, no analytics, no fonts from anyone else's server. <notice>The privacy notice</notice> names every other host it talks to, and when.

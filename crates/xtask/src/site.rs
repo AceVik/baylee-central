@@ -28,7 +28,7 @@ use crate::fail::{Fail, OrFail, Result};
 use crate::{process, random, wasm, workspace};
 
 /// The stylesheets, in the order they are joined.
-pub const STYLES: [&str; 13] = [
+pub const STYLES: [&str; 14] = [
     "tokens.css",
     "base.css",
     "buttons.css",
@@ -38,6 +38,7 @@ pub const STYLES: [&str; 13] = [
     "hero.css",
     "pages.css",
     "home.css",
+    "gateways.css",
     "album.css",
     "footer.css",
     "app.css",
@@ -45,7 +46,13 @@ pub const STYLES: [&str; 13] = [
 ];
 
 /// The scripts served under hashed names.
-const SCRIPTS: [&str; 4] = ["boot.js", "pwa.js", "pow-worker.js", "home.js"];
+const SCRIPTS: [&str; 5] = [
+    "boot.js",
+    "pwa.js",
+    "pow-worker.js",
+    "home.js",
+    "directory.js",
+];
 
 const TARGET: &str = "wasm32-unknown-unknown";
 const PROFILE: &str = "islands";

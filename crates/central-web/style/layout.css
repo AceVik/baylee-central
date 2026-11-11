@@ -69,6 +69,22 @@
   display: none;
 }
 
+/* a page's quieter second line, under its lead */
+.page-head .page-note {
+  max-inline-size: var(--prose);
+  margin-inline: auto;
+}
+
+/* what follows the head's words reads from the start again */
+.page-head > :is(.two-col, .directory) {
+  margin-block-start: var(--space-6);
+  text-align: start;
+}
+
+.page-head > .two-col {
+  margin-block-start: var(--space-4);
+}
+
 .crumbs ol {
   display: flex;
   flex-wrap: wrap;

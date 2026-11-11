@@ -1,0 +1,263 @@
+/* The gateways: the cards (on the start page and in the directory), the
+   start page's showcase, the directory with its finding, and the shell
+   lines for running one's own, as the old site set them. */
+
+/* ---- the cards and the start page's showcase ------------------------------ */
+
+.hgw-count {
+  display: block;
+  margin: 0 0 var(--space-4);
+  text-align: center;
+}
+
+.hgw-grid {
+  --hgw-columns: 2;
+
+  display: grid;
+  grid-template-columns: repeat(var(--hgw-columns), minmax(0, 1fr));
+  gap: var(--space-4);
+  margin: 0 auto;
+  padding: 0;
+  list-style: none;
+}
+
+.hgw-grid[data-count="1"] {
+  --hgw-columns: 1;
+
+  max-width: 24rem;
+}
+
+.hgw-grid[data-count="2"],
+.hgw-grid[data-count="4"] {
+  max-width: 56rem;
+}
+
+.hgw-grid[data-count="3"] {
+  --hgw-columns: 3;
+}
+
+@media (max-width: 860px) {
+  .hgw-grid[data-count="3"] {
+    --hgw-columns: 1;
+
+    max-width: 26rem;
+  }
+}
+
+@media (max-width: 600px) {
+  .hgw-grid[data-count] {
+    --hgw-columns: 1;
+
+    max-width: 26rem;
+  }
+}
+
+.hgw-foot {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.65rem;
+  margin-top: 1.25rem;
+}
+
+.gw {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  border: 1px solid var(--edge-soft);
+  border-radius: var(--radius);
+  background: var(--panel);
+  box-shadow: var(--shadow);
+  text-align: start;
+  transition:
+    border-color var(--dur) ease,
+    box-shadow var(--dur) ease;
+}
+
+.gw-is-official {
+  border-color: var(--edge);
+}
+
+.gw-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+}
+
+.gw-name {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-size: var(--text-lg);
+}
+
+.gw-official {
+  flex: none;
+}
+
+.gw-state {
+  align-self: flex-start;
+  margin: 0;
+}
+
+.gw-facts {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  font-family: var(--sans);
+}
+
+.gw-facts {
+  grid-template-columns: max-content minmax(0, 1fr);
+  column-gap: var(--space-4);
+  align-items: center;
+}
+
+.gw-facts > div {
+  display: contents;
+}
+
+.gw-facts dt {
+  color: var(--ink-faint);
+  font-size: var(--text-sm);
+}
+
+.gw-facts dd {
+  min-width: 0;
+  margin: 0;
+}
+
+/* the whole address, wrapped where it must: its end often tells two apart */
+.gw-facts code {
+  font-size: 0.8rem;
+}
+
+.gw-address code {
+  overflow-wrap: anywhere;
+}
+
+.gw-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: auto;
+  padding-top: var(--space-2);
+}
+
+.gw-actions .button {
+  flex: 1 1 10rem;
+}
+
+.gw-open .copy-done,
+.gw-open[data-copied] .copy-idle {
+  display: none;
+}
+
+.gw-open[data-copied] .copy-done {
+  display: block;
+}
+
+.gw-open[data-copied] {
+  border-color: var(--ok);
+  color: var(--ok);
+}
+
+/* ---- the directory --------------------------------------------------------- */
+
+.directory {
+  margin-top: var(--space-6);
+  text-align: start;
+}
+
+.dir-count {
+  display: block;
+  margin: 0 0 var(--space-4);
+  text-align: center;
+}
+
+/* finding one: a field and the online chip, in the middle above the cards */
+.dir-find {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  max-width: 36rem;
+  margin: 0 auto var(--space-3);
+}
+
+.dir-find input {
+  flex: 1 1 14rem;
+  min-height: var(--target);
+  padding: 0.5em 1em;
+  border: 1px solid var(--field-edge);
+  border-radius: var(--pill);
+  background: var(--field-bg);
+  color: var(--ink);
+  font: 1rem var(--sans);
+  transition:
+    border-color var(--dur-fast) ease,
+    box-shadow var(--dur-fast) ease;
+}
+
+.dir-find input:focus-visible {
+  outline: 2px solid transparent;
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold) 35%, transparent);
+}
+
+.dir-find .chip-btn[aria-pressed="true"] .dot {
+  background: var(--gold-ink);
+  box-shadow: none;
+}
+
+.dir-none {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2) var(--space-3);
+  color: var(--ink-soft);
+}
+
+.dir-none[hidden] {
+  display: none;
+}
+
+.dir-failure {
+  max-width: 36rem;
+  margin: var(--space-4) auto 0;
+  padding: var(--space-5);
+  text-align: center;
+}
+
+.directory .grid-cards {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 24rem));
+}
+
+/* ---- the shell lines -------------------------------------------------------- */
+
+pre.code {
+  max-width: 100%;
+  margin: 0 0 1em;
+  padding: 1.1em 1.2em;
+  overflow-x: auto;
+  border: 1px solid var(--edge-soft);
+  border-radius: 14px;
+  background: var(--code-bg);
+  box-shadow: var(--shadow);
+  color: var(--code-ink);
+  font-size: 0.78rem;
+  line-height: 1.6;
+}
+
+pre.code code {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font-size: 1em;
+  white-space: pre;
+}
