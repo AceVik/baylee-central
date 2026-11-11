@@ -452,6 +452,8 @@ async fn forms_and_the_account_area_are_islands_and_not_indexed() {
     for path in [
         "/en/signin",
         "/de/register",
+        "/en/reset",
+        "/de/reset",
         "/en/account",
         "/de/account/profile",
         "/en/account/security",
@@ -476,6 +478,73 @@ async fn forms_and_the_account_area_are_islands_and_not_indexed() {
             html.contains("/assets/crypto-worker.js"),
             "{path}: the crypto Worker's address"
         );
+    }
+}
+
+/// The reset page (`docs/account-reset.md`): a form page as signing in is,
+/// complete in the first response with every field labelled and the
+/// warning before a new vault; reached by a plain link from the sign-in
+/// form (on its page and in its dialog) and from the FAQ; in no sitemap.
+/// Without script it says that it needs script, of the recovery code too.
+#[tokio::test]
+async fn the_reset_page_is_linked_from_signing_in_and_listed_nowhere() {
+    let app = app(true);
+    let (status, _, html) = get(&app, "/en/reset", &[]).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(html.contains("Set a new password – Baylee"));
+    for id in [
+        "reset-name",
+        "reset-code",
+        "reset-keep",
+        "reset-new",
+        "reset-recovery",
+        "reset-confirm",
+        "reset-password",
+        "reset-repeat",
+    ] {
+        assert_eq!(count(&html, &format!(" id=\"{id}\"")), 1, "{id}");
+        assert_eq!(count(&html, &format!(" for=\"{id}\"")), 1, "{id}: a label");
+    }
+    // the data is kept unless the person says otherwise, and the choice
+    // that loses it is described by the warning
+    let radios: Vec<&str> = tags(&html, "input")
+        .into_iter()
+        .filter(|tag| tag.contains("type=\"radio\""))
+        .collect();
+    assert_eq!(radios.len(), 2);
+    assert!(radios[0].contains("id=\"reset-keep\"") && radios[0].contains(" checked"));
+    assert!(
+        radios[1].contains("id=\"reset-new\"")
+            && radios[1].contains("aria-describedby=\"reset-warning\"")
+            && !radios[1].contains(" checked")
+    );
+    assert_eq!(count(&html, " id=\"reset-warning\""), 1);
+    assert!(html.contains("your encrypted data is lost for good"));
+    let noscript = html.split("<noscript>").nth(1).expect("a noscript");
+    assert!(noscript.starts_with("<p class=\"notice\">Setting a new password needs JavaScript"));
+    // a form page of its own has no dialogs over it
+    assert!(!html.contains("id=\"auth-signin\""));
+
+    let (status, headers, _) = get(&app, "/reset", &[("accept-language", "de")]).await;
+    assert_eq!(status, StatusCode::FOUND);
+    assert_eq!(headers["location"], "/de/reset");
+
+    // the sign-in form's link, on its page and in the dialog over a page
+    let (_, _, signin) = get(&app, "/de/signin", &[]).await;
+    assert_eq!(count(&signin, "href=\"/de/reset\""), 1);
+    let (_, _, home) = get(&app, "/de/", &[]).await;
+    assert_eq!(count(&home, "href=\"/de/reset\""), 1, "in the dialog");
+    // the FAQ's answer, beside the dialog's
+    let (_, _, faq) = get(&app, "/en/faq", &[]).await;
+    assert_eq!(count(&faq, "href=\"/en/reset\""), 2);
+    assert!(!faq.contains("cannot be redeemed"));
+
+    let (_, _, sitemap) = get(&app, "/sitemap.xml", &[]).await;
+    assert!(!sitemap.contains("/reset"));
+    for lang in Lang::ALL {
+        let (status, _, html) = get(&app, &format!("/{}/reset", lang.code()), &[]).await;
+        assert_eq!(status, StatusCode::OK, "{lang:?}");
+        assert_eq!(count(&html, " id=\"reset-warning\""), 1, "{lang:?}");
     }
 }
 
@@ -995,6 +1064,7 @@ fn a_page_is_a_pure_function_of_what_it_is_rendered_from() {
         .chain([
             Page::SignIn,
             Page::Register,
+            Page::Reset,
             Page::Offline,
             Page::NotFound,
             Page::Gone,

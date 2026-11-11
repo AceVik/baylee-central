@@ -9,6 +9,7 @@ mod auth;
 mod b64;
 mod central;
 mod chat;
+mod clip;
 mod contact;
 mod crypto;
 mod early;
@@ -16,8 +17,10 @@ mod field;
 mod focus;
 mod impressum;
 pub(crate) mod net;
+mod password;
 mod pow;
 mod push;
+mod reset;
 mod session;
 #[cfg(target_arch = "wasm32")]
 mod trusted;
@@ -34,3 +37,5 @@ pub(crate) use chat::Messenger;
 pub(crate) use contact::ContactForm;
 #[cfg(not(target_arch = "wasm32"))]
 pub(crate) use impressum::Impressum;
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) use reset::Reset;

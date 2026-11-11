@@ -182,7 +182,7 @@ faq-account-a = Nicht, um allein zu spielen: Deckbuilder und Partien gegen die H
 faq-data-q = Was passiert mit meinen Daten?
 faq-data-a = So wenig wie möglich; was genau, steht in der <privacy>Datenschutzerklärung</privacy>. Dein Passwort verlässt nie deinen Browser; deine privaten Daten und deine Chatnachrichten werden auf deinem Gerät verschlüsselt, bevor sie uns erreichen.
 faq-password-q = Ich habe mein Passwort vergessen. Was nun?
-faq-password-a = Ein neues Passwort setzt du mit einem Reset-Code, den dir ein Administrator gibt; auf dieser Website lässt er sich noch nicht einlösen, das folgt. Deine verschlüsselten Daten bleiben dabei nur erhalten, wenn du den Wiederherstellungscode hast, den du beim Anlegen deines Accounts bekommen hast, oder noch im Baylee-Client angemeldet bist. Sonst sind sie verloren.
+faq-password-a = Ein neues Passwort setzt du mit einem Reset-Code, den dir ein Administrator gibt, <reset>auf dieser Seite</reset>. Deine verschlüsselten Daten bleiben dabei nur erhalten, wenn du den Wiederherstellungscode hast, den du beim Anlegen deines Accounts bekommen hast. Ohne ihn fängst du mit einem leeren Tresor an, und diese Daten sind verloren.
 faq-gateway-q = Was ist ein Gateway?
 faq-gateway-a = Ein Server, auf dem Online-Tische laufen. Jeder kann eins betreiben; das <gateways>Verzeichnis</gateways> zeigt die, die Central kennt.
 faq-systems-q = Auf welchen Systemen läuft es?
@@ -452,6 +452,7 @@ signin-working = Dein Passwort wird gesichert … das dauert einen Moment und pa
 signin-wrong = Anmeldename und Passwort passen nicht zusammen. Prüf beides und versuch es noch einmal.
 signin-not-moved = Dieser Account ist noch nicht zu Baylee Central umgezogen. Melde dich einmal im Baylee-Client an; er zieht deinen Account um.
 signin-no-account = Noch keinen Account? <register>Leg einen an</register>.
+signin-forgot = Passwort vergessen? <reset>Setz mit einem Reset-Code ein neues</reset>.
 register-have-account = Schon einen Account? <signin>Melde dich an</signin>.
 dialog-close = Schließen
 signin-noscript = Anmelden braucht JavaScript: Dein Passwort wird in deinem Browser verarbeitet und nie an uns gesendet.
@@ -492,6 +493,49 @@ code-kept = Ich habe meinen Wiederherstellungscode gesichert
 code-not-kept = Sichere zuerst den Code und bestätige es dann.
 code-continue = Weiter
 code-later = Nicht jetzt
+code-copy = Kopieren
+code-copied = Kopiert.
+code-copy-failed = Kopieren hat hier nicht geklappt. Markier den Code und kopier ihn von Hand.
+
+## Mit einem Reset-Code ein neues Passwort setzen
+
+reset-title = Neues Passwort setzen
+reset-lead = Für den Fall, dass du dein Passwort vergessen hast: Ein Administrator gibt dir einen Reset-Code, und mit ihm setzt du hier ein neues.
+reset-noscript = Ein neues Passwort zu setzen braucht JavaScript: Dein Passwort und dein Wiederherstellungscode werden in deinem Browser verarbeitet und nie an uns gesendet.
+reset-code = Reset-Code
+reset-code-hint = Von einem Administrator. Er beginnt mit RESET und gilt einmal, bis 24 Stunden nach dem Ausstellen.
+reset-data = Deine verschlüsselten Daten
+reset-keep = Ich habe meinen Wiederherstellungscode. Meine Daten bleiben.
+reset-new = Ich habe ihn nicht. Mit einem leeren Tresor neu anfangen.
+reset-recovery = Wiederherstellungscode
+reset-recovery-hint = Der Code, den du beim Anlegen deines Accounts gesichert hast. Er bleibt in deinem Browser und wird nie an uns gesendet.
+reset-warning = Mit einem leeren Tresor sind deine verschlüsselten Daten endgültig verloren: die Einstellungen, die in deinem Account gespeichert sind, deine Deck-Sicherungen und dein Chatverlauf. Niemand kann sie zurückholen, auch wir nicht. Dein Account, dein Anzeigename und deine Kontakte bleiben. Du bekommst einen neuen Wiederherstellungscode.
+reset-warning-confirm = Ich habe verstanden, dass diese Daten endgültig verloren sind.
+reset-submit = Neues Passwort setzen
+reset-missing = Gib deinen Anmeldenamen, den Reset-Code und ein neues Passwort ein.
+reset-recovery-missing = Gib deinen Wiederherstellungscode ein oder wähle den leeren Tresor.
+reset-error-code = Das ist kein Reset-Code. Er beginnt mit RESET, danach folgen acht Gruppen aus vier Zeichen.
+reset-error-recovery = Dieser Wiederherstellungscode öffnet die Daten deines Accounts nicht. Prüf ihn und versuch es noch einmal. Geändert wurde nichts, und dein Reset-Code gilt weiter.
+reset-error-confirm = Bestätige zuerst, dass du weißt, was verloren geht.
+reset-refused = Anmeldename und Reset-Code passen nicht zusammen, oder der Code ist abgelaufen oder schon benutzt. Prüf beides. Wenn nichts hilft, bitte um einen neuen Code.
+reset-done-title = Dein neues Passwort ist gesetzt
+reset-done-kept = Deine Daten und dein Wiederherstellungscode bleiben, wie sie waren. Du bist überall abgemeldet; melde dich mit dem neuen Passwort an.
+reset-done-new = Du fängst mit einem leeren Tresor an und bist überall abgemeldet. Unten steht dein neuer Wiederherstellungscode; der alte gilt nicht mehr.
+reset-unsure-title = Es kam keine Antwort
+reset-unsure = Die Verbindung brach ab, bevor Baylee Central geantwortet hat. Deshalb wissen wir nicht, ob dein neues Passwort gesetzt wurde. Versuch, dich damit anzumelden. Klappt das nicht, wurde nichts geändert: Dein Reset-Code gilt weiter, gib ihn hier noch einmal ein.
+reset-unsure-code = Wenn dein neues Passwort gilt, ist das dein neuer Wiederherstellungscode, und der alte gilt nicht mehr; er lässt sich nicht noch einmal anzeigen, sichere ihn also jetzt. Wenn dein neues Passwort nicht gilt, ist dieser Code wertlos.
+reset-to-signin = Anmelden
+
+## Das Passwort ändern
+
+password-new = Neues Passwort
+password-new-repeat = Neues Passwort wiederholen
+password-current = Aktuelles Passwort
+password-change-submit = Passwort ändern
+password-missing = Gib dein aktuelles Passwort und ein neues ein.
+password-error-current = Das aktuelle Passwort stimmt nicht. Prüf es und versuch es noch einmal.
+password-changed = Dein Passwort ist geändert. Hier bleibst du angemeldet, überall sonst bist du abgemeldet, auch im Baylee-Client; melde dich dort mit dem neuen Passwort an.
+password-unsure = Es kam keine Antwort. Deshalb wissen wir nicht, ob dein Passwort geändert wurde. Versuch beim nächsten Anmelden zuerst das neue Passwort, dann das alte.
 
 ## Die Nutzungsbedingungen von Central
 
@@ -552,7 +596,7 @@ security-end-client = Client abmelden
 security-client-ended = Der Client ist abgemeldet.
 security-sign-out = Hier abmelden
 security-password-title = Passwort
-security-password-later = Das Passwort auf der Website zu ändern folgt noch; bis dahin änderst du es im Baylee-Client.
+security-password-lead = Deine verschlüsselten Daten und dein Wiederherstellungscode bleiben, wie sie sind. Wenn du das Passwort änderst, wirst du überall außer hier abgemeldet.
 
 privacy-export-title = Deine Daten exportieren
 privacy-export-lead = Was Baylee Central über deinen Account weiß, als JSON-Datei: Stammdaten, Sitzungen, angenommene Bedingungen, deine Gateways und die Protokolleinträge zu deinem Account. Deine verschlüsselten Inhalte kann nur dein Baylee-Client entschlüsseln und exportieren. Für den Export braucht es eine Anmeldung, die weniger als 30 Minuten her ist.

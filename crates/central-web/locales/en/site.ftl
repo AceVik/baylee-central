@@ -182,7 +182,7 @@ faq-account-a = Not to play alone: the deck builder and matches against the hous
 faq-data-q = What happens to my data?
 faq-data-a = As little as possible; the <privacy>privacy notice</privacy> says exactly what. Your password never leaves your browser; your private data and your chat messages are encrypted on your device before they reach us.
 faq-password-q = I forgot my password. What now?
-faq-password-a = You set a new password with a reset code that an administrator gives you; it cannot be redeemed on this website yet, that will follow. Your encrypted data survives only if you have the recovery code you received when you created your account, or are still signed in to the Baylee client. Otherwise it is lost.
+faq-password-a = You set a new password with a reset code that an administrator gives you, <reset>on this page</reset>. Your encrypted data survives only if you have the recovery code you received when you created your account. Without it you start with an empty vault, and that data is lost.
 faq-gateway-q = What is a gateway?
 faq-gateway-a = A server where online tables live. Anyone can run one; the <gateways>directory</gateways> lists those Central knows.
 faq-systems-q = Which systems does it run on?
@@ -451,6 +451,7 @@ signin-working = Securing your password … this takes a moment and happens only
 signin-wrong = That sign-in name and password do not match. Check both and try again.
 signin-not-moved = This account has not moved to Baylee Central yet. Sign in once with the Baylee client; it moves your account.
 signin-no-account = No account yet? <register>Create one</register>.
+signin-forgot = Forgot your password? <reset>Set a new one with a reset code</reset>.
 register-have-account = Already have an account? <signin>Sign in</signin>.
 dialog-close = Close
 signin-noscript = Signing in needs JavaScript: your password is processed in your browser and never sent to us.
@@ -491,6 +492,49 @@ code-kept = I have saved my recovery code
 code-not-kept = Save the code first, then confirm it.
 code-continue = Continue
 code-later = Not now
+code-copy = Copy
+code-copied = Copied.
+code-copy-failed = Copying did not work here. Select the code and copy it by hand.
+
+## Setting a new password with a reset code
+
+reset-title = Set a new password
+reset-lead = For when you forgot your password: an administrator gives you a reset code, and with it you set a new one here.
+reset-noscript = Setting a new password needs JavaScript: your password and your recovery code are processed in your browser and never sent to us.
+reset-code = Reset code
+reset-code-hint = From an administrator. It starts with RESET and works once, within 24 hours of being made.
+reset-data = Your encrypted data
+reset-keep = I have my recovery code. My data stays.
+reset-new = I do not have it. Start with an empty vault.
+reset-recovery = Recovery code
+reset-recovery-hint = The code you saved when you created your account. It stays in your browser and is never sent to us.
+reset-warning = With an empty vault your encrypted data is lost for good: the settings saved in your account, your deck backups and your chat history. Nobody can bring it back, and neither can we. Your account, your display name and your contacts stay. You get a new recovery code.
+reset-warning-confirm = I understand that this data is lost for good.
+reset-submit = Set new password
+reset-missing = Enter your sign-in name, the reset code and a new password.
+reset-recovery-missing = Enter your recovery code, or choose the empty vault.
+reset-error-code = That is not a reset code. It starts with RESET, followed by eight groups of four characters.
+reset-error-recovery = This recovery code does not open your account's data. Check it and try again. Nothing was changed, and your reset code still works.
+reset-error-confirm = Confirm first that you know what is lost.
+reset-refused = This sign-in name and reset code do not go together, or the code has expired or was used already. Check both. If nothing helps, ask for a new code.
+reset-done-title = Your new password is set
+reset-done-kept = Your data and your recovery code stay as they were. You are signed out everywhere; sign in with your new password.
+reset-done-new = You start with an empty vault and are signed out everywhere. Below is your new recovery code; the old one no longer works.
+reset-unsure-title = No answer came back
+reset-unsure = The connection broke before Baylee Central answered, so we cannot tell whether your new password was set. Try to sign in with it. If that fails, nothing was changed: your reset code still works, enter it here again.
+reset-unsure-code = If your new password works, this is your new recovery code and the old one no longer works; it cannot be shown again, so save it now. If your new password does not work, this code is worth nothing.
+reset-to-signin = Sign in
+
+## Changing the password
+
+password-new = New password
+password-new-repeat = Repeat new password
+password-current = Current password
+password-change-submit = Change password
+password-missing = Enter your current password and a new one.
+password-error-current = The current password is not right. Check it and try again.
+password-changed = Your password is changed. You stay signed in here and are signed out everywhere else, the Baylee client included; sign in there with the new password.
+password-unsure = No answer came back, so we cannot tell whether your password was changed. When you sign in next, try the new password first, then the old one.
 
 ## Central's terms
 
@@ -551,7 +595,7 @@ security-end-client = Sign the client out
 security-client-ended = The client is signed out.
 security-sign-out = Sign out here
 security-password-title = Password
-security-password-later = Changing your password on the website will follow; until then, change it in the Baylee client.
+security-password-lead = Your encrypted data and your recovery code stay as they are. Changing the password signs you out everywhere except here.
 
 privacy-export-title = Export your data
 privacy-export-lead = What Baylee Central knows about your account, as a JSON file: its basic data, sessions, accepted terms, your gateways and the audit entries naming your account. Your encrypted contents can only be decrypted and exported by your Baylee client. The export needs a sign-in less than 30 minutes old.

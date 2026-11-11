@@ -28,6 +28,7 @@ pub fn document(page: Page, cx: &Context<'_>) -> impl IntoView + use<> {
         Page::FanContent => legal::fan_content(cx),
         Page::SignIn => account::sign_in(cx),
         Page::Register => account::register(cx),
+        Page::Reset => account::reset(cx),
         Page::Account(section) => account::area(cx, section),
         Page::NotFound => errors::not_found(cx),
         Page::Gone => errors::gone(cx),

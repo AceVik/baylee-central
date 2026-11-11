@@ -46,6 +46,17 @@ impl From<Failure> for Problem {
     }
 }
 
+impl Problem {
+    /// A failure where no name and password were judged: `Rejected` is then
+    /// no wrong sign-in, and never reads as one.
+    pub fn outside_sign_in(failure: Failure) -> Self {
+        match failure {
+            Failure::Rejected => Problem::Failed,
+            other => other.into(),
+        }
+    }
+}
+
 /// The words for a problem.
 pub fn problem_text(lang: Lang, problem: Problem) -> &'static str {
     match problem {
@@ -489,8 +500,10 @@ pub fn SignIn(lang: Lang, worker: String) -> impl IntoView {
         });
     };
     let register = format!("/{}/register", lang.code());
+    // a page of its own, in the dialog as on the page: a plain link
+    let reset = format!("/{}/reset", lang.code());
     let form = move || {
-        let register = register.clone();
+        let (register, reset) = (register.clone(), reset.clone());
         view! {
             <form class="form" method="post" novalidate=true on:submit=submit.clone()>
                 <div class="field">
@@ -513,7 +526,10 @@ pub fn SignIn(lang: Lang, worker: String) -> impl IntoView {
                 </div>
                 <p class="error" role="alert">{move || error.get()}</p>
                 <button type="submit" class="button primary">{words::signin_submit(lang)}</button>
-                <p class="hint">{rich(words::signin_no_account(lang), move |tag| (tag == "register").then(|| register.clone()))}</p>
+                <div class="hints">
+                    <p class="hint">{rich(words::signin_forgot(lang), move |tag| (tag == "reset").then(|| reset.clone()))}</p>
+                    <p class="hint">{rich(words::signin_no_account(lang), move |tag| (tag == "register").then(|| register.clone()))}</p>
+                </div>
             </form>
         }
         .into_any()

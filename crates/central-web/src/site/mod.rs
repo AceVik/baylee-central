@@ -41,6 +41,8 @@ pub enum Page {
     SignIn,
     /// `/{lang}/register`.
     Register,
+    /// `/{lang}/reset`: a new password with an administrator's reset code.
+    Reset,
     /// `/{lang}/account…`: the signed-in area.
     Account(Section),
     /// Any path the site does not have (404).
@@ -75,6 +77,7 @@ impl Page {
             Page::Offline => "offline",
             Page::SignIn => "signin",
             Page::Register => "register",
+            Page::Reset => "reset",
             Page::Account(section) => section.slug(),
             Page::Download => "download",
             Page::Gateways => "gateways",
@@ -93,7 +96,7 @@ impl Page {
     pub fn from_slug(slug: &str) -> Option<Page> {
         Page::LISTED
             .into_iter()
-            .chain([Page::SignIn, Page::Register, Page::Offline])
+            .chain([Page::SignIn, Page::Register, Page::Reset, Page::Offline])
             .chain(Section::ALL.map(Page::Account))
             .find(|page| page.slug() == slug)
     }
@@ -110,6 +113,7 @@ impl Page {
                 | Page::Offline
                 | Page::SignIn
                 | Page::Register
+                | Page::Reset
                 | Page::Account(_)
         )
     }

@@ -6,7 +6,7 @@ use leptos::prelude::*;
 
 use super::Built;
 use crate::data::Section;
-use crate::islands::{Account, Messenger, Register, SignIn};
+use crate::islands::{Account, Messenger, Register, Reset, SignIn};
 use crate::rich::{icon, rich};
 use crate::site::icons;
 use crate::site::shell::Meta;
@@ -14,9 +14,15 @@ use crate::site::{Context, Page};
 use crate::words::{self, Lang};
 
 /// The forms explain themselves without script: the password is processed
-/// in the browser, so there is nothing to send without it.
-fn noscript(lang: Lang) -> impl IntoView + use<> {
-    view! { <noscript><p class="notice">{words::signin_noscript(lang)}</p></noscript> }
+/// in the browser, so there is nothing to send without it. A reset says so
+/// of the recovery code as well.
+fn noscript(lang: Lang, page: Page) -> impl IntoView + use<> {
+    let words = if page == Page::Reset {
+        words::reset_noscript(lang)
+    } else {
+        words::signin_noscript(lang)
+    };
+    view! { <noscript><p class="notice">{words}</p></noscript> }
 }
 
 fn form_page(
@@ -53,7 +59,7 @@ fn form_page(
                 <p class="lead">{lead}</p>
                 <div class="auth-form glass">
                     {form}
-                    {noscript(lang)}
+                    {noscript(lang, page)}
                 </div>
                 {more}
             </section>
@@ -87,6 +93,21 @@ pub fn register(cx: &Context<'_>) -> Built {
         words::register_lead(lang),
         Page::Register,
         view! { <Register lang=lang worker=worker pow=pow /> }.into_any(),
+    )
+}
+
+/// A new password with an administrator's reset code
+/// (`docs/account-reset.md`): reached by its link from the sign-in form,
+/// in no navigation and no sitemap.
+pub fn reset(cx: &Context<'_>) -> Built {
+    let lang = cx.lang;
+    let worker = cx.assets.url("crypto-worker.js");
+    form_page(
+        cx,
+        words::reset_title(lang),
+        words::reset_lead(lang),
+        Page::Reset,
+        view! { <Reset lang=lang worker=worker /> }.into_any(),
     )
 }
 

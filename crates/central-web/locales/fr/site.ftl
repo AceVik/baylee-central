@@ -183,7 +183,7 @@ faq-account-a = Pas pour jouer seul : l’éditeur de decks et les parties cont
 faq-data-q = Qu’advient-il de mes données ?
 faq-data-a = Le moins possible ; la <privacy>politique de confidentialité</privacy> dit exactement quoi. Votre mot de passe ne quitte jamais votre navigateur ; vos données privées et vos messages de chat sont chiffrés sur votre appareil avant de nous parvenir.
 faq-password-q = J’ai oublié mon mot de passe. Que faire ?
-faq-password-a = Vous définissez un nouveau mot de passe avec un code de réinitialisation que vous remet un administrateur ; il ne peut pas encore être utilisé sur ce site, cela viendra. Vos données chiffrées ne survivent que si vous avez le code de récupération reçu à la création de votre compte, ou si vous êtes encore connecté dans le client Baylee. Sinon, elles sont perdues.
+faq-password-a = You set a new password with a reset code that an administrator gives you, <reset>on this page</reset>. Your encrypted data survives only if you have the recovery code you received when you created your account. Without it you start with an empty vault, and that data is lost.
 faq-gateway-q = Qu’est-ce qu’une gateway ?
 faq-gateway-a = Un serveur où vivent des tables en ligne. N’importe qui peut en faire tourner une ; l’<gateways>annuaire</gateways> liste celles que Central connaît.
 faq-systems-q = Sur quels systèmes fonctionne-t-il ?
@@ -474,6 +474,7 @@ signin-working = Sécurisation de votre mot de passe … cela prend un instant e
 signin-wrong = Ce nom de connexion et ce mot de passe ne correspondent pas. Vérifiez les deux et réessayez.
 signin-not-moved = Ce compte n’a pas encore migré vers Baylee Central. Connectez-vous une fois avec le client Baylee ; il migre votre compte.
 signin-no-account = Pas encore de compte ? <register>Créez-en un</register>.
+signin-forgot = Forgot your password? <reset>Set a new one with a reset code</reset>.
 register-have-account = Vous avez déjà un compte ? <signin>Connectez-vous</signin>.
 dialog-close = Fermer
 signin-noscript = La connexion nécessite JavaScript : votre mot de passe est traité dans votre navigateur et ne nous est jamais envoyé.
@@ -514,6 +515,49 @@ code-kept = J’ai enregistré mon code de récupération
 code-not-kept = Enregistrez d’abord le code, puis confirmez.
 code-continue = Continuer
 code-later = Pas maintenant
+code-copy = Copy
+code-copied = Copied.
+code-copy-failed = Copying did not work here. Select the code and copy it by hand.
+
+## Setting a new password with a reset code
+
+reset-title = Set a new password
+reset-lead = For when you forgot your password: an administrator gives you a reset code, and with it you set a new one here.
+reset-noscript = Setting a new password needs JavaScript: your password and your recovery code are processed in your browser and never sent to us.
+reset-code = Reset code
+reset-code-hint = From an administrator. It starts with RESET and works once, within 24 hours of being made.
+reset-data = Your encrypted data
+reset-keep = I have my recovery code. My data stays.
+reset-new = I do not have it. Start with an empty vault.
+reset-recovery = Recovery code
+reset-recovery-hint = The code you saved when you created your account. It stays in your browser and is never sent to us.
+reset-warning = With an empty vault your encrypted data is lost for good: the settings saved in your account, your deck backups and your chat history. Nobody can bring it back, and neither can we. Your account, your display name and your contacts stay. You get a new recovery code.
+reset-warning-confirm = I understand that this data is lost for good.
+reset-submit = Set new password
+reset-missing = Enter your sign-in name, the reset code and a new password.
+reset-recovery-missing = Enter your recovery code, or choose the empty vault.
+reset-error-code = That is not a reset code. It starts with RESET, followed by eight groups of four characters.
+reset-error-recovery = This recovery code does not open your account's data. Check it and try again. Nothing was changed, and your reset code still works.
+reset-error-confirm = Confirm first that you know what is lost.
+reset-refused = This sign-in name and reset code do not go together, or the code has expired or was used already. Check both. If nothing helps, ask for a new code.
+reset-done-title = Your new password is set
+reset-done-kept = Your data and your recovery code stay as they were. You are signed out everywhere; sign in with your new password.
+reset-done-new = You start with an empty vault and are signed out everywhere. Below is your new recovery code; the old one no longer works.
+reset-unsure-title = No answer came back
+reset-unsure = The connection broke before Baylee Central answered, so we cannot tell whether your new password was set. Try to sign in with it. If that fails, nothing was changed: your reset code still works, enter it here again.
+reset-unsure-code = If your new password works, this is your new recovery code and the old one no longer works; it cannot be shown again, so save it now. If your new password does not work, this code is worth nothing.
+reset-to-signin = Sign in
+
+## Changing the password
+
+password-new = New password
+password-new-repeat = Repeat new password
+password-current = Current password
+password-change-submit = Change password
+password-missing = Enter your current password and a new one.
+password-error-current = The current password is not right. Check it and try again.
+password-changed = Your password is changed. You stay signed in here and are signed out everywhere else, the Baylee client included; sign in there with the new password.
+password-unsure = No answer came back, so we cannot tell whether your password was changed. When you sign in next, try the new password first, then the old one.
 
 ## Central's terms
 
@@ -574,7 +618,7 @@ security-end-client = Déconnecter le client
 security-client-ended = Le client est déconnecté.
 security-sign-out = Se déconnecter ici
 security-password-title = Mot de passe
-security-password-later = Le changement de mot de passe sur le site viendra ; d’ici là, changez-le dans le client Baylee.
+security-password-lead = Your encrypted data and your recovery code stay as they are. Changing the password signs you out everywhere except here.
 
 privacy-export-title = Exporter vos données
 privacy-export-lead = Ce que Baylee Central sait de votre compte, sous forme de fichier JSON : ses données de base, les sessions, les conditions acceptées, vos gateways et les entrées du journal d’audit qui nomment votre compte. Vos contenus chiffrés ne peuvent être déchiffrés et exportés que par votre client Baylee. L’export demande une connexion de moins de 30 minutes.
