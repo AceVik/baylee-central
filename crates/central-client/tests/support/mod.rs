@@ -63,14 +63,46 @@ impl Http {
         self.sent(request, None, Some(hop))
     }
 
+    /// A body as written, not as this build's types encode it: what a
+    /// program built against another shape of the wire would send.
+    pub(super) fn raw(&self, body: &str, bearer: Option<&Token>) -> Result<Response, Error> {
+        central_api::decode(&self.posted(body.as_bytes(), bearer, None)?)
+    }
+
     fn sent(
         &self,
         request: &Request,
         bearer: Option<&Token>,
         hop: Option<&str>,
     ) -> Result<Response, Error> {
+        let answer = self.posted(&central_api::encode(request)?, bearer, hop)?;
+        if matches!(request, Request::WriteDocument { .. })
+            && self.lose_write_reply.swap(false, Ordering::AcqRel)
+        {
+            return Err(Error::Unavailable);
+        }
+        if matches!(request, Request::ChangePasswordFinish { .. })
+            && self.lose_password_reply.swap(false, Ordering::AcqRel)
+        {
+            return Err(Error::Unavailable);
+        }
+        if matches!(request, Request::DeleteAccountFinish { .. })
+            && self.lose_delete_reply.swap(false, Ordering::AcqRel)
+        {
+            return Err(Error::Unavailable);
+        }
+        central_api::decode(&answer)
+    }
+
+    /// One request's bytes to the native route, and its answer's body once
+    /// the status says there is one.
+    fn posted(
+        &self,
+        bytes: &[u8],
+        bearer: Option<&Token>,
+        hop: Option<&str>,
+    ) -> Result<Vec<u8>, Error> {
         pace();
-        let bytes = central_api::encode(request)?;
         let mut stream = TcpStream::connect_timeout(&self.address, Duration::from_secs(3))
             .map_err(|_| Error::Unavailable)?;
         stream
@@ -87,7 +119,7 @@ impl Http {
             write!(stream, "X-Forwarded-For: {hop}\r\n").unwrap();
         }
         stream.write_all(b"\r\n").unwrap();
-        stream.write_all(&bytes).unwrap();
+        stream.write_all(bytes).unwrap();
         let mut response = Vec::new();
         stream
             .take((central_api::MAX_WIRE_BYTES + 4096) as u64)
@@ -108,22 +140,7 @@ impl Http {
             "503" => return Err(Error::Unavailable),
             _ => return Err(Error::Rejected),
         }
-        if matches!(request, Request::WriteDocument { .. })
-            && self.lose_write_reply.swap(false, Ordering::AcqRel)
-        {
-            return Err(Error::Unavailable);
-        }
-        if matches!(request, Request::ChangePasswordFinish { .. })
-            && self.lose_password_reply.swap(false, Ordering::AcqRel)
-        {
-            return Err(Error::Unavailable);
-        }
-        if matches!(request, Request::DeleteAccountFinish { .. })
-            && self.lose_delete_reply.swap(false, Ordering::AcqRel)
-        {
-            return Err(Error::Unavailable);
-        }
-        central_api::decode(&response[split + 4..])
+        Ok(response.split_off(split + 4))
     }
 }
 

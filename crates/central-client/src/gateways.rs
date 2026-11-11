@@ -67,8 +67,8 @@ pub struct PublicFigures {
 /// page does not is one that does not report, not one that is empty.
 ///
 /// # Errors
-/// Rejects malformed IDs, unordered pages, counts above their bound and
-/// transport failure.
+/// Rejects malformed IDs, unordered pages, counts above their bound, more
+/// players in a game than connected and transport failure.
 pub fn public_figures(
     transport: &impl Transport,
     after: Option<[u8; 16]>,
@@ -105,8 +105,8 @@ pub fn public_figures(
 ///
 /// # Errors
 /// Rejects metadata that is unsafe or off `origin`, a count above its bound
-/// (neither is sent), a refused credential, the five-second limit (`Busy`)
-/// and transport failure.
+/// and more players in a game than connected (none of them is sent), a
+/// refused credential, the five-second limit (`Busy`) and transport failure.
 pub fn gateway_pulse(
     transport: &impl Transport,
     credential: &Token,
@@ -201,8 +201,14 @@ mod tests {
     const ORIGIN: &str = "https://gateway.invalid";
     const COUNTED: GatewayActivity = GatewayActivity {
         players: 12,
+        playing: 8,
         tables: 3,
         games: 4,
+    };
+    /// One more in a game than connected, each count within its bound.
+    const MORE: GatewayActivity = GatewayActivity {
+        playing: COUNTED.players + 1,
+        ..COUNTED
     };
 
     /// A stand-in Central: one prepared answer for whatever is asked, and
@@ -297,6 +303,8 @@ mod tests {
             page(&[id(1), id(1)], COUNTED),
             page(&[id(1), [0xff; 16]], COUNTED),
             page(&[id(1)], over),
+            page(&[id(1)], MORE),
+            page(&[id(1), id(2)], MORE),
             page(&crowd, COUNTED),
             Response::Done,
             Response::GatewayDirectory { gateways: vec![] },
@@ -327,10 +335,12 @@ mod tests {
             players: GatewayActivity::MOST + 1,
             ..COUNTED
         };
-        assert_eq!(
-            gateway_pulse(&central, &token, ORIGIN, metadata(), over),
-            Err(Error::Rejected)
-        );
+        for refused in [over, MORE] {
+            assert_eq!(
+                gateway_pulse(&central, &token, ORIGIN, metadata(), refused),
+                Err(Error::Rejected)
+            );
+        }
         assert_eq!(
             gateway_pulse(
                 &central,
@@ -341,7 +351,7 @@ mod tests {
             ),
             Err(Error::Rejected)
         );
-        assert!(central.asked.borrow().is_empty(), "neither was sent");
+        assert!(central.asked.borrow().is_empty(), "none of them was sent");
         gateway_pulse(&central, &token, ORIGIN, metadata(), COUNTED).unwrap();
         assert_eq!(
             *central.asked.borrow(),
@@ -349,7 +359,7 @@ mod tests {
                 concat!(
                     r#"{"operation":"gateway_pulse","metadata":{"name":"Synthetic","#,
                     r#""version":"1.2.3-test","website":"https://gateway.invalid/"},"#,
-                    r#""activity":{"players":12,"tables":3,"games":4}}"#
+                    r#""activity":{"players":12,"playing":8,"tables":3,"games":4}}"#
                 )
                 .to_owned(),
                 true

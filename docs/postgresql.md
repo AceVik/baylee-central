@@ -107,21 +107,29 @@ unguessability is claimed. See central-chat.md for migrations and exact grants.
 
 ## Gateway activity (migration 000025)
 
-`m20261111_000025_gateway_activity` adds four nullable columns to
-`central_identity.gateways`: `activity_players`, `activity_tables` and
-`activity_games` (`integer`) and `activity_at` (`timestamptz`), for what a
-gateway reports with `GatewayPulse`
+`m20261111_000025_gateway_activity` adds five nullable columns to
+`central_identity.gateways`: `activity_players`, `activity_playing`,
+`activity_tables` and `activity_games` (`integer`) and `activity_at`
+(`timestamptz`), for what a gateway reports with `GatewayPulse`
 ([gateway registry](gateway-registry.md#activity-and-the-public-figures)).
-Two CHECKs hold the shape: all four are set or all four are NULL
-(`gateway_activity_whole`), and each count is between 0 and 100 000
-(`gateway_activity_bounds`, the wire's `GatewayActivity::MOST`). Existing rows
-keep every column and start with no activity.
+Three CHECKs hold the shape: all five are set or all five are NULL
+(`gateway_activity_whole`), each count is between 0 and 100 000
+(`gateway_activity_bounds`, the wire's `GatewayActivity::MOST`), and the
+players in a game are at most the players connected
+(`gateway_activity_playing`: `activity_playing <= activity_players`). Existing
+rows keep every column and start with no activity.
+
+`activity_playing` and its CHECKs were written into this migration on the day
+it was made (11.11.2026), not added by a later one: 000025 had run on
+throwaway databases only. A database that ran its first form has the
+migration recorded and lacks the column, and the service's heartbeat and its
+read of the figures fail on it; such a database is made anew, not repaired.
 
 - **Grants.** None are added. The runtime's table-level `UPDATE` on `gateways`
   covers the new columns, and the startup check's list is unchanged.
 - **Writes.** Only the heartbeat's own `UPDATE` touches them, in the statement
   that sets `last_seen` under the five-second condition: a pulse sets the
-  three counts and the time, a plain heartbeat sets all four to NULL. No
+  four counts and the time, a plain heartbeat sets all five to NULL. No
   other statement of the service writes them.
 - **Reads.** `PublicFigures` reads one page of at most 100 rows by primary
   key, joined to enabled approvals, with `last_seen` and `activity_at` inside

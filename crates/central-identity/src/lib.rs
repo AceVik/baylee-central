@@ -841,14 +841,7 @@ mod tests {
                 metadata: metadata(),
             },
             // a gateway's counts come with its heartbeat's credential, never a page's
-            Request::GatewayPulse {
-                metadata: metadata(),
-                activity: central_api::gateway::GatewayActivity {
-                    players: 1,
-                    tables: 1,
-                    games: 1,
-                },
-            },
+            pulse(metadata()),
             Request::SetGatewayAdmins {
                 gateway: [0; 16],
                 expected_revision: 1,
@@ -916,6 +909,20 @@ mod tests {
         .chain(claimed_by_the_client())
         .chain(moved_by_the_client())
         .collect()
+    }
+
+    /// A pulse with counts Central would take: what refuses it is where it
+    /// was sent.
+    fn pulse(metadata: GatewayMetadata) -> Request {
+        Request::GatewayPulse {
+            metadata,
+            activity: central_api::gateway::GatewayActivity {
+                players: 1,
+                playing: 1,
+                tables: 1,
+                games: 1,
+            },
+        }
     }
 
     /// A native session's own objects.

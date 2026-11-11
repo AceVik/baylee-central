@@ -189,18 +189,29 @@ the directory and a listing are byte for byte what they were, and take no new
 field (`central-api`'s wire tests hold their exact JSON).
 
 **What a gateway may report.** `GatewayPulse { metadata, activity }` is a
-heartbeat that also carries `GatewayActivity { players, tables, games }`:
-players connected, tables open to join, games running, each a count from 0 to
-100 000 (`GatewayActivity::MOST`). Nothing else: no name, no account, no
-address, no list. It goes through the heartbeat's own code path with the
-activity added, so everything said of `GatewayHeartbeat` above holds for it:
+heartbeat that also carries
+`GatewayActivity { players, playing, tables, games }`: players connected, of
+those the players seated in a running game, tables open to join, games
+running. Each is a count from 0 to 100 000 (`GatewayActivity::MOST`), and
+`playing` is never more than `players`. On the wire an activity is exactly
+`{"players":12,"playing":8,"tables":3,"games":4}`, all four required.
+Nothing else: no name, no account, no address, no list. It goes through the
+heartbeat's own code path with the activity added, so everything said of
+`GatewayHeartbeat` above holds for it:
 the heartbeat credential or a live token with `listing` (never the redemption
 credential or an `sso`-only token), the bridge credential for the official
 gateway's row and no other, metadata on the gateway's origin, one beat per
 five seconds (`Busy`, and the counts stay as they were), the same budgets,
-the native route only, and the heartbeat's answer. A count above the bound is
-`Rejected` before anything is read or written, so not even the token is marked
-used.
+the native route only, and the heartbeat's answer. A count above the bound,
+or more `playing` than `players`, is `Rejected` before anything is read or
+written, so not even the token is marked used.
+
+`playing` is the fourth count, added on 11.11.2026 at the owner's wish for
+"players in game" beside "players online" on the website, before the pulse
+was merged or released anywhere. So there is no way from the three counts to
+the four: an activity without `playing` is not an activity, and a pulse that
+carries one is refused whole, as any malformed request is. No gateway sent
+pulses then.
 
 **Reporting is the operator's choice.** A gateway that never sends a pulse has
 no activity, and one that sends a plain `GatewayHeartbeat` afterwards has none
@@ -209,10 +220,11 @@ records it. Reporting therefore ends at once when an operator switches it off
 (or after 90 seconds if the gateway stops altogether), and nothing has to be
 revoked or deleted by hand.
 
-**What Central keeps.** The three counts and the time of the report, in four
+**What Central keeps.** The four counts and the time of the report, in five
 nullable columns of the gateway's own row (`activity_players`,
-`activity_tables`, `activity_games`, `activity_at`), all set or all NULL and
-each within the bound (two CHECKs). One row per gateway is overwritten by each
+`activity_playing`, `activity_tables`, `activity_games`, `activity_at`), all
+set or all NULL, each count within the bound and `activity_playing` at most
+`activity_players` (three CHECKs). One row per gateway is overwritten by each
 pulse: there is no history, no series and no per-player record, and Central
 logs none of it.
 
@@ -246,15 +258,18 @@ browser listener the same 60 a minute per address that `GatewayDirectory`
 spends, one budget for both ([web accounts](web-accounts.md)).
 
 **They are claims.** Central cannot see a gateway's tables. It bounds each
-count and says whose it is; a gateway that lies can show any number up to the
-bound beside its own name, and an administrator who notices disables it. The
+count, refuses more players in a game than connected (the one thing the
+counts say about each other) and says whose they are; a gateway that lies can
+show any number up to the bound beside its own name, with any share of its
+players in a game, and an administrator who notices disables it. The
 website shows the counts as the gateway's own, and any total it adds up is a
 sum of claims ([threat model](threat-model.md)).
 
 **SDK.** `central_client::gateway_pulse` and `central_client::public_figures`
-check what they send and what they read (the bound, well-formed ascending
-ids, at most 100). A Central built before 000025 does not know either
-operation and answers an unknown operation as it answers a wrong credential,
+check what they send and what they read (the bound, no more `playing` than
+`players`, well-formed ascending ids, at most 100). A Central built before
+000025 does not know either operation and answers an unknown operation as it
+answers a wrong credential,
 `Rejected` (HTTP 401): a gateway that is refused a pulse sends its plain
 heartbeat instead, and if that is accepted it keeps to plain heartbeats and
 tries the pulse again later.

@@ -105,6 +105,7 @@ pub(crate) fn run(
 
 const COUNTED: GatewayActivity = GatewayActivity {
     players: 12,
+    playing: 8,
     tables: 3,
     games: 4,
 };
@@ -125,8 +126,9 @@ fn earlier(runtime: &Runtime, operator: &DatabaseConnection, gateway: [u8; 16], 
 
 /// A registered gateway's pulse over HTTP and the public figures it makes:
 /// online and silent it has no figure; the pulse takes the heartbeat's
-/// credential and limit and counts within the bound; then anyone reads its
-/// counts, and a plain heartbeat withdraws them.
+/// credential and limit, counts within the bound and no more players in a
+/// game than connected; then anyone reads its counts, and a plain heartbeat
+/// withdraws them.
 fn activity(
     http: &Http,
     registered: &central_client::GatewayRegistration,
@@ -149,27 +151,39 @@ fn activity(
     // Five seconds after its heartbeat, like a heartbeat.
     assert_eq!(pulse(&registered.heartbeat, COUNTED), Err(Error::Busy));
     earlier(runtime, operator, registered.gateway, 6);
-    // The heartbeat's credential and no other; nothing above the bound,
-    // which the SDK does not send and Central does not take.
+    // The heartbeat's credential and no other; nothing above the bound and
+    // no more in a game than connected, which the SDK does not send and
+    // Central does not take.
     let over = GatewayActivity {
         players: GatewayActivity::MOST + 1,
+        ..COUNTED
+    };
+    let more = GatewayActivity {
+        playing: COUNTED.players + 1,
         ..COUNTED
     };
     for (credential, activity) in [
         (&registered.credential, COUNTED),
         (&Token::generate().unwrap(), COUNTED),
         (&registered.heartbeat, over),
+        (&registered.heartbeat, more),
     ] {
         assert_eq!(pulse(credential, activity), Err(Error::Rejected));
     }
-    for bearer in [Some(&registered.heartbeat), None] {
+    for (bearer, activity) in [
+        (Some(&registered.heartbeat), over),
+        (Some(&registered.heartbeat), more),
+        (None, COUNTED),
+    ] {
         let request = Request::GatewayPulse {
             metadata: metadata(),
-            activity: if bearer.is_some() { over } else { COUNTED },
+            activity,
         };
         assert_eq!(http.exchange(&request, bearer).err(), Some(Error::Rejected));
     }
     assert_eq!(figures().gateways, []);
+    former_shape(http, registered, origin);
+    earlier(runtime, operator, registered.gateway, 6);
     pulse(&registered.heartbeat, COUNTED).unwrap();
     let reported = figures();
     assert_eq!(reported.accounts, silent.accounts);
@@ -203,6 +217,40 @@ fn activity(
     .unwrap();
     assert_eq!(figures().gateways, []);
     assert!(central_client::gateway_directory(http, None).unwrap()[0].online);
+}
+
+/// The pulse as a gateway built before the fourth count would send it, with
+/// the heartbeat's own credential and past its limit: refused whole, and
+/// nothing is shown. The same bytes with the fourth count are taken, so it
+/// is the shape that was refused; everybody in a game is a count like any
+/// other.
+fn former_shape(http: &Http, registered: &central_client::GatewayRegistration, origin: &str) {
+    let pulse = |activity: &str| {
+        let body = format!(
+            r#"{{"operation":"gateway_pulse","metadata":{{"name":"Synthetic gateway","version":"test-2","website":"{origin}/status"}},"activity":{activity}}}"#
+        );
+        http.raw(&body, Some(&registered.heartbeat))
+    };
+    assert_eq!(
+        pulse(r#"{"players":12,"tables":3,"games":4}"#).err(),
+        Some(Error::Rejected)
+    );
+    assert_eq!(
+        central_client::public_figures(http, None).unwrap().gateways,
+        []
+    );
+    assert!(matches!(
+        pulse(r#"{"players":12,"playing":12,"tables":3,"games":4}"#),
+        Ok(Response::Done)
+    ));
+    let all = GatewayActivity {
+        playing: COUNTED.players,
+        ..COUNTED
+    };
+    assert_eq!(
+        central_client::public_figures(http, None).unwrap().gateways[0].activity,
+        all
+    );
 }
 
 /// The official gateway over HTTP: its origin is the bridge's, so nobody

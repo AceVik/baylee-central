@@ -1,6 +1,7 @@
 //! What gateways report (migration 000025, `docs/gateway-registry.md`
-//! §"Activity and the public figures"): a pulse is a heartbeat with three
-//! bounded counts, by the heartbeat's credential and under its limit; the
+//! §"Activity and the public figures"): a pulse is a heartbeat with four
+//! bounded counts, no more players in a game than connected, by the
+//! heartbeat's credential and under its limit; the
 //! figures show them for approved gateways that are online and reported
 //! within 90 seconds, and for no other; a plain heartbeat clears them; and
 //! the number of accounts is the enrolled ones.
@@ -33,9 +34,10 @@ struct Pair {
     heartbeat: Token,
 }
 
-const fn counts(players: u32, tables: u32, games: u32) -> GatewayActivity {
+const fn counts(players: u32, playing: u32, tables: u32, games: u32) -> GatewayActivity {
     GatewayActivity {
         players,
+        playing,
         tables,
         games,
     }
@@ -68,10 +70,10 @@ async fn tokens(operator: &DatabaseConnection, gateway: [u8; 16]) -> String {
     text(operator, sql, gateway).await
 }
 
-/// What the row holds of an activity: nothing, or all four columns.
+/// What the row holds of an activity: nothing, or all five columns.
 async fn kept(operator: &DatabaseConnection, gateway: [u8; 16]) -> String {
-    let sql = "SELECT pg_catalog.num_nonnulls(activity_players, activity_tables, activity_games,
-        activity_at)::text AS value FROM central_identity.gateways WHERE id = $1";
+    let sql = "SELECT pg_catalog.num_nonnulls(activity_players, activity_playing, activity_tables,
+        activity_games, activity_at)::text AS value FROM central_identity.gateways WHERE id = $1";
     text(operator, sql, gateway).await
 }
 
@@ -141,16 +143,22 @@ pub(super) async fn run(store: &AccountStore, operator: &DatabaseConnection, key
     accounts(store, operator, keys).await;
 }
 
-/// A count above the bound, a credential that is no heartbeat's, metadata
-/// elsewhere: each is refused, and the row is as it was. The bound itself
-/// is a count like any other.
+/// A count above the bound, more players in a game than connected, a
+/// credential that is no heartbeat's, metadata elsewhere: each is refused,
+/// and the row is as it was. The bound itself is a count like any other,
+/// and so is everybody in a game.
 async fn bounds(store: &AccountStore, operator: &DatabaseConnection, pair: &Pair) {
     let before = row(operator, pair.gateway).await;
     for over in [
-        counts(MOST + 1, 0, 0),
-        counts(0, MOST + 1, 0),
-        counts(0, 0, MOST + 1),
-        counts(u32::MAX, u32::MAX, u32::MAX),
+        counts(MOST + 1, 0, 0, 0),
+        counts(MOST + 1, MOST + 1, 0, 0),
+        counts(0, 0, MOST + 1, 0),
+        counts(0, 0, 0, MOST + 1),
+        counts(u32::MAX, u32::MAX, u32::MAX, u32::MAX),
+        // More in a game than connected, every count within the bound.
+        counts(0, 1, 0, 0),
+        counts(12, 13, 3, 4),
+        counts(MOST - 1, MOST, MOST, MOST),
     ] {
         assert_eq!(
             store
@@ -165,7 +173,7 @@ async fn bounds(store: &AccountStore, operator: &DatabaseConnection, pair: &Pair
     for wrong in [&pair.credential, &Token::generate().unwrap()] {
         assert_eq!(
             store
-                .gateway_pulse(wrong, &metadata(PAIR), counts(1, 1, 1))
+                .gateway_pulse(wrong, &metadata(PAIR), counts(1, 1, 1, 1))
                 .await
                 .err(),
             Some(Error::Rejected)
@@ -176,7 +184,7 @@ async fn bounds(store: &AccountStore, operator: &DatabaseConnection, pair: &Pair
             .gateway_pulse(
                 &pair.heartbeat,
                 &metadata("https://elsewhere.invalid"),
-                counts(1, 1, 1)
+                counts(1, 1, 1, 1)
             )
             .await
             .err(),
@@ -187,31 +195,39 @@ async fn bounds(store: &AccountStore, operator: &DatabaseConnection, pair: &Pair
     assert!(shown(store, pair.gateway).await.is_none());
     assert!(!online(store, pair.gateway).await);
     store
-        .gateway_pulse(&pair.heartbeat, &metadata(PAIR), counts(MOST, MOST, MOST))
+        .gateway_pulse(
+            &pair.heartbeat,
+            &metadata(PAIR),
+            counts(MOST, MOST, MOST, MOST),
+        )
         .await
         .unwrap();
     assert_eq!(
         shown(store, pair.gateway).await,
-        Some(counts(MOST, MOST, MOST))
+        Some(counts(MOST, MOST, MOST, MOST))
     );
     assert!(online(store, pair.gateway).await);
 }
 
 /// The heartbeat's limit holds for a pulse and leaves the counts alone; a
 /// later pulse replaces them, zeros included; a plain heartbeat clears
-/// them, and the gateway stays online without a figure.
+/// them, and the gateway stays online without a figure. Written past the
+/// store, more players in a game than connected are refused by the table.
 async fn reported(store: &AccountStore, operator: &DatabaseConnection, pair: &Pair) {
     let beat = metadata(PAIR);
     let (gateway, token) = (pair.gateway, &pair.heartbeat);
     assert_eq!(
         store
-            .gateway_pulse(token, &beat, counts(1, 1, 1))
+            .gateway_pulse(token, &beat, counts(1, 1, 1, 1))
             .await
             .err(),
         Some(Error::Busy)
     );
-    assert_eq!(shown(store, gateway).await, Some(counts(MOST, MOST, MOST)));
-    for next in [counts(12, 3, 4), counts(0, 0, 0)] {
+    assert_eq!(
+        shown(store, gateway).await,
+        Some(counts(MOST, MOST, MOST, MOST))
+    );
+    for next in [counts(12, 8, 3, 4), counts(0, 0, 0, 0)] {
         earlier(operator, gateway, "last_seen", 6).await;
         store.gateway_pulse(token, &beat, next).await.unwrap();
         assert_eq!(shown(store, gateway).await, Some(next));
@@ -225,15 +241,33 @@ async fn reported(store: &AccountStore, operator: &DatabaseConnection, pair: &Pa
     // A plain heartbeat refused for its rate clears nothing.
     earlier(operator, gateway, "last_seen", 6).await;
     store
-        .gateway_pulse(token, &beat, counts(12, 3, 4))
+        .gateway_pulse(token, &beat, counts(12, 8, 3, 4))
         .await
         .unwrap();
     assert_eq!(
         store.gateway_heartbeat(token, &beat).await.err(),
         Some(Error::Busy)
     );
-    assert_eq!(shown(store, gateway).await, Some(counts(12, 3, 4)));
-    assert_eq!(kept(operator, gateway).await, "4");
+    assert_eq!(shown(store, gateway).await, Some(counts(12, 8, 3, 4)));
+    assert_eq!(kept(operator, gateway).await, "5");
+    // The table holds it too. Written past the store, as an operator could:
+    // thirteen in a game of twelve connected is refused by its own CHECK,
+    // twelve of twelve is a count like any other, and the store reads it.
+    let before = row(operator, gateway).await;
+    let write = |playing: &'static str| async move {
+        let sql = format!(
+            "UPDATE central_identity.gateways SET activity_playing = {playing} WHERE id = '{}'",
+            Uuid::from_bytes(gateway)
+        );
+        operator.execute_unprepared(&sql).await
+    };
+    let refused = write("activity_players + 1").await.unwrap_err().to_string();
+    assert!(refused.contains("gateway_activity_playing"), "{refused}");
+    assert_eq!(row(operator, gateway).await, before);
+    assert_eq!(write("activity_players").await.unwrap().rows_affected(), 1);
+    assert_eq!(shown(store, gateway).await, Some(counts(12, 12, 3, 4)));
+    assert_eq!(write("8").await.unwrap().rows_affected(), 1);
+    assert_eq!(row(operator, gateway).await, before);
 }
 
 /// The 90 seconds: a figure needs the gateway seen within them and the
@@ -244,17 +278,17 @@ async fn window(store: &AccountStore, operator: &DatabaseConnection, pair: &Pair
     // Seen and reported 85 seconds ago: still shown.
     earlier(operator, gateway, "activity_at", 85).await;
     earlier(operator, gateway, "last_seen", 85).await;
-    assert_eq!(shown(store, gateway).await, Some(counts(12, 3, 4)));
+    assert_eq!(shown(store, gateway).await, Some(counts(12, 8, 3, 4)));
     // Seen since, but the report is older than the window.
     earlier(operator, gateway, "activity_at", 6).await;
     assert!(shown(store, gateway).await.is_none());
     assert!(online(store, gateway).await);
-    assert_eq!(kept(operator, gateway).await, "4");
+    assert_eq!(kept(operator, gateway).await, "5");
     store
-        .gateway_pulse(token, &beat, counts(5, 2, 1))
+        .gateway_pulse(token, &beat, counts(5, 4, 2, 1))
         .await
         .unwrap();
-    assert_eq!(shown(store, gateway).await, Some(counts(5, 2, 1)));
+    assert_eq!(shown(store, gateway).await, Some(counts(5, 4, 2, 1)));
     // Silent for longer than the window: offline, whatever it said last.
     earlier(operator, gateway, "last_seen", 91).await;
     assert!(shown(store, gateway).await.is_none());
@@ -262,10 +296,10 @@ async fn window(store: &AccountStore, operator: &DatabaseConnection, pair: &Pair
     earlier(operator, gateway, "activity_at", 91).await;
     assert!(shown(store, gateway).await.is_none());
     store
-        .gateway_pulse(token, &beat, counts(5, 2, 1))
+        .gateway_pulse(token, &beat, counts(5, 4, 2, 1))
         .await
         .unwrap();
-    assert_eq!(shown(store, gateway).await, Some(counts(5, 2, 1)));
+    assert_eq!(shown(store, gateway).await, Some(counts(5, 4, 2, 1)));
 }
 
 /// A gateway registered on the website pulses with a `listing` token. While
@@ -299,8 +333,13 @@ async fn by_token(
         tokens(operator, gateway).await,
     );
     // A token that only signs players in reports nothing; a count above the
-    // bound is refused before the token is looked at, so it is not marked used.
-    for (token, activity) in [(&sso, counts(1, 1, 1)), (&listing, counts(MOST + 1, 0, 0))] {
+    // bound, or more in a game than connected, is refused before the token
+    // is looked at, so it is not marked used.
+    for (token, activity) in [
+        (&sso, counts(1, 1, 1, 1)),
+        (&listing, counts(MOST + 1, 0, 0, 0)),
+        (&listing, counts(7, 8, 1, 2)),
+    ] {
         assert_eq!(
             store.gateway_pulse(token, &beat, activity).await.err(),
             Some(Error::Rejected)
@@ -309,14 +348,14 @@ async fn by_token(
     assert_eq!(row(operator, gateway).await, before);
     assert_eq!(tokens(operator, gateway).await, unused);
     store
-        .gateway_pulse(&listing, &beat, counts(7, 1, 1))
+        .gateway_pulse(&listing, &beat, counts(7, 5, 1, 2))
         .await
         .unwrap();
     assert_ne!(tokens(operator, gateway).await, unused, "marked used");
-    assert_eq!(kept(operator, gateway).await, "4");
+    assert_eq!(kept(operator, gateway).await, "5");
     assert!(shown(store, gateway).await.is_none(), "pending");
     approval(operator, gateway, true).await;
-    assert_eq!(shown(store, gateway).await, Some(counts(7, 1, 1)));
+    assert_eq!(shown(store, gateway).await, Some(counts(7, 5, 1, 2)));
     let page = store.gateway_figures(None).await.unwrap();
     assert_eq!(page.len(), 2);
     assert!(page[0].id < page[1].id);
@@ -331,7 +370,7 @@ async fn by_token(
         let before = row(operator, disabled).await;
         assert_eq!(
             store
-                .gateway_pulse(token, &beat, counts(9, 9, 9))
+                .gateway_pulse(token, &beat, counts(9, 9, 9, 9))
                 .await
                 .err(),
             Some(Error::Rejected)
@@ -340,7 +379,7 @@ async fn by_token(
     }
     // Enabled again within the window, the pair's gateway is shown as it last reported.
     approval(operator, pair.gateway, true).await;
-    assert_eq!(shown(store, pair.gateway).await, Some(counts(5, 2, 1)));
+    assert_eq!(shown(store, pair.gateway).await, Some(counts(5, 4, 2, 1)));
     assert_eq!(store.gateway_figures(None).await.unwrap().len(), 1);
 }
 
@@ -354,7 +393,7 @@ async fn official(store: &AccountStore, operator: &DatabaseConnection, pair: &Pa
     };
     let pulse = |activity| store.official_pulse(OFFICIAL, &beat, false, activity);
     // Not listed, then listed and not approved: refused as its heartbeat is.
-    assert_eq!(pulse(counts(1, 1, 1)).await.err(), Some(Error::Rejected));
+    assert_eq!(pulse(counts(1, 1, 1, 1)).await.err(), Some(Error::Rejected));
     operator
         .execute_unprepared(
             "INSERT INTO central_identity.gateways (official, origin, name, version, website)
@@ -373,26 +412,25 @@ async fn official(store: &AccountStore, operator: &DatabaseConnection, pair: &Pa
         .try_get("", "id")
         .unwrap();
     let id = *id.as_bytes();
-    assert_eq!(pulse(counts(1, 1, 1)).await.err(), Some(Error::Rejected));
+    assert_eq!(pulse(counts(1, 1, 1, 1)).await.err(), Some(Error::Rejected));
     approval(operator, id, true).await;
     let (listed, registered) = (row(operator, id).await, row(operator, pair.gateway).await);
-    assert_eq!(
-        pulse(counts(0, MOST + 1, 0)).await.err(),
-        Some(Error::Rejected)
-    );
+    for refused in [counts(0, 0, MOST + 1, 0), counts(40, 41, 6, 9)] {
+        assert_eq!(pulse(refused).await.err(), Some(Error::Rejected));
+    }
     // The bridge's pulse is for the bridge's origins alone.
     assert_eq!(
         store
-            .official_pulse(&[PAIR], &metadata(PAIR), false, counts(1, 1, 1))
+            .official_pulse(&[PAIR], &metadata(PAIR), false, counts(1, 1, 1, 1))
             .await
             .err(),
         Some(Error::Rejected)
     );
     assert_eq!(row(operator, id).await, listed);
-    pulse(counts(40, 6, 9)).await.unwrap();
-    assert_eq!(shown(store, id).await, Some(counts(40, 6, 9)));
-    assert_eq!(pulse(counts(41, 6, 9)).await.err(), Some(Error::Busy));
-    assert_eq!(shown(store, id).await, Some(counts(40, 6, 9)));
+    pulse(counts(40, 31, 6, 9)).await.unwrap();
+    assert_eq!(shown(store, id).await, Some(counts(40, 31, 6, 9)));
+    assert_eq!(pulse(counts(41, 31, 6, 9)).await.err(), Some(Error::Busy));
+    assert_eq!(shown(store, id).await, Some(counts(40, 31, 6, 9)));
     // Its plain heartbeat clears them, as a registered gateway's does.
     earlier(operator, id, "last_seen", 6).await;
     store
@@ -419,12 +457,12 @@ async fn paging(store: &AccountStore, operator: &DatabaseConnection, owner: [u8;
         .execute_unprepared(&format!(
             "WITH made AS (INSERT INTO central_identity.gateways (owner_id, origin, name, version,
                  website, credential_digest, heartbeat_digest, last_seen, activity_players,
-                 activity_tables, activity_games, activity_at)
+                 activity_playing, activity_tables, activity_games, activity_at)
              SELECT '{}'::uuid, 'https://page-' || n || '.invalid', 'Page', '1',
                  'https://page-' || n || '.invalid/',
                  pg_catalog.sha256(pg_catalog.convert_to('page-credential-' || n, 'UTF8')),
                  pg_catalog.sha256(pg_catalog.convert_to('page-heartbeat-' || n, 'UTF8')),
-                 pg_catalog.clock_timestamp(), n, 1, 0, pg_catalog.clock_timestamp()
+                 pg_catalog.clock_timestamp(), n, n - 1, 1, 0, pg_catalog.clock_timestamp()
              FROM pg_catalog.generate_series(1, 101) n RETURNING id)
              INSERT INTO central_identity.gateway_approvals (gateway_id) SELECT id FROM made",
             Uuid::from_bytes(owner)

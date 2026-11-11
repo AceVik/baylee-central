@@ -144,10 +144,11 @@ The server side of [web accounts](web-accounts.md) lands in three PRs.
   bridge's heartbeat moves it alone ([gateway registry](gateway-registry.md),
   [operations](operations.md#the-official-gateway)).
 - **The public figures, Central's side** (11.11.2026, migration 000025). A
-  gateway may send its heartbeat as `GatewayPulse` with three bounded counts
-  (players, tables, games); `PublicFigures` answers them for gateways that
-  are approved, online and reporting, with the number of accounts that can
-  sign in, on both listeners without a session ([gateway
+  gateway may send its heartbeat as `GatewayPulse` with four bounded counts
+  (players, of those the players in a game, tables, games; the fourth was
+  added the same day, before a release); `PublicFigures` answers them for
+  gateways that are approved, online and reporting, with the number of
+  accounts that can sign in, on both listeners without a session ([gateway
   registry](gateway-registry.md#activity-and-the-public-figures)). Not part
   of it, and open: the website reading them, and the game's gateway sending
   pulses (it sends plain heartbeats, so no gateway is listed yet).

@@ -119,7 +119,7 @@ pub enum Request {
         metadata: crate::gateway::GatewayMetadata,
     },
     /// A heartbeat that also reports activity: the same credential, checks,
-    /// limit and answer as [`Request::GatewayHeartbeat`], and the three
+    /// limit and answer as [`Request::GatewayHeartbeat`], and the four
     /// counts kept with the time. A plain heartbeat afterwards clears them:
     /// the gateway stopped reporting. Sending this is the operator's choice
     /// (`docs/gateway-registry.md` §"Activity and the public figures").
@@ -127,7 +127,8 @@ pub enum Request {
         /// Metadata must stay on the approved origin.
         metadata: crate::gateway::GatewayMetadata,
         /// The gateway's own counts, each at most
-        /// [`crate::gateway::GatewayActivity::MOST`].
+        /// [`crate::gateway::GatewayActivity::MOST`], and no more players in
+        /// a game than connected.
         activity: crate::gateway::GatewayActivity,
     },
     /// Public, no credential: the number of accounts, and one page of what
@@ -1427,10 +1428,13 @@ mod tests {
 
     const METADATA: &str =
         r#"{"name":"Synthetic","version":"1.2.3-test","website":"https://gateway.invalid/"}"#;
-    const ACTIVITY: &str = r#"{"players":12,"tables":3,"games":4}"#;
+    const ACTIVITY: &str = r#"{"players":12,"playing":8,"tables":3,"games":4}"#;
+    /// A pulse's activity as it was before the fourth count.
+    const THREE: &str = r#"{"players":12,"tables":3,"games":4}"#;
     const ID: &str = "[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]";
     const COUNTED: crate::gateway::GatewayActivity = crate::gateway::GatewayActivity {
         players: 12,
+        playing: 8,
         tables: 3,
         games: 4,
     };
@@ -1518,7 +1522,7 @@ mod tests {
         }
     }
 
-    /// The pulse: a heartbeat's metadata and the three counts, both required.
+    /// The pulse: a heartbeat's metadata and the four counts, all required.
     #[test]
     fn the_pulse_has_the_designed_shape() {
         let pulse = format!(
@@ -1546,8 +1550,10 @@ mod tests {
                 r#"{{"operation":"gateway_pulse","metadata":{METADATA},"activity":{ACTIVITY},"origin":"https://elsewhere.invalid"}}"#
             ),
             format!(
-                r#"{{"operation":"gateway_pulse","metadata":{METADATA},"activity":{{"players":12,"tables":3,"games":4,"names":[]}}}}"#
+                r#"{{"operation":"gateway_pulse","metadata":{METADATA},"activity":{{"players":12,"playing":8,"tables":3,"games":4,"names":[]}}}}"#
             ),
+            // The three counts from before the fourth are no pulse.
+            format!(r#"{{"operation":"gateway_pulse","metadata":{METADATA},"activity":{THREE}}}"#),
         ] {
             assert!(crate::decode::<Request>(bad.as_bytes()).is_err(), "{bad}");
         }
@@ -1613,6 +1619,8 @@ mod tests {
             figures.replace(r#""accounts":42"#, r#""accounts":-1"#),
             figures.replace(r#""activity""#, r#""name":"Synthetic","activity""#),
             figures.replace(r#""accounts":42"#, r#""accounts":42,"usernames":[]"#),
+            // A gateway's three counts from before the fourth.
+            figures.replace(ACTIVITY, THREE),
         ] {
             assert!(crate::decode::<Response>(bad.as_bytes()).is_err(), "{bad}");
         }
