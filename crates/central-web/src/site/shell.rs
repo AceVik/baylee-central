@@ -507,7 +507,6 @@ fn bar(page: Page, cx: &Context<'_>) -> impl IntoView + use<> {
                     {nav_link(Page::Security, page, lang, words::nav_security(lang))}
                     {nav_link(Page::Faq, page, lang, words::nav_faq(lang))}
                     {nav_link(Page::Contact, page, lang, words::nav_contact(lang))}
-                    <a class="nav-discord" href=DISCORD target="_blank" rel="noopener noreferrer">"Discord"</a>
                     <a
                         class="nav-account"
                         href=format!("/{}/signin", lang.code())
