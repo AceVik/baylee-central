@@ -82,6 +82,33 @@ if (bar && list && field instanceof HTMLInputElement && menu instanceof HTMLSele
     const text = query.toString();
     history.replaceState(history.state, "", `${location.pathname}${text === "" ? "" : `?${text}`}${location.hash}`);
   };
+  // A press on a chip, the sort or the layout: the cards glide to their new
+  // places where the browser can show one state giving way to another (a
+  // view transition) and nobody asked for less motion. Typing does not wait
+  // for that: each letter narrows at once.
+  const calm = matchMedia("(prefers-reduced-motion: reduce)");
+  let gliding = 0;
+  const glide = () => {
+    if (typeof document.startViewTransition !== "function" || calm.matches) {
+      apply();
+      return;
+    }
+    const mine = (gliding += 1);
+    document.documentElement.dataset.gliding = "";
+    cards.forEach((card, at) => {
+      card.style.viewTransitionName = `gw-${at}`;
+      card.style.viewTransitionClass = "gw-card";
+    });
+    document.startViewTransition(apply).finished.finally(() => {
+      // a later press has its own names on the cards
+      if (mine !== gliding) return;
+      delete document.documentElement.dataset.gliding;
+      for (const card of cards) {
+        card.style.viewTransitionName = "";
+        card.style.viewTransitionClass = "";
+      }
+    });
+  };
   const reset = () => {
     field.value = "";
     show = "";
@@ -110,19 +137,19 @@ if (bar && list && field instanceof HTMLInputElement && menu instanceof HTMLSele
       apply();
     }
   });
-  menu.addEventListener("change", apply);
+  menu.addEventListener("change", glide);
   for (const chip of chips) {
     chip.addEventListener("click", () => {
       const asks = chip.getAttribute("data-show") ?? "";
       // a pressed chip pressed again shows all
       show = asks === show ? "" : asks;
-      apply();
+      glide();
     });
   }
   for (const button of views) {
     button.addEventListener("click", () => {
       view = button.getAttribute("data-view") ?? "";
-      apply();
+      glide();
     });
   }
   none?.querySelector("button")?.addEventListener("click", reset);
