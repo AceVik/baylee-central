@@ -30,7 +30,9 @@ pub(super) const LEGACY_PER_NAME: u32 = 5;
 #[derive(Default)]
 pub(super) struct Limits {
     global: Option<(Instant, u32)>,
-    accounts: BTreeMap<[u8; 16], (Instant, u32)>,
+    /// Guesses at passwords: sign-ins, password changes and deletions
+    /// (`guesses.rs`).
+    pub(super) guesses: super::guesses::Guesses,
     legacy: Option<(Instant, u32)>,
     legacy_names: BTreeMap<String, (Instant, u32)>,
     data: Window,
@@ -170,6 +172,20 @@ impl Limits {
         Ok(())
     }
 
+    /// A legacy sign-in from `place`: one of the names' budgets
+    /// ([`Self::legacy`]) and one guess of the place's, which a proof
+    /// gives back (`guesses.rs`). Nothing is spent when either is used up.
+    pub(super) fn legacy_from(
+        &mut self,
+        typed: &str,
+        place: Option<super::Place>,
+        now: Instant,
+    ) -> Result<super::guesses::Guess, Error> {
+        self.guesses.legacy_fits(place, now)?;
+        self.legacy(typed, now)?;
+        self.guesses.legacy(place, now)
+    }
+
     /// Spend one of the gateway's [`central_api::reports::PER_GATEWAY_HOUR`]
     /// reports an hour. Nothing is spent when it is used up.
     pub(super) fn report(&mut self, gateway: [u8; 16], now: Instant) -> Result<(), Error> {
@@ -187,28 +203,20 @@ impl Limits {
         Ok(())
     }
 
-    /// Spend `units` of the account's eight OPAQUE evaluations a minute: a
-    /// sign-in's start is one, a password change's start two (it answers a
-    /// registration response besides KE2, and each is an evaluation of the
-    /// account's OPRF key that can test one guessed password). Nothing is
-    /// spent when the units do not fit.
+    /// Spend `units` of the account's eight OPAQUE evaluations a minute
+    /// and nothing of its longer windows: a reset's start, which only a
+    /// valid reset code reaches, so that guessers who spent the account's
+    /// hour or day do not keep its holder from a reset (`reset.rs`). The
+    /// starts that test a guessed password (a sign-in's, a password
+    /// change's, a deletion's) are counted by [`Self::guesses`]. Nothing
+    /// is spent when the units do not fit.
     pub(super) fn account(
         &mut self,
         account: [u8; 16],
         now: Instant,
         units: u32,
     ) -> Result<(), Error> {
-        self.accounts
-            .retain(|_, (start, _)| now.duration_since(*start) < Duration::from_secs(60));
-        if !self.accounts.contains_key(&account) && self.accounts.len() >= 1024 {
-            return Err(Error::Busy);
-        }
-        let (_, used) = self.accounts.entry(account).or_insert((now, 0));
-        if *used + units > 8 {
-            return Err(Error::Busy);
-        }
-        *used += units;
-        Ok(())
+        self.guesses.evaluate(account, now, units)
     }
 }
 
@@ -358,14 +366,15 @@ mod tests {
             limits.account([0; 16], now, 1).unwrap();
         }
         assert_eq!(limits.account([0; 16], now, 1), Err(Error::Busy));
-        for i in 1_u128..1024 {
+        // However many accounts there are, none keeps another out
+        // (`guesses.rs` bounds the table and what a full one forgets).
+        for i in 1_u128..2048 {
             limits.account(i.to_be_bytes(), now, 1).unwrap();
         }
-        assert_eq!(limits.account([255; 16], now, 1), Err(Error::Busy));
+        assert_eq!(limits.account([0; 16], now, 1), Err(Error::Busy));
         limits
-            .account([255; 16], now + Duration::from_secs(60), 1)
+            .account([0; 16], now + Duration::from_secs(60), 1)
             .unwrap();
-        assert_eq!(limits.accounts.len(), 1);
     }
     #[test]
     fn legacy_sign_ins_are_bounded_per_name_and_altogether() {

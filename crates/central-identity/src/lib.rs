@@ -26,6 +26,8 @@ pub use challenge::{Agent, Seen};
 mod deletion;
 mod dispatch;
 mod gateways;
+mod guesses;
+pub use guesses::Place;
 mod legacy;
 mod limits;
 mod objects;
@@ -43,6 +45,9 @@ struct Pending {
     credential: Option<Credential>,
     surface: Surface,
     purpose: Purpose,
+    /// The start as it was counted: a guess, until the proof shows it was
+    /// none (`guesses.rs`).
+    guess: guesses::Guess,
 }
 
 /// What a pending OPAQUE login proves the password for.
@@ -416,12 +421,16 @@ impl IdentityService {
         identity: Identity,
         message: Vec<u8>,
         surface: Surface,
+        place: Option<Place>,
     ) -> Result<Response, Error> {
         let context = self.context(identity)?;
+        // What the budgets show without the store is refused before a
+        // worker or a statement is taken: refused starts cost neither.
         self.limits
             .lock()
             .map_err(|_| Error::Unavailable)?
-            .account(identity.account, Instant::now(), 1)?;
+            .guesses
+            .fits(identity.account, place, Instant::now(), 1)?;
         let permit = self
             .workers
             .clone()
@@ -430,6 +439,20 @@ impl IdentityService {
         // Capacity is checked before a query/curve operation and again before insertion.
         self.prune_pending()?;
         let credential = self.store.credential(identity).await?;
+        // Counted once a worker is held, so a start that found none spent
+        // nothing: one guess, at the account or at nobody's.
+        let guess = self
+            .limits
+            .lock()
+            .map_err(|_| Error::Unavailable)?
+            .guesses
+            .guess(
+                identity.account,
+                credential.is_some(),
+                place,
+                Instant::now(),
+                1,
+            )?;
         let keys = self.keys.clone();
         let (attempt, message, credential) = tokio::task::spawn_blocking(move || {
             let _permit = permit;
@@ -458,6 +481,7 @@ impl IdentityService {
                 credential,
                 surface,
                 purpose: Purpose::Login,
+                guess,
             },
         );
         Ok(Response::LoginChallenge {
@@ -483,6 +507,14 @@ impl IdentityService {
         surface: Surface,
         previous: Option<&Token>,
     ) -> Result<BrowserReply, Error> {
+        // The worker first: without one the attempt stays and the answer is
+        // `Busy`, which a client asks again. Taken after the attempt, a
+        // right password would be lost with it and count as a wrong one.
+        let permit = self
+            .workers
+            .clone()
+            .try_acquire_owned()
+            .map_err(|_| Error::Busy)?;
         // Consumption precedes validation, including invalid message size/proofs.
         let pending = self
             .pending
@@ -497,21 +529,19 @@ impl IdentityService {
         {
             return Err(Error::Rejected);
         }
-        let permit = self
-            .workers
-            .clone()
-            .try_acquire_owned()
-            .map_err(|_| Error::Busy)?;
-        let credential = tokio::task::spawn_blocking(move || {
+        let (credential, guess) = tokio::task::spawn_blocking(move || {
             let _permit = permit;
             pending
                 .attempt
                 .finish(&message)
                 .map_err(|_| Error::Rejected)?;
-            pending.credential.ok_or(Error::Rejected)
+            Ok::<_, Error>((pending.credential.ok_or(Error::Rejected)?, pending.guess))
         })
         .await
         .map_err(|_| Error::Unavailable)??;
+        // The password is proven: the start was no guess, whatever the
+        // store says to the session.
+        self.proved(&guess)?;
         let token = Token::generate()?;
         let issued = match surface {
             Surface::Browser => {
@@ -533,14 +563,42 @@ impl IdentityService {
         request: Request,
         bearer: Option<&Token>,
     ) -> Result<Response, Error> {
+        self.handle_from(request, bearer, None).await
+    }
+
+    /// [`Self::handle`] for a request from `place`, the client's address as
+    /// the listener counts it. A place confers nothing: it only shares out
+    /// the guesses at passwords (`docs/native-login.md` §"Guessing a
+    /// password online"). Without one, each account's own budget alone
+    /// bounds them.
+    ///
+    /// # Errors
+    /// Returns generic authorization, capacity, conflict or availability errors only.
+    pub async fn handle_from(
+        &self,
+        request: Request,
+        bearer: Option<&Token>,
+        place: Option<Place>,
+    ) -> Result<Response, Error> {
         self.limits
             .lock()
             .map_err(|_| Error::Unavailable)?
             .request(&request, bearer, Instant::now())?;
         Ok(self
-            .dispatch(request, bearer, Surface::Native, Seen::default())
+            .dispatch(request, bearer, Surface::Native, Seen::default(), place)
             .await?
             .response)
+    }
+
+    /// A start's password was proven: its guess comes back, and its place
+    /// is the account's own from now on (`guesses.rs`).
+    fn proved(&self, guess: &guesses::Guess) -> Result<(), Error> {
+        self.limits
+            .lock()
+            .map_err(|_| Error::Unavailable)?
+            .guesses
+            .proved(guess, Instant::now());
+        Ok(())
     }
 
     /// Process a command from the website's browser listener. Only
@@ -555,21 +613,23 @@ impl IdentityService {
         request: Request,
         cookie: Option<&Token>,
     ) -> Result<BrowserReply, Error> {
-        self.handle_browser_seen(request, cookie, Seen::default())
+        self.handle_browser_from(request, cookie, None, Seen::default())
             .await
     }
 
-    /// [`Self::handle_browser`], with what the listener saw of the request
-    /// ([`Seen`]). Only a registration challenge reads it, for its
-    /// difficulty (`docs/registration-abuse.md` §"Hardened"): it never
+    /// [`Self::handle_browser`] for a request from `place`, as
+    /// [`Self::handle_from`] takes one, with what the listener saw of the
+    /// request ([`Seen`]). Only a registration challenge reads `seen`, for
+    /// its difficulty (`docs/registration-abuse.md` §"Hardened"): it never
     /// refuses a request and grants nothing.
     ///
     /// # Errors
-    /// As [`Self::handle_browser`].
-    pub async fn handle_browser_seen(
+    /// Returns generic authorization, capacity, conflict or availability errors only.
+    pub async fn handle_browser_from(
         &self,
         request: Request,
         cookie: Option<&Token>,
+        place: Option<Place>,
         seen: Seen,
     ) -> Result<BrowserReply, Error> {
         if !browser_operation(&request) {
@@ -587,7 +647,7 @@ impl IdentityService {
         } else {
             session
         };
-        self.dispatch(request, context, Surface::Browser, seen)
+        self.dispatch(request, context, Surface::Browser, seen, place)
             .await
     }
 }

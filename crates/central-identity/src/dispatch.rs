@@ -1,16 +1,19 @@
 use super::{
-    BrowserReply, Discovery, Error, IdentityService, Request, Response, Seen, Surface, Token,
-    browser_only, browser_operation, challenge,
+    BrowserReply, Discovery, Error, IdentityService, Place, Request, Response, Seen, Surface,
+    Token, browser_only, browser_operation, challenge,
 };
 use std::time::Instant;
 
 impl IdentityService {
+    /// `place` is where the request came from, for the starts that test a
+    /// guessed password (`guesses.rs`); nothing else reads it.
     pub(super) async fn dispatch(
         &self,
         request: Request,
         bearer: Option<&Token>,
         surface: Surface,
         seen: Seen,
+        place: Option<Place>,
     ) -> Result<BrowserReply, Error> {
         if surface == Surface::Browser && !browser_operation(&request) {
             return Err(Error::Rejected);
@@ -37,7 +40,9 @@ impl IdentityService {
                 .await;
         }
         Ok(BrowserReply {
-            response: self.respond(request, bearer, surface, seen).await?,
+            response: self
+                .respond(request, bearer, surface, seen, place)
+                .await?,
             session: None,
         })
     }
@@ -48,6 +53,7 @@ impl IdentityService {
         bearer: Option<&Token>,
         surface: Surface,
         seen: Seen,
+        place: Option<Place>,
     ) -> Result<Response, Error> {
         if super::terms::needs_acceptance(&request) {
             self.require_terms(bearer, surface).await?;
@@ -85,7 +91,7 @@ impl IdentityService {
             | Request::LegacyStatus { .. }
             | Request::LegacyLogin { .. }
             | Request::LegacyExport
-            | Request::LegacyLink { .. }) => self.legacy(request, bearer, surface).await,
+            | Request::LegacyLink { .. }) => self.legacy(request, bearer, surface, place).await,
             request @ (Request::RegisterGateway { .. }
             | Request::GatewayDirectory { .. }
             | Request::GatewayHeartbeat { .. }
@@ -101,7 +107,8 @@ impl IdentityService {
             request @ (Request::AccountExport
             | Request::DeleteAccountStart { .. }
             | Request::DeleteAccountFinish { .. }) => {
-                self.lifecycle_request(request, bearer, surface).await
+                self.lifecycle_request(request, bearer, surface, place)
+                    .await
             }
             request @ (Request::KeyCheckStatus
             | Request::SetKeyCheck { .. }
@@ -114,14 +121,15 @@ impl IdentityService {
             | Request::PairRedeem { .. }) => self.pairing_request(request, bearer, surface).await,
             Request::Discover { username } => self.discover(&username).await,
             Request::LoginStart { identity, message } => {
-                self.start(identity, message, surface).await
+                self.start(identity, message, surface, place).await
             }
             request @ (Request::ChangePasswordStart { .. }
             | Request::ResetStart { .. }
             | Request::ResetFinish { .. }
             | Request::LoginFinish { .. }
             | Request::ChangePasswordFinish { .. }) => {
-                self.credential_request(request, bearer, surface).await
+                self.credential_request(request, bearer, surface, place)
+                    .await
             }
             Request::RegisterChallenge => self.register_challenge(surface, seen, 0).await,
             Request::RegisterChallengeFor { signals } => {
@@ -352,10 +360,11 @@ impl IdentityService {
         request: Request,
         bearer: Option<&Token>,
         surface: Surface,
+        place: Option<Place>,
     ) -> Result<Response, Error> {
         match request {
             Request::LegacyLogin { username, password } => {
-                self.legacy_login(&username, password, surface).await
+                self.legacy_login(&username, password, surface, place).await
             }
             request @ (Request::LegacyExport | Request::LegacyLink { .. }) => {
                 self.legacy_request(request, bearer, surface).await

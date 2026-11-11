@@ -4,7 +4,9 @@
 //! still see their data. A stolen session token alone deletes nothing: the
 //! deletion carries a fresh OPAQUE proof of the password, bound to the
 //! session that started it and charged to the account's login budget.
-use super::{Error, IdentityService, Pending, Purpose, Request, Response, Surface, Token, limits};
+use super::{
+    Error, IdentityService, Pending, Place, Purpose, Request, Response, Surface, Token, limits,
+};
 use central_crypto::opaque::server::ServerKeys;
 use std::time::{Duration, Instant};
 use subtle::ConstantTimeEq;
@@ -20,6 +22,7 @@ impl IdentityService {
         request: Request,
         bearer: Option<&Token>,
         surface: Surface,
+        place: Option<Place>,
     ) -> Result<Response, Error> {
         match request {
             Request::AccountExport => {
@@ -29,7 +32,7 @@ impl IdentityService {
                 })
             }
             Request::DeleteAccountStart { login } => {
-                self.delete_start(login, bearer, surface).await
+                self.delete_start(login, bearer, surface, place).await
             }
             Request::DeleteAccountFinish { attempt, proof } => {
                 self.delete_finish(&attempt, proof, bearer, surface).await
@@ -45,23 +48,28 @@ impl IdentityService {
         login: Vec<u8>,
         bearer: Option<&Token>,
         surface: Surface,
+        place: Option<Place>,
     ) -> Result<Response, Error> {
         let session = surface.session(bearer)?;
         let (credential, gateways) = self.store.deletion_start(session).await?;
         let identity = credential.identity;
         let context = self.context(identity)?;
-        // The login budget bounds guesses at the password, also with a
-        // stolen session: KE2 is one evaluation of the account's OPRF key.
-        self.limits
-            .lock()
-            .map_err(|_| Error::Unavailable)?
-            .account(identity.account, Instant::now(), DELETE_UNITS)?;
         let permit = self
             .workers
             .clone()
             .try_acquire_owned()
             .map_err(|_| Error::Busy)?;
         self.prune_pending()?;
+        // The login budget bounds guesses at the password, also with a
+        // stolen session: KE2 is one evaluation of the account's OPRF key.
+        // Counted once a worker is held, and given back by the proof; a
+        // deletion started and not confirmed stays counted as one guess.
+        let guess = self
+            .limits
+            .lock()
+            .map_err(|_| Error::Unavailable)?
+            .guesses
+            .guess(identity.account, true, place, Instant::now(), DELETE_UNITS)?;
         let keys = self.keys.clone();
         let (attempt, login, credential) = tokio::task::spawn_blocking(move || {
             let _permit = permit;
@@ -88,6 +96,7 @@ impl IdentityService {
                 credential: Some(credential),
                 surface,
                 purpose: Purpose::DeleteAccount(started_by),
+                guess,
             },
         );
         Ok(Response::DeleteChallenge {
@@ -105,6 +114,12 @@ impl IdentityService {
         bearer: Option<&Token>,
         surface: Surface,
     ) -> Result<Response, Error> {
+        // The worker first, as for a sign-in: without one the attempt stays.
+        let permit = self
+            .workers
+            .clone()
+            .try_acquire_owned()
+            .map_err(|_| Error::Busy)?;
         // Consumption precedes every check, as for a sign-in.
         let pending = self
             .pending
@@ -123,21 +138,18 @@ impl IdentityService {
         {
             return Err(Error::Rejected);
         }
-        let permit = self
-            .workers
-            .clone()
-            .try_acquire_owned()
-            .map_err(|_| Error::Busy)?;
-        let credential = tokio::task::spawn_blocking(move || {
+        let (credential, guess) = tokio::task::spawn_blocking(move || {
             let _permit = permit;
             pending
                 .attempt
                 .finish(&proof)
                 .map_err(|_| Error::Rejected)?;
-            pending.credential.ok_or(Error::Rejected)
+            Ok::<_, Error>((pending.credential.ok_or(Error::Rejected)?, pending.guess))
         })
         .await
         .map_err(|_| Error::Unavailable)??;
+        // The password is proven, whatever the store says to the deletion.
+        self.proved(&guess)?;
         self.store
             .delete_account(surface.session(Some(presented))?, &credential)
             .await?;

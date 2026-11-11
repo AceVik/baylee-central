@@ -2,7 +2,7 @@
 //! listener without a session. The code authorizes the registration of a new
 //! password; its start spends one unit of the account's login budget, after
 //! the code is found, so nobody without it spends anything of the account's.
-use super::{Credential, Error, IdentityService, Request, Response, Surface, Token};
+use super::{Credential, Error, IdentityService, Place, Request, Response, Surface, Token};
 use central_api::reset_code::ResetCode;
 use central_api::wire::ResetVault;
 use std::time::{Duration, Instant};
@@ -26,10 +26,12 @@ impl IdentityService {
         request: Request,
         bearer: Option<&Token>,
         surface: Surface,
+        place: Option<Place>,
     ) -> Result<Response, Error> {
         match request {
             request @ Request::ChangePasswordStart { .. } => {
-                self.change_password_start(request, bearer, surface).await
+                self.change_password_start(request, bearer, surface, place)
+                    .await
             }
             Request::ResetStart {
                 username,
