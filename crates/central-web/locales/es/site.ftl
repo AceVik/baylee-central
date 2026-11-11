@@ -60,7 +60,7 @@ breadcrumb-home = Inicio
 
 ## Home
 
-hero-title = <nb>Build your decks.</nb> <nb>Gather your friends.</nb> <glow>Just play.</glow>
+hero-title = <nb>Crea tus mazos.</nb> <nb>Reúne a tus amigos.</nb> <glow>Solo juega.</glow>
 hero-lead = Un constructor de mazos completo, partidas de hasta ocho jugadores en duelos, todos contra todos o por equipos, y un motor de reglas que comprueba cada paso, para que cada turno sea justo sin que nadie tenga que consultar nada.
 hero-offline = Las partidas en solitario y el constructor de mazos funcionan sin conexión y sin cuenta. Las mesas online viven en gateways; <host>puedes montar el tuyo</host>.
 hero-account = ¿Vas a jugar online? <register>Crea una cuenta</register>, gratis y abierta a todos durante la beta abierta, o <signin>inicia sesión</signin>.
@@ -130,7 +130,7 @@ dl-archive = Archivo
 dl-fallback = Archivo para procesadores antiguos
 dl-fallback-help = Para procesadores x86-64 sin AVX2 (anteriores a 2013, más o menos). Las compilaciones principales de Baylee necesitan AVX2 y no arrancan sin él.
 plat-windows-x64 = Windows
-plat-windows-x64-sub = most PCs: 64‑bit Intel or AMD
+plat-windows-x64-sub = la mayoría de los PC: Intel o AMD de 64 bits
 plat-windows-arm64 = Windows en ARM
 plat-windows-arm64-sub = portátiles Snapdragon y similares
 plat-mac-arm64 = macOS
@@ -160,7 +160,7 @@ gws-official = Oficial
 gws-online = Online
 gws-offline = Sin conexión
 gws-version = Versión
-gws-now = Right now
+gws-now = Ahora mismo
 gws-website = Sitio web
 gws-address = Dirección
 gws-copy = Copiar dirección
@@ -225,8 +225,8 @@ impressum-name = Nombre
 impressum-address = Dirección
 impressum-email = Correo electrónico
 impressum-phone = Teléfono
-impressum-write = Write an e-mail
-impressum-call = Call
+impressum-write = Escribir un correo
+impressum-call = Llamar
 impressum-failed = No se pudieron cargar los datos. Inténtalo de nuevo o escríbenos con el <contact>formulario de contacto</contact>.
 impressum-noscript = Los datos necesitan JavaScript para mostrarse. Sin él, escríbenos por Discord o GitHub.
 impressum-responsible = Responsable del contenido: la persona indicada arriba.
@@ -259,7 +259,7 @@ privacy-device = Este sitio no instala ninguna cookie hasta que inicias sesión.
 privacy-github-title = GitHub
 privacy-github = La página de descarga y la página de inicio muestran la última versión, el estado de las pruebas y las cifras de las cartas. Es nuestro servidor quien se las pide a GitHub, no tu navegador; GitHub no averigua nada sobre ti con ello. Solo cuando haces clic en una descarga o en un enlace de GitHub se conecta tu navegador a GitHub (GitHub, Inc., EE. UU.) y le envía tu dirección IP y lo que lleva toda petición; a partir de ahí se aplica la política de privacidad del propio GitHub.
 privacy-directory-title = El directorio de gateways
-privacy-directory = Our server reads the directory of gateways from Baylee Central and shows it; nothing about you is involved. A gateway may tell Central how many players, open tables and games it has at the moment, and Central counts its accounts; the site shows these numbers. They are counts only, never names, and a gateway's numbers are its operator's own statement.
+privacy-directory = Nuestro servidor lee el directorio de gateways de Baylee Central y lo muestra; no interviene nada sobre ti. Un gateway puede decirle a Central cuántos jugadores, mesas abiertas y partidas tiene en este momento, y Central cuenta sus cuentas; el sitio muestra estas cifras. Son solo recuentos, nunca nombres, y las cifras de un gateway son una declaración de su propio operador.
 privacy-account-title = Tu cuenta
 privacy-account = Para una cuenta, Baylee Central almacena: el identificador de tu cuenta, tu nombre de inicio de sesión, tu nombre visible con su etiqueta, cuándo y cómo se creó la cuenta, un registro de contraseña OPAQUE (que te permite demostrar tu contraseña sin que nuestro servidor llegue a conocerla), tu clave maestra cifrada dos veces (con tu contraseña y con tu código de recuperación), tu documento de cuenta cifrado y tus objetos cifrados (ilegibles para nosotros; solo vemos tamaño, revisión y hora), qué versión de las condiciones aceptaste y cuándo, la hora de tu último inicio de sesión, tus sesiones, un rol de administrador si lo tienes, y los gateways que registras con sus tokens. Los demás jugadores ven tu nombre visible y tu etiqueta, nunca tu nombre de inicio de sesión. Si un administrador te da un código de restablecimiento, solo guardamos su huella hasta que se use el código o caduque. Lo que los administradores hacen con una cuenta o un gateway se conserva en un registro durante tres años (quién, qué, qué cuenta o gateway, cuándo). Base jurídica: art. 6, apdo. 1, letra b) del RGPD (la cuenta que pediste); para la hora del último inicio de sesión y el registro, art. 6, apdo. 1, letra f) del RGPD (nuestro interés legítimo en un funcionamiento seguro y trazable). Sin nombre de inicio de sesión y sin contraseña no hay cuenta; no necesitas correo electrónico. Puedes crear una cuenta a partir de los 16 años. Se conserva hasta que eliminas la cuenta; entonces se borra del sistema en funcionamiento de inmediato y de las copias de seguridad como máximo en 12 meses. Las sesiones terminan tras 30 minutos sin uso y, como máximo, 12 horas después de iniciar sesión.
 privacy-cookie-title = La cookie de sesión
@@ -273,11 +273,11 @@ privacy-counters = Para impedir que se adivinen contraseñas y la sobrecarga, Ce
 privacy-contact-title = El formulario de contacto
 privacy-contact = El formulario envía tu mensaje, el idioma de la página y la hora al servicio de comentarios de Baylee en el mismo servidor, y tu nombre y tu correo electrónico solo si los indicas; ambos son opcionales. El servicio también anota si el mensaje ya se ha atendido. Tu dirección IP no se almacena; solo se cuenta en memoria durante una hora, para impedir una avalancha de mensajes. Solo la persona indicada en el aviso legal lee los mensajes; no se transmite nada. Un mensaje se elimina 90 días después de haberse atendido, como máximo al cabo de un año, o antes si lo pides. Base jurídica: art. 6, apdo. 1, letra f) del RGPD (nuestro interés legítimo en responder a los mensajes), o letra b) cuando tu mensaje se refiere a tu cuenta.
 privacy-impressum-title = El rompecabezas del aviso legal
-privacy-impressum = The legal notice is shown only after your browser has solved a puzzle; that protects the address from programs that collect addresses. The puzzle consists of random numbers and holds nothing about you. For this, the feedback service keeps in memory only, never on disk and never in a log: how many puzzles your IP address asked for (for one hour; an IPv6 address by its first half), whether it followed a link that is hidden from people (for 24 hours), and which puzzles were solved (for five minutes, without an address). Three yes-or-no answers about your browser set the puzzle's difficulty and are not kept: whether a program drives it, whether it names no languages, and whether it draws without a graphics card. Nobody is refused; a browser that looks like a program gets a longer puzzle. Legal basis: Art. 6(1)(f) GDPR (our legitimate interest in protecting a private person's address).
+privacy-impressum = El aviso legal solo se muestra después de que tu navegador haya resuelto un rompecabezas; eso protege la dirección de los programas que recogen direcciones. El rompecabezas consiste en números aleatorios y no contiene nada sobre ti. Para ello, el servicio de comentarios guarda únicamente en memoria, nunca en disco ni en un registro: cuántos rompecabezas ha pedido tu dirección IP (durante una hora; una dirección IPv6, por su primera mitad), si ha seguido un enlace oculto para las personas (durante 24 horas) y qué rompecabezas se resolvieron (durante cinco minutos, sin dirección). Tres respuestas de sí o no sobre tu navegador fijan la dificultad del rompecabezas y no se guardan: si lo maneja un programa, si no declara ningún idioma y si dibuja sin tarjeta gráfica. No se rechaza a nadie; un navegador que parece un programa recibe un rompecabezas más largo. Base jurídica: art. 6, apdo. 1, letra f) del RGPD (nuestro interés legítimo en proteger la dirección de una persona física).
 privacy-recipients-title = Destinatarios y países
 privacy-recipients = No vendemos datos ni los cedemos con fines publicitarios. Los destinatarios son: netcup GmbH (alojamiento en Alemania, como encargado del tratamiento conforme al art. 28 del RGPD); los administradores de Baylee Central, que para la administración ven tu nombre de inicio de sesión, tu nombre visible con su etiqueta, el origen, la creación y el último inicio de sesión de tu cuenta, y tus gateways, nunca tus datos cifrados; un gateway en el que inicias sesión con tu cuenta (recibe el identificador de tu cuenta, tu nombre visible y tu etiqueta, no tu contraseña); tus contactos y los miembros de tus grupos (nombre visible, etiqueta y tus mensajes); las autoridades solo cuando la ley nos obliga. Países fuera del Espacio Económico Europeo: solo cuando activas las notificaciones las transporta el servicio push de tu navegador (Google, Mozilla o Apple, EE. UU.). Los gateways gestionados por terceros pueden estar en cualquier país; iniciar sesión en ellos es decisión tuya. Por lo demás, no transferimos datos a países fuera del Espacio Económico Europeo.
 privacy-rights-title = Tus derechos
-privacy-rights = You have the right of access (Art. 15 GDPR), rectification (Art. 16), erasure (Art. 17), restriction of processing (Art. 18) and data portability (Art. 20). You can object at any time, on grounds relating to your particular situation, to processing based on our legitimate interests under Art. 6(1)(f) (Art. 21). You can withdraw a consent at any time for the future (Art. 7(3)). Your account's data can be exported and the account deleted in your account's settings; for everything else, a message through the contact form or to the address in the legal notice is enough. You may lodge a complaint with a data protection supervisory authority (Art. 77), for example the one where you live or the State Commissioner for Data Protection and Freedom of Information of North Rhine-Westphalia. No law or contract obliges you to give us data; without a sign-in name and a password, however, there is no account. There is no automated decision-making and no profiling (Art. 22).
+privacy-rights = Tienes derecho de acceso (art. 15 del RGPD), rectificación (art. 16), supresión (art. 17), limitación del tratamiento (art. 18) y portabilidad de los datos (art. 20). Puedes oponerte en cualquier momento, por motivos relacionados con tu situación particular, al tratamiento basado en nuestros intereses legítimos conforme al art. 6, apdo. 1, letra f) (art. 21). Puedes retirar un consentimiento en cualquier momento con efecto futuro (art. 7, apdo. 3). Los datos de tu cuenta pueden exportarse y la cuenta puede eliminarse en los ajustes de tu cuenta; para todo lo demás basta un mensaje mediante el formulario de contacto o a la dirección del aviso legal. Puedes presentar una reclamación ante una autoridad de control de protección de datos (art. 77), por ejemplo la de tu lugar de residencia o el Comisionado Estatal para la Protección de Datos y la Libertad de Información de Renania del Norte-Westfalia. Ninguna ley ni contrato te obliga a darnos datos; sin embargo, sin un nombre de inicio de sesión y una contraseña no hay cuenta. No hay decisiones automatizadas ni elaboración de perfiles (art. 22).
 privacy-objection-title = Tu derecho de oposición
 privacy-objection = Cuando tratamos datos sobre la base del art. 6, apdo. 1, letra f) del RGPD (ofrecer el sitio, protección contra abusos, el formulario de contacto, el rompecabezas del aviso legal, la hora de tu último inicio de sesión, el registro de administración, los informes de errores y el recuento de uso), puedes oponerte en cualquier momento por motivos relacionados con tu situación particular (art. 21 del RGPD). Dejaremos entonces de tratar los datos, salvo que podamos acreditar motivos legítimos imperiosos que prevalezcan sobre tus intereses, o que el tratamiento sirva para formular, ejercer o defender reclamaciones. Basta un mensaje informal mediante el formulario de contacto o a la dirección del aviso legal.
 privacy-links-title = Enlaces a otros servicios
@@ -772,23 +772,23 @@ strip-directory = el directorio
 strip-cards = Cartas jugables
 strip-cards-unit = cartas
 strip-stars = Estrellas en GitHub
-strip-accounts = Accounts at Baylee Central
-strip-live = Right now on the gateways, as they report it
+strip-accounts = Cuentas en Baylee Central
+strip-live = Ahora mismo en los gateways, según informan
 live-accounts = { $n ->
-    [one] { $n } account
-   *[other] { $n } accounts
+    [one] { $n } cuenta
+   *[other] { $n } cuentas
 }
 live-players = { $n ->
-    [one] { $n } player
-   *[other] { $n } players
+    [one] { $n } jugador
+   *[other] { $n } jugadores
 }
 live-tables = { $n ->
-    [one] { $n } open table
-   *[other] { $n } open tables
+    [one] { $n } mesa abierta
+   *[other] { $n } mesas abiertas
 }
 live-games = { $n ->
-    [one] { $n } game
-   *[other] { $n } games
+    [one] { $n } partida
+   *[other] { $n } partidas
 }
 hero-badges = De un vistazo
 hero-badge-beta = Beta abierta
@@ -816,7 +816,7 @@ feature-hidden = Tu cliente recibe solo los datos que tu asiento puede ver. Las 
 feature-seatsTitle = Hasta ocho jugadores en una mesa
 feature-seats = Duelos, todos contra todos y partidas por equipos (como 2 contra 2) con hasta 8 asientos. Los compañeros comparten turnos y pueden mostrarse las cartas de la mano.
 feature-commanderTitle = Formatos flexibles y reglas de la casa personalizadas
-feature-commander = Assemble decks for classic 60‑card duels, multiplayer rings, or custom house formats. Starting life totals, team layouts, and mulligan rules are freely set by the host.
+feature-commander = Arma mazos para duelos clásicos de 60 cartas, partidas multijugador o formatos propios de la casa. El anfitrión fija libremente los puntos de vida iniciales, la disposición de los equipos y las reglas de mulligan.
 feature-aiTitle = Repeticiones deterministas e informes con F8
 feature-ai = Cada partida se registra jugada a jugada. Si durante el juego notas un problema en una interacción de reglas, pulsa F8 en la propia mesa para enviar un informe de estado reproducible.
 feature-processTitle = Un proceso de servidor aislado por partida
@@ -828,10 +828,10 @@ feature-watch = El botón Watch del vestíbulo te sienta a la mesa como espectad
 feature-connectionTitle = Reconexión fluida si se corta la conexión
 feature-connection = Si una conexión se corta un momento, la mesa mantiene el asiento con una cuenta atrás y puede pausar la partida o dejar que la IA de la casa entre temporalmente.
 feature-tablesTitle = Catorce relojes de decisión
-feature-tables = From brisk 15‑second turns to relaxed untimed tables, configure the pace individually for every room.
+feature-tables = Desde turnos ágiles de 15 segundos hasta mesas relajadas sin límite de tiempo, configura el ritmo por separado para cada sala.
 shots-eyebrow = En la mesa
 shots-title = Dentro del juego
-shots-lead = Short live recordings captured directly from the 3D client with card images from Scryfall (© Wizards of the Coast)—from duels and 4‑player rings to the encrypted lobby and deck builder.
+shots-lead = Breves grabaciones en directo tomadas del cliente 3D, con imágenes de cartas de Scryfall (© Wizards of the Coast): desde duelos y partidas de 4 jugadores hasta el vestíbulo cifrado y el constructor de mazos.
 shots-credit = Imágenes de cartas: Scryfall · © Wizards of the Coast
 shots-showLarge = Ampliar: { $title }
 shots-dialog = Captura de pantalla
@@ -940,132 +940,132 @@ app-account = Tu cuenta
 # Every sentence and every arrow of this page maps to a row of the claim
 # table in docs/security-page.md; a claim changes
 # there first. No "safe", "unbreakable" or compliance words: mechanisms only.
-title-security = Security in Baylee: passwords, keys and chats
-desc-security = How Baylee handles passwords, keys and chat messages, step by step in four diagrams, with the limits each one has.
-nav-security = Security
-sec-eyebrow = Security
-sec-title = Passwords, keys and chats: what goes where
-sec-lead = Four flows, step by step: what leaves your device, what Baylee Central sees and what it does not. With the limits each one has.
-sec-toc-label = On this page
-sec-figure = Diagram in steps: { $name }
-sec-play = Play
-sec-all = All steps
-sec-step = Step { $n }
-sec-hint = The diagram plays by itself. Choose a step to stop it there.
-sec-hint-still = Choose a step to highlight it.
-sec-in-browser = The dashed frame is your browser: all of this happens inside it.
+title-security = Seguridad en Baylee: contraseñas, claves y chats
+desc-security = Cómo trata Baylee las contraseñas, las claves y los mensajes de chat, paso a paso en cuatro diagramas, con los límites de cada uno.
+nav-security = Seguridad
+sec-eyebrow = Seguridad
+sec-title = Contraseñas, claves y chats: qué va adónde
+sec-lead = Cuatro flujos, paso a paso: qué sale de tu dispositivo, qué ve Baylee Central y qué no. Con los límites de cada uno.
+sec-toc-label = En esta página
+sec-figure = Diagrama por pasos: { $name }
+sec-play = Reproducir
+sec-all = Todos los pasos
+sec-step = Paso { $n }
+sec-hint = El diagrama se reproduce solo. Elige un paso para detenerlo ahí.
+sec-hint-still = Elige un paso para resaltarlo.
+sec-in-browser = El marco discontinuo es tu navegador: todo esto ocurre dentro de él.
 # The actors' names are the only words inside the drawings, where text does
 # not wrap: one or two words each, at most about twice the English width
 # (the test `names_fit_with_room_to_grow` measures every language).
-sec-actor-device = Your device
+sec-actor-device = Tu dispositivo
 sec-actor-central = Central
-sec-actor-page = Page
+sec-actor-page = Página
 sec-actor-worker = Worker
-sec-actor-store = Storage
-sec-actor-you = You
-sec-actor-contact = Contact
-sec-actor-website = Website
-sec-actor-client = Client
+sec-actor-store = Almacén
+sec-actor-you = Tú
+sec-actor-contact = Contacto
+sec-actor-website = Sitio web
+sec-actor-client = Cliente
 
-sec-signin-eyebrow = Signing in and registering
-sec-signin-title = Central checks your password without receiving it
-sec-signin-lead = Baylee signs you in with OPAQUE (RFC 9807). Your device and Central exchange three messages; your password is in none of them, not even as a plain hash.
-sec-signin-c1 = Blinded request
-sec-signin-t1 = Your device blinds the password.
-sec-signin-s1 = It combines the password with a fresh random number and sends only the result. The password cannot be read from that message.
-sec-signin-c2 = Central's answer
-sec-signin-t2 = Central answers with a key of its own.
-sec-signin-s2 = Central computes on the blinded value with a key only it holds and adds its half of a key exchange. It does not learn the password in doing so.
+sec-signin-eyebrow = Iniciar sesión y registrarse
+sec-signin-title = Central comprueba tu contraseña sin recibirla
+sec-signin-lead = Baylee te inicia sesión con OPAQUE (RFC 9807). Tu dispositivo y Central intercambian tres mensajes; tu contraseña no está en ninguno de ellos, ni siquiera como hash simple.
+sec-signin-c1 = Petición cegada
+sec-signin-t1 = Tu dispositivo ciega la contraseña.
+sec-signin-s1 = Combina la contraseña con un número aleatorio nuevo y envía solo el resultado. La contraseña no puede leerse a partir de ese mensaje.
+sec-signin-c2 = Respuesta de Central
+sec-signin-t2 = Central responde con una clave propia.
+sec-signin-s2 = Central calcula sobre el valor cegado con una clave que solo ella tiene y añade su mitad de un intercambio de claves. Al hacerlo, no llega a conocer la contraseña.
 sec-signin-c3 = Argon2id · 64 MiB
-sec-signin-t3 = Your device does the heavy work.
-sec-signin-s3 = It removes the blinding and stretches the result with Argon2id (64 MiB of memory, three passes); Central cannot ask for cheaper settings. A wrong password is noticed here, before anything else is sent.
-sec-signin-c4 = Proof
-sec-signin-t4 = Your device proves it has the right keys.
-sec-signin-s4 = With the right password your device arrives at the same session key as Central and sends a short proof of that (64 bytes).
-sec-signin-c5 = Session + wrapper
-sec-signin-t5 = Central opens the session.
-sec-signin-s5 = Back come the session (in the browser a cookie the page itself cannot read) and your master key in a wrapper that opens only on your device, with the right password.
-sec-signin-register = <b>Registering</b> runs the same protocol. Your device draws a random master key (256 bits), wraps it once under your password and once under your recovery code, and sends only the wrappers. Central stores an OPAQUE record and the wrappers, never the key.
-sec-signin-legacy = <b>One exception:</b> accounts of the old official gateway that have not moved to Central yet. Until such an account has moved, each sign-in attempt in the Baylee client sends the typed password, over a verified TLS connection, to Central, which checks it against the old hash and neither stores nor logs it. Once the move has succeeded, the account signs in as shown above. This website does not sign such accounts in; it points to the client. The exception ends with the deadline set for the move.
-sec-signin-limit = <b>What remains:</b> whoever takes Central's database together with its keys can try passwords one by one; every attempt costs an Argon2id run. A password found that way opens the account's encrypted data and its stored chats. A long password that you use nowhere else still matters.
+sec-signin-t3 = Tu dispositivo hace el trabajo pesado.
+sec-signin-s3 = Quita el cegado y refuerza el resultado con Argon2id (64 MiB de memoria, tres pasadas); Central no puede pedir ajustes más baratos. Aquí se detecta una contraseña incorrecta, antes de enviar nada más.
+sec-signin-c4 = Prueba
+sec-signin-t4 = Tu dispositivo demuestra que tiene las claves correctas.
+sec-signin-s4 = Con la contraseña correcta, tu dispositivo llega a la misma clave de sesión que Central y envía una breve prueba de ello (64 bytes).
+sec-signin-c5 = Sesión + envoltorio
+sec-signin-t5 = Central abre la sesión.
+sec-signin-s5 = Vuelven la sesión (en el navegador, una cookie que la propia página no puede leer) y tu clave maestra en un envoltorio que solo se abre en tu dispositivo, con la contraseña correcta.
+sec-signin-register = <b>El registro</b> usa el mismo protocolo. Tu dispositivo genera una clave maestra aleatoria (256 bits), la envuelve una vez con tu contraseña y otra con tu código de recuperación, y envía solo los envoltorios. Central almacena un registro OPAQUE y los envoltorios, nunca la clave.
+sec-signin-legacy = <b>Una excepción:</b> las cuentas del antiguo gateway oficial que aún no se han trasladado a Central. Mientras una cuenta así no se haya trasladado, cada intento de inicio de sesión en el cliente de Baylee envía la contraseña escrita, por una conexión TLS verificada, a Central, que la comprueba con el hash antiguo y ni la almacena ni la registra. Cuando el traslado se haya completado, la cuenta inicia sesión como se muestra arriba. Este sitio web no inicia sesión en esas cuentas; remite al cliente. La excepción termina con el plazo fijado para el traslado.
+sec-signin-limit = <b>Lo que queda:</b> quien se haga con la base de datos de Central junto con sus claves puede probar contraseñas una a una; cada intento cuesta una ejecución de Argon2id. Una contraseña encontrada así abre los datos cifrados de la cuenta y sus chats almacenados. Sigue importando una contraseña larga que no uses en ningún otro sitio.
 
-sec-memory-eyebrow = In memory
-sec-memory-title = What is still in memory after you sign in
-sec-memory-lead = The password is needed once: to open your master key. The diagram follows it through the browser; what the Baylee client does differently is below.
-sec-memory-c1 = Password
-sec-memory-t1 = The page hands the password to a Worker.
-sec-memory-s1 = The form passes it to a background thread of its own (a Worker), empties the input field and frees its copy.
+sec-memory-eyebrow = En memoria
+sec-memory-title = Qué sigue en memoria después de iniciar sesión
+sec-memory-lead = La contraseña hace falta una vez: para abrir tu clave maestra. El diagrama la sigue por el navegador; lo que hace distinto el cliente de Baylee está más abajo.
+sec-memory-c1 = Contraseña
+sec-memory-t1 = La página entrega la contraseña a un Worker.
+sec-memory-s1 = El formulario se la pasa a un hilo propio en segundo plano (un Worker), vacía el campo de entrada y libera su copia.
 sec-memory-c2 = OPAQUE + Argon2id
-sec-memory-t2 = The Worker computes, then overwrites.
-sec-memory-s2 = Its Rust code holds the password only until the OPAQUE step ends and then overwrites it, along with the keys it derived on the way and holds itself, and Argon2id's 64 MiB of working memory.
-sec-memory-c3 = Master key: checked, wiped
-sec-memory-t3 = The master key is opened, used and wiped.
-sec-memory-s3 = The Worker opens it to check the sign-in, derives the chat keys from it if your account has a chat, and overwrites it again.
-sec-memory-c4 = Chat keys, sealed
-sec-memory-t4 = Only the chat keys stay.
-sec-memory-s4 = So that the chat opens after a reload without your password, the Worker stores them in the browser (IndexedDB), encrypted with AES-256-GCM. The key for that is non-extractable: scripts can use it but cannot read it out. While a chat page is open, a Worker of its own holds the chat keys unsealed in memory. Signing out deletes the record; after a session has ended by itself, the next page of this site that loads deletes it.
-sec-memory-c5 = Worker ended
-sec-memory-t5 = The sign-in's Worker is ended.
-sec-memory-s5 = When the sign-in is done the sign-in page ends its Worker, and the browser discards that Worker's memory.
-sec-memory-limit = <b>What a browser does not promise:</b> the password as typed, its handover to the Worker and JavaScript's strings are managed by the browser. Baylee frees them; it does not overwrite the page's own copies and cannot overwrite the browser's. When that memory is really reused is the browser's decision. And whoever can run script on this site or read your browser profile while you are signed in can get at the sealed chat keys.
-sec-memory-client = <b>In the Baylee client</b> the typed password sits in memory that is overwritten when released, and it is dropped right after the sign-in; it is never stored. The master key stays in the client's memory while you are signed in, because the client opens your encrypted data with it.
+sec-memory-t2 = El Worker calcula y luego sobrescribe.
+sec-memory-s2 = Su código Rust conserva la contraseña solo hasta que termina el paso de OPAQUE y entonces la sobrescribe, junto con las claves que derivó por el camino y custodia él mismo, y con los 64 MiB de memoria de trabajo de Argon2id.
+sec-memory-c3 = Clave maestra: comprobada, borrada
+sec-memory-t3 = La clave maestra se abre, se usa y se borra.
+sec-memory-s3 = El Worker la abre para comprobar el inicio de sesión, deriva de ella las claves de chat si tu cuenta tiene chat, y la vuelve a sobrescribir.
+sec-memory-c4 = Claves de chat, selladas
+sec-memory-t4 = Solo quedan las claves de chat.
+sec-memory-s4 = Para que el chat se abra tras recargar sin tu contraseña, el Worker las guarda en el navegador (IndexedDB), cifradas con AES-256-GCM. La clave para ello no es extraíble: los scripts pueden usarla, pero no leerla. Mientras hay una página de chat abierta, un Worker propio mantiene en memoria las claves de chat sin sellar. Al cerrar sesión se borra el registro; cuando una sesión ha terminado por sí sola, la siguiente página de este sitio que se cargue lo borra.
+sec-memory-c5 = Worker terminado
+sec-memory-t5 = El Worker del inicio de sesión termina.
+sec-memory-s5 = Cuando el inicio de sesión ha terminado, la página de inicio de sesión finaliza su Worker y el navegador descarta la memoria de ese Worker.
+sec-memory-limit = <b>Lo que un navegador no promete:</b> la contraseña tal como se escribe, su entrega al Worker y las cadenas de JavaScript las gestiona el navegador. Baylee las libera; no sobrescribe las copias propias de la página y no puede sobrescribir las del navegador. Cuándo se reutiliza realmente esa memoria lo decide el navegador. Y quien pueda ejecutar un script en este sitio o leer el perfil de tu navegador mientras tienes la sesión iniciada puede acceder a las claves de chat selladas.
+sec-memory-client = <b>En el cliente de Baylee</b> la contraseña escrita está en una memoria que se sobrescribe al liberarse, y se descarta justo después de iniciar sesión; nunca se almacena. La clave maestra permanece en la memoria del cliente mientras tienes la sesión iniciada, porque el cliente abre con ella tus datos cifrados.
 
 sec-chat-eyebrow = Chat
-sec-chat-title = Messages are encrypted on your device
-sec-chat-lead = Every message gets a key of its own. Central stores and passes on only what is encrypted; reading it takes the chat key of an account it was wrapped for.
-sec-chat-c1 = Text + one-time key
-sec-chat-t1 = A new key for every message.
-sec-chat-s1 = Your device draws a random message key and encrypts the text with it (XChaCha20-Poly1305).
-sec-chat-c2 = Wrapped per chat key, signed
-sec-chat-t2 = Wrapped for each recipient's chat key, signed with yours.
-sec-chat-s2 = It wraps the message key separately for every chat key the recipient's account has registered (X25519) and signs header and ciphertext with your own chat key (Ed25519). Today an account has one chat key, derived from its master key and the same in every browser and client it is signed in on.
-sec-chat-c3 = Ciphertext + wraps
-sec-chat-t3 = Central receives only ciphertext.
-sec-chat-s3 = Central checks the signature and the list of recipients and stores the ciphertext with the wraps. It has neither the message keys nor your account's keys.
-sec-chat-c4 = Ciphertext + one wrap
-sec-chat-t4 = Each chat key gets its own wrap.
-sec-chat-s4 = When your contact fetches their messages, Central hands over the ciphertext and only the wrap made for that chat key.
-sec-chat-c5 = Checked, opened
-sec-chat-t5 = Check, unwrap, read.
-sec-chat-s5 = Your contact's device checks your signature, unwraps the message key with its chat key and decrypts the text.
-sec-chat-meta = <b>What Central sees all the same:</b> who is in contact with whom, groups with their names and members, display names, the public chat keys, and for every message who sent it, in which conversation, when, and how large it is. Like any server it also sees the address a request comes from.
-sec-chat-limit = <b>Limits:</b> there is no double ratchet and so no forward secrecy: if a recipient's chat key is stolen later, it also opens earlier messages that were wrapped for it. Your chat key is derived from your account's master key, and Central keeps the encrypted messages after delivery: whoever takes Central's database with its keys and guesses your password, or has your recovery code, can read them. At first contact your device trusts the keys Central names; to check them, compare the safety number over another channel. If a contact's keys change later, Baylee sends again only after you have confirmed them. Who belongs to a group is decided by Central.
+sec-chat-title = Los mensajes se cifran en tu dispositivo
+sec-chat-lead = Cada mensaje recibe una clave propia. Central solo almacena y transmite lo cifrado; leerlo requiere la clave de chat de una cuenta para la que se envolvió.
+sec-chat-c1 = Texto + clave de un solo uso
+sec-chat-t1 = Una clave nueva para cada mensaje.
+sec-chat-s1 = Tu dispositivo genera una clave de mensaje aleatoria y cifra el texto con ella (XChaCha20-Poly1305).
+sec-chat-c2 = Envuelta por clave de chat, firmada
+sec-chat-t2 = Envuelta para la clave de chat de cada destinatario, firmada con la tuya.
+sec-chat-s2 = Envuelve la clave del mensaje por separado para cada clave de chat que la cuenta del destinatario haya registrado (X25519) y firma la cabecera y el texto cifrado con tu propia clave de chat (Ed25519). Hoy una cuenta tiene una sola clave de chat, derivada de su clave maestra e igual en todos los navegadores y clientes en los que ha iniciado sesión.
+sec-chat-c3 = Texto cifrado + envoltorios
+sec-chat-t3 = Central recibe solo texto cifrado.
+sec-chat-s3 = Central comprueba la firma y la lista de destinatarios y almacena el texto cifrado con los envoltorios. No tiene ni las claves de los mensajes ni las claves de tu cuenta.
+sec-chat-c4 = Texto cifrado + un envoltorio
+sec-chat-t4 = Cada clave de chat recibe su propio envoltorio.
+sec-chat-s4 = Cuando tu contacto recoge sus mensajes, Central entrega el texto cifrado y solo el envoltorio hecho para esa clave de chat.
+sec-chat-c5 = Comprobado, abierto
+sec-chat-t5 = Comprobar, desenvolver, leer.
+sec-chat-s5 = El dispositivo de tu contacto comprueba tu firma, desenvuelve la clave del mensaje con su clave de chat y descifra el texto.
+sec-chat-meta = <b>Lo que Central ve de todos modos:</b> quién está en contacto con quién, los grupos con sus nombres y miembros, los nombres visibles, las claves públicas de chat y, de cada mensaje, quién lo envió, en qué conversación, cuándo y de qué tamaño es. Como cualquier servidor, también ve la dirección desde la que llega una petición.
+sec-chat-limit = <b>Límites:</b> no hay doble ratchet y, por tanto, no hay secreto hacia adelante: si más adelante se roba la clave de chat de un destinatario, también abre los mensajes anteriores que se envolvieron para ella. Tu clave de chat se deriva de la clave maestra de tu cuenta, y Central conserva los mensajes cifrados tras la entrega: quien se haga con la base de datos de Central junto con sus claves y adivine tu contraseña, o tenga tu código de recuperación, puede leerlos. En el primer contacto, tu dispositivo confía en las claves que nombra Central; para comprobarlas, compara el número de seguridad por otro canal. Si las claves de un contacto cambian más adelante, Baylee solo vuelve a enviar después de que las hayas confirmado. Central decide quién pertenece a un grupo.
 
-sec-pair-eyebrow = Signing in by link
-sec-pair-title = From the browser into the client without typing the password again
-sec-pair-lead = Someone signed in on the website should be able to start the Baylee client signed in. For that the page brings the master key to the client: sealed, and in such a way that Central can neither open it nor slip in one of its own.
-sec-pair-status = <b>Where this stands:</b> Central and Baylee's client library can do this today and are tested against each other. It cannot be used from this website or from a released client yet.
-sec-pair-c1 = Start pairing
-sec-pair-t1 = The page starts a pairing.
-sec-pair-s1 = Central issues a handle for it that is valid for five minutes. At the same time the page draws a one-time secret that it never shows to Central.
-sec-pair-c2 = Link with the secret
-sec-pair-t2 = A link opens the client.
-sec-pair-s2 = The link <code>baylee://pair</code> carries the handle and the secret from the page to the client on your own device, past Central.
-sec-pair-c3 = Public key
-sec-pair-t3 = The client answers with a fresh key pair.
-sec-pair-s3 = It sends Central the public half and a check value computed with the secret (HMAC-SHA-256). The page verifies that value; both screens show the same short code, and you approve on the page.
-sec-pair-c4 = Master key, sealed
-sec-pair-t4 = The page seals the master key for the client.
-sec-pair-s4 = With HPKE (RFC 9180), to the client's public key and under the secret as well. Central stores the seal once; it cannot open it and, not knowing the secret, cannot make one of its own.
-sec-pair-c5 = Session + seal
-sec-pair-t5 = The client redeems once.
-sec-pair-s5 = It receives a session together with the seal, opens the seal with its private key and the secret, and is signed in. The pairing is deleted afterwards, also when redeeming fails.
-sec-pair-note = <b>The password takes no part in this exchange.</b> The page has the master key only at the moment it has just opened it with your password. A session paired this way counts as no newer than the password sign-in on the page it came from: pairing never renews it.
+sec-pair-eyebrow = Iniciar sesión mediante un enlace
+sec-pair-title = Del navegador al cliente sin volver a escribir la contraseña
+sec-pair-lead = Quien haya iniciado sesión en el sitio web debería poder abrir el cliente de Baylee con la sesión ya iniciada. Para ello la página lleva la clave maestra al cliente: sellada y de tal modo que Central ni puede abrirla ni puede colar una propia.
+sec-pair-status = <b>En qué punto está:</b> Central y la biblioteca de cliente de Baylee pueden hacerlo hoy y se han probado entre sí. Todavía no puede usarse desde este sitio web ni desde un cliente publicado.
+sec-pair-c1 = Iniciar vinculación
+sec-pair-t1 = La página inicia una vinculación.
+sec-pair-s1 = Central emite para ella un identificador válido durante cinco minutos. A la vez, la página genera un secreto de un solo uso que nunca muestra a Central.
+sec-pair-c2 = Enlace con el secreto
+sec-pair-t2 = Un enlace abre el cliente.
+sec-pair-s2 = El enlace <code>baylee://pair</code> lleva el identificador y el secreto de la página al cliente, en tu propio dispositivo, sin pasar por Central.
+sec-pair-c3 = Clave pública
+sec-pair-t3 = El cliente responde con un par de claves nuevo.
+sec-pair-s3 = Envía a Central la mitad pública y un valor de comprobación calculado con el secreto (HMAC-SHA-256). La página verifica ese valor; ambas pantallas muestran el mismo código corto, y lo apruebas en la página.
+sec-pair-c4 = Clave maestra, sellada
+sec-pair-t4 = La página sella la clave maestra para el cliente.
+sec-pair-s4 = Con HPKE (RFC 9180), para la clave pública del cliente y también bajo el secreto. Central almacena el sello una vez; no puede abrirlo y, al no conocer el secreto, tampoco puede hacer uno propio.
+sec-pair-c5 = Sesión + sello
+sec-pair-t5 = El cliente lo canjea una vez.
+sec-pair-s5 = Recibe una sesión junto con el sello, abre el sello con su clave privada y el secreto, y queda con la sesión iniciada. Después se elimina la vinculación, también cuando el canje falla.
+sec-pair-note = <b>La contraseña no interviene en este intercambio.</b> La página tiene la clave maestra solo en el momento en que acaba de abrirla con tu contraseña. Una sesión vinculada así cuenta como no más reciente que el inicio de sesión con contraseña en la página de la que procede: vincular nunca la renueva.
 
-sec-limits-eyebrow = Limits
-sec-limits-title = What none of this can do
-sec-limit-device = <b>A compromised device.</b> Malware, a browser extension that reads pages, or a tampered client sees what you see and type. No encryption on the way to a server helps against that.
-sec-limit-site = <b>A website's code comes from its server.</b> Whoever takes over our server could deliver code that captures your password as you type it; integrity hashes and a strict Content Security Policy guard against changes from outside, not against that. The client is a program on your machine and checks a signature before it installs an update.
-sec-limit-central = <b>A Central that has been taken over.</b> It could reveal metadata, refuse service and attack sign-ins. It could name false keys at a first contact or add a member to a group, and so read messages sent after that. What it stores of your data and chats is encrypted; opening it takes your password or your recovery code.
-sec-limit-recovery = <b>Lost keys.</b> Without your password and without your recovery code nobody can bring your encrypted data back, not even we: Central has only the wrappers.
-sec-limit-audit = <b>No independent audit.</b> Sign-in follows OPAQUE (RFC 9807) with Argon2id (RFC 9106), and pairing seals with HPKE (RFC 9180): published specifications of the IRTF, not IETF standards. The order of the pairing's steps and the chat format are Baylee's own combinations of standard building blocks (Ed25519, X25519, XChaCha20-Poly1305). So far only the people who built it have reviewed the implementation. The code is open; if you find something, <contact>please tell us</contact>.
-sec-docs-title = To read further
-sec-docs = The details are in the project's documents: <protocol>crypto protocol</protocol>, <chat>chat</chat>, <accounts>accounts and pairing</accounts> and <threats>threat model</threats>. What happens to your data in legal terms is in the <privacy>privacy notice</privacy>.
+sec-limits-eyebrow = Límites
+sec-limits-title = Lo que nada de esto puede hacer
+sec-limit-device = <b>Un dispositivo comprometido.</b> Un malware, una extensión del navegador que lee páginas o un cliente manipulado ven lo que ves y escribes. Ningún cifrado en el camino hacia un servidor ayuda contra eso.
+sec-limit-site = <b>El código de un sitio web viene de su servidor.</b> Quien se haga con nuestro servidor podría entregar código que capture tu contraseña mientras la escribes; los hashes de integridad y una Content Security Policy estricta protegen contra cambios desde fuera, no contra eso. El cliente es un programa en tu equipo y comprueba una firma antes de instalar una actualización.
+sec-limit-central = <b>Un Central que haya sido tomado.</b> Podría revelar metadatos, negar el servicio y atacar inicios de sesión. Podría nombrar claves falsas en un primer contacto o añadir un miembro a un grupo y así leer los mensajes enviados después. Lo que almacena de tus datos y chats está cifrado; abrirlo requiere tu contraseña o tu código de recuperación.
+sec-limit-recovery = <b>Claves perdidas.</b> Sin tu contraseña y sin tu código de recuperación nadie puede recuperar tus datos cifrados, ni siquiera nosotros: Central solo tiene los envoltorios.
+sec-limit-audit = <b>Sin auditoría independiente.</b> El inicio de sesión sigue OPAQUE (RFC 9807) con Argon2id (RFC 9106), y la vinculación sella con HPKE (RFC 9180): especificaciones publicadas de la IRTF, no estándares de la IETF. El orden de los pasos de la vinculación y el formato del chat son combinaciones propias de Baylee de bloques de construcción estándar (Ed25519, X25519, XChaCha20-Poly1305). Hasta ahora solo han revisado la implementación las personas que la construyeron. El código es abierto; si encuentras algo, <contact>cuéntanoslo</contact>.
+sec-docs-title = Para leer más
+sec-docs = Los detalles están en los documentos del proyecto: <protocol>protocolo criptográfico</protocol>, <chat>chat</chat>, <accounts>cuentas y vinculación</accounts> y <threats>modelo de amenazas</threats>. Lo que ocurre con tus datos en términos jurídicos está en la <privacy>política de privacidad</privacy>.
 
 # The page's two links from elsewhere: the FAQ and the sign-in page.
-faq-security-q = How does Baylee handle my password and my chats?
-faq-security-a = When you sign in, your device uses the OPAQUE protocol to prove that it knows the password without sending it; chat messages are encrypted on your device. The <security>security page</security> shows each step as a diagram, with the one exception and the limits.
-sec-signin-link = What happens to your password when you sign in: <security>Security</security>
-sec-teaser-lead = Step by step: what leaves your device, what Baylee Central sees and what it does not, and the limits each flow has.
-sec-teaser-more = See each step in a diagram
+faq-security-q = ¿Cómo trata Baylee mi contraseña y mis chats?
+faq-security-a = Al iniciar sesión, tu dispositivo usa el protocolo OPAQUE para demostrar que conoce la contraseña sin enviarla; los mensajes de chat se cifran en tu dispositivo. La <security>página de seguridad</security> muestra cada paso en un diagrama, con la única excepción y los límites.
+sec-signin-link = Qué pasa con tu contraseña al iniciar sesión: <security>Seguridad</security>
+sec-teaser-lead = Paso a paso: qué sale de tu dispositivo, qué ve Baylee Central y qué no, y los límites de cada flujo.
+sec-teaser-more = Ver cada paso en un diagrama
 # ==== end of the security page =================================================
