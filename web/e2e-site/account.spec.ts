@@ -48,6 +48,11 @@ test("a sign-in runs the real crypto in its Worker and refuses a false challenge
   expect(start.message).toHaveLength(96);
   // Nothing of the password left the Worker: no request carried it.
   expect(JSON.stringify(seen)).not.toContain("battery");
+  // The form that held the focus is gone: the way back takes it, and the
+  // form's first field after that.
+  await expect(page.getByRole("button", { name: "Try again" })).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(page.getByLabel("Sign-in name")).toBeFocused();
   expect(problems).toEqual([]);
 });
 

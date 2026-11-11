@@ -113,7 +113,12 @@ fn submit(lang: Lang, form: Form, event: &leptos::ev::SubmitEvent) {
             Ok((400 | 413, _)) => State::Refused,
             _ => State::Network,
         };
+        let sent = outcome == State::Sent;
         state.set(outcome);
+        if sent {
+            // the form that held the focus is gone
+            super::focus::after_render("h2.contact-sent");
+        }
     });
 }
 
@@ -191,7 +196,7 @@ pub fn ContactForm(lang: Lang) -> impl IntoView {
             }
         >
             <div class="card done" role="status">
-                <h2>{words::contact_sent_title(lang)}</h2>
+                <h2 class="contact-sent" tabindex="-1">{words::contact_sent_title(lang)}</h2>
                 <p>{words::contact_sent(lang)}</p>
             </div>
         </Show>
