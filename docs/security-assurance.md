@@ -3235,3 +3235,134 @@ the first page after the sign is gone removes both; a device with
 notifications on keeps the worker without a sign-in; the offline page and the
 waiting update still work signed in. Not tested: an installed app on a real
 phone (the `display-mode` branch is exercised by no test).
+
+## The security page and what it claims, 11 November 2026
+
+The owner asked for animated diagrams that explain the sign-in, what stays
+in memory, the chat's encryption and signing the client in by a link.
+
+**Pass 1, what was built.** `/{lang}/security`: four sequence charts as
+inline SVG beside the same steps in words, each flow ending in its limits
+and the page in a list of what none of it can do. No script drives them: a
+radio group picks "play" or a step and `style/security.css` moves the rest,
+so the page needs no new entry in the CSP and holds no inline style (every
+position is an SVG attribute). A chart is hidden from assistive technology
+because the list beside it says all of it. Every sentence and every arrow
+maps to a row of `docs/security-page.md` with the file and lines it rests
+on; a claim changes there first.
+
+**Pass 2, a reader told to assume every sentence false.** A second reader
+who had not written the page checked each row against the code and changed
+the rows A7, A8, B2, B5 to B7, C1 to C7, D9, E2, E5 and E7 and the
+sentences on them. What that took back: the chat wraps for one key per
+account and not per device, and whoever has Central's database with its
+keys and guesses the password, or has the recovery code, reads the stored
+chats; an old gateway account's client sends the typed password at every
+attempt until the account has moved, not once; a paired session counts as
+no newer than the page's password sign-in, it is not "never fresh"; what is
+overwritten names only what the first-party code holds itself (not what
+`opaque-ke` holds inside, not the string's copy on its way into the
+module); the RFCs are called what they are (IRTF, informational).
+`boot.js` now deletes a stale chat record also where the browser cannot
+list its databases, because the page says the record goes.
+
+**Pass 3, what holds it.** `security.rs`: `no_promises` reads the page's
+words in every language's file and refuses "unbreakable", "guarantee",
+"GDPR", "100 %" and their German forms, and "secure", "sicher" and "safe"
+outside the page's own name and the safety number (the list holds German
+and English words only, so it does not read the other nine languages'
+own); `charts_are_drawable` and `names_fit_with_room_to_grow` hold the
+drawings; `e2e-site/security.spec.ts` plays and steps each chart
+with the keyboard and runs axe; the nine translated languages were spot-read
+for a claim made stronger than the English one (the limits of every flow,
+the memory sentence), by a model and by no speaker of the language. **Not
+an audit and not evidence of security:** the page says of itself that only
+the people who built Baylee have reviewed the implementation.
+
+## The Impressum's puzzle on the new site, 11 November 2026
+
+The owner asked to repair and improve the protection of the legal notice's
+details. The service that guards them is the game repository's
+`baylee-feedback` (`/site/impressum*`, unchanged here); the page is this
+repository's.
+
+**Pass 1, what was wrong and what changed.** The rewrite had lost two of
+the service's signals and weakened a third property: the hidden link to the
+service's honeypot (`/site/impressum/kontakt`) was gone, the answer "the
+graphics come from a program" (bit 4 of `s=`) was never sent, and the
+solved details stood in the page as `mailto:` and `tel:` links. Now
+`legal.rs` draws the bait link again (`hidden`, `display: none`,
+`tabindex="-1"`, `aria-hidden`, `rel="nofollow"`); `islands/impressum.rs`
+asks WebGL for its renderer after the click (never while the page loads)
+and sends the three yes-or-no answers; the e-mail address and the number
+are drawn as text with one hidden piece between their halves
+(`invalid.example `, `00 `), and two buttons build `mailto:` and `tel:`
+only when pressed. The privacy page names everything the puzzle keeps and
+asks.
+
+**Pass 2, the collector's view.** What a program gets without a browser:
+no detail in the page, in any language, and a link only a program follows,
+which marks its address for 24 hours. With a headless browser: the service
+sees `webdriver` and a software renderer and answers with made-up details
+of the same shape. Both answers are the browser's own word and a patient
+attacker lies about them; they raise the price, they are no barrier, and
+the puzzle's work is the only part that cannot be talked away. A harvester
+that reads `textContent` or the markup after a solved puzzle gets
+`…@invalid.example …` and a number with two digits too many; what a person
+sees, selects, copies and hears is the true value (`hidden` content is in
+neither `innerText` nor the accessibility tree). That is a hurdle against
+ready-made harvesters, not against one written for this page. No inline
+style or handler was needed, so the CSP is unchanged; the page speculates
+on no link (no prefetch, prerender or speculation rules), so no browser
+follows the bait for a person, and `robots.txt` keeps honest crawlers off
+`/site/`.
+Findings on the service's side, which this repository cannot change, are
+written up for the game repository and the owner: the made-up details also
+reach real people who share a marked address, and since the page now draws
+them as ordinary text they read as real; a challenge is not bound to the
+address that asked for it; the price does not rise with the total load;
+the mark is read when a challenge is issued, not when it is redeemed.
+
+**Pass 3, what was tested.** Units for the renderer test and the halves;
+`central-web-server/tests/pages.rs`
+(`the_impressum_holds_no_detail_and_keeps_its_bait`: the link once per
+language and on no other page, no `mailto:`, `tel:` or speculation in any);
+`e2e-site/impressum.spec.ts` against a stand-in service (the solved text as
+seen, selected and announced, the markup without either value, the buttons'
+addresses, bit 1 of `s=` in a driven browser, one retry after 410, axe and
+44 px). Against the game repository's real service on loopback with
+made-up details: a browser driven like a person's got 20 bits, 15 to 19
+seconds of work and the true details; a headless one 21 bits and made-up
+ones; after one request to the bait every browser on that address got
+made-up ones; a blob the service wrote decoded in the island. **Not
+tested:** the proxy's route on the live host (`/site/impressum*` must stay
+with the feedback service at the switch), real graphics cards on Windows
+and Linux, a screen reader by ear.
+
+## The figures on the website, 11 November 2026
+
+The other end of "The public figures" above: `central-web-server` shows
+what Central publishes.
+
+**Pass 1.** `fetch.rs` asks Central for the figures with the directory,
+once a minute for everyone and never per page view, as that section asks.
+It takes at most 20 pages of 100, requires ascending ids and a valid
+activity (each count at most 100 000), and shows a gateway's numbers only
+while the directory calls that gateway online. The strip adds them up and
+shows them, with the number of accounts, only while a source reports them;
+when Central stops answering, the numbers go rather than stand still.
+
+**Pass 2.** The numbers are plain text written by the server from integers;
+no markup comes from Central or a gateway. A gateway's counts are its own
+claim: an approved gateway can show up to the bound, which the privacy page
+says in words ("the operator's own statement") and the owner accepted with
+the bound. A Central that answers out of order or beyond the bounds is
+treated as one that does not answer. The exact number of accounts is public
+by the owner's choice.
+
+**Pass 3.** `fetch.rs`'
+`only_an_online_gateway_s_own_report_is_shown_and_it_goes_with_central`,
+`pages.rs`' `the_figures_are_shown_only_while_a_source_reports_them`, and
+the browser suite on pages with and without figures. Not tested: a real
+gateway's pulse (none sends one yet), and the strip with six-digit numbers
+in every language at every width (checked by eye in German and English).
