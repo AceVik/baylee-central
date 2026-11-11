@@ -30,7 +30,7 @@ const CHALLENGE = { nonce: "e2e-nonce_1", parts: 3, difficulty: 6, expires: 4102
 function blob(details: Record<string, string>): string {
   const fields: Record<string, number[][]> = {};
   for (const [name, text] of Object.entries(details)) {
-    fields[name] = [...text].map((char, position) => [position, char.codePointAt(0) ?? 0]).reverse();
+    fields[name] = [...text].map((char, position) => [position, char.codePointAt(0) ?? 0]).toReversed();
   }
   const nonce = Buffer.alloc(16, 7);
   const body = Buffer.from(JSON.stringify({ v: 2, fields }), "utf8");
