@@ -631,6 +631,24 @@ Not changed here; listed for the owner:
    WCAG); what changed is the drawing: once solved, the details are ordinary,
    accessible text. The data stays where it was, in the feedback service's
    deploy-time blob.
+   Repaired on 11.11.2026 (the owner asked for the protection to be mended
+   and improved): the rewrite had lost two of the service's three aids, and
+   no test held them. Back, and held by `pages.rs` and
+   `web/e2e-site/impressum.spec.ts`: the bait link to
+   `/site/impressum/kontakt` (hidden from people by `hidden`, a class,
+   `aria-hidden` and `tabindex="-1"`; whatever follows it gets invented
+   details for a day) and the third yes-or-no answer about the browser (a
+   software WebGL renderer, asked only after the click). New: no `mailto:`
+   or `tel:` address stands in the page (two buttons build them when
+   pressed), and the e-mail address and telephone number are each written
+   in two halves around a few characters under `hidden`, so that the page
+   read as markup or `textContent` yields an address under `.example` and a
+   number with two digits too many, while sight, screen reader, selection
+   and copy get the exact text. That last part stops collectors that read
+   any page, nothing written for this one: the blob's key is published in
+   the script. Tried once end to end against Baylee's real service on
+   loopback with made-up details (17 bits for a person's browser, 20 to 21
+   for a driven one, the decoy after the bait and for a headless browser).
 3. **Cards:** the card lists and pictures go entirely. Only the numbers
    remain: fully implemented, generated, partly implemented and all cards,
    each with an explanation (a toggletip, no script). `/cards` and its

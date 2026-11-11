@@ -465,6 +465,52 @@ async fn forms_and_the_account_area_are_islands_and_not_indexed() {
     }
 }
 
+/// The Impressum as the server writes it holds none of the operator's
+/// details and no way to them but the puzzle, and the bait for robots that
+/// the rewrite once lost: one link no person sees, hears or reaches, on this
+/// page only, which nothing on the site may follow or load ahead.
+#[tokio::test]
+async fn the_impressum_holds_no_detail_and_keeps_its_bait() {
+    const BAIT: &str = "href=\"/site/impressum/kontakt\"";
+    let app = app(false);
+    for lang in Lang::ALL {
+        let path = format!("/{}/impressum", lang.code());
+        let (status, headers, html) = get(&app, &path, &[]).await;
+        assert_eq!(status, StatusCode::OK, "{path}");
+        assert_eq!(headers["x-robots-tag"], "noindex, noarchive, nosnippet");
+        assert_eq!(count(&html, BAIT), 1, "{path}: the bait, once");
+        let link = tags(&html, "a")
+            .into_iter()
+            .find(|tag| tag.contains(BAIT))
+            .expect("the bait is a link");
+        for attribute in [
+            "class=\"bait\"",
+            "tabindex=\"-1\"",
+            "aria-hidden=\"true\"",
+            "rel=\"nofollow\"",
+            " hidden",
+        ] {
+            assert!(link.contains(attribute), "{path}: {attribute} in {link}");
+        }
+        for never in [
+            "mailto:",
+            "tel:",
+            "rel=\"prefetch\"",
+            "rel=\"prerender\"",
+            "speculationrules",
+        ] {
+            assert!(!html.contains(never), "{path}: {never}");
+        }
+        for other in ["", "contact", "privacy", "faq"] {
+            let path = format!("/{}/{other}", lang.code());
+            let (_, _, html) = get(&app, &path, &[]).await;
+            assert!(!html.contains("/site/impressum/kontakt"), "{path}");
+        }
+    }
+    let (_, _, robots) = get(&app, "/robots.txt", &[]).await;
+    assert!(robots.contains("Disallow: /site/\n"));
+}
+
 /// The security headers every answer carries, a 304 among them.
 fn secured(headers: &axum::http::HeaderMap) {
     for name in [

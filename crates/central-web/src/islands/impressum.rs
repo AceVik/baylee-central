@@ -5,6 +5,16 @@
 //! once solved, the details are drawn as ordinary, accessible text, not
 //! scrambled and hidden from screen readers.
 //!
+//! What still keeps a program that reads the finished page from the two
+//! things collected most, the e-mail address and the telephone number: no
+//! `mailto:` or `tel:` address stands in the page (two buttons build them
+//! on a click), and each of the two is written in two halves around a few
+//! characters under `hidden`. The page as a person sees, hears, selects and
+//! copies it is exact; the page read as markup or as `textContent` holds an
+//! address under `.example` and a number that is nobody's. That stops what
+//! collects from any page, nothing that was written for this one: whoever
+//! solved the puzzle holds the blob, and its key is published above.
+//!
 //! The puzzle runs in a Worker (`pow-worker.js`): a Worker needs a script of
 //! its own, and SHA-256 a million times must not freeze the page.
 
@@ -150,8 +160,54 @@ enum State {
     Failed,
 }
 
-/// What the page knows of its own browser, for the service's difficulty:
-/// 1 a browser driven by a program, 2 one without languages.
+/// Whether a WebGL renderer's name is a program's, not a graphics card's:
+/// the names Baylee's page looked for (`web/site/impressum.js`).
+#[cfg(any(target_arch = "wasm32", test))]
+fn software(renderer: &str) -> bool {
+    let renderer = renderer.to_ascii_lowercase();
+    ["swiftshader", "llvmpipe", "software"]
+        .iter()
+        .any(|name| renderer.contains(name))
+}
+
+/// The name of what draws WebGL here, if the browser says. Firefox names it
+/// as `RENDERER`; Chromium and Safari say only `WebKit WebGL` there and name
+/// it through an extension (which Firefox warns about, so it is asked last).
+#[cfg(target_arch = "wasm32")]
+fn renderer() -> Option<String> {
+    use wasm_bindgen::{JsCast, JsValue};
+    const RENDERER: u32 = 0x1F01;
+    const UNMASKED_RENDERER_WEBGL: u32 = 0x9246;
+    let call = |target: &JsValue, name: &str, argument: JsValue| -> Option<JsValue> {
+        let function: js_sys::Function = js_sys::Reflect::get(target, &JsValue::from_str(name))
+            .ok()?
+            .dyn_into()
+            .ok()?;
+        function
+            .call1(target, &argument)
+            .ok()
+            .filter(|value| !value.is_null() && !value.is_undefined())
+    };
+    let canvas: JsValue = document().create_element("canvas").ok()?.into();
+    let gl = call(&canvas, "getContext", JsValue::from_str("webgl"))?;
+    let named = call(&gl, "getParameter", JsValue::from(RENDERER)).and_then(|v| v.as_string());
+    if let Some(name) = named.filter(|name| !name.starts_with("WebKit")) {
+        return Some(name);
+    }
+    call(
+        &gl,
+        "getExtension",
+        JsValue::from_str("WEBGL_debug_renderer_info"),
+    )?;
+    call(&gl, "getParameter", JsValue::from(UNMASKED_RENDERER_WEBGL)).and_then(|v| v.as_string())
+}
+
+/// What the page knows of its own browser, for the service's difficulty
+/// (Baylee's `impressum.rs`, `CLIENT_…`): 1 a browser driven by a program,
+/// 2 one without languages, 4 one that draws with a program instead of a
+/// graphics card. Three yes-or-no answers, asked only after the visitor's
+/// click and never when the page loads; a yes makes the puzzle harder and
+/// refuses nobody.
 #[cfg(target_arch = "wasm32")]
 fn browser_bits() -> u32 {
     let Some(navigator) = web_sys::window().map(|w| w.navigator()) else {
@@ -165,6 +221,9 @@ fn browser_bits() -> u32 {
     if js_sys::Array::from(&navigator.languages()).length() == 0 {
         bits |= 2;
     }
+    if renderer().is_some_and(|name| software(&name)) {
+        bits |= 4;
+    }
     bits
 }
 
@@ -176,8 +235,8 @@ fn browser_bits() -> u32 {
 /// One round with the feedback service: a challenge, solved, answered;
 /// a challenge that expired or was answered already is asked again once.
 async fn fetch(worker: &str, state: RwSignal<State>) -> Option<Details> {
+    let url = format!("/site/impressum/challenge?s={}", browser_bits());
     for _ in 0..2 {
-        let url = format!("/site/impressum/challenge?s={}", browser_bits());
         let (status, text) = net::request("GET", &url, None, &[], net::Credentials::Omit)
             .await
             .ok()?;
@@ -216,18 +275,66 @@ async fn fetch(worker: &str, state: RwSignal<State>) -> Option<Details> {
     None
 }
 
+/// What stands between the halves of the e-mail address, under `hidden`:
+/// read with it, the address ends in a name nobody can register (RFC 2606).
+const BETWEEN_MAIL: &str = "invalid.example ";
+/// And between the telephone number's: read with it, the number has two
+/// digits too many.
+const BETWEEN_PHONE: &str = "00 ";
+
+/// The e-mail address in two halves, the first up to and with its `@`.
+fn mail_halves(mail: &str) -> (&str, &str) {
+    mail.find('@')
+        .map_or((mail, ""), |at| mail.split_at(at + 1))
+}
+
+/// The telephone number in two halves: before its last block of digits,
+/// or in the middle when it is written without spaces.
+fn phone_halves(phone: &str) -> (&str, &str) {
+    let phone = phone.trim();
+    let at = phone.rfind(' ').map_or_else(
+        || {
+            phone
+                .char_indices()
+                .nth(phone.chars().count() / 2)
+                .map_or(phone.len(), |(index, _)| index)
+        },
+        |space| space + 1,
+    );
+    phone.split_at(at)
+}
+
+/// The telephone number as a `tel:` address takes it.
+fn dialled(phone: &str) -> String {
+    phone
+        .chars()
+        .filter(|c| c.is_ascii_digit() || *c == '+')
+        .collect()
+}
+
+/// Opens `address` (`mailto:…`, `tel:…`) as a link would.
+fn open(address: &str) {
+    #[cfg(target_arch = "wasm32")]
+    if let Some(window) = web_sys::window() {
+        let _ = window.location().assign(address);
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    let _ = address;
+}
+
 fn details_view(lang: Lang, details: &Details) -> impl IntoView + use<> {
     // the country's name is kept in German and English only
     let country = match lang.of_record() {
         Lang::De => details.country_de.clone(),
         _ => details.country_en.clone(),
     };
+    let (mail_a, mail_b) = mail_halves(&details.email);
+    let (mail_a, mail_b) = (mail_a.to_owned(), mail_b.to_owned());
+    let (phone_a, phone_b) = phone_halves(&details.phone);
+    let (phone_a, phone_b) = (phone_a.to_owned(), phone_b.to_owned());
+    // the addresses exist from the click on, nowhere in the page before
     let mail = format!("mailto:{}", details.email);
-    let phone: String = details
-        .phone
-        .chars()
-        .filter(|c| c.is_ascii_digit() || *c == '+')
-        .collect();
+    let phone = format!("tel:{}", dialled(&details.phone));
     view! {
         <dl class="facts impressum-details" tabindex="-1">
             <dt>{words::impressum_name(lang)}</dt>
@@ -241,9 +348,19 @@ fn details_view(lang: Lang, details: &Details) -> impl IntoView + use<> {
                 </address>
             </dd>
             <dt>{words::impressum_email(lang)}</dt>
-            <dd><a href=mail>{details.email.clone()}</a></dd>
+            <dd>
+                <span class="impressum-value">{mail_a}<span hidden>{BETWEEN_MAIL}</span>{mail_b}</span>
+                <button type="button" class="button quiet button-sm" on:click=move |_| open(&mail)>
+                    {words::impressum_write(lang)}
+                </button>
+            </dd>
             <dt>{words::impressum_phone(lang)}</dt>
-            <dd><a href=format!("tel:{phone}")>{details.phone.clone()}</a></dd>
+            <dd>
+                <span class="impressum-value">{phone_a}<span hidden>{BETWEEN_PHONE}</span>{phone_b}</span>
+                <button type="button" class="button quiet button-sm" on:click=move |_| open(&phone)>
+                    {words::impressum_call(lang)}
+                </button>
+            </dd>
         </dl>
     }
 }
@@ -361,6 +478,56 @@ mod tests {
         assert!(decode("not a blob").is_none());
         let wrong = serde_json::json!({"v": 1, "fields": fields}).to_string();
         assert!(decode(&blob(&wrong, [7; 16])).is_none());
+    }
+
+    #[test]
+    fn a_renderer_that_is_a_program_is_told_from_a_graphics_card() {
+        for name in [
+            "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero)), SwiftShader driver)",
+            "llvmpipe (LLVM 15.0.7, 256 bits)",
+            "Google SwiftShader",
+            "Software Rasterizer",
+        ] {
+            assert!(software(name), "{name}");
+        }
+        for name in [
+            "Apple GPU",
+            "ANGLE (Intel, Intel(R) UHD Graphics 630, OpenGL 4.1)",
+            "Mali-G78",
+            "",
+        ] {
+            assert!(!software(name), "{name}");
+        }
+    }
+
+    #[test]
+    fn the_halves_are_the_whole_and_what_stands_between_them_spoils_it() {
+        for mail in ["erika@example.invalid", "a@b.example", "no-at-sign"] {
+            let (a, b) = mail_halves(mail);
+            assert_eq!(format!("{a}{b}"), mail);
+        }
+        assert_eq!(
+            mail_halves("erika@example.invalid"),
+            ("erika@", "example.invalid")
+        );
+        // read with what is hidden, the address is one under `.example`
+        let (a, b) = mail_halves("erika@example.invalid");
+        let read = format!("{a}{BETWEEN_MAIL}{b}");
+        assert!(read.starts_with("erika@invalid.example "));
+        assert!(!read.contains("erika@example.invalid"));
+
+        for phone in ["+49 30 1234567", "+49301234567", "030/1234567", "1", ""] {
+            let (a, b) = phone_halves(phone);
+            assert_eq!(format!("{a}{b}"), phone);
+        }
+        assert_eq!(phone_halves("+49 30 1234567"), ("+49 30 ", "1234567"));
+        assert_eq!(phone_halves("+49301234567"), ("+49301", "234567"));
+        let (a, b) = phone_halves("+49 30 1234567");
+        assert_ne!(
+            dialled(&format!("{a}{BETWEEN_PHONE}{b}")),
+            dialled("+49 30 1234567")
+        );
+        assert_eq!(dialled("+49 (0) 30 / 123-45 67"), "+490301234567");
     }
 
     #[test]

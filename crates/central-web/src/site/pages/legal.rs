@@ -77,6 +77,13 @@ pub fn impressum(cx: &Context<'_>) -> Built {
                 <p class="small">{words::impressum_why(lang)}</p>
                 <Impressum lang=lang worker=cx.assets.url("pow-worker.js") />
                 <noscript><p class="notice">{words::impressum_noscript(lang)}</p></noscript>
+                // A link no person sees, hears or reaches by Tab, and that
+                // robots.txt forbids: the feedback service answers it with
+                // invented details and gives whatever asked for it invented
+                // ones here too, behind its hardest puzzle, for a day
+                // (Baylee's `docs/feedback.md`, "The Impressum"). Nothing
+                // on this site may ever follow or preload it.
+                <a class="bait" href="/site/impressum/kontakt" tabindex="-1" aria-hidden="true" rel="nofollow" hidden>"Kontakt"</a>
             </div>
             <p>{words::impressum_responsible(lang)}</p>
             <p>{words::impressum_dispute(lang)}</p>
