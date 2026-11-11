@@ -358,7 +358,12 @@ Each header is compared byte for byte and must appear exactly once.
 - The connection comes from loopback (the proxy), and the operation is one of
   the list above.
 
-Other paths answer 404 and other methods 405. A body is at most 64 KiB (413).
+Other paths answer 404 and other methods 405, without reading the body.
+The conditions above and the client address (below) are checked on the
+headers alone, before the body is read; then the address takes one of four
+places for its requests in flight, else 429 `Busy` at once (11.11.2026). A
+body is at most 64 KiB (413) and must arrive within two seconds (408); the
+service then has five seconds to answer (408).
 A malformed or unknown request is `Rejected` (401), as on `/v1/native`; the
 other answers keep the native statuses too (409 `Conflict`, 429 `Busy`, 503
 `Unavailable`, 403 `TermsRequired`) with the same fixed text.
@@ -375,7 +380,8 @@ Per-address budgets read the last `X-Forwarded-For` hop, and only from the
 loopback proxy. Without a well-formed last hop a request is refused (400).
 IPv6 addresses count by their /64; an IPv4 address mapped into IPv6 is that
 IPv4 address. Each budget remembers at most 4096 addresses, in memory only, and
-forgets one when its window has passed; when full, the oldest window makes
+forgets one once its window has passed (when the address asks again, or at
+the latest a window's length later); when full, the oldest window makes
 room, so a crowd of addresses cannot lock new ones out.
 
 | Operation | Budget per address |

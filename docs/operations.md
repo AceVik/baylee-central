@@ -69,8 +69,12 @@ Per-address budgets read the last `X-Forwarded-For` hop, which Caddy sets to
 the client it saw: 5 registrations an hour, 30 discoveries and 30 sign-in starts
 a minute, and 60 reads of the gateway directory a minute (`GatewayDirectory`,
 which needs no session; the website's `/gateways` page). IPv6 addresses count by their /64. The counters live in memory only,
-at most 4096 addresses per budget, and forget an address when its window has
-passed. A request without a well-formed last hop is refused (400). Do not set
+at most 4096 addresses per budget, and forget an address once its window has
+passed (at the latest a window's length later). The headers are checked
+before a body is read; an address has at most four requests in flight (429
+past them), a body two seconds to arrive and the service five to answer
+(408), and the listener takes 128 connections at once (the native listener
+32). A request without a well-formed last hop is refused (400). Do not set
 Caddy's `trusted_proxies` for this site unless a CDN in front of it appends its
 own hop: without it Caddy ignores a client's own `X-Forwarded-For`.
 

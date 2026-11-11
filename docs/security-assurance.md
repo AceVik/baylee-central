@@ -2674,3 +2674,123 @@ origin and says so; and that the screenshot dialog steps and closes with
 focus returned. axe, the 44 px targets and the "nothing from elsewhere"
 check pass on every page in both colour schemes. Engineering review, not an
 audit.
+
+## Connection places, panics and the website server's answers, 11 November 2026
+
+Design pass. A read-only audit made seven claims; each was checked in the
+code before anything changed, and all seven held.
+- **Connections (medium).** Both listeners drop a new connection once 32
+  are open (`Config` default; the deployed launcher never raised it). The
+  browser listener read a request's body, for up to the request's five
+  seconds, before it looked at a header, its client address or a budget.
+  Caddy streams a body to its upstream as it arrives, so about seven
+  body-less `POST /api/v1` a second (a `Content-Length`, then nothing)
+  held every connection: nobody could sign in or chat. The native
+  listener checks `Host`, `Origin` and Fetch Metadata before the body and
+  an upload's credential before its bytes, but it has no client address
+  (forwarded headers confer nothing there), and the same stall holds its
+  32 connections for five seconds each.
+- **Panics (low).** A connection task that panicked made the accept loop
+  return an error, and `listeners::together` stopped the other listener
+  too: one reachable panic in any handler ended the service.
+- **Website server.** `/cards` (unprefixed) was a 301 chosen by
+  `Accept-Language` without `Vary`; `Accept-Encoding` was matched by
+  substring (`br;q=0` and `brotli` got Brotli); every page and the
+  sitemap deep-cloned the whole snapshot under its lock; every GET
+  rendered its page again.
+- **Budgets.** `Book::charge` walked all of a budget's (up to 4096)
+  addresses under the budgets' one lock on every browser request.
+
+Implementation pass:
+- **Browser listener** (`browser.rs`). For `POST /api/v1` and a report's
+  part, the loopback peer, the site's exact headers and the client
+  address are checked on the headers alone, first. Then the address takes
+  one of four places in flight: a table in memory of at most 1024
+  addresses, an RAII permit that gives the place back however the request
+  ends (answered, refused, timed out, its connection gone), no eviction
+  (a full table refuses newcomers). Past four, 429 `Busy` at once, before
+  the body, the service or a budget. The body has its own two seconds
+  (408), the service its own five after it; a seven-second layer is only
+  a backstop. Other paths and methods are answered without reading a
+  byte. The deployed browser listener takes 128 connections, the policy's
+  most (64 KiB bodies each), so one address holds at most four of them;
+  the policy default stays 32 (development, and the native listener's
+  1 MiB slots). The wire is unchanged: routes, statuses and fixed texts.
+- **Panics** (`server.rs`). A connection task that panicked is counted
+  and reported with a fixed line (no payload, no request data; the
+  launcher's panic hook prints none either), and the listener goes on,
+  while serving and while draining. A task that ended otherwise
+  (cancelled) still stops the listener as before.
+- **Budgets.** The caller's own window is checked lazily (passed: it
+  starts again); every other passed window is forgotten once a period, or
+  when a newcomer finds the book full, before the oldest window makes room
+  as before. Every decision is the one the old code made: an address is
+  charged against its own window only, and eviction still follows the
+  removal of every passed window.
+- **Website server** (`central-web-server`). `/cards` is a 302 with
+  `Vary: Accept-Language` and `no-cache`, as the proposal's §5 asks for
+  every unprefixed address; `/{lang}/cards` stays 301. `Accept-Encoding`
+  is parsed (RFC 9110 §12.5.3): tokens without case, a coding's own
+  weight else that of `*`, `q=0` or a weight that does not parse refuses,
+  `x-gzip` is gzip; the heavier of Brotli and gzip is sent, Brotli on a
+  tie. The data is `RwLock<Arc<Snapshot>>`; a request clones the `Arc`,
+  and a change installs a new one only when it changes anything. A page
+  is rendered once per (page, language, machine) for the snapshot it came
+  from; finding another snapshot drops them all, a render that raced a
+  replacement is not kept, at most 1024 pages and 32 MiB (a page is about
+  20 KB, the start page 70 KB). HTML, the fixed-name files, robots.txt,
+  the sitemap, the manifests and the TDM file carry a strong ETag of the
+  bytes sent (one per encoding); `If-None-Match` (a list, `*`, weak
+  comparison) gets 304 only where the unconditional answer is a 200 with
+  that tag, with ETag, Cache-Control, Vary and the security headers and
+  without the body's own headers.
+
+Adversarial pass: four stalled bodies from one address hold four places, a
+fifth is refused at once while another address is served, and the four
+end at the body's deadline; the same over a real socket, with a
+connection that goes away mid-body (its place comes back). Places come
+back after an answer, a malformed body, a refused operation, an
+oversized body, a spent budget and a service that never answers (408 at
+its own deadline). A full table refuses newcomers and keeps every place.
+With the per-address limit taken out, both stall tests fail. A route that
+panics, over a real socket: the next two requests are served, shutdown is
+clean and the panic is counted once; a cancelled task still stops the
+listener. The existing budget tests pass unchanged, and a new one shows
+an address's own passed window starting again between sweeps while
+another waits for the next sweep. Rendering is checked to be pure: every
+page in both languages for three machines, twice and on another thread,
+byte for byte. New data changes the page and its tag and drops the kept
+pages, the same data keeps them; with the snapshot check taken out that
+test fails. Each encoding case, `brotli` and `br;q=0` among them; one tag
+per encoding, a tag confirming only its own form; 304 with the security
+headers for pages and the server's documents; another tag, language or
+machine gets the page; a 404 or a redirect is never a 304. `cargo fmt`,
+clippy with `-D warnings` and the tests of `central-http`,
+`central-web-server`, `central-policy` and `central-service` pass; none
+of them needs PostgreSQL. The browser suites were not run.
+
+Recorded, not changed, for the owner:
+- 32 addresses (IPv6 /64s are cheap) stalling four bodies each still fill
+  the browser listener, each place for two seconds at most. This raises
+  the cost; it does not end the attack. Buffering bodies in Caddy would,
+  and Caddy's configuration was out of scope.
+- The native listener stays exhaustible by stalled bodies: there is no
+  client address to key places by, and a deadline of two seconds would
+  break slow uplinks for its bodies of up to 1 MiB, so its timing and
+  its 32 connections are unchanged.
+- A panic no longer stops the service. The identity service's locks fail
+  closed (503) when poisoned, so a panic while one is held would leave
+  that operation unavailable until a restart, where before the process
+  exited. The fixed log line counts panics. The listener's own critical
+  sections (budgets, places) cannot panic; the identity service's were
+  not all reviewed for this.
+- Every local and end-to-end run, and the website's own directory fetch,
+  arrive as 127.0.0.1 and share its four places. A page sends one request
+  at a time and the chat strictly in turn, but the browser suites were
+  not run against this change.
+- Caddy's `encode` may rewrite or weaken the tag of compressed HTML; that
+  was not checked here. The server confirms only the tag of the bytes it
+  would send now, so a rewritten tag can cost a 304, never serve a stale
+  page.
+
+Engineering review, not an audit.
