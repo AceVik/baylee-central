@@ -141,6 +141,46 @@ export class LoginKey {
 }
 
 /**
+ * A password change under way: `login` is KE1 under the current password
+ * and `registration` the OPAQUE registration request for the new one, both
+ * for `ChangePasswordStart`.
+ */
+export class PasswordChange {
+    private constructor();
+    free(): void;
+    [Symbol.dispose](): void;
+    /**
+     * KE1 under the current password.
+     */
+    readonly login: Uint8Array;
+    /**
+     * The OPAQUE registration request for the new password.
+     */
+    readonly registration: Uint8Array;
+}
+
+/**
+ * A password change, ready: what `ChangePasswordFinish` sends.
+ */
+export class PasswordChanged {
+    private constructor();
+    free(): void;
+    [Symbol.dispose](): void;
+    /**
+     * KE3 under the current password.
+     */
+    readonly proof: Uint8Array;
+    /**
+     * The OPAQUE registration upload for the new password.
+     */
+    readonly record: Uint8Array;
+    /**
+     * The same master key under the new password (73 bytes).
+     */
+    readonly wrapped_master: Uint8Array;
+}
+
+/**
  * A recovery code made after a sign-in: what `SetRecovery` sends, and the
  * code to show once. Free it once read; that wipes the code.
  */
@@ -157,6 +197,38 @@ export class Recovered {
      * than handed over, so no copy stays behind in the module's memory.
      */
     readonly recovery_code: string;
+}
+
+/**
+ * A reset under way. `message` is the OPAQUE registration request for
+ * `ResetStart`.
+ */
+export class Reset {
+    private constructor();
+    free(): void;
+    [Symbol.dispose](): void;
+    /**
+     * The OPAQUE registration request.
+     */
+    readonly message: Uint8Array;
+}
+
+/**
+ * A reset that keeps the vault, ready: what `ResetFinish` sends with
+ * `ResetVault::Keep`.
+ */
+export class ResetKept {
+    private constructor();
+    free(): void;
+    [Symbol.dispose](): void;
+    /**
+     * The OPAQUE registration upload.
+     */
+    readonly record: Uint8Array;
+    /**
+     * The same master key under the new password (73 bytes).
+     */
+    readonly wrapped_master: Uint8Array;
 }
 
 /**
@@ -250,6 +322,29 @@ export function login_finish(state: Login, response: Uint8Array | number[]): Log
 export function login_start(password: string, account: Uint8Array | number[], epoch: bigint): Login;
 
 /**
+ * Finish a password change with `PasswordChallenge`'s KE2 and registration
+ * response. A wrong current password is `rejected` here.
+ *
+ * # Errors
+ *
+ * `rejected` for a wrong current password and a malformed or foreign
+ * challenge or response, `unavailable` without randomness.
+ */
+export function password_finish(state: PasswordChange, challenge: Uint8Array | number[], registration: Uint8Array | number[]): PasswordChanged;
+
+/**
+ * Start a password change after a sign-in in this Worker: the sign-in's
+ * state opens `BrowserSession`'s `wrapped_master`, and the change proves
+ * `current` afresh and registers `new`.
+ *
+ * # Errors
+ *
+ * `rejected` for a new password shorter than eight characters or
+ * over-long, and a wrapper that is malformed or does not open.
+ */
+export function password_start(state: LoginKey, wrapped_master: Uint8Array | number[], current: string, _new: string): PasswordChange;
+
+/**
  * In place of [`login_confirm`], for an account without a recovery code:
  * open `BrowserSession`'s `wrapped_master` and wrap the same master key
  * under a new recovery code, keeping no key.
@@ -260,6 +355,44 @@ export function login_start(password: string, account: Uint8Array | number[], ep
  * without randomness.
  */
 export function recovery_create(state: LoginKey, wrapped_master: Uint8Array | number[]): Recovered;
+
+/**
+ * Finish a reset that keeps the vault with `ResetChallenge`'s registration
+ * response and recovery wrapper. A recovery code that does not open the
+ * wrapper is `rejected` here, before the reset code is spent.
+ *
+ * # Errors
+ *
+ * `rejected` for a reset started without a recovery code, a wrapper that
+ * is malformed or does not open and a malformed response, `unavailable`
+ * without randomness.
+ */
+export function reset_keep(state: Reset, response: Uint8Array | number[], recovery: Uint8Array | number[]): ResetKept;
+
+/**
+ * Finish a reset that makes a new vault with `ResetChallenge`'s
+ * registration response: what a registration makes, at the next epoch,
+ * with the new recovery code to show once. Free it once read.
+ *
+ * # Errors
+ *
+ * `rejected` for a reset started with a recovery code and a malformed
+ * response, `unavailable` without randomness.
+ */
+export function reset_new(state: Reset, response: Uint8Array | number[]): Enrolled;
+
+/**
+ * Start a reset: `Discover`'s identity, the new password, and the recovery
+ * code when the vault is kept. Without a recovery code a new vault is made,
+ * at the next epoch.
+ *
+ * # Errors
+ *
+ * `rejected` for a password shorter than eight characters or over-long, an
+ * account that is not a `UUIDv7`, epoch zero and a recovery code that does
+ * not read as one.
+ */
+export function reset_start(password: string, account: Uint8Array | number[], epoch: bigint, recovery_code?: string | null): Reset;
 
 /**
  * Start on `Response::RegisterWork`'s challenge.
@@ -279,7 +412,11 @@ export interface InitOutput {
     readonly __wbg_enrollment_free: (a: number, b: number) => void;
     readonly __wbg_login_free: (a: number, b: number) => void;
     readonly __wbg_loginkey_free: (a: number, b: number) => void;
+    readonly __wbg_passwordchange_free: (a: number, b: number) => void;
+    readonly __wbg_passwordchanged_free: (a: number, b: number) => void;
     readonly __wbg_recovered_free: (a: number, b: number) => void;
+    readonly __wbg_reset_free: (a: number, b: number) => void;
+    readonly __wbg_resetkept_free: (a: number, b: number) => void;
     readonly __wbg_work_free: (a: number, b: number) => void;
     readonly central_origin: () => [number, number];
     readonly chat_confirm: (a: number, b: number, c: number) => [number, number];
@@ -306,9 +443,22 @@ export interface InitOutput {
     readonly login_message: (a: number) => [number, number];
     readonly login_start: (a: number, b: number, c: number, d: number, e: bigint) => [number, number, number];
     readonly loginkey_message: (a: number) => [number, number];
+    readonly password_finish: (a: number, b: number, c: number, d: number, e: number) => [number, number, number];
+    readonly password_start: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => [number, number, number];
+    readonly passwordchange_login: (a: number) => [number, number];
+    readonly passwordchange_registration: (a: number) => [number, number];
+    readonly passwordchanged_proof: (a: number) => [number, number];
+    readonly passwordchanged_record: (a: number) => [number, number];
+    readonly passwordchanged_wrapped_master: (a: number) => [number, number];
     readonly recovered_recovery: (a: number) => [number, number];
     readonly recovered_recovery_code: (a: number) => any;
     readonly recovery_create: (a: number, b: number, c: number) => [number, number, number];
+    readonly reset_keep: (a: number, b: number, c: number, d: number, e: number) => [number, number, number];
+    readonly reset_message: (a: number) => [number, number];
+    readonly reset_new: (a: number, b: number, c: number) => [number, number, number];
+    readonly reset_start: (a: number, b: number, c: number, d: number, e: bigint, f: number, g: number) => [number, number, number];
+    readonly resetkept_record: (a: number) => [number, number];
+    readonly resetkept_wrapped_master: (a: number) => [number, number];
     readonly work_search: (a: number, b: number, c: bigint, d: number) => [number, bigint, number, number];
     readonly work_start: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number];
     readonly __wbindgen_exn_store: (a: number) => void;

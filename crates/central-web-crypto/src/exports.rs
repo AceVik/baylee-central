@@ -11,7 +11,7 @@ use crate::flow::{self, Recovery, Registered, Registering, SignedIn, SigningIn};
 use central_crypto::CryptoError;
 use wasm_bindgen::prelude::{JsError, JsValue, wasm_bindgen};
 
-fn refused(error: CryptoError) -> JsError {
+pub(crate) fn refused(error: CryptoError) -> JsError {
     JsError::new(match error {
         CryptoError::Invalid => "rejected",
         CryptoError::RandomnessUnavailable => "unavailable",
@@ -39,7 +39,7 @@ impl Enrollment {
 /// A finished registration: what `EnrollmentFinish` sends, and the
 /// recovery code to show once. Free it once read; that wipes the code.
 #[wasm_bindgen]
-pub struct Enrolled(Registered);
+pub struct Enrolled(pub(crate) Registered);
 
 #[wasm_bindgen]
 impl Enrolled {

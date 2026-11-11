@@ -12,9 +12,24 @@
 //
 // One flow per Worker: a registration, a sign-in (which may keep the chat
 // identity and then serve the chat for as long as it lives), a deletion's
-// password proof, or a chat resumed after a reload. The master key never
-// leaves this Worker; the page sends and receives bytes and words only.
-// Terminating the Worker discards the module's memory.
+// password proof, a reset with an administrator's code, a password change,
+// or a chat resumed after a reload. The master key never leaves this
+// Worker; the page sends and receives bytes and words only. Terminating the
+// Worker discards the module's memory.
+//
+// A reset (docs/account-reset.md): "reset_start" takes the new password,
+// the discovered identity and the recovery code, or null for a new vault,
+// and answers the registration request; "reset_keep" takes ResetChallenge's
+// registration response and recovery wrapper, "reset_new" the response
+// alone, and each answers what ResetFinish sends ("reset_new" with the new
+// recovery code to show once).
+//
+// A password change (docs/native-login.md §"Password change") follows a
+// sign-in in this Worker ("login_start", "login_finish"): "password_start"
+// takes the wrapper that sign-in was answered with and both passwords and
+// answers KE1 and the registration request; "password_finish" takes
+// PasswordChallenge's two messages and answers what ChangePasswordFinish
+// sends.
 //
 // "unlocked" answers the device and registration of the identity a
 // sign-in in this Worker unlocked (the chat page's way back when nothing
@@ -35,7 +50,12 @@ import init, {
   login_confirm,
   login_finish,
   login_start,
+  password_finish,
+  password_start,
   recovery_create,
+  reset_keep,
+  reset_new,
+  reset_start,
   work_start,
 } from "./central_web_crypto.js";
 
@@ -46,6 +66,8 @@ let login = null;
 let key = null;
 let chat = null;
 let work = null;
+let reset = null;
+let change = null;
 
 const bytes = (value) => {
   if (!Array.isArray(value) || value.length > 1 << 20 || !value.every((b) => Number.isInteger(b) && b >= 0 && b <= 255)) {
@@ -217,6 +239,57 @@ async function step(m) {
         return { recovery: array(made.recovery), recovery_code: made.recovery_code };
       } finally {
         made.free();
+      }
+    }
+    case "reset_start":
+      if (reset !== null) throw new Error("failed");
+      reset = reset_start(
+        String(m.password),
+        bytes(m.account),
+        BigInt(m.epoch),
+        m.recovery_code === null ? undefined : String(m.recovery_code),
+      );
+      return { message: array(reset.message) };
+    case "reset_keep": {
+      const state = take(reset);
+      reset = null;
+      const done = reset_keep(state, bytes(m.response), bytes(m.recovery));
+      try {
+        return { record: array(done.record), wrapped_master: array(done.wrapped_master) };
+      } finally {
+        done.free();
+      }
+    }
+    case "reset_new": {
+      const state = take(reset);
+      reset = null;
+      const done = reset_new(state, bytes(m.response));
+      try {
+        return {
+          record: array(done.record),
+          wrapped_master: array(done.wrapped_master),
+          recovery: array(done.recovery),
+          document: array(done.document),
+          recovery_code: done.recovery_code,
+        };
+      } finally {
+        done.free();
+      }
+    }
+    case "password_start": {
+      const state = take(key);
+      key = null;
+      change = password_start(state, bytes(m.wrapped_master), String(m.current), String(m.new));
+      return { login: array(change.login), registration: array(change.registration) };
+    }
+    case "password_finish": {
+      const state = take(change);
+      change = null;
+      const done = password_finish(state, bytes(m.challenge), bytes(m.registration));
+      try {
+        return { proof: array(done.proof), record: array(done.record), wrapped_master: array(done.wrapped_master) };
+      } finally {
+        done.free();
       }
     }
     case "chat_unlock": {

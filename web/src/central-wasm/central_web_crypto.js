@@ -362,6 +362,104 @@ export class LoginKey {
 if (Symbol.dispose) LoginKey.prototype[Symbol.dispose] = LoginKey.prototype.free;
 
 /**
+ * A password change under way: `login` is KE1 under the current password
+ * and `registration` the OPAQUE registration request for the new one, both
+ * for `ChangePasswordStart`.
+ */
+export class PasswordChange {
+    static __wrap(ptr) {
+        const obj = Object.create(PasswordChange.prototype);
+        obj.__wbg_ptr = ptr;
+        PasswordChangeFinalization.register(obj, obj.__wbg_ptr, obj);
+        return obj;
+    }
+    __destroy_into_raw() {
+        const ptr = this.__wbg_ptr;
+        this.__wbg_ptr = 0;
+        PasswordChangeFinalization.unregister(this);
+        return ptr;
+    }
+    free() {
+        const ptr = this.__destroy_into_raw();
+        wasm.__wbg_passwordchange_free(ptr, 0);
+    }
+    /**
+     * KE1 under the current password.
+     * @returns {Uint8Array}
+     */
+    get login() {
+        const ret = wasm.passwordchange_login(this.__wbg_ptr);
+        var v1 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
+        wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
+        return v1;
+    }
+    /**
+     * The OPAQUE registration request for the new password.
+     * @returns {Uint8Array}
+     */
+    get registration() {
+        const ret = wasm.passwordchange_registration(this.__wbg_ptr);
+        var v1 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
+        wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
+        return v1;
+    }
+}
+if (Symbol.dispose) PasswordChange.prototype[Symbol.dispose] = PasswordChange.prototype.free;
+
+/**
+ * A password change, ready: what `ChangePasswordFinish` sends.
+ */
+export class PasswordChanged {
+    static __wrap(ptr) {
+        const obj = Object.create(PasswordChanged.prototype);
+        obj.__wbg_ptr = ptr;
+        PasswordChangedFinalization.register(obj, obj.__wbg_ptr, obj);
+        return obj;
+    }
+    __destroy_into_raw() {
+        const ptr = this.__wbg_ptr;
+        this.__wbg_ptr = 0;
+        PasswordChangedFinalization.unregister(this);
+        return ptr;
+    }
+    free() {
+        const ptr = this.__destroy_into_raw();
+        wasm.__wbg_passwordchanged_free(ptr, 0);
+    }
+    /**
+     * KE3 under the current password.
+     * @returns {Uint8Array}
+     */
+    get proof() {
+        const ret = wasm.passwordchanged_proof(this.__wbg_ptr);
+        var v1 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
+        wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
+        return v1;
+    }
+    /**
+     * The OPAQUE registration upload for the new password.
+     * @returns {Uint8Array}
+     */
+    get record() {
+        const ret = wasm.passwordchanged_record(this.__wbg_ptr);
+        var v1 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
+        wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
+        return v1;
+    }
+    /**
+     * The same master key under the new password (73 bytes).
+     * @returns {Uint8Array}
+     */
+    get wrapped_master() {
+        const ret = wasm.passwordchanged_wrapped_master(this.__wbg_ptr);
+        var v1 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
+        wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
+        return v1;
+    }
+}
+if (Symbol.dispose) PasswordChanged.prototype[Symbol.dispose] = PasswordChanged.prototype.free;
+
+/**
  * A recovery code made after a sign-in: what `SetRecovery` sends, and the
  * code to show once. Free it once read; that wipes the code.
  */
@@ -403,6 +501,84 @@ export class Recovered {
     }
 }
 if (Symbol.dispose) Recovered.prototype[Symbol.dispose] = Recovered.prototype.free;
+
+/**
+ * A reset under way. `message` is the OPAQUE registration request for
+ * `ResetStart`.
+ */
+export class Reset {
+    static __wrap(ptr) {
+        const obj = Object.create(Reset.prototype);
+        obj.__wbg_ptr = ptr;
+        ResetFinalization.register(obj, obj.__wbg_ptr, obj);
+        return obj;
+    }
+    __destroy_into_raw() {
+        const ptr = this.__wbg_ptr;
+        this.__wbg_ptr = 0;
+        ResetFinalization.unregister(this);
+        return ptr;
+    }
+    free() {
+        const ptr = this.__destroy_into_raw();
+        wasm.__wbg_reset_free(ptr, 0);
+    }
+    /**
+     * The OPAQUE registration request.
+     * @returns {Uint8Array}
+     */
+    get message() {
+        const ret = wasm.reset_message(this.__wbg_ptr);
+        var v1 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
+        wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
+        return v1;
+    }
+}
+if (Symbol.dispose) Reset.prototype[Symbol.dispose] = Reset.prototype.free;
+
+/**
+ * A reset that keeps the vault, ready: what `ResetFinish` sends with
+ * `ResetVault::Keep`.
+ */
+export class ResetKept {
+    static __wrap(ptr) {
+        const obj = Object.create(ResetKept.prototype);
+        obj.__wbg_ptr = ptr;
+        ResetKeptFinalization.register(obj, obj.__wbg_ptr, obj);
+        return obj;
+    }
+    __destroy_into_raw() {
+        const ptr = this.__wbg_ptr;
+        this.__wbg_ptr = 0;
+        ResetKeptFinalization.unregister(this);
+        return ptr;
+    }
+    free() {
+        const ptr = this.__destroy_into_raw();
+        wasm.__wbg_resetkept_free(ptr, 0);
+    }
+    /**
+     * The OPAQUE registration upload.
+     * @returns {Uint8Array}
+     */
+    get record() {
+        const ret = wasm.resetkept_record(this.__wbg_ptr);
+        var v1 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
+        wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
+        return v1;
+    }
+    /**
+     * The same master key under the new password (73 bytes).
+     * @returns {Uint8Array}
+     */
+    get wrapped_master() {
+        const ret = wasm.resetkept_wrapped_master(this.__wbg_ptr);
+        var v1 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
+        wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
+        return v1;
+    }
+}
+if (Symbol.dispose) ResetKept.prototype[Symbol.dispose] = ResetKept.prototype.free;
 
 /**
  * A registration's proof of work under way: the challenge at its price
@@ -667,6 +843,81 @@ export function login_start(password, account, epoch) {
 }
 
 /**
+ * Finish a password change with `PasswordChallenge`'s KE2 and registration
+ * response. A wrong current password is `rejected` here.
+ *
+ * # Errors
+ *
+ * `rejected` for a wrong current password and a malformed or foreign
+ * challenge or response, `unavailable` without randomness.
+ * @param {PasswordChange} state
+ * @param {Uint8Array | number[]} challenge
+ * @param {Uint8Array | number[]} registration
+ * @returns {PasswordChanged}
+ */
+export function password_finish(state, challenge, registration) {
+    let ptr0, ptr1, len1, ptr2, len2;
+    try {
+        _assertClass(state, PasswordChange);
+        ptr0 = state.__destroy_into_raw();
+        ptr1 = passArray8ToWasm0(challenge, wasm.__wbindgen_malloc);
+        len1 = WASM_VECTOR_LEN;
+        ptr2 = passArray8ToWasm0(registration, wasm.__wbindgen_malloc);
+        len2 = WASM_VECTOR_LEN;
+    } catch (e) {
+        if (ptr2) { wasm.__wbindgen_free(ptr2, len2 * 1, 1); }
+        if (ptr1) { wasm.__wbindgen_free(ptr1, len1 * 1, 1); }
+        if (ptr0) wasm.__wbg_passwordchange_free(ptr0, 1);
+        throw e;
+    }
+    const ret = wasm.password_finish(ptr0, ptr1, len1, ptr2, len2);
+    if (ret[2]) {
+        throw takeFromExternrefTable0(ret[1]);
+    }
+    return PasswordChanged.__wrap(ret[0]);
+}
+
+/**
+ * Start a password change after a sign-in in this Worker: the sign-in's
+ * state opens `BrowserSession`'s `wrapped_master`, and the change proves
+ * `current` afresh and registers `new`.
+ *
+ * # Errors
+ *
+ * `rejected` for a new password shorter than eight characters or
+ * over-long, and a wrapper that is malformed or does not open.
+ * @param {LoginKey} state
+ * @param {Uint8Array | number[]} wrapped_master
+ * @param {string} current
+ * @param {string} _new
+ * @returns {PasswordChange}
+ */
+export function password_start(state, wrapped_master, current, _new) {
+    let ptr0, ptr1, len1, ptr2, len2, ptr3, len3;
+    try {
+        _assertClass(state, LoginKey);
+        ptr0 = state.__destroy_into_raw();
+        ptr1 = passArray8ToWasm0(wrapped_master, wasm.__wbindgen_malloc);
+        len1 = WASM_VECTOR_LEN;
+        ptr2 = passStringToWasm0(current, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        len2 = WASM_VECTOR_LEN;
+        ptr3 = passStringToWasm0(_new, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        len3 = WASM_VECTOR_LEN;
+    } catch (e) {
+        if (ptr3) { wasm.__wbindgen_free(ptr3, len3 * 1, 1); }
+        if (ptr2) { wasm.__wbindgen_free(ptr2, len2 * 1, 1); }
+        if (ptr1) { wasm.__wbindgen_free(ptr1, len1 * 1, 1); }
+        if (ptr0) wasm.__wbg_loginkey_free(ptr0, 1);
+        throw e;
+    }
+    const ret = wasm.password_start(ptr0, ptr1, len1, ptr2, len2, ptr3, len3);
+    if (ret[2]) {
+        throw takeFromExternrefTable0(ret[1]);
+    }
+    return PasswordChange.__wrap(ret[0]);
+}
+
+/**
  * In place of [`login_confirm`], for an account without a recovery code:
  * open `BrowserSession`'s `wrapped_master` and wrap the same master key
  * under a new recovery code, keeping no key.
@@ -696,6 +947,114 @@ export function recovery_create(state, wrapped_master) {
         throw takeFromExternrefTable0(ret[1]);
     }
     return Recovered.__wrap(ret[0]);
+}
+
+/**
+ * Finish a reset that keeps the vault with `ResetChallenge`'s registration
+ * response and recovery wrapper. A recovery code that does not open the
+ * wrapper is `rejected` here, before the reset code is spent.
+ *
+ * # Errors
+ *
+ * `rejected` for a reset started without a recovery code, a wrapper that
+ * is malformed or does not open and a malformed response, `unavailable`
+ * without randomness.
+ * @param {Reset} state
+ * @param {Uint8Array | number[]} response
+ * @param {Uint8Array | number[]} recovery
+ * @returns {ResetKept}
+ */
+export function reset_keep(state, response, recovery) {
+    let ptr0, ptr1, len1, ptr2, len2;
+    try {
+        _assertClass(state, Reset);
+        ptr0 = state.__destroy_into_raw();
+        ptr1 = passArray8ToWasm0(response, wasm.__wbindgen_malloc);
+        len1 = WASM_VECTOR_LEN;
+        ptr2 = passArray8ToWasm0(recovery, wasm.__wbindgen_malloc);
+        len2 = WASM_VECTOR_LEN;
+    } catch (e) {
+        if (ptr2) { wasm.__wbindgen_free(ptr2, len2 * 1, 1); }
+        if (ptr1) { wasm.__wbindgen_free(ptr1, len1 * 1, 1); }
+        if (ptr0) wasm.__wbg_reset_free(ptr0, 1);
+        throw e;
+    }
+    const ret = wasm.reset_keep(ptr0, ptr1, len1, ptr2, len2);
+    if (ret[2]) {
+        throw takeFromExternrefTable0(ret[1]);
+    }
+    return ResetKept.__wrap(ret[0]);
+}
+
+/**
+ * Finish a reset that makes a new vault with `ResetChallenge`'s
+ * registration response: what a registration makes, at the next epoch,
+ * with the new recovery code to show once. Free it once read.
+ *
+ * # Errors
+ *
+ * `rejected` for a reset started with a recovery code and a malformed
+ * response, `unavailable` without randomness.
+ * @param {Reset} state
+ * @param {Uint8Array | number[]} response
+ * @returns {Enrolled}
+ */
+export function reset_new(state, response) {
+    let ptr0, ptr1, len1;
+    try {
+        _assertClass(state, Reset);
+        ptr0 = state.__destroy_into_raw();
+        ptr1 = passArray8ToWasm0(response, wasm.__wbindgen_malloc);
+        len1 = WASM_VECTOR_LEN;
+    } catch (e) {
+        if (ptr1) { wasm.__wbindgen_free(ptr1, len1 * 1, 1); }
+        if (ptr0) wasm.__wbg_reset_free(ptr0, 1);
+        throw e;
+    }
+    const ret = wasm.reset_new(ptr0, ptr1, len1);
+    if (ret[2]) {
+        throw takeFromExternrefTable0(ret[1]);
+    }
+    return Enrolled.__wrap(ret[0]);
+}
+
+/**
+ * Start a reset: `Discover`'s identity, the new password, and the recovery
+ * code when the vault is kept. Without a recovery code a new vault is made,
+ * at the next epoch.
+ *
+ * # Errors
+ *
+ * `rejected` for a password shorter than eight characters or over-long, an
+ * account that is not a `UUIDv7`, epoch zero and a recovery code that does
+ * not read as one.
+ * @param {string} password
+ * @param {Uint8Array | number[]} account
+ * @param {bigint} epoch
+ * @param {string | null} [recovery_code]
+ * @returns {Reset}
+ */
+export function reset_start(password, account, epoch, recovery_code) {
+    const val4 = BigInt.asIntN(64, epoch);
+    let ptr0, len0, ptr1, len1, ptr2, len2;
+    try {
+        ptr0 = passStringToWasm0(password, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        len0 = WASM_VECTOR_LEN;
+        ptr1 = passArray8ToWasm0(account, wasm.__wbindgen_malloc);
+        len1 = WASM_VECTOR_LEN;
+        ptr2 = isLikeNone(recovery_code) ? 0 : passStringToWasm0(recovery_code, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        len2 = WASM_VECTOR_LEN;
+    } catch (e) {
+        if (ptr2) { wasm.__wbindgen_free(ptr2, len2 * 1, 1); }
+        if (ptr1) { wasm.__wbindgen_free(ptr1, len1 * 1, 1); }
+        if (ptr0) { wasm.__wbindgen_free(ptr0, len0 * 1, 1); }
+        throw e;
+    }
+    const ret = wasm.reset_start(ptr0, len0, ptr1, len1, val4, ptr2, len2);
+    if (ret[2]) {
+        throw takeFromExternrefTable0(ret[1]);
+    }
+    return Reset.__wrap(ret[0]);
 }
 
 /**
@@ -859,9 +1218,21 @@ const LoginFinalization = (typeof FinalizationRegistry === 'undefined')
 const LoginKeyFinalization = (typeof FinalizationRegistry === 'undefined')
     ? { register: () => {}, unregister: () => {} }
     : new FinalizationRegistry(ptr => wasm.__wbg_loginkey_free(ptr, 1));
+const PasswordChangeFinalization = (typeof FinalizationRegistry === 'undefined')
+    ? { register: () => {}, unregister: () => {} }
+    : new FinalizationRegistry(ptr => wasm.__wbg_passwordchange_free(ptr, 1));
+const PasswordChangedFinalization = (typeof FinalizationRegistry === 'undefined')
+    ? { register: () => {}, unregister: () => {} }
+    : new FinalizationRegistry(ptr => wasm.__wbg_passwordchanged_free(ptr, 1));
 const RecoveredFinalization = (typeof FinalizationRegistry === 'undefined')
     ? { register: () => {}, unregister: () => {} }
     : new FinalizationRegistry(ptr => wasm.__wbg_recovered_free(ptr, 1));
+const ResetFinalization = (typeof FinalizationRegistry === 'undefined')
+    ? { register: () => {}, unregister: () => {} }
+    : new FinalizationRegistry(ptr => wasm.__wbg_reset_free(ptr, 1));
+const ResetKeptFinalization = (typeof FinalizationRegistry === 'undefined')
+    ? { register: () => {}, unregister: () => {} }
+    : new FinalizationRegistry(ptr => wasm.__wbg_resetkept_free(ptr, 1));
 const WorkFinalization = (typeof FinalizationRegistry === 'undefined')
     ? { register: () => {}, unregister: () => {} }
     : new FinalizationRegistry(ptr => wasm.__wbg_work_free(ptr, 1));
