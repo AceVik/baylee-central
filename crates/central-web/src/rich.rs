@@ -20,7 +20,8 @@ pub fn rich(pieces: Vec<Piece>, href: impl Fn(&str) -> Option<String>) -> AnyVie
             Some("glow") => view! { <span class="glow">{piece.text}</span> }.into_any(),
             Some(tag) => match href(tag) {
                 Some(url) if url.starts_with("https://") => {
-                    view! { <a href=url target="_blank" rel="noopener noreferrer">{piece.text}</a> }.into_any()
+                    view! { <a href=url target="_blank" rel="noopener noreferrer">{piece.text}</a> }
+                        .into_any()
                 }
                 Some(url) => view! { <a href=url>{piece.text}</a> }.into_any(),
                 None => piece.text.into_any(),
