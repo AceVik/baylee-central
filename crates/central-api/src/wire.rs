@@ -217,15 +217,24 @@ pub enum Request {
         /// Its tag at the official gateway.
         tag: u32,
     },
+    /// A proof-of-work challenge for one registration, on the browser
+    /// listener only (`docs/registration-abuse.md`), answered with
+    /// [`Response::RegisterChallenge`].
+    RegisterChallenge,
     /// Reserve a new registered account with a beta key, on the browser listener
-    /// only (`docs/web-accounts.md`). A bad, used-up, expired or revoked key is
-    /// `Rejected` before the name is looked at; with a valid key a taken name is
-    /// `Conflict`.
+    /// only (`docs/web-accounts.md`). The challenge's solution is checked and
+    /// spent first, then the key: a bad solution and a bad, used-up, expired or
+    /// revoked key are `Rejected` before the name is looked at; only then is a
+    /// taken name `Conflict`.
     Register {
         /// Wanted username, canonicalized by the service's versioned name policy.
         username: String,
         /// The beta key as typed, read like the recovery code.
         beta_key: String,
+        /// The challenge's nonce ([`Response::RegisterChallenge`]).
+        nonce: String,
+        /// One counter per part ([`crate::register`]).
+        counters: Vec<u64>,
         /// The display name other players see, chosen now; a malformed or
         /// reserved one is `Rejected`, after the key check. `None` chooses it
         /// later on the account page. The tag is drawn with the reservation.
@@ -677,6 +686,20 @@ pub enum Response {
         /// Closed decision type; never an arbitrary credential URL.
         discovery: Discovery,
     },
+    /// A registration's proof of work ([`crate::register`]): find, for each
+    /// of `parts`, a counter with `difficulty` leading zero bits, and send
+    /// them with `Register` no sooner than three seconds from now and before
+    /// `expires_at`.
+    RegisterChallenge {
+        /// 32 random bytes in hex, used once.
+        nonce: String,
+        /// Parts to solve ([`crate::register::PARTS`]).
+        parts: u8,
+        /// Leading zero bits each part needs.
+        difficulty: u8,
+        /// Absolute Unix seconds after which it is not taken.
+        expires_at: i64,
+    },
     /// OPAQUE KE2 plus a one-use attempt capability.
     LoginChallenge {
         /// Attempt identifier/capability, unrelated to account UUIDs.
@@ -1049,18 +1072,45 @@ mod tests {
     }
 
     #[test]
-    fn register_and_legacy_reserve_from_before_still_decode() {
-        // The page and the bridge built before display names send neither field.
+    fn a_registration_carries_its_proof_and_legacy_reserve_still_decodes() {
+        // A registration without the proof of work is not one any more.
+        assert!(
+            crate::decode::<Request>(
+                br#"{"operation":"register","username":"synthetic","beta_key":"k"}"#
+            )
+            .is_err()
+        );
         let Request::Register {
             username,
             display_name,
+            nonce,
+            counters,
             ..
-        } = crate::decode(br#"{"operation":"register","username":"synthetic","beta_key":"k"}"#)
-            .unwrap()
+        } = crate::decode(
+            br#"{"operation":"register","username":"synthetic","beta_key":"k","nonce":"n","counters":[1,2]}"#,
+        )
+        .unwrap()
         else {
             panic!("a registration");
         };
         assert_eq!((username.as_str(), display_name), ("synthetic", None));
+        assert_eq!((nonce.as_str(), counters), ("n", vec![1, 2]));
+        let challenge = crate::encode(&Response::RegisterChallenge {
+            nonce: "n".into(),
+            parts: 8,
+            difficulty: 16,
+            expires_at: 1,
+        })
+        .unwrap();
+        assert_eq!(
+            String::from_utf8(challenge).unwrap(),
+            r#"{"result":"register_challenge","nonce":"n","parts":8,"difficulty":16,"expires_at":1}"#
+        );
+        assert!(matches!(
+            crate::decode::<Request>(br#"{"operation":"register_challenge"}"#).unwrap(),
+            Request::RegisterChallenge
+        ));
+        // The bridge built before display names sends neither field.
         let Request::LegacyReserve {
             display_name, tag, ..
         } = crate::decode(
@@ -1071,31 +1121,16 @@ mod tests {
             panic!("a reservation");
         };
         assert_eq!((display_name, tag), (None, None));
-        // Without them, both are sent exactly as before.
-        for (request, earlier) in [
-            (
-                Request::Register {
-                    username: "synthetic".into(),
-                    beta_key: "k".into(),
-                    display_name: None,
-                },
-                r#"{"operation":"register","username":"synthetic","beta_key":"k"}"#,
-            ),
-            (
-                Request::LegacyReserve {
-                    legacy_id: "x".into(),
-                    username: "synthetic".into(),
-                    display_name: None,
-                    tag: None,
-                },
-                r#"{"operation":"legacy_reserve","legacy_id":"x","username":"synthetic"}"#,
-            ),
-        ] {
-            assert_eq!(
-                String::from_utf8(crate::encode(&request).unwrap()).unwrap(),
-                earlier
-            );
-        }
+        let earlier = Request::LegacyReserve {
+            legacy_id: "x".into(),
+            username: "synthetic".into(),
+            display_name: None,
+            tag: None,
+        };
+        assert_eq!(
+            String::from_utf8(crate::encode(&earlier).unwrap()).unwrap(),
+            r#"{"operation":"legacy_reserve","legacy_id":"x","username":"synthetic"}"#
+        );
         let Request::LegacyReserve {
             display_name, tag, ..
         } = crate::decode(
@@ -1106,18 +1141,10 @@ mod tests {
             panic!("a reservation");
         };
         assert_eq!((display_name.as_deref(), tag), (Some("Alice"), Some(7)));
-        let Request::Register { display_name, .. } = crate::decode(
-            br#"{"operation":"register","username":"synthetic","beta_key":"k","display_name":"Alice"}"#,
-        )
-        .unwrap()
-        else {
-            panic!("a registration");
-        };
-        assert_eq!(display_name.as_deref(), Some("Alice"));
         for bad in [
             br#"{"operation":"legacy_reserve","legacy_id":"x","username":"synthetic","tag":-1}"#.as_slice(),
             br#"{"operation":"legacy_reserve","legacy_id":"x","username":"synthetic","tag":4294967296}"#,
-            br#"{"operation":"register","username":"synthetic","beta_key":"k","name":"Alice"}"#,
+            br#"{"operation":"register","username":"synthetic","beta_key":"k","nonce":"n","counters":[],"name":"Alice"}"#,
         ] {
             assert!(crate::decode::<Request>(bad).is_err());
         }

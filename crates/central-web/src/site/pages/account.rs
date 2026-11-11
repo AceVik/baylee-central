@@ -64,12 +64,13 @@ pub fn sign_in(cx: &Context<'_>) -> Built {
 pub fn register(cx: &Context<'_>) -> Built {
     let lang = cx.lang;
     let worker = cx.assets.url("crypto-worker.js");
+    let pow = cx.assets.url("pow-worker.js");
     form_page(
         cx,
         words::register_title(lang),
         words::register_lead(lang),
         Page::Register,
-        view! { <Register lang=lang worker=worker /> }.into_any(),
+        view! { <Register lang=lang worker=worker pow=pow /> }.into_any(),
     )
 }
 

@@ -259,8 +259,13 @@ the recovery code. The admin UI (M2) comes later.
 
 **Wire.**
 
-- `Request::Register { username, beta_key, display_name }` (the name since
-  23.10.2026, optional on the wire) → `Response::Enrollment`. It needs
+- `Request::RegisterChallenge` → `Response::RegisterChallenge { nonce,
+  parts, difficulty, expires_at }` (11.11.2026, browser listener only): the
+  proof of work of `docs/registration-abuse.md`, which `Register` carries
+  as `nonce` and `counters` and Central checks and spends before anything
+  else.
+- `Request::Register { username, beta_key, display_name, nonce, counters }`
+  (the name since 23.10.2026, optional on the wire) → `Response::Enrollment`. It needs
   no credential, shares the unauthenticated budget and takes a per-address
   budget on the browser surface. It is served **on the browser surface only**;
   `/v1/native` answers `Rejected`. (Changed in the server PR: the per-address
@@ -369,7 +374,8 @@ room, so a crowd of addresses cannot lock new ones out.
 
 | Operation | Budget per address |
 | --- | --- |
-| `Register` | 5 an hour |
+| `Register` | 5 an hour and 10 a day |
+| `RegisterChallenge` | 20 an hour |
 | `Discover` | 30 a minute |
 | `LoginStart` | 30 a minute, apart from `Discover` |
 | `GatewayDirectory` | 60 a minute, apart from the others |

@@ -395,12 +395,15 @@ impl From<IpAddr> for Client {
 const ADDRESSES: usize = 4_096;
 const MINUTE: Duration = Duration::from_secs(60);
 const HOUR: Duration = Duration::from_secs(3_600);
+const DAY: Duration = Duration::from_hours(24);
 
 /// The per-address budgets, in memory only; an address is forgotten once its
 /// window has passed.
 #[derive(Default)]
 struct Budgets {
     register: Book,
+    register_day: Book,
+    challenge: Book,
     discover: Book,
     login: Book,
     directory: Book,
@@ -414,7 +417,14 @@ struct Budgets {
 impl Budgets {
     fn charge(&mut self, request: &Request, client: Client, now: Instant) -> bool {
         match request {
-            Request::Register { .. } => self.register.charge(client, now, 5, HOUR),
+            // Open registration (`docs/registration-abuse.md`): five an hour
+            // and ten a day; a refused one spends no daily unit.
+            Request::Register { .. } => {
+                self.register.charge(client, now, 5, HOUR)
+                    && self.register_day.charge(client, now, 10, DAY)
+            }
+            // A challenge for each attempt, with room for a few retries.
+            Request::RegisterChallenge => self.challenge.charge(client, now, 20, HOUR),
             Request::Discover { .. } => self.discover.charge(client, now, 30, MINUTE),
             Request::LoginStart { .. } => self.login.charge(client, now, 30, MINUTE),
             // The public directory needs no session; a page reads it a few
@@ -937,6 +947,8 @@ mod tests {
         let register = body(&Request::Register {
             username: "synthetic".into(),
             beta_key: "CENTRAL-0000-0000-0000-0000".into(),
+            nonce: String::new(),
+            counters: Vec::new(),
             display_name: None,
         });
         for forged in 0..5 {
@@ -1106,6 +1118,8 @@ mod tests {
         let register = body(&Request::Register {
             username: "synthetic".into(),
             beta_key: "CENTRAL-0000-0000-0000-0000".into(),
+            nonce: String::new(),
+            counters: Vec::new(),
             display_name: None,
         });
         for _ in 0..5 {
@@ -1237,6 +1251,35 @@ mod tests {
         }
         assert!(!budgets.charge(&request, client, now + Duration::from_secs(59)));
         assert!(budgets.charge(&request, client, now + MINUTE));
+    }
+
+    #[test]
+    fn registration_has_five_an_hour_ten_a_day_and_its_own_challenges() {
+        let mut budgets = Budgets::default();
+        let client = Client::from("198.51.100.44".parse::<IpAddr>().unwrap());
+        let register = Request::Register {
+            username: "synthetic".into(),
+            beta_key: String::new(),
+            display_name: None,
+            nonce: String::new(),
+            counters: Vec::new(),
+        };
+        let now = Instant::now();
+        for _ in 0..5 {
+            assert!(budgets.charge(&register, client, now));
+        }
+        assert!(!budgets.charge(&register, client, now));
+        for _ in 0..5 {
+            assert!(budgets.charge(&register, client, now + HOUR));
+        }
+        // ten in the day: the next hour's budget is there, the day's is not
+        assert!(!budgets.charge(&register, client, now + HOUR * 2));
+        assert!(budgets.charge(&register, client, now + DAY));
+        for _ in 0..20 {
+            assert!(budgets.charge(&Request::RegisterChallenge, client, now));
+        }
+        assert!(!budgets.charge(&Request::RegisterChallenge, client, now));
+        assert!(budgets.charge(&Request::RegisterChallenge, client, now + HOUR));
     }
 
     #[test]

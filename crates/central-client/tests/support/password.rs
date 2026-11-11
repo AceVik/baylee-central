@@ -7,7 +7,10 @@
 //! the protocol's crossed and forged attempts by hand, the budget, and the
 //! website's change on a registered account, whose recovery code, document
 //! and other sessions are checked.
-use super::{Http, browser::Browser};
+use super::{
+    Http,
+    browser::{Browser, proof},
+};
 use central_api::{
     Error, Token,
     beta_key::BetaKey,
@@ -554,12 +557,15 @@ pub(crate) fn register(
                 .issue(operator),
         )
         .unwrap();
+    let (nonce, counters) = proof(browser);
     let Response::Enrollment { identity, ticket } = browser
         .answer(
             &Request::Register {
                 username: name.into(),
                 beta_key: key.display().as_str().into(),
                 display_name: Some("Pass_Web".into()),
+                nonce,
+                counters,
             },
             None,
         )

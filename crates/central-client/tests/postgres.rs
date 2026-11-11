@@ -62,7 +62,9 @@ fn real_native_login_restore_migration_and_adversarial_paths() {
             "http://127.0.0.1:28766",
         )
         .unwrap()
-        .with_terms(Some(support::terms::central_document())),
+        .with_terms(Some(support::terms::central_document()))
+        // many registrations: the proof of work's check, not its cost
+        .with_registration_challenge(1, std::time::Duration::ZERO),
     );
     let (stop_browser, browser_stopped) = oneshot::channel();
     let browser_task =
