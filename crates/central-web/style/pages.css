@@ -1,14 +1,4 @@
-/* The public pages: the start page's hero, status and screenshots, the
-   download, the album, the reading pages. */
-
-/* ---- Screenshots ----------------------------------------------------------------- */
-
-.shots {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 24rem), 1fr));
-  gap: var(--space-6) var(--space-5);
-  margin-block-start: var(--space-6);
-}
+/* The public pages: the download and the reading pages. */
 
 /* ---- Download ------------------------------------------------------------------- */
 

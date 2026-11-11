@@ -341,9 +341,12 @@ fn title_of(caption: &[crate::words::Piece]) -> String {
 }
 
 /// The client's screenshots, each opening large in `#shot-viewer` (the
-/// arrow keys step). Each is a still (WebP); its recording, a short AVIF
-/// that loops and weighs a few hundred kB, `home.js` adds once the card
-/// comes into view, for those who did not ask for less motion.
+/// arrow keys step). `home.js` draws each picture once its card comes
+/// near: the still (WebP), and its recording (a short AVIF that loops, a
+/// few hundred kB) for those who did not ask for less motion. On a phone
+/// the cards start a screen below the first, inside the browser's own
+/// lazy-loading reach, and six stills taken then delayed the painting.
+/// Without script the `<noscript>` picture shows the still.
 fn screens(cx: &Context<'_>) -> Option<impl IntoView + use<>> {
     let lang = cx.lang;
     let assets = cx.assets;
@@ -362,10 +365,14 @@ fn screens(cx: &Context<'_>) -> Option<impl IntoView + use<>> {
                 <li class="glass reveal">
                     <figure>
                         <button type="button" class="shot-open" commandfor="shot-viewer" command="show-modal" aria-haspopup="dialog"
-                            aria-label=label data-shot=at.to_string() data-still=still(1200) data-moving=moving(1200)>
-                            <picture data-moving=format!("{} 640w, {} 1200w", moving(640), moving(1200)) data-sizes=sizes>
-                                <img src=still(1200) srcset=format!("{} 640w, {} 1200w", still(640), still(1200)) sizes=sizes width="1200" height="703" alt=alt(lang) loading="lazy" decoding="async" />
-                            </picture>
+                            aria-label=label data-shot=at.to_string() data-alt=alt(lang) data-sizes=sizes
+                            data-still=still(1200) data-stills=format!("{} 640w, {} 1200w", still(640), still(1200))
+                            data-moving=moving(1200) data-movings=format!("{} 640w, {} 1200w", moving(640), moving(1200))>
+                            <noscript>
+                                <picture>
+                                    <img src=still(1200) srcset=format!("{} 640w, {} 1200w", still(640), still(1200)) sizes=sizes width="1200" height="703" alt=alt(lang) loading="lazy" decoding="async" />
+                                </picture>
+                            </noscript>
                             <span class="shot-zoom" aria-hidden="true">{solid::icon(solid::EXTERNAL)}</span>
                         </button>
                         <figcaption>{plain(caption(lang))}</figcaption>
@@ -663,7 +670,7 @@ fn contact(lang: Lang) -> impl IntoView + use<> {
                             {channel(DISCORD.to_owned(), solid::DISCORD, "Discord", words::contact_discord(lang))}
                             {channel(WHATSAPP.to_owned(), solid::WHATSAPP, "WhatsApp", words::contact_whatsapp_sub(lang))}
                             {channel(format!("{REPOSITORY}/issues"), solid::GITHUB, words::contact_issues(lang), words::contact_issues_sub(lang))}
-                            {channel(Page::Privacy.path(lang), solid::CHAT, words::contact_reports_title(lang), words::contact_reports_sub(lang))}
+                            {channel(Page::Contact.path(lang), solid::CHAT, words::contact_reports_title(lang), words::contact_reports_sub(lang))}
                         </ul>
                         <p class="small">{operator}</p>
                     </div>

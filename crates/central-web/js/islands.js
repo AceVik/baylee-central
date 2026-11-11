@@ -22,7 +22,11 @@ await new Promise((resolve) => {
 });
 await new Promise((resolve) => {
   const all = [...document.querySelectorAll("leptos-island")];
-  if (typeof IntersectionObserver !== "function" || all.some((island) => island.getClientRects().length === 0)) {
+  if (
+    all.length === 0 ||
+    typeof IntersectionObserver !== "function" ||
+    all.some((island) => island.getClientRects().length === 0)
+  ) {
     resolve();
     return;
   }

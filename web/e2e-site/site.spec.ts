@@ -253,9 +253,11 @@ test("a gateway's address is copied from its card, and the page says so", async 
   await expect(copy).toBeVisible();
   await copy.click();
   await expect(copy).toHaveAttribute("data-copied", "");
+  await expect(copy).toHaveText("Copied");
   await expect(page.getByRole("status").filter({ hasText: "Address copied." })).toHaveCount(1);
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(await copy.getAttribute("data-copy"));
   await expect(copy).not.toHaveAttribute("data-copied", "", { timeout: 4000 });
+  await expect(copy).toHaveText("Copy address");
 });
 
 test("the start page fetches no WebAssembly until its form comes near, then the form takes over", async ({ page }) => {

@@ -102,6 +102,89 @@
   overflow-wrap: anywhere;
 }
 
+/* ---- Glass, columns, facts ---------------------------------------------- */
+
+/* the old site's panel: a nearly opaque glass with a gold edge (no
+   backdrop blur: it would be redrawn on every scroll over the painting) */
+.glass {
+  position: relative;
+  border: 1px solid var(--edge);
+  border-radius: var(--radius);
+  background: var(--panel);
+  box-shadow: var(--shadow);
+  transition:
+    border-color var(--dur) ease,
+    box-shadow var(--dur) ease,
+    background-color var(--dur) ease;
+}
+
+.two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: clamp(1.5rem, 4vw, 3.5rem);
+  align-items: start;
+}
+
+.two-col > * {
+  min-width: 0;
+}
+
+@media (max-width: 860px) {
+  .two-col {
+    grid-template-columns: 1fr;
+  }
+}
+
+.links-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.kv {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: var(--space-2) var(--space-5);
+  align-items: baseline;
+  margin: 0 0 var(--space-4);
+  font-family: var(--sans);
+}
+
+.kv > div {
+  display: contents;
+}
+
+.kv dt {
+  color: var(--ink-faint);
+  font-size: var(--text-sm);
+  white-space: nowrap;
+}
+
+.kv dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.kv dd > a {
+  display: inline-flex;
+  align-items: center;
+  min-width: var(--target);
+  min-height: var(--target);
+  margin-block: -0.6rem;
+}
+
+@media (max-width: 600px) {
+  .kv {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 0;
+  }
+
+  .kv dd {
+    margin-bottom: var(--space-3);
+  }
+}
+
 /* ---- Words of state ------------------------------------------------------ */
 
 .pills {
@@ -260,38 +343,7 @@
   border-inline-start: 0.25rem solid var(--ok);
 }
 
-/* ---- The card numbers ----------------------------------------------------- */
-
-.stats {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
-  gap: var(--space-4);
-  margin-block-start: var(--space-6);
-}
-
-.stat {
-  position: relative;
-  padding: var(--space-5);
-  border: var(--hairline) solid var(--edge-soft);
-  border-radius: var(--radius-md);
-  background: var(--surface);
-}
-
-.stat-value {
-  color: var(--title);
-  font-family: var(--font-prose);
-  font-size: var(--text-2xl);
-  font-weight: 700;
-  line-height: 1.1;
-}
-
-.stat-label {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-  margin-block-start: var(--space-1);
-  color: var(--ink-soft);
-}
+/* ---- The card numbers' explanations ----------------------------------------------------- */
 
 .tip {
   flex: none;
@@ -333,12 +385,6 @@
     position-try-fallbacks: flip-block;
     margin-block: var(--space-2);
   }
-}
-
-.share {
-  margin-block-start: var(--space-5);
-  color: var(--ink);
-  font-size: var(--text-lg);
 }
 
 /* ---- Pictures ---------------------------------------------------------------- */

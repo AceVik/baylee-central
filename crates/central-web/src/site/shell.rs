@@ -137,22 +137,15 @@ fn preloads(page: Page, assets: &Assets) -> impl IntoView + use<> {
         view! { <link rel="preload" href=assets.url(name) r#as="font" type="font/woff2" crossorigin="anonymous" /> }
     };
     // the start page's title ends in italic: its face, too, before the
-    // title wraps around a stand-in
+    // title wraps around a stand-in. (The download button's bold and
+    // medium faces move it by less than CLS 0.05 as they arrive; asked for
+    // early, they took the painting's bandwidth: LCP was later.)
     let italic = (page == Page::Home).then(|| font("fonts/Faustina-Italic.woff2"));
-    // the download button's bold label and its medium line, centred in the
-    // first screen, would move as their faces arrive
-    let download = matches!(page, Page::Home | Page::Download).then(|| {
-        view! {
-            {font("fonts/AlegreyaSans-Bold.woff2")}
-            {font("fonts/AlegreyaSans-Medium.woff2")}
-        }
-    });
     view! {
         {painting}
         {font("fonts/AlegreyaSans-Regular.woff2")}
         {font("fonts/Faustina.woff2")}
         {italic}
-        {download}
     }
 }
 

@@ -307,7 +307,11 @@ error-home = Zur Startseite
 
 ## Baylees Erinnerung (am 27. Oktober 2026 von ihrer Familie freigegeben; Wort für Wort beibehalten)
 
+baylee-dedication = Für Baylee. Für immer im Sonnenlicht.
+baylee-invitation = Die kleine Seele hinter dieser Welt
+baylee-open = An Baylee erinnern · Fotoalbum öffnen
 baylee-eyebrow = Das Herz dieses Projekts
+baylee-date = In liebevoller Erinnerung · 26. Oktober 2026
 baylee-close = Zurück in ihre Welt
 baylee-previous = Vorheriges Foto
 baylee-next = Nächstes Foto
@@ -323,6 +327,7 @@ baylee-chapters = Ihre Geschichte
 baylee-chapterPrevious = Vorheriges Kapitel
 baylee-chapterNext = Nächstes Kapitel
 baylee-photos = Unsere Erinnerungen
+baylee-read = Zum Lesen scrollen
 
 baylee-chapter1Title = Ein Zuhause für Baylee
 baylee-chapter1Body =

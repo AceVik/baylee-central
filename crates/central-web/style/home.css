@@ -6,18 +6,6 @@
 
 /* ---- glass cards and their light ------------------------------------------ */
 
-.glass {
-  position: relative;
-  border: 1px solid var(--edge);
-  border-radius: var(--radius);
-  background: var(--panel);
-  box-shadow: var(--shadow);
-  transition:
-    border-color var(--dur) ease,
-    box-shadow var(--dur) ease,
-    background-color var(--dur) ease;
-}
-
 /* a sheen slides across a card as the pointer arrives */
 .features > li,
 .about-arch-card,
@@ -67,23 +55,6 @@
 .repo-card:hover {
   border-color: var(--gold);
   box-shadow: var(--shadow-lift);
-}
-
-.two-col {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: clamp(1.5rem, 4vw, 3.5rem);
-  align-items: start;
-}
-
-.two-col > * {
-  min-width: 0;
-}
-
-@media (max-width: 860px) {
-  .two-col {
-    grid-template-columns: 1fr;
-  }
 }
 
 /* ---- the screenshots ------------------------------------------------------ */
@@ -803,62 +774,12 @@
   font-size: 1.12rem;
 }
 
-.links-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.6rem;
-}
-
 .repo-card {
   padding: 1.5rem;
 }
 
 .repo-card h3 {
   font-size: 1.2rem;
-}
-
-.kv {
-  display: grid;
-  grid-template-columns: max-content minmax(0, 1fr);
-  gap: var(--space-2) var(--space-5);
-  align-items: baseline;
-  margin: 0 0 var(--space-4);
-  font-family: var(--sans);
-}
-
-.kv > div {
-  display: contents;
-}
-
-.kv dt {
-  color: var(--ink-faint);
-  font-size: var(--text-sm);
-  white-space: nowrap;
-}
-
-.kv dd {
-  min-width: 0;
-  margin: 0;
-  overflow-wrap: anywhere;
-}
-
-.kv dd > a {
-  display: inline-flex;
-  align-items: center;
-  min-width: var(--target);
-  min-height: var(--target);
-  margin-block: -0.6rem;
-}
-
-@media (max-width: 600px) {
-  .kv {
-    grid-template-columns: minmax(0, 1fr);
-    row-gap: 0;
-  }
-
-  .kv dd {
-    margin-bottom: var(--space-3);
-  }
 }
 
 /* ---- as they come into view ------------------------------------------------
