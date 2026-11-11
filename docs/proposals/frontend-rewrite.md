@@ -1058,3 +1058,22 @@ tells someone at the same address; the privacy page says it, the security
 page names what guessing still finds and who can keep whom out. Nothing
 on the wire changed, so the released client and gateway are served as
 before.
+
+**The proof of work costs memory** (owner, 11.11.2026;
+[registration abuse](../registration-abuse.md), "A proof that costs
+memory"): Argon2id at 16 MiB in SHA-256's place, because a script solved
+the SHA-256 proof about thirteen times as fast as the page and now solves
+this one 1.3 times as fast, one core against one. One Rust function finds
+the answer in the page's Worker and checks it in Central, through the
+`argon2` crate the password stretch already used; no dependency changed.
+Central answers the page's request with a new answer, `RegisterWork`,
+takes no SHA-256 solution, and now computes for each registration: one of
+its four workers, 16 MiB, a few milliseconds. `Register` is unchanged on
+the wire, and the released client and gateway send none of this. The page
+solves the proof in a Worker of its own that ends before the password's
+starts, and asks a Central from before the older way, so the site is
+deployed first and Central after it
+([operations](../operations.md#registration)); the other order leaves an
+open register page unable to register until it is reloaded. The privacy
+page says what the puzzle costs, what its difficulty depends on and that
+Central computes part of it again.

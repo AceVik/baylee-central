@@ -3794,8 +3794,11 @@ committed module rebuilt in the pinned container. `central-identity`:
 turns, the older way at an older Central, one more try on `Busy`). No
 migration, grant, setting, log line or stored datum is new; `Cargo.toml`
 and `Cargo.lock` are untouched. The crypto scope's fingerprint was pinned
-again after the documented source and graph review, by the author alone:
-`Review: pending` in `docs/crypto-proposal/bigint-advisory.md`.
+again after the documented source and graph review by the author, and the
+pass that took the change into the website's branch read `proof.rs` a
+second time and computed the pinned output again with OpenSSL; a review by
+another model or a person is open (`Review: pending` in
+`docs/crypto-proposal/bigint-advisory.md`).
 
 **Pass 3, an attacker's view, and what was tested.**
 - *The cheap way back.* The old request gets no nonce, and a SHA-256
@@ -3902,10 +3905,15 @@ the numbers):
   ([operations](operations.md#registration)).
 - A device several times slower than the measured quarter can run out of
   the hardest challenge's twenty minutes.
-- The privacy notice's sentence about the puzzle is older than this and
+- The privacy notice's sentence about the puzzle was older than this and
   the hardening before it (five minutes, nothing about what the difficulty
-  depends on, nothing about Central computing); the wording is the
-  owner's and is handed over, not changed here.
-- A second reviewer has not read `proof.rs`.
+  depends on, nothing about Central computing). On the website's branch it
+  now says twenty minutes at the latest, memory and computing time, what
+  the difficulty depends on and that Central computes part of it again
+  (`privacy-counters`, German and English by hand, the nine other
+  languages by machine); the owner has not read the wording, and it makes
+  no statement about the law.
+- `proof.rs` was read a second time by another pass of the same model
+  only; no other model and no person has reviewed it.
 
 Engineering review, not an audit.

@@ -206,8 +206,18 @@ type with `opaque::Suite`, its group, the OPRF or the key exchange, which
 are unchanged; reverse dependencies stay `crypto-bigint ← elliptic-curve ←
 opaque-ke/voprf ← central-crypto`. The reachability above is unchanged.
 Fingerprint `52af94ea…`. This is the author's source and graph review
-(one agent pass, the one that wrote the module); a second reviewer has not
-read it (`Review: pending`).
+(one agent pass, the one that wrote the module).
+
+A second reading the same day, by the agent pass that took the change into
+the website's branch (another pass of the same model, not another model
+and not a person): `proof.rs` line by line against the paragraph above;
+the diff of the manifests and the lockfile, which is empty; the pinned
+output computed again with OpenSSL 4.1.0's Argon2id from the bytes the
+test's comment names, equal to the test's; and Central's side, which
+allocates for a check only at the price it kept with the nonce, never
+above its own 16 MiB (`central-identity`'s `challenge.rs`). It found
+nothing to change. A review by another model or a person is still open
+(`Review: pending`).
 
 
 ## Chat source and graph review, 2 November 2026
