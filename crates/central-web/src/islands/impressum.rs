@@ -210,17 +210,8 @@ fn renderer() -> Option<String> {
 /// refuses nobody.
 #[cfg(target_arch = "wasm32")]
 fn browser_bits() -> u32 {
-    let Some(navigator) = web_sys::window().map(|w| w.navigator()) else {
-        return 0;
-    };
-    let mut bits = 0;
-    let driven = js_sys::Reflect::get(&navigator, &wasm_bindgen::JsValue::from_str("webdriver"));
-    if driven.is_ok_and(|value| value.is_truthy()) {
-        bits |= 1;
-    }
-    if js_sys::Array::from(&navigator.languages()).length() == 0 {
-        bits |= 2;
-    }
+    // the first two are the bits registration's page reports too
+    let mut bits = u32::from(super::pow::browser_signals());
     if renderer().is_some_and(|name| software(&name)) {
         bits |= 4;
     }
@@ -392,8 +383,12 @@ pub fn Impressum(lang: Lang, worker: String) -> impl IntoView {
             {move || match state.get() {
                 State::Shown(details) => details_view(lang, &details).into_any(),
                 State::Solving(percent) => view! {
-                    <p>{words::impressum_solving(lang, &percent.to_string())}</p>
-                    <progress max="100" value=percent.to_string()></progress>
+                    <p id="impressum-solving">{words::impressum_solving(lang, &percent.to_string())}</p>
+                    <progress
+                        max="100"
+                        value=percent.to_string()
+                        aria-labelledby="impressum-solving"
+                    ></progress>
                 }
                 .into_any(),
                 State::Hidden | State::Failed => {
