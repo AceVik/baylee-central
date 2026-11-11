@@ -4,17 +4,17 @@
 (`crates/central-web/locales/*/site.ftl`) changed 124 messages and added three
 sections to the privacy notice the site shows (links to other services, reports
 and the usage count from the game, the right to object set apart as Art. 21(4)
-GDPR asks). This file holds what that pass did **not** change, because it
-needs a decision, a fact only the owner has, or a new version of a text every
-account accepts. Nothing here is legal advice, and the pass is no evidence of
-compliance: the notice keeps its sentence that a lawyer reads it before the
-final version.
+GDPR asks). This file holds what needs a decision or a fact only the owner has. On the
+owner's word (11.11.2026) the legal texts were then corrected too: the
+changes at the end are applied as version 2026-11-11, and the notice on the
+site no longer calls itself a draft. Nothing here is legal advice, and the
+pass is no evidence of compliance: no lawyer has read the texts.
 
 ## Open questions
 
-The reviewer's notes, in German as written.
-
-- ZUM STAND DIESER DATEI: Die erste Fassung wurde bereits übernommen (Commit 6818fb9, 'The site's words proofread; the privacy notice says more'). Diese Fassung enthält nur noch, was gegenüber dem jetzigen Stand zu ändern ist: Korrekturen an meiner ersten Fassung (privacy-rights nennt den Widerspruch wieder selbst; privacy-hosting ohne die unbelegten 14 Tage; privacy-links ohne unbelegte Aussagen zu USA und Telefonnummer; install-first, faq-data-a, faq-open-a, shot-log, people-unblock, privacy-export-lead, privacy-account, privacy-recipients, privacy-device, faq-password-a), dazu privacy-lead (noch nicht übernommen, Eigentümer-Entscheidung) und alle legal/*.md-Änderungen (noch nicht übernommen). Die Commit-Nachricht nennt 'the log's 14 days': diese Frist ist nicht belegt und sollte wieder heraus, bis der Eigentümer sie bestätigt.
+The reviewer's notes, in German as written. Also open: a reset code cannot be
+redeemed on the new site yet (`ResetStart`/`ResetFinish` exist in
+`central-client` only); the FAQ says so.
 
 - Zwei Datenschutzerklärungen: Die Website zeigt die privacy-*-Texte aus site.ftl (legal.rs), daneben gibt es legal/privacy.de.md/.en.md (Version 2026-11-02, laut legal/README.md 'binding'). Sie widersprechen sich (Serverprotokolle: 'kein Zugriffsprotokoll' gegen '14 Tage Protokolle'; Drittländer; Sprachwahl im Browser gespeichert; Umfang). Welche gilt? Empfehlung: ein einziger Text, aus dem beide Stellen gespeist werden. legal/README.md nennt außerdem Version 2026-10-28, die Datei 2026-11-02.
 
@@ -53,10 +53,6 @@ The reviewer's notes, in German as written.
 - Fan Content Policy: Der deutsche Hinweis im Fuß entspricht dem offiziellen Wortlaut, soweit ich ihn kenne; bitte einmal gegen die deutsche Richtlinienseite prüfen. Die Richtlinie verlangt freien Zugang ohne Zahlung, Abo oder E-Mail-Registrierung; ein Pflicht-Account für Online-Tische (ohne E-Mail) und die Verwendung von Kartenbildern, Manasymbolen und Regeltexten in einem Spiel-Client liegen im Graubereich der Richtlinie. Das ist eine Risikoentscheidung des Eigentümers, kein Textproblem.
 
 - Discord und WhatsApp: Wer verwaltet die beiden Communities? Als Administrator sieht der Betreiber dort Namen und bei WhatsApp Telefonnummern; ich habe das im neuen Abschnitt privacy-links nur allgemein erwähnt. Soll der Abschnitt ausdrücklich sagen, dass in der WhatsApp-Community die Telefonnummer für andere sichtbar sein kann? Das konnte ich nicht belegen und habe es weggelassen.
-
-- privacy-lead nannte die Erklärung einen 'Entwurf', den noch ein Anwalt prüft. Ich habe den Satz gestrichen, weil eine geltende Erklärung kein Entwurf sein kann. Wenn du den Hinweis behalten willst, dann als 'Stand'-Zeile ohne das Wort Entwurf. privacy-updated ('Stand: 10. November 2026') muss beim Übernehmen der Änderungen auf das neue Datum gesetzt werden; ich habe es nicht geändert, weil das Datum deins ist.
-
-- Die neuen Abschnitte (privacy-objection, privacy-links, privacy-reports) brauchen je einen Eintrag in legal.rs (Abschnitt und Inhaltsverzeichnis); die privacy-*-Texte außer controller, device, cookie und chat werden als reiner Text gerendert, deshalb enthalten meine Fassungen dort keine Tags.
 
 - Handle oder Kürzel: Profil und Code-Seite sagten 'Handle', Chat und Kontakte 'Kürzel'. Ich habe auf 'Handle' vereinheitlicht (Kopfkommentar: englische Spielerbegriffe bleiben englisch). Wenn dir 'Kürzel' lieber ist, dann umgekehrt in code-handle, account-profile-lead und profile-handle.
 
