@@ -129,7 +129,7 @@
   margin: 0;
 }
 
-/* what the gateway says of itself right now: three counts, each whole,
+/* what the gateway says of itself right now: four counts, each whole,
    the next below when the card is narrow */
 .gw-now dd {
   display: flex;

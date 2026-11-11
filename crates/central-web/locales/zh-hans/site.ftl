@@ -788,6 +788,7 @@ live-players = { $n ->
    *[other] { $n } 位玩家
 }
 live-playing = { $n ->
+    [one] { $n } in a game
    *[other] { $n } in a game
 }
 live-tables = { $n ->
@@ -901,6 +902,7 @@ gw-stats = The directory in numbers
 gw-stat-listed = Gateways listed
 gw-stat-online = Online now
 gw-stat-players = Players online
+gw-stat-playing = Of them in a game
 gw-stat-tables = Open tables
 gw-stat-games = Games running
 gw-show = Show
