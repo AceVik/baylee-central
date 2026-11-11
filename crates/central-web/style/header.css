@@ -1,5 +1,5 @@
-/* The bar at the top of every page: the brand, the sections, Discord and
-   the account; the colour switch and the language menu; on narrow screens
+/* The bar at the top of every page: the brand, the sections and the
+   account; the colour switch and the language menu; on narrow screens
    the sections fold into a menu. Below it on the start page, the strip with
    the project's state. */
 
@@ -123,10 +123,6 @@ body:has(dialog[open]) .top {
 
 .nav a[aria-current="page"] {
   color: var(--title);
-}
-
-.nav .nav-discord {
-  font-weight: 600;
 }
 
 .nav .nav-account {
