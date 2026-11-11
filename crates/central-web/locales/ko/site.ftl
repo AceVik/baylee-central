@@ -254,14 +254,14 @@ privacy-short-title = 요약
 privacy-short = 추적도, 광고도, 분석도 없고, 로그인하지 않으면 쿠키도 없으며, 다른 서버에서 불러오는 것도 없어요. 글꼴, 그림, 스크립트가 모두 baylee.app에서 제공돼요. 비밀번호는 우리에게 도달하지 않으며, 채팅 메시지와 개인 데이터는 전송되기 전에 브라우저에서 암호화돼요.
 privacy-hosting-title = 사이트 방문
 privacy-hosting = 이 사이트는 독일 netcup GmbH에서 임대한 서버에서 운영돼요. 페이지를 열면 브라우저가 모든 요청에 담기는 정보를 보내요. 곧 IP 주소, 요청한 주소, 시각, 브라우저 언어, 브라우저 식별 정보(user agent)예요. 서버는 응답하기 위해 이 정보가 필요해요. 서버는 언어 정보로 언어 버전을 고르고, 다운로드 페이지는 user agent로 알맞은 파일을 제안해요. 웹 서버는 접속 로그를 남기지 않으므로 이 요청들은 저장되지 않아요. 서버 자체의 운영 메시지(시스템 저널)에는 드문 오류 상황에서 IP 주소가 들어갈 수 있으며, 늦어도 14일 후에 삭제돼요. 법적 근거: GDPR 제6조 제1항 (f)호. 우리의 정당한 이익은 사이트를 안전하고 안정적으로 제공하는 것이에요.
-privacy-views-title = Counting page views
-privacy-views = The website counts how often its pages are opened: one single number for all pages and all visitors together, shown on the start page. A page opened in a browser adds one to it. Nothing about you is stored for this: no IP address, no cookie, no identifier, not even which page it was.
+privacy-views-title = 페이지 조회수 세기
+privacy-views = 이 사이트는 페이지가 열린 횟수를 세요. 모든 페이지와 모든 방문자를 합친 숫자 하나뿐이고, 시작 페이지에 표시돼요. 브라우저에서 페이지가 열리면 이 숫자에 1이 더해져요. 이를 위해 여러분에 관한 정보는 저장하지 않아요. IP 주소도, 쿠키도, 식별자도, 어느 페이지였는지조차 저장하지 않아요.
 privacy-device-title = 브라우저에 저장되는 것
 privacy-device = 이 사이트는 로그인하기 전에는 쿠키를 설정하지 않아요. 브라우저가 기기에 저장하는 것은 다음과 같고, JavaScript를 쓸 때만 해당돼요. 색상을 선택했다면 그 선택(<code>baylee-site-theme</code>), 로그인한 동안에는 세션이 끝나는 시각(<code>baylee-central-session</code>), 채팅 키, 연락처의 신뢰한 키(채팅 항목 참고), 알림을 켰다면 이 기기의 임의 번호(<code>baylee-push-installation-v1</code>, <code>baylee-push</code>), 그리고 로그인했거나 사이트를 앱으로 설치했거나 알림을 켠 경우에 한해 사이트의 공개 파일(페이지 틀, 글꼴, 스크립트)의 사본이에요. 이 사본이 있으면 연결 없이도 시작되고 알림을 받을 수 있어요. 세 가지가 모두 더는 해당하지 않으면 다음에 사이트를 열 때 사본이 제거돼요. 아래 항목에서 달리 말하지 않는 한, 이 중 어떤 것도 우리에게 전송되지 않아요. 채팅과 세션 항목은 로그아웃하면 삭제되며, 나머지는 브라우저에서 사이트 데이터를 지우면 제거할 수 있어요. 법적 근거: TDDDG § 25 제2항 제2호(사용하는 기능에 꼭 필요한 경우). 알림의 임의 번호에 대해서는 동의(TDDDG § 25 제1항).
 privacy-github-title = GitHub
 privacy-github = 다운로드 페이지와 시작 페이지는 최신 릴리스, 테스트 상태, 카드 수치를 보여 줘요. 이 정보는 브라우저가 아니라 우리 서버가 GitHub에 요청하므로, GitHub는 이를 통해 여러분에 대해 아무것도 알 수 없어요. 다운로드나 GitHub 링크를 누를 때만 브라우저가 GitHub(GitHub, Inc., 미국)에 연결해 IP 주소와 모든 요청에 담기는 정보를 보내며, 그 뒤에는 GitHub의 개인정보 처리방침이 적용돼요.
 privacy-directory-title = Gateway 목록
-privacy-directory = 우리 서버가 Baylee Central에서 Gateway 목록을 읽어 와 보여 줘요. 여러분에 관한 정보는 관여하지 않아요. Gateway는 지금 플레이어, 열린 테이블, 게임이 몇 개인지 Central에 알릴 수 있고, Central은 계정 수를 세요. 사이트는 이 숫자들을 보여 줘요. 이 숫자들은 개수일 뿐 이름이 아니며, Gateway의 숫자는 그 운영자 본인의 진술이에요.
+privacy-directory = 우리 서버가 Baylee Central에서 Gateway 목록을 읽어 와 보여 줘요. 여러분에 관한 정보는 관여하지 않아요. Gateway는 지금 접속 중인 플레이어가 몇 명인지, 그중 몇 명이 게임 중인지, 열린 테이블과 게임이 몇 개인지 Central에 알릴 수 있고, Central은 계정 수를 세요. 사이트는 이 숫자들을 보여 줘요. 이 숫자들은 개수일 뿐 이름이 아니며, Gateway의 숫자는 그 운영자 본인의 진술이에요.
 privacy-account-title = 내 계정
 privacy-account = 계정을 위해 Baylee Central은 다음을 저장해요. 계정 ID, 로그인 이름, 태그가 붙은 표시 이름, 계정을 만든 시기와 방법, OPAQUE 비밀번호 기록(우리 서버가 비밀번호를 알지 못한 채 여러분이 비밀번호를 증명할 수 있게 해 줌), 비밀번호와 복구 코드로 각각 한 번씩 암호화된 마스터 키, 암호화된 계정 문서와 암호화된 객체(우리는 읽을 수 없고 크기, 리비전, 시각만 볼 수 있음), 동의한 약관의 버전과 시기, 마지막 로그인 시각, 세션, 관리자 역할(있는 경우), 등록한 Gateway와 그 토큰. 다른 플레이어에게는 태그가 붙은 표시 이름이 보이고, 로그인 이름은 절대 보이지 않아요. 관리자가 재설정 코드를 주면, 코드를 사용하거나 만료될 때까지 그 다이제스트만 저장해요. 관리자가 계정이나 Gateway에 한 작업은 누가, 무엇을, 어느 계정이나 Gateway에, 언제 했는지를 3년 동안 기록으로 남겨요. 법적 근거: GDPR 제6조 제1항 (b)호(요청하신 계정). 마지막 로그인 시각과 기록에 대해서는 GDPR 제6조 제1항 (f)호(안전하고 추적 가능한 운영에 대한 우리의 정당한 이익). 로그인 이름과 비밀번호가 없으면 계정이 없으며, 이메일 주소는 필요 없어요. 계정은 만 16세부터 만들 수 있어요. 계정을 삭제할 때까지 보관하며, 삭제하면 운영 중인 시스템에서는 즉시, 백업에서는 늦어도 12개월 안에 제거돼요. 세션은 사용하지 않은 지 30분 후에 끝나고, 늦어도 로그인 후 12시간이 지나면 끝나요.
 privacy-cookie-title = 세션 쿠키
@@ -271,7 +271,7 @@ privacy-chat = 메시지는 각 수신자의 기기에 맞게 여러분의 기�
 privacy-push-title = 알림
 privacy-push = 브라우저에서 알림을 켜면 브라우저가 푸시 서비스에 등록되고, Central은 이 브라우저에 대한 그 서비스의 주소, 브라우저의 공개 키와 인증 비밀값, 언어, 이 기기의 임의 번호, 선택한 범주를 저장해요. 푸시 서비스는 브라우저 제조사의 서비스로, Google(Firebase Cloud Messaging), Mozilla 또는 Apple이며 모두 미국에 있어요. 알림에는 암호화된 상태로 종류(예: "새 메시지")와 언어만 담기며, 이름이나 본문은 절대 담기지 않아요. 푸시 서비스는 주소, 시각, 크기 같은 연결 데이터를 볼 수 있어요. 이 정보는 이 기기에서 알림을 끄거나 로그아웃하거나 계정을 삭제하면 삭제돼요. 90일 동안 갱신되지 않은 주소는 더는 쓰이지 않고, 대기 중인 알림은 하루 후에 만료돼요. 법적 근거: GDPR 제6조 제1항 (a)호 및 TDDDG § 25 제1항(동의). 계정 설정에서 언제든 동의를 철회할 수 있으며, 그때까지 이루어진 처리는 적법하게 남아요.
 privacy-counters-title = 남용 방지
-privacy-counters = 비밀번호 추측과 과부하를 막기 위해 Central은 특정 요청(가입, 로그인 시도, 비밀번호 재설정, 디렉터리 읽기)을 IP 주소별로 메모리에서만 세요. 가입과 올바른 비밀번호로 끝나지 않은 로그인 시도는 최대 하루 동안, 나머지는 길어야 한 시간 동안 세요. 올바른 비밀번호로 로그인한 뒤에는 Central이 여러분의 계정이 그 주소(IPv4 주소 또는 IPv6 주소의 앞 절반, 계정당 최대 여덟 개)에서 로그인했다는 사실을 마찬가지로 메모리에서만 30일 동안 기억해요. 다른 사람이 여러분의 계정에 시도하더라도 여러분이 그 주소에서 차단되지 않게 하기 위해서예요. 같은 주소를 쓰면서 여러분의 로그인 이름을 아는 사람은 Central의 응답으로 여러분의 계정이 그 주소에서 로그인했다는 것을 알 수 있어요. 새 비밀번호를 설정하면 설정한 주소를 뺀 이 주소들을 잊고, 계정을 삭제하면 모두 잊으며, 서비스를 다시 시작해도 마찬가지예요. 가입 전에 브라우저는 메모리와 계산 시간이 드는 퍼즐도 풀어요. 퍼즐은 임의의 숫자로 이루어져 있고 여러분에 관해 아무것도 담지 않으며, 늦어도 20분 뒤에는 잊혀요. Central은 브라우저의 답을 확인하려고 그 일부를 다시 계산해요. 얼마나 어려운지는 몇 개의 계정이 만들어지고 있는지, 그리고 요청이 프로그램의 것처럼 보이는지에 따라 달라요. 모든 브라우저가 보내는 헤더가 있는지, 브라우저가 프로그램이 자신을 조종하고 있다고 알리는지, 그리고 지난 한 시간 동안 여러분의 주소와 그 주변 네트워크 블록(IPv4 주소의 처음 세 숫자, IPv6 주소의 처음 48비트)이 퍼즐을 몇 개 요청했는지가 기준이에요. 이 가운데 Central이 보관하는 것은 메모리 속의 횟수뿐이며, 길어야 한 시간이에요. 계정별로 Central은 연락 요청과 다른 플레이어 검색을 세요. 아무도 다른 사람에게 요청을 쏟아붓지 못하게 하기 위해서예요. 법적 근거: GDPR 제6조 제1항 (f)호. 우리의 정당한 이익은 계정과 서비스를 악용으로부터 보호하는 것이에요.
+privacy-counters = 비밀번호 추측과 과부하를 막기 위해 Central은 요청(가입, 로그인 시도, 비밀번호 재설정, 디렉터리 읽기, 그리고 더 일반적으로 한 주소가 1분 안에 보내는 요청 수)을 IP 주소별로 메모리에서만 세요. 가입과 올바른 비밀번호로 끝나지 않은 로그인 시도는 최대 하루 동안, 나머지는 길어야 한 시간 동안 세요. 올바른 비밀번호로 로그인한 뒤에는 Central이 여러분의 계정이 그 주소(IPv4 주소 또는 IPv6 주소의 앞 절반, 계정당 최대 여덟 개)에서 로그인했다는 사실을 마찬가지로 메모리에서만 30일 동안 기억해요. 다른 사람이 여러분의 계정에 시도하더라도 여러분이 그 주소에서 차단되지 않게 하기 위해서예요. 같은 주소를 쓰면서 여러분의 로그인 이름을 아는 사람은 Central의 응답으로 여러분의 계정이 그 주소에서 로그인했다는 것을 알 수 있어요. 새 비밀번호를 설정하면 설정한 주소를 뺀 이 주소들을 잊고, 계정을 삭제하면 모두 잊으며, 서비스를 다시 시작해도 마찬가지예요. 가입 전에 브라우저는 메모리와 계산 시간이 드는 퍼즐도 풀어요. 퍼즐은 임의의 숫자로 이루어져 있고 여러분에 관해 아무것도 담지 않으며, 늦어도 20분 뒤에는 잊혀요. Central은 브라우저의 답을 확인하려고 그 일부를 다시 계산해요. 얼마나 어려운지는 몇 개의 계정이 만들어지고 있는지, 그리고 요청이 프로그램의 것처럼 보이는지에 따라 달라요. 모든 브라우저가 보내는 헤더가 있는지, 브라우저가 프로그램이 자신을 조종하고 있다고 알리는지, 그리고 지난 한 시간 동안 여러분의 주소와 그 주변 네트워크 블록(IPv4 주소의 처음 세 숫자, IPv6 주소의 처음 48비트)이 퍼즐을 몇 개 요청했는지가 기준이에요. 이 가운데 Central이 보관하는 것은 메모리 속의 횟수뿐이며, 길어야 한 시간이에요. 계정별로 Central은 연락 요청과 다른 플레이어 검색을 세요. 아무도 다른 사람에게 요청을 쏟아붓지 못하게 하기 위해서예요. 법적 근거: GDPR 제6조 제1항 (f)호. 우리의 정당한 이익은 계정과 서비스를 악용으로부터 보호하는 것이에요.
 privacy-contact-title = 문의 양식
 privacy-contact = 이 양식은 메시지, 페이지의 언어, 시각을 같은 서버에 있는 Baylee의 피드백 서비스로 보내며, 이름과 이메일 주소는 입력했을 때만 보내요. 둘 다 선택 사항이에요. 이 서비스는 메시지를 처리했는지도 기록해요. IP 주소는 저장하지 않으며, 메시지 폭주를 막기 위해 한 시간 동안 메모리에서만 세요. 법적 고지에 이름이 적힌 사람만 메시지를 읽으며, 누구에게도 전달하지 않아요. 메시지는 처리한 지 90일 후에, 늦어도 1년 후에, 또는 요청하시면 더 일찍 삭제돼요. 법적 근거: GDPR 제6조 제1항 (f)호(메시지에 답하는 것에 대한 우리의 정당한 이익), 메시지가 계정에 관한 것이면 (b)호.
 privacy-impressum-title = 법적 고지의 퍼즐
@@ -437,7 +437,7 @@ error-unavailable = Baylee Central이 지금은 응답하지 않아요. 잠시 �
 error-network = 연결되지 않았어요. 네트워크를 확인하고 다시 시도해 주세요.
 error-failed = 문제가 생겼어요. 다시 시도해 보고, 계속되면 알려 주세요.
 error-again = 다시 시도
-password-show-label = Show the password
+password-show-label = 비밀번호 보기
 
 ## Signing in
 
@@ -451,8 +451,8 @@ signin-working = 비밀번호를 안전하게 처리하는 중 … 잠시 걸리
 signin-wrong = 로그인 이름과 비밀번호가 일치하지 않아요. 둘 다 확인하고 다시 시도해 주세요.
 signin-not-moved = 이 계정은 아직 Baylee Central로 옮겨지지 않았어요. Baylee 클라이언트로 한 번 로그인해 주세요. 그러면 계정이 옮겨져요.
 signin-no-account = 아직 계정이 없나요? <register>계정 만들기</register>.
-register-have-account = Already have an account? <signin>Sign in</signin>.
-dialog-close = Close
+register-have-account = 이미 계정이 있나요? <signin>로그인</signin>.
+dialog-close = 닫기
 signin-noscript = 로그인하려면 JavaScript가 필요해요. 비밀번호는 브라우저에서 처리되며 우리에게 전송되지 않아요.
 
 ## Registering
@@ -776,10 +776,9 @@ strip-cards-unit = 장
 strip-stars = GitHub 스타
 strip-accounts = Baylee Central의 계정
 strip-live = 지금 Gateways가 보고한 수치
-strip-views = Page views since { $date }
+strip-views = { $date }부터의 페이지 조회수
 live-views = { $n ->
-    [one] { $n } view
-   *[other] { $n } views
+   *[other] 조회 { $n }회
 }
 live-accounts = { $n ->
    *[other] 계정 { $n }개
@@ -788,8 +787,7 @@ live-players = { $n ->
    *[other] 플레이어 { $n }명
 }
 live-playing = { $n ->
-    [one] { $n } in a game
-   *[other] { $n } in a game
+   *[other] { $n }명 게임 중
 }
 live-tables = { $n ->
    *[other] 열린 테이블 { $n }개
@@ -898,27 +896,27 @@ gw-findHint = 이름 또는 주소
 gw-shown = { $all }개 중 { $n }개 표시
 gw-noMatch = 지금까지 불러온 Gateway 중 일치하는 것이 없어요.
 gw-showAll = 모두 보기
-gw-stats = The directory in numbers
-gw-stat-listed = Gateways listed
-gw-stat-online = Online now
-gw-stat-players = Players online
-gw-stat-playing = Of them in a game
-gw-stat-tables = Open tables
-gw-stat-games = Games running
-gw-show = Show
-gw-show-every = All
-gw-show-online = Online
-gw-show-official = Official
-gw-show-tables = With open tables
-gw-sort = Sort by
-gw-sort-best = Recommended
-gw-sort-name = Name (A–Z)
-gw-sort-players = Most players
-gw-sort-tables = Most open tables
-gw-sort-version = Newest version
-gw-view = View
-gw-view-cards = Cards
-gw-view-list = List
+gw-stats = 숫자로 보는 디렉터리
+gw-stat-listed = 등록된 Gateway
+gw-stat-online = 지금 온라인
+gw-stat-players = 온라인 플레이어
+gw-stat-playing = 그중 게임 중
+gw-stat-tables = 열린 테이블
+gw-stat-games = 진행 중인 게임
+gw-show = 표시
+gw-show-every = 전체
+gw-show-online = 온라인
+gw-show-official = 공식
+gw-show-tables = 열린 테이블 있음
+gw-sort = 정렬
+gw-sort-best = 추천순
+gw-sort-name = 이름순
+gw-sort-players = 플레이어 많은 순
+gw-sort-tables = 열린 테이블 많은 순
+gw-sort-version = 최신 버전순
+gw-view = 보기 방식
+gw-view-cards = 타일
+gw-view-list = 목록
 link-readmeGateway = #running-your-own-gateway
 selfhost-eyebrow = 셀프 호스팅과 Central 연동
 selfhost-title = 나만의 Gateway 운영하기

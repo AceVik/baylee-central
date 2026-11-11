@@ -255,18 +255,14 @@ privacy-short-title = En bref
 privacy-short = Pas de suivi, pas de publicité, pas d’analyse d’audience, pas de cookie tant que vous ne vous connectez pas, et rien de chargé depuis d’autres serveurs : polices, images et scripts viennent tous de baylee.app. Votre mot de passe ne nous parvient jamais, et vos messages de chat et vos données privées sont chiffrés dans votre navigateur avant d’être envoyés.
 privacy-hosting-title = Visite du site
 privacy-hosting = Le site tourne sur un serveur que nous louons à netcup GmbH en Allemagne. Quand vous ouvrez une page, votre navigateur envoie ce que porte toute requête : votre adresse IP, l’adresse demandée, l’heure, la langue de votre navigateur et son identification (user agent). Le serveur en a besoin pour répondre ; il choisit la version linguistique d’après la langue, et la page de téléchargement utilise le user agent pour suggérer le bon fichier. Le serveur web ne tient aucun journal d’accès : ces requêtes ne sont donc pas enregistrées. Les messages de fonctionnement propres au serveur (son journal système) peuvent, dans de rares cas d’erreur, contenir une adresse IP ; ils sont supprimés au plus tard après 14 jours. Base légale : art. 6, par. 1, point f) du RGPD ; notre intérêt légitime est de fournir le site de façon sûre et fiable.
-privacy-views-title = Counting page views
-privacy-views = The website counts how often its pages are opened: one single number for all pages and all visitors together, shown on the start page. A page opened in a browser adds one to it. Nothing about you is stored for this: no IP address, no cookie, no identifier, not even which page it was.
+privacy-views-title = Le comptage des pages vues
+privacy-views = Le site compte combien de fois ses pages sont ouvertes : un seul nombre pour toutes les pages et tous les visiteurs ensemble, affiché sur la page d’accueil. Une page ouverte dans un navigateur y ajoute un. Rien sur vous n’est enregistré pour cela : ni adresse IP, ni cookie, ni identifiant, pas même la page dont il s’agissait.
 privacy-device-title = Ce que conserve votre navigateur
 privacy-device = Ce site ne dépose aucun cookie tant que vous ne vous connectez pas. Ce que votre navigateur conserve sur votre appareil, et seulement avec JavaScript : votre choix de couleurs si vous en avez fait un (<code>baylee-site-theme</code>) ; pendant que vous êtes connecté, la fin de votre session (<code>baylee-central-session</code>), votre clé de chat et les clés de confiance de vos contacts (voir Chat) ; si vous avez activé les notifications, un nombre aléatoire pour cet appareil (<code>baylee-push-installation-v1</code>, <code>baylee-push</code>) ; et, uniquement une fois que vous vous êtes connecté, que vous avez installé le site comme application ou activé les notifications, une copie des fichiers publics du site (structure des pages, polices, scripts), pour qu’il démarre sans connexion et que les notifications puissent arriver. Si aucun de ces trois cas ne s’applique plus, la copie est supprimée à la prochaine ouverture du site. Rien de tout cela ne nous est envoyé, sauf si une section ci-dessous le dit. Les entrées du chat et de la session sont supprimées quand vous vous déconnectez ; vous supprimez tout le reste en effaçant les données du site dans votre navigateur. Base légale : § 25, par. 2, n° 2 TDDDG (strictement nécessaire à la fonction que vous utilisez) ; pour le nombre aléatoire des notifications, votre consentement (§ 25, par. 1 TDDDG).
 privacy-github-title = GitHub
 privacy-github = La page de téléchargement et la page d’accueil affichent la dernière version, l’état des tests et les nombres de cartes. Notre serveur les demande à GitHub, pas votre navigateur ; GitHub n’apprend rien sur vous par ce biais. Ce n’est que lorsque vous cliquez sur un lien de téléchargement ou de GitHub que votre navigateur se connecte à GitHub (GitHub, Inc., États-Unis) et lui envoie votre adresse IP et ce que porte toute requête ; la politique de confidentialité propre à GitHub s’applique alors.
 privacy-directory-title = L’annuaire des gateways
-privacy-directory = Notre serveur lit l’annuaire des gateways auprès de Baylee Central et l’affiche ; rien qui vous
-    concerne n’y intervient. Une gateway peut indiquer à Central combien de joueurs, de tables
-    ouvertes et de parties elle compte en ce moment, et Central compte ses comptes ; le site affiche
-    ces nombres. Ce ne sont que des nombres, jamais des noms, et les chiffres d’une gateway sont la
-    déclaration de son propre opérateur.
+privacy-directory = Notre serveur lit l’annuaire des gateways auprès de Baylee Central et l’affiche ; rien qui vous concerne n’y intervient. Une gateway peut indiquer à Central combien de joueurs sont connectés en ce moment, combien d’entre eux sont dans une partie, et combien de tables ouvertes et de parties elle compte, et Central compte ses comptes ; le site affiche ces nombres. Ce ne sont que des nombres, jamais des noms, et les chiffres d’une gateway sont la déclaration de son propre opérateur.
 privacy-account-title = Votre compte
 privacy-account = Pour un compte, Baylee Central enregistre : l’identifiant de votre compte, votre nom de connexion, votre nom d’affichage avec son tag, la date et le mode de création du compte, un enregistrement de mot de passe OPAQUE (qui vous permet de prouver votre mot de passe sans que notre serveur ne l’apprenne jamais), votre clé maîtresse chiffrée deux fois (par votre mot de passe et par votre code de récupération), votre document de compte chiffré et vos objets chiffrés (illisibles pour nous ; nous ne voyons que la taille, la révision et l’heure), la version des conditions que vous avez acceptée et la date, l’heure de votre dernière connexion, vos sessions, un rôle d’administrateur si vous en avez un, et les gateways que vous enregistrez avec leurs jetons. Les autres joueurs voient votre nom d’affichage et votre tag, jamais votre nom de connexion. Si un administrateur vous remet un code de réinitialisation, nous n’en conservons que l’empreinte jusqu’à ce que le code soit utilisé ou ait expiré. Ce que les administrateurs font sur un compte ou une gateway est consigné dans un registre pendant trois ans (qui, quoi, quel compte ou quelle gateway, quand). Base légale : art. 6, par. 1, point b) du RGPD (le compte que vous avez demandé) ; pour l’heure de la dernière connexion et le registre, art. 6, par. 1, point f) du RGPD (notre intérêt légitime à un fonctionnement sûr et traçable). Sans nom de connexion et sans mot de passe, il n’y a pas de compte ; vous n’avez besoin d’aucune adresse e-mail. Vous pouvez créer un compte à partir de 16 ans. Conservé jusqu’à la suppression du compte ; il est alors retiré immédiatement du système en fonctionnement, et des sauvegardes au plus tard dans les 12 mois. Les sessions prennent fin après 30 minutes sans utilisation et au plus tard 12 heures après la connexion.
 privacy-cookie-title = Le cookie de session
@@ -276,7 +272,7 @@ privacy-chat = Les messages sont chiffrés sur votre appareil pour les appareils
 privacy-push-title = Notifications
 privacy-push = Si vous activez les notifications dans un navigateur, votre navigateur s’enregistre auprès de son service push, et Central enregistre l’adresse de ce service pour ce navigateur, la clé publique et le secret d’authentification du navigateur, votre langue, un nombre aléatoire pour cet appareil et votre choix de catégories. Le service push appartient au fabricant de votre navigateur : Google (Firebase Cloud Messaging), Mozilla ou Apple, tous établis aux États-Unis. Une notification ne porte, chiffrés, que son genre (par exemple « nouveau message ») et votre langue, jamais de noms ni de texte ; le service push voit des données de connexion telles que l’adresse, l’heure et la taille. Ces données sont supprimées quand vous désactivez les notifications sur cet appareil, quand vous vous déconnectez ou quand vous supprimez votre compte ; une adresse non renouvelée pendant 90 jours n’est plus utilisée, et les notifications en attente expirent après un jour. Base légale : art. 6, par. 1, point a) du RGPD et § 25, par. 1 TDDDG (votre consentement). Vous pouvez le retirer à tout moment dans les réglages de votre compte ; ce qui s’est passé jusque-là reste licite.
 privacy-counters-title = Protection contre les abus
-privacy-counters = Pour empêcher qu’on devine les mots de passe et pour éviter la surcharge, Central compte certaines requêtes par adresse IP (inscriptions, tentatives de connexion, réinitialisations de mot de passe, lecture de l’annuaire), uniquement en mémoire : les inscriptions et les tentatives de connexion qui n’ont pas abouti avec le bon mot de passe, jusqu’à un jour, tout le reste une heure au plus. Après une connexion avec le bon mot de passe, Central retient pendant 30 jours, là aussi uniquement en mémoire, que votre compte s’est connecté depuis cette adresse (une adresse IPv4, ou la première moitié d’une adresse IPv6 ; huit au plus par compte), afin que les tentatives d’autres personnes sur votre compte ne vous en excluent pas depuis cette adresse. Quelqu’un qui utilise la même adresse et connaît votre nom de connexion peut déduire des réponses de Central que votre compte s’est connecté depuis celle-ci. Un nouveau mot de passe oublie ces adresses, sauf celle depuis laquelle vous l’avez défini ; la suppression du compte les oublie toutes, tout comme un redémarrage du service. Avant une inscription, votre navigateur résout en outre une énigme qui demande de la mémoire et du temps de calcul ; elle est faite de nombres aléatoires, ne contient rien sur vous et est oubliée au bout de vingt minutes au plus tard. Central en recalcule une petite partie pour vérifier la réponse de votre navigateur. Sa difficulté dépend du nombre de comptes en cours de création et de l’apparence de la requête, selon qu’elle vient d’un programme : si elle porte les en-têtes que tout navigateur envoie, si votre navigateur indique qu’un programme le pilote, et combien d’énigmes votre adresse et le bloc réseau qui l’entoure (les trois premiers nombres d’une adresse IPv4, les 48 premiers bits d’une adresse IPv6) ont demandées durant la dernière heure. De cela, Central ne conserve que les décomptes, en mémoire, une heure au plus. Par compte, Central compte les demandes de contact et les recherches d’autres joueurs, afin que personne n’inonde les autres de demandes. Base légale : art. 6, par. 1, point f) du RGPD ; notre intérêt légitime est de protéger les comptes et le service contre les abus.
+privacy-counters = Pour empêcher qu’on devine les mots de passe et pour éviter la surcharge, Central compte les requêtes par adresse IP (inscriptions, tentatives de connexion, réinitialisations de mot de passe, lecture de l’annuaire et, plus généralement, le nombre de requêtes qu’une adresse envoie en une minute), uniquement en mémoire : les inscriptions et les tentatives de connexion qui n’ont pas abouti avec le bon mot de passe, jusqu’à un jour, tout le reste une heure au plus. Après une connexion avec le bon mot de passe, Central retient pendant 30 jours, là aussi uniquement en mémoire, que votre compte s’est connecté depuis cette adresse (une adresse IPv4, ou la première moitié d’une adresse IPv6 ; huit au plus par compte), afin que les tentatives d’autres personnes sur votre compte ne vous en excluent pas depuis cette adresse. Quelqu’un qui utilise la même adresse et connaît votre nom de connexion peut déduire des réponses de Central que votre compte s’est connecté depuis celle-ci. Un nouveau mot de passe oublie ces adresses, sauf celle depuis laquelle vous l’avez défini ; la suppression du compte les oublie toutes, tout comme un redémarrage du service. Avant une inscription, votre navigateur résout en outre une énigme qui demande de la mémoire et du temps de calcul ; elle est faite de nombres aléatoires, ne contient rien sur vous et est oubliée au bout de vingt minutes au plus tard. Central en recalcule une petite partie pour vérifier la réponse de votre navigateur. Sa difficulté dépend du nombre de comptes en cours de création et de l’apparence de la requête, selon qu’elle vient d’un programme : si elle porte les en-têtes que tout navigateur envoie, si votre navigateur indique qu’un programme le pilote, et combien d’énigmes votre adresse et le bloc réseau qui l’entoure (les trois premiers nombres d’une adresse IPv4, les 48 premiers bits d’une adresse IPv6) ont demandées durant la dernière heure. De cela, Central ne conserve que les décomptes, en mémoire, une heure au plus. Par compte, Central compte les demandes de contact et les recherches d’autres joueurs, afin que personne n’inonde les autres de demandes. Base légale : art. 6, par. 1, point f) du RGPD ; notre intérêt légitime est de protéger les comptes et le service contre les abus.
 privacy-contact-title = Le formulaire de contact
 privacy-contact = Le formulaire envoie votre message, la langue de la page et l’heure au service de retours de Baylee sur le même serveur, et votre nom et votre adresse e-mail uniquement si vous les indiquez ; les deux sont facultatifs. Le service note aussi si le message a été traité. Votre adresse IP n’est pas enregistrée ; elle est seulement comptée en mémoire pendant une heure, pour empêcher une avalanche de messages. Seule la personne nommée dans les mentions légales lit les messages ; rien n’est transmis. Un message est supprimé 90 jours après son traitement, après un an au plus tard, ou plus tôt si vous le demandez. Base légale : art. 6, par. 1, point f) du RGPD (notre intérêt légitime à répondre aux messages), ou point b) lorsque votre message concerne votre compte.
 privacy-impressum-title = L’énigme des mentions légales
@@ -464,7 +460,7 @@ error-unavailable = Baylee Central ne répond pas pour le moment. Réessayez dan
 error-network = Pas de connexion. Vérifiez votre réseau et réessayez.
 error-failed = Une erreur s’est produite. Réessayez ; si cela continue, dites-le-nous.
 error-again = Réessayer
-password-show-label = Show the password
+password-show-label = Afficher le mot de passe
 
 ## Signing in
 
@@ -478,8 +474,8 @@ signin-working = Sécurisation de votre mot de passe … cela prend un instant e
 signin-wrong = Ce nom de connexion et ce mot de passe ne correspondent pas. Vérifiez les deux et réessayez.
 signin-not-moved = Ce compte n’a pas encore migré vers Baylee Central. Connectez-vous une fois avec le client Baylee ; il migre votre compte.
 signin-no-account = Pas encore de compte ? <register>Créez-en un</register>.
-register-have-account = Already have an account? <signin>Sign in</signin>.
-dialog-close = Close
+register-have-account = Vous avez déjà un compte ? <signin>Connectez-vous</signin>.
+dialog-close = Fermer
 signin-noscript = La connexion nécessite JavaScript : votre mot de passe est traité dans votre navigateur et ne nous est jamais envoyé.
 
 ## Registering
@@ -805,10 +801,10 @@ strip-cards-unit = cartes
 strip-stars = Étoiles sur GitHub
 strip-accounts = Comptes sur Baylee Central
 strip-live = En ce moment sur les gateways, selon leurs déclarations
-strip-views = Page views since { $date }
+strip-views = Pages vues depuis le { $date }
 live-views = { $n ->
-    [one] { $n } view
-   *[other] { $n } views
+    [one] { $n } vue
+   *[other] { $n } vues
 }
 live-accounts = { $n ->
     [one] { $n } compte
@@ -819,8 +815,8 @@ live-players = { $n ->
    *[other] { $n } joueurs
 }
 live-playing = { $n ->
-    [one] { $n } in a game
-   *[other] { $n } in a game
+    [one] { $n } en partie
+   *[other] { $n } en partie
 }
 live-tables = { $n ->
     [one] { $n } table ouverte
@@ -937,27 +933,27 @@ gw-findHint = Nom ou adresse
 gw-shown = { $n } sur { $all } affichées
 gw-noMatch = Aucune gateway chargée jusqu’ici ne correspond.
 gw-showAll = Tout afficher
-gw-stats = The directory in numbers
-gw-stat-listed = Gateways listed
-gw-stat-online = Online now
-gw-stat-players = Players online
-gw-stat-playing = Of them in a game
-gw-stat-tables = Open tables
-gw-stat-games = Games running
-gw-show = Show
-gw-show-every = All
-gw-show-online = Online
-gw-show-official = Official
-gw-show-tables = With open tables
-gw-sort = Sort by
-gw-sort-best = Recommended
-gw-sort-name = Name (A–Z)
-gw-sort-players = Most players
-gw-sort-tables = Most open tables
-gw-sort-version = Newest version
-gw-view = View
-gw-view-cards = Cards
-gw-view-list = List
+gw-stats = L’annuaire en chiffres
+gw-stat-listed = Gateways listées
+gw-stat-online = En ligne maintenant
+gw-stat-players = Joueurs en ligne
+gw-stat-playing = Dont en partie
+gw-stat-tables = Tables ouvertes
+gw-stat-games = Parties en cours
+gw-show = Afficher
+gw-show-every = Toutes
+gw-show-online = En ligne
+gw-show-official = Officielle
+gw-show-tables = Avec tables ouvertes
+gw-sort = Trier par
+gw-sort-best = Recommandées
+gw-sort-name = Nom (A–Z)
+gw-sort-players = Plus de joueurs
+gw-sort-tables = Plus de tables ouvertes
+gw-sort-version = Version la plus récente
+gw-view = Vue
+gw-view-cards = Tuiles
+gw-view-list = Liste
 link-readmeGateway = #running-your-own-gateway
 selfhost-eyebrow = Auto-hébergement et intégration à Central
 selfhost-title = Faites tourner votre propre gateway

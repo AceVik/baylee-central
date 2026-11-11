@@ -254,14 +254,14 @@ privacy-short-title = 要点
 privacy-short = トラッキング、広告、アクセス解析はなく、ログインしない限りクッキーもなく、ほかのサーバーから読み込むものもありません。フォント、画像、スクリプトはすべて baylee.app から配信されます。パスワードが私たちに届くことはなく、チャットのメッセージと非公開のデータは、送信前にブラウザー内で暗号化されます。
 privacy-hosting-title = サイトの閲覧
 privacy-hosting = このサイトは、ドイツの netcup GmbH から借りているサーバーで動いています。ページを開くと、ブラウザーはすべてのリクエストに付くもの、つまりIPアドレス、要求したアドレス、時刻、ブラウザーの言語、ブラウザーの識別情報（ユーザーエージェント）を送ります。サーバーは応答のためにこれを必要とします。言語版は言語の情報から選び、ダウンロードページはユーザーエージェントから適切なファイルを提案します。ウェブサーバーはアクセスログを残さないため、これらのリクエストは保存されません。サーバー自身の動作メッセージ（システムジャーナル）には、まれにエラーの際にIPアドレスが含まれることがあり、遅くとも14日後に削除されます。法的根拠：GDPR第6条第1項(f)。私たちの正当な利益は、サイトを安全かつ確実に提供することです。
-privacy-views-title = Counting page views
-privacy-views = The website counts how often its pages are opened: one single number for all pages and all visitors together, shown on the start page. A page opened in a browser adds one to it. Nothing about you is stored for this: no IP address, no cookie, no identifier, not even which page it was.
+privacy-views-title = ページビューの集計
+privacy-views = このサイトは、ページが開かれた回数を数えています。すべてのページとすべての訪問者をまとめた1つの数だけで、トップページに表示されます。ブラウザでページが開かれると、この数が1増えます。このために、あなたに関することは何も保存しません。IPアドレスも、クッキーも、識別子も、どのページだったかさえ保存しません。
 privacy-device-title = ブラウザーが保持するもの
 privacy-device = ログインするまで、このサイトはクッキーを設定しません。ブラウザーがお使いの端末に保持するものは次のとおりで、JavaScript を使う場合に限ります。配色を選んだ場合はその選択（<code>baylee-site-theme</code>）。ログイン中は、セッションの終了時刻（<code>baylee-central-session</code>）、チャットの鍵、連絡先の信頼済みの鍵（チャットの項を参照）。通知をオンにした場合は、この端末の乱数（<code>baylee-push-installation-v1</code>、<code>baylee-push</code>）。そして、ログインした、サイトをアプリとしてインストールした、通知をオンにした、のいずれかの場合に限り、サイトの公開ファイル（ページの枠、フォント、スクリプト）の控え。これにより、接続がなくても起動でき、通知を受け取れます。この三つのいずれにも当てはまらなくなった場合、控えは次にサイトを開いたときに削除されます。以下の項に記載がない限り、これらが私たちに送られることはありません。チャットとセッションの項目はログアウト時に削除されます。それ以外は、ブラウザーでサイトのデータを消去すれば削除できます。法的根拠：TDDDG第25条第2項第2号（利用する機能に厳密に必要なもの）。通知の乱数については、同意（TDDDG第25条第1項）。
 privacy-github-title = GitHub
 privacy-github = ダウンロードページとトップページには、最新のリリース、テストの状況、カードの数が表示されます。これらはブラウザーではなく私たちのサーバーが GitHub に問い合わせて取得するため、GitHub があなたについて知ることはありません。ダウンロードや GitHub へのリンクを押したときに限り、ブラウザーが GitHub（GitHub, Inc.、米国）に接続し、IPアドレスとすべてのリクエストに付くものを送ります。その後は GitHub 自身のプライバシー通知が適用されます。
 privacy-directory-title = Gateway 一覧
-privacy-directory = 私たちのサーバーは Baylee Central から Gateway の一覧を読み、表示します。あなたに関することは含まれません。Gateway は、その時点のプレイヤー数、開いているテーブル数、ゲーム数を Central に伝えることがあり、Central はアカウント数を数えます。サイトはこれらの数を表示します。表示されるのは数だけで、名前は含まれません。Gateway の数は、その運営者自身の申告です。
+privacy-directory = 私たちのサーバーは Baylee Central から Gateway の一覧を読み、表示します。あなたに関することは含まれません。Gateway は、その時点で接続しているプレイヤーの数、そのうちゲーム中の数、開いているテーブルの数、ゲームの数を Central に伝えることがあり、Central はアカウント数を数えます。サイトはこれらの数を表示します。表示されるのは数だけで、名前は含まれません。Gateway の数は、その運営者自身の申告です。
 privacy-account-title = アカウント
 privacy-account = アカウントについて、Baylee Central は次を保存します。アカウントID、ログイン名、タグ付きの表示名、アカウントがいつどのように作られたか、OPAQUE のパスワード記録（私たちのサーバーがパスワードを知ることなく、パスワードを証明できる仕組み）、パスワードと回復コードで二重に暗号化されたマスターキー、暗号化されたアカウント文書と暗号化されたオブジェクト（私たちには読めず、サイズ、リビジョン、時刻だけが見えます）、同意した利用規約のバージョンと時期、最後にログインした時刻、セッション、管理者の役割（ある場合）、登録した Gateway とそのトークン。ほかのプレイヤーに見えるのは表示名とタグで、ログイン名は見えません。管理者がリセットコードを渡した場合、私たちが保存するのは、コードが使われるか期限が切れるまで、そのダイジェストだけです。管理者がアカウントや Gateway に対して行った操作は、3年間、記録（誰が、何を、どのアカウントまたは Gateway に、いつ）として保管されます。法的根拠：GDPR第6条第1項(b)（ご希望のアカウント）。最後のログイン時刻と記録については、GDPR第6条第1項(f)（安全で追跡可能な運用という私たちの正当な利益）。ログイン名とパスワードがなければアカウントはありません。メールアドレスは不要です。アカウントを作成できるのは16歳からです。アカウントを削除するまで保管します。削除すると、稼働中のシステムからは直ちに、バックアップからは遅くとも12か月以内に削除されます。セッションは、使われないまま30分で、遅くともログインから12時間で終了します。
 privacy-cookie-title = セッションのクッキー
@@ -271,7 +271,7 @@ privacy-chat = メッセージは、受信者の端末ごとに、お使いの�
 privacy-push-title = 通知
 privacy-push = ブラウザーで通知をオンにすると、ブラウザーがそのプッシュサービスに登録し、Central は、このブラウザー向けのそのサービスのアドレス、ブラウザーの公開鍵と認証シークレット、言語、この端末の乱数、選んだカテゴリーを保存します。プッシュサービスは、ブラウザーの提供元であるGoogle（Firebase Cloud Messaging）、MozillaまたはAppleのもので、いずれも米国に拠点があります。通知には、暗号化された状態で、種類（たとえば「新着メッセージ」）と言語だけが入り、名前や本文は入りません。プッシュサービスには、アドレス、時刻、サイズなどの接続データが見えます。これらは、この端末で通知をオフにしたとき、ログアウトしたとき、またはアカウントを削除したときに削除されます。90日間更新されないアドレスは使われなくなり、待機中の通知は1日で失効します。法的根拠：GDPR第6条第1項(a)およびTDDDG第25条第1項（同意）。アカウントの設定でいつでも撤回できます。それまでの処理は適法のままです。
 privacy-counters-title = 不正利用への対策
-privacy-counters = パスワードの推測と過負荷を防ぐため、Central は特定のリクエスト（登録、ログインの試行、パスワードのリセット、ディレクトリの閲覧）を IP アドレスごとに、メモリ内でのみ数えます。登録と、正しいパスワードで完了しなかったログインの試行は最長で1日、それ以外は長くても1時間です。正しいパスワードでログインした後、Central は、あなたのアカウントがそのアドレス（IPv4 アドレス、または IPv6 アドレスの前半。1アカウントにつき最大8件）からログインしたことを、やはりメモリ内でのみ30日間覚えています。これは、他の人によるあなたのアカウントへの試行で、あなたがそのアドレスから締め出されないようにするためです。同じアドレスを使っていて、あなたのログイン名を知っている人は、Central の応答から、あなたのアカウントがそのアドレスからログインしたことが分かります。新しいパスワードを設定すると、設定したアドレスを除いてこれらのアドレスは忘れられ、アカウントを削除するとすべて忘れられ、サービスを再起動した場合も同様です。登録の前には、ブラウザーがメモリと計算時間を要するパズルも解きます。パズルは乱数でできており、あなたに関する情報は含まず、遅くとも20分後には忘れられます。Central はブラウザーの答えを確認するため、その一部を計算し直します。難しさは、作成中のアカウントの数と、リクエストがプログラムのものに見えるかどうかで決まります。具体的には、すべてのブラウザーが送るヘッダーが付いているか、ブラウザーがプログラムに操作されていると申告しているか、そして直近1時間にあなたのアドレスとその周りのネットワークブロック（IPv4 アドレスの最初の3つの数、IPv6 アドレスの最初の48ビット）が何個のパズルを要求したかです。これについて Central が保持するのは、メモリ内の件数だけで、最長で1時間です。アカウントごとに、Central は連絡の依頼と他のプレイヤーの検索を数えます。誰も他の人に依頼を大量に送りつけないようにするためです。法的根拠：GDPR第6条第1項(f)。私たちの正当な利益は、アカウントとサービスを不正利用から守ることです。
+privacy-counters = パスワードの推測と過負荷を防ぐため、Central はリクエスト（登録、ログインの試行、パスワードのリセット、ディレクトリの閲覧、およびより一般に、1つのアドレスが1分間に送るリクエストの数）を IP アドレスごとに、メモリ内でのみ数えます。登録と、正しいパスワードで完了しなかったログインの試行は最長で1日、それ以外は長くても1時間です。正しいパスワードでログインした後、Central は、あなたのアカウントがそのアドレス（IPv4 アドレス、または IPv6 アドレスの前半。1アカウントにつき最大8件）からログインしたことを、やはりメモリ内でのみ30日間覚えています。これは、他の人によるあなたのアカウントへの試行で、あなたがそのアドレスから締め出されないようにするためです。同じアドレスを使っていて、あなたのログイン名を知っている人は、Central の応答から、あなたのアカウントがそのアドレスからログインしたことが分かります。新しいパスワードを設定すると、設定したアドレスを除いてこれらのアドレスは忘れられ、アカウントを削除するとすべて忘れられ、サービスを再起動した場合も同様です。登録の前には、ブラウザーがメモリと計算時間を要するパズルも解きます。パズルは乱数でできており、あなたに関する情報は含まず、遅くとも20分後には忘れられます。Central はブラウザーの答えを確認するため、その一部を計算し直します。難しさは、作成中のアカウントの数と、リクエストがプログラムのものに見えるかどうかで決まります。具体的には、すべてのブラウザーが送るヘッダーが付いているか、ブラウザーがプログラムに操作されていると申告しているか、そして直近1時間にあなたのアドレスとその周りのネットワークブロック（IPv4 アドレスの最初の3つの数、IPv6 アドレスの最初の48ビット）が何個のパズルを要求したかです。これについて Central が保持するのは、メモリ内の件数だけで、最長で1時間です。アカウントごとに、Central は連絡の依頼と他のプレイヤーの検索を数えます。誰も他の人に依頼を大量に送りつけないようにするためです。法的根拠：GDPR第6条第1項(f)。私たちの正当な利益は、アカウントとサービスを不正利用から守ることです。
 privacy-contact-title = お問い合わせフォーム
 privacy-contact = フォームは、メッセージ、ページの言語、時刻を同じサーバー上の Baylee のフィードバックサービスに送り、氏名とメールアドレスは、ご記入いただいた場合に限って送ります。どちらも任意です。サービスは、メッセージに対応済みかどうかも記録します。IPアドレスは保存せず、メッセージの大量送信を防ぐために、1時間だけメモリ内で数えます。メッセージを読むのは法的表示に記載した人物だけで、第三者には渡しません。メッセージは、対応後90日、遅くとも1年後に削除し、ご希望があればそれより早く削除します。法的根拠：GDPR第6条第1項(f)（メッセージに答えるという私たちの正当な利益）。メッセージがアカウントに関するものである場合は(b)。
 privacy-impressum-title = 法的表示のパズル
@@ -437,7 +437,7 @@ error-unavailable = Baylee Central がいま応答していません。しばら
 error-network = 接続がありません。ネットワークを確認して、もう一度お試しください。
 error-failed = 問題が発生しました。もう一度お試しください。何度も起きる場合はお知らせください。
 error-again = もう一度試す
-password-show-label = Show the password
+password-show-label = パスワードを表示
 
 ## Signing in
 
@@ -451,8 +451,8 @@ signin-working = パスワードを保護しています … 少し時間がか�
 signin-wrong = ログイン名とパスワードが一致しません。両方を確認して、もう一度お試しください。
 signin-not-moved = このアカウントはまだ Baylee Central に移行していません。Baylee クライアントで一度ログインしてください。アカウントが移行されます。
 signin-no-account = まだアカウントがありませんか？ <register>作成する</register>。
-register-have-account = Already have an account? <signin>Sign in</signin>.
-dialog-close = Close
+register-have-account = すでにアカウントをお持ちですか？ <signin>ログイン</signin>。
+dialog-close = 閉じる
 signin-noscript = ログインには JavaScript が必要です。パスワードはブラウザー内で処理され、私たちに送られることはありません。
 
 ## Registering
@@ -776,10 +776,9 @@ strip-cards-unit = 枚
 strip-stars = GitHub のスター
 strip-accounts = Baylee Central のアカウント
 strip-live = Gateway が報告する、今の数
-strip-views = Page views since { $date }
+strip-views = { $date } からのページビュー
 live-views = { $n ->
-    [one] { $n } view
-   *[other] { $n } views
+   *[other] { $n } ビュー
 }
 live-accounts = { $n ->
     [one] { $n } アカウント
@@ -790,8 +789,7 @@ live-players = { $n ->
    *[other] { $n } 人のプレイヤー
 }
 live-playing = { $n ->
-    [one] { $n } in a game
-   *[other] { $n } in a game
+   *[other] { $n } 人がゲーム中
 }
 live-tables = { $n ->
     [one] 開いているテーブル { $n } 件
@@ -902,27 +900,27 @@ gw-findHint = 名前またはアドレス
 gw-shown = { $all } 件中 { $n } 件を表示
 gw-noMatch = 読み込み済みの Gateway には、一致するものがありません。
 gw-showAll = すべて表示
-gw-stats = The directory in numbers
-gw-stat-listed = Gateways listed
-gw-stat-online = Online now
-gw-stat-players = Players online
-gw-stat-playing = Of them in a game
-gw-stat-tables = Open tables
-gw-stat-games = Games running
-gw-show = Show
-gw-show-every = All
-gw-show-online = Online
-gw-show-official = Official
-gw-show-tables = With open tables
-gw-sort = Sort by
-gw-sort-best = Recommended
-gw-sort-name = Name (A–Z)
-gw-sort-players = Most players
-gw-sort-tables = Most open tables
-gw-sort-version = Newest version
-gw-view = View
-gw-view-cards = Cards
-gw-view-list = List
+gw-stats = ディレクトリの数字
+gw-stat-listed = 掲載中の Gateway
+gw-stat-online = 現在オンライン
+gw-stat-players = オンラインのプレイヤー
+gw-stat-playing = うちゲーム中
+gw-stat-tables = 開いているテーブル
+gw-stat-games = 進行中のゲーム
+gw-show = 表示
+gw-show-every = すべて
+gw-show-online = オンライン
+gw-show-official = 公式
+gw-show-tables = 開いているテーブルあり
+gw-sort = 並べ替え
+gw-sort-best = おすすめ
+gw-sort-name = 名前順
+gw-sort-players = プレイヤー数が多い順
+gw-sort-tables = 開いているテーブルが多い順
+gw-sort-version = 新しいバージョン順
+gw-view = 表示形式
+gw-view-cards = タイル
+gw-view-list = リスト
 link-readmeGateway = #running-your-own-gateway
 selfhost-eyebrow = セルフホストと Central 連携
 selfhost-title = 自分の Gateway を運営する

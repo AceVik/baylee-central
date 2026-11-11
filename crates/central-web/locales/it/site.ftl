@@ -255,17 +255,14 @@ privacy-short-title = In breve
 privacy-short = Nessun tracciamento, nessuna pubblicità, nessuna analisi statistica, nessun cookie a meno che tu non acceda, e nulla caricato da altri server: caratteri, immagini e script provengono tutti da baylee.app. La tua password non ci raggiunge mai, e i tuoi messaggi in chat e i tuoi dati privati vengono cifrati nel tuo browser prima di essere inviati.
 privacy-hosting-title = Visita al sito
 privacy-hosting = Il sito gira su un server che prendiamo in affitto da netcup GmbH in Germania. Quando apri una pagina, il tuo browser invia ciò che porta con sé ogni richiesta: il tuo indirizzo IP, l'indirizzo richiesto, l'ora, la lingua del browser e la sua identificazione (user agent). Il server ne ha bisogno per rispondere; sceglie la versione linguistica in base alla lingua, e la pagina di download usa lo user agent per suggerire il file giusto. Il server web non conserva alcun log di accesso, quindi queste richieste non vengono memorizzate. I messaggi di funzionamento del server stesso (il suo journal di sistema) possono, in rari casi di errore, contenere un indirizzo IP; vengono cancellati al più tardi dopo 14 giorni. Base giuridica: art. 6, par. 1, lett. f) del GDPR; il nostro legittimo interesse è fornire il sito in modo sicuro e affidabile.
-privacy-views-title = Counting page views
-privacy-views = The website counts how often its pages are opened: one single number for all pages and all visitors together, shown on the start page. A page opened in a browser adds one to it. Nothing about you is stored for this: no IP address, no cookie, no identifier, not even which page it was.
+privacy-views-title = Il conteggio delle visualizzazioni di pagina
+privacy-views = Il sito conta quante volte vengono aperte le sue pagine: un solo numero per tutte le pagine e tutti i visitatori insieme, mostrato nella pagina iniziale. Una pagina aperta in un browser lo aumenta di uno. Per questo non viene memorizzato nulla su di te: né indirizzo IP, né cookie, né identificatore, nemmeno quale pagina fosse.
 privacy-device-title = Che cosa conserva il tuo browser
 privacy-device = Questo sito non imposta alcun cookie finché non accedi. Ciò che il tuo browser conserva sul tuo dispositivo, e solo con JavaScript: la tua scelta dei colori, se ne hai fatta una (<code>baylee-site-theme</code>); finché sei connesso, quando termina la tua sessione (<code>baylee-central-session</code>), la tua chiave di chat e le chiavi fidate dei tuoi contatti (vedi Chat); se hai attivato le notifiche, un numero casuale per questo dispositivo (<code>baylee-push-installation-v1</code>, <code>baylee-push</code>); e, solo dopo che hai effettuato l'accesso, installato il sito come app o attivato le notifiche, una copia dei file pubblici del sito (guscio della pagina, caratteri, script), così che si avvii senza connessione e le notifiche possano arrivare. Se nessuna delle tre condizioni vale più, la copia viene rimossa alla successiva apertura del sito. Nulla di tutto questo ci viene inviato, a meno che una sezione qui sotto non lo dica. Le voci della chat e della sessione vengono cancellate quando esci; tutto il resto lo rimuovi cancellando i dati del sito nel tuo browser. Base giuridica: § 25, comma 2, n. 2 TDDDG (strettamente necessario per la funzione che usi); per il numero casuale delle notifiche, il tuo consenso (§ 25, comma 1 TDDDG).
 privacy-github-title = GitHub
 privacy-github = La pagina di download e la pagina iniziale mostrano l'ultima versione, lo stato dei test e i numeri delle carte. È il nostro server a chiederli a GitHub, non il tuo browser; GitHub non apprende nulla su di te da questo. Solo quando fai clic su un download o su un link di GitHub il tuo browser si collega a GitHub (GitHub, Inc., USA) e gli invia il tuo indirizzo IP e ciò che porta con sé ogni richiesta; si applica allora l'informativa sulla privacy di GitHub.
 privacy-directory-title = L'elenco dei gateway
-privacy-directory = Il nostro server legge l'elenco dei gateway da Baylee Central e lo mostra; non è
-    coinvolto nulla che ti riguardi. Un gateway può comunicare a Central quanti giocatori, tavoli
-    aperti e partite ha al momento, e Central conta i propri account; il sito mostra questi numeri.
-    Sono solo conteggi, mai nomi, e i numeri di un gateway sono una dichiarazione del suo gestore.
+privacy-directory = Il nostro server legge l'elenco dei gateway da Baylee Central e lo mostra; non è coinvolto nulla che ti riguardi. Un gateway può comunicare a Central quanti giocatori sono connessi al momento, quanti di loro sono in una partita e quanti tavoli aperti e partite ha, e Central conta i propri account; il sito mostra questi numeri. Sono solo conteggi, mai nomi, e i numeri di un gateway sono una dichiarazione del suo gestore.
 privacy-account-title = Il tuo account
 privacy-account = Per un account, Baylee Central memorizza: l'ID del tuo account, il tuo nome di accesso, il tuo nome visualizzato con il suo tag, quando e come è stato creato l'account, un record di password OPAQUE (che ti permette di dimostrare la tua password senza che il nostro server la conosca mai), la tua chiave principale cifrata due volte (dalla tua password e dal tuo codice di recupero), il documento cifrato del tuo account e i tuoi oggetti cifrati (illeggibili per noi; vediamo solo dimensione, revisione e ora), quale versione delle condizioni hai accettato e quando, l'ora del tuo ultimo accesso, le tue sessioni, un ruolo di amministratore se ne hai uno, e i gateway che registri con i loro token. Gli altri giocatori vedono il tuo nome visualizzato e il tag, mai il tuo nome di accesso. Se un amministratore ti dà un codice di reimpostazione, ne memorizziamo solo l'impronta (digest) finché il codice non viene usato o scade. Ciò che gli amministratori fanno a un account o a un gateway viene conservato in un registro per tre anni (chi, che cosa, quale account o gateway, quando). Base giuridica: art. 6, par. 1, lett. b) del GDPR (l'account che hai richiesto); per l'ora dell'ultimo accesso e il registro, art. 6, par. 1, lett. f) del GDPR (il nostro legittimo interesse a un funzionamento sicuro e tracciabile). Senza un nome di accesso e una password non c'è alcun account; non ti serve un indirizzo e-mail. Puoi creare un account a partire dai 16 anni. Conservato finché non elimini l'account; viene poi rimosso subito dal sistema in esercizio, e dai backup al più tardi entro 12 mesi. Le sessioni terminano dopo 30 minuti di inutilizzo e al più tardi 12 ore dopo l'accesso.
 privacy-cookie-title = Il cookie di sessione
@@ -275,7 +272,7 @@ privacy-chat = I messaggi vengono cifrati sul tuo dispositivo per i dispositivi 
 privacy-push-title = Notifiche
 privacy-push = Se attivi le notifiche in un browser, il tuo browser si registra presso il proprio servizio push, e Central memorizza l'indirizzo di quel servizio per questo browser, la chiave pubblica e il segreto di autenticazione del browser, la tua lingua, un numero casuale per questo dispositivo e la tua scelta delle categorie. Il servizio push appartiene al produttore del tuo browser: Google (Firebase Cloud Messaging), Mozilla o Apple, tutte con sede negli USA. Una notifica contiene, cifrati, solo il suo tipo (per esempio «nuovo messaggio») e la tua lingua, mai nomi o testo; il servizio push vede i dati di connessione come indirizzo, ora e dimensione. Questi dati vengono cancellati quando disattivi le notifiche su questo dispositivo, quando esci o quando elimini il tuo account; un indirizzo non rinnovato per 90 giorni non viene più usato, e le notifiche in attesa scadono dopo un giorno. Base giuridica: art. 6, par. 1, lett. a) del GDPR e § 25, comma 1 TDDDG (il tuo consenso). Puoi revocarlo in qualsiasi momento nelle impostazioni del tuo account; ciò che è avvenuto fino ad allora resta lecito.
 privacy-counters-title = Protezione dagli abusi
-privacy-counters = Per impedire che le password vengano indovinate e per evitare il sovraccarico, Central conta alcune richieste per indirizzo IP (registrazioni, tentativi di accesso, reimpostazioni della password, lettura dell'elenco), solo in memoria: le registrazioni e i tentativi di accesso non conclusi con la password giusta fino a un giorno, tutto il resto per al massimo un'ora. Dopo un accesso con la password giusta, Central ricorda per 30 giorni, di nuovo solo in memoria, che il tuo account ha effettuato l'accesso da quell'indirizzo (un indirizzo IPv4, o la prima metà di un indirizzo IPv6; al massimo otto per account), in modo che i tentativi altrui sul tuo account non ti escludano da lì. Chi usa lo stesso indirizzo e conosce il tuo nome di accesso può capire dalle risposte di Central che il tuo account ha effettuato l'accesso da lì. Una nuova password dimentica questi indirizzi, tranne quello da cui l'hai impostata; l'eliminazione dell'account li dimentica tutti, e lo stesso vale per un riavvio del servizio. Prima di una registrazione il tuo browser risolve inoltre un rompicapo che richiede memoria e tempo di calcolo; è fatto di numeri casuali, non contiene nulla su di te e viene dimenticato al più tardi dopo venti minuti. Central ne ricalcola una piccola parte per verificare la risposta del tuo browser. Quanto è difficile dipende da quanti account vengono creati e da se la richiesta sembra venire da un programma: se contiene le intestazioni che ogni browser invia, se il tuo browser dichiara che un programma lo sta controllando, e quanti rompicapi il tuo indirizzo e il blocco di rete che lo circonda (i primi tre numeri di un indirizzo IPv4, i primi 48 bit di un indirizzo IPv6) hanno richiesto nell'ultima ora. Di questo Central conserva solo i conteggi, in memoria, per al massimo un'ora. Per ogni account Central conta le richieste di contatto e le ricerche di altri giocatori, perché nessuno sommerga gli altri di richieste. Base giuridica: art. 6, par. 1, lett. f) del GDPR; il nostro legittimo interesse è proteggere gli account e il servizio dagli abusi.
+privacy-counters = Per impedire che le password vengano indovinate e per evitare il sovraccarico, Central conta le richieste per indirizzo IP (registrazioni, tentativi di accesso, reimpostazioni della password, lettura dell'elenco e, più in generale, quante richieste invia un indirizzo entro un minuto), solo in memoria: le registrazioni e i tentativi di accesso non conclusi con la password giusta fino a un giorno, tutto il resto per al massimo un'ora. Dopo un accesso con la password giusta, Central ricorda per 30 giorni, di nuovo solo in memoria, che il tuo account ha effettuato l'accesso da quell'indirizzo (un indirizzo IPv4, o la prima metà di un indirizzo IPv6; al massimo otto per account), in modo che i tentativi altrui sul tuo account non ti escludano da lì. Chi usa lo stesso indirizzo e conosce il tuo nome di accesso può capire dalle risposte di Central che il tuo account ha effettuato l'accesso da lì. Una nuova password dimentica questi indirizzi, tranne quello da cui l'hai impostata; l'eliminazione dell'account li dimentica tutti, e lo stesso vale per un riavvio del servizio. Prima di una registrazione il tuo browser risolve inoltre un rompicapo che richiede memoria e tempo di calcolo; è fatto di numeri casuali, non contiene nulla su di te e viene dimenticato al più tardi dopo venti minuti. Central ne ricalcola una piccola parte per verificare la risposta del tuo browser. Quanto è difficile dipende da quanti account vengono creati e da se la richiesta sembra venire da un programma: se contiene le intestazioni che ogni browser invia, se il tuo browser dichiara che un programma lo sta controllando, e quanti rompicapi il tuo indirizzo e il blocco di rete che lo circonda (i primi tre numeri di un indirizzo IPv4, i primi 48 bit di un indirizzo IPv6) hanno richiesto nell'ultima ora. Di questo Central conserva solo i conteggi, in memoria, per al massimo un'ora. Per ogni account Central conta le richieste di contatto e le ricerche di altri giocatori, perché nessuno sommerga gli altri di richieste. Base giuridica: art. 6, par. 1, lett. f) del GDPR; il nostro legittimo interesse è proteggere gli account e il servizio dagli abusi.
 privacy-contact-title = Il modulo di contatto
 privacy-contact = Il modulo invia il tuo messaggio, la lingua della pagina e l'ora al servizio di feedback di Baylee sullo stesso server, e il tuo nome e il tuo indirizzo e-mail solo se li indichi; entrambi sono facoltativi. Il servizio annota anche se il messaggio è stato gestito. Il tuo indirizzo IP non viene memorizzato; viene solo contato in memoria per un'ora, per fermare un'ondata di messaggi. Solo la persona indicata nelle note legali legge i messaggi; nulla viene trasmesso ad altri. Un messaggio viene cancellato 90 giorni dopo che è stato gestito, al più tardi dopo un anno, o prima se lo chiedi. Base giuridica: art. 6, par. 1, lett. f) del GDPR (il nostro legittimo interesse a rispondere ai messaggi), oppure lett. b) se il tuo messaggio riguarda il tuo account.
 privacy-impressum-title = Il rompicapo delle note legali
@@ -462,7 +459,7 @@ error-unavailable = Baylee Central non risponde al momento. Riprova tra poco.
 error-network = Nessuna connessione. Controlla la rete e riprova.
 error-failed = Qualcosa è andato storto. Riprova; se continua, faccelo sapere.
 error-again = Riprova
-password-show-label = Show the password
+password-show-label = Mostra la password
 
 ## Signing in
 
@@ -476,8 +473,8 @@ signin-working = Protezione della tua password in corso … ci vuole un momento 
 signin-wrong = Questo nome di accesso e questa password non corrispondono. Controlla entrambi e riprova.
 signin-not-moved = Questo account non è ancora passato a Baylee Central. Accedi una volta con il client di Baylee; sposta il tuo account.
 signin-no-account = Non hai ancora un account? <register>Creane uno</register>.
-register-have-account = Already have an account? <signin>Sign in</signin>.
-dialog-close = Close
+register-have-account = Hai già un account? <signin>Accedi</signin>.
+dialog-close = Chiudi
 signin-noscript = Per accedere serve JavaScript: la tua password viene elaborata nel tuo browser e non ci viene mai inviata.
 
 ## Registering
@@ -803,10 +800,10 @@ strip-cards-unit = carte
 strip-stars = Stelle su GitHub
 strip-accounts = Account su Baylee Central
 strip-live = Adesso sui gateway, come riferito da loro
-strip-views = Page views since { $date }
+strip-views = Pagine viste dal { $date }
 live-views = { $n ->
-    [one] { $n } view
-   *[other] { $n } views
+    [one] { $n } visualizzazione
+   *[other] { $n } visualizzazioni
 }
 live-accounts = { $n ->
     [one] { $n } account
@@ -817,8 +814,8 @@ live-players = { $n ->
    *[other] { $n } giocatori
 }
 live-playing = { $n ->
-    [one] { $n } in a game
-   *[other] { $n } in a game
+    [one] { $n } in partita
+   *[other] { $n } in partita
 }
 live-tables = { $n ->
     [one] { $n } tavolo aperto
@@ -935,27 +932,27 @@ gw-findHint = Nome o indirizzo
 gw-shown = { $n } su { $all } mostrati
 gw-noMatch = Nessun gateway caricato finora corrisponde.
 gw-showAll = Mostra tutti
-gw-stats = The directory in numbers
-gw-stat-listed = Gateways listed
-gw-stat-online = Online now
-gw-stat-players = Players online
-gw-stat-playing = Of them in a game
-gw-stat-tables = Open tables
-gw-stat-games = Games running
-gw-show = Show
-gw-show-every = All
+gw-stats = L'elenco in numeri
+gw-stat-listed = Gateway in elenco
+gw-stat-online = Online ora
+gw-stat-players = Giocatori online
+gw-stat-playing = Di cui in partita
+gw-stat-tables = Tavoli aperti
+gw-stat-games = Partite in corso
+gw-show = Mostra
+gw-show-every = Tutti
 gw-show-online = Online
-gw-show-official = Official
-gw-show-tables = With open tables
-gw-sort = Sort by
-gw-sort-best = Recommended
-gw-sort-name = Name (A–Z)
-gw-sort-players = Most players
-gw-sort-tables = Most open tables
-gw-sort-version = Newest version
-gw-view = View
-gw-view-cards = Cards
-gw-view-list = List
+gw-show-official = Ufficiale
+gw-show-tables = Con tavoli aperti
+gw-sort = Ordina per
+gw-sort-best = Consigliati
+gw-sort-name = Nome (A–Z)
+gw-sort-players = Più giocatori
+gw-sort-tables = Più tavoli aperti
+gw-sort-version = Versione più recente
+gw-view = Vista
+gw-view-cards = Riquadri
+gw-view-list = Lista
 link-readmeGateway = #running-your-own-gateway
 selfhost-eyebrow = Self-hosting e integrazione con Central
 selfhost-title = Gestisci il tuo gateway
