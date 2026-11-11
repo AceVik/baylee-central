@@ -17,7 +17,7 @@ async function register(page: Page, username: string, display: string): Promise<
   await page.getByLabel("Sign-in name").fill(username);
   await page.getByLabel("Display name").fill(display);
   await page.getByLabel("Password", { exact: true }).fill(password);
-  await page.getByLabel("Password again").fill(password);
+  await page.getByLabel("Repeat password").fill(password);
   await page.getByLabel("I am 16 or older.").check();
   await page.getByRole("checkbox", { name: /I accept the terms of use/ }).check();
   // a person takes longer than three seconds to fill a form; the page refuses faster ones

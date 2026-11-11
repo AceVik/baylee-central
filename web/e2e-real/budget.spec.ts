@@ -10,7 +10,7 @@ test("the sixth registration attempt in an hour is refused, and the page says wh
   await page.getByLabel("Username").fill(`rr_budget_${Date.now() % 100_000}`);
   await page.getByLabel("Display name").fill("Real_Budget");
   await page.getByLabel("Password", { exact: true }).fill("violet lantern harbour quietly");
-  await page.getByLabel("Password again").fill("violet lantern harbour quietly");
+  await page.getByLabel("Repeat password").fill("violet lantern harbour quietly");
   await page.getByLabel("I am at least 16 years old.").check();
   await page.getByRole("checkbox", { name: /I accept the terms of use/ }).check();
   const statuses: number[] = [];
