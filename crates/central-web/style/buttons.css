@@ -209,12 +209,16 @@
   color: var(--link);
   cursor: pointer;
   font: 600 var(--text-sm) var(--sans);
-  text-decoration: underline;
-  text-decoration-thickness: 1px;
-  text-underline-offset: 0.18em;
-  transition: color var(--dur-fast) ease;
+  text-decoration: underline transparent;
+  text-decoration-thickness: 0.08em;
+  text-underline-offset: 0.24em;
+  transition:
+    color var(--dur-fast) ease,
+    text-decoration-color var(--dur-fast) ease;
 }
 
-.text-link:hover {
+.text-link:hover,
+.text-link:focus-visible {
   color: var(--link-hover);
+  text-decoration-color: currentcolor;
 }

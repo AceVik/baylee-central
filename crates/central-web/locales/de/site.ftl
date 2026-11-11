@@ -29,7 +29,7 @@ foot-discord = Discord-Community
 foot-central-source = Quellcode dieser Seite
 foot-dedication = Für Baylee. Für immer im Sonnenlicht.
 fan-content = Baylee ist ein inoffizieller Fan-Inhalt im Rahmen der <policy>Richtlinie für Fan-Inhalte</policy>. Nicht von Wizards gefördert/gesponsert. Bestandteile des enthaltenen Materials sind Eigentum von Wizards of the Coast. ©Wizards of the Coast LLC.
-foot-colophon = Schriften: Faustina und Alegreya Sans, SIL Open Font License 1.1, von dieser Seite ausgeliefert. Das Gemälde und das Logo sind unsere eigenen. <notices>Hinweise</notices>
+foot-colophon = Schriften: Literata und Inter, SIL Open Font License 1.1, von dieser Seite ausgeliefert. Das Gemälde und das Logo sind unsere eigenen. <notices>Hinweise</notices>
 
 ## Titel und Beschreibungen
 
@@ -58,7 +58,6 @@ breadcrumb-home = Start
 
 ## Start
 
-hero-kicker = Offene Beta · Kostenlos · Open Source · Inoffizieller Fan-Inhalt
 hero-title = Decks bauen. Freunde einladen. <glow>Einfach spielen.</glow>
 hero-lead = Ein umfassender Deckbuilder, Partien für bis zu acht Spieler – im Duell, jeder gegen jeden oder im Team – und eine Regel-Engine, die jeden Schritt prüft. So bleibt jeder Zug fair, ohne dass jemand etwas nachschlagen muss.
 hero-offline = Solopartien und der Deckbuilder funktionieren offline, ohne Account. Online-Tische laufen auf Gateways; <host>du kannst dein eigenes betreiben</host>.
@@ -755,13 +754,25 @@ foot-central = Baylee Central (Quellcode einsehbar)
 foot-summary = Freies, quelloffenes Tabletop-Kartenspiel in Rust & Bevy – mit deterministischer Regel-Engine, lokalem Offline-Modus, Haus-KI, LLM-Anbindung und Community-Gateways.
 strip-build = Build
 strip-ci = CI
-strip-commit = Letzter Commit
+strip-commit = Commit
 strip-gateways = Gateways
 strip-online = online
 strip-offline = offline
 strip-releases = siehe Releases
 strip-on-github = auf GitHub ansehen
 strip-directory = das Verzeichnis
+strip-cards = Spielbare Karten
+strip-cards-unit = Karten
+strip-stars = Sterne auf GitHub
+hero-badges = Auf einen Blick
+hero-badge-beta = Offene Beta
+hero-badge-free = Kostenlos
+hero-badge-open = Open Source
+hero-badge-fan = Inoffizieller Fan-Inhalt
+gws-open-client = In Baylee öffnen
+gws-open-client-help = „In Baylee öffnen“ startet den installierten Client (ab 0.1.1-beta.9b). Er zeigt die Adresse und fragt nach, bevor er das Gateway hinzufügt.
+dl-menu-title = Alle Systeme
+dl-old-cpu = ältere Prozessoren (ohne AVX2)
 ci-passing = grün
 ci-failing = rot
 dl-button = Baylee herunterladen

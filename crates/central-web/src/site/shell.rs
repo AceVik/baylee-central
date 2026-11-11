@@ -140,11 +140,11 @@ fn preloads(page: Page, assets: &Assets) -> impl IntoView + use<> {
     // title wraps around a stand-in. (The download button's bold and
     // medium faces move it by less than CLS 0.05 as they arrive; asked for
     // early, they took the painting's bandwidth: LCP was later.)
-    let italic = (page == Page::Home).then(|| font("fonts/Faustina-Italic.woff2"));
+    let italic = (page == Page::Home).then(|| font("fonts/Literata-Italic-latin.woff2"));
     view! {
         {painting}
-        {font("fonts/AlegreyaSans-Regular.woff2")}
-        {font("fonts/Faustina.woff2")}
+        {font("fonts/Inter-latin.woff2")}
+        {font("fonts/Literata-latin.woff2")}
         {italic}
     }
 }
@@ -188,6 +188,12 @@ fn head(page: Page, cx: &Context<'_>, meta: &Meta) -> impl IntoView + use<> {
         _ => None,
     }
     .map(|name| view! { <script type="module" src=assets.url(name) integrity=assets.integrity(name)></script> });
+    // the start page's sky: clouds the pointer stirs; the script waits for
+    // the page to have loaded and the browser to be idle before it begins.
+    // A phone has no pointer to stir with and is not sent it.
+    let sky = (page == Page::Home && !cx.machine.mobile).then(|| {
+        view! { <script type="module" src=assets.url("clouds.js") integrity=assets.integrity("clouds.js") fetchpriority="low"></script> }
+    });
     let islands = meta.islands.then(|| {
         view! { <script type="module" src=assets.url("islands.js") integrity=assets.integrity("islands.js") fetchpriority="low"></script> }
     });
@@ -216,10 +222,13 @@ fn head(page: Page, cx: &Context<'_>, meta: &Meta) -> impl IntoView + use<> {
             <link rel="stylesheet" href=assets.url("site.css") integrity=assets.integrity("site.css") />
             <script src=assets.url("boot.js") integrity=assets.integrity("boot.js")></script>
             <script type="module" src=assets.url("pwa.js") integrity=assets.integrity("pwa.js")></script>
+            <script type="module" src=assets.url("hint.js") integrity=assets.integrity("hint.js") fetchpriority="low"></script>
             {own}
+            {sky}
             {islands}
             <link rel="icon" href="/favicon.ico" sizes="32x32" />
-            <link rel="icon" href=assets.url("img/icon.svg") type="image/svg+xml" />
+            <link rel="icon" href=assets.url("img/icon-32.png") type="image/png" sizes="32x32" />
+            <link rel="icon" href=assets.url("img/icon-192.webp") type="image/webp" sizes="192x192" />
             <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
             <link rel="manifest" href=format!("/{}/manifest.webmanifest", lang.code()) />
             <meta {..custom_attribute("property", "og:type")} content="website" />

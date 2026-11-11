@@ -119,7 +119,8 @@ pub fn manifest(lang: Lang, assets: &Assets) -> String {
         "theme_color": "#0f1b2d",
         "icons": [
             {"src": assets.url("img/icon-192.webp"), "sizes": "192x192", "type": "image/webp", "purpose": "any"},
-            {"src": assets.url("img/icon.svg"), "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable"}
+            {"src": assets.url("img/icon-512.webp"), "sizes": "512x512", "type": "image/webp", "purpose": "any"},
+            {"src": assets.url("img/icon-maskable-512.webp"), "sizes": "512x512", "type": "image/webp", "purpose": "maskable"}
         ]
     })
     .to_string()

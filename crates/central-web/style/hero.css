@@ -8,9 +8,9 @@
   z-index: 15;
   isolation: isolate;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  min-height: min(calc(100svh - var(--top-h) - 2.15rem), 54rem);
+  min-height: min(calc(100svh - var(--top-h) - 2.4rem), 56rem);
 }
 
 .sky {
@@ -55,6 +55,23 @@
       transform: translate3d(0, 18%, 0);
     }
   }
+}
+
+/* the clouds the pointer stirs (clouds.js): over the painting, under its
+   light and the veil that keeps the words readable; faded in once drawn */
+.sky-clouds {
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  transition: opacity 1.4s ease;
+}
+
+.sky-clouds.on {
+  opacity: 1;
+}
+
+.sky-clouds[data-renderer="none"] {
+  display: none;
 }
 
 .sky-beams {
@@ -194,25 +211,165 @@ body:has(dialog[open]) .wave {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.55rem;
+  gap: 0.5rem;
   width: 100%;
   max-width: 54rem;
-  margin: 0 auto;
-  padding: clamp(1.2rem, 2.4vw, 2rem) max(var(--gutter), 3vw) 3.8rem;
+  /* in the middle of what the notice at the hero's foot leaves */
+  margin: auto;
+  padding: clamp(1rem, 2vw, 1.6rem) max(var(--gutter), 3vw) 1.4rem;
   text-align: center;
 }
 
 .hero h1 {
-  max-width: 16em;
-  margin: 0 0 0.25em;
-  font-size: clamp(2.25rem, 3.9vw, 3.55rem);
-  line-height: 1.08;
+  max-width: 17em;
+  margin: 0 0 0.2em;
+  font-size: clamp(2.1rem, 3.7vw, 3.3rem);
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
   text-shadow: var(--hero-shadow);
 }
 
 .glow {
   color: var(--link);
   font-style: italic;
+}
+
+/* a slow glint runs through the title's last words, where the browser can
+   paint a gradient into letters */
+@supports ((background-clip: text) or (-webkit-background-clip: text)) {
+  @media (prefers-reduced-motion: no-preference) and (forced-colors: none) {
+    .glow {
+      background: linear-gradient(
+          100deg,
+          var(--link) 0%,
+          var(--link) 42%,
+          color-mix(in srgb, var(--link) 40%, white) 50%,
+          var(--link) 58%,
+          var(--link) 100%
+        )
+        0 0 / 260% 100%;
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      text-shadow: none;
+      filter: drop-shadow(0 2px 10px color-mix(in srgb, var(--bg) 70%, transparent));
+      animation: glint 9s ease-in-out infinite;
+    }
+  }
+}
+
+@keyframes glint {
+  0%,
+  55% {
+    background-position: 100% 0;
+  }
+
+  100% {
+    background-position: 0 0;
+  }
+}
+
+/* ---- what Baylee is, at a glance: under the logo --------------------------- */
+
+.hero-badges {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.4rem 0.45rem;
+  margin: 0 0 0.55rem;
+  padding: 0;
+  list-style: none;
+}
+
+.hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.42em;
+  min-height: 1.8rem;
+  padding: 0 0.85rem;
+  border: 1px solid var(--edge);
+  border-radius: var(--pill);
+  background: color-mix(in srgb, var(--panel-solid) 74%, transparent);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.08),
+    0 8px 20px -12px rgb(0 0 0 / 0.55);
+  color: var(--title);
+  font: 600 0.74rem var(--sans);
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  backdrop-filter: blur(10px) saturate(1.25);
+}
+
+.hero-badge .icon {
+  width: 0.95em;
+  height: 0.95em;
+  color: var(--gold);
+}
+
+.hero-badge:first-child {
+  border-color: color-mix(in srgb, var(--ok) 50%, var(--edge));
+}
+
+/* they arrive one after the other, once; nothing waits on them */
+@media (prefers-reduced-motion: no-preference) {
+  .hero-badge {
+    animation: badge-in 520ms var(--ease) both;
+  }
+
+  .hero-badge:nth-child(2) {
+    animation-delay: 70ms;
+  }
+
+  .hero-badge:nth-child(3) {
+    animation-delay: 140ms;
+  }
+
+  .hero-badge:nth-child(4) {
+    animation-delay: 210ms;
+  }
+}
+
+@keyframes badge-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+/* ---- Wizards' Fan Content notice, at the hero's foot ----------------------- */
+
+.hero-fan {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  max-width: min(58rem, calc(100% - 2 * var(--gutter)));
+  margin: 0 auto 1.1rem;
+  padding: 0.55rem 1rem;
+  border: 1px solid var(--edge-soft);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--panel-solid) 70%, transparent);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.05),
+    0 10px 26px -18px rgb(0 0 0 / 0.6);
+  color: var(--ink-soft);
+  font: 0.76rem / 1.45 var(--sans);
+  text-align: start;
+  backdrop-filter: blur(10px);
+}
+
+.hero-fan .icon {
+  flex: none;
+  width: 1rem;
+  height: 1rem;
+  margin-block-start: 0.1rem;
+  color: var(--gold);
+}
+
+.hero-fan a {
+  font-weight: 600;
 }
 
 .hero .lead {
@@ -222,47 +379,6 @@ body:has(dialog[open]) .wave {
   font-size: clamp(1rem, 1.12vw, 1.12rem);
   line-height: 1.4;
   text-shadow: 0 1px 12px color-mix(in srgb, var(--bg) 82%, transparent);
-}
-
-.hero-note,
-.hero-signup {
-  max-width: 40rem;
-  margin: 0.95rem auto 0;
-  color: var(--ink-soft);
-  font: 0.85rem / 1.38 var(--sans);
-  text-shadow: 0 1px 10px color-mix(in srgb, var(--bg) 88%, transparent);
-}
-
-.hero-signup {
-  margin-block-start: 0.35rem;
-  color: var(--ink);
-}
-
-.hero-note a,
-.hero-signup a {
-  color: var(--link);
-  font-weight: 600;
-}
-
-.hero-note a:hover,
-.hero-signup a:hover {
-  color: var(--link-hover);
-}
-
-.kicker {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  margin: 0.85rem auto 0;
-  padding: 0.34rem 1.05rem;
-  border: 1px solid var(--edge);
-  border-radius: var(--pill);
-  background: color-mix(in srgb, var(--panel-solid) 78%, transparent);
-  box-shadow: 0 6px 18px -8px rgb(0 0 0 / 0.32);
-  color: var(--title);
-  font: 700 0.72rem var(--sans);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
 }
 
 /* ---- the logo: it opens Baylee's album ------------------------------------ */
@@ -284,7 +400,7 @@ body:has(dialog[open]) .wave {
 
 .hero-logo {
   display: block;
-  width: min(22rem, 72vw);
+  width: min(19.5rem, 72vw);
   height: auto;
   aspect-ratio: 960 / 400;
   filter: drop-shadow(0 10px 24px #16263242);
@@ -443,38 +559,130 @@ body:has(dialog[open]) .wave {
   color: inherit;
 }
 
+/* every system under its mark; a row a file, the visitor's own in gold */
 .dl .menu {
   inset-inline: 50% auto;
-  width: min(24rem, calc(100vw - 2 * var(--gutter)));
+  width: min(25rem, calc(100vw - 2 * var(--gutter)));
+  max-height: min(31rem, 72dvh);
+  padding: 0.5rem;
+  border-radius: var(--radius);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--panel-2) 70%, transparent), transparent 9rem),
+    var(--panel-solid);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.07),
+    0 30px 60px -18px rgb(0 0 0 / 0.78),
+    0 0 0 1px color-mix(in srgb, var(--gold) 10%, transparent);
   translate: -50% 0;
   text-align: start;
   transform-origin: top center;
 }
 
+.menu-title {
+  margin: 0.15rem 0.5rem 0.4rem;
+  color: var(--ink-faint);
+  font: 700 0.66rem var(--sans);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.menu .menu-groups {
+  gap: 0.35rem;
+}
+
+.menu-group + .menu-group {
+  padding-block-start: 0.35rem;
+  border-block-start: 1px solid var(--edge-soft);
+}
+
+.menu-group-name {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0.3rem 0.55rem 0.2rem;
+  color: var(--title);
+  font: 700 0.86rem var(--sans);
+}
+
+.menu-group-name .os {
+  width: 1.05rem;
+  height: 1.05rem;
+  color: var(--gold);
+}
+
 .dl .menu-item {
-  justify-content: space-between;
   gap: var(--space-3);
+  padding-inline: 0.6rem 0.55rem;
 }
 
 .dl-plat {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
+  gap: 0.1rem;
+  min-inline-size: 0;
   line-height: 1.2;
 }
 
 .dl-plat strong {
-  color: var(--title);
-  font: 700 0.92rem var(--sans);
+  color: var(--ink);
+  font: 600 0.88rem var(--sans);
 }
 
-.dl-plat span,
 .dl-file {
   color: var(--ink-faint);
-  font: 500 0.78rem var(--sans);
+  font: 500 0.76rem var(--sans);
+}
+
+.dl-item .dl-get {
+  flex: none;
+  width: 1.05rem;
+  height: 1.05rem;
+  color: var(--ink-faint);
+  opacity: 0.55;
+  transition:
+    opacity var(--dur-fast) ease,
+    color var(--dur-fast) ease;
+}
+
+.dl-item:hover .dl-get,
+.dl-item:focus-visible .dl-get {
+  color: var(--gold);
+  opacity: 1;
+}
+
+.dl-item:hover strong,
+.dl-item:focus-visible strong {
+  color: var(--title);
+}
+
+.dl-item .mine-tag {
+  flex: none;
 }
 
 .menu-item.is-mine {
   border-color: color-mix(in srgb, var(--gold) 55%, var(--edge));
+  background: color-mix(in srgb, var(--gold) 9%, transparent);
+}
+
+.dl-item.is-old strong {
+  font-weight: 500;
+}
+
+/* the systems arrive one after the other as the menu opens */
+@media (prefers-reduced-motion: no-preference) {
+  .dl-more[open] .menu-group {
+    animation: badge-in 300ms var(--ease) both;
+  }
+
+  .dl-more[open] .menu-group:nth-child(2) {
+    animation-delay: 50ms;
+  }
+
+  .dl-more[open] .menu-group:nth-child(3) {
+    animation-delay: 100ms;
+  }
 }
 
 .menu-foot {
@@ -505,12 +713,22 @@ body:has(dialog[open]) .wave {
   text-shadow: var(--hero-shadow);
 }
 
+/* the release's facts and its links share a line where there is room */
+.dl-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0 1.1rem;
+}
+
 .dl-sub a {
   display: inline-flex;
   align-items: center;
   min-height: var(--target);
   padding: 0 0.1em;
   color: var(--link-hover);
+  font-weight: 600;
 }
 
 .dl-arch {
@@ -531,8 +749,8 @@ body:has(dialog[open]) .wave {
   align-items: center;
   justify-content: center;
   gap: 0.65rem;
-  margin: 1.15rem auto 0;
-  font-size: 0.92rem;
+  margin: 0.9rem auto 0;
+  font-size: 0.9rem;
 }
 
 .hero-actions .button {
@@ -680,23 +898,28 @@ body:has(dialog[open]) .wave {
 
 @media (max-width: 900px) {
   .hero-inner {
-    padding-block: 1.8rem 2.8rem;
+    padding-block: 1.4rem 1.2rem;
   }
 }
 
 @media (max-width: 480px) {
   .hero-inner {
     gap: 0.6rem;
-    padding-block: 1.25rem 2.2rem;
+    padding-block: 1.1rem 1rem;
   }
 
   .hero-logo {
     width: min(15.5rem, 78vw);
   }
 
-  .kicker {
-    padding: 0.3rem 0.75rem;
-    font-size: 0.66rem;
+  .hero-badge {
+    min-height: 1.65rem;
+    padding-inline: 0.65rem;
+    font-size: 0.68rem;
+  }
+
+  .hero-fan {
+    font-size: 0.72rem;
   }
 
   .hero h1 {

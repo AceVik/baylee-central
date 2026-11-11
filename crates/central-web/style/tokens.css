@@ -1,7 +1,10 @@
 /*
- * The fonts are the game's (SIL OFL 1.1, no reserved name), subset to
- * Latin-1 and the punctuation the site writes; `unicode-range` says so, so
- * any other character falls back to a system font.
+ * The fonts: Inter for the interface, Literata for titles and prose (owner,
+ * 11.11.2026), both SIL OFL 1.1 and variable in weight, in the subsets of
+ * @fontsource-variable 5.3.0 (Latin, Latin Extended, Cyrillic, Cyrillic
+ * Extended); `unicode-range` lets a browser fetch only the subsets a page
+ * writes. East Asian text comes from the device's own fonts, by the page's
+ * language.
  *
  * Design tokens: the old site's look (owner, 11.11.2026: "das Design das
  * Aussehen etc. übernimm von der alten"), Baylee in sunlight by day and the
@@ -11,53 +14,120 @@
  * crates/central-web/tests/contrast.rs.
  */
 @font-face {
-  font-family: "Alegreya Sans";
-  src: url("/assets/fonts/AlegreyaSans-Regular.woff2") format("woff2");
-  font-weight: 400;
+  font-family: "Inter";
+  src: url("/assets/fonts/Inter-cyrillic-ext.woff2") format("woff2");
+  font-weight: 100 900;
   font-style: normal;
   font-display: swap;
-  unicode-range: U+0020-007E, U+00A0-00FF, U+0152-0153, U+0160-0161, U+0178, U+017D-017E, U+2010-2014,
-    U+2018-201E, U+2022, U+2026, U+2030, U+2039-203A, U+20AC, U+2122, U+2212;
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
 }
 
 @font-face {
-  font-family: "Alegreya Sans";
-  src: url("/assets/fonts/AlegreyaSans-Medium.woff2") format("woff2");
-  font-weight: 500;
+  font-family: "Inter";
+  src: url("/assets/fonts/Inter-cyrillic.woff2") format("woff2");
+  font-weight: 100 900;
   font-style: normal;
   font-display: swap;
-  unicode-range: U+0020-007E, U+00A0-00FF, U+0152-0153, U+0160-0161, U+0178, U+017D-017E, U+2010-2014,
-    U+2018-201E, U+2022, U+2026, U+2030, U+2039-203A, U+20AC, U+2122, U+2212;
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
 }
 
 @font-face {
-  font-family: "Alegreya Sans";
-  src: url("/assets/fonts/AlegreyaSans-Bold.woff2") format("woff2");
-  font-weight: 700;
+  font-family: "Inter";
+  src: url("/assets/fonts/Inter-latin-ext.woff2") format("woff2");
+  font-weight: 100 900;
   font-style: normal;
   font-display: swap;
-  unicode-range: U+0020-007E, U+00A0-00FF, U+0152-0153, U+0160-0161, U+0178, U+017D-017E, U+2010-2014,
-    U+2018-201E, U+2022, U+2026, U+2030, U+2039-203A, U+20AC, U+2122, U+2212;
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329,
+    U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113,
+    U+2C60-2C7F, U+A720-A7FF;
 }
 
 @font-face {
-  font-family: "Faustina";
-  src: url("/assets/fonts/Faustina.woff2") format("woff2");
-  font-weight: 300 800;
+  font-family: "Inter";
+  src: url("/assets/fonts/Inter-latin.woff2") format("woff2");
+  font-weight: 100 900;
   font-style: normal;
   font-display: swap;
-  unicode-range: U+0020-007E, U+00A0-00FF, U+0152-0153, U+0160-0161, U+0178, U+017D-017E, U+2010-2014,
-    U+2018-201E, U+2022, U+2026, U+2030, U+2039-203A, U+20AC, U+2122, U+2212;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308,
+    U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
 @font-face {
-  font-family: "Faustina";
-  src: url("/assets/fonts/Faustina-Italic.woff2") format("woff2");
-  font-weight: 300 800;
+  font-family: "Literata";
+  src: url("/assets/fonts/Literata-cyrillic-ext.woff2") format("woff2");
+  font-weight: 200 900;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+
+@font-face {
+  font-family: "Literata";
+  src: url("/assets/fonts/Literata-cyrillic.woff2") format("woff2");
+  font-weight: 200 900;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+
+@font-face {
+  font-family: "Literata";
+  src: url("/assets/fonts/Literata-latin-ext.woff2") format("woff2");
+  font-weight: 200 900;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329,
+    U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113,
+    U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: "Literata";
+  src: url("/assets/fonts/Literata-latin.woff2") format("woff2");
+  font-weight: 200 900;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308,
+    U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "Literata";
+  src: url("/assets/fonts/Literata-Italic-cyrillic-ext.woff2") format("woff2");
+  font-weight: 200 900;
   font-style: italic;
   font-display: swap;
-  unicode-range: U+0020-007E, U+00A0-00FF, U+0152-0153, U+0160-0161, U+0178, U+017D-017E, U+2010-2014,
-    U+2018-201E, U+2022, U+2026, U+2030, U+2039-203A, U+20AC, U+2122, U+2212;
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+
+@font-face {
+  font-family: "Literata";
+  src: url("/assets/fonts/Literata-Italic-cyrillic.woff2") format("woff2");
+  font-weight: 200 900;
+  font-style: italic;
+  font-display: swap;
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+
+@font-face {
+  font-family: "Literata";
+  src: url("/assets/fonts/Literata-Italic-latin-ext.woff2") format("woff2");
+  font-weight: 200 900;
+  font-style: italic;
+  font-display: swap;
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329,
+    U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113,
+    U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: "Literata";
+  src: url("/assets/fonts/Literata-Italic-latin.woff2") format("woff2");
+  font-weight: 200 900;
+  font-style: italic;
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308,
+    U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
 /* The blue hour: the default, and the device's choice of dark. */
@@ -119,8 +189,8 @@
   --on-avatar: #fffdf7;
 
   /* Type: the serif for reading, the sans for every control. */
-  --serif: "Faustina", Georgia, "Times New Roman", serif;
-  --sans: "Alegreya Sans", "Segoe UI", system-ui, sans-serif;
+  --serif: "Literata", "Iowan Old Style", Georgia, "Times New Roman", serif;
+  --sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
   --text-xs: 0.78rem;
   --text-sm: 0.9rem;
@@ -188,7 +258,7 @@
   --radius-lg: var(--radius);
   --radius-full: var(--pill);
   --hairline: 1px;
-  --space-section: clamp(2.4rem, 4.5vw, 3.6rem);
+  --space-section: clamp(1.7rem, 3vw, 2.5rem);
   --elevation-1: 0 1px 2px var(--shade), 0 2px 8px var(--shade);
   --elevation-2: 0 8px 24px -8px var(--shade-strong);
   --elevation-3: var(--shadow-lift);

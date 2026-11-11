@@ -46,9 +46,11 @@ pub const STYLES: [&str; 14] = [
 ];
 
 /// The scripts served under hashed names.
-const SCRIPTS: [&str; 5] = [
+const SCRIPTS: [&str; 7] = [
     "boot.js",
     "pwa.js",
+    "hint.js",
+    "clouds.js",
     "pow-worker.js",
     "home.js",
     "directory.js",
@@ -186,7 +188,7 @@ fn service_worker(source: &Path, files: &BTreeMap<String, Value>) -> Result<Stri
         url("site.css")?,
         url("boot.js")?,
         url("pwa.js")?,
-        url("img/icon.svg")?,
+        url("img/icon-192.webp")?,
     ];
     let font = |name: &&String| {
         name.starts_with("fonts/")
@@ -538,11 +540,13 @@ fn notices(root: &Path) -> Result<String> {
     let mut text = String::from(
         "baylee.app: third-party notices\n\
          ================================\n\n\
-         Fonts: Alegreya Sans (Copyright 2013 The Alegreya Sans Project Authors) and Faustina\n\
-         (Copyright 2016 The Faustina Project Authors), SIL Open Font License 1.1; the licence\n\
-         texts are served beside the fonts.\n\n\
+         Fonts: Inter (Copyright 2016 The Inter Project Authors) and Literata (Copyright 2017\n\
+         The Literata Project Authors), SIL Open Font License 1.1; the licence texts are served\n\
+         beside the fonts.\n\n\
          Icons: Lucide (lucide-static 1.60.0), ISC License, Copyright (c) 2026 Lucide Icons and\n\
-         Contributors; parts derived from Feather, MIT License, Copyright (c) 2013-2023 Cole Bemis.\n\n\
+         Contributors; parts derived from Feather, MIT License, Copyright (c) 2013-2023 Cole Bemis.\n\
+         The marks of Windows, Apple and Linux: Font Awesome Free 7.3.1 by Fonticons, Inc.,\n\
+         CC BY 4.0 (https://fontawesome.com/license/free), unchanged.\n\n\
          The interactive parts are Rust compiled to WebAssembly from these crates:\n\n",
     );
     let output = process::capture(
@@ -600,9 +604,10 @@ fn notices(root: &Path) -> Result<String> {
     }
     let assets = root.join(WEB).join("assets");
     for (title, file) in [
-        ("Alegreya Sans", "fonts/OFL-AlegreyaSans.txt"),
-        ("Faustina", "fonts/OFL-Faustina.txt"),
+        ("Inter", "fonts/OFL-Inter.txt"),
+        ("Literata", "fonts/OFL-Literata.txt"),
         ("Lucide", "LICENSE-lucide.txt"),
+        ("Font Awesome Free", "LICENSE-fontawesome.txt"),
     ] {
         let body = fs::read_to_string(assets.join(file)).or_fail("a licence text is missing")?;
         let _ = write!(

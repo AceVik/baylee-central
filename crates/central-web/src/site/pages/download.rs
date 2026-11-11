@@ -76,29 +76,88 @@ fn sep() -> impl IntoView + use<> {
     view! { <span class="sep" aria-hidden="true">"·"</span> }
 }
 
-/// The download menu's rows: each system's first file.
+/// The download menu: every system under its mark, each architecture's
+/// first file a row; where the release has a build for older processors
+/// (`-v2`, without AVX2), it stands under its system as a row of its own.
 fn menu_items(lang: Lang, release: &Release, mine: Option<Platform>) -> impl IntoView + use<> {
-    Platform::ALL
+    let systems: [(&'static str, solid::Mark, [Platform; 2]); 3] = [
+        (
+            "Windows",
+            solid::WINDOWS,
+            [Platform::WindowsX64, Platform::WindowsArm64],
+        ),
+        (
+            "macOS",
+            solid::APPLE,
+            [Platform::MacArm64, Platform::MacX64],
+        ),
+        (
+            "Linux",
+            solid::LINUX,
+            [Platform::LinuxX64, Platform::LinuxArm64],
+        ),
+    ];
+    systems
         .into_iter()
-        .filter_map(|platform| release.best(platform).map(|file| (platform, file.clone())))
-        .map(|(platform, file)| {
-            let (name, _) = platform_name(lang, platform);
-            let is_mine = mine == Some(platform);
-            view! {
-                <li>
-                    <a class="menu-item" class:is-mine=is_mine href=file.url.clone() target="_blank" rel="noopener noreferrer">
-                        <span class="dl-plat">
-                            <strong>{name}</strong>
-                            <span>{arch(platform)}</span>
-                        </span>
-                        <span class="dl-file num">
-                            {kind_name(lang, file.kind)}
-                            {sep()}
-                            {words::dl_size(lang, &format::megabytes(lang, file.size))}
-                        </span>
-                    </a>
-                </li>
+        .filter_map(|(system, mark, platforms)| {
+            let mut rows: Vec<(Platform, ReleaseFile, bool)> = Vec::new();
+            for platform in platforms {
+                let Some(best) = release.best(platform) else {
+                    continue;
+                };
+                rows.push((platform, best.clone(), best.kind == Kind::Fallback));
+                if best.kind != Kind::Fallback
+                    && let Some(old) = release
+                        .for_platform(platform)
+                        .into_iter()
+                        .find(|file| file.kind == Kind::Fallback)
+                {
+                    rows.push((platform, old.clone(), true));
+                }
             }
+            if rows.is_empty() {
+                return None;
+            }
+            let rows = rows
+                .into_iter()
+                .map(|(platform, file, old)| {
+                    let is_mine = mine == Some(platform) && !old;
+                    let title = if old {
+                        format!("{} · {}", arch(platform), words::dl_old_cpu(lang))
+                    } else {
+                        arch(platform).to_owned()
+                    };
+                    let kind = if old {
+                        words::dl_archive(lang)
+                    } else {
+                        kind_name(lang, file.kind)
+                    };
+                    let yours = is_mine
+                        .then(|| view! { <span class="mine-tag">{words::dl_yours(lang)}</span> });
+                    view! {
+                        <li>
+                            <a class="menu-item dl-item" class:is-mine=is_mine class:is-old=old href=file.url.clone() target="_blank" rel="noopener noreferrer">
+                                <span class="dl-plat">
+                                    <strong>{title}</strong>
+                                    <span class="dl-file num">
+                                        {kind}
+                                        {sep()}
+                                        {words::dl_size(lang, &format::megabytes(lang, file.size))}
+                                    </span>
+                                </span>
+                                {yours}
+                                {solid::icon_as(solid::DOWNLOAD, "dl-get")}
+                            </a>
+                        </li>
+                    }
+                })
+                .collect_view();
+            Some(view! {
+                <li class="menu-group">
+                    <p class="menu-group-name">{solid::mark(mark, "os")}<span translate="no">{system}</span></p>
+                    <ul aria-label=system>{rows}</ul>
+                </li>
+            })
         })
         .collect_view()
 }
@@ -132,17 +191,19 @@ fn lines(
     });
     view! {
         <p class="dl-meta">
-            <span translate="no">{release.tag.clone()}</span>
-            {meta}
-            {sep()}
-            {format::date(lang, &release.date)}
-        </p>
-        <p class="dl-sub">
-            {checksum}
-            {signature}
-            <a href=release.page.clone() target="_blank" rel="noopener noreferrer">{words::dl_notes(lang)}</a>
-            {sep()}
-            <a href=others>{words::dl_others(lang)}</a>
+            <span class="dl-facts">
+                <span translate="no">{release.tag.clone()}</span>
+                {meta}
+                {sep()}
+                {format::date(lang, &release.date)}
+            </span>
+            <span class="dl-sub">
+                {checksum}
+                {signature}
+                <a href=release.page.clone() target="_blank" rel="noopener noreferrer">{words::dl_notes(lang)}</a>
+                {sep()}
+                <a href=others>{words::dl_others(lang)}</a>
+            </span>
         </p>
     }
 }
@@ -205,7 +266,8 @@ pub fn download_block(cx: &Context<'_>, on_page: bool) -> impl IntoView + use<> 
                         {solid::icon_as(solid::DOWN, "chevron")}
                     </summary>
                     <div class="menu">
-                        <ul>{items}</ul>
+                        <p class="menu-title">{words::dl_menu_title(lang)}</p>
+                        <ul class="menu-groups">{items}</ul>
                         <p class="menu-foot">
                             <a href=others.clone()>{words::dl_others(lang)}</a>
                             {sep()}
