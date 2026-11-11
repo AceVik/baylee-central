@@ -1681,9 +1681,13 @@ mod tests {
     /// A request over a real socket from the loopback proxy, its headers
     /// as the page's, from `address`, declaring `length` bytes and sending `sent`.
     fn raw(address: &str, length: usize, sent: &str) -> String {
+        request(&from(address), length, sent)
+    }
+
+    fn request(headers: &[(&'static str, String)], length: usize, sent: &str) -> String {
         use std::fmt::Write as _;
         let mut text = String::from("POST /api/v1 HTTP/1.1\r\n");
-        for (name, value) in from(address) {
+        for (name, value) in headers {
             let _ = write!(text, "{name}: {value}\r\n");
         }
         let _ = write!(text, "content-length: {length}\r\n\r\n{sent}");
@@ -1732,7 +1736,7 @@ mod tests {
             .collect();
         let stalled_client = client_of("203.0.113.5");
         until(|| state.in_flight.count(stalled_client) == IN_FLIGHT).await;
-        let (served, refused) = tokio::task::spawn_blocking(move || {
+        let (served, refused, whole) = tokio::task::spawn_blocking(move || {
             let mut gone = connect();
             gone.write_all(raw("203.0.113.6", 64, "{").as_bytes())
                 .unwrap();
@@ -1744,17 +1748,37 @@ mod tests {
                 .write_all(raw("203.0.113.5", 64, "").as_bytes())
                 .unwrap();
             let refused = (answer(&mut fifth), started.elapsed());
-            // Another address is served while the four wait.
+            // A proxy sends the headers and the whole body at once: the
+            // refusal still arrives whole, its body unread.
             let body = discover();
+            let large = " ".repeat(60_000);
+            let mut whole = Vec::new();
+            for (headers, sent) in [
+                (from("203.0.113.5"), body.as_str()),
+                (from("203.0.113.5"), large.as_str()),
+                (with("origin", &["https://evil.example"]), body.as_str()),
+                (with("origin", &["https://evil.example"]), large.as_str()),
+            ] {
+                let mut socket = connect();
+                let _ = socket.write_all(request(&headers, sent.len(), sent).as_bytes());
+                whole.push(answer(&mut socket));
+            }
+            // Another address is served while the four wait.
             let mut other = connect();
             other
                 .write_all(raw("203.0.113.7", body.len(), &body).as_bytes())
                 .unwrap();
-            (answer(&mut other), refused)
+            (answer(&mut other), refused, whole)
         })
         .await
         .unwrap();
         assert!(refused.0.starts_with("HTTP/1.1 429"), "{}", refused.0);
+        for (answer, status) in whole.iter().zip(["429", "429", "403", "403"]) {
+            assert!(
+                answer.starts_with(&format!("HTTP/1.1 {status}")),
+                "{status}: {answer}"
+            );
+        }
         assert!(refused.1 < BODY_TIME, "{:?}", refused.1);
         assert!(served.starts_with("HTTP/1.1 200"), "{served}");
         // The one whose connection went away has given its place back.
