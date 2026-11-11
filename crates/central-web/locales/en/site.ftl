@@ -884,3 +884,9 @@ privacy-eyebrow = Privacy
 
 # The privacy notice's contents, as the old site named them
 privacy-contents = Contents
+
+# The account pages' eyebrow, as the old site set it
+acct-eyebrow = Baylee Central
+
+# The account area's navigation, as the old site named it
+app-account = Your account

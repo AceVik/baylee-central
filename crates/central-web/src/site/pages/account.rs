@@ -30,19 +30,26 @@ fn form_page(
     let mut meta = Meta::new(format!("{title} – Baylee"), lead, "img/og.jpg");
     meta.islands = true;
     meta.trail.push((title.to_owned(), page));
+    // as the old site set it: the words and the form on the left, Baylee
+    // on her cloud beside them, floating
+    let cloud = format!(
+        "{} 600w, {} 1200w",
+        cx.assets.url("img/cloud-600.webp"),
+        cx.assets.url("img/cloud-1200.webp")
+    );
     let body = view! {
         <div class="wrap auth">
-            <section class="page-head">
-                <h1>{title}</h1>
+            <section class="page-head auth-head" aria-labelledby="auth-title">
+                <p class="eyebrow">{words::acct_eyebrow(lang)}</p>
+                <h1 id="auth-title">{title}</h1>
                 <p class="lead">{lead}</p>
-            </section>
-            <div class="auth-grid">
-                <div class="auth-form">
+                <div class="auth-form glass">
                     {form}
                     {noscript(lang)}
                 </div>
-                <img class="auth-cloud" src=cx.assets.url("img/cloud-600.webp") width="600" height="400" alt="" loading="lazy" decoding="async" />
-            </div>
+            </section>
+            <img class="auth-cloud" src=cx.assets.url("img/cloud-600.webp") srcset=cloud sizes="min(40vw, 40rem)"
+                width="600" height="400" alt="" loading="lazy" decoding="async" />
         </div>
     }
     .into_any();
@@ -122,6 +129,7 @@ pub fn area(cx: &Context<'_>, section: Section) -> Built {
     let body = view! {
         <div class="frame" class:frame-messenger=messenger>
             <nav class="frame-nav" aria-label=words::account_nav(lang)>
+                <p class="frame-nav-head" aria-hidden="true">{words::app_account(lang)}</p>
                 <ul>{links}</ul>
                 // shown by pwa.js where the browser offers to install the app
                 <p class="install" data-install-box hidden>
@@ -131,7 +139,10 @@ pub fn area(cx: &Context<'_>, section: Section) -> Built {
                 </p>
             </nav>
             <div class="frame-main">
-                <h1 class=messenger.then_some("visually-hidden")>{title}</h1>
+                <header class="frame-head" class:visually-hidden=messenger>
+                    <p class="eyebrow">{words::acct_eyebrow(lang)}</p>
+                    <h1>{title}</h1>
+                </header>
                 {island}
             </div>
         </div>
