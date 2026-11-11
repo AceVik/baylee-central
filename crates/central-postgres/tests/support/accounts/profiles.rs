@@ -84,17 +84,12 @@ async fn browser(store: &AccountStore, identity: Identity) -> Token {
 /// Registers and enrolls `name` with `display_name`.
 async fn registration(
     store: &AccountStore,
-    operator: &DatabaseConnection,
     keys: &ServerKeys,
     name: &str,
     display_name: Option<&str>,
 ) -> Identity {
-    let key = super::register::issue(operator, 1, name).await;
     let ticket = Token::generate().unwrap();
-    let identity = store
-        .register(name, display_name, &key.digest(), &ticket)
-        .await
-        .unwrap();
+    let identity = store.register(name, display_name, &ticket).await.unwrap();
     let enrolled = super::register::credentials(keys, identity);
     store
         .enroll(
@@ -119,44 +114,24 @@ pub(super) async fn run(store: &AccountStore, operator: &DatabaseConnection, key
 }
 
 /// A name chosen at registration, with the tag drawn for the reservation;
-/// a name a person may not choose is refused, after the key.
+/// a name a person may not choose is refused.
 async fn chosen(store: &AccountStore, operator: &DatabaseConnection, keys: &ServerKeys) {
-    let key = super::register::issue(operator, 2, "profile-refusals").await;
     for name in ["Support", "a-d-m-i-n", "_Chosen", "Chosen Name", "ab"] {
         assert_eq!(
             store
-                .register(
-                    "profile-refused",
-                    Some(name),
-                    &key.digest(),
-                    &Token::generate().unwrap()
-                )
+                .register("profile-refused", Some(name), &Token::generate().unwrap())
                 .await
                 .err(),
             Some(Error::Rejected),
             "{name}"
         );
     }
-    let unknown = central_api::beta_key::BetaKey::generate().unwrap();
-    assert_eq!(
-        store
-            .register(
-                "profile-refused",
-                Some("Support"),
-                &unknown.digest(),
-                &Token::generate().unwrap()
-            )
-            .await
-            .err(),
-        Some(Error::Rejected),
-        "an unknown key is refused as before"
-    );
     assert_eq!(
         count(operator, "profile-refused").await,
         0,
         "nothing reserved"
     );
-    let identity = registration(store, operator, keys, "profile-chosen", Some("Chosen_Name")).await;
+    let identity = registration(store, keys, "profile-chosen", Some("Chosen_Name")).await;
     let (name, tag, timed) = registered(operator, "profile-chosen").await;
     assert_eq!(name.as_deref(), Some("Chosen_Name"), "kept as typed");
     assert!(four_digits(tag) && timed, "{tag:?}");
@@ -165,14 +140,7 @@ async fn chosen(store: &AccountStore, operator: &DatabaseConnection, keys: &Serv
     assert_eq!(summary.display_name.as_deref(), Some("Chosen_Name"));
     assert_eq!(summary.tag.map(|t| i32::try_from(t).unwrap()), tag);
     // Two reservations never share a tag.
-    let other = registration(
-        store,
-        operator,
-        keys,
-        "profile-chosen-two",
-        Some("Chosen_Name"),
-    )
-    .await;
+    let other = registration(store, keys, "profile-chosen-two", Some("Chosen_Name")).await;
     let second = registered(operator, "profile-chosen-two").await.1;
     assert!(four_digits(second) && second != tag);
     let _ = other;
@@ -182,7 +150,7 @@ async fn chosen(store: &AccountStore, operator: &DatabaseConnection, keys: &Serv
 /// No name at registration: the account chooses one on the account page,
 /// once; the previous binary's registration draws its tag at the next sign-in.
 async fn later(store: &AccountStore, operator: &DatabaseConnection, keys: &ServerKeys) {
-    let identity = registration(store, operator, keys, "profile-later", None).await;
+    let identity = registration(store, keys, "profile-later", None).await;
     let (name, tag, timed) = registered(operator, "profile-later").await;
     assert!(name.is_none() && !timed && four_digits(tag));
     let native = login(store, keys, identity).await;
@@ -454,13 +422,12 @@ async fn drawn(store: &AccountStore, operator: &DatabaseConnection) {
         })
     };
     let small = store.clone().with_tag_draw(1, draw.clone());
-    let key = super::register::issue(operator, 16, "profile-draws").await;
     let register = async |name: &str, draws: &[u32]| {
         given.lock().unwrap().clear();
         given.lock().unwrap().extend(draws);
         asked.lock().unwrap().clear();
         let result = small
-            .register(name, None, &key.digest(), &Token::generate().unwrap())
+            .register(name, None, &Token::generate().unwrap())
             .await;
         let ranges: Vec<_> = asked.lock().unwrap().drain(..).collect();
         (result.map(|_| ()), ranges)
@@ -494,27 +461,17 @@ async fn drawn(store: &AccountStore, operator: &DatabaseConnection) {
     assert_eq!(result.err(), Some(Error::Unavailable));
     // The last range, MAX_TAG alone: once it is taken, no range is left.
     let last = store.clone().with_tag_draw(MAX_TAG, draw);
-    last.register(
-        "draw-last",
-        None,
-        &key.digest(),
-        &Token::generate().unwrap(),
-    )
-    .await
-    .unwrap();
+    last.register("draw-last", None, &Token::generate().unwrap())
+        .await
+        .unwrap();
     assert_eq!(
         registered(operator, "draw-last").await.1,
         Some(i32::try_from(MAX_TAG).unwrap())
     );
     assert_eq!(
-        last.register(
-            "draw-none",
-            None,
-            &key.digest(),
-            &Token::generate().unwrap()
-        )
-        .await
-        .err(),
+        last.register("draw-none", None, &Token::generate().unwrap())
+            .await
+            .err(),
         Some(Error::Busy)
     );
 }

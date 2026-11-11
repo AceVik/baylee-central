@@ -4,8 +4,9 @@
 //! over registered gateways, then 000010 over legacy and registered
 //! accounts, then 000011 over the same, drawing the registered accounts'
 //! tags, then 000012's administration over all of it, then 000013's reset
-//! codes, then 000014's gateway tokens over the registered gateways. All
-//! inside one transaction that is rolled back.
+//! codes, then 000014's gateway tokens over the registered gateways, then
+//! 000023's open registration over all of it. All inside one transaction
+//! that is rolled back.
 use super::scalar;
 use sea_orm::{ConnectionTrait, DatabaseConnection, TransactionTrait};
 
@@ -34,6 +35,8 @@ const ADMINISTRATION: &str =
 const RESET: &str = include_str!("../../../central-migration/src/m20261028_000013_reset.sql");
 const TOKENS: &str =
     include_str!("../../../central-migration/src/m20261030_000014_gateway_tokens.sql");
+const OPEN: &str =
+    include_str!("../../../central-migration/src/m20261111_000023_open_registration.sql");
 
 fn scratch(sql: &str) -> String {
     sql.replace("central_identity", "upgrade_probe")
@@ -120,6 +123,7 @@ pub(crate) async fn run(operator: &DatabaseConnection) {
     administration(&tx).await;
     reset(&tx).await;
     tokens(&tx).await;
+    open_registration(&tx).await;
     tx.rollback().await.unwrap();
     assert_eq!(
         scalar(
@@ -678,4 +682,56 @@ async fn tokens(tx: &sea_orm::DatabaseTransaction) {
     ] {
         refused(tx, &sql).await;
     }
+}
+
+/// 000023 over all of it (the owner's decisions of 10 and 11.11.2026): the
+/// closed beta's keys and an unfinished registration's link to one go; every
+/// account, finished or pending, and every audit event stays, with the key
+/// ids the audit names; registration opens with the switch's one row.
+async fn open_registration(tx: &sea_orm::DatabaseTransaction) {
+    // As the binary before it left them: an audit event naming a key.
+    tx.execute_unprepared(
+        "INSERT INTO upgrade_probe.audit_events (actor_kind, action, beta_key_id)
+         SELECT 'operator', 'beta_key.issued', id FROM upgrade_probe.beta_keys ORDER BY id LIMIT 1",
+    )
+    .await
+    .unwrap();
+    let kept = [
+        "SELECT count(*)::bigint AS value FROM upgrade_probe.accounts",
+        "SELECT count(*)::bigint AS value FROM upgrade_probe.accounts
+         WHERE source = 'registered' AND credential IS NULL AND enrollment_digest IS NOT NULL",
+        "SELECT count(*)::bigint AS value FROM upgrade_probe.audit_events",
+        "SELECT count(*)::bigint AS value FROM upgrade_probe.audit_events WHERE beta_key_id IS NOT NULL",
+    ];
+    let mut before = Vec::new();
+    for sql in kept {
+        before.push(scalar(tx, sql).await);
+    }
+    assert!(before[1] >= 1 && before[3] == 1, "{before:?}");
+    tx.execute_unprepared(&scratch(OPEN)).await.unwrap();
+    for (sql, expected) in kept.iter().zip(&before) {
+        assert_eq!(scalar(tx, sql).await, *expected, "{sql}");
+    }
+    for (expected, sql) in [
+        (0, "SELECT count(*)::bigint AS value FROM pg_catalog.pg_class
+             WHERE oid = pg_catalog.to_regclass('upgrade_probe.beta_keys')"),
+        (0, "SELECT count(*)::bigint AS value FROM information_schema.columns
+             WHERE table_schema = 'upgrade_probe' AND table_name = 'accounts' AND column_name = 'beta_key_id'"),
+        (1, "SELECT count(*)::bigint AS value FROM upgrade_probe.registration WHERE open"),
+    ] {
+        assert_eq!(scalar(tx, sql).await, expected, "{sql}");
+    }
+    // A registration without a key is a valid row now; one without a ticket is not.
+    tx.execute_unprepared(
+        "INSERT INTO upgrade_probe.accounts (source, username_key, enrollment_digest, enrollment_expires)
+         VALUES ('registered', 'open-registered', decode(repeat('61', 32), 'hex'),
+             clock_timestamp() + interval '10 minutes')",
+    )
+    .await
+    .unwrap();
+    refused(
+        tx,
+        "INSERT INTO upgrade_probe.accounts (source, username_key) VALUES ('registered', 'no-ticket')",
+    )
+    .await;
 }

@@ -946,7 +946,6 @@ mod tests {
         // A forged first hop changes nothing: the last one is counted.
         let register = body(&Request::Register {
             username: "synthetic".into(),
-            beta_key: "CENTRAL-0000-0000-0000-0000".into(),
             nonce: String::new(),
             counters: Vec::new(),
             display_name: None,
@@ -1117,7 +1116,6 @@ mod tests {
         let from = |address: &str| with("x-forwarded-for", &[address]);
         let register = body(&Request::Register {
             username: "synthetic".into(),
-            beta_key: "CENTRAL-0000-0000-0000-0000".into(),
             nonce: String::new(),
             counters: Vec::new(),
             display_name: None,
@@ -1259,7 +1257,6 @@ mod tests {
         let client = Client::from("198.51.100.44".parse::<IpAddr>().unwrap());
         let register = Request::Register {
             username: "synthetic".into(),
-            beta_key: String::new(),
             display_name: None,
             nonce: String::new(),
             counters: Vec::new(),

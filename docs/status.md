@@ -99,15 +99,16 @@ The server side of [web accounts](web-accounts.md) lands in three PRs.
   `registered`) paired with `legacy_id`; legacy rules hold legacy accounts only,
   so a registered account uses private objects after `ConfirmRestore` and the
   bridge's redemption answers `legacy_id: None` for it. The recovery wrapper is
-  stored for registered accounts. Beta keys (`beta_keys`, digests only) are
-  issued with `--issue-beta-keys-stdin` ([operations](operations.md)); the
-  runtime role may only spend their uses. Sessions have a kind, one per account
+  stored for registered accounts. Beta keys (`beta_keys`, digests only) were
+  issued with `--issue-beta-keys-stdin` until the open beta removed them
+  (migration 000023, 11.11.2026; [registration abuse](registration-abuse.md)). Sessions have a kind, one per account
   and kind, and a browser session lives in its own digest domain. Tests: a
   prior-version upgrade of the exact migration SQL with legacy data, the schema
   constraints, the grant contract and both session kinds over PostgreSQL 18.
   Deploy: stop, migrate, grant (`ops/grants.sql`), start.
-- **Wire and identity.** `Register { username, beta_key }` reserves a
-  registered account (key before name, `Conflict` only with a valid key);
+- **Wire and identity.** `Register { username, beta_key }` reserved a
+  registered account (key before name, `Conflict` only with a valid key; since
+  11.11.2026 the proof of work in the key's place, `RegisterChallenge`);
   `EnrollmentFinish.recovery` carries the recovery wrapper, required for
   registered and refused for legacy accounts, and old clients still decode.
   `IdentityService::handle_browser` serves the browser operations only, issues
@@ -271,7 +272,7 @@ The server side of [web accounts](web-accounts.md) lands in three PRs.
   heartbeats and administrators"). No migration; the operator moves the
   official row in the deploy's window ([operations](operations.md#the-official-gateway)).
 - **Not yet deployed.** Deploy: migrate, grant, add `browser.listen`, pass
-  `/api/*` in the `baylee.app` site block, issue beta keys. Central's own terms
+  `/api/*` in the `baylee.app` site block (no keys since the open beta, 11.11.2026). Central’s own terms
   are still `draft`, so none are in force.
 
 ## Validation and historical milestone evidence

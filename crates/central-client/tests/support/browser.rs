@@ -10,7 +10,6 @@
 use super::Http;
 use central_api::{
     Error, Token,
-    beta_key::BetaKey,
     profile::REGISTERED_TAG_FLOOR,
     terms::TermsSubject,
     wire::{AccountSource, Discovery, Identity, Request, Response, TicketPurpose},
@@ -22,7 +21,6 @@ use central_crypto::{
     vault::{MasterKey, ObjectContext, RecoveryCode, WrappedMasterKey},
 };
 use central_identity::BrowserReply;
-use central_postgres::BetaKeyBatch;
 use sea_orm::{ConnectionTrait, DatabaseConnection};
 use std::{
     io::{Read, Write},
@@ -198,19 +196,10 @@ pub(crate) fn run(
     runtime: &Runtime,
     operator: &DatabaseConnection,
 ) {
-    let key = BetaKey::generate().unwrap();
-    runtime
-        .block_on(
-            BetaKeyBatch::new(&[key.digest()], 1, None, "browser fixture")
-                .unwrap()
-                .issue(operator),
-        )
-        .unwrap();
     let named = |name: &str, display_name: &str| {
         let (nonce, counters) = proof(browser);
         Request::Register {
             username: name.into(),
-            beta_key: key.display().as_str().to_lowercase(),
             display_name: Some(display_name.into()),
             nonce,
             counters,
@@ -276,7 +265,7 @@ pub(crate) fn run(
         .unwrap();
     let first = ObjectContext::new(context, account.account, 1).unwrap();
     assert_eq!(&opened.open_object(first, &document).unwrap()[..], DOCUMENT);
-    budgets(browser, &key);
+    budgets(browser);
     let cookie = sign_in(browser, http, context);
     summary(browser, http, &cookie, account, &recovery);
     session(browser, http, bridge, &cookie);
@@ -316,7 +305,7 @@ fn refusals(browser: &Browser, http: &Http, named: &dyn Fn(&str, &str) -> Reques
             .answer(&named("synthetic", "Web_Player"), None)
             .err(),
         Some(Error::Conflict),
-        "a valid key learns that the name is taken"
+        "a registration learns that the name is taken"
     );
     let elsewhere = Browser {
         address: browser.address,
@@ -512,7 +501,7 @@ pub(crate) fn accept_terms(browser: &Browser, cookie: &Token) {
 
 /// Registration is budgeted per client address, five an hour; a page from
 /// another origin is refused before any of that.
-fn budgets(browser: &Browser, key: &BetaKey) {
+fn budgets(browser: &Browser) {
     let discover = central_api::encode(&Request::Discover {
         username: "web-player".into(),
     })
@@ -524,12 +513,12 @@ fn budgets(browser: &Browser, key: &BetaKey) {
             "{origin}"
         );
     }
-    // Two registrations so far from this address; three more with a wrong key.
+    // Two registrations so far from this address; three more refused for
+    // their name, after their proof of work.
     let wrong = |name: &str| {
         let (nonce, counters) = proof(browser);
         Request::Register {
             username: name.into(),
-            beta_key: "CENTRAL-0000-0000-0000-0000".into(),
             display_name: None,
             nonce,
             counters,
@@ -537,7 +526,7 @@ fn budgets(browser: &Browser, key: &BetaKey) {
     };
     for _ in 0..3 {
         assert_eq!(
-            browser.answer(&wrong("budget-probe"), None).err(),
+            browser.answer(&wrong("ab"), None).err(),
             Some(Error::Rejected)
         );
     }
@@ -545,7 +534,6 @@ fn budgets(browser: &Browser, key: &BetaKey) {
         let (nonce, counters) = proof(browser);
         Request::Register {
             username: name.into(),
-            beta_key: key.display().as_str().into(),
             display_name: None,
             nonce,
             counters,
@@ -559,8 +547,9 @@ fn budgets(browser: &Browser, key: &BetaKey) {
         address: browser.address,
         client: "198.51.100.77",
     };
+    // its neighbour's budget is its own: answered, and refused for the name
     assert_eq!(
-        neighbour.answer(&wrong("budget-probe"), None).err(),
+        neighbour.answer(&wrong("ab"), None).err(),
         Some(Error::Rejected)
     );
 }

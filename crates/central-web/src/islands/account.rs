@@ -156,7 +156,84 @@ fn reauth(lang: Lang, worker: String, done: Callback<()>) -> impl IntoView {
     }
 }
 
-fn home(lang: Lang, summary: &Summary) -> AnyView {
+/// Open registration's brake (`docs/registration-abuse.md`), for
+/// administrators: closed during an attack, opened again by hand; a change
+/// needs a sign-in under 30 minutes old, so a stale one signs in again here.
+fn registration_switch(lang: Lang, worker: String) -> AnyView {
+    use central_api::admin::{AdminAnswer, AdminRequest};
+
+    let open = RwSignal::new(None::<bool>);
+    let busy = RwSignal::new(false);
+    let again = RwSignal::new(false);
+    let failed = RwSignal::new(false);
+    let read = move || {
+        leptos::task::spawn_local(async move {
+            let request = Request::Admin {
+                request: AdminRequest::Registration,
+            };
+            match call(&request).await {
+                Ok(Response::Admin {
+                    answer: AdminAnswer::Registration { open: now, .. },
+                }) => open.set(Some(now)),
+                _ => failed.set(true),
+            }
+        });
+    };
+    Effect::new(move |_| read());
+    let change = move || {
+        let Some(now) = open.get_untracked() else {
+            return;
+        };
+        busy.set(true);
+        failed.set(false);
+        leptos::task::spawn_local(async move {
+            let request = Request::Admin {
+                request: AdminRequest::SetRegistration { open: !now },
+            };
+            match call(&request).await {
+                Ok(Response::Done) => open.set(Some(!now)),
+                Err(Failure::Rejected) => again.set(true),
+                _ => failed.set(true),
+            }
+            busy.set(false);
+        });
+    };
+    let signed_again = Callback::new(move |()| {
+        again.set(false);
+        change();
+    });
+    view! {
+        <section class="card" aria-labelledby="registration-title">
+            <h2 id="registration-title">{words::admin_registration(lang)}</h2>
+            <p role="status">{move || match open.get() {
+                Some(true) => words::admin_registration_open(lang),
+                Some(false) => words::admin_registration_closed(lang),
+                None => words::account_loading(lang),
+            }}</p>
+            <p class="meta">{words::admin_registration_lead(lang)}</p>
+            {move || failed.get().then(|| view! { <p class="error" role="alert">{words::push_failed(lang)}</p> })}
+            {move || {
+                if again.get() {
+                    reauth(lang, worker.clone(), signed_again).into_any()
+                } else {
+                    let label = if open.get() == Some(false) {
+                        words::admin_registration_reopen(lang)
+                    } else {
+                        words::admin_registration_close(lang)
+                    };
+                    view! {
+                        <p><button type="button" class="button" aria-disabled=move || (busy.get() || open.get().is_none()).then_some("true")
+                            on:click=move |_| if !busy.get_untracked() { change() }>{label}</button></p>
+                    }
+                    .into_any()
+                }
+            }}
+        </section>
+    }
+    .into_any()
+}
+
+fn home(lang: Lang, summary: &Summary, worker: &str) -> AnyView {
     let code = lang.code();
     let needs = (!summary.recovery).then(|| {
         view! { <li><a href=format!("/{code}/account/profile")>{words::account_needs_code(lang)}</a></li> }
@@ -203,7 +280,10 @@ fn home(lang: Lang, summary: &Summary) -> AnyView {
         }
     });
     let admin = summary.admin.then(|| {
-        view! { <p><a class="button" href="/admin">{words::account_admin(lang)}</a></p> }
+        view! {
+            {registration_switch(lang, worker.to_owned())}
+            <p><a class="button" href="/admin">{words::account_admin(lang)}</a></p>
+        }
     });
     view! {
         <div class="account-who">
@@ -642,10 +722,10 @@ fn gateway_card(
                 <div class="field">
                     <label for=format!("{form_id}-days")>{words::tokens_days(lang)}</label>
                     <select id=format!("{form_id}-days") on:change=move |ev| days.set(event_target_value(&ev).parse().unwrap_or(90))>
-                        <option value="30">"30"</option>
+                        <option value="30">{"30"}</option>
                         <option value="90" selected=true>"90"</option>
-                        <option value="180">"180"</option>
-                        <option value="365">"365"</option>
+                        <option value="180">{"180"}</option>
+                        <option value="365">{"365"}</option>
                     </select>
                 </div>
                 <div class="check">
@@ -971,7 +1051,7 @@ pub fn Account(lang: Lang, section: Section, worker: String) -> impl IntoView {
         }
         .into_any(),
         Load::Ready(summary) => match section {
-            Section::Home => home(lang, &summary),
+            Section::Home => home(lang, &summary, &worker),
             Section::Profile => profile(lang, &worker, &summary, reload),
             Section::Security => security(lang, worker.clone()),
             Section::Privacy => privacy(lang, worker.clone()),

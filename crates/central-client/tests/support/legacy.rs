@@ -131,7 +131,7 @@ pub(crate) fn run(
         address: browser.address,
         client: "198.51.100.61",
     };
-    let central_only = password::register("legacy-central", original, browser, runtime, operator);
+    let central_only = password::register("legacy-central", original, browser);
     let mut rows: Vec<LegacyRow> = ["mover", "early", "limited", "locked", "banned", "forced"]
         .into_iter()
         .map(row)

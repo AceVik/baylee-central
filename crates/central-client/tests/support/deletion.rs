@@ -40,7 +40,7 @@ pub(crate) fn run(
     crossed(http, browser, bridge, runtime, operator);
     replaced(http, bridge);
     budget(http, bridge);
-    website(http, browser, runtime, operator);
+    website(http, browser);
 }
 
 /// A moved account, its move closed, with the session of its sign-in. One
@@ -365,8 +365,8 @@ fn budget(http: &Http, bridge: &Token) {
 
 /// The website exports and deletes a registered account; the deletion
 /// clears the cookie (checked by [`Browser::call`]).
-fn website(http: &Http, browser: &Browser, runtime: &Runtime, operator: &DatabaseConnection) {
-    let registered = register("delete-web", http, browser, runtime, operator);
+fn website(http: &Http, browser: &Browser) {
+    let registered = register("delete-web", http, browser);
     let identity = registered.identity;
     let cookie = browser_sign_in(browser, identity, registered.context, OLD);
     let Response::AccountExport { export } = browser

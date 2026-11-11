@@ -24,9 +24,6 @@ never in argv or the environment. Unknown fields fail closed.
   legacy sign-in; [the legacy store](#the-legacy-store)).
 - `--migrate-stdin` applies pending migrations once under the migration login
   and exits. Input: `database` only. The service never migrates by itself.
-- `--issue-beta-keys-stdin` issues beta keys under the migration login (see
-  [beta keys](#beta-keys)) and prints each once. Input: `database`, `count`,
-  `uses`, `note` and optionally `expires_days`.
 - `--legacy-import-stdin` and `--legacy-deadline-stdin` import the official
   gateway's legacy accounts once and set the legacy store's deadline, under the
   migration login ([the legacy store](#the-legacy-store)).
@@ -149,43 +146,27 @@ The terms tables (`docs/terms.md`) get `SELECT, INSERT` only: published
 gateway versions and acceptances are immutable records, and an account's
 acceptances go with the account by cascade.
 
-## Beta keys
+## Registration
 
-Registration on `baylee.app` needs a beta key ([web accounts](web-accounts.md)).
-Issue them with the migrator login, from a file the operator keeps, as for
-`--migrate-stdin`:
+Registration on `baylee.app` is open (owner, 10 and 11.11.2026; [registration
+abuse](registration-abuse.md)): no key, but Central's own proof of work,
+harder while registrations flood in, and the per-address budgets of the
+browser listener (`Register` 5 an hour and 10 a day). The closed beta's keys
+and `--issue-beta-keys-stdin` are gone; migration 000023 drops their table
+and an unfinished registration's link to a key, nothing else.
 
-```sh
-central-service --issue-beta-keys-stdin < issue.json
-```
+**The brake.** An administrator closes registration during an attack, and
+opens it again by hand, on the account overview of the website (or with
+`AdminRequest::SetRegistration`); a change needs a password sign-in under 30
+minutes old and is an audit event (`registration.closed`,
+`registration.opened`). While closed, the page says registration is paused
+and Central refuses every `Register`.
 
-```json
-{"database": {"host": "…", "port": 5432, "name": "baylee_central", "user": "central_migrator",
-  "password": "…", "ca_certificate": "…"},
- "count": 10, "uses": 1, "expires_days": 30, "note": "October playtest"}
-```
-
-`count` is 1 to 100 keys, `uses` 1 to 1000 registrations per key,
-`expires_days` (optional) 1 to 3650 days, `note` at most 200 characters without
-control characters. Everything is checked before the database is reached; the
-keys of one run are written in one transaction, all or none. Each key is printed
-once, one per line, as `CENTRAL-XXXX-XXXX-XXXX-XXXX` (80 random bits in
-Crockford base32); a count goes to standard error. Central keeps only the
-SHA-256 digest: a lost key cannot be printed again, only replaced.
-
-Keys are read back case-insensitively, with or without the `CENTRAL` prefix and
-the hyphens, `O` read as `0` and `I` or `L` as `1`. A registration reserves one
-use while its enrollment ticket lives (10 minutes) and spends it when the
-enrollment commits; an expired reservation gives its use back. Revoke a key as
-an operator, which ends its pending registrations too:
-
-```sql
-UPDATE central_identity.beta_keys SET revoked_at = clock_timestamp() WHERE note = 'October playtest';
-```
-
-The runtime role may only `SELECT` keys and `UPDATE` their `uses_left`; it can
-neither issue, revoke, re-date nor delete one, and the store refuses to start
-with any wider or narrower grant.
+**Deploying it.** Central and the server-rendered site switch together:
+from this release, `Register` carries the proof of work, which the previous
+site's register page cannot make. Migrate and grant (`ops/grants.sql` now
+grants the switch's row instead of the keys) before the new service starts,
+as for every migration.
 
 ## Administration
 

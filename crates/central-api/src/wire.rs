@@ -219,24 +219,23 @@ pub enum Request {
     },
     /// A proof-of-work challenge for one registration, on the browser
     /// listener only (`docs/registration-abuse.md`), answered with
-    /// [`Response::RegisterChallenge`].
+    /// [`Response::RegisterChallenge`], or [`Response::RegistrationClosed`]
+    /// while an administrator closed registration.
     RegisterChallenge,
-    /// Reserve a new registered account with a beta key, on the browser listener
-    /// only (`docs/web-accounts.md`). The challenge's solution is checked and
-    /// spent first, then the key: a bad solution and a bad, used-up, expired or
-    /// revoked key are `Rejected` before the name is looked at; only then is a
-    /// taken name `Conflict`.
+    /// Reserve a new registered account, on the browser listener only
+    /// (`docs/web-accounts.md`), while registration is open (`Rejected`
+    /// while an administrator closed it). The challenge's solution is
+    /// checked and spent first: a bad one is `Rejected` before the name is
+    /// looked at; only then is a taken name `Conflict`.
     Register {
         /// Wanted username, canonicalized by the service's versioned name policy.
         username: String,
-        /// The beta key as typed, read like the recovery code.
-        beta_key: String,
         /// The challenge's nonce ([`Response::RegisterChallenge`]).
         nonce: String,
         /// One counter per part ([`crate::register`]).
         counters: Vec<u64>,
         /// The display name other players see, chosen now; a malformed or
-        /// reserved one is `Rejected`, after the key check. `None` chooses it
+        /// reserved one is `Rejected`, after the proof is spent. `None` chooses it
         /// later on the account page. The tag is drawn with the reservation.
         /// Absent on the wire when `None`.
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -574,7 +573,7 @@ pub enum ResetVault {
 pub enum AccountSource {
     /// Moved from the official gateway, which kept no recovery code.
     Legacy,
-    /// Registered on the website with a beta key.
+    /// Registered on the website (with a beta key while the beta was closed).
     Registered,
 }
 
@@ -700,6 +699,9 @@ pub enum Response {
         /// Absolute Unix seconds after which it is not taken.
         expires_at: i64,
     },
+    /// Registration is closed: an administrator stopped it during an
+    /// attack; the answer to `RegisterChallenge` until it opens again.
+    RegistrationClosed,
     /// OPAQUE KE2 plus a one-use attempt capability.
     LoginChallenge {
         /// Attempt identifier/capability, unrelated to account UUIDs.
@@ -1087,7 +1089,7 @@ mod tests {
             counters,
             ..
         } = crate::decode(
-            br#"{"operation":"register","username":"synthetic","beta_key":"k","nonce":"n","counters":[1,2]}"#,
+            br#"{"operation":"register","username":"synthetic","nonce":"n","counters":[1,2]}"#,
         )
         .unwrap()
         else {
@@ -1144,7 +1146,9 @@ mod tests {
         for bad in [
             br#"{"operation":"legacy_reserve","legacy_id":"x","username":"synthetic","tag":-1}"#.as_slice(),
             br#"{"operation":"legacy_reserve","legacy_id":"x","username":"synthetic","tag":4294967296}"#,
-            br#"{"operation":"register","username":"synthetic","beta_key":"k","nonce":"n","counters":[],"name":"Alice"}"#,
+            br#"{"operation":"register","username":"synthetic","nonce":"n","counters":[],"name":"Alice"}"#,
+            // the closed beta's key is no field any more
+            br#"{"operation":"register","username":"synthetic","beta_key":"k","nonce":"n","counters":[]}"#,
         ] {
             assert!(crate::decode::<Request>(bad).is_err());
         }

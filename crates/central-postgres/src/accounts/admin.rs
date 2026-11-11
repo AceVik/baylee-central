@@ -35,6 +35,10 @@ pub enum Action {
     GatewayDisabled,
     /// A gateway token was revoked by an administrator.
     GatewayTokenRevoked,
+    /// An administrator closed registration.
+    RegistrationClosed,
+    /// An administrator opened registration again.
+    RegistrationOpened,
 }
 
 impl Action {
@@ -49,6 +53,8 @@ impl Action {
             Self::GatewayApproved => "gateway.approved",
             Self::GatewayDisabled => "gateway.disabled",
             Self::GatewayTokenRevoked => "gateway.token_revoked",
+            Self::RegistrationClosed => "registration.closed",
+            Self::RegistrationOpened => "registration.opened",
         }
     }
 }
@@ -703,6 +709,78 @@ impl AccountStore {
             .map_err(|_| Error::Unavailable)?;
             audit_gateway(&tx, actor, Action::GatewayTokenRevoked, gateway).await?;
         }
+        tx.commit().await.map_err(|_| Error::Unavailable)
+    }
+
+    /// Whether registration is open, and when an administrator last
+    /// changed it (Unix seconds), for the administrator behind `browser`.
+    ///
+    /// # Errors
+    /// `Rejected` without an administrator's live browser session; storage
+    /// failure.
+    pub async fn admin_registration(&self, browser: &Token) -> Result<(bool, Option<i64>), Error> {
+        Self::administrator(&self.db, browser).await?;
+        let row = self
+            .db
+            .query_one_raw(statement(
+                "SELECT open, floor(extract(epoch FROM changed_at))::bigint AS changed_at
+                 FROM central_identity.registration",
+                vec![],
+            ))
+            .await
+            .map_err(|_| Error::Unavailable)?
+            .ok_or(Error::Unavailable)?;
+        Ok((
+            row.try_get("", "open").map_err(|_| Error::Unavailable)?,
+            row.try_get("", "changed_at")
+                .map_err(|_| Error::Unavailable)?,
+        ))
+    }
+
+    /// Close registration, or open it again, for the administrator behind
+    /// `browser`, whose password sign-in must be less than 30 minutes old.
+    /// The same state again changes nothing; a change writes its audit
+    /// event in the same transaction, and a registration in flight finishes
+    /// before it (`register` reads the row for share).
+    ///
+    /// # Errors
+    /// `Rejected` without a fresh administrator's browser session; storage
+    /// failure.
+    pub async fn set_registration(&self, browser: &Token, open: bool) -> Result<(), Error> {
+        let tx = self.db.begin().await.map_err(|_| Error::Unavailable)?;
+        let actor = self.acting_administrator(&tx, browser).await?;
+        let before: bool = tx
+            .query_one_raw(statement(
+                "SELECT open FROM central_identity.registration FOR UPDATE",
+                vec![],
+            ))
+            .await
+            .map_err(|_| Error::Unavailable)?
+            .ok_or(Error::Unavailable)?
+            .try_get("", "open")
+            .map_err(|_| Error::Unavailable)?;
+        if before == open {
+            return tx.commit().await.map_err(|_| Error::Unavailable);
+        }
+        tx.execute_raw(statement(
+            "UPDATE central_identity.registration
+             SET open = $1, changed_at = pg_catalog.clock_timestamp(), changed_by = $2",
+            vec![open.into(), actor.into()],
+        ))
+        .await
+        .map_err(|_| Error::Unavailable)?;
+        let action = if open {
+            Action::RegistrationOpened
+        } else {
+            Action::RegistrationClosed
+        };
+        tx.execute_raw(statement(
+            "INSERT INTO central_identity.audit_events (actor_kind, actor_account, action)
+             VALUES ('admin', $1, $2)",
+            vec![actor.into(), action.as_str().into()],
+        ))
+        .await
+        .map_err(|_| Error::Unavailable)?;
         tx.commit().await.map_err(|_| Error::Unavailable)
     }
 

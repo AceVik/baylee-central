@@ -4,24 +4,24 @@
 // register, become contacts, write both ways, reload without a password,
 // compare safety numbers, share a group and leave it. Set up as README.md
 // §"The new site" describes; never real accounts.
-import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 
 const password = "violet lantern harbour quietly";
-const key = readFileSync(process.env["REAL_KEYS"] ?? "", "utf8").split("\n")[0]?.trim() ?? "";
 const stamp = String(Date.now() % 1_000_000);
 
 async function register(page: Page, username: string, display: string): Promise<string> {
   await page.goto("/en/register");
   await expect(page.locator("html")).toHaveAttribute("data-islands", "ready");
-  await page.getByLabel("Beta key").fill(key);
+  await expect(page.getByLabel("Beta key")).toHaveCount(0);
   await page.getByLabel("Sign-in name").fill(username);
   await page.getByLabel("Display name").fill(display);
   await page.getByLabel("Password", { exact: true }).fill(password);
   await page.getByLabel("Password again").fill(password);
   await page.getByLabel("I am 16 or older.").check();
   await page.getByRole("checkbox", { name: /I accept the terms of use/ }).check();
+  // a person takes longer than three seconds to fill a form; the page refuses faster ones
+  await page.waitForTimeout(3_000);
   await page.getByRole("button", { name: "Create account" }).click();
   await expect(page.getByRole("heading", { name: "Your recovery code" })).toBeVisible({ timeout: 90_000 });
   await page.getByLabel("I have saved my recovery code").check();

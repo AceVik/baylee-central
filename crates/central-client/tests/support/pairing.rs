@@ -132,7 +132,7 @@ pub(crate) fn run(
         address: browser.address,
         client: "198.51.100.31",
     };
-    let account = password::register("pairing-web", http, browser, runtime, operator);
+    let account = password::register("pairing-web", http, browser);
     let check = account.master.key_check(account.context).unwrap();
 
     // After a password sign-in the SDK stores the key check, once.

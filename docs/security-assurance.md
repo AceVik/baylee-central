@@ -2518,3 +2518,67 @@ password opens it once and the next reload needs none. Not run here: a real
 Central with the real module end to end. The native client is the client's own
 change. Engineering review, not an audit.
 
+
+## Open registration: the proof of work and the end of the beta keys, 11 November 2026
+
+Design pass. The owner, 10 and 11.11.2026: the site is for the open beta,
+the closed beta's keys go, in the backend too, on conditions (the client's
+and the gateway's API compatible; a migration that deletes nothing else;
+the replacement protection in place before the key stops being one), and
+an administrator keeps a simple switch to close registration during an
+attack. The replacement is the owner's design of 28.10.2026: a proof of
+work issued and checked by Central, per-address budgets with a daily one,
+a honeypot and a minimum fill time. Options weighed for the challenge: a
+signed stateless token (a token format of our own, excluded by the
+project's rule against custom token algorithms) against random nonces held
+in memory (bounded, one use); chosen: the latter. The puzzle is the one the
+Impressum already uses (SHA-256 over `nonce:part:counter`, leading zero
+bits, eight parts), so the page's Worker solves both and nothing new runs in
+the browser. A closed registration answers the challenge with a new response
+(`RegistrationClosed`) instead of a new error kind, which would have broken
+exhaustive matches in the game client.
+
+Implementation pass:
+- `central_api::register` checks and solves; `RegisterChallenge` and its
+  answer, `Register { nonce, counters }`, `RegistrationClosed`, and the admin
+  requests `Registration` and `SetRegistration` are additive to the wire;
+  `beta_key` left `Register`, and `central_api::beta_key` went (the gateway's
+  own integration tests use it; they need the proof when they update their
+  pin, and the game repository's session was told).
+- The identity service holds the challenges (at most 10,000, the oldest
+  making room, five minutes, one use, three seconds at the soonest) and the
+  last hour's registrations for the difficulty (16 bits, one more per
+  doubling from 60 an hour, three at most); it spends the proof before the
+  store sees the name. Tests may build it with an easy base; the service's
+  own launch never does.
+- The browser listener's budgets: `Register` 5 an hour and 10 a day,
+  `RegisterChallenge` 20 an hour.
+- Migration 000023 drops `beta_keys`, `accounts.beta_key_id` and the two
+  constraints naming it, re-creates `account_registered_pending` without the
+  key, keeps the audit's `beta_key_id` (it never had a foreign key), and
+  adds `registration` (one row, open). The runtime role gets `SELECT` and
+  `UPDATE (open, changed_at, changed_by)` on it, nothing else, checked at
+  startup. `register` reads the row for share in its transaction, the switch
+  for update, so a registration in flight finishes before a close and none
+  starts after it.
+- `--issue-beta-keys-stdin` went; the CLI refuses it as an unknown mode.
+- The register page solves the proof in `pow-worker.js`, waits out the
+  three seconds, keeps a hidden field for form robots and refuses a form
+  sent within three seconds; administrators find the switch on the account
+  overview, with a fresh sign-in when theirs is older than 30 minutes.
+
+Adversarial pass: unit tests that a solution counts once, not too soon,
+not after five minutes, not for an unknown nonce, that a full table drops
+the oldest, that the difficulty rises with each doubling and falls with the
+hour; that every part must be solved and a wrong counter fails; the wire's
+shapes, a `Register` without the proof and one with the old `beta_key`
+refused; the budgets per hour and day and the challenge's own. On PostgreSQL
+18: registration open, closed (refused before the name, also for a taken
+one), reservations, names, races and the sweep without keys; the switch
+read and set by an administrator only, a stale sign-in refused, the same
+state writing nothing, each change one audit event; the runtime's exact
+privileges on the switch, both ways; the keys' table and column gone, the
+audit's column kept; and 000023 over the upgrade chain's data, where every
+account, the pending registrations and every audit event (one naming a key)
+survive. The client's integration tests register through the real listener
+with a proof each. Engineering review, not an audit.

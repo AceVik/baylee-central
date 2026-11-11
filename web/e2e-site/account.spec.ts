@@ -54,9 +54,10 @@ test("a sign-in runs the real crypto in its Worker and refuses a false challenge
 test("registration says early what Central would refuse", async ({ page }) => {
   await page.goto("/de/register");
   await expect(page.locator("html")).toHaveAttribute("data-islands", "ready");
+  // the open beta asks for no key
+  await expect(page.getByLabel("Beta-Key")).toHaveCount(0);
   await page.getByRole("button", { name: "Account anlegen" }).click();
-  await expect(page.getByRole("alert")).toHaveText("Gib deinen Beta-Key ein.");
-  await page.getByLabel("Beta-Key").fill("CENTRAL-TEST");
+  await expect(page.getByRole("alert")).toHaveText("Der Anmeldename braucht 3 bis 24 Kleinbuchstaben, Ziffern, Punkte, Binde- oder Unterstriche.");
   await page.getByLabel("Anmeldename").fill("erika");
   await page.getByLabel("Anzeigename").fill("Admin");
   await page.getByRole("button", { name: "Account anlegen" }).click();
@@ -68,4 +69,46 @@ test("the account area says when nobody is signed in", async ({ page }) => {
   await expect(page.locator("html")).toHaveAttribute("data-islands", "ready");
   await expect(page.getByText("You are not signed in.")).toBeVisible();
   await expect(page.getByRole("link", { name: "Sign in" }).last()).toHaveAttribute("href", "/en/signin");
+});
+
+test("registration refuses a robot's haste and its hidden field, and says when it is paused", async ({ page }) => {
+  const asked: string[] = [];
+  await page.route("**/api/v1", (route) => {
+    asked.push(String(JSON.parse(route.request().postData() ?? "{}").operation));
+    return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ result: "registration_closed" }) });
+  });
+  await page.goto("/en/register");
+  await expect(page.locator("html")).toHaveAttribute("data-islands", "ready");
+  await page.getByLabel("Sign-in name").fill("erika");
+  await page.getByLabel("Display name").fill("Erika");
+  const fill = async () => {
+    await page.getByLabel("Password", { exact: true }).fill("violet lantern harbour");
+    await page.getByLabel("Password again").fill("violet lantern harbour");
+  };
+  await fill();
+  await page.getByLabel("I am 16 or older.").check();
+  await page.getByRole("checkbox", { name: /I accept the terms of use/ }).check();
+  const refused = "The registration was not accepted. Please try once more.";
+  // faster than a person: not sent
+  await page.getByRole("button", { name: "Create account" }).click();
+  await expect(page.getByRole("alert")).toHaveText(refused);
+  // the field people never see, filled as form robots do: not sent
+  await page.waitForTimeout(3_000);
+  await fill();
+  await page.locator("#register-website").evaluate((field: HTMLInputElement) => {
+    field.value = "https://spam.invalid";
+    field.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await page.getByRole("button", { name: "Create account" }).click();
+  await expect(page.getByRole("alert")).toHaveText(refused);
+  expect(asked).toEqual([]);
+  // a person, while an administrator closed registration
+  await page.locator("#register-website").evaluate((field: HTMLInputElement) => {
+    field.value = "";
+    field.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await fill();
+  await page.getByRole("button", { name: "Create account" }).click();
+  await expect(page.getByRole("alert")).toHaveText("Registration is paused right now. Please try again later.", { timeout: 15_000 });
+  expect(asked).toEqual(["register_challenge"]);
 });

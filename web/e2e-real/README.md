@@ -27,9 +27,15 @@ needed.
    `openssl rand -hex 32` passwords fed to `psql` on standard input.
 3. **Central**, each document on standard input with `umask 077`:
    `central-service --generate-secrets`, `--migrate-stdin`, then
-   `ops/grants.sql` as the database owner, `--issue-beta-keys-stdin` (count 2,
-   uses 3) into a keys file, and `--accounts-stdin` with
+   `ops/grants.sql` as the database owner, and `--accounts-stdin` with
    `"listen": "127.0.0.1:47920", "browser": {"listen": "127.0.0.1:47921"}`.
+
+**The old build's specs.** `account`, `chat`, `area` and `budget` register
+through the old build's page (`dist/`) with a beta key (`REAL_KEYS`). Since
+the open beta (11.11.2026) Central issues no keys and wants its proof of work
+instead, so they no longer run against a current Central; they go with `web/`
+(`../docs/proposals/frontend-rewrite.md` §8, phase 5). `site-chat.spec.ts`
+below registers through the new site.
 4. **The site**: `npm run build`, a certificate for `baylee.app`
    (`openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes
    -subj /CN=baylee.app -addext subjectAltName=DNS:baylee.app`), then
@@ -109,7 +115,7 @@ put the front before it instead of `dist/`:
 `node e2e-real/front.ts --tls <its folder> --site 28792`. Then
 
 ```bash
-REAL_FRONT_SPKI=<pin> REAL_KEYS=<keys file> REAL_OUT=<empty folder> npx playwright test -c e2e-real/playwright.config.ts e2e-real/site-chat.spec.ts
+REAL_FRONT_SPKI=<pin> REAL_OUT=<empty folder> npx playwright test -c e2e-real/playwright.config.ts e2e-real/site-chat.spec.ts
 ```
 
 `REAL_FRONT_SPKI` is the base64 SHA-256 of the throwaway certificate's
@@ -117,15 +123,19 @@ public key (`openssl x509 -in cert.pem -pubkey -noout | openssl pkey -pubin
 -outform der | openssl dgst -sha256 -binary | base64`): Chromium registers
 no service worker on an untrusted certificate, and the pages register one.
 
-registers two accounts at each width, makes them contacts by handle, has
+registers two accounts at each width without a key (the open beta; the page
+solves Central's proof of work), makes them contacts by handle, has
 them write to each other (markup in a message stays text), reloads one page
 and finds the chat open again without a password (the identity the sign-in
 kept in this browser), compares the safety number on both sides, creates a
 group, invites, joins, writes to it and leaves it (the history stays, the
 composer goes), switches a notification category off and on across a reload
 (the device's own Web Push needs a push service and is not run), and checks
-that localStorage holds neither a message nor the password. Central allows five registrations an hour per address: start it
-afresh between runs.
+that localStorage holds neither a message nor the password.
+
+Central allows five registrations an hour and ten a day per address, and
+counts them in memory: one run registers four, so start Central afresh
+between runs.
 
 ## Tearing down
 

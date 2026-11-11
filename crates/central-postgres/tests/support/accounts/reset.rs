@@ -397,10 +397,9 @@ async fn renewed_registered(
     keys: &ServerKeys,
     cookie: &Token,
 ) {
-    let key = super::register::issue(operator, 1, "reset-registered").await;
     let ticket = Token::generate().unwrap();
     let identity = store
-        .register("reset-registered", None, &key.digest(), &ticket)
+        .register("reset-registered", None, &ticket)
         .await
         .unwrap();
     let enrolled = super::register::credentials(keys, identity);

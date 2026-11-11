@@ -66,11 +66,11 @@ breadcrumb-home = Start
 
 ## Start
 
-hero-kicker = Frei · Open Source · Inoffizieller Fan-Inhalt
+hero-kicker = Offene Beta · Kostenlos · Open Source · Inoffizieller Fan-Content
 hero-title = Bau deine Decks. Hol deine Freunde. Einfach spielen.
 hero-lead = Ein umfassender Deckbuilder, Partien für bis zu acht Spieler – im Duell, jeder gegen jeden oder im Team – und eine Regel-Engine, die jeden Schritt prüft. So bleibt jeder Zug fair, ohne dass jemand etwas nachschlagen muss.
 hero-offline = Solopartien und der Deckbuilder funktionieren offline, ohne Account. Online-Tische laufen auf Gateways; <host>du kannst dein eigenes betreiben</host>.
-hero-account = Online spielen? <register>Leg einen Account an</register> oder <signin>melde dich an</signin>.
+hero-account = Online spielen? <register>Leg ein Konto an</register>, kostenlos und in der offenen Beta für alle offen, oder <signin>melde dich an</signin>.
 hero-memorial = Erinnerung an Baylee: ihr Fotoalbum öffnen
 hero-other = Andere Systeme
 
@@ -225,7 +225,7 @@ faq-what-a = Ein freies Fanspiel zu Magic: The Gathering für deinen Computer, m
 faq-cost-q = Was kostet es?
 faq-cost-a = Nichts, und das bleibt so: keine Bezahlschranke, keine bezahlten Funktionen, keine Werbung.
 faq-account-q = Brauche ich einen Account?
-faq-account-a = Nicht, um allein zu spielen: Deckbuilder und Partien gegen die Haus-KI funktionieren offline. Für Online-Tische brauchst du einen Baylee-Account, den du auf dieser Seite anlegst.
+faq-account-a = Nicht, um allein zu spielen: Deckbauer und Partien gegen die Haus-KI laufen offline. Für Online-Tische brauchst du ein Baylee-Konto; in der offenen Beta kann es jede und jeder hier auf der Seite kostenlos anlegen.
 faq-data-q = Was passiert mit meinen Daten?
 faq-data-a = So wenig wie möglich, und es steht in der <privacy>Datenschutzerklärung</privacy>. Dein Passwort verlässt nie deinen Browser; deine privaten Daten und deine Chatnachrichten werden auf deinem Gerät verschlüsselt, bevor sie uns erreichen.
 faq-password-q = Ich habe mein Passwort vergessen. Was nun?
@@ -494,9 +494,7 @@ signin-noscript = Anmelden braucht JavaScript: Dein Passwort wird in deinem Brow
 ## Registrieren
 
 register-title = Account anlegen
-register-lead = Für Online-Tische, Kontakte und den Chat. Solange Baylee in der Beta ist, brauchst du einen Beta-Key.
-register-key = Beta-Key
-register-key-hint = So, wie du ihn bekommen hast, etwa CENTRAL-XXXX-XXXX-XXXX-XXXX.
+register-lead = Für Online-Tische, Kontakte und den Chat. Kostenlos und in der offenen Beta für alle offen.
 register-name = Anmeldename
 register-name-hint = Privat, nur zum Anmelden: 3 bis 24 Kleinbuchstaben, Ziffern, Punkte, Binde- oder Unterstriche.
 register-display = Anzeigename
@@ -508,8 +506,6 @@ register-repeat-hint = Dasselbe noch einmal, gegen Tippfehler.
 register-age = Ich bin mindestens 16 Jahre alt.
 register-consent = Ich akzeptiere die <terms>Nutzungsbedingungen</terms> und habe die <privacy>Datenschutzerklärung</privacy> gelesen.
 register-submit = Account anlegen
-register-error-key = Gib deinen Beta-Key ein.
-register-error-key-refused = Dieser Beta-Key ist ungültig, aufgebraucht oder abgelaufen.
 register-error-name = Der Anmeldename braucht 3 bis 24 Kleinbuchstaben, Ziffern, Punkte, Binde- oder Unterstriche.
 register-error-display = Der Anzeigename braucht 3 bis 16 Buchstaben oder Ziffern; - und _ nur innen.
 register-error-reserved = Dieser Anzeigename ist reserviert. Wähle einen anderen.
@@ -786,3 +782,12 @@ push-failed = Die Änderung konnte nicht bestätigt werden. Bitte versuche es er
 push-denied = Benachrichtigungen sind gesperrt. Du kannst sie in den Browser- oder Geräteeinstellungen erlauben und es erneut versuchen.
 push-unsupported = Dieser Browser bietet hier kein Web Push an. Füge Baylee auf iPhone und iPad zum Home-Bildschirm hinzu und öffne es dort.
 push-unconfigured = Hintergrund-Benachrichtigungen sind auf diesem Server noch nicht verfügbar. Deine Auswahl kannst du bereits speichern.
+
+register-closed = Die Registrierung ist gerade pausiert. Bitte versuche es später noch einmal.
+register-refused = Die Registrierung wurde nicht angenommen. Bitte versuche es noch einmal.
+admin-registration = Registrierung
+admin-registration-open = Offen: Jede und jeder kann ein Konto anlegen, mit dem Arbeitsnachweis.
+admin-registration-closed = Geschlossen: Niemand kann ein Konto anlegen, bis du sie wieder öffnest.
+admin-registration-lead = Schließe die Registrierung bei einem Angriff und öffne sie von Hand wieder. Jede Änderung steht im Prüfprotokoll.
+admin-registration-close = Registrierung schließen
+admin-registration-reopen = Registrierung wieder öffnen

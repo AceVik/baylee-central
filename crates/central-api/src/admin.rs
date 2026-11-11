@@ -227,6 +227,16 @@ pub enum AdminRequest {
         /// Opened, or not.
         seen: bool,
     },
+    /// Whether registration is open (`docs/registration-abuse.md`).
+    /// Answered with [`AdminAnswer::Registration`].
+    Registration,
+    /// Close registration during an attack, or open it again: the brake the
+    /// owner kept when the keys went (11.11.2026). Audited. `Done`; the
+    /// same state again changes nothing.
+    SetRegistration {
+        /// Open, or closed.
+        open: bool,
+    },
 }
 
 impl AdminRequest {
@@ -253,7 +263,8 @@ impl AdminRequest {
             | Self::RemoveReportNote { .. }
             | Self::SaveReportView { .. }
             | Self::DeleteReportView { .. }
-            | Self::SetReportsSeen { .. } => true,
+            | Self::SetReportsSeen { .. }
+            | Self::SetRegistration { .. } => true,
             Self::Accounts { .. }
             | Self::Account { .. }
             | Self::Audit { .. }
@@ -268,7 +279,8 @@ impl AdminRequest {
             | Self::CrashGroups { .. }
             | Self::ReportStats
             | Self::ReportAdmins
-            | Self::ReportViews => false,
+            | Self::ReportViews
+            | Self::Registration => false,
         }
     }
 
@@ -482,7 +494,8 @@ pub struct AuditEvent {
     pub account: Option<[u8; 16]>,
     /// The gateway it touched, if any.
     pub gateway: Option<[u8; 16]>,
-    /// The beta key it touched, if any.
+    /// The closed beta's key it touched, if any: history from before
+    /// 11.11.2026, when the keys went.
     pub beta_key: Option<[u8; 16]>,
 }
 
@@ -550,6 +563,14 @@ pub enum AdminAnswer {
     Overview {
         /// Accounts and gateways by kind and state.
         overview: AdminOverview,
+    },
+    /// Whether registration is open.
+    Registration {
+        /// Open: anyone may register, with the proof of work.
+        open: bool,
+        /// When an administrator last changed it, Unix seconds; none since
+        /// it opened with the keys' removal.
+        changed_at: Option<i64>,
     },
     /// A page of reports.
     Reports {

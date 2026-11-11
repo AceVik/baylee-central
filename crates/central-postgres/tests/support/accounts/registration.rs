@@ -1,149 +1,86 @@
-//! Migration 000007: beta keys, the account's source, and the legacy rules
-//! that apply to legacy accounts only.
+//! Migration 000007: the account's source and the legacy rules that apply
+//! to legacy accounts only; and 000023: the closed beta's keys gone, the
+//! administrators' registration switch in their place.
 use super::{AccountStore, ServerKeys, TicketPurpose, Token, config, enroll, login};
-use central_api::beta_key::BetaKey;
-use central_postgres::{BetaKeyBatch, connect_dev};
-use sea_orm::{ConnectionTrait, DatabaseConnection, DbBackend, Statement};
+use central_postgres::connect_dev;
+use sea_orm::{ConnectionTrait, DatabaseConnection};
 
 pub(super) async fn run(store: &AccountStore, operator: &DatabaseConnection, keys: &ServerKeys) {
-    issuing(operator).await;
+    switch(operator).await;
     privileges(operator).await;
     constraints(store, operator, keys).await;
-    registered(store, operator, keys).await;
+    registered(store, keys).await;
 }
 
 async fn count(db: &impl ConnectionTrait, sql: &str) -> i64 {
     super::super::scalar(db, sql).await
 }
 
-/// A key of the first run, for rows that need one.
-const KEY: &str =
-    "(SELECT id FROM central_identity.beta_keys WHERE note = 'fixture run' ORDER BY id LIMIT 1)";
-
-async fn issuing(operator: &DatabaseConnection) {
-    let keys: Vec<BetaKey> = (0..3).map(|_| BetaKey::generate().unwrap()).collect();
-    let digests: Vec<[u8; 32]> = keys.iter().map(BetaKey::digest).collect();
-    BetaKeyBatch::new(&digests[..2], 5, None, "fixture run")
-        .unwrap()
-        .issue(operator)
-        .await
-        .unwrap();
-    BetaKeyBatch::new(&digests[2..], 1, Some(30), "")
-        .unwrap()
-        .issue(operator)
-        .await
-        .unwrap();
-    assert_eq!(
-        count(
-            operator,
-            "SELECT count(*)::bigint AS value FROM central_identity.beta_keys
-             WHERE uses_left = 5 AND note = 'fixture run' AND expires_at IS NULL AND revoked_at IS NULL"
-        )
-        .await,
-        2
-    );
-    assert_eq!(
-        count(
-            operator,
-            "SELECT count(*)::bigint AS value FROM central_identity.beta_keys WHERE uses_left = 1
-             AND expires_at - created_at = interval '30 days'"
-        )
-        .await,
-        1
-    );
-    // Each key is stored as its digest, and nothing else of it is.
-    for key in &keys {
-        let row = operator
-            .query_one_raw(Statement::from_sql_and_values(
-                DbBackend::Postgres,
-                "SELECT count(*)::bigint AS value FROM central_identity.beta_keys
-                 WHERE digest = $1 AND position($2 in note) = 0",
-                [key.digest().to_vec().into(), key.display().as_str().into()],
-            ))
-            .await
-            .unwrap()
-            .unwrap();
-        assert_eq!(row.try_get::<i64>("", "value").unwrap(), 1);
+async fn switch(operator: &DatabaseConnection) {
+    // Nothing of the keys is left: their table, and an account's link to one.
+    for (expected, sql) in [
+        (0, "SELECT count(*)::bigint AS value FROM pg_catalog.pg_class
+             WHERE oid = pg_catalog.to_regclass('central_identity.beta_keys')"),
+        (0, "SELECT count(*)::bigint AS value FROM information_schema.columns
+             WHERE table_schema = 'central_identity' AND table_name = 'accounts' AND column_name = 'beta_key_id'"),
+        // The audit keeps the key ids its old events name, as history.
+        (1, "SELECT count(*)::bigint AS value FROM information_schema.columns
+             WHERE table_schema = 'central_identity' AND table_name = 'audit_events' AND column_name = 'beta_key_id'"),
+        // One row, open.
+        (1, "SELECT count(*)::bigint AS value FROM central_identity.registration WHERE open AND changed_by IS NULL"),
+    ] {
+        assert_eq!(count(operator, sql).await, expected, "{sql}");
     }
-    // A run repeating a stored digest writes nothing at all.
-    let repeated = [BetaKey::generate().unwrap().digest(), digests[0]];
-    assert!(
-        BetaKeyBatch::new(&repeated, 1, None, "")
-            .unwrap()
-            .issue(operator)
-            .await
-            .is_err()
-    );
-    assert_eq!(
-        count(
-            operator,
-            "SELECT count(*)::bigint AS value FROM central_identity.beta_keys"
-        )
-        .await,
-        3
-    );
+    for sql in [
+        "INSERT INTO central_identity.registration (singleton, open) VALUES (true, false)",
+        "INSERT INTO central_identity.registration (singleton, open) VALUES (false, false)",
+        "UPDATE central_identity.registration SET open = NULL",
+    ] {
+        assert!(operator.execute_unprepared(sql).await.is_err(), "{sql}");
+    }
 }
 
 async fn privileges(operator: &DatabaseConnection) {
     let runtime = connect_dev(config("central_runtime", "CENTRAL_TEST_RUNTIME_PASSWORD"))
         .await
         .unwrap();
-    // The runtime spends a use; it cannot issue, revoke, re-date, re-note or delete a key.
+    // The runtime opens and closes registration; the row itself stays.
     runtime
         .execute_unprepared(
-            "UPDATE central_identity.beta_keys SET uses_left = uses_left - 1 WHERE note = 'fixture run'",
+            "UPDATE central_identity.registration SET open = true, changed_at = NULL, changed_by = NULL",
         )
         .await
         .unwrap();
     for sql in [
-        "INSERT INTO central_identity.beta_keys (digest, uses_left, note) VALUES (decode(repeat('ab', 32), 'hex'), 1, '')",
-        "UPDATE central_identity.beta_keys SET revoked_at = NULL",
-        "UPDATE central_identity.beta_keys SET expires_at = NULL",
-        "UPDATE central_identity.beta_keys SET note = 'changed'",
-        "UPDATE central_identity.beta_keys SET digest = digest",
-        "DELETE FROM central_identity.beta_keys",
-        "TRUNCATE central_identity.beta_keys",
-        "UPDATE central_identity.beta_keys SET uses_left = -1",
+        "INSERT INTO central_identity.registration (singleton, open) VALUES (true, true)",
+        "UPDATE central_identity.registration SET singleton = true",
+        "DELETE FROM central_identity.registration",
+        "TRUNCATE central_identity.registration",
     ] {
         assert!(runtime.execute_unprepared(sql).await.is_err(), "{sql}");
     }
     runtime.close().await.unwrap();
-    // The store's startup check refuses a wider grant on beta keys, and a missing one.
-    let table = "central_identity.beta_keys";
+    // The store's startup check refuses a wider grant on the switch, and a missing one.
+    let table = "central_identity.registration";
     let restore_update = format!(
-        "REVOKE UPDATE ON {table} FROM central_runtime; GRANT UPDATE (uses_left) ON {table} TO central_runtime"
+        "REVOKE UPDATE ON {table} FROM central_runtime;
+         GRANT UPDATE (open, changed_at, changed_by) ON {table} TO central_runtime"
     );
     for (change, undo) in [
         (
-            format!("GRANT UPDATE (note) ON {table} TO central_runtime"),
-            format!("REVOKE UPDATE (note) ON {table} FROM central_runtime"),
-        ),
-        (
-            format!("GRANT UPDATE (revoked_at) ON {table} TO central_runtime"),
-            format!("REVOKE UPDATE (revoked_at) ON {table} FROM central_runtime"),
-        ),
-        (
-            format!("GRANT UPDATE ON {table} TO central_runtime"),
-            restore_update.clone(),
+            format!("GRANT UPDATE (singleton) ON {table} TO central_runtime"),
+            format!("REVOKE UPDATE (singleton) ON {table} FROM central_runtime"),
         ),
         (
             format!("GRANT INSERT ON {table} TO central_runtime"),
             format!("REVOKE INSERT ON {table} FROM central_runtime"),
         ),
         (
-            format!("GRANT INSERT (note) ON {table} TO central_runtime"),
-            format!("REVOKE INSERT (note) ON {table} FROM central_runtime"),
-        ),
-        (
             format!("GRANT DELETE ON {table} TO central_runtime"),
             format!("REVOKE DELETE ON {table} FROM central_runtime"),
         ),
         (
-            format!("GRANT UPDATE (uses_left) ON {table} TO central_runtime WITH GRANT OPTION"),
-            restore_update.clone(),
-        ),
-        (
-            format!("REVOKE UPDATE (uses_left) ON {table} FROM central_runtime"),
+            format!("REVOKE UPDATE (open) ON {table} FROM central_runtime"),
             restore_update.clone(),
         ),
         (
@@ -174,7 +111,7 @@ async fn constraints(store: &AccountStore, operator: &DatabaseConnection, keys: 
         count(
             operator,
             "SELECT count(*)::bigint AS value FROM central_identity.accounts WHERE legacy_id = 'source-legacy'
-             AND source = 'legacy' AND recovery_wrapped_master IS NULL AND beta_key_id IS NULL"
+             AND source = 'legacy' AND recovery_wrapped_master IS NULL"
         )
         .await,
         1
@@ -199,38 +136,32 @@ async fn constraints(store: &AccountStore, operator: &DatabaseConnection, keys: 
         )
         .await
         .unwrap();
-    let pending = format!(
-        "INSERT INTO central_identity.accounts (source, username_key, enrollment_digest, enrollment_expires, beta_key_id)
-         VALUES ('registered', 'constraint-probe', decode(repeat('cd', 32), 'hex'), clock_timestamp() + interval '10 minutes', {KEY})"
-    );
-    operator.execute_unprepared(&pending).await.unwrap();
+    let pending = "INSERT INTO central_identity.accounts (source, username_key, enrollment_digest, enrollment_expires)
+         VALUES ('registered', 'constraint-probe', decode(repeat('cd', 32), 'hex'), clock_timestamp() + interval '10 minutes')";
+    operator.execute_unprepared(pending).await.unwrap();
     let enrolled = "credential = '\\x01', wrapped_master = decode(repeat('01', 73), 'hex'),
         document = decode(repeat('01', 41), 'hex'), document_revision = 1,
         enrollment_digest = NULL, enrollment_expires = NULL";
     let recovery = "recovery_wrapped_master = decode(repeat('01', 73), 'hex')";
     let probe = "WHERE username_key = 'constraint-probe'";
     for sql in [
-        format!("INSERT INTO central_identity.accounts (source, legacy_id, username_key, enrollment_digest, enrollment_expires, beta_key_id)
-            VALUES ('registered', 'probe-two', 'probe-two', decode(repeat('ce', 32), 'hex'), clock_timestamp() + interval '1 minute', {KEY})"),
+        "INSERT INTO central_identity.accounts (source, legacy_id, username_key, enrollment_digest, enrollment_expires)
+            VALUES ('registered', 'probe-two', 'probe-two', decode(repeat('ce', 32), 'hex'), clock_timestamp() + interval '1 minute')".into(),
         "INSERT INTO central_identity.accounts (username_key) VALUES ('probe-three')".into(),
         "INSERT INTO central_identity.accounts (source, username_key) VALUES ('registered', 'probe-four')".into(),
-        "INSERT INTO central_identity.accounts (source, username_key, enrollment_digest, enrollment_expires)
-            VALUES ('registered', 'probe-five', decode(repeat('cf', 32), 'hex'), clock_timestamp() + interval '1 minute')".into(),
-        format!("INSERT INTO central_identity.accounts (legacy_id, username_key, beta_key_id) VALUES ('probe-six', 'probe-six', {KEY})"),
         "INSERT INTO central_identity.accounts (source, legacy_id, username_key) VALUES ('other', 'probe-seven', 'probe-seven')".into(),
         format!("UPDATE central_identity.accounts SET legacy_closed = true {probe}"),
         format!("UPDATE central_identity.accounts SET {recovery} {probe}"),
         format!("UPDATE central_identity.accounts SET {recovery} WHERE legacy_id = 'pending-legacy'"),
-        format!("UPDATE central_identity.accounts SET {enrolled}, beta_key_id = NULL {probe}"),
-        format!("UPDATE central_identity.accounts SET {enrolled}, {recovery} {probe}"),
-        format!("UPDATE central_identity.accounts SET {enrolled}, beta_key_id = NULL,
+        format!("UPDATE central_identity.accounts SET {enrolled} {probe}"),
+        format!("UPDATE central_identity.accounts SET {enrolled},
             recovery_wrapped_master = decode(repeat('01', 72), 'hex') {probe}"),
     ] {
         assert!(operator.execute_unprepared(&sql).await.is_err(), "{sql}");
     }
     operator
         .execute_unprepared(&format!(
-            "UPDATE central_identity.accounts SET {enrolled}, {recovery}, beta_key_id = NULL {probe}"
+            "UPDATE central_identity.accounts SET {enrolled}, {recovery} {probe}"
         ))
         .await
         .unwrap();
@@ -242,11 +173,10 @@ async fn constraints(store: &AccountStore, operator: &DatabaseConnection, keys: 
 
 /// A registered account, through registration and enrollment: legacy rules
 /// do not hold it back.
-async fn registered(store: &AccountStore, operator: &DatabaseConnection, keys: &ServerKeys) {
-    let key = super::register::issue(operator, 1, "registered-one").await;
+async fn registered(store: &AccountStore, keys: &ServerKeys) {
     let ticket = Token::generate().unwrap();
     let identity = store
-        .register("Registered-One", None, &key.digest(), &ticket)
+        .register("Registered-One", None, &ticket)
         .await
         .unwrap();
     assert_eq!(

@@ -5,7 +5,7 @@ administration design's step 5 (branch `c41/accounts-admin-design`,
 `docs/accounts-admin-proposal.md`, with the owner's answers of 22.10.2026):
 roles, the first administrator, an append-only audit with its sweep, the
 last sign-in time, and the administrator's reads and role changes. The
-pages (`/admin` in the web app) are M4; locks and bans, beta keys and
+pages (`/admin` in the web app) are M4; locks and bans and
 gateway approval on the website and reports are the design's later steps.
 Every piece goes through the three passes of [security
 assurance](security-assurance.md).
@@ -204,3 +204,15 @@ pairings, in one transaction, and prints the three counts on standard error. A d
   owner's approval; `legal/` is unchanged.
 - The owner's account moved to Central and appointed; the sweep's timer
   installed.
+
+## Registration's switch (11 November 2026)
+
+`AdminRequest::Registration` reads whether registration is open and when an
+administrator last changed it; `AdminRequest::SetRegistration { open }`
+closes it during an attack or opens it again, a change that needs a password
+sign-in under 30 minutes old and writes `registration.closed` or
+`registration.opened` (no account, no gateway). The website shows it to
+administrators on the account overview. The closed beta's keys, which this
+section's earlier plans listed, are gone ([registration
+abuse](registration-abuse.md)); `audit_events.beta_key_id` keeps the ids
+older events name.

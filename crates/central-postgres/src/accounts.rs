@@ -303,7 +303,7 @@ impl AccountStore {
         let tx = self.db.begin().await.map_err(|_| Error::Unavailable)?;
         let pending = tx
             .query_one_raw(statement(
-                "SELECT source, beta_key_id FROM central_identity.accounts WHERE enrollment_digest = $1
+                "SELECT source FROM central_identity.accounts WHERE enrollment_digest = $1
                  AND enrollment_expires > pg_catalog.clock_timestamp() AND credential IS NULL",
                 vec![digest.clone().into()],
             ))
@@ -313,35 +313,20 @@ impl AccountStore {
         let source: String = pending
             .try_get("", "source")
             .map_err(|_| Error::Unavailable)?;
-        let key: Option<Uuid> = pending
-            .try_get("", "beta_key_id")
-            .map_err(|_| Error::Unavailable)?;
-        match (source.as_str(), recovery, key) {
-            ("registered", Some(_), Some(key)) => {
-                // The key's row before the account's, the order registration takes.
-                let spent = tx
-                    .execute_raw(statement(
-                        "UPDATE central_identity.beta_keys SET uses_left = uses_left - 1
-                         WHERE id = $1 AND uses_left > 0 AND revoked_at IS NULL",
-                        vec![key.into()],
-                    ))
-                    .await
-                    .map_err(|_| Error::Unavailable)?;
-                if spent.rows_affected() != 1 {
-                    return Err(Error::Rejected);
-                }
-            }
-            ("legacy", None, None) => {}
+        // A registered account enrols with its recovery wrapper, a legacy one
+        // without (`docs/web-accounts.md`).
+        match (source.as_str(), recovery) {
+            ("registered", Some(_)) | ("legacy", None) => {}
             _ => return Err(Error::Rejected),
         }
         let result = tx.execute_raw(statement(
             "UPDATE central_identity.accounts SET credential = $2, wrapped_master = $3, document = $4,
              recovery_wrapped_master = $5, document_revision = 1, enrollment_digest = NULL,
-             enrollment_expires = NULL, beta_key_id = NULL
+             enrollment_expires = NULL
              WHERE enrollment_digest = $1 AND enrollment_expires > pg_catalog.clock_timestamp() AND credential IS NULL
-             AND source = $6 AND beta_key_id IS NOT DISTINCT FROM $7",
+             AND source = $6",
             vec![digest.into(), record.to_vec().into(), wrapped.to_vec().into(), document.to_vec().into(),
-                recovery.map(<[u8]>::to_vec).into(), source.into(), key.into()],
+                recovery.map(<[u8]>::to_vec).into(), source.into()],
         )).await.map_err(|_| Error::Unavailable)?;
         if result.rows_affected() != 1 {
             return Err(Error::Rejected);

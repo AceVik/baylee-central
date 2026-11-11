@@ -1,12 +1,12 @@
-//! `register` and the registered enrollment: the key before the name,
-//! reservations that give their use back, reclaimed names and races.
+//! `register` and the registered enrollment: open registration (since
+//! 000023, the proof of work checked before, in the identity service),
+//! closed registration refused before the name, reservations that expire,
+//! reclaimed names and races.
 use super::{AccountStore, Error, Identity, ServerKeys, Token, context};
-use central_api::beta_key::BetaKey;
 use central_crypto::{
     opaque::Enrollment,
     vault::{MasterKey, ObjectContext, RecoveryCode},
 };
-use central_postgres::BetaKeyBatch;
 use sea_orm::{ConnectionTrait, DatabaseConnection};
 
 /// What a browser sends to enroll.
@@ -40,16 +40,6 @@ pub(super) fn credentials(keys: &ServerKeys, identity: Identity) -> Enrolled {
     }
 }
 
-pub(super) async fn issue(operator: &DatabaseConnection, uses: u32, note: &str) -> BetaKey {
-    let key = BetaKey::generate().unwrap();
-    BetaKeyBatch::new(&[key.digest()], uses, None, note)
-        .unwrap()
-        .issue(operator)
-        .await
-        .unwrap();
-    key
-}
-
 async fn scalar(operator: &DatabaseConnection, sql: &str) -> i64 {
     super::super::scalar(operator, sql).await
 }
@@ -66,57 +56,31 @@ fn expire(name: &str) -> String {
     )
 }
 
-async fn register(store: &AccountStore, name: &str, key: &BetaKey) -> Result<Identity, Error> {
+async fn register(store: &AccountStore, name: &str) -> Result<Identity, Error> {
     store
-        .register(name, None, &key.digest(), &Token::generate().unwrap())
+        .register(name, None, &Token::generate().unwrap())
         .await
 }
 
 pub(super) async fn run(store: &AccountStore, operator: &DatabaseConnection, keys: &ServerKeys) {
     refusals(store, operator).await;
+    closed(store, operator).await;
     reservations(store, operator, keys).await;
-    revocation(store, operator, keys).await;
     names(store, operator).await;
-    races(store, operator).await;
+    races(store).await;
     sweep(store, operator).await;
 }
 
 async fn refusals(store: &AccountStore, operator: &DatabaseConnection) {
-    let good = issue(operator, 10, "refusals").await;
-    let unknown = BetaKey::generate().unwrap();
-    let revoked = issue(operator, 10, "revoked").await;
-    sql(operator, "UPDATE central_identity.beta_keys SET revoked_at = clock_timestamp() WHERE note = 'revoked'").await;
-    let expired = issue(operator, 10, "expired").await;
-    sql(
+    let before = scalar(
         operator,
-        "UPDATE central_identity.beta_keys SET created_at = clock_timestamp() - interval '2 days',
-        expires_at = clock_timestamp() - interval '1 day' WHERE note = 'expired'",
+        "SELECT count(*)::bigint AS value FROM central_identity.accounts",
     )
     .await;
-    let spent = issue(operator, 1, "spent").await;
-    sql(
-        operator,
-        "UPDATE central_identity.beta_keys SET uses_left = 0 WHERE note = 'spent'",
-    )
-    .await;
-    for key in [&unknown, &revoked, &expired, &spent] {
-        // Refused before the name is looked at: a taken name answers the same.
-        assert_eq!(
-            register(store, "alice", key).await.err(),
-            Some(Error::Rejected)
-        );
-        assert_eq!(
-            register(store, "free-name", key).await.err(),
-            Some(Error::Rejected)
-        );
-    }
-    // A valid key learns that a name is taken: enrolled, or a legacy migration's.
+    // A taken name: enrolled, or a legacy migration's.
+    assert_eq!(register(store, "ALICE").await.err(), Some(Error::Conflict));
     assert_eq!(
-        register(store, "ALICE", &good).await.err(),
-        Some(Error::Conflict)
-    );
-    assert_eq!(
-        register(store, "expired", &good).await.err(),
+        register(store, "expired").await.err(),
         Some(Error::Conflict)
     );
     for name in [
@@ -129,7 +93,7 @@ async fn refusals(store: &AccountStore, operator: &DatabaseConnection) {
         "älice",
     ] {
         assert_eq!(
-            register(store, name, &good).await.err(),
+            register(store, name).await.err(),
             Some(Error::Rejected),
             "{name}"
         );
@@ -137,34 +101,55 @@ async fn refusals(store: &AccountStore, operator: &DatabaseConnection) {
     assert_eq!(
         scalar(
             operator,
-            "SELECT count(*)::bigint AS value FROM central_identity.accounts a
-            JOIN central_identity.beta_keys k ON k.id = a.beta_key_id WHERE k.note = 'refusals'"
+            "SELECT count(*)::bigint AS value FROM central_identity.accounts"
         )
         .await,
-        0,
+        before,
         "no refusal reserved anything"
     );
 }
 
-async fn reservations(store: &AccountStore, operator: &DatabaseConnection, keys: &ServerKeys) {
-    let key = issue(operator, 1, "one-use").await;
-    let first = Token::generate().unwrap();
-    let a = store
-        .register("reserve-a", None, &key.digest(), &first)
-        .await
-        .unwrap();
-    // The key's only use is reserved.
+async fn closed(store: &AccountStore, operator: &DatabaseConnection) {
+    assert!(store.registration_open().await.unwrap());
+    sql(
+        operator,
+        "UPDATE central_identity.registration SET open = false",
+    )
+    .await;
+    assert!(!store.registration_open().await.unwrap());
+    // Closed: refused before the name is looked at, a taken one alike.
     assert_eq!(
-        register(store, "reserve-b", &key).await.err(),
+        register(store, "closed-name").await.err(),
         Some(Error::Rejected)
     );
-    // The reservation expires and gives the use back; its ticket no longer enrolls.
+    assert_eq!(register(store, "alice").await.err(), Some(Error::Rejected));
+    sql(
+        operator,
+        "UPDATE central_identity.registration SET open = true",
+    )
+    .await;
+    assert_eq!(
+        scalar(
+            operator,
+            "SELECT count(*)::bigint AS value FROM central_identity.accounts WHERE username_key = 'closed-name'"
+        )
+        .await,
+        0
+    );
+}
+
+async fn reservations(store: &AccountStore, operator: &DatabaseConnection, keys: &ServerKeys) {
+    let first = Token::generate().unwrap();
+    let a = store.register("reserve-a", None, &first).await.unwrap();
+    // A live reservation holds its name.
+    assert_eq!(
+        register(store, "reserve-a").await.err(),
+        Some(Error::Conflict)
+    );
+    // The reservation expires; its ticket no longer enrolls.
     sql(operator, &expire("reserve-a")).await;
     let second = Token::generate().unwrap();
-    let b = store
-        .register("reserve-b", None, &key.digest(), &second)
-        .await
-        .unwrap();
+    let b = store.register("reserve-b", None, &second).await.unwrap();
     assert_ne!(a.account, b.account);
     let late = credentials(keys, a);
     assert_eq!(
@@ -220,74 +205,33 @@ async fn reservations(store: &AccountStore, operator: &DatabaseConnection, keys:
             .err(),
         Some(Error::Rejected)
     );
-    // The use is spent, the link is gone, the wrapper is stored.
-    assert_eq!(scalar(operator, "SELECT uses_left::bigint AS value FROM central_identity.beta_keys WHERE note = 'one-use'").await, 0);
+    // The wrapper is stored, the reservation's ticket is gone.
     assert_eq!(
         scalar(operator, "SELECT count(*)::bigint AS value FROM central_identity.accounts WHERE username_key = 'reserve-b'
-            AND source = 'registered' AND beta_key_id IS NULL AND octet_length(recovery_wrapped_master) = 73
+            AND source = 'registered' AND enrollment_digest IS NULL AND octet_length(recovery_wrapped_master) = 73
             AND legacy_id IS NULL AND credential IS NOT NULL").await,
         1
     );
-    assert_eq!(
-        register(store, "reserve-c", &key).await.err(),
-        Some(Error::Rejected)
-    );
-}
-
-async fn revocation(store: &AccountStore, operator: &DatabaseConnection, keys: &ServerKeys) {
-    // Revoking a key ends its pending registrations, and spends nothing.
-    let revocable = issue(operator, 5, "revoke-later").await;
-    let ticket = Token::generate().unwrap();
-    let c = store
-        .register("reserve-c", None, &revocable.digest(), &ticket)
-        .await
-        .unwrap();
-    sql(operator, "UPDATE central_identity.beta_keys SET revoked_at = clock_timestamp() WHERE note = 'revoke-later'").await;
-    let enrolled = credentials(keys, c);
-    assert_eq!(
-        store
-            .enroll(
-                &ticket,
-                &enrolled.upload,
-                &enrolled.wrapped,
-                &enrolled.document,
-                Some(&enrolled.recovery)
-            )
-            .await
-            .err(),
-        Some(Error::Rejected)
-    );
-    assert_eq!(scalar(operator, "SELECT uses_left::bigint AS value FROM central_identity.beta_keys WHERE note = 'revoke-later'").await, 5);
 }
 
 async fn names(store: &AccountStore, operator: &DatabaseConnection) {
-    let key = issue(operator, 10, "names").await;
     // A live reservation holds its name; an expired one is reclaimed.
     let first = Token::generate().unwrap();
-    let a = store
-        .register("reclaimed", None, &key.digest(), &first)
-        .await
-        .unwrap();
+    let a = store.register("reclaimed", None, &first).await.unwrap();
     assert_eq!(
-        register(store, "reclaimed", &key).await.err(),
+        register(store, "reclaimed").await.err(),
         Some(Error::Conflict)
     );
     sql(operator, &expire("reclaimed")).await;
     let second = Token::generate().unwrap();
-    let b = store
-        .register("Reclaimed", None, &key.digest(), &second)
-        .await
-        .unwrap();
+    let b = store.register("Reclaimed", None, &second).await.unwrap();
     assert_ne!(a.account, b.account);
     assert!(store.enrollment(&first).await.is_err());
     assert_eq!(store.enrollment(&second).await.unwrap().account, b.account);
     // A legacy migration takes a name back from an abandoned registration only,
     // and a registration never takes a legacy name.
     let ticket = Token::generate().unwrap();
-    store
-        .register("legacy-name", None, &key.digest(), &ticket)
-        .await
-        .unwrap();
+    store.register("legacy-name", None, &ticket).await.unwrap();
     assert_eq!(
         store
             .reserve_legacy(
@@ -315,33 +259,14 @@ async fn names(store: &AccountStore, operator: &DatabaseConnection) {
     assert!(store.enrollment(&ticket).await.is_err());
     sql(operator, &expire("legacy-name")).await;
     assert_eq!(
-        register(store, "legacy-name", &key).await.err(),
+        register(store, "legacy-name").await.err(),
         Some(Error::Conflict)
     );
 }
 
-async fn races(store: &AccountStore, operator: &DatabaseConnection) {
-    // Two registrations for a key's last use: exactly one gets it.
-    let key = issue(operator, 1, "race").await;
-    let (a, b) = tokio::join!(
-        register(store, "race-a", &key),
-        register(store, "race-b", &key)
-    );
-    assert!(
-        matches!(
-            (&a, &b),
-            (Ok(_), Err(Error::Rejected)) | (Err(Error::Rejected), Ok(_))
-        ),
-        "{:?} {:?}",
-        a.is_ok(),
-        b.is_ok()
-    );
+async fn races(store: &AccountStore) {
     // Two registrations for one name: exactly one gets it.
-    let key = issue(operator, 5, "race-name").await;
-    let (a, b) = tokio::join!(
-        register(store, "race-name", &key),
-        register(store, "race-name", &key)
-    );
+    let (a, b) = tokio::join!(register(store, "race-name"), register(store, "race-name"));
     assert!(
         matches!(
             (&a, &b),
@@ -354,16 +279,15 @@ async fn races(store: &AccountStore, operator: &DatabaseConnection) {
 }
 
 async fn sweep(store: &AccountStore, operator: &DatabaseConnection) {
-    let key = issue(operator, 100, "sweep").await;
-    sql(operator, "INSERT INTO central_identity.accounts (source, username_key, enrollment_digest, enrollment_expires, beta_key_id)
+    sql(operator, "INSERT INTO central_identity.accounts (source, username_key, enrollment_digest, enrollment_expires)
         SELECT 'registered', 'sweep-' || g, decode(md5(g::text) || md5(g::text), 'hex'),
-        clock_timestamp() - interval '1 minute', (SELECT id FROM central_identity.beta_keys WHERE note = 'sweep')
+        clock_timestamp() - interval '1 minute'
         FROM generate_series(1, 20) g").await;
     let abandoned = "SELECT count(*)::bigint AS value FROM central_identity.accounts
         WHERE source = 'registered' AND credential IS NULL AND enrollment_expires <= clock_timestamp()";
     let before = scalar(operator, abandoned).await;
     assert!(before >= 20);
-    register(store, "sweeper", &key).await.unwrap();
+    register(store, "sweeper").await.unwrap();
     // Sixteen abandoned registrations go with each registration, oldest first.
     assert_eq!(scalar(operator, abandoned).await, before - 16);
     assert_eq!(
