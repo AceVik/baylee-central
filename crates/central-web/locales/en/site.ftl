@@ -160,6 +160,7 @@ gws-official = Official
 gws-online = Online
 gws-offline = Offline
 gws-version = Version
+gws-now = Right now
 gws-website = Website
 gws-address = Address
 gws-copy = Copy address
@@ -258,7 +259,7 @@ privacy-device = This site sets no cookie until you sign in. What your browser k
 privacy-github-title = GitHub
 privacy-github = The download page and the start page show the newest release, the test status and the card numbers. Our server asks GitHub for them, not your browser; GitHub learns nothing about you from that. Only when you click a download or GitHub link does your browser connect to GitHub (GitHub, Inc., USA) and send it your IP address and what every request carries; GitHub's own privacy notice then applies.
 privacy-directory-title = The gateway directory
-privacy-directory = Our server reads the directory of gateways from Baylee Central and shows it; nothing about you is involved.
+privacy-directory = Our server reads the directory of gateways from Baylee Central and shows it; nothing about you is involved. A gateway may tell Central how many players, open tables and games it has at the moment, and Central counts its accounts; the site shows these numbers. They are counts only, never names, and a gateway's numbers are its operator's own statement.
 privacy-account-title = Your account
 privacy-account = For an account, Baylee Central stores: your account id, your sign-in name, your display name with its tag, when and how the account was created, an OPAQUE password record (which lets you prove your password without our server ever learning it), your master key twice encrypted (by your password and by your recovery code), your encrypted account document and your encrypted objects (unreadable to us; we see only size, revision and time), which version of the terms you accepted and when, the time of your last sign-in, your sessions, an administrator role if you have one, and the gateways you register with their tokens. Other players see your display name and tag, never your sign-in name. If an administrator gives you a reset code, we store only its digest until the code is used or has expired. What administrators do to an account or gateway is kept in a record for three years (who, what, which account or gateway, when). Legal basis: Art. 6(1)(b) GDPR (the account you asked for); for the time of the last sign-in and the record, Art. 6(1)(f) GDPR (our legitimate interest in secure, traceable operation). Without a sign-in name and a password there is no account; you need no e-mail address. You may create an account from the age of 16. Kept until you delete the account; it is then removed from the running system at once, and from backups within 12 months at the latest. Sessions end after 30 minutes without use and at the latest 12 hours after signing in.
 privacy-cookie-title = The session cookie
@@ -771,6 +772,24 @@ strip-directory = the directory
 strip-cards = Playable cards
 strip-cards-unit = cards
 strip-stars = Stars on GitHub
+strip-accounts = Accounts at Baylee Central
+strip-live = Right now on the gateways, as they report it
+live-accounts = { $n ->
+    [one] { $n } account
+   *[other] { $n } accounts
+}
+live-players = { $n ->
+    [one] { $n } player
+   *[other] { $n } players
+}
+live-tables = { $n ->
+    [one] { $n } open table
+   *[other] { $n } open tables
+}
+live-games = { $n ->
+    [one] { $n } game
+   *[other] { $n } games
+}
 hero-badges = At a glance
 hero-badge-beta = Open beta
 hero-badge-free = Free

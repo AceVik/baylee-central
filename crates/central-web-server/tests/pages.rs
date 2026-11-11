@@ -465,6 +465,45 @@ async fn forms_and_the_account_area_are_islands_and_not_indexed() {
     }
 }
 
+/// Central's figures (the accounts, and what a gateway says is happening
+/// on it): in the strip and on the gateway's card while a source reports
+/// them, and nowhere when nobody does. A number nobody reported is never
+/// drawn as a zero.
+#[tokio::test]
+async fn the_figures_are_shown_only_while_a_source_reports_them() {
+    let reported = app(true);
+    let (_, _, home) = get(&reported, "/de/", &[]).await;
+    for number in ["1.234 Konten", "12 Spieler", "3 offene Tische", "4 Partien"] {
+        assert_eq!(
+            count(&home, number),
+            2 - usize::from(number.contains("Konten")),
+            "{number}"
+        );
+    }
+    let (_, _, gateways) = get(&reported, "/en/gateways", &[]).await;
+    // the online gateway that reports, not the offline one beside it
+    assert_eq!(count(&gateways, "class=\"gw-now\""), 1);
+    for number in ["12 players", "3 open tables", "4 games"] {
+        assert_eq!(count(&gateways, number), 1, "{number}");
+    }
+
+    let silent = app(false);
+    for path in ["/de/", "/en/", "/en/gateways"] {
+        let (_, _, html) = get(&silent, path, &[]).await;
+        for never in [
+            "gw-now",
+            "Konten",
+            " accounts<",
+            "Spieler<",
+            " players<",
+            "0 Partien",
+            "0 games",
+        ] {
+            assert!(!html.contains(never), "{path}: {never}");
+        }
+    }
+}
+
 /// The Impressum as the server writes it holds none of the operator's
 /// details and no way to them but the puzzle, and the bait for robots that
 /// the rewrite once lost: one link no person sees, hears or reaches, on this

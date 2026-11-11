@@ -160,6 +160,7 @@ gws-official = 官方
 gws-online = 在線
 gws-offline = 離線
 gws-version = 版本
+gws-now = Right now
 gws-website = 網站
 gws-address = 位址
 gws-copy = 複製位址
@@ -258,7 +259,7 @@ privacy-device = 在你登入之前，本站不設定任何 Cookie。你的瀏�
 privacy-github-title = GitHub
 privacy-github = 下載頁面與首頁會顯示最新版本、測試狀態與卡牌數量。是我們的伺服器向 GitHub 取得這些資料，不是你的瀏覽器；GitHub 不會因此得知任何關於你的事。只有在你點擊下載或 GitHub 連結時，你的瀏覽器才會連線到 GitHub（GitHub, Inc.，美國），並把你的 IP 位址與每個請求都帶有的資訊傳給它；之後適用 GitHub 自己的隱私權聲明。
 privacy-directory-title = Gateway 目錄
-privacy-directory = 我們的伺服器從 Baylee Central 讀取 Gateways 目錄並顯示出來；其中不涉及任何關於你的資料。
+privacy-directory = Our server reads the directory of gateways from Baylee Central and shows it; nothing about you is involved. A gateway may tell Central how many players, open tables and games it has at the moment, and Central counts its accounts; the site shows these numbers. They are counts only, never names, and a gateway's numbers are its operator's own statement.
 privacy-account-title = 你的帳號
 privacy-account = 為了建立帳號，Baylee Central 會儲存：你的帳號 ID、登入名稱、帶標籤的顯示名稱、帳號建立的時間與方式、一筆 OPAQUE 密碼紀錄（讓你能證明自己知道密碼，而我們的伺服器完全不會得知密碼）、經過兩次加密的主金鑰（分別由你的密碼與救援碼加密）、你加密的帳號文件與加密物件（我們無法讀取，只看得到大小、修訂版本與時間）、你接受的是哪一版條款以及何時接受、上次登入的時間、你的工作階段、管理員角色（如果你有的話），以及你註冊的 Gateways 與其權杖。其他玩家看到的是你的顯示名稱與標籤，不會看到你的登入名稱。如果管理員給你一組重設碼，我們只會儲存它的摘要，直到該重設碼被使用或過期為止。管理員對帳號或 Gateway 所做的操作，會記錄保存三年（誰、做了什麼、哪個帳號或 Gateway、何時）。法律基礎：GDPR 第 6 條第 1 項 (b) 款（你要求建立的帳號）；至於上次登入的時間與該紀錄，則是 GDPR 第 6 條第 1 項 (f) 款（我們在安全、可追溯的營運上的正當利益）。沒有登入名稱和密碼就沒有帳號；你不需要電子郵件地址。年滿 16 歲才可以建立帳號。資料保存到你刪除帳號為止；刪除後，會立即從運作中的系統移除，並最遲在 12 個月內從備份中移除。工作階段在閒置 30 分鐘後結束，最遲在登入後 12 小時結束。
 privacy-cookie-title = 工作階段 Cookie
@@ -769,6 +770,24 @@ strip-directory = 目錄
 strip-cards = 可玩的牌
 strip-cards-unit = 張
 strip-stars = GitHub 星數
+strip-accounts = Accounts at Baylee Central
+strip-live = Right now on the gateways, as they report it
+live-accounts = { $n ->
+    [one] { $n } account
+   *[other] { $n } accounts
+}
+live-players = { $n ->
+    [one] { $n } player
+   *[other] { $n } players
+}
+live-tables = { $n ->
+    [one] { $n } open table
+   *[other] { $n } open tables
+}
+live-games = { $n ->
+    [one] { $n } game
+   *[other] { $n } games
+}
 hero-badges = 一覽
 hero-badge-beta = 公開測試
 hero-badge-free = 免費

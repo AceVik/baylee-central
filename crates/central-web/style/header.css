@@ -602,9 +602,11 @@ body:has(dialog[open]) .top {
   padding: 0;
 }
 
-.strip-right {
-  justify-content: flex-end;
-  margin-inline-start: auto;
+/* The project's group takes what room there is, so the numbers stand at the
+   far end while both fit on one line; once they do not, the numbers start a
+   line of their own at the same edge as the first. */
+.strip-group:first-child {
+  flex: 1 1 auto;
 }
 
 .strip-stat {
@@ -734,12 +736,11 @@ body:has(dialog[open]) .top {
   }
 }
 
-/* a phone: two columns of two, the second column flush right; the last
-   commit and the stars stay for a wider screen */
+/* a phone: the stats as they fit, two on a line pushed to its ends, a long
+   one alone; the last commit and the stars stay for a wider screen */
 @media (max-width: 760px) {
   .strip-inner {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
+    justify-content: space-between;
     gap: 0.2rem 0.75rem;
     padding-block: 0.4rem;
   }
@@ -759,19 +760,15 @@ body:has(dialog[open]) .top {
     display: none;
   }
 
-  .strip-stat:nth-child(2n of :not(.strip-opt)) {
-    justify-self: end;
+  /* three counts in one pill are as wide as a phone: they may break */
+  .strip-stat:has(.stat-pill) {
+    white-space: normal;
   }
 
-}
-
-/* the narrowest phones: one stat a line, nothing over anything */
-@media (max-width: 340px) {
-  .strip-inner {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .strip-stat:nth-child(2n of :not(.strip-opt)) {
-    justify-self: start;
+  .stat-pill {
+    flex-wrap: wrap;
+    gap: 0 0.7rem;
+    padding-block: 0.15rem;
+    border-radius: 0.9rem;
   }
 }

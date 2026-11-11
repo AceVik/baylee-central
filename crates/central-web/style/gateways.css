@@ -129,6 +129,25 @@
   margin: 0;
 }
 
+/* what the gateway says of itself right now: three counts, each whole,
+   the next below when the card is narrow */
+.gw-now dd {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--space-3);
+  font-size: var(--text-sm);
+}
+
+.gw-now dd > span {
+  white-space: nowrap;
+}
+
+.gw-now dd > span + span::before {
+  content: "·";
+  margin-inline-end: var(--space-3);
+  color: var(--ink-faint);
+}
+
 /* the whole address, wrapped where it must: its end often tells two apart */
 .gw-facts code {
   font-size: 0.8rem;

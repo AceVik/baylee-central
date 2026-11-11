@@ -10,7 +10,7 @@ use serde_json::json;
 
 use super::download::download_block;
 use super::{Built, section_head};
-use crate::data::{CardStatus, Gateway};
+use crate::data::{self, CardStatus, Gateway};
 use crate::format;
 use crate::islands::ContactForm;
 use crate::rich::{icon, paragraphs, plain, rich};
@@ -318,10 +318,55 @@ fn strip_play(cx: &Context<'_>) -> impl IntoView + use<> {
     };
     view! {
         <dl class="strip-group strip-right">
+            {strip_live(cx)}
             {cards}
             {stars}
             {strip_stat(icon(icons::SERVER).into_any(), words::strip_gateways(lang), gateways, false, true)}
         </dl>
+    }
+}
+
+/// The strip's numbers that are true for a minute: Central's accounts, and
+/// what the online gateways say is happening on them, added up. Each is
+/// there only while a source reports it.
+fn strip_live(cx: &Context<'_>) -> impl IntoView + use<> {
+    let lang = cx.lang;
+    let accounts = cx.data.accounts.map(|accounts| {
+        strip_stat(
+            icon(icons::USERS).into_any(),
+            words::strip_accounts(lang),
+            view! { <span class="num">{words::live_accounts(lang, accounts)}</span> }.into_any(),
+            false,
+            true,
+        )
+    });
+    let now = cx
+        .data
+        .gateways
+        .as_deref()
+        .and_then(data::activity_of)
+        .map(|(players, tables, games)| {
+            strip_stat(
+                icon(icons::GAMEPAD_2).into_any(),
+                words::strip_live(lang),
+                view! {
+                    <a href="#gateways">
+                        <span class="stat-pill num">
+                            <span class="stat-part"><span class="dot ok live" aria-hidden="true"></span>{words::live_players(lang, players)}</span>
+                            <span class="stat-part">{words::live_tables(lang, tables)}</span>
+                            <span class="stat-part">{words::live_games(lang, games)}</span>
+                        </span>
+                    </a>
+                }
+                .into_any(),
+                false,
+                true,
+            )
+        });
+    // the longest first: on a phone it has a line to itself
+    view! {
+        {now}
+        {accounts}
     }
 }
 
@@ -670,6 +715,19 @@ pub fn gateway_card(lang: Lang, gateway: &Gateway, h2: bool) -> impl IntoView + 
                 </a>
             }
         });
+    // what the gateway itself says is happening on it, while it says so
+    let now = gateway.activity.filter(|_| gateway.online).map(|activity| {
+        view! {
+            <div class="gw-now">
+                <dt>{words::gws_now(lang)}</dt>
+                <dd class="num">
+                    <span>{words::live_players(lang, u64::from(activity.players))}</span>
+                    <span>{words::live_tables(lang, u64::from(activity.tables))}</span>
+                    <span>{words::live_games(lang, u64::from(activity.games))}</span>
+                </dd>
+            </div>
+        }
+    });
     let find = format!("{} {}", gateway.name, gateway.origin).to_lowercase();
     let name = gateway.name.clone();
     let name = if h2 {
@@ -693,6 +751,7 @@ pub fn gateway_card(lang: Lang, gateway: &Gateway, h2: bool) -> impl IntoView + 
                     <dt>{words::gws_version(lang)}</dt>
                     <dd><code translate="no">{gateway.version.clone()}</code></dd>
                 </div>
+                {now}
             </dl>
             <div class="gw-actions">
                 {open}

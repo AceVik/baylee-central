@@ -175,6 +175,9 @@ pub struct Snapshot {
     pub gateways: Option<Vec<Gateway>>,
     /// The repository's state.
     pub repo: Repo,
+    /// The accounts that can sign in, as Central counts them about once a
+    /// minute (its public figures).
+    pub accounts: Option<u64>,
 }
 
 /// What a page needs besides its own words.
