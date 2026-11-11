@@ -659,6 +659,7 @@ chat-history-only = No longer a contact.
 chat-today = Today
 chat-yesterday = Yesterday
 chat-encrypted = End-to-end encrypted
+chat-opening-lead = Your conversations and contacts. Messages are encrypted on your devices before they leave them, and Central passes them on without being able to read them.
 chat-new-from = New message from { $who }.
 chat-new-many = { $n } new messages.
 chat-retry = Try again

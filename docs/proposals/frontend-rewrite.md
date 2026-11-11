@@ -794,12 +794,22 @@ the inbox.
   rendered it and throws once the browser renders it again. Literal text
   goes in braces (`{"Website"}`), and `crates/central-web/tests/inert.rs`
   scans the islands and the views they share for any such element.
-- Where an island replaces the part that held the focus (a form by its next
-  step, the Impressum's button by the details, the contact form by its
-  thanks), the new part takes the focus where it begins
-  (`islands/focus.rs`); before, the next Tab went on at the page's end and
-  skipped the recovery code. Found by the keyboard walk of 11.11.2026 and
-  kept by the browser tests.
+- Where an island replaces the part that held the focus, the new part takes
+  the focus where it begins (`islands/focus.rs`). Before, the next Tab went
+  on at the page's end and skipped, for one, the recovery code. This covers:
+  - a form replaced by its next step;
+  - the Impressum's button replaced by the details;
+  - the contact form replaced by its thanks;
+  - in the account area: re-auth, the deletion steps, the export, a new
+    token and its gateway, the registration switch and the chosen display
+    name;
+  - push switches, which are marked busy instead of disabled while they
+    save.
+
+  Found by the keyboard walk of 11.11.2026 and kept by the browser tests.
+- The gateway cards' field ids came from the origin's length, so two
+  equally long origins shared their labels' targets. They now come from
+  the gateway's id, and a test checks the page's ids are unique.
 
 **The app.**
 
@@ -833,6 +843,33 @@ between 60 and 72rem. The contacts' section headings skipped a level.
 Rendering the whole messenger on every inbox read (it lost composer text
 and focus, and trapped in WebAssembly) became memos that pass only
 changes.
+
+**Measured (11.11.2026, the final build, local, Lighthouse 13.5.0, behind
+gzip):**
+
+| Page | Mobile perf. | LCP (mobile) | Desktop perf. | SEO |
+| --- | ---: | ---: | ---: | ---: |
+| `/en/` | 95 | 2.9 s | 100 | 100 |
+| `/en/download`, `/en/gateways`, `/en/faq` | 99 | 1.7–1.8 s | 100 | 100 |
+| `/en/contact` | 99 | 2.0 s | 100 | 100 |
+| `/de/impressum` | 99 | 2.0 s | 100 | 69 (`noindex`) |
+| `/en/signin`, `/en/register` | 99 | 1.8 s | 98, 100 | 66 (`noindex`) |
+| `/en/account`, `/de/account` | 98–99 | 1.8–2.0 s | 100 | 66 (`noindex`) |
+| `/en/account/chat`, `/de/account/chat`, `/en/account/contacts` | 98–99 | 1.7–1.8 s | 100 | 66 (`noindex`) |
+
+Accessibility and Best Practices are 100 everywhere. CLS is at most 0.052
+and TBT 0 ms. The account pages are measured signed out.
+
+Three changes got there from 81 for register, chat and contacts and 94 for
+the overview (CLS 0.134):
+- The islands start after the first frame as well as after load. The
+  WebAssembly fetch then never precedes the first paint, which had put it
+  on the simulated critical path.
+- The account column holds the window's height from the start, so the
+  footer no longer jumps when the island's content arrives.
+- The messenger's page renders a lead on the server. It stays one element
+  until the messenger opens, so the largest paint never waits for the
+  WebAssembly.
 
 **Tests.**
 
