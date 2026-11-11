@@ -3169,6 +3169,8 @@ Not tested, and recorded for the owner:
 - **Load.** No measurement with many gateways or many accounts; the cost
   statements are from the statements' shape.
 
+Engineering review, not an audit.
+
 ## Registration hardened: reviewed as an attacker, a price by look, a longer rise, 11 November 2026
 
 Design pass. The owner, 11.11.2026: repair and improve the protection of
@@ -3289,6 +3291,7 @@ Adversarial pass:
   addresses; a block's people share its count; a hard budget per block; a
   proof that costs memory, since SHA-256 costs a native program a
   thirteenth of what it costs a page.
+
 Engineering review, not an audit.
 
 ## The site's polish: links in new tabs, movement, the words, 11 November 2026
