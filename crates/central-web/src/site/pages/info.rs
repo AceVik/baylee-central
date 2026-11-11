@@ -62,9 +62,10 @@ fn directory_stats(lang: Lang, all: &[Gateway]) -> impl IntoView + use<> {
         }
     };
     let online = all.iter().filter(|gateway| gateway.online).count();
-    let now = crate::data::activity_of(all).map(|(players, tables, games)| {
+    let now = crate::data::activity_of(all).map(|(players, playing, tables, games)| {
         view! {
             {tile(icons::USERS, words::gw_stat_players(lang), players, false)}
+            {tile(icons::SWORDS, words::gw_stat_playing(lang), playing, false)}
             {tile(icons::LAYOUT_DASHBOARD, words::gw_stat_tables(lang), tables, false)}
             {tile(icons::GAMEPAD_2, words::gw_stat_games(lang), games, false)}
         }

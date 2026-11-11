@@ -857,7 +857,7 @@ body:has(dialog[open]) .top {
     display: none;
   }
 
-  /* three counts in one pill are as wide as a phone: they may break */
+  /* four counts in one pill are wider than a phone: they may break */
   .strip-stat:has(.stat-pill) {
     white-space: normal;
   }
@@ -867,5 +867,12 @@ body:has(dialog[open]) .top {
     gap: 0 0.7rem;
     padding-block: 0.15rem;
     border-radius: 0.9rem;
+  }
+
+  /* and four break evenly, two and two, not three and a leftover */
+  .stat-pill:has(> .stat-part:nth-child(4)) {
+    display: inline-grid;
+    grid-template-columns: auto auto;
+    justify-items: start;
   }
 }

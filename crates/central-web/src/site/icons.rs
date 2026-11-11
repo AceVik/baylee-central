@@ -165,3 +165,5 @@ pub const LAYOUT_GRID: &str = r#"<rect width="7" height="7" x="3" y="3" rx="1" /
 pub const LIST: &str = r#"<path d="M3 5h.01" /> <path d="M3 12h.01" /> <path d="M3 19h.01" /> <path d="M8 5h13" /> <path d="M8 12h13" /> <path d="M8 19h13" />"#;
 /// The `arrow-up-down` icon.
 pub const ARROW_UP_DOWN: &str = r#"<path d="m21 16-4 4-4-4" /> <path d="M17 20V4" /> <path d="m3 8 4-4 4 4" /> <path d="M7 4v16" />"#;
+/// The `swords` icon.
+pub const SWORDS: &str = r#"<path d="m13 19 6-6" /> <path d="M14.5 17.5 3.586 6.586A2 2 0 013 5.172V3h2.172a2 2 0 011.414.586L17.5 14.5" /> <path d="m14.828 6.172 2.586-2.586A2 2 0 0118.828 3H21v2.172a2 2 0 01-.586 1.414l-2.586 2.586" /> <path d="m16 16 4 4" /> <path d="m19 21 2-2" /> <path d="m5 14 4 4" /> <path d="m5 21-2-2" /> <path d="M7.5 16.5 4 20" />"#;
