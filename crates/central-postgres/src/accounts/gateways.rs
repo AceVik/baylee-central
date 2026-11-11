@@ -3,14 +3,40 @@ use super::{
     AccountStore, Error, NOT_DISABLED, Token, any_origin, number, origins, statement, uuid,
 };
 use central_api::{
-    gateway::{GatewayListing, GatewayMetadata, validate_origin},
+    gateway::{GatewayActivity, GatewayFigures, GatewayListing, GatewayMetadata, validate_origin},
     is_official_origin,
     wire::TicketPurpose,
 };
-use sea_orm::{ConnectionTrait, DatabaseTransaction, TransactionTrait, prelude::Uuid};
+use sea_orm::{ConnectionTrait, DatabaseTransaction, TransactionTrait, Value, prelude::Uuid};
 
 pub(super) fn valid_id(id: [u8; 16]) -> bool {
     id[6] >> 4 == 7 && id[8] >> 6 == 2
+}
+
+/// What a beat does to its row's activity, from parameters 5 to 7
+/// ([`counts`]): a pulse's three counts with the time, or all four columns
+/// cleared by a plain heartbeat's NULLs. Part of the beat's one UPDATE, so
+/// the five-second limit and every other condition hold for it as well.
+const ACTIVITY: &str = "activity_players=$5,activity_tables=$6,activity_games=$7,
+    activity_at=CASE WHEN $5::integer IS NULL THEN NULL ELSE pg_catalog.clock_timestamp() END";
+
+/// A beat's three activity parameters, in [`ACTIVITY`]'s order: a pulse's
+/// counts within their bound, or NULLs for a plain heartbeat.
+fn counts(activity: Option<GatewayActivity>) -> Result<[Value; 3], Error> {
+    let Some(activity) = activity else {
+        return Ok([None::<i32>.into(), None::<i32>.into(), None::<i32>.into()]);
+    };
+    activity.validate()?;
+    let count = |n: u32| {
+        i32::try_from(n)
+            .map(Value::from)
+            .map_err(|_| Error::Rejected)
+    };
+    Ok([
+        count(activity.players)?,
+        count(activity.tables)?,
+        count(activity.games)?,
+    ])
 }
 
 async fn lock_owner(tx: &DatabaseTransaction, session: &Token) -> Result<Uuid, Error> {
@@ -113,6 +139,79 @@ impl AccountStore {
             .collect()
     }
 
+    /// One bounded page of what gateways report (`docs/gateway-registry.md`
+    /// §"Activity and the public figures"): the id and the three counts of
+    /// each gateway that is approved and enabled, online by the directory's
+    /// 90 seconds, and whose activity was reported within them. A gateway
+    /// that sends plain heartbeats, or stopped, is not in it. Ids and counts
+    /// only: no name, origin, owner or credential field.
+    ///
+    /// # Errors
+    /// Rejects invalid cursors and unavailable storage.
+    pub async fn gateway_figures(
+        &self,
+        after: Option<[u8; 16]>,
+    ) -> Result<Vec<GatewayFigures>, Error> {
+        if after.is_some_and(|id| !valid_id(id)) {
+            return Err(Error::Rejected);
+        }
+        let rows = self.db.query_all_raw(statement(
+            "SELECT g.id,g.activity_players,g.activity_tables,g.activity_games
+             FROM central_identity.gateways g JOIN central_identity.gateway_approvals p ON p.gateway_id=g.id AND p.enabled
+             WHERE ($1::uuid IS NULL OR g.id>$1)
+             AND g.last_seen > pg_catalog.clock_timestamp()-interval '90 seconds'
+             AND g.activity_at > pg_catalog.clock_timestamp()-interval '90 seconds'
+             ORDER BY g.id LIMIT 100", vec![after.map(uuid).into()]
+        )).await.map_err(|_| Error::Unavailable)?;
+        rows.into_iter()
+            .map(|row| {
+                let id: Uuid = row.try_get("", "id").map_err(|_| Error::Unavailable)?;
+                let count = |column: &str| {
+                    row.try_get::<i32>("", column)
+                        .ok()
+                        .and_then(|n| u32::try_from(n).ok())
+                        .ok_or(Error::Unavailable)
+                };
+                let activity = GatewayActivity {
+                    players: count("activity_players")?,
+                    tables: count("activity_tables")?,
+                    games: count("activity_games")?,
+                };
+                // The table's CHECK holds the bound; a row outside it is not passed on.
+                activity.validate().map_err(|_| Error::Unavailable)?;
+                Ok(GatewayFigures {
+                    id: *id.as_bytes(),
+                    activity,
+                })
+            })
+            .collect()
+    }
+
+    /// How many accounts can sign in: those with a stored credential, the
+    /// administration's "enrolled" ([`Self::admin_overview`]). An unfinished
+    /// registration or move has none and is not counted; a deleted account's
+    /// row is gone. One count over the table: its caller keeps the answer
+    /// for a while rather than ask for every request.
+    ///
+    /// # Errors
+    /// Unavailable storage.
+    pub async fn account_count(&self) -> Result<u64, Error> {
+        let row = self
+            .db
+            .query_one_raw(statement(
+                "SELECT count(*)::bigint AS accounts FROM central_identity.accounts
+                 WHERE credential IS NOT NULL",
+                vec![],
+            ))
+            .await
+            .map_err(|_| Error::Unavailable)?
+            .ok_or(Error::Unavailable)?;
+        row.try_get::<i64>("", "accounts")
+            .ok()
+            .and_then(|n| u64::try_from(n).ok())
+            .ok_or(Error::Unavailable)
+    }
+
     /// Authenticate a gateway's redemption credential or a live gateway token
     /// with the `sso` scope (migration 000014), never a heartbeat credential
     /// or a listing-only token. The official gateway holds neither
@@ -150,6 +249,7 @@ impl AccountStore {
     /// gateway token with the `listing` scope (migration 000014), which this
     /// marks used. A token beats while its gateway awaits approval, so its
     /// owner sees it seen; the directory lists approved gateways only.
+    /// A plain heartbeat reports no activity and clears what a pulse stored.
     ///
     /// # Errors
     /// Rejects wrong credentials, disabled gateways, an unapproved heartbeat
@@ -160,6 +260,33 @@ impl AccountStore {
         token: &Token,
         metadata: &GatewayMetadata,
     ) -> Result<(), Error> {
+        self.registered_beat(token, metadata, None).await
+    }
+
+    /// [`Self::gateway_heartbeat`] with the gateway's activity
+    /// (`docs/gateway-registry.md` §"Activity and the public figures"): the
+    /// same credential, checks and limit, and the three counts kept with the
+    /// time. The counts are the gateway's claim; only their bound is checked.
+    ///
+    /// # Errors
+    /// As [`Self::gateway_heartbeat`], and a count above
+    /// [`GatewayActivity::MOST`], before anything is read or written.
+    pub async fn gateway_pulse(
+        &self,
+        token: &Token,
+        metadata: &GatewayMetadata,
+        activity: GatewayActivity,
+    ) -> Result<(), Error> {
+        self.registered_beat(token, metadata, Some(activity)).await
+    }
+
+    async fn registered_beat(
+        &self,
+        token: &Token,
+        metadata: &GatewayMetadata,
+        activity: Option<GatewayActivity>,
+    ) -> Result<(), Error> {
+        let [players, tables, games] = counts(activity)?;
         let row=self.db.query_one_raw(statement(
             &format!("SELECT g.id,g.origin,false AS by_token FROM central_identity.gateways g JOIN central_identity.gateway_approvals p
              ON p.gateway_id=g.id AND p.enabled WHERE g.heartbeat_digest=$1 AND NOT g.official
@@ -178,11 +305,12 @@ impl AccountStore {
             self.touch_gateway_token(token).await?;
         }
         let updated=self.db.execute_raw(statement(
-            &format!("UPDATE central_identity.gateways g SET name=$2,version=$3,website=$4,last_seen=pg_catalog.clock_timestamp()
+            &format!("UPDATE central_identity.gateways g SET name=$2,version=$3,website=$4,last_seen=pg_catalog.clock_timestamp(),
+             {ACTIVITY}
              WHERE id=$1 AND NOT official
              AND (last_seen IS NULL OR last_seen<=pg_catalog.clock_timestamp()-interval '5 seconds')
              AND {NOT_DISABLED}"),
-            vec![gateway.into(),metadata.name.clone().into(),metadata.version.clone().into(),metadata.website.clone().into()]
+            vec![gateway.into(),metadata.name.clone().into(),metadata.version.clone().into(),metadata.website.clone().into(),players,tables,games]
         )).await.map_err(|_|Error::Unavailable)?;
         if updated.rows_affected() != 1 {
             return Err(Error::Busy);
@@ -197,6 +325,7 @@ impl AccountStore {
     /// first), which a live service (`development` false) holds to the
     /// compiled ones ([`is_official_origin`]); the website may be on any of
     /// them, so a gateway that still names its old address keeps its entry.
+    /// A plain heartbeat reports no activity and clears what a pulse stored.
     ///
     /// # Errors
     /// Rejects another origin, metadata on none of them, an unlisted,
@@ -208,6 +337,34 @@ impl AccountStore {
         metadata: &GatewayMetadata,
         development: bool,
     ) -> Result<(), Error> {
+        self.official_beat(set, metadata, development, None).await
+    }
+
+    /// [`Self::official_heartbeat`] with the official gateway's activity, as
+    /// [`Self::gateway_pulse`] for a registered one.
+    ///
+    /// # Errors
+    /// As [`Self::official_heartbeat`], and a count above
+    /// [`GatewayActivity::MOST`], before anything is read or written.
+    pub async fn official_pulse<S: AsRef<str> + Sync>(
+        &self,
+        set: &[S],
+        metadata: &GatewayMetadata,
+        development: bool,
+        activity: GatewayActivity,
+    ) -> Result<(), Error> {
+        self.official_beat(set, metadata, development, Some(activity))
+            .await
+    }
+
+    async fn official_beat<S: AsRef<str> + Sync>(
+        &self,
+        set: &[S],
+        metadata: &GatewayMetadata,
+        development: bool,
+        activity: Option<GatewayActivity>,
+    ) -> Result<(), Error> {
+        let [players, tables, games] = counts(activity)?;
         if set.is_empty() || (!development && !set.iter().all(|o| is_official_origin(o.as_ref()))) {
             return Err(Error::Rejected);
         }
@@ -223,11 +380,12 @@ impl AccountStore {
              ON p.gateway_id=g.id AND p.enabled WHERE g.official AND g.origin={any}"),vec![origins(set)?]
         )).await.map_err(|_|Error::Unavailable)?.ok_or(Error::Rejected)?;
         let updated=self.db.execute_raw(statement(
-            &format!("UPDATE central_identity.gateways g SET name=$2,version=$3,website=$4,last_seen=pg_catalog.clock_timestamp()
+            &format!("UPDATE central_identity.gateways g SET name=$2,version=$3,website=$4,last_seen=pg_catalog.clock_timestamp(),
+             {ACTIVITY}
              WHERE official AND origin={any}
              AND (last_seen IS NULL OR last_seen<=pg_catalog.clock_timestamp()-interval '5 seconds')
              AND EXISTS(SELECT 1 FROM central_identity.gateway_approvals p WHERE p.gateway_id=g.id AND p.enabled)"),
-            vec![origins(set)?,metadata.name.clone().into(),metadata.version.clone().into(),metadata.website.clone().into()]
+            vec![origins(set)?,metadata.name.clone().into(),metadata.version.clone().into(),metadata.website.clone().into(),players,tables,games]
         )).await.map_err(|_|Error::Unavailable)?;
         if updated.rows_affected() != 1 {
             return Err(Error::Busy);

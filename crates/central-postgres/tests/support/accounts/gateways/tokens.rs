@@ -44,7 +44,7 @@ async fn count(operator: &DatabaseConnection, sql: &str, values: Vec<sea_orm::Va
 
 /// An account whose move is finished, with its client session and a browser
 /// session as the website's sign-in issues it.
-async fn moved(
+pub(super) async fn moved(
     store: &AccountStore,
     keys: &ServerKeys,
     legacy: &str,
