@@ -405,6 +405,17 @@ room, so a crowd of addresses cannot lock new ones out.
 | `LoginStart` | 30 a minute, apart from `Discover` |
 | `GatewayDirectory` and `PublicFigures` | 60 a minute for the two together, apart from the others |
 | `ResetStart` | 10 an hour |
+| Every request that needs no session | 600 a minute, of the 32 a second all clients share |
+
+The listener also tells the service the address, and the service counts
+guesses at passwords by it (11.11.2026): each sign-in start, each start of a
+password change (two) and of a deletion is a guess until its proof, with
+counts per account, per address and per account at an address, and a proof
+gives the guess back and makes the address the account's own for 30 days
+([native login](native-login.md) §"Guessing a password online"). The
+refusal is the same `Busy`, which the page shows as it shows any other; it
+can last until the hour or the day ends, and the answer does not say how
+long.
 
 The global budgets of the native surface apply as well: `AccountSummary`
 counts with the control requests (`SessionStatus`, `RenewSession`, …),
@@ -531,10 +542,12 @@ existing insert stays valid, and the meaning is the same.
 address on the browser listener; `PairApprove`, `PairCancel` and the key
 check's two requests have no address budget, since each acts on a live
 session, which counts them as it counts its other requests. The native
-listener's claim, polls and redeem have a window of their own (64 a second),
-so polling cannot spend the sign-ins' budget, besides the per-pairing limits
-above. `PairCancel` ends a pairing in any state until it is redeemed, so a
-page that is left can end its own at once. The browser listener
+listener's claim, polls and redeem have a window of their own (64 a second,
+and of it 240 a minute for one address since 11.11.2026), so polling cannot
+spend the sign-ins' budget and one address cannot spend everyone's polls,
+besides the per-pairing limits above. `PairCancel` ends a pairing in any
+state until it is redeemed, so a page that is left can end its own at
+once. The browser listener
 serves `PairStart`, `PairStatus`, `PairApprove`, `PairCancel`,
 `KeyCheckStatus` and `SetKeyCheck`; the native listener refuses the first
 four and serves the claim, poll and redeem.

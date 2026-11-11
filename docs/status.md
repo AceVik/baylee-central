@@ -39,6 +39,10 @@ Request budgets separate unauthenticated/login traffic (32 per second, with the
 existing eight login starts per account/minute), data operations (256 per second,
 64 per bearer), and session/revocation control (512 per second, 128 per bearer).
 All buckets remain bounded and dispatch still authenticates every capability.
+Since 11.11.2026 guesses at passwords are also counted per account by the
+hour and day, per client address and per account at an address, and each
+address has a share of the unauthenticated budget
+([native login](native-login.md) §"Guessing a password online").
 These development limits are not a production capacity benchmark. The native
 wire limit includes worst-case JSON expansion of a maximum ciphertext and its
 enrollment envelope. No first-party unsafe or new external dependency was added.

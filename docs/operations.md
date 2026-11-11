@@ -38,9 +38,11 @@ never in argv or the environment. Unknown fields fail closed.
 on loopback only; a TLS reverse proxy terminates `https://central.baylee.app`
 and must pass the original `Host` header unchanged (Caddy's `reverse_proxy`
 does). Every other Host, an `Origin` or Fetch-Metadata header is refused.
-Forwarded headers confer no identity, credential or budget; the proxy's
-`X-Forwarded-For` hop only shares out the places of late and large bodies
-([below](#the-account-listeners-connections)). `/health/live` answers;
+Forwarded headers confer no identity and no credential; the proxy's
+`X-Forwarded-For` hop shares out the places of late and large bodies
+([below](#the-account-listeners-connections)) and, since 11.11.2026, is the
+address the sign-in's guesses and the address budgets are counted by
+([below](#sign-in-guesses-and-address-budgets)). `/health/live` answers;
 `/health/ready` deliberately answers 503, so no proxy or supervisor health
 check may use it. SIGTERM or Ctrl-C closes the listener, drains briefly and
 closes the pool.
@@ -73,8 +75,8 @@ bodies of up to 1 MiB are in memory at once than before (32).
 The address is the last `X-Forwarded-For` hop, which Caddy sets to the client
 it saw (its default; without `trusted_proxies` it ignores a client's own),
 and it counts only when the connection comes from loopback; a request
-without a well-formed one counts by its peer. Nothing but these places
-follows from it. Two things follow for the proxy:
+without a well-formed one counts by its peer. Only these places and the
+budgets of the next section follow from it. Two things follow for the proxy:
 
 - If the proxy does not send the header, every client counts as `127.0.0.1`
   and all of them share four places: small requests go on, but large writes
@@ -108,6 +110,84 @@ central.baylee.app {
 }
 ```
 
+### Sign-in guesses and address budgets
+
+Since 11.11.2026 Central counts guesses at passwords and gives each client
+address a budget ([native login](native-login.md) §"Guessing a password
+online" has the numbers and the reasons). All of it is in memory: nothing
+is written to the database or a log, and a restart forgets every count and
+every "own place".
+
+**What an operator sees.** Central logs none of this. A refusal is a 429
+with the route's fixed text; the proxy's access log, if one is kept, shows
+them (Caddy's sites here keep none, see below). There is no counter or
+admin page for them yet. A person who is refused sees the client's or the
+page's "busy" message and cannot tell for how long: at most until the hour
+or the day ends, counted from the first guess of that window.
+
+**What people may report, and what it means.**
+
+- *One person cannot sign in, others can, existing sessions work.* The
+  account's count is spent: someone guessed at it (30 an hour, 100 a day
+  from places that are not its own). The account's own places are served,
+  so the person can sign in where they did in the last 30 days, since the
+  last restart. There is no switch for one account. A restart clears all
+  counts, and with them every own place; a guesser who keeps asking spends
+  an account's minute again within seconds, so a restart alone does not
+  let a person in who is kept out on purpose. What does: keeping the
+  guessing addresses away at the proxy (its access log shows them, if one
+  is switched on for the purpose), then waiting for the window to end or
+  restarting.
+- *Nobody at one site (an office, a campus, a carrier's shared address) can
+  sign in to an account they never used there.* That address spent its 30
+  an hour or 100 a day on wrong passwords. Accounts that signed in there
+  before are served.
+- *Everyone is refused for seconds at a time.* The 32 requests a second all
+  clients share are spent: a flood from several addresses (one alone is
+  held to 600 a minute; an IPv6 subscriber with more than a /64, a /56
+  say, is several). Rate limits at the proxy or the network answer that.
+- *Someone changed or reset a password and is refused elsewhere.* Another
+  password ends the account's own places but the one it was set from. If
+  the account's count is spent by guessing, the other devices are refused
+  until the window ends; the place of the change is served.
+
+**The proxy must send the client's address.** Caddy does by default. Check
+it after any change to the proxy: 31 `Discover` requests within a minute
+through the public name must end in a 429, and the same from another
+address must not.
+
+- Without the header the account listener counts no address at all: each
+  account's own count (30 an hour, 100 a day) and the shared budgets still
+  hold, the per-address budgets and the own places do not, and everyone
+  who guesses shares each account's count with its holder. The browser
+  listener refuses such requests (400).
+- A CDN or a second proxy in front of Caddy makes its address the last
+  hop: all clients are then one place, and 30 wrong passwords an hour from
+  anyone keep everyone from signing in to accounts they have not used
+  before from there. Do not put one in front as things are: Central
+  believes the last hop only, and which hop to believe behind two proxies
+  needs its own decision and code.
+- Every local, preview and end-to-end run arrives as one place
+  (`127.0.0.1`, or none on the account listener without a proxy): 30
+  unproven guesses an hour for all accounts together, 10 for one account,
+  600 requests a minute without a session. A test suite that makes more
+  wrong sign-ins than that against one running Central is refused; start a
+  fresh Central per run.
+
+**Constants to tune**, each with the reason beside it in the code:
+`central-identity/src/guesses.rs` (the guesses: per account 8 a minute, 30
+an hour, 100 a day; per account at a place 10 and 30; per place 30 and 100;
+per IPv6 /48 120 and 400; an own place's 30 days and eight per account; the
+tables' 16,384 entries, which must stay above the number of accounts that
+sign in within 30 days), `central-identity/src/limits.rs` (a place's 600
+requests a minute without a session and 240 pairing requests, beside the
+shared 32 and 64 a second), `central-http/src/addresses.rs` (the native
+listener's `Discover` 30 and `LoginStart` 30 a minute, `LegacyLogin` 10 a
+minute, `ResetStart` 10 an hour) and `central-http/src/browser.rs` (the
+browser listener's). Lower numbers slow guessing and make it cheaper to
+keep someone out; higher ones the reverse. Changing one needs a build and a
+deploy; none is in `central.json`.
+
 ## The browser listener
 
 `browser.listen` in `central.json` (`{"browser": {"listen": "127.0.0.1:28791"}}`)
@@ -137,7 +217,10 @@ a minute, and 60 reads of the gateway directory a minute (`GatewayDirectory`,
 which needs no session; the website's `/gateways` page; `PublicFigures`, the
 numbers the site shows, spends the same 60). IPv6 addresses count by their /64. The counters live in memory only,
 at most 4096 addresses per budget, and forget an address once its window has
-passed (at the latest a window's length later). The headers are checked
+passed (at the latest a window's length later). Every request that needs no
+session also draws on its address's 600 a minute, and the sign-in's guesses
+are counted by the same address ([above](#sign-in-guesses-and-address-budgets)).
+The headers are checked
 before a body is read; an address has at most four requests in flight (429
 past them), a body two seconds to arrive and the service five to answer
 (408), and the listener takes 128 connections at once (as the account
@@ -799,18 +882,25 @@ startup).
 
 ## Known limits of this deployment
 
-Request budgets on the native listener are global and per account or bearer,
-not per client address: behind the proxy every client shares one address, so a
-flood can exhaust the shared login budget for everyone (service denial, not
-account takeover). The table of unfinished sign-ins is larger than that budget
+Since 11.11.2026 both listeners count requests and guesses at passwords by
+client address as well as globally and per account or bearer
+([above](#sign-in-guesses-and-address-budgets)). What stays: four addresses
+that each keep up their 600 requests a minute spend the login budget all
+clients share (service denial, not account takeover), which the proxy or the
+network must limit. Requests that carry a bearer nobody issued are not
+counted by address: they draw on the windows all sessions share (512 control
+and 256 data requests a second, and a table of 1,024 bearers a second that
+refuses newcomers when full), so a flood of them can keep signed-in clients
+and gateways at `Busy` while sign-in goes on (recorded on 11.11.2026, not
+changed). The table of unfinished sign-ins is larger than the shared budget
 can fill (4096 against 32 a second for 60 seconds), so it is never the cheaper
-target (31.10.2026; before, 128 entries filled at two requests a second). The
-per-account budget (eight OPAQUE evaluations a minute) is keyed by the
-account alone: whoever knows an account's identity can keep its sign-ins
-busy, and discovery still says whether a username is enrolled. Both are the
-price of the guessing brake as it stands; the trade-off is the owner's to
-decide (see the security record of 31.10.2026). The browser listener adds per-address budgets in front of the
-same global ones; a client with many addresses still shares the global budget.
+target (31.10.2026; before, 128 entries filled at two requests a second).
+Whoever knows an account's identity can still keep its password sign-in at
+`Busy` everywhere but at the account's own places, now with 100 requests a
+day from four addresses, and discovery still says whether a username is
+enrolled; the counts live in memory, so a restart forgets who signed in
+where. The guessing brake's numbers are the owner's to decide (the security
+records of 31.10.2026 and 11.11.2026).
 Central sessions last 30 minutes unless renewed, and at most 12 hours. Password change
 is served on both listeners since 28.10.2026 ([native login](native-login.md)
 §"Password change"; no migration or grant), with no form on the website or in

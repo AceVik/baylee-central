@@ -79,14 +79,25 @@ The person, on the website or in the native client (`central-client`):
    the recovery code) race for the code; the second is `Rejected`.
 
 On the browser listener these three requests have a per-address budget (10
-an hour) besides the global one; natively the global one applies.
+an hour) besides the global one; natively `ResetStart` has the same since
+11.11.2026, for an address the proxy forwards ([native login](native-login.md)
+§"Guessing a password online").
 
 ## Accepted limits
 
-- The code's holder spends the account's login budget with each start, so
-  for the code's 24 hours it can keep the owner from signing in. Anyone can
-  already do that with `LoginStart`, which needs no code, so this path adds
-  nothing to it.
+- The code's holder spends one of the account's eight evaluations a minute
+  with each start, and since 11.11.2026 nothing of its hour or day
+  ([native login](native-login.md) §"Guessing a password online"): guessers
+  who spent those do not keep a holder with a code from the reset. With
+  eight starts a minute, for the code's 24 hours, the holder of a code can
+  still keep the account's sign-ins from places that are not its own at
+  `Busy`. Anyone can do as much with `LoginStart`, which needs no code, so
+  this path adds nothing to it.
+- A reset's finish ends the account's own places (the addresses it proved
+  the old password from) and makes the one the finish came from its own:
+  whoever knew the old password guesses at the new one as a stranger does,
+  and the code's user signs in there next whatever others spent of the
+  account's count.
 
 - Central cannot tell whether a kept wrapper holds the old master key. Whoever
   holds the code takes the login; with `keep` and a wrong key the data stays
