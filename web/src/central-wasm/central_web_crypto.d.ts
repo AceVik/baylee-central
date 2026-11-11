@@ -160,6 +160,28 @@ export class Recovered {
 }
 
 /**
+ * A registration's proof of work under way: the challenge at its price
+ * and the memory its evaluations work in. Free it when the last part is
+ * found; that gives the memory back to the module before the password
+ * stretch asks for its own.
+ */
+export class Work {
+    private constructor();
+    free(): void;
+    [Symbol.dispose](): void;
+    /**
+     * Looks for `part`'s counter among the `tries` counters from `from`
+     * on: the first that solves the part, or nothing when none of them
+     * does and the page asks again from `from + tries`.
+     *
+     * # Errors
+     *
+     * `rejected` for a part the challenge does not have.
+     */
+    search(part: number, from: bigint, tries: number): bigint | undefined;
+}
+
+/**
  * The origin of the Central this module is bound to: the live one.
  */
 export function central_origin(): string;
@@ -239,6 +261,15 @@ export function login_start(password: string, account: Uint8Array | number[], ep
  */
 export function recovery_create(state: LoginKey, wrapped_master: Uint8Array | number[]): Recovered;
 
+/**
+ * Start on `Response::RegisterWork`'s challenge.
+ *
+ * # Errors
+ *
+ * `rejected` for a nonce of another shape or a price above the ceilings.
+ */
+export function work_start(nonce: string, memory: number, passes: number, parts: number, difficulty: number): Work;
+
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
 
 export interface InitOutput {
@@ -249,6 +280,7 @@ export interface InitOutput {
     readonly __wbg_login_free: (a: number, b: number) => void;
     readonly __wbg_loginkey_free: (a: number, b: number) => void;
     readonly __wbg_recovered_free: (a: number, b: number) => void;
+    readonly __wbg_work_free: (a: number, b: number) => void;
     readonly central_origin: () => [number, number];
     readonly chat_confirm: (a: number, b: number, c: number) => [number, number];
     readonly chat_device: (a: number) => [number, number];
@@ -277,6 +309,8 @@ export interface InitOutput {
     readonly recovered_recovery: (a: number) => [number, number];
     readonly recovered_recovery_code: (a: number) => any;
     readonly recovery_create: (a: number, b: number, c: number) => [number, number, number];
+    readonly work_search: (a: number, b: number, c: bigint, d: number) => [number, bigint, number, number];
+    readonly work_start: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number];
     readonly __wbindgen_exn_store: (a: number) => void;
     readonly __externref_table_alloc: () => number;
     readonly __wbindgen_externrefs: WebAssembly.Table;
