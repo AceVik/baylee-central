@@ -1,4 +1,6 @@
-import { expect, type Route, test } from "@playwright/test";
+import { createHash } from "node:crypto";
+
+import { expect, type Page, type Route, test } from "@playwright/test";
 
 import { axe, targets } from "./check.ts";
 
@@ -120,36 +122,9 @@ test("registration refuses a robot's haste and its hidden field, and says when i
   expect(asked).toEqual(["register_challenge_for"]);
 });
 
-// A stand-in for the proof's Worker: eight seconds of "work" in eight steps,
-// then counters the stand-in for Central does not check.
-const SLOW_WORKER = `self.onmessage = (event) => {
-  const parts = JSON.parse(event.data).parts;
-  let done = 0;
-  const step = () => {
-    done += 1;
-    if (done < parts) {
-      self.postMessage(JSON.stringify({ progress: Math.floor((done * 100) / parts) }));
-      setTimeout(step, 1000);
-    } else {
-      self.postMessage(JSON.stringify({ counters: Array.from({ length: parts }, (_, i) => i + 1) }));
-    }
-  };
-  setTimeout(step, 1000);
-};`;
-
-test("a proof that takes long says so politely, and the page reports its browser", async ({ page }) => {
-  const problems: string[] = [];
-  page.on("pageerror", (error) => problems.push(error.message));
-  await page.route("**/assets/pow-worker.*.js", (route) => route.fulfill({ status: 200, contentType: "text/javascript", body: SLOW_WORKER }));
-  const asked: Record<string, unknown>[] = [];
-  await page.route("**/api/v1", (route) => {
-    const body = JSON.parse(route.request().postData() ?? "{}");
-    asked.push(body);
-    if (body.operation !== "register_challenge_for") return route.fulfill({ status: 401, body: "account request rejected\n" });
-    // the hardest challenge Central asks for, twenty minutes to hand it in
-    const challenge = { result: "register_challenge", nonce: "ab".repeat(32), parts: 8, difficulty: 22, expires_at: Math.floor(Date.now() / 1000) + 1200 };
-    return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(challenge) });
-  });
+// The register form, filled in as a person would, after the three seconds
+// a person takes at the least.
+async function fillRegistration(page: Page) {
   await page.goto("/en/register");
   await expect(page.locator("html")).toHaveAttribute("data-islands", "ready");
   await page.getByLabel("Sign-in name").fill("erika");
@@ -158,12 +133,145 @@ test("a proof that takes long says so politely, and the page reports its browser
   await page.getByLabel("Repeat password").fill("violet lantern harbour");
   await page.getByLabel("I am 16 or older.").check();
   await page.getByRole("checkbox", { name: /I accept the terms of use/ }).check();
+  await page.waitForTimeout(3_000);
+}
+
+const REFUSED = "The registration was not accepted. Try again.";
+const rejected = (route: Route) => route.fulfill({ status: 401, body: "account request rejected\n" });
+const reply = (route: Route, value: unknown) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(value) });
+const soon = () => Math.floor(Date.now() / 1000) + 1200;
+
+// The pinned vector of central_crypto::proof (crates/central-crypto/src/proof.rs):
+// this nonce at this price has these smallest counters, in Rust on the host
+// and in the committed module in a browser.
+const PINNED = {
+  nonce: "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+  price: { parts: 4, difficulty: 3, memory: 64, passes: 1 },
+  counters: [7, 25, 2, 7],
+};
+
+test("the page's Worker finds the counters Central checks, and sends them again when Central is busy", async ({ page }) => {
+  const problems: string[] = [];
+  page.on("pageerror", (error) => problems.push(error.message));
+  const asked: Record<string, unknown>[] = [];
+  const scripts: string[] = [];
+  page.on("request", (request) => {
+    if (/\/assets\/(pow|crypto)-worker\./.test(request.url())) scripts.push(new URL(request.url()).pathname.replace(/\.[0-9a-z]+\.js$/, ".js"));
+  });
+  await page.route("**/api/v1", (route) => {
+    const body = JSON.parse(route.request().postData() ?? "{}");
+    asked.push(body);
+    if (body.operation === "register_challenge_for") {
+      return reply(route, { result: "register_work", nonce: PINNED.nonce, ...PINNED.price, expires_at: soon() });
+    }
+    // no worker free at first: Central keeps the challenge and says so
+    if (asked.filter((b) => b.operation === "register").length === 1) return route.fulfill({ status: 429, body: "account request limit reached\n" });
+    return rejected(route);
+  });
+  await fillRegistration(page);
+  await page.getByRole("button", { name: "Create account" }).click();
+  await expect(page.getByRole("alert")).toHaveText(REFUSED, { timeout: 30_000 });
+  const register = { operation: "register", username: "erika", display_name: "Erika", nonce: PINNED.nonce, counters: PINNED.counters };
+  expect(asked).toEqual([{ operation: "register_challenge_for", signals: 1 }, register, register]);
+  // the module's Worker did the work: the older proof's script was not even fetched
+  expect(scripts).toEqual(["/assets/crypto-worker.js"]);
+  expect(problems).toEqual([]);
+});
+
+test("a price above what the page and Central agreed on is not worked on", async ({ page }) => {
+  const asked: string[] = [];
+  // What Central asks at its most, the page takes (the test below); one
+  // bit more is twice that, and 64 MiB and a kibibyte is more memory than
+  // any price may ask. central-api's tests have every other ceiling.
+  const above = [
+    { parts: 8, difficulty: 11, memory: 16_384, passes: 1 },
+    { parts: 1, difficulty: 0, memory: 65_537, passes: 1 },
+  ];
+  let price = above[0];
+  await page.route("**/api/v1", (route) => {
+    const body = JSON.parse(route.request().postData() ?? "{}");
+    asked.push(String(body.operation));
+    if (body.operation !== "register_challenge_for") return rejected(route);
+    return reply(route, { result: "register_work", nonce: "ab".repeat(32), ...price, expires_at: soon() });
+  });
+  for (price of above) {
+    asked.length = 0;
+    await fillRegistration(page);
+    await page.getByRole("button", { name: "Create account" }).click();
+    await expect(page.getByText("Something went wrong. Try again; if it keeps happening, tell us.")).toBeVisible({ timeout: 15_000 });
+    // refused before any work, and nothing was handed in
+    expect(asked, JSON.stringify(price)).toEqual(["register_challenge_for"]);
+  }
+});
+
+const zeroBits = (hash: Buffer) => {
+  let bits = 0;
+  for (const byte of hash) {
+    if (byte !== 0) return bits + Math.clz32(byte) - 24;
+    bits += 8;
+  }
+  return bits;
+};
+
+test("against a Central from before, the page asks the older way and solves the older proof", async ({ page }) => {
+  const problems: string[] = [];
+  page.on("pageerror", (error) => problems.push(error.message));
+  page.on("console", (message) => {
+    if (message.type() === "error" && !message.text().includes("status of 401")) problems.push(message.text());
+  });
+  const asked: Record<string, unknown>[] = [];
+  const nonce = "5c".repeat(32);
+  await page.route("**/api/v1", (route) => {
+    const body = JSON.parse(route.request().postData() ?? "{}");
+    asked.push(body);
+    // it knows neither the newer request nor the newer answer
+    if (body.operation === "register_challenge") return reply(route, { result: "register_challenge", nonce, parts: 8, difficulty: 10, expires_at: soon() });
+    return rejected(route);
+  });
+  await fillRegistration(page);
+  await page.getByRole("button", { name: "Create account" }).click();
+  await expect(page.getByRole("alert")).toHaveText(REFUSED, { timeout: 30_000 });
+  expect(asked.map((b) => b.operation)).toEqual(["register_challenge_for", "register_challenge", "register"]);
+  expect(asked[1]).toEqual({ operation: "register_challenge" });
+  const sent = asked[2] as { nonce: string; counters: number[] };
+  expect(sent.nonce).toBe(nonce);
+  expect(sent.counters).toHaveLength(8);
+  // SHA-256 over nonce ":" part ":" counter, as that Central checks it
+  sent.counters.forEach((counter, part) => {
+    expect(zeroBits(createHash("sha256").update(`${nonce}:${part}:${counter}`).digest())).toBeGreaterThanOrEqual(10);
+  });
+  expect(problems).toEqual([]);
+});
+
+// A stand-in for the crypto Worker's proof of work: each part takes a
+// second and "finds" its own number, which the stand-in for Central does
+// not check. It speaks the Worker's protocol, so the page's own code runs.
+const SLOW_WORKER = `self.onmessage = (event) => {
+  const m = JSON.parse(event.data);
+  const answer = (ok) => self.postMessage(JSON.stringify({ id: m.id, ok }));
+  if (m.op === "work_search") setTimeout(() => answer({ counter: m.part + 1 }), 1000);
+  else if (m.op === "work_start" || m.op === "work_end") answer({});
+  else self.postMessage(JSON.stringify({ id: m.id, error: "failed" }));
+};`;
+
+test("a proof that takes long says so politely, and the page reports its browser", async ({ page }) => {
+  const problems: string[] = [];
+  page.on("pageerror", (error) => problems.push(error.message));
+  await page.route("**/assets/crypto-worker.*.js", (route) => route.fulfill({ status: 200, contentType: "text/javascript", body: SLOW_WORKER }));
+  const asked: Record<string, unknown>[] = [];
+  await page.route("**/api/v1", (route) => {
+    const body = JSON.parse(route.request().postData() ?? "{}");
+    asked.push(body);
+    if (body.operation !== "register_challenge_for") return rejected(route);
+    // the hardest challenge Central asks for, twenty minutes to hand it in
+    return reply(route, { result: "register_work", nonce: "ab".repeat(32), parts: 8, difficulty: 10, memory: 16_384, passes: 1, expires_at: soon() });
+  });
+  await fillRegistration(page);
   // quiet until there is something to say, and polite when there is
   const solving = page.locator(".solving");
   await expect(solving).toHaveAttribute("aria-live", "polite");
   await expect(solving).toBeEmpty();
   await expect(solving).toBeHidden();
-  await page.waitForTimeout(3_000);
   await page.getByRole("button", { name: "Create account" }).click();
   // nothing for the first three seconds, then the line and the bar
   await expect(solving).toBeEmpty();
@@ -176,7 +284,7 @@ test("a proof that takes long says so politely, and the page reports its browser
   expect(await axe(page)).toEqual([]);
   expect(await targets(page)).toEqual([]);
   // handed in, the line goes; this stand-in refuses the registration
-  await expect(page.getByRole("alert")).toHaveText("The registration was not accepted. Try again.", { timeout: 20_000 });
+  await expect(page.getByRole("alert")).toHaveText(REFUSED, { timeout: 20_000 });
   await expect(solving).toBeEmpty();
   // a browser a program drives says so (bit 1), and has languages (bit 2 unset)
   expect(asked[0]).toEqual({ operation: "register_challenge_for", signals: 1 });
