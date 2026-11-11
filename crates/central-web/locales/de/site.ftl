@@ -42,7 +42,7 @@ desc-gateways = Das öffentliche Verzeichnis der Baylee-Gateways, der Server, au
 title-faq = Fragen und Antworten
 desc-faq = Was Baylee ist, was es kostet, wie Online-Spiel und Accounts funktionieren und was mit deinen Daten geschieht.
 title-contact = Kontakt
-desc-contact = Schreib den Leuten hinter Baylee oder melde einen Fehler.
+desc-contact = Schreib der Person hinter Baylee oder melde einen Fehler.
 title-impressum = Impressum
 desc-impressum = Wer baylee.app betreibt (§ 5 DDG).
 title-privacy = Datenschutzerklärung
@@ -801,7 +801,7 @@ ai-house = Sofort spielbereit im Offline-Modus und an jedem Online-Tisch: Wähle
 ai-modelTitle = Sprachmodelle via Seat-Bridge am Tisch
 ai-model = Hole <b>Google Gemini, OpenAI ChatGPT, Anthropic Claude, DeepSeek</b> oder lokale Modelle über <b>LM Studio</b> direkt als Mitspieler an den Tisch. API-Schlüssel bleiben geschützt in Umgebungsvariablen mit Kostenlimits; bei Timeouts übernimmt nahtlos die Haus-KI.
 ai-setup = Anleitung zur LLM- & Seat-Bridge-Einrichtung
-home-gwLead = Online-Tische leben auf Gateways, Servern, die Baylee Central erst listet, nachdem der Betreiber geprüft hat, wer sie betreibt. Hier sind die ersten; das Verzeichnis zeigt alle.
+home-gwLead = Online-Tische leben auf Gateways, Servern, die Baylee Central listet, sobald sein Administrator sie freigegeben hat. Hier sind die ersten; das Verzeichnis zeigt alle.
 beta-open = Verzeichnis öffnen
 beta-own = Selbst betreiben
 source-eyebrow = Quellcode
@@ -821,7 +821,7 @@ gw-count =
        *[other] { $n } Gateways gelistet, { $online } online.
     }
 gw-none = Noch ist kein Gateway gelistet.
-contact-intro = Eine Frage, eine Idee, ein Spiel, das du gern sehen würdest, oder etwas, das du lieber nicht öffentlich schreibst: Dieses Formular geht direkt an die Leute hinter Baylee. Lass eine E-Mail-Adresse da, wenn du eine Antwort willst; ohne können wir es nur lesen.
+contact-intro = Eine Frage, eine Idee, ein Spiel, das du gern sehen würdest, oder etwas, das du lieber nicht öffentlich schreibst: Dieses Formular geht direkt an die Person hinter Baylee. Lass eine E-Mail-Adresse da, wenn du eine Antwort willst; ohne können wir es nur lesen.
 contact-f8 = Eine Karte, die falsch verrechnet wurde, meldest du am besten im Spiel mit <kbd>F8</kbd>, weil der Bericht das ganze Spiel mitnehmen kann.
 contact-discord = reden, Gegner finden, von Builds hören
 contact-issues = GitHub-Issues
@@ -841,7 +841,7 @@ ai-training = Parallel zur Haus-KI und der externen LLM-Anbindung wird eine eige
 ai-hostingLink = Gateway-Hosting & LLM-Setup
 
 # The gateways and the contact page, as the old site wrote them (owner, 11.11.2026)
-gw-lead = Ein Gateway ist ein Server für Online-Tische: Accounts, Decks, Räume und ein Engine-Prozess pro Spiel. Hier stehen die bei Baylee Central registrierten; dessen Betreiber hat bei jedem geprüft, wer es betreibt, bevor er es aufgenommen hat. Baylee betreibt Sanctuary; die anderen betreiben andere für ihre Runde, und dort gelten deren eigene Regeln.
+gw-lead = Ein Gateway ist ein Server für Online-Tische: Accounts, Decks, Räume und ein Engine-Prozess pro Spiel. Hier stehen die bei Baylee Central registrierten, die dessen Administrator freigegeben hat. Baylee betreibt das als offiziell markierte; die anderen betreiben andere für ihre Runde, und dort gelten deren eigene Regeln. Ein Eintrag ist kein Versprechen darüber, was ein Gateway tut.
 gw-howTo = Um auf einem zu spielen, kopiere seine Adresse in die Eingangstür des Clients. Online heißt, Central hat in den letzten anderthalb Minuten von dem Gateway gehört; ein Versprechen, dass es antwortet, ist das nicht. Namen und Versionen sind die Angaben der Betreiber.
 gw-find = Gateway finden
 gw-findHint = Name oder Adresse
@@ -863,7 +863,7 @@ reports-f8 = Drück <kbd>F8</kbd> am Tisch oder in der Lobby. Ein Bericht enthä
 reports-usage = Beim Offline-Spielen sagt der Client einmal pro Minute, dass ein Spiel läuft: kein Account, keine Geräte-ID, nichts über das Spiel. <i>Anonyme Nutzungszahl senden</i> unter Einstellungen › Datenschutz & Daten schaltet das ab.
 reports-discord = Lust zu reden, Gegner zu finden oder als Erstes von neuen Builds zu erfahren? Komm in die <discord>Baylee-Community auf Discord</discord>.
 reports-issues = Regelfragen, falsches Kartenverhalten, Ideen: <issues>eröffne ein Issue auf GitHub</issues>. Eine Karte, die falsch verrechnet wurde, ist der nützlichste Bericht, den wir bekommen können, denn jede Karte hat einen Test, und deine wird einer.
-reports-privacy = <docs>docs/privacy.md</docs> listet alles, was Client, Gateway und Feedback-Dienst speichern. Diese Seite speichert nichts über dich: keine Cookies, keine Analyse, keine Schriften von fremden Servern. <notice>Die Datenschutzerklärung</notice> nennt jeden anderen Host, mit dem sie spricht, und wann.
+reports-privacy = <docs>docs/privacy.md</docs> listet alles, was Client, Gateway und Feedback-Dienst speichern. Diese Seite setzt kein Cookie, solange du dich nicht anmeldest, analysiert nichts und lädt keine Schriften oder Skripte von fremden Servern. <notice>Die Datenschutzerklärung</notice> sagt, was die Seite und Baylee Central speichern, und nennt jeden anderen Host, mit dem sie sprechen, und wann.
 
 # The download page, as the old site set it (owner, 11.11.2026)
 dlPage-eyebrow = Hol es dir

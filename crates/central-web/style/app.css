@@ -331,3 +331,9 @@
 .app-empty p {
   margin: 0;
 }
+
+/* a section of the account area is a panel with a modest title, as the
+   old site's were */
+.frame-main section > h2 {
+  font-size: var(--text-lg);
+}

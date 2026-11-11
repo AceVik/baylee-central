@@ -455,8 +455,9 @@ fn steps_view(
 #[island]
 pub fn SignIn(lang: Lang, worker: String) -> impl IntoView {
     let step = RwSignal::new(Step::Form);
-    let name = RwSignal::new(String::new());
-    let password = RwSignal::new(String::new());
+    // what was typed before the islands ran stays (`early`)
+    let name = RwSignal::new(super::early::typed("signin-name"));
+    let password = RwSignal::new(super::early::typed("signin-password"));
     let shown = RwSignal::new(false);
     let error = RwSignal::new(None::<&'static str>);
     let submit = move |event: leptos::ev::SubmitEvent| {
@@ -547,6 +548,21 @@ struct RegisterFields {
     repeat: String,
     age: bool,
     consent: bool,
+}
+
+impl RegisterFields {
+    /// The form as it stands when the islands start: what was typed or
+    /// ticked before they ran stays (`early`).
+    fn early() -> Self {
+        Self {
+            username: super::early::typed("register-name"),
+            display: super::early::typed("register-display"),
+            password: super::early::typed("register-password"),
+            repeat: super::early::typed("register-repeat"),
+            age: super::early::ticked("register-age"),
+            consent: super::early::ticked("register-consent"),
+        }
+    }
 }
 
 /// A token's bytes. `Token` is deliberately not `Clone`; the enrolment
@@ -682,13 +698,13 @@ async fn register(
 #[island]
 pub fn Register(lang: Lang, worker: String, pow: String) -> impl IntoView {
     let step = RwSignal::new(Step::Form);
-    let fields = RwSignal::new(RegisterFields::default());
+    let fields = RwSignal::new(RegisterFields::early());
     let error = RwSignal::new(None::<&'static str>);
     // A form filled in faster than a person types, or one whose hidden
     // field (invisible to people, filled by form robots) has text, is
     // never sent (`docs/registration-abuse.md`).
     let shown = StoredValue::new(0u64);
-    let honey = RwSignal::new(String::new());
+    let honey = RwSignal::new(super::early::typed("register-website"));
     Effect::new(move |_| shown.set_value(super::pow::now_ms()));
     let submit = move |event: leptos::ev::SubmitEvent| {
         event.prevent_default();
