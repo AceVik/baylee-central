@@ -94,6 +94,8 @@ pub(crate) fn run(root: &Path) -> Result<()> {
             &fs::read_to_string(web.join("style").join(name)).or_fail("a stylesheet is missing")?,
         )?);
     }
+    let languages = languages(&web)?;
+    css.push_str(&new_tab_rules(&web, &languages)?);
     let css = site.rewrite(&css)?;
     site.add("site.css", css.as_bytes())?;
 
@@ -101,7 +103,7 @@ pub(crate) fn run(root: &Path) -> Result<()> {
         fs::copy(web.join("assets").join(name), out.join(name))
             .or_fail("a root file is missing")?;
     }
-    let worker = service_worker(&web.join("js/sw.js"), &site.files)?;
+    let worker = service_worker(&web.join("js/sw.js"), &site.files, &languages)?;
     fs::write(out.join("sw.js"), worker).or_fail("sw.js could not be written")?;
     fs::write(out.join("notices.txt"), notices(root)?)
         .or_fail("notices.txt could not be written")?;
@@ -174,7 +176,11 @@ impl Site {
 /// page needs: the stylesheet, the scripts every page loads, the fonts and
 /// the icon. The stamp is the digest of every asset's address, so a build
 /// that changes any file installs as a new service worker.
-fn service_worker(source: &Path, files: &BTreeMap<String, Value>) -> Result<String> {
+fn service_worker(
+    source: &Path,
+    files: &BTreeMap<String, Value>,
+    languages: &[String],
+) -> Result<String> {
     let text = fs::read_to_string(source).or_fail("the service worker is missing")?;
     let url = |name: &str| -> Result<String> {
         files
@@ -190,13 +196,14 @@ fn service_worker(source: &Path, files: &BTreeMap<String, Value>) -> Result<Stri
         url("pwa.js")?,
         url("img/icon-192.webp")?,
     ];
-    let font = |name: &&String| {
-        name.starts_with("fonts/")
-            && Path::new(name.as_str())
-                .extension()
-                .is_some_and(|e| e.eq_ignore_ascii_case("woff2"))
-    };
-    for name in files.keys().filter(font) {
+    // The upright faces of the two scripts the fonts cover; the rarer
+    // letters' files and the italics are kept as a page first asks for them.
+    for name in [
+        "fonts/Inter-latin.woff2",
+        "fonts/Literata-latin.woff2",
+        "fonts/Inter-cyrillic.woff2",
+        "fonts/Literata-cyrillic.woff2",
+    ] {
         offline.push(url(name)?);
     }
     let every: String = files
@@ -207,17 +214,98 @@ fn service_worker(source: &Path, files: &BTreeMap<String, Value>) -> Result<Stri
     let build = &random::to_hex(&Sha256::digest(every.as_bytes()))[..16];
     let assets =
         serde_json::to_string(&offline).or_fail("the offline list could not be written")?;
+    let codes = serde_json::to_string(languages).or_fail("the languages could not be written")?;
     let stamped = text
         .replacen("\"__BUILD__\"", &format!("\"{build}\""), 1)
         .replacen(
             "/* the offline page's files */ []",
             &format!("/* the offline page's files */ {assets}"),
             1,
+        )
+        .replacen(
+            "/* the site's languages */ [\"en\"]",
+            &format!("/* the site's languages */ {codes}"),
+            1,
         );
-    if stamped.contains("__BUILD__") || !stamped.contains(&assets) {
+    if stamped.contains("__BUILD__") || !stamped.contains(&assets) || !stamped.contains(&codes) {
         return Err(Fail::new("the service worker's placeholders changed"));
     }
     Ok(stamped)
+}
+
+/// The site's languages: the folders of its words
+/// (`crates/central-web/locales/<code>/site.ftl`, which `central-web`'s
+/// build script holds to its own list), English first.
+fn languages(web: &Path) -> Result<Vec<String>> {
+    let mut codes = Vec::new();
+    for entry in fs::read_dir(web.join("locales")).or_fail("the words' folders are missing")? {
+        let entry = entry.or_fail("a words' folder could not be read")?;
+        if entry.path().join("site.ftl").is_file() {
+            codes.push(
+                entry
+                    .file_name()
+                    .into_string()
+                    .ok()
+                    .or_fail("a words' folder has no plain name")?,
+            );
+        }
+    }
+    codes.sort_by_key(|code| (code != "en", code.clone()));
+    if codes.first().map(String::as_str) != Some("en") {
+        return Err(Fail::new("the English words are missing"));
+    }
+    Ok(codes)
+}
+
+/// A language's tag as `lang=` and `:lang()` write it, from its folder's
+/// name: `pt-br` is `pt-BR`, `zh-hans` is `zh-Hans`.
+fn language_tag(code: &str) -> String {
+    code.split('-')
+        .enumerate()
+        .map(|(at, part)| match (at, part.len()) {
+            (0, _) => part.to_owned(),
+            (_, 2) => part.to_ascii_uppercase(),
+            (_, 4) => {
+                let (first, rest) = part.split_at(1);
+                format!("{}{rest}", first.to_ascii_uppercase())
+            }
+            _ => part.to_owned(),
+        })
+        .collect::<Vec<_>>()
+        .join("-")
+}
+
+/// A message of one line from a language's words, as plain text for a
+/// stylesheet's string: nothing a string or a message could be closed or
+/// opened with.
+fn word(web: &Path, code: &str, id: &str) -> Result<String> {
+    let text = fs::read_to_string(web.join("locales").join(code).join("site.ftl"))
+        .or_fail("a language's words are missing")?;
+    text.lines()
+        .find_map(|line| {
+            let value = line.strip_prefix(id)?.trim_start().strip_prefix('=')?;
+            Some(value.trim().to_owned())
+        })
+        .filter(|value| {
+            !value.is_empty() && !value.contains(['{', '}', '<', '>', '"', '\\', '\'', ';'])
+        })
+        .or_fail("a language lacks a plain word the stylesheet needs")
+}
+
+/// What a screen reader hears after a link that leaves the site, in every
+/// language but English (whose words `layout.css` carries): the arrow's
+/// spoken text, from each language's `new-tab`.
+fn new_tab_rules(web: &Path, languages: &[String]) -> Result<String> {
+    let mut rules = String::new();
+    for code in languages.iter().filter(|code| *code != "en") {
+        let _ = writeln!(
+            rules,
+            ":lang({}) :where(p, li, dd, blockquote):not(.strip *) > a[target=\"_blank\"]:not([class])::after{{content:\"\\2197\" / \" ({})\"}}",
+            language_tag(code),
+            word(web, code, "new-tab")?
+        );
+    }
+    Ok(rules)
 }
 
 fn base64(bytes: &[u8]) -> String {
@@ -668,7 +756,8 @@ fn islands_graph(metadata: &Value) -> std::collections::BTreeSet<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::lean_css;
+    use super::{WEB, language_tag, languages, lean_css, new_tab_rules, word};
+    use crate::workspace;
 
     #[test]
     fn a_lean_stylesheet_keeps_rules_and_strings() {
@@ -681,5 +770,70 @@ mod tests {
         assert!(lean_css(".a{content:\"x\\\ny\"}").is_err());
         assert!(lean_css(".a{content:\"x\n\"}").is_err());
         assert!(lean_css(".a{} /* open").is_err());
+    }
+    #[test]
+    fn a_language_s_tag_from_its_folder() {
+        for (code, tag) in [
+            ("en", "en"),
+            ("pt-br", "pt-BR"),
+            ("zh-hans", "zh-Hans"),
+            ("zh-hant", "zh-Hant"),
+            ("ru", "ru"),
+        ] {
+            assert_eq!(language_tag(code), tag);
+        }
+    }
+
+    #[test]
+    fn every_language_has_its_words_for_the_stylesheet() {
+        let web = workspace::root().expect("root").join(WEB);
+        let languages = languages(&web).expect("languages");
+        assert_eq!(languages.first().map(String::as_str), Some("en"));
+        assert!(languages.len() >= 11, "{languages:?}");
+        let rules = new_tab_rules(&web, &languages).expect("rules");
+        assert_eq!(rules.lines().count(), languages.len() - 1);
+        assert!(rules.contains(":lang(zh-Hant) ") && rules.contains(":lang(de) "));
+        assert!(!rules.contains(":lang(en) "));
+        // a word that could close the string or the rule is refused
+        assert!(word(&web, "en", "new-tab").is_ok());
+        assert!(word(&web, "en", "no-such-word").is_err());
+        assert!(
+            word(&web, "en", "foot-colophon").is_err(),
+            "a message with tags"
+        );
+    }
+
+    /// A language whose file is still the English one must not go out as a
+    /// language of its own: names and technical words may match, the text
+    /// may not.
+    #[test]
+    fn no_language_is_english_under_another_name() {
+        let web = workspace::root().expect("root").join(WEB);
+        let read = |code: &str| {
+            std::fs::read_to_string(web.join("locales").join(code).join("site.ftl"))
+                .expect("a language's words")
+        };
+        let english = read("en");
+        let english: std::collections::BTreeSet<&str> = english
+            .lines()
+            .filter(|line| line.contains(" = ") && !line.starts_with('#'))
+            .collect();
+        for code in languages(&web).expect("languages") {
+            if code == "en" {
+                continue;
+            }
+            let own = read(&code);
+            let lines: Vec<&str> = own
+                .lines()
+                .filter(|line| line.contains(" = ") && !line.starts_with('#'))
+                .collect();
+            let same = lines.iter().filter(|line| english.contains(**line)).count();
+            assert!(lines.len() > 600, "{code}: {} messages", lines.len());
+            assert!(
+                same * 100 < lines.len() * 12,
+                "{code}: {same} of {} messages are the English ones",
+                lines.len()
+            );
+        }
     }
 }

@@ -123,6 +123,8 @@ pub fn short(lang: Lang, at: u64, now: u64) -> String {
     match today.days() - then.days() {
         ..=0 => clock(at),
         1 => words::chat_yesterday(lang).to_owned(),
+        // a day and a month in numbers, in the order and with the marks
+        // the language writes them (CLDR); English names the month
         _ => match lang {
             Lang::En => {
                 let month = format::date(lang, &then.iso());
@@ -130,6 +132,11 @@ pub fn short(lang: Lang, at: u64, now: u64) -> String {
                 format!("{} {}", then.day, name.chars().take(3).collect::<String>())
             }
             Lang::De => format!("{}.{}.", then.day, then.month),
+            Lang::Fr | Lang::It | Lang::PtBr => format!("{:02}/{:02}", then.day, then.month),
+            Lang::Es => format!("{}/{}", then.day, then.month),
+            Lang::Ru => format!("{:02}.{:02}", then.day, then.month),
+            Lang::Ja | Lang::ZhHans | Lang::ZhHant => format!("{}/{}", then.month, then.day),
+            Lang::Ko => format!("{}. {}.", then.month, then.day),
         },
     }
 }
@@ -160,6 +167,20 @@ mod tests {
         );
         assert_eq!(short(Lang::En, AT, AT + 3 * 86_400_000), "10 Nov");
         assert_eq!(short(Lang::De, AT, AT + 3 * 86_400_000), "10.11.");
+        // Intl.DateTimeFormat, day and month numeric
+        for (lang, want) in [
+            (Lang::Fr, "10/11"),
+            (Lang::It, "10/11"),
+            (Lang::Es, "10/11"),
+            (Lang::PtBr, "10/11"),
+            (Lang::Ru, "10.11"),
+            (Lang::Ja, "11/10"),
+            (Lang::Ko, "11. 10."),
+            (Lang::ZhHans, "11/10"),
+            (Lang::ZhHant, "11/10"),
+        ] {
+            assert_eq!(short(lang, AT, AT + 3 * 86_400_000), want, "{lang:?}");
+        }
         assert!(same_day(AT, AT + 60_000));
         assert!(!same_day(AT, AT + 86_400_000));
         assert_eq!(local(AT).days(), 20_767);

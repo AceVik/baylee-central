@@ -89,6 +89,28 @@ fn tags<'a>(html: &'a str, tag: &str) -> Vec<&'a str> {
     out
 }
 
+/// The Fan Content notice in the page's language, and on a page a machine
+/// translated, the note that says so.
+fn check_notices(html: &str, lang: Lang, page: Page) {
+    let code = lang.code();
+    // the notice in the page's language, as the words have it: its
+    // opening up to the policy's name
+    let notice = central_web::words::fan_content(lang)
+        .into_iter()
+        .next()
+        .map(|piece| piece.text)
+        .unwrap_or_default();
+    assert!(
+        notice.contains("Baylee") && html.contains(notice.trim()),
+        "{code} {page:?}: the Fan Content notice"
+    );
+    assert_eq!(
+        html.contains("class=\"machine-note\""),
+        lang.machine_translated(),
+        "{code} {page:?}: the note on a machine's translation"
+    );
+}
+
 fn check_page(html: &str, lang: Lang, page: Page) {
     let code = lang.code();
     assert!(
@@ -96,8 +118,8 @@ fn check_page(html: &str, lang: Lang, page: Page) {
         "{code} {page:?}: a doctype and html lang"
     );
     assert!(
-        html.contains(&format!("<html lang=\"{code}\"")),
-        "{page:?}: lang"
+        html.contains(&format!("<html lang=\"{}\"", lang.tag())),
+        "{code} {page:?}: lang"
     );
     assert_eq!(count(html, "<h1"), 1, "{code} {page:?}: one h1");
     assert_eq!(count(html, "<title>"), 1, "{code} {page:?}: one title");
@@ -153,13 +175,13 @@ fn check_page(html: &str, lang: Lang, page: Page) {
     for other in Lang::ALL {
         let alternate = format!(
             "hreflang=\"{}\" href=\"https://baylee.app{}\"",
-            other.code(),
+            other.tag(),
             page.path(other)
         );
         assert!(
             html.contains(&alternate),
             "{code} {page:?}: hreflang {}",
-            other.code()
+            other.tag()
         );
     }
     assert!(
@@ -174,14 +196,7 @@ fn check_page(html: &str, lang: Lang, page: Page) {
         html.contains("company.wizards.com/"),
         "{code} {page:?}: the Fan Content Policy link"
     );
-    let notice = match lang {
-        Lang::En => "is unofficial Fan Content permitted under the",
-        Lang::De => "ist ein inoffizieller Fan-Inhalt im Rahmen der",
-    };
-    assert!(
-        html.contains(notice),
-        "{code} {page:?}: the Fan Content notice"
-    );
+    check_notices(html, lang, page);
     for block in html.split("<script type=\"application/ld+json\">").skip(1) {
         let json = block.split("</script>").next().unwrap_or("");
         let value: serde_json::Value = serde_json::from_str(json).expect("structured data parses");
@@ -639,6 +654,65 @@ async fn an_encoding_is_sent_only_where_the_browser_takes_it() {
     assert_eq!(status, StatusCode::NOT_MODIFIED);
     assert!(!headers.contains_key("content-encoding"));
     assert_eq!(headers["vary"], "Accept-Encoding");
+}
+
+#[tokio::test]
+async fn only_the_pages_with_a_download_are_kept_per_machine() {
+    let mut config = Config::development(site(), Some(data()));
+    config.origin = "https://baylee.app".into();
+    let state = central_web_server::app(config).expect("app");
+    let app = router(Arc::clone(&state));
+    let windows = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36";
+    let phone = "Mozilla/5.0 (Linux; Android 15; Pixel 9) AppleWebKit/537.36 Mobile";
+    // a page that is the same for every machine: one copy, whoever asks
+    let (_, headers, first) = get(&app, "/fr/faq", &[("user-agent", windows)]).await;
+    let (_, _, second) = get(&app, "/fr/faq", &[("user-agent", phone)]).await;
+    assert_eq!(first, second);
+    let varies = |headers: &axum::http::HeaderMap| {
+        headers
+            .get_all("vary")
+            .iter()
+            .any(|value| value.to_str().unwrap_or("").contains("User-Agent"))
+    };
+    assert!(!varies(&headers));
+    assert_eq!(state.pages.kept(), 1);
+    // the download is written for the machine, and says so to caches
+    let (_, headers, first) = get(&app, "/fr/download", &[("user-agent", windows)]).await;
+    let (_, _, second) = get(&app, "/fr/download", &[("user-agent", phone)]).await;
+    assert_ne!(first, second);
+    assert!(varies(&headers));
+    assert_eq!(state.pages.kept(), 3);
+}
+
+#[tokio::test]
+async fn a_translated_language_says_what_exists_in_german_and_english_only() {
+    let app = app(true);
+    // Central's terms: the English text, marked as English, under a note
+    let (status, _, terms) = get(&app, "/ja/terms", &[]).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(terms.contains("<html lang=\"ja\""));
+    assert!(
+        terms.contains("<div lang=\"en\">"),
+        "the terms are marked as English"
+    );
+    assert!(
+        terms.contains("href=\"/de/terms\""),
+        "the German text is one link away"
+    );
+    let (_, _, german) = get(&app, "/de/terms", &[]).await;
+    assert!(german.contains("<div lang=\"de\">") && !german.contains("role=\"note\">Central"));
+    // the privacy notice, the legal notice and the Fan Content page are a
+    // machine's translation there and say which texts apply
+    for page in ["privacy", "impressum", "fan-content"] {
+        let (_, _, html) = get(&app, &format!("/zh-hant/{page}"), &[]).await;
+        assert!(
+            html.contains(&format!("href=\"/de/{page}\""))
+                && html.contains(&format!("href=\"/en/{page}\"")),
+            "{page}: the German and the English text are named"
+        );
+        let (_, _, english) = get(&app, &format!("/en/{page}"), &[]).await;
+        assert!(!english.contains("class=\"machine-note\""), "{page}");
+    }
 }
 
 #[tokio::test]

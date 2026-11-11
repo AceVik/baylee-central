@@ -3,8 +3,8 @@
 // docs/proposals/frontend-rewrite.md §7).
 //
 // It keeps one cache per build ("baylee-site-<build>", written by
-// `cargo xtask site` over the two placeholders below): the offline page in
-// both languages and the hashed files it needs, then every hashed asset as
+// `cargo xtask site` over the placeholders below): the offline page in
+// every language and the hashed files it needs, then every hashed asset as
 // it is fetched. Hashed files never change, so they come from the cache
 // first; pages always come from the network, and only when there is none
 // the offline page answers in the address's language. /api and /site are
@@ -16,7 +16,8 @@
 // {v:1, kind, nonce, lang}; it is shown only while this browser's opt-in
 // (IndexedDB "baylee-push"/"settings", written by the page with
 // PUSH_STATE) names the same random nonce and the kind is switched on.
-// Text is fixed per kind; no name or message ever arrives here.
+// Text is fixed per kind, in German or English as Central says (it knows
+// no other language yet); no name or message ever arrives here.
 "use strict";
 
 const BITS = { chat: 1, contacts: 2, updates: 4, feedback: 8, gateways: 16 };
@@ -78,7 +79,8 @@ function state(write, value) {
 
 const BUILD = "__BUILD__";
 const CACHE = `baylee-site-${BUILD}`;
-const OFFLINE = ["/en/offline", "/de/offline"];
+const LANGS = /* the site's languages */ ["en"];
+const OFFLINE = LANGS.map((lang) => `/${lang}/offline`);
 const ASSETS = /* the offline page's files */ [];
 const HASHED = /^\/assets\/(?:[\w-]+\/)*[\w.-]+\.[0-9a-f]{12}\.[a-z0-9]+$/;
 
@@ -103,21 +105,24 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
   if (request.mode === "navigate") {
-    const offline = url.pathname.startsWith("/de/") || url.pathname === "/de" ? "/de/offline" : "/en/offline";
-    event.respondWith(
-      fetch(request).catch(async () => (await caches.match(offline, { cacheName: CACHE })) ?? Response.error()),
-    );
+    const first = url.pathname.split("/")[1] ?? "";
+    const offline = `/${LANGS.includes(first) ? first : "en"}/offline`;
+    event.respondWith(fetch(request).catch(async () => (await caches.match(offline, { cacheName: CACHE })) ?? Response.error()));
     return;
   }
   if (!HASHED.test(url.pathname)) return;
   event.respondWith(
-    caches.open(CACHE).then(async (cache) => {
+    (async () => {
+      // A page that found its visitor signed out takes the cache away while
+      // this worker still answers for it: what is gone is not made again.
+      if (!(await caches.has(CACHE))) return fetch(request);
+      const cache = await caches.open(CACHE);
       const kept = await cache.match(request);
       if (kept) return kept;
       const answer = await fetch(request);
       if (answer.ok && answer.type === "basic") await cache.put(request, answer.clone());
       return answer;
-    }),
+    })(),
   );
 });
 

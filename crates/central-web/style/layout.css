@@ -127,7 +127,9 @@
 
 /* ---- a link that leaves the site ---------------------------------------------
    It opens a tab of its own; a small arrow says so before the click, and a
-   screen reader hears it in words. Buttons and cards carry their own icons; the strip is too tight for it. */
+   screen reader hears it in words: English here, every other language's by
+   a rule the build writes from its words (`new-tab`, xtask's site.rs).
+   Buttons and cards carry their own icons; the strip is too tight for it. */
 
 :where(p, li, dd, blockquote):not(.strip *) > a[target="_blank"]:not([class])::after {
   content: "\2197";
@@ -137,10 +139,6 @@
   font: 0.72em/1 var(--sans);
   vertical-align: 0.25em;
   text-decoration: none;
-}
-
-:lang(de) :where(p, li, dd, blockquote):not(.strip *) > a[target="_blank"]:not([class])::after {
-  content: "\2197" / " (öffnet in neuem Tab)";
 }
 
 /* ---- where a link leads ---------------------------------------------------------

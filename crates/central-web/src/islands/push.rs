@@ -177,7 +177,8 @@ pub async fn enable(asked: browser::Asked, lang: Lang, public_key: &str) -> Resu
         endpoint,
         p256dh,
         auth,
-        lang: lang.code().to_owned(),
+        // Central words a notification in German or English only
+        lang: lang.of_record().code().to_owned(),
         nonce: nonce.clone(),
     };
     if let Ok(state) = central(NotificationRequest::Subscribe { subscription }).await {

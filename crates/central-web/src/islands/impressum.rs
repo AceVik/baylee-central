@@ -217,9 +217,10 @@ async fn fetch(worker: &str, state: RwSignal<State>) -> Option<Details> {
 }
 
 fn details_view(lang: Lang, details: &Details) -> impl IntoView + use<> {
-    let country = match lang {
+    // the country's name is kept in German and English only
+    let country = match lang.of_record() {
         Lang::De => details.country_de.clone(),
-        Lang::En => details.country_en.clone(),
+        _ => details.country_en.clone(),
     };
     let mail = format!("mailto:{}", details.email);
     let phone: String = details

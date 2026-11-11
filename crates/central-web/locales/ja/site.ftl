@@ -1,0 +1,913 @@
+# baylee.app's words in English, Project Fluent's format. English decides
+# which messages exist and which arguments each takes; build.rs turns them
+# into typed functions (crates/central-web/build.rs). The reader is "you";
+# a button says what it does.
+
+## The frame of every page
+
+site-name = Baylee
+skip = 本文へ移動
+# Read out after a link that leaves the site (the stylesheet carries it).
+new-tab = 新しいタブで開きます
+nav-label = メイン
+nav-download = ダウンロード
+nav-gateways = Gateway
+nav-faq = よくある質問
+nav-contact = お問い合わせ
+nav-sign-in = ログイン
+nav-account = アカウント
+lang-label = 言語
+theme-label = 配色
+theme-system = 配色：端末に合わせる
+theme-light = 配色：ライト
+theme-dark = 配色：ダーク
+
+foot-label = このサイトについて
+foot-play = 遊ぶ
+foot-legal = 法的情報
+foot-releases = すべてのリリース
+foot-issues = 不具合を報告
+foot-discord = Discord コミュニティ
+foot-central-source = このサイトのソース
+foot-dedication = Baylee へ。いつまでも日だまりの中で。
+fan-content = Baylee は<policy>ファンコンテンツ・ポリシー</policy>に沿った非公式のファンコンテンツです。ウィザーズ社の認可/許諾は得ていません。題材の一部に、ウィザーズ・オブ・ザ・コースト社の財産を含んでいます。©Wizards of the Coast LLC.
+foot-colophon = フォント：Literata と Inter（SIL Open Font License 1.1、このサイトから配信）。絵画とロゴは私たちの作品です。<notices>表示事項</notices>
+
+## Titles and descriptions
+
+title-home = Baylee – デッキを組んで、仲間を集めて、さあ遊ぼう。
+desc-home = Baylee は、Linux・Windows・macOS で動く、無料でオープンソースの「Magic: The Gathering」ファンゲームです。カードを知っているルールエンジン、最大8人のテーブル、ほかに誰もいないときの対戦相手を備えています。
+title-download = Baylee のダウンロード
+desc-download = Windows・macOS・Linux 向けの Baylee クライアントをダウンロード。最新リリースのインストーラーとアーカイブを、チェックサムと署名付きで配布しています。
+title-gateways = Gateway：Baylee をオンラインで遊ぶ場所
+desc-gateways = オンラインのテーブルがある Baylee の Gateway（サーバー）の公開一覧と、自分で運営する方法。
+title-faq = よくある質問
+desc-faq = Baylee とは何か、費用、オンライン対戦とアカウントの仕組み、データの扱いについて。
+title-contact = お問い合わせ
+desc-contact = Baylee の作者への連絡、不具合の報告はこちらから。
+title-impressum = 法的表示
+desc-impressum = baylee.app の運営者（DDG第5条）。
+title-privacy = プライバシー通知
+desc-privacy = baylee.app と Baylee Central があなたについて何を、なぜ、どの法的根拠で、どれだけの期間処理するか。
+title-terms = 利用規約
+desc-terms = baylee.app の背後にあるアカウントサービス Baylee Central の利用規約。
+title-fan-content = 非公式ファンコンテンツ
+desc-fan-content = Baylee はウィザーズ・オブ・ザ・コースト社のファンコンテンツ・ポリシーに沿ったファンプロジェクトです。その意味と、意味しないこと。
+title-not-found = ページが見つかりません
+title-gone = このページは削除されました
+crumbs-label = 現在地
+breadcrumb-home = ホーム
+
+## Home
+
+hero-title = デッキを組んで、仲間を集めて、<glow>さあ遊ぼう。</glow>
+hero-lead = 充実したデッキビルダー、対戦・全員対戦・チーム戦に対応した最大8人の対戦、そしてすべての手順を確認するルールエンジン。調べものをしなくても、毎ターン公正に進みます。
+hero-offline = 一人用の対戦とデッキビルダーは、アカウントなしでオフラインでも使えます。オンラインのテーブルは Gateway 上にあり、<host>自分で運営することもできます</host>。
+hero-account = オンラインで遊びますか？ オープンベータ中は誰でも無料で作れます。<register>アカウントを作成</register>するか、<signin>ログイン</signin>してください。
+hero-memorial = Baylee を偲んで：写真アルバムを開く
+
+status-label = プロジェクトの状況
+
+cards-eyebrow = カード
+cards-title = Baylee が知っているカードの数
+cards-lead = Baylee は Magic のカードを一枚ずつ実装し、それぞれ印刷されたテキストと照合しています。数字は最新リリースのものです。
+cards-implemented = 完全に実装
+cards-implemented-help = カードのすべてのルールが動作し、テスト済みです。
+cards-generated = 自動生成
+cards-generated-help = カードのルールテキストから Baylee の生成器が実装したもので、手作業のテストはまだです。プレイはできますが、まれな特殊ケースで挙動が異なることがあります。
+cards-partial = 一部実装
+cards-partial-help = カードはプレイできますが、能力の一つ、またはルール上の特殊ケースがまだ足りません。
+cards-total = カード総数
+cards-total-help = Scryfall が挙げる、Magic のすべてのカードです。前の三つの数字は、Baylee でプレイできるものです。
+cards-help = これは何を意味しますか
+cards-share = { $total } 枚中 { $playable } 枚のカードが、現在プレイできます。
+cards-as-of = リリース { $tag }、{ $date } 時点の集計。
+cards-missing = カードの数をいま読み込めませんでした。
+
+shot-duel-alt = ハウスAIとの対戦：クリーチャー6体が攻撃し、3体がブロックされている
+shot-duel = ハウスAIとの<b>戦術的な対戦</b>。どの割り当てにも、わかりやすい戦闘の線が引かれます。
+shot-log-alt = ゲームログを開いた対戦。スタックに呪文が3つ
+shot-log = <b>ゲームログ</b>はチャットのように、すべての手順を記録します。カード名を押すとプレビューが開きます。
+shot-ring-alt = 円形に並んだ4席のテーブル
+shot-ring = <b>最大8席のテーブル</b>は、戦場のまわりに自動で並びます。
+shot-lobby-alt = 友達からのメッセージとテーブルへの招待が表示されたロビー
+shot-lobby = <b>ロビー：</b>公開テーブル、フレンド、招待、そしてエンドツーエンド暗号化のチャット。
+shot-room-alt = 空いた3席をハウスAIが埋めているルーム
+shot-room = <b>全員の席：</b>人間、5段階のハウスAI、または言語モデル。
+shot-builder-alt = 天使を探してプールを絞り込むデッキビルダー
+shot-builder = <b>デッキビルダー</b>は、入力するそばからプール全体を検索します。
+
+about-eyebrow = Baylee とは
+about-title = 完全なルールエンジンと、見やすい3Dテーブル
+about-engine = 優先権、スタック、レイヤー、置換効果、誘発型能力、状況起因処理、戦闘まで。Rust 製のエンジンが完全なルールを適用し、各場面で選べる合法な選択肢を正確に算出します。クライアントが表示するのは、その有効な操作だけです。
+about-table = 戦場、手札、スタック、追放領域、墓地を、すっきりした3Dテーブルに表示。戦闘の線はわかりやすく、カードのプレビューは瞬時に出ます。カードの絵はプレイ中に Scryfall から読み込まれ、いつでもオラクルテキスト表示に切り替えられます。
+
+gw-eyebrow = オンライン
+gw-title = Gateway
+
+open-central = GitHub の Baylee Central
+
+## Download
+
+dl-prerelease = Beta
+dl-for = { $system } 版をダウンロード
+dl-size = { $size } MB
+dl-checksum = SHA-256
+dl-signature = 署名
+dl-notes = リリースノート
+dl-unknown = このブラウザーからはお使いのシステムを判別できませんでした。下からお選びください。
+dl-mobile = スマートフォンとタブレット向けの版はまだありません。Baylee はパソコンで動きます。
+dl-mac-unsure = このブラウザーでは、お使いの Mac が Apple チップか Intel かがわかりません。上のファイルは Apple チップ（M1 以降）用で、Intel Mac 用のファイルは下にあります。
+dl-windows-unsure = ARM プロセッサーの Windows パソコン（たとえば Snapdragon 搭載のノートパソコン）では、下の ARM 用ファイルを選んでください。
+dl-linux-unsure = ブラウザーがプロセッサーの種類を示さないため、x86-64 と仮定しています。ARM 用のファイルは下にあります。
+dl-missing = このリリースには、お使いのシステム用のファイルがありません。以前のリリースは<releases>リリース一覧</releases>にあります。
+dl-none = GitHub からいま応答がありませんでした。すべてのリリースは<releases>リリース一覧</releases>にあります。
+dl-yours = お使いのシステム
+dl-more-files = ほかのファイル（{ $count }）
+dl-installer = インストーラー
+dl-deb = Debian パッケージ
+dl-archive = アーカイブ
+dl-fallback = 古いプロセッサー向けアーカイブ
+dl-fallback-help = AVX2 のない x86-64 プロセッサー（2013年ごろより前）向けです。Baylee の通常ビルドは AVX2 が必要で、なければ起動しません。
+plat-windows-x64 = Windows
+plat-windows-x64-sub = ほとんどのPC：64ビットの Intel または AMD
+plat-windows-arm64 = Windows on ARM
+plat-windows-arm64-sub = Snapdragon 搭載ノートなど
+plat-mac-arm64 = macOS
+plat-mac-arm64-sub = Apple チップ：M1 以降
+plat-mac-x64 = Intel 版 macOS
+plat-mac-x64-sub = Intel プロセッサーの Mac
+plat-linux-x64 = Linux
+plat-linux-x64-sub = x86-64
+plat-linux-arm64 = Linux on ARM
+plat-linux-arm64-sub = ARM64 / aarch64
+plat-none = このリリースには、このシステム用のファイルがありません。
+install-title = 初回起動と動作環境
+install-first-title = 初回起動
+install-first = ビルドにはコード署名がありません（署名には費用がかかるため）。そのため Windows と macOS では初回に警告が出ます。Windows では<i>詳細情報</i>から<i>実行</i>を選んでください。macOS では<i>システム設定 → プライバシーとセキュリティ</i>を開き、<i>このまま開く</i>を選んでください。
+install-check-title = ダウンロードの確認
+install-check = 各ファイルの隣に、チェックサムを記した <code>.sha256</code> があります。アーカイブには <code>.sig</code> も付いており、これはクライアントが自己更新の前に確認する Ed25519 署名です。Linux では <code>sha256sum -c</code>、macOS では <code>shasum -a 256</code>、Windows では <code>certutil -hashfile</code> でファイルを確認できます。
+install-needs-title = 動作環境
+install-windows = <b>Windows</b> 10 または 11（x64 または ARM64）。
+install-mac = <b>macOS</b> 11 以降（Apple チップまたは Intel）。
+install-linux = <b>Linux</b>：glibc 2.35 以降（Ubuntu 22.04 以降）と Vulkan ドライバーが必要です。そのほか必要なものは <code>.deb</code> が一緒に導入します。
+install-cpu = <b>プロセッサー：</b>x86-64 向けビルドには AVX2 が必要です。古いプロセッサー向けには別のアーカイブがあります。
+
+## Gateways
+
+gws-title = Gateway
+gws-official = 公式
+gws-online = オンライン
+gws-offline = オフライン
+gws-version = バージョン
+gws-website = ウェブサイト
+gws-address = アドレス
+gws-copy = アドレスをコピー
+gws-copied = アドレスをコピーしました。
+gws-copied-short = コピー済み
+gws-copy-failed = コピーできませんでした。
+gws-failed = 一覧をいま読み込めませんでした。しばらくしてからもう一度お試しください。
+
+## Questions
+
+faq-eyebrow = 質問
+faq-title = よくある質問
+faq-what-q = Baylee とは何ですか？
+faq-what-a = パソコンで遊べる、「Magic: The Gathering」の無料のファンゲームです。デッキビルダー、すべての手順を確認するルールエンジン、最大8人のテーブル、コンピューターの対戦相手があります。ウィザーズ・オブ・ザ・コースト社が制作・承認・推奨したものではありません。
+faq-cost-q = 費用はかかりますか？
+faq-cost-a = かかりません。今後も変わりません。課金も、有料機能も、広告もありません。
+faq-account-q = アカウントは必要ですか？
+faq-account-a = 一人で遊ぶ分には不要です。デッキビルダーとハウスAIとの対戦はオフラインで使えます。オンラインのテーブルには Baylee のアカウントが必要です。オープンベータ中は、誰でもこのサイトで無料で作成できます。
+faq-data-q = 私のデータはどうなりますか？
+faq-data-a = できるだけ少なくしています。詳しくは<privacy>プライバシー通知</privacy>をご覧ください。パスワードがブラウザーの外に出ることはなく、非公開のデータとチャットのメッセージは、私たちに届く前にお使いの端末で暗号化されます。
+faq-password-q = パスワードを忘れました。どうすればよいですか？
+faq-password-a = 管理者が渡すリセットコードで新しいパスワードを設定します。ただし、このウェブサイトではまだコードを使えません（今後対応します）。暗号化されたデータが残るのは、アカウント作成時に受け取った回復コードをお持ちの場合か、Baylee クライアントにまだログインしている場合だけです。そうでなければ失われます。
+faq-gateway-q = Gateway とは何ですか？
+faq-gateway-a = オンラインのテーブルがあるサーバーです。誰でも運営できます。<gateways>一覧</gateways>には、Central が把握しているものが載っています。
+faq-systems-q = どのシステムで動きますか？
+faq-systems-a = x86-64 と ARM64 の Windows、macOS、Linux です。スマートフォンとタブレット向けの版はまだありません。
+faq-open-q = オープンソースですか？
+faq-open-a = ゲームはオープンソースで、GNU Affero General Public License の下にあります。Baylee Central のコードは、データの扱いを誰でも確かめられるよう公開されています。
+faq-bug-q = 不具合を見つけました。どこに報告すればよいですか？
+faq-bug-a = ゲーム内で <kbd>F8</kbd> を押すと、必要な情報をまとめて送れます。ほかには、GitHub の Issue トラッカー、Discord、<contact>お問い合わせフォーム</contact>からも報告できます。
+
+## Contact
+
+contact-eyebrow = お問い合わせ
+contact-title = ご連絡ください
+contact-name = お名前
+contact-name-hint = 任意です。
+contact-email = メールアドレス
+contact-email-hint = 任意です。返信のためだけに使います。
+contact-message = メッセージ
+contact-count = { $n } / 5,000 文字
+contact-send = 送信
+contact-sending = 送信中 …
+contact-sent-title = ありがとうございます
+contact-sent = メッセージが届きました。アドレスをご記入いただいた場合は、そちらに返信します。
+contact-error-empty = 先にメッセージを書いてください。
+contact-error-email = メールアドレスの形式ではないようです。
+contact-error-busy = お使いのネットワークからのメッセージが多すぎます。1時間後にもう一度お試しください。
+contact-error-refused = メッセージを受け付けられませんでした。長さを確認して、もう一度お試しください。
+contact-error-network = メッセージを送信できませんでした。接続を確認して、もう一度お試しください。
+contact-privacy = お送りいただいた内容は、返信のために保管し、対応後90日で、遅くとも1年後に削除します。詳しくは<privacy>プライバシー通知</privacy>をご覧ください。
+contact-noscript = このフォームには JavaScript が必要です。Discord または GitHub からも連絡できます。
+
+## Legal notice
+
+impressum-title = 法的表示
+impressum-lead = DDG（ドイツのデジタルサービス法）第5条が求める情報です。Baylee は個人による非営利のプロジェクトです。
+impressum-show = 詳細を表示
+impressum-why = 詳細は、住所を収集するロボットを遠ざけるため、ブラウザーが数秒で解く短いパズルの先にあります。それ以外にお願いすることはありません。
+impressum-solving = パズルを解いています … { $percent } %
+impressum-name = 氏名
+impressum-address = 住所
+impressum-email = メール
+impressum-phone = 電話
+impressum-failed = 詳細を読み込めませんでした。もう一度お試しいただくか、<contact>お問い合わせフォーム</contact>からご連絡ください。
+impressum-noscript = 詳細の表示には JavaScript が必要です。使えない場合は、Discord または GitHub からご連絡ください。
+impressum-responsible = 内容の責任者：上に記載した人物。
+impressum-dispute = 私たちは、消費者仲裁機関での紛争解決手続に参加する義務を負わず、参加する意思もありません。
+
+## Fan content
+
+fc-title = 非公式ファンコンテンツ
+fc-eyebrow = ファンコンテンツ
+fc-lead = Baylee はファンプロジェクトです。ウィザーズ・オブ・ザ・コースト社のファンコンテンツ・ポリシーに沿ったものであり、そのルールに従っています。
+fc-notice-title = すべてのページにある表示
+fc-means-title = その意味
+fc-means = Baylee は、ウィザーズ・オブ・ザ・コースト社が制作・承認・推奨したものではありません。Magic: The Gathering、そのカード名、セット名、カード画像、マナ・シンボルは、Wizards of the Coast LLC の財産です。Baylee は誰でも無料で使えます。課金も、有料機能も、メールアドレスでの登録もありません。
+fc-images = ゲームは Scryfall のカード画像を、加工せず、アーティストのクレジットとともに表示します。このサイトには画像を載せていません。カードのデータと画像は Scryfall が提供しており、Baylee は Scryfall と提携していません。
+fc-policy = ウィザーズ・オブ・ザ・コースト社の<policy>ファンコンテンツ・ポリシー</policy>
+
+## Privacy notice
+
+privacy-title = プライバシー通知
+privacy-lead = このサイトと Baylee Central があなたについて何を、なぜ、どの法的根拠で、どれだけの期間処理するか。
+privacy-updated = 2026年11月11日現在
+privacy-controller-title = 責任者
+privacy-controller = GDPR（EU一般データ保護規則）上の管理者は、<impressum>法的表示</impressum>に記載した個人です。そこには氏名、郵送先住所、メールアドレスが記されています。プライバシーに関する質問は、お問い合わせフォームからも送れます。データ保護責任者はいません。選任は義務付けられていません。
+privacy-short-title = 要点
+privacy-short = トラッキング、広告、アクセス解析はなく、ログインしない限りクッキーもなく、ほかのサーバーから読み込むものもありません。フォント、画像、スクリプトはすべて baylee.app から配信されます。パスワードが私たちに届くことはなく、チャットのメッセージと非公開のデータは、送信前にブラウザー内で暗号化されます。
+privacy-hosting-title = サイトの閲覧
+privacy-hosting = このサイトは、ドイツの netcup GmbH から借りているサーバーで動いています。ページを開くと、ブラウザーはすべてのリクエストに付くもの、つまりIPアドレス、要求したアドレス、時刻、ブラウザーの言語、ブラウザーの識別情報（ユーザーエージェント）を送ります。サーバーは応答のためにこれを必要とします。言語版は言語の情報から選び、ダウンロードページはユーザーエージェントから適切なファイルを提案します。ウェブサーバーはアクセスログを残さないため、これらのリクエストは保存されません。サーバー自身の動作メッセージ（システムジャーナル）には、まれにエラーの際にIPアドレスが含まれることがあり、遅くとも14日後に削除されます。法的根拠：GDPR第6条第1項(f)。私たちの正当な利益は、サイトを安全かつ確実に提供することです。
+privacy-device-title = ブラウザーが保持するもの
+privacy-device = ログインするまで、このサイトはクッキーを設定しません。ブラウザーがお使いの端末に保持するものは次のとおりで、JavaScript を使う場合に限ります。配色を選んだ場合はその選択（<code>baylee-site-theme</code>）。ログイン中は、セッションの終了時刻（<code>baylee-central-session</code>）、チャットの鍵、連絡先の信頼済みの鍵（チャットの項を参照）。通知をオンにした場合は、この端末の乱数（<code>baylee-push-installation-v1</code>、<code>baylee-push</code>）。そして、ログインした、サイトをアプリとしてインストールした、通知をオンにした、のいずれかの場合に限り、サイトの公開ファイル（ページの枠、フォント、スクリプト）の控え。これにより、接続がなくても起動でき、通知を受け取れます。この三つのいずれにも当てはまらなくなった場合、控えは次にサイトを開いたときに削除されます。以下の項に記載がない限り、これらが私たちに送られることはありません。チャットとセッションの項目はログアウト時に削除されます。それ以外は、ブラウザーでサイトのデータを消去すれば削除できます。法的根拠：TDDDG第25条第2項第2号（利用する機能に厳密に必要なもの）。通知の乱数については、同意（TDDDG第25条第1項）。
+privacy-github-title = GitHub
+privacy-github = ダウンロードページとトップページには、最新のリリース、テストの状況、カードの数が表示されます。これらはブラウザーではなく私たちのサーバーが GitHub に問い合わせて取得するため、GitHub があなたについて知ることはありません。ダウンロードや GitHub へのリンクを押したときに限り、ブラウザーが GitHub（GitHub, Inc.、米国）に接続し、IPアドレスとすべてのリクエストに付くものを送ります。その後は GitHub 自身のプライバシー通知が適用されます。
+privacy-directory-title = Gateway 一覧
+privacy-directory = 私たちのサーバーは Baylee Central から Gateway の一覧を読み取って表示します。あなたに関することは含まれません。
+privacy-account-title = アカウント
+privacy-account = アカウントについて、Baylee Central は次を保存します。アカウントID、ログイン名、タグ付きの表示名、アカウントがいつどのように作られたか、OPAQUE のパスワード記録（私たちのサーバーがパスワードを知ることなく、パスワードを証明できる仕組み）、パスワードと回復コードで二重に暗号化されたマスターキー、暗号化されたアカウント文書と暗号化されたオブジェクト（私たちには読めず、サイズ、リビジョン、時刻だけが見えます）、同意した利用規約のバージョンと時期、最後にログインした時刻、セッション、管理者の役割（ある場合）、登録した Gateway とそのトークン。ほかのプレイヤーに見えるのは表示名とタグで、ログイン名は見えません。管理者がリセットコードを渡した場合、私たちが保存するのは、コードが使われるか期限が切れるまで、そのダイジェストだけです。管理者がアカウントや Gateway に対して行った操作は、3年間、記録（誰が、何を、どのアカウントまたは Gateway に、いつ）として保管されます。法的根拠：GDPR第6条第1項(b)（ご希望のアカウント）。最後のログイン時刻と記録については、GDPR第6条第1項(f)（安全で追跡可能な運用という私たちの正当な利益）。ログイン名とパスワードがなければアカウントはありません。メールアドレスは不要です。アカウントを作成できるのは16歳からです。アカウントを削除するまで保管します。削除すると、稼働中のシステムからは直ちに、バックアップからは遅くとも12か月以内に削除されます。セッションは、使われないまま30分で、遅くともログインから12時間で終了します。
+privacy-cookie-title = セッションのクッキー
+privacy-cookie = ログインすると、クッキーを一つ設定します。<code>__Host-central</code> で、セッションを識別する乱数です。baylee.app にだけ送られ、スクリプトからは読めず、セッションとともに、遅くとも12時間後に終了します。ログイン状態を保つために厳密に必要なものであり、同意は要りません。法的根拠：TDDDG第25条第2項第2号およびGDPR第6条第1項(b)。
+privacy-chat-title = チャットと連絡先
+privacy-chat = メッセージは、受信者の端末ごとに、お使いの端末で暗号化されます。Baylee Central は暗号化された形でのみ保存し、読むことはできません。Central が見られるもの、保存するものは次のとおりです。連絡先、連絡先リクエストとブロック、名前・メンバー・招待を含むグループ、誰が誰にいつどのくらいの大きさのメッセージを送ったか、そしてお使いの端末の公開鍵。連絡先とグループのメンバーには、タグ付きの表示名とあなたのメッセージが見えます。ブラウザーは、ログイン中、チャットの鍵（このブラウザーだけが持つ鍵で封じて、ストレージ <code>baylee-chat</code> に）と、信頼した連絡先の鍵（暗号化して、<code>baylee-chat-trust</code> に）を保持します。メッセージと配信は、アカウントを削除するまで保管されます。これより短い自動削除期間は、まだありません。送信者ごと、端末ごとに保持できるのは最大5,000件で、それを超えると新しいメッセージは拒否されます。法的根拠：GDPR第6条第1項(b)。
+privacy-push-title = 通知
+privacy-push = ブラウザーで通知をオンにすると、ブラウザーがそのプッシュサービスに登録し、Central は、このブラウザー向けのそのサービスのアドレス、ブラウザーの公開鍵と認証シークレット、言語、この端末の乱数、選んだカテゴリーを保存します。プッシュサービスは、ブラウザーの提供元であるGoogle（Firebase Cloud Messaging）、MozillaまたはAppleのもので、いずれも米国に拠点があります。通知には、暗号化された状態で、種類（たとえば「新着メッセージ」）と言語だけが入り、名前や本文は入りません。プッシュサービスには、アドレス、時刻、サイズなどの接続データが見えます。これらは、この端末で通知をオフにしたとき、ログアウトしたとき、またはアカウントを削除したときに削除されます。90日間更新されないアドレスは使われなくなり、待機中の通知は1日で失効します。法的根拠：GDPR第6条第1項(a)およびTDDDG第25条第1項（同意）。アカウントの設定でいつでも撤回できます。それまでの処理は適法のままです。
+privacy-counters-title = 不正利用への対策
+privacy-counters = パスワードの総当たりと過負荷を防ぐため、Central は特定のリクエスト（登録、ログインの試行、パスワードのリセット、一覧の読み取り）をIPアドレスごとに、メモリ内だけで数えます。登録は最長1日、それ以外は長くても1時間です。登録の前に、ブラウザーはパズルも解きます。パズルは乱数でできており、あなたに関する情報は何も含まず、遅くとも5分後には忘れられます。アカウントごとには、連絡先リクエストと他のプレイヤーの検索を数えます。誰かが大量のリクエストで他人を困らせないようにするためです。法的根拠：GDPR第6条第1項(f)。私たちの正当な利益は、アカウントとサービスを不正利用から守ることです。
+privacy-contact-title = お問い合わせフォーム
+privacy-contact = フォームは、メッセージ、ページの言語、時刻を同じサーバー上の Baylee のフィードバックサービスに送り、氏名とメールアドレスは、ご記入いただいた場合に限って送ります。どちらも任意です。サービスは、メッセージに対応済みかどうかも記録します。IPアドレスは保存せず、メッセージの大量送信を防ぐために、1時間だけメモリ内で数えます。メッセージを読むのは法的表示に記載した人物だけで、第三者には渡しません。メッセージは、対応後90日、遅くとも1年後に削除し、ご希望があればそれより早く削除します。法的根拠：GDPR第6条第1項(f)（メッセージに答えるという私たちの正当な利益）。メッセージがアカウントに関するものである場合は(b)。
+privacy-impressum-title = 法的表示のパズル
+privacy-impressum = 法的表示は、ブラウザーがパズルを解いた後にのみ表示されます。住所を収集するプログラムから住所を守るためです。パズルは乱数でできており、あなたに関する情報は含みません。そのため、フィードバックサービスは、要求されたパズルをIPアドレスごとに1時間メモリ内で数え、解かれたパズルを5分間保持します。法的根拠：GDPR第6条第1項(f)（個人の住所を守るという私たちの正当な利益）。
+privacy-recipients-title = 受領者と国
+privacy-recipients = データを販売することも、広告のために渡すこともありません。受領者は次のとおりです。netcup GmbH（ドイツでのホスティング、GDPR第28条にいう処理者）。Baylee Central の管理者（管理のため、ログイン名、タグ付きの表示名、アカウントの由来・作成・最後のログイン、Gateway が見えますが、暗号化されたデータは見えません）。アカウントでログインする Gateway（アカウントID、表示名、タグを受け取り、パスワードは受け取りません）。連絡先とグループのメンバー（表示名、タグ、あなたのメッセージ）。法律で義務付けられている場合に限り、当局。欧州経済領域外の国：通知をオンにした場合に限り、ブラウザーのプッシュサービス（Google、Mozilla、Apple、米国）がこれらを運びます。他者が運営する Gateway はどの国にもありえます。そこでログインするかどうかは、あなたが決めます。それ以外に、欧州経済領域外の国へデータを移転することはありません。
+privacy-rights-title = あなたの権利
+privacy-rights = あなたには、アクセスの権利（GDPR第15条）、訂正（第16条）、消去（第17条）、処理の制限（第18条）、データポータビリティ（第20条）があります。私たちの正当な利益（第6条第1項(f)）に基づく処理には、ご自身の特別な事情を理由に、いつでも異議を述べることができます（第21条）。同意は、将来に向けていつでも撤回できます（第7条第3項）。アカウントのデータは、アカウントの設定からエクスポートでき、アカウントも削除できます。それ以外は、お問い合わせフォームまたは法的表示のアドレスへのメッセージで足ります。データ保護監督機関に苦情を申し立てることもできます（第77条）。たとえばお住まいの地域の機関や、ノルトライン＝ヴェストファーレン州データ保護・情報自由州委員です。データを私たちに提供する法律上・契約上の義務はありませんが、ログイン名とパスワードがなければアカウントはありません。自動化された意思決定やプロファイリングは行いません（第22条）。
+privacy-objection-title = 異議を述べる権利
+privacy-objection = GDPR第6条第1項(f)に基づいてデータを処理する場合（サイトの提供、不正利用への対策、お問い合わせフォーム、法的表示のパズル、最後のログイン時刻、管理の記録、不具合の報告、利用数の集計）、ご自身の特別な事情を理由に、いつでも異議を述べることができます（GDPR第21条）。その場合、あなたの利益に優先する、やむを得ない正当な理由を示せるとき、または処理が法的請求の主張、行使、防御に役立つときを除き、処理をやめます。お問い合わせフォームまたは法的表示のアドレスへの、形式にとらわれないメッセージで足ります。
+privacy-links-title = ほかのサービスへのリンク
+privacy-links = このサイトは、GitHub、Discord、WhatsApp などへのリンクを載せています。これらは単なるリンクで、何も埋め込んでおらず、押すまでは、これらのサービスがあなたの訪問を知ることはありません。押したとき、ブラウザーは、どのページから来たかを伝えません（リファラーなし）。その後は各提供元のプライバシー通知が適用され、EU域外でデータが処理されることもあります。そこでコミュニティのグループの他のメンバーにあなたの何が見えるかは、それらのサービスが決めます。
+privacy-reports-title = ゲームからの不具合報告と利用数の集計
+privacy-reports = ゲームから F8 で送る不具合報告には、種類、あなたのテキスト、クライアントのバージョン、チェックを残した添付が含まれます。内容はお問い合わせページに一覧があります。対応後90日、遅くとも3年後に削除します。法的根拠：GDPR第6条第1項(f)（不具合のないゲームという私たちの正当な利益）。クライアントがクラッシュレポートを送るのは、許可した場合に限ります（GDPR第6条第1項(a)。クライアントの設定でいつでも撤回できます）。オフラインのゲーム中、クライアントはそのゲームのランダムな識別子を1分に1回送り、それ以外は何も送りません。これはメモリ内だけに保持し、最後の反応から150秒後に忘れます（GDPR第6条第1項(f)。「匿名の利用数を送信」でオフにできます）。すべての接続と同様に、IPアドレスは私たちに届きます。
+
+## Terms
+
+terms-title = 利用規約
+terms-draft = この規約は草案であり、まだ効力を持ちません。
+terms-version = バージョン { $version }、{ $date } 更新。
+# Shown only in the languages a machine translated: every one but German and English.
+machine-note = このサイトは機械翻訳されたもので、日本語を話す方による確認はまだ受けていません。ゲーム自体は今のところ英語とドイツ語です。<link>誤りを知らせる。</link>
+legal-machine = このページは参考として提供する機械翻訳です。<de>ドイツ語</de>版または<en>英語</en>版と異なる場合は、それらが優先します。
+terms-machine = Central の利用規約は、ドイツ語と英語でのみ提供されています。以下は英語版です。<de>ドイツ語版</de>もあります。
+
+## Errors
+
+not-found-title = このページは存在しません
+not-found-lead = アドレスの入力が間違っているか、ページが移動した可能性があります。
+gone-title = このページは完全に削除されました
+gone-lead = ここにあったものは削除されました。次に進む先はトップページに載っています。
+error-home = トップページへ
+
+## Baylee's remembrance (approved by her family on 27 October 2026; keep word for word)
+baylee-dedication = Baylee へ。いつまでも日だまりの中で。
+baylee-invitation = この世界の向こうにいる小さな魂に会いに
+baylee-open = Baylee を偲んで · 写真アルバムを開く
+baylee-eyebrow = このプロジェクトの心
+baylee-date = 愛をこめて偲んで · 2026年10月26日
+baylee-close = Baylee の世界へ戻る
+baylee-previous = 前の写真
+baylee-next = 次の写真
+baylee-photo1 = やわらかな白い掛け布団の中で丸くなる Baylee。
+baylee-photo2 = 花柄の掛け布団からのぞいている Baylee。
+baylee-photo3 = 丸いグレーのベッドで休んでいます。
+baylee-photo4 = ぴたりと丸まって眠る Baylee。
+baylee-photo5 = 掛け布団にくるまった、静かなひととき。
+
+baylee-storyTitle = Baylee へ。いつまでも日だまりの中で。
+baylee-together = 私たちとともに · 2025年11月17日 – 2026年10月26日
+baylee-chapters = Baylee の物語
+baylee-chapterPrevious = 前の章
+baylee-chapterNext = 次の章
+baylee-photos = 私たちの思い出
+baylee-read = スクロールして読む
+
+baylee-chapter1Title = Baylee の家
+baylee-chapter1Body =
+    Baylee は2025年11月17日に、私たちの家に来ました。
+
+    妻と私は、クレーフェルトの動物保護施設から彼女を迎えました。推定で13歳ほどでした。悪性の乳腺腫瘍があり、がんはすでに肝臓にまで広がっていました。Baylee は緩和ケアの猫でした。ともに過ごせる時間が限られていることは、わかっていました。私たちのもとで、愛される家を持ってほしいと思ったのです。
+
+    彼女がその家をあっという間に自分のものにすることを、私たちはすぐに知りました。
+
+    来たその日に、仕事中の私の膝にするりと乗ってきました。最初の夜には、両親の猫のために注文しておいたキャットフードの袋に穴を開け、勝手に食べてしまいました。もちろん彼女には専用のごはんがあり、その晩もしっかり食べていました。でも Baylee は、この備蓄はまだ詳しく調べる価値があると考えたようです。
+
+    私たちの小さなネズミさんは、驚くほどの食欲と、信じられないほどの元気を持っていました。
+
+baylee-chapter2Title = 深まる信頼
+baylee-chapter2Body =
+    水をたくさん飲むことに気づき、獣医に連れて行きました。血液検査で甲状腺の病気がわかり、旺盛な食欲と活発さの理由もそこにありました。甲状腺の薬と、炎症の数値が高かったため一時的な抗生物質が処方されました。
+
+    突然あらゆるものに体をこすりつけ、よく鳴き、いつになく甘えてくっつくようになったとき、新しい薬のどれかが合わないのではと最初は心配しました。別の診察で理由がわかりました。うちの小さな子は発情していたのです。避妊手術を受けていませんでした。
+
+    その時期も、ともに乗り越えました。Baylee は私たちをますます信頼するようになり、私たちの距離もどんどん近くなっていきました。
+
+baylee-chapter3Title = 私たちの小さなお姫さま
+baylee-chapter3Body =
+    キャットツリーが届いたときの、彼女の喜びようを今もはっきり覚えています。すぐいちばん上の台に座り、満足そうに部屋を見渡していました。不思議なことに、その場所を使ったのは、それきりでした。理由は彼女だけの秘密です。
+
+    ほかの場所は、空いていることがほとんどありませんでした。私の膝、私の脚、私たちのベッド。ベッドでは、たいてい私か妻の上で眠りました。いちばんいいのは、二人の上に同時に寝ることでした。
+
+    しっぽをぴんと立てて部屋を歩く姿は、自分がここのお姫さまだと、よくわかっているかのようでした。気が強く、自分の境界をはっきり示すことができました。私たちのもとでは、ありのままでいられました。くせも、要求も、ちょっと頑固なところも、みんな愛されていました。
+
+    動物とこれほど深い絆を結んだことは、それまでありませんでした。Baylee は、妻と私の心のとても深いところに居場所を見つけました。
+
+baylee-chapter4Title = 日なたで過ごす時間
+baylee-chapter4Body =
+    暖かくなると、彼女はバルコニーを見つけました。その日最初の日差しを毛皮に受けるのが大好きでした。まもなく、ほとんど一日中そこで過ごすようになりました。
+
+    ハトや庭の鳥たちは、特別な楽しみでした。じっと見つめ、待ち伏せし、何度も驚かせようとしました。日向ぼっこと鳥の観察のあいだで、うちの小さなお姫さまの一日はとても忙しいものでした。
+
+baylee-chapter5Title = 自分だけの考え
+baylee-chapter5Body =
+    その間にも、病気は進んでいきました。
+
+    腫瘍は炎症を起こし、Baylee は患部をなめて開いてしまいました。獣医で最初の術後服をもらいました。赤い服でした。それからは、傷をこれ以上傷つけないよう、毎日着なければなりませんでした。
+
+    すぐに着慣れました。ただ、着せられるのは最後の日まで嫌がりました。ごはんの皿を見せても、そのときはあまり効きませんでした。食欲は旺盛でも、服についての意見ははっきりしていました。
+
+    傷は悪くなっていきました。膿が出て、やがて出血し、いやなにおいがするようになりました。それでも Baylee は、毎日の暮らしにまだどれほど喜びを見いだしているかを、私たちに見せ続けました。遊び、食べ、まわりを探検し、爪とぎの板や戸棚に登りました。
+
+    ときには何時間も私たちの隣のベッドの端で、私たちがやっと目を覚まして朝ごはんを用意するのを待っていました。時間がかかりすぎると、ただ私たちの上を乗り越えていきました。顔だって邪魔になりませんでした。
+
+    食べ物にはとてもはっきりした考えがありました。好みはむしろ「冷凍ピザ」派でした。しばらくすると、高級なキャットフードでは興奮しなくなり、バリエーションが欠かせませんでした。同じものが二回続くなど、もってのほかでした。レバー入りのチキン、チーズ入りのもの、ツナやサーモン、そういったものが彼女を幸せにしました。
+
+baylee-chapter6Title = しっぽをぴんと立てて
+baylee-chapter6Body =
+    腫瘍は大きくなり、ますます液がにじむようになりました。Baylee は目に見えて痛がっていました。痛みがやわらぐと、また私たちの小さな猫に戻り、しっぽをぴんと立てて部屋を歩き、自分の人間たちを独り占めしていました。
+
+    彼女の力が少しずつ弱まっていくのが、わかりました。それでも、食欲も、好奇心も、甘えん坊なところも、大きなゴロゴロも、まだそこにありました。
+
+baylee-chapter7Title = お別れ
+baylee-chapter7Body =
+    2026年10月23日の金曜日の夜、最初は風邪のように見える症状が出ました。鼻水が出て、呼吸は深く苦しそうで、息をするのに苦労しているようでした。
+
+    土曜日は、また元気になったように見えました。いつもと違う呼吸と鼻水は残っていましたが、私たちのよく知る元気さと生きる喜びを、また見せてくれました。
+
+    日曜日の朝はつらいものでした。目から涙が出て、息をするのが苦しく、痛がっていました。痛み止めをあげました。1時間ほどで楽になりましたが、呼吸はやはり違ったままでした。獣医に連れて行かなければならないと、私たちにはわかりました。
+
+    月曜日の朝、容態はまた悪くなりました。幸い、妻はその日が休みでした。病院に電話をして予約を取り、Baylee を連れて行きました。
+
+    レントゲンで、がんがどこまで広がっているかがわかりました。呼吸に使えるのは肺の約3分の1しか残っていない、と告げられました。このまま生きさせることは、彼女がだんだん息ができなくなることを意味していました。
+
+    お別れしなければなりませんでした。
+
+    2026年10月26日の月曜日、正午ごろ、いちばん愛しい Baylee は安らかに眠りにつきました。
+
+baylee-chapter8Title = いつまでも日だまりの中で
+baylee-chapter8Body =
+    彼女が私たちのもとにいたのは、1年に少し足りない間でした。その間に、彼女は私たちの家族になり、とても近しい友になりました。仕事をする日々にも、夜にも、朝の目覚めにも、彼女はいました。バルコニーの日だまりの時間にも、ともに暮らすことをかたちづくる小さな習慣にも。
+
+    今は、そのどの瞬間にも彼女がいません。
+
+    空白は、まだ生々しく、深いままです。ゴロゴロという声も、脚にかかる重みも、ぴんと立ったしっぽも、私たちがやっと朝ごはんを用意すると信じて疑わない顔も、恋しいです。
+
+    この人生のあとに何かがあるなら、それがどんなものであっても、いつかあの魂にまた会いたいと願います。
+
+    それまでは、私たちの小さなネズミさんを、いつまでも心の中に抱いていきます。
+
+    だから、この趣味のプロジェクトは Baylee に捧げられています。彼女の魂、彼女のぬくもり、日差しと鳥たちを喜ぶ心に。そして、ともに過ごした時間に育った愛に。
+
+    ここで彼女が、雲の上で、暖かな日差しの中、花とハトと庭の鳥たちに囲まれて、安らかに眠れますように。
+
+    安らかに眠って、いちばん愛しい Baylee。
+
+baylee-photoOpen = 写真を大きく表示
+baylee-photoClose = 写真を閉じる
+baylee-zoomIn = 拡大
+baylee-zoomOut = 縮小
+baylee-fit = 全体表示
+
+baylee-photo6 = ブランケットの中で心地よさそうな Baylee。
+baylee-photo7 = 赤い術後服を着て身を寄せています。
+baylee-photo8 = 段ボール箱の日だまり。
+baylee-photo9 = くるまれて、すっかりくつろいでいます。
+baylee-photo10 = お気に入りの場所：私たちのすぐ隣。
+
+## Errors shared by the forms
+
+error-busy = 試行が多すぎます。1分待ってから、もう一度お試しください。
+error-unavailable = Baylee Central がいま応答していません。しばらくしてからもう一度お試しください。
+error-network = 接続がありません。ネットワークを確認して、もう一度お試しください。
+error-failed = 問題が発生しました。もう一度お試しください。何度も起きる場合はお知らせください。
+error-again = もう一度試す
+password-show = 表示
+
+## Signing in
+
+signin-title = ログイン
+signin-lead = オンラインのテーブル、連絡先、チャットのための Baylee アカウント。
+signin-name = ログイン名
+signin-password = パスワード
+signin-submit = ログイン
+signin-missing = ログイン名とパスワードを入力してください。
+signin-working = パスワードを保護しています … 少し時間がかかりますが、処理はブラウザー内だけで行われます。
+signin-wrong = ログイン名とパスワードが一致しません。両方を確認して、もう一度お試しください。
+signin-not-moved = このアカウントはまだ Baylee Central に移行していません。Baylee クライアントで一度ログインしてください。アカウントが移行されます。
+signin-no-account = まだアカウントがありませんか？ <register>作成する</register>。
+signin-noscript = ログインには JavaScript が必要です。パスワードはブラウザー内で処理され、私たちに送られることはありません。
+
+## Registering
+
+register-title = アカウントを作成
+register-lead = オンラインのテーブル、連絡先、チャットのために。オープンベータ中は誰でも無料です。
+register-name = ログイン名
+register-name-hint = 非公開で、ログインにだけ使います。小文字の英字、数字、ドット、ハイフン、アンダースコアで3〜24文字。
+register-display = 表示名
+register-display-hint = ほかのプレイヤーに見える名前です。英字、数字、- と _ で3〜16文字。タグは自動で付きます。
+register-password = パスワード
+register-password-hint = 8文字以上。長い文は覚えやすく、推測されにくいです。
+register-repeat = パスワードを再入力
+register-repeat-hint = 入力ミスを防ぐため、もう一度同じものを入力してください。
+register-age = 16歳以上です。
+register-consent = <terms>利用規約</terms>に同意します。データの扱いは<privacy>プライバシー通知</privacy>に記載されています。
+register-submit = アカウントを作成
+register-error-name = ログイン名は、小文字の英字、数字、ドット、ハイフン、アンダースコアで3〜24文字にしてください。
+register-error-display = 表示名は英字または数字で3〜16文字にしてください。- と _ は途中だけに使えます。
+register-error-reserved = この表示名は予約されています。別の名前を選んでください。
+register-error-short = パスワードは8文字以上にしてください。
+register-error-long = パスワードが長すぎます。
+register-error-repeat = 2つのパスワードが同じではありません。
+register-error-age = アカウントを持つには16歳以上である必要があります。
+register-error-consent = アカウントを作成するには、利用規約に同意してください。
+register-error-taken = このログイン名は使われています。別の名前を選んでください。
+
+## The recovery code
+
+code-title = 回復コード
+code-handle = あなたのハンドル：{ $handle }
+code-lead = パスワードを忘れたとき、暗号化されたデータが残るのは、このコードがある場合だけです。私たちはこのコードを知らず、復元もできません。この端末から離れた安全な場所に保管してください。
+code-shown-once = 表示は今だけです
+code-download = テキストファイルとして保存
+code-kept = 回復コードを保存しました
+code-not-kept = 先にコードを保存してから、確認してください。
+code-continue = 続ける
+code-later = 今はしない
+
+## Central's terms
+
+terms-step-title = 新しい利用規約
+terms-step-lead = Baylee Central の利用規約が変わりました。アカウントを使うには、読んで同意してください。同意しない場合は、ログアウトもできます。
+terms-accept = 同意する
+terms-decline = 同意せずログアウト
+
+## The signed-in area
+
+account-lead = あなたの Baylee アカウント：プロフィール、セキュリティ、プライバシー、Gateway。
+account-nav = アカウント
+account-home = 概要
+account-profile = プロフィール
+account-profile-lead = ハンドル、表示名、回復コード。
+account-security = セキュリティ
+account-security-lead = ログイン中の場所と、ログアウト。
+account-privacy = プライバシーとデータ
+account-privacy-lead = データのエクスポートと、アカウントの削除。
+account-gateways = Gateway とトークン
+account-gateways-lead = 登録した Gateway と、そのログインに使うトークン。
+account-loading = 読み込み中 …
+account-signed-out = ログインしていません。
+account-unnamed = アカウント
+account-signin-name = ログイン名：{ $name }
+account-until = { $time } までログイン中
+account-needs-title = 対応が必要です
+account-needs-code = 回復コードを作成
+account-needs-name = 表示名を選ぶ
+account-admin = 管理
+
+reauth-lead = この操作には最近のログインが必要です。ログイン名とパスワードをもう一度入力してください。
+reauth-submit = もう一度ログイン
+
+profile-who-title = あなたについて
+profile-handle = ハンドル
+profile-signin-name = ログイン名
+profile-source = アカウント
+profile-source-moved = 公式 Gateway から移行
+profile-source-registered = このサイトで登録
+profile-choose-title = 表示名を選ぶ
+profile-choose-submit = 表示名を保存
+profile-name-taken = このアカウントには、すでに表示名があります。
+profile-code-title = 回復コード
+profile-code-kept = アカウントには回復コードがあります。大切に保管してください。パスワードがないとき、暗号化されたデータに戻る唯一の方法です。
+profile-code-missing = アカウントには、まだ回復コードがありません。作成してください。パスワードをもう一度入力する必要があります。
+profile-code-make = 回復コードを作成
+
+security-sessions = ログイン中の場所
+security-lead = Baylee Central は、このウェブサイト用に一つ、ゲームクライアント用に一つのセッションを保持します。個々の端末は区別しません。
+security-kind-browser = このウェブサイト
+security-kind-client = Baylee クライアント
+security-this = これ
+security-signed-in = ログイン
+security-ends = 終了
+security-gateways = Gateway にて
+security-end-client = クライアントをログアウト
+security-client-ended = クライアントはログアウトしました。
+security-sign-out = ここをログアウト
+security-password-title = パスワード
+security-password-later = ウェブサイトでのパスワード変更は今後対応します。それまでは Baylee クライアントで変更してください。
+
+privacy-export-title = データのエクスポート
+privacy-export-lead = Baylee Central があなたのアカウントについて把握していることを、JSON ファイルにまとめます。基本データ、セッション、同意した規約、Gateway、あなたのアカウントに関する監査記録です。暗号化された内容を復号してエクスポートできるのは、Baylee クライアントだけです。エクスポートには、30分以内のログインが必要です。
+privacy-export-make = エクスポートを準備
+privacy-export-save = エクスポートを保存
+privacy-delete-title = アカウントを削除
+privacy-delete-lead = アカウント、そのデータ、セッション、連絡先、あなたが所有する Gateway は、稼働中のシステムから直ちに完全に削除されます。バックアップからは、遅くとも12か月以内に消えます。Central は、あなたが送ったメッセージも削除します。ほかの人がすでに端末に保存したものは、そこに残ることがあります。
+privacy-delete-start = アカウントを削除する
+privacy-delete-password = 確認のためパスワードを入力
+privacy-delete-prove = 続ける
+privacy-delete-last = 最後の手順です。取り消せません。時間は1分です。
+privacy-delete-gateways = あなたが所有する次の Gateway も一緒に削除されます：
+privacy-delete-confirm = アカウントを完全に削除
+privacy-delete-cancel = アカウントを残す
+privacy-deleted = アカウントを削除しました。
+
+gateways-none = Gateway を登録していません。ほとんどのプレイヤーには必要ありません。
+gateways-add-title = Gateway を登録
+gateways-origin = Gateway のアドレス
+gateways-origin-hint = Gateway の https アドレス。例：https://play.example.org
+gateways-name = Gateway の名前
+gateways-add = Gateway を登録
+gateways-added = Gateway を登録しました。管理者の承認を待っています。
+gateways-taken = このアドレスはすでに登録されています。
+gateways-invalid = パスのない https アドレスと、名前を入力してください。
+gateways-approved = 承認済み
+gateways-pending = 承認待ち
+gateways-disabled = 無効
+tokens-title = トークン
+tokens-name = トークン名
+tokens-days = 有効期間（日）
+tokens-sso = プレイヤーをログインさせる
+tokens-listing = Gateway を一覧に載せる
+tokens-both = プレイヤーをログインさせ、Gateway を一覧に載せる
+tokens-make = トークンを作成
+tokens-revoke = 失効させる
+tokens-revoked = 失効済み
+tokens-revoked-now = トークンを失効させました。
+tokens-until = { $time } まで
+tokens-invalid = トークンに名前を付け、許可することを少なくとも一つ選んでください。
+tokens-shown-title = 新しいトークン
+tokens-kept = 保存しました
+tokens-again = 再ログインしました。もう一度トークンを作成してください。
+
+## The messenger
+
+account-chat = チャット
+account-contacts = 連絡先
+chat-side = 会話と連絡先
+chat-tabs = メッセンジャー
+chat-tab-chats = チャット
+chat-tab-contacts = 連絡先
+chat-main = 会話
+chat-unread = 未読
+chat-conversations = 会話
+chat-search = 会話を探す
+chat-search-hint = 検索 (Ctrl+K)
+chat-new-group = 新しいグループ
+chat-no-conversations = まだ会話がありません。連絡先を追加して、メッセージを送りましょう。
+chat-no-match = その名前の会話はありません。
+chat-former-group = 以前のグループ
+chat-former-lead = このグループにはもういません。
+chat-you = あなた
+chat-members = { $n ->
+   *[other] メンバー { $n } 人
+}
+chat-say-hello = あいさつしましょう。
+chat-history-only = もう連絡先ではありません。
+chat-today = 今日
+chat-yesterday = 昨日
+chat-encrypted = エンドツーエンド暗号化
+chat-opening-lead = あなたの会話と連絡先です。メッセージは端末を出る前に暗号化され、Central は読めないまま中継します。
+chat-new-from = { $who } からの新着メッセージ。
+chat-new-many = 新着メッセージ { $n } 件。
+chat-retry = もう一度試す
+chat-discard = 破棄
+chat-not-sent = 未送信。
+chat-sending = 送信中 …
+chat-keys-changed = この会話の誰かの鍵が変わりました。もう一度書く前に、安全番号を比べてください。
+chat-refused = 検証できなかったメッセージがあり、表示していません。
+chat-failed = チャットがいま Central に接続できませんでした。
+chat-failed-open = チャットを開けませんでした。ページを再読み込みして、もう一度お試しください。
+chat-empty = まだメッセージがありません。
+chat-older = 古いメッセージを表示
+chat-compare-first = 鍵が変わりました。先に安全番号を比べてから、書いてください。
+chat-compare = 安全番号を比べる
+chat-friend-required = 再び連絡先になると、書き込めます。
+chat-group-left = このグループにはもういません。
+chat-details = 詳細
+chat-close = 閉じる
+chat-back = 会話に戻る
+chat-messages = メッセージ
+chat-fan = Baylee は非公式のファンコンテンツで、ウィザーズ社の承認や推奨を受けたものではありません。<more>その意味</more>
+chat-safety = 安全番号
+chat-safety-lead = 番号を相手と比べてください。直接会うか、信頼できる別の手段で。一致すれば、あなたたちの間に誰かが気づかれず入り込んではいません。
+chat-changed = 変更あり
+chat-confirm-keys = 一致しました：新しい鍵を信頼する
+chat-count = { $n } / 1,000 文字
+chat-write = メッセージを書く
+chat-send = 送信
+chat-enter-hint = Enter で送信、Shift+Enter で改行します。
+chat-choose = 会話を選んでください
+chat-choose-lead = メッセージはこのブラウザーで暗号化され、Central は中継するだけです。
+chat-storage = ログインしている間、チャットの鍵はこのブラウザーに残ります。
+chat-opening = チャットを開いています …
+chat-open = チャットを開く
+chat-ended = ログインが終了しました。
+chat-unnamed = 先に表示名を選んでください。他の人が書き込むときのハンドルになります。
+chat-missing-title = チャットを開くには、もう一度ログインしてください
+chat-missing-lead = このブラウザーにはチャットの鍵がありません。パスワードでここで開けます。パスワードがこのブラウザーの外に出ることはありません。
+chat-invites = グループへの招待
+chat-invited-by = { $who } から
+chat-group-name = グループ名
+chat-group-name-hint = 1〜48文字の名前。
+chat-group-create = 作成
+chat-group-failed = グループをいま変更できませんでした。
+chat-group-members = { $n ->
+   *[other] メンバー { $n } 人
+}
+chat-group-owner = オーナー
+chat-group-rename = 名前を変更
+chat-group-transfer = オーナーにする
+chat-group-remove = 外す
+chat-group-transfer-ask = { $who } をこのグループのオーナーにしますか？ あなたはメンバーのままです。
+chat-group-remove-ask = { $who } をこのグループから外しますか？
+chat-group-invite = 連絡先を招待
+chat-group-choose = 連絡先を選ぶ
+chat-group-invite-button = 招待
+chat-group-invited = 招待済み
+chat-group-delete = グループを削除
+chat-group-leave = グループを抜ける
+chat-group-delete-ask = 「{ $name }」を全員分削除しますか？ 受信済みのメッセージは読めるままです。
+chat-group-leave-ask = 「{ $name }」を抜けますか？ 戻るには新しい招待が必要です。
+
+people-incoming = リクエスト
+people-failed = 連絡先をいま読み込めませんでした。
+people-empty = まだ連絡先がありません。ハンドルで相手を探すか、自分のハンドルを伝えましょう。
+people-your-handle = あなたのハンドル：
+people-incoming-title = あなた宛てのリクエスト
+people-friends = 連絡先
+people-outgoing = 送信したリクエスト
+people-blocked = ブロック中
+people-find = ハンドルで連絡先を追加
+people-find-button = 探す
+people-handle-hint = タグ付きの完全なハンドル。例：Name#1a2b
+people-yourself = それはあなた自身のハンドルです。
+people-nobody = このハンドルの人はいません。
+people-request = 連絡先リクエストを送る
+people-requested = リクエストを送りました。
+people-is-friend = 連絡先
+people-is-incoming = 連絡先になりたいとのリクエスト
+people-is-outgoing = リクエスト送信済み
+people-is-blocked = ブロック中
+people-write = 書く
+people-remove = 削除
+people-block = ブロック
+people-accept = 承認
+people-decline = 断る
+people-cancel = 取り下げ
+people-unblock = ブロック解除
+people-keep = 残す
+people-confirm-remove = { $who } を連絡先から削除しますか？ メッセージは残ります。
+people-confirm-block = { $who } をブロックしますか？ 相手は連絡先のリクエストも、あなたへの書き込みもできなくなります。
+
+## Offline, updates, installing
+
+title-offline = オフライン
+offline-title = オフラインです
+offline-lead = このページには接続が必要です。Central は、接続が戻るまでメッセージを預かります。
+offline-again = もう一度試す
+update-ready = baylee.app の新しいバージョンが用意できました。
+update-unsent = ここに未送信の文章があります。それでも再読み込みしますか？
+update-reload = 再読み込み
+install-app = アプリとしてインストール
+
+## Notifications
+
+push-title = 通知
+push-lead = Baylee からの通知の内容を選びます。通知には、メッセージの本文、名前、報告の内容は表示されません。
+push-device = この端末の通知
+push-categories = 通知する内容
+push-chat = チャットのメッセージ
+push-contacts = 連絡先リクエスト
+push-updates = 新しいバージョン
+push-feedback = フィードバックの報告（管理者）
+push-gateways = Gateway の申請（管理者）
+push-on = この端末で有効です。選んだカテゴリーだけが届きます。
+push-off = この端末で無効です。カテゴリーの選択は保持されます。
+push-scope = カテゴリーの選択はアカウントに適用されます。端末の許可は、ブラウザーごとに別です。ログアウトすると、この端末は切断されます。
+push-failed = 変更を確認できませんでした。もう一度お試しください。
+push-denied = 通知がブロックされています。ブラウザーまたは端末の設定で許可してから、もう一度お試しください。
+push-unsupported = このブラウザーでは、ここで Web Push を使えません。iPhone と iPad では、Baylee をホーム画面に追加して、そこから開いてください。
+push-unconfigured = バックグラウンド通知は、このサーバーではまだ使えません。設定は、今から保存できます。
+
+register-closed = 登録はいま一時停止しています。しばらくしてからもう一度お試しください。
+register-refused = 登録を受け付けられませんでした。もう一度お試しください。
+admin-registration = 登録
+admin-registration-open = 開放中：proof of work を解けば、誰でもアカウントを作成できます。
+admin-registration-closed = 閉鎖中：もう一度開放するまで、誰もアカウントを作成できません。
+admin-registration-lead = 攻撃を受けている間は登録を閉じ、手動でもう一度開きます。変更はすべて監査ログに記録されます。
+admin-registration-close = 登録を閉じる
+admin-registration-reopen = 登録をもう一度開く
+hero-discord = Discord コミュニティ
+hero-whatsapp = WhatsApp コミュニティ
+hero-github = GitHub
+nav-menu = メニュー
+foot-project = プロジェクト
+foot-source = ソースコード (AGPL-3.0)
+foot-central = Baylee Central（ソース公開）
+foot-summary = Rust と Bevy で作られた、無料でオープンソースのテーブルトップ・カードゲーム。決定論的なルールエンジン、完全なオフラインモード、ハウスAI、LLMブリッジ、コミュニティ Gateway を備えています。
+strip-build = ビルド
+strip-ci = CI
+strip-commit = コミット
+strip-gateways = Gateway
+strip-online = オンライン
+strip-offline = オフライン
+strip-releases = リリースを見る
+strip-on-github = GitHub で見る
+strip-directory = 一覧
+strip-cards = プレイ可能なカード
+strip-cards-unit = 枚
+strip-stars = GitHub のスター
+hero-badges = 概要
+hero-badge-beta = オープンベータ
+hero-badge-free = 無料
+hero-badge-open = オープンソース
+hero-badge-fan = 非公式ファンコンテンツ
+gws-open-client = Baylee で開く
+gws-open-client-help = 「Baylee で開く」は、インストール済みのクライアント（0.1.1-beta.9b 以降）を起動します。アドレスを表示し、Gateway を追加する前に確認します。
+dl-menu-title = すべてのシステム
+dl-old-cpu = 古いプロセッサー（AVX2 なし）
+ci-passing = 成功
+ci-failing = 失敗
+dl-button = Baylee をダウンロード
+dl-quick = ほかのシステムとアーキテクチャ
+dl-others = ほかのシステム
+
+# The start page, as the old site wrote it (owner, 11.11.2026)
+link-readmeModel = #playing-against-a-language-model
+about-engineTitle = すべてのルールを守らせるエンジン
+about-deterministic = 実時間にもハッシュの順序にも依存しない、シード付き乱数生成器で動くため、すべての対戦は厳密に決定論的で、一手ずつ再現できます。
+about-tableTitle = Bevy で作った、すっきりした3Dテーブル
+about-keys = 統合されたロビーから、ローカルのデッキビルダー、一人用の対戦、コミュニティ Gateway 上のマルチプレイヤーのテーブルへ、気軽に行き来できます。
+feature-hiddenTitle = 非公開の情報は非公開のまま
+feature-hidden = クライアントに届くのは、あなたの席が見てよいデータだけです。ライブラリーと相手の手札は枚数としてだけ届くので、改造したクライアントでも、隠されたカードは見られません。
+feature-seatsTitle = 一つのテーブルに最大8人
+feature-seats = 最大8席までの対戦、全員対戦、チーム戦（2対2など）。チームメイトはターンを共有し、手札をお互いに公開できます。
+feature-commanderTitle = 柔軟なフォーマットと自由なハウスルール
+feature-commander = 60枚の標準的な対戦、マルチプレイヤーの円卓、独自のハウスフォーマット向けにデッキを組めます。開始時のライフ、チーム編成、マリガンのルールは、ホストが自由に決められます。
+feature-aiTitle = 決定論的なリプレイと F8 報告
+feature-ai = すべての対戦は一手ずつ記録されます。プレイ中にルール上の相互作用の問題に気づいたら、テーブルでそのまま F8 を押すと、再現できる状態の報告を送れます。
+feature-processTitle = 対戦ごとに分離されたサーバープロセス
+feature-process = 進行中のゲームはすべて、Gateway 上のサンドボックス化された専用のエンジンプロセスで動きます。Gateway 自体が管理するのはロビーとルームだけなので、エラーがほかのテーブルに及ぶことはありません。
+feature-languagesTitle = 19言語のカードテキスト
+feature-languages = Gateway が多言語のカードカタログを提供していれば、カードは希望の言語で表示され、英語が代わりに使われます。クライアントのUIはドイツ語と英語で使えます。
+feature-watchTitle = ライブ対戦を観戦
+feature-watch = ロビーの観戦ボタンで、ライブの観戦者としてテーブルに着けます。公開された戦場をリアルタイムで追え、プレイヤーの手札は隠されたままです。
+feature-connectionTitle = 切断してもスムーズに再接続
+feature-connection = 接続が一時的に切れても、テーブルはカウントダウンつきで席を確保し、対戦を一時停止するか、一時的にハウスAIに代わらせることができます。
+feature-tablesTitle = 14段階の持ち時間
+feature-tables = 15秒のきびきびしたターンから、時間無制限ののんびりしたテーブルまで、ルームごとにペースを設定できます。
+shots-eyebrow = テーブルにて
+shots-title = ゲームの中
+shots-lead = Scryfall のカード画像（© Wizards of the Coast）を使い、3Dクライアントから直接撮った短いライブ録画です。対戦や4人の円卓から、暗号化されたロビーやデッキビルダーまで。
+shots-credit = カード画像：Scryfall · © Wizards of the Coast
+shots-showLarge = 大きく表示：{ $title }
+shots-dialog = スクリーンショット
+shots-previous = 前へ
+shots-next = 次へ
+shots-close = 閉じる
+ai-eyebrow = AI の対戦相手と言語モデル
+ai-title = ハウスAI、LLMブリッジ、Baylee 独自のAI
+ai-houseTitle = 5段階の強さのヒューリスティック・ハウスAI
+ai-house = オフラインでも、どのオンラインのテーブルでもすぐに遊べます。初心者、カジュアル、堅実、鋭い、エキスパートから選べます。ハウスAIは待ち時間なしでローカルに判断し、人間のプレイヤーと同じ公開状態しか見ません。
+ai-modelTitle = Seat-Bridge で、言語モデルがテーブルに
+ai-model = <b>Google Gemini、OpenAI ChatGPT、Anthropic Claude、DeepSeek</b>、または <b>LM Studio</b> のローカルモデルを、テーブルにそのまま座らせられます。API キーは、利用上限つきの環境変数で保護されます。タイムアウトしたときは、ハウスAIが途切れなく代わります。
+ai-setup = LLM と Seat-Bridge のセットアップガイド
+home-gwLead = オンラインのテーブルは Gateway 上にあります。Gateway は、管理者が承認した後に、Baylee Central が一覧に載せるサーバーです。ここには最初のいくつかを載せています。全部は一覧にあります。
+beta-open = 一覧を開く
+beta-own = 自分で運営する
+source-eyebrow = ソース
+source-title = オープンソースです。これからも
+source-promise = Baylee はこれからもずっとオープンソースで、無料です。課金も、有料機能も、広告もありません。今も、この先も。コードは GNU Affero General Public License の下にあり、改変した Gateway を他の人のために運営する人は、そのソースも提供しなければなりません。
+source-rust = Rust で書かれた、一人のプロジェクトで、コーディングエージェントの大きな助けを借りています。すべての変更は同じ関門を通ります。書式、リント、テストスイート、そしてすべてのカードを印刷されたテキストと照らす検証です。Issue とプルリクエストを歓迎します。<agents>AGENTS.md</agents> と <claude>CLAUDE.md</claude> は、人間とエージェントの両方のための作業ルールです。
+source-discord = Discord のコミュニティ
+source-whatsapp = WhatsApp のコミュニティ
+source-architecture = アーキテクチャ
+source-repoTitle = リポジトリの現在の状況
+source-stars = スター
+source-issues = 未解決の Issue とプルリクエスト
+source-note = このサイトのサーバーが GitHub の公開 API から10分ごとに読み取っています。ブラウザーが GitHub に問い合わせることはありません。
+gw-count = 
+    { $n ->
+       *[other] 登録されている Gateway は { $n } 件で、{ $online } 件がオンラインです。
+    }
+gw-none = 登録されている Gateway はまだありません。
+contact-intro = 質問、アイデア、遊んでみたいゲーム、公開の場には書きたくないこと。このフォームは、Baylee の作者に直接届きます。返信が必要な場合はメールアドレスを残してください。なければ、読むことしかできません。
+contact-f8 = 誤って解決されたカードは、ゲーム内で <kbd>F8</kbd> から報告するのがいちばんです。報告にはゲーム全体を添えられるからです。
+contact-discord = 雑談、対戦相手探し、新しいビルドの情報
+contact-issues = GitHub の Issue
+contact-issuesSub = 不具合とアイデア（公開）
+contact-operator = このサイトの運営者と郵送先住所：<impressum>法的表示</impressum>。
+contact-whatsappSub = コミュニティグループとクイックマッチ
+contact-reportsTitle = 報告とプライバシー
+contact-reportsSub = F8 報告とデータの詳細
+ai-housePill = オフラインとオンライン
+ai-providers = 対応している言語モデル
+ai-hostsPill = Gateway ホスト向け
+ai-hostsTitle = Gateway でホスト型の LLM 席を提供する
+ai-hosts = Gateway の運営者は、設定済みの言語モデルをサーバー上で直接提供できます。テーブルのゲストは、ホストされているモデルを対戦相手として選ぶだけです。API キーは要りません。
+ai-trainingPill = 訓練中 · ネイティブなエンジンAI
+ai-trainingTitle = Baylee 独自のAI — 本物のプレイヤーのように、エンジン上で直接プレイするよう訓練中
+ai-training = ハウスAIと外部の LLM ブリッジのほかに、決定論的なルールエンジン上で、専用の Baylee 独自のAIを直接訓練しています。盤面、優先権の窓、戦闘の計算、デッキのシナジーを、経験豊富な人間のプレイヤーのように評価することを学びます。外部APIの遅延はゼロです。
+ai-hostingLink = Gateway のホスティングと LLM の設定
+
+# The gateways and the contact page, as the old site wrote them (owner, 11.11.2026)
+gw-lead = Gateway は、オンラインのテーブルがあるサーバーです。アカウント、デッキ、ルーム、そしてゲームごとに一つのエンジンプロセスがあります。ここに載っているのは、Baylee Central に登録され、その管理者が承認したものです。公式と記されたものは Baylee が運営し、そのほかは他の人が自分たちのグループのために運営しており、そこでは各自のルールが適用されます。一覧に載っていることは、その Gateway が何をするかの約束ではありません。
+gw-howTo = Gateway で遊ぶには、そのアドレスをクライアントの入口にコピーします。オンラインとは、Central が直近1分半以内にその Gateway から連絡を受けたという意味で、応答する約束ではありません。名前とバージョンは、各運営者が報告したものです。
+gw-find = Gateway を探す
+gw-findHint = 名前またはアドレス
+gw-onlineOnly = オンラインのみ
+gw-shown = { $all } 件中 { $n } 件を表示
+gw-noMatch = 読み込み済みの Gateway には、一致するものがありません。
+gw-showAll = すべて表示
+link-readmeGateway = #running-your-own-gateway
+selfhost-eyebrow = セルフホストと Central 連携
+selfhost-title = 自分の Gateway を運営する
+selfhost-processes = セルフホストの Gateway は、PostgreSQL 18+ のほかに、軽量なプロセスを三つ動かします。<code>baylee-gateway</code> がルーム、デッキ、ルーティングを管理し、<code>baylee-agent</code> が対戦ごとに分離された <code>baylee-engine-server</code> プロセスを一つ起動するので、どのテーブルもサンドボックス化されます。
+selfhost-proxy = HTTPS のオリジン（例：<code>https://play.example.org</code>）の前に TLS リバースプロキシを置きます。19言語のカードテキストが必要なら、Scryfall のバルクカタログを取り込むこともできます。これで、プレイヤーはクライアントからあなたのアドレスで直接接続できます。
+selfhost-central = <b>Baylee Central と連携し、プライバシーを設定する：</b>HTTPS のオリジンを<mine>あなたの Gateway</mine>に登録し、<code>bgt_…</code> トークンを発行します（スコープ：シングルサインオンは <code>sso</code>、一覧へのハートビートとライブのテレメトリは <code>listing</code>）。Gateway のコンソールで、テレメトリのプライバシーレベルを選びます（進行中のゲーム、テーブルの設定、同意したプレイヤーまで含める <code>full</code>、合計だけの <code>counts_only</code>、稼働状態だけの <code>private</code>）。
+selfhost-guide = <guide>セルフホストの完全なガイドを読む</guide> · <protocol>プロトコルとハートビートのリファレンス（docs/protocol.md）</protocol>
+selfhost-source = すべての Gateway は、<code>GET /source</code> に、ライセンス、バージョン、コミットを、ログインなしで返します。これにより、AGPL のソース開示の要件が自動的に満たされます。
+reports-eyebrow = 報告
+reports-title = おかしなところを見つけましたか？ お知らせください
+reports-f8 = テーブルまたはロビーで <kbd>F8</kbd> を押します。報告には、種類、あなたのテキスト、クライアントのバージョン、テーブルではゲームのIDが入ります。それ以外はそれぞれ専用のチェックボックスがあり、どれも最初はチェックされています。送信を押す前に、残したくないものはチェックを外してください。システムとハードウェア、見ているとおりのテーブル、ログ（ほかのプレイヤーは「Player A」「Player B」…に置き換えられます）、設定、Baylee のウィンドウだけのスクリーンショット、そしてテーブルではゲームの全記録（すべての手と、全席のカード。名前は含みません）です。<i>送信内容を表示</i>で、すべてのバイトを確認できます。セッショントークンは送信されません。
+reports-usage = オフラインで遊んでいる間、クライアントは1分に1回、ゲームが動いていることだけを伝えます。アカウントも、端末IDも、ゲームの内容も含みません。設定 › プライバシーとデータの<i>匿名の利用数を送信</i>でオフにできます。
+reports-discord = 雑談したい、対戦相手を探したい、新しいビルドをいち早く知りたいという方は、<discord>Discord の Baylee コミュニティ</discord>にどうぞ。
+reports-issues = ルールの質問、カードの誤った挙動、アイデアは<issues>GitHub で Issue を開いて</issues>ください。誤って解決されたカードは、いちばん役に立つ報告です。すべてのカードにテストがあり、あなたの報告がそのテストになるからです。
+reports-privacy = <docs>docs/privacy.md</docs> に、クライアント、Gateway、フィードバックサービスが保持するものがすべて載っています。このサイトはログインしない限りクッキーを設定せず、アクセス解析を行わず、他者のサーバーからフォントもスクリプトも読み込みません。<notice>プライバシー通知</notice>には、このサイトと Baylee Central が保持するもの、通信するすべてのホストとその時期が記されています。
+
+# The download page, as the old site set it (owner, 11.11.2026)
+dlPage-eyebrow = 入手する
+dlPage-filesEyebrow = すべてのファイル
+dlPage-filesTitle = すべてのシステム
+install-eyebrow = インストール
+install-releases = GitHub のすべてのリリース
+release-notes = リリースノートとチェックサム
+release-all = すべてのリリース
+
+# The download page's head, as the old site wrote it
+dlPage-title = ダウンロード
+dlPage-lead = ダウンロードはすべて、GitHub 上のファイルに直接つながり、間に何も挟みません。インストーラーがあるリリースでは、それがいちばん簡単な方法です。アーカイブは同じゲームで、好きな場所に展開できます。インストールした Baylee は、自分のフォルダーに書き込める場所なら、署名付きのアーカイブから自己更新します。どのパッケージにも、ゲームの隣に言語モデル用の Seat-Bridge が入っています。
+
+# The reading pages' eyebrows, as the old site set them
+imp-eyebrow = 法的表示
+terms-eyebrow = 利用規約
+privacy-eyebrow = プライバシー
+
+# The privacy notice's contents, as the old site named them
+privacy-contents = 目次
+
+# The account pages' eyebrow, as the old site set it
+acct-eyebrow = Baylee Central
+
+# The account area's navigation, as the old site named it
+app-account = アカウント

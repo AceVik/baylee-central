@@ -44,6 +44,19 @@ fn head<L: IntoView + 'static>(
     }
 }
 
+/// Above a legal page in a language a machine translated: that it is a
+/// help, and that the German and the English text apply.
+fn machine_note(page: Page, lang: Lang) -> Option<impl IntoView + use<>> {
+    lang.machine_translated().then(|| {
+        let note = rich(words::legal_machine(lang), move |tag| match tag {
+            "de" => Some(page.path(Lang::De)),
+            "en" => Some(page.path(Lang::En)),
+            _ => None,
+        });
+        view! { <p class="notice" role="note">{note}</p> }
+    })
+}
+
 pub fn impressum(cx: &Context<'_>) -> Built {
     let lang = cx.lang;
     let mut meta = Meta::new(
@@ -57,6 +70,7 @@ pub fn impressum(cx: &Context<'_>) -> Built {
     let body = view! {
         {head(words::imp_eyebrow(lang), words::impressum_title(lang), words::impressum_lead(lang))}
         <div class="wrap reading prose">
+            {machine_note(Page::Impressum, lang)}
             // what the puzzle is for, in the page itself: the island holds
             // only the button and what it finds
             <div class="legal-box glass">
@@ -81,6 +95,28 @@ type Section = (
     fn(Lang) -> &'static str,
     fn(Lang) -> &'static str,
 );
+
+/// The privacy notice's contents, in the order its parts stand.
+const PRIVACY_PARTS: [Part; 18] = [
+    ("controller", words::privacy_controller_title),
+    ("short", words::privacy_short_title),
+    ("hosting", words::privacy_hosting_title),
+    ("device", words::privacy_device_title),
+    ("github", words::privacy_github_title),
+    ("links", words::privacy_links_title),
+    ("directory", words::privacy_directory_title),
+    ("account", words::privacy_account_title),
+    ("cookie", words::privacy_cookie_title),
+    ("chat", words::privacy_chat_title),
+    ("push", words::privacy_push_title),
+    ("counters", words::privacy_counters_title),
+    ("contact", words::privacy_contact_title),
+    ("reports", words::privacy_reports_title),
+    ("impressum", words::privacy_impressum_title),
+    ("recipients", words::privacy_recipients_title),
+    ("rights", words::privacy_rights_title),
+    ("objection", words::privacy_objection_title),
+];
 
 pub fn privacy(cx: &Context<'_>) -> Built {
     let lang = cx.lang;
@@ -129,28 +165,7 @@ pub fn privacy(cx: &Context<'_>) -> Built {
             </section>
         }
     };
-    // the contents, in the order the parts stand
-    let parts: [Part; 18] = [
-        ("controller", words::privacy_controller_title),
-        ("short", words::privacy_short_title),
-        ("hosting", words::privacy_hosting_title),
-        ("device", words::privacy_device_title),
-        ("github", words::privacy_github_title),
-        ("links", words::privacy_links_title),
-        ("directory", words::privacy_directory_title),
-        ("account", words::privacy_account_title),
-        ("cookie", words::privacy_cookie_title),
-        ("chat", words::privacy_chat_title),
-        ("push", words::privacy_push_title),
-        ("counters", words::privacy_counters_title),
-        ("contact", words::privacy_contact_title),
-        ("reports", words::privacy_reports_title),
-        ("impressum", words::privacy_impressum_title),
-        ("recipients", words::privacy_recipients_title),
-        ("rights", words::privacy_rights_title),
-        ("objection", words::privacy_objection_title),
-    ];
-    let contents = parts
+    let contents = PRIVACY_PARTS
         .iter()
         .map(|(id, title)| view! { <li><a href=format!("#{id}")>{title(lang)}</a></li> })
         .collect_view();
@@ -159,6 +174,7 @@ pub fn privacy(cx: &Context<'_>) -> Built {
     let body = view! {
         {head(words::privacy_eyebrow(lang), words::privacy_title(lang), words::privacy_lead(lang))}
         <div class="wrap reading prose">
+            {machine_note(Page::Privacy, lang)}
             <nav class="toc glass" aria-label=words::privacy_contents(lang)><ol>{contents}</ol></nav>
             <p class="meta">{words::privacy_updated(lang)}</p>
             {section("controller", words::privacy_controller_title(lang),
@@ -196,10 +212,20 @@ pub fn terms(cx: &Context<'_>) -> Built {
     );
     meta.trail
         .push((words::terms_title(lang).to_owned(), Page::Terms));
-    let text = match lang {
+    // the terms are written in German and English; every other language
+    // reads the English, marked as English for whoever has it read aloud
+    let written = lang.of_record();
+    let text = match written {
         Lang::De => TERMS_DE,
-        Lang::En => TERMS_EN,
+        _ => TERMS_EN,
     };
+    let foreign = (written != lang).then(|| {
+        let german = Page::Terms.path(Lang::De);
+        let note = rich(words::terms_machine(lang), move |tag| {
+            (tag == "de").then(|| german.clone())
+        });
+        view! { <p class="notice" role="note">{note}</p> }
+    });
     let version = header(text, "version").unwrap_or("draft");
     let state = if version == "draft" {
         view! { <p class="notice" role="note">{words::terms_draft(lang)}</p> }.into_any()
@@ -211,8 +237,9 @@ pub fn terms(cx: &Context<'_>) -> Built {
     let body = view! {
         {head(words::terms_eyebrow(lang), words::terms_title(lang), "")}
         <div class="wrap reading prose legal-text">
+            {foreign}
             {state}
-            {markdown::render(text)}
+            <div lang=written.tag()>{markdown::render(text)}</div>
         </div>
     }
     .into_any();
@@ -238,6 +265,7 @@ pub fn fan_content(cx: &Context<'_>) -> Built {
     let body = view! {
         {head(words::fc_eyebrow(lang), words::fc_title(lang), words::fc_lead(lang))}
         <div class="wrap reading prose">
+            {machine_note(Page::FanContent, lang)}
             <h2>{words::fc_notice_title(lang)}</h2>
             <blockquote class="quote"><p>{notice}</p></blockquote>
             <h2>{words::fc_means_title(lang)}</h2>

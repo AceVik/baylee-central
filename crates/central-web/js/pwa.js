@@ -52,11 +52,12 @@ if (root && window.isSecureContext) {
       .then(watch)
       .catch(() => {});
   } else {
+    // the cache goes even where no worker is left: one that was still
+    // answering as it was removed may have written once more
     root
       .getRegistration("/")
       .then(async (registration) => {
-        if (!registration) return;
-        await registration.unregister();
+        await registration?.unregister();
         const names = await caches.keys();
         await Promise.all(
           names.filter((name) => name.startsWith("baylee-site-") || name.startsWith("baylee-public-")).map((name) => caches.delete(name)),

@@ -1,6 +1,6 @@
-import { expect, type Page, test } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
-import { axe, targets } from "./check.ts";
+import { axe, targets, watch } from "./check.ts";
 
 const PAGES = [
   "",
@@ -24,22 +24,6 @@ const PAGES = [
 ];
 const LANGS = ["en", "de"];
 const WIDTHS = [320, 375, 768, 1024, 1440, 2560];
-
-/** Fails the test on any console error, uncaught error or request to another origin. */
-function watch(page: Page, origin: string, expected404 = false): string[] {
-  const problems: string[] = [];
-  page.on("console", (message) => {
-    // The 404 page's own status is the one error a browser reports there.
-    if (expected404 && message.text().includes("status of 404")) return;
-    if (message.type() === "error") problems.push(`console: ${message.text()}`);
-  });
-  page.on("pageerror", (error) => problems.push(`error: ${error.message}`));
-  page.on("request", (request) => {
-    if (!request.url().startsWith(origin) && !request.url().startsWith("data:")) problems.push(`elsewhere: ${request.url()}`);
-  });
-  return problems;
-}
-
 
 for (const lang of LANGS) {
   for (const slug of PAGES) {

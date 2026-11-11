@@ -83,7 +83,7 @@ pub fn sitemap(origin: &str, data: &Snapshot) -> String {
                 let _ = writeln!(
                     out,
                     "    <xhtml:link rel=\"alternate\" hreflang=\"{}\" href=\"{href}\"/>",
-                    other.code()
+                    other.tag()
                 );
             }
             let href = escape(&format!("{origin}{}", page.path(Lang::En)));
@@ -110,7 +110,7 @@ pub fn manifest(lang: Lang, assets: &Assets) -> String {
         "name": "Baylee Central",
         "short_name": "Baylee",
         "description": words::desc_home(lang),
-        "lang": lang.code(),
+        "lang": lang.tag(),
         "dir": "ltr",
         "start_url": format!("/{}/account", lang.code()),
         "scope": "/",

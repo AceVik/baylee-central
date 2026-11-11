@@ -7,6 +7,8 @@
 
 site-name = Baylee
 skip = Zum Inhalt springen
+# Read out after a link that leaves the site (the stylesheet carries it).
+new-tab = öffnet in neuem Tab
 nav-label = Hauptnavigation
 nav-download = Download
 nav-gateways = Gateways
@@ -285,6 +287,10 @@ privacy-reports = Ein Fehlerbericht, den du im Spiel mit F8 sendest, enthält se
 terms-title = Nutzungsbedingungen
 terms-draft = Diese Bedingungen sind ein Entwurf und noch nicht in Kraft.
 terms-version = Version { $version }, aktualisiert am { $date }.
+# Shown only in the languages a machine translated: every one but German and English.
+machine-note = Diese Website wurde maschinell übersetzt, und noch niemand, der deine Sprache spricht, hat sie gelesen. Das Spiel selbst gibt es bisher auf Englisch und Deutsch. <link>Sag uns, wenn etwas nicht stimmt.</link>
+legal-machine = Diese Seite ist eine maschinelle Übersetzung und dient als Hilfe. Wo sie vom <de>deutschen</de> oder <en>englischen</en> Text abweicht, gelten diese.
+terms-machine = Die Nutzungsbedingungen von Central gibt es nur auf Deutsch und Englisch. Unten steht der englische Text; es gibt auch einen <de>deutschen</de>.
 
 ## Fehler
 
