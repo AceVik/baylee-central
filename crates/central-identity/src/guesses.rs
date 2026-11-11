@@ -361,6 +361,13 @@ pub(super) struct Guess {
     at: Instant,
 }
 
+impl Guess {
+    /// Where the guess came from.
+    pub(super) const fn place(&self) -> Option<Place> {
+        self.place
+    }
+}
+
 /// Every count of guesses.
 #[derive(Default)]
 pub(super) struct Guesses {
@@ -453,6 +460,17 @@ impl Guesses {
             }
         }
         if let (Whose::Account(account), Some(place)) = (guess.whose, guess.place) {
+            self.own.mark(account, place, now);
+        }
+    }
+
+    /// `account`'s password is another one now, or the account is gone:
+    /// the places it proved the old one from are its own no longer, so
+    /// whoever knew the old one guesses at the new one as a stranger
+    /// does. `at`, where the new one was set, is its own from now on.
+    pub(super) fn changed(&mut self, account: [u8; 16], at: Option<Place>, now: Instant) {
+        self.own.0.remove(&account);
+        if let Some(place) = at {
             self.own.mark(account, place, now);
         }
     }
@@ -797,6 +815,50 @@ mod tests {
         }
         assert!(guesses.guess(account(999), true, home, start, 1).is_err());
         assert!(guesses.guess(VICTIM, true, home, start, 1).is_ok());
+    }
+
+    #[test]
+    fn another_password_forgets_the_places_the_old_one_was_proven_from() {
+        let start = Instant::now();
+        let mut guesses = Guesses::default();
+        // Whoever knew the old password proved it from two places; the
+        // holder proved it at home.
+        for place in [1, 2, 3] {
+            let now = after(start, u64::from(place) * 10);
+            let guess = guesses
+                .guess(VICTIM, true, Some(v4(place)), now, 1)
+                .unwrap();
+            guesses.proved(&guess, now);
+        }
+        // The holder sets another one at home.
+        let now = after(start, 120);
+        guesses.changed(VICTIM, Some(v4(1)), now);
+        assert!(guesses.own.is(VICTIM, v4(1), now));
+        assert!(!guesses.own.is(VICTIM, v4(2), now));
+        assert!(!guesses.own.is(VICTIM, v4(3), now));
+        // The world spends the account's hour: the two places are refused
+        // with it, and home is served.
+        assert_eq!(
+            from_everywhere(&mut guesses, now, 3_000, 10),
+            ACCOUNT_PER_HOUR
+        );
+        let later = after(now, 3_100);
+        assert!(guesses.guess(VICTIM, true, Some(v4(2)), later, 1).is_err());
+        assert!(guesses.guess(VICTIM, true, Some(v4(3)), later, 1).is_err());
+        assert!(guesses.guess(VICTIM, true, Some(v4(1)), later, 1).is_ok());
+        // A reset from a new place makes that one the only own place; one
+        // without a place, or a deletion, leaves none.
+        guesses.changed(VICTIM, Some(v4(4)), later);
+        assert!(guesses.own.is(VICTIM, v4(4), later));
+        assert!(!guesses.own.is(VICTIM, v4(1), later));
+        guesses.changed(VICTIM, None, later);
+        assert!(!guesses.own.0.contains_key(&VICTIM));
+        // Another account's places are not touched by any of it.
+        let other = account(1);
+        let guess = guesses.guess(other, true, Some(v4(2)), later, 1).unwrap();
+        guesses.proved(&guess, later);
+        guesses.changed(VICTIM, None, later);
+        assert!(guesses.own.is(other, v4(2), later));
     }
 
     #[test]

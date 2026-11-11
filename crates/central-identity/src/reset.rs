@@ -47,7 +47,7 @@ impl IdentityService {
                 wrapped_master,
                 vault,
             } => {
-                self.reset_finish(&attempt, &record, &wrapped_master, &vault, surface)
+                self.reset_finish(&attempt, &record, &wrapped_master, &vault, surface, place)
                     .await
             }
             // Answered by `dispatch`, which knows how to hand out the session.
@@ -115,6 +115,7 @@ impl IdentityService {
         wrapped: &[u8],
         vault: &ResetVault,
         surface: Surface,
+        place: Option<Place>,
     ) -> Result<Response, Error> {
         // Consumption precedes every check.
         let pending = self
@@ -129,6 +130,10 @@ impl IdentityService {
         self.store
             .finish_reset(&pending.credential, &pending.digest, record, wrapped, vault)
             .await?;
+        // Whoever knew the old password has no place of the account's any
+        // more. The one the code was used from is its own: the code is the
+        // stronger secret, and its user signs in there next.
+        self.changed(pending.credential.identity.account, place);
         Ok(Response::Done)
     }
 }

@@ -77,6 +77,31 @@ pub(crate) fn run(http: &Http, browser: &Browser) {
         .err(),
         Some(Error::Busy)
     );
+    // Handed on by the proxy from the holder's address, the same start is
+    // answered in the same minute: the native listener counts by the
+    // address too, and home is the account's own place on both.
+    assert!(matches!(
+        http.from(
+            "203.0.113.10",
+            &Request::LoginStart {
+                identity: account.identity,
+                message: Login::start(OLD.into(), context).unwrap().1,
+            },
+        ),
+        Ok(Response::LoginChallenge { .. })
+    ));
+    // From a guesser's address it is refused there as well.
+    assert_eq!(
+        http.from(
+            "203.0.113.20",
+            &Request::LoginStart {
+                identity: account.identity,
+                message: Login::start(OLD.into(), context).unwrap().1,
+            },
+        )
+        .err(),
+        Some(Error::Busy)
+    );
 
     // The holder is served at home meanwhile, and a proof gives its guess
     // back: more right sign-ins than the account has guesses at one place
@@ -116,4 +141,26 @@ pub(crate) fn run(http: &Http, browser: &Browser) {
     for from in [&stranger, &other, &third] {
         assert!(guess(from, http, untouched.identity).is_ok());
     }
+
+    // The native listener's own budgets, by the address the proxy hands
+    // on: thirty discoveries a minute from one, then `Busy` for it alone.
+    let discover = Request::Discover {
+        username: "guessed-at".into(),
+    };
+    for _ in 0..30 {
+        assert!(http.from("203.0.113.60", &discover).is_ok());
+    }
+    assert_eq!(
+        http.from("203.0.113.60", &discover).err(),
+        Some(Error::Busy)
+    );
+    assert!(http.from("203.0.113.61", &discover).is_ok());
+    // A forged earlier hop changes nothing: the last one is the proxy's.
+    assert_eq!(
+        http.from("198.51.100.9, 203.0.113.60", &discover).err(),
+        Some(Error::Busy)
+    );
+    // Without a hop there is no address to count by (a proxy that sent
+    // none must not make everyone one address).
+    assert!(http.exchange(&discover, None).is_ok());
 }

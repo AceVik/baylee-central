@@ -601,6 +601,16 @@ impl IdentityService {
         Ok(())
     }
 
+    /// The store committed another password for `account`, or its
+    /// deletion: the places it proved the old one from are forgotten, and
+    /// `at`, where the new one was set, is its own (`guesses.rs`). Never
+    /// a refusal: what the store committed is answered as done.
+    fn changed(&self, account: [u8; 16], at: Option<Place>) {
+        if let Ok(mut limits) = self.limits.lock() {
+            limits.guesses.changed(account, at, Instant::now());
+        }
+    }
+
     /// Process a command from the website's browser listener. Only
     /// [`browser_operation`]s are served; the cookie's token is a browser
     /// session, used only by the operations that act on one, and a sign-in

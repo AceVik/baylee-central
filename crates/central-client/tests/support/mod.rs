@@ -52,6 +52,23 @@ impl Transport for Http {
         &self.endpoint
     }
     fn exchange(&self, request: &Request, bearer: Option<&Token>) -> Result<Response, Error> {
+        self.sent(request, bearer, None)
+    }
+}
+
+impl Http {
+    /// A request without a session as the proxy would hand it on from
+    /// `hop`: the address the account listener's budgets count it by.
+    pub(super) fn from(&self, hop: &str, request: &Request) -> Result<Response, Error> {
+        self.sent(request, None, Some(hop))
+    }
+
+    fn sent(
+        &self,
+        request: &Request,
+        bearer: Option<&Token>,
+        hop: Option<&str>,
+    ) -> Result<Response, Error> {
         pace();
         let bytes = central_api::encode(request)?;
         let mut stream = TcpStream::connect_timeout(&self.address, Duration::from_secs(3))
@@ -65,6 +82,9 @@ impl Transport for Http {
         write!(stream, "POST /v1/native HTTP/1.1\r\nHost: {}\r\nContent-Type: application/json\r\nContent-Length: {}\r\n", self.address, bytes.len()).unwrap();
         if let Some(token) = bearer {
             write!(stream, "Authorization: {}\r\n", token.bearer().as_str()).unwrap();
+        }
+        if let Some(hop) = hop {
+            write!(stream, "X-Forwarded-For: {hop}\r\n").unwrap();
         }
         stream.write_all(b"\r\n").unwrap();
         stream.write_all(&bytes).unwrap();

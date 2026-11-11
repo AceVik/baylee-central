@@ -153,6 +153,8 @@ impl IdentityService {
         self.store
             .delete_account(surface.session(Some(presented))?, &credential)
             .await?;
+        // Nothing is remembered of where the account signed in.
+        self.changed(credential.identity.account, None);
         Ok(Response::Done)
     }
 }
