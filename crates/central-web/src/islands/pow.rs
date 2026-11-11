@@ -90,6 +90,36 @@ pub fn solve(
     std::future::ready(None)
 }
 
+/// What the page knows of its own browser, for the difficulty of a
+/// registration's challenge (`central_api::register::SIGNALS`, the bits the
+/// Impressum's page sends its service too): a browser a program drives,
+/// one without languages. A person's browser says 0.
+#[cfg(target_arch = "wasm32")]
+#[must_use]
+pub fn browser_signals() -> u8 {
+    use central_api::register::{SIGNAL_NO_LANGUAGES, SIGNAL_WEBDRIVER};
+
+    let Some(navigator) = web_sys::window().map(|window| window.navigator()) else {
+        return 0;
+    };
+    let mut signals = 0;
+    let driven = js_sys::Reflect::get(&navigator, &wasm_bindgen::JsValue::from_str("webdriver"));
+    if driven.is_ok_and(|value| value.is_truthy()) {
+        signals |= SIGNAL_WEBDRIVER;
+    }
+    if js_sys::Array::from(&navigator.languages()).length() == 0 {
+        signals |= SIGNAL_NO_LANGUAGES;
+    }
+    signals
+}
+
+/// On the server there is no browser to look at.
+#[cfg(not(target_arch = "wasm32"))]
+#[must_use]
+pub fn browser_signals() -> u8 {
+    0
+}
+
 /// Waits `millis` milliseconds (the browser's timer).
 #[cfg(target_arch = "wasm32")]
 pub async fn wait(millis: u32) {

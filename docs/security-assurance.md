@@ -3169,6 +3169,118 @@ Not tested, and recorded for the owner:
 - **Load.** No measurement with many gateways or many accounts; the cost
   statements are from the statements' shape.
 
+## Registration hardened: reviewed as an attacker, a price by look, a longer rise, 11 November 2026
+
+Design pass. The owner, 11.11.2026: repair and improve the protection of
+registration as the Impressum's is protected, against accounts made
+automatically, with good mechanisms. First a review as an attacker who
+reads the source and speaks the listener's protocol directly; its questions
+and answers are in `docs/registration-abuse.md` §"Hardened". Then three
+changes, each weighed:
+
+- *A request that looks automated.* Refusing it was excluded by the owner's
+  rule for the Impressum that no person is ever locked out; chosen: a harder
+  challenge only, up to four bits, counted as the Impressum's service
+  counts. The listener has the headers and the identity service issues the
+  challenge: the listener hands over plain facts (`central_identity::Seen`),
+  never a header's text and never the address.
+- *What the page reports of its browser* needs room on the wire. A field on
+  `RegisterChallenge` would have parsed on both sides (serde takes extra
+  fields on a unit variant, which a test showed), and for that reason would
+  have been ignored silently by a Central from before. Chosen: a request of
+  its own, `RegisterChallengeFor { signals }`, with the old one unchanged
+  byte for byte; a Central from before refuses the new one as it refuses
+  every body it cannot read, and the page then asks the old way.
+- *A longer rise.* Six bits for a flood and four for a look would add up to
+  ten: half an hour of the phone that needs two seconds for the base, a
+  lock-out by another name. Chosen: both add up and stop at six, 22 bits a
+  part, which `central_api::register::MAX_DIFFICULTY` now is on both sides
+  (the page took up to 30 before). A slow phone needs longer than five
+  minutes for the two hardest steps, so those challenges live ten and twenty
+  minutes, and the table holds 40,000: more than the shared budget lets all
+  callers ask for in twenty minutes.
+- *A block of addresses.* The budgets count IPv6 by /64, and whoever holds
+  a /48 is a new address with every request. A hard budget per block would
+  refuse people who share one (a carrier, a school); chosen: the block
+  (IPv6 /48, IPv4 /24) is counted for the difficulty only. A hard budget
+  stays the owner's decision.
+
+Implementation pass:
+- `central_api::register`: `MAX_DIFFICULTY` 22 and the two signal bits;
+  `wire`: `RegisterChallengeFor { signals: u8 }`, additive, answered with
+  the responses that existed.
+- `central_identity::challenge`: `points` (the facts and the report to 0 to
+  4 bits), `issue(now, points)`, the rise to six bits, the common ceiling,
+  a lifetime per challenge checked when it is spent, a sweep at most once a
+  second; the constants are checked against the wire's ceiling and the
+  shared budget when the crate is compiled. `spend` still removes the
+  challenge before it judges it, and checks the difficulty stored with the
+  nonce.
+- `central_identity::limits`: both challenge requests are named in the
+  shared budget's list, so a token sent along does not move them to the
+  budget for sessions.
+- `central-http`: `seen.rs` reads three headers into `Seen`;
+  `Budgets::admit` charges the request and, for a challenge, counts the
+  haste of the address and of its block (`Client::block`), the block never
+  being a reason to refuse; `Accounts::browser` carries `Seen` to
+  `IdentityService::handle_browser_seen`. Nothing of it is logged, and
+  nothing is stored but the counts the budgets keep for an hour.
+- The page: `pow::browser_signals` (`navigator.webdriver`, no
+  `navigator.languages`), the new request with the old as its fallback, the
+  three seconds counted from the answer's arrival (`handover_wait`; counted
+  from the request, a slow connection handed its solution in too early and
+  lost the challenge), and after three seconds of work a line with the
+  share done and a bar in an `aria-live="polite"` region
+  (`register-solving`). No new control.
+- The words in English and German; the nine other languages carry the
+  English line until they are translated.
+
+Adversarial pass:
+- Over the real listener, the identity service and PostgreSQL 18
+  (`crates/central-client/tests/support/registration.rs`, in
+  `cargo xtask postgres`): a solution for less work than was asked is
+  refused, and the right one after it finds the challenge gone; a good proof
+  with a taken name is a conflict and is spent by it; a nonce Central never
+  issued, in the issued shape and solved, is refused the same for a taken
+  and a free name; three registrations with one solved challenge at the
+  same instant make one account; the native listener refuses both challenge
+  requests, `Register` and a reservation without the bridge, and made-up
+  tickets enroll nothing; the price by look (a tool's user agent, missing
+  headers, the page's report, bits Central does not know, all together at
+  four), the same for both ways to ask; an address pays one bit more with
+  every five challenges and is refused at its twenty-first, both ways
+  counted together; the twenty-first challenge from one /48, each from
+  another /64, costs one bit more, and the block beside it nothing.
+- Unit tests: a solution once, not too soon, not after its time, not for an
+  unknown nonce, not for less than the difficulty stored with it; the rise
+  at each doubling to six and its fall with the hour; a flood and a look
+  together never over six; every combination a challenge the page takes;
+  lifetimes of five, ten and twenty minutes; a table filled at the shared
+  budget's full rate for twenty minutes drops nothing that still lives; the
+  header facts and the user-agent markers, where a person's browsers score
+  nothing; the steps of haste; the new request's exact bytes, the old one's
+  unchanged, signals a `u8` cannot hold refused; a challenge request with a
+  token still spending the shared budget (it did not before); the page's
+  wait counted from the answer's arrival.
+- In a real browser (Chromium at both widths, `web/e2e-site`, run on a port
+  of this checkout's own): the page asks with `RegisterChallengeFor` and
+  reports the browser a program drives, stays quiet for three seconds, then
+  shows the line and the bar in the polite region, hands the proof in and
+  clears the line; the whole site suite passed with it (278 passed, 6 of
+  its own skipped), the pages' WCAG checks among them. The Worker's real
+  speed was measured there (`docs/registration-abuse.md` §"A flood"), which
+  corrected this change's first figure for a desktop from seconds to a
+  minute.
+- Not run: the page against a real Central in one piece (`web/e2e-real`):
+  the two halves were tested apart, the page against a strict stand-in and
+  Central over its real listener. Such a run under Playwright now gets two
+  bits more for the driven browser. The nine other languages' words are
+  English.
+- Left open and written down (`docs/registration-abuse.md` §"Hardened"):
+  the budget all callers without a session share can be used up from few
+  addresses; a block's people share its count; a hard budget per block; a
+  proof that costs memory, since SHA-256 costs a native program a
+  thirteenth of what it costs a page.
 Engineering review, not an audit.
 
 ## The site's polish: links in new tabs, movement, the words, 11 November 2026
