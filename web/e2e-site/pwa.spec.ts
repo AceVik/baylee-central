@@ -93,7 +93,7 @@ test("works offline", async ({ page, context }) => {
     if (name === undefined) return [];
     return (await (await caches.open(name)).keys()).map((request) => new URL(request.url).pathname);
   });
-  expect(cached).toEqual(expect.arrayContaining(["/en/offline", "/de/offline"]));
+  expect(cached).toEqual(expect.arrayContaining(["/en/offline", "/de/offline", "/ja/offline", "/zh-hant/offline"]));
   expect(cached.every((path) => path.endsWith("/offline") || path.startsWith("/assets/"))).toBe(true);
 
   // the page asked for answers with the offline page, in its language

@@ -20,9 +20,24 @@ use std::fmt::Write as _;
 use std::path::Path;
 use std::{env, fs};
 
-/// The languages, their file folder and their `Lang` variant. English first:
-/// it decides which messages exist and which arguments each takes.
-const LANGS: [(&str, &str); 2] = [("en", "En"), ("de", "De")];
+/// The languages: their file folder (`Lang::code`), their `Lang` variant and
+/// the plural categories a selector on a count must name in them (CLDR's
+/// for whole numbers, without the millions' `many` of the Romance
+/// languages and without `other`, which the default covers). English
+/// first: it decides which messages exist and which arguments each takes.
+const LANGS: [(&str, &str, &[&str]); 11] = [
+    ("en", "En", &["one"]),
+    ("de", "De", &["one"]),
+    ("fr", "Fr", &["one"]),
+    ("it", "It", &["one"]),
+    ("es", "Es", &["one"]),
+    ("pt-br", "PtBr", &["one"]),
+    ("ru", "Ru", &["one", "few", "many"]),
+    ("ja", "Ja", &[]),
+    ("ko", "Ko", &[]),
+    ("zh-hans", "ZhHans", &[]),
+    ("zh-hant", "ZhHant", &[]),
+];
 
 #[derive(Clone, Debug, PartialEq)]
 enum Node {
@@ -47,8 +62,20 @@ fn main() {
     let root = Path::new(&env::var("CARGO_MANIFEST_DIR").expect("cargo sets the manifest dir"))
         .join("locales");
     println!("cargo::rerun-if-changed=locales");
+    // Every folder of words is a language here: the site's build reads the
+    // folders (xtask's site.rs), so the two lists cannot drift apart.
+    for entry in fs::read_dir(&root).unwrap_or_else(|error| panic!("locales: {error}")) {
+        let name = entry
+            .unwrap_or_else(|error| panic!("locales: {error}"))
+            .file_name();
+        let name = name.to_string_lossy();
+        assert!(
+            LANGS.iter().any(|(code, _, _)| *code == name) || name.starts_with('.'),
+            "locales/{name} is no language of build.rs"
+        );
+    }
     let mut languages = Vec::new();
-    for (code, _) in LANGS {
+    for (code, _, _) in LANGS {
         let path = root.join(code).join("site.ftl");
         println!("cargo::rerun-if-changed={}", path.display());
         let text =
@@ -299,9 +326,6 @@ impl Parser {
             variants.push((key, normalise(pattern)));
         }
         let default = default.ok_or_else(|| format!("`${var}`: no default variant"))?;
-        if variants.len() < 2 {
-            return Err(format!("`${var}`: a selector needs two variants at least"));
-        }
         Ok(Node::Select {
             var,
             variants,
@@ -410,10 +434,30 @@ fn tags(nodes: &[Node]) -> Vec<String> {
     found
 }
 
+/// The plural categories each selector of a pattern names, the default's
+/// among them; a selector on exact values only names none.
+fn categories(nodes: &[Node], out: &mut Vec<Vec<String>>) {
+    for node in nodes {
+        if let Node::Select { variants, .. } = node {
+            let named: Vec<String> = variants
+                .iter()
+                .filter_map(|(key, _)| match key {
+                    Key::Category(name) => Some(name.clone()),
+                    Key::Exact(_) => None,
+                })
+                .collect();
+            out.push(named);
+            for (_, pattern) in variants {
+                categories(pattern, out);
+            }
+        }
+    }
+}
+
 fn check(languages: &[Messages]) -> Result<(), String> {
     let english = &languages[0];
-    for (index, messages) in languages.iter().enumerate().skip(1) {
-        let code = LANGS[index].0;
+    for (index, messages) in languages.iter().enumerate() {
+        let (code, _, needed) = LANGS[index];
         for id in english.keys() {
             if !messages.contains_key(id) {
                 return Err(format!("{code}: `{id}` is missing"));
@@ -423,6 +467,8 @@ fn check(languages: &[Messages]) -> Result<(), String> {
             let Some(reference) = english.get(id) else {
                 return Err(format!("{code}: `{id}` is not an English message"));
             };
+            // The same arguments in every language: one a translation
+            // drops would be a number or a name the reader never sees.
             let mut ours = Vec::new();
             variables(nodes, &mut ours);
             let mut theirs = Vec::new();
@@ -434,6 +480,13 @@ fn check(languages: &[Messages]) -> Result<(), String> {
                     ));
                 }
             }
+            for (name, _) in &theirs {
+                if !ours.iter().any(|(n, _)| n == name) {
+                    return Err(format!(
+                        "{code}: `{id}` leaves out `${name}`, which English writes"
+                    ));
+                }
+            }
             let (mut a, mut b) = (tags(nodes), tags(reference));
             a.sort();
             b.sort();
@@ -441,6 +494,18 @@ fn check(languages: &[Messages]) -> Result<(), String> {
                 return Err(format!(
                     "{code}: `{id}` has other tags than English ({a:?}, {b:?})"
                 ));
+            }
+            // A count is selected by every category the language tells
+            // apart, or its nouns stand in the wrong form.
+            let mut selectors = Vec::new();
+            categories(nodes, &mut selectors);
+            for named in selectors.iter().filter(|named| !named.is_empty()) {
+                if let Some(missing) = needed.iter().find(|need| !named.iter().any(|n| n == *need))
+                {
+                    return Err(format!(
+                        "{code}: a selector of `{id}` names no `[{missing}]`, which {code} needs"
+                    ));
+                }
             }
         }
     }
@@ -508,10 +573,13 @@ fn generate(languages: &[Messages]) -> String {
         let arms: Vec<String> = LANGS
             .iter()
             .zip(languages)
-            .map(|((_, variant), messages)| body(&messages[id], variant, shape))
+            .map(|(_, messages)| body(&messages[id], shape))
             .collect();
         let same = arms.iter().all(|arm| arm == &arms[0]);
-        let lang = if same { "_lang" } else { "lang" };
+        // The language is read to pick an arm, to write a number or to
+        // choose a plural; a message that does none of these ignores it.
+        let reads = arms[0].contains("(lang, ");
+        let lang = if same && !reads { "_lang" } else { "lang" };
         let mut params = format!("{lang}: Lang");
         for (name, number) in &ordered {
             let _ = write!(params, ", {name}: {}", if *number { "u64" } else { "&str" });
@@ -526,9 +594,18 @@ fn generate(languages: &[Messages]) -> String {
         if same {
             let _ = writeln!(out, "    {}", arms[0]);
         } else {
+            // Languages that say the same share an arm (a name, a number).
+            let mut grouped: Vec<(Vec<&str>, &String)> = Vec::new();
+            for ((_, variant, _), arm) in LANGS.iter().zip(&arms) {
+                match grouped.iter_mut().find(|(_, kept)| *kept == arm) {
+                    Some((variants, _)) => variants.push(variant),
+                    None => grouped.push((vec![variant], arm)),
+                }
+            }
             let _ = writeln!(out, "    match lang {{");
-            for ((_, variant), arm) in LANGS.iter().zip(&arms) {
-                let _ = writeln!(out, "        Lang::{variant} => {arm},");
+            for (variants, arm) in grouped {
+                let pattern: Vec<String> = variants.iter().map(|v| format!("Lang::{v}")).collect();
+                let _ = writeln!(out, "        {} => {arm},", pattern.join(" | "));
             }
             let _ = writeln!(out, "    }}");
         }
@@ -537,8 +614,8 @@ fn generate(languages: &[Messages]) -> String {
     out
 }
 
-/// One language's expression for a message.
-fn body(nodes: &[Node], variant: &str, shape: Shape) -> String {
+/// One language's expression for a message (it may read `lang`).
+fn body(nodes: &[Node], shape: Shape) -> String {
     if shape == Shape::Fixed {
         let mut text = String::new();
         for node in nodes {
@@ -549,7 +626,7 @@ fn body(nodes: &[Node], variant: &str, shape: Shape) -> String {
         return format!("{text:?}");
     }
     let mut code = String::from("{ let mut s = String::new(); ");
-    push_nodes(nodes, variant, shape == Shape::Rich, &mut code);
+    push_nodes(nodes, shape == Shape::Rich, &mut code);
     code.push_str(if shape == Shape::Rich {
         "pieces(&s) }"
     } else {
@@ -558,7 +635,7 @@ fn body(nodes: &[Node], variant: &str, shape: Shape) -> String {
     code
 }
 
-fn push_nodes(nodes: &[Node], variant: &str, rich: bool, code: &mut String) {
+fn push_nodes(nodes: &[Node], rich: bool, code: &mut String) {
     for node in nodes {
         match node {
             Node::Text(text) => {
@@ -574,7 +651,7 @@ fn push_nodes(nodes: &[Node], variant: &str, rich: bool, code: &mut String) {
             }
             Node::Var(name) => {
                 // A number written where the variable is also selected on.
-                let _ = write!(code, "s.push_str(&arg(Lang::{variant}, &{name}, {rich})); ");
+                let _ = write!(code, "s.push_str(&arg(lang, &{name}, {rich})); ");
             }
             Node::Select {
                 var,
@@ -587,7 +664,7 @@ fn push_nodes(nodes: &[Node], variant: &str, rich: bool, code: &mut String) {
                 for (key, pattern) in variants {
                     if let Key::Exact(n) = key {
                         let _ = write!(code, "if {var} == {n} {{ ");
-                        push_nodes(pattern, variant, rich, code);
+                        push_nodes(pattern, rich, code);
                         code.push_str("} else ");
                         exact = true;
                     }
@@ -603,23 +680,32 @@ fn push_nodes(nodes: &[Node], variant: &str, rich: bool, code: &mut String) {
                         _ => None,
                     })
                     .collect();
-                if categories.is_empty() {
-                    push_nodes(&variants[*default].1, variant, rich, code);
-                } else {
-                    let _ = write!(code, "match plural(Lang::{variant}, {var}) {{ ");
-                    let mut rest = Vec::new();
-                    for (name, rust) in PLURALS {
-                        if let Some((_, pattern)) = categories.iter().find(|(n, _)| *n == name) {
-                            let _ = write!(code, "Plural::{rust} => {{ ");
-                            push_nodes(pattern, variant, rich, code);
-                            code.push_str("} ");
-                        } else {
-                            rest.push(format!("Plural::{rust}"));
-                        }
+                // Each category's text, the default's where the selector
+                // names none for it; categories that read the same share an
+                // arm, and one arm for all of them is no match at all.
+                let mut arms: Vec<(Vec<&str>, String)> = Vec::new();
+                for (name, rust) in PLURALS {
+                    let pattern = categories
+                        .iter()
+                        .find(|(n, _)| *n == name)
+                        .map_or(&variants[*default].1, |(_, pattern)| *pattern);
+                    let mut text = String::new();
+                    push_nodes(pattern, rich, &mut text);
+                    match arms.iter_mut().find(|(_, kept)| *kept == text) {
+                        Some((names, _)) => names.push(rust),
+                        None => arms.push((vec![rust], text)),
                     }
-                    let _ = write!(code, "{} => {{ ", rest.join(" | "));
-                    push_nodes(&variants[*default].1, variant, rich, code);
-                    code.push_str("} } ");
+                }
+                if let [(_, only)] = arms.as_slice() {
+                    code.push_str(only);
+                } else {
+                    let _ = write!(code, "match plural(lang, {var}) {{ ");
+                    for (names, text) in &arms {
+                        let pattern: Vec<String> =
+                            names.iter().map(|n| format!("Plural::{n}")).collect();
+                        let _ = write!(code, "{} => {{ {text}}} ", pattern.join(" | "));
+                    }
+                    code.push_str("} ");
                 }
                 if exact {
                     code.push_str("} ");

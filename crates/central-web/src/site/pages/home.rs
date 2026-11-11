@@ -196,19 +196,27 @@ fn hero(cx: &Context<'_>) -> impl IntoView + use<> {
 /// cards, the repository's stars, the gateways online and not). Only what a
 /// source said is shown: a number nobody reported is left out, and while
 /// GitHub or the directory has not answered, the strip links there instead.
-fn strip(cx: &Context<'_>) -> impl IntoView + use<> {
+/// One of the strip's stats. `wide`: a phone has no room for it. `quiet`:
+/// its glyph and its value say what it is; the label is for a screen reader
+/// and the pointer's tooltip.
+fn strip_stat(
+    glyph: AnyView,
+    label: &'static str,
+    value: AnyView,
+    wide: bool,
+    quiet: bool,
+) -> impl IntoView + use<> {
+    view! {
+        <div class="strip-stat" class:strip-opt=wide title=quiet.then_some(label)>
+            <dt>{glyph}<span class:visually-hidden=quiet>{label}</span></dt>
+            <dd>{value}</dd>
+        </div>
+    }
+}
+
+/// The strip's left: the client's build, its checks and its last commit.
+fn strip_project(cx: &Context<'_>) -> impl IntoView + use<> {
     let lang = cx.lang;
-    // `wide`: a stat a phone has no room for. `quiet`: its glyph and its
-    // value say what it is; the label is for a screen reader and the
-    // pointer's tooltip.
-    let stat = |glyph: AnyView, label: &'static str, value: AnyView, wide: bool, quiet: bool| {
-        view! {
-            <div class="strip-stat" class:strip-opt=wide title=quiet.then_some(label)>
-                <dt>{glyph}<span class:visually-hidden=quiet>{label}</span></dt>
-                <dd>{value}</dd>
-            </div>
-        }
-    };
     let build = match cx.data.release.as_ref() {
         Some(release) => view! {
             <a href=release.page.clone() target="_blank" rel="noopener noreferrer"><code translate="no">{release.tag.clone()}</code></a>
@@ -247,13 +255,25 @@ fn strip(cx: &Context<'_>) -> impl IntoView + use<> {
         }
         .into_any(),
     };
+    view! {
+        <dl class="strip-group">
+            {strip_stat(icon(icons::PACKAGE).into_any(), words::strip_build(lang), build, false, false)}
+            {strip_stat(icon(icons::CIRCLE_CHECK).into_any(), words::strip_ci(lang), ci, false, false)}
+            {strip_stat(icon(icons::HISTORY).into_any(), words::strip_commit(lang), commit, true, false)}
+        </dl>
+    }
+}
+
+/// The strip's right: what can be played, and where.
+fn strip_play(cx: &Context<'_>) -> impl IntoView + use<> {
+    let lang = cx.lang;
     let cards = cx.data.cards.as_ref().map(|status| {
         let s = status.stats;
         let playable = s
             .implemented
             .saturating_add(s.generated)
             .saturating_add(s.partial);
-        stat(
+        strip_stat(
             icon(icons::LAYERS).into_any(),
             words::strip_cards(lang),
             view! {
@@ -265,7 +285,7 @@ fn strip(cx: &Context<'_>) -> impl IntoView + use<> {
         )
     });
     let stars = cx.data.repo.stars.map(|stars| {
-        stat(
+        strip_stat(
             solid::icon(solid::STAR).into_any(),
             words::strip_stars(lang),
             view! {
@@ -296,18 +316,20 @@ fn strip(cx: &Context<'_>) -> impl IntoView + use<> {
             .into_any(),
     };
     view! {
-        <section class="strip" aria-label=words::status_label(lang)>
+        <dl class="strip-group strip-right">
+            {cards}
+            {stars}
+            {strip_stat(icon(icons::SERVER).into_any(), words::strip_gateways(lang), gateways, false, true)}
+        </dl>
+    }
+}
+
+fn strip(cx: &Context<'_>) -> impl IntoView + use<> {
+    view! {
+        <section class="strip" aria-label=words::status_label(cx.lang)>
             <div class="strip-inner">
-                <dl class="strip-group">
-                    {stat(icon(icons::PACKAGE).into_any(), words::strip_build(lang), build, false, false)}
-                    {stat(icon(icons::CIRCLE_CHECK).into_any(), words::strip_ci(lang), ci, false, false)}
-                    {stat(icon(icons::HISTORY).into_any(), words::strip_commit(lang), commit, true, false)}
-                </dl>
-                <dl class="strip-group strip-right">
-                    {cards}
-                    {stars}
-                    {stat(icon(icons::SERVER).into_any(), words::strip_gateways(lang), gateways, false, true)}
-                </dl>
+                {strip_project(cx)}
+                {strip_play(cx)}
             </div>
         </section>
     }

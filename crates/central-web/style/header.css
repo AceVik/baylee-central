@@ -274,6 +274,18 @@ body:has(dialog[open]) .top {
   border-radius: 2.5px;
 }
 
+/* Chinese by the character that names its writing (简, 繁): no country's flag */
+.flag.script {
+  align-items: center;
+  justify-content: center;
+  inline-size: calc(1.25rem + 5px);
+  block-size: calc(0.84rem + 5px);
+  padding: 0;
+  background: color-mix(in srgb, var(--gold) 18%, var(--panel-2));
+  color: var(--title);
+  font: 700 0.74rem / 1 var(--sans);
+}
+
 .lang-code {
   display: inline-flex;
   align-items: center;
@@ -315,6 +327,18 @@ body:has(dialog[open]) .top {
 .lang .menu {
   inset-inline-end: 0;
   transform-origin: top right;
+}
+
+/* eleven languages: side by side in two columns where there is room */
+@media (min-width: 620px) {
+  .lang .menu {
+    min-width: 27rem;
+    max-height: none;
+  }
+
+  .lang .menu ul {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @keyframes menu-in {

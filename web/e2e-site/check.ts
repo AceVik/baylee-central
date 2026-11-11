@@ -41,9 +41,26 @@ export async function targets(page: Page): Promise<string[]> {
       }
       if (element.closest(".trap")) continue;
       if (rect.width < 44 - 0.5 || rect.height < 44 - 0.5) {
-        small.push(`${element.tagName.toLowerCase()} "${(element.textContent ?? "").trim().slice(0, 30)}" ${Math.round(rect.width)}×${Math.round(rect.height)}`);
+        small.push(
+          `${element.tagName.toLowerCase()} "${(element.textContent ?? "").trim().slice(0, 30)}" ${Math.round(rect.width)}×${Math.round(rect.height)}`,
+        );
       }
     }
     return small;
   });
+}
+
+/** Fails the test on any console error, uncaught error or request to another origin. */
+export function watch(page: Page, origin: string, expected404 = false): string[] {
+  const problems: string[] = [];
+  page.on("console", (message) => {
+    // The 404 page's own status is the one error a browser reports there.
+    if (expected404 && message.text().includes("status of 404")) return;
+    if (message.type() === "error") problems.push(`console: ${message.text()}`);
+  });
+  page.on("pageerror", (error) => problems.push(`error: ${error.message}`));
+  page.on("request", (request) => {
+    if (!request.url().startsWith(origin) && !request.url().startsWith("data:")) problems.push(`elsewhere: ${request.url()}`);
+  });
+  return problems;
 }

@@ -45,6 +45,51 @@ body {
   isolation: isolate;
 }
 
+/* ---- the eleven languages' writing -------------------------------------------
+   Inter and Literata carry Latin and Cyrillic. Chinese, Japanese and Korean
+   are set in the faces each system ships for them, named per language so a
+   character the three share takes that language's shape. Those faces have
+   no italic (none is slanted in its place), and titles there are set in
+   the text's own sans: a system's serif for these scripts often comes in
+   one weight only. */
+
+:root:lang(ja) {
+  --cjk:
+    "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", "Yu Gothic", "Meiryo", "Noto Sans JP",
+    "Noto Sans CJK JP";
+
+  line-break: strict;
+}
+
+:root:lang(ko) {
+  --cjk: "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", "Noto Sans CJK KR";
+
+  /* Korean breaks between words, not inside them */
+  word-break: keep-all;
+}
+
+:root:lang(zh-Hans) {
+  --cjk: "PingFang SC", "Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans SC", "Noto Sans CJK SC";
+}
+
+:root:lang(zh-Hant) {
+  --cjk: "PingFang TC", "Microsoft JhengHei UI", "Microsoft JhengHei", "Noto Sans TC", "Noto Sans CJK TC";
+}
+
+:root:lang(ja),
+:root:lang(ko),
+:root:lang(zh) {
+  --sans: "Inter", var(--cjk), system-ui, sans-serif;
+  --serif: "Literata", var(--cjk), system-ui, sans-serif;
+
+  font-synthesis-style: none;
+}
+
+/* a Japanese title breaks between phrases where the browser can tell them */
+:root:lang(ja) :is(h1, h2, h3, .lead) {
+  word-break: auto-phrase;
+}
+
 .page {
   display: flex;
   flex: 1 0 auto;
@@ -110,6 +155,8 @@ h4 {
   line-height: var(--leading-tight);
   letter-spacing: -0.01em;
   text-wrap: balance;
+  /* a word longer than the line breaks rather than widening the page */
+  overflow-wrap: break-word;
 }
 
 h1 {

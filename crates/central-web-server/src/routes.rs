@@ -37,12 +37,24 @@ pub struct App {
 }
 
 /// Most pages kept for one snapshot of the data, and their most bytes
-/// together. A page is about 20 KB (the start page about 70 KB) and
-/// depends on its language and the visitor's machine: some forty pages in
-/// two languages for the dozen or so machines told apart fit well within
-/// both. Past either bound a page is rendered for its request and not kept.
-const PAGES: usize = 1_024;
-const PAGE_BYTES: usize = 32 * 1024 * 1024;
+/// together. A page is about 25 KB (the start page about 75 KB). Only the
+/// start page and the download depend on the visitor's machine ([`varies`]);
+/// every other page is kept once per language. Some forty pages in eleven
+/// languages, and those two for each of the at most 28 machines told apart
+/// (seven platforms, read or assumed, phone or not), are about 1,050 pages
+/// and 45 MB: both bounds hold every page there can be, so no request can
+/// fill the table with rare pages and leave the common ones to be rendered
+/// each time. Past either bound a page is rendered for its request and not
+/// kept.
+const PAGES: usize = 2_048;
+const PAGE_BYTES: usize = 64 * 1024 * 1024;
+
+/// Whether a page is written for the visitor's machine: the two with the
+/// download for it. They say so to caches (`Vary`), and only they are kept
+/// per machine.
+const fn varies(page: Page) -> bool {
+    matches!(page, Page::Home | Page::Download)
+}
 
 /// A page as rendered: its bytes and their entity tag.
 struct Rendered {
@@ -243,12 +255,22 @@ fn snapshot(app: &App) -> Arc<Snapshot> {
 }
 
 fn page(app: &App, headers: &HeaderMap, page: Page, lang: Lang) -> Response {
-    let machine = machine(
-        header_text(headers, "user-agent").unwrap_or(""),
-        header_text(headers, "sec-ch-ua-platform"),
-        header_text(headers, "sec-ch-ua-arch"),
-        header_text(headers, "sec-ch-ua-bitness"),
-    );
+    // A page that is the same for every machine is rendered for none in
+    // particular, and so kept once.
+    let machine = if varies(page) {
+        machine(
+            header_text(headers, "user-agent").unwrap_or(""),
+            header_text(headers, "sec-ch-ua-platform"),
+            header_text(headers, "sec-ch-ua-arch"),
+            header_text(headers, "sec-ch-ua-bitness"),
+        )
+    } else {
+        Machine {
+            platform: None,
+            sure: false,
+            mobile: false,
+        }
+    };
     let data = snapshot(app);
     let key = (page, lang, machine);
     let rendered = app.pages.find(key, &data).unwrap_or_else(|| {
@@ -274,7 +296,7 @@ fn page(app: &App, headers: &HeaderMap, page: Page, lang: Lang) -> Response {
         _ => StatusCode::OK,
     };
     let mut extra: Vec<(&'static str, &str)> = Vec::new();
-    if matches!(page, Page::Home | Page::Download) {
+    if varies(page) {
         extra.push((
             "accept-ch",
             "Sec-CH-UA-Platform, Sec-CH-UA-Arch, Sec-CH-UA-Bitness",

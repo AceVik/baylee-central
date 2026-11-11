@@ -55,11 +55,21 @@ impl Meta {
     }
 }
 
-/// The Fan Content Policy's address in a language (Wizards' own pages).
+/// The Fan Content Policy's address in a language: Wizards' own page in
+/// each of them (every one answered on 2026-11-11).
 pub fn policy_url(lang: Lang) -> &'static str {
     match lang {
         Lang::En => "https://company.wizards.com/en/legal/fancontentpolicy",
         Lang::De => "https://company.wizards.com/de/legal/fancontentpolicy",
+        Lang::Fr => "https://company.wizards.com/fr/legal/fancontentpolicy",
+        Lang::It => "https://company.wizards.com/it/legal/fancontentpolicy",
+        Lang::Es => "https://company.wizards.com/es/legal/fancontentpolicy",
+        Lang::PtBr => "https://company.wizards.com/pt-BR/legal/fancontentpolicy",
+        Lang::Ru => "https://company.wizards.com/ru/legal/fancontentpolicy",
+        Lang::Ja => "https://company.wizards.com/ja/legal/fancontentpolicy",
+        Lang::Ko => "https://company.wizards.com/ko/legal/fancontentpolicy",
+        Lang::ZhHans => "https://company.wizards.com/zh-Hans/legal/fancontentpolicy",
+        Lang::ZhHant => "https://company.wizards.com/zh-Hant/legal/fancontentpolicy",
     }
 }
 
@@ -121,7 +131,7 @@ fn crumbs(lang: Lang, trail: &[(String, Page)]) -> Option<impl IntoView + use<>>
 /// What a page asks for before its stylesheet and scripts: the start
 /// page's painting (its largest paint) and the faces the first screen
 /// is set in.
-fn preloads(page: Page, assets: &Assets) -> impl IntoView + use<> {
+fn preloads(page: Page, lang: Lang, assets: &Assets) -> impl IntoView + use<> {
     let painting = (page == Page::Home).then(|| {
         let set = format!(
             "{} 640w, {} 960w, {} 1600w",
@@ -140,11 +150,22 @@ fn preloads(page: Page, assets: &Assets) -> impl IntoView + use<> {
     // title wraps around a stand-in. (The download button's bold and
     // medium faces move it by less than CLS 0.05 as they arrive; asked for
     // early, they took the painting's bandwidth: LCP was later.)
-    let italic = (page == Page::Home).then(|| font("fonts/Literata-Italic-latin.woff2"));
+    //
+    // The faces a language's words are set in: Cyrillic for Russian; the
+    // Latin ones for every other, which Chinese, Japanese and Korean use
+    // for names and numbers beside their own system faces (and they have
+    // no italic).
+    let (subset, slanted) = match lang {
+        Lang::Ru => ("cyrillic", true),
+        Lang::Ja | Lang::Ko | Lang::ZhHans | Lang::ZhHant => ("latin", false),
+        _ => ("latin", true),
+    };
+    let italic = (page == Page::Home && slanted)
+        .then(|| font(&format!("fonts/Literata-Italic-{subset}.woff2")));
     view! {
         {painting}
-        {font("fonts/Inter-latin.woff2")}
-        {font("fonts/Literata-latin.woff2")}
+        {font(&format!("fonts/Inter-{subset}.woff2"))}
+        {font(&format!("fonts/Literata-{subset}.woff2"))}
         {italic}
     }
 }
@@ -159,7 +180,7 @@ fn head(page: Page, cx: &Context<'_>, meta: &Meta) -> impl IntoView + use<> {
     let alternates = listed.then(|| {
         let mut links: Vec<(&'static str, String)> = Lang::ALL
             .into_iter()
-            .map(|other| (other.code(), format!("{origin}{}", page.path(other))))
+            .map(|other| (other.tag(), format!("{origin}{}", page.path(other))))
             .collect();
         links.push(("x-default", format!("{origin}{}", page.path(Lang::En))));
         links
@@ -197,10 +218,11 @@ fn head(page: Page, cx: &Context<'_>, meta: &Meta) -> impl IntoView + use<> {
     let islands = meta.islands.then(|| {
         view! { <script type="module" src=assets.url("islands.js") integrity=assets.integrity("islands.js") fetchpriority="low"></script> }
     });
-    let other = Lang::ALL
+    let others = Lang::ALL
         .into_iter()
-        .find(|l| *l != lang)
-        .unwrap_or(Lang::En);
+        .filter(|other| *other != lang)
+        .map(|other| view! { <meta {..custom_attribute("property", "og:locale:alternate")} content=other.locale() /> })
+        .collect_view();
     view! {
         <head>
             <meta charset="utf-8" />
@@ -218,7 +240,7 @@ fn head(page: Page, cx: &Context<'_>, meta: &Meta) -> impl IntoView + use<> {
             <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0f1b2d" />
             <meta name="referrer" content="no-referrer" />
             <meta name="tdm-reservation" content="1" />
-            {preloads(page, assets)}
+            {preloads(page, lang, assets)}
             <link rel="stylesheet" href=assets.url("site.css") integrity=assets.integrity("site.css") />
             <script src=assets.url("boot.js") integrity=assets.integrity("boot.js")></script>
             <script type="module" src=assets.url("pwa.js") integrity=assets.integrity("pwa.js")></script>
@@ -241,7 +263,7 @@ fn head(page: Page, cx: &Context<'_>, meta: &Meta) -> impl IntoView + use<> {
             <meta {..custom_attribute("property", "og:image:height")} content="630" />
             <meta {..custom_attribute("property", "og:image:alt")} content=meta.title.clone() />
             <meta {..custom_attribute("property", "og:locale")} content=lang.locale() />
-            <meta {..custom_attribute("property", "og:locale:alternate")} content=other.locale() />
+            {others}
             <meta name="twitter:card" content="summary_large_image" />
             {verification}
             {structured}
@@ -255,7 +277,7 @@ pub fn document(page: Page, cx: &Context<'_>, meta: &Meta, body: AnyView) -> imp
     // the start page has the world in its hero; every other one behind it
     let world = (page != Page::Home).then(|| world(cx));
     view! {
-        <html lang=lang.code() dir="ltr">
+        <html lang=lang.tag() dir="ltr">
             {head(page, cx, meta)}
             <body>
                 <a class="skip" href="#main">{words::skip(lang)}</a>
@@ -337,13 +359,61 @@ fn theme_switch(lang: Lang, in_menu: bool) -> impl IntoView + use<> {
     }
 }
 
-/// A language's flag, drawn.
-fn flag(lang: Lang) -> impl IntoView + use<> {
-    let stripes = match lang {
-        Lang::De => view! {
-            <rect width="24" height="5.34" y="0" fill="#18181b"></rect>
-            <rect width="24" height="5.34" y="5.33" fill="#dc2626"></rect>
-            <rect width="24" height="5.34" y="10.66" fill="#facc15"></rect>
+/// A language's mark in the switch: a flag, drawn plainly, where one flag
+/// stands for the language; the two ways of writing Chinese by the
+/// character that names each (简, 繁), which is how readers tell them apart
+/// and which belongs to no country.
+fn flag(lang: Lang) -> AnyView {
+    // three bands side by side, or one above the other
+    let upright = |a: &'static str, b: &'static str, c: &'static str| {
+        view! {
+            <rect width="8" height="16" fill=a></rect>
+            <rect width="8" height="16" x="8" fill=b></rect>
+            <rect width="8" height="16" x="16" fill=c></rect>
+        }
+        .into_any()
+    };
+    let level = |a: &'static str, b: &'static str, c: &'static str| {
+        view! {
+            <rect width="24" height="5.34" y="0" fill=a></rect>
+            <rect width="24" height="5.34" y="5.33" fill=b></rect>
+            <rect width="24" height="5.34" y="10.66" fill=c></rect>
+        }
+        .into_any()
+    };
+    let drawn = match lang {
+        Lang::ZhHans | Lang::ZhHant => {
+            let script = if lang == Lang::ZhHans { "简" } else { "繁" };
+            return view! { <span class="flag script" aria-hidden="true">{script}</span> }
+                .into_any();
+        }
+        Lang::De => level("#18181b", "#dc2626", "#facc15"),
+        Lang::Ru => level("#ffffff", "#1d4ed8", "#dc2626"),
+        Lang::Fr => upright("#1e40af", "#ffffff", "#dc2626"),
+        Lang::It => upright("#15803d", "#ffffff", "#dc2626"),
+        Lang::Es => view! {
+            <rect width="24" height="16" fill="#b91c1c"></rect>
+            <rect width="24" height="8" y="4" fill="#facc15"></rect>
+        }
+        .into_any(),
+        Lang::PtBr => view! {
+            <rect width="24" height="16" fill="#15803d"></rect>
+            <path d="M12 2L21.5 8L12 14L2.5 8Z" fill="#facc15"></path>
+            <circle cx="12" cy="8" r="3.3" fill="#1e3a8a"></circle>
+        }
+        .into_any(),
+        Lang::Ja => view! {
+            <rect width="24" height="16" fill="#ffffff"></rect>
+            <circle cx="12" cy="8" r="4.6" fill="#be123c"></circle>
+        }
+        .into_any(),
+        Lang::Ko => view! {
+            <rect width="24" height="16" fill="#ffffff"></rect>
+            <g transform="rotate(33.7 12 8)">
+                <path d="M8 8A4 4 0 0 1 16 8Z" fill="#be123c"></path>
+                <path d="M8 8A4 4 0 0 0 16 8Z" fill="#1e3a8a"></path>
+            </g>
+            <path d="M3.6 4.6L6 1.6M18 14.4L20.4 11.4M18 1.6L20.4 4.6M3.6 11.4L6 14.4" stroke="#18181b" stroke-width="1.5"></path>
         }
         .into_any(),
         Lang::En => view! {
@@ -358,11 +428,21 @@ fn flag(lang: Lang) -> impl IntoView + use<> {
     view! {
         <span class="flag" aria-hidden="true">
             <svg viewBox="0 0 24 16" width="21" height="14" focusable="false">
-                {stripes}
-                <rect width="24" height="16" fill="none" stroke="rgb(255 255 255 / 0.28)" stroke-width="1.2"></rect>
+                {drawn}
+                <rect width="24" height="16" fill="none" stroke="rgb(128 128 128 / 0.45)" stroke-width="1.2"></rect>
             </svg>
         </span>
     }
+    .into_any()
+}
+
+/// A language's two letters on its chip: `EN`, `PT`, `ZH`.
+fn chip(lang: Lang) -> String {
+    lang.code()
+        .chars()
+        .take(2)
+        .collect::<String>()
+        .to_uppercase()
 }
 
 /// The language menu: this page in every language the site speaks.
@@ -376,12 +456,12 @@ fn languages(page: Page, lang: Lang) -> impl IntoView + use<> {
                     <a
                         class="menu-item"
                         href=translated(page, other)
-                        hreflang=other.code()
-                        lang=other.code()
+                        hreflang=other.tag()
+                        lang=other.tag()
                         aria-current=here.then_some("true")
                     >
                         {flag(other)}
-                        <span class="lang-code">{other.code().to_uppercase()}</span>
+                        <span class="lang-code">{chip(other)}</span>
                         <span class="grow">{other.own_name()}</span>
                         {here.then(|| solid::icon_as(solid::CHECK, "check"))}
                     </a>
@@ -395,7 +475,7 @@ fn languages(page: Page, lang: Lang) -> impl IntoView + use<> {
                 <span class="visually-hidden">{words::lang_label(lang)}": "</span>
                 <span class="lang-main">
                     {flag(lang)}
-                    <span class="lang-code">{lang.code().to_uppercase()}</span>
+                    <span class="lang-code">{chip(lang)}</span>
                     <span class="lang-name">{lang.own_name()}</span>
                 </span>
                 <span class="lang-toggle">{solid::icon_as(solid::DOWN, "chevron")}</span>
@@ -456,6 +536,14 @@ fn footer(page: Page, cx: &Context<'_>) -> impl IntoView + use<> {
     });
     let colophon = rich(words::foot_colophon(lang), |tag| {
         (tag == "notices").then(|| "/notices.txt".to_owned())
+    });
+    // in a language a machine translated, the footer says so
+    let machine = lang.machine_translated().then(|| {
+        let contact = format!("{}#contact", Page::Home.path(lang));
+        let note = rich(words::machine_note(lang), move |tag| {
+            (tag == "link").then(|| contact.clone())
+        });
+        view! { <p class="machine-note">{note}</p> }
     });
     let link = |target: Page, label: &'static str| {
         view! { <li><a href=target.path(lang) aria-current=(target == page).then_some("page")>{label}</a></li> }
@@ -523,6 +611,7 @@ fn footer(page: Page, cx: &Context<'_>) -> impl IntoView + use<> {
                 <div class="foot-bottom">
                     <div class="foot-notices">
                         <p>{fan}</p>
+                        {machine}
                     </div>
                     <div class="foot-colophon">
                         <p class="colophon">{colophon}</p>

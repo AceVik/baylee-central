@@ -51,7 +51,8 @@ fn body(name: &str, email: &str, message: &str, website: &str, lang: Lang) -> St
         "name": optional(name),
         "email": optional(email),
         "message": message.trim(),
-        "language": lang.code(),
+        // the endpoint takes German or English and refuses any other
+        "language": lang.of_record().code(),
         "website": website,
     })
     .to_string()

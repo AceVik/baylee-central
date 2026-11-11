@@ -7,6 +7,8 @@
 
 site-name = Baylee
 skip = Skip to content
+# Read out after a link that leaves the site (the stylesheet carries it).
+new-tab = opens in a new tab
 nav-label = Main
 nav-download = Download
 nav-gateways = Gateways
@@ -285,6 +287,10 @@ privacy-reports = A bug report you send from the game with F8 holds its kind, yo
 terms-title = Terms of use
 terms-draft = These terms are a draft and not yet in force.
 terms-version = Version { $version }, updated { $date }.
+# Shown only in the languages a machine translated: every one but German and English.
+machine-note = This site was translated by a machine, and no speaker of your language has read it yet. The game itself speaks English and German so far. <link>Tell us about a mistake.</link>
+legal-machine = This page is a machine translation, offered as a help. Where it differs from the <de>German</de> or the <en>English</en> text, those apply.
+terms-machine = Central's terms exist in German and English only. Below is the English text; there is a <de>German one</de> as well.
 
 ## Errors
 

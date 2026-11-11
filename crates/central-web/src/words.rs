@@ -6,25 +6,77 @@
 
 use serde::{Deserialize, Serialize};
 
-/// A language the site is written in.
+/// A language the site is written in: the eleven Magic is printed in.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Lang {
     /// English, the language every message exists in first.
     En,
     /// German, addressing the reader as „du“.
     De,
+    /// French.
+    Fr,
+    /// Italian.
+    It,
+    /// Spanish.
+    Es,
+    /// Portuguese as Brazil writes it.
+    PtBr,
+    /// Russian.
+    Ru,
+    /// Japanese.
+    Ja,
+    /// Korean.
+    Ko,
+    /// Chinese in simplified characters.
+    ZhHans,
+    /// Chinese in traditional characters.
+    ZhHant,
 }
 
 impl Lang {
     /// Every language, in the order the language switch lists them.
-    pub const ALL: [Lang; 2] = [Lang::En, Lang::De];
+    pub const ALL: [Lang; 11] = [
+        Lang::En,
+        Lang::De,
+        Lang::Fr,
+        Lang::It,
+        Lang::Es,
+        Lang::PtBr,
+        Lang::Ru,
+        Lang::Ja,
+        Lang::Ko,
+        Lang::ZhHans,
+        Lang::ZhHant,
+    ];
 
-    /// The path prefix and `hreflang` code: `en`, `de`.
+    /// The path prefix and the words' folder, lowercase: `en`, `pt-br`,
+    /// `zh-hans`.
     #[must_use]
     pub const fn code(self) -> &'static str {
         match self {
             Lang::En => "en",
             Lang::De => "de",
+            Lang::Fr => "fr",
+            Lang::It => "it",
+            Lang::Es => "es",
+            Lang::PtBr => "pt-br",
+            Lang::Ru => "ru",
+            Lang::Ja => "ja",
+            Lang::Ko => "ko",
+            Lang::ZhHans => "zh-hans",
+            Lang::ZhHant => "zh-hant",
+        }
+    }
+
+    /// The language tag (BCP 47) for `lang`, `hreflang` and `Intl`:
+    /// `pt-BR`, `zh-Hans`.
+    #[must_use]
+    pub const fn tag(self) -> &'static str {
+        match self {
+            Lang::PtBr => "pt-BR",
+            Lang::ZhHans => "zh-Hans",
+            Lang::ZhHant => "zh-Hant",
+            other => other.code(),
         }
     }
 
@@ -40,6 +92,15 @@ impl Lang {
         match self {
             Lang::En => "English",
             Lang::De => "Deutsch",
+            Lang::Fr => "Français",
+            Lang::It => "Italiano",
+            Lang::Es => "Español",
+            Lang::PtBr => "Português (Brasil)",
+            Lang::Ru => "Русский",
+            Lang::Ja => "日本語",
+            Lang::Ko => "한국어",
+            Lang::ZhHans => "简体中文",
+            Lang::ZhHant => "繁體中文",
         }
     }
 
@@ -49,6 +110,61 @@ impl Lang {
         match self {
             Lang::En => "en_GB",
             Lang::De => "de_DE",
+            Lang::Fr => "fr_FR",
+            Lang::It => "it_IT",
+            Lang::Es => "es_ES",
+            Lang::PtBr => "pt_BR",
+            Lang::Ru => "ru_RU",
+            Lang::Ja => "ja_JP",
+            Lang::Ko => "ko_KR",
+            Lang::ZhHans => "zh_CN",
+            Lang::ZhHant => "zh_TW",
+        }
+    }
+
+    /// The language of what exists in German and English only: Central's
+    /// terms, the legal notice's country, a notification's words, and what
+    /// Central is told the visitor reads. German for German, English for
+    /// everyone else.
+    #[must_use]
+    pub const fn of_record(self) -> Lang {
+        match self {
+            Lang::De => Lang::De,
+            _ => Lang::En,
+        }
+    }
+
+    /// Whether the site's words in this language were translated by a
+    /// machine and not yet read by a speaker: every language but the two
+    /// the site is written in.
+    #[must_use]
+    pub const fn machine_translated(self) -> bool {
+        !matches!(self, Lang::En | Lang::De)
+    }
+
+    /// The language of one `Accept-Language` tag (lowercase), if it is one
+    /// of the site's: Chinese by its script or, without one, its region;
+    /// any Portuguese is Brazil's; else the primary subtag decides.
+    fn of_tag(tag: &str) -> Option<Lang> {
+        let mut subtags = tag.split('-');
+        let primary = subtags.next().unwrap_or("");
+        match primary {
+            "zh" => {
+                let script = subtags
+                    .clone()
+                    .find(|subtag| matches!(*subtag, "hans" | "hant"));
+                let traditional = match script {
+                    Some(script) => script == "hant",
+                    None => subtags.any(|subtag| matches!(subtag, "tw" | "hk" | "mo")),
+                };
+                Some(if traditional {
+                    Lang::ZhHant
+                } else {
+                    Lang::ZhHans
+                })
+            }
+            "pt" => Some(Lang::PtBr),
+            _ => Lang::from_code(primary),
         }
     }
 
@@ -63,9 +179,8 @@ impl Lang {
             let quality = fields
                 .find_map(|field| field.trim().strip_prefix("q="))
                 .map_or(1000, |q| quality(q.trim()));
-            let primary = tag.split('-').next().unwrap_or("");
             // Strictly greater: of equal weights the first listed wins.
-            if let Some(lang) = Lang::from_code(primary)
+            if let Some(lang) = Lang::of_tag(&tag)
                 && quality > best.0
             {
                 best = (quality, lang);
@@ -90,7 +205,7 @@ fn quality(value: &str) -> u16 {
     }
 }
 
-/// CLDR's plural categories; English and German use only `One` and `Other`.
+/// CLDR's plural categories for whole numbers.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Plural {
     /// Zero.
@@ -107,23 +222,55 @@ pub enum Plural {
     Other,
 }
 
-/// The plural category of `n` in `lang`.
+/// The plural category of the whole number `n` in `lang`, by CLDR's rules
+/// (the tests hold them against `Intl.PluralRules`).
 #[must_use]
 pub fn plural(lang: Lang, n: u64) -> Plural {
+    // French, Italian, Spanish and Portuguese count whole millions apart.
+    let million = n != 0 && n.is_multiple_of(1_000_000);
     match lang {
-        Lang::En | Lang::De if n == 1 => Plural::One,
-        Lang::En | Lang::De => Plural::Other,
+        Lang::En | Lang::De => {
+            if n == 1 {
+                Plural::One
+            } else {
+                Plural::Other
+            }
+        }
+        Lang::It | Lang::Es => match n {
+            1 => Plural::One,
+            _ if million => Plural::Many,
+            _ => Plural::Other,
+        },
+        Lang::Fr | Lang::PtBr => match n {
+            0 | 1 => Plural::One,
+            _ if million => Plural::Many,
+            _ => Plural::Other,
+        },
+        Lang::Ru => match (n % 10, n % 100) {
+            (1, tens) if tens != 11 => Plural::One,
+            (2..=4, tens) if !(12..=14).contains(&tens) => Plural::Few,
+            _ => Plural::Many,
+        },
+        Lang::Ja | Lang::Ko | Lang::ZhHans | Lang::ZhHant => Plural::Other,
     }
 }
 
-/// `n` as the language writes it: `1,234` or `1.234` (CLDR's grouping).
+/// `n` as the language writes it: `1,234`, `1.234` or `1 234` (CLDR's
+/// grouping; Italian and Spanish group from five digits on).
 #[must_use]
 pub fn number(lang: Lang, n: u64) -> String {
     let digits = n.to_string();
-    let separator = match lang {
-        Lang::En => ',',
-        Lang::De => '.',
+    let (separator, least) = match lang {
+        Lang::En | Lang::Ja | Lang::Ko | Lang::ZhHans | Lang::ZhHant => (',', 4),
+        Lang::De | Lang::PtBr => ('.', 4),
+        Lang::It | Lang::Es => ('.', 5),
+        // a narrow no-break space, a no-break space
+        Lang::Fr => ('\u{202f}', 4),
+        Lang::Ru => ('\u{a0}', 4),
     };
+    if digits.len() < least {
+        return digits;
+    }
     let mut out = String::new();
     for (at, digit) in digits.chars().enumerate() {
         if at > 0 && (digits.len() - at).is_multiple_of(3) {
@@ -242,18 +389,97 @@ mod tests {
 
     #[test]
     fn numbers_are_grouped_by_language() {
-        assert_eq!(number(Lang::En, 999), "999");
-        assert_eq!(number(Lang::En, 1234), "1,234");
-        assert_eq!(number(Lang::De, 1234), "1.234");
-        assert_eq!(number(Lang::De, 12345), "12.345");
-        assert_eq!(number(Lang::En, 1_234_567), "1,234,567");
+        // Intl.NumberFormat (CLDR) for 999, 1234, 12345 and 1234567
+        let expected: [(Lang, [&str; 4]); 11] = [
+            (Lang::En, ["999", "1,234", "12,345", "1,234,567"]),
+            (Lang::De, ["999", "1.234", "12.345", "1.234.567"]),
+            (
+                Lang::Fr,
+                [
+                    "999",
+                    "1\u{202f}234",
+                    "12\u{202f}345",
+                    "1\u{202f}234\u{202f}567",
+                ],
+            ),
+            (Lang::It, ["999", "1234", "12.345", "1.234.567"]),
+            (Lang::Es, ["999", "1234", "12.345", "1.234.567"]),
+            (Lang::PtBr, ["999", "1.234", "12.345", "1.234.567"]),
+            (
+                Lang::Ru,
+                ["999", "1\u{a0}234", "12\u{a0}345", "1\u{a0}234\u{a0}567"],
+            ),
+            (Lang::Ja, ["999", "1,234", "12,345", "1,234,567"]),
+            (Lang::Ko, ["999", "1,234", "12,345", "1,234,567"]),
+            (Lang::ZhHans, ["999", "1,234", "12,345", "1,234,567"]),
+            (Lang::ZhHant, ["999", "1,234", "12,345", "1,234,567"]),
+        ];
+        for (lang, written) in expected {
+            for (n, want) in [999, 1234, 12345, 1_234_567].into_iter().zip(written) {
+                assert_eq!(number(lang, n), want, "{lang:?} {n}");
+            }
+        }
+        assert_eq!(Lang::ALL.len(), expected.len());
     }
 
     #[test]
     fn plurals() {
-        assert_eq!(plural(Lang::En, 1), Plural::One);
-        assert_eq!(plural(Lang::De, 0), Plural::Other);
-        assert_eq!(plural(Lang::De, 2), Plural::Other);
+        use Plural::{Few, Many, One, Other};
+        // Intl.PluralRules (CLDR) for these numbers, in this order
+        const NUMBERS: [u64; 16] = [
+            0, 1, 2, 3, 4, 5, 11, 12, 14, 21, 22, 25, 101, 111, 1_000_000, 1_000_001,
+        ];
+        let o = Other;
+        let expected: [(Lang, [Plural; 16]); 11] = [
+            (Lang::En, [o, One, o, o, o, o, o, o, o, o, o, o, o, o, o, o]),
+            (Lang::De, [o, One, o, o, o, o, o, o, o, o, o, o, o, o, o, o]),
+            (
+                Lang::Fr,
+                [One, One, o, o, o, o, o, o, o, o, o, o, o, o, Many, o],
+            ),
+            (
+                Lang::It,
+                [o, One, o, o, o, o, o, o, o, o, o, o, o, o, Many, o],
+            ),
+            (
+                Lang::Es,
+                [o, One, o, o, o, o, o, o, o, o, o, o, o, o, Many, o],
+            ),
+            (
+                Lang::PtBr,
+                [One, One, o, o, o, o, o, o, o, o, o, o, o, o, Many, o],
+            ),
+            (
+                Lang::Ru,
+                [
+                    Many, One, Few, Few, Few, Many, Many, Many, Many, One, Few, Many, One, Many,
+                    Many, One,
+                ],
+            ),
+            (Lang::Ja, [o; 16]),
+            (Lang::Ko, [o; 16]),
+            (Lang::ZhHans, [o; 16]),
+            (Lang::ZhHant, [o; 16]),
+        ];
+        for (lang, categories) in expected {
+            for (n, want) in NUMBERS.into_iter().zip(categories) {
+                assert_eq!(plural(lang, n), want, "{lang:?} {n}");
+            }
+        }
+        assert_eq!(Lang::ALL.len(), expected.len());
+    }
+
+    #[test]
+    fn codes_tags_and_names() {
+        for lang in Lang::ALL {
+            assert_eq!(Lang::from_code(lang.code()), Some(lang));
+            assert_eq!(lang.code(), lang.tag().to_ascii_lowercase());
+            assert!(!lang.own_name().is_empty() && lang.locale().len() == 5);
+            assert_eq!(lang.of_record().of_record(), lang.of_record());
+        }
+        assert_eq!(Lang::Fr.of_record(), Lang::En);
+        assert_eq!(Lang::De.of_record(), Lang::De);
+        assert!(Lang::Ja.machine_translated() && !Lang::De.machine_translated());
     }
 
     #[test]
@@ -285,10 +511,31 @@ mod tests {
     #[test]
     fn accept_language() {
         assert_eq!(Lang::negotiate("de-DE,de;q=0.9,en;q=0.8"), Lang::De);
-        assert_eq!(Lang::negotiate("fr-FR, en;q=0.5, de;q=0.7"), Lang::De);
-        assert_eq!(Lang::negotiate("fr"), Lang::En);
+        assert_eq!(Lang::negotiate("fr-FR, en;q=0.5, de;q=0.7"), Lang::Fr);
+        assert_eq!(Lang::negotiate("nl, en;q=0.5, de;q=0.7"), Lang::De);
+        assert_eq!(Lang::negotiate("nl"), Lang::En);
         assert_eq!(Lang::negotiate(""), Lang::En);
         assert_eq!(Lang::negotiate("de;q=0, en;q=0.1"), Lang::En);
         assert_eq!(Lang::negotiate("en, de"), Lang::En);
+        // Chinese by script, else by region; any Portuguese; the rest by
+        // their primary subtag
+        for (accept, want) in [
+            ("zh-TW,zh;q=0.9", Lang::ZhHant),
+            ("zh-HK", Lang::ZhHant),
+            ("zh-Hant-CN", Lang::ZhHant),
+            ("zh-CN,zh;q=0.9,en;q=0.8", Lang::ZhHans),
+            ("zh", Lang::ZhHans),
+            ("zh-Hans-TW", Lang::ZhHans),
+            ("zh-SG", Lang::ZhHans),
+            ("pt-PT,pt;q=0.9", Lang::PtBr),
+            ("pt-BR", Lang::PtBr),
+            ("es-MX", Lang::Es),
+            ("ru-RU,ru;q=0.9,en-US;q=0.8", Lang::Ru),
+            ("ja", Lang::Ja),
+            ("ko-KR", Lang::Ko),
+            ("it-CH", Lang::It),
+        ] {
+            assert_eq!(Lang::negotiate(accept), want, "{accept}");
+        }
     }
 }
