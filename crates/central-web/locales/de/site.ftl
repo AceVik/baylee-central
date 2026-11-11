@@ -436,7 +436,7 @@ error-unavailable = Baylee Central antwortet gerade nicht. Versuch es gleich noc
 error-network = Keine Verbindung. Prüf dein Netz und versuch es noch einmal.
 error-failed = Etwas ist schiefgegangen. Versuch es noch einmal; wenn es bleibt, sag uns Bescheid.
 error-again = Noch einmal versuchen
-password-show = Zeigen
+password-show-label = Passwort zeigen
 
 ## Anmelden
 
@@ -450,6 +450,8 @@ signin-working = Dein Passwort wird gesichert … das dauert einen Moment und pa
 signin-wrong = Anmeldename und Passwort passen nicht zusammen. Prüf beides und versuch es noch einmal.
 signin-not-moved = Dieser Account ist noch nicht zu Baylee Central umgezogen. Melde dich einmal im Baylee-Client an; er zieht deinen Account um.
 signin-no-account = Noch keinen Account? <register>Leg einen an</register>.
+register-have-account = Schon einen Account? <signin>Melde dich an</signin>.
+dialog-close = Schließen
 signin-noscript = Anmelden braucht JavaScript: Dein Passwort wird in deinem Browser verarbeitet und nie an uns gesendet.
 
 ## Registrieren

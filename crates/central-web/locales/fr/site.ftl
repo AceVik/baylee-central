@@ -462,7 +462,7 @@ error-unavailable = Baylee Central ne répond pas pour le moment. Réessayez dan
 error-network = Pas de connexion. Vérifiez votre réseau et réessayez.
 error-failed = Une erreur s’est produite. Réessayez ; si cela continue, dites-le-nous.
 error-again = Réessayer
-password-show = Afficher
+password-show-label = Show the password
 
 ## Signing in
 
@@ -476,6 +476,8 @@ signin-working = Sécurisation de votre mot de passe … cela prend un instant e
 signin-wrong = Ce nom de connexion et ce mot de passe ne correspondent pas. Vérifiez les deux et réessayez.
 signin-not-moved = Ce compte n’a pas encore migré vers Baylee Central. Connectez-vous une fois avec le client Baylee ; il migre votre compte.
 signin-no-account = Pas encore de compte ? <register>Créez-en un</register>.
+register-have-account = Already have an account? <signin>Sign in</signin>.
+dialog-close = Close
 signin-noscript = La connexion nécessite JavaScript : votre mot de passe est traité dans votre navigateur et ne nous est jamais envoyé.
 
 ## Registering

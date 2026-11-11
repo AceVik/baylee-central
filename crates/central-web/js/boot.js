@@ -210,7 +210,43 @@
     if (menu && !(event.relatedTarget instanceof Node && menu.contains(event.relatedTarget))) close(menu);
   });
 
-  // An island's form works only once the islands run. Until then the
+  // Signing in and registering open over the page that asked for them:
+  // every link to either shows its dialog where the page has one. A press
+  // with a modifier key, a browser without <dialog>, or a page without
+  // them (the two pages themselves) follows the link as ever. The dialog
+  // closes by its button, by Escape, and by a press on the veil around it
+  // that also began there (a text selection dragged out of a field is not
+  // one).
+  let pressed = null;
+  document.addEventListener("pointerdown", (event) => {
+    pressed = event.target;
+  });
+  document.addEventListener("click", (event) => {
+    const target = event.target instanceof Element ? event.target : null;
+    if (!target || event.defaultPrevented) return;
+    const shut = target.closest("[data-auth-close]");
+    if (shut) {
+      shut.closest("dialog")?.close();
+      return;
+    }
+    if (target instanceof HTMLDialogElement && target.matches(".auth-dialog")) {
+      if (pressed === target) target.close();
+      return;
+    }
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    const link = target.closest("a[href]");
+    if (!(link instanceof HTMLAnchorElement) || link.origin !== location.origin || link.target === "_blank") return;
+    const which = /^\/[A-Za-z-]+\/(signin|register)\/?$/.exec(link.pathname)?.[1];
+    const dialog = which ? document.getElementById(`auth-${which}`) : null;
+    if (!(dialog instanceof HTMLDialogElement) || typeof dialog.showModal !== "function") return;
+    event.preventDefault();
+    for (const other of document.querySelectorAll("dialog.auth-dialog[open]")) other.close();
+    const nav = document.getElementById("nav");
+    if (nav?.matches(":popover-open")) nav.hidePopover();
+    dialog.showModal();
+  });
+
+  // An island's form works only once its island runs. Until then the
   // browser's own submit would send its fields to the page's address, and
   // the sign-in's password must never leave the crypto Worker, so it is
   // held back. The islands' fields carry no names either, so even a submit
@@ -218,8 +254,8 @@
   document.addEventListener(
     "submit",
     (event) => {
-      const form = event.target instanceof Element ? event.target : null;
-      if (root.dataset.islands !== "ready" && form?.closest("leptos-island")) event.preventDefault();
+      const island = event.target instanceof Element ? event.target.closest("leptos-island") : null;
+      if (island && !("hydrated" in island.dataset)) event.preventDefault();
     },
     true,
   );

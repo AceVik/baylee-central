@@ -58,6 +58,254 @@
   }
 }
 
+/* ---- a field's inside: its glyph, and a password's eye ------------------- */
+
+.inset {
+  position: relative;
+}
+
+.inset-mark {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  display: grid;
+  place-items: center;
+  inline-size: 2.75rem;
+  color: var(--ink-faint);
+  pointer-events: none;
+  transition: color var(--dur) ease;
+}
+
+.inset-mark .icon {
+  inline-size: 1.12rem;
+  block-size: 1.12rem;
+}
+
+.inset:focus-within .inset-mark {
+  color: var(--gold);
+}
+
+.field .inset input {
+  padding-inline-start: 2.75rem;
+}
+
+.field .inset:has(.eye) input {
+  padding-inline-end: 3.2rem;
+}
+
+/* the eye lies inside the field's end, a target of its own */
+.eye {
+  position: absolute;
+  inset-block: 1px;
+  inset-inline-end: 1px;
+  display: grid;
+  place-items: center;
+  inline-size: 46px;
+  min-block-size: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 0 11px 11px 0;
+  background: transparent;
+  color: var(--ink-faint);
+  cursor: pointer;
+  transition:
+    background-color var(--dur-fast) ease,
+    color var(--dur-fast) ease;
+}
+
+.eye:hover {
+  background: color-mix(in srgb, var(--gold) 13%, transparent);
+  color: var(--title);
+}
+
+.eye:focus-visible {
+  outline-offset: -3px;
+}
+
+.eye[aria-pressed="true"] {
+  color: var(--gold);
+}
+
+.eye .icon {
+  inline-size: 1.22rem;
+  block-size: 1.22rem;
+}
+
+.eye-open,
+.eye[aria-pressed="true"] .eye-shut {
+  display: contents;
+}
+
+.eye-shut,
+.eye[aria-pressed="true"] .eye-open {
+  display: none;
+}
+
+/* ---- signing in and registering over the page that asked ------------------ */
+
+.auth-dialog {
+  inline-size: min(31rem, calc(100vw - 2 * var(--gutter)));
+  max-inline-size: none;
+  max-block-size: calc(100dvh - 2 * var(--gutter));
+  margin: auto;
+  padding: 0;
+  overflow: hidden auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--edge);
+  border-radius: var(--radius);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--panel-2) 82%, transparent), transparent 13rem), var(--panel-solid);
+  box-shadow: var(--shadow-menu);
+  color: var(--ink);
+  opacity: 0;
+  transform: translateY(18px) scale(0.96);
+  transition:
+    opacity 200ms ease,
+    transform 300ms var(--ease),
+    overlay 300ms allow-discrete,
+    display 300ms allow-discrete;
+}
+
+/* its own way in and out, not the plain dialogs' `pop` */
+.auth-dialog[open] {
+  opacity: 1;
+  transform: none;
+  animation: none;
+}
+
+@starting-style {
+  .auth-dialog[open] {
+    opacity: 0;
+    transform: translateY(18px) scale(0.96);
+  }
+}
+
+.auth-dialog::backdrop {
+  background: transparent;
+  backdrop-filter: blur(0);
+  transition:
+    background-color 260ms ease,
+    backdrop-filter 260ms ease,
+    overlay 260ms allow-discrete,
+    display 260ms allow-discrete;
+}
+
+.auth-dialog[open]::backdrop {
+  background: var(--backdrop);
+  backdrop-filter: blur(6px);
+}
+
+@starting-style {
+  .auth-dialog[open]::backdrop {
+    background: transparent;
+    backdrop-filter: blur(0);
+  }
+}
+
+.auth-card {
+  position: relative;
+  display: grid;
+  gap: 0.4rem;
+  padding: clamp(1.3rem, 5vw, 2.1rem);
+}
+
+.auth-close {
+  position: absolute;
+  inset-block-start: 0.7rem;
+  inset-inline-end: 0.7rem;
+}
+
+.auth-mark {
+  inline-size: 3.6rem;
+  block-size: 3.6rem;
+  margin: 0 auto 0.35rem;
+  border-radius: 1.05rem;
+  box-shadow:
+    0 0 0 1px var(--edge),
+    0 12px 26px -12px var(--shade-deep);
+}
+
+.auth-card > .eyebrow,
+.auth-card > h2,
+.auth-lead,
+.auth-more {
+  margin: 0;
+  text-align: center;
+}
+
+.auth-card > h2 {
+  color: var(--title);
+  font: 700 var(--text-xl) / var(--leading-tight) var(--serif);
+}
+
+.auth-lead {
+  margin-block-end: 0.9rem;
+  color: var(--ink-soft);
+  font-size: var(--text-sm);
+}
+
+.auth-more {
+  margin-block-start: 0.9rem;
+}
+
+/* the one thing to do here is as wide as the fields above it */
+.auth-card .form > .button.primary,
+.auth-form .form > .button.primary {
+  inline-size: 100%;
+  justify-content: center;
+}
+
+.auth-card .form > .hint {
+  margin: 0;
+  text-align: center;
+}
+
+/* what the card shows arrives after the card */
+@media (prefers-reduced-motion: no-preference) {
+  .auth-dialog[open] .auth-mark {
+    animation: mark-in 520ms var(--ease) 60ms both;
+  }
+
+  .auth-dialog[open] .field,
+  .auth-dialog[open] .check,
+  .auth-dialog[open] .form > .button {
+    animation: menu-row-in 380ms var(--ease) both;
+  }
+
+  .auth-dialog[open] .field:nth-child(1) {
+    animation-delay: 90ms;
+  }
+
+  .auth-dialog[open] .field:nth-child(2) {
+    animation-delay: 130ms;
+  }
+
+  .auth-dialog[open] .field:nth-child(3) {
+    animation-delay: 170ms;
+  }
+
+  .auth-dialog[open] .field:nth-child(4) {
+    animation-delay: 210ms;
+  }
+
+  .auth-dialog[open] .check,
+  .auth-dialog[open] .form > .button {
+    animation-delay: 250ms;
+  }
+}
+
+@keyframes mark-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.7) rotate(-8deg);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 .with-tool {
   display: flex;
   gap: var(--space-2);

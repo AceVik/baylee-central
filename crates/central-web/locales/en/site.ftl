@@ -435,7 +435,7 @@ error-unavailable = Baylee Central is not answering right now. Try again in a mo
 error-network = No connection. Check your network and try again.
 error-failed = Something went wrong. Try again; if it keeps happening, tell us.
 error-again = Try again
-password-show = Show
+password-show-label = Show the password
 
 ## Signing in
 
@@ -449,6 +449,8 @@ signin-working = Securing your password … this takes a moment and happens only
 signin-wrong = That sign-in name and password do not match. Check both and try again.
 signin-not-moved = This account has not moved to Baylee Central yet. Sign in once with the Baylee client; it moves your account.
 signin-no-account = No account yet? <register>Create one</register>.
+register-have-account = Already have an account? <signin>Sign in</signin>.
+dialog-close = Close
 signin-noscript = Signing in needs JavaScript: your password is processed in your browser and never sent to us.
 
 ## Registering

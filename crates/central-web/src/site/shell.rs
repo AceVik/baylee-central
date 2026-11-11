@@ -7,8 +7,9 @@ use leptos::prelude::*;
 use leptos::tachys::html::attribute::custom::custom_attribute;
 use serde_json::{Value, json};
 
-use super::{Assets, Context, Page};
-use crate::rich::rich;
+use super::{Assets, Context, Page, icons};
+use crate::islands::{Register, SignIn};
+use crate::rich::{icon, rich};
 use crate::solid;
 use crate::words::{self, Lang};
 
@@ -215,7 +216,8 @@ fn head(page: Page, cx: &Context<'_>, meta: &Meta) -> impl IntoView + use<> {
     let sky = (page == Page::Home && !cx.machine.mobile).then(|| {
         view! { <script type="module" src=assets.url("clouds.js") integrity=assets.integrity("clouds.js") fetchpriority="low"></script> }
     });
-    let islands = meta.islands.then(|| {
+    // every page that can open the sign-in over itself has its islands
+    let islands = (meta.islands || has_auth_dialogs(page)).then(|| {
         view! { <script type="module" src=assets.url("islands.js") integrity=assets.integrity("islands.js") fetchpriority="low"></script> }
     });
     let others = Lang::ALL
@@ -291,9 +293,88 @@ pub fn document(page: Page, cx: &Context<'_>, meta: &Meta, body: AnyView) -> imp
                     {footer(page, cx)}
                 </div>
                 {update(lang)}
+                {auth_dialogs(page, cx)}
             </body>
         </html>
     }
+}
+
+/// Whether signing in and registering open over this page. Not over their
+/// own pages, not in the signed-in area, and not on the page a device
+/// shows without a connection.
+fn has_auth_dialogs(page: Page) -> bool {
+    !matches!(
+        page,
+        Page::SignIn | Page::Register | Page::Account(_) | Page::Offline
+    )
+}
+
+/// One of the two dialogs: Baylee's mark, the title, a line, the form.
+fn auth_dialog(
+    cx: &Context<'_>,
+    id: &'static str,
+    title: &'static str,
+    lead: &'static str,
+    form: AnyView,
+    more: Option<AnyView>,
+) -> impl IntoView + use<> {
+    let lang = cx.lang;
+    let title_id = format!("{id}-title");
+    let labelled = title_id.clone();
+    view! {
+        <dialog {..custom_attribute("closedby", "any")} class="auth-dialog" id=id aria-labelledby=labelled>
+            <div class="auth-card">
+                <img class="auth-mark" src=cx.assets.url("img/icon-192.webp") alt="" width="192" height="192" loading="lazy" decoding="async" />
+                <p class="eyebrow">{words::acct_eyebrow(lang)}</p>
+                <h2 id=title_id>{title}</h2>
+                <p class="auth-lead">{lead}</p>
+                {form}
+                {more}
+                // last in the card, so the dialog opens with the keyboard
+                // in its first field; drawn in the card's corner
+                <button type="button" class="round-btn auth-close" data-auth-close aria-label=words::dialog_close(lang) title=words::dialog_close(lang)>
+                    {icon(icons::X)}
+                </button>
+            </div>
+        </dialog>
+    }
+}
+
+/// Signing in and registering, over the page that asked for them: a link
+/// to either opens its dialog (`boot.js`); without script, with a modifier
+/// key, or on those pages themselves, the link leads to the page as
+/// before. The forms are the pages' own islands, taken over when their
+/// dialog first opens (`islands.js`), so a page that never opens one
+/// fetches no WebAssembly for it.
+fn auth_dialogs(page: Page, cx: &Context<'_>) -> Option<impl IntoView + use<>> {
+    if !has_auth_dialogs(page) {
+        return None;
+    }
+    let lang = cx.lang;
+    let worker = cx.assets.url("crypto-worker.js");
+    let pow = cx.assets.url("pow-worker.js");
+    let security = Page::Security.path(lang);
+    let link = rich(words::sec_signin_link(lang), move |tag| {
+        (tag == "security").then(|| security.clone())
+    });
+    Some(view! {
+        {auth_dialog(
+            cx,
+            "auth-signin",
+            words::signin_title(lang),
+            words::signin_lead(lang),
+            view! { <SignIn lang=lang worker=worker.clone() /> }.into_any(),
+            Some(view! { <p class="hint auth-more">{link}</p> }.into_any()),
+        )}
+        {auth_dialog(
+            cx,
+            "auth-register",
+            words::register_title(lang),
+            words::register_lead(lang),
+            view! { <Register lang=lang worker=worker pow=pow /> }.into_any(),
+            None,
+        )}
+    })
 }
 
 /// The address of the same page in `lang`.

@@ -9,7 +9,7 @@
 //! Worker resumes it. Only where nothing is kept (another browser, cleared
 //! storage) does the page ask to sign in again, in the chat's own Worker.
 
-mod glyph;
+pub(super) mod glyph;
 mod model;
 mod people;
 mod talk;

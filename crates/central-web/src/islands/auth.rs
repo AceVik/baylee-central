@@ -10,8 +10,9 @@ use leptos::prelude::*;
 use serde_json::json;
 
 use super::central::{Failure, call, uuid_v7, valid_username};
+use super::chat::glyph;
 use super::crypto::{Crypto, field_bytes};
-use super::session;
+use super::{field, session};
 use crate::markdown;
 use crate::rich::rich;
 use crate::words::{self, Lang};
@@ -420,9 +421,12 @@ fn terms_view(
     }
 }
 
-/// The steps after the form, shared by signing in and registering.
+/// The steps after the form, shared by signing in and registering. `id`
+/// names the element they stand in: a page can hold both forms (each in its
+/// dialog) beside a form of its own, and a step's focus stays in its own.
 fn steps_view(
     lang: Lang,
+    id: &'static str,
     step: RwSignal<Step>,
     form: impl Fn() -> AnyView + Send + Sync + 'static,
 ) -> impl IntoView {
@@ -434,10 +438,12 @@ fn steps_view(
         step.track();
         if shown.is_some() {
             // its heading, its status, the way back, or the form's first field
-            super::focus::after_render("[data-step-focus], form.form input");
+            super::focus::after_render(format!(
+                "#{id} [data-step-focus], #{id} form.form input"
+            ));
         }
     });
-    move || {
+    let steps = move || {
         match step.get() {
         Step::Form => form(),
         Step::Working => view! { <p class="working" role="status" tabindex="-1" data-step-focus>{words::signin_working(lang)}</p> }.into_any(),
@@ -449,7 +455,8 @@ fn steps_view(
         }
         .into_any(),
     }
-    }
+    };
+    view! { <div id=id class="steps">{steps}</div> }
 }
 
 #[island]
@@ -488,17 +495,20 @@ pub fn SignIn(lang: Lang, worker: String) -> impl IntoView {
             <form class="form" method="post" novalidate=true on:submit=submit.clone()>
                 <div class="field">
                     <label for="signin-name">{words::signin_name(lang)}</label>
-                    <input id="signin-name" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="64" required=true
-                        on:input=move |ev| name.set(event_target_value(&ev)) prop:value=move || name.get() />
+                    <div class="inset">
+                        {field::mark(glyph::USER)}
+                        <input id="signin-name" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="64" required=true
+                            on:input=move |ev| name.set(event_target_value(&ev)) prop:value=move || name.get() />
+                    </div>
                 </div>
                 <div class="field">
                     <label for="signin-password">{words::signin_password(lang)}</label>
-                    <div class="with-tool">
+                    <div class="inset">
+                        {field::mark(glyph::LOCK)}
                         <input id="signin-password" autocomplete="current-password" maxlength="1024" required=true
                             type=move || if shown.get() { "text" } else { "password" }
                             on:input=move |ev| password.set(event_target_value(&ev)) prop:value=move || password.get() />
-                        <button type="button" class="button quiet" aria-pressed=move || if shown.get() { "true" } else { "false" }
-                            on:click=move |_| shown.update(|s| *s = !*s)>{words::password_show(lang)}</button>
+                        {field::eye(lang, shown, "signin-password")}
                     </div>
                 </div>
                 <p class="error" role="alert">{move || error.get()}</p>
@@ -508,7 +518,7 @@ pub fn SignIn(lang: Lang, worker: String) -> impl IntoView {
         }
         .into_any()
     };
-    steps_view(lang, step, form)
+    steps_view(lang, "signin-steps", step, form)
 }
 
 /// The registration form's checks, as Central would refuse (`docs/web-accounts.md`).
@@ -952,27 +962,37 @@ pub fn Register(lang: Lang, worker: String, pow: String) -> impl IntoView {
     let text_field = move |id: &'static str,
                            label: &'static str,
                            hint: &'static str,
-                           kind: &'static str,
+                           mark: &'static [glyph::Shape],
                            auto: &'static str,
                            set: fn(&mut RegisterFields, String)| {
         let hint_id = format!("{id}-hint");
+        // a password's field has the eye; any other is text for good
+        let secret = auto == "new-password";
+        let shown = RwSignal::new(!secret);
+        let eye = secret.then(|| field::eye(lang, shown, id));
         view! {
             <div class="field">
                 <label for=id>{label}</label>
-                <input id=id type=kind autocomplete=auto autocapitalize="none" spellcheck="false" maxlength="1024" aria-describedby=hint_id.clone()
-                    on:input=move |ev| { let value = event_target_value(&ev); fields.update(|f| set(f, value)); } />
+                <div class="inset">
+                    {field::mark(mark)}
+                    <input id=id autocomplete=auto autocapitalize="none" spellcheck="false" maxlength="1024" aria-describedby=hint_id.clone()
+                        type=move || if shown.get() { "text" } else { "password" }
+                        on:input=move |ev| { let value = event_target_value(&ev); fields.update(|f| set(f, value)); } />
+                    {eye}
+                </div>
                 <p class="hint" id=hint_id>{hint}</p>
             </div>
         }
     };
+    let signin = format!("/{}/signin", lang.code());
     let form = move || {
-        let (terms, privacy) = (terms.clone(), privacy.clone());
+        let (terms, privacy, signin) = (terms.clone(), privacy.clone(), signin.clone());
         view! {
             <form class="form" method="post" novalidate=true on:submit=submit.clone()>
-                {text_field("register-name", words::register_name(lang), words::register_name_hint(lang), "text", "username", |f, v| f.username = v)}
-                {text_field("register-display", words::register_display(lang), words::register_display_hint(lang), "text", "nickname", |f, v| f.display = v)}
-                {text_field("register-password", words::register_password(lang), words::register_password_hint(lang), "password", "new-password", |f, v| f.password = v)}
-                {text_field("register-repeat", words::register_repeat(lang), words::register_repeat_hint(lang), "password", "new-password", |f, v| f.repeat = v)}
+                {text_field("register-name", words::register_name(lang), words::register_name_hint(lang), glyph::USER, "username", |f, v| f.username = v)}
+                {text_field("register-display", words::register_display(lang), words::register_display_hint(lang), glyph::ID_CARD, "nickname", |f, v| f.display = v)}
+                {text_field("register-password", words::register_password(lang), words::register_password_hint(lang), glyph::LOCK, "new-password", |f, v| f.password = v)}
+                {text_field("register-repeat", words::register_repeat(lang), words::register_repeat_hint(lang), glyph::LOCK_KEYHOLE, "new-password", |f, v| f.repeat = v)}
                 <div class="check">
                     <input id="register-age" type="checkbox" on:change=move |ev| { let on = event_target_checked(&ev); fields.update(|f| f.age = on); } />
                     <label for="register-age">{words::register_age(lang)}</label>
@@ -992,11 +1012,12 @@ pub fn Register(lang: Lang, worker: String, pow: String) -> impl IntoView {
                 </div>
                 <p class="error" role="alert">{move || error.get()}</p>
                 <button type="submit" class="button primary">{words::register_submit(lang)}</button>
+                <p class="hint">{rich(words::register_have_account(lang), move |tag| (tag == "signin").then(|| signin.clone()))}</p>
             </form>
         }
         .into_any()
     };
-    (steps_view(lang, step, form), solving_view(lang, solving))
+    (steps_view(lang, "register-steps", step, form), solving_view(lang, solving))
 }
 
 /// The proof of work's progress under the step that is working, once it
