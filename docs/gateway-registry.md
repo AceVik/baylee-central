@@ -131,9 +131,10 @@ pending one beats, so its owner sees it seen, but is not listed) in
 UUID order. Pass the last returned UUID as `after` for the next page. Each entry
 contains origin, public metadata and `online`. Online means Central accepted a
 heartbeat within 90 seconds; it is not an independent availability guarantee.
-It is served on the native route and on the website's browser listener, where it
-uses no session and has a per-address budget of 60 a minute
-([web accounts](web-accounts.md)); `baylee.app/gateways` reads it there.
+It is served on the native route and on the website's browser listener; it
+uses no session and has a per-address budget of 60 a minute on both
+([web accounts](web-accounts.md); on the native route since 11.11.2026);
+`baylee.app/gateways` reads it on the browser listener.
 `GatewayHeartbeat { metadata }` requires only the heartbeat token, is limited to
 one update per five seconds, and cannot alter owner, origin, administrator list,
 approval, or SSO credentials. `GatewayPulse` is the same heartbeat with the
@@ -253,8 +254,8 @@ The ids join the figures to the directory's entries; the figures carry no
 origin or name of their own. `PublicFigures` is served wherever the directory
 is, on the native route and on the browser listener, without a session (a
 cookie sent along is not looked at), and spends the directory's budgets: the
-unauthenticated budget of 32 a second for everyone together, and on the
-browser listener the same 60 a minute per address that `GatewayDirectory`
+unauthenticated budget of 32 a second for everyone together, and on both
+listeners the same 60 a minute per address that `GatewayDirectory`
 spends, one budget for both ([web accounts](web-accounts.md)).
 
 **They are claims.** Central cannot see a gateway's tables. It bounds each

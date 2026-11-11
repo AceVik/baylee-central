@@ -4691,3 +4691,102 @@ before, on RUSTSEC-2026-0459; `Cargo.toml`, `Cargo.lock` and `deny.toml`
 are untouched.
 
 Engineering review, not an audit.
+
+## The review's leads on the website's server and on origins, 12 November 2026
+
+The section above lists what a second reading reported and nobody had
+checked ("leads"). Those that touch the website's server, the islands'
+redirect, the runbook's site block and a gateway's origin were checked
+against the code on 12.11.2026, on the pull request's branch. What held
+was fixed; what did not is said.
+
+**Design pass.** Each lead was read as a claim about one function and
+checked there before anything was changed.
+- *The deadline's answer carried no security headers.* True: the timeout
+  layer was added after the header layer and so stood outside it; a 503
+  from the deadline left without the content policy. The body is empty,
+  so nothing could run in it, but "on every answer" was not true.
+- *A 404 under no language depends on `Accept-Language` and did not say
+  so.* True. The answer is `no-cache` with an entity tag per language, so
+  a cache had to ask again and would have been corrected; the header was
+  missing all the same.
+- *Release links were held to a prefix.* True: an address that begins as
+  Baylee's and climbs (`…/releases/download/../../../other/…`) passed,
+  and a browser resolves it to another repository. The addresses come
+  from GitHub's API for Baylee's repository over TLS, so this needs
+  GitHub's answer to be wrong; the check is cheap.
+- *`session::go` refused `//host` and not `/\host`.* True, and not
+  reachable: every caller passes a path built from a known language code
+  and a fixed word. Fixed as a guard for the caller that comes later.
+- *No panic hook.* True. The process holds no secret; a panic's text can
+  hold a header or a path of the machine.
+- *A host with the root's trailing dot is a second origin.* True
+  (`central_api::gateway::validate_origin`): `https://host.` passed and
+  is the same host as `https://host`. An approval still stood between
+  such a registration and the directory.
+- *The feedback service is sent the session cookie.* True of the
+  runbook's block: the cookie is `Path=/` (`__Host-` requires it), so the
+  browser sends it to `/site/impressum*` and `/site/contact`, and the
+  block removed it only on the way to `central-web`.
+- *The two `/api/*` blocks disagree on the body bound; `/admin*` from the
+  old build has no headers.* True of the text: the new block had no
+  `request_body`, and the note on `/admin*` did not say that the old
+  block's headers must come with it.
+- *No bound on connections and no header timeout of its own.* True and
+  left: the listener is refused unless it is loopback
+  (`Config::validate`), Caddy stands in front of it and bounds both, and
+  `axum::serve` offers neither without a server of our own under it. Open
+  below.
+
+**Implementation pass.**
+- `routes::router`: the header layer is the outermost, the deadline
+  inside it.
+- `routes::answer`: the last case sets `Vary: Accept-Language`.
+- `fetch::below`: an address is `prefix` and then exactly the expected
+  number of plain segments (letters, digits, `. - + _ %`), none of them
+  `.` or `..`, nothing after them; a release's page is
+  `…/releases/tag/<tag>`, a file `…/releases/download/<tag>/<name>`.
+  `plain_tag` refuses `.` and `..`.
+- `islands::session::local`: one slash, then neither a slash nor a
+  backslash; `go` asks it.
+- `central-web`'s `main` sets a panic hook that prints a fixed line, as
+  `central-service` does.
+- `validate_origin` refuses a host that ends in a dot. The function is
+  shared with the game's client and gateway through `central-api`: no
+  type or signature changed; an origin with a trailing dot, which no
+  gateway should have been given, is now refused where it was accepted.
+- `docs/operations.md`: `header_up -Cookie` on the way to the feedback
+  service, the 64 KiB bound on `/api/*`, the old block's headers named
+  for `/admin*`, and that HSTS is sent without `includeSubDomains`.
+- The privacy notice's sentence on counting by address (German and
+  English by hand) no longer reads as a complete list of four: it says
+  that Central also counts how many requests an address sends within a
+  minute. The duration it gives was already true of those counts.
+
+**Adversarial pass.**
+- `a_release_s_links_stay_below_baylee_s_releases`: climbing addresses,
+  a query, a fragment, an empty segment, a backslash, a third segment and
+  a neighbouring repository are refused; a real asset's address and one
+  with a percent-encoded octet pass. `tags_are_plain` has `.` and `..`.
+- `addresses_and_status_codes`: a 404 under no language carries `Vary`
+  and all security headers in three languages; one under a language
+  carries no `Vary`.
+- `only_a_path_on_this_site_is_gone_to`: `//host`, `/\host`, `\/host`,
+  a scheme and an empty path are refused.
+- `origins_and_public_metadata_cannot_redirect_or_smuggle_credentials`:
+  the trailing dot, with and without a port.
+- Not shown by a test: the deadline's answer with headers (the handler
+  cannot be made to take ten seconds without a seam for it; the order of
+  the two layers was read, and the header layer runs on whatever the
+  inner service answers); the panic hook.
+
+**Open after this section.**
+- `central-web` relies on Caddy for the bound on connections and for
+  slow headers; reachable only from the machine itself.
+- The deploy hook's leads (S6, L14) and the split of the runtime's and
+  the migrator's system user are operations on the owner's machine and
+  were not changed.
+- The nine translated privacy notices carry the new sentence by machine
+  translation, unread by a speaker, like the rest of them.
+
+Engineering review, not an audit.

@@ -573,20 +573,27 @@ fn answer(app: &App, headers: &HeaderMap, uri: &Uri) -> Response {
         let lang = negotiated(headers, uri);
         return redirect(StatusCode::FOUND, &format!("/{}/#cards", lang.code()), true);
     }
+    // Not found, in the language the browser asks for: the answer depends
+    // on that header and says so, as the redirects above do.
     let lang = Lang::negotiate(header_text(headers, "accept-language").unwrap_or(""));
-    page(app, headers, Page::NotFound, lang)
+    let mut response = page(app, headers, Page::NotFound, lang);
+    response
+        .headers_mut()
+        .insert(header::VARY, HeaderValue::from_static("Accept-Language"));
+    response
 }
 
-/// The router: one handler for every address, the security headers on
-/// every answer, a ten-second deadline.
+/// The router: one handler for every address, a ten-second deadline, and
+/// the security headers on every answer, the deadline's own included (the
+/// layer added last is the outermost).
 pub fn router(app: Arc<App>) -> Router {
     Router::new()
         .fallback(any)
-        .layer(middleware::from_fn_with_state(Arc::clone(&app), security))
         .layer(tower_http::timeout::TimeoutLayer::with_status_code(
             StatusCode::SERVICE_UNAVAILABLE,
             std::time::Duration::from_secs(10),
         ))
+        .layer(middleware::from_fn_with_state(Arc::clone(&app), security))
         .with_state(app)
 }
 

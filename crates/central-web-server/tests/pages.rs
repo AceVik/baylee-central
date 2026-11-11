@@ -380,6 +380,20 @@ async fn addresses_and_status_codes() {
     let (status, headers, _) = get(&app, "/de/cards", &[("accept-language", "en")]).await;
     assert_eq!(status, StatusCode::MOVED_PERMANENTLY);
     assert!(!headers.contains_key("vary"));
+    // An address under no language is not found in the language the
+    // browser asks for, and the answer says that it depends on it; under
+    // a language it depends on nothing.
+    for (wanted, lang) in [("de", "de"), ("en", "en"), ("fr", "fr")] {
+        let (status, headers, html) =
+            get(&app, "/wp-login.php", &[("accept-language", wanted)]).await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
+        assert!(html.contains(&format!("<html lang=\"{lang}\"")), "{wanted}");
+        assert_eq!(headers["vary"], "Accept-Language");
+        secured(&headers);
+    }
+    let (status, headers, _) = get(&app, "/en/no-such-page", &[("accept-language", "de")]).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    assert!(!headers.contains_key("vary"));
 }
 
 #[tokio::test]

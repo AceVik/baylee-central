@@ -69,11 +69,20 @@ pub fn remove(key: &str) {
     }
 }
 
+/// Whether `path` names a place on this site and nowhere else: it starts
+/// with one slash, and what follows is neither a slash nor a backslash
+/// (browsers read `/\host` as they read `//host`, another site).
+#[cfg(any(target_arch = "wasm32", test))]
+#[must_use]
+pub fn local(path: &str) -> bool {
+    let mut bytes = path.bytes();
+    bytes.next() == Some(b'/') && !matches!(bytes.next(), Some(b'/' | b'\\'))
+}
+
 /// Sends the browser to `path` on this site.
 #[cfg(target_arch = "wasm32")]
 pub fn go(path: &str) {
-    if path.starts_with('/')
-        && !path.starts_with("//")
+    if local(path)
         && let Some(window) = web_sys::window()
     {
         let _ = window.location().assign(path);
@@ -113,3 +122,26 @@ pub fn remove(_key: &str) {}
 /// On the server nobody is sent anywhere.
 #[cfg(not(target_arch = "wasm32"))]
 pub fn go(_path: &str) {}
+
+#[cfg(test)]
+mod tests {
+    use super::local;
+
+    #[test]
+    fn only_a_path_on_this_site_is_gone_to() {
+        for path in ["/", "/de/account", "/en/account/profile", "/de/#cards"] {
+            assert!(local(path), "{path}");
+        }
+        for path in [
+            "",
+            "de/account",
+            "//example.org",
+            "/\\example.org",
+            "https://example.org/",
+            "\\/example.org",
+            "javascript:alert(1)",
+        ] {
+            assert!(!local(path), "{path}");
+        }
+    }
+}

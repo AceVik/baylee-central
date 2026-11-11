@@ -839,8 +839,12 @@ build of `web/` as before; nothing here changes production by being merged.
 - **Caddy**: `/api/*` stays as it is (Central's browser listener);
   `/site/impressum*` and, new, `/site/contact` go to the feedback service
   (which needs `https://baylee.app` in `FEEDBACK_CONTACT_ORIGINS`);
-  everything else to `central-web`, with the `Cookie` header removed (it
-  never needs the session) and `encode zstd gzip`:
+  everything else to `central-web`, with `encode zstd gzip`. The `Cookie`
+  header is removed on both ways that are not Central's: the session
+  cookie is `__Host-central` with `Path=/`, so the browser sends it with
+  every request to the site, and neither `central-web` nor the feedback
+  service has any use for it. `/api/*` keeps the body bound it has
+  [above](#the-browser-listener):
 
   ```caddyfile
   baylee.app {
@@ -849,9 +853,14 @@ build of `web/` as before; nothing here changes production by being merged.
   		request_body {
   			max_size 32KiB
   		}
-  		reverse_proxy <feedback service>
+  		reverse_proxy <feedback service> {
+  			header_up -Cookie
+  		}
   	}
   	handle /api/* {
+  		request_body {
+  			max_size 64KiB
+  		}
   		reverse_proxy 127.0.0.1:28791
   	}
   	handle {
@@ -864,10 +873,17 @@ build of `web/` as before; nothing here changes production by being merged.
   ```
 
   The security headers (CSP, Permissions-Policy, COOP, CORP, HSTS) come from
-  `central-web` itself; Caddy adds none.
+  `central-web` itself, on every answer it gives; Caddy adds none to those.
+  HSTS is sent without `includeSubDomains`: whether every name under
+  `baylee.app` is served over HTTPS for good is the owner's to say.
 - **Until the administration is rebuilt** (phase 5 of the proposal),
   `/admin*` can keep being served from the old build: a `handle /admin*`
   with the old `file_server` block in front of the `central-web` handle.
+  What `central-web` does not answer carries none of its headers: that
+  handle needs the old site block's own `header` directives inside it
+  (`web/README.md` §"Serving it": the old build's Content-Security-Policy,
+  Permissions-Policy, COOP, `nosniff`, `no-referrer`), or the
+  administration is served without a content policy.
 
 ## Deploying with the gateway
 
