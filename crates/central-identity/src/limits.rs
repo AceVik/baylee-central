@@ -128,6 +128,13 @@ impl Window {
         *used += 1;
         Ok(())
     }
+
+    /// Whether one more of `maximum` a second fits; nothing is spent.
+    fn fits(&self, now: Instant, maximum: u32) -> bool {
+        self.0.is_none_or(|(start, used)| {
+            now.duration_since(start) >= Duration::from_secs(1) || used < maximum
+        })
+    }
 }
 impl Limits {
     /// Count a request against what all clients share, before anything
@@ -197,24 +204,29 @@ impl Limits {
                 | Request::Logout
                 | Request::SetGatewayAdmins { .. }
         );
-        if control {
-            self.control.charge(now, 512)?;
-        } else {
-            self.data.charge(now, 256)?;
-        }
         self.peers.retain(|_, window| {
             window
                 .0
                 .is_some_and(|(start, _)| now.duration_since(start) < Duration::from_secs(1))
         });
         let key = (bearer.digest(), control);
-        if !self.peers.contains_key(&key) && self.peers.len() >= 1024 {
+        let own = if control { 128 } else { 64 };
+        // The bearer's own budget is looked at before the shared one is
+        // drawn on: a bearer asking faster than its own allows is refused
+        // here and spends nothing of what every session shares.
+        let room = match self.peers.get(&key) {
+            Some(window) => window.fits(now, own),
+            None => self.peers.len() < 1024,
+        };
+        if !room {
             return Err(Error::Busy);
         }
-        self.peers
-            .entry(key)
-            .or_default()
-            .charge(now, if control { 128 } else { 64 })
+        if control {
+            self.control.charge(now, 512)?;
+        } else {
+            self.data.charge(now, 256)?;
+        }
+        self.peers.entry(key).or_default().charge(now, own)
     }
     /// Spend one of the [`GLOBAL_PER_SECOND`] requests everyone shares,
     /// and one of the [`PLACE_PER_MINUTE`] its place may draw of them.
@@ -355,6 +367,45 @@ mod tests {
                 now + Duration::from_secs(1),
             )
             .unwrap();
+    }
+
+    /// A bearer that asks faster than its own budget allows is refused out
+    /// of that budget alone: what its refused requests would have drawn of
+    /// the window every session shares stays there for the others.
+    #[test]
+    fn one_bearer_past_its_own_budget_spends_no_one_else_s() {
+        let now = Instant::now();
+        for (request, own, shared) in [
+            (Request::SessionStatus, 128_u32, 512_u32),
+            (Request::CreateObject, 64, 256),
+        ] {
+            let mut limits = Limits::default();
+            let greedy = Token::generate().unwrap();
+            // Everything the shared window holds, from one bearer.
+            let mut served = 0;
+            for _ in 0..shared {
+                if limits.request(&request, Some(&greedy), None, now).is_ok() {
+                    served += 1;
+                }
+            }
+            assert_eq!(served, own);
+            // The rest of the second is still everyone else's: three more
+            // bearers are served their whole budgets beside it.
+            for _ in 0..3 {
+                let other = Token::generate().unwrap();
+                for _ in 0..own {
+                    limits
+                        .request(&request, Some(&other), None, now)
+                        .expect("another session is served");
+                }
+            }
+            // Then the shared window is spent, by requests that were served.
+            let last = Token::generate().unwrap();
+            assert_eq!(
+                limits.request(&request, Some(&last), None, now),
+                Err(Error::Busy)
+            );
+        }
     }
 
     fn place(n: u32) -> Place {
