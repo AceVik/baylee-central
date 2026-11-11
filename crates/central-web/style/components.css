@@ -413,3 +413,10 @@ h2.count {
   font-size: var(--text-sm);
   font-weight: 500;
 }
+
+/* a link that stands alone on its line: a 44 px target, the text as it was */
+.more-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--target);
+}
