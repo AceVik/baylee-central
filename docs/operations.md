@@ -134,7 +134,8 @@ canonical username (`BrowserSession`, `BrowserStatus`). The site is fixed to
 Per-address budgets read the last `X-Forwarded-For` hop, which Caddy sets to
 the client it saw: 5 registrations an hour, 30 discoveries and 30 sign-in starts
 a minute, and 60 reads of the gateway directory a minute (`GatewayDirectory`,
-which needs no session; the website's `/gateways` page). IPv6 addresses count by their /64. The counters live in memory only,
+which needs no session; the website's `/gateways` page; `PublicFigures`, the
+numbers the site shows, spends the same 60). IPv6 addresses count by their /64. The counters live in memory only,
 at most 4096 addresses per budget, and forget an address once its window has
 passed (at the latest a window's length later). The headers are checked
 before a body is read; an address has at most four requests in flight (429
@@ -339,6 +340,40 @@ UPDATE central_identity.gateway_tokens SET revoked_at = clock_timestamp()
     WHERE gateway_id = (SELECT id FROM central_identity.gateways WHERE origin = 'https://…')
     AND revoked_at IS NULL;
 ```
+
+### What gateways report (migration 000025)
+
+Since 11.11.2026 a gateway may send its heartbeat as a `GatewayPulse` with
+three counts (players, tables, games), and anyone may read them and the
+number of accounts with `PublicFigures` ([gateway
+registry](gateway-registry.md#activity-and-the-public-figures)). For the
+operator:
+
+- **Deploying it** is the usual order: stop, migrate, start. The migration
+  adds four nullable columns to `gateways` and needs no new grant
+  (`ops/grants.sql` is unchanged); the earlier binary runs over the migrated
+  table, so a rollback of the binary alone works. The new binary does not
+  run over the unmigrated table: its heartbeat names the new columns.
+- **Nothing is switched on here.** Central takes a pulse from every gateway
+  that may send a heartbeat. Whether a gateway reports is its operator's
+  setting on the gateway, the official one included; until the game's
+  gateway sends pulses, `PublicFigures` lists no gateway and still answers
+  the number of accounts.
+- **Taking a gateway's numbers away.** Disabling the gateway
+  (`/admin/gateways`) hides them at once. To withdraw the numbers alone
+  while the gateway stays listed, clear them; they come back with the
+  gateway's next pulse, so its operator has to stop reporting as well:
+
+```sql
+UPDATE central_identity.gateways
+    SET activity_players = NULL, activity_tables = NULL, activity_games = NULL, activity_at = NULL
+    WHERE origin = 'https://…';
+```
+
+- **What it costs.** A read is one page of the gateway table; the number of
+  accounts is counted over `accounts` once a minute at most and kept in the
+  service's memory, so it starts again from a count after a restart. No
+  history is kept, nothing is logged, and there is nothing to prune.
 
 ## The official gateway
 

@@ -53,7 +53,8 @@ GRANT SELECT, INSERT, DELETE ON central_identity.gateway_admins,
 
 Existing native account/session/ticket permissions remain necessary. The runtime
 also requires the [private object and archive grants](private-objects.md).
-The reusable SDK exposes `gateway_directory`, `Session::register_gateway` and
+The reusable SDK exposes `gateway_directory`, `public_figures`,
+`gateway_pulse`, `Session::register_gateway` and
 `Session::set_gateway_admins`; it validates returned IDs and public metadata.
 The runtime
 must not own these objects or inherit operator privileges. Startup rejects any
@@ -92,7 +93,8 @@ Central for its players' sign-ins and its entry in the gateway list.
     gateway's own name as well);
   - **scopes**: `sso` (redeem its players' tickets; check their leases,
     profiles, admin rights and terms; publish its terms) and `listing` (its
-    directory heartbeat), at least one;
+    directory heartbeat, and its pulse if it reports its activity), at least
+    one;
   - an **expiry**, 1 to 366 days (the table's CHECK holds both ends);
   - a **revocation**, by its owner or an administrator, at once.
 - **Minting** needs a password sign-in less than 30 minutes old, as an
@@ -134,7 +136,9 @@ uses no session and has a per-address budget of 60 a minute
 ([web accounts](web-accounts.md)); `baylee.app/gateways` reads it there.
 `GatewayHeartbeat { metadata }` requires only the heartbeat token, is limited to
 one update per five seconds, and cannot alter owner, origin, administrator list,
-approval, or SSO credentials.
+approval, or SSO credentials. `GatewayPulse` is the same heartbeat with the
+gateway's counts, and `PublicFigures` reads them
+([below](#activity-and-the-public-figures)).
 
 **The official gateway** is the bridge's, and the directory lists it
 like any other approved gateway (the website marks it and shows it first). Its
@@ -172,8 +176,86 @@ enrolled. Registration starts with an empty list. Ownership permits changing thi
 list but grants no implicit backend access: the owner must also be explicitly
 listed and loses backend access upon removal. A redemption credential can ask
 `CheckGatewayAdmin { account }` only about its own gateway. Heartbeats never carry
-administrator claims. Removed members lose existing admin leases as well as the
-ability to redeem previously issued admin tickets.
+administrator claims, and neither does a pulse. Removed members lose existing
+admin leases as well as the ability to redeem previously issued admin tickets.
+
+## Activity and the public figures
+
+*11.11.2026, migration 000025.* The owner's decision: the website shows how
+many players, tables and games there are, and those numbers come from where
+they arise, "the gateways tell Central, Central tells the website". Two
+operations were added for it. Nothing that existed changed: the heartbeat,
+the directory and a listing are byte for byte what they were, and take no new
+field (`central-api`'s wire tests hold their exact JSON).
+
+**What a gateway may report.** `GatewayPulse { metadata, activity }` is a
+heartbeat that also carries `GatewayActivity { players, tables, games }`:
+players connected, tables open to join, games running, each a count from 0 to
+100 000 (`GatewayActivity::MOST`). Nothing else: no name, no account, no
+address, no list. It goes through the heartbeat's own code path with the
+activity added, so everything said of `GatewayHeartbeat` above holds for it:
+the heartbeat credential or a live token with `listing` (never the redemption
+credential or an `sso`-only token), the bridge credential for the official
+gateway's row and no other, metadata on the gateway's origin, one beat per
+five seconds (`Busy`, and the counts stay as they were), the same budgets,
+the native route only, and the heartbeat's answer. A count above the bound is
+`Rejected` before anything is read or written, so not even the token is marked
+used.
+
+**Reporting is the operator's choice.** A gateway that never sends a pulse has
+no activity, and one that sends a plain `GatewayHeartbeat` afterwards has none
+again: that heartbeat clears the stored counts in the same statement that
+records it. Reporting therefore ends at once when an operator switches it off
+(or after 90 seconds if the gateway stops altogether), and nothing has to be
+revoked or deleted by hand.
+
+**What Central keeps.** The three counts and the time of the report, in four
+nullable columns of the gateway's own row (`activity_players`,
+`activity_tables`, `activity_games`, `activity_at`), all set or all NULL and
+each within the bound (two CHECKs). One row per gateway is overwritten by each
+pulse: there is no history, no series and no per-player record, and Central
+logs none of it.
+
+**What is published.** `PublicFigures { after }` needs no credential and
+answers `PublicFigures { accounts, gateways }`:
+
+- `accounts` is the number of accounts that can sign in: rows with a stored
+  credential, which is the administration overview's "enrolled". A
+  registration or move that was started and not finished is not counted, and
+  a deleted account's row is gone. Central counts once and keeps the number
+  for 60 seconds, however many ask, so the figure can be up to a minute old
+  (two after a count that failed) and is the same on every page. It is the
+  exact number, not a rounded one.
+- `gateways` is at most 100 `GatewayFigures { id, activity }` in ascending ID
+  order, with `after` as the exclusive cursor, as in the directory. A gateway
+  is in it only if it is approved and enabled, was seen within 90 seconds (the
+  directory's `online`) and reported its activity within those 90 seconds. A
+  pending gateway's pulse is accepted, as its heartbeat is, and shown nowhere
+  until an administrator approves it; a disabled gateway is hidden at once and
+  its pulse refused. A gateway the directory lists and the figures do not is
+  one that does not report, which is different from one that reports zeros.
+
+The ids join the figures to the directory's entries; the figures carry no
+origin or name of their own. `PublicFigures` is served wherever the directory
+is, on the native route and on the browser listener, without a session (a
+cookie sent along is not looked at), and spends the directory's budgets: the
+unauthenticated budget of 32 a second for everyone together, and on the
+browser listener the same 60 a minute per address that `GatewayDirectory`
+spends, one budget for both ([web accounts](web-accounts.md)).
+
+**They are claims.** Central cannot see a gateway's tables. It bounds each
+count and says whose it is; a gateway that lies can show any number up to the
+bound beside its own name, and an administrator who notices disables it. The
+website shows the counts as the gateway's own, and any total it adds up is a
+sum of claims ([threat model](threat-model.md)).
+
+**SDK.** `central_client::gateway_pulse` and `central_client::public_figures`
+check what they send and what they read (the bound, well-formed ascending
+ids, at most 100). A Central built before 000025 does not know either
+operation and answers an unknown operation as it answers a wrong credential,
+`Rejected` (HTTP 401): a gateway that is refused a pulse sends its plain
+heartbeat instead, and if that is accepted it keeps to plain heartbeats and
+tries the pulse again later.
 
 ## SSO and revocation
 

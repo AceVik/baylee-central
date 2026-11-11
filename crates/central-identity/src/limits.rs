@@ -81,6 +81,7 @@ impl Limits {
                 | Request::EnrollmentStart { .. }
                 | Request::EnrollmentFinish { .. }
                 | Request::GatewayDirectory { .. }
+                | Request::PublicFigures { .. }
                 | Request::Terms
                 | Request::GatewayTerms { .. }
                 | Request::ResetStart { .. }
@@ -261,6 +262,56 @@ mod tests {
             Err(Error::Busy)
         );
     }
+    #[test]
+    fn the_figures_spend_the_public_budget_and_a_pulse_a_heartbeat_s() {
+        let now = Instant::now();
+        let mut limits = Limits::default();
+        let token = Token::generate().unwrap();
+        let figures = Request::PublicFigures { after: None };
+        // Public: a bearer sent along buys no budget of its own.
+        for _ in 0..GLOBAL_PER_SECOND {
+            limits.request(&figures, Some(&token), now).unwrap();
+        }
+        for request in [&figures, &Request::GatewayDirectory { after: None }] {
+            assert_eq!(limits.request(request, None, now), Err(Error::Busy));
+            assert_eq!(limits.request(request, Some(&token), now), Err(Error::Busy));
+        }
+        // A pulse and a heartbeat are one credential's same 64 a second.
+        let metadata = || central_api::gateway::GatewayMetadata {
+            name: "Synthetic".into(),
+            version: "1".into(),
+            website: "https://gateway.invalid/".into(),
+        };
+        let pulse = Request::GatewayPulse {
+            metadata: metadata(),
+            activity: central_api::gateway::GatewayActivity {
+                players: 1,
+                tables: 1,
+                games: 1,
+            },
+        };
+        let heartbeat = Request::GatewayHeartbeat {
+            metadata: metadata(),
+        };
+        for sent in 0..64 {
+            let request = if sent % 2 == 0 { &pulse } else { &heartbeat };
+            limits.request(request, Some(&token), now).unwrap();
+        }
+        for request in [&pulse, &heartbeat] {
+            assert_eq!(limits.request(request, Some(&token), now), Err(Error::Busy));
+        }
+        // Without a credential a pulse is one more public request, refused
+        // here with the budget and by dispatch otherwise.
+        assert_eq!(limits.request(&pulse, None, now), Err(Error::Busy));
+        // Neither took anything from a session's checks.
+        limits
+            .request(&Request::SessionStatus, Some(&token), now)
+            .unwrap();
+        limits
+            .request(&figures, None, now + Duration::from_secs(1))
+            .unwrap();
+    }
+
     #[test]
     fn rate_limits_expire_and_have_bounded_cardinality() {
         let now = Instant::now();

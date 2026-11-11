@@ -118,6 +118,26 @@ pub enum Request {
         /// Metadata must stay on the approved origin.
         metadata: crate::gateway::GatewayMetadata,
     },
+    /// A heartbeat that also reports activity: the same credential, checks,
+    /// limit and answer as [`Request::GatewayHeartbeat`], and the three
+    /// counts kept with the time. A plain heartbeat afterwards clears them:
+    /// the gateway stopped reporting. Sending this is the operator's choice
+    /// (`docs/gateway-registry.md` §"Activity and the public figures").
+    GatewayPulse {
+        /// Metadata must stay on the approved origin.
+        metadata: crate::gateway::GatewayMetadata,
+        /// The gateway's own counts, each at most
+        /// [`crate::gateway::GatewayActivity::MOST`].
+        activity: crate::gateway::GatewayActivity,
+    },
+    /// Public, no credential: the number of accounts, and one page of what
+    /// online gateways last reported. Answered with
+    /// [`Response::PublicFigures`]; served like [`Request::GatewayDirectory`],
+    /// under its budgets.
+    PublicFigures {
+        /// Exclusive pagination cursor, or None for the first page.
+        after: Option<[u8; 16]>,
+    },
     /// Owner-authorized, revision-checked replacement of this gateway's administrator list.
     SetGatewayAdmins {
         /// Owned gateway ID.
@@ -662,6 +682,17 @@ pub enum Response {
     GatewayDirectory {
         /// At most 100 records; use the final ID as the next cursor.
         gateways: Vec<crate::gateway::GatewayListing>,
+    },
+    /// Central's public figures ([`Request::PublicFigures`]): counts only.
+    PublicFigures {
+        /// Accounts that can sign in: enrolled and not deleted. The same on
+        /// every page; Central counts about once a minute.
+        accounts: u64,
+        /// At most 100 gateways in ascending ID order, each approved, online
+        /// and with an activity it reported within the last 90 seconds; use
+        /// the final ID as the next cursor. A gateway that does not report
+        /// is not here, though the directory lists it.
+        gateways: Vec<crate::gateway::GatewayFigures>,
     },
     /// Administrator-list update committed.
     GatewayAdmins {
@@ -1222,6 +1253,199 @@ mod tests {
             )
             .is_err()
         );
+    }
+
+    const METADATA: &str =
+        r#"{"name":"Synthetic","version":"1.2.3-test","website":"https://gateway.invalid/"}"#;
+    const ACTIVITY: &str = r#"{"players":12,"tables":3,"games":4}"#;
+    const ID: &str = "[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]";
+    const COUNTED: crate::gateway::GatewayActivity = crate::gateway::GatewayActivity {
+        players: 12,
+        tables: 3,
+        games: 4,
+    };
+
+    fn gateway_id() -> [u8; 16] {
+        core::array::from_fn(|i| u8::try_from(i + 1).unwrap())
+    }
+
+    fn metadata() -> crate::gateway::GatewayMetadata {
+        crate::gateway::GatewayMetadata {
+            name: "Synthetic".into(),
+            version: "1.2.3-test".into(),
+            website: "https://gateway.invalid/".into(),
+        }
+    }
+
+    fn text<T: Serialize>(value: &T) -> String {
+        String::from_utf8(crate::encode(value).unwrap()).unwrap()
+    }
+
+    /// The pulse and the figures are operations of their own. The heartbeat,
+    /// the directory and a listing are, byte for byte, what a client or
+    /// gateway built before them sends and reads, and take nothing new.
+    #[test]
+    fn the_heartbeat_and_the_directory_keep_the_earlier_wire_and_take_no_activity() {
+        let id = gateway_id();
+        let heartbeat = format!(r#"{{"operation":"gateway_heartbeat","metadata":{METADATA}}}"#);
+        assert_eq!(
+            text(&Request::GatewayHeartbeat {
+                metadata: metadata()
+            }),
+            heartbeat
+        );
+        assert!(matches!(
+            crate::decode::<Request>(heartbeat.as_bytes()).unwrap(),
+            Request::GatewayHeartbeat { .. }
+        ));
+        for (request, wire) in [
+            (
+                Request::GatewayDirectory { after: None },
+                r#"{"operation":"gateway_directory","after":null}"#.to_owned(),
+            ),
+            (
+                Request::GatewayDirectory { after: Some(id) },
+                format!(r#"{{"operation":"gateway_directory","after":{ID}}}"#),
+            ),
+        ] {
+            assert_eq!(text(&request), wire);
+            assert!(matches!(
+                crate::decode::<Request>(wire.as_bytes()).unwrap(),
+                Request::GatewayDirectory { .. }
+            ));
+        }
+        let listing = format!(
+            r#"{{"id":{ID},"origin":"https://gateway.invalid","metadata":{METADATA},"online":true}}"#
+        );
+        let directory = format!(r#"{{"result":"gateway_directory","gateways":[{listing}]}}"#);
+        assert_eq!(
+            text(&Response::GatewayDirectory {
+                gateways: vec![crate::gateway::GatewayListing {
+                    id,
+                    origin: "https://gateway.invalid".into(),
+                    metadata: metadata(),
+                    online: true,
+                }],
+            }),
+            directory
+        );
+        assert!(crate::decode::<Response>(directory.as_bytes()).is_ok());
+        assert_eq!(text(&Response::Done), r#"{"result":"done"}"#);
+        // None of them takes an activity: the old shapes stay closed.
+        let with_activity =
+            heartbeat.replace(r#"/"}}"#, &format!(r#"/"}},"activity":{ACTIVITY}}}"#));
+        assert!(with_activity.contains("activity"));
+        assert!(crate::decode::<Request>(with_activity.as_bytes()).is_err());
+        for changed in [
+            directory.replace(
+                r#","online":true"#,
+                &format!(r#","online":true,"activity":{ACTIVITY}"#),
+            ),
+            directory.replace(r#""gateways":["#, r#""accounts":1,"gateways":["#),
+        ] {
+            assert_ne!(changed, directory);
+            assert!(crate::decode::<Response>(changed.as_bytes()).is_err());
+        }
+    }
+
+    /// The pulse: a heartbeat's metadata and the three counts, both required.
+    #[test]
+    fn the_pulse_has_the_designed_shape() {
+        let pulse = format!(
+            r#"{{"operation":"gateway_pulse","metadata":{METADATA},"activity":{ACTIVITY}}}"#
+        );
+        assert_eq!(
+            text(&Request::GatewayPulse {
+                metadata: metadata(),
+                activity: COUNTED,
+            }),
+            pulse
+        );
+        let Request::GatewayPulse {
+            metadata: read,
+            activity,
+        } = crate::decode(pulse.as_bytes()).unwrap()
+        else {
+            panic!("a pulse");
+        };
+        assert_eq!((read.name.as_str(), activity), ("Synthetic", COUNTED));
+        for bad in [
+            format!(r#"{{"operation":"gateway_pulse","metadata":{METADATA}}}"#),
+            format!(r#"{{"operation":"gateway_pulse","activity":{ACTIVITY}}}"#),
+            format!(
+                r#"{{"operation":"gateway_pulse","metadata":{METADATA},"activity":{ACTIVITY},"origin":"https://elsewhere.invalid"}}"#
+            ),
+            format!(
+                r#"{{"operation":"gateway_pulse","metadata":{METADATA},"activity":{{"players":12,"tables":3,"games":4,"names":[]}}}}"#
+            ),
+        ] {
+            assert!(crate::decode::<Request>(bad.as_bytes()).is_err(), "{bad}");
+        }
+    }
+
+    /// The figures: a cursor in, the accounts and a page of counts out.
+    #[test]
+    fn the_figures_have_the_designed_shapes() {
+        use crate::gateway::GatewayFigures;
+        let id = gateway_id();
+        for (request, wire) in [
+            (
+                Request::PublicFigures { after: None },
+                r#"{"operation":"public_figures","after":null}"#.to_owned(),
+            ),
+            (
+                Request::PublicFigures { after: Some(id) },
+                format!(r#"{{"operation":"public_figures","after":{ID}}}"#),
+            ),
+        ] {
+            assert_eq!(text(&request), wire);
+            assert!(matches!(
+                crate::decode::<Request>(wire.as_bytes()).unwrap(),
+                Request::PublicFigures { .. }
+            ));
+        }
+        // A cursor left out is none, as the directory reads it.
+        for operation in ["public_figures", "gateway_directory"] {
+            assert!(matches!(
+                crate::decode::<Request>(format!(r#"{{"operation":"{operation}"}}"#).as_bytes())
+                    .unwrap(),
+                Request::PublicFigures { after: None } | Request::GatewayDirectory { after: None }
+            ));
+        }
+        assert!(
+            crate::decode::<Request>(br#"{"operation":"public_figures","after":null,"token":"x"}"#)
+                .is_err()
+        );
+        let figures = format!(
+            r#"{{"result":"public_figures","accounts":42,"gateways":[{{"id":{ID},"activity":{ACTIVITY}}}]}}"#
+        );
+        let page = || {
+            vec![GatewayFigures {
+                id,
+                activity: COUNTED,
+            }]
+        };
+        assert_eq!(
+            text(&Response::PublicFigures {
+                accounts: 42,
+                gateways: page(),
+            }),
+            figures
+        );
+        let Response::PublicFigures { accounts, gateways } =
+            crate::decode(figures.as_bytes()).unwrap()
+        else {
+            panic!("the figures");
+        };
+        assert_eq!((accounts, gateways), (42, page()));
+        for bad in [
+            figures.replace(r#""accounts":42,"#, ""),
+            figures.replace(r#""accounts":42"#, r#""accounts":-1"#),
+            figures.replace(r#""activity""#, r#""name":"Synthetic","activity""#),
+            figures.replace(r#""accounts":42"#, r#""accounts":42,"usernames":[]"#),
+        ] {
+            assert!(crate::decode::<Response>(bad.as_bytes()).is_err(), "{bad}");
+        }
     }
 
     #[test]

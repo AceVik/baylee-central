@@ -137,6 +137,14 @@ The server side of [web accounts](web-accounts.md) lands in three PRs.
   gateway's row, without owner or credential; the operator lists it, and the
   bridge's heartbeat moves it alone ([gateway registry](gateway-registry.md),
   [operations](operations.md#the-official-gateway)).
+- **The public figures, Central's side** (11.11.2026, migration 000025). A
+  gateway may send its heartbeat as `GatewayPulse` with three bounded counts
+  (players, tables, games); `PublicFigures` answers them for gateways that
+  are approved, online and reporting, with the number of accounts that can
+  sign in, on both listeners without a session ([gateway
+  registry](gateway-registry.md#activity-and-the-public-figures)). Not part
+  of it, and open: the website reading them, and the game's gateway sending
+  pulses (it sends plain heartbeats, so no gateway is listed yet).
 - **The account page and recovery codes for moved accounts** (22.10.2026,
   the accounts and administration design's step 2). `AccountSummary` (browser
   listener, the cookie, no terms needed) names the session's account, where it

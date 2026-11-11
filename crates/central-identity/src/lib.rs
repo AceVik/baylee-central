@@ -88,9 +88,10 @@ pub struct BrowserReply {
 
 /// The operations the browser listener serves (`docs/web-accounts.md`); every
 /// other one is refused before anything else happens. Terms are accepted there
-/// for Central only; the public gateway directory is read there without a
-/// session. The match names every operation, so a new one does not compile
-/// until it is decided here.
+/// for Central only; the public gateway directory and the public figures are
+/// read there without a session. A gateway's pulse, like its heartbeat, is
+/// the native route's. The match names every operation, so a new one does
+/// not compile until it is decided here.
 #[must_use]
 pub fn browser_operation(request: &Request) -> bool {
     match request {
@@ -109,6 +110,7 @@ pub fn browser_operation(request: &Request) -> bool {
         | Request::Terms
         | Request::TermsStatus
         | Request::GatewayDirectory { .. }
+        | Request::PublicFigures { .. }
         | Request::AccountSummary
         | Request::SetRecovery { .. }
         | Request::SetDisplayName { .. }
@@ -138,6 +140,7 @@ pub fn browser_operation(request: &Request) -> bool {
         | Request::LegacyProfile { .. }
         | Request::RegisterGateway { .. }
         | Request::GatewayHeartbeat { .. }
+        | Request::GatewayPulse { .. }
         | Request::SetGatewayAdmins { .. }
         | Request::CheckGatewayAdmin { .. }
         | Request::GatewaySession { .. }
@@ -265,6 +268,9 @@ pub struct IdentityService {
     /// Registration's proofs of work and the last hour's registrations.
     challenges: Mutex<challenge::Challenges>,
     limits: Mutex<limits::Limits>,
+    /// The public figures' number of accounts and when it was counted
+    /// ([`gateways::FIGURES_SECONDS`]); one value, whoever asks.
+    accounts: Mutex<gateways::Counted>,
     workers: Arc<Semaphore>,
     terms: Option<central_api::terms::TermsDocument>,
     /// The legacy store, from the cutover until its deadline
@@ -312,6 +318,7 @@ impl IdentityService {
             resets: Mutex::default(),
             challenges: Mutex::default(),
             limits: Mutex::default(),
+            accounts: Mutex::default(),
             workers: Arc::new(Semaphore::new(4)),
             terms: terms::central()?,
             legacy: None,
@@ -628,6 +635,7 @@ mod tests {
                 digest: [0; 32],
             },
             Request::GatewayDirectory { after: None },
+            Request::PublicFigures { after: None },
             Request::AccountSummary,
             Request::SetRecovery {
                 recovery: vec![1; 73],
@@ -710,6 +718,15 @@ mod tests {
             },
             Request::GatewayHeartbeat {
                 metadata: metadata(),
+            },
+            // a gateway's counts come with its heartbeat's credential, never a page's
+            Request::GatewayPulse {
+                metadata: metadata(),
+                activity: central_api::gateway::GatewayActivity {
+                    players: 1,
+                    tables: 1,
+                    games: 1,
+                },
             },
             Request::SetGatewayAdmins {
                 gateway: [0; 16],
@@ -842,7 +859,7 @@ mod tests {
                 text[start..].split('"').next().unwrap().to_owned()
             })
             .collect();
-        assert_eq!(named.len(), 64, "every operation is in one of the lists");
+        assert_eq!(named.len(), 66, "every operation is in one of the lists");
     }
 
     #[test]
@@ -905,6 +922,12 @@ mod tests {
         }));
         assert!(!uses_session(&Request::Terms));
         assert!(!uses_session(&Request::GatewayDirectory { after: None }));
+        // The figures are for everyone: a cookie sent along is not looked at.
+        assert!(!uses_session(&Request::PublicFigures { after: None }));
+        assert!(!browser_only(&Request::PublicFigures { after: None }));
+        assert!(!terms::needs_acceptance(&Request::PublicFigures {
+            after: None
+        }));
         assert!(!uses_session(&Request::Discover {
             username: "synthetic".into()
         }));
