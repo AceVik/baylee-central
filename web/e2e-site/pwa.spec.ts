@@ -1,5 +1,6 @@
-// The site as an app (docs/proposals/frontend-rewrite.md §7): the service
-// worker caches the offline page per build, answers a page it cannot fetch
+// The site as an app (docs/proposals/frontend-rewrite.md §7): only someone
+// signed in, the installed app or a device with notifications on gets the
+// service worker; it caches the offline page per build, answers a page it cannot fetch
 // with it in the address's language, and a new build waits until the
 // visitor chooses to reload, which warns once about text not sent yet.
 //
@@ -52,7 +53,35 @@ async function stop(child: ChildProcessWithoutNullStreams | null) {
   await exited;
 }
 
+const SIGNED_IN = () => localStorage.setItem("baylee-central-session", JSON.stringify({ expiresAt: 4_102_444_800 }));
+
+test("a reader gets no worker, and after signing out it goes with its cache", async ({ page }) => {
+  await page.goto("/en/");
+  await page.waitForLoadState("networkidle");
+  expect(await page.evaluate(async () => (await navigator.serviceWorker.getRegistrations()).length)).toBe(0);
+  expect(await page.evaluate(async () => (await caches.keys()).length)).toBe(0);
+
+  // signed in, the worker comes; signed out, the next page takes it away
+  await page.evaluate(SIGNED_IN);
+  await page.reload();
+  await page.evaluate(async () => {
+    await navigator.serviceWorker.ready;
+  });
+  await page.evaluate(() => localStorage.removeItem("baylee-central-session"));
+  await expect.poll(() => page.evaluate(async () => (await caches.keys()).some((key) => key.startsWith("baylee-site-")))).toBe(true);
+  await page.reload();
+  await expect.poll(() => page.evaluate(async () => (await navigator.serviceWorker.getRegistrations()).length)).toBe(0);
+  await expect.poll(() => page.evaluate(async () => (await caches.keys()).length)).toBe(0);
+});
+
+test("a device with notifications on keeps its worker past the sign-in", async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem("baylee-push-installation-v1", "0123456789abcdef0123456789abcdef"));
+  await page.goto("/en/");
+  await expect.poll(() => page.evaluate(async () => Boolean((await navigator.serviceWorker.getRegistration("/"))?.active))).toBe(true);
+});
+
 test("works offline", async ({ page, context }) => {
+  await page.addInitScript(SIGNED_IN);
   await page.goto("/en/");
   await page.evaluate(async () => {
     await navigator.serviceWorker.ready;
@@ -82,6 +111,7 @@ test("a new version waits, and warns once about unsent text before reloading", a
   try {
     cpSync(join(ROOT, "target/site"), copy, { recursive: true });
     server = await serve(copy);
+    await page.addInitScript(SIGNED_IN);
     await page.goto(`${ORIGIN}/en/contact`);
     await page.evaluate(async () => {
       await navigator.serviceWorker.ready;

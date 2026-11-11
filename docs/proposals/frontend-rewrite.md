@@ -841,7 +841,11 @@ the inbox.
   `baylee-sw`, that vouches for `/sw.js` alone (the CSP now names
   `trusted-types baylee baylee-sw`). It offers a waiting version, warns once
   about unsent text before reloading, and shows "Install as an app" in the
-  account area after `beforeinstallprompt`.
+  account area after `beforeinstallprompt`. It registers the worker only
+  for someone signed in, for the installed app (`display-mode`) and for a
+  device whose notifications are on (the nonce in localStorage); for anyone
+  else it removes a worker left from earlier and its caches, so a reader
+  gets nothing stored (owner's decision, 11 November 2026).
 - `/{lang}/offline` (200, not indexed) and
   `/{lang}/account/notifications`: Web Push on this device and the
   account's categories, the protocol, bits, nonce and storage names
