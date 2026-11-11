@@ -103,6 +103,19 @@
   color: var(--ink-soft);
 }
 
+/* Registration's proof of work, once it takes long: a line and its bar
+   under the working step; nothing takes room while there is nothing to say. */
+.solving {
+  display: grid;
+  gap: var(--space-2);
+  margin-block-start: var(--space-3);
+  color: var(--ink-soft);
+}
+
+.solving:empty {
+  display: none;
+}
+
 .step {
   display: grid;
   gap: var(--space-3);

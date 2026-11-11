@@ -115,7 +115,68 @@ test("registration refuses a robot's haste and its hidden field, and says when i
   await fill();
   await page.getByRole("button", { name: "Create account" }).click();
   await expect(page.getByRole("alert")).toHaveText("Registration is paused right now. Try again later.", { timeout: 15_000 });
-  expect(asked).toEqual(["register_challenge"]);
+  expect(asked).toEqual(["register_challenge_for"]);
+});
+
+// A stand-in for the proof's Worker: six seconds of "work" in eight steps,
+// then counters the stand-in for Central does not check.
+const SLOW_WORKER = `self.onmessage = (event) => {
+  const parts = JSON.parse(event.data).parts;
+  let done = 0;
+  const step = () => {
+    done += 1;
+    if (done < parts) {
+      self.postMessage(JSON.stringify({ progress: Math.floor((done * 100) / parts) }));
+      setTimeout(step, 750);
+    } else {
+      self.postMessage(JSON.stringify({ counters: Array.from({ length: parts }, (_, i) => i + 1) }));
+    }
+  };
+  setTimeout(step, 750);
+};`;
+
+test("a proof that takes long says so politely, and the page reports its browser", async ({ page }) => {
+  const problems: string[] = [];
+  page.on("pageerror", (error) => problems.push(error.message));
+  await page.route("**/assets/pow-worker.*.js", (route) => route.fulfill({ status: 200, contentType: "text/javascript", body: SLOW_WORKER }));
+  const asked: Record<string, unknown>[] = [];
+  await page.route("**/api/v1", (route) => {
+    const body = JSON.parse(route.request().postData() ?? "{}");
+    asked.push(body);
+    if (body.operation !== "register_challenge_for") return route.fulfill({ status: 401, body: "account request rejected\n" });
+    // the hardest challenge Central asks for, twenty minutes to hand it in
+    const challenge = { result: "register_challenge", nonce: "ab".repeat(32), parts: 8, difficulty: 22, expires_at: Math.floor(Date.now() / 1000) + 1200 };
+    return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(challenge) });
+  });
+  await page.goto("/en/register");
+  await expect(page.locator("html")).toHaveAttribute("data-islands", "ready");
+  await page.getByLabel("Sign-in name").fill("erika");
+  await page.getByLabel("Display name").fill("Erika");
+  await page.getByLabel("Password", { exact: true }).fill("violet lantern harbour");
+  await page.getByLabel("Repeat password").fill("violet lantern harbour");
+  await page.getByLabel("I am 16 or older.").check();
+  await page.getByRole("checkbox", { name: /I accept the terms of use/ }).check();
+  // quiet until there is something to say, and polite when there is
+  const solving = page.locator(".solving");
+  await expect(solving).toHaveAttribute("aria-live", "polite");
+  await expect(solving).toBeEmpty();
+  await expect(solving).toBeHidden();
+  await page.waitForTimeout(3_000);
+  await page.getByRole("button", { name: "Create account" }).click();
+  // nothing for the first three seconds, then the line and the bar
+  await expect(solving).toBeEmpty();
+  await expect(solving.locator("p")).toContainText("Your browser is solving a puzzle that keeps robots out.", { timeout: 10_000 });
+  await expect(solving.locator("p")).toContainText("%");
+  await expect(solving.getByRole("progressbar")).toHaveAttribute("max", "100");
+  await expect(solving.getByRole("progressbar")).toHaveAttribute("value", /^(37|50|62|75|87)$/);
+  // handed in, the line goes; this stand-in refuses the registration
+  await expect(page.getByRole("alert")).toHaveText("The registration was not accepted. Try again.", { timeout: 15_000 });
+  await expect(solving).toBeEmpty();
+  // a browser a program drives says so (bit 1), and has languages (bit 2 unset)
+  expect(asked[0]).toEqual({ operation: "register_challenge_for", signals: 1 });
+  expect(asked[1]).toMatchObject({ operation: "register", username: "erika", display_name: "Erika", nonce: "ab".repeat(32), counters: [1, 2, 3, 4, 5, 6, 7, 8] });
+  expect(asked).toHaveLength(2);
+  expect(problems).toEqual([]);
 });
 
 // UUIDv7-shaped ids, the last byte telling them apart

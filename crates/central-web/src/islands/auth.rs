@@ -579,21 +579,61 @@ fn token(bytes: [u8; 32]) -> Token {
     serde_json::from_value(json!(bytes)).unwrap_or_else(|_| unreachable!("32 bytes are a token"))
 }
 
-/// Registers an account and signs it in: `Register`, the OPAQUE enrolment
-/// with a new master key and recovery code in the Worker, then a sign-in
-/// with the same password, which is let go after it.
+/// How far the proof of work is, for the line a person reads while it
+/// takes long.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+enum Solving {
+    /// Nothing is being solved.
+    #[default]
+    Idle,
+    /// Solving, this share done, and quick so far: nothing is said.
+    Quiet(u32),
+    /// Solving for longer than [`SLOW_MS`]: the share done is shown.
+    Shown(u32),
+}
+
+/// How long a solution is held back after the challenge arrived, in
+/// milliseconds: Central takes none sooner than three seconds after it
+/// issued the challenge, which was before the answer came.
+const HANDOVER_MS: u64 = 3_200;
+/// How long the proof of work may take before the page says what it does.
+const SLOW_MS: u32 = 3_000;
+
+/// How long to wait still, `now`, with a challenge that arrived at
+/// `answered` (both in the browser clock's milliseconds). The time counts
+/// from the answer and not from the request: a slow connection spends its
+/// time before Central issues the challenge, and a solution handed in
+/// three seconds after the request would be too early for Central, which
+/// spends the challenge on it. A clock set back waits the whole time.
+fn handover_wait(answered: u64, now: u64) -> u32 {
+    u32::try_from(HANDOVER_MS.saturating_sub(now.saturating_sub(answered))).unwrap_or(u32::MAX)
+}
+
 /// Central's proof of work for one registration (`docs/registration-abuse.md`),
 /// solved in the Worker at `pow`; handed over no sooner than Central takes
-/// it, three seconds after the challenge.
+/// it, three seconds after the challenge. The page says what it saw of its
+/// own browser, which only ever makes the challenge harder. `solving`
+/// follows the work, and shows it once it takes long.
 ///
 /// # Errors
 /// The problem, tagged `closed` while an administrator closed registration.
-async fn proof(pow: &str) -> Result<(String, Vec<u64>), (Problem, Option<&'static str>)> {
+async fn proof(
+    pow: &str,
+    solving: RwSignal<Solving>,
+) -> Result<(String, Vec<u64>), (Problem, Option<&'static str>)> {
     use central_api::register::{MAX_DIFFICULTY, PARTS, valid_nonce};
 
-    let asked = super::pow::now_ms();
     let fail = |failure: Failure| (Problem::from(failure), None);
-    let (nonce, parts, difficulty) = match call(&Request::RegisterChallenge).await.map_err(fail)? {
+    let reported = Request::RegisterChallengeFor {
+        signals: super::pow::browser_signals(),
+    };
+    let answer = match call(&reported).await {
+        // a Central from before the page reported its browser
+        Err(Failure::Rejected) => call(&Request::RegisterChallenge).await,
+        answer => answer,
+    };
+    let answered = super::pow::now_ms();
+    let (nonce, parts, difficulty) = match answer.map_err(fail)? {
         Response::RegisterChallenge {
             nonce,
             parts,
@@ -606,24 +646,51 @@ async fn proof(pow: &str) -> Result<(String, Vec<u64>), (Problem, Option<&'stati
     if !valid_nonce(&nonce) || parts != PARTS || difficulty > MAX_DIFFICULTY {
         return Err((Problem::Failed, None));
     }
-    let counters = super::pow::solve(pow, &nonce, u32::from(parts), u32::from(difficulty), |_| {})
-        .await
-        .ok_or((Problem::Failed, None))?;
-    let spent = super::pow::now_ms().saturating_sub(asked);
-    if spent < 3_200 {
-        super::pow::wait(u32::try_from(3_200 - spent).unwrap_or(3_200)).await;
+    solving.set(Solving::Quiet(0));
+    leptos::task::spawn_local(async move {
+        super::pow::wait(SLOW_MS).await;
+        solving.update(|solving| {
+            if let Solving::Quiet(percent) = *solving {
+                *solving = Solving::Shown(percent);
+            }
+        });
+    });
+    let progress = move |percent: u32| {
+        solving.update(|solving| match *solving {
+            Solving::Quiet(_) => *solving = Solving::Quiet(percent),
+            Solving::Shown(_) => *solving = Solving::Shown(percent),
+            Solving::Idle => {}
+        });
+    };
+    let counters = super::pow::solve(
+        pow,
+        &nonce,
+        u32::from(parts),
+        u32::from(difficulty),
+        progress,
+    )
+    .await;
+    solving.set(Solving::Idle);
+    let counters = counters.ok_or((Problem::Failed, None))?;
+    let wait = handover_wait(answered, super::pow::now_ms());
+    if wait > 0 {
+        super::pow::wait(wait).await;
     }
     Ok((nonce, counters))
 }
 
+/// Registers an account and signs it in: `Register`, the OPAQUE enrolment
+/// with a new master key and recovery code in the Worker, then a sign-in
+/// with the same password, which is let go after it.
 async fn register(
     worker: &str,
     pow: &str,
     f: RegisterFields,
+    solving: RwSignal<Solving>,
 ) -> Result<(NewCode, SignedIn), (Problem, Option<&'static str>)> {
     let username = f.username.trim().to_ascii_lowercase();
     let crypto = Crypto::start(worker).ok_or((Problem::Failed, None))?;
-    let (nonce, counters) = proof(pow).await?;
+    let (nonce, counters) = proof(pow, solving).await?;
     let answer = call(&Request::Register {
         username: username.clone(),
         display_name: Some(f.display.clone()),
@@ -704,6 +771,7 @@ pub fn Register(lang: Lang, worker: String, pow: String) -> impl IntoView {
     // field (invisible to people, filled by form robots) has text, is
     // never sent (`docs/registration-abuse.md`).
     let shown = StoredValue::new(0u64);
+    let solving = RwSignal::new(Solving::Idle);
     let honey = RwSignal::new(super::early::typed("register-website"));
     Effect::new(move |_| shown.set_value(super::pow::now_ms()));
     let submit = move |event: leptos::ev::SubmitEvent| {
@@ -727,7 +795,7 @@ pub fn Register(lang: Lang, worker: String, pow: String) -> impl IntoView {
         let (worker, pow) = (worker.clone(), pow.clone());
         leptos::task::spawn_local(async move {
             let _ = super::push::disable().await;
-            match register(&worker, &pow, f).await {
+            match register(&worker, &pow, f, solving).await {
                 Ok((code, signed)) => {
                     // The code first: it is shown once, before anything
                     // else; Central's terms follow it (`code_view`).
@@ -798,12 +866,45 @@ pub fn Register(lang: Lang, worker: String, pow: String) -> impl IntoView {
         }
         .into_any()
     };
-    steps_view(lang, step, form)
+    (steps_view(lang, step, form), solving_view(lang, solving))
+}
+
+/// The proof of work's progress under the step that is working, once it
+/// takes long: the share done in words and as a bar, said politely where a
+/// screen reader hears it. Empty, and without room, the rest of the time.
+fn solving_view(lang: Lang, solving: RwSignal<Solving>) -> impl IntoView {
+    let progress = move || match solving.get() {
+        Solving::Shown(percent) => Some(view! {
+            <p>{words::register_solving(lang, &percent.to_string())}</p>
+            <progress max="100" value=percent.to_string()></progress>
+        }),
+        Solving::Idle | Solving::Quiet(_) => None,
+    };
+    view! { <div class="solving" aria-live="polite">{progress}</div> }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Central counts its three seconds from the challenge it issued; the
+    /// page counts from the answer's arrival, which is never earlier.
+    #[test]
+    fn a_solution_waits_three_seconds_from_the_challenge_s_arrival() {
+        // solved at once: the whole time
+        assert_eq!(handover_wait(10_000, 10_000), 3_200);
+        // A slow connection: asked at 9,000, answered at 10,000, solved at
+        // 10,300. From the request it would be 1,900 more, which Central
+        // could still find too early; from the answer it is 2,900.
+        assert_eq!(handover_wait(10_000, 10_300), 2_900);
+        assert_eq!(handover_wait(10_000, 13_199), 1);
+        assert_eq!(handover_wait(10_000, 13_200), 0);
+        // a long proof waits no more
+        assert_eq!(handover_wait(10_000, 140_000), 0);
+        // a clock set back meanwhile waits the whole time, never longer
+        assert_eq!(handover_wait(10_000, 4_000), 3_200);
+        assert_eq!(handover_wait(u64::MAX, 0), 3_200);
+    }
 
     fn fields() -> RegisterFields {
         RegisterFields {
