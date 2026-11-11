@@ -1068,5 +1068,6 @@ sec-docs = Die Einzelheiten stehen in den Dokumenten des Projekts: <protocol>Kry
 faq-security-q = Wie geht Baylee mit meinem Passwort und meinen Chats um?
 faq-security-a = Beim Anmelden beweist dein Gerät mit dem Protokoll OPAQUE, dass es das Passwort kennt, ohne es zu senden; Chatnachrichten werden auf deinem Gerät verschlüsselt. Die Seite <security>Sicherheit</security> zeigt jeden Schritt als Grafik, mit der einen Ausnahme und den Grenzen.
 sec-signin-link = Was beim Anmelden mit deinem Passwort geschieht: <security>Sicherheit</security>
+sec-teaser-lead = Schritt für Schritt: was dein Gerät verlässt, was Baylee Central sieht und was nicht, und welche Grenzen jeder Ablauf hat.
 sec-teaser-more = Jeden Schritt als Grafik ansehen
 # ==== Ende der Seite Sicherheit =================================================
