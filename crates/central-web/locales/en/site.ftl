@@ -914,3 +914,135 @@ acct-eyebrow = Baylee Central
 
 # The account area's navigation, as the old site named it
 app-account = Your account
+
+# ==== The security page (/security) ====================================
+# Every sentence and every arrow of this page maps to a row of the claim
+# table in docs/security-page.md; a claim changes
+# there first. No "safe", "unbreakable" or compliance words: mechanisms only.
+title-security = Security in Baylee: passwords, keys and chats
+desc-security = How Baylee handles passwords, keys and chat messages, step by step in four diagrams, with the limits each one has.
+nav-security = Security
+sec-eyebrow = Security
+sec-title = Passwords, keys and chats: what goes where
+sec-lead = Four flows, step by step: what leaves your device, what Baylee Central sees and what it does not. With the limits each one has.
+sec-toc-label = On this page
+sec-figure = Diagram in steps: { $name }
+sec-play = Play
+sec-all = All steps
+sec-step = Step { $n }
+sec-hint = The diagram plays by itself. Choose a step to stop it there.
+sec-hint-still = Choose a step to highlight it.
+sec-in-browser = The dashed frame is your browser: all of this happens inside it.
+# The actors' names are the only words inside the drawings, where text does
+# not wrap: one or two words each, at most about twice the English width
+# (the test `names_fit_with_room_to_grow` measures every language).
+sec-actor-device = Your device
+sec-actor-central = Central
+sec-actor-page = Page
+sec-actor-worker = Worker
+sec-actor-store = Storage
+sec-actor-you = You
+sec-actor-contact = Contact
+sec-actor-website = Website
+sec-actor-client = Client
+
+sec-signin-eyebrow = Signing in and registering
+sec-signin-title = Central checks your password without receiving it
+sec-signin-lead = Baylee signs you in with OPAQUE (RFC 9807). Your device and Central exchange three messages; your password is in none of them, not even as a plain hash.
+sec-signin-c1 = Blinded request
+sec-signin-t1 = Your device blinds the password.
+sec-signin-s1 = It combines the password with a fresh random number and sends only the result. The password cannot be read from that message.
+sec-signin-c2 = Central's answer
+sec-signin-t2 = Central answers with a key of its own.
+sec-signin-s2 = Central computes on the blinded value with a key only it holds and adds its half of a key exchange. It does not learn the password in doing so.
+sec-signin-c3 = Argon2id · 64 MiB
+sec-signin-t3 = Your device does the heavy work.
+sec-signin-s3 = It removes the blinding and stretches the result with Argon2id (64 MiB of memory, three passes); Central cannot ask for cheaper settings. A wrong password is noticed here, before anything else is sent.
+sec-signin-c4 = Proof
+sec-signin-t4 = Your device proves it has the right keys.
+sec-signin-s4 = With the right password your device arrives at the same session key as Central and sends a short proof of that (64 bytes).
+sec-signin-c5 = Session + wrapper
+sec-signin-t5 = Central opens the session.
+sec-signin-s5 = Back come the session (in the browser a cookie the page itself cannot read) and your master key in a wrapper that opens only on your device, with the right password.
+sec-signin-register = <b>Registering</b> runs the same protocol. Your device draws a random master key (256 bits), wraps it once under your password and once under your recovery code, and sends only the wrappers. Central stores an OPAQUE record and the wrappers, never the key.
+sec-signin-legacy = <b>One exception:</b> accounts of the old official gateway that have not moved to Central yet. At their first sign-in the Baylee client sends the old password once, over a verified TLS connection, to Central, which checks it against the old hash and neither stores nor logs it. After that the account signs in as shown above. This website does not sign such accounts in; it points to the client. The exception ends with the deadline set for the move.
+sec-signin-limit = <b>What remains:</b> whoever takes Central's database together with its keys can try passwords one by one; every attempt costs an Argon2id run. A long password that you use nowhere else still matters.
+
+sec-memory-eyebrow = In memory
+sec-memory-title = What is still in memory after you sign in
+sec-memory-lead = The password is needed once: to open your master key. The diagram follows it through the browser; what the Baylee client does differently is below.
+sec-memory-c1 = Password
+sec-memory-t1 = The page hands the password to a Worker.
+sec-memory-s1 = The form passes it to a background thread of its own (a Worker), empties the input field and frees its copy.
+sec-memory-c2 = OPAQUE + Argon2id
+sec-memory-t2 = The Worker computes, then overwrites.
+sec-memory-s2 = Its Rust code holds the password only until the OPAQUE step ends and then overwrites it, along with the intermediate keys and Argon2id's 64 MiB of working memory.
+sec-memory-c3 = Master key: checked, wiped
+sec-memory-t3 = The master key is opened, used and wiped.
+sec-memory-s3 = The Worker opens it to check the sign-in, derives the chat keys from it if your account has a chat, and overwrites it again.
+sec-memory-c4 = Chat keys, sealed
+sec-memory-t4 = Only the chat keys stay, sealed.
+sec-memory-s4 = So that the chat opens after a reload without your password, the Worker stores them in the browser (IndexedDB), encrypted with AES-256-GCM. The key for that is non-extractable: scripts can use it but cannot read it out. Signing out and the end of the session delete the record.
+sec-memory-c5 = Worker ended
+sec-memory-t5 = The Worker is ended.
+sec-memory-s5 = When the sign-in is done the page ends the Worker, and the browser discards its memory.
+sec-memory-limit = <b>What a browser does not promise:</b> the password as typed, its handover to the Worker and JavaScript's strings are managed by the browser. Baylee frees them but cannot overwrite them; when that memory is really reused is the browser's decision. And whoever can run script on this site or read your browser profile while you are signed in can get at the sealed chat keys.
+sec-memory-client = <b>In the Baylee client</b> the typed password sits in memory that is overwritten when released, and it is dropped right after the sign-in; it is never stored. The master key stays in the client's memory while you are signed in, because the client opens your encrypted data with it.
+
+sec-chat-eyebrow = Chat
+sec-chat-title = Messages are encrypted on your device
+sec-chat-lead = Every message gets a key of its own. Central stores and passes on only what is encrypted; the devices it was wrapped for can read it.
+sec-chat-c1 = Text + one-time key
+sec-chat-t1 = A new key for every message.
+sec-chat-s1 = Your device draws a random message key and encrypts the text with it (XChaCha20-Poly1305).
+sec-chat-c2 = Wrapped per device, signed
+sec-chat-t2 = Wrapped for each device, signed by yours.
+sec-chat-s2 = It wraps the message key separately for every device of the recipient (X25519) and signs header and ciphertext with your device's key (Ed25519).
+sec-chat-c3 = Ciphertext + wraps
+sec-chat-t3 = Central receives only ciphertext.
+sec-chat-s3 = Central checks the signature and the list of recipients and stores the ciphertext with the wraps. It has neither the message keys nor your account's keys.
+sec-chat-c4 = Ciphertext + one wrap
+sec-chat-t4 = Each device gets its own wrap.
+sec-chat-s4 = When your contact's device fetches its messages, Central hands it the ciphertext and only the wrap made for that device.
+sec-chat-c5 = Checked, opened
+sec-chat-t5 = Check, unwrap, read.
+sec-chat-s5 = The device checks your signature, unwraps the message key with its own key and decrypts the text.
+sec-chat-meta = <b>What Central sees all the same:</b> who is in contact with whom, groups, display names, the devices' public keys, and when messages are delivered and how large they are.
+sec-chat-limit = <b>Limits:</b> there is no double ratchet and so no forward secrecy: if a recipient device's key is stolen later, it also opens earlier messages that were wrapped for that device. At first contact your device trusts the keys Central names; to check them, compare the safety number over another channel. If a contact's keys change later, Baylee sends again only after you have confirmed them. Who belongs to a group is decided by Central.
+
+sec-pair-eyebrow = Signing in by link
+sec-pair-title = From the browser into the client without typing the password again
+sec-pair-lead = Someone signed in on the website should be able to start the Baylee client signed in. For that the page brings the master key to the client: sealed, and in such a way that Central can neither open it nor slip in one of its own.
+sec-pair-status = <b>Where this stands:</b> Central and Baylee's client library can do this today and are tested against each other. It cannot be used from this website or from a released client yet.
+sec-pair-c1 = Start pairing
+sec-pair-t1 = The page starts a pairing.
+sec-pair-s1 = Central issues a handle for it that is valid for five minutes. At the same time the page draws a one-time secret that it never shows to Central.
+sec-pair-c2 = Link with the secret
+sec-pair-t2 = A link opens the client.
+sec-pair-s2 = The link <code>baylee://pair</code> carries the handle and the secret from the page to the client on your own device, past Central.
+sec-pair-c3 = Public key
+sec-pair-t3 = The client answers with a fresh key pair.
+sec-pair-s3 = It sends Central the public half and a check value computed with the secret (HMAC-SHA-256). The page verifies that value; both screens show the same short code, and you approve on the page.
+sec-pair-c4 = Master key, sealed
+sec-pair-t4 = The page seals the master key for the client.
+sec-pair-s4 = With HPKE (RFC 9180), to the client's public key and under the secret as well. Central stores the seal once; it cannot open it and, not knowing the secret, cannot make one of its own.
+sec-pair-c5 = Session + seal
+sec-pair-t5 = The client redeems once.
+sec-pair-s5 = It receives a session together with the seal, opens the seal with its private key and the secret, and is signed in. The pairing is deleted afterwards, also when redeeming fails.
+sec-pair-note = <b>The password takes no part in this exchange.</b> The page has the master key only at the moment it has just opened it with your password, and a session paired this way never counts as a fresh password sign-in.
+
+sec-limits-eyebrow = Limits
+sec-limits-title = What none of this can do
+sec-limit-device = <b>A compromised device.</b> Malware, a browser extension that reads pages, or a tampered client sees what you see and type. No encryption on the way to a server helps against that.
+sec-limit-site = <b>A website's code comes from its server.</b> Whoever takes over our server could deliver code that captures your password as you type it; integrity hashes and a strict Content Security Policy guard against changes from outside, not against that. The client is a program on your machine and checks a signature before it installs an update.
+sec-limit-central = <b>A Central that has been taken over.</b> It could reveal metadata, refuse service and attack sign-ins. It does not hold the content of your encrypted data and chats.
+sec-limit-recovery = <b>Lost keys.</b> Without your password and without your recovery code nobody can bring your encrypted data back, not even we: Central has only the wrappers.
+sec-limit-audit = <b>No independent audit.</b> Sign-in and pairing follow published standards (RFC 9807, RFC 9180, RFC 9106); the chat format is Baylee's own combination of standard building blocks (Ed25519, X25519, XChaCha20-Poly1305). So far only the people who built it have reviewed the implementation. The code is open; if you find something, <contact>please tell us</contact>.
+sec-docs-title = To read further
+sec-docs = The details are in the project's documents: <protocol>crypto protocol</protocol>, <chat>chat</chat>, <accounts>accounts and pairing</accounts> and <threats>threat model</threats>. What happens to your data in legal terms is in the <privacy>privacy notice</privacy>.
+
+# The page's two links from elsewhere: the FAQ and the sign-in page.
+faq-security-q = How does Baylee handle my password and my chats?
+faq-security-a = When you sign in, your device uses the OPAQUE protocol to prove that it knows the password without sending it; chat messages are encrypted on your device. The <security>security page</security> shows each step as a diagram, with the one exception and the limits.
+sec-signin-link = What happens to your password when you sign in: <security>Security</security>
+# ==== end of the security page =================================================

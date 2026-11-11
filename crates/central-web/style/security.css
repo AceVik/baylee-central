@@ -1,0 +1,986 @@
+/* The security page: four charts in steps, each beside the same steps in
+   words (crates/central-web/src/site/pages/security.rs).
+
+   No script moves anything here. Six radio buttons stand before each chart:
+   the first plays the steps in turn, the others stop at one step. The rules
+   below read which one is checked. Whoever asked for stillness gets the
+   whole chart at rest, and a chosen step is then only lit, never moved.
+
+   A chart holds no sentence, only its actors' names and the steps' numbers:
+   the page is read in many languages and SVG text does not wrap. What a
+   step sends and means is HTML in the list, under the same number and the
+   same sign as in the chart. */
+
+/* what the page holds, as links under its head */
+.sec-toc ol {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-2);
+  margin: var(--space-5) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sec-toc a {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-block-size: var(--target);
+  padding-inline: 0.5rem 1rem;
+  border: 1px solid var(--edge);
+  border-radius: var(--pill);
+  background: var(--panel);
+  color: var(--ink);
+  font: 700 0.95rem/1.2 var(--sans);
+  text-align: start;
+  text-decoration: none;
+  transition:
+    border-color var(--dur) ease,
+    color var(--dur) ease;
+}
+
+.sec-toc a:hover {
+  border-color: var(--gold);
+  color: var(--title);
+}
+
+.sec-toc .num {
+  display: grid;
+  flex: none;
+  place-items: center;
+  inline-size: 1.75rem;
+  block-size: 1.75rem;
+  border-radius: 50%;
+  background: var(--violet-soft);
+  color: var(--violet);
+  font-size: 0.85rem;
+}
+
+/* a chart with its switch, and its steps in words beside it */
+.sec-fig {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 24rem) minmax(0, 1fr);
+  gap: clamp(1.25rem, 3vw, 2.75rem);
+  align-items: center;
+  max-inline-size: 62rem;
+  margin-inline: auto;
+}
+
+.sec-flip {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 24rem);
+}
+
+.sec-flip > .sec-stage {
+  grid-row: 1;
+  grid-column: 2;
+}
+
+.sec-flip > .sec-list {
+  grid-row: 1;
+  grid-column: 1;
+}
+
+.sec-stage {
+  min-inline-size: 0;
+  padding: var(--space-3);
+}
+
+/* beside a longer list the chart stays in view while its steps are read */
+@media (min-width: 861px) and (min-height: 700px) {
+  .sec-fig {
+    align-items: start;
+  }
+
+  .sec-stage {
+    position: sticky;
+    inset-block-start: calc(var(--top-h) + var(--space-4));
+  }
+}
+
+/* the switch: play, or one of the five steps */
+.sec-controls {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.4rem;
+  margin-block-end: var(--space-2);
+}
+
+/* the five steps stay in one row: where the switch needs two, play has the
+   first to itself */
+.sec-steps {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.sec-l {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-inline-size: var(--target);
+  min-block-size: var(--target);
+  padding-inline: 0.5rem;
+  border: 1px solid var(--edge-soft);
+  border-radius: var(--pill);
+  background-color: transparent;
+  color: var(--ink-soft);
+  font: 700 0.95rem/1.15 var(--sans);
+  font-variant-numeric: lining-nums;
+  text-align: center;
+  cursor: pointer;
+  user-select: none;
+  transition:
+    background-color var(--dur) ease,
+    border-color var(--dur) ease,
+    color var(--dur) ease;
+}
+
+.sec-l0 {
+  padding-inline: 0.7rem 0.95rem;
+}
+
+.sec-l .icon {
+  width: 1em;
+  height: 1em;
+}
+
+.sec-l:hover {
+  border-color: var(--gold);
+  color: var(--title);
+}
+
+.sec-p0:checked ~ .sec-stage .sec-l0,
+.sec-p1:checked ~ .sec-stage .sec-l1,
+.sec-p2:checked ~ .sec-stage .sec-l2,
+.sec-p3:checked ~ .sec-stage .sec-l3,
+.sec-p4:checked ~ .sec-stage .sec-l4,
+.sec-p5:checked ~ .sec-stage .sec-l5 {
+  border-color: var(--gold);
+  background-color: var(--gold);
+  color: var(--gold-ink);
+}
+
+/* the radio buttons are out of sight, so the ring goes around the label */
+.sec-p0:focus-visible ~ .sec-stage .sec-l0,
+.sec-p1:focus-visible ~ .sec-stage .sec-l1,
+.sec-p2:focus-visible ~ .sec-stage .sec-l2,
+.sec-p3:focus-visible ~ .sec-stage .sec-l3,
+.sec-p4:focus-visible ~ .sec-stage .sec-l4,
+.sec-p5:focus-visible ~ .sec-stage .sec-l5 {
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
+}
+
+.sec-hint,
+.sec-frame-note {
+  margin: var(--space-1) 0 0;
+  color: var(--ink-faint);
+  font: 400 var(--text-sm) / 1.35 var(--sans);
+  text-align: center;
+}
+
+.sec-frame-note {
+  color: var(--ink-soft);
+}
+
+/* the words for a chart at rest */
+.sec-when-still {
+  display: none;
+}
+
+/* the chart: its sizes are its own units, 320 across */
+.sec-chart {
+  inline-size: 100%;
+  font-family: var(--sans);
+}
+
+.sec-life {
+  stroke: var(--edge-soft);
+  stroke-width: 1.5;
+  stroke-dasharray: 2 5;
+  stroke-linecap: round;
+}
+
+.sec-node {
+  fill: var(--panel-2);
+  stroke: var(--edge);
+  stroke-width: 1.5;
+}
+
+.sec-node-ico,
+.sec-badge-ico {
+  color: var(--gold);
+}
+
+/* the one word a chart has per actor: it may grow to twice its English
+   width before it meets its neighbour or the edge */
+.sec-name {
+  fill: var(--title);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.sec-frame {
+  fill: none;
+  stroke: var(--ink-faint);
+  stroke-width: 1.2;
+  stroke-dasharray: 5 5;
+}
+
+.sec-num circle {
+  fill: var(--violet-soft);
+  stroke: var(--edge-soft);
+}
+
+.sec-num text {
+  fill: var(--violet);
+  font-size: 10.5px;
+  font-weight: 700;
+  font-variant-numeric: lining-nums;
+}
+
+.sec-wire {
+  stroke: var(--ink-faint);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+}
+
+.sec-head {
+  fill: var(--ink-faint);
+}
+
+/* A step's sign: what kind of thing travels, or that an actor is at work.
+   The value on its arrow in the chart and the sign in the list look alike. */
+.sec-token circle {
+  fill: var(--panel-solid);
+  stroke: currentColor;
+  stroke-width: 1.5;
+}
+
+.sec-sign {
+  display: grid;
+  flex: none;
+  place-items: center;
+  inline-size: 1.6rem;
+  block-size: 1.6rem;
+  border: 1.5px solid currentColor;
+  border-radius: 50%;
+  background: var(--panel-solid);
+}
+
+.sec-sign .icon {
+  width: 0.95rem;
+  height: 0.95rem;
+}
+
+.sec-open {
+  color: var(--violet);
+}
+
+.sec-sealed {
+  color: var(--gold-ink);
+}
+
+.sec-sealed circle {
+  fill: var(--gold);
+  stroke: var(--gold);
+}
+
+.sec-sign.sec-sealed {
+  border-color: var(--gold);
+  background: var(--gold);
+}
+
+.sec-proof {
+  color: var(--ok);
+}
+
+.sec-proof circle {
+  fill: var(--ok-tint);
+}
+
+.sec-sign.sec-proof {
+  background: var(--ok-tint);
+}
+
+.sec-secret {
+  color: var(--warn);
+}
+
+.sec-secret circle {
+  fill: var(--warn-tint);
+  stroke-dasharray: 3 2.5;
+}
+
+.sec-sign.sec-secret {
+  border-style: dashed;
+  background: var(--warn-tint);
+}
+
+.sec-sign.sec-work {
+  background: var(--panel-2);
+  color: var(--gold);
+}
+
+/* how far a value travels to either side of its arrow's middle */
+.sec-reach-33 {
+  --sec-reach: 33px;
+}
+
+.sec-reach-62 {
+  --sec-reach: 62px;
+}
+
+.sec-reach-84 {
+  --sec-reach: 84px;
+}
+
+.sec-east {
+  --sec-to: var(--sec-reach);
+}
+
+.sec-west {
+  --sec-to: calc(var(--sec-reach) * -1);
+}
+
+/* what an actor does by itself: a badge on its line, a ring around it */
+.sec-badge {
+  fill: var(--panel-2);
+  stroke: var(--gold);
+  stroke-width: 1.5;
+}
+
+.sec-halo {
+  fill: none;
+  stroke: var(--gold);
+  stroke-width: 1.5;
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+/* a row that stands back dims its drawing; its number keeps its contrast
+   and only changes its colours */
+.sec-art {
+  transition: opacity var(--dur-slow) ease;
+}
+
+.sec-num circle,
+.sec-num text {
+  transition:
+    fill var(--dur-slow) ease,
+    stroke var(--dur-slow) ease;
+}
+
+/* the same steps in words */
+.sec-list {
+  display: grid;
+  gap: 0.3rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: sec-step;
+}
+
+.sec-list li {
+  position: relative;
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.65rem 0.85rem 0.7rem 3.15rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  color: var(--ink-soft);
+  counter-increment: sec-step;
+  transition:
+    background-color var(--dur-slow) ease,
+    border-color var(--dur-slow) ease;
+}
+
+.sec-list li::before {
+  content: counter(sec-step);
+  position: absolute;
+  inset-block-start: 0.6rem;
+  inset-inline-start: 0.75rem;
+  display: grid;
+  place-items: center;
+  inline-size: 1.75rem;
+  block-size: 1.75rem;
+  border: 1px solid var(--edge-soft);
+  border-radius: 50%;
+  background-color: var(--violet-soft);
+  color: var(--title);
+  font: 700 0.9rem/1 var(--sans);
+  font-variant-numeric: lining-nums;
+  transition:
+    background-color var(--dur-slow) ease,
+    border-color var(--dur-slow) ease,
+    color var(--dur-slow) ease;
+}
+
+/* what the step sends or does, beside its sign */
+.sec-what {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-block-size: 1.75rem;
+  font: 700 0.88rem/1.25 var(--sans);
+  letter-spacing: 0.01em;
+}
+
+.sec-list strong {
+  color: var(--title);
+  font: 700 1.06rem/1.3 var(--sans);
+}
+
+/* one step chosen: its row and its sentence are lit, the others stand back */
+.sec-p1:checked ~ .sec-stage .sec-row:not(.sec-r1) .sec-art,
+.sec-p2:checked ~ .sec-stage .sec-row:not(.sec-r2) .sec-art,
+.sec-p3:checked ~ .sec-stage .sec-row:not(.sec-r3) .sec-art,
+.sec-p4:checked ~ .sec-stage .sec-row:not(.sec-r4) .sec-art,
+.sec-p5:checked ~ .sec-stage .sec-row:not(.sec-r5) .sec-art {
+  opacity: 0.4;
+}
+
+.sec-p1:checked ~ .sec-stage .sec-r1 .sec-num circle,
+.sec-p2:checked ~ .sec-stage .sec-r2 .sec-num circle,
+.sec-p3:checked ~ .sec-stage .sec-r3 .sec-num circle,
+.sec-p4:checked ~ .sec-stage .sec-r4 .sec-num circle,
+.sec-p5:checked ~ .sec-stage .sec-r5 .sec-num circle {
+  fill: var(--gold);
+  stroke: var(--gold);
+}
+
+.sec-p1:checked ~ .sec-stage .sec-r1 .sec-num text,
+.sec-p2:checked ~ .sec-stage .sec-r2 .sec-num text,
+.sec-p3:checked ~ .sec-stage .sec-r3 .sec-num text,
+.sec-p4:checked ~ .sec-stage .sec-r4 .sec-num text,
+.sec-p5:checked ~ .sec-stage .sec-r5 .sec-num text {
+  fill: var(--gold-ink);
+}
+
+.sec-p1:checked ~ .sec-list .sec-s1,
+.sec-p2:checked ~ .sec-list .sec-s2,
+.sec-p3:checked ~ .sec-list .sec-s3,
+.sec-p4:checked ~ .sec-list .sec-s4,
+.sec-p5:checked ~ .sec-list .sec-s5 {
+  border-color: var(--edge);
+  background-color: var(--violet-soft);
+}
+
+.sec-p1:checked ~ .sec-list .sec-s1::before,
+.sec-p2:checked ~ .sec-list .sec-s2::before,
+.sec-p3:checked ~ .sec-list .sec-s3::before,
+.sec-p4:checked ~ .sec-list .sec-s4::before,
+.sec-p5:checked ~ .sec-list .sec-s5::before {
+  border-color: var(--gold);
+  background-color: var(--gold);
+  color: var(--gold-ink);
+}
+
+/* a flow's notes: what else holds, and where it ends */
+.sec-notes {
+  display: grid;
+  gap: var(--space-3);
+  max-inline-size: 52rem;
+  margin: var(--space-5) auto 0;
+}
+
+.sec-note {
+  display: flex;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--edge-soft);
+  border-radius: var(--radius-md);
+  background: var(--panel);
+  color: var(--ink-soft);
+  font-size: 0.97rem;
+}
+
+.sec-note .icon {
+  margin-block-start: 0.2em;
+  color: var(--violet);
+}
+
+.sec-note strong,
+.sec-limits strong {
+  color: var(--title);
+  font-family: var(--sans);
+}
+
+.sec-warn {
+  border-color: var(--edge);
+  background: var(--warn-tint);
+  color: var(--ink);
+}
+
+.sec-warn .icon {
+  color: var(--warn);
+}
+
+/* what a reader has to know before a chart stands above it */
+.sec-status {
+  max-inline-size: 52rem;
+  margin: 0 auto var(--space-5);
+  text-align: start;
+}
+
+.sec-limits {
+  margin-block-start: var(--space-5);
+}
+
+.sec-limits li {
+  margin-block-end: 1em;
+}
+
+.sec-docs-title {
+  margin-block-start: var(--space-6);
+}
+
+.sec-docs {
+  margin: 0;
+  color: var(--ink-soft);
+}
+
+/* one column where two would be cramped; the chart first */
+@media (max-width: 860px) {
+  .sec-fig,
+  .sec-flip {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sec-flip > .sec-stage,
+  .sec-flip > .sec-list {
+    grid-row: auto;
+    grid-column: auto;
+  }
+
+  .sec-stage {
+    inline-size: 100%;
+    max-inline-size: 26rem;
+    margin-inline: auto;
+  }
+}
+
+@media (max-width: 400px) {
+  .sec-stage {
+    padding: var(--space-2);
+  }
+
+  .sec-list li {
+    padding-inline: 2.85rem 0.5rem;
+  }
+
+  .sec-list li::before {
+    inset-inline-start: 0.5rem;
+  }
+}
+
+/* Play: one step after the other, 3.5 s each, 17.5 s for the five. Every
+   part of step n runs the same loop, begun (5 - n + 1) steps ago, so the
+   loop is in full swing from the first moment and step 1 is the one lit. */
+@media (prefers-reduced-motion: no-preference) {
+  .sec-r2,
+  .sec-l2,
+  .sec-s2 {
+    --sec-at: -14s;
+  }
+
+  .sec-r3,
+  .sec-l3,
+  .sec-s3 {
+    --sec-at: -10.5s;
+  }
+
+  .sec-r4,
+  .sec-l4,
+  .sec-s4 {
+    --sec-at: -7s;
+  }
+
+  .sec-r5,
+  .sec-l5,
+  .sec-s5 {
+    --sec-at: -3.5s;
+  }
+
+  .sec-p0:checked ~ .sec-stage .sec-art {
+    animation: sec-spot 17.5s linear var(--sec-at, 0s) infinite;
+  }
+
+  .sec-p0:checked ~ .sec-stage .sec-num circle {
+    animation: sec-dot 17.5s linear var(--sec-at, 0s) infinite;
+  }
+
+  .sec-p0:checked ~ .sec-stage .sec-num text {
+    animation: sec-digit 17.5s linear var(--sec-at, 0s) infinite;
+  }
+
+  .sec-p0:checked ~ .sec-stage .sec-token {
+    animation: sec-carry 17.5s linear var(--sec-at, 0s) infinite;
+  }
+
+  .sec-p0:checked ~ .sec-stage .sec-halo {
+    animation: sec-ring 17.5s linear var(--sec-at, 0s) infinite;
+  }
+
+  .sec-p0:checked ~ .sec-stage .sec-l:not(.sec-l0) {
+    animation: sec-tick 17.5s linear var(--sec-at, 0s) infinite;
+  }
+
+  .sec-p0:checked ~ .sec-list li {
+    animation: sec-say 17.5s linear var(--sec-at, 0s) infinite;
+  }
+
+  .sec-p0:checked ~ .sec-list li::before {
+    animation: sec-count 17.5s linear var(--sec-at, 0s) infinite;
+  }
+
+  /* a chosen step shows its movement once and stays where it ended */
+  .sec-p1:checked ~ .sec-stage .sec-r1 .sec-token,
+  .sec-p2:checked ~ .sec-stage .sec-r2 .sec-token,
+  .sec-p3:checked ~ .sec-stage .sec-r3 .sec-token,
+  .sec-p4:checked ~ .sec-stage .sec-r4 .sec-token,
+  .sec-p5:checked ~ .sec-stage .sec-r5 .sec-token {
+    animation: sec-once 2.4s linear both;
+  }
+
+  .sec-p1:checked ~ .sec-stage .sec-r1 .sec-halo,
+  .sec-p2:checked ~ .sec-stage .sec-r2 .sec-halo,
+  .sec-p3:checked ~ .sec-stage .sec-r3 .sec-halo,
+  .sec-p4:checked ~ .sec-stage .sec-r4 .sec-halo,
+  .sec-p5:checked ~ .sec-stage .sec-r5 .sec-halo {
+    animation: sec-ring-once 2.4s linear both;
+  }
+}
+
+/* a row's turn is the first fifth of the loop: its drawing is lit and its
+   number takes the colours of the step in the list */
+@keyframes sec-spot {
+  0%,
+  18% {
+    opacity: 1;
+  }
+
+  21%,
+  97% {
+    opacity: 0.4;
+  }
+
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes sec-dot {
+  0%,
+  18% {
+    fill: var(--gold);
+    stroke: var(--gold);
+  }
+
+  21%,
+  97% {
+    fill: var(--violet-soft);
+    stroke: var(--edge-soft);
+  }
+
+  100% {
+    fill: var(--gold);
+    stroke: var(--gold);
+  }
+}
+
+@keyframes sec-digit {
+  0%,
+  18% {
+    fill: var(--gold-ink);
+  }
+
+  21%,
+  97% {
+    fill: var(--violet);
+  }
+
+  100% {
+    fill: var(--gold-ink);
+  }
+}
+
+/* the value leaves its place in the middle while its row is still dim,
+   appears at the sender, travels, rests at the receiver and returns */
+@keyframes sec-carry {
+  0% {
+    opacity: 0;
+    transform: translateX(calc(var(--sec-to) * -1));
+  }
+
+  2.5% {
+    opacity: 1;
+    transform: translateX(calc(var(--sec-to) * -1));
+    animation-timing-function: cubic-bezier(0.45, 0, 0.2, 1);
+  }
+
+  12.5% {
+    opacity: 1;
+    transform: translateX(var(--sec-to));
+  }
+
+  17% {
+    opacity: 1;
+    transform: translateX(var(--sec-to));
+  }
+
+  18.6% {
+    opacity: 0;
+    transform: translateX(var(--sec-to));
+  }
+
+  18.7% {
+    opacity: 0;
+    transform: none;
+  }
+
+  21%,
+  97% {
+    opacity: 1;
+    transform: none;
+  }
+
+  98.8% {
+    opacity: 0;
+    transform: none;
+  }
+
+  98.9%,
+  100% {
+    opacity: 0;
+    transform: translateX(calc(var(--sec-to) * -1));
+  }
+}
+
+@keyframes sec-once {
+  0% {
+    opacity: 0;
+    transform: translateX(calc(var(--sec-to) * -1));
+  }
+
+  15% {
+    opacity: 1;
+    transform: translateX(calc(var(--sec-to) * -1));
+    animation-timing-function: cubic-bezier(0.45, 0, 0.2, 1);
+  }
+
+  85%,
+  100% {
+    opacity: 1;
+    transform: translateX(var(--sec-to));
+  }
+}
+
+/* two rings leave the badge while its actor works */
+@keyframes sec-ring {
+  0%,
+  1.5% {
+    opacity: 0;
+    transform: scale(1);
+  }
+
+  2.5% {
+    opacity: 0.75;
+    transform: scale(1);
+    animation-timing-function: ease-out;
+  }
+
+  8.5% {
+    opacity: 0;
+    transform: scale(1.85);
+  }
+
+  8.6% {
+    opacity: 0;
+    transform: scale(1);
+  }
+
+  9.6% {
+    opacity: 0.75;
+    transform: scale(1);
+    animation-timing-function: ease-out;
+  }
+
+  15.6%,
+  100% {
+    opacity: 0;
+    transform: scale(1.85);
+  }
+}
+
+@keyframes sec-ring-once {
+  0% {
+    opacity: 0;
+    transform: scale(1);
+  }
+
+  8% {
+    opacity: 0.75;
+    transform: scale(1);
+    animation-timing-function: ease-out;
+  }
+
+  48% {
+    opacity: 0;
+    transform: scale(1.85);
+  }
+
+  49% {
+    opacity: 0;
+    transform: scale(1);
+  }
+
+  57% {
+    opacity: 0.75;
+    transform: scale(1);
+    animation-timing-function: ease-out;
+  }
+
+  100% {
+    opacity: 0;
+    transform: scale(1.85);
+  }
+}
+
+/* the step's number in the switch, and its sentence, in the same turn */
+@keyframes sec-tick {
+  0%,
+  18% {
+    border-color: var(--gold);
+    background-color: var(--violet-soft);
+    color: var(--title);
+  }
+
+  21%,
+  97% {
+    border-color: var(--edge-soft);
+    background-color: transparent;
+    color: var(--ink-soft);
+  }
+
+  100% {
+    border-color: var(--gold);
+    background-color: var(--violet-soft);
+    color: var(--title);
+  }
+}
+
+@keyframes sec-say {
+  0%,
+  18% {
+    border-color: var(--edge);
+    background-color: var(--violet-soft);
+  }
+
+  21%,
+  97% {
+    border-color: transparent;
+    background-color: transparent;
+  }
+
+  100% {
+    border-color: var(--edge);
+    background-color: var(--violet-soft);
+  }
+}
+
+@keyframes sec-count {
+  0%,
+  18% {
+    border-color: var(--gold);
+    background-color: var(--gold);
+    color: var(--gold-ink);
+  }
+
+  21%,
+  97% {
+    border-color: var(--edge-soft);
+    background-color: var(--violet-soft);
+    color: var(--title);
+  }
+
+  100% {
+    border-color: var(--gold);
+    background-color: var(--gold);
+    color: var(--gold-ink);
+  }
+}
+
+/* stillness: nothing plays, so the first button shows every step at once
+   and says so */
+@media (prefers-reduced-motion: reduce) {
+  .sec-when-moving {
+    display: none;
+  }
+
+  .sec-when-still {
+    display: inline;
+  }
+
+  .sec-l0 .icon {
+    display: none;
+  }
+
+  .sec-l0 {
+    padding-inline: 0.95rem;
+  }
+}
+
+/* the system's colours: lines and letters in the text colour, fills gone */
+@media (forced-colors: active) {
+  .sec-life,
+  .sec-wire,
+  .sec-halo,
+  .sec-frame {
+    stroke: CanvasText;
+  }
+
+  .sec-node,
+  .sec-badge,
+  .sec-num circle,
+  .sec-token circle {
+    fill: Canvas;
+    stroke: CanvasText;
+  }
+
+  .sec-head,
+  .sec-name,
+  .sec-num text {
+    fill: CanvasText;
+  }
+
+  .sec-node-ico,
+  .sec-badge-ico,
+  .sec-token,
+  .sec-sign {
+    color: CanvasText;
+  }
+
+  .sec-p0:checked ~ .sec-stage .sec-l0,
+  .sec-p1:checked ~ .sec-stage .sec-l1,
+  .sec-p2:checked ~ .sec-stage .sec-l2,
+  .sec-p3:checked ~ .sec-stage .sec-l3,
+  .sec-p4:checked ~ .sec-stage .sec-l4,
+  .sec-p5:checked ~ .sec-stage .sec-l5 {
+    border-color: Highlight;
+    background-color: Highlight;
+    color: HighlightText;
+    forced-color-adjust: none;
+  }
+
+  .sec-l,
+  .sec-note,
+  .sec-toc a {
+    border: 1px solid CanvasText;
+  }
+}
