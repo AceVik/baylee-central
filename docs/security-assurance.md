@@ -2974,6 +2974,203 @@ Not tested, and recorded for the owner:
 
 Engineering review, not an audit.
 
+## The public figures: a gateway's pulse and what Central publishes, 11 November 2026
+
+The owner wants the website to show how many players, tables, games and
+accounts there are, with the numbers coming from where they arise: "the
+gateways tell Central, Central tells the website". This is Central's side
+of that chain (wire, store, service, both listeners, the SDK). The website
+reading the figures and the game's gateway sending them are not in this
+change ([gateway registry](gateway-registry.md#activity-and-the-public-figures)).
+
+Design pass. Nothing secret is added, so the questions were what the two
+new operations let a caller do that it could not do before:
+- **Callers.** A pulse comes from whoever holds a gateway's heartbeat
+  credential, which is all a heartbeat needs. The figures are for anyone.
+- **The pulse must not be a second way into the gateway's row.** It is the
+  heartbeat itself with three numbers added: one function in the service
+  and one `UPDATE` in the store serve both, so there is no second
+  credential check, limit or condition to keep equal. What a pulse can do
+  beyond a heartbeat is write three bounded integers and a time on its own
+  row.
+- **The wire the game links must not move.** The client and the gateway of
+  the game build on `central-api`, and every type refuses unknown fields.
+  An activity as an optional field of `GatewayHeartbeat` would have changed
+  that request and, sent to an earlier Central, been refused as a whole, so
+  a reporting gateway would have gone offline there. Hence two new
+  operations and two new types, and no change to an existing one.
+- **What is kept is the least that shows the numbers.** Three counts and a
+  time on the gateway's own row, overwritten by each pulse: no history, no
+  player, no address. Reporting is the operator's choice, and the way out
+  needs no new operation: a plain heartbeat clears the counts.
+- **What is published.** For a gateway: its id, which the directory
+  publishes already, and its three counts, only while it is approved and
+  enabled, seen within the directory's 90 seconds and reported within
+  them. For Central: the number of accounts that can sign in (a stored
+  credential; the administration's "enrolled").
+- **Lies.** Central cannot check a gateway's counts. It bounds them (100 000
+  each, in the wire type's check, in the store before anything is read,
+  and in a CHECK) and never publishes them apart from the gateway's id, so
+  whoever shows them can say whose claim they are.
+- **Cost.** The count of accounts is a scan, so it is not run per request:
+  the service keeps it for a minute. A read of the figures is one page of
+  the gateway table, as the directory's is, under the directory's budgets
+  on both listeners.
+- Decided against: an optional field on the heartbeat (above); a table of
+  reports or any series (history of when people play, and a second write
+  path); Central counting players itself from tickets (it would have to
+  follow players; it does not see tables at all); an index on the report's
+  time (every pulse writes it); an estimate of the accounts from the
+  planner's statistics (another notion: it counts unfinished registrations
+  too); the count held in a table (a write path for a number that a minute
+  in memory serves).
+
+Implementation pass:
+- `central-api`: `GatewayActivity` (three `u32`, `MOST`, `validate`),
+  `GatewayFigures`, `Request::GatewayPulse`, `Request::PublicFigures`,
+  `Response::PublicFigures`; all refuse unknown fields. Nothing existing
+  was edited.
+- Store: `counts` validates a pulse's activity before the first statement,
+  so an over-bound pulse reads and writes nothing and marks no token used.
+  The beat's one `UPDATE` sets the four columns from bound parameters (a
+  plain heartbeat's are NULL) under the conditions it already had: its own
+  row, the five seconds, not disabled. `gateway_heartbeat` and
+  `official_heartbeat` keep their signatures. `gateway_figures` reads ids
+  and counts only, joined to enabled approvals, both times inside 90
+  seconds, 100 a page by primary key, and checks each row's bound again on
+  the way out. `account_count` is one `count(*)`.
+- Migration 000025: four nullable columns and two CHECKs (all or none; each
+  count from 0 to 100 000). No grant changes: the runtime's `UPDATE` on
+  `gateways` is table-wide, and the startup check's list is the same. No
+  index.
+- Service: `GatewayPulse` is decided in the exhaustive `browser_operation`
+  match as native only, `PublicFigures` as served on both listeners
+  without a session or accepted terms. The figures spend the public
+  budget, a pulse the bearer's budget its heartbeat spends. The account
+  count sits in `Counted`: fresh for 60 seconds; after that one caller
+  counts while the others answer the earlier number; the lock is not held
+  across the query.
+- Browser listener: the figures are charged to the directory's book, one
+  60 a minute per address for the two.
+- `central-client` (AGPL, built on `central-api` only): `gateway_pulse`
+  checks metadata and bound before it sends; `public_figures` refuses an
+  answer with more than 100 entries, ids that are not ascending UUIDv7s
+  after the cursor, or a count above the bound.
+- Nothing is logged for either operation, and no dependency was added
+  (`Cargo.lock` is unchanged).
+
+Adversarial pass:
+- **The earlier wire.** The exact JSON of `gateway_heartbeat`,
+  `gateway_directory` and a listing is asserted, and each refuses an
+  `activity` or `accounts` field; the new shapes are asserted byte for
+  byte as well. A `public_figures` without `after` reads as the first
+  page, as the directory's does (an absent option); kept, not changed.
+- **The pulse against the store** (PostgreSQL 18): a count above the bound,
+  the redemption credential, an unknown token, an `sso`-only token and
+  metadata on another origin are refused and leave the whole row and the
+  tokens' last use as they were; the bound itself and zeros are taken.
+  Inside the five seconds a pulse is `Busy` and the counts stay, and a
+  plain heartbeat refused the same way clears nothing. A later pulse
+  replaces the counts; a plain heartbeat clears all four columns and the
+  gateway stays online without a figure.
+- **The 90 seconds**: seen and reported 85 seconds ago is shown; a report
+  91 seconds old is not, although the gateway is online; a gateway silent
+  for 91 seconds is not, although its report is fresh.
+- **Approval**: a pending gateway's pulse (by `listing` token) is kept and
+  not shown, then shown once approved; a disabled gateway is hidden at
+  once and its pulse refused, by token and by credential pair; enabled
+  again within the window it is shown as it last reported.
+- **The official gateway**: unlisted or unapproved its pulse is refused as
+  its heartbeat is; the bridge's pulse moves its own row and no other, for
+  the bridge's origins only; its plain heartbeat clears the counts; a
+  registered gateway's row is unchanged through all of it.
+- **Paging**: 101 reporting gateways give 100 and then one, ascending,
+  none twice; a cursor that is no UUIDv7 is refused.
+- **The count**: an unfinished move is not counted, a finished enrollment
+  is, a deleted account no longer. `Counted`: no number before the first
+  count; kept for the minute; then one caller is told to count and the
+  rest are not, also when that count never comes back.
+- **The migration** over the upgrade fixture's rows: every earlier column
+  of every gateway unchanged (a digest of the rows), no activity anywhere,
+  the previous binary's heartbeat statement still runs and leaves a stored
+  activity alone, partial activities and counts outside the bound are
+  refused by the table.
+- **Over real HTTP** (`central-client` against a real Central): a silent
+  online gateway has no figure; a pulse inside five seconds is `Busy`; the
+  redemption credential, an unknown token, no
+  bearer and an over-bound count are refused; then the pulse is taken and
+  anyone reads the gateway's counts, with the cursor, on the native route
+  and on the browser listener with and without a cookie, the same answer;
+  the directory shows the pulse's metadata (it is a heartbeat); a plain
+  heartbeat withdraws the figure. The bridge's pulse works for the
+  official gateway. On the browser listener a pulse is refused whatever
+  the token.
+- **Budgets**: the figures and the directory spend one public budget, and
+  a bearer sent along buys none of its own; on the browser listener 30 of
+  each use up an address's 60, both are then refused, other addresses and
+  other budgets are untouched, and the window ends for both together.
+- **Found on the way and put right.** The upgrade step first addressed
+  gateways that an earlier step had removed; its updates would have
+  changed no row and its refusals proved nothing. Every statement of the
+  step now asserts that it changed one row. The first form of the kept
+  count let every request that arrived while a count ran count as well;
+  `Counted` lets one.
+- **The checks have teeth**: with the report's 90 seconds taken out of the
+  read, with the clearing taken out of the plain heartbeat, and with the
+  approval taken out of the read, the fixture fails each time (one change
+  at a time, each undone).
+
+Run on this change: `cargo xtask gate` does not pass. It stops at clippy
+on a function this change does not contain: `strip` in `central-web`'s
+start page has 111 lines where 100 are allowed, in the commit this work
+started from (2293736); the website's crates were not this work's to
+touch. Its format check, policy and crypto scope pass before that, and
+its remaining steps pass when run by hand: clippy over every crate that
+does not build on `central-web`, the workspace's tests (471), the doc
+tests and the release build; `cargo xtask gate --client` passes. `cargo
+xtask postgres` (PostgreSQL 18.6), `cargo xtask smoke`, `cargo xtask
+secrets`, `cargo xtask crypto-scope` and `cargo deny check` pass. `cargo
+audit --deny warnings` reports RUSTSEC-2026-0459 (`libsqlite3-sys`
+0.37.0), as it did before this change; `Cargo.lock` is untouched here.
+
+Not tested, and recorded for the owner:
+- **The earlier binary over the migrated table** was not started; that it
+  runs there is read from its statements and its startup check
+  ([operations](operations.md#what-gateways-report-migration-000025)).
+- **The commits one by one.** The gates ran on the last of them; the
+  commits before it were ordered so that each builds, and were not built
+  singly.
+- **The kept count over HTTP.** That the number of accounts is not counted
+  again within the minute is tested on `Counted` alone; over HTTP the
+  fixture checks that both listeners answer the same number.
+- **No gateway sends a pulse yet.** The game's gateway and client were not
+  run against this build; the gateway's side is described in a brief for
+  that repository, not written. Until it sends pulses the figures list no
+  gateway.
+- **An earlier Central.** That it refuses the two new operations as it
+  refuses a wrong credential (`Rejected`, HTTP 401) follows from its
+  decoder and was not run against an earlier binary. The gateway's
+  fallback rests on it.
+- **The session-token line of work** (the revision the game pins) answers
+  a heartbeat with its own response, and has a migration with this line's
+  number 000023. This change was not merged with it. The pulse shares the
+  heartbeat's path so that it answers whatever the heartbeat answers after
+  the merge; `central_client::gateway_pulse` expects `Done` and has to
+  follow then. This migration is 000025 and leaves 000024 free.
+- **What stays open.** An approved gateway can claim any numbers up to the
+  bound. The number of accounts is exact and public, so Central's growth
+  can be watched minute by minute. A reporting gateway publishes how busy
+  it is to anyone who records it. On the native route the figures have no
+  per-address budget, like the directory: one client can spend the public
+  32 a second, which sign-in draws from too; that was so before, with the
+  directory, and is the proxy's to limit. The website should therefore
+  read the figures about once a minute for everyone and keep the last
+  answer, never once per page view.
+- **Load.** No measurement with many gateways or many accounts; the cost
+  statements are from the statements' shape.
+
+Engineering review, not an audit.
+
 ## The site's polish: links in new tabs, movement, the words, 11 November 2026
 
 The owner asked for a polish of the Leptos site (layout, movement, every

@@ -221,8 +221,10 @@ answers `PublicFigures { accounts, gateways }`:
 
 - `accounts` is the number of accounts that can sign in: rows with a stored
   credential, which is the administration overview's "enrolled". A
-  registration or move that was started and not finished is not counted, and
-  a deleted account's row is gone. Central counts once and keeps the number
+  registration or move that was started and not finished is not counted, an
+  account of the legacy store that has not moved to Central is not counted
+  either (it has no credential at Central yet), and a deleted account's
+  row is gone. Central counts once and keeps the number
   for 60 seconds, however many ask, so the figure can be up to a minute old
   (two after a count that failed) and is the same on every page. It is the
   exact number, not a rounded one.

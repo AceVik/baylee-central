@@ -351,9 +351,16 @@ operator:
 
 - **Deploying it** is the usual order: stop, migrate, start. The migration
   adds four nullable columns to `gateways` and needs no new grant
-  (`ops/grants.sql` is unchanged); the earlier binary runs over the migrated
-  table, so a rollback of the binary alone works. The new binary does not
-  run over the unmigrated table: its heartbeat names the new columns.
+  (`ops/grants.sql` is unchanged). Migrate before the new binary starts:
+  the startup check asks about grants, not about columns, so the new
+  binary would start over the unmigrated table, and then every heartbeat
+  and every read of the figures fails until the migration is applied
+  (gateways drop out of the directory's `online` after 90 seconds).
+  The other way round is expected to work and was not tried: the earlier
+  binary's statements name their columns, none reads a gateway's row
+  whole, its startup check does not look at the migration history, and
+  its heartbeat statement runs over the migrated table in the upgrade
+  fixture; the earlier binary itself was not started over it.
 - **Nothing is switched on here.** Central takes a pulse from every gateway
   that may send a heartbeat. Whether a gateway reports is its operator's
   setting on the gateway, the official one included; until the game's
