@@ -2582,3 +2582,42 @@ audit's column kept; and 000023 over the upgrade chain's data, where every
 account, the pending registrations and every audit event (one naming a key)
 survive. The client's integration tests register through the real listener
 with a proof each. Engineering review, not an audit.
+
+## The sign-in form before the islands run, 11 November 2026
+
+Design pass. The website's sign-in sends Central only OPAQUE messages: the
+password goes from the field to the crypto Worker and nowhere else
+(`docs/web-accounts.md`). The form is rendered by the server and taken over
+by its island once the WebAssembly runs. The islands start after the load,
+and since `cb1df03` after the first frame too. Until then, the browser's
+own submit applied: `method="post"` to the page's address, with the fields
+named `username` and `password`. Pressing Enter that early posted the
+password in the request body to `central-web`, which answers every POST
+with 405 and reads no body, through Caddy, which logs no bodies. Nothing
+stored it, but the password left the Worker's boundary. The contact form
+posted its fields to its page the same way, and they were lost. Options
+weighed:
+- no form element, which would cost the implicit submit and the password
+  managers' recognition;
+- an `action` the server refuses, which still sends the body;
+- holding the submit back until the islands run, and leaving the fields
+  without names.
+
+Chosen: the last, both layers.
+
+Implementation pass:
+- `boot.js`, the one script that runs before the first paint, cancels a
+  submit from a form inside a `<leptos-island>` while `<html>` does not yet
+  say `data-islands="ready"`. A form outside an island (the album's
+  `method="dialog"`) is untouched.
+- The sign-in's and the contact form's fields lose their `name`
+  attributes, so even a submit let through sends an empty body. The islands
+  read the fields through their own signals, and password managers go by
+  `autocomplete`.
+
+Adversarial pass: a browser test blocks the WebAssembly (and the service
+worker, which would fetch it past the page's routes), fills the sign-in,
+and submits with Enter and by script. It sees no request other than GET or
+HEAD, and the page stays where it was. The fields' lack of names is checked
+too. With the guard taken out, the test fails. Engineering review, not an
+audit.
