@@ -920,10 +920,11 @@ What that cost and how it was won back:
 | Page | Mobile perf. | LCP (mobile) | Desktop perf. | SEO |
 | --- | ---: | ---: | ---: | ---: |
 | `/en/` | 96–98 | 2.3–2.6 s | 100 | 100 |
-| `/en/download`, `/en/gateways`, `/en/privacy` | 98–100 | 1.6–2.1 s | 100 | 100 |
-| `/en/contact` | 98–99 | 2.1–2.3 s | — | 100 |
-| `/en/signin` | 98–99 | 2.1–2.3 s | 100 | 66 (`noindex`) |
-| `/en/account` | 98 | 2.1 s | — | 66 (`noindex`) |
+| `/en/download`, `/en/gateways`, `/en/privacy`, `/en/faq` | 98–100 | 1.6–2.1 s | 100 | 100 |
+| `/en/contact` | 98–99 | 2.1–2.3 s | 100 | 100 |
+| `/de/impressum` | 99 | 2.0 s | 100 | 69 (`noindex`) |
+| `/en/signin`, `/en/register` | 98–99 | 1.9–2.3 s | 100 | 66 (`noindex`) |
+| `/en/account`, `/en/account/chat`, `/en/account/contacts` | 98 | 2.1 s | 100 | 66 (`noindex`) |
 
 Accessibility and Best Practices are 100 on every page measured; CLS at
 most 0.046 (the start page on a desktop, as the download button's faces
