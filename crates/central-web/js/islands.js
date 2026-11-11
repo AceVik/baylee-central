@@ -8,13 +8,42 @@
 // WebAssembly then never competes with the text, the fonts and the pictures
 // the visitor sees first, and the server-rendered page is whole until the
 // islands take it over. A hidden tab draws no frames; there the half second
-// starts it.
+// starts it. Islands far down the page (the start page's contact form)
+// wait until the reader comes within a screen of one, or reaches into one
+// with the keyboard or a pointer: a page read only at its top never
+// fetches the half megabyte. An island without a box of its own cannot be
+// watched, so it starts at once.
 if (document.readyState !== "complete") {
   await new Promise((resolve) => window.addEventListener("load", resolve, { once: true }));
 }
 await new Promise((resolve) => {
   requestAnimationFrame(() => setTimeout(resolve, 0));
   setTimeout(resolve, 500);
+});
+await new Promise((resolve) => {
+  const all = [...document.querySelectorAll("leptos-island")];
+  if (typeof IntersectionObserver !== "function" || all.some((island) => island.getClientRects().length === 0)) {
+    resolve();
+    return;
+  }
+  const watch = new IntersectionObserver(
+    (entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) start();
+    },
+    { rootMargin: "100% 0px" },
+  );
+  const reach = (event) => {
+    if (event.target instanceof Element && event.target.closest("leptos-island")) start();
+  };
+  function start() {
+    watch.disconnect();
+    document.removeEventListener("focusin", reach, true);
+    document.removeEventListener("pointerdown", reach, true);
+    resolve();
+  }
+  document.addEventListener("focusin", reach, true);
+  document.addEventListener("pointerdown", reach, true);
+  for (const island of all) watch.observe(island);
 });
 const islands = await import("./islands-glue.js");
 

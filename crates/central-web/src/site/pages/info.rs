@@ -46,7 +46,7 @@ pub fn gateways(cx: &Context<'_>) -> Built {
                 .collect_view();
             view! {
                 <h2 class="count">{words::gws_count(lang, count)}</h2>
-                <div class="cards-grid">{cards}</div>
+                <ul class="gateways grid-cards">{cards}</ul>
                 <p class="hint">{words::gws_copy_hint(lang)}</p>
             }
             .into_any()

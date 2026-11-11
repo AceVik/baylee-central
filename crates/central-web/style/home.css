@@ -1,0 +1,911 @@
+/* The start page below the hero, as the old site set it: the screenshots
+   and their dialog, the gateways, what Baylee is, the opponents, the card
+   numbers, writing to us, and the open source promise. Hovering lights a
+   card (its edge, its shadow, a sheen sliding across); nothing moves or
+   grows as a whole (owner, 11.11.2026; tests/hover.rs). */
+
+/* ---- glass cards and their light ------------------------------------------ */
+
+.glass {
+  position: relative;
+  border: 1px solid var(--edge);
+  border-radius: var(--radius);
+  background: var(--panel);
+  box-shadow: var(--shadow);
+  transition:
+    border-color var(--dur) ease,
+    box-shadow var(--dur) ease,
+    background-color var(--dur) ease;
+}
+
+/* a sheen slides across a card as the pointer arrives */
+.features > li,
+.about-arch-card,
+.ai-card,
+.number,
+.shots > li,
+.gw,
+.channels a,
+.repo-card {
+  isolation: isolate;
+  overflow: hidden;
+}
+
+.features > li::after,
+.about-arch-card::after,
+.ai-card::after,
+.number::after,
+.gw::after,
+.channels a::after,
+.repo-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(105deg, transparent 30%, rgb(227 192 126 / 0.09) 50%, transparent 70%);
+  transform: translateX(-110%);
+  transition: transform 0.9s var(--ease);
+  pointer-events: none;
+}
+
+.features > li:hover::after,
+.about-arch-card:hover::after,
+.ai-card:hover::after,
+.number:hover::after,
+.gw:hover::after,
+.channels a:hover::after,
+.repo-card:hover::after {
+  transform: translateX(110%);
+}
+
+.features > li:hover,
+.about-arch-card:hover,
+.ai-card:hover,
+.number:hover,
+.shots > li:hover,
+.gw:hover,
+.repo-card:hover {
+  border-color: var(--gold);
+  box-shadow: var(--shadow-lift);
+}
+
+.two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: clamp(1.5rem, 4vw, 3.5rem);
+  align-items: start;
+}
+
+.two-col > * {
+  min-width: 0;
+}
+
+@media (max-width: 860px) {
+  .two-col {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---- the screenshots ------------------------------------------------------ */
+
+.shots {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.shots figure {
+  margin: 0;
+}
+
+.shot-open {
+  appearance: none;
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 1200 / 703;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: calc(var(--radius) - 1px) calc(var(--radius) - 1px) 0 0;
+  background: var(--panel-2);
+  cursor: zoom-in;
+}
+
+.shot-open img {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: 0;
+  object-fit: cover;
+}
+
+/* a light passes over the picture, and a mark says it opens large */
+.shot-open::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 35%, rgb(255 247 228 / 0.16) 50%, transparent 65%);
+  transform: translateX(-110%);
+  transition: transform 0.9s var(--ease);
+}
+
+.shot-open:hover::after,
+.shot-open:focus-visible::after {
+  transform: translateX(110%);
+}
+
+.shot-zoom {
+  position: absolute;
+  inset-block-start: 0.6rem;
+  inset-inline-end: 0.6rem;
+  display: inline-grid;
+  place-items: center;
+  width: 2.2rem;
+  height: 2.2rem;
+  border: 1px solid var(--edge);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--panel-solid) 80%, transparent);
+  color: var(--title);
+  opacity: 0;
+  transition: opacity var(--dur) ease;
+}
+
+.shot-open:hover .shot-zoom,
+.shot-open:focus-visible .shot-zoom {
+  opacity: 1;
+}
+
+.shot-zoom .icon {
+  width: 1rem;
+  height: 1rem;
+}
+
+.shot-open:focus-visible {
+  outline-offset: -3px;
+}
+
+.shots figcaption {
+  margin: 0;
+  padding: 0.8rem 1rem 1rem;
+  color: var(--ink-soft);
+  font-size: 0.93rem;
+}
+
+.shots figcaption strong {
+  color: var(--title);
+}
+
+.shots-credit {
+  margin: 1rem 0 0;
+  text-align: center;
+}
+
+@media (max-width: 960px) {
+  .shots {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .shots {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* the screenshot, large */
+.lightbox {
+  width: min(92vw, 75rem);
+  max-width: none;
+  max-height: 92dvh;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--edge);
+  border-radius: var(--radius);
+  background: var(--panel-solid);
+  color: var(--ink);
+  box-shadow: 0 40px 80px -30px rgb(0 0 0 / 0.8);
+}
+
+.lightbox img {
+  width: 100%;
+  max-height: calc(92dvh - 6rem);
+  border: 0;
+  border-radius: 0;
+  object-fit: contain;
+  background: var(--photo-ground);
+}
+
+.lightbox-cap {
+  margin: 0;
+  padding: 0.9rem 4.5rem 1rem 1.2rem;
+  font-size: 0.95rem;
+}
+
+.lightbox-cap strong {
+  color: var(--title);
+}
+
+.lightbox-credit {
+  display: block;
+  margin-top: 0.3rem;
+  color: var(--ink-faint);
+  font-size: 0.8rem;
+}
+
+.lightbox .round-btn {
+  position: absolute;
+  background: color-mix(in srgb, var(--panel-solid) 82%, transparent);
+}
+
+.lightbox-close {
+  inset-block-start: 0.6rem;
+  inset-inline-end: 0.6rem;
+}
+
+.lightbox-prev,
+.lightbox-next {
+  inset-block-start: calc(50% - 2.5rem);
+}
+
+.lightbox-prev {
+  inset-inline-start: 0.6rem;
+}
+
+.lightbox-next {
+  inset-inline-end: 0.6rem;
+}
+
+/* ---- the gateways ----------------------------------------------------------- */
+
+.hgw-count {
+  display: block;
+  margin: 0 0 var(--space-4);
+  text-align: center;
+}
+
+.hgw-grid {
+  --hgw-columns: 2;
+
+  display: grid;
+  grid-template-columns: repeat(var(--hgw-columns), minmax(0, 1fr));
+  gap: var(--space-4);
+  margin: 0 auto;
+  padding: 0;
+  list-style: none;
+}
+
+.hgw-grid[data-count="1"] {
+  --hgw-columns: 1;
+
+  max-width: 24rem;
+}
+
+.hgw-grid[data-count="2"],
+.hgw-grid[data-count="4"] {
+  max-width: 56rem;
+}
+
+.hgw-grid[data-count="3"] {
+  --hgw-columns: 3;
+}
+
+@media (max-width: 860px) {
+  .hgw-grid[data-count="3"] {
+    --hgw-columns: 1;
+
+    max-width: 26rem;
+  }
+}
+
+@media (max-width: 600px) {
+  .hgw-grid[data-count] {
+    --hgw-columns: 1;
+
+    max-width: 26rem;
+  }
+}
+
+.hgw-foot {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.65rem;
+  margin-top: 1.25rem;
+}
+
+.gw {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  border: 1px solid var(--edge-soft);
+  border-radius: var(--radius);
+  background: var(--panel);
+  box-shadow: var(--shadow);
+  text-align: start;
+  transition:
+    border-color var(--dur) ease,
+    box-shadow var(--dur) ease;
+}
+
+.gw-is-official {
+  border-color: var(--edge);
+}
+
+.gw-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+}
+
+.gw-name {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-size: var(--text-lg);
+}
+
+.gw-official {
+  flex: none;
+}
+
+.gw-state {
+  align-self: flex-start;
+  margin: 0;
+}
+
+.gw-facts {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  font-family: var(--sans);
+}
+
+.gw-facts > div {
+  display: grid;
+  grid-template-columns: 5.5rem 1fr;
+  gap: var(--space-3);
+  align-items: center;
+}
+
+.gw-facts dt {
+  color: var(--ink-faint);
+  font-size: var(--text-sm);
+}
+
+.gw-facts dd {
+  min-width: 0;
+  margin: 0;
+}
+
+/* the whole address, wrapped where it must: its end often tells two apart */
+.gw-address code {
+  overflow-wrap: anywhere;
+  font-size: var(--text-sm);
+}
+
+.gw-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: auto;
+  padding-top: var(--space-2);
+}
+
+.gw-actions .button {
+  flex: 1 1 10rem;
+}
+
+.gw-open .copy-done,
+.gw-open[data-copied] .copy-idle {
+  display: none;
+}
+
+.gw-open[data-copied] .copy-done {
+  display: block;
+}
+
+.gw-open[data-copied] {
+  border-color: var(--ok);
+  color: var(--ok);
+}
+
+/* ---- what it is ------------------------------------------------------------- */
+
+.about-arch-grid {
+  gap: 1rem;
+  margin-bottom: 1rem;
+  align-items: stretch;
+}
+
+.about-arch-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 1.35rem 1.45rem;
+}
+
+.about-arch-card p,
+.features p,
+.ai-card p,
+.ai-training-badge-col p {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 0.95rem;
+  line-height: 1.55;
+}
+
+.about-arch-head,
+.feat-head {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.about-arch-head h3,
+.features h3,
+.ai-card h3,
+.ai-training-badge-col h3 {
+  margin: 0;
+  color: var(--title);
+  font-family: var(--serif);
+  font-weight: 600;
+  line-height: 1.24;
+}
+
+.about-arch-head h3 {
+  font-size: 1.26rem;
+}
+
+.features h3 {
+  font-size: 1.14rem;
+}
+
+.feat-icon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 2.35rem;
+  height: 2.35rem;
+  border: 1px solid var(--edge-soft);
+  border-radius: 10px;
+  background: var(--violet-soft);
+  color: var(--violet);
+  transition:
+    box-shadow var(--dur-slow) ease,
+    color var(--dur-slow) ease,
+    border-color var(--dur-slow) ease;
+}
+
+.feat-icon .icon {
+  width: 1.2rem;
+  height: 1.2rem;
+}
+
+/* the icon of the card under the pointer takes the gold light */
+:is(.features > li, .about-arch-card, .ai-card):hover .feat-icon {
+  border-color: var(--gold);
+  color: var(--gold);
+  box-shadow: 0 0 1.1rem -0.2rem color-mix(in srgb, var(--gold) 55%, transparent);
+}
+
+.features {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.features > li {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding: 1.2rem 1.3rem;
+}
+
+@media (max-width: 960px) {
+  .features {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .features {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---- the opponents ---------------------------------------------------------- */
+
+.ai-showcase {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+  margin-top: clamp(2rem, 3.8vw, 2.8rem);
+  padding-top: clamp(1.75rem, 3.2vw, 2.4rem);
+  border-top: 1px solid var(--edge-soft);
+}
+
+.ai-showcase-head {
+  max-width: 46rem;
+  margin: 0 auto 0.2rem;
+  text-align: center;
+}
+
+.ai-showcase-title {
+  margin: 0;
+  font-size: clamp(1.5rem, 2.3vw, 2.05rem);
+  line-height: 1.18;
+}
+
+.ai-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.ai-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 1.25rem 1.35rem;
+}
+
+.ai-card-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.ai-card h3 {
+  font-size: 1.18rem;
+}
+
+.ai-provider-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: auto 0 0;
+  padding: 0.3rem 0 0;
+  list-style: none;
+  font-family: var(--sans);
+}
+
+.ai-provider-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.18rem 0.56rem;
+  border: 1px solid color-mix(in srgb, var(--gold) 45%, var(--edge-soft));
+  border-radius: var(--pill);
+  background: color-mix(in srgb, var(--gold) 12%, var(--panel-2));
+  color: var(--title);
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.ai-training-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.15rem;
+  padding: 1.35rem 1.55rem;
+  border-color: color-mix(in srgb, var(--ok) 48%, var(--edge));
+  background:
+    radial-gradient(ellipse 65% 90% at 0% 0%, color-mix(in srgb, var(--ok) 11%, transparent), transparent 70%),
+    color-mix(in srgb, var(--panel-solid) 88%, var(--bg-alt));
+}
+
+.ai-training-badge-col {
+  display: flex;
+  flex: 1 1 32rem;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.ai-training-pill {
+  align-self: flex-start;
+}
+
+.ai-training-badge-col h3 {
+  font-size: 1.24rem;
+}
+
+.ai-training-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+@media (max-width: 960px) {
+  .ai-cards-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---- the card numbers ------------------------------------------------------- */
+
+.numbers {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem;
+  margin: 0;
+}
+
+.number {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 1.3rem 1rem 0.9rem;
+  text-align: center;
+}
+
+.number dt {
+  color: var(--title);
+  font-family: var(--serif);
+  font-size: clamp(1.9rem, 1.3rem + 2vw, 2.75rem);
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+.number dd {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.1rem;
+  margin: 0.2rem 0 0;
+  color: var(--ink-soft);
+  font-size: 0.95rem;
+}
+
+.number-implemented dt {
+  color: var(--ok);
+}
+
+.number .tip {
+  margin-block: 0;
+  color: var(--violet);
+}
+
+.share {
+  display: grid;
+  gap: 0.6rem;
+  margin-top: 1rem;
+  padding: 1.1rem 1.3rem;
+  text-align: center;
+}
+
+.share p {
+  margin: 0;
+}
+
+.share > p:first-child {
+  color: var(--title);
+  font-size: var(--text-lg);
+}
+
+.share-bar {
+  appearance: none;
+  display: block;
+  width: 100%;
+  height: 0.7rem;
+  overflow: hidden;
+  border: 1px solid var(--edge-soft);
+  border-radius: var(--pill);
+  background: var(--panel-2);
+  accent-color: var(--ok);
+  transform-origin: left;
+}
+
+.share-bar::-webkit-progress-bar {
+  background: var(--panel-2);
+}
+
+.share-bar::-webkit-progress-value {
+  border-radius: var(--pill);
+  background: linear-gradient(90deg, var(--ok), color-mix(in srgb, var(--ok) 60%, var(--gold)));
+}
+
+.share-bar::-moz-progress-bar {
+  border-radius: var(--pill);
+  background: linear-gradient(90deg, var(--ok), color-mix(in srgb, var(--ok) 60%, var(--gold)));
+}
+
+@media (max-width: 860px) {
+  .numbers {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* ---- writing to us ------------------------------------------------------------ */
+
+.channels {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.8rem;
+  margin: 1.4rem 0;
+  padding: 0;
+  list-style: none;
+}
+
+.channels a {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  min-height: 56px;
+  height: 100%;
+  padding: 0.9rem 1rem;
+  color: var(--ink);
+  font-family: var(--sans);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.channels a:hover {
+  border-color: var(--gold);
+  background: var(--panel-2);
+  color: var(--title);
+}
+
+.channels a > span {
+  display: flex;
+  flex-direction: column;
+}
+
+.channels small {
+  color: var(--ink-faint);
+  font-size: 0.86rem;
+  font-weight: 400;
+}
+
+.channels .icon {
+  width: 1.6rem;
+  height: 1.6rem;
+  color: var(--violet);
+  transition: color var(--dur) ease;
+}
+
+.channels a:hover .icon {
+  color: var(--gold);
+}
+
+.contact-card {
+  padding: clamp(1.2rem, 3vw, 1.8rem);
+}
+
+.privacy-note {
+  margin: var(--space-4) 0 0;
+}
+
+@media (max-width: 480px) {
+  .channels {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---- open source -------------------------------------------------------------- */
+
+.promise {
+  padding-left: 1rem;
+  border-left: 3px solid var(--gold);
+  color: var(--title);
+  font-size: 1.12rem;
+}
+
+.links-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.repo-card {
+  padding: 1.5rem;
+}
+
+.repo-card h3 {
+  font-size: 1.2rem;
+}
+
+.kv {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: var(--space-2) var(--space-5);
+  align-items: baseline;
+  margin: 0 0 var(--space-4);
+  font-family: var(--sans);
+}
+
+.kv > div {
+  display: contents;
+}
+
+.kv dt {
+  color: var(--ink-faint);
+  font-size: var(--text-sm);
+  white-space: nowrap;
+}
+
+.kv dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.kv dd > a {
+  display: inline-flex;
+  align-items: center;
+  min-width: var(--target);
+  min-height: var(--target);
+  margin-block: -0.6rem;
+}
+
+@media (max-width: 600px) {
+  .kv {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 0;
+  }
+
+  .kv dd {
+    margin-bottom: var(--space-3);
+  }
+}
+
+/* ---- as they come into view ------------------------------------------------
+   Driven by the scroll itself (no script, nothing waits): a card rises and
+   brightens while it enters, the ones beside it a beat later; the share of
+   playable cards fills. What starts on screen is already there. */
+
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .reveal {
+      animation: reveal linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 60%;
+    }
+
+    .stagger > .reveal:nth-child(3n + 2) {
+      animation-range: entry 6% entry 66%;
+    }
+
+    .stagger > .reveal:nth-child(3n) {
+      animation-range: entry 12% entry 72%;
+    }
+
+    .band > .wrap > .eyebrow,
+    .band > .wrap > h2 {
+      animation: reveal linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 100%;
+    }
+
+    .share-bar {
+      animation: fill linear both;
+      animation-timeline: view();
+      animation-range: entry 20% cover 45%;
+    }
+  }
+}
+
+@keyframes reveal {
+  from {
+    opacity: 0;
+    transform: translateY(1.6rem);
+  }
+}
+
+@keyframes fill {
+  from {
+    transform: scaleX(0);
+  }
+}

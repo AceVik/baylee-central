@@ -8,17 +8,13 @@
 site-name = Baylee
 skip = Skip to content
 nav-label = Main
-nav-home = Home
 nav-download = Download
 nav-gateways = Gateways
 nav-faq = Questions
 nav-contact = Contact
-nav-more = More
-nav-close = Close menu
 nav-sign-in = Sign in
 nav-account = Your account
 lang-label = Language
-lang-switch = Deutsch
 theme-label = Colour scheme
 theme-system = Colours: as your device
 theme-light = Colours: light
@@ -26,21 +22,17 @@ theme-dark = Colours: dark
 
 foot-label = About this site
 foot-play = Play
-foot-about = About
 foot-legal = Legal
-foot-repository = Source code on GitHub
 foot-releases = All releases
 foot-issues = Report a bug
 foot-discord = Discord community
 foot-central-source = This site's source
 foot-dedication = For Baylee. Forever in the sunlight.
 fan-content = Baylee is unofficial Fan Content permitted under the <policy>Fan Content Policy</policy>. Not approved/endorsed by Wizards. Portions of the materials used are property of Wizards of the Coast. ©Wizards of the Coast LLC.
-fan-content-short = Unofficial Fan Content · <more>what that means</more>
 foot-colophon = Fonts: Faustina and Alegreya Sans, SIL Open Font License 1.1, served from this site. The painting and the logo are our own. <notices>Notices</notices>
 
 ## Titles and descriptions
 
-title-suffix = Baylee
 title-home = Baylee – Build your decks. Gather your friends. Just play.
 desc-home = Baylee is a free, open-source fan game for Magic: The Gathering on Linux, Windows and macOS: a rules engine that knows the cards, tables for up to eight players, and opponents when no one else is around.
 title-download = Download Baylee
@@ -72,20 +64,8 @@ hero-lead = A comprehensive deck builder, matches for up to eight players in due
 hero-offline = Solo matches and the deck builder work offline, without an account. Online tables live on gateways; <host>you can run your own</host>.
 hero-account = Playing online? <register>Create an account</register>, free and open to everyone in the open beta, or <signin>sign in</signin>.
 hero-memorial = Remember Baylee: open her photo album
-hero-other = Other systems
 
 status-label = Project status
-status-release = Release
-status-released = released { $date }
-status-ci-pass = Tests pass on main
-status-ci-fail = Tests fail on main
-status-ci-unknown = Test status unknown
-status-commit = Latest change
-status-gateways = { $online ->
-    [one] { $online } gateway online
-   *[other] { $online } gateways online
-}
-status-stale = As of { $time }; GitHub did not answer since.
 
 cards-eyebrow = The cards
 cards-title = How many cards Baylee knows
@@ -103,9 +83,6 @@ cards-share = { $playable } of { $total } cards are playable today.
 cards-as-of = Release { $tag }, counted on { $date }.
 cards-missing = The card numbers could not be read just now.
 
-screens-eyebrow = A look at the table
-screens-title = What it looks like
-screens-credit = Card images in the screenshots: Scryfall · © Wizards of the Coast.
 shot-duel-alt = A duel against the house AI: six creatures attack, three are blocked
 shot-duel = <b>Tactical duel</b> against the house AI, with clear combat lines for every assignment.
 shot-log-alt = A duel with the game log open, three spells on the stack
@@ -120,30 +97,14 @@ shot-builder-alt = The deck builder filtering the pool for an angel
 shot-builder = <b>The deck builder</b> searches the whole pool as you type.
 
 about-eyebrow = What it is
-about-title = A rules engine and a clear table
-about-engine-title = An engine that knows every rule
-about-engine = Priority, the stack, layers, replacement effects, triggers, state-based actions and combat: the engine, written in Rust, applies the whole rule set and works out the exact legal choices at every step.
-about-table-title = A calm 3D table
-about-table = Battlefield, hands, stack, exile and graveyards on an uncluttered table, with clear combat lines and instant card previews. From the lobby you move between the deck builder, solo matches and online tables.
-about-ai-title = Opponents when nobody is around
-about-ai = The house AI plays at five levels, from Novice to Expert, offline and at online tables, and sees only what a player would see. A language model can take a seat too, through your own key or a gateway that offers one.
+about-title = Complete Rules Engine & Clear 3D Table
+about-engine = Priority, the stack, layers, replacement effects, triggers, state-based actions, and combat: the Rust engine applies the complete ruleset and computes the exact legal choices at every step. The client presents only those valid actions.
+about-table = Battlefield, hands, stack, exile, and graveyards on an uncluttered 3D table with clear combat lines and instant card previews. Card art streams from Scryfall while you play, or switches to a crisp oracle-text view anytime.
 
-gw-eyebrow = Online play
+gw-eyebrow = Online
 gw-title = Gateways
-gw-lead = Online tables live on gateways: servers that Baylee Central lists once their operator was checked. Baylee's own is first.
-gw-all = All gateways
-gw-host = Run your own
 
-open-eyebrow = Open source
-open-title = Free, and it stays that way
-open-lead = No paywall, no paid features, no ads – not now, not later. The game's code is under the GNU Affero General Public License; Baylee Central's code is public too, so anyone can read what happens to their data.
-open-repository = The game on GitHub
 open-central = Baylee Central on GitHub
-
-## The remembrance
-
-memorial-label = Baylee's photo album and story
-memorial-close = Close the album
 
 ## Download
 
@@ -210,6 +171,10 @@ gws-version = Version
 gws-website = Website
 gws-address = Address
 gws-copy-hint = In Baylee, add a gateway by its address.
+gws-copy = Copy address
+gws-copied = Address copied.
+gws-copied-short = Copied
+gws-copy-failed = Copying did not work.
 gws-none = No gateway is listed yet.
 gws-failed = The directory could not be read just now. Try again in a minute.
 host-title = Run your own gateway
@@ -275,8 +240,6 @@ impressum-name = Name
 impressum-address = Address
 impressum-email = E-mail
 impressum-phone = Phone
-impressum-copy = Copy
-impressum-copied = Copied
 impressum-failed = The details could not be loaded. Try again, or write to us through the <contact>contact form</contact>.
 impressum-noscript = The details need JavaScript to show. Without it, reach us through Discord or GitHub.
 impressum-responsible = Responsible for the content: the person named above.
@@ -343,11 +306,7 @@ gone-lead = What was here has been removed. The start page shows where to go on.
 error-home = To the start page
 
 ## Baylee's remembrance (approved by her family on 27 October 2026; keep word for word)
-baylee-dedication = For Baylee. Forever in the sunlight.
-baylee-invitation = Meet the little soul behind this world
-baylee-open = Remember Baylee · open her photo album
 baylee-eyebrow = The heart of this project
-baylee-date = In loving memory · 26 October 2026
 baylee-close = Back to her world
 baylee-previous = Previous photograph
 baylee-next = Next photograph
@@ -363,7 +322,6 @@ baylee-chapters = Her story
 baylee-chapterPrevious = Previous chapter
 baylee-chapterNext = Next chapter
 baylee-photos = Our memories
-baylee-read = Scroll to read
 
 baylee-chapter1Title = A home for Baylee
 baylee-chapter1Body =
@@ -813,3 +771,82 @@ ci-failing = failing
 dl-button = Download Baylee
 dl-quick = Other systems and architectures
 dl-others = other systems
+
+# The start page, as the old site wrote it (owner, 11.11.2026)
+link-readmeModel = #playing-against-a-language-model
+about-engineTitle = An engine that enforces every rule
+about-deterministic = Powered by a seeded random generator with zero wall-clock or hash-order dependencies, every match is strictly deterministic and reproducible move by move.
+about-tableTitle = A clean 3D table built with Bevy
+about-keys = From the integrated lobby you move effortlessly between the local deck builder, solo matches, and multiplayer tables on community gateways.
+feature-hiddenTitle = Hidden information stays private
+feature-hidden = Your client receives only the data your seat is allowed to see. Libraries and opponents' hands arrive strictly as counts—even a modified client cannot inspect hidden cards.
+feature-seatsTitle = Up to eight players at one table
+feature-seats = Duels, free-for-all, and team matches (such as 2v2) for up to 8 seats. Teammates share turns and can reveal their hand cards to one another.
+feature-commanderTitle = Flexible formats & custom house rules
+feature-commander = Assemble decks for classic 60-card duels, multiplayer rings, or custom house formats. Starting life totals, team layouts, and mulligan rules are freely set by the host.
+feature-aiTitle = Deterministic replays & F8 reports
+feature-ai = Every match is recorded move by move. If you spot a rules interaction issue during play, press F8 right at the table to send a reproducible state report.
+feature-processTitle = Isolated server process per match
+feature-process = Every active game runs in its own sandboxed engine process on the gateway. The gateway itself only manages lobby and rooms—an error never affects other tables.
+feature-languagesTitle = Card text in 19 languages
+feature-languages = Whenever a gateway provides the multilingual card catalog, cards read in your preferred language with English as fallback. The client UI is available in German and English.
+feature-watchTitle = Spectate live matches
+feature-watch = The lobby's Watch button seats you at the table as a live spectator: follow the public battlefield in real time while all player hands remain hidden.
+feature-connectionTitle = Seamless reconnect on drop
+feature-connection = If a connection drops briefly, the table holds the seat with a countdown and can pause the match or let the House AI step in temporarily.
+feature-tablesTitle = Fourteen decision clocks
+feature-tables = From brisk 15-second turns to relaxed untimed tables, configure the pace individually for every room.
+shots-eyebrow = At the table
+shots-title = Inside the game
+shots-lead = Short live recordings captured directly from the 3D client with card images from Scryfall (© Wizards of the Coast)—from duels and 4-player rings to the encrypted lobby and deck builder.
+shots-credit = Card images: Scryfall · © Wizards of the Coast
+shots-showLarge = Show large: { $title }
+shots-dialog = Screenshot
+shots-previous = Previous
+shots-next = Next
+shots-close = Close
+ai-eyebrow = AI Opponents & Language Models
+ai-title = House AI, LLM Bridge & Native Baylee AI
+ai-houseTitle = Heuristic House AI in five skill levels
+ai-house = Ready to play offline and at any online table: choose between Novice, Casual, Steady, Sharp, and Expert. The House AI decides locally with zero wait time and sees only the same public state as a human player.
+ai-modelTitle = Language models at the table via Seat-Bridge
+ai-model = Seat <b>Google Gemini, OpenAI ChatGPT, Anthropic Claude, DeepSeek</b>, or local models via <b>LM Studio</b> right at your table. API keys stay protected in environment variables with spending caps; on timeouts, the House AI steps in seamlessly.
+ai-setup = LLM & Seat-Bridge setup guide
+home-gwLead = Online tables live on gateways, servers that Baylee Central lists after its operator checked who runs each. Here are the first few; the directory has them all.
+beta-open = Open the directory
+beta-own = Run your own
+source-eyebrow = Source
+source-title = Open source, and it stays that way
+source-promise = Baylee will always be open source and free. No paywall, no paid features, no ads. Not now, not later. The code is under the GNU Affero General Public License, which means anyone who runs a modified gateway for other people must offer them its source too.
+source-rust = It is written in Rust, one person's project with a lot of help from coding agents, and every change goes through the same gate: formatting, lints, the test suite, and a validation of every card against its printed text. Issues and pull requests are welcome; <agents>AGENTS.md</agents> and <claude>CLAUDE.md</claude> are the working rules for people and agents alike.
+source-discord = Community on Discord
+source-whatsapp = Community on WhatsApp
+source-architecture = Architecture
+source-repoTitle = The repository right now
+source-stars = Stars
+source-issues = Open issues and pull requests
+source-note = Read from GitHub's public API by this site's server every ten minutes. Your browser asks GitHub nothing.
+gw-count = 
+    { $n ->
+        [one] { $n } gateway listed, { $online } online.
+       *[other] { $n } gateways listed, { $online } online.
+    }
+gw-none = No gateway is listed yet.
+contact-intro = A question, an idea, a game you would like to see, or something you would rather not post in public: this form goes straight to the people behind Baylee. Leave an e-mail address if you want an answer; without one we can only read it.
+contact-f8 = A card that resolved wrongly is best reported from the game with <kbd>F8</kbd>, because the report can carry the whole game.
+contact-discord = talk, find opponents, hear about builds
+contact-issues = GitHub issues
+contact-issuesSub = bugs and ideas, in public
+contact-operator = Who runs this site, with a postal address: the <impressum>legal notice</impressum>.
+contact-whatsappSub = Community group & quick matches
+contact-reportsTitle = Reports & privacy
+contact-reportsSub = Details on F8 reports & data
+ai-housePill = Offline & online
+ai-providers = Supported language models
+ai-hostsPill = For gateway hosts
+ai-hostsTitle = Offer hosted LLM seats on your gateway
+ai-hosts = As a gateway operator, you can provide pre-configured language models directly on your server. Guests at a table simply pick one of your hosted models as an opponent—with no API key needed.
+ai-trainingPill = In training · native engine AI
+ai-trainingTitle = Native Baylee AI — trained to play directly on the engine like a real player
+ai-training = Alongside the House AI and external LLM bridge, a dedicated native Baylee AI is being trained directly on the deterministic rules engine. It learns to evaluate board states, priority windows, combat math, and deck synergies like an experienced human player—with zero external API latency.
+ai-hostingLink = Gateway hosting & LLM setup

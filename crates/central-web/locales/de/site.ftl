@@ -8,17 +8,13 @@
 site-name = Baylee
 skip = Zum Inhalt springen
 nav-label = Hauptnavigation
-nav-home = Start
 nav-download = Download
 nav-gateways = Gateways
 nav-faq = Fragen
 nav-contact = Kontakt
-nav-more = Mehr
-nav-close = Menü schließen
 nav-sign-in = Anmelden
 nav-account = Dein Account
 lang-label = Sprache
-lang-switch = English
 theme-label = Farbschema
 theme-system = Farben: wie dein Gerät
 theme-light = Farben: hell
@@ -26,21 +22,17 @@ theme-dark = Farben: dunkel
 
 foot-label = Über diese Seite
 foot-play = Spielen
-foot-about = Über Baylee
 foot-legal = Rechtliches
-foot-repository = Quellcode auf GitHub
 foot-releases = Alle Releases
 foot-issues = Fehler melden
 foot-discord = Discord-Community
 foot-central-source = Quellcode dieser Seite
 foot-dedication = Für Baylee. Für immer im Sonnenlicht.
 fan-content = Baylee ist ein inoffizieller Fan-Inhalt im Rahmen der <policy>Richtlinie für Fan-Inhalte</policy>. Nicht von Wizards gefördert/gesponsert. Bestandteile des enthaltenen Materials sind Eigentum von Wizards of the Coast. ©Wizards of the Coast LLC.
-fan-content-short = Inoffizieller Fan-Inhalt · <more>was das heißt</more>
 foot-colophon = Schriften: Faustina und Alegreya Sans, SIL Open Font License 1.1, von dieser Seite ausgeliefert. Das Gemälde und das Logo sind unsere eigenen. <notices>Hinweise</notices>
 
 ## Titel und Beschreibungen
 
-title-suffix = Baylee
 title-home = Baylee – Bau deine Decks. Hol deine Freunde. Einfach spielen.
 desc-home = Baylee ist ein freies Open-Source-Fanspiel zu Magic: The Gathering für Linux, Windows und macOS: eine Regel-Engine, die die Karten kennt, Tische für bis zu acht Spieler und Gegner, wenn sonst niemand da ist.
 title-download = Baylee herunterladen
@@ -72,20 +64,8 @@ hero-lead = Ein umfassender Deckbuilder, Partien für bis zu acht Spieler – im
 hero-offline = Solopartien und der Deckbuilder funktionieren offline, ohne Account. Online-Tische laufen auf Gateways; <host>du kannst dein eigenes betreiben</host>.
 hero-account = Online spielen? <register>Leg ein Konto an</register>, kostenlos und in der offenen Beta für alle offen, oder <signin>melde dich an</signin>.
 hero-memorial = Erinnerung an Baylee: ihr Fotoalbum öffnen
-hero-other = Andere Systeme
 
 status-label = Stand des Projekts
-status-release = Release
-status-released = erschienen am { $date }
-status-ci-pass = Tests auf main bestanden
-status-ci-fail = Tests auf main fehlgeschlagen
-status-ci-unknown = Teststand unbekannt
-status-commit = Letzte Änderung
-status-gateways = { $online ->
-    [one] { $online } Gateway online
-   *[other] { $online } Gateways online
-}
-status-stale = Stand { $time }; GitHub hat seitdem nicht geantwortet.
 
 cards-eyebrow = Die Karten
 cards-title = Wie viele Karten Baylee kennt
@@ -103,9 +83,6 @@ cards-share = { $playable } von { $total } Karten sind heute spielbar.
 cards-as-of = Release { $tag }, gezählt am { $date }.
 cards-missing = Die Kartenzahlen konnten gerade nicht gelesen werden.
 
-screens-eyebrow = Ein Blick auf den Tisch
-screens-title = So sieht es aus
-screens-credit = Kartenbilder in den Screenshots: Scryfall · © Wizards of the Coast.
 shot-duel-alt = Ein Duell gegen die Haus-KI: sechs Kreaturen greifen an, drei werden geblockt
 shot-duel = <b>Taktisches Duell</b> gegen die Haus-KI, mit klaren Kampflinien für jede Zuteilung.
 shot-log-alt = Ein Duell mit offenem Spielprotokoll, drei Zauber auf dem Stapel
@@ -120,30 +97,14 @@ shot-builder-alt = Der Deckbuilder filtert den Pool nach einem Engel
 shot-builder = <b>Der Deckbuilder</b> durchsucht den ganzen Pool, während du tippst.
 
 about-eyebrow = Was es ist
-about-title = Eine Regel-Engine und ein klarer Tisch
-about-engine-title = Eine Engine, die jede Regel kennt
-about-engine = Priorität, der Stapel, Schichten, Ersatzeffekte, Auslöser, zustandsbasierte Aktionen und Kampf: Die Engine, in Rust geschrieben, wendet das ganze Regelwerk an und errechnet bei jedem Schritt genau die erlaubten Entscheidungen.
-about-table-title = Ein ruhiger 3D-Tisch
-about-table = Spielfeld, Hände, Stapel, Exil und Friedhöfe auf einem aufgeräumten Tisch, mit klaren Kampflinien und sofortiger Kartenvorschau. Aus der Lobby wechselst du zwischen Deckbuilder, Solopartien und Online-Tischen.
-about-ai-title = Gegner, wenn niemand da ist
-about-ai = Die Haus-KI spielt in fünf Stufen, von Anfänger bis Experte, offline und an Online-Tischen, und sieht nur, was ein Spieler sehen würde. Auch ein Sprachmodell kann Platz nehmen, mit deinem eigenen Schlüssel oder über ein Gateway, das eines anbietet.
+about-title = Vollständige Regel-Engine & übersichtlicher 3D-Tisch
+about-engine = Priorität, Stapel, Schichtensystem, Ersetzungseffekte, Trigger, zustandsbasierte Aktionen und Kampf: Die Rust-Engine wendet das gesamte Regelwerk an und berechnet bei jedem Schritt exakt die legalen Züge eines Spielers. Der Client zeigt ausschließlich diese gültigen Optionen an.
+about-table = Spielfeld, Handkarten, Stapel, Exil und Friedhöfe auf einem aufgeräumten 3D-Tisch mit flüssigen Kampflinien und Kartenvorschau. Kartenbilder werden beim Spielen von Scryfall geladen; alternativ stellt eine präzise Regeltext-Ansicht jede Karte direkt aus ihrem aktuellen Oracle-Text dar.
 
-gw-eyebrow = Online spielen
+gw-eyebrow = Online
 gw-title = Gateways
-gw-lead = Online-Tische laufen auf Gateways: Servern, die Baylee Central aufführt, nachdem ihr Betreiber geprüft wurde. Baylees eigenes steht vorn.
-gw-all = Alle Gateways
-gw-host = Eigenes betreiben
 
-open-eyebrow = Open Source
-open-title = Frei, und das bleibt so
-open-lead = Keine Bezahlschranke, keine bezahlten Funktionen, keine Werbung – nicht jetzt und nicht später. Der Code des Spiels steht unter der GNU Affero General Public License; auch der Code von Baylee Central ist öffentlich, damit jeder nachlesen kann, was mit seinen Daten geschieht.
-open-repository = Das Spiel auf GitHub
 open-central = Baylee Central auf GitHub
-
-## Die Erinnerung
-
-memorial-label = Baylees Fotoalbum und Geschichte
-memorial-close = Album schließen
 
 ## Download
 
@@ -210,6 +171,10 @@ gws-version = Version
 gws-website = Website
 gws-address = Adresse
 gws-copy-hint = In Baylee fügst du ein Gateway über seine Adresse hinzu.
+gws-copy = Adresse kopieren
+gws-copied = Adresse kopiert.
+gws-copied-short = Kopiert
+gws-copy-failed = Kopieren hat nicht geklappt.
 gws-none = Noch ist kein Gateway aufgeführt.
 gws-failed = Das Verzeichnis konnte gerade nicht gelesen werden. Versuch es in einer Minute noch einmal.
 host-title = Dein eigenes Gateway
@@ -275,8 +240,6 @@ impressum-name = Name
 impressum-address = Anschrift
 impressum-email = E-Mail
 impressum-phone = Telefon
-impressum-copy = Kopieren
-impressum-copied = Kopiert
 impressum-failed = Die Angaben konnten nicht geladen werden. Versuch es noch einmal oder schreib uns über das <contact>Kontaktformular</contact>.
 impressum-noscript = Die Angaben brauchen JavaScript. Ohne erreichst du uns über Discord oder GitHub.
 impressum-responsible = Verantwortlich für den Inhalt: die oben genannte Person.
@@ -344,11 +307,7 @@ error-home = Zur Startseite
 
 ## Baylees Erinnerung (am 27. Oktober 2026 von ihrer Familie freigegeben; Wort für Wort beibehalten)
 
-baylee-dedication = Für Baylee. Für immer im Sonnenlicht.
-baylee-invitation = Die kleine Seele hinter dieser Welt
-baylee-open = An Baylee erinnern · Fotoalbum öffnen
 baylee-eyebrow = Das Herz dieses Projekts
-baylee-date = In liebevoller Erinnerung · 26. Oktober 2026
 baylee-close = Zurück in ihre Welt
 baylee-previous = Vorheriges Foto
 baylee-next = Nächstes Foto
@@ -364,7 +323,6 @@ baylee-chapters = Ihre Geschichte
 baylee-chapterPrevious = Vorheriges Kapitel
 baylee-chapterNext = Nächstes Kapitel
 baylee-photos = Unsere Erinnerungen
-baylee-read = Zum Lesen scrollen
 
 baylee-chapter1Title = Ein Zuhause für Baylee
 baylee-chapter1Body =
@@ -814,3 +772,82 @@ ci-failing = rot
 dl-button = Baylee herunterladen
 dl-quick = Andere Systeme und Architekturen
 dl-others = andere Systeme
+
+# The start page, as the old site wrote it (owner, 11.11.2026)
+link-readmeModel = /blob/main/README.de.md#gegen-ein-sprachmodell-spielen
+about-engineTitle = Eine Engine, die jede Regel durchsetzt
+about-deterministic = Dank geseedetem Zufallsgenerator ohne Uhrzeit- oder Hash-Reihenfolge-Abhängigkeiten verläuft jede Partie vollständig deterministisch und lässt sich Zug für Zug exakt reproduzieren.
+about-tableTitle = Ein klarer 3D-Tisch auf Basis von Bevy
+about-keys = Über die integrierte Lobby wechselst du ohne Umwege zwischen lokalem Deckbuilder, Solo-Partien und Mehrspieler-Runden auf Community-Gateways.
+feature-hiddenTitle = Verdeckte Information bleibt geschützt
+feature-hidden = Dein Client erhält vom Server ausschließlich die Daten, die dein Platz sehen darf. Bibliotheken und fremde Hände werden nur als Anzahl übertragen – selbst ein veränderter Client kann verdeckte Karten nicht einsehen.
+feature-seatsTitle = Bis zu acht Spieler am selben Tisch
+feature-seats = Duelle, Jeder-gegen-jeden und Team-Partien (z. B. 2v2) mit bis zu 8 Plätzen. Teammitglieder teilen sich Züge und können sich gegenseitig ihre Handkarten zeigen.
+feature-commanderTitle = Freie Formate & eigene Tischregeln
+feature-commander = Stelle Decks für klassische 60-Karten-Duelle, Mehrspieler-Runden oder eigene Hausformate zusammen. Startlebenspunkte, Teamgrößen und Mulligan-Optionen legt der Gastgeber frei fest.
+feature-aiTitle = Deterministische Replays & F8-Bericht
+feature-ai = Jede Partie wird lückenlos aufgezeichnet. Fällt dir im Spiel eine fehlerhafte Regelinteraktion auf, sendest du mit F8 direkt aus dem Tisch heraus einen reproduzierbaren Spielstands-Bericht.
+feature-processTitle = Isolierter Server-Prozess pro Partie
+feature-process = Jedes laufende Spiel wird auf dem Gateway in einem eigenen, gekapselten Engine-Prozess ausgeführt. Das Gateway selbst verwaltet nur Lobby und Räume – ein Fehler stört niemals andere Tische.
+feature-languagesTitle = Kartentexte in 19 Sprachen
+feature-languages = Sobald ein Gateway den mehrsprachigen Kartenkatalog bereitstellt, liest du jede Karte in deiner Wunschsprache (mit Englisch als Fallback). Die Client-Oberfläche ist auf Deutsch und Englisch verfügbar.
+feature-watchTitle = Laufenden Partien live zuschauen
+feature-watch = Über den „Zuschauen"-Button in der Lobby nimmst du als Zuschauer am Tisch Platz: Du verfolgst das öffentliche Spielfeld in Echtzeit, während alle Spielerhände geschützt bleiben.
+feature-connectionTitle = Nahtloser Reconnect bei Verbindungsabbruch
+feature-connection = Bricht eine Verbindung kurzzeitig ab, hält der Tisch den Platz mit einem Countdown frei. Auf Wunsch pausiert die Partie oder lässt vorübergehend die Haus-KI einspringen.
+feature-tablesTitle = Vierzehn Bedenkzeit-Uhren
+feature-tables = Von schnellen 15-Sekunden-Zügen bis zu entspannten Runden ganz ohne Zeitlimit bestimmst du das Tempo für jeden Tisch individuell.
+shots-eyebrow = Am Tisch
+shots-title = Einblicke ins Spielgeschehen
+shots-lead = Kurze Live-Aufnahmen direkt aus dem 3D-Client mit den Kartenbildern von Scryfall (© Wizards of the Coast) – vom Duell und der 4-Spieler-Runde über die verschlüsselte Lobby bis zum Deckbuilder.
+shots-credit = Kartenbilder: Scryfall · © Wizards of the Coast
+shots-showLarge = Groß zeigen: { $title }
+shots-dialog = Screenshot
+shots-previous = Zurück
+shots-next = Weiter
+shots-close = Schließen
+ai-eyebrow = KI-Mitspieler & Sprachmodelle
+ai-title = Haus-KI, LLM-Anbindung & eigene Baylee AI
+ai-houseTitle = Heuristische Haus-KI in fünf Spielstärken
+ai-house = Sofort spielbereit im Offline-Modus und an jedem Online-Tisch: Wähle zwischen Anfänger, Locker, Solide, Scharf und Experte. Die Haus-KI entscheidet lokal ohne Wartezeit und sieht ausschließlich dieselben öffentlichen Informationen wie ein menschlicher Spieler.
+ai-modelTitle = Sprachmodelle via Seat-Bridge am Tisch
+ai-model = Hole <b>Google Gemini, OpenAI ChatGPT, Anthropic Claude, DeepSeek</b> oder lokale Modelle über <b>LM Studio</b> direkt als Mitspieler an den Tisch. API-Schlüssel bleiben geschützt in Umgebungsvariablen mit Kostenlimits; bei Timeouts übernimmt nahtlos die Haus-KI.
+ai-setup = Anleitung zur LLM- & Seat-Bridge-Einrichtung
+home-gwLead = Online-Tische leben auf Gateways, Servern, die Baylee Central erst listet, nachdem der Betreiber geprüft hat, wer sie betreibt. Hier sind die ersten; das Verzeichnis zeigt alle.
+beta-open = Verzeichnis öffnen
+beta-own = Selbst betreiben
+source-eyebrow = Quellcode
+source-title = Quelloffen, und das bleibt so
+source-promise = Baylee bleibt immer quelloffen und kostenlos. Keine Bezahlschranke, keine kostenpflichtigen Funktionen, keine Werbung. Nicht jetzt, nicht später. Der Code steht unter der GNU Affero General Public License: Wer ein verändertes Gateway für andere betreibt, muss auch ihnen den Quellcode anbieten.
+source-rust = Geschrieben in Rust, das Projekt einer Person mit viel Hilfe von Coding-Agenten, und jede Änderung geht durch dasselbe Gate: Formatierung, Lints, die Testsuite und eine Prüfung jeder Karte gegen ihren gedruckten Text. Issues und Pull Requests sind willkommen; <agents>AGENTS.md</agents> und <claude>CLAUDE.md</claude> sind die Arbeitsregeln für Menschen und Agenten.
+source-discord = Community auf Discord
+source-whatsapp = Community auf WhatsApp
+source-architecture = Architektur
+source-repoTitle = Das Repository gerade jetzt
+source-stars = Sterne
+source-issues = Offene Issues und Pull Requests
+source-note = Vom Server dieser Seite alle zehn Minuten aus GitHubs öffentlicher API gelesen. Dein Browser fragt GitHub nichts.
+gw-count = 
+    { $n ->
+        [one] { $n } Gateway gelistet, { $online } online.
+       *[other] { $n } Gateways gelistet, { $online } online.
+    }
+gw-none = Noch ist kein Gateway gelistet.
+contact-intro = Eine Frage, eine Idee, ein Spiel, das du gern sehen würdest, oder etwas, das du lieber nicht öffentlich schreibst: Dieses Formular geht direkt an die Leute hinter Baylee. Lass eine E-Mail-Adresse da, wenn du eine Antwort willst; ohne können wir es nur lesen.
+contact-f8 = Eine Karte, die falsch verrechnet wurde, meldest du am besten im Spiel mit <kbd>F8</kbd>, weil der Bericht das ganze Spiel mitnehmen kann.
+contact-discord = reden, Gegner finden, von Builds hören
+contact-issues = GitHub-Issues
+contact-issuesSub = Fehler und Ideen, öffentlich
+contact-operator = Wer diese Seite betreibt, mit Postanschrift: das <impressum>Impressum</impressum>.
+contact-whatsappSub = Community-Gruppe & schnelle Runden
+contact-reportsTitle = Berichte & Datenschutz
+contact-reportsSub = Details zu F8-Berichten & Daten
+ai-housePill = Offline & online
+ai-providers = Unterstützte Sprachmodelle
+ai-hostsPill = Für Gateway-Hosts
+ai-hostsTitle = LLM-Spieler als Gateway-Host anbieten
+ai-hosts = Als Gateway-Betreiber kannst du vorkonfigurierte Sprachmodelle direkt auf deinem Server bereitstellen. Deine Gäste wählen am Tisch einfach eines deiner gehosteten Modelle als Mitspieler aus – ganz ohne eigenen API-Key.
+ai-trainingPill = Aktuell im Training · Native Engine-KI
+ai-trainingTitle = Eigene Baylee AI – trainiert für echtes Spiel direkt auf der Engine
+ai-training = Parallel zur Haus-KI und der externen LLM-Anbindung wird eine eigene Baylee AI direkt auf der deterministischen Regel-Engine trainiert. Sie lernt, komplexe Spielzustände, Prioritätsfenster, Kampfreihenfolgen und Deck-Synergien wie ein erfahrener menschlicher Spieler einzuschätzen – ganz ohne externe API-Latenzen.
+ai-hostingLink = Gateway-Hosting & LLM-Setup

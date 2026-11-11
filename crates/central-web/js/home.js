@@ -1,9 +1,11 @@
-// Baylee's album (the start page's #album and #photo-viewer): the server
-// writes the whole book; this turns it into one chapter and one photograph
-// at a time, turns the page between chapters, and opens a photograph full
-// size to zoom into and move about. Plain DOM, no markup strings: nothing
-// here needs a Trusted Types policy. Without it the book still reads,
-// every chapter after the other.
+// The start page's script. Baylee's album (#album and #photo-viewer): the
+// server writes the whole book; this turns it into one chapter and one
+// photograph at a time, turns the page between chapters, and opens a
+// photograph full size to zoom into and move about. The screenshots: each
+// starts moving once it comes into view, and opens large (#shot-viewer),
+// where the arrow keys step. Plain DOM, no
+// markup strings: nothing here needs a Trusted Types policy. Without it
+// the book still reads, every chapter after the other.
 
 const album = document.getElementById("album");
 const viewer = document.getElementById("photo-viewer");
@@ -206,4 +208,70 @@ if (album instanceof HTMLDialogElement && viewer instanceof HTMLDialogElement) {
   showChapter(0);
   showPhoto(0, true);
   album.dataset.ready = "";
+}
+
+// ---- the screenshots: their recordings, and each one large -------------------
+
+// A recording (an animated AVIF) for those who did not ask for less motion,
+// added to a picture once it is near the window: the still stands until
+// then, and without script.
+const MOVING = "(prefers-reduced-motion: no-preference)";
+const animate = (picture, srcset, sizes) => {
+  let source = picture.querySelector("source[data-moving-source]");
+  if (!source) {
+    source = document.createElement("source");
+    source.dataset.movingSource = "";
+    source.media = MOVING;
+    source.type = "image/avif";
+    picture.prepend(source);
+  }
+  if (sizes) source.sizes = sizes;
+  source.srcset = srcset;
+};
+
+const pictures = [...document.querySelectorAll(".shot-open picture[data-moving]")];
+if (pictures.length > 0 && typeof IntersectionObserver === "function") {
+  const near = new IntersectionObserver(
+    (entries) => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue;
+        near.unobserve(entry.target);
+        animate(entry.target, entry.target.dataset.moving ?? "", entry.target.dataset.sizes ?? "");
+      }
+    },
+    { rootMargin: "200px 0px" },
+  );
+  for (const picture of pictures) near.observe(picture);
+}
+
+const shotViewer = document.getElementById("shot-viewer");
+
+if (shotViewer instanceof HTMLDialogElement) {
+  const shots = [...document.querySelectorAll(".shot-open")];
+  const picture = shotViewer.querySelector("[data-shot-picture]");
+  const image = shotViewer.querySelector("[data-shot-image]");
+  const words = shotViewer.querySelector("[data-shot-caption]");
+  let at = 0;
+  const show = (to) => {
+    at = (to + shots.length) % shots.length;
+    const shot = shots[at];
+    if (!shot) return;
+    if (picture) animate(picture, shot.dataset.moving ?? "", "");
+    if (image instanceof HTMLImageElement) {
+      image.src = shot.dataset.still ?? "";
+      image.alt = shot.querySelector("img")?.alt ?? "";
+    }
+    const caption = shot.closest("figure")?.querySelector("figcaption");
+    if (words && caption) words.replaceChildren(...[...caption.childNodes].map((node) => node.cloneNode(true)));
+  };
+  shots.forEach((shot, index) => shot.addEventListener("click", () => show(index)));
+  for (const button of shotViewer.querySelectorAll("[data-shot-step]")) {
+    button.addEventListener("click", () => show(at + Number(button.getAttribute("data-shot-step"))));
+  }
+  shotViewer.addEventListener("keydown", (event) => {
+    if (event.ctrlKey || event.metaKey || event.altKey) return;
+    if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return;
+    event.preventDefault();
+    show(at + (event.key === "ArrowRight" ? 1 : -1));
+  });
 }

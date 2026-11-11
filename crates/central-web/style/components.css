@@ -49,6 +49,17 @@
   margin-block-start: var(--space-6);
 }
 
+/* equal columns, and a row that is not full stands in the middle */
+.grid-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 22rem));
+  justify-content: center;
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
 .facts {
   display: grid;
   grid-template-columns: max-content minmax(0, 1fr);
@@ -103,13 +114,14 @@
   display: inline-flex;
   align-items: center;
   gap: 0.4em;
-  padding: 0.15em 0.65em;
-  border: var(--hairline) solid var(--edge-soft);
-  border-radius: var(--radius-full);
-  background: var(--surface-raised);
+  padding: 0.1em 0.65em;
+  border: 1px solid color-mix(in srgb, currentcolor 35%, transparent);
+  border-radius: var(--pill);
+  background: color-mix(in srgb, currentcolor 12%, transparent);
   color: var(--ink-soft);
-  font-size: var(--text-xs);
-  font-weight: 700;
+  font: 700 var(--text-xs) / 1.6 var(--sans);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
 }
 
 .pill .icon {
@@ -117,23 +129,35 @@
   block-size: 1.1em;
 }
 
-.pill .dot {
-  inline-size: 0.55em;
-  block-size: 0.55em;
-  border-radius: var(--radius-full);
-  background: currentcolor;
+.pill > .dot {
+  margin: 0;
 }
 
 .pill.ok {
   color: var(--ok);
 }
 
+.pill.warn {
+  color: var(--warn);
+}
+
+.pill.bad {
+  color: var(--bad);
+}
+
 .pill.off {
   color: var(--ink-faint);
 }
 
-.pill.accent {
-  color: var(--accent);
+.pill.accent,
+.pill.info {
+  color: var(--violet);
+}
+
+.pill.gold {
+  border-color: var(--gold);
+  background: var(--gold);
+  color: var(--gold-ink);
 }
 
 .notice {
@@ -165,33 +189,56 @@
 
 .form {
   display: grid;
-  gap: var(--space-5);
+  gap: var(--space-4);
 }
 
 .field {
   display: grid;
-  gap: var(--space-1);
+  gap: 0.35rem;
+  font-family: var(--sans);
 }
 
 .field label {
-  color: var(--title);
+  color: var(--ink);
   font-weight: 700;
+}
+
+.field .hint {
+  margin: 0;
 }
 
 .field input,
 .field textarea {
   inline-size: 100%;
-  min-block-size: var(--target);
-  padding: 0.6em 0.75em;
-  border: var(--hairline) solid var(--edge);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
+  min-block-size: 46px;
+  padding: 0.65em 0.85em;
+  border: 1px solid var(--field-edge);
+  border-radius: 12px;
+  background: var(--field-bg);
   color: var(--ink);
-  font: inherit;
+  font: 1rem var(--sans);
+  transition:
+    border-color var(--dur-fast) ease,
+    box-shadow var(--dur-fast) ease;
 }
 
 .field textarea {
+  min-block-size: 9rem;
+  line-height: 1.5;
   resize: vertical;
+}
+
+.field input:hover,
+.field textarea:hover {
+  border-color: var(--edge);
+}
+
+.field input:focus-visible,
+.field textarea:focus-visible {
+  outline: 2px solid transparent;
+  outline-offset: 0;
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold) 35%, transparent);
 }
 
 .field [aria-invalid="true"] {
