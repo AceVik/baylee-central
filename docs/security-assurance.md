@@ -4076,3 +4076,124 @@ Not tested, and recorded for the owner:
   this build; that it fails there follows from the statements.
 
 Engineering review, not an audit.
+
+## The site's count of page views, and signing in as a dialog, 11 November 2026
+
+The owner asked for the number of page views back in the start page's strip,
+and for signing in and registering to open as dialogs over the page. Both
+touch what the website's server and the browser hold, so both went through
+the three passes.
+
+### The count of page views
+
+Design pass. The old site showed a number a third party counted. The new
+site has no third party, so the number is the site's own or none.
+- **What is kept.** One unsigned number for every page and every visitor
+  together, and the day it began. Nothing of a request: no address, no
+  cookie, no identifier, not which page, not when. The privacy notice says
+  so, and says it only where a deployment counts (`privacy-views`).
+- **Opt-in.** `Config::views` names a file; without it nothing is counted,
+  nothing is shown and the server writes nothing anywhere, as before. The
+  development and test configurations do not count; the tests' fixture
+  shows a fixed number, so their pages stay the same bytes.
+- **The server's first writable state.** The file is the one thing this
+  server may write. It is read with a bound (1024 bytes), parsed with
+  unknown fields refused, and a file that is not this server's own stops
+  the start instead of being overwritten. It is written beside itself and
+  renamed over, with the bytes synced first, at most once a minute and
+  only if the number grew, and once more when the server stops.
+- **What counts.** A request the server answers with a page (status 200)
+  whose headers are a browser's navigation to a document
+  (`Sec-Fetch-Mode: navigate`, `Sec-Fetch-Dest: document`) and not a fetch
+  ahead of a visit (`Sec-Purpose`, `Purpose`). A crawler or a script that
+  does not send these is not counted.
+- **How it reaches a page.** Through the snapshot the pages are drawn
+  from, once a minute, never per request. A visit does not change the
+  page it gets, a page's entity tag changes with the data only, and
+  nobody can watch a single request move the number.
+- Decided against: a count per page or per day (a history, and with few
+  visitors close to saying when somebody read what); unique visitors (needs
+  an identifier or an address); counting in Central (the site's visitors
+  are no business of the account service); a cookie to count a person once.
+
+Implementation pass. `central-web-server/src/views.rs`; the counter is an
+`AtomicU64` raised with `checked_add`, so it stays at its end instead of
+wrapping. The date is computed from the system clock without a new
+dependency. No header value is stored or logged; a header that is not text
+counts as absent. Saving runs on the blocking pool, off the request path.
+
+Adversarial pass.
+- *Can a request make the server write?* Only the number, at most once a
+  minute, to the configured path. No request data reaches the file's name
+  or content.
+- *Can the number be inflated?* Yes, by anyone who sends the two headers:
+  they are the browser's word, and a program can say them. The number is
+  therefore a count of requests that look like visits, not of people, and
+  the strip calls it page views. It is bounded by what the server answers
+  and by the proxy's limits; it cannot overflow. Accepted: it is a figure
+  for the curious, and no decision of the system reads it.
+- *Does it leak a visit?* The number moves once a minute by the sum of all
+  visits. On a site with almost no traffic an observer who polls it learns
+  that some page was opened by somebody within a minute, not which or by
+  whom. Accepted, and said in the threat model.
+- *The file as an attack surface.* A larger or malformed file stops the
+  start (tested). `File::create` follows a symbolic link, so a directory
+  that another account can write would let that account aim the server's
+  write at another file the service may write. The runbook therefore
+  requires the service's own state directory; with the unit's sandbox
+  (`ReadWritePaths` naming only that directory) there is no other file to
+  aim at. Open: not enforced in code.
+- *A crash between write and rename* leaves `<file>.new` and the old file;
+  the next start reads the old file and the next save replaces the
+  leftover. At worst a minute's growth is lost.
+- Tests: `views.rs` (what is a visit, the file's forms, the write),
+  `tests/pages.rs` (`a_visit_counts_once_and_never_changes_the_page_it_gets`,
+  `a_views_file_that_cannot_be_used_stops_the_start`,
+  `page_views_are_shown_and_told_only_where_they_are_counted`).
+
+### Signing in and registering as dialogs
+
+Design pass. Every page that is not itself a sign-in, registration or
+account page now carries the two forms in closed `<dialog>` elements; a
+link to `/signin` or `/register` opens the dialog where script runs and
+leads to the page where it does not. The forms are the pages' own islands,
+so there is one implementation of each flow.
+- **No new path for a secret.** The dialogs post nothing themselves; the
+  islands talk to Central as on their pages (OPAQUE through the
+  WebAssembly, the registration proof, the same origin checks). The CSP is
+  unchanged: no inline script or style was added, and the dialog is opened
+  by `boot.js`.
+- **WebAssembly only when needed.** A closed dialog's islands are not
+  hydrated; `islands.js` hydrates them when the dialog first opens. A
+  visitor who never opens one loads no WebAssembly, as before.
+- **A password must not travel in an address.** Without script a form's
+  default submit would put its fields in the URL. The hold-back that
+  prevents this is now per island (`data-hydrated`), not per page: a
+  form inside an island that is not yet hydrated does not submit at all.
+- **The registration's fill-time check** counts from when the form became
+  usable; hydrating on open keeps that the time the person first saw it.
+- **A password shown by the eye** is the field's type changed in place;
+  nothing copies the value. The eye is a button with `aria-pressed`.
+  Sending the sign-in form hides its field again, so a failed try does not
+  come back with the password's field readable; the registration's fields
+  leave the page with their form.
+
+Adversarial pass.
+- *Can a page open the dialog over something and take a click?* The dialog
+  is modal (`showModal`), the page behind is inert, and it is opened only
+  by a same-origin link whose path is exactly a language's `signin` or
+  `register`. A link with a modifier key or a new-tab target is left alone.
+- *Can a third party frame the site and draw over the dialog?* Framing is
+  refused as before (`frame-ancestors 'none'`).
+- *Does the hidden form change what a password manager fills?* The forms
+  carry the same `autocomplete` values as the pages; a closed dialog is not
+  rendered, and browsers do not fill what is not rendered. Not tested
+  against individual password managers.
+- Tests: `web/e2e-site/dialogs.spec.ts` (opening fetches the WebAssembly
+  only then; the eye; axe and 44 px targets inside the dialog; an empty
+  form is refused; Escape, the button and the veil close; the pages
+  themselves carry no dialog; without script the link leads to the page).
+
+Open after this section: the count's file is trusted to live in the
+service's own directory; the dialogs were not tried with password managers
+or on a phone.

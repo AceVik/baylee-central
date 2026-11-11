@@ -285,17 +285,17 @@
 @media (prefers-color-scheme: light) {
   :root:not([data-theme="dark"]) {
     color-scheme: light;
-    --bg: #f5f2e9;
-    --bg-alt: #e9eee8;
-    --panel: rgb(255 253 246 / 0.96);
-    --panel-solid: #fffdf5;
-    --panel-2: #eceee5;
-    --edge: rgb(140 104 40 / 0.3);
-    --edge-soft: rgb(40 60 100 / 0.15);
+    --bg: #f2efe4;
+    --bg-alt: #e4ebe5;
+    --panel: rgb(255 254 250 / 0.97);
+    --panel-solid: #fffefa;
+    --panel-2: #e8ebe1;
+    --edge: rgb(132 100 42 / 0.36);
+    --edge-soft: rgb(31 58 64 / 0.16);
     --field-edge: #6f7f8f;
     --ink: #233e43;
     --ink-soft: #415c5e;
-    --ink-faint: #536c6b;
+    --ink-faint: #506968;
     --title: #173c43;
     --gold: #235b66;
     --gold-2: #174955;
@@ -314,16 +314,17 @@
     --bad-tint: #f9e3df;
     --bubble-own: #dcebe6;
     --hero-shadow: 0 1px 2px rgb(255 255 255 / 0.6), 0 2px 18px rgb(255 255 255 / 0.55);
-    --shadow: 0 1px 2px rgb(20 30 60 / 0.08), 0 14px 30px -18px rgb(20 30 60 / 0.26), 0 34px 64px -44px rgb(20 30 60 / 0.24);
+    --shadow:
+      0 1px 2px rgb(20 38 45 / 0.07), 0 4px 10px -4px rgb(20 38 45 / 0.12), 0 16px 32px -18px rgb(20 38 45 / 0.3),
+      0 36px 64px -44px rgb(20 38 45 / 0.28);
     --shadow-lift:
-      0 2px 4px rgb(20 30 60 / 0.1), 0 22px 44px -20px rgb(20 30 60 / 0.34), 0 44px 80px -48px rgb(20 30 60 / 0.3),
+      0 2px 4px rgb(20 38 45 / 0.1), 0 22px 44px -20px rgb(20 38 45 / 0.36), 0 44px 80px -48px rgb(20 38 45 / 0.32),
       0 0 0 1px var(--edge);
     --shadow-menu:
       inset 0 1px 0 var(--sheen), 0 0 0 1px rgb(20 38 45 / 0.05), 0 3px 8px -2px rgb(20 38 45 / 0.12),
       0 18px 38px -14px rgb(20 38 45 / 0.26), 0 44px 84px -34px rgb(20 38 45 / 0.3),
       0 26px 70px -36px rgb(35 91 102 / 0.3);
     --sheen: rgb(255 255 255 / 0.75);
-    --shade: rgb(20 38 45 / 0.05);
     --bar-shadow: 0 8px 20px -8px rgb(20 38 45 / 0.22), 0 2px 5px rgb(20 38 45 / 0.12);
     --top-bg: rgb(251 248 236 / 0.96);
     --code-bg: #233e43;
@@ -343,17 +344,17 @@
 
 :root[data-theme="light"] {
   color-scheme: light;
-  --bg: #f5f2e9;
-  --bg-alt: #e9eee8;
-  --panel: rgb(255 253 246 / 0.96);
-  --panel-solid: #fffdf5;
-  --panel-2: #eceee5;
-  --edge: rgb(140 104 40 / 0.3);
-  --edge-soft: rgb(40 60 100 / 0.15);
+  --bg: #f2efe4;
+  --bg-alt: #e4ebe5;
+  --panel: rgb(255 254 250 / 0.97);
+  --panel-solid: #fffefa;
+  --panel-2: #e8ebe1;
+  --edge: rgb(132 100 42 / 0.36);
+  --edge-soft: rgb(31 58 64 / 0.16);
   --field-edge: #6f7f8f;
   --ink: #233e43;
   --ink-soft: #415c5e;
-  --ink-faint: #536c6b;
+  --ink-faint: #506968;
   --title: #173c43;
   --gold: #235b66;
   --gold-2: #174955;
@@ -372,16 +373,17 @@
   --bad-tint: #f9e3df;
   --bubble-own: #dcebe6;
   --hero-shadow: 0 1px 2px rgb(255 255 255 / 0.6), 0 2px 18px rgb(255 255 255 / 0.55);
-  --shadow: 0 1px 2px rgb(20 30 60 / 0.08), 0 14px 30px -18px rgb(20 30 60 / 0.26), 0 34px 64px -44px rgb(20 30 60 / 0.24);
+  --shadow:
+    0 1px 2px rgb(20 38 45 / 0.07), 0 4px 10px -4px rgb(20 38 45 / 0.12), 0 16px 32px -18px rgb(20 38 45 / 0.3),
+    0 36px 64px -44px rgb(20 38 45 / 0.28);
   --shadow-lift:
-    0 2px 4px rgb(20 30 60 / 0.1), 0 22px 44px -20px rgb(20 30 60 / 0.34), 0 44px 80px -48px rgb(20 30 60 / 0.3),
+    0 2px 4px rgb(20 38 45 / 0.1), 0 22px 44px -20px rgb(20 38 45 / 0.36), 0 44px 80px -48px rgb(20 38 45 / 0.32),
     0 0 0 1px var(--edge);
   --shadow-menu:
     inset 0 1px 0 var(--sheen), 0 0 0 1px rgb(20 38 45 / 0.05), 0 3px 8px -2px rgb(20 38 45 / 0.12),
     0 18px 38px -14px rgb(20 38 45 / 0.26), 0 44px 84px -34px rgb(20 38 45 / 0.3),
     0 26px 70px -36px rgb(35 91 102 / 0.3);
   --sheen: rgb(255 255 255 / 0.75);
-  --shade: rgb(20 38 45 / 0.05);
   --bar-shadow: 0 8px 20px -8px rgb(20 38 45 / 0.22), 0 2px 5px rgb(20 38 45 / 0.12);
   --top-bg: rgb(251 248 236 / 0.96);
   --code-bg: #233e43;

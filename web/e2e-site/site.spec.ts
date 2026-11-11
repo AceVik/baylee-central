@@ -273,7 +273,7 @@ test("the gateway directory finds by name or address, narrows, sorts and lays ou
   const online = page.getByRole("button", { name: /^Online/ });
   await expect(cards).toHaveCount(2);
   // the directory in numbers, from the server
-  await expect(page.locator(".dir-stat")).toHaveCount(5);
+  await expect(page.locator(".dir-stat")).toHaveCount(6);
   await expect(page.locator(".dir-stat").first()).toContainText("2");
   // each chip says how many it would show
   await expect(every).toHaveText(/2$/);

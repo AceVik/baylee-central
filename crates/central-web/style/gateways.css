@@ -129,23 +129,17 @@
   margin: 0;
 }
 
-/* what the gateway says of itself right now: four counts, each whole,
-   the next below when the card is narrow */
+/* what the gateway says of itself right now: four counts, each whole, two
+   and two (players and those of them in a game, then tables and games) */
 .gw-now dd {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0 var(--space-3);
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, max-content));
+  gap: 0.1rem var(--space-4);
   font-size: var(--text-sm);
 }
 
 .gw-now dd > span {
   white-space: nowrap;
-}
-
-.gw-now dd > span + span::before {
-  content: "·";
-  margin-inline-end: var(--space-3);
-  color: var(--ink-faint);
 }
 
 /* the whole address, wrapped where it must: its end often tells two apart */
