@@ -277,7 +277,8 @@ fn translated(page: Page, lang: Lang) -> String {
 fn world(cx: &Context<'_>) -> impl IntoView + use<> {
     let assets = cx.assets;
     view! {
-        <div class="world" aria-hidden="true">
+        <picture class="world" aria-hidden="true">
+            <source type="image/avif" srcset=format!("{} 640w, {} 960w", assets.url("img/world-640.avif"), assets.url("img/world-960.avif")) sizes="100vw" />
             <img
                 src=assets.url("img/world-960.webp")
                 srcset=format!("{} 640w, {} 960w", assets.url("img/world-640.webp"), assets.url("img/world-960.webp"))
@@ -288,7 +289,7 @@ fn world(cx: &Context<'_>) -> impl IntoView + use<> {
                 decoding="async"
                 fetchpriority="low"
             />
-        </div>
+        </picture>
     }
 }
 
