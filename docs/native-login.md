@@ -293,16 +293,19 @@ address, or an IPv6 address's /64.
   hour and day back wherever they were counted; the minute stays, since the
   evaluation happened. Signing in with the right password spends nothing,
   however often.
-- **An account's own places.** A place an account proved its password from
-  (a sign-in, a change or a deletion) is its own for 30 days, at most eight
-  for one account; a ninth takes the place of the one that would end
+- **An account's own places.** A place an account signed in from, or set
+  its password from, is its own for 30 days, at most eight for one
+  account; a ninth takes the place of the one that would end
   first. At an own place a start draws on that account's count at that
   place and on nothing else. So what everyone else guesses at an account
   does not keep its holder out where the holder signs in, and the sign-ins
   of a household or an office do not spend their address's count. Another
   password ends them: after a change or a reset only the place it was made
   from is the account's own, so whoever knew the old password guesses at
-  the new one as a stranger does, and a deletion leaves none.
+  the new one as a stranger does, and a deletion leaves none. A place
+  becomes an account's own only when the store has issued the session or
+  stored the new password: a sign-in begun before a change and finished
+  after it proves the old password, gets its guess back and no place.
 - **Ids that are nobody's** (made up, or an account without a credential
   for the epoch asked) are answered as before, with OPAQUE's stand-in
   record after the same work. All of them together count as one account (8

@@ -163,4 +163,6 @@ pub(crate) fn run(http: &Http, browser: &Browser) {
     // Without a hop there is no address to count by (a proxy that sent
     // none must not make everyone one address).
     assert!(http.exchange(&discover, None).is_ok());
+
+    password::stale(http, browser);
 }

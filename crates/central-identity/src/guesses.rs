@@ -8,10 +8,10 @@
 //!
 //! Counted are each account over every place that is not its own, each
 //! account at each place, each place over every account, and an IPv6 /48
-//! over its /64s. A place an account proved its password from is its own
-//! for [`OWN_DAYS`] days: it draws on its own count there and on nothing
-//! else, so what others guess never keeps the account's holder out where
-//! the holder signs in.
+//! over its /64s. A place an account signed in from, or set its password
+//! from, is its own for [`OWN_DAYS`] days, until another password is set:
+//! it draws on its own count there and on nothing else, so what others
+//! guess never keeps the account's holder out where the holder signs in.
 //!
 //! Nothing here is written down or logged, and a restart forgets all of it.
 //! Every table is bounded; a full one forgets the entry that spent least
@@ -51,7 +51,7 @@ pub(super) const PLACE_PER_DAY: u32 = 100;
 pub(super) const WIDE_PER_HOUR: u32 = 120;
 /// The same a day.
 pub(super) const WIDE_PER_DAY: u32 = 400;
-/// Days a place stays an account's own after a proof from it.
+/// Days a place stays an account's own after a sign-in from it.
 pub(super) const OWN_DAYS: u64 = 30;
 /// Own places one account has at once; a ninth takes the place of the one
 /// that would end first, so no account's places push out another's.
@@ -441,9 +441,9 @@ impl Guesses {
     }
 
     /// The guess was none: the password was proven. Its hour and day come
-    /// back wherever they were counted, and the place is the account's own
-    /// from now on.
-    pub(super) fn proved(&mut self, guess: &Guess, now: Instant) {
+    /// back wherever they were counted. Whether its place becomes the
+    /// account's own is for the store to say ([`Self::accepted`]).
+    pub(super) fn proved(&mut self, guess: &Guess) {
         let (at, units) = (guess.at, guess.units);
         if let (Some(account), Some(place)) = (guess.whose.id(), guess.place) {
             self.pairs.give_back(&(account, place), at, units);
@@ -459,6 +459,14 @@ impl Guesses {
                 self.accounts.give_back(&account, at, units);
             }
         }
+    }
+
+    /// The store took the proof for the credential as it stands and
+    /// issued its session: the place is the account's own from now on. A
+    /// proof of a password that was replaced meanwhile, from an attempt
+    /// begun before the change, never comes here, so it gives no place
+    /// back to whoever knew the old one.
+    pub(super) fn accepted(&mut self, guess: &Guess, now: Instant) {
         if let (Whose::Account(account), Some(place)) = (guess.whose, guess.place) {
             self.own.mark(account, place, now);
         }
@@ -574,6 +582,13 @@ mod tests {
 
     fn after(start: Instant, seconds: u64) -> Instant {
         start + Duration::from_secs(seconds)
+    }
+
+    /// A proof the store accepted: the guess comes back, and the place is
+    /// the account's own.
+    fn proved(guesses: &mut Guesses, guess: &Guess, now: Instant) {
+        guesses.proved(guess);
+        guesses.accepted(guess, now);
     }
 
     /// Guesses at `VICTIM`, each from a place of its own, as fast as the
@@ -751,13 +766,13 @@ mod tests {
         for n in 0..500 {
             let now = after(start, n * 10);
             let guess = guesses.guess(VICTIM, true, Some(v4(1)), now, 1).unwrap();
-            guesses.proved(&guess, now);
+            proved(&mut guesses, &guess, now);
         }
         // Without a place the account's own windows give them back.
         for n in 0..500 {
             let now = after(start, n * 10);
             let guess = guesses.guess(account(1), true, None, now, 1).unwrap();
-            guesses.proved(&guess, now);
+            proved(&mut guesses, &guess, now);
         }
         // A wrong one in between stays counted: ten an hour at the place.
         let mut guesses = Guesses::default();
@@ -768,7 +783,7 @@ mod tests {
                 wrong += 1;
             }
             if let Ok(guess) = guesses.guess(account(1), true, Some(v4(1)), now, 1) {
-                guesses.proved(&guess, now);
+                proved(&mut guesses, &guess, now);
             }
         }
         assert_eq!(
@@ -783,7 +798,7 @@ mod tests {
         let mut guesses = Guesses::default();
         let home = Some(v4(1));
         let guess = guesses.guess(VICTIM, true, home, start, 1).unwrap();
-        guesses.proved(&guess, start);
+        proved(&mut guesses, &guess, start);
         // The world spends the account's day.
         let mut spent = 0;
         for hour in 0..24 {
@@ -799,7 +814,7 @@ mod tests {
         );
         // The holder signs in at home all the same, and may mistype there.
         let guess = guesses.guess(VICTIM, true, home, now, 1).unwrap();
-        guesses.proved(&guess, now);
+        proved(&mut guesses, &guess, now);
         for _ in 0..PAIR_PER_HOUR {
             guesses.guess(VICTIM, true, home, now, 1).unwrap();
         }
@@ -809,7 +824,7 @@ mod tests {
         // It is no own place of another account.
         let mut guesses = Guesses::default();
         let guess = guesses.guess(VICTIM, true, home, start, 1).unwrap();
-        guesses.proved(&guess, start);
+        proved(&mut guesses, &guess, start);
         for n in 0..PLACE_PER_HOUR {
             guesses.guess(account(n), true, home, start, 1).unwrap();
         }
@@ -828,7 +843,7 @@ mod tests {
             let guess = guesses
                 .guess(VICTIM, true, Some(v4(place)), now, 1)
                 .unwrap();
-            guesses.proved(&guess, now);
+            proved(&mut guesses, &guess, now);
         }
         // The holder sets another one at home.
         let now = after(start, 120);
@@ -856,9 +871,37 @@ mod tests {
         // Another account's places are not touched by any of it.
         let other = account(1);
         let guess = guesses.guess(other, true, Some(v4(2)), later, 1).unwrap();
-        guesses.proved(&guess, later);
+        proved(&mut guesses, &guess, later);
         guesses.changed(VICTIM, None, later);
         assert!(guesses.own.is(other, v4(2), later));
+    }
+
+    #[test]
+    fn a_proof_the_store_did_not_accept_makes_no_place_the_account_s_own() {
+        let start = Instant::now();
+        let mut guesses = Guesses::default();
+        // Whoever knew the old password begins a sign-in; the holder sets
+        // another password at home; the sign-in's proof of the old one
+        // still verifies, and the store refuses its session.
+        let stale = guesses.guess(VICTIM, true, Some(v4(2)), start, 1).unwrap();
+        guesses.changed(VICTIM, Some(v4(1)), start);
+        guesses.proved(&stale);
+        assert!(!guesses.own.is(VICTIM, v4(2), start));
+        // The guess came back all the same, since it was none: the
+        // place's ten an hour are whole, and it gets no eleventh.
+        for n in 0..u64::from(PAIR_PER_HOUR) {
+            let now = after(start, 120 + n * 10);
+            assert!(guesses.guess(VICTIM, true, Some(v4(2)), now, 1).is_ok());
+        }
+        let now = after(start, 600);
+        assert!(guesses.guess(VICTIM, true, Some(v4(2)), now, 1).is_err());
+        // An accepted proof makes the place the account's own.
+        let mut guesses = Guesses::default();
+        let guess = guesses.guess(VICTIM, true, Some(v4(2)), start, 1).unwrap();
+        guesses.proved(&guess);
+        assert!(!guesses.own.is(VICTIM, v4(2), start));
+        guesses.accepted(&guess, start);
+        assert!(guesses.own.is(VICTIM, v4(2), start));
     }
 
     #[test]
@@ -871,7 +914,7 @@ mod tests {
             let guess = guesses
                 .guess(VICTIM, true, Some(v4(place)), now, 1)
                 .unwrap();
-            guesses.proved(&guess, now);
+            proved(&mut guesses, &guess, now);
         }
         // The ninth took the place of the first; the others stayed.
         let soon = after(start, 90);
@@ -886,12 +929,12 @@ mod tests {
         // A proof again begins the days anew.
         let now = after(start, 86_400);
         let guess = guesses.guess(VICTIM, true, Some(v4(8)), now, 1).unwrap();
-        guesses.proved(&guess, now);
+        proved(&mut guesses, &guess, now);
         assert!(guesses.own.is(VICTIM, v4(8), after(last, 80)));
         // One account's places never push out another's.
         let other = account(1);
         let guess = guesses.guess(other, true, Some(v4(77)), start, 1).unwrap();
-        guesses.proved(&guess, start);
+        proved(&mut guesses, &guess, start);
         for place in 100..400 {
             // Six a minute: a proof gives the hour and the day back, and
             // the minute's evaluations stay spent.
@@ -899,7 +942,7 @@ mod tests {
             let guess = guesses
                 .guess(VICTIM, true, Some(v4(place)), now, 1)
                 .unwrap();
-            guesses.proved(&guess, now);
+            proved(&mut guesses, &guess, now);
         }
         assert!(
             guesses
@@ -1016,7 +1059,7 @@ mod tests {
             .unwrap();
         let next = after(start, 3_601);
         guesses.guess(VICTIM, true, Some(v4(1)), next, 1).unwrap();
-        guesses.proved(&late, next);
+        proved(&mut guesses, &late, next);
         let pair = guesses.pairs.tallies[&(VICTIM, Place::V4([0, 0, 0, 1]))];
         assert_eq!(pair.hour.used(next, HOUR), 1);
         assert_eq!(pair.day.used(next, DAY), PAIR_PER_HOUR);
@@ -1069,7 +1112,7 @@ mod tests {
         let mut guesses = Guesses::default();
         for _ in 0..200 {
             let guess = guesses.legacy(Some(v4(1)), now).unwrap();
-            guesses.proved(&guess, now);
+            proved(&mut guesses, &guess, now);
             guesses.legacy(None, now).unwrap();
         }
         assert!(guesses.accounts.tallies.is_empty() && guesses.own.0.is_empty());
