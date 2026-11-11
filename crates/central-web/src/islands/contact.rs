@@ -178,7 +178,7 @@ pub fn ContactForm(lang: Lang) -> impl IntoView {
                             </p>
                         </div>
                         <div class="trap" aria-hidden="true">
-                            <label for="contact-website">Website</label>
+                            <label for="contact-website">{"Website"}</label>
                             <input id="contact-website" name="website" type="text" tabindex="-1" autocomplete="off"
                                 on:input=move |ev| trap.set(event_target_value(&ev)) />
                         </div>

@@ -66,11 +66,11 @@ breadcrumb-home = Home
 
 ## Home
 
-hero-kicker = Free · Open source · Unofficial fan content
+hero-kicker = Open beta · Free · Open source · Unofficial fan content
 hero-title = Build your decks. Gather your friends. Just play.
 hero-lead = A comprehensive deck builder, matches for up to eight players in duels, free-for-all or teams, and a rules engine that checks every step, so every turn stays fair without anyone having to look anything up.
 hero-offline = Solo matches and the deck builder work offline, without an account. Online tables live on gateways; <host>you can run your own</host>.
-hero-account = Playing online? <register>Create an account</register> or <signin>sign in</signin>.
+hero-account = Playing online? <register>Create an account</register>, free and open to everyone in the open beta, or <signin>sign in</signin>.
 hero-memorial = Remember Baylee: open her photo album
 hero-other = Other systems
 
@@ -225,7 +225,7 @@ faq-what-a = A free fan game for Magic: The Gathering on your computer. It has a
 faq-cost-q = What does it cost?
 faq-cost-a = Nothing, and that will not change: no paywall, no paid features, no advertising.
 faq-account-q = Do I need an account?
-faq-account-a = Not to play alone: the deck builder and matches against the house AI work offline. For online tables you need a Baylee account, which you create on this site.
+faq-account-a = Not to play alone: the deck builder and matches against the house AI work offline. For online tables you need a Baylee account; during the open beta anyone can create one on this site, free of charge.
 faq-data-q = What happens to my data?
 faq-data-a = As little as possible, and it is written down in the <privacy>privacy notice</privacy>. Your password never leaves your browser; your private data and your chat messages are encrypted on your device before they reach us.
 faq-password-q = I forgot my password. What now?
@@ -493,9 +493,7 @@ signin-noscript = Signing in needs JavaScript: your password is processed in you
 ## Registering
 
 register-title = Create an account
-register-lead = For online tables, contacts and the chat. You need a beta key while Baylee is in its beta.
-register-key = Beta key
-register-key-hint = As you received it, like CENTRAL-XXXX-XXXX-XXXX-XXXX.
+register-lead = For online tables, contacts and the chat. Free and open to everyone in the open beta.
 register-name = Sign-in name
 register-name-hint = Private, only for signing in: 3 to 24 lowercase letters, digits, dots, dashes or underscores.
 register-display = Display name
@@ -507,8 +505,6 @@ register-repeat-hint = The same once more, to catch a typo.
 register-age = I am 16 or older.
 register-consent = I accept the <terms>terms of use</terms> and have read the <privacy>privacy notice</privacy>.
 register-submit = Create account
-register-error-key = Enter your beta key.
-register-error-key-refused = This beta key is not valid, used up or expired.
 register-error-name = The sign-in name needs 3 to 24 lowercase letters, digits, dots, dashes or underscores.
 register-error-display = The display name needs 3 to 16 letters or digits; - and _ only inside.
 register-error-reserved = This display name is reserved. Choose another.
@@ -785,3 +781,12 @@ push-failed = The change could not be confirmed. Please try again.
 push-denied = Notifications are blocked. You can allow them in your browser or device settings and try again.
 push-unsupported = This browser does not offer Web Push here. On iPhone and iPad, add Baylee to the Home Screen and open it there.
 push-unconfigured = Background notifications are not available on this server yet. Your preferences can already be saved.
+
+register-closed = Registration is paused right now. Please try again later.
+register-refused = The registration was not accepted. Please try once more.
+admin-registration = Registration
+admin-registration-open = Open: anyone may create an account, with the proof of work.
+admin-registration-closed = Closed: nobody can create an account until you open it again.
+admin-registration-lead = Close registration during an attack and open it again by hand. Each change is in the audit.
+admin-registration-close = Close registration
+admin-registration-reopen = Open registration again

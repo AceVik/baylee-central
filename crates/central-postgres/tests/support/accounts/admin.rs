@@ -56,6 +56,7 @@ pub(super) async fn run(store: &AccountStore, operator: &DatabaseConnection, key
     assert!(!store.account_summary(&other).await.unwrap().admin);
     rules(store, operator, first, second, &cookie, &other).await;
     reads(store, operator, first, second, &cookie).await;
+    brake(store, operator, first, &cookie, &other).await;
     together(store, operator, first, second).await;
     sign_in_time(store, operator, keys, first).await;
     swept(operator).await;
@@ -269,6 +270,67 @@ async fn rules(
     );
     age(operator, first, -31).await;
     assert_eq!(events().await, before + 2);
+}
+
+/// The registration switch (`docs/registration-abuse.md`): read and set by
+/// an administrator only, a change needs a fresh sign-in and writes its
+/// audit event, the same state again writes nothing, and a closed
+/// registration refuses before any name is looked at.
+async fn brake(
+    store: &AccountStore,
+    operator: &DatabaseConnection,
+    first: Identity,
+    cookie: &Token,
+    other: &Token,
+) {
+    let events = |action: &'static str| {
+        let sql = format!(
+            "SELECT count(*)::bigint AS value FROM central_identity.audit_events
+             WHERE actor_kind = 'admin' AND actor_account = '{}' AND action = '{action}'
+             AND account_id IS NULL AND gateway_id IS NULL",
+            uuid(first)
+        );
+        async move { count(operator, &sql).await }
+    };
+    assert_eq!(
+        store.admin_registration(cookie).await.unwrap(),
+        (true, None)
+    );
+    assert_eq!(
+        store.admin_registration(other).await.err(),
+        Some(Error::Rejected)
+    );
+    assert_eq!(
+        store.set_registration(other, false).await,
+        Err(Error::Rejected)
+    );
+    store.set_registration(cookie, false).await.unwrap();
+    let (open, changed) = store.admin_registration(cookie).await.unwrap();
+    assert!(!open && changed.is_some());
+    assert_eq!(events("registration.closed").await, 1);
+    // Closed: no registration, before the name is looked at.
+    assert_eq!(
+        store
+            .register("brake-probe", None, &Token::generate().unwrap())
+            .await
+            .err(),
+        Some(Error::Rejected)
+    );
+    // The same state again writes nothing.
+    store.set_registration(cookie, false).await.unwrap();
+    assert_eq!(events("registration.closed").await, 1);
+    // A sign-in 30 minutes old or older changes nothing.
+    age(operator, first, 31).await;
+    assert_eq!(
+        store.set_registration(cookie, true).await,
+        Err(Error::Rejected)
+    );
+    age(operator, first, -31).await;
+    store.set_registration(cookie, true).await.unwrap();
+    assert_eq!(events("registration.opened").await, 1);
+    assert!(store.registration_open().await.unwrap());
+    let ticket = Token::generate().unwrap();
+    store.register("brake-probe", None, &ticket).await.unwrap();
 }
 
 /// The lists: search by text and tag, pages, one account, the audit.

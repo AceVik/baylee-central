@@ -95,6 +95,8 @@ fn an_explicit_mode_is_required_and_extra_arguments_are_rejected() {
         &["--accounts-stdin", "PRIVATE_ARG_CANARY"],
         &["--migrate-stdin", "--dev"],
         &["--issue-beta-keys-stdin", "PRIVATE_ARG_CANARY"],
+        // the closed beta's keys went on 11.11.2026, and their mode with them
+        &["--issue-beta-keys-stdin"],
         &["--appoint-admin-stdin", "PRIVATE_ARG_CANARY"],
         &["--sweep-stdin", "--dev"],
         &["--legacy-import-stdin", "PRIVATE_ARG_CANARY"],
@@ -109,7 +111,7 @@ fn an_explicit_mode_is_required_and_extra_arguments_are_rejected() {
         assert!(!stderr.contains("PRIVATE_ARG_CANARY"));
         assert_eq!(
             stderr.trim(),
-            "usage: central-service --dev | --dev-accounts-stdin | --accounts-stdin | --migrate-stdin | --issue-beta-keys-stdin | --appoint-admin-stdin | --sweep-stdin | --legacy-import-stdin | --legacy-deadline-stdin | --import-reports-stdin | --generate-secrets"
+            "usage: central-service --dev | --dev-accounts-stdin | --accounts-stdin | --migrate-stdin | --appoint-admin-stdin | --sweep-stdin | --legacy-import-stdin | --legacy-deadline-stdin | --import-reports-stdin | --generate-secrets"
         );
     }
 }
@@ -124,10 +126,6 @@ fn production_modes_reject_missing_or_invalid_input_without_echoing_it() {
         (
             "--migrate-stdin",
             "central: migration rejected configuration or failed",
-        ),
-        (
-            "--issue-beta-keys-stdin",
-            "central: beta keys rejected configuration or failed; none were issued",
         ),
         (
             "--appoint-admin-stdin",

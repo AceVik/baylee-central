@@ -55,6 +55,9 @@ impl IdentityService {
                 AdminAnswer::Gateway { gateway, tokens }
             }
             AdminRequest::LegacyAccounts => self.admin_legacy(cookie).await?,
+            request @ (AdminRequest::Registration | AdminRequest::SetRegistration { .. }) => {
+                return self.registration_admin(request, cookie).await;
+            }
             // Reports (`docs/reports.md`, `reports.rs`): the store checks the
             // administrator, a purge's fresh sign-in, and writes the report's history.
             request @ (AdminRequest::Reports { .. }
@@ -106,5 +109,28 @@ impl IdentityService {
             }
         };
         Ok(Response::Admin { answer })
+    }
+
+    /// The registration switch (`docs/registration-abuse.md`): the store
+    /// checks the administrator, a change's fresh sign-in, and writes the
+    /// audit.
+    async fn registration_admin(
+        &self,
+        request: AdminRequest,
+        cookie: &Token,
+    ) -> Result<Response, Error> {
+        match request {
+            AdminRequest::Registration => {
+                let (open, changed_at) = self.store.admin_registration(cookie).await?;
+                Ok(Response::Admin {
+                    answer: AdminAnswer::Registration { open, changed_at },
+                })
+            }
+            AdminRequest::SetRegistration { open } => {
+                self.store.set_registration(cookie, open).await?;
+                Ok(Response::Done)
+            }
+            _ => Err(Error::Rejected),
+        }
     }
 }

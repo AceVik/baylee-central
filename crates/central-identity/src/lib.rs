@@ -602,7 +602,6 @@ mod tests {
             Request::RegisterChallenge,
             Request::Register {
                 username: "synthetic".into(),
-                beta_key: String::new(),
                 display_name: Some("Synthetic".into()),
                 nonce: String::new(),
                 counters: Vec::new(),
@@ -911,7 +910,6 @@ mod tests {
         }));
         assert!(!uses_session(&Request::Register {
             username: "synthetic".into(),
-            beta_key: String::new(),
             display_name: None,
             nonce: String::new(),
             counters: Vec::new(),

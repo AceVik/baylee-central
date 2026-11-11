@@ -27,7 +27,7 @@ impl AccountStore {
              ('gateway_terms', ARRAY['SELECT','INSERT'], NULL),
              ('gateway_terms_texts', ARRAY['SELECT','INSERT'], NULL),
              ('terms_acceptances', ARRAY['SELECT','INSERT'], NULL),
-             ('beta_keys', ARRAY['SELECT'], ARRAY['uses_left']),
+             ('registration', ARRAY['SELECT'], ARRAY['open','changed_at','changed_by']),
              ('account_roles', ARRAY['SELECT','INSERT','DELETE'], NULL),
              ('audit_events', ARRAY['SELECT','INSERT'], NULL),
              ('pairings', ARRAY['SELECT','INSERT','UPDATE','DELETE'], NULL),

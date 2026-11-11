@@ -1,10 +1,12 @@
 # Abuse protection for registration
 
-*Design, 28.10.2026; the owner's decisions of the same day below. The proof
-of work (5) and the budgets (6, 7) are built (11.11.2026, "As built"
-below); the owner's decisions of 10 and 11.11.2026 replace the modes,
-keys and invitations (1 to 4) by open registration with an administrator's
-switch.* The owner made strong captcha and spam protection for registration an
+*Design, 28.10.2026; the owner's decisions of the same day below. Built
+11.11.2026 ("As built" below): the proof of work (5), the budgets (6) and
+the honeypot and fill time (7). The owner's decisions of 10 and 11.11.2026
+replaced the modes, keys and invitations (1 to 4): registration is open, the
+closed beta's keys are gone, and an administrator's switch is the brake.*
+
+The owner made strong captcha and spam protection for registration an
 open-beta blocker (28.10.2026): privacy-friendly, no Google reCAPTCHA, the
 design first. A new dependency or a third-party service needs the owner's
 approval; this design needs neither.
@@ -23,7 +25,7 @@ approval; this design needs neither.
 4. **No third-party service,** as strong as a self-hosted design allows: a
    proof of work that grows harder while registrations flood in.
 
-## What exists
+## What existed (28.10.2026)
 
 - A beta key per registration; each key has a number of uses, an expiry and
   can be revoked (`docs/web-accounts.md`).
@@ -139,3 +141,14 @@ native client's part (solving the proof, entering an invitation) is M6.
   spends no daily unit.
 - Nothing about the person is processed for the proof: the nonce is random,
   the counts are counts.
+- **The brake** (owner, 11.11.2026, in place of the invite mode): one row,
+  `registration.open`; `AdminRequest::SetRegistration { open }` by an
+  administrator with a sign-in under 30 minutes, audited
+  (`registration.closed`, `registration.opened`), on the website's account
+  overview. While closed, `RegisterChallenge` answers `RegistrationClosed`
+  and every `Register` is refused before the name is looked at.
+- **The keys are gone**: their table, their issuing mode and an unfinished
+  registration's link to one (migration 000023); the audit keeps the key ids
+  its old events name. Invitations were never built.
+- **The page** keeps a hidden field for form robots and does not send a form
+  within three seconds of showing it.

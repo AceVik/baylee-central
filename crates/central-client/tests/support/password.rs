@@ -13,7 +13,6 @@ use super::{
 };
 use central_api::{
     Error, Token,
-    beta_key::BetaKey,
     terms::TermsSubject,
     wire::{Identity, Request, Response, TicketPurpose},
 };
@@ -23,7 +22,6 @@ use central_crypto::{
     opaque::{Enrollment, Login},
     vault::{MasterKey, ObjectContext, RecoveryCode, WrappedMasterKey},
 };
-use central_postgres::BetaKeyBatch;
 use sea_orm::{ConnectionTrait, DatabaseConnection};
 use std::sync::atomic::Ordering;
 use tokio::runtime::Runtime;
@@ -540,29 +538,13 @@ pub(crate) struct Registered {
     pub(crate) document: Vec<u8>,
 }
 
-/// Register `name` with a beta key of its own, enrolled under [`OLD`], its
-/// first document [`DOCUMENT`].
-pub(crate) fn register(
-    name: &str,
-    http: &Http,
-    browser: &Browser,
-    runtime: &Runtime,
-    operator: &DatabaseConnection,
-) -> Registered {
-    let key = BetaKey::generate().unwrap();
-    runtime
-        .block_on(
-            BetaKeyBatch::new(&[key.digest()], 1, None, "password fixture")
-                .unwrap()
-                .issue(operator),
-        )
-        .unwrap();
+/// Register `name`, enrolled under [`OLD`], its first document [`DOCUMENT`].
+pub(crate) fn register(name: &str, http: &Http, browser: &Browser) -> Registered {
     let (nonce, counters) = proof(browser);
     let Response::Enrollment { identity, ticket } = browser
         .answer(
             &Request::Register {
                 username: name.into(),
-                beta_key: key.display().as_str().into(),
                 display_name: Some("Pass_Web".into()),
                 nonce,
                 counters,
@@ -676,7 +658,7 @@ fn website(
         address: browser.address,
         client: "198.51.100.40",
     };
-    let registered = register("password-web", http, &browser, runtime, operator);
+    let registered = register("password-web", http, &browser);
     let (identity, context, master) = (registered.identity, registered.context, &registered.master);
     // Unit 1: the website's sign-in, and the terms.
     let cookie = browser_sign_in(&browser, identity, context, OLD);

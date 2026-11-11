@@ -56,7 +56,7 @@ pub(crate) fn run(
         assert!(expires_at > 0);
         code
     };
-    recovery(http, &browser, runtime, operator, &issue);
+    recovery(http, &browser, &issue);
     renewed(http, bridge, &issue);
     device(http, bridge, &issue);
     browser.answer(&Request::Logout, Some(&cookie)).unwrap();
@@ -64,14 +64,8 @@ pub(crate) fn run(
 
 /// A registered account keeps its data with its recovery code; a wrong one
 /// spends nothing, and a code is spent once.
-fn recovery(
-    http: &Http,
-    browser: &Browser,
-    runtime: &Runtime,
-    operator: &DatabaseConnection,
-    issue: &dyn Fn(Identity) -> ResetCode,
-) {
-    let registered = register("reset-web-a", http, browser, runtime, operator);
+fn recovery(http: &Http, browser: &Browser, issue: &dyn Fn(Identity) -> ResetCode) {
+    let registered = register("reset-web-a", http, browser);
     let identity = registered.identity;
     let code = issue(identity);
     let again = || ResetCode::parse(&code.display()).unwrap();

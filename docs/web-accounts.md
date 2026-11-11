@@ -28,8 +28,10 @@ first. Every piece goes through the three passes of
 
 **Registration** (website, no session yet):
 
-1. `Register { username, beta_key, display_name }` → `Enrollment { identity,
-   ticket }`. The key is checked and one use reserved; the username must be
+1. `RegisterChallenge`, then `Register { username, display_name, nonce,
+   counters }` → `Enrollment { identity, ticket }` while registration is
+   open. The proof of work is checked and spent first
+   ([registration abuse](registration-abuse.md)); the username must be
    free under the versioned name policy; the display name, which the page
    always sends, keeps the name rule and is no reserved name (§"Display name
    and tag"), and a tag is drawn for it. The account row is created with no
@@ -251,11 +253,11 @@ official gateway with the Baylee client.
   runtime role gets `SELECT` and `UPDATE (uses_left)` on `beta_keys`, nothing
   more; issuing and revoking keys stay with the operator.
 
-**Beta keys.** A launcher mode `--issue-beta-keys-stdin` reads `{ "database":
-…, "count": n ≤ 100, "uses": n ≤ 1000, "expires_days": n?, "note": "…" }`
-(the migrator login, as `--migrate-stdin`). It prints each new key once as
-`CENTRAL-XXXX-XXXX-XXXX-XXXX`: 80 random bits in Crockford base32, read like
-the recovery code. The admin UI (M2) comes later.
+**Beta keys (until 11.11.2026).** The closed beta's keys, issued with
+`--issue-beta-keys-stdin`, went with the open beta: migration 000023 drops
+`beta_keys` and `accounts.beta_key_id`, keeps the audit's `beta_key_id` as
+history, and adds `registration`, the administrators' switch
+([operations](operations.md#registration)).
 
 **Wire.**
 
@@ -264,8 +266,8 @@ the recovery code. The admin UI (M2) comes later.
   proof of work of `docs/registration-abuse.md`, which `Register` carries
   as `nonce` and `counters` and Central checks and spends before anything
   else.
-- `Request::Register { username, beta_key, display_name, nonce, counters }`
-  (the name since 23.10.2026, optional on the wire) → `Response::Enrollment`. It needs
+- `Request::Register { username, display_name, nonce, counters }`
+  (the name since 23.10.2026, optional on the wire; the key until 11.11.2026) → `Response::Enrollment`. It needs
   no credential, shares the unauthenticated budget and takes a per-address
   budget on the browser surface. It is served **on the browser surface only**;
   `/v1/native` answers `Rejected`. (Changed in the server PR: the per-address
@@ -276,10 +278,14 @@ the recovery code. The admin UI (M2) comes later.
   clients pinned before the change still decode, and a legacy enrollment is sent
   exactly as before. It is required for registered accounts and refused for
   legacy ones; the schema holds the same rule.
-- A bad, used-up, expired or revoked key is `Rejected`, before the name is
-  looked at. Only with a valid key does a taken name answer `Conflict`, so the
-  page can say so: the key is what stops enumeration, and its holder may learn
-  whether a name is free. A malformed name is `Rejected`.
+- A missing, spent, expired or wrong proof of work is `Rejected`, and so is
+  every `Register` while registration is closed, before the name is looked
+  at. Only with a valid proof does a taken name answer `Conflict`, so the page
+  can say so. (Until 11.11.2026 the beta key held that place.) What stays:
+  whoever solves a proof learns whether one sign-in name is free; each answer
+  costs a proof (two seconds and more, rising while registrations flood in)
+  and spends the address's budgets (5 an hour, 10 a day), and sign-in names
+  are private, never shown to other players. A malformed name is `Rejected`.
 - A name is taken by any enrolled account, any legacy account (also one whose
   migration is unfinished) and any registration whose ticket still lives. An
   abandoned registration (its ticket expired) gives its name back to the next
@@ -569,9 +575,9 @@ the account page also says where the account came from and whether it has a
 recovery code (`AccountSummary`), and offers a moved account "Make a
 recovery code" (§"A recovery code after a sign-in").
 
-Registration has these fields:
+Registration has these fields (the beta key until 11.11.2026; a hidden
+field for form robots, and a form sent within three seconds is not sent):
 
-- beta key
 - username, with the name rules shown
 - display name, with its rules shown (since 23.10.2026)
 - password, twice, with a strength hint and no composition rules
@@ -628,7 +634,8 @@ with a legacy link still has to match it. An e2e test covers both.
 1. Central's new release: migrate, grant, start, through `ops/deploy-hook`.
 2. `central.json` gains `browser.listen` (`127.0.0.1:28791`). The `baylee.app`
    site block passes `/api/*` to it instead of answering 404.
-3. Beta keys are issued with the new mode.
+3. Beta keys were issued with the new mode, until the open beta
+   (11.11.2026) removed them.
 4. The official gateway gets `BAYLEE_CENTRAL_CONFIG_FILE`
    (`{"endpoint": "live", "bridge": …}` from Central's `secrets.json`), is
    restarted, and its `/auth/config` says `central`.

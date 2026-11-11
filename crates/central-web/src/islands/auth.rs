@@ -501,9 +501,6 @@ pub fn SignIn(lang: Lang, worker: String) -> impl IntoView {
 
 /// The registration form's checks, as Central would refuse (`docs/web-accounts.md`).
 fn register_problem(lang: Lang, f: &RegisterFields) -> Option<&'static str> {
-    if f.key.trim().is_empty() {
-        return Some(words::register_error_key(lang));
-    }
     if !valid_username(&f.username.trim().to_ascii_lowercase()) {
         return Some(words::register_error_name(lang));
     }
@@ -533,7 +530,6 @@ fn register_problem(lang: Lang, f: &RegisterFields) -> Option<&'static str> {
 
 #[derive(Clone, Debug, Default)]
 struct RegisterFields {
-    key: String,
     username: String,
     display: String,
     password: String,
@@ -562,25 +558,30 @@ fn token(bytes: [u8; 32]) -> Token {
 /// Central's proof of work for one registration (`docs/registration-abuse.md`),
 /// solved in the Worker at `pow`; handed over no sooner than Central takes
 /// it, three seconds after the challenge.
-async fn proof(pow: &str) -> Result<(String, Vec<u64>), Problem> {
+///
+/// # Errors
+/// The problem, tagged `closed` while an administrator closed registration.
+async fn proof(pow: &str) -> Result<(String, Vec<u64>), (Problem, Option<&'static str>)> {
     use central_api::register::{MAX_DIFFICULTY, PARTS, valid_nonce};
 
     let asked = super::pow::now_ms();
-    let Response::RegisterChallenge {
-        nonce,
-        parts,
-        difficulty,
-        ..
-    } = call(&Request::RegisterChallenge).await?
-    else {
-        return Err(Problem::Failed);
+    let fail = |failure: Failure| (Problem::from(failure), None);
+    let (nonce, parts, difficulty) = match call(&Request::RegisterChallenge).await.map_err(fail)? {
+        Response::RegisterChallenge {
+            nonce,
+            parts,
+            difficulty,
+            ..
+        } => (nonce, parts, difficulty),
+        Response::RegistrationClosed => return Err((Problem::Failed, Some("closed"))),
+        _ => return Err((Problem::Failed, None)),
     };
     if !valid_nonce(&nonce) || parts != PARTS || difficulty > MAX_DIFFICULTY {
-        return Err(Problem::Failed);
+        return Err((Problem::Failed, None));
     }
     let counters = super::pow::solve(pow, &nonce, u32::from(parts), u32::from(difficulty), |_| {})
         .await
-        .ok_or(Problem::Failed)?;
+        .ok_or((Problem::Failed, None))?;
     let spent = super::pow::now_ms().saturating_sub(asked);
     if spent < 3_200 {
         super::pow::wait(u32::try_from(3_200 - spent).unwrap_or(3_200)).await;
@@ -595,10 +596,9 @@ async fn register(
 ) -> Result<(NewCode, SignedIn), (Problem, Option<&'static str>)> {
     let username = f.username.trim().to_ascii_lowercase();
     let crypto = Crypto::start(worker).ok_or((Problem::Failed, None))?;
-    let (nonce, counters) = proof(pow).await.map_err(|problem| (problem, None))?;
+    let (nonce, counters) = proof(pow).await?;
     let answer = call(&Request::Register {
         username: username.clone(),
-        beta_key: f.key.trim().to_owned(),
         display_name: Some(f.display.clone()),
         nonce,
         counters,
@@ -609,7 +609,8 @@ async fn register(
             (identity, token_bytes(&ticket))
         }
         Ok(_) => return Err((Problem::Failed, None)),
-        Err(Failure::Rejected) => return Err((Problem::Failed, Some("key"))),
+        // the proof expired, or registration closed meanwhile
+        Err(Failure::Rejected) => return Err((Problem::Failed, Some("refused"))),
         Err(Failure::Conflict) => return Err((Problem::Failed, Some("taken"))),
         Err(failure) => return Err((failure.into(), None)),
     };
@@ -672,11 +673,22 @@ pub fn Register(lang: Lang, worker: String, pow: String) -> impl IntoView {
     let step = RwSignal::new(Step::Form);
     let fields = RwSignal::new(RegisterFields::default());
     let error = RwSignal::new(None::<&'static str>);
+    // A form filled in faster than a person types, or one whose hidden
+    // field (invisible to people, filled by form robots) has text, is
+    // never sent (`docs/registration-abuse.md`).
+    let shown = StoredValue::new(0u64);
+    let honey = RwSignal::new(String::new());
+    Effect::new(move |_| shown.set_value(super::pow::now_ms()));
     let submit = move |event: leptos::ev::SubmitEvent| {
         event.prevent_default();
         let f = fields.get_untracked();
         if let Some(problem) = register_problem(lang, &f) {
             error.set(Some(problem));
+            return;
+        }
+        let quick = super::pow::now_ms().saturating_sub(shown.get_value()) < 3_000;
+        if quick || !honey.with_untracked(String::is_empty) {
+            error.set(Some(words::register_refused(lang)));
             return;
         }
         fields.update(|f| {
@@ -694,8 +706,12 @@ pub fn Register(lang: Lang, worker: String, pow: String) -> impl IntoView {
                     // else; Central's terms follow it (`code_view`).
                     step.set(Step::Code(code, signed.handle));
                 }
-                Err((_, Some("key"))) => {
-                    error.set(Some(words::register_error_key_refused(lang)));
+                Err((_, Some("closed"))) => {
+                    error.set(Some(words::register_closed(lang)));
+                    step.set(Step::Form);
+                }
+                Err((_, Some("refused"))) => {
+                    error.set(Some(words::register_refused(lang)));
                     step.set(Step::Form);
                 }
                 Err((_, Some("taken"))) => {
@@ -728,7 +744,6 @@ pub fn Register(lang: Lang, worker: String, pow: String) -> impl IntoView {
         let (terms, privacy) = (terms.clone(), privacy.clone());
         view! {
             <form class="form" method="post" novalidate=true on:submit=submit.clone()>
-                {text_field("register-key", words::register_key(lang), words::register_key_hint(lang), "text", "off", |f, v| f.key = v)}
                 {text_field("register-name", words::register_name(lang), words::register_name_hint(lang), "text", "username", |f, v| f.username = v)}
                 {text_field("register-display", words::register_display(lang), words::register_display_hint(lang), "text", "nickname", |f, v| f.display = v)}
                 {text_field("register-password", words::register_password(lang), words::register_password_hint(lang), "password", "new-password", |f, v| f.password = v)}
@@ -745,6 +760,11 @@ pub fn Register(lang: Lang, worker: String, pow: String) -> impl IntoView {
                         _ => None,
                     })}</label>
                 </div>
+                <div class="trap" aria-hidden="true">
+                    <label for="register-website">{"Website"}</label>
+                    <input id="register-website" type="text" tabindex="-1" autocomplete="off"
+                        on:input=move |ev| honey.set(event_target_value(&ev)) />
+                </div>
                 <p class="error" role="alert">{move || error.get()}</p>
                 <button type="submit" class="button primary">{words::register_submit(lang)}</button>
             </form>
@@ -760,7 +780,6 @@ mod tests {
 
     fn fields() -> RegisterFields {
         RegisterFields {
-            key: "CENTRAL-AAAA".into(),
             username: "erika".into(),
             display: "Erika".into(),
             password: "long enough".into(),

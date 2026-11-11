@@ -787,7 +787,13 @@ the inbox.
 - *The Fan Content notice* (owner, 10.11.2026: "nicely and not bulky"): one
   quiet line with a link at the foot of a conversation's details.
 - Icons in islands are drawn element by element: Trusted Types allow no
-  `innerHTML` in the browser, and an island's view runs there.
+  `innerHTML` in the browser, and an island's view runs there. For the same
+  reason an island holds no "inert" element: Leptos builds an element whose
+  attributes and children are all literal (`<label for="x">Website</label>`)
+  through `innerHTML` on a `<template>`, which works when the server
+  rendered it and throws once the browser renders it again. Literal text
+  goes in braces (`{"Website"}`), and `crates/central-web/tests/inert.rs`
+  scans the islands and the views they share for any such element.
 
 **The app.**
 

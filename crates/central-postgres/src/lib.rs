@@ -4,7 +4,6 @@
 #![forbid(unsafe_code)]
 
 mod accounts;
-mod beta_keys;
 mod connection;
 mod legacy;
 mod pending;
@@ -15,9 +14,6 @@ pub use accounts::{
     ReportImportRefusal, Session, Status, Summary, Swept, TAG_DRAWS, TagDraw, appoint_admin, sweep,
 };
 
-pub use beta_keys::{
-    BetaKeyBatch, MAX_BETA_KEY_DAYS, MAX_BETA_KEY_NOTE, MAX_BETA_KEY_USES, MAX_BETA_KEYS,
-};
 pub use connection::{DevConfig, ServerConfig, connect_dev, connect_server, supports_version};
 pub use legacy::{
     Candidate, ImportRefusal, Imported, LOCKOUT_FAILURES, LOCKOUT_MINUTES, LegacyRow, LegacyStore,

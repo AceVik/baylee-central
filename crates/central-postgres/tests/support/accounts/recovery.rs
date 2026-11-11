@@ -200,10 +200,9 @@ async fn summary(store: &AccountStore, identity: Identity, cookie: &Token, nativ
 /// A registered account has the wrapper of its registration: the same bytes
 /// are `Done`, others a conflict.
 async fn registered(store: &AccountStore, operator: &DatabaseConnection, keys: &ServerKeys) {
-    let key = super::register::issue(operator, 1, "recovery-registered").await;
     let ticket = Token::generate().unwrap();
     let identity = store
-        .register("recovery-registered", None, &key.digest(), &ticket)
+        .register("recovery-registered", None, &ticket)
         .await
         .unwrap();
     let enrolled = super::register::credentials(keys, identity);

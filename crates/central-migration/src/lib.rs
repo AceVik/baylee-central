@@ -29,6 +29,7 @@ mod m20261102_000019_social;
 mod m20261102_000020_chat;
 mod m20261102_000021_groups;
 mod m20261102_000022_notifications;
+mod m20261111_000023_open_registration;
 
 use sea_orm_migration::{
     MigrationTrait, MigratorTrait,
@@ -63,6 +64,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261102_000020_chat::Migration),
             Box::new(m20261102_000021_groups::Migration),
             Box::new(m20261102_000022_notifications::Migration),
+            Box::new(m20261111_000023_open_registration::Migration),
         ]
     }
 }
