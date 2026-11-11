@@ -16,7 +16,7 @@ use std::sync::{Arc, RwLock};
 
 use config::Config;
 use files::{Broken, Files};
-use routes::App;
+use routes::{App, Pages};
 
 /// Builds the application from its settings: reads the assets and the
 /// fallback data, but starts no task and opens no socket.
@@ -25,11 +25,14 @@ use routes::App;
 /// When the build's assets cannot be read.
 pub fn app(config: Config) -> Result<Arc<App>, Broken> {
     let (assets, files) = Files::load(&config.site)?;
-    let data = Arc::new(RwLock::new(fetch::fallback(config.fallback.as_deref())));
+    let data = Arc::new(RwLock::new(Arc::new(fetch::fallback(
+        config.fallback.as_deref(),
+    ))));
     Ok(Arc::new(App {
         config,
         assets,
         files,
         data,
+        pages: Pages::default(),
     }))
 }

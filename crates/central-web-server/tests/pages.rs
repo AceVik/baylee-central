@@ -1,17 +1,21 @@
 //! Every page in every language, as a browser and a search engine get it:
 //! status, headers, one `h1`, canonical address and languages, sharing
 //! card, structured data that parses, no inline style or script, pictures
-//! with their size, the Fan Content notice, and nothing from another origin.
+//! with their size, the Fan Content notice, and nothing from another origin;
+//! and how a browser's cache revalidates them.
 #![forbid(unsafe_code)]
 
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
 
 use axum::body::{Body, to_bytes};
 use axum::http::{Request, StatusCode};
-use central_web::site::Page;
+use central_web::data::{Section, machine};
+use central_web::site::{Assets, Context, Page, render};
 use central_web::words::Lang;
 use central_web_server::config::Config;
+use central_web_server::fetch::{fallback, install};
 use central_web_server::routes::router;
 use tower::ServiceExt as _;
 
@@ -446,6 +450,117 @@ async fn forms_and_the_account_area_are_islands_and_not_indexed() {
     }
 }
 
+/// The security headers every answer carries, a 304 among them.
+fn secured(headers: &axum::http::HeaderMap) {
+    for name in [
+        "content-security-policy",
+        "permissions-policy",
+        "cross-origin-opener-policy",
+        "cross-origin-resource-policy",
+        "referrer-policy",
+        "x-content-type-options",
+        "x-frame-options",
+        "strict-transport-security",
+    ] {
+        assert!(headers.contains_key(name), "{name}");
+    }
+}
+
+#[tokio::test]
+async fn a_page_is_revalidated_by_its_entity_tag() {
+    let app = app(true);
+    let (status, headers, html) = get(&app, "/en/faq", &[]).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(headers["cache-control"], "no-cache");
+    let etag = headers["etag"].to_str().expect("an entity tag").to_owned();
+    assert!(
+        etag.starts_with('"') && etag.ends_with('"') && etag.len() == 34,
+        "{etag}"
+    );
+    let weak = format!("W/{etag}");
+    let listed = format!("\"0000\", {etag}");
+    for asked in [etag.as_str(), weak.as_str(), listed.as_str(), "*"] {
+        let (status, headers, body) = get(&app, "/en/faq", &[("if-none-match", asked)]).await;
+        assert_eq!(status, StatusCode::NOT_MODIFIED, "{asked}");
+        assert_eq!(body, "");
+        assert_eq!(headers["etag"], etag.as_str());
+        assert_eq!(headers["cache-control"], "no-cache");
+        assert_eq!(headers.contains_key("x-robots-tag"), !Page::Faq.indexed());
+        assert!(!headers.contains_key("content-type"));
+        secured(&headers);
+    }
+    // Another tag, or another language's page, is the page itself.
+    let (status, _, again) = get(&app, "/en/faq", &[("if-none-match", "\"0000\"")]).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(again, html);
+    let (status, headers, _) = get(&app, "/de/faq", &[("if-none-match", etag.as_str())]).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_ne!(headers["etag"], etag.as_str());
+    // A page for another machine has its own tag: a cache's copy for one
+    // visitor is never confirmed for another.
+    let windows = (
+        "user-agent",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/140.0",
+    );
+    let linux = ("user-agent", "Mozilla/5.0 (X11; Linux x86_64) Chrome/140.0");
+    let (_, headers, _) = get(&app, "/en/download", &[windows]).await;
+    let tag = headers["etag"].to_str().expect("tag").to_owned();
+    let (status, _, _) = get(
+        &app,
+        "/en/download",
+        &[linux, ("if-none-match", tag.as_str())],
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let (status, headers, _) = get(
+        &app,
+        "/en/download",
+        &[windows, ("if-none-match", tag.as_str())],
+    )
+    .await;
+    assert_eq!(status, StatusCode::NOT_MODIFIED);
+    assert!(
+        headers["vary"]
+            .to_str()
+            .unwrap_or("")
+            .contains("User-Agent")
+    );
+    // Only a 200 is ever confirmed: not the error pages, not a redirect.
+    for path in ["/en/no-such-page", "/download"] {
+        let (status, _, _) = get(&app, path, &[("if-none-match", "*")]).await;
+        assert!(
+            status == StatusCode::NOT_FOUND || status == StatusCode::FOUND,
+            "{path}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn the_documents_the_server_writes_are_revalidated_too() {
+    let app = app(true);
+    for path in [
+        "/sw.js",
+        "/favicon.ico",
+        "/robots.txt",
+        "/sitemap.xml",
+        "/.well-known/tdmrep.json",
+        "/de/manifest.webmanifest",
+    ] {
+        let (status, headers, _) = get(&app, path, &[]).await;
+        assert_eq!(status, StatusCode::OK, "{path}");
+        assert_eq!(headers["cache-control"], "no-cache", "{path}");
+        let etag = headers["etag"].to_str().expect("tag").to_owned();
+        let (status, headers, body) = get(&app, path, &[("if-none-match", etag.as_str())]).await;
+        assert_eq!(status, StatusCode::NOT_MODIFIED, "{path}");
+        assert_eq!(body, "");
+        assert_eq!(headers["etag"], etag.as_str());
+        secured(&headers);
+        if path == "/sw.js" {
+            assert_eq!(headers["service-worker-allowed"], "/");
+        }
+    }
+}
+
 /// A site folder whose service worker the build also compressed.
 fn compressed_site() -> PathBuf {
     let dir = site();
@@ -459,6 +574,7 @@ fn compressed_site() -> PathBuf {
 async fn an_encoding_is_sent_only_where_the_browser_takes_it() {
     let config = Config::development(compressed_site(), None);
     let app = router(central_web_server::app(config).expect("app"));
+    let mut tags = Vec::new();
     for (accepts, sent) in [
         ("br, gzip", "brotli"),
         ("gzip, br", "brotli"),
@@ -489,5 +605,137 @@ async fn an_encoding_is_sent_only_where_the_browser_takes_it() {
         };
         assert_eq!(encoding, expected, "{accepts}");
         assert_eq!(headers["vary"], "Accept-Encoding");
+        tags.push((sent, headers["etag"].to_str().expect("tag").to_owned()));
+    }
+    // Each form has its own tag; a tag confirms only the form it names.
+    let tag = |form: &str| {
+        tags.iter()
+            .find(|(sent, _)| *sent == form)
+            .map(|(_, tag)| tag.clone())
+            .expect("form")
+    };
+    assert_ne!(tag("brotli"), tag("gzip"));
+    assert_ne!(tag("brotli"), tag("plain"));
+    let brotli = tag("brotli");
+    let (status, _, body) = get(
+        &app,
+        "/sw.js",
+        &[
+            ("accept-encoding", "gzip"),
+            ("if-none-match", brotli.as_str()),
+        ],
+    )
+    .await;
+    assert_eq!((status, body.as_str()), (StatusCode::OK, "gzip"));
+    let (status, headers, _) = get(
+        &app,
+        "/sw.js",
+        &[
+            ("accept-encoding", "br"),
+            ("if-none-match", brotli.as_str()),
+        ],
+    )
+    .await;
+    assert_eq!(status, StatusCode::NOT_MODIFIED);
+    assert!(!headers.contains_key("content-encoding"));
+    assert_eq!(headers["vary"], "Accept-Encoding");
+}
+
+#[tokio::test]
+async fn new_data_drops_the_pages_rendered_from_the_old() {
+    let mut config = Config::development(site(), Some(data()));
+    config.origin = "https://baylee.app".into();
+    let state = central_web_server::app(config).expect("app");
+    let app = router(Arc::clone(&state));
+    let (_, headers, before) = get(&app, "/en/gateways", &[]).await;
+    assert!(before.contains("Kitchen"));
+    let tag = headers["etag"].to_str().expect("tag").to_owned();
+    assert_eq!(state.pages.kept(), 1);
+    // The same page again is the kept one.
+    let (_, headers, again) = get(&app, "/en/gateways", &[]).await;
+    assert_eq!(again, before);
+    assert_eq!(headers["etag"], tag.as_str());
+    assert_eq!(state.pages.kept(), 1);
+    let (_, _, _) = get(&app, "/de/gateways", &[]).await;
+    assert_eq!(state.pages.kept(), 2);
+    // The same data installed again keeps them.
+    install(&state.data, |_| {});
+    let (_, _, _) = get(&app, "/en/gateways", &[]).await;
+    assert_eq!(state.pages.kept(), 2);
+    // New data: the page shows it at once, under another tag, and a cache's
+    // copy of the old page is no longer confirmed.
+    install(&state.data, |snapshot| {
+        if let Some(gateways) = &mut snapshot.gateways {
+            gateways.retain(|gateway| gateway.official);
+        }
+    });
+    let (status, headers, after) =
+        get(&app, "/en/gateways", &[("if-none-match", tag.as_str())]).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(!after.contains("Kitchen"));
+    assert!(after.contains("Sanctuary"));
+    assert_ne!(headers["etag"], tag.as_str());
+    assert_eq!(state.pages.kept(), 1, "the old pages are gone");
+}
+
+#[test]
+fn a_page_is_a_pure_function_of_what_it_is_rendered_from() {
+    // The kept pages rest on this: the same page, language, machine, data
+    // and settings render the same bytes, again and on another thread.
+    let data = fallback(Some(&data()));
+    let assets = Assets::default();
+    let machines = [
+        machine("", None, None, None),
+        machine(
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/140.0",
+            Some("\"Windows\""),
+            Some("\"arm\""),
+            Some("\"64\""),
+        ),
+        machine(
+            "Mozilla/5.0 (Linux; Android 15; Pixel 7) Mobile",
+            None,
+            None,
+            None,
+        ),
+    ];
+    let pages: Vec<Page> = Page::LISTED
+        .into_iter()
+        .chain([
+            Page::SignIn,
+            Page::Register,
+            Page::Offline,
+            Page::NotFound,
+            Page::Gone,
+        ])
+        .chain(Section::ALL.map(Page::Account))
+        .collect();
+    for page in pages {
+        for lang in Lang::ALL {
+            for machine in machines {
+                let render_once = || {
+                    render(
+                        page,
+                        &Context {
+                            lang,
+                            origin: "https://baylee.app",
+                            assets: &assets,
+                            data: &data,
+                            machine,
+                            verification: Some("synthetic-value"),
+                        },
+                    )
+                };
+                let first = render_once();
+                let again = render_once();
+                let elsewhere =
+                    std::thread::scope(|scope| scope.spawn(render_once).join().expect("thread"));
+                assert!(first == again, "{page:?} {lang:?} {machine:?}: again");
+                assert!(
+                    first == elsewhere,
+                    "{page:?} {lang:?} {machine:?}: elsewhere"
+                );
+            }
+        }
     }
 }
