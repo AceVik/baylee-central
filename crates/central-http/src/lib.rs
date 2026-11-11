@@ -8,6 +8,7 @@
 
 mod boundary;
 mod browser;
+mod in_flight;
 mod native;
 mod server;
 
