@@ -125,11 +125,17 @@ fn submit(lang: Lang, form: Form, event: &leptos::ev::SubmitEvent) {
 #[island]
 pub fn ContactForm(lang: Lang) -> impl IntoView {
     let state = RwSignal::new(State::Ready);
-    let name = RwSignal::new(String::new());
-    let email = RwSignal::new(String::new());
-    let message = RwSignal::new(String::new());
-    let trap = RwSignal::new(String::new());
-    let count = move || message.with(|m| m.chars().count());
+    // what was typed before the islands ran stays (`early`)
+    let name = RwSignal::new(super::early::typed("contact-name"));
+    let email = RwSignal::new(super::early::typed("contact-email"));
+    let message = RwSignal::new(super::early::typed("contact-message"));
+    let trap = RwSignal::new(super::early::typed("contact-website"));
+    // The count as drawn starts where the server's page did and follows the
+    // message once the island runs: hydration writes no text at first, so
+    // a count derived straight from early text would stay at the server's 0.
+    let count = RwSignal::new(0_usize);
+    Effect::new(move |_| count.set(message.with(|m| m.chars().count())));
+    let count = move || count.get();
     let near = move || count() * 10 >= MAX_MESSAGE * 9;
     let form = Form {
         state,
@@ -179,7 +185,7 @@ pub fn ContactForm(lang: Lang) -> impl IntoView {
                                 on:input=move |ev| message.set(event_target_value(&ev))
                                 prop:value=move || message.get()></textarea>
                             <p class="hint num" id="contact-count" class:near=near>
-                                {move || words::contact_count(lang, &words::number(lang, u64::try_from(count()).unwrap_or(u64::MAX)))}
+                                <span>{move || words::contact_count(lang, &words::number(lang, u64::try_from(count()).unwrap_or(u64::MAX)))}</span>
                             </p>
                         </div>
                         <div class="trap" aria-hidden="true">

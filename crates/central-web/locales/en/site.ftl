@@ -42,7 +42,7 @@ desc-gateways = The public directory of Baylee gateways, the servers where onlin
 title-faq = Questions and answers
 desc-faq = What Baylee is, what it costs, how online play and accounts work, and what happens to your data.
 title-contact = Contact
-desc-contact = Write to the people behind Baylee, or report a bug.
+desc-contact = Write to the person behind Baylee, or report a bug.
 title-impressum = Legal notice
 desc-impressum = Who runs baylee.app (§ 5 DDG).
 title-privacy = Privacy notice
@@ -800,7 +800,7 @@ ai-house = Ready to play offline and at any online table: choose between Novice,
 ai-modelTitle = Language models at the table via Seat-Bridge
 ai-model = Seat <b>Google Gemini, OpenAI ChatGPT, Anthropic Claude, DeepSeek</b>, or local models via <b>LM Studio</b> right at your table. API keys stay protected in environment variables with spending caps; on timeouts, the House AI steps in seamlessly.
 ai-setup = LLM & Seat-Bridge setup guide
-home-gwLead = Online tables live on gateways, servers that Baylee Central lists after its operator checked who runs each. Here are the first few; the directory has them all.
+home-gwLead = Online tables live on gateways, servers that Baylee Central lists once its administrator approved them. Here are the first few; the directory has them all.
 beta-open = Open the directory
 beta-own = Run your own
 source-eyebrow = Source
@@ -820,7 +820,7 @@ gw-count =
        *[other] { $n } gateways listed, { $online } online.
     }
 gw-none = No gateway is listed yet.
-contact-intro = A question, an idea, a game you would like to see, or something you would rather not post in public: this form goes straight to the people behind Baylee. Leave an e-mail address if you want an answer; without one we can only read it.
+contact-intro = A question, an idea, a game you would like to see, or something you would rather not post in public: this form goes straight to the person behind Baylee. Leave an e-mail address if you want an answer; without one we can only read it.
 contact-f8 = A card that resolved wrongly is best reported from the game with <kbd>F8</kbd>, because the report can carry the whole game.
 contact-discord = talk, find opponents, hear about builds
 contact-issues = GitHub issues
@@ -840,7 +840,7 @@ ai-training = Alongside the House AI and external LLM bridge, a dedicated native
 ai-hostingLink = Gateway hosting & LLM setup
 
 # The gateways and the contact page, as the old site wrote them (owner, 11.11.2026)
-gw-lead = A gateway is a server where online tables live: accounts, decks, rooms and one engine process per game. These are the ones registered with Baylee Central, whose operator checked who runs each before listing it. Baylee runs Sanctuary; the others are run by other people for their groups, and their own rules apply there.
+gw-lead = A gateway is a server where online tables live: accounts, decks, rooms and one engine process per game. These are the ones registered with Baylee Central and approved by its administrator. Baylee runs the one marked official; the others are run by other people for their groups, and their own rules apply there. A listing is not a promise about what a gateway does.
 gw-howTo = To play on one, copy its address into the client's front door. Online means Central heard from the gateway within the last minute and a half; it is no promise that it answers. Names and versions are what each operator reports.
 gw-find = Find a gateway
 gw-findHint = Name or address
@@ -862,7 +862,7 @@ reports-f8 = Press <kbd>F8</kbd> at the table or in the lobby. A report carries 
 reports-usage = While you play offline, the client says once a minute that a game is running: no account, no device id, nothing about the game. <i>Send anonymous usage count</i> under Settings › Privacy & Data switches it off.
 reports-discord = Want to talk, find opponents or hear first about new builds? Join the <discord>Baylee community on Discord</discord>.
 reports-issues = Rules questions, wrong card behaviour, ideas: <issues>open an issue on GitHub</issues>. A card that resolved wrongly is the most useful report we can get, because every card has a test and yours becomes one.
-reports-privacy = <docs>docs/privacy.md</docs> lists everything the client, the gateway and the feedback service keep. This site keeps nothing about you: no cookies, no analytics, no fonts from anyone else's server. <notice>The privacy notice</notice> names every other host it talks to, and when.
+reports-privacy = <docs>docs/privacy.md</docs> lists everything the client, the gateway and the feedback service keep. This site sets no cookie unless you sign in, runs no analytics and loads no fonts or scripts from anyone else's server. <notice>The privacy notice</notice> says what the site and Baylee Central keep, and names every other host they talk to, and when.
 
 # The download page, as the old site set it (owner, 11.11.2026)
 dlPage-eyebrow = Get it

@@ -277,3 +277,20 @@ beside 0.12.0.
 - `npm run e2e:site` (188 passed, desktop and Pixel 7);
 - `web/e2e-real/site-chat.spec.ts` against a real Central on desktop and
   phone.
+
+### Behaviour found in 0.9.0-rc1 (11.11.2026)
+
+- Hydration does not take over a reactive text that is the only child of
+  an element with a `class:` directive: the text keeps the server's words
+  and never changes again (the contact form's character count did that).
+  Wrapped in a `<span>` of its own it works. No other island has the
+  pattern; `web/e2e-site/site.spec.ts` checks the count.
+- Hydration writes no derived text at first, and later writes only what
+  differs from what it computed then: a view derived from a signal that
+  starts from something other than the server's state (fields typed into
+  before the islands ran, `islands/early.rs`) keeps the server's words
+  until the value changes. The contact form's drawn count is therefore a
+  signal of its own that starts at the server's 0 and follows the message
+  through an effect.
+- Timers, frames and window listeners belong to the reactive owner and end
+  with it (see `islands/focus.rs` and the chat engine's own root owner).

@@ -11,6 +11,7 @@ mod central;
 mod chat;
 mod contact;
 mod crypto;
+mod early;
 mod focus;
 mod impressum;
 pub(crate) mod net;

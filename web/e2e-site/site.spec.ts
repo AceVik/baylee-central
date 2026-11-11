@@ -302,3 +302,50 @@ test("the gateway directory finds by name or address, and online only", async ({
   await page.keyboard.press("Control+k");
   await expect(field).toBeFocused();
 });
+
+test("what is typed before the islands run stays when they take the forms over", async ({ page }) => {
+  // the WebAssembly is held back until the fields are filled
+  const { promise: held, resolve: release } = Promise.withResolvers<void>();
+  await page.route("**/assets/islands.*.wasm", async (route) => {
+    await held;
+    await route.continue();
+  });
+  await page.goto("/en/contact");
+  await page.locator("#contact-name").fill("Early");
+  await page.locator("#contact-message").fill("Typed before the islands ran");
+  release();
+  await expect(page.locator("html")).toHaveAttribute("data-islands", "ready");
+  await expect(page.locator("#contact-name")).toHaveValue("Early");
+  await expect(page.locator("#contact-message")).toHaveValue("Typed before the islands ran");
+  // and the form works with it: the count follows the text that was there,
+  // and what is typed next
+  await expect(page.locator("#contact-count")).toContainText("28");
+  await page.locator("#contact-message").press("End");
+  await page.keyboard.type("!");
+  await expect(page.locator("#contact-count")).toContainText("29");
+});
+
+test("the sign-in and the registration keep what was typed before the islands ran", async ({ page }) => {
+  let { promise: held, resolve: release } = Promise.withResolvers<void>();
+  await page.route("**/assets/islands.*.wasm", async (route) => {
+    await held;
+    await route.continue();
+  });
+  await page.goto("/en/signin");
+  await page.getByLabel("Sign-in name").fill("early_erika");
+  release();
+  await expect(page.locator("html")).toHaveAttribute("data-islands", "ready");
+  await expect(page.getByLabel("Sign-in name")).toHaveValue("early_erika");
+  ({ promise: held, resolve: release } = Promise.withResolvers<void>());
+  await page.goto("/en/register");
+  await page.getByLabel("Sign-in name").fill("early_erika");
+  await page.getByLabel("Display name").fill("Erika");
+  await page.getByLabel("I am 16 or older.").check();
+  release();
+  await expect(page.locator("html")).toHaveAttribute("data-islands", "ready");
+  await expect(page.getByLabel("Sign-in name")).toHaveValue("early_erika");
+  await expect(page.getByLabel("I am 16 or older.")).toBeChecked();
+  // the island knows them too: only the missing password is named
+  await page.getByRole("button", { name: "Create account" }).click();
+  await expect(page.locator(".error[role=alert]")).not.toContainText(/name/i);
+});
