@@ -1071,3 +1071,5 @@ sec-signin-link = Was beim Anmelden mit deinem Passwort geschieht: <security>Sic
 sec-teaser-lead = Schritt für Schritt: was dein Gerät verlässt, was Baylee Central sieht und was nicht, und welche Grenzen jeder Ablauf hat.
 sec-teaser-more = Jeden Schritt als Grafik ansehen
 # ==== Ende der Seite Sicherheit =================================================
+# ==== Registrierung: das Rätsel, solange es dauert ==============================
+register-solving = Dein Browser löst ein Rätsel, das Roboter fernhält. Wenn gerade viele Konten angelegt werden, kann das ein paar Minuten dauern … { $percent } %
