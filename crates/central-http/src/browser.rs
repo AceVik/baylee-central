@@ -18,7 +18,7 @@ use central_api::{
     reports::{Part, RecordOrigin},
     wire::Request,
 };
-use central_identity::{BrowserReply, IdentityService, browser_operation};
+use central_identity::{BrowserReply, IdentityService, Seen, browser_operation};
 use std::{
     collections::BTreeMap,
     future::Future,
@@ -89,10 +89,13 @@ pub(crate) struct Peer(pub(crate) SocketAddr);
 
 /// What answers browser requests: the identity service, or a test's stand-in.
 pub(crate) trait Accounts: Send + Sync + 'static {
+    /// `seen` is what the listener saw of a request for a registration
+    /// challenge (`seen.rs`), and nothing for every other request.
     fn browser(
         &self,
         request: Request,
         cookie: Option<&Token>,
+        seen: Seen,
     ) -> impl Future<Output = Result<BrowserReply, Error>> + Send;
 
     /// A report's part as stored, for an administrator's session (`docs/reports.md`).
@@ -109,8 +112,9 @@ impl Accounts for IdentityService {
         &self,
         request: Request,
         cookie: Option<&Token>,
+        seen: Seen,
     ) -> impl Future<Output = Result<BrowserReply, Error>> + Send {
-        self.handle_browser(request, cookie)
+        self.handle_browser_seen(request, cookie, seen)
     }
 
     fn report_part(
@@ -261,19 +265,22 @@ async fn call<A: Accounts>(State(state): State<Arc<Browser<A>>>, request: HttpRe
         return refused();
     }
     // The guard is gone before anything is awaited.
-    let charged = match state.budgets.lock() {
-        Ok(mut budgets) => budgets.charge(&request, permit.client, Instant::now()),
-        Err(_) => return failure(Error::Unavailable),
+    let Ok(charged) = state
+        .budgets
+        .lock()
+        .map(|mut budgets| budgets.admit(&request, permit.client, headers, Instant::now()))
+    else {
+        return failure(Error::Unavailable);
     };
-    if !charged {
+    let Some(seen) = charged else {
         return failure(Error::Busy);
-    }
+    };
     let logout = matches!(request, Request::Logout);
     let deletion = matches!(request, Request::DeleteAccountFinish { .. });
     let cookie = cookie(headers);
     let Ok(result) = tokio::time::timeout(
         ANSWER_TIME,
-        state.accounts.browser(request, cookie.as_ref()),
+        state.accounts.browser(request, cookie.as_ref(), seen),
     )
     .await
     else {
@@ -464,7 +471,25 @@ struct Budgets {
     pair_status: Book,
     /// A report's parts an administrator's page reads.
     parts: Book,
+    /// Registration challenges by the block of addresses around the caller
+    /// ([`Client::block`]): counted for the challenge's difficulty, and
+    /// never a reason to refuse.
+    near: Book,
 }
+
+/// How much haste `count` challenges in an hour are: one more for each of
+/// `steps` they pass, 0 to 3.
+fn haste(count: u32, steps: [u32; 3]) -> u8 {
+    steps
+        .iter()
+        .fold(0, |haste, step| haste + u8::from(count > *step))
+}
+
+/// Challenges an address may ask for in an hour and count as a few: a
+/// person asks for one with each try, and registers five times at most.
+const OWN_STEPS: [u32; 3] = [5, 10, 15];
+/// The same for the block around it, which many people share.
+const NEAR_STEPS: [u32; 3] = [20, 60, 200];
 
 impl Budgets {
     fn charge(&mut self, request: &Request, client: Client, now: Instant) -> bool {
@@ -475,8 +500,11 @@ impl Budgets {
                 self.register.charge(client, now, 5, HOUR)
                     && self.register_day.charge(client, now, 10, DAY)
             }
-            // A challenge for each attempt, with room for a few retries.
-            Request::RegisterChallenge => self.challenge.charge(client, now, 20, HOUR),
+            // A challenge for each attempt, with room for a few retries;
+            // one budget for both ways to ask for it.
+            Request::RegisterChallenge | Request::RegisterChallengeFor { .. } => {
+                self.challenge.charge(client, now, 20, HOUR)
+            }
             Request::Discover { .. } => self.discover.charge(client, now, 30, MINUTE),
             Request::LoginStart { .. } => self.login.charge(client, now, 30, MINUTE),
             // The public directory needs no session; a page reads it a few
@@ -494,6 +522,31 @@ impl Budgets {
             _ => true,
         }
     }
+
+    /// Charges `request` to its budget: `None` when that is spent. For a
+    /// registration challenge within its budget, what the listener saw of
+    /// it (`seen.rs`), with the haste of its address and of the block
+    /// around it this hour; for every other request nothing.
+    fn admit(
+        &mut self,
+        request: &Request,
+        client: Client,
+        headers: &HeaderMap,
+        now: Instant,
+    ) -> Option<Seen> {
+        if !self.charge(request, client, now) {
+            return None;
+        }
+        if !matches!(
+            request,
+            Request::RegisterChallenge | Request::RegisterChallengeFor { .. }
+        ) {
+            return Some(Seen::default());
+        }
+        let own = haste(self.challenge.used(client), OWN_STEPS);
+        let near = haste(self.near.count(client.block(), now, HOUR), NEAR_STEPS);
+        Some(super::seen::glance(headers, own.max(near)))
+    }
 }
 
 /// One budget: each address's window (its start and the units spent), and
@@ -503,6 +556,30 @@ struct Book(BTreeMap<Client, (Instant, u32)>, Option<Instant>);
 
 impl Book {
     fn charge(&mut self, client: Client, now: Instant, limit: u32, period: Duration) -> bool {
+        let used = self.window(client, now, period);
+        if *used >= limit {
+            return false;
+        }
+        *used += 1;
+        true
+    }
+
+    /// One more unit of `client`, never refused: its units in this window,
+    /// this one included.
+    fn count(&mut self, client: Client, now: Instant, period: Duration) -> u32 {
+        let used = self.window(client, now, period);
+        *used = used.saturating_add(1);
+        *used
+    }
+
+    /// The units `client` spent in the window it has.
+    fn used(&self, client: Client) -> u32 {
+        self.0.get(&client).map_or(0, |(_, used)| *used)
+    }
+
+    /// The units `client` spent in its window, which starts now when it has
+    /// none; the windows that passed are forgotten and room is made first.
+    fn window(&mut self, client: Client, now: Instant, period: Duration) -> &mut u32 {
         // The caller's own window, once passed, starts again.
         if self
             .0
@@ -532,12 +609,7 @@ impl Book {
                 self.0.remove(&oldest);
             }
         }
-        let (_, used) = self.0.entry(client).or_insert((now, 0));
-        if *used >= limit {
-            return false;
-        }
-        *used += 1;
-        true
+        &mut self.0.entry(client).or_insert((now, 0)).1
     }
 }
 
@@ -545,6 +617,7 @@ impl Book {
 mod tests {
     use super::*;
     use axum::body::{Body, to_bytes};
+    use axum::http::HeaderValue;
     use central_api::{
         terms::TermsSubject,
         wire::{Identity, Response as Answer, TicketPurpose},
@@ -556,6 +629,8 @@ mod tests {
     #[derive(Default)]
     struct Mock {
         calls: Mutex<Vec<(String, Option<[u8; 32]>)>>,
+        /// What the listener saw of each request, as it handed it over.
+        seen: Mutex<Vec<Seen>>,
         fail: Option<Error>,
         /// Never answer, as a service that hangs.
         stall: bool,
@@ -568,11 +643,13 @@ mod tests {
             &self,
             request: Request,
             cookie: Option<&Token>,
+            seen: Seen,
         ) -> impl Future<Output = Result<BrowserReply, Error>> + Send {
             self.calls
                 .lock()
                 .unwrap()
                 .push((operation(&request), cookie.map(Token::digest)));
+            self.seen.lock().unwrap().push(seen);
             let reply = match (self.fail, request) {
                 (Some(error), _) => Err(error),
                 (None, Request::LoginFinish { .. }) => Ok(BrowserReply {
@@ -1424,6 +1501,210 @@ mod tests {
         }
         assert!(!budgets.charge(&Request::RegisterChallenge, client, now));
         assert!(budgets.charge(&Request::RegisterChallenge, client, now + HOUR));
+    }
+
+    /// Both ways to ask for a registration challenge spend the one budget:
+    /// the newer one is no way around it.
+    #[test]
+    fn both_ways_to_ask_for_a_challenge_share_its_budget() {
+        let mut budgets = Budgets::default();
+        let client = Client::from("198.51.100.45".parse::<IpAddr>().unwrap());
+        let now = Instant::now();
+        let plain = Request::RegisterChallenge;
+        let reported = Request::RegisterChallengeFor { signals: 0 };
+        for _ in 0..10 {
+            assert!(budgets.charge(&plain, client, now));
+            assert!(budgets.charge(&reported, client, now));
+        }
+        assert!(!budgets.charge(&reported, client, now));
+        assert!(!budgets.charge(&plain, client, now));
+        let headers = HeaderMap::new();
+        assert_eq!(budgets.admit(&reported, client, &headers, now), None);
+        assert!(budgets.charge(&reported, client, now + HOUR));
+    }
+
+    /// The headers of a person's browser, as its page sends them.
+    fn person() -> HeaderMap {
+        let mut headers = HeaderMap::new();
+        for (name, value) in [
+            (
+                "user-agent",
+                "Mozilla/5.0 (X11; Linux x86_64; rv:130.0) Gecko/20100101 Firefox/130.0",
+            ),
+            ("accept-language", "de-DE,de;q=0.9"),
+            ("sec-fetch-site", "same-origin"),
+        ] {
+            headers.insert(name, HeaderValue::from_static(value));
+        }
+        headers
+    }
+
+    /// An address's own haste: a person asks for one challenge with each
+    /// try and may register five times an hour; more than that is counted,
+    /// and never refused before the budget's twenty.
+    #[test]
+    fn an_address_s_challenges_past_a_few_count_as_haste() {
+        let mut budgets = Budgets::default();
+        let client = Client::from("198.51.100.46".parse::<IpAddr>().unwrap());
+        let now = Instant::now();
+        let headers = person();
+        let mut seen = Vec::new();
+        for index in 0..20 {
+            // either way to ask counts the same
+            let request = if index % 2 == 0 {
+                Request::RegisterChallenge
+            } else {
+                Request::RegisterChallengeFor { signals: 0 }
+            };
+            let glance = budgets
+                .admit(&request, client, &headers, now)
+                .expect("within the budget");
+            assert_eq!(
+                glance,
+                Seen {
+                    frequent: glance.frequent,
+                    ..Seen::default()
+                },
+                "nothing else is seen of a person's browser"
+            );
+            seen.push(glance.frequent);
+        }
+        let expected: Vec<u8> = [[0; 5], [1; 5], [2; 5], [3; 5]].concat();
+        assert_eq!(seen, expected);
+        assert_eq!(
+            budgets.admit(&Request::RegisterChallenge, client, &headers, now),
+            None
+        );
+        // the next hour starts with a few again
+        let later = budgets.admit(&Request::RegisterChallenge, client, &headers, now + HOUR);
+        assert_eq!(later, Some(Seen::default()));
+    }
+
+    /// One who holds a block of addresses is a new address with each
+    /// request: the block around an address is counted too (an IPv6 /48, an
+    /// IPv4 /24), for the difficulty only. Nobody is refused for it.
+    #[test]
+    fn a_block_of_addresses_is_counted_and_never_refused() {
+        let now = Instant::now();
+        let headers = person();
+        for (blocks, other) in [
+            (
+                (0..300u16)
+                    .map(|index| format!("2001:db8:77:{index:x}::1"))
+                    .collect::<Vec<_>>(),
+                "2001:db8:78::1",
+            ),
+            (
+                // an IPv4 /24 has 256 addresses: each asks twice
+                (0..300u16)
+                    .map(|index| format!("203.0.113.{}", index % 150))
+                    .collect::<Vec<_>>(),
+                "203.0.112.9",
+            ),
+        ] {
+            let mut budgets = Budgets::default();
+            let mut haste = Vec::new();
+            for address in &blocks {
+                let client = Client::from(address.parse::<IpAddr>().unwrap());
+                let seen = budgets
+                    .admit(&Request::RegisterChallenge, client, &headers, now)
+                    .expect("never refused for its block");
+                haste.push(seen.frequent);
+            }
+            assert_eq!(&haste[..20], &[0; 20], "a few");
+            assert_eq!((haste[20], haste[59]), (1, 1));
+            assert_eq!((haste[60], haste[199]), (2, 2));
+            assert_eq!((haste[200], haste[299]), (3, 3));
+            // another block is another count, and the hour ends this one
+            let elsewhere = Client::from(other.parse::<IpAddr>().unwrap());
+            let seen = budgets.admit(&Request::RegisterChallenge, elsewhere, &headers, now);
+            assert_eq!(seen, Some(Seen::default()), "{other}");
+            let first = Client::from(blocks[0].parse::<IpAddr>().unwrap());
+            let seen = budgets.admit(&Request::RegisterChallenge, first, &headers, now + HOUR);
+            assert_eq!(seen, Some(Seen::default()));
+        }
+        // Only challenges are counted by their block, and only they are looked at.
+        let mut budgets = Budgets::default();
+        let client = Client::from("203.0.113.5".parse::<IpAddr>().unwrap());
+        let discover = Request::Discover {
+            username: "synthetic".into(),
+        };
+        for _ in 0..30 {
+            let seen = budgets.admit(&discover, client, &HeaderMap::new(), now);
+            assert_eq!(seen, Some(Seen::default()));
+        }
+        assert!(budgets.near.0.is_empty());
+    }
+
+    #[test]
+    fn haste_steps_at_its_three_marks() {
+        assert_eq!(haste(0, OWN_STEPS), 0);
+        assert_eq!(haste(5, OWN_STEPS), 0);
+        assert_eq!(haste(6, OWN_STEPS), 1);
+        assert_eq!(haste(11, OWN_STEPS), 2);
+        assert_eq!(haste(16, OWN_STEPS), 3);
+        assert_eq!(haste(u32::MAX, NEAR_STEPS), 3);
+        assert_eq!(haste(200, NEAR_STEPS), 2);
+        let block = |text: &str| Client::from(text.parse::<IpAddr>().unwrap()).block();
+        assert_eq!(block("2001:db8:77:1::1"), block("2001:db8:77:ffff::2"));
+        assert_ne!(block("2001:db8:77:1::1"), block("2001:db8:78:1::1"));
+        assert_eq!(block("203.0.113.1"), block("203.0.113.254"));
+        assert_ne!(block("203.0.113.1"), block("203.0.112.1"));
+        // an IPv4 address written as IPv6 is the IPv4 address
+        assert_eq!(block("::ffff:203.0.113.1"), block("203.0.113.9"));
+    }
+
+    /// What the listener hands the service of a request for a registration
+    /// challenge: plain facts of its headers, the same for both ways to
+    /// ask, and nothing of any other request.
+    #[tokio::test]
+    async fn the_service_is_told_what_a_challenge_request_looked_like() {
+        let (app, mock) = listener();
+        let plain = body(&Request::RegisterChallenge);
+        let reported = body(&Request::RegisterChallengeFor { signals: 1 });
+        // A script with the listener's own headers and no browser's.
+        let script = Seen {
+            no_language: true,
+            agent: central_identity::Agent::Missing,
+            ..Seen::default()
+        };
+        assert_eq!(send(&app, &base(), plain.clone()).await.status, 200);
+        assert_eq!(send(&app, &base(), reported.clone()).await.status, 200);
+        // A person's browser through the proxy.
+        let mut browser = base();
+        browser.push((
+            "user-agent",
+            "Mozilla/5.0 (X11; Linux x86_64; rv:130.0) Gecko/20100101 Firefox/130.0".into(),
+        ));
+        browser.push(("accept-language", "en-GB,en;q=0.9".into()));
+        assert_eq!(send(&app, &browser, plain.clone()).await.status, 200);
+        assert_eq!(send(&app, &browser, reported.clone()).await.status, 200);
+        // A tool that names itself, and an older browser without fetch metadata.
+        let mut tool = browser.clone();
+        tool.retain(|(name, _)| *name != "user-agent" && *name != "sec-fetch-site");
+        tool.push(("user-agent", "curl/8.7.1".into()));
+        assert_eq!(send(&app, &tool, plain.clone()).await.status, 200);
+        // Another request is not looked at, whatever it sends.
+        assert_eq!(send(&app, &base(), discover()).await.status, 200);
+        let seen = mock.seen.lock().unwrap().clone();
+        assert_eq!(
+            seen,
+            [
+                script,
+                script,
+                Seen::default(),
+                Seen::default(),
+                Seen {
+                    no_fetch_site: true,
+                    agent: central_identity::Agent::Tool,
+                    ..Seen::default()
+                },
+                Seen::default(),
+            ]
+        );
+        // The sixth challenge of the hour from the address is haste.
+        assert_eq!(send(&app, &browser, plain).await.status, 200);
+        assert_eq!(mock.seen.lock().unwrap().last().unwrap().frequent, 1);
     }
 
     #[test]

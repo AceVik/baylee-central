@@ -15,8 +15,22 @@ use sha2::{Digest, Sha256};
 pub const PARTS: u8 = 8;
 /// The nonce's length: 32 random bytes in lowercase hex.
 pub const NONCE_LEN: usize = 64;
-/// The highest difficulty Central asks for or a client accepts.
-pub const MAX_DIFFICULTY: u8 = 30;
+/// The highest difficulty Central asks for or a client accepts: sixteen
+/// bits when registrations are few and six more at the most, 64 times the
+/// base work. A challenge of that size lives long enough for a slow phone
+/// to finish it (the identity service's `challenge` asserts both), and a
+/// page takes none above it, so it never works on one it could not hand in.
+pub const MAX_DIFFICULTY: u8 = 22;
+
+/// What a page says of its own browser when it asks for a challenge
+/// (`Request::RegisterChallengeFor`), one bit each, the bits the Impressum's
+/// page sends its service: a browser a program drives (`navigator.webdriver`).
+pub const SIGNAL_WEBDRIVER: u8 = 1;
+/// A browser without languages (`navigator.languages` is empty).
+pub const SIGNAL_NO_LANGUAGES: u8 = 2;
+/// Every bit Central reads; it ignores the others, so a later page may
+/// send more.
+pub const SIGNALS: u8 = SIGNAL_WEBDRIVER | SIGNAL_NO_LANGUAGES;
 
 fn zero_bits(hash: &[u8]) -> u32 {
     let mut bits = 0;
@@ -97,6 +111,14 @@ mod tests {
         assert!(solve(NONCE, PARTS, MAX_DIFFICULTY + 1).is_none());
         assert!(solve(NONCE, 4, 4).is_none());
         assert!(!solved(NONCE, MAX_DIFFICULTY + 1, &[0; 8]));
+    }
+
+    #[test]
+    fn the_ceiling_is_sixty_four_times_the_base_work() {
+        // 16 bits and 6 more; a page and Central refuse the same above it
+        assert_eq!(MAX_DIFFICULTY, 22);
+        assert_eq!(SIGNALS, 3);
+        assert_eq!(SIGNAL_WEBDRIVER & SIGNAL_NO_LANGUAGES, 0);
     }
 
     #[test]

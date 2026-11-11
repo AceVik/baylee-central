@@ -1,6 +1,6 @@
 use super::{
-    BrowserReply, Discovery, Error, IdentityService, Request, Response, Surface, Token,
-    browser_only, browser_operation,
+    BrowserReply, Discovery, Error, IdentityService, Request, Response, Seen, Surface, Token,
+    browser_only, browser_operation, challenge,
 };
 use std::time::Instant;
 
@@ -10,6 +10,7 @@ impl IdentityService {
         request: Request,
         bearer: Option<&Token>,
         surface: Surface,
+        seen: Seen,
     ) -> Result<BrowserReply, Error> {
         if surface == Surface::Browser && !browser_operation(&request) {
             return Err(Error::Rejected);
@@ -36,7 +37,7 @@ impl IdentityService {
                 .await;
         }
         Ok(BrowserReply {
-            response: self.respond(request, bearer, surface).await?,
+            response: self.respond(request, bearer, surface, seen).await?,
             session: None,
         })
     }
@@ -46,6 +47,7 @@ impl IdentityService {
         request: Request,
         bearer: Option<&Token>,
         surface: Surface,
+        seen: Seen,
     ) -> Result<Response, Error> {
         if super::terms::needs_acceptance(&request) {
             self.require_terms(bearer, surface).await?;
@@ -121,7 +123,10 @@ impl IdentityService {
             | Request::ChangePasswordFinish { .. }) => {
                 self.credential_request(request, bearer, surface).await
             }
-            Request::RegisterChallenge => self.register_challenge(surface).await,
+            Request::RegisterChallenge => self.register_challenge(surface, seen, 0).await,
+            Request::RegisterChallengeFor { signals } => {
+                self.register_challenge(surface, seen, signals).await
+            }
             Request::Register {
                 username,
                 display_name,
@@ -255,8 +260,15 @@ impl IdentityService {
 
     /// A proof-of-work challenge for one registration
     /// (`docs/registration-abuse.md`), or word that an administrator closed
-    /// registration.
-    async fn register_challenge(&self, surface: Surface) -> Result<Response, Error> {
+    /// registration. What the listener saw of the request and what the page
+    /// reported of its browser (`signals`) only make it harder: both ways
+    /// to ask are weighed alike, and neither is ever refused for its look.
+    async fn register_challenge(
+        &self,
+        surface: Surface,
+        seen: Seen,
+        signals: u8,
+    ) -> Result<Response, Error> {
         if surface != Surface::Browser {
             return Err(Error::Rejected);
         }
@@ -267,7 +279,7 @@ impl IdentityService {
             .challenges
             .lock()
             .map_err(|_| Error::Unavailable)?
-            .issue(Instant::now())?;
+            .issue(Instant::now(), challenge::points(seen, signals))?;
         Ok(Response::RegisterChallenge {
             nonce: issued.nonce,
             parts: central_api::register::PARTS,

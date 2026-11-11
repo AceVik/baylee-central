@@ -28,9 +28,9 @@ first. Every piece goes through the three passes of
 
 **Registration** (website, no session yet):
 
-1. `RegisterChallenge`, then `Register { username, display_name, nonce,
-   counters }` → `Enrollment { identity, ticket }` while registration is
-   open. The proof of work is checked and spent first
+1. `RegisterChallengeFor { signals }` (or `RegisterChallenge`), then
+   `Register { username, display_name, nonce, counters }` →
+   `Enrollment { identity, ticket }` while registration is open. The proof of work is checked and spent first
    ([registration abuse](registration-abuse.md)); the username must be
    free under the versioned name policy; the display name, which the page
    always sends, keeps the name rule and is no reserved name (§"Display name
@@ -266,6 +266,15 @@ history, and adds `registration`, the administrators' switch
   proof of work of `docs/registration-abuse.md`, which `Register` carries
   as `nonce` and `counters` and Central checks and spends before anything
   else.
+- `Request::RegisterChallengeFor { signals }` → the same answers
+  (11.11.2026, browser listener only): the challenge asked by a page that
+  reports what it saw of its own browser, one bit each
+  (`central_api::register::SIGNALS`: 1 `navigator.webdriver`, 2 no
+  `navigator.languages`; other bits are ignored). The report and the
+  request's headers only make the challenge harder, by up to four bits; the
+  older request is weighed by the same headers
+  (`docs/registration-abuse.md` §"Hardened"). `difficulty` is 16 to 22 and
+  `expires_at` five to twenty minutes away, longer for a harder challenge.
 - `Request::Register { username, display_name, nonce, counters }`
   (the name since 23.10.2026, optional on the wire; the key until 11.11.2026) → `Response::Enrollment`. It needs
   no credential, shares the unauthenticated budget and takes a per-address
@@ -391,7 +400,7 @@ room, so a crowd of addresses cannot lock new ones out.
 | Operation | Budget per address |
 | --- | --- |
 | `Register` | 5 an hour and 10 a day |
-| `RegisterChallenge` | 20 an hour |
+| `RegisterChallenge` and `RegisterChallengeFor` | 20 an hour, together |
 | `Discover` | 30 a minute |
 | `LoginStart` | 30 a minute, apart from `Discover` |
 | `GatewayDirectory` and `PublicFigures` | 60 a minute for the two together, apart from the others |

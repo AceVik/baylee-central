@@ -10,6 +10,7 @@ mod boundary;
 mod browser;
 mod in_flight;
 mod native;
+mod seen;
 mod server;
 
 pub use browser::{BrowserOrigin, REQUEST_BYTES as BROWSER_REQUEST_BYTES};

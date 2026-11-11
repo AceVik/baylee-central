@@ -22,6 +22,7 @@ use tokio::sync::Semaphore;
 
 mod admin;
 mod challenge;
+pub use challenge::{Agent, Seen};
 mod deletion;
 mod dispatch;
 mod gateways;
@@ -101,6 +102,7 @@ pub fn browser_operation(request: &Request) -> bool {
         | Request::LoginStart { .. }
         | Request::LoginFinish { .. }
         | Request::RegisterChallenge
+        | Request::RegisterChallengeFor { .. }
         | Request::Register { .. }
         | Request::EnrollmentStart { .. }
         | Request::EnrollmentFinish { .. }
@@ -176,6 +178,7 @@ fn browser_only(request: &Request) -> bool {
         request,
         Request::Notifications { .. }
             | Request::RegisterChallenge
+            | Request::RegisterChallengeFor { .. }
             | Request::Register { .. }
             | Request::AccountSummary
             | Request::SetRecovery { .. }
@@ -535,7 +538,7 @@ impl IdentityService {
             .map_err(|_| Error::Unavailable)?
             .request(&request, bearer, Instant::now())?;
         Ok(self
-            .dispatch(request, bearer, Surface::Native)
+            .dispatch(request, bearer, Surface::Native, Seen::default())
             .await?
             .response)
     }
@@ -552,6 +555,23 @@ impl IdentityService {
         request: Request,
         cookie: Option<&Token>,
     ) -> Result<BrowserReply, Error> {
+        self.handle_browser_seen(request, cookie, Seen::default())
+            .await
+    }
+
+    /// [`Self::handle_browser`], with what the listener saw of the request
+    /// ([`Seen`]). Only a registration challenge reads it, for its
+    /// difficulty (`docs/registration-abuse.md` §"Hardened"): it never
+    /// refuses a request and grants nothing.
+    ///
+    /// # Errors
+    /// As [`Self::handle_browser`].
+    pub async fn handle_browser_seen(
+        &self,
+        request: Request,
+        cookie: Option<&Token>,
+        seen: Seen,
+    ) -> Result<BrowserReply, Error> {
         if !browser_operation(&request) {
             return Err(Error::Rejected);
         }
@@ -567,7 +587,8 @@ impl IdentityService {
         } else {
             session
         };
-        self.dispatch(request, context, Surface::Browser).await
+        self.dispatch(request, context, Surface::Browser, seen)
+            .await
     }
 }
 
@@ -607,6 +628,7 @@ mod tests {
                 message: vec![],
             },
             Request::RegisterChallenge,
+            Request::RegisterChallengeFor { signals: 0 },
             Request::Register {
                 username: "synthetic".into(),
                 display_name: Some("Synthetic".into()),
@@ -859,14 +881,18 @@ mod tests {
                 text[start..].split('"').next().unwrap().to_owned()
             })
             .collect();
-        assert_eq!(named.len(), 66, "every operation is in one of the lists");
+        assert_eq!(named.len(), 67, "every operation is in one of the lists");
     }
 
     #[test]
     fn the_native_listener_refuses_the_websites_own_operations() {
         let (served, _) = (served(), refused());
         let only: Vec<&Request> = served.iter().filter(|r| browser_only(r)).collect();
-        assert_eq!(only.len(), 11);
+        assert_eq!(only.len(), 12);
+        // Both ways to ask for a registration challenge: neither is served
+        // where no address is counted.
+        assert!(browser_only(&Request::RegisterChallenge));
+        assert!(browser_only(&Request::RegisterChallengeFor { signals: 0 }));
         // An account's own area is the website's alone, as administration is.
         assert!(browser_only(&Request::Owner {
             request: central_api::owner::OwnerRequest::Gateways,
@@ -938,5 +964,6 @@ mod tests {
             counters: Vec::new(),
         }));
         assert!(!uses_session(&Request::RegisterChallenge));
+        assert!(!uses_session(&Request::RegisterChallengeFor { signals: 3 }));
     }
 }

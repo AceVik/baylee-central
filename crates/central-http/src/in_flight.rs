@@ -31,6 +31,24 @@ impl From<IpAddr> for Client {
     }
 }
 
+impl Client {
+    /// The block of addresses around this one: an IPv6 /48, the least a
+    /// site is usually given to hand out its /64s from, or an IPv4 /24.
+    /// For counting only: nothing is ever refused by its block.
+    pub(crate) fn block(self) -> Self {
+        match self {
+            Self::V4(mut address) => {
+                address[3] = 0;
+                Self::V4(address)
+            }
+            Self::V6(mut prefix) => {
+                prefix[6..].fill(0);
+                Self::V6(prefix)
+            }
+        }
+    }
+}
+
 /// The last `X-Forwarded-For` hop, which the local proxy appended; `None`
 /// without one or when it is not a bare address.
 pub(crate) fn forwarded(headers: &HeaderMap) -> Option<Client> {
