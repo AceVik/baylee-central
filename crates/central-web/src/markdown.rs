@@ -260,7 +260,7 @@ fn spans_view(spans: Vec<Span>) -> AnyView {
                     view! { <a href=href>{text}</a> }.into_any()
                 }
                 Some(href) => {
-                    view! { <a href=href rel="noopener noreferrer">{text}</a> }.into_any()
+                    view! { <a href=href target="_blank" rel="noopener noreferrer">{text}</a> }.into_any()
                 }
                 None => text,
             }

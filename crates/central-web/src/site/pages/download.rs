@@ -86,7 +86,7 @@ fn menu_items(lang: Lang, release: &Release, mine: Option<Platform>) -> impl Int
             let is_mine = mine == Some(platform);
             view! {
                 <li>
-                    <a class="menu-item" class:is-mine=is_mine href=file.url.clone() rel="noopener noreferrer">
+                    <a class="menu-item" class:is-mine=is_mine href=file.url.clone() target="_blank" rel="noopener noreferrer">
                         <span class="dl-plat">
                             <strong>{name}</strong>
                             <span>{arch(platform)}</span>
@@ -125,10 +125,10 @@ fn lines(
         }
     });
     let checksum = file.and_then(|file| file.checksum.clone()).map(|url| {
-        view! { <a href=url rel="noopener noreferrer">{words::dl_checksum(lang)}</a>{sep()} }
+        view! { <a href=url target="_blank" rel="noopener noreferrer">{words::dl_checksum(lang)}</a>{sep()} }
     });
     let signature = file.and_then(|file| file.signature.clone()).map(|url| {
-        view! { <a href=url rel="noopener noreferrer">{words::dl_signature(lang)}</a>{sep()} }
+        view! { <a href=url target="_blank" rel="noopener noreferrer">{words::dl_signature(lang)}</a>{sep()} }
     });
     view! {
         <p class="dl-meta">
@@ -140,7 +140,7 @@ fn lines(
         <p class="dl-sub">
             {checksum}
             {signature}
-            <a href=release.page.clone() rel="noopener noreferrer">{words::dl_notes(lang)}</a>
+            <a href=release.page.clone() target="_blank" rel="noopener noreferrer">{words::dl_notes(lang)}</a>
             {sep()}
             <a href=others>{words::dl_others(lang)}</a>
         </p>
@@ -159,7 +159,7 @@ pub fn download_block(cx: &Context<'_>, on_page: bool) -> impl IntoView + use<> 
         return view! {
             <div class="dl">
                 <div class="dl-split">
-                    <a class="button button-big dl-main" href=format!("{REPOSITORY}/releases") rel="noopener noreferrer">
+                    <a class="button button-big dl-main" href=format!("{REPOSITORY}/releases") target="_blank" rel="noopener noreferrer">
                         {solid::icon(solid::DOWNLOAD)}
                         <span class="dl-text"><span class="dl-title">{fallback}</span></span>
                     </a>
@@ -193,7 +193,7 @@ pub fn download_block(cx: &Context<'_>, on_page: bool) -> impl IntoView + use<> 
     view! {
         <div class="dl">
             <div class="dl-split">
-                <a class="button button-big dl-main" href=href rel="noopener noreferrer">
+                <a class="button button-big dl-main" href=href target="_blank" rel="noopener noreferrer">
                     {solid::icon(solid::DOWNLOAD)}
                     <span class="dl-text">
                         <span class="dl-title">{title}</span>
@@ -209,7 +209,7 @@ pub fn download_block(cx: &Context<'_>, on_page: bool) -> impl IntoView + use<> 
                         <p class="menu-foot">
                             <a href=others.clone()>{words::dl_others(lang)}</a>
                             {sep()}
-                            <a href=release.page.clone() rel="noopener noreferrer">{words::dl_notes(lang)}</a>
+                            <a href=release.page.clone() target="_blank" rel="noopener noreferrer">{words::dl_notes(lang)}</a>
                         </p>
                     </div>
                 </details>
@@ -248,10 +248,10 @@ pub fn software(cx: &Context<'_>) -> Value {
 /// its checksum and signature, as the old site listed them.
 fn file_row(lang: Lang, file: &ReleaseFile) -> impl IntoView + use<> {
     let checksum = file.checksum.clone().map(|url| {
-        view! { <a href=url rel="noopener noreferrer" translate="no">".sha256"</a> }
+        view! { <a href=url target="_blank" rel="noopener noreferrer" translate="no">".sha256"</a> }
     });
     let signature = file.signature.clone().map(|url| {
-        view! { <a href=url rel="noopener noreferrer" translate="no">".sig"</a> }
+        view! { <a href=url target="_blank" rel="noopener noreferrer" translate="no">".sig"</a> }
     });
     let between = (checksum.is_some() && signature.is_some()).then_some(" · ");
     let aux = (file.checksum.is_some() || file.signature.is_some())
@@ -260,7 +260,7 @@ fn file_row(lang: Lang, file: &ReleaseFile) -> impl IntoView + use<> {
         .then(|| view! { <span class="help">{words::dl_fallback_help(lang)}</span> });
     view! {
         <li>
-            <a class="file" href=file.url.clone() rel="noopener noreferrer" translate="no">{file.name.clone()}</a>
+            <a class="file" href=file.url.clone() target="_blank" rel="noopener noreferrer" translate="no">{file.name.clone()}</a>
             <span class="kind">{kind_name(lang, file.kind)}</span>
             <span class="size num">{words::dl_size(lang, &format::megabytes(lang, file.size))}</span>
             {aux}
@@ -291,7 +291,7 @@ fn install(lang: Lang) -> impl IntoView + use<> {
                             <li>{plain(words::install_linux(lang))}</li>
                             <li>{plain(words::install_cpu(lang))}</li>
                         </ul>
-                        <p><a class="more-link" href=format!("{REPOSITORY}/releases") rel="noopener noreferrer">{words::install_releases(lang)}</a></p>
+                        <p><a class="more-link" href=format!("{REPOSITORY}/releases") target="_blank" rel="noopener noreferrer">{words::install_releases(lang)}</a></p>
                     </div>
                 </div>
             </div>
@@ -340,8 +340,8 @@ fn platforms(cx: &Context<'_>, release: &Release) -> impl IntoView + use<> {
                     <span class="ver" translate="no">{release.tag.clone()}</span>
                     {prerelease}
                     <span>{format::date(lang, &release.date)}</span>
-                    <a href=release.page.clone() rel="noopener noreferrer">{words::release_notes(lang)}</a>
-                    <a href=format!("{REPOSITORY}/releases") rel="noopener noreferrer">{words::release_all(lang)}</a>
+                    <a href=release.page.clone() target="_blank" rel="noopener noreferrer">{words::release_notes(lang)}</a>
+                    <a href=format!("{REPOSITORY}/releases") target="_blank" rel="noopener noreferrer">{words::release_all(lang)}</a>
                 </p>
                 <ul class="platforms stagger">{cards}</ul>
             </div>

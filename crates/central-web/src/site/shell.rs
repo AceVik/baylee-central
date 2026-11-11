@@ -417,7 +417,7 @@ fn bar(page: Page, cx: &Context<'_>) -> impl IntoView + use<> {
                     {nav_link(Page::Gateways, page, lang, words::nav_gateways(lang))}
                     {nav_link(Page::Faq, page, lang, words::nav_faq(lang))}
                     {nav_link(Page::Contact, page, lang, words::nav_contact(lang))}
-                    <a class="nav-discord" href=DISCORD rel="noopener noreferrer">"Discord"</a>
+                    <a class="nav-discord" href=DISCORD target="_blank" rel="noopener noreferrer">"Discord"</a>
                     <a
                         class="nav-account"
                         href=format!("/{}/signin", lang.code())
@@ -452,7 +452,7 @@ fn footer(page: Page, cx: &Context<'_>) -> impl IntoView + use<> {
         view! { <li><a href=target.path(lang) aria-current=(target == page).then_some("page")>{label}</a></li> }
     };
     let away = |href: String, label: &'static str| {
-        view! { <li><a href=href rel="noopener noreferrer">{label}</a></li> }
+        view! { <li><a href=href target="_blank" rel="noopener noreferrer">{label}</a></li> }
     };
     view! {
         <footer class="foot">
@@ -473,9 +473,9 @@ fn footer(page: Page, cx: &Context<'_>) -> impl IntoView + use<> {
                         <p class="dedication">{words::foot_dedication(lang)}</p>
                         <p class="foot-summary">{words::foot_summary(lang)}</p>
                         <div class="foot-social">
-                            <a class="social-pill" href=DISCORD rel="noopener noreferrer">{solid::icon(solid::DISCORD)}<span>"Discord"</span></a>
-                            <a class="social-pill" href=WHATSAPP rel="noopener noreferrer">{solid::icon(solid::WHATSAPP)}<span>"WhatsApp"</span></a>
-                            <a class="social-pill" href=REPOSITORY rel="noopener noreferrer">{solid::icon(solid::GITHUB)}<span>"GitHub"</span></a>
+                            <a class="social-pill" href=DISCORD target="_blank" rel="noopener noreferrer">{solid::icon(solid::DISCORD)}<span>"Discord"</span></a>
+                            <a class="social-pill" href=WHATSAPP target="_blank" rel="noopener noreferrer">{solid::icon(solid::WHATSAPP)}<span>"WhatsApp"</span></a>
+                            <a class="social-pill" href=REPOSITORY target="_blank" rel="noopener noreferrer">{solid::icon(solid::GITHUB)}<span>"GitHub"</span></a>
                         </div>
                     </div>
                     <nav class="foot-map" aria-label=words::foot_label(lang)>

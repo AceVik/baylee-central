@@ -124,6 +124,23 @@ fn check_page(html: &str, lang: Lang, page: Page) {
             "{code} {page:?}: nothing loaded from elsewhere ({attribute})"
         );
     }
+    // a link that leaves the site opens a tab of its own and tells the other
+    // site nothing about this one
+    for anchor in tags(html, "a") {
+        let away = anchor.contains(" href=\"https://")
+            && !anchor.contains(" href=\"https://baylee.app/");
+        if away {
+            assert!(
+                anchor.contains(" target=\"_blank\"") && anchor.contains("noopener noreferrer"),
+                "{code} {page:?}: a link away opens its own tab: {anchor}"
+            );
+        } else {
+            assert!(
+                !anchor.contains(" target=\""),
+                "{code} {page:?}: a link within the site stays in the tab: {anchor}"
+            );
+        }
+    }
     let canonical = format!(
         "<link rel=\"canonical\" href=\"https://baylee.app{}\"",
         page.path(lang)
