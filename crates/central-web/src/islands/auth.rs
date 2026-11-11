@@ -475,6 +475,8 @@ pub fn SignIn(lang: Lang, worker: String) -> impl IntoView {
             return;
         }
         password.set(String::new());
+        // a field left readable is hidden again for the next try
+        shown.set(false);
         error.set(None);
         step.set(Step::Working);
         let worker = worker.clone();
