@@ -4,6 +4,12 @@
 // needs a script of its own; this is the whole of it, everything the page
 // does is Rust (crates/central-web/src/islands).
 //
+// A registration starts with its proof of work (docs/registration-abuse.md
+// §"A proof that costs memory"): "work_start" takes the challenge and its
+// price, "work_search" tries some counters of one part and answers the one
+// that solves it or null, "work_end" gives the memory back. The hash is the
+// module's, the function Central checks the answer with; none is here.
+//
 // One flow per Worker: a registration, a sign-in (which may keep the chat
 // identity and then serve the chat for as long as it lives), a deletion's
 // password proof, or a chat resumed after a reload. The master key never
@@ -30,6 +36,7 @@ import init, {
   login_finish,
   login_start,
   recovery_create,
+  work_start,
 } from "./central_web_crypto.js";
 
 const ready = init({ module_or_path: "./central_web_crypto_bg.wasm" });
@@ -38,6 +45,7 @@ let enrollment = null;
 let login = null;
 let key = null;
 let chat = null;
+let work = null;
 
 const bytes = (value) => {
   if (!Array.isArray(value) || value.length > 1 << 20 || !value.every((b) => Number.isInteger(b) && b >= 0 && b <= 255)) {
@@ -131,11 +139,41 @@ async function resume(owner) {
   }
 }
 
+const count = (value, most) => {
+  if (!Number.isSafeInteger(value) || value < 0 || value > most) throw new Error("failed");
+  return value;
+};
+const rest = () => {
+  if (work !== null) work.free();
+  work = null;
+};
+
 const unlocked = () => ({ device: chat.device, registration: decode(chat.registration()) });
 const owner = (m) => ({ account: bytes(m.account), epoch: m.epoch, tag: m.tag });
 
 async function step(m) {
   switch (m.op) {
+    case "work_start":
+      rest();
+      work = work_start(
+        String(m.nonce),
+        count(m.memory, 0xffffffff),
+        count(m.passes, 0xffffffff),
+        count(m.parts, 255),
+        count(m.difficulty, 255),
+      );
+      return {};
+    case "work_search": {
+      const found = take(work).search(
+        count(m.part, 255),
+        BigInt(count(m.from, Number.MAX_SAFE_INTEGER)),
+        count(m.tries, 0xffffffff),
+      );
+      return { counter: found === undefined ? null : Number(found) };
+    }
+    case "work_end":
+      rest();
+      return {};
     case "enrollment_start":
       enrollment = enrollment_start(String(m.password), bytes(m.account), BigInt(m.epoch));
       return { message: array(enrollment.message) };

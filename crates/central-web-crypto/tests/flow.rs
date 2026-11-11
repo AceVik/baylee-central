@@ -11,7 +11,7 @@ use central_crypto::{
 };
 use central_web_crypto::flow::{
     self, DOCUMENT, Recovery, SignedIn, chat_resume, chat_unlock, enrollment_finish,
-    enrollment_start, login_confirm, login_finish, login_start, recovery_create,
+    enrollment_start, login_confirm, login_finish, login_start, recovery_create, work_start,
 };
 
 const ACCOUNT: [u8; 16] = [
@@ -351,4 +351,40 @@ fn a_kept_chat_identity_resumes_as_the_same_device_and_nothing_else_does() {
     )
     .unwrap();
     assert_ne!(other.chat.device(), opened.chat.device());
+}
+
+/// The pinned vector of `central_crypto::proof`, through what the Worker
+/// calls: searched in turns as the page asks, the counters are the ones
+/// Central's check takes. `web/e2e-site/account.spec.ts` holds the built
+/// module to the same counters in a browser.
+#[test]
+fn the_proof_of_work_the_worker_searches_is_the_one_central_checks() {
+    const NONCE: &str = "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f";
+    let mut work = work_start(NONCE, 64, 1, 4, 3).unwrap();
+    let counters: Vec<u64> = (0..4)
+        .map(|part| {
+            let mut from = 0;
+            loop {
+                if let Some(found) = work.search(part, from, 4).unwrap() {
+                    break found;
+                }
+                from += 4;
+            }
+        })
+        .collect();
+    assert_eq!(counters, [7, 25, 2, 7]);
+    let price = central_crypto::proof::Work {
+        memory: 64,
+        passes: 1,
+        parts: 4,
+        difficulty: 3,
+    };
+    assert!(central_crypto::proof::solved(NONCE, price, &counters));
+    assert_eq!(work.search(4, 0, 1), Err(CryptoError::Invalid));
+    // what the module refuses before it takes any memory
+    assert!(work_start("n", 64, 1, 4, 3).is_err());
+    assert!(work_start(NONCE, 65_537, 1, 4, 3).is_err());
+    assert!(work_start(NONCE, 64, 5, 4, 3).is_err());
+    assert!(work_start(NONCE, 64, 1, 17, 3).is_err());
+    assert!(work_start(NONCE, 64, 1, 4, 17).is_err());
 }

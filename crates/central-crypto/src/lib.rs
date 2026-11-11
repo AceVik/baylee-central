@@ -14,6 +14,7 @@ mod context;
 pub mod legacy;
 pub mod opaque;
 pub mod pairing;
+pub mod proof;
 pub mod vault;
 
 pub use context::Context;
