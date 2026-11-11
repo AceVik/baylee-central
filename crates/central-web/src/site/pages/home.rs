@@ -358,7 +358,7 @@ fn strip_live(cx: &Context<'_>) -> impl IntoView + use<> {
         .gateways
         .as_deref()
         .and_then(data::activity_of)
-        .map(|(players, tables, games)| {
+        .map(|(players, playing, tables, games)| {
             strip_stat(
                 icon(icons::GAMEPAD_2).into_any(),
                 words::strip_live(lang),
@@ -366,6 +366,7 @@ fn strip_live(cx: &Context<'_>) -> impl IntoView + use<> {
                     <a href="#gateways">
                         <span class="stat-pill num">
                             <span class="stat-part"><span class="dot ok live" aria-hidden="true"></span>{words::live_players(lang, players)}</span>
+                            <span class="stat-part">{words::live_playing(lang, playing)}</span>
                             <span class="stat-part">{words::live_tables(lang, tables)}</span>
                             <span class="stat-part">{words::live_games(lang, games)}</span>
                         </span>
@@ -735,6 +736,7 @@ pub fn gateway_card(lang: Lang, gateway: &Gateway, h2: bool) -> impl IntoView + 
                 <dt>{words::gws_now(lang)}</dt>
                 <dd class="num">
                     <span>{words::live_players(lang, u64::from(activity.players))}</span>
+                    <span>{words::live_playing(lang, u64::from(activity.playing))}</span>
                     <span>{words::live_tables(lang, u64::from(activity.tables))}</span>
                     <span>{words::live_games(lang, u64::from(activity.games))}</span>
                 </dd>

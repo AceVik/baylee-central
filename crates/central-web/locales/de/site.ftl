@@ -792,6 +792,10 @@ live-players = { $n ->
     [one] { $n } Spieler
    *[other] { $n } Spieler
 }
+live-playing = { $n ->
+    [one] { $n } im Spiel
+   *[other] { $n } im Spiel
+}
 live-tables = { $n ->
     [one] { $n } offener Tisch
    *[other] { $n } offene Tische

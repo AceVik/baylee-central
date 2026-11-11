@@ -787,6 +787,9 @@ live-accounts = { $n ->
 live-players = { $n ->
    *[other] 플레이어 { $n }명
 }
+live-playing = { $n ->
+   *[other] { $n } in a game
+}
 live-tables = { $n ->
    *[other] 열린 테이블 { $n }개
 }

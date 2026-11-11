@@ -414,6 +414,7 @@ fn figures(central: &Central<'_>) -> Option<(u64, BTreeMap<[u8; 16], Activity>)>
                 gateway.id,
                 Activity {
                     players: gateway.activity.players,
+                    playing: gateway.activity.playing,
                     tables: gateway.activity.tables,
                     games: gateway.activity.games,
                 },
@@ -672,6 +673,7 @@ mod tests {
     fn only_an_online_gateway_s_own_report_is_shown_and_it_goes_with_central() {
         let counts = |players| Activity {
             players,
+            playing: players - 3,
             tables: 2,
             games: 1,
         };
@@ -703,7 +705,7 @@ mod tests {
         assert_eq!(of("https://four.example.org"), None);
         assert_eq!(
             central_web::data::activity_of(&shown),
-            Some((16, 4, 2)),
+            Some((16, 10, 4, 2)),
             "the strip adds up what was reported"
         );
 

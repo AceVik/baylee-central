@@ -3917,3 +3917,162 @@ the numbers):
   only; no other model and no person has reviewed it.
 
 Engineering review, not an audit.
+
+## The pulse's fourth count, 11 November 2026
+
+The owner asked for "players in game" beside "players online" on the
+website. A gateway's activity gets a fourth count for it:
+`GatewayActivity { players, playing, tables, games }`, where `playing` is
+the number of connected players seated in a running game. On the wire an
+activity is `{"players":12,"playing":8,"tables":3,"games":4}`. The pulse
+and the figures were made on this branch earlier the same day and were
+neither merged nor released, so their shape changed in place; nothing else
+on the wire moved ([gateway
+registry](gateway-registry.md#activity-and-the-public-figures)).
+
+Design pass. The count is one more bounded integer on the gateway's own
+row, written by the heartbeat's one statement under the heartbeat's
+credential and read on the same public page. The questions were what is
+new about it:
+- **One thing about the counts can now be checked.** The players in a game
+  are among the players connected, so `playing <= players`. It is refused
+  where a count above the bound is refused: in `GatewayActivity::validate`
+  (which the SDK calls before it sends and on what it reads, the store
+  before its first statement and again on each row it hands out, and the
+  website's reader on each entry) and in a CHECK of the table. A claim can
+  no longer contradict itself. It stays a claim: an approved gateway can
+  show any number up to the bound with any share of it in a game.
+- **No way from three counts to four.** `playing` is required. An activity
+  without it is not an activity, and the pulse that carries it is refused
+  whole. An optional count read as zero was decided against: a gateway
+  that does not say how many play would be shown with "0 in a game", a
+  number nobody reported drawn as a zero, which the figures never do.
+  Nothing sent the three counts: no gateway sends pulses yet.
+- **The migration was edited, not followed by another.** 000025 gained
+  the column and its CHECKs in place. That it had run on throwaway
+  databases only is the brief's statement for this change and was not
+  checked against any deployed database's migration history. A database
+  that ran the first form has 000025 recorded and lacks the column; it is
+  made anew ([PostgreSQL](postgresql.md#gateway-activity-migration-000025)).
+- **What the figures give away grows a little.** For a reporting gateway
+  anyone can now read how many of its connected players are in a game. On
+  a gateway with one or two players that is closer to saying when those
+  people play than the players' count alone was. It is still a count, and
+  reporting is still the operator's choice
+  ([threat model](threat-model.md)).
+- Decided against: the rule folded into the bounds' CHECK (a CHECK of its
+  own names the rule a refusal broke, and the store's test reads that
+  name); Central working out who plays (it does not see tables); a share
+  or a percentage in place of a count.
+
+Implementation pass:
+- `central-api`: `playing: u32` between `players` and `tables`.
+  `validate` refuses a count above `MOST` and more `playing` than
+  `players` (`playing` has its bound through `players`). No other type
+  changed.
+- Migration 000025: `activity_playing integer`; `gateway_activity_whole`
+  counts five columns (none or all); `gateway_activity_bounds` holds the
+  fourth count too; `gateway_activity_playing` is
+  `activity_playing <= activity_players`. No grant changes
+  (`ops/grants.sql` names no column of `gateways`).
+- Store: the beat's `UPDATE` binds four counts (parameters 5 to 8),
+  `counts` hands them over in that order after `validate`, and
+  `gateway_figures` reads the column. A plain heartbeat clears all five.
+- `central-identity` and `central-client`: no code changed; the pulse
+  passes through the first, and the second's checks are `validate`.
+- Website: `Activity` has `playing`, `fetch.rs` copies it, `activity_of`
+  adds it up, and `home.rs` draws one more span after the players' in the
+  strip and on a gateway's card (`live-playing`: German and English
+  written, the nine other languages hold the English words until they are
+  translated).
+- No dependency changed (`Cargo.lock` is untouched), and nothing is logged.
+
+Adversarial pass:
+- **The wire.** The exact JSON of an activity, a pulse and the figures
+  with four counts. Refused by the decoder: the three counts from before,
+  `playing` alone left out of or doubled in an activity, a negative,
+  fractional, too large, quoted or null `playing`, an extra field. More
+  `playing` than `players` decodes and fails `validate`, by one and by
+  many, inside the bound and outside it; nobody in a game and everybody in
+  one pass.
+- **The SDK.** `gateway_pulse` sends neither an over-bound activity nor
+  one with more playing than players (the stand-in Central is not asked);
+  `public_figures` refuses a page that holds one.
+- **The store** (PostgreSQL 18.6): more playing than players is refused
+  with the heartbeat's credential and with a `listing` token, and for the
+  official gateway, and leaves the row and the token's last use as they
+  were; four different numbers go in and come out in their places through
+  every later step; everybody in a game at the bound is taken.
+- **The table.** Written past the store, thirteen in a game of twelve
+  connected is refused, and the error names `gateway_activity_playing`;
+  twelve of twelve is taken and the store reads it. In the upgrade
+  fixture each refused statement breaks one rule and no other: `playing`
+  alone set or alone NULL, `playing` below zero, players lowered under
+  playing, six in a game of five; five of five and none of five are
+  taken.
+- **Over real HTTP** (`central-client` against a real Central): with the
+  heartbeat's credential, a pulse with more playing than players is
+  refused when the SDK is asked to send it and when it is sent past the
+  SDK; the same pulse written with three counts, as a gateway built
+  before would write it, is refused, and no figure appears; the same
+  bytes with the fourth count are taken, so it was the shape; then anyone
+  reads the four counts on the native route. On the browser listener the
+  four counts of a row written as the operator are read, each in its
+  place.
+- **The website.** The fixture's gateway is drawn with "8 im Spiel" in
+  the strip and on its card on the German start page, and with "8 in a
+  game" on its card in the English directory; neither appears while nobody
+  reports. The strip's sum of the fourth count is tested with the three
+  others.
+- **The checks have teeth** (one change at a time, each undone): with the
+  rule taken out of `validate`, `central-api`'s test and both of the
+  SDK's fail; with `gateway_activity_playing` taken out of the migration,
+  the upgrade fixture fails at its first statement of that kind; with two
+  of the store's four parameters swapped, the HTTP scenario reads back the
+  wrong activity; with the strip's span taken out, the pages' test fails.
+
+Run on this change: `cargo xtask gate` passes (format, policy, crypto
+scope, clippy, the workspace's tests, the doc tests, the release build), as
+do `cargo xtask postgres` (PostgreSQL 18.6), `cargo test -p central-web -p
+central-web-server -p xtask`, `cargo xtask site`, `cargo xtask smoke`,
+`cargo xtask secrets` and `cargo deny check`. `cargo audit --deny warnings`
+reports RUSTSEC-2026-0459 (`libsqlite3-sys` 0.37.0), as it did before this
+change; `Cargo.lock` is untouched here. Clippy's limit of 100 lines moved
+two parts of tests into functions of their own (`pulse` in
+`central-identity`'s lists of requests, `activity_held` in the upgrade
+fixture); no lint was switched off. The gates ran on the second of the two
+commits; the first was checked on its own (`cargo check` over the
+workspace's targets, and the website crates' tests, which it leaves at
+three counts).
+
+Not tested, and recorded for the owner:
+- **The browser suites** (`npm run e2e:site`, `e2e-real`) were not run:
+  other sessions held their ports. The site suite's specs were read: none
+  names the figures' words or counts the pill's parts, and it draws its
+  pages from the fixture that now holds four counts. In the suites' place
+  the built site was served once with that fixture on a loopback port of
+  its own and opened in headless Chromium. At the suite's six widths (320
+  to 2560) and two heights, the German, English, Russian and Japanese
+  start pages and the English directory need no sideways scrolling, which
+  is the suite's own measure; the strip was looked at in German at 320
+  and at 1440: four parts, two lines of two on the phone, one line on the
+  desktop. Nothing else of the suites was repeated (contrast, the other
+  languages' pill, the card's line by eye). The stylesheet was not
+  changed, and its comments still say three counts (`gateways.css`,
+  `header.css`). The server was stopped and its port seen closed.
+- **No gateway sends the count.** The game's gateway does not send pulses
+  yet (its repository was searched for one and holds none); when it does,
+  it has to send all four.
+- **The website's reader against a Central that answers more playing than
+  players** has no test of its own, as it has none for the bound: it calls
+  the same `validate`, and the reader is not built to be asked without a
+  Central.
+- **The privacy page's sentence** still says a gateway may tell Central
+  "how many players, open tables and games it has". The fourth count is a
+  count of players, so the sentence was left; whether it should name the
+  players in a game is the owner's to say.
+- **The nine translations** of `live-playing` are the English words.
+- **A database that ran the first form of 000025** was not tried against
+  this build; that it fails there follows from the statements.
+
+Engineering review, not an audit.
