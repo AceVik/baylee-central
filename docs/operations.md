@@ -462,6 +462,21 @@ UPDATE central_identity.gateway_tokens SET revoked_at = clock_timestamp()
     AND revoked_at IS NULL;
 ```
 
+### An origin's host may not end in a dot (12.11.2026)
+
+`https://host.` names the same host as `https://host` and was taken as a
+second origin; Central now refuses it wherever an origin is checked
+(`central_api::gateway::validate_origin`). A gateway that was registered
+under such a spelling would have its registration, tokens and heartbeat
+refused after the deploy. None is expected. Look once before deploying, as
+the database's owner, and re-register what it finds under the plain
+spelling:
+
+```sql
+SELECT id, origin FROM central_identity.gateways
+ WHERE origin ~ '\.(:[0-9]+)?$';
+```
+
 ### What gateways report (migration 000025)
 
 Since 11.11.2026 a gateway may send its heartbeat as a `GatewayPulse` with
