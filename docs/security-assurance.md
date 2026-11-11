@@ -4492,3 +4492,202 @@ options):
   directly, so the listeners' own limits are not part of what was shown.
 
 Engineering review, not an audit.
+
+## The review's other findings, 11 November 2026
+
+The owner asked on 11.11.2026 for Central to be checked for
+vulnerabilities and for those to be closed. The three sections above are
+what was closed, each with a test that failed first. This section is the
+rest: one small budget that was added, what is open and whose decision it
+is, what is low, what was read and found sound, and what was not read.
+
+**How.** Everything a stranger, a signed-in account or a registered
+gateway can reach was read: `central-http`, `central-identity`,
+`central-postgres` with `ops/grants.sql`, `central-web-server`,
+`central-service`, `ops/` and what [operations](operations.md) prescribes.
+The store's authorization, the administration with the reports, and the
+website's server with the service and the deploy hook were each read a
+second time by a separate pass of the same model with nothing but the
+source; their leads were checked against the code before they were
+written down here, and where that was not done the entry says "lead".
+Nothing was run against a deployed Central, nothing against an account
+that is anyone's. Out of scope and not edited: the website's look and
+words, `central-api/src/gateway.rs` and the gateway's pulse,
+`central-crypto/src/proof.rs`.
+
+**Added besides** (low). The account listener gave `GatewayDirectory` and
+`PublicFigures` no budget by address; a place's 600 a minute was all that
+held one address. They now share 60 a minute an address there, the number
+the website's listener has (`central-http/src/addresses.rs`, a test that
+passed 120 before). The released client asks neither; the website's
+server reads both through the website's listener. And
+[reports](reports.md) said the log names a report's id and gateway:
+Central writes no such line, and the sentence now says so.
+
+**Open, medium or worse.** None of these was built: each needs a number,
+a trade or a server's configuration that is the owner's.
+
+1. *Several vouched-for bearers of one account spend what sessions share*
+   (what stays of the section above). Four bearers at their own budget
+   fill a window; one account holds two sessions and up to 64 gateway
+   tokens (eight gateways, eight tokens each, 32 made in a day). From one
+   address, with one account.
+   - (a) A share for one place of the sessions' windows, as the sign-ins'
+     budget has: at one bearer's budget (128 and 64 a second) it changes
+     nothing for a gateway alone at its address and holds one address to
+     a quarter. Two gateways, or very many clients, behind one address
+     would share it: a limit that can keep someone out.
+   - (b) Count a gateway's tokens together, by gateway or by owner. No
+     address is involved and nobody honest is refused; it needs the store
+     to tell the count whose a token is.
+   - (c) A rate limit by address in front of both listeners (below).
+   - Recommended: (b), and (a) at half a window rather than a quarter.
+2. *The 32 a second of those who have no session* is spent by four
+   addresses that each keep up their 600 a minute (known since
+   11.11.2026). Sign-in, registration and the public pages' data are
+   `Busy` meanwhile.
+   - (a) A limit on new connections by source address in the firewall in
+     front of Caddy (nftables has one; Caddy's own build has no rate
+     limit, to this review's knowledge, and was not run here). It answers
+     this, the next two points and floods of whole requests at once, and
+     costs no code. An IPv6 subscriber must be counted by its /64, as
+     Central does.
+   - (b) A smaller share for a place (240 a minute needs ten addresses,
+     not four). A campus or a carrier's shared address signs in through
+     the same share: a limit that can keep people out.
+   - (c) Part of the second kept for places that have asked little in the
+     minute, so that a household still signs in while a few addresses
+     flood. More code; many addresses still win.
+   - Recommended: (a) now, (c) when there is time.
+3. *A request that reaches the account listener without the proxy's
+   address* is counted by no address (known). The listener binds
+   loopback, so this is a process on the host, or a proxy that stopped
+   sending the header. The runbook's check after every proxy change (31
+   `Discover` in a minute must end in 429) is the control. Refusing such
+   requests would refuse the official gateway on the same host and every
+   local run; an option is to refuse them on the deployed listener unless
+   the bearer is the bridge's. Recommended: keep the check, and decide
+   the refusal together with point 2.
+4. *The account listener's connections* (128, a quarter of them for late
+   and large bodies) can be held by many addresses (known). Recommended:
+   the firewall's limit of connections per source, with point 2.
+5. *Reports.* A gateway may file 120 reports an hour, each with up to 66
+   MiB of parts (one of 2 MiB and one of 64, `central-api/src/reports.rs`);
+   nothing bounds what one gateway, or all, have stored, the hour's count
+   is in memory and a restart starts it again, and one gateway can hold
+   both upload slots. It needs an approved gateway. About 7.7 GiB an hour
+   from one.
+   - (a) One upload slot for one gateway. Small, no number to choose.
+   - (b) A bound in the store on the bytes a gateway has stored (a
+     migration and a number), refused with `Busy`.
+   - (c) A bound on all stored report bytes.
+   - Recommended: (a) at once, (b) with the owner's number.
+6. *Chat.* A device's inbox and a sender's outbox hold 5,000 deliveries
+   and nothing deletes one that was delivered; a send to a group is
+   refused whole while one recipient's device is full, so a contact can
+   fill an inbox and keep others from being heard. [Central
+   chat](central-chat.md) names retention as the owner's pending
+   decision; this is what it costs meanwhile. Options: delete on
+   acknowledged delivery; a time limit; a share of an inbox for one
+   sender. Recommended: the share and the deletion.
+7. *The deploy hook* (`ops/deploy-hook`; not reachable from the internet).
+   Root builds as the build user in the source tree and then takes
+   `ops/grants.sql`, the binary and the website from that same tree; the
+   grants go to the database's superuser. Whatever ran in the build (a
+   dependency's build script, `npm ci`'s install scripts) could have
+   rewritten them. Options: apply the grants as the migrator, not the
+   superuser; read `grants.sql` from the commit that was verified, not
+   from the working tree; build as a user without a home or keys;
+   `npm ci --ignore-scripts`. Recommended: the first two.
+
+**Low** (listed, not changed):
+- `central-api/src/gateway.rs`, `validate_origin`: a host with a trailing
+  dot is another origin, so a look-alike of a registered origin can be
+  registered (an administrator's approval is the gate). In a file this
+  review was told not to edit.
+- The website's report-part route passes no budget of the account service
+  and no terms check, only the listener's 120 a minute an address.
+- `reset_start` spends the account's unit before it holds a worker.
+- A push subscription moves to the same browser's next session; a stolen
+  cookie's subscription outlives a sign-in (lead).
+- `invalidate_legacy` leaves the key check in place (the bridge's path).
+- `redeem_pairing` does not ask again whether the session that began the
+  pairing still lives (lead).
+- Removing and blocking a contact answer differently for a tag nobody has,
+  with no budget of their own for looking tags up (lead).
+- A gateway's origin is taken by whoever registers it first, with no proof
+  of holding it; `Conflict` and `Busy` tell registered origins apart, and
+  `Register`'s `Conflict` a pending name.
+- 1,000 open pairings for everyone: about 334 accounts reach it (lead).
+- A reset code made for an account before it was appointed administrator
+  stays valid (lead).
+- Triage: the role is read once in a transaction; `DELETE` on
+  `report_parts` is granted and unused; a gateway's credential pair files
+  reports without the `sso` scope, where the document says token; the
+  sweep inside every administrator's read is unbounded; sixteen labels of
+  32 characters pass the request's check and fail the column's, answered
+  503; a date that is none is answered 503, not `Rejected` (leads).
+- [Operations](operations.md): the new site block gives `/admin*` no
+  security headers from `file_server`; the feedback service is sent the
+  session cookie; two `/api/*` blocks disagree on the body's size; the
+  runtime's and the migrator's runs share one system user; HSTS without
+  `includeSubDomains` (leads).
+- `central-web-server`: no bound of its own on connections and no header
+  timeout; the timeout's answer passes outside the security headers;
+  release links are held to a prefix only and a tag may be `.` or `..`; a
+  404 without a language varies by `Accept-Language` without saying so;
+  no panic hook; `session::go` refuses `//` and not `/\` (leads).
+- The deploy hook leaves the service stopped after some failures, rolls
+  back the binary only, takes no lock and builds as a person's login
+  (leads).
+- The privacy notice's sentence on counting by address names four kinds
+  of request in a bracket; more are counted (a place's share of every
+  request without a session, pairing, report parts, and since this review
+  the requests whose bearer is not vouched for).
+
+**Read and found sound.**
+- *Store.* Every id a caller chooses is bound to the token's principal;
+  no read or write across accounts was found. Sessions, tokens, leases
+  and tickets are bound to account, gateway and listener; password
+  change, reset and deletion check again under a row lock; a reset code
+  is used once; the key check is written once behind a fresh proof;
+  objects and documents have quotas and compare revisions; push endpoints
+  are held to three hosts, https, no redirects and public addresses.
+  Statements are constants with bound parameters; none is built from a
+  caller's input. No function but the one fixed above asks the pool while
+  it holds a transaction.
+- *Administration.* The role is read at every request; a change needs a
+  password sign-in under 30 minutes and only those count; the last
+  administrator stays; the audit's grants are append-only and checked at
+  start; no database error's text reaches a caller.
+- *Identity.* Dispatch checks the listener, then the terms, then the
+  operation's own credential, for every operation; OPAQUE states are
+  bounded, bound to listener, session and purpose and used once; the
+  proof of work's table is sized by its budget; nothing is logged.
+- *Listeners.* One request a connection, fixed texts, bounded and paced
+  bodies; the forwarded address is believed from a loopback peer only and
+  shares out places and budgets, never identity.
+- *Website's server.* No request's path reaches the file system;
+  redirects are relative and under known languages; the content policy
+  with Trusted Types; the cache's key and `Vary` agree; the fetcher asks
+  fixed hosts over TLS without redirects, bounded in size and time;
+  gateway data is validated and escaped before it is rendered.
+- *Service.* Secrets on standard input only; loopback and `verify-full`
+  enforced; fixed texts on standard error; a panic prints no payload.
+
+**Not read or not run.** `central-crypto` and the browser module; the
+website's pages and islands; the SDK beyond what the fixture uses; the
+dependencies' own code; Caddy, the firewall and the machine that serves
+`baylee.app`; any flood over a socket; the released game client and
+gateway against this tree (their requests and answers are unchanged by
+construction: no type of `central-api` was touched).
+
+**Run.** Each fix's own tests are in its section. The six checks
+`AGENTS.md` names (`cargo xtask gate`, `postgres`, `smoke`, `secrets`,
+`crypto-scope` and `cargo deny check`) are run on the branch's last tree, which holds this section, before it is handed over; their last
+lines are in the review's hand-over note and not here, since this text is
+part of the tree they run on. `cargo audit --deny warnings` fails as
+before, on RUSTSEC-2026-0459; `Cargo.toml`, `Cargo.lock` and `deny.toml`
+are untouched.
+
+Engineering review, not an audit.
