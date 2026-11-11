@@ -181,7 +181,11 @@ pub fn privacy(cx: &Context<'_>) -> Built {
         .collect_view();
     // said only where the deployment counts
     let views = cx.data.views.is_some().then(|| {
-        section("views", words::privacy_views_title(lang), words::privacy_views(lang).into_any())
+        section(
+            "views",
+            words::privacy_views_title(lang),
+            words::privacy_views(lang).into_any(),
+        )
     });
     let [hosting, github, directory, push, counters, contact, puzzle] =
         simple.map(|(id, title, text)| section(id, title(lang), text(lang).into_any()));

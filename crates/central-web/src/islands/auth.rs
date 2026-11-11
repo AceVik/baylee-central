@@ -438,9 +438,7 @@ fn steps_view(
         step.track();
         if shown.is_some() {
             // its heading, its status, the way back, or the form's first field
-            super::focus::after_render(format!(
-                "#{id} [data-step-focus], #{id} form.form input"
-            ));
+            super::focus::after_render(format!("#{id} [data-step-focus], #{id} form.form input"));
         }
     });
     let steps = move || {
@@ -1033,7 +1031,10 @@ pub fn Register(lang: Lang, worker: String, pow: String) -> impl IntoView {
         }
         .into_any()
     };
-    (steps_view(lang, "register-steps", step, form), solving_view(lang, solving))
+    (
+        steps_view(lang, "register-steps", step, form),
+        solving_view(lang, solving),
+    )
 }
 
 /// The proof of work's progress under the step that is working, once it

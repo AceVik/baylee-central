@@ -102,7 +102,8 @@ fn directory_tools(lang: Lang, all: &[Gateway]) -> impl IntoView + use<> {
             }
         })
     };
-    let sort = |value: &'static str, label: &'static str| view! { <option value=value>{label}</option> };
+    let sort =
+        |value: &'static str, label: &'static str| view! { <option value=value>{label}</option> };
     view! {
         <div class="dir-tools" hidden=true data-find-bar="">
             <div class="dir-row">

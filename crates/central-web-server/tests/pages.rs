@@ -555,7 +555,10 @@ async fn a_visit_counts_once_and_never_changes_the_page_it_gets() {
     let views = state.views.clone().expect("counting");
     assert_eq!(views.now().count, 41);
 
-    let visit = [("sec-fetch-mode", "navigate"), ("sec-fetch-dest", "document")];
+    let visit = [
+        ("sec-fetch-mode", "navigate"),
+        ("sec-fetch-dest", "document"),
+    ];
     let (status, first_headers, first) = get(&app, "/en/", &visit).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(views.now().count, 42);
@@ -579,7 +582,12 @@ async fn a_visit_counts_once_and_never_changes_the_page_it_gets() {
 
     // not a person opening a page
     get(&app, "/en/", &[]).await;
-    get(&app, "/en/faq", &[("sec-fetch-mode", "cors"), ("sec-fetch-dest", "empty")]).await;
+    get(
+        &app,
+        "/en/faq",
+        &[("sec-fetch-mode", "cors"), ("sec-fetch-dest", "empty")],
+    )
+    .await;
     let mut ahead = visit.to_vec();
     ahead.push(("sec-purpose", "prefetch"));
     get(&app, "/en/faq", &ahead).await;
