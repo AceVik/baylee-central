@@ -173,8 +173,11 @@ test("the page's Worker finds the counters Central checks, and sends them again 
   await expect(page.getByRole("alert")).toHaveText(REFUSED, { timeout: 30_000 });
   const register = { operation: "register", username: "erika", display_name: "Erika", nonce: PINNED.nonce, counters: PINNED.counters };
   expect(asked).toEqual([{ operation: "register_challenge_for", signals: 1 }, register, register]);
-  // the module's Worker did the work: the older proof's script was not even fetched
-  expect(scripts).toEqual(["/assets/crypto-worker.js"]);
+  // The module's Worker did the work, and a fresh one stood ready for the
+  // enrolment: a Worker's memory does not shrink, so the proof's is ended
+  // and never holds the password's too. The older proof's script was not
+  // even fetched.
+  expect(scripts).toEqual(["/assets/crypto-worker.js", "/assets/crypto-worker.js"]);
   expect(problems).toEqual([]);
 });
 

@@ -404,10 +404,13 @@ lifetimes to the shared budget as before.
 
 Why these:
 
-- **16 MiB.** The same Worker takes 64 MiB for the password right
+- **16 MiB.** A Worker of the page takes 64 MiB for the password right
   afterwards, on every device that can register at all, so a quarter of
-  that is known to fit; the proof's memory is given back before the
-  password's is asked for. Central holds four checks at once at the most:
+  that is known to fit. The proof runs in a Worker of its own that is
+  ended before the password's is started: a Worker's WebAssembly memory
+  does not shrink, and one Worker for both would have held about 80 MiB.
+  So the page never holds more than it did before this change. Central
+  holds four checks at once at the most:
   64 MiB. More would cost Central more for each check and make the page's
   steps coarser; less buys less against hardware that runs many
   evaluations side by side.
@@ -558,7 +561,19 @@ request reaches it (the launch never calls it; `the_knob_only_lowers`). The
 PostgreSQL fixture runs at one bit and 64 KiB, the unit tests at 64 KiB;
 the site's suite checks the pinned vector at 64 KiB in the real module and
 plays Central for the rest. `web/e2e-real` meets the real service at the
-real price: against a throwaway Central of this tree (release build, 11.11.2026) Chromium under Playwright was asked 6 bits, two over the base for the `navigator.webdriver` it reports, at 16 MiB, one pass and eight parts, with five minutes to live. Two timed registrations handed their solutions in 3.2 seconds after the challenge, which is the three seconds' floor (six bits take four seconds on average, so both were a little lucky); Central answered `Register` in 67 and 72 ms, its eight evaluations and the store's work together; the recovery code was on the page 3.9 seconds after the click. `site-chat.spec.ts` passed with two more registrations (29 seconds). So the project's driven registrations pay four times the base, as before, and do not crawl.
+real price: against a throwaway Central of this tree (release build,
+11.11.2026) Chromium under Playwright was asked 6 bits, two over the base
+for the `navigator.webdriver` it reports, at 16 MiB, one pass and eight
+parts, with five minutes to live. Six timed registrations in three runs,
+each run a fresh Central: the solution was handed in 3.2 seconds after the
+challenge four times (the three seconds' floor) and after 4.4 and 6.4
+seconds (six bits take four seconds on average); Central answered
+`Register` in 67 to 95 ms, its eight evaluations and the store's work
+together; the recovery code was on the page 3.9 to 6.9 seconds after the
+click. `site-chat.spec.ts` passed in each run with two more registrations
+(29 seconds). So the project's driven registrations pay four times the
+base, as before, and do not crawl. The first run was before the proof got
+a Worker of its own, the other two after.
 
 ### What stays
 
