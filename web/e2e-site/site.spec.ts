@@ -222,3 +222,55 @@ test("the download offers every other system from its menu", async ({ page }) =>
   await page.locator("h1").click();
   await expect(more.locator(".menu")).toBeHidden();
 });
+
+test("a screenshot opens large, the arrows step, and Escape closes it", async ({ page }) => {
+  await page.goto("/en/");
+  const shots = page.locator(".shot-open");
+  // the screenshots come from a Baylee checkout (BAYLEE_SRC); a build without one has none
+  test.skip((await shots.count()) === 0, "built without Baylee's screenshots");
+  await shots.nth(1).scrollIntoViewIfNeeded();
+  await shots.nth(1).click();
+  const viewer = page.locator("dialog#shot-viewer");
+  await expect(viewer).toBeVisible();
+  await expect(viewer.locator("[data-shot-image]")).toHaveAttribute("src", /shot-game-log-1200/);
+  await expect(viewer.locator("[data-shot-caption] strong")).toHaveText("The game log");
+  await page.keyboard.press("ArrowRight");
+  await expect(viewer.locator("[data-shot-image]")).toHaveAttribute("src", /shot-table-ring-1200/);
+  await viewer.locator('[data-shot-step="-1"]').click();
+  await page.keyboard.press("ArrowLeft");
+  await expect(viewer.locator("[data-shot-image]")).toHaveAttribute("src", /shot-table-duel-1200/);
+  expect(await axe(page)).toEqual([]);
+  await page.keyboard.press("Escape");
+  await expect(viewer).toBeHidden();
+  await expect(shots.nth(1)).toBeFocused();
+});
+
+test("a gateway's address is copied from its card, and the page says so", async ({ page, context }) => {
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  await page.goto("/en/");
+  const card = page.locator(".gw").first();
+  const copy = card.locator("button[data-copy]");
+  await expect(copy).toBeVisible();
+  await copy.click();
+  await expect(copy).toHaveAttribute("data-copied", "");
+  await expect(page.getByRole("status").filter({ hasText: "Address copied." })).toHaveCount(1);
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(await copy.getAttribute("data-copy"));
+  await expect(copy).not.toHaveAttribute("data-copied", "", { timeout: 4000 });
+});
+
+test("the start page fetches no WebAssembly until its form comes near, then the form takes over", async ({ page }) => {
+  const wasm: string[] = [];
+  page.on("request", (request) => {
+    if (request.url().endsWith(".wasm")) wasm.push(request.url());
+  });
+  await page.goto("/en/");
+  await page.waitForLoadState("load");
+  await page.waitForTimeout(1200);
+  expect(wasm).toEqual([]);
+  await page.locator("#contact").scrollIntoViewIfNeeded();
+  await expect(page.locator("html")).toHaveAttribute("data-islands", "ready", { timeout: 15_000 });
+  expect(wasm).toHaveLength(1);
+  // hydrated: an empty message is refused in place, nothing is sent
+  await page.locator("#contact button[type=submit]").click();
+  await expect(page.locator("#contact-error")).not.toBeEmpty();
+});

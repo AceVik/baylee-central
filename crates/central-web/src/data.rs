@@ -446,6 +446,15 @@ pub struct Repo {
     pub ci: Option<bool>,
     /// The newest commit on `main`: its short id and date.
     pub commit: Option<(String, String)>,
+    /// That commit's subject, its first line, at most 120 characters: text.
+    #[serde(default)]
+    pub subject: Option<String>,
+    /// How many stars the repository has.
+    #[serde(default)]
+    pub stars: Option<u64>,
+    /// How many issues are open.
+    #[serde(default)]
+    pub issues: Option<u64>,
 }
 
 #[cfg(test)]

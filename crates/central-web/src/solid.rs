@@ -24,6 +24,43 @@ pub const MOON: &str = "M12 3a9 9 0 1 0 9 9 7 7 0 0 1-9-9z";
 /// A half-filled circle: the device's colours.
 pub const HALF: &str = "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 2v16a8 8 0 0 1 0-16z";
 
+/// An eye, struck through: what stays hidden.
+pub const EYE_OFF: &str = "M12 5c-5 0-9 4.5-10 7 .5 1.3 1.7 3 3.4 4.4L3.3 18.5l1.4 1.4 16-16-1.4-1.4-2.6 2.6A10.6 10.6 0 0 0 12 5zm-3.9 9.3A4 4 0 0 1 13.3 8.1L8.1 13.3zM12 19c5 0 9-4.5 10-7-.4-1-1.2-2.3-2.4-3.5l-3.7 3.7A4 4 0 0 1 12.2 16l-2.7 2.7c.8.2 1.6.3 2.5.3z";
+/// An open eye: watching.
+pub const EYE: &str = "M12 5C7 5 3 9.5 2 12c1 2.5 5 7 10 7s9-4.5 10-7c-1-2.5-5-7-10-7zm0 11a4 4 0 1 1 4-4 4 4 0 0 1-4 4zm0-6a2 2 0 1 0 2 2 2 2 0 0 0-2-2z";
+/// Two people.
+pub const PEOPLE: &str = "M8 11a3 3 0 1 0-3-3 3 3 0 0 0 3 3zm8 0a3 3 0 1 0-3-3 3 3 0 0 0 3 3zm-8 2c-2.7 0-6 1.3-6 3.5V19h12v-2.5C14 14.3 10.7 13 8 13zm8 0c-.4 0-.9 0-1.4.1A4.3 4.3 0 0 1 16 16.5V19h6v-2.5c0-2.2-3.3-3.5-6-3.5z";
+/// A crown.
+pub const CROWN: &str = "M3 8l4.5 3.5L12 4l4.5 7.5L21 8l-2 11H5zm3.5 13h11v-1.2h-11z";
+/// A chip.
+pub const CHIP: &str = "M9 2v2H7a3 3 0 0 0-3 3v2H2v2h2v2H2v2h2v2a3 3 0 0 0 3 3h2v2h2v-2h2v2h2v-2h2a3 3 0 0 0 3-3v-2h2v-2h-2v-2h2V9h-2V7a3 3 0 0 0-3-3h-2V2h-2v2h-2V2zm0 6h6v8H9z";
+/// Four squares.
+pub const GRID: &str = "M4 4h7v7H4zm9 0h7v7h-7zM4 13h7v7H4zm9 0h7v7h-7z";
+/// A globe.
+pub const GLOBE: &str = "M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm6.9 6h-3a15.7 15.7 0 0 0-1.4-3.6A8 8 0 0 1 18.9 8zM12 4a14 14 0 0 1 1.9 4h-3.8A14 14 0 0 1 12 4zM4.3 14a8.2 8.2 0 0 1 0-4h3.4a16.5 16.5 0 0 0 0 4zm.8 2h3a15.7 15.7 0 0 0 1.4 3.6A8 8 0 0 1 5.1 16zm3-8h-3a8 8 0 0 1 4.4-3.6A15.7 15.7 0 0 0 8.1 8zM12 20a14 14 0 0 1-1.9-4h3.8A14 14 0 0 1 12 20zm2.3-6H9.7a14.7 14.7 0 0 1 0-4h4.6a14.7 14.7 0 0 1 0 4zm.2 5.6a15.7 15.7 0 0 0 1.4-3.6h3a8 8 0 0 1-4.4 3.6zm1.8-5.6a16.5 16.5 0 0 0 0-4h3.4a8.2 8.2 0 0 1 0 4z";
+/// A signal: the connection.
+pub const WIFI: &str = "M12 6a11 11 0 0 0-8.5 4L2 8.6A13 13 0 0 1 12 4a13 13 0 0 1 10 4.6L20.5 10A11 11 0 0 0 12 6zm0 4a7 7 0 0 0-5.6 2.7L5 11.3A9 9 0 0 1 12 8a9 9 0 0 1 7 3.3l-1.4 1.4A7 7 0 0 0 12 10zm0 4a3 3 0 0 0-2.4 1.2L12 18l2.4-2.8A3 3 0 0 0 12 14z";
+/// Sliders: settings.
+pub const SLIDERS: &str = "M3 17v2h6v-2zM3 5v2h10V5zm10 16v-2h8v-2h-8v-2h-2v6zM7 9v2H3v2h4v2h2V9zm14 4v-2H11v2zm-6-4h2V7h4V5h-4V3h-2z";
+/// A speech bubble.
+pub const CHAT: &str = "M4 4h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H8l-4 4V6a2 2 0 0 1 2-2zm3 6v2h2v-2zm4 0v2h2v-2zm4 0v2h2v-2z";
+/// A cross: close.
+pub const CLOSE: &str = "M18.3 5.7 12 12l6.3 6.3-1.4 1.4L10.6 13.4 4.3 19.7l-1.4-1.4L9.2 12 2.9 5.7l1.4-1.4 6.3 6.3 6.3-6.3z";
+/// A chevron to the left.
+pub const PREV: &str = "M15.4 7.4 14 6l-6 6 6 6 1.4-1.4L10.8 12z";
+/// A chevron to the right.
+pub const NEXT: &str = "M8.6 16.6 10 18l6-6-6-6-1.4 1.4 4.6 4.6z";
+/// Two servers in a rack.
+pub const SERVER: &str = "M4 3h16a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zm0 10h16a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1zm3-7v2h2V6zm0 10v2h2v-2z";
+/// A box with an arrow out of it: another site.
+pub const EXTERNAL: &str = "M14 3h7v7h-2V6.4l-9.3 9.3-1.4-1.4L17.6 5H14zM5 5h6v2H5v12h12v-6h2v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z";
+/// A shield with a check.
+pub const SHIELD: &str =
+    "M12 2 4 5v6c0 5 3.4 9.7 8 11 4.6-1.3 8-6 8-11V5zm-1 14-4-4 1.4-1.4 2.6 2.6 5.6-5.6L18 9z";
+
+/// Two sheets: copy.
+pub const COPY: &str = "M16 1H4a2 2 0 0 0-2 2v14h2V3h12zm3 4H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2zm0 16H8V7h11z";
+
 /// A glyph, `class="icon"`, hidden from assistive technology.
 pub fn icon(path: &'static str) -> impl IntoView + use<> {
     view! {

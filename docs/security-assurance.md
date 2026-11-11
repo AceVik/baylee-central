@@ -2621,3 +2621,43 @@ and submits with Enter and by script. It sees no request other than GET or
 HEAD, and the page stays where it was. The fields' lack of names is checked
 too. With the guard taken out, the test fails. Engineering review, not an
 audit.
+
+## The start page in the old site's look, 11 November 2026
+
+Scope: the start page's new sections (screenshots and their dialog, the
+gateways with a copy button, what Baylee is, the opponents, the card
+numbers, the contact form, the repository card), the GitHub snapshot's new
+fields, and the islands starting only near the reader.
+
+Threat-model pass:
+- The repository card shows a commit subject, star and issue counts from
+  GitHub's API: text from outside, fetched by the server.
+- The contact form, an island, is on the start page now, far below the
+  first screen; until the islands run it must send nothing.
+- Copying a gateway's address writes to the visitor's clipboard.
+- The screenshots' recordings and the dialog are built by `home.js`.
+
+Implementation pass:
+- `fetch.rs` reads `GET /repos/AceVik/baylee` (same host, agent, timeouts
+  and size limit as before) into two integers, and the newest commit's
+  message into its first line: control characters dropped, at most 120
+  characters. Leptos writes it as a text node inside `<bdi>`, so markup or
+  a direction override in a subject stays text and stays in its box.
+- The islands' loader waits, after the load and the first frame, until an
+  island is within a screen of the window or a pointer or the keyboard
+  reaches into one; an island without a box starts at once. The submit
+  guard of the previous entry holds the start page's form back until then,
+  and the CSP's `form-action 'none'` holds it back anyway.
+- `boot.js` shows a gateway's copy button only in a secure context with
+  `navigator.clipboard.writeText`, and writes only the origin the server
+  put on the button (Central's directory checked it), on a click.
+- `home.js` builds `<source>` elements and copies the figure's caption with
+  `cloneNode`; no markup strings, nothing for a Trusted Types policy.
+
+Adversarial pass: browser tests check that the start page fetches no
+WebAssembly until the form comes near and that the form then refuses an
+empty message in place; that the copy button copies exactly the listed
+origin and says so; and that the screenshot dialog steps and closes with
+focus returned. axe, the 44 px targets and the "nothing from elsewhere"
+check pass on every page in both colour schemes. Engineering review, not an
+audit.

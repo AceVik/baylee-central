@@ -201,6 +201,28 @@ struct Commit {
 #[derive(Deserialize)]
 struct CommitInner {
     committer: Committer,
+    #[serde(default)]
+    message: String,
+}
+
+#[derive(Deserialize)]
+struct Repository {
+    stargazers_count: u64,
+    open_issues_count: u64,
+}
+
+/// A commit's subject: its first line, at most 120 characters, no control
+/// characters (it is shown as text, never as markup).
+fn subject(message: &str) -> Option<String> {
+    let line: String = message
+        .lines()
+        .next()?
+        .chars()
+        .filter(|c| !c.is_control())
+        .take(120)
+        .collect();
+    let line = line.trim().to_owned();
+    (!line.is_empty()).then_some(line)
 }
 
 #[derive(Deserialize)]
@@ -218,22 +240,34 @@ fn repo(agent: &ureq::Agent) -> Repo {
     .and_then(|runs| runs.workflow_runs.into_iter().next())
     .and_then(|run| run.conclusion)
     .map(|conclusion| conclusion == "success");
-    let commit = get::<Vec<Commit>>(agent, &format!("{API}/commits?sha=main&per_page=1"))
+    let newest = get::<Vec<Commit>>(agent, &format!("{API}/commits?sha=main&per_page=1"))
         .and_then(|commits| commits.into_iter().next())
-        .filter(|commit| commit.sha.len() >= 7 && commit.sha.bytes().all(|b| b.is_ascii_hexdigit()))
-        .map(|commit| {
-            (
-                commit.sha[..7].to_owned(),
-                commit
-                    .commit
-                    .committer
-                    .date
-                    .get(..10)
-                    .unwrap_or("")
-                    .to_owned(),
-            )
+        .filter(|commit| {
+            commit.sha.len() >= 7 && commit.sha.bytes().all(|b| b.is_ascii_hexdigit())
         });
-    Repo { ci, commit }
+    let subject = newest
+        .as_ref()
+        .and_then(|commit| subject(&commit.commit.message));
+    let commit = newest.map(|commit| {
+        (
+            commit.sha[..7].to_owned(),
+            commit
+                .commit
+                .committer
+                .date
+                .get(..10)
+                .unwrap_or("")
+                .to_owned(),
+        )
+    });
+    let repository = get::<Repository>(agent, API);
+    Repo {
+        ci,
+        commit,
+        subject,
+        stars: repository.as_ref().map(|r| r.stargazers_count),
+        issues: repository.as_ref().map(|r| r.open_issues_count),
+    }
 }
 
 fn valid_id(id: [u8; 16]) -> bool {
@@ -354,7 +388,7 @@ pub fn spawn(config: &Config, shared: &Shared) {
                     if cards.is_some() {
                         snapshot.cards = cards;
                     }
-                    if repo.ci.is_some() || repo.commit.is_some() {
+                    if repo.ci.is_some() || repo.commit.is_some() || repo.stars.is_some() {
                         snapshot.repo = repo;
                     }
                 }
@@ -393,6 +427,21 @@ mod tests {
             size: 1_000_000,
             browser_download_url: format!("{DOWNLOADS}v1/{name}"),
         }
+    }
+
+    #[test]
+    fn a_commit_subject_is_one_short_line_of_text() {
+        assert_eq!(
+            subject("Card rules: Equip\n\nThe body.").as_deref(),
+            Some("Card rules: Equip")
+        );
+        assert_eq!(subject("a\u{7}b\tc").as_deref(), Some("abc"));
+        assert_eq!(
+            subject(&"x".repeat(500)).map(|s| s.chars().count()),
+            Some(120)
+        );
+        assert_eq!(subject("   \n body"), None);
+        assert_eq!(subject(""), None);
     }
 
     #[test]

@@ -1,1 +1,10 @@
-{"ci": true, "commit": ["4f5e471", "2026-11-09"]}
+{
+  "ci": true,
+  "commit": [
+    "4f5e471",
+    "2026-11-09"
+  ],
+  "subject": "Card rules: Equip costs read from the printed text",
+  "stars": 42,
+  "issues": 7
+}

@@ -10,6 +10,7 @@ use super::download::download_block;
 use super::{Built, section_head};
 use crate::data::{CardStatus, Gateway};
 use crate::format;
+use crate::islands::ContactForm;
 use crate::rich::{icon, paragraphs, plain, rich};
 use crate::site::icons;
 use crate::site::shell::{CENTRAL_REPOSITORY, DISCORD, Meta, REPOSITORY, WHATSAPP};
@@ -88,14 +89,16 @@ pub fn page(cx: &Context<'_>) -> Built {
         "sameAs": [REPOSITORY, CENTRAL_REPOSITORY],
     }));
     meta.data.push(super::download::software(cx));
+    meta.islands = true;
     let body = view! {
         {strip(cx)}
         {hero(cx)}
-        {cards(lang, cx.data.cards.as_ref())}
         {screens(cx)}
-        {about(lang)}
         {gateways(lang, cx.data.gateways.as_deref())}
-        {open(lang)}
+        {about(lang)}
+        {cards(lang, cx.data.cards.as_ref())}
+        {contact(lang)}
+        {source(cx)}
         {album(cx)}
     }
     .into_any();
@@ -267,6 +270,7 @@ fn strip(cx: &Context<'_>) -> impl IntoView + use<> {
     }
 }
 
+/// One card number, large, with what it means behind a small button.
 fn stat(
     lang: Lang,
     id: &'static str,
@@ -277,15 +281,15 @@ fn stat(
     let tip = format!("tip-{id}");
     let what = format!("{} – {label}", words::cards_help(lang));
     view! {
-        <div class="stat">
-            <p class="stat-value num">{words::number(lang, value)}</p>
-            <p class="stat-label">
+        <div class=format!("number glass reveal number-{id}")>
+            <dt class="num">{words::number(lang, value)}</dt>
+            <dd>
                 {label}
                 <button type="button" class="tip" popovertarget=tip.clone() {..custom_attribute("interestfor", tip.clone())} aria-label=what>
                     {icon(icons::INFO)}
                 </button>
-            </p>
-            <div id=tip class="tip-body" popover="auto" role="note">{help}</div>
+                <span id=tip class="tip-body" popover="auto" role="note">{help}</span>
+            </dd>
         </div>
     }
 }
@@ -299,14 +303,17 @@ fn cards(lang: Lang, status: Option<&CardStatus>) -> impl IntoView + use<> {
                 .saturating_add(s.generated)
                 .saturating_add(s.partial);
             view! {
-                <div class="stats">
+                <dl class="numbers stagger">
                     {stat(lang, "implemented", s.implemented, words::cards_implemented(lang), words::cards_implemented_help(lang))}
                     {stat(lang, "generated", s.generated, words::cards_generated(lang), words::cards_generated_help(lang))}
                     {stat(lang, "partial", s.partial, words::cards_partial(lang), words::cards_partial_help(lang))}
                     {stat(lang, "total", s.total, words::cards_total(lang), words::cards_total_help(lang))}
+                </dl>
+                <div class="share glass reveal">
+                    <p>{words::cards_share(lang, &words::number(lang, playable), &words::number(lang, s.total))}</p>
+                    <progress class="share-bar" max=s.total.to_string() value=playable.min(s.total).to_string() aria-hidden="true"></progress>
+                    <p class="small">{words::cards_as_of(lang, &status.tag, &format::date(lang, &status.date))}</p>
                 </div>
-                <p class="share">{words::cards_share(lang, &words::number(lang, playable), &words::number(lang, s.total))}</p>
-                <p class="meta">{words::cards_as_of(lang, &status.tag, &format::date(lang, &status.date))}</p>
             }
             .into_any()
         }
@@ -323,126 +330,429 @@ fn cards(lang: Lang, status: Option<&CardStatus>) -> impl IntoView + use<> {
     }
 }
 
+/// The first piece in bold of a caption: the screenshot's title.
+fn title_of(caption: &[crate::words::Piece]) -> String {
+    caption
+        .iter()
+        .find(|piece| piece.tag.as_deref() == Some("b"))
+        .or_else(|| caption.first())
+        .map(|piece| piece.text.trim_end_matches(':').to_owned())
+        .unwrap_or_default()
+}
+
+/// The client's screenshots, each opening large in `#shot-viewer` (the
+/// arrow keys step). Each is a still (WebP); its recording, a short AVIF
+/// that loops and weighs a few hundred kB, `home.js` adds once the card
+/// comes into view, for those who did not ask for less motion.
 fn screens(cx: &Context<'_>) -> Option<impl IntoView + use<>> {
     let lang = cx.lang;
     let assets = cx.assets;
     if !assets.has("media/shot-table-duel-1200.webp") {
         return None;
     }
+    let sizes = "(max-width: 600px) 92vw, (max-width: 1000px) 46vw, 380px";
     let figures = SHOTS
         .iter()
-        .map(|(name, caption, alt)| {
+        .enumerate()
+        .map(|(at, (name, caption, alt))| {
             let still = |width: u32| assets.url(&format!("media/shot-{name}-{width}.webp"));
             let moving = |width: u32| assets.url(&format!("media/shot-{name}-{width}.avif"));
+            let label = words::shots_show_large(lang, &title_of(&caption(lang)));
             view! {
-                <figure class="shot">
-                    <picture>
-                        <source media="(prefers-reduced-motion: reduce)" type="image/webp" srcset=format!("{} 640w, {} 1200w", still(640), still(1200)) sizes="(min-width: 60rem) 30rem, 100vw" />
-                        <source type="image/avif" srcset=format!("{} 640w, {} 1200w", moving(640), moving(1200)) sizes="(min-width: 60rem) 30rem, 100vw" />
-                        <img src=still(1200) srcset=format!("{} 640w, {} 1200w", still(640), still(1200)) sizes="(min-width: 60rem) 30rem, 100vw" width="1200" height="703" alt=alt(lang) loading="lazy" decoding="async" />
-                    </picture>
-                    <figcaption>{plain(caption(lang))}</figcaption>
-                </figure>
+                <li class="glass reveal">
+                    <figure>
+                        <button type="button" class="shot-open" commandfor="shot-viewer" command="show-modal" aria-haspopup="dialog"
+                            aria-label=label data-shot=at.to_string() data-still=still(1200) data-moving=moving(1200)>
+                            <picture data-moving=format!("{} 640w, {} 1200w", moving(640), moving(1200)) data-sizes=sizes>
+                                <img src=still(1200) srcset=format!("{} 640w, {} 1200w", still(640), still(1200)) sizes=sizes width="1200" height="703" alt=alt(lang) loading="lazy" decoding="async" />
+                            </picture>
+                            <span class="shot-zoom" aria-hidden="true">{solid::icon(solid::EXTERNAL)}</span>
+                        </button>
+                        <figcaption>{plain(caption(lang))}</figcaption>
+                    </figure>
+                </li>
             }
         })
         .collect_view();
     Some(view! {
-        <section class="band alt" aria-labelledby="screens-title">
+        <section class="band" id="screens" aria-labelledby="screens-title">
             <div class="wrap">
-                {section_head(words::screens_eyebrow(lang), words::screens_title(lang), "screens-title")}
-                <div class="shots">{figures}</div>
-                <p class="meta">{words::screens_credit(lang)}</p>
+                {section_head(words::shots_eyebrow(lang), words::shots_title(lang), "screens-title")}
+                <p class="lead reveal">{words::shots_lead(lang)}</p>
+                <ul class="shots stagger">{figures}</ul>
+                <p class="small shots-credit">{words::shots_credit(lang)}</p>
             </div>
+            <dialog id="shot-viewer" class="lightbox" aria-label=words::shots_dialog(lang)>
+                <picture data-shot-picture="">
+                    <img src=assets.url("media/shot-table-duel-1200.webp") width="1200" height="703" alt="" loading="lazy" decoding="async" data-shot-image="" />
+                </picture>
+                <p class="lightbox-cap">
+                    <span data-shot-caption=""></span>
+                    <span class="lightbox-credit">{words::shots_credit(lang)}</span>
+                </p>
+                <button type="button" class="round-btn lightbox-prev" data-shot-step="-1" aria-label=words::shots_previous(lang)>{solid::icon(solid::PREV)}</button>
+                <button type="button" class="round-btn lightbox-next" data-shot-step="1" aria-label=words::shots_next(lang)>{solid::icon(solid::NEXT)}</button>
+                <form method="dialog">
+                    <button type="submit" class="round-btn lightbox-close" aria-label=words::shots_close(lang)>{solid::icon(solid::CLOSE)}</button>
+                </form>
+            </dialog>
         </section>
     })
 }
 
+/// What Baylee does: nine things, an icon and two messages each.
+type Feature = (
+    &'static str,
+    fn(Lang) -> &'static str,
+    fn(Lang) -> &'static str,
+);
+
+const FEATURES: [Feature; 9] = [
+    (
+        solid::EYE_OFF,
+        words::feature_hidden_title,
+        words::feature_hidden,
+    ),
+    (
+        solid::PEOPLE,
+        words::feature_seats_title,
+        words::feature_seats,
+    ),
+    (
+        solid::CROWN,
+        words::feature_commander_title,
+        words::feature_commander,
+    ),
+    (solid::CHIP, words::feature_ai_title, words::feature_ai),
+    (
+        solid::GRID,
+        words::feature_process_title,
+        words::feature_process,
+    ),
+    (
+        solid::GLOBE,
+        words::feature_languages_title,
+        words::feature_languages,
+    ),
+    (solid::EYE, words::feature_watch_title, words::feature_watch),
+    (
+        solid::WIFI,
+        words::feature_connection_title,
+        words::feature_connection,
+    ),
+    (
+        solid::SLIDERS,
+        words::feature_tables_title,
+        words::feature_tables,
+    ),
+];
+
+/// The language models a seat can take, by their makers' names.
+const PROVIDERS: [&str; 5] = [
+    "Google Gemini",
+    "OpenAI ChatGPT",
+    "Anthropic Claude",
+    "DeepSeek",
+    "LM Studio",
+];
+
+fn feature_icon(path: &'static str) -> impl IntoView + use<> {
+    view! { <span class="feat-icon">{solid::icon(path)}</span> }
+}
+
 fn about(lang: Lang) -> impl IntoView + use<> {
+    let features = FEATURES
+        .iter()
+        .map(|(glyph, title, text)| {
+            view! {
+                <li class="glass reveal">
+                    <div class="feat-head">{feature_icon(glyph)}<h3>{title(lang)}</h3></div>
+                    <p>{text(lang)}</p>
+                </li>
+            }
+        })
+        .collect_view();
     view! {
-        <section class="band" aria-labelledby="about-title">
+        <section class="band" id="about" aria-labelledby="about-title">
             <div class="wrap">
                 {section_head(words::about_eyebrow(lang), words::about_title(lang), "about-title")}
-                <div class="cards-grid">
-                    <article class="card">
-                        {icon(icons::SCALE)}
-                        <h3>{words::about_engine_title(lang)}</h3>
+                <div class="two-col about-arch-grid">
+                    <div class="about-arch-card glass reveal">
+                        <div class="about-arch-head">{feature_icon(solid::SHIELD)}<h3>{words::about_engine_title(lang)}</h3></div>
                         <p>{words::about_engine(lang)}</p>
-                    </article>
-                    <article class="card">
-                        {icon(icons::LAYERS)}
-                        <h3>{words::about_table_title(lang)}</h3>
+                        <p>{words::about_deterministic(lang)}</p>
+                    </div>
+                    <div class="about-arch-card glass reveal">
+                        <div class="about-arch-head">{feature_icon(solid::GRID)}<h3>{words::about_table_title(lang)}</h3></div>
                         <p>{words::about_table(lang)}</p>
-                    </article>
-                    <article class="card">
-                        {icon(icons::BOT)}
-                        <h3>{words::about_ai_title(lang)}</h3>
-                        <p>{words::about_ai(lang)}</p>
-                    </article>
+                        <p>{words::about_keys(lang)}</p>
+                    </div>
+                </div>
+                <ul class="features stagger">{features}</ul>
+                {ai(lang)}
+            </div>
+        </section>
+    }
+}
+
+/// The opponents: the house AI, language models, hosted seats, and the
+/// native AI in training.
+fn ai(lang: Lang) -> impl IntoView + use<> {
+    let providers = PROVIDERS
+        .iter()
+        .map(|name| view! { <li class="ai-provider-chip" translate="no">{*name}</li> })
+        .collect_view();
+    view! {
+        <div id="ai" class="ai-showcase">
+            <div class="ai-showcase-head">
+                <p class="eyebrow">{words::ai_eyebrow(lang)}</p>
+                <h2 class="ai-showcase-title">{words::ai_title(lang)}</h2>
+            </div>
+            <div class="ai-cards-grid stagger">
+                <div class="ai-card glass reveal">
+                    <div class="ai-card-top">{feature_icon(solid::CHIP)}<span class="pill">{words::ai_house_pill(lang)}</span></div>
+                    <h3>{words::ai_house_title(lang)}</h3>
+                    <p>{words::ai_house(lang)}</p>
+                </div>
+                <div class="ai-card glass reveal">
+                    <div class="ai-card-top">{feature_icon(solid::GLOBE)}<span class="pill gold" translate="no">"Seat-Bridge · Bring Your Own Model"</span></div>
+                    <h3>{words::ai_model_title(lang)}</h3>
+                    <p>{plain(words::ai_model(lang))}</p>
+                    <ul class="ai-provider-badges" aria-label=words::ai_providers(lang)>{providers}</ul>
+                </div>
+                <div class="ai-card glass reveal">
+                    <div class="ai-card-top">{feature_icon(solid::SERVER)}<span class="pill">{words::ai_hosts_pill(lang)}</span></div>
+                    <h3>{words::ai_hosts_title(lang)}</h3>
+                    <p>{words::ai_hosts(lang)}</p>
+                </div>
+            </div>
+            <div class="ai-training-banner glass reveal">
+                <div class="ai-training-badge-col">
+                    <span class="pill ok ai-training-pill"><span class="dot ok live" aria-hidden="true"></span>{words::ai_training_pill(lang)}</span>
+                    <h3>{words::ai_training_title(lang)}</h3>
+                    <p>{words::ai_training(lang)}</p>
+                </div>
+                <div class="ai-training-actions">
+                    <a class="button button-ghost" href=format!("{REPOSITORY}{}", words::link_readme_model(lang)) rel="noopener noreferrer">
+                        {solid::icon(solid::EXTERNAL)}<span>{words::ai_setup(lang)}</span>
+                    </a>
+                    <a class="button button-ghost" href=format!("{}#host", Page::Gateways.path(lang))>
+                        {solid::icon(solid::SERVER)}<span>{words::ai_hosting_link(lang)}</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+/// A gateway's card, shared with the directory page: its name and version
+/// are the operator's words, shown as text; the official mark comes from
+/// the origin alone. Copying the address (`boot.js`, `[data-copy]`) shows
+/// only where the browser can copy.
+pub fn gateway_card(lang: Lang, gateway: &Gateway) -> impl IntoView + use<> {
+    let state = if gateway.online {
+        view! { <p class="gw-state pill ok"><span class="dot ok live" aria-hidden="true"></span>{words::gws_online(lang)}</p> }.into_any()
+    } else {
+        view! { <p class="gw-state pill off"><span class="dot off" aria-hidden="true"></span>{words::gws_offline(lang)}</p> }.into_any()
+    };
+    let official = gateway
+        .official
+        .then(|| view! { <span class="pill gold gw-official">{words::gws_official(lang)}</span> });
+    let class = if gateway.official {
+        "gw card card-link reveal gw-is-official"
+    } else {
+        "gw card card-link reveal"
+    };
+    let website = gateway.website.clone();
+    view! {
+        <li class=class>
+            <div class="gw-head">
+                <h3 class="gw-name"><bdi>{gateway.name.clone()}</bdi></h3>
+                {official}
+            </div>
+            {state}
+            <dl class="gw-facts">
+                <div>
+                    <dt>{words::gws_address(lang)}</dt>
+                    <dd class="gw-address"><code translate="no">{gateway.origin.clone()}</code></dd>
+                </div>
+                <div>
+                    <dt>{words::gws_version(lang)}</dt>
+                    <dd><code translate="no">{gateway.version.clone()}</code></dd>
+                </div>
+            </dl>
+            <div class="gw-actions">
+                <button type="button" class="button button-ghost gw-open" hidden=true
+                    data-copy=gateway.origin.clone() data-copied-label=words::gws_copied_short(lang) data-copied-said=words::gws_copied(lang) data-copy-failed=words::gws_copy_failed(lang)>
+                    {solid::icon_as(solid::COPY, "copy-idle")}{solid::icon_as(solid::CHECK, "copy-done")}<span>{words::gws_copy(lang)}</span>
+                </button>
+                <a class="button button-ghost" href=website rel="noopener noreferrer nofollow">
+                    {solid::icon(solid::EXTERNAL)}<span>{words::gws_website(lang)}</span>
+                </a>
+            </div>
+        </li>
+    }
+}
+
+fn gateways(lang: Lang, all: Option<&[Gateway]>) -> impl IntoView + use<> {
+    let listed = all.unwrap_or_default();
+    let online = listed.iter().filter(|gateway| gateway.online).count();
+    let count = match all {
+        Some([]) => words::gw_none(lang).to_owned(),
+        Some(all) => words::gw_count(
+            lang,
+            u64::try_from(all.len()).unwrap_or(u64::MAX),
+            &words::number(lang, u64::try_from(online).unwrap_or(u64::MAX)),
+        ),
+        None => words::gws_failed(lang).to_owned(),
+    };
+    let shown: Vec<_> = listed.iter().take(4).collect();
+    let n = shown.len();
+    let grid = (n > 0).then(|| {
+        let cards = shown
+            .into_iter()
+            .map(|gateway| gateway_card(lang, gateway))
+            .collect_view();
+        view! { <ul class="gateways hgw-grid stagger" data-count=n.to_string()>{cards}</ul> }
+    });
+    view! {
+        <section class="band" id="gateways" aria-labelledby="gw-title">
+            <div class="wrap">
+                {section_head(words::gw_eyebrow(lang), words::gw_title(lang), "gw-title")}
+                <p class="lead">{words::home_gw_lead(lang)}</p>
+                <p class="small hgw-count">{count}</p>
+                {grid}
+                <p class="hgw-foot">
+                    <a class="button" href=Page::Gateways.path(lang)>{words::beta_open(lang)}</a>
+                    <a class="button button-ghost" href=format!("{}#host", Page::Gateways.path(lang))>{words::beta_own(lang)}</a>
+                </p>
+            </div>
+        </section>
+    }
+}
+
+/// Writing to the people behind Baylee: the channels, and the form.
+fn contact(lang: Lang) -> impl IntoView + use<> {
+    let impressum = Page::Impressum.path(lang);
+    let operator = rich(words::contact_operator(lang), move |tag| {
+        (tag == "impressum").then(|| impressum.clone())
+    });
+    let privacy = Page::Privacy.path(lang);
+    let note = rich(words::contact_privacy(lang), move |tag| {
+        (tag == "privacy").then(|| privacy.clone())
+    });
+    let channel = |href: String, glyph: &'static str, name: &'static str, what: &'static str| {
+        view! {
+            <li>
+                <a class="glass" href=href.clone() rel=href.starts_with("https://").then_some("noopener noreferrer")>
+                    {solid::icon(glyph)}
+                    <span>{name}<small>{what}</small></span>
+                </a>
+            </li>
+        }
+    };
+    view! {
+        <section class="band alt" id="contact" aria-labelledby="contact-title">
+            <div class="wrap">
+                {section_head(words::contact_eyebrow(lang), words::contact_title(lang), "contact-title")}
+                <div class="two-col">
+                    <div class="reveal">
+                        <p>{words::contact_intro(lang)}</p>
+                        <p>{plain(words::contact_f8(lang))}</p>
+                        <ul class="channels">
+                            {channel(DISCORD.to_owned(), solid::DISCORD, "Discord", words::contact_discord(lang))}
+                            {channel(WHATSAPP.to_owned(), solid::WHATSAPP, "WhatsApp", words::contact_whatsapp_sub(lang))}
+                            {channel(format!("{REPOSITORY}/issues"), solid::GITHUB, words::contact_issues(lang), words::contact_issues_sub(lang))}
+                            {channel(Page::Privacy.path(lang), solid::CHAT, words::contact_reports_title(lang), words::contact_reports_sub(lang))}
+                        </ul>
+                        <p class="small">{operator}</p>
+                    </div>
+                    <div class="contact-card glass reveal">
+                        <ContactForm lang=lang />
+                        <noscript><p class="notice">{words::contact_noscript(lang)}</p></noscript>
+                        <p class="small privacy-note">{note}</p>
+                    </div>
                 </div>
             </div>
         </section>
     }
 }
 
-/// A gateway's card, shared with the directory page.
-pub fn gateway_card(lang: Lang, gateway: &Gateway) -> impl IntoView + use<> {
-    let state = if gateway.online {
-        view! { <span class="pill ok"><span class="dot" aria-hidden="true"></span>{words::gws_online(lang)}</span> }.into_any()
-    } else {
-        view! { <span class="pill off"><span class="dot" aria-hidden="true"></span>{words::gws_offline(lang)}</span> }.into_any()
+/// The open-source promise, and the repository as it stands.
+fn source(cx: &Context<'_>) -> impl IntoView + use<> {
+    let lang = cx.lang;
+    let repo = &cx.data.repo;
+    let rules = rich(words::source_rust(lang), |tag| match tag {
+        "agents" => Some(format!("{REPOSITORY}/blob/main/AGENTS.md")),
+        "claude" => Some(format!("{REPOSITORY}/blob/main/CLAUDE.md")),
+        _ => None,
+    });
+    let actions = format!("{REPOSITORY}/actions/workflows/ci.yml?query=branch%3Amain");
+    let ci = match repo.ci {
+        Some(passed) => {
+            let (class, word) = if passed {
+                ("dot ok", words::ci_passing(lang))
+            } else {
+                ("dot bad", words::ci_failing(lang))
+            };
+            view! { <a href=actions rel="noopener noreferrer"><span class=class aria-hidden="true"></span>{word}</a> }.into_any()
+        }
+        None => "–".into_any(),
     };
-    let official = gateway
-        .official
-        .then(|| view! { <span class="pill accent">{icon(icons::SHIELD_CHECK)}{words::gws_official(lang)}</span> });
-    let website = gateway.website.clone();
-    view! {
-        <article class="card gateway">
-            <h3><bdi>{gateway.name.clone()}</bdi></h3>
-            <p class="pills">{official}{state}</p>
-            <dl class="facts">
-                <dt>{words::gws_address(lang)}</dt>
-                <dd><code class="address" translate="no">{gateway.origin.clone()}</code></dd>
-                <dt>{words::gws_version(lang)}</dt>
-                <dd><code translate="no">{gateway.version.clone()}</code></dd>
-                <dt>{words::gws_website(lang)}</dt>
-                <dd><a href=website.clone() rel="noopener noreferrer nofollow">{website.clone()}</a></dd>
-            </dl>
-        </article>
+    let commit = match &repo.commit {
+        Some((sha, date)) => {
+            let subject = repo
+                .subject
+                .clone()
+                .map(|subject| view! { " · " <bdi class="small">{subject}</bdi> });
+            view! {
+                <a href=format!("{REPOSITORY}/commit/{sha}") rel="noopener noreferrer" translate="no">{sha.clone()}</a>
+                " · "{format::date(lang, date)}
+                {subject}
+            }
+            .into_any()
+        }
+        None => "–".into_any(),
+    };
+    let count = |value: Option<u64>, href: String| {
+        match value {
+        Some(value) => view! { <a href=href rel="noopener noreferrer" class="num">{words::number(lang, value)}</a> }.into_any(),
+        None => "–".into_any(),
     }
-}
-
-fn gateways(lang: Lang, all: Option<&[Gateway]>) -> Option<impl IntoView + use<>> {
-    let all = all?;
-    let first = all
-        .iter()
-        .take(4)
-        .map(|gateway| gateway_card(lang, gateway))
-        .collect_view();
-    Some(view! {
-        <section class="band alt" aria-labelledby="gw-title">
-            <div class="wrap">
-                {section_head(words::gw_eyebrow(lang), words::gw_title(lang), "gw-title")}
-                <p class="lead">{words::gw_lead(lang)}</p>
-                <div class="cards-grid">{first}</div>
-                <p class="actions">
-                    <a class="button quiet" href=Page::Gateways.path(lang)>{words::gw_all(lang)}</a>
-                    <a class="button quiet" href=format!("{}#host", Page::Gateways.path(lang))>{words::gw_host(lang)}</a>
-                </p>
-            </div>
-        </section>
-    })
-}
-
-fn open(lang: Lang) -> impl IntoView + use<> {
+    };
+    let stars = count(repo.stars, format!("{REPOSITORY}/stargazers"));
+    let issues = count(repo.issues, format!("{REPOSITORY}/issues"));
+    let link = |href: String, words: AnyView| {
+        view! { <a class="button button-ghost" href=href rel="noopener noreferrer">{words}</a> }
+    };
     view! {
-        <section class="band" aria-labelledby="open-title">
-            <div class="wrap narrow">
-                {section_head(words::open_eyebrow(lang), words::open_title(lang), "open-title")}
-                <p class="lead">{words::open_lead(lang)}</p>
-                <p class="actions">
-                    <a class="button quiet" href=REPOSITORY rel="noopener noreferrer">{icon(icons::EXTERNAL_LINK)}{words::open_repository(lang)}</a>
-                    <a class="button quiet" href=CENTRAL_REPOSITORY rel="noopener noreferrer">{icon(icons::EXTERNAL_LINK)}{words::open_central(lang)}</a>
-                </p>
+        <section class="band" id="source" aria-labelledby="source-title">
+            <div class="wrap">
+                {section_head(words::source_eyebrow(lang), words::source_title(lang), "source-title")}
+                <div class="two-col">
+                    <div class="reveal">
+                        <p class="promise">{words::source_promise(lang)}</p>
+                        <p>{rules}</p>
+                        <p class="links-row">
+                            {link(REPOSITORY.to_owned(), view! { {solid::icon(solid::GITHUB)}<span translate="no">"github.com/AceVik/baylee"</span> }.into_any())}
+                            {link(CENTRAL_REPOSITORY.to_owned(), view! { {solid::icon(solid::GITHUB)}<span>{words::open_central(lang)}</span> }.into_any())}
+                            {link(DISCORD.to_owned(), view! { {solid::icon(solid::DISCORD)}<span>{words::source_discord(lang)}</span> }.into_any())}
+                            {link(WHATSAPP.to_owned(), view! { {solid::icon(solid::WHATSAPP)}<span>{words::source_whatsapp(lang)}</span> }.into_any())}
+                            {link(format!("{REPOSITORY}/blob/main/LICENSE"), view! { <span translate="no">"AGPL-3.0"</span> }.into_any())}
+                            {link(format!("{REPOSITORY}/blob/main/docs/architecture.md"), view! { <span>{words::source_architecture(lang)}</span> }.into_any())}
+                        </p>
+                    </div>
+                    <div class="repo-card glass reveal">
+                        <h3>{words::source_repo_title(lang)}</h3>
+                        <dl class="kv">
+                            <div><dt>{words::strip_ci(lang)}</dt><dd>{ci}</dd></div>
+                            <div><dt>{words::strip_commit(lang)}</dt><dd>{commit}</dd></div>
+                            <div><dt>{words::source_stars(lang)}</dt><dd>{stars}</dd></div>
+                            <div><dt>{words::source_issues(lang)}</dt><dd>{issues}</dd></div>
+                        </dl>
+                        <p class="small">{words::source_note(lang)}</p>
+                    </div>
+                </div>
             </div>
         </section>
     }
@@ -451,7 +761,7 @@ fn open(lang: Lang) -> impl IntoView + use<> {
 /// Baylee's album: a book the big logo opens (no page of its own, owner
 /// 10.11.2026), as the old site drew it: her photographs on the left, her
 /// story on the right, one chapter at a time. The server writes the whole
-/// book; `album.js` turns its pages (without it every chapter stands one
+/// book; `home.js` turns its pages (without it every chapter stands one
 /// after the other). Photographs load only once the album is open: lazy
 /// images in a closed dialog are not fetched.
 fn album(cx: &Context<'_>) -> impl IntoView + use<> {
@@ -535,7 +845,7 @@ fn album(cx: &Context<'_>) -> impl IntoView + use<> {
                 </div>
             </div>
         </dialog>
-        {viewer(lang)}
+        {viewer(lang, assets.url("img/memorial/full/baylee-1.jpg"))}
     }
 }
 
@@ -586,7 +896,7 @@ fn story(lang: Lang) -> (impl IntoView + use<>, impl IntoView + use<>) {
 }
 
 /// The full photograph, larger, to zoom into and move about.
-fn viewer(lang: Lang) -> impl IntoView + use<> {
+fn viewer(lang: Lang, full: String) -> impl IntoView + use<> {
     view! {
         <dialog id="photo-viewer" class="book photo-viewer" aria-label=words::baylee_photos(lang)>
             <header class="photo-viewer-header">
@@ -598,7 +908,7 @@ fn viewer(lang: Lang) -> impl IntoView + use<> {
                 </form>
             </header>
             <div class="photo-viewport" data-viewport="">
-                <img src="" alt="" draggable="false" data-viewer-image="" />
+                <img src=full alt=words::baylee_photo1(lang) width="787" height="1400" loading="lazy" decoding="async" draggable="false" data-viewer-image="" />
             </div>
             <footer class="photo-viewer-tools">
                 <div class="photo-step-controls">

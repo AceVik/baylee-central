@@ -9,12 +9,18 @@ import type { Page } from "@playwright/test";
  * until the page scrolls (focus is never hidden: `scroll-padding`); the
  * owner's rule, 44 × 44 px for every control, is stricter than WCAG's 24 px
  * and is measured without that overlap.
+ *
+ * The page is read at rest: cards that rise and brighten as they scroll
+ * into view (a scroll-driven animation) would otherwise be measured half
+ * faded at the window's edge. Contrast is owed to the text as it stays.
  */
 export async function axe(page: Page): Promise<string[]> {
+  await page.emulateMedia({ reducedMotion: "reduce" });
   const result = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa", "best-practice"])
     .disableRules(["target-size"])
-    .analyze();
+    .analyze()
+    .finally(() => page.emulateMedia({ reducedMotion: null }));
   return result.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(" ")).join(", ")}`);
 }
 

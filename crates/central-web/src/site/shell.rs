@@ -7,7 +7,7 @@ use leptos::prelude::*;
 use leptos::tachys::html::attribute::custom::custom_attribute;
 use serde_json::{Value, json};
 
-use super::{Context, Page};
+use super::{Assets, Context, Page};
 use crate::rich::rich;
 use crate::solid;
 use crate::words::{self, Lang};
@@ -118,6 +118,44 @@ fn crumbs(lang: Lang, trail: &[(String, Page)]) -> Option<impl IntoView + use<>>
     })
 }
 
+/// What a page asks for before its stylesheet and scripts: the start
+/// page's painting (its largest paint) and the faces the first screen
+/// is set in.
+fn preloads(page: Page, assets: &Assets) -> impl IntoView + use<> {
+    let painting = (page == Page::Home).then(|| {
+        let set = format!(
+            "{} 640w, {} 960w, {} 1600w",
+            assets.url("img/world-640.avif"),
+            assets.url("img/world-960.avif"),
+            assets.url("img/world-1600.avif")
+        );
+        view! {
+            <link rel="preload" r#as="image" type="image/avif" imagesrcset=set imagesizes="100vw" fetchpriority="high" />
+        }
+    });
+    let font = |name: &str| {
+        view! { <link rel="preload" href=assets.url(name) r#as="font" type="font/woff2" crossorigin="anonymous" /> }
+    };
+    // the start page's title ends in italic: its face, too, before the
+    // title wraps around a stand-in
+    let italic = (page == Page::Home).then(|| font("fonts/Faustina-Italic.woff2"));
+    // the download button's bold label and its medium line, centred in the
+    // first screen, would move as their faces arrive
+    let download = matches!(page, Page::Home | Page::Download).then(|| {
+        view! {
+            {font("fonts/AlegreyaSans-Bold.woff2")}
+            {font("fonts/AlegreyaSans-Medium.woff2")}
+        }
+    });
+    view! {
+        {painting}
+        {font("fonts/AlegreyaSans-Regular.woff2")}
+        {font("fonts/Faustina.woff2")}
+        {italic}
+        {download}
+    }
+}
+
 /// Everything in `<head>`.
 fn head(page: Page, cx: &Context<'_>, meta: &Meta) -> impl IntoView + use<> {
     let lang = cx.lang;
@@ -151,7 +189,7 @@ fn head(page: Page, cx: &Context<'_>, meta: &Meta) -> impl IntoView + use<> {
         .map(|value| view! { <meta name="google-site-verification" content=value.to_owned() /> });
     // Baylee's album, on the start page only
     let album = (page == Page::Home).then(|| {
-        view! { <script type="module" src=assets.url("album.js") integrity=assets.integrity("album.js")></script> }
+        view! { <script type="module" src=assets.url("home.js") integrity=assets.integrity("home.js")></script> }
     });
     let islands = meta.islands.then(|| {
         view! { <script type="module" src=assets.url("islands.js") integrity=assets.integrity("islands.js") fetchpriority="low"></script> }
@@ -160,22 +198,6 @@ fn head(page: Page, cx: &Context<'_>, meta: &Meta) -> impl IntoView + use<> {
         .into_iter()
         .find(|l| *l != lang)
         .unwrap_or(Lang::En);
-    // the start page's painting is its largest paint: asked for before the
-    // stylesheet and the scripts
-    let painting = (page == Page::Home).then(|| {
-        let set = format!(
-            "{} 640w, {} 960w, {} 1600w",
-            assets.url("img/world-640.avif"),
-            assets.url("img/world-960.avif"),
-            assets.url("img/world-1600.avif")
-        );
-        view! {
-            <link rel="preload" r#as="image" type="image/avif" imagesrcset=set imagesizes="100vw" fetchpriority="high" />
-        }
-    });
-    let font = |name: &str| {
-        view! { <link rel="preload" href=assets.url(name) r#as="font" type="font/woff2" crossorigin="anonymous" /> }
-    };
     view! {
         <head>
             <meta charset="utf-8" />
@@ -193,12 +215,7 @@ fn head(page: Page, cx: &Context<'_>, meta: &Meta) -> impl IntoView + use<> {
             <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0f1b2d" />
             <meta name="referrer" content="no-referrer" />
             <meta name="tdm-reservation" content="1" />
-            {painting}
-            {font("fonts/AlegreyaSans-Regular.woff2")}
-            {font("fonts/Faustina.woff2")}
-            // the start page's title ends in italic: its face, too, before
-            // the title wraps around a stand-in
-            {(page == Page::Home).then(|| font("fonts/Faustina-Italic.woff2"))}
+            {preloads(page, assets)}
             <link rel="stylesheet" href=assets.url("site.css") integrity=assets.integrity("site.css") />
             <script src=assets.url("boot.js") integrity=assets.integrity("boot.js")></script>
             <script type="module" src=assets.url("pwa.js") integrity=assets.integrity("pwa.js")></script>

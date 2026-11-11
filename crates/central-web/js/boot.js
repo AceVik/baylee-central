@@ -4,7 +4,8 @@
 // colour switch, names the account link while a session is remembered
 // ("baylee-central-session", which holds only when it ends), opens
 // dialogs in browsers without invoker commands, closes the dropdowns as a
-// menu closes, and pauses the hero's light off screen. Nothing here is
+// menu closes, copies a gateway's address, and pauses the hero's light
+// off screen. Nothing here is
 // required: without it the device's scheme decides and every page still
 // works.
 (() => {
@@ -83,6 +84,36 @@
         if (entry?.isIntersecting) delete hero.dataset.away;
         else hero.dataset.away = "";
       }).observe(hero);
+    }
+    // Copying an address (a gateway's card), only where the browser can:
+    // the button shows a check for a moment, and the live line says it.
+    if (window.isSecureContext && typeof navigator.clipboard?.writeText === "function") {
+      let live = null;
+      const say = (words) => {
+        if (!live) {
+          live = document.createElement("p");
+          live.className = "visually-hidden";
+          live.setAttribute("role", "status");
+          document.body.append(live);
+        }
+        // the same words twice in a row would not be read again
+        live.textContent = live.textContent === words ? `${words}\u00a0` : (words ?? "");
+      };
+      for (const button of document.querySelectorAll("button[data-copy]")) {
+        let back = 0;
+        button.hidden = false;
+        button.addEventListener("click", () => {
+          navigator.clipboard.writeText(button.dataset.copy ?? "").then(
+            () => {
+              button.dataset.copied = "";
+              say(button.dataset.copiedSaid);
+              clearTimeout(back);
+              back = setTimeout(() => delete button.dataset.copied, 1600);
+            },
+            () => say(button.dataset.copyFailed),
+          );
+        });
+      }
     }
     // Invoker commands (<button commandfor command>) where the browser has none.
     if (!("command" in HTMLButtonElement.prototype)) {
