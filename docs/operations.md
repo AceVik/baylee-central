@@ -519,6 +519,44 @@ MemoryDenyWriteExecute=yes
 SystemCallFilter=@system-service
 ```
 
+### Logs and how long they stay
+
+The privacy notice (`legal/privacy.*.md` § 7 and the site's "Hosting")
+promises: no access log, and server logs deleted after 14 days at the
+latest. Three settings on the host carry that promise; none is in this
+repository, so check them after every change to the host:
+
+- Caddy has no `log` directive for these sites (the default writes no
+  access log).
+- journald is capped, `/etc/systemd/journald.conf.d/baylee.conf`:
+
+  ```ini
+  [Journal]
+  MaxRetentionSec=14day
+  ```
+
+- Where journald forwards to rsyslog (`ForwardToSyslog=yes`, Ubuntu's
+  default), the same messages are written again to `/var/log/syslog`, and
+  the distribution's `/etc/logrotate.d/rsyslog` keeps four weekly files:
+  about five weeks. Cap it to match, in that file:
+
+  ```
+  daily
+  rotate 13
+  maxage 14
+  ```
+
+  (in place of `weekly` and `rotate 4`; the same for
+  `/etc/logrotate.d/fail2ban` if it is installed, whose log holds the
+  addresses it banned). Turning forwarding off instead also works, but
+  check first that nothing reads `/var/log/auth.log` (an older fail2ban
+  does).
+
+Read on 11 November 2026 (read-only, by the owner's leave): the live host
+has the journald cap and no access log, and still the weekly `rotate 4` for
+syslog and fail2ban. Until that is changed, "14 days" is not true of
+`/var/log/syslog*`.
+
 ## The server-rendered website (`central-web`)
 
 *Added 10.11.2026, not deployed* ([proposal](proposals/frontend-rewrite.md)).

@@ -18,7 +18,6 @@ redeemed on the new site yet (`ResetStart`/`ResetFinish` exist in
 
 - Zwei Datenschutzerklärungen: Die Website zeigt die privacy-*-Texte aus site.ftl (legal.rs), daneben gibt es legal/privacy.de.md/.en.md (Version 2026-11-02, laut legal/README.md 'binding'). Sie widersprechen sich (Serverprotokolle: 'kein Zugriffsprotokoll' gegen '14 Tage Protokolle'; Drittländer; Sprachwahl im Browser gespeichert; Umfang). Welche gilt? Empfehlung: ein einziger Text, aus dem beide Stellen gespeist werden. legal/README.md nennt außerdem Version 2026-10-28, die Datei 2026-11-02.
 
-- Impressum hinter Rechenrätsel und JavaScript: § 5 DDG verlangt 'leicht erkennbar, unmittelbar erreichbar und ständig verfügbar'. Ohne JavaScript gibt es gar keine Angaben, und die Datenschutzerklärung nennt den Verantwortlichen (Art. 13 Abs. 1 lit. a DSGVO) nur durch Verweis dorthin. Das ist ein echtes Abmahn- und Bußgeldrisiko und sollte ein Anwalt entscheiden. Gilt § 5 DDG überhaupt (rein privat, nicht geschäftsmäßig)? Wenn nicht, bliebe § 18 Abs. 1 MStV (Name und Anschrift) - auch der kennt kein Rätsel.
 
 - Verfahren beim Reset-Code: Wie prüft ein Administrator ohne E-Mail-Adresse, dass die anfragende Person der Account gehört? Die Texte (faq-password-a, Bedingungen §3) versprechen den Reset; das Verfahren sollte feststehen, bevor es öffentlich zugesagt wird. Die neue Website hat keine Seite zum Einlösen eines Reset-Codes (kein ResetStart in crates/central-web); der alte FAQ-Satz 'mit dem Wiederherstellungscode setzt du ein neues' stimmt laut docs/account-reset.md nicht (ein neues Passwort braucht immer den Reset-Code, der Wiederherstellungscode rettet nur die Daten). faq-password-a, code-lead, profile-code-kept und Bedingungen §3 bitte daran messen, was Website und Client wirklich anbieten.
 
@@ -28,7 +27,9 @@ redeemed on the new site yet (`ResetStart`/`ResetFinish` exist in
 
 - Speicherdauer des Chats: Nachrichten und Metadaten bleiben bis zur Kontolöschung; docs/central-chat.md nennt die automatische Löschfrist eine offene Eigentümer-Entscheidung. Für Art. 5 Abs. 1 lit. e DSGVO (Speicherbegrenzung) wäre eine Frist besser begründbar.
 
-- Serverprotokolle: Führt der Webserver/Reverse-Proxy wirklich kein Zugriffsprotokoll, und ist das Systemjournal auf höchstens 14 Tage begrenzt? legal/privacy §7 und docs/account-deletion.md sagen 14 Tage, die Website sagt 'solange das Journal sie hält' (keine Frist im Sinn von Art. 13 Abs. 2 lit. a); in ops/ steht keine Journal-Konfiguration. Ich habe privacy-hosting dort unverändert gelassen; bitte die echte Frist eintragen.
+- Serverprotokolle (am 11.11.2026 mit deiner Erlaubnis nur lesend auf dem Live-Server nachgesehen): Caddy führt kein Zugriffsprotokoll, und das Journal ist auf 14 Tage begrenzt (`MaxRetentionSec=14day`). **Aber:** journald reicht alle Meldungen an rsyslog weiter (`ForwardToSyslog=yes`), und `/var/log/syslog` wird wöchentlich mit `rotate 4` gedreht, bleibt also rund fünf Wochen; ebenso `fail2ban.log`. Die Website sagt jetzt wie legal/privacy § 7 „höchstens 14 Tage“. Damit das stimmt, musst du auf dem Server die Rotation kürzen; die Zeilen stehen in docs/operations.md, „Logs and how long they stay“. Ich habe am Server nichts geändert. Den Inhalt von /var/log/syslog konnte ich nicht lesen (keine Rechte), also nicht prüfen, ob dort tatsächlich IP-Adressen stehen.
+- Impressum: Das Rätsel bleibt (deine Entscheidung vom 11.11.2026: Crawler sollen die Angaben nicht automatisiert abgreifen). Das Restrisiko, dass ein Gericht „unmittelbar erreichbar“ (§ 5 DDG) enger sieht, ist dir bekannt.
+- Service Worker: auf deine Entscheidung vom 11.11.2026 nur noch nach Anmeldung, in der installierten App oder bei eingeschalteten Benachrichtigungen; wer nur liest, bekommt nichts gespeichert.
 
 - netcup: Ist ein Auftragsverarbeitungsvertrag (Art. 28 DSGVO) abgeschlossen? Die Erklärung nennt netcup als Auftragsverarbeiter. Gibt es weitere Dienstleister (Backup-Speicher, DNS/CDN, E-Mail-Postfach für Antworten auf das Kontaktformular und die Impressum-Adresse)? Antworten per E-Mail laufen über einen Mailanbieter, der nirgends genannt ist.
 
@@ -36,7 +37,6 @@ redeemed on the new site yet (`ResetStart`/`ResetFinish` exist in
 
 - Web Push und Drittland: Google, Mozilla und Apple erhalten Endpunkt, verschlüsselte Hinweise und Verbindungsdaten in den USA. Auf welche Grundlage stützt sich das (Angemessenheitsbeschluss/Data Privacy Framework je Anbieter, oder der Push-Dienst als vom Nutzer gewählter eigener Dienst)? Ich habe nur die Tatsache benannt, keinen Mechanismus behauptet.
 
-- Service Worker: js/pwa.js registriert ihn für jeden Besucher und speichert die öffentlichen Dateien, nicht erst beim Installieren oder Anmelden. Ob das 'unbedingt erforderlich' im Sinn von § 25 Abs. 2 Nr. 2 TDDDG ist, ist angreifbar. Entweder erst nach Anmeldung/Installation registrieren oder das Risiko bewusst tragen.
 
 - Zuständige Aufsichtsbehörde: Die LDI NRW ist nur richtig, wenn der Verantwortliche in Nordrhein-Westfalen wohnt. Bitte bestätigen.
 
