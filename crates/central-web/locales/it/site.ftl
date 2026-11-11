@@ -1196,3 +1196,5 @@ sec-teaser-lead = Passo dopo passo: che cosa lascia il tuo dispositivo, che cosa
     e che cosa no, e i limiti di ogni flusso.
 sec-teaser-more = Vedi ogni passaggio in un diagramma
 # ==== end of the security page =================================================
+# ==== registration: the proof of work, while it takes long (English until translated) ====
+register-solving = Your browser is solving a puzzle that keeps robots out. When many accounts are being created, this can take a few minutes … { $percent } %

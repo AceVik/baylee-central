@@ -1069,3 +1069,5 @@ sec-signin-link = O que acontece com a sua senha quando você entra: <security>S
 sec-teaser-lead = Passo a passo: o que sai do seu dispositivo, o que o Baylee Central vê e o que ele não vê, e os limites de cada fluxo.
 sec-teaser-more = Veja cada passo em um diagrama
 # ==== end of the security page =================================================
+# ==== registration: the proof of work, while it takes long (English until translated) ====
+register-solving = Your browser is solving a puzzle that keeps robots out. When many accounts are being created, this can take a few minutes … { $percent } %
