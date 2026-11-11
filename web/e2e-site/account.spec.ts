@@ -117,3 +117,55 @@ test("registration refuses a robot's haste and its hidden field, and says when i
   await expect(page.getByRole("alert")).toHaveText("Registration is paused right now. Please try again later.", { timeout: 15_000 });
   expect(asked).toEqual(["register_challenge"]);
 });
+
+// UUIDv7-shaped ids, the last byte telling them apart
+const id = (n: number) => Array.from({ length: 16 }, (_, i) => ({ 6: 0x70, 8: 0x80, 15: n })[i] ?? 0x10 + i);
+// two origins of the same length: their cards' fields must still differ
+const gateway = (n: number, origin: string) => ({
+  id: id(n), origin, metadata: { name: `Gateway ${n}`, version: "1.0.0", website: origin },
+  state: "approved", online: false, last_seen: null, created_at: 1_794_000_000, tokens: [],
+});
+
+test("signed in, each action puts the focus where its result is", async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem("baylee-central-session", JSON.stringify({ expiresAt: 4_102_444_800 })));
+  await page.route("**/api/v1", (route) => {
+    const body = JSON.parse(route.request().postData() ?? "{}");
+    const json = (value: unknown) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(value) });
+    const owner = (answer: unknown) => json({ result: "owner", answer });
+    if (body.operation === "account_summary") {
+      return json({
+        result: "account_summary", identity: { account: ACCOUNT, epoch: 1 }, username: "erika", display_name: "Erika", tag: 0x1a2b,
+        source: "registered", recovery: true, admin: false, signed_in_at: 1_794_000_000, expires_at: 4_102_444_800,
+      });
+    }
+    if (body.operation === "owner" && body.request?.action === "gateways") {
+      return owner({ answer: "gateways", gateways: [gateway(1, "https://one.example"), gateway(2, "https://two.example")] });
+    }
+    if (body.operation === "owner" && body.request?.action === "create_token") {
+      return owner({ answer: "token_created", id: id(9), token: Array(32).fill(5), expires_at: 4_102_444_800 });
+    }
+    if (body.operation === "account_export") return route.fulfill({ status: 503, body: "unavailable\n" });
+    return route.fulfill({ status: 401, body: "rejected\n" });
+  });
+
+  await page.goto("/en/account/gateways");
+  await expect(page.locator("html")).toHaveAttribute("data-islands", "ready");
+  await expect(page.getByRole("heading", { name: "Gateway 2" })).toBeVisible();
+  const ids = await page.locator("[id]").evaluateAll((all) => all.map((element) => element.id));
+  expect(ids.filter((value, index) => ids.indexOf(value) !== index)).toEqual([]);
+  const second = page.locator("article").filter({ hasText: "Gateway 2" });
+  await second.getByLabel("Token name").fill("qa");
+  await second.getByRole("button", { name: "Make a token" }).click();
+  // the new token takes the focus; kept, its gateway's card does
+  await expect(page.getByRole("heading", { name: "Your new token" })).toBeFocused();
+  await page.getByRole("button", { name: "I have kept it" }).focus();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("heading", { name: "Gateway 2" })).toBeFocused();
+
+  await page.goto("/en/account/privacy");
+  await expect(page.locator("html")).toHaveAttribute("data-islands", "ready");
+  await page.getByRole("button", { name: "Prepare the export" }).click();
+  await expect(page.locator("#export-error")).toBeFocused();
+  await page.getByRole("button", { name: "Delete my account" }).click();
+  await expect(page.locator("#delete-password")).toBeFocused();
+});
