@@ -499,18 +499,25 @@ impl AccountStore {
         })
     }
 
-    /// The administrator behind `browser` for a change in `tx`: anyone else
-    /// is refused before any lock is taken; then every administrator's
-    /// account row is locked, in one order so two changes cannot deadlock
-    /// (the role rows themselves need an UPDATE grant to lock), and the role
-    /// and a password sign-in less than 30 minutes old are checked again in a
-    /// fresh snapshot, so a removal that committed meanwhile is seen.
+    /// A transaction for a change by the administrator behind `browser`,
+    /// and who that is. Anyone else is refused before the transaction is
+    /// begun or a lock taken, on the pool alone: asked for inside the
+    /// transaction, that check needed a second connection while the first
+    /// was held, and as many changes at once as the pool has connections,
+    /// from any signed-in account, kept every one of them waiting for the
+    /// pool's whole patience and the store with them. Then every
+    /// administrator's account row is locked, in one order so two changes
+    /// cannot deadlock (the role rows themselves need an UPDATE grant to
+    /// lock), and the role and a password sign-in less than 30 minutes old
+    /// are checked again in a fresh snapshot, so a removal that committed
+    /// meanwhile is seen. Nothing but the transaction itself asks the pool
+    /// for a connection from here to its end.
     async fn acting_administrator(
         &self,
-        tx: &sea_orm::DatabaseTransaction,
         browser: &Token,
-    ) -> Result<Uuid, Error> {
+    ) -> Result<(sea_orm::DatabaseTransaction, Uuid), Error> {
         Self::administrator(&self.db, browser).await?;
+        let tx = self.db.begin().await.map_err(|_| Error::Unavailable)?;
         tx.query_all_raw(statement(
             "SELECT a.id FROM central_identity.accounts a JOIN central_identity.account_roles r
              ON r.account_id = a.id WHERE r.role = 'admin' ORDER BY a.id FOR UPDATE OF a",
@@ -518,11 +525,11 @@ impl AccountStore {
         ))
         .await
         .map_err(|_| Error::Unavailable)?;
-        let (actor, fresh) = Self::administrator(tx, browser).await?;
+        let (actor, fresh) = Self::administrator(&tx, browser).await?;
         if !fresh {
             return Err(Error::Rejected);
         }
-        Ok(actor)
+        Ok((tx, actor))
     }
 
     /// A page of registered gateways for the administrator behind
@@ -629,8 +636,7 @@ impl AccountStore {
         gateway: [u8; 16],
         enabled: bool,
     ) -> Result<(), Error> {
-        let tx = self.db.begin().await.map_err(|_| Error::Unavailable)?;
-        let actor = self.acting_administrator(&tx, browser).await?;
+        let (tx, actor) = self.acting_administrator(browser).await?;
         let gateway = Uuid::from_bytes(gateway);
         tx.query_one_raw(statement(
             "SELECT id FROM central_identity.gateways WHERE id = $1 FOR UPDATE",
@@ -681,8 +687,7 @@ impl AccountStore {
         browser: &Token,
         token: [u8; 16],
     ) -> Result<(), Error> {
-        let tx = self.db.begin().await.map_err(|_| Error::Unavailable)?;
-        let actor = self.acting_administrator(&tx, browser).await?;
+        let (tx, actor) = self.acting_administrator(browser).await?;
         let token = Uuid::from_bytes(token);
         let row = tx
             .query_one_raw(statement(
@@ -747,8 +752,7 @@ impl AccountStore {
     /// `Rejected` without a fresh administrator's browser session; storage
     /// failure.
     pub async fn set_registration(&self, browser: &Token, open: bool) -> Result<(), Error> {
-        let tx = self.db.begin().await.map_err(|_| Error::Unavailable)?;
-        let actor = self.acting_administrator(&tx, browser).await?;
+        let (tx, actor) = self.acting_administrator(browser).await?;
         let before: bool = tx
             .query_one_raw(statement(
                 "SELECT open FROM central_identity.registration FOR UPDATE",
@@ -800,8 +804,7 @@ impl AccountStore {
             return Err(Error::Rejected);
         }
         let tag = i32::try_from(tag).map_err(|_| Error::Rejected)?;
-        let tx = self.db.begin().await.map_err(|_| Error::Unavailable)?;
-        let actor = self.acting_administrator(&tx, browser).await?;
+        let (tx, actor) = self.acting_administrator(browser).await?;
         let target = Uuid::from_bytes(target);
         let before: Option<i32> = tx
             .query_one_raw(statement(
@@ -884,8 +887,7 @@ impl AccountStore {
         target: [u8; 16],
         admin: bool,
     ) -> Result<(), Error> {
-        let tx = self.db.begin().await.map_err(|_| Error::Unavailable)?;
-        let actor = self.acting_administrator(&tx, browser).await?;
+        let (tx, actor) = self.acting_administrator(browser).await?;
         let target = Uuid::from_bytes(target);
         if !admin && actor == target {
             return Err(Error::Rejected);

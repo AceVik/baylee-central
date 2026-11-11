@@ -23,6 +23,18 @@ assurance](security-assurance.md).
   administrator in its own transaction; a change locks the administrators'
   account rows first and checks the acting role after the lock, in a fresh
   statement. A removed administrator's next request fails.
+- **A change holds one connection, and a stranger's none for long**
+  (11.11.2026). A change asks who is acting before it opens its
+  transaction, on a connection it gives back at once: a session that is no
+  administrator's is refused there and never holds a transaction. Only
+  then does it open the transaction, lock, and ask again after the lock
+  (that second reading is the one that decides, and it reads on the
+  transaction's own connection). Before, the first reading was asked of
+  the pool while the transaction already held a connection; as many
+  changes at once as the pool has connections (four) waited for each
+  other until the pool's three seconds ran out, and every other request
+  of the store with them ([security
+  assurance](security-assurance.md), the section of that day).
 - **A change needs a recent password.** The browser session's password
   sign-in (`sessions.created_at`, which renewal never moves) must be less
   than 30 minutes old; reads need not. The page knows the sign-in time

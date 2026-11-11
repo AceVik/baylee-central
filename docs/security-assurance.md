@@ -4197,3 +4197,85 @@ Adversarial pass.
 Open after this section: the count's file is trusted to live in the
 service's own directory; the dialogs were not tried with password managers
 or on a phone.
+
+## An administrator's change and the store's four connections, 11 November 2026
+
+Found in a review of everything a stranger, a signed-in account or a
+registered gateway can reach, asked for by the owner on 11.11.2026
+(§"The review's other findings" below lists the rest).
+
+Design pass. The store's pool has four connections and waits three
+seconds for one (`connection.rs`). Each of the administrators' five
+changes (`set_admin`, `set_tag`, `set_registration`,
+`set_gateway_approval`, `admin_revoke_gateway_token`) began its
+transaction, which takes a connection, and then asked `acting_administrator`
+who was acting. That asked the pool (`&self.db`), not the transaction: a
+second connection while the first was held. Four changes at once each
+held one and waited for a second that none of them would give back until
+the pool's three seconds were over. For those seconds every request of
+the store waited too, and then each change answered `Unavailable`.
+- **Who can ask.** `Admin` is the browser listener's request and needs a
+  browser session with Central's terms accepted. It does not need the
+  role: the role is what that first reading decides. So any registered
+  account could do it. An address has four requests in flight there, which
+  is exactly the pool, and `Admin` has no budget by address. One browser
+  session, four requests every three seconds: sign-in, the chat's relay,
+  every gateway's check of its players and the website's account pages
+  answer 503 for as long as it goes on. High: it needs an account and
+  nothing else, and stops the whole service.
+- **The answer** keeps the order of the checks and moves where the first
+  one is asked: before the transaction begins, on a connection that goes
+  back to the pool before the next is taken. Anyone who is no
+  administrator is refused there and never holds a transaction. The
+  transaction, the lock on the administrators' account rows and the
+  second reading after the lock, which is the one that decides, are as
+  they were, all on the transaction's own connection.
+- **The wire** is unchanged. A stranger's change was `Rejected` before
+  (when the pool had room) and is `Rejected` now.
+- Decided against: a larger pool (the wait scales with it, and five
+  requests then do what four did); dropping the first reading (a stranger
+  would then take the lock on the administrators' rows before being
+  refused); a budget by address for `Admin` alone (it would hide this
+  cause, not remove it).
+
+Implementation pass:
+- `accounts/admin.rs`, `acting_administrator`: takes the session alone and
+  returns the transaction with the acting account. It reads the role on
+  the pool, begins, locks, reads again on the transaction and refuses a
+  sign-in older than 30 minutes, as before. The five changes take their
+  transaction from it; none begins one of its own, so the order cannot be
+  got wrong again in a sixth.
+- Looked for the same shape elsewhere: every function of
+  `central-postgres/src` that begins a transaction was searched for a use
+  of the pool before its end. None: `publish_gateway_terms` rolls its
+  transaction back before it asks the pool, `issue_reset` asks first and
+  begins after.
+- Nothing is logged; no statement changed.
+
+Adversarial pass, on PostgreSQL 18 (`cargo xtask postgres`,
+`tests/support/accounts/admin.rs`, `crowd`):
+- A session of an account without the role asks for eight changes at
+  once, twice the pool, each of the five among them, while the same
+  session reads its account summary. Every change is `Rejected`, the
+  summary is answered, and all of it takes under two seconds.
+- Before the fix, the same test failed, and that run is the finding's
+  evidence: `assertion left == right failed: refused, not unavailable
+  left: Err(Unavailable) right: Err(Rejected)` at
+  `tests/support/accounts/admin.rs:94`, after the pool's three seconds.
+- An administrator's own eight changes at once (four that are allowed,
+  four that the rule against removing one's own role refuses): four done,
+  four `Rejected`, none `Unavailable`. Changes still wait for each other
+  on the lock, each on one connection.
+- The earlier tests of this file (stale sign-in, self and last
+  administrator, two removing each other, the audit's rows) pass
+  unchanged.
+
+**What stays possible:**
+- Four connections are few. Requests that are slow in the database for
+  another reason (a statement may run five seconds) still hold them; what
+  each caller may ask is bounded by the budgets in
+  [operations](operations.md), not by the pool.
+- An administrator's changes wait for one another on the lock, as
+  designed.
+
+Engineering review, not an audit.
