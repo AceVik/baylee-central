@@ -4474,10 +4474,11 @@ Adversarial pass.
 **What stays possible** (for the owner; the review's last section has the
 options):
 - An account is enough again: four vouched-for bearers that each keep up
-  their own budget fill a shared window, and one account can hold more
-  than four (two sessions, and up to eight gateways with eight tokens
-  each, which `GatewayStatus` answers while the gateway awaits approval).
-  From one address. This is narrower than the finding, not its end.
+  their own budget fill a shared window. Two accounts' four sessions are
+  four, and one account alone can hold more (two sessions, and up to
+  eight gateways with eight tokens each, which `GatewayStatus` answers
+  while the gateway awaits approval). From one address. This is narrower
+  than the finding, not its end.
 - Seven addresses of made-up bearers fill the strangers' second all the
   time, one alone for nine or ten seconds of each minute. A session that
   is not vouched for then waits: after a restart, after half an hour
@@ -4527,21 +4528,28 @@ Central writes no such line, and the sentence now says so.
 **Open, medium or worse.** None of these was built: each needs a number,
 a trade or a server's configuration that is the owner's.
 
-1. *Several vouched-for bearers of one account spend what sessions share*
-   (what stays of the section above). Four bearers at their own budget
-   fill a window; one account holds two sessions and up to 64 gateway
-   tokens (eight gateways, eight tokens each, 32 made in a day). From one
-   address, with one account.
+1. *Four vouched-for bearers spend what sessions share* (what stays of
+   the section above). Four bearers at their own budget fill a window
+   (4 x 128, 4 x 64). Two accounts have four sessions between them; one
+   account alone holds two sessions and up to 64 gateway tokens (eight
+   gateways, eight tokens each, 32 made in a day). From one address, with
+   two accounts or with one.
    - (a) A share for one place of the sessions' windows, as the sign-ins'
      budget has: at one bearer's budget (128 and 64 a second) it changes
      nothing for a gateway alone at its address and holds one address to
-     a quarter. Two gateways, or very many clients, behind one address
-     would share it: a limit that can keep someone out.
+     a quarter; four addresses then do what one does now. Two gateways, or
+     very many clients, behind one address would share it: a limit that
+     can keep someone out.
    - (b) Count a gateway's tokens together, by gateway or by owner. No
      address is involved and nobody honest is refused; it needs the store
-     to tell the count whose a token is.
+     to tell the count whose a token is. It ends the way with one account
+     only: two accounts' four sessions stay.
    - (c) A rate limit by address in front of both listeners (below).
-   - Recommended: (b), and (a) at half a window rather than a quarter.
+   - Recommended: (a), at half a window rather than a quarter where two
+     gateways may share an address, and (b) besides. Neither ends it for
+     four addresses with an account each: a shared window is four
+     bearers' budgets wide, and how much wider it may be is a question of
+     what the store's four connections serve.
 2. *The 32 a second of those who have no session* is spent by four
    addresses that each keep up their 600 a minute (known since
    11.11.2026). Sign-in, registration and the public pages' data are
@@ -4571,17 +4579,36 @@ a trade or a server's configuration that is the owner's.
 4. *The account listener's connections* (128, a quarter of them for late
    and large bodies) can be held by many addresses (known). Recommended:
    the firewall's limit of connections per source, with point 2.
-5. *Reports.* A gateway may file 120 reports an hour, each with up to 66
-   MiB of parts (one of 2 MiB and one of 64, `central-api/src/reports.rs`);
-   nothing bounds what one gateway, or all, have stored, the hour's count
-   is in memory and a restart starts it again, and one gateway can hold
-   both upload slots. It needs an approved gateway. About 7.7 GiB an hour
-   from one.
-   - (a) One upload slot for one gateway. Small, no number to choose.
-   - (b) A bound in the store on the bytes a gateway has stored (a
+5. *Reports.* It needs an approved gateway. Two things:
+   - *Stored bytes.* A gateway may file 120 reports an hour, each with up
+     to 66 MiB of parts (one of 2 MiB and one of 64,
+     `central-api/src/reports.rs`): about 7.7 GiB an hour from one.
+     Nothing bounds what one gateway, or all, have stored; the hour's
+     count is in memory and a restart starts it again.
+   - *The two upload slots.* A part that was never stored may be sent
+     again, and twice at once: one report an hour and two connections
+     that keep the pace (16 KiB in five seconds) without ever finishing
+     hold both slots, a minute at a time. Every other gateway's parts are
+     answered 429 meanwhile; the released gateway sends a part five
+     times, with about 70 seconds of waiting in all, and then leaves the
+     report without it.
+   - (a) One upload slot for one gateway was this review's first thought
+     and is not compatible: the released gateway sends two parts at once
+     and says it chose two because Central takes two (`baylee-gateway`,
+     `report/central.rs`, `UPLOADS`). With one slot it would be refused
+     by its own other upload, and with several reports waiting a part can
+     use up its five sends. What is compatible: more slots in all and at
+     most two for one gateway. Each slot is up to 64 MiB of memory, so how
+     many is the server's to say; two approved gateways then hold what one
+     holds now.
+   - (b) An hour's count for a gateway of uploads that ended unfinished;
+     past it, `Busy` for its uploads. It needs a number that a gateway on
+     a poor line, or one caught by a restart, never reaches.
+   - (c) A bound in the store on the bytes a gateway has stored (a
      migration and a number), refused with `Busy`.
-   - (c) A bound on all stored report bytes.
-   - Recommended: (a) at once, (b) with the owner's number.
+   - (d) A bound on all stored report bytes.
+   - Recommended: (c) and (b) with the owner's numbers; (a) where the
+     server's memory allows it.
 6. *Chat.* A device's inbox and a sender's outbox hold 5,000 deliveries
    and nothing deletes one that was delivered; a send to a group is
    refused whole while one recipient's device is full, so a contact can
@@ -4684,11 +4711,12 @@ construction: no type of `central-api` was touched).
 
 **Run.** Each fix's own tests are in its section. The six checks
 `AGENTS.md` names (`cargo xtask gate`, `postgres`, `smoke`, `secrets`,
-`crypto-scope` and `cargo deny check`) are run on the branch's last tree, which holds this section, before it is handed over; their last
-lines are in the review's hand-over note and not here, since this text is
-part of the tree they run on. `cargo audit --deny warnings` fails as
-before, on RUSTSEC-2026-0459; `Cargo.toml`, `Cargo.lock` and `deny.toml`
-are untouched.
+`crypto-scope` and `cargo deny check`) are run on the branch's last tree,
+which holds this section, before it is handed over; their last lines are
+in the review's hand-over note and not here, since this text is part of
+the tree they run on. `cargo audit --deny warnings` fails as before, on
+RUSTSEC-2026-0459 alone (`libsqlite3-sys`); `Cargo.toml`, `Cargo.lock`
+and `deny.toml` are untouched.
 
 Engineering review, not an audit.
 

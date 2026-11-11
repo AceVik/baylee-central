@@ -314,6 +314,12 @@ What the building decided beyond pass 2:
   missing or oversized `Content-Length`. Since 11.11.2026 the gateway's own
   body must keep a pace too (16 KiB in every five seconds until it is
   whole), so one that is withheld gives its slot back then, with `408`.
+  What that does not hold is an approved gateway that keeps the pace and
+  never finishes: a part that was not stored may be sent again, and twice
+  at once, so one gateway can hold both slots while other gateways' parts
+  are answered `429`. Open since 11.11.2026, with the bound on stored
+  bytes ([security assurance](security-assurance.md), "The review's other
+  findings").
 - **Triage asks for no fresh password; a purge does.** Triage is daily
   work, reversible and in the report's history; only the purge cannot be
   undone (`AdminRequest::fresh`).
