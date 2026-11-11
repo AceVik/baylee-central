@@ -80,8 +80,9 @@ impl DevelopmentServer {
     /// Serve the native account API through the same bounded loopback transport.
     /// Live mode requires an external TLS reverse proxy preserving the canonical Host.
     /// No forwarded headers confer identity or change credential destinations; the
-    /// proxy's `X-Forwarded-For` hop only shares out the places of late and large
-    /// bodies (`boundary.rs`).
+    /// proxy's `X-Forwarded-For` hop shares out the places of late and large
+    /// bodies (`boundary.rs`) and is the address the budgets and the guesses at
+    /// passwords are counted by (`addresses.rs`, `docs/native-login.md`).
     ///
     /// # Errors
     /// Rejects mismatched development endpoints, inadequate body capacity or listener failures.

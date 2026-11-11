@@ -583,7 +583,7 @@ impl IdentityService {
         self.limits
             .lock()
             .map_err(|_| Error::Unavailable)?
-            .request(&request, bearer, Instant::now())?;
+            .request(&request, bearer, place, Instant::now())?;
         Ok(self
             .dispatch(request, bearer, Surface::Native, Seen::default(), place)
             .await?
@@ -639,7 +639,7 @@ impl IdentityService {
         self.limits
             .lock()
             .map_err(|_| Error::Unavailable)?
-            .request(&request, session, Instant::now())?;
+            .request(&request, session, place, Instant::now())?;
         // Login keeps its anonymous budget and proof requirement. The old cookie
         // identifies only existing push consent after that proof is verified.
         let context = if matches!(&request, Request::LoginFinish { .. }) {

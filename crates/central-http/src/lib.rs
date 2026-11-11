@@ -6,6 +6,7 @@
 //! provisioning remain development-only; this is not a production launch path.
 #![forbid(unsafe_code)]
 
+mod addresses;
 mod boundary;
 mod browser;
 mod in_flight;

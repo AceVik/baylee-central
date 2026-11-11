@@ -104,6 +104,7 @@ fn real_native_login_restore_migration_and_adversarial_paths() {
         support::pairing::run(&http, &browser, &runtime, &operator);
         support::legacy::run(&http, &browser, &bridge, &store, &runtime, &operator);
         support::notifications::run(&http, &browser, &bridge, &store, &runtime);
+        support::guessing::run(&http, &browser);
     }));
     // Cleanup runs even if an assertion panics; listeners and pools belong to this fixture only.
     let _ = stop.send(());

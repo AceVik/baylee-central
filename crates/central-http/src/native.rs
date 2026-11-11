@@ -1,15 +1,22 @@
-use super::boundary::{Pace, REJECTED, UPLOAD_PACE, paced, timed_out};
+use super::{
+    addresses::Budgets,
+    boundary::{Origin, Pace, REJECTED, UPLOAD_PACE, paced, timed_out},
+    in_flight::Client,
+};
 use axum::{
     Router,
     body::{Body, Bytes},
     extract::{Path, Request, State},
-    http::{HeaderMap, StatusCode, header},
+    http::{Extensions, HeaderMap, StatusCode, header},
     response::{IntoResponse, Response},
     routing::{post, put},
 };
 use central_api::{Error, Token, reports::Part};
-use central_identity::IdentityService;
-use std::sync::Arc;
+use central_identity::{IdentityService, Place};
+use std::{
+    sync::{Arc, Mutex},
+    time::Instant,
+};
 use tokio::sync::Semaphore;
 
 /// Uploads of report parts at once: each holds at most its announced
@@ -20,6 +27,8 @@ const UPLOADS: usize = 2;
 struct Native {
     identity: Arc<IdentityService>,
     uploads: Arc<Semaphore>,
+    /// What each client address may ask in its window (`addresses.rs`).
+    budgets: Arc<Mutex<Budgets>>,
 }
 
 pub(crate) fn router(identity: Arc<IdentityService>) -> Router {
@@ -32,7 +41,14 @@ pub(crate) fn router(identity: Arc<IdentityService>) -> Router {
         .with_state(Native {
             identity,
             uploads: Arc::new(Semaphore::new(UPLOADS)),
+            budgets: Arc::default(),
         })
+}
+
+/// The client address the boundary attached, if it knows one. It shares
+/// out budgets and grants nothing (`boundary.rs`).
+fn origin(extensions: &Extensions) -> Option<Client> {
+    extensions.get::<Origin>().and_then(|origin| origin.0)
 }
 
 /// Fixed public vocabulary; no parser/database/crypto diagnostics reach the peer.
@@ -80,8 +96,13 @@ async fn part_body(body: Body, length: usize, pace: Pace) -> Result<Bytes, Stopp
         })
 }
 
-async fn call(State(native): State<Native>, headers: HeaderMap, body: Bytes) -> Response {
-    match process(&native.identity, &headers, &body).await {
+async fn call(
+    State(native): State<Native>,
+    extensions: Extensions,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Response {
+    match process(&native, origin(&extensions), &headers, &body).await {
         Ok(bytes) => ([(header::CONTENT_TYPE, "application/json")], bytes).into_response(),
         Err(error) => failure(error),
     }
@@ -104,22 +125,49 @@ fn credential(headers: &HeaderMap, content_type: &str) -> Result<Option<Token>, 
         .transpose()
 }
 
+/// One native request from `from`: its address's budget for the operation
+/// first (`addresses.rs`), then the service, which is told the address for
+/// its guesses at passwords and its share of the requests without a session.
 async fn process(
-    identity: &IdentityService,
+    native: &Native,
+    from: Option<Client>,
     headers: &HeaderMap,
     body: &[u8],
 ) -> Result<Vec<u8>, Error> {
     let token = credential(headers, "application/json")?;
     let request = central_api::decode(body)?;
-    let response = identity.handle(request, token.as_ref()).await?;
+    if let Some(client) = from {
+        // The guard is gone before anything is awaited.
+        let charged = native
+            .budgets
+            .lock()
+            .map_err(|_| Error::Unavailable)?
+            .charge(&request, client, Instant::now());
+        if !charged {
+            return Err(Error::Busy);
+        }
+    }
+    let response = native
+        .identity
+        .handle_from(request, token.as_ref(), from.map(Place::from))
+        .await?;
     central_api::encode(&response)
 }
 
 /// `POST /v1/reports`: `201 {"report_id": "<32 hex>"}`.
-async fn file(State(native): State<Native>, headers: HeaderMap, body: Bytes) -> Response {
+async fn file(
+    State(native): State<Native>,
+    extensions: Extensions,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Response {
     let filed = async {
         let token = credential(&headers, "application/json")?;
-        native.identity.file_report(token.as_ref(), &body).await
+        let place = origin(&extensions).map(Place::from);
+        native
+            .identity
+            .file_report(token.as_ref(), &body, place)
+            .await
     };
     match filed.await {
         Ok(id) => (
@@ -150,9 +198,10 @@ async fn file_part(
         else {
             return Err(Stopped::Failed(Error::Rejected));
         };
+        let place = origin(&head.extensions).map(Place::from);
         let upload = native
             .identity
-            .report_upload(token.as_ref(), report, part)
+            .report_upload(token.as_ref(), report, part, place)
             .await?;
         let declared = head
             .headers

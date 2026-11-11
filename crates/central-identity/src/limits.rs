@@ -1,3 +1,4 @@
+use super::Place;
 use central_api::{Error, Token, wire::Request};
 use std::{
     collections::BTreeMap,
@@ -27,9 +28,78 @@ pub(super) const LEGACY_PER_MINUTE: u32 = 30;
 /// store's lockout counts the failures that pass this.
 pub(super) const LEGACY_PER_NAME: u32 = 5;
 
+/// Requests a minute from one place that draw on [`GLOBAL_PER_SECOND`]: a
+/// little under a third of that minute's 1,920, so one address alone never
+/// spends everyone's sign-ins, and far more than a house or an office
+/// needs (a sign-in is three to five such requests).
+pub(super) const PLACE_PER_MINUTE: u32 = 600;
+/// A client's pairing requests a minute from one place: a pairing polls
+/// once a second, so four at once, of the 64 a second all places share.
+pub(super) const PLACE_PAIRING_PER_MINUTE: u32 = 240;
+/// Places one such budget remembers. Never full of live minutes: fewer
+/// requests pass the shared windows between two sweeps and the minute
+/// before them (at most 64 a second) than it holds.
+pub(super) const PLACES: usize = 8_192;
+const _: () = assert!(PLACES > 2 * 60 * 64);
+const MINUTE: Duration = Duration::from_secs(60);
+
+/// What each place drew of one shared budget in its current minute, in
+/// memory only; a place is forgotten at most a minute after its minute.
+#[derive(Default)]
+struct Places {
+    windows: BTreeMap<Place, (Instant, u32)>,
+    swept: Option<Instant>,
+}
+
+impl Places {
+    /// Whether `place` may draw once more of `limit` a minute. A request
+    /// the listener knows no place of meets the shared budget alone.
+    fn fits(&self, place: Option<Place>, now: Instant, limit: u32) -> bool {
+        place
+            .and_then(|place| self.windows.get(&place))
+            .is_none_or(|(start, used)| {
+                now.saturating_duration_since(*start) >= MINUTE || *used < limit
+            })
+    }
+
+    /// Count one request that passed the shared budget.
+    fn spend(&mut self, place: Option<Place>, now: Instant) {
+        let Some(place) = place else {
+            return;
+        };
+        let due = self
+            .swept
+            .is_none_or(|swept| now.saturating_duration_since(swept) >= MINUTE);
+        if due {
+            self.windows
+                .retain(|_, (start, _)| now.saturating_duration_since(*start) < MINUTE);
+            self.swept = Some(now);
+        }
+        if self.windows.len() >= PLACES && !self.windows.contains_key(&place) {
+            let oldest = self
+                .windows
+                .iter()
+                .min_by_key(|(_, (start, _))| *start)
+                .map(|(place, _)| *place);
+            if let Some(oldest) = oldest {
+                self.windows.remove(&oldest);
+            }
+        }
+        let window = self.windows.entry(place).or_insert((now, 0));
+        if now.saturating_duration_since(window.0) >= MINUTE {
+            *window = (now, 0);
+        }
+        window.1 = window.1.saturating_add(1);
+    }
+}
+
 #[derive(Default)]
 pub(super) struct Limits {
     global: Option<(Instant, u32)>,
+    /// Each place's share of [`GLOBAL_PER_SECOND`] ([`PLACE_PER_MINUTE`]).
+    public: Places,
+    /// Each place's share of the pairing window ([`PLACE_PAIRING_PER_MINUTE`]).
+    paired: Places,
     /// Guesses at passwords: sign-ins, password changes and deletions
     /// (`guesses.rs`).
     pub(super) guesses: super::guesses::Guesses,
@@ -60,10 +130,17 @@ impl Window {
     }
 }
 impl Limits {
+    /// Count a request against what all clients share, before anything
+    /// else is looked at. `place` is where it came from: a request that
+    /// needs no session draws on its place's share first
+    /// ([`PLACE_PER_MINUTE`], [`PLACE_PAIRING_PER_MINUTE`]), so one address
+    /// cannot spend what everyone signs in with. Nothing is spent when a
+    /// budget is used up.
     pub(super) fn request(
         &mut self,
         request: &Request,
         bearer: Option<&Token>,
+        place: Option<Place>,
         now: Instant,
     ) -> Result<(), Error> {
         // A client's claim, polls and redeem carry no session; their own
@@ -72,7 +149,12 @@ impl Limits {
             request,
             Request::PairClaim { .. } | Request::PairPoll { .. } | Request::PairRedeem { .. }
         ) {
-            return self.pairing.charge(now, 64);
+            if !self.paired.fits(place, now, PLACE_PAIRING_PER_MINUTE) {
+                return Err(Error::Busy);
+            }
+            self.pairing.charge(now, 64)?;
+            self.paired.spend(place, now);
+            return Ok(());
         }
         if matches!(
             request,
@@ -95,10 +177,10 @@ impl Limits {
                 | Request::ResetFinish { .. }
                 | Request::LegacyLogin { .. }
         ) {
-            return self.global(now);
+            return self.global(place, now);
         }
         let Some(bearer) = bearer else {
-            return self.global(now);
+            return self.global(place, now);
         };
         // Separate bounded budgets keep a ciphertext transfer from exhausting
         // login or revocation checks. A bearer is still verified by dispatch;
@@ -134,7 +216,19 @@ impl Limits {
             .or_default()
             .charge(now, if control { 128 } else { 64 })
     }
-    pub(super) fn global(&mut self, now: Instant) -> Result<(), Error> {
+    /// Spend one of the [`GLOBAL_PER_SECOND`] requests everyone shares,
+    /// and one of the [`PLACE_PER_MINUTE`] its place may draw of them.
+    /// Nothing is spent when either is used up.
+    pub(super) fn global(&mut self, place: Option<Place>, now: Instant) -> Result<(), Error> {
+        if !self.public.fits(place, now, PLACE_PER_MINUTE) {
+            return Err(Error::Busy);
+        }
+        self.everyone(now)?;
+        self.public.spend(place, now);
+        Ok(())
+    }
+
+    fn everyone(&mut self, now: Instant) -> Result<(), Error> {
         let (start, used) = self.global.get_or_insert((now, 0));
         if now.duration_since(*start) >= Duration::from_secs(1) {
             *start = now;
@@ -178,7 +272,7 @@ impl Limits {
     pub(super) fn legacy_from(
         &mut self,
         typed: &str,
-        place: Option<super::Place>,
+        place: Option<Place>,
         now: Instant,
     ) -> Result<super::guesses::Guess, Error> {
         self.guesses.legacy_fits(place, now)?;
@@ -230,11 +324,11 @@ mod tests {
         let token = Token::generate().unwrap();
         for _ in 0..64 {
             limits
-                .request(&Request::CreateObject, Some(&token), now)
+                .request(&Request::CreateObject, Some(&token), None, now)
                 .unwrap();
         }
         assert_eq!(
-            limits.request(&Request::CreateObject, Some(&token), now),
+            limits.request(&Request::CreateObject, Some(&token), None, now),
             Err(Error::Busy)
         );
         limits
@@ -243,20 +337,167 @@ mod tests {
                     username: "synthetic".into(),
                 },
                 None,
+                None,
                 now,
             )
             .unwrap();
         limits
-            .request(&Request::SessionStatus, Some(&token), now)
+            .request(&Request::SessionStatus, Some(&token), None, now)
             .unwrap();
-        limits.request(&Request::Logout, Some(&token), now).unwrap();
+        limits
+            .request(&Request::Logout, Some(&token), None, now)
+            .unwrap();
         limits
             .request(
                 &Request::CreateObject,
                 Some(&token),
+                None,
                 now + Duration::from_secs(1),
             )
             .unwrap();
+    }
+
+    fn place(n: u32) -> Place {
+        Place::V4(n.to_be_bytes())
+    }
+
+    /// `count` requests of `place`, one every `step` milliseconds from
+    /// `from` on; how many were served.
+    fn served(
+        limits: &mut Limits,
+        request: &Request,
+        from: Option<Place>,
+        start: Instant,
+        count: u32,
+        step: u64,
+    ) -> u32 {
+        let mut served = 0;
+        for index in 0..u64::from(count) {
+            let now = start + Duration::from_millis(index * step);
+            if limits.request(request, None, from, now).is_ok() {
+                served += 1;
+            }
+        }
+        served
+    }
+
+    #[test]
+    fn one_place_draws_its_share_of_what_everyone_signs_in_with_and_no_more() {
+        let start = Instant::now();
+        let mut limits = Limits::default();
+        let discover = Request::Discover {
+            username: "synthetic".into(),
+        };
+        // As fast as the shared budget lets one address go (32 a second):
+        // 600 in the minute, whatever it asks, and nothing after.
+        assert_eq!(
+            served(&mut limits, &discover, Some(place(1)), start, 700, 40),
+            PLACE_PER_MINUTE
+        );
+        let later = start + Duration::from_secs(30);
+        for request in [
+            &discover,
+            &Request::Terms,
+            &Request::SessionStatus,
+            &Request::LoginFinish {
+                attempt: Token::generate().unwrap(),
+                message: Vec::new(),
+            },
+        ] {
+            assert_eq!(
+                limits.request(request, None, Some(place(1)), later),
+                Err(Error::Busy)
+            );
+            // Everyone else is served meanwhile, and so is a request the
+            // listener knows no place of.
+            limits
+                .request(request, None, Some(place(2)), later)
+                .unwrap();
+            limits.request(request, None, None, later).unwrap();
+        }
+        // A request with a session draws on its session's budgets instead.
+        let token = Token::generate().unwrap();
+        limits
+            .request(&Request::SessionStatus, Some(&token), Some(place(1)), later)
+            .unwrap();
+        // Its minute over, the place is served again.
+        let next = start + Duration::from_secs(60);
+        limits
+            .request(&discover, None, Some(place(1)), next)
+            .unwrap();
+        // Refusals spent nothing of anyone's: the second is still whole.
+        assert_eq!(
+            served(&mut limits, &discover, Some(place(3)), next, 40, 0),
+            31
+        );
+    }
+
+    #[test]
+    fn a_report_s_routes_draw_on_the_same_share() {
+        let start = Instant::now();
+        let mut limits = Limits::default();
+        let mut passed = 0;
+        for index in 0..700_u64 {
+            let now = start + Duration::from_millis(index * 40);
+            if limits.global(Some(place(1)), now).is_ok() {
+                passed += 1;
+            }
+        }
+        assert_eq!(passed, PLACE_PER_MINUTE);
+        let later = start + Duration::from_secs(30);
+        assert_eq!(limits.global(Some(place(1)), later), Err(Error::Busy));
+        assert_eq!(
+            limits.request(&Request::Terms, None, Some(place(1)), later),
+            Err(Error::Busy)
+        );
+        limits.global(Some(place(2)), later).unwrap();
+    }
+
+    #[test]
+    fn one_place_polls_four_pairings_and_spends_no_sign_in() {
+        let start = Instant::now();
+        let mut limits = Limits::default();
+        let poll = Request::PairPoll {
+            handle: Token::generate().unwrap(),
+        };
+        assert_eq!(
+            served(&mut limits, &poll, Some(place(1)), start, 300, 20),
+            PLACE_PAIRING_PER_MINUTE
+        );
+        let later = start + Duration::from_secs(30);
+        assert_eq!(
+            limits.request(&poll, None, Some(place(1)), later),
+            Err(Error::Busy)
+        );
+        limits.request(&poll, None, Some(place(2)), later).unwrap();
+        // The polls spent nothing of the place's other requests.
+        limits
+            .request(&Request::Terms, None, Some(place(1)), later)
+            .unwrap();
+    }
+
+    #[test]
+    fn places_are_forgotten_after_their_minute_and_none_is_refused_for_room() {
+        let start = Instant::now();
+        let mut places = Places::default();
+        for n in 0..u32::try_from(PLACES).unwrap() {
+            places.spend(Some(place(n)), start);
+        }
+        assert_eq!(places.windows.len(), PLACES);
+        // Full of live minutes (more than the shared budget lets in): a
+        // newcomer takes the oldest one's room.
+        let soon = start + Duration::from_secs(1);
+        places.spend(Some(place(u32::MAX)), soon);
+        assert_eq!(places.windows.len(), PLACES);
+        assert!(!places.fits(Some(place(u32::MAX)), soon, 1));
+        // A minute on, the next request sweeps everything that passed.
+        let later = start + Duration::from_secs(61);
+        places.spend(Some(place(7)), later);
+        assert_eq!(places.windows.len(), 1);
+        // No place: nothing is kept, and nothing refuses.
+        places.spend(None, later);
+        assert!(places.fits(None, later, 0));
+        assert_eq!(places.windows.len(), 1);
     }
     #[test]
     fn supplying_a_bearer_never_bypasses_the_authentication_budget() {
@@ -267,11 +508,11 @@ mod tests {
             username: "synthetic".into(),
         };
         for _ in 0..32 {
-            limits.request(&request, Some(&token), now).unwrap();
+            limits.request(&request, Some(&token), None, now).unwrap();
         }
-        assert_eq!(limits.request(&request, None, now), Err(Error::Busy));
+        assert_eq!(limits.request(&request, None, None, now), Err(Error::Busy));
         assert_eq!(
-            limits.request(&request, Some(&Token::generate().unwrap()), now),
+            limits.request(&request, Some(&Token::generate().unwrap()), None, now),
             Err(Error::Busy)
         );
     }
@@ -287,18 +528,18 @@ mod tests {
         ] {
             let mut limits = Limits::default();
             for _ in 0..GLOBAL_PER_SECOND / 2 {
-                limits.request(&request, None, now).unwrap();
+                limits.request(&request, None, None, now).unwrap();
                 limits
-                    .request(&request, Some(&Token::generate().unwrap()), now)
+                    .request(&request, Some(&Token::generate().unwrap()), None, now)
                     .unwrap();
             }
-            assert_eq!(limits.request(&request, None, now), Err(Error::Busy));
+            assert_eq!(limits.request(&request, None, None, now), Err(Error::Busy));
             assert_eq!(
-                limits.request(&request, Some(&Token::generate().unwrap()), now),
+                limits.request(&request, Some(&Token::generate().unwrap()), None, now),
                 Err(Error::Busy)
             );
             limits
-                .request(&request, None, now + Duration::from_secs(1))
+                .request(&request, None, None, now + Duration::from_secs(1))
                 .unwrap();
         }
     }
@@ -311,11 +552,14 @@ mod tests {
         let figures = Request::PublicFigures { after: None };
         // Public: a bearer sent along buys no budget of its own.
         for _ in 0..GLOBAL_PER_SECOND {
-            limits.request(&figures, Some(&token), now).unwrap();
+            limits.request(&figures, Some(&token), None, now).unwrap();
         }
         for request in [&figures, &Request::GatewayDirectory { after: None }] {
-            assert_eq!(limits.request(request, None, now), Err(Error::Busy));
-            assert_eq!(limits.request(request, Some(&token), now), Err(Error::Busy));
+            assert_eq!(limits.request(request, None, None, now), Err(Error::Busy));
+            assert_eq!(
+                limits.request(request, Some(&token), None, now),
+                Err(Error::Busy)
+            );
         }
         // A pulse and a heartbeat are one credential's same 64 a second.
         let metadata = || central_api::gateway::GatewayMetadata {
@@ -336,20 +580,23 @@ mod tests {
         };
         for sent in 0..64 {
             let request = if sent % 2 == 0 { &pulse } else { &heartbeat };
-            limits.request(request, Some(&token), now).unwrap();
+            limits.request(request, Some(&token), None, now).unwrap();
         }
         for request in [&pulse, &heartbeat] {
-            assert_eq!(limits.request(request, Some(&token), now), Err(Error::Busy));
+            assert_eq!(
+                limits.request(request, Some(&token), None, now),
+                Err(Error::Busy)
+            );
         }
         // Without a credential a pulse is one more public request, refused
         // here with the budget and by dispatch otherwise.
-        assert_eq!(limits.request(&pulse, None, now), Err(Error::Busy));
+        assert_eq!(limits.request(&pulse, None, None, now), Err(Error::Busy));
         // Neither took anything from a session's checks.
         limits
-            .request(&Request::SessionStatus, Some(&token), now)
+            .request(&Request::SessionStatus, Some(&token), None, now)
             .unwrap();
         limits
-            .request(&figures, None, now + Duration::from_secs(1))
+            .request(&figures, None, None, now + Duration::from_secs(1))
             .unwrap();
     }
 
@@ -358,10 +605,10 @@ mod tests {
         let now = Instant::now();
         let mut limits = Limits::default();
         for _ in 0..32 {
-            limits.global(now).unwrap();
+            limits.global(None, now).unwrap();
         }
-        assert_eq!(limits.global(now), Err(Error::Busy));
-        limits.global(now + Duration::from_secs(1)).unwrap();
+        assert_eq!(limits.global(None, now), Err(Error::Busy));
+        limits.global(None, now + Duration::from_secs(1)).unwrap();
         for _ in 0..8 {
             limits.account([0; 16], now, 1).unwrap();
         }
