@@ -1,8 +1,9 @@
 //! The native listener's budgets per client address (`docs/native-login.md`
 //! §"Guessing a password online"), in memory only: how often one address
-//! may ask what a guesser or a collector of names repeats. The browser
-//! listener has its own (`browser.rs`), with the same numbers where both
-//! serve an operation. The address is the boundary's
+//! may ask what a guesser or a collector of names repeats, and how often
+//! it may read the public directory and figures. The browser listener has
+//! its own (`browser.rs`), with the same numbers where both serve an
+//! operation. The address is the boundary's
 //! ([`super::boundary::Origin`]); a request it knows none of has no budget
 //! here and meets the account service's alone. A budget refuses with the
 //! route's `Busy` and never grants anything.
@@ -27,6 +28,11 @@ pub(crate) const LEGACY: u32 = 10;
 /// for typing it.
 pub(crate) const RESET: u32 = 10;
 
+/// Readings a minute of the gateway directory and the public figures
+/// together, as on the browser listener: both are read in pages, side by
+/// side, and a minute's budget leaves room for paging.
+pub(crate) const DIRECTORY: u32 = 60;
+
 /// Each budget's addresses; one is forgotten once its window has passed.
 #[derive(Default)]
 pub(crate) struct Budgets {
@@ -34,6 +40,7 @@ pub(crate) struct Budgets {
     login: Book,
     legacy: Book,
     reset: Book,
+    directory: Book,
 }
 
 impl Budgets {
@@ -47,6 +54,9 @@ impl Budgets {
             Request::LoginStart { .. } => self.login.charge(client, now, LOGIN, MINUTE),
             Request::LegacyLogin { .. } => self.legacy.charge(client, now, LEGACY, MINUTE),
             Request::ResetStart { .. } => self.reset.charge(client, now, RESET, HOUR),
+            Request::GatewayDirectory { .. } | Request::PublicFigures { .. } => {
+                self.directory.charge(client, now, DIRECTORY, MINUTE)
+            }
             _ => true,
         }
     }
@@ -149,6 +159,38 @@ mod tests {
                 start
             ));
         }
+    }
+
+    /// The directory and the public figures are one budget, as on the
+    /// browser listener: they are read side by side, page after page.
+    #[test]
+    fn the_directory_and_the_figures_share_one_budget_an_address() {
+        let start = Instant::now();
+        let mut budgets = Budgets::default();
+        let directory = Request::GatewayDirectory { after: None };
+        let figures = Request::PublicFigures {
+            after: Some([7; 16]),
+        };
+        let mut passed = 0;
+        for turn in 0..2 * DIRECTORY {
+            let request = if turn % 2 == 0 { &directory } else { &figures };
+            passed += u32::from(budgets.charge(request, client(1), start));
+        }
+        assert_eq!(passed, DIRECTORY);
+        let late = start + MINUTE.saturating_sub(Duration::from_secs(1));
+        for request in [&directory, &figures] {
+            assert!(!budgets.charge(request, client(1), late));
+            // Another address is served meanwhile.
+            assert!(budgets.charge(request, client(2), late));
+        }
+        // The address's other budgets are whole.
+        for (request, limit, _) in requests() {
+            assert_eq!(
+                served(&mut budgets, &request, client(1), late, limit + 1),
+                limit
+            );
+        }
+        assert!(budgets.charge(&directory, client(1), start + MINUTE));
     }
 
     #[test]
