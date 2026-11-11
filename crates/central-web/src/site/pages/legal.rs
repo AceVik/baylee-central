@@ -271,7 +271,7 @@ pub fn fan_content(cx: &Context<'_>) -> Built {
             <h2>{words::fc_means_title(lang)}</h2>
             <p>{words::fc_means(lang)}</p>
             <p>{words::fc_images(lang)}</p>
-            <p>{link}</p>
+            <p class="lone-link">{link}</p>
         </div>
     }
     .into_any();

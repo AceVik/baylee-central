@@ -5,7 +5,8 @@ use leptos::prelude::*;
 
 use crate::words::Piece;
 
-/// A message with tags: `b`, `i`, `code`, `kbd` and `glow` drawn as such; any other
+/// A message with tags: `b`, `i`, `code`, `kbd` and `glow` drawn as such, `nb`
+/// as words a line break does not part (a sentence of a title); any other
 /// tag as a link where `href` names one for it, else as its text. Nothing
 /// in a message is ever read as HTML.
 pub fn rich(pieces: Vec<Piece>, href: impl Fn(&str) -> Option<String>) -> AnyView {
@@ -18,6 +19,7 @@ pub fn rich(pieces: Vec<Piece>, href: impl Fn(&str) -> Option<String>) -> AnyVie
             Some("code") => view! { <code translate="no">{piece.text}</code> }.into_any(),
             Some("kbd") => view! { <kbd>{piece.text}</kbd> }.into_any(),
             Some("glow") => view! { <span class="glow">{piece.text}</span> }.into_any(),
+            Some("nb") => view! { <span class="keep">{piece.text}</span> }.into_any(),
             Some(tag) => match href(tag) {
                 Some(url) if url.starts_with("https://") => {
                     view! { <a href=url target="_blank" rel="noopener noreferrer">{piece.text}</a> }

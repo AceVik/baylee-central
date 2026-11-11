@@ -379,6 +379,7 @@ body:has(dialog[open]) .wave {
   font-size: clamp(1rem, 1.12vw, 1.12rem);
   line-height: 1.4;
   text-shadow: 0 1px 12px color-mix(in srgb, var(--bg) 82%, transparent);
+  text-wrap: balance;
 }
 
 /* ---- the logo: it opens Baylee's album ------------------------------------ */
@@ -945,5 +946,12 @@ body:has(dialog[open]) .wave {
   .hero-actions .button {
     padding-inline: 0.95em;
     font-size: 0.88rem;
+  }
+}
+
+/* the narrowest phones: each of the title's sentences keeps its line */
+@media (max-width: 340px) {
+  .hero h1 {
+    font-size: 1.85rem;
   }
 }

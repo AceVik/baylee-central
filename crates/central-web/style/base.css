@@ -188,6 +188,13 @@ p {
   text-wrap: pretty;
 }
 
+/* words a line break does not part: a sentence of a title moves to the next
+   line whole, and wraps only where it is wider than the line */
+.keep,
+h1 .glow {
+  display: inline-block;
+}
+
 li,
 dd {
   text-wrap: pretty;
