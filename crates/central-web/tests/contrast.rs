@@ -47,60 +47,67 @@ fn ratio(a: [f64; 3], b: [f64; 3]) -> f64 {
 }
 
 /// Text on grounds: 4.5:1.
-const TEXT: [(&str, &str); 39] = [
-    ("--ink", "--ground"),
-    ("--ink", "--ground-alt"),
-    ("--ink", "--surface"),
-    ("--ink", "--surface-raised"),
+const TEXT: [(&str, &str); 45] = [
+    ("--ink", "--bg"),
+    ("--ink", "--bg-alt"),
+    ("--ink", "--panel-solid"),
+    ("--ink", "--panel-2"),
     ("--ink", "--bubble-own"),
     ("--ink", "--warn-tint"),
     ("--ink", "--ok-tint"),
     ("--ink", "--bad-tint"),
-    ("--ink-soft", "--ground"),
-    ("--ink-soft", "--ground-alt"),
-    ("--ink-soft", "--surface"),
-    ("--ink-soft", "--surface-raised"),
-    ("--ink-faint", "--ground"),
-    ("--ink-faint", "--ground-alt"),
-    ("--ink-faint", "--surface"),
-    ("--title", "--ground"),
-    ("--title", "--ground-alt"),
-    ("--title", "--surface"),
-    ("--accent", "--ground"),
-    ("--accent", "--ground-alt"),
-    ("--accent", "--surface"),
-    ("--accent", "--surface-raised"),
-    ("--on-action", "--action"),
-    ("--on-action", "--action-hover"),
-    ("--ok", "--surface"),
-    ("--warn", "--ground"),
-    ("--warn", "--surface"),
-    ("--bad", "--ground"),
-    ("--bad", "--surface"),
-    // the messenger: badges, times in one's own bubbles, a changed key's
-    // mark, and initials on the six avatar tints
-    ("--surface", "--accent"),
+    ("--ink-soft", "--bg"),
+    ("--ink-soft", "--bg-alt"),
+    ("--ink-soft", "--panel-solid"),
+    ("--ink-soft", "--panel-2"),
+    ("--ink-faint", "--bg"),
+    ("--ink-faint", "--bg-alt"),
+    ("--ink-faint", "--panel-solid"),
     ("--ink-faint", "--bubble-own"),
+    ("--title", "--bg"),
+    ("--title", "--bg-alt"),
+    ("--title", "--panel-solid"),
+    ("--title", "--panel-2"),
+    // links, eyebrows and the gold the old look writes in
+    ("--link", "--bg"),
+    ("--link", "--bg-alt"),
+    ("--link", "--panel-solid"),
+    ("--link-hover", "--panel-2"),
+    ("--violet", "--bg"),
+    ("--violet", "--bg-alt"),
+    ("--violet", "--panel-solid"),
+    ("--violet", "--panel-2"),
+    ("--gold", "--bg"),
+    ("--gold", "--panel-solid"),
+    ("--gold-ink", "--gold"),
+    ("--gold-ink", "--gold-2"),
+    ("--ok", "--panel-solid"),
+    ("--warn", "--bg"),
+    ("--warn", "--panel-solid"),
+    ("--bad", "--bg"),
+    ("--bad", "--panel-solid"),
     ("--bad", "--bad-tint"),
+    // the messenger: badges, and initials on the six avatar tints
+    ("--panel-solid", "--violet"),
     ("--on-avatar", "--avatar-0"),
     ("--on-avatar", "--avatar-1"),
     ("--on-avatar", "--avatar-2"),
     ("--on-avatar", "--avatar-3"),
     ("--on-avatar", "--avatar-4"),
     ("--on-avatar", "--avatar-5"),
-    ("--ink-faint", "--ground-alt"),
 ];
 
 /// Non-text that carries meaning (the focus ring, field borders, the gold
-/// button's edge): 3:1.
-const GRAPHICS: [(&str, &str); 7] = [
-    ("--focus", "--ground"),
-    ("--focus", "--surface"),
-    ("--focus", "--surface-raised"),
-    ("--edge", "--ground"),
-    ("--edge", "--surface"),
-    ("--action-edge", "--ground"),
-    ("--accent", "--surface-raised"),
+/// button against the page): 3:1.
+const GRAPHICS: [(&str, &str); 8] = [
+    ("--focus", "--bg"),
+    ("--focus", "--panel-solid"),
+    ("--focus", "--panel-2"),
+    ("--field-edge", "--bg"),
+    ("--field-edge", "--panel-solid"),
+    ("--gold", "--bg"),
+    ("--gold", "--panel-solid"),
+    ("--violet", "--panel-2"),
 ];
 
 fn check(scheme: &str, colours: &HashMap<String, [f64; 3]>) -> Vec<String> {
@@ -124,16 +131,18 @@ fn check(scheme: &str, colours: &HashMap<String, [f64; 3]>) -> Vec<String> {
 
 #[test]
 fn both_schemes_meet_aa() {
-    let light = block(":root {");
-    let dark = block(":root[data-theme=\"dark\"] {");
+    let dark = block(":root {");
+    // light overrides the blue hour's names; the rest it inherits
+    let mut light = dark.clone();
+    light.extend(block(":root[data-theme=\"light\"] {"));
     let mut failures = check("light", &light);
     failures.extend(check("dark", &dark));
     assert!(failures.is_empty(), "{}", failures.join("\n"));
 }
 
 #[test]
-fn the_dark_scheme_is_the_same_for_the_device_and_the_choice() {
-    let chosen = block(":root[data-theme=\"dark\"] {");
-    let device = block(":root:not([data-theme=\"light\"]) {");
-    assert_eq!(chosen, device, "the two dark blocks must agree");
+fn the_light_scheme_is_the_same_for_the_device_and_the_choice() {
+    let chosen = block(":root[data-theme=\"light\"] {");
+    let device = block(":root:not([data-theme=\"dark\"]) {");
+    assert_eq!(chosen, device, "the two light blocks must agree");
 }

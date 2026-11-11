@@ -2,9 +2,11 @@
 // first paint (WebAssembly cannot): it applies the colour scheme the
 // visitor chose (localStorage "baylee-site-theme", as before), shows the
 // colour switch, names the account link while a session is remembered
-// ("baylee-central-session", which holds only when it ends), and opens
-// dialogs in browsers without invoker commands. Nothing here is required:
-// without it the device's scheme decides and every page still works.
+// ("baylee-central-session", which holds only when it ends), opens
+// dialogs in browsers without invoker commands, closes the dropdowns as a
+// menu closes, and pauses the hero's light off screen. Nothing here is
+// required: without it the device's scheme decides and every page still
+// works.
 (() => {
   "use strict";
   const root = document.documentElement;
@@ -72,6 +74,15 @@
         const text = link.querySelector("span");
         if (text) text.textContent = link.dataset.account;
       }
+      for (const line of document.querySelectorAll("[data-signed-out]")) line.hidden = true;
+    }
+    // The hero's slow light moves only while the hero is on screen.
+    const hero = document.querySelector(".hero");
+    if (hero && typeof IntersectionObserver === "function") {
+      new IntersectionObserver(([entry]) => {
+        if (entry?.isIntersecting) delete hero.dataset.away;
+        else hero.dataset.away = "";
+      }).observe(hero);
     }
     // Invoker commands (<button commandfor command>) where the browser has none.
     if (!("command" in HTMLButtonElement.prototype)) {
@@ -87,6 +98,35 @@
   };
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", ready, { once: true });
   else ready();
+
+  // The dropdowns (the language menu, the download's other systems) are
+  // <details data-menu>: they open without script; with it, one at a time,
+  // and they close on a press outside, on Escape (the keyboard back on
+  // their button) and when the keyboard leaves them.
+  const menus = () => document.querySelectorAll("details[data-menu][open]");
+  document.addEventListener(
+    "toggle",
+    (event) => {
+      const opened = event.target;
+      if (!(opened instanceof HTMLDetailsElement) || !opened.open || !opened.matches("[data-menu]")) return;
+      for (const other of menus()) if (other !== opened) other.open = false;
+    },
+    true,
+  );
+  document.addEventListener("pointerdown", (event) => {
+    for (const menu of menus()) if (!(event.target instanceof Node && menu.contains(event.target))) menu.open = false;
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") return;
+    for (const menu of menus()) {
+      menu.open = false;
+      menu.querySelector("summary")?.focus();
+    }
+  });
+  document.addEventListener("focusout", (event) => {
+    const menu = event.target instanceof Element ? event.target.closest("details[data-menu][open]") : null;
+    if (menu && !(event.relatedTarget instanceof Node && menu.contains(event.relatedTarget))) menu.open = false;
+  });
 
   // An island's form works only once the islands run. Until then the
   // browser's own submit would send its fields to the page's address, and

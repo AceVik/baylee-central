@@ -6,14 +6,15 @@ use leptos::prelude::*;
 use leptos::tachys::html::attribute::custom::custom_attribute;
 use serde_json::json;
 
-use super::download::best_link;
+use super::download::download_block;
 use super::{Built, section_head};
 use crate::data::{CardStatus, Gateway};
 use crate::format;
 use crate::rich::{icon, paragraphs, plain, rich};
 use crate::site::icons;
-use crate::site::shell::{CENTRAL_REPOSITORY, Meta, REPOSITORY};
+use crate::site::shell::{CENTRAL_REPOSITORY, DISCORD, Meta, REPOSITORY, WHATSAPP};
 use crate::site::{Context, Page};
+use crate::solid;
 use crate::words::{self, Lang};
 
 /// The client's screenshots (`npm run content` of the old site, now
@@ -88,8 +89,8 @@ pub fn page(cx: &Context<'_>) -> Built {
     }));
     meta.data.push(super::download::software(cx));
     let body = view! {
+        {strip(cx)}
         {hero(cx)}
-        {status(cx)}
         {cards(lang, cx.data.cards.as_ref())}
         {screens(cx)}
         {about(lang)}
@@ -114,101 +115,154 @@ fn hero(cx: &Context<'_>) -> impl IntoView + use<> {
         "signin" => Some(format!("/{code}/signin")),
         _ => None,
     });
+    let world = |kind: &str| {
+        format!(
+            "{} 640w, {} 960w, {} 1600w",
+            assets.url(&format!("img/world-640.{kind}")),
+            assets.url(&format!("img/world-960.{kind}")),
+            assets.url(&format!("img/world-1600.{kind}"))
+        )
+    };
     view! {
         <section class="hero" aria-labelledby="hero-title">
-            <picture class="hero-sky">
-                <source
-                    type="image/avif"
-                    srcset=format!("{} 640w, {} 960w, {} 1600w", assets.url("img/world-640.avif"), assets.url("img/world-960.avif"), assets.url("img/world-1600.avif"))
-                    sizes="100vw"
-                />
-                <img
-                    src=assets.url("img/world-1600.webp")
-                    srcset=format!("{} 640w, {} 960w, {} 1600w", assets.url("img/world-640.webp"), assets.url("img/world-960.webp"), assets.url("img/world-1600.webp"))
-                    sizes="100vw"
-                    width="1600"
-                    height="900"
-                    alt=""
-                    fetchpriority="high"
-                />
-            </picture>
-            <div class="hero-in">
-                <button
-                    type="button"
-                    class="memorial-open"
-                    commandfor="album"
-                    command="show-modal"
-                    aria-haspopup="dialog"
-                >
+            <div class="sky" aria-hidden="true">
+                <picture class="sky-painting">
+                    <source type="image/avif" srcset=world("avif") sizes="100vw" />
                     <img
+                        src=assets.url("img/world-1600.webp")
+                        srcset=world("webp")
+                        sizes="100vw"
+                        width="1600"
+                        height="900"
+                        alt=""
+                        fetchpriority="high"
+                    />
+                </picture>
+                <div class="sky-beams"></div>
+                <div class="sky-motes"></div>
+                <div class="sky-light"></div>
+                <div class="sky-mist"></div>
+                <div class="sky-veil"></div>
+            </div>
+            <div class="hero-inner">
+                <button type="button" class="memorial-open" commandfor="album" command="show-modal" aria-haspopup="dialog">
+                    <span class="halo" aria-hidden="true"></span>
+                    <img
+                        class="hero-logo"
                         src=assets.url("img/logo-960.webp")
                         srcset=format!("{} 480w, {} 960w", assets.url("img/logo-480.webp"), assets.url("img/logo-960.webp"))
-                        sizes="(min-width: 40rem) 30rem, 80vw"
+                        sizes="(min-width: 30rem) 22rem, 78vw"
                         width="960"
                         height="400"
                         alt=""
+                        fetchpriority="low"
                     />
                     <span class="visually-hidden">{words::hero_memorial(lang)}</span>
                 </button>
-                <p class="kicker">{words::hero_kicker(lang)}</p>
-                <h1 id="hero-title">{words::hero_title(lang)}</h1>
+                <h1 id="hero-title">{plain(words::hero_title(lang))}</h1>
                 <p class="lead">{words::hero_lead(lang)}</p>
-                <div class="actions">
-                    {best_link(cx)}
-                    <a class="button quiet" href=Page::Download.path(lang)>{words::hero_other(lang)}</a>
+                {download_block(cx, false)}
+                <p class="hero-note">{offline}</p>
+                <p class="hero-signup" data-signed-out="">{account}</p>
+                <div class="hero-actions">
+                    <a class="button discord" href=DISCORD rel="noopener noreferrer">
+                        <span class="beacon" aria-hidden="true"></span>
+                        {solid::icon_as(solid::DISCORD, "wave")}
+                        <span>{words::hero_discord(lang)}</span>
+                    </a>
+                    <a class="button whatsapp" href=WHATSAPP rel="noopener noreferrer">
+                        <span class="beacon" aria-hidden="true"></span>
+                        {solid::icon(solid::WHATSAPP)}
+                        <span>{words::hero_whatsapp(lang)}</span>
+                    </a>
+                    <a class="button github" href=REPOSITORY rel="noopener noreferrer">
+                        {solid::icon(solid::GITHUB)}
+                        <span>{words::hero_github(lang)}</span>
+                    </a>
                 </div>
-                <p class="note">{offline}</p>
-                <p class="note">{account}</p>
+                <p class="kicker">{words::hero_kicker(lang)}</p>
             </div>
         </section>
     }
 }
 
-fn status(cx: &Context<'_>) -> impl IntoView + use<> {
+/// The strip under the bar: the latest build, CI on main and the last
+/// commit, and the gateways online and not. Only what a source said is
+/// shown; while a source has not answered, the strip links to it instead.
+fn strip(cx: &Context<'_>) -> impl IntoView + use<> {
     let lang = cx.lang;
-    let release = cx.data.release.as_ref().map(|release| {
-        let page = release.page.clone();
-        view! {
-            <li>
-                {icon(icons::PACKAGE)}
-                <span class="label">{words::status_release(lang)}</span>
-                <a href=page rel="noopener noreferrer"><code translate="no">{release.tag.clone()}</code></a>
-                <span class="meta">{words::status_released(lang, &format::date(lang, &release.date))}</span>
-            </li>
+    let build = match cx.data.release.as_ref() {
+        Some(release) => view! {
+            <a href=release.page.clone() rel="noopener noreferrer"><code translate="no">{release.tag.clone()}</code></a>
+            <span class="small">"· "{format::date(lang, &release.date)}</span>
         }
-    });
-    let ci = match cx.data.repo.ci {
-        Some(true) => view! { <li class="ok">{icon(icons::CIRCLE_CHECK)}<span>{words::status_ci_pass(lang)}</span></li> }.into_any(),
-        Some(false) => view! { <li class="bad">{icon(icons::OCTAGON_ALERT)}<span>{words::status_ci_fail(lang)}</span></li> }.into_any(),
-        None => view! { <li class="off">{icon(icons::CIRCLE_HELP)}<span>{words::status_ci_unknown(lang)}</span></li> }.into_any(),
+        .into_any(),
+        None => view! {
+            <a href=format!("{REPOSITORY}/releases") rel="noopener noreferrer">{words::strip_releases(lang)}</a>
+        }
+        .into_any(),
     };
-    let commit = cx.data.repo.commit.clone().map(|(id, date)| {
-        let href = format!("{REPOSITORY}/commit/{id}");
-        view! {
-            <li>
-                {icon(icons::HISTORY)}
-                <span class="label">{words::status_commit(lang)}</span>
-                <a href=href rel="noopener noreferrer"><code translate="no">{id}</code></a>
-                <span class="meta">{format::date(lang, &date)}</span>
-            </li>
+    let actions = format!("{REPOSITORY}/actions/workflows/ci.yml");
+    let ci = match cx.data.repo.ci {
+        Some(ok) => {
+            let (class, word) = if ok {
+                ("dot ok", words::ci_passing(lang))
+            } else {
+                ("dot bad", words::ci_failing(lang))
+            };
+            view! { <a href=actions rel="noopener noreferrer"><span class=class aria-hidden="true"></span>{word}</a> }
+                .into_any()
         }
-    });
-    let online = cx
-        .data
-        .gateways
-        .as_ref()
-        .map(|all| u64::try_from(all.iter().filter(|g| g.online).count()).unwrap_or(u64::MAX))
-        .map(|online| {
+        None => {
+            view! { <a href=actions rel="noopener noreferrer">{words::strip_on_github(lang)}</a> }
+                .into_any()
+        }
+    };
+    let commit = match cx.data.repo.commit.clone() {
+        Some((id, date)) => view! {
+            <a href=format!("{REPOSITORY}/commit/{id}") rel="noopener noreferrer"><code translate="no">{id.clone()}</code></a>
+            <span class="small">"· "{format::date(lang, &date)}</span>
+        }
+        .into_any(),
+        None => view! {
+            <a href=format!("{REPOSITORY}/commits/main") rel="noopener noreferrer">{words::strip_on_github(lang)}</a>
+        }
+        .into_any(),
+    };
+    let gateways = match cx.data.gateways.as_deref() {
+        Some(all) => {
+            let online = all.iter().filter(|g| g.online).count();
+            let offline = all.len() - online;
+            let count = |n: usize| words::number(lang, u64::try_from(n).unwrap_or(u64::MAX));
+            let dot = if online > 0 { "dot ok" } else { "dot off" };
             view! {
-                <li>
-                    {icon(icons::SERVER)}
-                    <a href=Page::Gateways.path(lang)>{words::status_gateways(lang, online)}</a>
-                </li>
+                <a href=Page::Gateways.path(lang)>
+                    <span class="stat-pill num">
+                        <span class=dot aria-hidden="true"></span>
+                        {count(online)}" "{words::strip_online(lang)}
+                        <span class="small">"·"</span>
+                        <span class="dot off" aria-hidden="true"></span>
+                        {count(offline)}" "{words::strip_offline(lang)}
+                    </span>
+                </a>
             }
-        });
+            .into_any()
+        }
+        None => view! { <a href=Page::Gateways.path(lang)>{words::strip_directory(lang)}</a> }
+            .into_any(),
+    };
     view! {
-        <section class="status" aria-label=words::status_label(lang)>
-            <ul>{release}{ci}{commit}{online}</ul>
+        <section class="strip" aria-label=words::status_label(lang)>
+            <div class="strip-inner">
+                <dl class="strip-group">
+                    <div class="strip-stat"><dt>{words::strip_build(lang)}</dt><dd>{build}</dd></div>
+                    <div class="strip-stat"><dt>{words::strip_ci(lang)}</dt><dd>{ci}</dd></div>
+                    <div class="strip-stat strip-commit"><dt>{words::strip_commit(lang)}</dt><dd>{commit}</dd></div>
+                </dl>
+                <dl class="strip-group strip-right">
+                    <div class="strip-stat"><dt>{words::strip_gateways(lang)}</dt><dd>{gateways}</dd></div>
+                </dl>
+            </div>
         </section>
     }
 }

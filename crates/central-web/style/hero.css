@@ -1,0 +1,722 @@
+/* The start page's hero: Baylee's world behind everything, its light and
+   mist moving slowly; the logo that opens her album; the title, the
+   download with every other system a press away, the community. Ambient
+   motion only, still under reduced motion, paused off screen. */
+
+.hero {
+  position: relative;
+  z-index: 15;
+  isolation: isolate;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: min(calc(100svh - var(--top-h) - 2.15rem), 54rem);
+}
+
+.sky {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  background: var(--bg);
+  pointer-events: none;
+}
+
+.sky > * {
+  position: absolute;
+  inset: 0;
+}
+
+/* the painting: a picture element (it is the page's largest paint), drawn
+   a little larger than the hero so the slow drift never shows an edge */
+.sky-painting {
+  inset: -5% -2%;
+  max-inline-size: none;
+}
+
+.sky-painting img {
+  width: 100%;
+  height: 100%;
+  max-inline-size: none;
+  object-fit: cover;
+  object-position: center 46%;
+}
+
+/* it sinks slower than the page scrolls, where the browser can say how far */
+@supports (animation-timeline: scroll()) {
+  .sky-painting {
+    animation: drift linear both;
+    animation-timeline: scroll(root block);
+    animation-range: 0 100svh;
+  }
+
+  @keyframes drift {
+    to {
+      transform: translate3d(0, 18%, 0);
+    }
+  }
+}
+
+.sky-beams {
+  background:
+    radial-gradient(ellipse 58% 46% at 50% 24%, #ffe59642 0%, #ffd97d1c 42%, transparent 72%),
+    linear-gradient(
+      115deg,
+      transparent 12%,
+      #fff3c41f 22%,
+      transparent 34%,
+      #ffe19426 48%,
+      transparent 60%,
+      #fff3c41a 74%,
+      transparent 86%
+    );
+  animation: rays 24s ease-in-out infinite alternate;
+}
+
+.sky-motes {
+  background-image:
+    radial-gradient(circle at 18% 64%, #ffe89e99 0 2px, #ffe89e26 5px, transparent 9px),
+    radial-gradient(circle at 34% 28%, #fff4c299 0 1.5px, #fff4c224 4px, transparent 8px),
+    radial-gradient(circle at 66% 32%, #ffe38f99 0 2px, #ffe38f26 5px, transparent 9px),
+    radial-gradient(circle at 82% 58%, #fff0b899 0 1.8px, #fff0b824 4.5px, transparent 8px),
+    radial-gradient(circle at 48% 76%, #ffdf828c 0 2.2px, #ffdf8221 5px, transparent 10px),
+    radial-gradient(circle at 24% 42%, #aed4ff80 0 1.6px, transparent 6px),
+    radial-gradient(circle at 75% 72%, #aed4ff80 0 1.6px, transparent 6px);
+  animation: motes 20s ease-in-out infinite alternate;
+}
+
+.sky-light {
+  background: radial-gradient(ellipse at 50% 14%, #ffefb966, transparent 62%);
+  mix-blend-mode: screen;
+  animation: sunlight 24s ease-in-out infinite alternate;
+}
+
+/* placed from the top, not by the hero's height: fonts arriving late change
+   that height, and a layer that moved with it would count as a shift */
+.sky-mist {
+  inset: 24rem -15% auto;
+  height: 28rem;
+  background: radial-gradient(ellipse at 50% 50%, #fff8e548, transparent 65%);
+  animation: sunlight 32s ease-in-out infinite alternate-reverse;
+}
+
+.sky-veil {
+  background:
+    radial-gradient(
+      ellipse 72% 68% at 50% 42%,
+      color-mix(in srgb, var(--scene-veil) 84%, transparent) 0%,
+      color-mix(in srgb, var(--scene-veil) 58%, transparent) 54%,
+      color-mix(in srgb, var(--scene-veil) 22%, transparent) 100%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--bg) 52%, transparent) 0%,
+      transparent 18%,
+      transparent 48%,
+      color-mix(in srgb, var(--bg) 28%, transparent) 66%,
+      color-mix(in srgb, var(--bg) 68%, transparent) 81%,
+      color-mix(in srgb, var(--bg) 92%, transparent) 92%,
+      var(--bg) 100%
+    );
+}
+
+/* the hero fades into the page below it */
+.hero::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 -1px;
+  z-index: 1;
+  height: clamp(6.5rem, 16vh, 11.5rem);
+  background:
+    radial-gradient(ellipse 85% 95% at 50% 100%, var(--bg) 18%, transparent 78%),
+    linear-gradient(
+      180deg,
+      transparent 0%,
+      color-mix(in srgb, var(--bg) 38%, transparent) 38%,
+      color-mix(in srgb, var(--bg) 78%, transparent) 72%,
+      var(--bg) 100%
+    );
+  pointer-events: none;
+}
+
+@keyframes rays {
+  from {
+    opacity: 0.58;
+    transform: translate3d(-1%, 0, 0);
+  }
+
+  to {
+    opacity: 0.94;
+    transform: translate3d(1%, 0, 0);
+  }
+}
+
+@keyframes motes {
+  from {
+    opacity: 0.55;
+    transform: translate3d(-6px, 5px, 0);
+  }
+
+  to {
+    opacity: 0.95;
+    transform: translate3d(6px, -8px, 0);
+  }
+}
+
+@keyframes sunlight {
+  from {
+    opacity: 0.45;
+    transform: translate3d(0, 0, 0);
+  }
+
+  to {
+    opacity: 0.85;
+    transform: translate3d(-1.5%, 1%, 0);
+  }
+}
+
+/* still while the hero is off screen (boot.js marks it) or a dialog
+   covers the page */
+.hero[data-away] .sky > *,
+.hero[data-away] .hero-logo,
+.hero[data-away] .beacon,
+.hero[data-away] .wave,
+body:has(dialog[open]) .sky > *,
+body:has(dialog[open]) .hero-logo,
+body:has(dialog[open]) .beacon,
+body:has(dialog[open]) .wave {
+  animation-play-state: paused;
+}
+
+/* ---- the words ------------------------------------------------------------ */
+
+.hero-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.55rem;
+  width: 100%;
+  max-width: 54rem;
+  margin: 0 auto;
+  padding: clamp(1.2rem, 2.4vw, 2rem) max(var(--gutter), 3vw) 3.8rem;
+  text-align: center;
+}
+
+.hero h1 {
+  max-width: 16em;
+  margin: 0 0 0.25em;
+  font-size: clamp(2.25rem, 3.9vw, 3.55rem);
+  line-height: 1.08;
+  text-shadow: var(--hero-shadow);
+}
+
+.glow {
+  color: var(--link);
+  font-style: italic;
+}
+
+.hero .lead {
+  max-width: 39rem;
+  margin: 0 auto 1.05rem;
+  color: var(--ink);
+  font-size: clamp(1rem, 1.12vw, 1.12rem);
+  line-height: 1.4;
+  text-shadow: 0 1px 12px color-mix(in srgb, var(--bg) 82%, transparent);
+}
+
+.hero-note,
+.hero-signup {
+  max-width: 40rem;
+  margin: 0.95rem auto 0;
+  color: var(--ink-soft);
+  font: 0.85rem / 1.38 var(--sans);
+  text-shadow: 0 1px 10px color-mix(in srgb, var(--bg) 88%, transparent);
+}
+
+.hero-signup {
+  margin-block-start: 0.35rem;
+  color: var(--ink);
+}
+
+.hero-note a,
+.hero-signup a {
+  color: var(--link);
+  font-weight: 600;
+}
+
+.hero-note a:hover,
+.hero-signup a:hover {
+  color: var(--link-hover);
+}
+
+.kicker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0.85rem auto 0;
+  padding: 0.34rem 1.05rem;
+  border: 1px solid var(--edge);
+  border-radius: var(--pill);
+  background: color-mix(in srgb, var(--panel-solid) 78%, transparent);
+  box-shadow: 0 6px 18px -8px rgb(0 0 0 / 0.32);
+  color: var(--title);
+  font: 700 0.72rem var(--sans);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* ---- the logo: it opens Baylee's album ------------------------------------ */
+
+.memorial-open {
+  position: relative;
+  isolation: isolate;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 0 auto 0.1rem;
+  padding: 0.35rem 0.8rem;
+  border: 0;
+  border-radius: 1.5rem;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.hero-logo {
+  display: block;
+  width: min(22rem, 72vw);
+  height: auto;
+  aspect-ratio: 960 / 400;
+  filter: drop-shadow(0 10px 24px #16263242);
+  transition: filter 260ms ease;
+  animation: cloud-breath 9s ease-in-out infinite;
+}
+
+/* a halo and two sparkles show that the logo can be pressed */
+.halo {
+  position: absolute;
+  inset: -6% -5%;
+  z-index: -1;
+  border: 1px solid #fff4ce80;
+  border-radius: 50%;
+  outline: 1px solid #f5d78d50;
+  outline-offset: 8px;
+  background: radial-gradient(ellipse, #ffe8a36b 0%, #fff5d938 45%, transparent 72%);
+  opacity: 0;
+  transition:
+    opacity 320ms ease,
+    border-color 320ms ease;
+}
+
+.halo::before,
+.halo::after {
+  content: "✧";
+  position: absolute;
+  top: 14%;
+  color: #fff9dd;
+  font-size: 1.55rem;
+  text-shadow: 0 0 14px #fff0a5;
+}
+
+.halo::before {
+  left: 6%;
+}
+
+.halo::after {
+  right: 6%;
+  top: 68%;
+}
+
+.memorial-open:hover .halo,
+.memorial-open:focus-visible .halo {
+  opacity: 1;
+}
+
+.memorial-open:hover .hero-logo,
+.memorial-open:focus-visible .hero-logo {
+  filter: drop-shadow(0 0 24px #ffeaa5cc) drop-shadow(0 12px 24px #1829364d);
+}
+
+.memorial-open:active .hero-logo {
+  filter: drop-shadow(0 0 32px #fff2bdd9) drop-shadow(0 8px 18px #18293666);
+}
+
+.memorial-open:focus-visible {
+  outline-offset: 4px;
+}
+
+@keyframes cloud-breath {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+/* ---- the download: this machine's file, every other a press away --------- */
+
+.dl {
+  position: relative;
+  z-index: 25;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.dl-split {
+  position: relative;
+  z-index: 30;
+  display: inline-flex;
+  align-items: stretch;
+  max-width: 100%;
+  border-radius: var(--pill);
+  box-shadow: 0 10px 24px -12px rgb(224 190 124 / 0.72);
+}
+
+.dl-split > .button {
+  min-height: 58px;
+  box-shadow: none;
+}
+
+.dl-main {
+  gap: 0.7em;
+  padding: 0.55em 1.45em 0.55em 1.65em;
+}
+
+.dl-split:has(.dl-more) > .dl-main {
+  border-start-end-radius: 0;
+  border-end-end-radius: 0;
+  padding-inline-end: 1.2em;
+}
+
+.dl-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.14rem;
+  line-height: 1.15;
+  text-align: start;
+}
+
+.dl-title {
+  font-size: 1.08rem;
+  font-weight: 700;
+}
+
+.dl-badge {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  opacity: 0.78;
+}
+
+.dl-more {
+  position: static;
+}
+
+.dl-more > summary {
+  min-width: 48px;
+  min-height: 58px;
+  height: 100%;
+  padding: 0 1.05em 0 0.9em;
+  border-inline-start: 1px solid color-mix(in srgb, var(--gold-ink) 24%, transparent);
+  border-start-start-radius: 0;
+  border-end-start-radius: 0;
+  box-shadow: none;
+  list-style: none;
+}
+
+.dl-more > summary::-webkit-details-marker {
+  display: none;
+}
+
+.dl-more .chevron {
+  width: 1.15rem;
+  height: 1.15rem;
+}
+
+.dl-more[open] > summary .chevron {
+  color: inherit;
+}
+
+.dl .menu {
+  inset-inline: 50% auto;
+  width: min(24rem, calc(100vw - 2 * var(--gutter)));
+  translate: -50% 0;
+  text-align: start;
+  transform-origin: top center;
+}
+
+.dl .menu-item {
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.dl-plat {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.dl-plat strong {
+  color: var(--title);
+  font: 700 0.92rem var(--sans);
+}
+
+.dl-plat span,
+.dl-file {
+  color: var(--ink-faint);
+  font: 500 0.78rem var(--sans);
+}
+
+.menu-item.is-mine {
+  border-color: color-mix(in srgb, var(--gold) 55%, var(--edge));
+}
+
+.menu-foot {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0 0.4rem;
+  margin-block-start: 0.32rem;
+  padding-block-start: 0.32rem;
+  border-block-start: 1px solid var(--edge-soft);
+  font: 600 0.8rem var(--sans);
+}
+
+.menu-foot a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--target);
+  padding: 0 0.4rem;
+}
+
+.dl-meta,
+.dl-sub,
+.dl-arch {
+  margin: 0;
+  color: var(--ink-soft);
+  font-family: var(--sans);
+  font-size: 0.9rem;
+  text-shadow: var(--hero-shadow);
+}
+
+.dl-sub a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--target);
+  padding: 0 0.1em;
+  color: var(--link-hover);
+}
+
+.dl-arch {
+  max-width: 36em;
+  font-size: 0.86rem;
+}
+
+.sep {
+  margin-inline: 0.35em;
+  color: var(--ink-faint);
+}
+
+/* ---- the community -------------------------------------------------------- */
+
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
+  margin: 1.15rem auto 0;
+  font-size: 0.92rem;
+}
+
+.hero-actions .button {
+  gap: 0.5rem;
+  padding-inline: 1.15em;
+  border-color: var(--edge);
+  background: color-mix(in srgb, var(--panel-solid) 86%, transparent);
+  box-shadow: none;
+  color: var(--ink);
+  font-weight: 700;
+  transition:
+    box-shadow 420ms ease,
+    background-color 420ms ease,
+    border-color 420ms ease,
+    color 420ms ease;
+}
+
+.hero-actions .button .icon {
+  width: 1.2rem;
+  height: 1.2rem;
+}
+
+.hero-actions .button:hover {
+  color: var(--title);
+}
+
+.hero-actions .button::after {
+  background: linear-gradient(105deg, transparent 24%, rgb(224 190 124 / 0.12) 50%, transparent 76%);
+}
+
+.hero-actions .button:active {
+  box-shadow: inset 0 2px 7px rgb(0 0 0 / 0.34);
+}
+
+.hero-actions .discord {
+  border-color: var(--gold);
+  background: color-mix(in srgb, var(--panel-solid) 90%, var(--violet-soft));
+  box-shadow: 0 8px 22px -10px rgb(0 0 0 / 0.42);
+}
+
+.hero-actions .discord:hover {
+  border-color: var(--link-hover);
+  background: var(--panel-2);
+  box-shadow:
+    0 0 22px -4px #ffe59666,
+    0 8px 22px -10px rgb(0 0 0 / 0.5);
+}
+
+.hero-actions .whatsapp {
+  border-color: color-mix(in srgb, var(--ok) 65%, var(--edge));
+  background: color-mix(in srgb, var(--panel-solid) 90%, var(--ok));
+  box-shadow: 0 8px 22px -10px rgb(0 0 0 / 0.42);
+}
+
+.hero-actions .whatsapp:hover {
+  border-color: var(--ok);
+  background: var(--panel-2);
+  box-shadow:
+    0 0 22px -4px #52d17c59,
+    0 8px 22px -10px rgb(0 0 0 / 0.5);
+}
+
+.hero-actions .github:hover {
+  border-color: var(--gold);
+  background: var(--panel-2);
+  box-shadow:
+    0 0 18px -5px #ffe59652,
+    0 8px 22px -10px rgb(0 0 0 / 0.48);
+}
+
+.discord .icon {
+  color: var(--link);
+}
+
+.whatsapp .icon {
+  color: var(--ok);
+}
+
+/* a slow sheen crosses Discord's and WhatsApp's buttons, and Discord's
+   icon waves now and then */
+.beacon {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  background-size: 240% 100%;
+  pointer-events: none;
+  animation: sheen 9.5s ease-in-out infinite;
+}
+
+.discord .beacon {
+  box-shadow: inset 0 0 12px #ffe49445;
+  background-image: linear-gradient(110deg, transparent 20%, #ffe8a329 45%, #fff6d642 50%, #ffe8a329 55%, transparent 80%);
+}
+
+.whatsapp .beacon {
+  box-shadow: inset 0 0 10px #52d17c33;
+  background-image: linear-gradient(110deg, transparent 20%, #6de39624 45%, #b8ffd038 50%, #6de39624 55%, transparent 80%);
+  animation-duration: 11s;
+  animation-delay: 2.2s;
+}
+
+.wave {
+  transform-origin: center;
+  animation: wave 4.8s ease-in-out infinite;
+}
+
+@keyframes sheen {
+  0% {
+    opacity: 0.35;
+    background-position: 130% 0;
+  }
+
+  45%,
+  55% {
+    opacity: 0.95;
+    background-position: -30% 0;
+  }
+
+  100% {
+    opacity: 0.35;
+    background-position: 130% 0;
+  }
+}
+
+@keyframes wave {
+  0%,
+  76%,
+  100% {
+    transform: rotate(0deg);
+  }
+
+  82% {
+    transform: rotate(-9deg);
+  }
+
+  88% {
+    transform: rotate(8deg);
+  }
+
+  94% {
+    transform: rotate(-4deg);
+  }
+}
+
+@media (max-width: 900px) {
+  .hero-inner {
+    padding-block: 1.8rem 2.8rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .hero-inner {
+    gap: 0.6rem;
+    padding-block: 1.25rem 2.2rem;
+  }
+
+  .hero-logo {
+    width: min(15.5rem, 78vw);
+  }
+
+  .kicker {
+    padding: 0.3rem 0.75rem;
+    font-size: 0.66rem;
+  }
+
+  .hero h1 {
+    font-size: 2.05rem;
+  }
+
+  .hero .lead {
+    font-size: 0.96rem;
+  }
+
+  /* one column of three equal buttons: no orphan, no wrapped label */
+  .hero-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    width: min(100%, 20rem);
+    gap: 0.5rem;
+  }
+
+  .hero-actions .button {
+    padding-inline: 0.95em;
+    font-size: 0.88rem;
+  }
+}

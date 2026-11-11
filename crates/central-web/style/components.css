@@ -1,4 +1,4 @@
-/* Components: buttons, icons, cards, facts, pills, notices, fields, the
+/* Components: cards, facts, pills, notices, fields, the
    card numbers with their explanations. Sizes that follow their own text
    are in em; targets are 44 px at least. */
 
@@ -8,102 +8,7 @@
   block-size: 1.25em;
 }
 
-/* ---- Buttons ----------------------------------------------------------- */
-
-.button,
-.tool {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5em;
-  min-block-size: var(--target);
-  font: inherit;
-  font-weight: 700;
-  line-height: 1.2;
-  text-decoration: none;
-  cursor: pointer;
-  transition:
-    background-color var(--dur-fast) var(--ease),
-    color var(--dur-fast) var(--ease),
-    transform var(--dur-fast) var(--ease);
-}
-
-.button {
-  padding: 0.6em 1.15em;
-  border: var(--hairline) solid var(--edge);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
-  color: var(--ink);
-}
-
-.button:hover {
-  background: var(--surface-raised);
-}
-
-.button:active {
-  transform: scale(0.98);
-}
-
-/* The one thing to do: gold, once per view. */
-.button.primary {
-  border-color: var(--action-edge);
-  background: var(--action);
-  color: var(--on-action);
-}
-
-.button.primary:hover {
-  background: var(--action-hover);
-}
-
-.button.quiet {
-  border-color: transparent;
-  background: transparent;
-  color: var(--accent);
-}
-
-.button.quiet:hover {
-  background: var(--surface-raised);
-}
-
-.button.danger {
-  color: var(--bad);
-}
-
-.button[aria-disabled="true"] {
-  cursor: progress;
-  opacity: 0.75;
-}
-
-.tool {
-  min-inline-size: var(--target);
-  padding: 0.5em;
-  border: 0;
-  border-radius: var(--radius-full);
-  background: transparent;
-  color: var(--ink);
-}
-
-.tool:hover {
-  background: var(--surface-raised);
-}
-
-.tool.lang {
-  gap: 0.4em;
-  padding-inline: 0.75em;
-  border-radius: var(--radius-sm);
-  font-weight: 500;
-}
-
-/* The colour switch shows the icon of the scheme in use. */
-.theme [class^="when-"] {
-  display: none;
-}
-
-.theme[data-state="system"] .when-system,
-.theme[data-state="light"] .when-light,
-.theme[data-state="dark"] .when-dark {
-  display: inline-flex;
-}
+/* ---- Rows of actions ------------------------------------------------------ */
 
 .actions {
   display: flex;

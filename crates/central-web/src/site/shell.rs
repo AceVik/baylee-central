@@ -1,14 +1,15 @@
 //! The frame of every page: the document head (title, description,
-//! canonical address, languages, sharing cards, structured data), the bar,
-//! the footer with the Fan Content notice, and the bottom bar on phones.
+//! canonical address, languages, sharing cards, structured data), the bar
+//! with the language menu, the footer with the Fan Content notice, and
+//! Baylee's world behind every page but the start.
 
 use leptos::prelude::*;
 use leptos::tachys::html::attribute::custom::custom_attribute;
 use serde_json::{Value, json};
 
-use super::icons;
 use super::{Context, Page};
-use crate::rich::{icon, rich};
+use crate::rich::rich;
+use crate::solid;
 use crate::words::{self, Lang};
 
 /// Where Baylee's code lives.
@@ -17,6 +18,8 @@ pub const REPOSITORY: &str = "https://github.com/AceVik/baylee";
 pub const CENTRAL_REPOSITORY: &str = "https://github.com/AceVik/baylee-central";
 /// Baylee's community on Discord.
 pub const DISCORD: &str = "https://discord.gg/4pP3uAwgY";
+/// Baylee's community on `WhatsApp`.
+pub const WHATSAPP: &str = "https://chat.whatsapp.com/JsWHl71rnPPGEG74w48vk6";
 
 /// What a page says about itself to the head.
 pub struct Meta {
@@ -153,6 +156,19 @@ fn head(page: Page, cx: &Context<'_>, meta: &Meta) -> impl IntoView + use<> {
         .into_iter()
         .find(|l| *l != lang)
         .unwrap_or(Lang::En);
+    // the start page's painting is its largest paint: asked for before the
+    // stylesheet and the scripts
+    let painting = (page == Page::Home).then(|| {
+        let set = format!(
+            "{} 640w, {} 960w, {} 1600w",
+            assets.url("img/world-640.avif"),
+            assets.url("img/world-960.avif"),
+            assets.url("img/world-1600.avif")
+        );
+        view! {
+            <link rel="preload" r#as="image" type="image/avif" imagesrcset=set imagesizes="100vw" fetchpriority="high" />
+        }
+    });
     let font = |name: &str| {
         view! { <link rel="preload" href=assets.url(name) r#as="font" type="font/woff2" crossorigin="anonymous" /> }
     };
@@ -169,12 +185,16 @@ fn head(page: Page, cx: &Context<'_>, meta: &Meta) -> impl IntoView + use<> {
             {alternates}
             {robots}
             <meta name="color-scheme" content="light dark" />
-            <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f3ea" />
+            <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f5f2e9" />
             <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0f1b2d" />
             <meta name="referrer" content="no-referrer" />
             <meta name="tdm-reservation" content="1" />
+            {painting}
             {font("fonts/AlegreyaSans-Regular.woff2")}
             {font("fonts/Faustina.woff2")}
+            // the start page's title ends in italic: its face, too, before
+            // the title wraps around a stand-in
+            {(page == Page::Home).then(|| font("fonts/Faustina-Italic.woff2"))}
             <link rel="stylesheet" href=assets.url("site.css") integrity=assets.integrity("site.css") />
             <script src=assets.url("boot.js") integrity=assets.integrity("boot.js")></script>
             <script type="module" src=assets.url("pwa.js") integrity=assets.integrity("pwa.js")></script>
@@ -204,11 +224,14 @@ fn head(page: Page, cx: &Context<'_>, meta: &Meta) -> impl IntoView + use<> {
 /// The whole document around a page's `body`.
 pub fn document(page: Page, cx: &Context<'_>, meta: &Meta, body: AnyView) -> impl IntoView + use<> {
     let lang = cx.lang;
+    // the start page has the world in its hero; every other one behind it
+    let world = (page != Page::Home).then(|| world(cx));
     view! {
         <html lang=lang.code() dir="ltr">
             {head(page, cx, meta)}
             <body>
                 <a class="skip" href="#main">{words::skip(lang)}</a>
+                {world}
                 {bar(page, cx)}
                 <div class="page">
                     <main id="main" tabindex="-1">
@@ -217,7 +240,6 @@ pub fn document(page: Page, cx: &Context<'_>, meta: &Meta, body: AnyView) -> imp
                     </main>
                     {footer(page, cx)}
                 </div>
-                {dock(page, cx)}
                 {update(lang)}
             </body>
         </html>
@@ -232,28 +254,45 @@ fn translated(page: Page, lang: Lang) -> String {
     }
 }
 
-/// A navigation link that says when it is the current page.
-fn nav_link(
-    page: Page,
-    current: Page,
-    lang: Lang,
-    label: String,
-    glyph: &'static str,
-) -> impl IntoView + use<> {
-    let here = page == current;
+/// Baylee's world, quiet behind the page: decorative, small, late.
+fn world(cx: &Context<'_>) -> impl IntoView + use<> {
+    let assets = cx.assets;
     view! {
-        <a href=page.path(lang) aria-current=here.then_some("page")>
-            {icon(glyph)}
-            <span>{label}</span>
-        </a>
+        <div class="world" aria-hidden="true">
+            <img
+                src=assets.url("img/world-960.webp")
+                srcset=format!("{} 640w, {} 960w", assets.url("img/world-640.webp"), assets.url("img/world-960.webp"))
+                sizes="100vw"
+                width="960"
+                height="540"
+                alt=""
+                decoding="async"
+                fetchpriority="low"
+            />
+        </div>
     }
 }
 
-fn theme_switch(lang: Lang) -> impl IntoView + use<> {
+/// A section in the bar, saying when it is the current page.
+fn nav_link(page: Page, current: Page, lang: Lang, label: &'static str) -> impl IntoView + use<> {
+    view! {
+        <a href=page.path(lang) aria-current=(page == current).then_some("page")>{label}</a>
+    }
+}
+
+/// The colour switch: device, light, dark (boot.js turns it).
+fn theme_switch(lang: Lang, in_menu: bool) -> impl IntoView + use<> {
+    let class = if in_menu {
+        "round-btn theme-btn theme-in-menu"
+    } else {
+        "round-btn theme-btn theme-in-bar"
+    };
+    let word =
+        in_menu.then(|| view! { <span class="theme-word">{words::theme_label(lang)}</span> });
     view! {
         <button
             type="button"
-            class="tool theme"
+            class=class
             data-theme-switch=""
             data-system=words::theme_system(lang)
             data-light=words::theme_light(lang)
@@ -261,47 +300,118 @@ fn theme_switch(lang: Lang) -> impl IntoView + use<> {
             aria-label=words::theme_system(lang)
             hidden=true
         >
-            <span class="when-system">{icon(icons::SUN_MOON)}</span>
-            <span class="when-light">{icon(icons::SUN)}</span>
-            <span class="when-dark">{icon(icons::MOON)}</span>
+            <span class="when-system">{solid::icon(solid::HALF)}</span>
+            <span class="when-light">{solid::icon(solid::SUN)}</span>
+            <span class="when-dark">{solid::icon(solid::MOON)}</span>
+            {word}
         </button>
+    }
+}
+
+/// A language's flag, drawn.
+fn flag(lang: Lang) -> impl IntoView + use<> {
+    let stripes = match lang {
+        Lang::De => view! {
+            <rect width="24" height="5.34" y="0" fill="#18181b"></rect>
+            <rect width="24" height="5.34" y="5.33" fill="#dc2626"></rect>
+            <rect width="24" height="5.34" y="10.66" fill="#facc15"></rect>
+        }
+        .into_any(),
+        Lang::En => view! {
+            <rect width="24" height="16" fill="#1e3a8a"></rect>
+            <path d="M0 0L24 16M24 0L0 16" stroke="#ffffff" stroke-width="3.2"></path>
+            <path d="M0 0L24 16M24 0L0 16" stroke="#dc2626" stroke-width="1.6"></path>
+            <path d="M12 0V16M0 8H24" stroke="#ffffff" stroke-width="5.2"></path>
+            <path d="M12 0V16M0 8H24" stroke="#dc2626" stroke-width="3"></path>
+        }
+        .into_any(),
+    };
+    view! {
+        <span class="flag" aria-hidden="true">
+            <svg viewBox="0 0 24 16" width="21" height="14" focusable="false">
+                {stripes}
+                <rect width="24" height="16" fill="none" stroke="rgb(255 255 255 / 0.28)" stroke-width="1.2"></rect>
+            </svg>
+        </span>
+    }
+}
+
+/// The language menu: this page in every language the site speaks.
+fn languages(page: Page, lang: Lang) -> impl IntoView + use<> {
+    let choices = Lang::ALL
+        .into_iter()
+        .map(|other| {
+            let here = other == lang;
+            view! {
+                <li>
+                    <a
+                        class="menu-item"
+                        href=translated(page, other)
+                        hreflang=other.code()
+                        lang=other.code()
+                        aria-current=here.then_some("true")
+                    >
+                        {flag(other)}
+                        <span class="lang-code">{other.code().to_uppercase()}</span>
+                        <span class="grow">{other.own_name()}</span>
+                        {here.then(|| solid::icon_as(solid::CHECK, "check"))}
+                    </a>
+                </li>
+            }
+        })
+        .collect_view();
+    view! {
+        <details class="lang" data-menu="">
+            <summary>
+                <span class="visually-hidden">{words::lang_label(lang)}": "</span>
+                <span class="lang-main">
+                    {flag(lang)}
+                    <span class="lang-code">{lang.code().to_uppercase()}</span>
+                    <span class="lang-name">{lang.own_name()}</span>
+                </span>
+                <span class="lang-toggle">{solid::icon_as(solid::DOWN, "chevron")}</span>
+            </summary>
+            <div class="menu">
+                <ul>{choices}</ul>
+            </div>
+        </details>
     }
 }
 
 fn bar(page: Page, cx: &Context<'_>) -> impl IntoView + use<> {
     let lang = cx.lang;
-    let other = Lang::ALL
-        .into_iter()
-        .find(|l| *l != lang)
-        .unwrap_or(Lang::En);
+    let signing = matches!(page, Page::SignIn | Page::Register | Page::Account(_));
     view! {
-        <header class="bar">
-            <div class="bar-in">
+        <header class="top">
+            <div class="top-inner">
                 <a class="brand" href=Page::Home.path(lang)>
-                    <img src=cx.assets.url("img/icon.svg") alt="" width="40" height="40" />
+                    <img src=cx.assets.url("img/icon-192.webp") alt="" width="192" height="192" fetchpriority="low" />
                     <span>{words::site_name(lang)}</span>
                 </a>
-                <nav class="nav" aria-label=words::nav_label(lang)>
-                    <ul>
-                        <li>{nav_link(Page::Download, page, lang, words::nav_download(lang).into(), icons::DOWNLOAD)}</li>
-                        <li>{nav_link(Page::Gateways, page, lang, words::nav_gateways(lang).into(), icons::SERVER)}</li>
-                        <li>{nav_link(Page::Faq, page, lang, words::nav_faq(lang).into(), icons::CIRCLE_HELP)}</li>
-                        <li>{nav_link(Page::Contact, page, lang, words::nav_contact(lang).into(), icons::MAIL)}</li>
-                    </ul>
-                </nav>
-                <div class="tools">
-                    <a class="tool lang" href=translated(page, other) hreflang=other.code() lang=other.code()>
-                        {icon(icons::LANGUAGES)}
-                        <span>{words::lang_switch(lang)}</span>
-                    </a>
-                    {theme_switch(lang)}
-                    <button type="button" class="tool menu-tool" popovertarget="more" aria-haspopup="dialog" aria-label=words::nav_more(lang)>
-                        {icon(icons::MENU)}
-                    </button>
-                    <a class="button quiet sign-in" href=format!("/{}/signin", lang.code()) data-account=words::nav_account(lang) data-account-href=format!("/{}/account", lang.code())>
-                        {icon(icons::LOG_IN)}
+                <button type="button" class="round-btn menu-btn" popovertarget="nav">
+                    <span class="bars" aria-hidden="true"></span>
+                    <span class="visually-hidden">{words::nav_menu(lang)}</span>
+                </button>
+                <nav class="nav" id="nav" popover="auto" aria-label=words::nav_label(lang)>
+                    {nav_link(Page::Download, page, lang, words::nav_download(lang))}
+                    {nav_link(Page::Gateways, page, lang, words::nav_gateways(lang))}
+                    {nav_link(Page::Faq, page, lang, words::nav_faq(lang))}
+                    {nav_link(Page::Contact, page, lang, words::nav_contact(lang))}
+                    <a class="nav-discord" href=DISCORD rel="noopener noreferrer">"Discord"</a>
+                    <a
+                        class="nav-account"
+                        href=format!("/{}/signin", lang.code())
+                        aria-current=signing.then_some("page")
+                        data-account=words::nav_account(lang)
+                        data-account-href=format!("/{}/account", lang.code())
+                    >
                         <span>{words::nav_sign_in(lang)}</span>
                     </a>
+                    {theme_switch(lang, true)}
+                </nav>
+                <div class="top-tools">
+                    {theme_switch(lang, false)}
+                    {languages(page, lang)}
                 </div>
             </div>
         </header>
@@ -310,6 +420,7 @@ fn bar(page: Page, cx: &Context<'_>) -> impl IntoView + use<> {
 
 fn footer(page: Page, cx: &Context<'_>) -> impl IntoView + use<> {
     let lang = cx.lang;
+    let assets = cx.assets;
     let policy = policy_url(lang);
     let fan = rich(words::fan_content(lang), move |tag| {
         (tag == "policy").then(|| policy.to_owned())
@@ -320,115 +431,80 @@ fn footer(page: Page, cx: &Context<'_>) -> impl IntoView + use<> {
     let link = |target: Page, label: &'static str| {
         view! { <li><a href=target.path(lang) aria-current=(target == page).then_some("page")>{label}</a></li> }
     };
-    let languages = Lang::ALL
-        .into_iter()
-        .map(|other| {
-            let here = other == lang;
-            view! {
-                <li>
-                    <a href=translated(page, other) hreflang=other.code() lang=other.code() aria-current=here.then_some("true")>
-                        {other.own_name()}
-                    </a>
-                </li>
-            }
-        })
-        .collect_view();
+    let away = |href: String, label: &'static str| {
+        view! { <li><a href=href rel="noopener noreferrer">{label}</a></li> }
+    };
     view! {
-        <footer class="foot" id="site-menu">
-            <div class="foot-in">
-                <nav class="foot-nav" aria-label=words::foot_label(lang)>
-                    <div>
-                        <h2>{words::foot_play(lang)}</h2>
-                        <ul>
-                            {link(Page::Download, words::nav_download(lang))}
-                            {link(Page::Gateways, words::nav_gateways(lang))}
-                            <li><a href=format!("{REPOSITORY}/releases") rel="noopener noreferrer">{words::foot_releases(lang)}</a></li>
-                            <li><a href=REPOSITORY rel="noopener noreferrer">{words::foot_repository(lang)}</a></li>
+        <footer class="foot">
+            <div class="foot-inner">
+                <div class="foot-top">
+                    <div class="foot-brand">
+                        <a class="foot-logo-link" href=Page::Home.path(lang) aria-label=words::site_name(lang)>
+                            <img
+                                class="foot-logo"
+                                src=assets.url("img/logo-480.webp")
+                                width="480"
+                                height="200"
+                                alt=""
+                                loading="lazy"
+                                decoding="async"
+                            />
+                        </a>
+                        <p class="dedication">{words::foot_dedication(lang)}</p>
+                        <p class="foot-summary">{words::foot_summary(lang)}</p>
+                        <div class="foot-social">
+                            <a class="social-pill" href=DISCORD rel="noopener noreferrer">{solid::icon(solid::DISCORD)}<span>"Discord"</span></a>
+                            <a class="social-pill" href=WHATSAPP rel="noopener noreferrer">{solid::icon(solid::WHATSAPP)}<span>"WhatsApp"</span></a>
+                            <a class="social-pill" href=REPOSITORY rel="noopener noreferrer">{solid::icon(solid::GITHUB)}<span>"GitHub"</span></a>
+                        </div>
+                    </div>
+                    <nav class="foot-map" aria-label=words::foot_label(lang)>
+                        <section aria-labelledby="foot-play">
+                            <h2 class="foot-head" id="foot-play">{words::foot_play(lang)}</h2>
+                            <ul class="foot-list">
+                                {link(Page::Download, words::nav_download(lang))}
+                                {link(Page::Gateways, words::nav_gateways(lang))}
+                                {link(Page::Faq, words::nav_faq(lang))}
+                                {away(DISCORD.to_owned(), words::foot_discord(lang))}
+                                {away(WHATSAPP.to_owned(), words::hero_whatsapp(lang))}
+                                {link(Page::Contact, words::nav_contact(lang))}
+                            </ul>
+                        </section>
+                        <section aria-labelledby="foot-project">
+                            <h2 class="foot-head" id="foot-project">{words::foot_project(lang)}</h2>
+                            <ul class="foot-list">
+                                {away(REPOSITORY.to_owned(), words::foot_source(lang))}
+                                {away(CENTRAL_REPOSITORY.to_owned(), words::foot_central(lang))}
+                                {away(format!("{CENTRAL_REPOSITORY}/tree/main/crates/central-web"), words::foot_central_source(lang))}
+                                {away(format!("{REPOSITORY}/releases"), words::foot_releases(lang))}
+                                {away(format!("{REPOSITORY}/issues"), words::foot_issues(lang))}
+                            </ul>
+                        </section>
+                        <section aria-labelledby="foot-legal">
+                            <h2 class="foot-head" id="foot-legal">{words::foot_legal(lang)}</h2>
+                            <ul class="foot-list">
+                                {link(Page::Terms, words::title_terms(lang))}
+                                {link(Page::Privacy, words::title_privacy(lang))}
+                                {link(Page::Impressum, words::title_impressum(lang))}
+                                {link(Page::FanContent, words::title_fan_content(lang))}
+                            </ul>
+                        </section>
+                    </nav>
+                </div>
+                <div class="foot-bottom">
+                    <div class="foot-notices">
+                        <p>{fan}</p>
+                    </div>
+                    <div class="foot-colophon">
+                        <p class="colophon">{colophon}</p>
+                        <ul class="foot-badges">
+                            <li>"AGPL-3.0"</li>
+                            <li>"Rust & Bevy"</li>
                         </ul>
                     </div>
-                    <div>
-                        <h2>{words::foot_about(lang)}</h2>
-                        <ul>
-                            {link(Page::Faq, words::nav_faq(lang))}
-                            {link(Page::Contact, words::nav_contact(lang))}
-                            <li><a href=format!("{REPOSITORY}/issues") rel="noopener noreferrer">{words::foot_issues(lang)}</a></li>
-                            <li><a href=DISCORD rel="noopener noreferrer">{words::foot_discord(lang)}</a></li>
-                            <li><a href=CENTRAL_REPOSITORY rel="noopener noreferrer">{words::foot_central_source(lang)}</a></li>
-                        </ul>
-                    </div>
-                    <div>
-                        <h2>{words::foot_legal(lang)}</h2>
-                        <ul>
-                            {link(Page::Impressum, words::title_impressum(lang))}
-                            {link(Page::Privacy, words::title_privacy(lang))}
-                            {link(Page::Terms, words::title_terms(lang))}
-                            {link(Page::FanContent, words::title_fan_content(lang))}
-                        </ul>
-                    </div>
-                    <div>
-                        <h2>{words::lang_label(lang)}</h2>
-                        <ul>{languages}</ul>
-                    </div>
-                </nav>
-                <p class="fan-content">{fan}</p>
-                <p class="dedication">{words::foot_dedication(lang)}</p>
-                <p class="colophon">{colophon}</p>
+                </div>
             </div>
         </footer>
-    }
-}
-
-/// The bottom bar on phones, within thumb reach; "More" opens a sheet
-/// (`popover`, no script needed) with the rest.
-fn dock(page: Page, cx: &Context<'_>) -> impl IntoView + use<> {
-    let lang = cx.lang;
-    let other = Lang::ALL
-        .into_iter()
-        .find(|l| *l != lang)
-        .unwrap_or(Lang::En);
-    view! {
-        <nav class="dock" aria-label=words::nav_label(lang)>
-            <ul>
-                <li>{nav_link(Page::Home, page, lang, words::nav_home(lang).into(), icons::HOUSE)}</li>
-                <li>{nav_link(Page::Download, page, lang, words::nav_download(lang).into(), icons::DOWNLOAD)}</li>
-                <li>{nav_link(Page::Gateways, page, lang, words::nav_gateways(lang).into(), icons::SERVER)}</li>
-                <li>
-                    <button type="button" popovertarget="more" aria-haspopup="dialog">
-                        {icon(icons::MENU)}
-                        <span>{words::nav_more(lang)}</span>
-                    </button>
-                </li>
-            </ul>
-        </nav>
-        <div id="more" class="sheet" popover="auto" role="dialog" aria-label=words::nav_more(lang)>
-            <div class="sheet-head">
-                <button type="button" class="tool" popovertarget="more" popovertargetaction="hide" aria-label=words::nav_close(lang)>
-                    {icon(icons::X)}
-                </button>
-            </div>
-            <ul class="sheet-list">
-                <li>{nav_link(Page::Faq, page, lang, words::nav_faq(lang).into(), icons::CIRCLE_HELP)}</li>
-                <li>{nav_link(Page::Contact, page, lang, words::nav_contact(lang).into(), icons::MAIL)}</li>
-                <li>
-                    <a href=format!("/{}/signin", lang.code())>
-                        {icon(icons::LOG_IN)}
-                        <span>{words::nav_sign_in(lang)}</span>
-                    </a>
-                </li>
-                <li>
-                    <a href=translated(page, other) hreflang=other.code() lang=other.code()>
-                        {icon(icons::LANGUAGES)}
-                        <span>{words::lang_switch(lang)}</span>
-                    </a>
-                </li>
-            </ul>
-            <ul class="sheet-legal">
-                <li><a href=Page::Impressum.path(lang)>{words::title_impressum(lang)}</a></li>
-                <li><a href=Page::Privacy.path(lang)>{words::title_privacy(lang)}</a></li>
-                <li><a href=Page::Terms.path(lang)>{words::title_terms(lang)}</a></li>
-                <li><a href=Page::FanContent.path(lang)>{words::title_fan_content(lang)}</a></li>
-            </ul>
-        </div>
     }
 }
 

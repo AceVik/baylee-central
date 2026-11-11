@@ -1,0 +1,277 @@
+/* The footer: the logo, the dedication and the community on the left, the
+   map of the site in three columns on the right; below, the notices and the
+   colophon. And Baylee's world, quiet behind every page. */
+
+.foot {
+  position: relative;
+  padding: clamp(2.8rem, 5vw, 4.2rem) 0 clamp(2.2rem, 4vw, 3.2rem);
+  border-top: 1px solid var(--edge);
+  background:
+    radial-gradient(ellipse 80% 50% at 50% 0%, color-mix(in srgb, var(--gold) 6%, transparent), transparent 70%),
+    var(--bg-alt);
+}
+
+.foot-inner {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(2rem, 3.8vw, 2.8rem);
+  max-width: var(--wrap);
+  margin: 0 auto;
+  padding: 0 var(--gutter);
+}
+
+.foot-top {
+  display: grid;
+  grid-template-columns: minmax(17rem, 1.15fr) 2fr;
+  align-items: start;
+  gap: clamp(2rem, 4.5vw, 4rem);
+}
+
+.foot-brand {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.foot-logo-link {
+  display: inline-block;
+  border-radius: var(--radius-md);
+  text-decoration: none;
+  transition: opacity 200ms ease;
+}
+
+.foot-logo-link:hover {
+  opacity: 0.85;
+}
+
+.foot-logo {
+  width: 8.5rem;
+  height: auto;
+  opacity: 0.94;
+}
+
+.dedication {
+  margin: 0;
+  color: var(--title);
+  font-size: 0.96rem;
+  font-style: italic;
+}
+
+.foot-summary {
+  max-width: 26rem;
+  margin: 0;
+  color: var(--ink-soft);
+  font: 0.9rem / 1.5 var(--sans);
+}
+
+.foot-social {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-block-start: 0.25rem;
+  font-family: var(--sans);
+}
+
+.social-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.42rem;
+  min-height: var(--target);
+  padding: 0 0.88rem;
+  border: 1px solid var(--edge);
+  border-radius: var(--pill);
+  background: color-mix(in srgb, var(--panel-solid) 72%, transparent);
+  color: var(--title);
+  font-size: 0.84rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition:
+    border-color 180ms ease,
+    background-color 180ms ease;
+}
+
+.social-pill:hover {
+  border-color: var(--gold);
+  background: var(--panel-2);
+  color: var(--title);
+}
+
+.social-pill .icon {
+  width: 1.05rem;
+  height: 1.05rem;
+  color: var(--gold);
+}
+
+.foot-map {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-5);
+  font-family: var(--sans);
+}
+
+.foot-head {
+  margin: 0 0 0.55rem;
+  padding-inline: 0.55rem;
+  color: var(--violet);
+  font: 700 var(--text-xs) var(--sans);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.foot-list {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.foot-list a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--target);
+  padding: 0 0.55rem;
+  border-radius: var(--radius-sm);
+  color: var(--ink-soft);
+  font-size: 0.93rem;
+  text-decoration: none;
+  transition:
+    color 160ms ease,
+    background-color 160ms ease;
+}
+
+.foot-list a:hover {
+  background: var(--panel-2);
+  color: var(--title);
+}
+
+.foot-list a[aria-current="page"] {
+  color: var(--title);
+  font-weight: 600;
+}
+
+.foot-bottom {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding-top: clamp(1.5rem, 3vw, 2.1rem);
+  border-top: 1px solid var(--edge-soft);
+}
+
+.foot-notices {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding: 1.15rem 1.35rem;
+  border: 1px solid var(--edge-soft);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--panel) 65%, transparent);
+}
+
+.foot-notices p {
+  margin: 0;
+  color: var(--ink-faint);
+  font: 0.82rem / 1.5 var(--sans);
+}
+
+.foot-colophon {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1.5rem;
+  font-family: var(--sans);
+}
+
+.colophon {
+  margin: 0;
+  color: var(--ink-faint);
+  font-size: 0.8rem;
+}
+
+.foot-badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.foot-badges li {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.18rem 0.6rem;
+  border: 1px solid var(--edge-soft);
+  border-radius: var(--pill);
+  background: color-mix(in srgb, var(--panel-solid) 75%, transparent);
+  color: var(--ink-soft);
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+@media (max-width: 900px) {
+  .foot-top {
+    grid-template-columns: 1fr;
+    gap: 2rem;
+  }
+
+  .foot-summary {
+    max-width: 38rem;
+  }
+}
+
+@media (max-width: 600px) {
+  .foot-map {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  /* the third column below the two, its links in their two columns */
+  .foot-map > :last-child {
+    grid-column: 1 / -1;
+  }
+
+  .foot-map > :last-child .foot-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: var(--space-5);
+  }
+}
+
+/* ---- Baylee's world behind every page but the start ------------------------ */
+
+.world {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.world img {
+  width: 100%;
+  height: 100%;
+  max-inline-size: none;
+  object-fit: cover;
+  object-position: 64% center;
+  opacity: 0.45;
+}
+
+.world::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(100deg, var(--bg) 6%, transparent 100%),
+    linear-gradient(0deg, var(--bg), transparent 80%);
+}
+
+@media (max-width: 999px) {
+  .world img {
+    object-position: 70% center;
+    opacity: 0.28;
+  }
+}
