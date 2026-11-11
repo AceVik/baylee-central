@@ -1,5 +1,5 @@
-<!-- version: 2026-11-02 -->
-<!-- updated: 2026-11-02 -->
+<!-- version: 2026-11-11 -->
+<!-- updated: 2026-11-11 -->
 
 # Baylee Central privacy policy
 
@@ -80,15 +80,19 @@ forged requests without a cookie. This needs no consent (section 25(2) no. 2 TDD
 stored locally by your browser. There are no tracking cookies and no embedded
 third-party services that collect data about you.
 
-## Optional chat and notification features
+## 5a. Chat and notifications
 
-Central stores personal contacts, blocks and group memberships, device public keys,
+For the chat (Art. 6(1)(b) GDPR), Central stores personal contacts, contact
+requests, blocks and group memberships, device public keys,
 and encrypted personal-message envelopes and delivery metadata. Chat text is decrypted
 only on your device. Personal chat uses Central; game chat remains with the gateway.
-Current per-account/device message limits reject new sends when full; no automatic
-history deletion is introduced by this change.
+Central stores at most 5,000 messages per sender and per device; after that,
+new ones are refused. History is not deleted automatically; it stays until you
+delete your account.
 
-If you enable notifications, Central stores this browser's push endpoint, public key,
+If you enable notifications (Art. 6(1)(a) GDPR, section 25(1) TDDDG: your
+consent, which you can withdraw for the future at any time in your profile),
+Central stores this browser's push endpoint, public key,
 authentication secret, language, a random installation generation and your category
 choices. Your browser's push provider (Google, Mozilla or Apple) carries encrypted
 generic hints and can see transport metadata such as IPs, times and sizes. Hints
@@ -119,7 +123,10 @@ only after you choose to enable notifications; OS/browser settings can block del
   not your password or your encrypted data.
 - **Authorities** receive data only where we are legally obliged.
 
-No data is transferred to countries outside the European Economic Area.
+Data is transferred to countries outside the European Economic Area only if
+you enable notifications: your browser's push provider (Google, Mozilla or
+Apple, USA) then carries them. Gateways run by others can be in any country;
+whether you sign in there is your decision.
 
 ## 7. How long we keep data
 

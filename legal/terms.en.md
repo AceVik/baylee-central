@@ -1,5 +1,5 @@
-<!-- version: 2026-10-22 -->
-<!-- updated: 2026-10-21 -->
+<!-- version: 2026-11-11 -->
+<!-- updated: 2026-11-11 -->
 
 # Terms of use for Baylee accounts
 
@@ -47,8 +47,8 @@ no entitlement to any particular availability.
 Your settings, deck backups and chat history are encrypted on your device
 before they reach us. We cannot read them. As a result:
 
-- If you forget your password, you cannot reset it yet; a reset by e-mail or
-  with our help will follow. **Your encrypted data survives it only if you have
+- If you forget your password, an administrator can give you a reset code to
+  set a new one; a reset by e-mail will follow. **Your encrypted data survives it only if you have
   your recovery code or are still signed in on a device.** Otherwise it is
   lost, and nobody, including us, can bring it back.
 - Keep your recovery code safe.
@@ -96,10 +96,10 @@ restrict content or an account, we tell you why and how you can object.
 
 ## 7. Suspension and deletion
 
-1. You can have your account deleted at any time: write to us at the contact
-   details in the [legal notice](https://baylee.app/impressum) and we delete it
-   without delay. Deleting it in the client's settings and on the website will
-   follow.
+1. You can delete your account at any time: in your account's settings on
+   the website, or write to us at the contact details in the
+   [legal notice](https://baylee.app/impressum) and we delete it without
+   delay. Deleting it in the client's settings will follow.
 2. We may suspend or delete an account that breaks these terms or the law, to
    an extent proportionate to the breach. We give reasons and, where
    possible, hear you first. For serious breaches we may act immediately.

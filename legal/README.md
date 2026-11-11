@@ -1,6 +1,14 @@
 # Legal texts of Baylee Central
 
-**Status: the terms are in force at version 2026-10-22, the privacy policy at 2026-10-28** (administration, login reset, deletion and export; approved by the owner on 28.10.2026; before that 2026-10-23, display name and tag). The owner published the drafts on
+**Status: the terms and the privacy policy are at version 2026-11-11** (the
+owner asked for the texts to be corrected on 11.11.2026: an administrator's
+reset code, deleting the account in its settings on the website, the Fan
+Content notice in its given words, the chat's and the notifications' legal
+bases, and the push services as recipients outside the EEA; before that the
+terms at 2026-10-22 and the privacy policy at 2026-11-02). Being a new
+version of the terms, every account is asked to accept it again. What is
+still the owner's to decide or confirm stands in
+[the text review](../docs/proposals/website-text-review.md). The owner published the drafts on
 21.10.2026 with registration on `baylee.app`, after only the statements the
 deployed service did not yet bear out were corrected: deletion is on request
 until it is in the settings, there is no password reset or e-mail yet, and the

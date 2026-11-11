@@ -1,5 +1,5 @@
-<!-- version: 2026-10-22 -->
-<!-- updated: 2026-10-21 -->
+<!-- version: 2026-11-11 -->
+<!-- updated: 2026-11-11 -->
 
 # Nutzungsbedingungen für Baylee-Konten
 
@@ -54,8 +54,8 @@ Deine Einstellungen, Deck-Sicherungen und dein Chat-Verlauf werden auf
 deinem Gerät verschlüsselt, bevor sie uns erreichen. Wir können sie nicht
 lesen. Daraus folgt:
 
-- Vergisst du dein Passwort, kannst du es noch nicht zurücksetzen; das
-  Zurücksetzen per E-Mail oder durch uns folgt. **Deine verschlüsselten Daten
+- Vergisst du dein Passwort, kann dir ein Administrator einen Rücksetzcode
+  geben, mit dem du ein neues setzt; das Zurücksetzen per E-Mail folgt. **Deine verschlüsselten Daten
   bleiben dabei nur erhalten, wenn du deinen Wiederherstellungscode hast oder
   noch auf einem Gerät angemeldet bist.** Sonst sind sie verloren, und
   niemand, auch wir nicht, kann sie zurückholen.
@@ -71,7 +71,7 @@ lesen. Daraus folgt:
    neu annehmen musst. Für das, was auf einem fremden Gateway geschieht, ist
    dessen Betreiber verantwortlich.
 2. **Eigene Gateways.** Wenn du ein Gateway einträgst, versicherst du, dass
-   du es betreiben darfst, dass seine Adresse dir gehört, und dass du für
+   du es betreiben darfst, dass seine Adresse dir gehört und dass du für
    den Betrieb die gesetzlichen Pflichten erfüllst (zum Beispiel Impressum,
    Datenschutzhinweise und eigene Nutzungsbedingungen). Ein Gateway
    erscheint im Verzeichnis erst nach unserer Freigabe. Wir dürfen die
@@ -110,10 +110,11 @@ wir dir die Gründe mit und sagen dir, wie du widersprechen kannst.
 
 ## 7. Sperrung und Löschung
 
-1. Du kannst dein Konto jederzeit löschen lassen: Schreib uns über die im
+1. Du kannst dein Konto jederzeit löschen: in den Einstellungen deines
+   Kontos auf der Website, oder schreib uns über die im
    [Impressum](https://baylee.app/impressum) genannten Kontaktdaten, dann
    löschen wir es unverzüglich. Das Löschen in den Einstellungen des Clients
-   und auf der Website folgt.
+   folgt.
 2. Wir können ein Konto vorübergehend sperren oder löschen, wenn es gegen
    diese Bedingungen oder geltendes Recht verstößt, und zwar in einem
    Umfang, der dem Verstoß angemessen ist. Wir begründen das und hören dich,
@@ -124,10 +125,10 @@ wir dir die Gründe mit und sagen dir, wie du widersprechen kannst.
 
 ## 8. Fan-Inhalt
 
-Baylee ist ein inoffizieller Fan-Inhalt im Sinne der Fan Content Policy von
-Wizards of the Coast. Es ist nicht von Wizards of the Coast genehmigt oder
-unterstützt. Teile der verwendeten Inhalte sind Eigentum von Wizards of the
-Coast. © Wizards of the Coast LLC.
+Baylee ist ein inoffizieller Fan-Inhalt im Rahmen der Richtlinie für
+Fan-Inhalte. Nicht von Wizards gefördert/gesponsert. Bestandteile des
+enthaltenen Materials sind Eigentum von Wizards of the Coast. ©Wizards of
+the Coast LLC.
 
 ## 9. Haftung
 
