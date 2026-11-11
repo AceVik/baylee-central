@@ -2715,8 +2715,9 @@ Implementation pass:
   a backstop. Other paths and methods are answered without reading a
   byte. The deployed browser listener takes 128 connections, the policy's
   most (64 KiB bodies each), so one address holds at most four of them;
-  the policy default stays 32 (development, and the native listener's
-  1 MiB slots). The wire is unchanged: routes, statuses and fixed texts.
+  the policy default stays 32 (development; the deployed account listener
+  followed the same day, next section). The wire is unchanged: routes,
+  statuses and fixed texts.
 - **Panics** (`server.rs`). A connection task that panicked is counted
   and reported with a fixed line (no payload, no request data; the
   launcher's panic hook prints none either), and the listener goes on,
@@ -2781,10 +2782,10 @@ Recorded, not changed, for the owner:
   the browser listener, each place for two seconds at most. This raises
   the cost; it does not end the attack. Buffering bodies in Caddy would,
   and Caddy's configuration was out of scope.
-- The native listener stays exhaustible by stalled bodies: there is no
-  client address to key places by, and a deadline of two seconds would
-  break slow uplinks for its bodies of up to 1 MiB, so its timing and
-  its 32 connections are unchanged.
+- The native listener stayed exhaustible by stalled bodies in this
+  change (no client address to key places by, and a deadline of two
+  seconds would break slow uplinks for its bodies of up to 1 MiB). It
+  was closed the same day: the next section.
 - A panic no longer stops the service. The identity service's locks fail
   closed (503) when poisoned, so a panic while one is held would leave
   that operation unavailable until a restart, where before the process
@@ -2808,6 +2809,168 @@ Recorded, not changed, for the owner:
   was not checked here. The server confirms only the tag of the bytes it
   would send now, so a rewritten tag can cost a 304, never serve a stale
   page.
+
+Engineering review, not an audit.
+
+## The account listener's places for late and large bodies, 11 November 2026
+
+Design pass. The section above left the account listener exhaustible: a
+`POST` that announces a body and sends none held one of its 32
+connections for the request's five seconds, so about seven a second held
+them all, and no client or gateway could sign in. Its two obstacles, and
+what answers them:
+- **No client address.** The listener binds loopback only (the policy
+  refuses anything else) and is deployed behind Caddy on the same host,
+  which sets `X-Forwarded-For` to the client it saw and, without
+  `trusted_proxies`, ignores a client's own (Caddy's documentation; Caddy
+  was not run here). So the last hop of a request from a loopback peer is
+  the proxy's word. It is used for one thing, to share out places; no
+  identity, credential, budget or log line follows from it. A client beyond
+  the proxy cannot choose it. A process on the host can send its own and
+  so use other addresses' shares, but never more than all addresses
+  together may hold (a quarter of the connections), where today it could
+  hold every connection. A request without a well-formed hop counts by its
+  peer.
+- **A short deadline breaks slow uplinks.** No deadline changed. What a
+  withheld body may hold is bounded instead, so how long it holds it no
+  longer decides anything.
+- **Places for whole requests, as on the browser listener, would refuse
+  honest bursts**: a gateway makes its calls from one address, many at
+  once. So a request whose small body is there with its headers is never
+  counted: a body of at most 64 KiB has a quarter of a second to arrive
+  free. Only a body that is late, or large (over 64 KiB, or without a
+  length), needs a place: four an address, a quarter of the listener's
+  connections together.
+- **Memory.** A large body keeps its place until its request ends, so at
+  most a quarter of the connections hold a body of up to 1 MiB. With the
+  deployed listener raised from 32 connections to the policy's most, 128,
+  that is 32 such bodies, as before, and at most 128 small ones (8 MiB)
+  beside them. The table holds no more addresses than there are places.
+- **Uploads.** A report part's upload is authenticated before its body is
+  read and takes one of two slots; a gateway that withheld the body held
+  the slot for the upload's minute. The body must now bring 16 KiB in
+  every five seconds until it is whole.
+- **The wire** is unchanged: routes, statuses and fixed texts. The new
+  refusal is the route's own answer for `Busy` (429, `account request
+  rejected`), which the client's transport already reads as a refusal
+  before execution and may ask again.
+- Decided against: a shorter body deadline (the obstacle above, and not
+  needed once places bound the hold); a place for every body from its
+  first byte (honest bursts); more connections alone (the attack scales
+  with them).
+
+Implementation pass:
+- `in_flight.rs`: the browser listener's table and its `X-Forwarded-For`
+  reading, moved unchanged in what they decide; an address's share is an
+  argument and the table can bound all places together (the browser
+  listener leaves that unbounded).
+- `boundary.rs`, `admitted`: a declared oversize is refused first (413, as
+  before). A body whose size hint is at most 64 KiB is read for the grace
+  (250 ms) without a place; when it is not whole by then, or for any other
+  body at once, the address takes a place or the request ends with 429
+  before another byte is waited for. The place is an RAII permit: a late
+  body's is dropped when the body is read, a large one's when the
+  handler has answered, both when the request times out, fails or its
+  connection goes. The request's five seconds cover all of it as before.
+  `client`: the last forwarded hop when the peer is loopback, else the
+  peer; a request without a peer (a test's) counts as `0.0.0.0`.
+- `boundary.rs`, `paced`: reads frame by frame under the body's bound; a
+  window that ends with the body unfinished and fewer than the pace's
+  bytes ends it (408); a window also closes when frames are always ready;
+  empty frames are dropped; more than one frame is gathered in one buffer
+  whose capacity never passes the bound.
+- `native.rs`: a part's body is read through `paced` (16 KiB per five
+  seconds); a stalled one answers 408 with the boundary's fixed text,
+  every other failure as before.
+- `production.rs`: the deployed account listener takes 128 connections.
+  Development listeners keep the policy's default of 32 (eight places).
+- Nothing new is logged. An address is held only in the table, only while
+  it has a place.
+
+Adversarial pass:
+- In the router: four withheld bodies of one address take its four
+  places; a fifth is refused when its grace ends, long before the
+  request's time; a request of the same address and one of another whose
+  body is there are served meanwhile and take no place; another
+  address's late body waits, arrives and is served; the four end with 408
+  at the request's time and the table is empty. With eight connections
+  (two places) two addresses hold both: a third address's late body is
+  refused, its large one at once although all of it is there, its small
+  one that is there is served. A large body, and one of unknown length,
+  keeps its place while its handler runs; a late one has given it back by
+  then; a fifth large one of an address is refused. A place comes back
+  after a broken body (400), a body past the bound (413), a connection
+  that goes and a timeout.
+- The address: the proxy's hop is the last whatever a client wrote before
+  it; a hop that is no address, or none, counts by the peer; a peer that
+  is not loopback is not believed; IPv6 by its /64.
+- Over real sockets against the listener itself, once with a forwarded
+  address and once by the peer alone: four withheld bodies, the fifth
+  answered 429 with the fixed text and the security headers within two
+  seconds, another address's late body waiting and then served when its
+  byte comes, the stalling address's own complete request served, and
+  the places back once the four connections are gone. With eight
+  connections: two addresses (IPv4 and IPv6) hold the two places, two more
+  are refused, twelve complete requests are served meanwhile, and the two
+  end with 408 at five seconds as a withheld body always did.
+- The pace: a body at twice the pace over ten windows is read whole and in
+  order; a tail shorter than the pace's bytes ends the body; one that is
+  withheld, stops after a good window, or trickles a byte at a time ends
+  at its window; the bound (413) and a broken body (400) hold; frames
+  that are always ready and empty still end.
+- Mutations, each caught: no share per address, no total, the forwarded
+  hop ignored, a large body's place given back before its answer (unit
+  tests, the first two also over sockets); with the pace's check removed
+  the withheld-body test never ends.
+- The browser listener's tests pass unchanged but for the table's
+  constructor.
+
+Run on this change: `cargo xtask gate` (format, policy, clippy, tests, doc
+tests and the release build), `cargo xtask postgres` (PostgreSQL 18.6;
+`central-client`'s sign-in, restore and migration against a real Central
+over this listener among it), `cargo xtask smoke`, `cargo xtask secrets`,
+`cargo xtask crypto-scope` and `cargo deny check` pass. `cargo audit
+--deny warnings` reports RUSTSEC-2026-0459 (`libsqlite3-sys` 0.37.0), as
+it did before this change; `Cargo.lock` is untouched here.
+
+Not tested, and recorded for the owner:
+- **Caddy was not run.** That it sends the client as the last
+  `X-Forwarded-For` hop for `central.baylee.app` is taken from its
+  documentation, and the live Caddyfile was not seen. If the proxy sends
+  no such header, every client counts as `127.0.0.1` and all share four
+  places: small requests go on, large writes and late bodies meet 429
+  early. The runbook says so.
+- **A 429 sent with the body unread.** For a late body nothing more is
+  coming, but a large body refused at once is still on its way; the
+  proxy could pass that on as a broken connection (502) in place of the
+  429. Either is a refusal before execution to the client's transport,
+  which treats a broken connection as no answer.
+- **The game's client and gateway were not run against this build**
+  (their suites live in the other repository; `central-client`'s test
+  here ran in `cargo xtask postgres`). Every local run is one address,
+  `127.0.0.1`: a suite that sends more than four bodies over 64 KiB at
+  once, or four late ones, from one machine would now meet 429.
+- **What stays open.** Eight addresses that withhold four bodies each
+  hold all 32 places, each for five seconds; until one comes back, late
+  and large bodies of everyone else are refused, so an encrypted object
+  over 64 KiB cannot be written and a body delayed past the grace is
+  turned away, while sign-in and every request whose small body is there
+  go on. One address that opens about 400 connections a second, each
+  with a body withheld for its grace, can still hold the other 96: that
+  is a flood, which the proxy or the network must limit by rate.
+  Buffering bodies in Caddy (`request_buffers`, documented, not tried)
+  keeps withheld bodies from Central altogether; the runbook has the
+  line.
+- **Constants to tune** (`boundary.rs`): the grace (250 ms; shorter
+  raises the flood's cost and makes more honest bodies late), 64 KiB,
+  four places an address (an address many people share, on a slow
+  uplink, can meet it), a quarter of the connections, 128 connections,
+  and the upload's pace (a gateway on a line slower than about
+  26 kbit/s could upload before and cannot now; a part under 16 KiB must
+  be whole within five seconds).
+- No slow or lossy real uplink was tried; the times are from reasoning,
+  the tests use shortened ones in the router and the real ones over
+  loopback sockets.
 
 Engineering review, not an audit.
 

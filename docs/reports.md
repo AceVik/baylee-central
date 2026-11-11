@@ -309,7 +309,9 @@ What the building decided beyond pass 2:
   yet), then the declared length must equal the announced one, then it
   takes one of two slots and reads exactly that many bytes. A stranger's
   slow body holds no slot and is never read; the boundary only refuses a
-  missing or oversized `Content-Length`.
+  missing or oversized `Content-Length`. Since 11.11.2026 the gateway's own
+  body must keep a pace too (16 KiB in every five seconds until it is
+  whole), so one that is withheld gives its slot back then, with `408`.
 - **Triage asks for no fresh password; a purge does.** Triage is daily
   work, reversible and in the report's history; only the purge cannot be
   undone (`AdminRequest::fresh`).

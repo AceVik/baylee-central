@@ -18,7 +18,11 @@ synthetic databases/objects and must not read production configuration.
 
 Current HTTP scope of `--dev`: native local tooling only; exact Host, no browser
 Origin or Fetch-Metadata, no CORS, no keep-alive. Host and Origin filtering is
-defense in depth, not authentication. The website's browser listener has its
+defense in depth, not authentication. A body that is late (not there a quarter
+of a second after its headers) or larger than 64 KiB needs one of its address's
+four places among a quarter of the listener's connections, else 429
+([operations](operations.md#the-account-listeners-connections)); every local
+run is one address, `127.0.0.1`. The website's browser listener has its
 own origin and CSRF policy ([web accounts](web-accounts.md)); for local runs
 `--dev-accounts-stdin` can serve it for a numeric loopback page origin with
 every other check unchanged ([native login](native-login.md)).

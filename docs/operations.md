@@ -38,9 +38,75 @@ never in argv or the environment. Unknown fields fail closed.
 on loopback only; a TLS reverse proxy terminates `https://central.baylee.app`
 and must pass the original `Host` header unchanged (Caddy's `reverse_proxy`
 does). Every other Host, an `Origin` or Fetch-Metadata header is refused.
-Forwarded headers confer nothing. `/health/live` answers; `/health/ready`
-deliberately answers 503, so no proxy or supervisor health check may use it.
-SIGTERM or Ctrl-C closes the listener, drains briefly and closes the pool.
+Forwarded headers confer no identity, credential or budget; the proxy's
+`X-Forwarded-For` hop only shares out the places of late and large bodies
+([below](#the-account-listeners-connections)). `/health/live` answers;
+`/health/ready` deliberately answers 503, so no proxy or supervisor health
+check may use it. SIGTERM or Ctrl-C closes the listener, drains briefly and
+closes the pool.
+
+### The account listener's connections
+
+The deployed account listener takes 128 connections at once (the policy's
+most; a development listener 32), one request each: its headers within three
+seconds, the request with its body within five (a report part's upload
+within 60).
+
+A body of at most 64 KiB that is there a quarter of a second after its
+headers needs nothing more; a client sends its body with its headers, so
+this is every sign-in and almost every other request. A body that is not
+there by then, or a larger one (up to the 1 MiB of an encrypted object, or
+one without a length), needs a place:
+
+- four places per client address, IPv6 by its /64;
+- a quarter of the listener's connections for all addresses together (32 of
+  128);
+- past either, 429 with the route's fixed text at once, which a client reads
+  as `Busy`, before another byte is waited for.
+
+A late body gives its place back when it has arrived, a large one when its
+request ends. So bodies that are announced and withheld hold at most 32
+connections, four an address, each for the request's five seconds at most,
+and 96 connections stay with requests whose small body is there; no more
+bodies of up to 1 MiB are in memory at once than before (32).
+
+The address is the last `X-Forwarded-For` hop, which Caddy sets to the client
+it saw (its default; without `trusted_proxies` it ignores a client's own),
+and it counts only when the connection comes from loopback; a request
+without a well-formed one counts by its peer. Nothing but these places
+follows from it. Two things follow for the proxy:
+
+- If the proxy does not send the header, every client counts as `127.0.0.1`
+  and all of them share four places: small requests go on, but large writes
+  and late bodies meet 429 early. A CDN in front of Caddy has the same
+  effect: the last hop is then the CDN's address, not the client's.
+- Every local and end-to-end run arrives as `127.0.0.1` and shares its four
+  places for late and large bodies.
+
+What this does not bound: eight addresses that withhold four bodies each
+hold all 32 places, and until one comes back the late and large bodies of
+everyone else are refused (429), while every request whose small body is
+there is still served. A flood of whole requests is a matter of rate, which
+the proxy or the network must limit. Caddy can keep withheld bodies away
+from Central altogether (from its documentation, not tried here): with
+`request_buffers` it reads a body up to that size before the upstream sees
+the request. Caddy then holds such a connection itself, under its own
+limits (`timeouts`), which were not reviewed here.
+
+```caddyfile
+central.baylee.app {
+	# The account listener. Caddy sets X-Forwarded-For to the client it saw;
+	# no trusted_proxies here, so a client's own value is ignored.
+	reverse_proxy 127.0.0.1:28790
+	# Optional, from Caddy's documentation and not tried here: read a body of
+	# up to the wire's 1032 KiB before Central sees the request (a report
+	# part's longer upload is passed on after that much of it). The line
+	# above then becomes:
+	#   reverse_proxy 127.0.0.1:28790 {
+	#   	request_buffers 1032KiB
+	#   }
+}
+```
 
 ## The browser listener
 
@@ -73,8 +139,8 @@ at most 4096 addresses per budget, and forget an address once its window has
 passed (at the latest a window's length later). The headers are checked
 before a body is read; an address has at most four requests in flight (429
 past them), a body two seconds to arrive and the service five to answer
-(408), and the listener takes 128 connections at once (the native listener
-32). A request without a well-formed last hop is refused (400). Do not set
+(408), and the listener takes 128 connections at once (as the account
+listener does). A request without a well-formed last hop is refused (400). Do not set
 Caddy's `trusted_proxies` for this site unless a CDN in front of it appends its
 own hop: without it Caddy ignores a client's own `X-Forwarded-For`.
 
@@ -441,7 +507,9 @@ gateway's token with the `sso` scope:
   the report's announcement are checked before the body is read, which must
   be exactly the announced length; at most two uploads at once, each within
   60 seconds (the native listener's connections may last that long; every
-  other request keeps its 5 seconds); `204`.
+  other request keeps its 5 seconds) and bringing at least 16 KiB in every
+  five of them until it is whole, else `408` and its slot is free again;
+  `204`.
 
 The browser listener adds `POST /api/v1/reports/{id}/client|record` for an
 administrator's page, with every check of `POST /api/v1`, 120 a minute per
