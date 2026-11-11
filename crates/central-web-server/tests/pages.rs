@@ -127,8 +127,8 @@ fn check_page(html: &str, lang: Lang, page: Page) {
     // a link that leaves the site opens a tab of its own and tells the other
     // site nothing about this one
     for anchor in tags(html, "a") {
-        let away = anchor.contains(" href=\"https://")
-            && !anchor.contains(" href=\"https://baylee.app/");
+        let away =
+            anchor.contains(" href=\"https://") && !anchor.contains(" href=\"https://baylee.app/");
         if away {
             assert!(
                 anchor.contains(" target=\"_blank\"") && anchor.contains("noopener noreferrer"),
@@ -315,9 +315,9 @@ async fn addresses_and_status_codes() {
         ),
         (
             "/cards",
-            &[],
-            StatusCode::MOVED_PERMANENTLY,
-            Some("/en/#cards"),
+            &[("accept-language", "de")],
+            StatusCode::FOUND,
+            Some("/de/#cards"),
         ),
         (
             "/de/cards",
@@ -350,6 +350,17 @@ async fn addresses_and_status_codes() {
     let (_, headers, html) = get(&app, "/de/nope", &[]).await;
     assert!(html.contains("<html lang=\"de\""));
     assert_eq!(headers["x-robots-tag"], "noindex, noarchive, nosnippet");
+    // The unprefixed card address is chosen by the visitor's language: no
+    // cache may keep one visitor's answer for another, nor for good.
+    let (status, headers, _) = get(&app, "/cards", &[("accept-language", "en")]).await;
+    assert_eq!(status, StatusCode::FOUND);
+    assert_eq!(headers["location"], "/en/#cards");
+    assert_eq!(headers["vary"], "Accept-Language");
+    assert_eq!(headers["cache-control"], "no-cache");
+    // Under a language it is fixed, and stays permanent.
+    let (status, headers, _) = get(&app, "/de/cards", &[("accept-language", "en")]).await;
+    assert_eq!(status, StatusCode::MOVED_PERMANENTLY);
+    assert!(!headers.contains_key("vary"));
 }
 
 #[tokio::test]
@@ -432,5 +443,51 @@ async fn forms_and_the_account_area_are_islands_and_not_indexed() {
             html.contains("/assets/crypto-worker.js"),
             "{path}: the crypto Worker's address"
         );
+    }
+}
+
+/// A site folder whose service worker the build also compressed.
+fn compressed_site() -> PathBuf {
+    let dir = site();
+    std::fs::write(dir.join("sw.js"), b"plain").expect("plain");
+    std::fs::write(dir.join("sw.js.br"), b"brotli").expect("brotli");
+    std::fs::write(dir.join("sw.js.gz"), b"gzip").expect("gzip");
+    dir
+}
+
+#[tokio::test]
+async fn an_encoding_is_sent_only_where_the_browser_takes_it() {
+    let config = Config::development(compressed_site(), None);
+    let app = router(central_web_server::app(config).expect("app"));
+    for (accepts, sent) in [
+        ("br, gzip", "brotli"),
+        ("gzip, br", "brotli"),
+        ("br;q=0, gzip", "gzip"),
+        ("br;q=0", "plain"),
+        ("br;q=0.0, gzip;q=0.000", "plain"),
+        ("gzip;q=0.9, br;q=0.4", "gzip"),
+        ("*", "brotli"),
+        ("*;q=0", "plain"),
+        ("gzip, *;q=0", "gzip"),
+        ("BR", "brotli"),
+        ("brotli", "plain"),
+        ("x-gzip", "gzip"),
+        ("gzip;q=2", "plain"),
+        ("identity", "plain"),
+        ("", "plain"),
+    ] {
+        let (status, headers, body) = get(&app, "/sw.js", &[("accept-encoding", accepts)]).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(body, sent, "{accepts}");
+        let encoding = headers
+            .get("content-encoding")
+            .map(|v| v.to_str().unwrap_or(""));
+        let expected = match sent {
+            "brotli" => Some("br"),
+            "gzip" => Some("gzip"),
+            _ => None,
+        };
+        assert_eq!(encoding, expected, "{accepts}");
+        assert_eq!(headers["vary"], "Accept-Encoding");
     }
 }
