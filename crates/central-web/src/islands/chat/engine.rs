@@ -80,6 +80,10 @@ pub struct Engine {
     delay: Cell<u32>,
     timer: Cell<Option<TimeoutHandle>>,
     listener: RefCell<Option<WindowListenerHandle>>,
+    /// The engine's own reactive owner, for its timer and listener: Leptos
+    /// (0.9) ends both with the owner current when they were set, which
+    /// for a poll is whatever part of the page happened to run it.
+    owner: Owner,
     /// The keys last given to the Worker, by tag, as JSON.
     directory: RefCell<BTreeMap<String, String>>,
     /// Tags that have at least one device to write to.
@@ -115,16 +119,19 @@ impl Engine {
             delay: Cell::new(QUICK),
             timer: Cell::new(None),
             listener: RefCell::new(None),
+            owner: Owner::new_root(None),
             directory: RefCell::default(),
             available: RefCell::default(),
         });
         let weak = Rc::downgrade(&engine);
-        let listener = window_event_listener_untyped("visibilitychange", move |_| {
-            if let Some(engine) = weak.upgrade()
-                && !document().hidden()
-            {
-                engine.push(Job::Poll);
-            }
+        let listener = engine.owner.with(|| {
+            window_event_listener_untyped("visibilitychange", move |_| {
+                if let Some(engine) = weak.upgrade()
+                    && !document().hidden()
+                {
+                    engine.push(Job::Poll);
+                }
+            })
         });
         *engine.listener.borrow_mut() = Some(listener);
         leptos::task::spawn_local(Rc::clone(&engine).run());
@@ -220,14 +227,16 @@ impl Engine {
             timer.clear();
         }
         let weak: Weak<Engine> = Rc::downgrade(self);
-        let timer = set_timeout_with_handle(
-            move || {
-                if let Some(engine) = weak.upgrade() {
-                    engine.push(Job::Poll);
-                }
-            },
-            Duration::from_millis(u64::from(wait)),
-        );
+        let timer = self.owner.with(|| {
+            set_timeout(
+                move || {
+                    if let Some(engine) = weak.upgrade() {
+                        engine.push(Job::Poll);
+                    }
+                },
+                Duration::from_millis(u64::from(wait)),
+            )
+        });
         self.timer.set(timer.ok());
     }
 

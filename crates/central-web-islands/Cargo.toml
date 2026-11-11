@@ -14,7 +14,7 @@ crate-type = ["cdylib", "rlib"]
 central-web = { path = "../central-web", version = "=0.1.0" }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-leptos = { version = "=0.8.23", default-features = false, features = ["islands", "hydrate"] }
+leptos = { version = "=0.9.0-rc1", default-features = false, features = ["islands", "hydrate"] }
 wasm-bindgen = { version = "=0.2.130", default-features = false, features = ["std"] }
 
 [lints]

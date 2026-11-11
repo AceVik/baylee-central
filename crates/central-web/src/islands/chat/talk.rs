@@ -523,7 +523,7 @@ fn conversation(
     let open = Open::new(lang, id, own, ctl, lists, selected);
     open.watch();
     // a conversation opened from the list: its heading takes the focus
-    request_animation_frame(|| focus("conv-title"));
+    crate::islands::focus::after_render("#conv-title");
     let escape = move |event: leptos::ev::KeyboardEvent| {
         if event.key() == "Escape" && open.details.get_untracked() {
             open.details.set(false);
@@ -687,8 +687,9 @@ impl Open {
         let back = move |_| {
             remember(lang, Tab::Chats, None);
             self.selected.set(None);
+            // the conversation goes; its row in the list takes the focus
             let row = self.id.with_value(|id| row_id(id));
-            request_animation_frame(move || focus(&row));
+            crate::islands::focus::after_render(format!("#{row}"));
         };
         let (changed, details) = (self.changed, self.details);
         let name = self.name();
@@ -858,7 +859,7 @@ impl Open {
                 self.ctl.shown.with(|s| s.pending.is_some()),
                 visible.get(),
             );
-            request_animation_frame(move || {
+            let _ = request_animation_frame(move || {
                 let Some(node) = scroller.get_untracked() else {
                     return;
                 };

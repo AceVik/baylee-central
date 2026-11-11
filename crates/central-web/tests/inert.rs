@@ -5,7 +5,7 @@
 //! later (a form shown again, a list filled in). Literal text goes in braces,
 //! `{"Website"}`, which Leptos renders with plain DOM calls.
 //!
-//! The rule mirrors `leptos_macro`'s `is_inert_element` (0.8): an element,
+//! The rule mirrors `leptos_macro`'s `is_inert_element` (0.9): an element,
 //! not a component, with attributes or children, where every attribute is
 //! bare or a string literal under a plain name, and every child is text or
 //! such an element.
