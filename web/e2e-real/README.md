@@ -133,8 +133,36 @@ composer goes), switches a notification category off and on across a reload
 (the device's own Web Push needs a push service and is not run), and checks
 that localStorage holds neither a message nor the password.
 
+```bash
+REAL_FRONT_SPKI=<pin> REAL_SERVICE=<central-service> REAL_MIGRATE=<the migrator document> REAL_NATIVE=<the native listener> \
+  npx playwright test -c e2e-real/playwright.config.ts e2e-real/site-reset.spec.ts e2e-real/site-password.spec.ts --project desktop
+```
+
+the reset page and the password's change (12.11.2026; steps shared in
+`site.ts`). `site-reset.spec.ts` registers an administrator, whom the
+operator's `--appoint-admin-stdin` appoints as in `area.spec.ts`, and an
+account. The administrator makes reset codes (the new site has no page for
+that yet: the request goes out with the administrator's session, as the page
+would send it), and the account redeems them on `/en/reset`: a recovery code
+that is not its own stops before the code is spent; its own keeps the vault;
+the used code is refused in the words of any wrong one; without the recovery
+code a new vault begins at the next epoch and its new recovery code is shown
+once; the old recovery code opens nothing any more and the new one does.
+`site-password.spec.ts` registers one account and changes its password in
+the account area: a wrong current password changes nothing, the right one
+leaves this browser signed in and ends the client's session, the old
+password is refused and the new one signs in. Both read what became of the
+vault from outside the page: a sign-in over the native listener as Baylee's
+client makes it (the committed module, `REAL_NATIVE`, default
+`127.0.0.1:47920`) tells whether the session lives, the fingerprint of the
+chat identity, which is derived from the master key (the same after a kept
+reset and a password change, another after a new vault), and the stored
+document with its revision. No password, code or token is printed or
+written. One project registers three accounts and starts six resets (ten an
+hour from one address): run one project against a Central started afresh.
+
 Central allows five registrations an hour and ten a day per address, and
-counts them in memory: one run registers four, so start Central afresh
+counts them in memory: one run of `site-chat.spec.ts` registers four, so start Central afresh
 between runs. Since 11.11.2026 it also counts sign-ins that were not
 completed with the right password (30 an hour from one address, 10 an hour
 at one account from one address; `docs/native-login.md` §"Guessing a
