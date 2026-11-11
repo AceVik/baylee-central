@@ -190,6 +190,28 @@ fn tells(request: &Request) -> Tells {
 pub(super) struct Told {
     bearer: [u8; 32],
     tells: Tells,
+    /// Whether a refusal says something about the bearer
+    /// ([`refusal_is_the_bearer_s`]).
+    refusal_counts: bool,
+}
+
+/// Whether a `Rejected` answer to `request` may count against its bearer.
+/// Not where the request carries a second secret that is someone else's: a
+/// gateway asks these with its own credential about a lease or a ticket a
+/// player handed it, and Central refuses a made-up one with the same
+/// `Rejected` it has for a credential that ended. Counted, four bad
+/// tickets from any player would take a gateway's credential out of the
+/// vouched-for at will. Not counted, a credential that did end keeps its
+/// place until its last vouching answer is [`PROVEN_SECONDS`] old, and
+/// spends its own bearer's budget meanwhile.
+fn refusal_is_the_bearer_s(request: &Request) -> bool {
+    !matches!(
+        request,
+        Request::GatewaySession { .. }
+            | Request::GatewayProfile { .. }
+            | Request::GatewayAuthorize { .. }
+            | Request::RedeemGateway { .. }
+    )
 }
 
 /// What `request`'s answer will say about `bearer`; nothing for a request
@@ -200,6 +222,7 @@ pub(super) fn told(request: &Request, bearer: Option<&Token>) -> Option<Told> {
     matches!(class(request), Class::Control | Class::Data).then(|| Told {
         bearer: bearer.digest(),
         tells: tells(request),
+        refusal_counts: refusal_is_the_bearer_s(request),
     })
 }
 
@@ -443,14 +466,18 @@ impl Limits {
     /// A request counted by its bearer was answered: `refused` is the
     /// error, if it was one. An answer to one of the requests in [`tells`]
     /// vouches for the bearer from now on; [`REFUSALS`] rejections in a
-    /// row, or the session's end, take that back.
+    /// row, or the session's end, take that back. A rejection of a request
+    /// that carries someone else's secret is not counted
+    /// ([`refusal_is_the_bearer_s`]).
     pub(super) fn answered(&mut self, told: &Told, refused: Option<&Error>, now: Instant) {
         match (refused, told.tells) {
             (None, Tells::Proves) => self.proven.mark(told.bearer, now),
             (None, Tells::Ends) => {
                 self.proven.known.remove(&told.bearer);
             }
-            (Some(Error::Rejected), _) => self.proven.refused(&told.bearer),
+            (Some(Error::Rejected), _) if told.refusal_counts => {
+                self.proven.refused(&told.bearer);
+            }
             _ => {}
         }
     }
@@ -791,6 +818,55 @@ mod tests {
     fn answer(limits: &mut Limits, request: &Request, token: &Token, refused: Option<Error>) {
         let told = told(request, Some(token)).expect("counted by its bearer");
         limits.answered(&told, refused.as_ref(), Instant::now());
+    }
+
+    /// A gateway asks about its players with its own credential, and a
+    /// player's made-up lease or ticket is refused with the `Rejected` a
+    /// dead credential gets. Such refusals do not count against the
+    /// gateway: no player takes its credential out of the vouched-for.
+    #[test]
+    fn a_player_s_bad_ticket_is_not_held_against_the_gateway_that_asked() {
+        let now = Instant::now();
+        let mut limits = Limits::default();
+        let gateway = Token::generate().unwrap();
+        let of_a_player = || Token::generate().unwrap();
+        answer(&mut limits, &Request::GatewayStatus, &gateway, None);
+        assert!(vouched(&limits, &gateway, now));
+        for _ in 0..4 * REFUSALS {
+            for asked in [
+                Request::GatewaySession {
+                    lease: of_a_player(),
+                    purpose: central_api::wire::TicketPurpose::Admit,
+                },
+                Request::GatewayProfile {
+                    lease: of_a_player(),
+                    purpose: central_api::wire::TicketPurpose::Admit,
+                },
+                Request::GatewayAuthorize {
+                    lease: of_a_player(),
+                    purpose: central_api::wire::TicketPurpose::Admit,
+                    terms: None,
+                },
+                Request::RedeemGateway {
+                    ticket: of_a_player(),
+                    purpose: central_api::wire::TicketPurpose::Admit,
+                },
+            ] {
+                answer(&mut limits, &asked, &gateway, Some(Error::Rejected));
+            }
+        }
+        assert!(vouched(&limits, &gateway, now));
+        // What is the gateway's own still counts: its status, refused four
+        // times in a row, says the credential ended.
+        for _ in 0..REFUSALS {
+            answer(
+                &mut limits,
+                &Request::GatewayStatus,
+                &gateway,
+                Some(Error::Rejected),
+            );
+        }
+        assert!(!vouched(&limits, &gateway, now));
     }
 
     #[test]

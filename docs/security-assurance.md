@@ -4482,10 +4482,11 @@ options):
 - Seven addresses of made-up bearers fill the strangers' second all the
   time, one alone for nine or ten seconds of each minute. A session that
   is not vouched for then waits: after a restart, after half an hour
-  without a request, after four refusals in a row. A gateway whose players
-  present bad tickets while nobody else plays there can be made a stranger
-  by those players; it is served as one, and waits only while such a flood
-  lasts. The official gateway's bridge cannot.
+  without a request, after four refusals in a row. (As first built, a
+  gateway whose players presented bad tickets could be made a stranger by
+  those players. Since 12.11.2026 a refusal of a request that carries a
+  player's lease or ticket is not counted against the gateway that asked;
+  the section on the review's leads has it.)
 - A request that reaches the account listener without a proxy's address
   has no place: it meets the 64 a second alone.
 - A restart forgets the list; every session is a stranger once.
@@ -4807,6 +4808,44 @@ checked there before anything was changed.
   cannot be made to take ten seconds without a seam for it; the order of
   the two layers was read, and the header layer runs on whatever the
   inner service answers); the panic hook.
+
+**A second look, the same day** (asked of a reviewer that read the whole
+change; three of this section's own claims said more than the code did).
+- *Release links.* `%2e%2e` is `..` to a browser, and `below` let it
+  pass: the count of segments kept such an address inside Baylee's
+  repository, but "cannot climb" was not true. A segment that is only
+  dots, however they are spelled (`.`, `%2e`, `%2E`), is refused; the
+  test has `%2e%2e`, `.%2E`, `%2E` and `...`.
+- *The islands' redirect.* A browser drops a tab or a line break from an
+  address before it reads it, so `/<tab>/host` is `//host`. `local`
+  refuses any control character; the test has tab, line feed and
+  carriage return. Still not reachable: every caller passes a fixed path.
+- *Whose refusal it is* (`central-identity/src/limits.rs`). The budgets
+  stopped counting a bearer as a session's after four `Rejected` answers
+  in a row. A gateway asks about its players with its own credential
+  (`GatewaySession`, `GatewayProfile`, `GatewayAuthorize`,
+  `RedeemGateway`), and a made-up lease or ticket is answered with the
+  same `Rejected`: four bad tickets from any player took the gateway's
+  credential out of the vouched-for, and its next request then met the
+  strangers' second, which seven addresses can keep full. Refusals of
+  those four requests are no longer counted
+  (`refusal_is_the_bearer_s`). What that costs: a gateway credential that
+  did end keeps its place among the vouched-for until its last vouching
+  answer is half an hour old, and spends its own bearer's budget
+  meanwhile, as any vouched-for bearer can.
+  `a_player_s_bad_ticket_is_not_held_against_the_gateway_that_asked` was
+  seen failing with the change switched off (`assertion failed:
+  vouched(&limits, &gateway, now)`), and holds that the gateway's own
+  refused status still counts.
+- *The trailing dot* refuses a gateway that was registered under such a
+  spelling: the runbook has the one query to run before deploying
+  (`docs/operations.md`, "An origin's host may not end in a dot").
+- *The card numbers' explanations* (found by a test that lost a race, not
+  by the review): where the browser has interest invokers, the keyboard's
+  focus opens an explanation after half a second. Enter and then Escape
+  within that half second leave it closed for a moment and then open, once;
+  Escape closes it again. Left as it is; the test waits for the focus's
+  own showing.
 
 **Open after this section.**
 - `central-web` relies on Caddy for the bound on connections and for

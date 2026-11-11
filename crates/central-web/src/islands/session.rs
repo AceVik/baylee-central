@@ -70,13 +70,17 @@ pub fn remove(key: &str) {
 }
 
 /// Whether `path` names a place on this site and nowhere else: it starts
-/// with one slash, and what follows is neither a slash nor a backslash
-/// (browsers read `/\host` as they read `//host`, another site).
+/// with one slash, what follows is neither a slash nor a backslash
+/// (browsers read `/\host` as they read `//host`, another site), and it
+/// holds no control character (a browser drops a tab or a line break
+/// from an address before it reads it, so `/<tab>/host` is `//host` too).
 #[cfg(any(target_arch = "wasm32", test))]
 #[must_use]
 pub fn local(path: &str) -> bool {
     let mut bytes = path.bytes();
-    bytes.next() == Some(b'/') && !matches!(bytes.next(), Some(b'/' | b'\\'))
+    bytes.next() == Some(b'/')
+        && !matches!(bytes.next(), Some(b'/' | b'\\'))
+        && !path.bytes().any(|b| b.is_ascii_control())
 }
 
 /// Sends the browser to `path` on this site.
@@ -140,6 +144,10 @@ mod tests {
             "https://example.org/",
             "\\/example.org",
             "javascript:alert(1)",
+            "/\t/example.org",
+            "/\n/example.org",
+            "/\r\\example.org",
+            "/de/account\t",
         ] {
             assert!(!local(path), "{path}");
         }

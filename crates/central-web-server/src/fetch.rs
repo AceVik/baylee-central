@@ -143,17 +143,25 @@ fn plain_tag(tag: &str) -> bool {
 /// Whether `url` is `prefix` and then exactly `segments` plain segments
 /// (a percent-encoded octet counts as plain): an address that begins as
 /// Baylee's and climbs out of it (`…/download/../../../other/…`), or
-/// carries a query, is none of ours, whoever sent it.
+/// carries a query, is none of ours, whoever sent it. A dot may be
+/// written `%2e`, and a browser reads `%2e%2e` as it reads `..`: a
+/// segment that is only dots, however they are spelled, is refused.
 fn below(url: &str, prefix: &str, segments: usize) -> bool {
     let Some(rest) = url.strip_prefix(prefix) else {
         return false;
+    };
+    let dots_only = |segment: &str| {
+        segment
+            .replace("%2e", ".")
+            .replace("%2E", ".")
+            .bytes()
+            .all(|b| b == b'.')
     };
     rest.len() <= 512
         && rest.split('/').count() == segments
         && rest.split('/').all(|segment| {
             !segment.is_empty()
-                && segment != "."
-                && segment != ".."
+                && !dots_only(segment)
                 && segment.bytes().all(|b| {
                     b.is_ascii_alphanumeric() || matches!(b, b'.' | b'-' | b'+' | b'_' | b'%')
                 })
@@ -768,6 +776,11 @@ mod tests {
         for url in [
             "https://github.com/AceVik/baylee/releases/download/../../../../other/repo/x.exe",
             "https://github.com/AceVik/baylee/releases/download/v1/../x.exe",
+            // a dot spelled as an octet is a dot to the browser
+            "https://github.com/AceVik/baylee/releases/download/%2e%2e/x.exe",
+            "https://github.com/AceVik/baylee/releases/download/v1/.%2E",
+            "https://github.com/AceVik/baylee/releases/download/%2E/x.exe",
+            "https://github.com/AceVik/baylee/releases/download/v1/...",
             "https://github.com/AceVik/baylee/releases/download/v1/x.exe?to=elsewhere",
             "https://github.com/AceVik/baylee/releases/download/v1/x.exe#part",
             "https://github.com/AceVik/baylee/releases/download/v1/a/b.exe",
@@ -786,6 +799,7 @@ mod tests {
         ));
         for url in [
             "https://github.com/AceVik/baylee/releases/tag/..",
+            "https://github.com/AceVik/baylee/releases/tag/%2e%2E",
             "https://github.com/AceVik/baylee/releases/tag/v1/../../..",
             "https://github.com/AceVik/baylee/../../other",
         ] {

@@ -496,8 +496,9 @@ options):
 - Seven addresses that each keep up their 600 a minute fill the strangers'
   second all the time; one alone fills it for nine or ten seconds of each
   minute. A session that is not vouched for then waits: after a restart,
-  after half an hour without a request, or after four refusals in a row (a
-  gateway whose players present bad tickets while nobody else plays there).
+  after half an hour without a request, or after four refusals in a row
+  (refusals of a gateway's questions about a player's lease or ticket are
+  not counted: no player's bad ticket makes a gateway a stranger).
   Sessions that are vouched for go on, and so does sign-in.
 - A request without a proxy's address has no place and no share: it meets
   the 64 a second alone, like the other budgets by address.
