@@ -242,6 +242,16 @@ pub enum Request {
     /// [`Response::RegisterChallenge`], or [`Response::RegistrationClosed`]
     /// while an administrator closed registration.
     RegisterChallenge,
+    /// The same challenge, asked by a page that says what it saw of its own
+    /// browser (`docs/registration-abuse.md` §"Hardened"): the answer is
+    /// [`Response::RegisterChallenge`] or [`Response::RegistrationClosed`]
+    /// as for [`Request::RegisterChallenge`], and a browser that looks
+    /// driven by a program gets a harder challenge, never a refusal.
+    RegisterChallengeFor {
+        /// [`crate::register::SIGNALS`]; bits Central does not know are
+        /// ignored.
+        signals: u8,
+    },
     /// Reserve a new registered account, on the browser listener only
     /// (`docs/web-accounts.md`), while registration is open (`Rejected`
     /// while an administrator closed it). The challenge's solution is
@@ -1143,6 +1153,12 @@ mod tests {
             crate::decode::<Request>(br#"{"operation":"register_challenge"}"#).unwrap(),
             Request::RegisterChallenge
         ));
+        // What the page sent before it reported its browser is sent the
+        // same, byte for byte: nothing was added to it.
+        assert_eq!(
+            crate::encode(&Request::RegisterChallenge).unwrap(),
+            br#"{"operation":"register_challenge"}"#
+        );
         // The bridge built before display names sends neither field.
         let Request::LegacyReserve {
             display_name, tag, ..
@@ -1183,6 +1199,46 @@ mod tests {
         ] {
             assert!(crate::decode::<Request>(bad).is_err());
         }
+    }
+
+    #[test]
+    fn a_challenge_for_a_reported_browser_is_its_own_operation() {
+        let sent = crate::encode(&Request::RegisterChallengeFor { signals: 3 }).unwrap();
+        assert_eq!(
+            String::from_utf8(sent).unwrap(),
+            r#"{"operation":"register_challenge_for","signals":3}"#
+        );
+        // Bits a later page may send decode; Central reads the ones it knows.
+        assert!(matches!(
+            crate::decode::<Request>(br#"{"operation":"register_challenge_for","signals":255}"#)
+                .unwrap(),
+            Request::RegisterChallengeFor { signals: 255 }
+        ));
+        for refused in [
+            &br#"{"operation":"register_challenge_for"}"#[..],
+            br#"{"operation":"register_challenge_for","signals":256}"#,
+            br#"{"operation":"register_challenge_for","signals":-1}"#,
+            br#"{"operation":"register_challenge_for","signals":"1"}"#,
+            br#"{"operation":"register_challenge_for","signals":1,"difficulty":1}"#,
+        ] {
+            assert!(crate::decode::<Request>(refused).is_err());
+        }
+        // Its answer is the challenge as it was: no field tells the page
+        // what Central made of its report.
+        let answer: Response = crate::decode(
+            br#"{"result":"register_challenge","nonce":"n","parts":8,"difficulty":20,"expires_at":1}"#,
+        )
+        .unwrap();
+        assert!(matches!(
+            answer,
+            Response::RegisterChallenge { difficulty: 20, .. }
+        ));
+        assert!(
+            crate::decode::<Response>(
+                br#"{"result":"register_challenge","nonce":"n","parts":8,"difficulty":20,"expires_at":1,"points":4}"#
+            )
+            .is_err()
+        );
     }
 
     #[test]

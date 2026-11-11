@@ -69,6 +69,12 @@ struct Answer {
 impl Browser {
     fn post(&self, origin: &str, body: &[u8], cookie: Option<&Token>) -> Answer {
         super::pace();
+        self.send(origin, "", body, cookie)
+    }
+
+    /// One request with `extra` header lines (each ending in CRLF) besides
+    /// the page's own, at once: `post` paces, a race does not.
+    fn send(&self, origin: &str, extra: &str, body: &[u8], cookie: Option<&Token>) -> Answer {
         let mut stream = TcpStream::connect_timeout(&self.address, Duration::from_secs(3)).unwrap();
         stream
             .set_read_timeout(Some(Duration::from_secs(10)))
@@ -76,7 +82,7 @@ impl Browser {
         write!(
             stream,
             "POST /api/v1 HTTP/1.1\r\nHost: baylee.app\r\nOrigin: {origin}\r\nSec-Fetch-Site: same-origin\r\n\
-             Content-Type: application/json\r\nX-Baylee-Central: 1\r\nX-Forwarded-For: {}\r\nContent-Length: {}\r\n",
+             Content-Type: application/json\r\nX-Baylee-Central: 1\r\nX-Forwarded-For: {}\r\nContent-Length: {}\r\n{extra}",
             self.client,
             body.len()
         )
@@ -171,6 +177,30 @@ impl Browser {
             cookie,
         );
         answer.status == 403 && answer.body == b"request not permitted\n" && answer.cookie.is_none()
+    }
+
+    /// The answer to a request without a session that also sends `headers`
+    /// (a browser's own, or a tool's: `registration.rs`), paced like every
+    /// other request unless it races.
+    pub(crate) fn answer_as(
+        &self,
+        request: &Request,
+        headers: &str,
+        paced: bool,
+    ) -> Result<Response, Error> {
+        if paced {
+            super::pace();
+        }
+        let body = central_api::encode(request)?;
+        let answer = self.send("https://baylee.app", headers, &body, None);
+        assert!(answer.cookie.is_none());
+        match answer.status {
+            200 => central_api::decode(&answer.body),
+            409 => Err(Error::Conflict),
+            429 => Err(Error::Busy),
+            503 => Err(Error::Unavailable),
+            _ => Err(Error::Rejected),
+        }
     }
 
     /// An answer that issues no session.

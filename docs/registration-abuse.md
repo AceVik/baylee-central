@@ -120,6 +120,9 @@ native client's part (solving the proof, entering an invitation) is M6.
 
 ## As built (11.11.2026)
 
+The table's size, a challenge's lifetime and the rise changed the same day:
+see "Hardened" below.
+
 - **The proof of work** is the puzzle the website's Impressum already
   solves (`central_api::register`): for each of eight parts, the smallest
   counter whose SHA-256 over `nonce:part:counter` has `difficulty` leading
@@ -152,3 +155,175 @@ native client's part (solving the proof, entering an invitation) is M6.
   its old events name. Invitations were never built.
 - **The page** keeps a hidden field for form robots and does not send a form
   within three seconds of showing it.
+
+## Hardened (11.11.2026)
+
+The owner asked for registration's protection to be reviewed and
+strengthened as the Impressum's is. First a review as an attacker who reads
+the source and speaks the listener's protocol directly; then what changed.
+Where the numbers below differ from "As built", these are the ones in
+force.
+
+### What the review found
+
+**Held already**, and each now has a test that attacks it over the real
+listener, the identity service and PostgreSQL
+(`crates/central-client/tests/support/registration.rs`):
+
+- *A proof used twice, or by several registrations at the same moment.*
+  The challenge leaves the table under the table's lock before anything
+  about it is judged (`challenge.rs`, `spend`). Of three `Register` with one
+  solved challenge sent at the same instant, one makes an account and two
+  are refused.
+- *A proof for less work than was asked.* The difficulty is kept with the
+  nonce and is the only one a solution is checked against; the client sends
+  none.
+- *A proof made up or worked out ahead.* The nonce is 32 random bytes that
+  Central must have issued and still hold.
+- *A way to an account around the proof.* The native listener refuses
+  `Register` and both challenge requests before anything else. An enrollment
+  needs the ticket of a reservation, and only three things make one:
+  `Register` after its spent proof, the bridge with its own credential, and
+  the legacy sign-in with a legacy account's password. A reset makes no
+  account.
+- *The name.* A refused proof says nothing about the name: it is refused
+  before the name is looked at, the same for a taken and a free one. That a
+  name is taken is told only after a spent proof and within five
+  registrations an hour, where `Discover` tells it thirty times a minute.
+- *The address and the clock.* The address is the last `X-Forwarded-For`
+  hop, which the local Caddy sets to the client it saw, and the listener
+  takes requests from loopback only. The three seconds and the lifetimes
+  are measured on Central's clock from the moment it issued the challenge.
+- *The budget tables* (4,096 addresses each). A crowd of addresses makes the
+  oldest window start again and refuses nobody; it gains the crowd nothing
+  a fresh address would not have had.
+
+**Found and fixed:**
+
+1. *A person on a slow connection was refused.* The page counted its three
+   seconds from its request, Central from the challenge it issued. When the
+   request took longer than about 200 ms to reach Central (a cold
+   connection, a phone), the solution arrived too early, was refused, and
+   the challenge was spent. The page now counts from the answer's arrival,
+   which is never before Central issued it (`auth.rs`, `handover_wait`).
+2. *That a crowd cannot push a living challenge out of the table was true by
+   accident.* It rested on the challenge request spending the budget all
+   callers share, which it did only because it carries no session, and on 32
+   a second times five minutes staying under 10,000, which nothing checked.
+   Both requests are now named in that budget's list, whatever token comes
+   with them (`limits.rs`), and the table's size is checked when the service
+   is compiled against that budget and the longest lifetime (`challenge.rs`).
+3. *A program paid what a person pays.* A script with none of a browser's
+   headers got the same challenge as a person's browser. See "A request that
+   looks automated" below.
+4. *One who holds a block of addresses was a new address with each request.*
+   The budgets count IPv6 by /64, and a routed /48 is 65,536 of those, so no
+   per-address budget ever applied to them. The block is now counted too,
+   for the difficulty only. What remains is under "What stays".
+5. *A flood stopped costing more at three bits*, sixteen seconds of a phone,
+   however many registered. It now goes on to six.
+
+**Seen and left:**
+
+- The difficulty is fixed when a challenge is issued, so one asked for
+  before a flood keeps its price. That is bounded by its five minutes and by
+  twenty challenges an hour per address.
+- Whoever shares an address with others (a carrier's NAT, a school) can use
+  up its five registrations of the hour with refused requests, because the
+  budget is spent before the proof is looked at. Per-address budgets are
+  like that; charging only for a good proof is a decision for the owner.
+- Outside registration, and the cheapest way to keep people out: the budget
+  of 32 requests a second that all callers without a session share. One
+  address uses it up with operations that have no budget of their own on
+  the browser listener (`Terms`, `LoginFinish`, `EnrollmentStart`, a
+  `SessionStatus` without a cookie; the last arm of `Budgets::charge` in
+  `browser.rs`), and 64 addresses do with `Discover` alone. While it is used
+  up, nobody signs in or registers. Not changed here: it is the sign-in's
+  budget as much as registration's, and wants its own review.
+
+### A request that looks automated
+
+Central never refuses a request for how it looks: no person is ever locked
+out (the owner's rule for the Impressum, 13.10.2026). It asks for more work,
+up to four bits (16 times), counted as the Impressum's service counts:
+
+| What Central sees | Bits |
+| --- | --- |
+| No `Accept-Language`, which every browser sends | 1 |
+| No `Sec-Fetch-Site`, which every current browser sends (one that is not `same-origin` was refused already) | 1 |
+| No `User-Agent`, or one that names a tool, a crawler or a headless browser | 2 |
+| The page reports `navigator.webdriver`: a program drives the browser | 2 |
+| The page reports no `navigator.languages` | 1 |
+| More than 5, 10, 15 challenges from the address this hour (its budget ends at 20) | 1, 2, 3 |
+| More than 20, 60, 200 challenges this hour from the block around it (an IPv6 /48, an IPv4 /24); the larger of the two counts | 1, 2, 3 |
+
+A person's browser scores nothing. The browser listener reads the headers
+and hands the identity service plain facts (`central_identity::Seen`: two
+yes/no, one of three for the user agent, a number from 0 to 3), never a
+header's text and never the address; of them only the challenge's
+difficulty is kept, until the challenge ends. Nothing is logged. The
+counts are the ones the budgets keep already, in memory for an hour, and
+one more table for the blocks with the same bound of 4,096.
+
+The page's report comes with a new request, `RegisterChallengeFor {
+signals }` (bit 1 `webdriver`, bit 2 no languages, as the Impressum's page
+sends them; other bits are ignored, so a later page may say more). Its
+answer is the challenge as before. `RegisterChallenge` is unchanged on the
+wire and is weighed by the same headers and counts, so asking the old way
+saves nothing. Both spend the one budget of 20 an hour. A page that meets a
+Central from before this asks the old way.
+
+These signs cost a careless robot time and a careful one nothing: the
+headers and the report are whatever the sender says. The counts are not.
+
+### A flood
+
+One bit for each doubling of the last hour's registrations: from 60, 120,
+240, 480, 960 and 1,920 an hour, six bits at most (it was three). The hour
+takes it back as before.
+
+The flood's bits and the request's own add up, and stop at six over the
+base: 22 bits a part, 64 times the base work, about two minutes of the
+mid-range phone that needs two seconds for the base. Adding all ten would be
+half an hour of that phone, which is a lock-out by another name.
+`central_api::register::MAX_DIFFICULTY` is that 22, so the page takes no
+challenge above what Central asks, and Central's own constants are checked
+against it when it is compiled.
+
+Measured on 11.11.2026 with the page's own Worker in Chromium on a laptop
+(Apple M1 Max), three runs each: 16 bits under the three seconds the page
+waits anyway; 20 bits 15, 15 and 40 seconds; 22 bits 26, 63 and 98 seconds.
+That is about 0.55 million hashes a second and one second for the base, so
+the design's phone is one half as fast as this laptop; a slower one needs
+as much longer, and the lifetimes below are there for it. The spread is the
+puzzle's own: eight parts, each found by chance.
+
+A challenge lives five minutes up to four bits over the base, ten minutes
+with five and twenty with six: about nine times what that phone needs on
+average, so a slow device still hands its solution in. The table holds
+40,000 challenges (it was 10,000), more than the shared budget lets all
+callers together ask for in twenty minutes, so no challenge makes room for
+another before its own time is over. Full, it is a few megabytes.
+
+The page says what it is doing once the proof takes longer than three
+seconds: a line with the share done and a bar, announced politely
+(`register-solving`).
+
+### What stays
+
+- SHA-256 is cheap for a program that is not a page. On the laptop above,
+  native code hashes about thirteen times as fast as the page's JavaScript
+  (7 million a second on one core by `openssl speed`, against 0.55 million),
+  so the hardest challenge is five seconds of one core for a script and a
+  minute for a person; for a graphics card it is a blink. The proof slows
+  the simplest scripts and costs a person little at the base; it does not
+  stop someone with a card and a block of addresses. Against them stand the budgets, the count of the block, the
+  rising price, and the administrators' switch.
+- Many addresses in many blocks, with patience, still create accounts.
+- The count of a block is shared by everyone in it. Addresses that ask at
+  their full budgets make their neighbours' challenges harder for the hour:
+  two in an IPv4 /24 by one bit, four by two, eleven by three (eight times
+  the work); in an IPv6 /48 that a provider hands out in smaller pieces, one
+  customer does. It is never a refusal, and it ends at the four bits a
+  request's look can cost.
+- The counts are in memory and start again with the service.

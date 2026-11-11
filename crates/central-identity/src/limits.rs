@@ -77,6 +77,11 @@ impl Limits {
             Request::Discover { .. }
                 | Request::LoginStart { .. }
                 | Request::LoginFinish { .. }
+                // Named, not left to the rule for requests without a
+                // session: the table of challenges is sized by this budget
+                // (`challenge::HELD`), whatever token comes with the request.
+                | Request::RegisterChallenge
+                | Request::RegisterChallengeFor { .. }
                 | Request::Register { .. }
                 | Request::EnrollmentStart { .. }
                 | Request::EnrollmentFinish { .. }
@@ -262,6 +267,34 @@ mod tests {
             Err(Error::Busy)
         );
     }
+    /// A registration challenge spends the budget all callers share,
+    /// whichever way it is asked and whatever token comes with it: the
+    /// table of challenges is sized by that budget.
+    #[test]
+    fn a_registration_challenge_spends_the_global_budget_with_or_without_a_token() {
+        let now = Instant::now();
+        for request in [
+            Request::RegisterChallenge,
+            Request::RegisterChallengeFor { signals: 0 },
+        ] {
+            let mut limits = Limits::default();
+            for _ in 0..GLOBAL_PER_SECOND / 2 {
+                limits.request(&request, None, now).unwrap();
+                limits
+                    .request(&request, Some(&Token::generate().unwrap()), now)
+                    .unwrap();
+            }
+            assert_eq!(limits.request(&request, None, now), Err(Error::Busy));
+            assert_eq!(
+                limits.request(&request, Some(&Token::generate().unwrap()), now),
+                Err(Error::Busy)
+            );
+            limits
+                .request(&request, None, now + Duration::from_secs(1))
+                .unwrap();
+        }
+    }
+
     #[test]
     fn the_figures_spend_the_public_budget_and_a_pulse_a_heartbeat_s() {
         let now = Instant::now();

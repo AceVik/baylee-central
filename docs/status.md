@@ -108,7 +108,8 @@ The server side of [web accounts](web-accounts.md) lands in three PRs.
   Deploy: stop, migrate, grant (`ops/grants.sql`), start.
 - **Wire and identity.** `Register { username, beta_key }` reserved a
   registered account (key before name, `Conflict` only with a valid key; since
-  11.11.2026 the proof of work in the key's place, `RegisterChallenge`);
+  11.11.2026 the proof of work in the key's place, `RegisterChallenge` and
+  `RegisterChallengeFor`, harder for a request that looks automated);
   `EnrollmentFinish.recovery` carries the recovery wrapper, required for
   registered and refused for legacy accounts, and old clients still decode.
   `IdentityService::handle_browser` serves the browser operations only, issues
