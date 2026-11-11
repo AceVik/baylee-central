@@ -902,6 +902,36 @@ async fn register(
     ))
 }
 
+/// What the registration asks to be ticked, and the field no person sees
+/// (`docs/registration-abuse.md`).
+fn register_checks(
+    lang: Lang,
+    fields: RwSignal<RegisterFields>,
+    honey: RwSignal<String>,
+    terms: String,
+    privacy: String,
+) -> impl IntoView {
+    view! {
+        <div class="check">
+            <input id="register-age" type="checkbox" on:change=move |ev| { let on = event_target_checked(&ev); fields.update(|f| f.age = on); } />
+            <label for="register-age">{words::register_age(lang)}</label>
+        </div>
+        <div class="check">
+            <input id="register-consent" type="checkbox" on:change=move |ev| { let on = event_target_checked(&ev); fields.update(|f| f.consent = on); } />
+            <label for="register-consent">{rich(words::register_consent(lang), move |tag| match tag {
+                "terms" => Some(terms.clone()),
+                "privacy" => Some(privacy.clone()),
+                _ => None,
+            })}</label>
+        </div>
+        <div class="trap" aria-hidden="true">
+            <label for="register-website">{"Website"}</label>
+            <input id="register-website" type="text" tabindex="-1" autocomplete="off"
+                on:input=move |ev| honey.set(event_target_value(&ev)) />
+        </div>
+    }
+}
+
 #[island]
 pub fn Register(lang: Lang, worker: String, pow: String) -> impl IntoView {
     let step = RwSignal::new(Step::Form);
@@ -993,23 +1023,7 @@ pub fn Register(lang: Lang, worker: String, pow: String) -> impl IntoView {
                 {text_field("register-display", words::register_display(lang), words::register_display_hint(lang), glyph::ID_CARD, "nickname", |f, v| f.display = v)}
                 {text_field("register-password", words::register_password(lang), words::register_password_hint(lang), glyph::LOCK, "new-password", |f, v| f.password = v)}
                 {text_field("register-repeat", words::register_repeat(lang), words::register_repeat_hint(lang), glyph::LOCK_KEYHOLE, "new-password", |f, v| f.repeat = v)}
-                <div class="check">
-                    <input id="register-age" type="checkbox" on:change=move |ev| { let on = event_target_checked(&ev); fields.update(|f| f.age = on); } />
-                    <label for="register-age">{words::register_age(lang)}</label>
-                </div>
-                <div class="check">
-                    <input id="register-consent" type="checkbox" on:change=move |ev| { let on = event_target_checked(&ev); fields.update(|f| f.consent = on); } />
-                    <label for="register-consent">{rich(words::register_consent(lang), move |tag| match tag {
-                        "terms" => Some(terms.clone()),
-                        "privacy" => Some(privacy.clone()),
-                        _ => None,
-                    })}</label>
-                </div>
-                <div class="trap" aria-hidden="true">
-                    <label for="register-website">{"Website"}</label>
-                    <input id="register-website" type="text" tabindex="-1" autocomplete="off"
-                        on:input=move |ev| honey.set(event_target_value(&ev)) />
-                </div>
+                {register_checks(lang, fields, honey, terms, privacy)}
                 <p class="error" role="alert">{move || error.get()}</p>
                 <button type="submit" class="button primary">{words::register_submit(lang)}</button>
                 <p class="hint">{rich(words::register_have_account(lang), move |tag| (tag == "signin").then(|| signin.clone()))}</p>
