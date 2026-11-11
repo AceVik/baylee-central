@@ -38,6 +38,9 @@ pub struct GatewayListing {
 pub struct GatewayActivity {
     /// Players connected.
     pub players: u32,
+    /// Of those, the players seated in a running game: never more than
+    /// `players`.
+    pub playing: u32,
     /// Tables open to join.
     pub tables: u32,
     /// Games running.
@@ -128,12 +131,19 @@ impl GatewayActivity {
     /// through Central, whatever it claims.
     pub const MOST: u32 = 100_000;
 
-    /// Check the counts' bounds; nothing else about them can be checked.
+    /// Check the counts' bounds, and that no more players are in a game than
+    /// are connected; nothing else about them can be checked.
     ///
     /// # Errors
-    /// Rejects a count above [`Self::MOST`].
+    /// Rejects a count above [`Self::MOST`], and more `playing` than
+    /// `players`.
     pub const fn validate(&self) -> Result<(), Error> {
-        if self.players > Self::MOST || self.tables > Self::MOST || self.games > Self::MOST {
+        // `playing` has its bound through `players`.
+        if self.players > Self::MOST
+            || self.playing > self.players
+            || self.tables > Self::MOST
+            || self.games > Self::MOST
+        {
             return Err(Error::Rejected);
         }
         Ok(())
@@ -205,51 +215,86 @@ mod tests {
     }
 
     #[test]
-    fn an_activity_is_three_bounded_counts_and_nothing_else() {
+    fn an_activity_is_four_bounded_counts_and_nothing_else() {
         let most = GatewayActivity::MOST;
-        let activity = |players, tables, games| GatewayActivity {
+        let activity = |players, playing, tables, games| GatewayActivity {
             players,
+            playing,
             tables,
             games,
         };
-        activity(0, 0, 0).validate().unwrap();
-        activity(most, most, most).validate().unwrap();
+        activity(0, 0, 0, 0).validate().unwrap();
+        activity(most, most, most, most).validate().unwrap();
+        // Nobody in a game, and everybody in one.
+        activity(most, 0, 0, 0).validate().unwrap();
+        activity(7, 7, 0, 0).validate().unwrap();
         for over in [
-            activity(most + 1, 0, 0),
-            activity(0, most + 1, 0),
-            activity(0, 0, most + 1),
-            activity(u32::MAX, u32::MAX, u32::MAX),
+            activity(most + 1, 0, 0, 0),
+            activity(most + 1, most + 1, 0, 0),
+            activity(0, 0, most + 1, 0),
+            activity(0, 0, 0, most + 1),
+            activity(u32::MAX, u32::MAX, u32::MAX, u32::MAX),
         ] {
             assert_eq!(over.validate(), Err(Error::Rejected), "{over:?}");
         }
-        let text = String::from_utf8(crate::encode(&activity(12, 3, 4)).unwrap()).unwrap();
-        assert_eq!(text, r#"{"players":12,"tables":3,"games":4}"#);
+        // More players in a game than are connected, by one and by many,
+        // with every count inside the bound and with one outside it.
+        for more in [
+            activity(0, 1, 0, 0),
+            activity(7, 8, 0, 0),
+            activity(12, most, 3, 4),
+            activity(most - 1, most, most, most),
+            activity(most, most + 1, 0, 0),
+            activity(0, u32::MAX, 0, 0),
+        ] {
+            assert_eq!(more.validate(), Err(Error::Rejected), "{more:?}");
+        }
+        let text = String::from_utf8(crate::encode(&activity(12, 8, 3, 4)).unwrap()).unwrap();
+        assert_eq!(text, r#"{"players":12,"playing":8,"tables":3,"games":4}"#);
         assert_eq!(
             crate::decode::<GatewayActivity>(text.as_bytes()).unwrap(),
-            activity(12, 3, 4)
+            activity(12, 8, 3, 4)
         );
-        // No name, no list, no negative or fractional count, nothing left out.
+        // No name, no list, no negative or fractional count, nothing left
+        // out: the three counts from before the fourth are no activity.
         for bad in [
-            r#"{"players":12,"tables":3,"games":4,"names":["synthetic"]}"#,
-            r#"{"players":12,"tables":3}"#,
-            r#"{"players":-1,"tables":3,"games":4}"#,
-            r#"{"players":1.5,"tables":3,"games":4}"#,
-            r#"{"players":4294967296,"tables":3,"games":4}"#,
-            r#"{"players":"12","tables":3,"games":4}"#,
+            r#"{"players":12,"playing":8,"tables":3,"games":4,"names":["synthetic"]}"#,
+            r#"{"players":12,"playing":8,"tables":3}"#,
+            r#"{"players":12,"tables":3,"games":4}"#,
+            r#"{"playing":8,"tables":3,"games":4}"#,
+            r#"{"players":-1,"playing":0,"tables":3,"games":4}"#,
+            r#"{"players":1.5,"playing":1,"tables":3,"games":4}"#,
+            r#"{"players":4294967296,"playing":8,"tables":3,"games":4}"#,
+            r#"{"players":"12","playing":8,"tables":3,"games":4}"#,
+            r#"{"players":12,"playing":-1,"tables":3,"games":4}"#,
+            r#"{"players":12,"playing":1.5,"tables":3,"games":4}"#,
+            r#"{"players":12,"playing":4294967296,"tables":3,"games":4}"#,
+            r#"{"players":12,"playing":"8","tables":3,"games":4}"#,
+            r#"{"players":12,"playing":null,"tables":3,"games":4}"#,
+            r#"{"players":12,"playing":8,"playing":8,"tables":3,"games":4}"#,
         ] {
             assert!(
                 crate::decode::<GatewayActivity>(bad.as_bytes()).is_err(),
                 "{bad}"
             );
         }
+        // The shape is the decoder's. That no more play than are connected
+        // is the check's, which every writer and reader of a pulse calls.
+        let more = r#"{"players":8,"playing":12,"tables":3,"games":4}"#;
+        assert_eq!(
+            crate::decode::<GatewayActivity>(more.as_bytes())
+                .unwrap()
+                .validate(),
+            Err(Error::Rejected)
+        );
         let figures = GatewayFigures {
             id: [7; 16],
-            activity: activity(1, 2, 3),
+            activity: activity(4, 1, 2, 3),
         };
         let text = String::from_utf8(crate::encode(&figures).unwrap()).unwrap();
         assert_eq!(
             text,
-            r#"{"id":[7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7],"activity":{"players":1,"tables":2,"games":3}}"#
+            r#"{"id":[7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7],"activity":{"players":4,"playing":1,"tables":2,"games":3}}"#
         );
         assert_eq!(
             crate::decode::<GatewayFigures>(text.as_bytes()).unwrap(),

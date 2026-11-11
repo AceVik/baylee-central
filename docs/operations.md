@@ -453,14 +453,18 @@ UPDATE central_identity.gateway_tokens SET revoked_at = clock_timestamp()
 ### What gateways report (migration 000025)
 
 Since 11.11.2026 a gateway may send its heartbeat as a `GatewayPulse` with
-three counts (players, tables, games), and anyone may read them and the
-number of accounts with `PublicFigures` ([gateway
+four counts (players, of those the players in a game, tables, games), and
+anyone may read them and the number of accounts with `PublicFigures` ([gateway
 registry](gateway-registry.md#activity-and-the-public-figures)). For the
 operator:
 
 - **Deploying it** is the usual order: stop, migrate, start. The migration
-  adds four nullable columns to `gateways` and needs no new grant
-  (`ops/grants.sql` is unchanged). Migrate before the new binary starts:
+  adds five nullable columns to `gateways` and needs no new grant
+  (`ops/grants.sql` is unchanged). The fourth count's column
+  (`activity_playing`) is part of 000025 itself: a test database that ran
+  the migration before that column was written into it is made anew
+  ([PostgreSQL](postgresql.md#gateway-activity-migration-000025)); 000025
+  had run on throwaway databases only. Migrate before the new binary starts:
   the startup check asks about grants, not about columns, so the new
   binary would start over the unmigrated table, and then every heartbeat
   and every read of the figures fails until the migration is applied
@@ -482,7 +486,8 @@ operator:
 
 ```sql
 UPDATE central_identity.gateways
-    SET activity_players = NULL, activity_tables = NULL, activity_games = NULL, activity_at = NULL
+    SET activity_players = NULL, activity_playing = NULL, activity_tables = NULL,
+        activity_games = NULL, activity_at = NULL
     WHERE origin = 'https://…';
 ```
 

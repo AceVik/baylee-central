@@ -690,8 +690,8 @@ async fn tokens(tx: &sea_orm::DatabaseTransaction) {
 /// 000025 over the gateways the earlier steps left, a registered one that
 /// was seen and the official one that never was: each keeps every column and
 /// reports nothing; the prior binary's heartbeat still works and leaves the
-/// activity alone; an activity is whole or absent, and each count is within
-/// its bound.
+/// activity alone; an activity is whole or absent, each count is within
+/// its bound, and no more players are in a game than connected.
 async fn activity(tx: &sea_orm::DatabaseTransaction) {
     // The prior binary's heartbeat, which names none of the new columns.
     let earlier = "UPDATE upgrade_probe.gateways g SET name='Tokens',version='2',
@@ -747,8 +747,8 @@ async fn activity(tx: &sea_orm::DatabaseTransaction) {
         scalar(
             tx,
             "SELECT count(*)::bigint AS value FROM upgrade_probe.gateways
-             WHERE activity_players IS NULL AND activity_tables IS NULL
-             AND activity_games IS NULL AND activity_at IS NULL"
+             WHERE activity_players IS NULL AND activity_playing IS NULL
+             AND activity_tables IS NULL AND activity_games IS NULL AND activity_at IS NULL"
         )
         .await,
         gateways
@@ -757,8 +757,9 @@ async fn activity(tx: &sea_orm::DatabaseTransaction) {
     // heartbeat after it leaves what was reported.
     for count in [0, 100_000] {
         changed(format!(
-            "UPDATE upgrade_probe.gateways SET activity_players={count}, activity_tables={count},
-                 activity_games={count}, activity_at=pg_catalog.clock_timestamp()
+            "UPDATE upgrade_probe.gateways SET activity_players={count}, activity_playing={count},
+                 activity_tables={count}, activity_games={count},
+                 activity_at=pg_catalog.clock_timestamp()
              WHERE origin='https://tokens.invalid'"
         ))
         .await;
@@ -769,32 +770,59 @@ async fn activity(tx: &sea_orm::DatabaseTransaction) {
             tx,
             "SELECT count(*)::bigint AS value FROM upgrade_probe.gateways
              WHERE origin='https://tokens.invalid' AND activity_players=100000
-             AND activity_tables=100000 AND activity_games=100000 AND activity_at IS NOT NULL"
+             AND activity_playing=100000 AND activity_tables=100000 AND activity_games=100000
+             AND activity_at IS NOT NULL"
         )
         .await,
         1
     );
-    for sql in [
-        // Part of an activity, in either direction.
-        "UPDATE upgrade_probe.gateways SET activity_players=1 WHERE official",
-        "UPDATE upgrade_probe.gateways SET activity_at=pg_catalog.clock_timestamp()
-         WHERE official",
-        "UPDATE upgrade_probe.gateways SET activity_games=NULL WHERE origin='https://tokens.invalid'",
-        "UPDATE upgrade_probe.gateways SET activity_at=NULL WHERE origin='https://tokens.invalid'",
-        // A count outside its bound.
-        "UPDATE upgrade_probe.gateways SET activity_players=100001 WHERE origin='https://tokens.invalid'",
-        "UPDATE upgrade_probe.gateways SET activity_tables=-1 WHERE origin='https://tokens.invalid'",
-        "UPDATE upgrade_probe.gateways SET activity_games=2147483647 WHERE origin='https://tokens.invalid'",
-    ] {
-        refused(tx, sql).await;
-    }
+    activity_held(tx).await;
     // This binary's plain heartbeat.
     changed(
-        "UPDATE upgrade_probe.gateways SET activity_players=NULL, activity_tables=NULL,
-             activity_games=NULL, activity_at=NULL WHERE origin='https://tokens.invalid'"
+        "UPDATE upgrade_probe.gateways SET activity_players=NULL, activity_playing=NULL,
+             activity_tables=NULL, activity_games=NULL, activity_at=NULL
+             WHERE origin='https://tokens.invalid'"
             .into(),
     )
     .await;
+}
+
+/// What 000025's CHECKs refuse, over the official gateway's row, which
+/// reports nothing, and the registered one's, whose four counts are all at
+/// the bound: each statement breaks one rule and no other.
+async fn activity_held(tx: &sea_orm::DatabaseTransaction) {
+    for sql in [
+        // Part of an activity, in either direction.
+        "UPDATE upgrade_probe.gateways SET activity_players=1 WHERE official",
+        "UPDATE upgrade_probe.gateways SET activity_playing=0 WHERE official",
+        "UPDATE upgrade_probe.gateways SET activity_at=pg_catalog.clock_timestamp()
+         WHERE official",
+        "UPDATE upgrade_probe.gateways SET activity_games=NULL WHERE origin='https://tokens.invalid'",
+        "UPDATE upgrade_probe.gateways SET activity_playing=NULL WHERE origin='https://tokens.invalid'",
+        "UPDATE upgrade_probe.gateways SET activity_at=NULL WHERE origin='https://tokens.invalid'",
+        // A count outside its bound.
+        "UPDATE upgrade_probe.gateways SET activity_players=100001 WHERE origin='https://tokens.invalid'",
+        "UPDATE upgrade_probe.gateways SET activity_playing=-1 WHERE origin='https://tokens.invalid'",
+        "UPDATE upgrade_probe.gateways SET activity_tables=-1 WHERE origin='https://tokens.invalid'",
+        "UPDATE upgrade_probe.gateways SET activity_games=2147483647 WHERE origin='https://tokens.invalid'",
+        // More players in a game than connected, each count within its bound.
+        "UPDATE upgrade_probe.gateways SET activity_players=99999 WHERE origin='https://tokens.invalid'",
+        "UPDATE upgrade_probe.gateways SET activity_players=5, activity_playing=6
+         WHERE origin='https://tokens.invalid'",
+    ] {
+        refused(tx, sql).await;
+    }
+    // As many in a game as connected, and none of them: both are taken.
+    for playing in [5, 0] {
+        let taken = tx
+            .execute_unprepared(&format!(
+                "UPDATE upgrade_probe.gateways SET activity_players=5, activity_playing={playing}
+                 WHERE origin='https://tokens.invalid'"
+            ))
+            .await
+            .unwrap();
+        assert_eq!(taken.rows_affected(), 1, "{playing}");
+    }
 }
 
 /// 000023 over all of it (the owner's decisions of 10 and 11.11.2026): the

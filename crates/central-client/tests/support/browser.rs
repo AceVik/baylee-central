@@ -707,6 +707,7 @@ fn outside(browser: &Browser, bridge: &Token, cookie: &Token) {
                 metadata: metadata(),
                 activity: central_api::gateway::GatewayActivity {
                     players: 1,
+                    playing: 1,
                     tables: 1,
                     games: 1,
                 },
@@ -815,7 +816,8 @@ fn directory(
     runtime
         .block_on(operator.execute_unprepared(
             "UPDATE central_identity.gateways g SET last_seen = pg_catalog.clock_timestamp(),
-                 activity_players = 5, activity_tables = 2, activity_games = 1,
+                 activity_players = 5, activity_playing = 4, activity_tables = 2,
+                 activity_games = 1,
                  activity_at = pg_catalog.clock_timestamp()
              WHERE EXISTS (SELECT 1 FROM central_identity.gateway_approvals p
                  WHERE p.gateway_id = g.id AND p.enabled)",
@@ -835,12 +837,20 @@ fn directory(
             panic!("the figures");
         };
         assert_eq!((accounts, &gateways), (native.accounts, &native.gateways));
-        assert_eq!(gateways[0].activity.players, 5);
+        assert_eq!(
+            gateways[0].activity,
+            central_api::gateway::GatewayActivity {
+                players: 5,
+                playing: 4,
+                tables: 2,
+                games: 1,
+            }
+        );
     }
     runtime
         .block_on(operator.execute_unprepared(
-            "UPDATE central_identity.gateways SET activity_players = NULL, activity_tables = NULL,
-                 activity_games = NULL, activity_at = NULL",
+            "UPDATE central_identity.gateways SET activity_players = NULL, activity_playing = NULL,
+                 activity_tables = NULL, activity_games = NULL, activity_at = NULL",
         ))
         .unwrap();
 }

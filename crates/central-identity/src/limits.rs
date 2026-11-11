@@ -571,6 +571,7 @@ mod tests {
             metadata: metadata(),
             activity: central_api::gateway::GatewayActivity {
                 players: 1,
+                playing: 1,
                 tables: 1,
                 games: 1,
             },

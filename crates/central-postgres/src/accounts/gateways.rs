@@ -13,18 +13,21 @@ pub(super) fn valid_id(id: [u8; 16]) -> bool {
     id[6] >> 4 == 7 && id[8] >> 6 == 2
 }
 
-/// What a beat does to its row's activity, from parameters 5 to 7
-/// ([`counts`]): a pulse's three counts with the time, or all four columns
+/// What a beat does to its row's activity, from parameters 5 to 8
+/// ([`counts`]): a pulse's four counts with the time, or all five columns
 /// cleared by a plain heartbeat's NULLs. Part of the beat's one UPDATE, so
 /// the five-second limit and every other condition hold for it as well.
-const ACTIVITY: &str = "activity_players=$5,activity_tables=$6,activity_games=$7,
+const ACTIVITY: &str =
+    "activity_players=$5,activity_playing=$6,activity_tables=$7,activity_games=$8,
     activity_at=CASE WHEN $5::integer IS NULL THEN NULL ELSE pg_catalog.clock_timestamp() END";
 
-/// A beat's three activity parameters, in [`ACTIVITY`]'s order: a pulse's
-/// counts within their bound, or NULLs for a plain heartbeat.
-fn counts(activity: Option<GatewayActivity>) -> Result<[Value; 3], Error> {
+/// A beat's four activity parameters, in [`ACTIVITY`]'s order: a pulse's
+/// counts within their bound and with no more players in a game than
+/// connected, or NULLs for a plain heartbeat.
+fn counts(activity: Option<GatewayActivity>) -> Result<[Value; 4], Error> {
     let Some(activity) = activity else {
-        return Ok([None::<i32>.into(), None::<i32>.into(), None::<i32>.into()]);
+        let none = || Value::from(None::<i32>);
+        return Ok([none(), none(), none(), none()]);
     };
     activity.validate()?;
     let count = |n: u32| {
@@ -34,6 +37,7 @@ fn counts(activity: Option<GatewayActivity>) -> Result<[Value; 3], Error> {
     };
     Ok([
         count(activity.players)?,
+        count(activity.playing)?,
         count(activity.tables)?,
         count(activity.games)?,
     ])
@@ -140,7 +144,7 @@ impl AccountStore {
     }
 
     /// One bounded page of what gateways report (`docs/gateway-registry.md`
-    /// §"Activity and the public figures"): the id and the three counts of
+    /// §"Activity and the public figures"): the id and the four counts of
     /// each gateway that is approved and enabled, online by the directory's
     /// 90 seconds, and whose activity was reported within them. A gateway
     /// that sends plain heartbeats, or stopped, is not in it. Ids and counts
@@ -156,7 +160,7 @@ impl AccountStore {
             return Err(Error::Rejected);
         }
         let rows = self.db.query_all_raw(statement(
-            "SELECT g.id,g.activity_players,g.activity_tables,g.activity_games
+            "SELECT g.id,g.activity_players,g.activity_playing,g.activity_tables,g.activity_games
              FROM central_identity.gateways g JOIN central_identity.gateway_approvals p ON p.gateway_id=g.id AND p.enabled
              WHERE ($1::uuid IS NULL OR g.id>$1)
              AND g.last_seen > pg_catalog.clock_timestamp()-interval '90 seconds'
@@ -174,10 +178,12 @@ impl AccountStore {
                 };
                 let activity = GatewayActivity {
                     players: count("activity_players")?,
+                    playing: count("activity_playing")?,
                     tables: count("activity_tables")?,
                     games: count("activity_games")?,
                 };
-                // The table's CHECK holds the bound; a row outside it is not passed on.
+                // The table's CHECKs hold the bound and that no more play than
+                // are connected; a row outside either is not passed on.
                 activity.validate().map_err(|_| Error::Unavailable)?;
                 Ok(GatewayFigures {
                     id: *id.as_bytes(),
@@ -265,12 +271,14 @@ impl AccountStore {
 
     /// [`Self::gateway_heartbeat`] with the gateway's activity
     /// (`docs/gateway-registry.md` §"Activity and the public figures"): the
-    /// same credential, checks and limit, and the three counts kept with the
-    /// time. The counts are the gateway's claim; only their bound is checked.
+    /// same credential, checks and limit, and the four counts kept with the
+    /// time. The counts are the gateway's claim; only their bound is checked,
+    /// and that no more players are in a game than connected.
     ///
     /// # Errors
     /// As [`Self::gateway_heartbeat`], and a count above
-    /// [`GatewayActivity::MOST`], before anything is read or written.
+    /// [`GatewayActivity::MOST`] or more playing than players, before
+    /// anything is read or written.
     pub async fn gateway_pulse(
         &self,
         token: &Token,
@@ -286,7 +294,7 @@ impl AccountStore {
         metadata: &GatewayMetadata,
         activity: Option<GatewayActivity>,
     ) -> Result<(), Error> {
-        let [players, tables, games] = counts(activity)?;
+        let [players, playing, tables, games] = counts(activity)?;
         let row=self.db.query_one_raw(statement(
             &format!("SELECT g.id,g.origin,false AS by_token FROM central_identity.gateways g JOIN central_identity.gateway_approvals p
              ON p.gateway_id=g.id AND p.enabled WHERE g.heartbeat_digest=$1 AND NOT g.official
@@ -310,7 +318,7 @@ impl AccountStore {
              WHERE id=$1 AND NOT official
              AND (last_seen IS NULL OR last_seen<=pg_catalog.clock_timestamp()-interval '5 seconds')
              AND {NOT_DISABLED}"),
-            vec![gateway.into(),metadata.name.clone().into(),metadata.version.clone().into(),metadata.website.clone().into(),players,tables,games]
+            vec![gateway.into(),metadata.name.clone().into(),metadata.version.clone().into(),metadata.website.clone().into(),players,playing,tables,games]
         )).await.map_err(|_|Error::Unavailable)?;
         if updated.rows_affected() != 1 {
             return Err(Error::Busy);
@@ -345,7 +353,8 @@ impl AccountStore {
     ///
     /// # Errors
     /// As [`Self::official_heartbeat`], and a count above
-    /// [`GatewayActivity::MOST`], before anything is read or written.
+    /// [`GatewayActivity::MOST`] or more playing than players, before
+    /// anything is read or written.
     pub async fn official_pulse<S: AsRef<str> + Sync>(
         &self,
         set: &[S],
@@ -364,7 +373,7 @@ impl AccountStore {
         development: bool,
         activity: Option<GatewayActivity>,
     ) -> Result<(), Error> {
-        let [players, tables, games] = counts(activity)?;
+        let [players, playing, tables, games] = counts(activity)?;
         if set.is_empty() || (!development && !set.iter().all(|o| is_official_origin(o.as_ref()))) {
             return Err(Error::Rejected);
         }
@@ -385,7 +394,7 @@ impl AccountStore {
              WHERE official AND origin={any}
              AND (last_seen IS NULL OR last_seen<=pg_catalog.clock_timestamp()-interval '5 seconds')
              AND EXISTS(SELECT 1 FROM central_identity.gateway_approvals p WHERE p.gateway_id=g.id AND p.enabled)"),
-            vec![origins(set)?,metadata.name.clone().into(),metadata.version.clone().into(),metadata.website.clone().into(),players,tables,games]
+            vec![origins(set)?,metadata.name.clone().into(),metadata.version.clone().into(),metadata.website.clone().into(),players,playing,tables,games]
         )).await.map_err(|_|Error::Unavailable)?;
         if updated.rows_affected() != 1 {
             return Err(Error::Busy);
