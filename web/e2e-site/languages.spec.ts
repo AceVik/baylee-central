@@ -37,6 +37,7 @@ const PAGES = [
   "download",
   "gateways",
   "faq",
+  "security",
   "contact",
   "impressum",
   "privacy",
@@ -83,6 +84,29 @@ for (const [lang, tag] of Object.entries(TAGS)) {
     expect(problems).toEqual([]);
   });
 }
+
+test("the bar's sections stand in one row beside each other from where they unfold, in every language", async ({ page }) => {
+  test.slow();
+  for (const lang of Object.keys(TAGS)) {
+    await page.goto(`/${lang}/`);
+    for (const width of [1080, 1081, 1140, 1279, 1280]) {
+      await page.setViewportSize({ width, height: 800 });
+      const bar = await page.evaluate(() => {
+        const links = [...document.querySelectorAll<HTMLElement>(".nav > a")].filter((link) => link.offsetParent !== null);
+        return {
+          wide: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+          rows: new Set(links.map((link) => Math.round(link.getBoundingClientRect().top))).size,
+          tall: Math.max(0, ...links.map((link) => link.getBoundingClientRect().height)),
+        };
+      });
+      expect(bar.wide, `${lang} at ${width}`).toBeLessThanOrEqual(0);
+      if (width > 1080) {
+        expect(bar.rows, `${lang} at ${width}: rows`).toBe(1);
+        expect(bar.tall, `${lang} at ${width}: a label on two lines`).toBeLessThan(60);
+      }
+    }
+  }
+});
 
 test("the language menu names the eleven languages, each in its own, and each leads to this page", async ({ page }) => {
   await page.goto("/en/faq");

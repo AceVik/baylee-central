@@ -253,6 +253,15 @@
 .toc a {
   display: inline-flex;
   align-items: center;
+  min-inline-size: var(--target);
+  min-height: var(--target);
+}
+
+/* a paragraph that is one link and nothing else (a language may word it so)
+   is a target of its own, not a link in a sentence */
+.lone-link a {
+  display: inline-flex;
+  align-items: center;
   min-height: var(--target);
 }
 

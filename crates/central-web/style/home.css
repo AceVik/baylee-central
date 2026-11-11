@@ -431,10 +431,15 @@
   flex: 1 1 32rem;
   flex-direction: column;
   gap: 0.45rem;
+  min-inline-size: 0;
 }
 
+/* a long language's badge takes a second line on a phone */
 .ai-training-pill {
   align-self: flex-start;
+  max-inline-size: 100%;
+  border-radius: 0.9rem;
+  white-space: normal;
 }
 
 .ai-training-badge-col h3 {

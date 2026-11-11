@@ -204,8 +204,8 @@
   --text-lg: clamp(1.12rem, 1rem + 0.4vw, 1.32rem);
   --text-xl: clamp(1.7rem, 1.2rem + 1.7vw, 2.6rem);
   /* on a phone a title's longest word still fits on a line ("Datenschutzerklärung"
-     at 320 px), from about 460 px on it grows as before */
-  --text-2xl: clamp(1.65rem, min(8.3vw, 1.4rem + 3.4vw), 4rem);
+     and "Nutzungsbedingungen" at 320 px), from about 490 px on it grows as before */
+  --text-2xl: clamp(1.6rem, min(8vw, 1.4rem + 3.4vw), 4rem);
   --leading-tight: 1.12;
   --leading: 1.5;
   --leading-prose: 1.6;

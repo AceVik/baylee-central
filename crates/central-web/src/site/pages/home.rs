@@ -98,6 +98,7 @@ pub fn page(cx: &Context<'_>) -> Built {
         {gateways(lang, cx.data.gateways.as_deref())}
         {screens(cx)}
         {about(lang)}
+        {super::security::teaser(lang)}
         {cards(lang, cx.data.cards.as_ref())}
         {contact(lang)}
         {source(cx)}

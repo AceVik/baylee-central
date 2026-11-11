@@ -136,6 +136,7 @@
   display: inline-flex;
   align-items: center;
   max-inline-size: 100%;
+  min-inline-size: var(--target);
   min-height: var(--target);
   overflow-wrap: anywhere;
   padding: 0 0.55rem;

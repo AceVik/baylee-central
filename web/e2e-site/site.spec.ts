@@ -7,6 +7,7 @@ const PAGES = [
   "download",
   "gateways",
   "faq",
+  "security",
   "contact",
   "impressum",
   "privacy",

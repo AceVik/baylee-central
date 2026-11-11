@@ -557,6 +557,52 @@ fn figure(lang: Lang, flow: &Flow, flip: bool) -> impl IntoView + use<> {
     }
 }
 
+/// The start page's way in: the flows that can be used today and the
+/// limits, each by the title its section has here, so the start page says
+/// nothing this page does not.
+pub fn teaser(lang: Lang) -> impl IntoView + use<> {
+    const SIGNS: [&str; 4] = [icons::KEY_ROUND, icons::CPU, icons::LOCK, icons::LINK];
+    let page = Page::Security.path(lang);
+    let way = |sign: &'static str, id: &str, kind: &'static str, title: &'static str| {
+        view! {
+            <li>
+                <a class="sec-way glass reveal" href=format!("{page}#{id}")>
+                    <span class="sec-way-sign">{icon(sign)}</span>
+                    <span class="sec-way-text">
+                        <span class="sec-way-kind">{kind}</span>
+                        <span class="sec-way-title">{title}</span>
+                    </span>
+                </a>
+            </li>
+        }
+    };
+    let flows = FLOWS
+        .iter()
+        .zip(SIGNS)
+        .filter(|(flow, _)| flow.status.is_none())
+        .map(|(flow, sign)| way(sign, flow.id, (flow.eyebrow)(lang), (flow.title)(lang)))
+        .collect_view();
+    let limits = way(
+        icons::TRIANGLE_ALERT,
+        "limits",
+        words::sec_limits_eyebrow(lang),
+        words::sec_limits_title(lang),
+    );
+    view! {
+        <section class="band alt" id="security" aria-labelledby="security-way-title">
+            <div class="wrap">
+                <p class="eyebrow">{words::sec_eyebrow(lang)}</p>
+                <h2 id="security-way-title">{words::sec_title(lang)}</h2>
+                <p class="lead">{words::sec_lead(lang)}</p>
+                <ul class="sec-ways stagger">{flows}{limits}</ul>
+                <p class="sec-ways-more">
+                    <a class="button button-ghost" href=page.clone()>{words::sec_teaser_more(lang)}</a>
+                </p>
+            </div>
+        </section>
+    }
+}
+
 /// One flow's section.
 fn section(lang: Lang, at: usize, flow: &Flow) -> impl IntoView + use<> {
     let title = format!("{}-title", flow.id);
