@@ -195,6 +195,66 @@
   font-weight: 700;
 }
 
+/* for those who type her name (hint.js): a cat walks across the foot of
+   the window, and her prints fade behind her */
+.paws {
+  position: fixed;
+  inset: auto 0 0.8rem;
+  z-index: 91;
+  width: auto;
+  height: 3.2rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  overflow: visible;
+  background: none;
+  color: var(--gold);
+  pointer-events: none;
+}
+
+.paw {
+  position: absolute;
+  bottom: 0.2rem;
+  width: 1.45rem;
+  height: 1.45rem;
+  margin-left: -0.72rem;
+  fill: currentColor;
+  opacity: 0;
+  /* Lucide's print points up and right; she walks to the right */
+  rotate: 46deg;
+  animation: paw-step 2500ms ease-out both;
+}
+
+.paw.other {
+  bottom: 1.4rem;
+}
+
+@keyframes paw-step {
+  0% {
+    opacity: 0;
+    scale: 0.72;
+  }
+
+  9% {
+    opacity: 0.9;
+    scale: 1;
+  }
+
+  55% {
+    opacity: 0.6;
+  }
+
+  100% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .paw {
+    opacity: 0.75;
+  }
+}
+
 @media (pointer: coarse) and (hover: none) {
   .link-hint {
     display: none;
@@ -222,6 +282,33 @@
 
   ::view-transition-new(root) {
     animation: 280ms cubic-bezier(0.22, 1, 0.36, 1) both page-in;
+  }
+
+  /* Within a page the same means show one state giving way to another.
+     A new colour scheme spreads from its switch over the old one, the bar
+     with the rest (boot.js). */
+  :root[data-switching] .top {
+    view-transition-name: none;
+  }
+
+  :root[data-switching]::view-transition-old(root) {
+    animation: none;
+  }
+
+  :root[data-switching]::view-transition-new(root) {
+    animation: 560ms cubic-bezier(0.22, 1, 0.36, 1) both scheme-spread;
+  }
+
+  /* The directory's cards glide to their new places while the page around
+     them stays as it is (directory.js). */
+  :root[data-gliding]::view-transition-old(root),
+  :root[data-gliding]::view-transition-new(root) {
+    animation: none;
+  }
+
+  ::view-transition-group(.gw-card) {
+    animation-duration: 360ms;
+    animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
   }
 
   .page-head > :is(.eyebrow, h1, .lead, .page-note),
@@ -261,6 +348,16 @@
 @keyframes settle {
   from {
     transform: translateY(0.9rem);
+  }
+}
+
+@keyframes scheme-spread {
+  from {
+    clip-path: circle(0 at var(--switch-x, 50%) var(--switch-y, 0%));
+  }
+
+  to {
+    clip-path: circle(150vmax at var(--switch-x, 50%) var(--switch-y, 0%));
   }
 }
 

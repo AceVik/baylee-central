@@ -114,6 +114,70 @@ test("the big logo opens Baylee's album, Escape closes it and focus returns", as
   await expect(logo).toBeFocused();
 });
 
+test("a page of the album turns as a leaf that leaves nothing behind, and a photograph is laid on the one before", async ({ page }) => {
+  await page.goto("/en/");
+  await page.locator("button.memorial-open").click();
+  const album = page.locator("dialog#album");
+  await expect(album).toBeVisible();
+  const turning = album.locator("[data-turning]");
+  // going on: the chapter being left lifts away as a leaf of strips, hidden from a screen reader
+  await album.locator('[data-chapter-step="1"]').click();
+  await expect(album.locator("#chapter-2")).toBeVisible();
+  await expect(album.locator(".story-turning-leaf.forward .leaf-strip")).toHaveCount(10);
+  await expect(album.locator(".story-turning-leaf")).toHaveAttribute("aria-hidden", "true");
+  await expect(turning).toHaveCount(0);
+  // going back: the earlier chapter is laid down over the one being left
+  await album.locator('[data-chapter-step="-1"]').click();
+  await expect(album.locator(".story-turning-leaf.backward")).toHaveCount(1);
+  await expect(album.locator(".story-under")).toHaveCount(1);
+  await expect(turning).toHaveCount(0);
+  await expect(album.locator("#chapter-1")).toBeVisible();
+  // the copies carry no second id into the page
+  expect(await page.evaluate(() => document.querySelectorAll("#chapter-1").length)).toBe(1);
+  // a turn before the last one ended makes way for the next
+  await album.locator('[data-chapter-step="1"]').click();
+  await album.locator('[data-chapter-step="1"]').click();
+  await expect(album.locator(".story-turning-leaf")).toHaveCount(1);
+  await expect(turning).toHaveCount(0);
+  await expect(album.locator("[data-chapter-count]")).toHaveText("3 / 8");
+  // a photograph lies on the one before until it has settled
+  await album.locator('[data-photo-step="1"]').first().click();
+  await expect(album.locator(".photo-preview img.under")).toHaveCount(1);
+  await expect(album.locator(".photo-preview img:not([hidden])")).toHaveCount(1);
+  await expect(album.locator(".photo-preview img.under")).toHaveCount(0);
+});
+
+test("with less motion the album changes its page and its photograph at once", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/en/");
+  await page.locator("button.memorial-open").click();
+  const album = page.locator("dialog#album");
+  await album.locator('[data-chapter-step="1"]').click();
+  await expect(album.locator("#chapter-2")).toBeVisible();
+  await expect(album.locator("[data-turning]")).toHaveCount(0);
+  await album.locator('[data-photo-step="1"]').first().click();
+  await expect(album.locator(".photo-preview img:not([hidden])")).toHaveCount(1);
+  await expect(album.locator(".photo-preview img.under")).toHaveCount(0);
+});
+
+test("whoever types her name sees a cat walk by, and a field keeps what is typed into it", async ({ page }) => {
+  await page.goto("/en/gateways");
+  const paws = page.locator(".paws");
+  // into a field it is a search like any other
+  await page.locator("#dir-find").pressSequentially("baylee");
+  await expect(paws).toHaveCount(0);
+  await page.locator("#dir-find").fill("");
+  await page.locator("h1").click();
+  await page.keyboard.type("Baylee");
+  await expect(paws).toHaveCount(1);
+  await expect(paws).toHaveAttribute("aria-hidden", "true");
+  expect(await paws.locator(".paw").count()).toBeGreaterThanOrEqual(6);
+  // nothing in the way of the page, and nothing left of it afterwards
+  expect(await paws.evaluate((trail) => getComputedStyle(trail).pointerEvents)).toBe("none");
+  expect(await axe(page)).toEqual([]);
+  await expect(paws).toHaveCount(0, { timeout: 8000 });
+});
+
 test("each card number explains itself by keyboard", async ({ page }) => {
   await page.goto("/en/#cards");
   const tip = page.locator("button[popovertarget=tip-generated]");

@@ -1,7 +1,7 @@
 // baylee.app's only blocking script, loaded in <head> so it runs before the
 // first paint (WebAssembly cannot): it applies the colour scheme the
 // visitor chose (localStorage "baylee-site-theme", as before), shows the
-// colour switch, names the account link while a session is remembered
+// colour switch and lets a new scheme spread from it, names the account link while a session is remembered
 // ("baylee-central-session", which holds only when it ends), opens
 // dialogs in browsers without invoker commands, closes the dropdowns as a
 // menu closes, copies a gateway's address, pauses the hero's light off
@@ -37,10 +37,27 @@
     } catch {
       // Private windows may refuse storage; the choice then lasts this page.
     }
-    if (next === "system") delete root.dataset.theme;
-    else root.dataset.theme = next;
-    for (const button of document.querySelectorAll("[data-theme-switch]")) label(button);
-    event.currentTarget.focus();
+    const pressed = event.currentTarget;
+    const apply = () => {
+      if (next === "system") delete root.dataset.theme;
+      else root.dataset.theme = next;
+      for (const button of document.querySelectorAll("[data-theme-switch]")) label(button);
+    };
+    // The new colours spread from the switch where the browser can show
+    // one state giving way to another (a view transition), and where
+    // nobody asked for less motion; anywhere else they are simply there.
+    if (typeof document.startViewTransition === "function" && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      const box = pressed.getBoundingClientRect();
+      root.style.setProperty("--switch-x", `${box.left + box.width / 2}px`);
+      root.style.setProperty("--switch-y", `${box.top + box.height / 2}px`);
+      root.dataset.switching = "";
+      document.startViewTransition(apply).finished.finally(() => {
+        delete root.dataset.switching;
+      });
+    } else {
+      apply();
+    }
+    pressed.focus();
   };
 
   const signedIn = () => {

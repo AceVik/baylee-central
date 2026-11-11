@@ -40,28 +40,85 @@ if (album instanceof HTMLDialogElement && viewer instanceof HTMLDialogElement) {
     if (nextChapter) nextChapter.disabled = to === chapters.length - 1;
   };
 
-  // A copy of the chapter being left folds away over the new one.
-  const turnLeaf = (from, forward) => {
-    const leaving = chapters[from];
-    if (!leaving || !leaves || !page || still()) return;
-    const leaf = document.createElement("div");
-    leaf.className = `story-turning-leaf ${forward ? "forward" : "backward"}`;
-    leaf.setAttribute("aria-hidden", "true");
-    const ink = leaving.cloneNode(true);
+  // The page that turns is a sheet of paper, not a board: a copy of the
+  // chapter, cut into strips that are each hinged on the one before, so the
+  // leaf bends as its edge lifts and lies flat again where it lands. Going
+  // on, the chapter being left lifts away from the next; going back, the
+  // chapter come back to is laid down over the one being left.
+  const STRIPS = 10;
+  const copyOf = (section, lift) => {
+    const ink = section.cloneNode(true);
     ink.removeAttribute("id");
     ink.removeAttribute("role");
     ink.removeAttribute("aria-labelledby");
     ink.hidden = false;
-    ink.style.transform = `translateY(${-page.scrollTop}px)`;
-    leaf.append(ink);
-    leaves.append(leaf);
-    leaf.addEventListener("animationend", () => leaf.remove(), { once: true });
+    ink.style.transform = `translateY(${-lift}px)`;
+    return ink;
+  };
+  const sheetOf = (section, lift, width, gutter) => {
+    const sheet = document.createElement("div");
+    sheet.className = "leaf-sheet";
+    sheet.style.width = `${width}px`;
+    // the page's own text ends where its scrollbar begins
+    if (gutter > 0) sheet.style.borderInlineEnd = `${gutter}px solid transparent`;
+    sheet.append(copyOf(section, lift));
+    return sheet;
+  };
+  const turnLeaf = (from, to) => {
+    const leaving = chapters[from];
+    const entering = chapters[to];
+    if (!leaving || !entering || !leaves || !page || still()) return;
+    // a turn that had not ended makes way for this one
+    for (const old of leaves.querySelectorAll("[data-turning]")) old.remove();
+    const forward = to > from;
+    const width = leaves.clientWidth;
+    const gutter = page.offsetWidth - page.clientWidth;
+    const scrolled = page.scrollTop;
+    const parts = [];
+    if (!forward) {
+      // what the leaf comes down on: the chapter being left, as it stood
+      const under = document.createElement("div");
+      under.className = "story-under";
+      under.append(sheetOf(leaving, scrolled, width, gutter));
+      parts.push(under);
+    }
+    const shade = document.createElement("div");
+    shade.className = "story-turn-shade";
+    parts.push(shade);
+    const leaf = document.createElement("div");
+    leaf.className = `story-turning-leaf ${forward ? "forward" : "backward"}`;
+    let hinge = leaf;
+    let first = null;
+    for (let at = 0; at < STRIPS; at += 1) {
+      const strip = document.createElement("div");
+      strip.className = "leaf-strip";
+      if (at === 0) strip.style.width = `${width / STRIPS}px`;
+      const face = document.createElement("div");
+      face.className = "leaf-face";
+      const sheet = sheetOf(forward ? leaving : entering, forward ? scrolled : 0, width, gutter);
+      sheet.style.left = `${(-at * width) / STRIPS}px`;
+      face.append(sheet);
+      strip.append(face);
+      hinge.append(strip);
+      hinge = strip;
+      first ??= strip;
+    }
+    parts.push(leaf);
+    for (const part of parts) {
+      part.dataset.turning = "";
+      part.setAttribute("aria-hidden", "true");
+    }
+    leaves.append(...parts);
+    // every strip's animation ends at once; the first one's is the leaf's
+    first?.addEventListener("animationend", (event) => {
+      if (event.target === first) for (const part of parts) part.remove();
+    });
   };
 
   const turn = (to, focusTab = false) => {
     const next = Math.max(0, Math.min(chapters.length - 1, to));
     if (next === chapter) return;
-    turnLeaf(chapter, next > chapter);
+    turnLeaf(chapter, next);
     chapter = next;
     showChapter(chapter);
     page?.scrollTo({ top: 0, behavior: "instant" });
@@ -74,27 +131,68 @@ if (album instanceof HTMLDialogElement && viewer instanceof HTMLDialogElement) {
 
   // ---- photographs ------------------------------------------------------
 
+  // The photograph asked for is laid on the one before it, which goes once
+  // the new one has settled.
   const showPhoto = (to, forward) => {
+    const before = photos[photo];
     photo = (to + photos.length) % photos.length;
-    photos.forEach((image, at) => {
-      image.hidden = at !== photo;
-      if (at === photo) {
-        image.classList.toggle("back", !forward);
-        // the slide runs again for each photograph
-        image.style.animation = "none";
-        void image.offsetWidth;
-        image.style.animation = "";
-      }
-    });
-    const words = photos[photo]?.alt ?? "";
+    const next = photos[photo];
+    const lay = before !== next && before?.hidden === false && !still();
+    for (const image of photos) {
+      const under = lay && image === before;
+      image.classList.toggle("under", under);
+      image.hidden = image !== next && !under;
+    }
+    if (next) {
+      next.classList.toggle("back", !forward);
+      // the movement runs again for each photograph
+      next.style.animation = "none";
+      void next.offsetWidth;
+      next.style.animation = "";
+    }
+    const words = next?.alt ?? "";
     if (caption) caption.textContent = words;
     for (const count of counts) count.textContent = `${photo + 1} / ${photos.length}`;
     if (viewer.open) showFull();
   };
+  for (const image of photos) {
+    image.addEventListener("animationend", () => {
+      for (const other of photos) {
+        if (!other.classList.contains("under")) continue;
+        other.hidden = true;
+        other.classList.remove("under");
+      }
+    });
+  }
   const step = (by) => showPhoto(photo + by, by > 0);
   for (const button of document.querySelectorAll("[data-photo-step]")) {
     button.addEventListener("click", () => step(Number(button.getAttribute("data-photo-step"))));
   }
+
+  // ---- a finger: a stroke sideways turns the page, or the photograph --------
+
+  // The page scrolls up and down under a finger as ever (touch-action:
+  // pan-y); a stroke that is mostly sideways is the turn. A mouse selects
+  // text with the same movement, so this is for touch and pen only.
+  const stroke = (area, act) => {
+    if (!area) return;
+    let from = null;
+    area.addEventListener("pointerdown", (event) => {
+      from = event.pointerType === "mouse" ? null : { id: event.pointerId, x: event.clientX, y: event.clientY };
+    });
+    area.addEventListener("pointerup", (event) => {
+      if (from?.id !== event.pointerId) return;
+      const across = event.clientX - from.x;
+      const down = event.clientY - from.y;
+      from = null;
+      if (Math.abs(across) >= 48 && Math.abs(across) > 2 * Math.abs(down)) act(across < 0 ? 1 : -1);
+    });
+    area.addEventListener("pointercancel", () => {
+      from = null;
+    });
+  };
+  stroke(leaves, (by) => turn(chapter + by));
+  stroke(album.querySelector(".photo-preview"), (by) => step(by));
 
   // ---- keys: arrows turn photographs, or chapters on the tabs or with Alt --
 
