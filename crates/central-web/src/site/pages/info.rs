@@ -4,10 +4,9 @@ use leptos::prelude::*;
 use serde_json::json;
 
 use super::Built;
-use super::home::gateway_card;
-use crate::islands::ContactForm;
-use crate::rich::{icon, plain, rich};
-use crate::site::icons;
+use super::home::{contact_columns, gateway_card};
+use crate::data::Gateway;
+use crate::rich::{plain, rich};
 use crate::site::shell::{DISCORD, Meta, REPOSITORY};
 use crate::site::{Context, Page};
 use crate::words::{self, Lang, Piece};
@@ -35,41 +34,109 @@ pub fn gateways(cx: &Context<'_>) -> Built {
     );
     meta.trail
         .push((words::gws_title(lang).to_owned(), Page::Gateways));
-    let list = match cx.data.gateways.as_deref() {
-        None => view! { <p class="notice">{words::gws_failed(lang)}</p> }.into_any(),
-        Some([]) => view! { <p class="notice">{words::gws_none(lang)}</p> }.into_any(),
-        Some(all) => {
-            let count = u64::try_from(all.len()).unwrap_or(u64::MAX);
-            let cards = all
-                .iter()
-                .map(|gateway| gateway_card(lang, gateway))
-                .collect_view();
-            view! {
-                <h2 class="count">{words::gws_count(lang, count)}</h2>
-                <ul class="gateways grid-cards">{cards}</ul>
-                <p class="hint">{words::gws_copy_hint(lang)}</p>
-            }
-            .into_any()
-        }
-    };
-    let code = lang.code();
-    let steps = rich(words::host_steps(lang), move |tag| match tag {
-        "guide" => Some(format!("{REPOSITORY}/blob/main/docs/gateway.md")),
-        "account" => Some(format!("/{code}/account/gateways")),
-        _ => None,
-    });
     let body = view! {
-        {head(None, words::gws_title(lang), words::gws_lead(lang))}
-        <section class="wrap" aria-label=words::gws_title(lang)>{list}</section>
-        <section class="wrap prose-block" aria-labelledby="host">
-            <h2 id="host">{words::host_title(lang)}</h2>
-            <p>{words::host_lead(lang)}</p>
-            <p>{steps}</p>
+        <section class="page-head wrap" aria-labelledby="gateways-title">
+            <p class="eyebrow">{words::gw_eyebrow(lang)}</p>
+            <h1 id="gateways-title">{words::gws_title(lang)}</h1>
+            <p class="lead">{words::gw_lead(lang)}</p>
+            <p class="small page-note">{words::gw_how_to(lang)}</p>
+            {directory(lang, cx.data.gateways.as_deref())}
         </section>
+        {self_host(lang)}
     }
     .into_any();
     (meta, body)
 }
+
+/// Every gateway Central lists, the official one first; finding one by
+/// name or address, or only those online, is `directory.js`'s (without
+/// it every card shows).
+fn directory(lang: Lang, all: Option<&[Gateway]>) -> impl IntoView + use<> {
+    let Some(all) = all else {
+        return view! { <p class="notice dir-failure glass">{words::gws_failed(lang)}</p> }
+            .into_any();
+    };
+    if all.is_empty() {
+        return view! { <p class="small dir-count">{words::gw_none(lang)}</p> }.into_any();
+    }
+    let online = all.iter().filter(|gateway| gateway.online).count();
+    let count = words::gw_count(
+        lang,
+        u64::try_from(all.len()).unwrap_or(u64::MAX),
+        &words::number(lang, u64::try_from(online).unwrap_or(u64::MAX)),
+    );
+    let find = (all.len() > 1).then(|| {
+        view! {
+            <div class="dir-find" hidden=true data-find-bar="">
+                <label class="visually-hidden" for="dir-find">{words::gw_find(lang)}</label>
+                <input id="dir-find" type="search" placeholder=words::gw_find_hint(lang) maxlength="80"
+                    autocomplete="off" spellcheck="false" aria-keyshortcuts="Control+K Meta+K" />
+                <button type="button" class="chip-btn" aria-pressed="false" data-online-only="">
+                    <span class="dot ok" aria-hidden="true"></span>{words::gw_online_only(lang)}
+                </button>
+            </div>
+        }
+    });
+    let cards = all
+        .iter()
+        .map(|gateway| gateway_card(lang, gateway, true))
+        .collect_view();
+    view! {
+        <div class="directory">
+            {find}
+            <output class="small dir-count" data-dir-count="" data-shown=words::gw_shown(lang, "{n}", "{all}")>{count}</output>
+            <p class="dir-none" hidden=true data-no-match="">
+                {words::gw_no_match(lang)}" "
+                <button type="button" class="button button-ghost button-sm">{words::gw_show_all(lang)}</button>
+            </p>
+            <ul class="gateways grid-cards stagger" data-directory="">{cards}</ul>
+        </div>
+    }
+    .into_any()
+}
+
+/// Running a gateway of one's own, as the old site told it.
+fn self_host(lang: Lang) -> impl IntoView + use<> {
+    let code = lang.code();
+    let central = rich(words::selfhost_central(lang), move |tag| {
+        (tag == "mine").then(|| format!("/{code}/account/gateways"))
+    });
+    let guide = rich(words::selfhost_guide(lang), move |tag| match tag {
+        "guide" => Some(format!("{REPOSITORY}{}", words::link_readme_gateway(lang))),
+        "protocol" => Some(format!("{REPOSITORY}/blob/main/docs/protocol.md")),
+        _ => None,
+    });
+    view! {
+        <section class="band alt" id="host" aria-labelledby="host-title">
+            <div class="wrap">
+                <p class="eyebrow">{words::selfhost_eyebrow(lang)}</p>
+                <h2 id="host-title">{words::selfhost_title(lang)}</h2>
+                <div class="two-col">
+                    <div class="reveal">
+                        <p>{plain(words::selfhost_processes(lang))}</p>
+                        <p>{plain(words::selfhost_proxy(lang))}</p>
+                        <p>{central}</p>
+                        <p>{guide}</p>
+                    </div>
+                    <div class="reveal">
+                        <pre class="code" tabindex="0"><code translate="no">{SHELL}</code></pre>
+                        <p class="small">{plain(words::selfhost_source(lang))}</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+    }
+}
+
+/// The shell lines that start a gateway, as the old site showed them.
+const SHELL: &str = "docker compose up -d
+export DATABASE_URL=postgres://baylee:baylee@127.0.0.1:5432/baylee
+cargo build --release -p baylee-gateway \\
+  -p baylee-agent -p baylee-engine-server
+
+export BAYLEE_AGENT_TOKEN=$(openssl rand -hex 32)
+RUST_LOG=info BAYLEE_GATEWAY_NAME=\"My table\" ./target/release/baylee-gateway
+RUST_LOG=info ./target/release/baylee-agent";
 
 fn text(message: &'static str) -> Vec<Piece> {
     vec![Piece {
@@ -150,25 +217,36 @@ pub fn contact(cx: &Context<'_>) -> Built {
     meta.trail
         .push((words::contact_title(lang).to_owned(), Page::Contact));
     meta.islands = true;
-    let privacy = Page::Privacy.path(lang);
-    let note = rich(words::contact_privacy(lang), move |tag| {
-        (tag == "privacy").then(|| privacy.clone())
-    });
+    let links = move |tag: &str| match tag {
+        "discord" => Some(DISCORD.to_owned()),
+        "issues" => Some(format!("{REPOSITORY}/issues")),
+        "docs" => Some(format!("{REPOSITORY}/blob/main/docs/privacy.md")),
+        "notice" => Some(Page::Privacy.path(lang)),
+        _ => None,
+    };
     let body = view! {
-        {head(Some(words::contact_eyebrow(lang)), words::contact_title(lang), words::contact_lead(lang))}
-        <div class="wrap narrow">
-            <ContactForm lang=lang />
-            <noscript><p class="notice">{words::contact_noscript(lang)}</p></noscript>
-            <p class="hint">{note}</p>
-            <section class="card" aria-labelledby="bugs">
-                <h2 id="bugs">{icon(icons::FLAG)}{words::contact_bugs_title(lang)}</h2>
-                <p>{plain(words::contact_bugs(lang))}</p>
-                <p class="actions">
-                    <a class="button quiet" href=format!("{REPOSITORY}/issues") rel="noopener noreferrer">{icon(icons::EXTERNAL_LINK)}{words::foot_issues(lang)}</a>
-                    <a class="button quiet" href=DISCORD rel="noopener noreferrer">{icon(icons::MESSAGE_CIRCLE)}{words::foot_discord(lang)}</a>
-                </p>
-            </section>
-        </div>
+        <section class="page-head wrap" aria-labelledby="contact-title">
+            <p class="eyebrow">{words::contact_eyebrow(lang)}</p>
+            <h1 id="contact-title">{words::contact_title(lang)}</h1>
+            {contact_columns(lang, "#reports".to_owned())}
+        </section>
+        <section class="band alt" id="reports" aria-labelledby="reports-title">
+            <div class="wrap">
+                <p class="eyebrow">{words::reports_eyebrow(lang)}</p>
+                <h2 id="reports-title">{words::reports_title(lang)}</h2>
+                <div class="two-col">
+                    <div class="reveal">
+                        <p>{plain(words::reports_f8(lang))}</p>
+                        <p>{plain(words::reports_usage(lang))}</p>
+                    </div>
+                    <div class="reveal">
+                        <p>{rich(words::reports_discord(lang), links)}</p>
+                        <p>{rich(words::reports_issues(lang), links)}</p>
+                        <p>{rich(words::reports_privacy(lang), links)}</p>
+                    </div>
+                </div>
+            </div>
+        </section>
     }
     .into_any();
     (meta, body)
