@@ -276,6 +276,11 @@ Central from before this asks the old way.
 These signs cost a careless robot time and a careful one nothing: the
 headers and the report are whatever the sender says. The counts are not.
 
+Checked against a real Central behind the proxy's stand-in (11.11.2026,
+`web/e2e-real`): Chromium's own requests score nothing, and Chromium driven
+by a test tool reports `webdriver` and is asked for 18 bits, so the
+project's browser tests pay four times the base and no more.
+
 ### A flood
 
 One bit for each doubling of the last hour's registrations: from 60, 120,

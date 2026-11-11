@@ -3186,7 +3186,7 @@ changes, each weighed:
   never a header's text and never the address.
 - *What the page reports of its browser* needs room on the wire. A field on
   `RegisterChallenge` would have parsed on both sides (serde takes extra
-  fields on a unit variant, which a test showed), and for that reason would
+  fields on a unit variant, which a test holds), and for that reason would
   have been ignored silently by a Central from before. Chosen: a request of
   its own, `RegisterChallengeFor { signals }`, with the old one unchanged
   byte for byte; a Central from before refuses the new one as it refuses
@@ -3265,17 +3265,25 @@ Adversarial pass:
 - In a real browser (Chromium at both widths, `web/e2e-site`, run on a port
   of this checkout's own): the page asks with `RegisterChallengeFor` and
   reports the browser a program drives, stays quiet for three seconds, then
-  shows the line and the bar in the polite region, hands the proof in and
-  clears the line; the whole site suite passed with it (278 passed, 6 of
-  its own skipped), the pages' WCAG checks among them. The Worker's real
+  shows the line and the bar in the polite region, the bar named by the
+  line, with the page's WCAG rules and its 44 px targets holding while it
+  shows, hands the proof in and clears the line; the whole site suite
+  passed with it (278 passed, 6 of its own skipped). The Worker's real
   speed was measured there (`docs/registration-abuse.md` §"A flood"), which
   corrected this change's first figure for a desktop from seconds to a
   minute.
-- Not run: the page against a real Central in one piece (`web/e2e-real`):
-  the two halves were tested apart, the page against a strict stand-in and
-  Central over its real listener. Such a run under Playwright now gets two
-  bits more for the driven browser. The nine other languages' words are
-  English.
+- Against a real Central in one piece (`web/e2e-real`: a throwaway
+  PostgreSQL 18 with TLS, the deployed `--accounts-stdin` with its browser
+  listener, `central-web` and the stand-in for Caddy, on ports of this
+  checkout's own, stopped and deleted after): Chromium with a device's
+  profile is asked for 18 bits, two for the driven browser the page reports
+  and none for its headers, which arrive through the proxy as a person's do
+  (`Accept-Language`, `Sec-Fetch-Site: same-origin`, a user agent that
+  names no tool); the proof the page's Worker solved is taken four seconds
+  after the challenge, and registration, enrollment and sign-in go through;
+  `site-chat.spec.ts` passes at both widths with its four registrations.
+- Not run: a browser no program drives (it would be asked for 16 bits), a
+  phone, Safari and Firefox. The nine other languages' words are English.
 - Left open and written down (`docs/registration-abuse.md` §"Hardened"):
   the budget all callers without a session share can be used up from few
   addresses; a block's people share its count; a hard budget per block; a

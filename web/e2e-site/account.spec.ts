@@ -1,5 +1,7 @@
 import { expect, type Route, test } from "@playwright/test";
 
+import { axe, targets } from "./check.ts";
+
 // The sign-in's browser crypto, for real: the committed central-web-crypto
 // module in its Worker (started through the Trusted Types policy, compiled
 // under 'wasm-unsafe-eval'), against a stand-in for Central's browser
@@ -118,7 +120,7 @@ test("registration refuses a robot's haste and its hidden field, and says when i
   expect(asked).toEqual(["register_challenge_for"]);
 });
 
-// A stand-in for the proof's Worker: six seconds of "work" in eight steps,
+// A stand-in for the proof's Worker: eight seconds of "work" in eight steps,
 // then counters the stand-in for Central does not check.
 const SLOW_WORKER = `self.onmessage = (event) => {
   const parts = JSON.parse(event.data).parts;
@@ -127,12 +129,12 @@ const SLOW_WORKER = `self.onmessage = (event) => {
     done += 1;
     if (done < parts) {
       self.postMessage(JSON.stringify({ progress: Math.floor((done * 100) / parts) }));
-      setTimeout(step, 750);
+      setTimeout(step, 1000);
     } else {
       self.postMessage(JSON.stringify({ counters: Array.from({ length: parts }, (_, i) => i + 1) }));
     }
   };
-  setTimeout(step, 750);
+  setTimeout(step, 1000);
 };`;
 
 test("a proof that takes long says so politely, and the page reports its browser", async ({ page }) => {
@@ -169,8 +171,12 @@ test("a proof that takes long says so politely, and the page reports its browser
   await expect(solving.locator("p")).toContainText("%");
   await expect(solving.getByRole("progressbar")).toHaveAttribute("max", "100");
   await expect(solving.getByRole("progressbar")).toHaveAttribute("value", /^(37|50|62|75|87)$/);
+  // the bar is named by the line, and the page keeps its rules while it works
+  await expect(solving.getByRole("progressbar")).toHaveAccessibleName(/^Your browser is solving a puzzle/);
+  expect(await axe(page)).toEqual([]);
+  expect(await targets(page)).toEqual([]);
   // handed in, the line goes; this stand-in refuses the registration
-  await expect(page.getByRole("alert")).toHaveText("The registration was not accepted. Try again.", { timeout: 15_000 });
+  await expect(page.getByRole("alert")).toHaveText("The registration was not accepted. Try again.", { timeout: 20_000 });
   await expect(solving).toBeEmpty();
   // a browser a program drives says so (bit 1), and has languages (bit 2 unset)
   expect(asked[0]).toEqual({ operation: "register_challenge_for", signals: 1 });
