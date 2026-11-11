@@ -24,6 +24,8 @@ async function register(page: Page, username: string, display: string): Promise<
   await page.waitForTimeout(3_000);
   await page.getByRole("button", { name: "Create account" }).click();
   await expect(page.getByRole("heading", { name: "Your recovery code" })).toBeVisible({ timeout: 90_000 });
+  // the form that held the focus is gone: the code's heading takes it
+  await expect(page.getByRole("heading", { name: "Your recovery code" })).toBeFocused();
   await page.getByLabel("I have saved my recovery code").check();
   await page.getByRole("button", { name: "Continue" }).click();
   // where Central's terms are in force, they come after the code

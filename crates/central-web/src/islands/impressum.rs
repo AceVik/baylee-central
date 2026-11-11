@@ -228,7 +228,7 @@ fn details_view(lang: Lang, details: &Details) -> impl IntoView + use<> {
         .filter(|c| c.is_ascii_digit() || *c == '+')
         .collect();
     view! {
-        <dl class="facts impressum-details">
+        <dl class="facts impressum-details" tabindex="-1">
             <dt>{words::impressum_name(lang)}</dt>
             <dd>{details.name.clone()}</dd>
             <dt>{words::impressum_address(lang)}</dt>
@@ -258,7 +258,14 @@ pub fn Impressum(lang: Lang, worker: String) -> impl IntoView {
         let worker = worker.clone();
         leptos::task::spawn_local(async move {
             let outcome = fetch(&worker, state).await;
+            let shown = outcome.is_some();
             state.set(outcome.map_or(State::Failed, State::Shown));
+            // the button that held the focus went while solving
+            super::focus::after_render(if shown {
+                ".impressum-details"
+            } else {
+                ".impressum button"
+            });
         });
     };
     let contact = format!("/{}/contact", lang.code());

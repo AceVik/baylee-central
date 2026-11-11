@@ -794,6 +794,12 @@ the inbox.
   rendered it and throws once the browser renders it again. Literal text
   goes in braces (`{"Website"}`), and `crates/central-web/tests/inert.rs`
   scans the islands and the views they share for any such element.
+- Where an island replaces the part that held the focus (a form by its next
+  step, the Impressum's button by the details, the contact form by its
+  thanks), the new part takes the focus where it begins
+  (`islands/focus.rs`); before, the next Tab went on at the page's end and
+  skipped the recovery code. Found by the keyboard walk of 11.11.2026 and
+  kept by the browser tests.
 
 **The app.**
 

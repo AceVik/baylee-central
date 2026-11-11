@@ -349,7 +349,7 @@ fn code_view(
     });
     view! {
         <section class="card step" aria-labelledby="code-title">
-            <h2 id="code-title">{words::code_title(lang)}</h2>
+            <h2 id="code-title" tabindex="-1" data-step-focus>{words::code_title(lang)}</h2>
             {handle_line}
             <p>{words::code_lead(lang)}</p>
             <p class="eyebrow">{words::code_shown_once(lang)}</p>
@@ -409,7 +409,7 @@ fn terms_view(
     };
     view! {
         <section class="card step" aria-labelledby="terms-step-title">
-            <h2 id="terms-step-title">{words::terms_step_title(lang)}</h2>
+            <h2 id="terms-step-title" tabindex="-1" data-step-focus>{words::terms_step_title(lang)}</h2>
             <p>{words::terms_step_lead(lang)}</p>
             <div class="terms-text prose" tabindex="0" role="region" aria-labelledby="terms-step-title">{text}</div>
             <p class="actions">
@@ -426,15 +426,26 @@ fn steps_view(
     step: RwSignal<Step>,
     form: impl Fn() -> AnyView + Send + Sync + 'static,
 ) -> impl IntoView {
+    // A new step replaces the old one's elements, focus among them: it
+    // takes the focus where it begins, so the keyboard and a screen reader
+    // go on there and not at the page's end. The first render leaves the
+    // focus where the page put it.
+    Effect::new(move |shown: Option<()>| {
+        step.track();
+        if shown.is_some() {
+            // its heading, its status, the way back, or the form's first field
+            super::focus::after_render("[data-step-focus], form.form input");
+        }
+    });
     move || {
         match step.get() {
         Step::Form => form(),
-        Step::Working => view! { <p class="working" role="status">{words::signin_working(lang)}</p> }.into_any(),
+        Step::Working => view! { <p class="working" role="status" tabindex="-1" data-step-focus>{words::signin_working(lang)}</p> }.into_any(),
         Step::Code(code, handle) => code_view(lang, step, &code, handle).into_any(),
         Step::Terms(document, code, handle) => terms_view(lang, step, &document, code, handle).into_any(),
         Step::Failed(problem) => view! {
             <p class="error" role="alert">{problem_text(lang, problem)}</p>
-            <p><button type="button" class="button" on:click=move |_| step.set(Step::Form)>{words::error_again(lang)}</button></p>
+            <p><button type="button" class="button" data-step-focus on:click=move |_| step.set(Step::Form)>{words::error_again(lang)}</button></p>
         }
         .into_any(),
     }

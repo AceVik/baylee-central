@@ -149,6 +149,10 @@ test("the contact form hydrates, checks before it sends, and says what failed", 
   // No feedback service runs here: the form says so and keeps the text.
   await expect(page.getByRole("alert")).toContainText("could not be sent");
   await expect(page.locator("#contact-message")).toHaveValue("Hello");
+  // Sent: the form goes, and its confirmation takes the focus.
+  await page.route("**/site/contact", (route) => route.fulfill({ status: 201, body: "" }));
+  await page.getByRole("button", { name: "Send message" }).click();
+  await expect(page.getByRole("heading", { name: "Thank you" })).toBeFocused();
 });
 
 test("the Impressum's puzzle fails gracefully without the feedback service", async ({ page }) => {
@@ -156,6 +160,8 @@ test("the Impressum's puzzle fails gracefully without the feedback service", asy
   await expect(page.locator("html")).toHaveAttribute("data-islands", "ready");
   await page.getByRole("button", { name: "Angaben anzeigen" }).click();
   await expect(page.getByRole("alert")).toContainText("konnten nicht geladen werden");
+  // the button went while solving; back, it takes the focus again
+  await expect(page.getByRole("button", { name: "Angaben anzeigen" })).toBeFocused();
 });
 
 test("the phone's More sheet opens, holds the rest and closes with Escape", async ({ page, isMobile }) => {
