@@ -3837,8 +3837,12 @@ again after the documented source and graph review, by the author alone:
   committed module; its bytes also come out of OpenSSL's Argon2id.
 - *What the memory holds.* The inputs are public and the output is
   compared with zero, so nothing secret is in the proof's memory and no
-  constant time is needed. The password's 64 MiB are taken after the
-  proof's 16 are given back.
+  constant time is needed. The proof has a Worker of its own, ended
+  before the password's Worker starts, so the page holds 16 MiB and then
+  64 MiB and never both (a Worker's WebAssembly memory does not shrink;
+  the first build of the page used one Worker for both and would have
+  held about 80 MiB, found when the allocator was read for this review).
+  The browser's own figure for the Worker's memory was not measured.
 - *The other listener.* The native listener refuses `Register` and both
   challenge requests, as before.
 

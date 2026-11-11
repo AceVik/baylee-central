@@ -692,8 +692,8 @@ const WORK_TRIES: u32 = 8;
 /// Solves a memory-hard challenge in the crypto Worker: for each part, the
 /// module's own search (`central_crypto::proof`, the function Central
 /// checks with) in turns of [`WORK_TRIES`], telling `progress` the share
-/// of parts done. The memory is given back before the answer returns, so
-/// the password stretch that follows in the same Worker finds it free.
+/// of parts done. The caller ends this Worker afterwards: its memory
+/// does not shrink, and the password is stretched in a fresh one.
 async fn work(
     crypto: &Crypto,
     nonce: &str,
@@ -805,8 +805,14 @@ async fn register(
     solving: RwSignal<Solving>,
 ) -> Result<(NewCode, SignedIn), (Problem, Option<&'static str>)> {
     let username = f.username.trim().to_ascii_lowercase();
+    // The proof has a Worker of its own, ended before the password's is
+    // started. A Worker's memory never shrinks, so one Worker for both
+    // would hold the proof's 16 MiB and the password's 64 MiB at once.
+    let (nonce, counters) = {
+        let proving = Crypto::start(worker).ok_or((Problem::Failed, None))?;
+        proof(&proving, pow, solving).await?
+    };
     let crypto = Crypto::start(worker).ok_or((Problem::Failed, None))?;
-    let (nonce, counters) = proof(&crypto, pow, solving).await?;
     let request = Request::Register {
         username: username.clone(),
         display_name: Some(f.display.clone()),

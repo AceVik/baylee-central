@@ -605,8 +605,8 @@ call is the page's.
   work (11.11.2026), `central_crypto::proof`, the function Central checks
   with. `work_start` refuses a price above the ceilings before it takes
   memory. The Worker searches in turns of eight counters, so the page can
-  show how far it is, and frees the state (`work_end`) before the password
-  is stretched.
+  show how far it is. The page ends that Worker when the proof is found
+  and stretches the password in a fresh one.
 
 *Changed 21.10.2026 while building it:* `login_finish` first took
 `wrapped_master` too, but that only arrives in the answer to the KE3
@@ -616,10 +616,10 @@ exported objects rather than fields of plain objects, which would have needed
 JavaScript object, and an error is `rejected` or `unavailable`.
 
 A state is opaque, consumed by the step that takes it and wiped when dropped,
-also when the page frees it unused. Argon2id (64 MiB for the password;
-before it, 16 MiB for each evaluation of registration's proof, given back
-first) runs in a module
-Worker, one per flow, terminated at the flow's end. The JS glue is made by
+also when the page frees it unused. Argon2id (64 MiB) runs in a module
+Worker, one per flow, terminated at the flow's end. Registration has one
+more before it, for its proof's 16 MiB, ended when the proof is found: a
+Worker's memory does not shrink, so the two never share one. The JS glue is made by
 `wasm-bindgen` (CLI, the same version) and committed under
 `web/src/central-wasm/` with its SHA-256 sums, so `npm run build` needs no
 Rust toolchain; `cargo xtask wasm` rebuilds it on x86-64 Linux (other machines use the
