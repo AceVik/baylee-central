@@ -427,6 +427,7 @@ first-paint faces preloaded, the licences beside them and in the notices.
   canonical is the page itself.
 - **Map:** `/{lang}/` home (with the card numbers and the album behind the
   big logo, §10); `download`; `gateways` (with how to host one); `faq`;
+  `security` (four diagrams in steps, [its claims](../security-page.md));
   `contact`;
   `impressum`, `privacy`, `terms`, `fan-content`; `signin`, `register`,
   `reset`; `account` and its sections (§6.2); `pair`; `admin…` as today.

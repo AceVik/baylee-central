@@ -11,6 +11,7 @@ mod errors;
 mod home;
 mod info;
 mod legal;
+mod security;
 
 /// The document for `page`.
 pub fn document(page: Page, cx: &Context<'_>) -> impl IntoView + use<> {
@@ -19,6 +20,7 @@ pub fn document(page: Page, cx: &Context<'_>) -> impl IntoView + use<> {
         Page::Download => download::page(cx),
         Page::Gateways => info::gateways(cx),
         Page::Faq => info::faq(cx),
+        Page::Security => security::page(cx),
         Page::Contact => info::contact(cx),
         Page::Impressum => legal::impressum(cx),
         Page::Privacy => legal::privacy(cx),

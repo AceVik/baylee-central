@@ -582,6 +582,7 @@ fn footer(page: Page, cx: &Context<'_>) -> impl IntoView + use<> {
                                 {link(Page::Download, words::nav_download(lang))}
                                 {link(Page::Gateways, words::nav_gateways(lang))}
                                 {link(Page::Faq, words::nav_faq(lang))}
+                                {link(Page::Security, words::nav_security(lang))}
                                 {away(DISCORD.to_owned(), words::foot_discord(lang))}
                                 {away(WHATSAPP.to_owned(), words::hero_whatsapp(lang))}
                                 {link(Page::Contact, words::nav_contact(lang))}
