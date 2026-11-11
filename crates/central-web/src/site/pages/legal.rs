@@ -130,12 +130,13 @@ pub fn privacy(cx: &Context<'_>) -> Built {
         }
     };
     // the contents, in the order the parts stand
-    let parts: [Part; 15] = [
+    let parts: [Part; 18] = [
         ("controller", words::privacy_controller_title),
         ("short", words::privacy_short_title),
         ("hosting", words::privacy_hosting_title),
         ("device", words::privacy_device_title),
         ("github", words::privacy_github_title),
+        ("links", words::privacy_links_title),
         ("directory", words::privacy_directory_title),
         ("account", words::privacy_account_title),
         ("cookie", words::privacy_cookie_title),
@@ -143,9 +144,11 @@ pub fn privacy(cx: &Context<'_>) -> Built {
         ("push", words::privacy_push_title),
         ("counters", words::privacy_counters_title),
         ("contact", words::privacy_contact_title),
+        ("reports", words::privacy_reports_title),
         ("impressum", words::privacy_impressum_title),
         ("recipients", words::privacy_recipients_title),
         ("rights", words::privacy_rights_title),
+        ("objection", words::privacy_objection_title),
     ];
     let contents = parts
         .iter()
@@ -164,6 +167,7 @@ pub fn privacy(cx: &Context<'_>) -> Built {
             {hosting}
             {section("device", words::privacy_device_title(lang), plain(words::privacy_device(lang)))}
             {github}
+            {section("links", words::privacy_links_title(lang), words::privacy_links(lang).into_any())}
             {directory}
             {section("account", words::privacy_account_title(lang), words::privacy_account(lang).into_any())}
             {section("cookie", words::privacy_cookie_title(lang), plain(words::privacy_cookie(lang)))}
@@ -171,9 +175,12 @@ pub fn privacy(cx: &Context<'_>) -> Built {
             {push}
             {counters}
             {contact}
+            {section("reports", words::privacy_reports_title(lang), words::privacy_reports(lang).into_any())}
             {puzzle}
             {section("recipients", words::privacy_recipients_title(lang), words::privacy_recipients(lang).into_any())}
             {section("rights", words::privacy_rights_title(lang), words::privacy_rights(lang).into_any())}
+            // Art. 21(4): the right to object stands apart from the rest
+            {section("objection", words::privacy_objection_title(lang), words::privacy_objection(lang).into_any())}
         </div>
     }
     .into_any();
