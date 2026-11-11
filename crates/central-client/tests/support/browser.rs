@@ -269,7 +269,7 @@ pub(crate) fn run(
     let cookie = sign_in(browser, http, context);
     summary(browser, http, &cookie, account, &recovery);
     session(browser, http, bridge, &cookie);
-    directory(browser, http);
+    directory(browser, http, &cookie, runtime, operator);
     // With the terms accepted, the registration's own wrapper is `Done` again
     // and another is a conflict: a registered account keeps its code.
     let set = |r: &WrappedMasterKey| Request::SetRecovery {
@@ -623,6 +623,61 @@ fn sign_in(browser: &Browser, http: &Http, context: Context) -> Token {
     reply.session.expect("a session for the cookie")
 }
 
+/// Operations outside the browser listener's list are refused, with any token.
+fn outside(browser: &Browser, bridge: &Token, cookie: &Token) {
+    let metadata = || central_api::gateway::GatewayMetadata {
+        name: "Synthetic official gateway".into(),
+        version: "test-1".into(),
+        website: format!("{GATEWAY}/"),
+    };
+    for (request, token) in [
+        (Request::ReadDocument, cookie),
+        (Request::CreateObject, cookie),
+        (
+            Request::GatewayTicket {
+                gateway: GATEWAY.into(),
+                purpose: TicketPurpose::Admit,
+            },
+            cookie,
+        ),
+        (
+            Request::AcceptTerms {
+                subject: TermsSubject::Gateway {
+                    origin: GATEWAY.into(),
+                },
+                version: "1".into(),
+                digest: [0; 32],
+            },
+            cookie,
+        ),
+        (
+            Request::LegacyStatus {
+                legacy_id: "synthetic-legacy".into(),
+            },
+            bridge,
+        ),
+        (
+            Request::GatewayHeartbeat {
+                metadata: metadata(),
+            },
+            bridge,
+        ),
+        (
+            Request::GatewayPulse {
+                metadata: metadata(),
+                activity: central_api::gateway::GatewayActivity {
+                    players: 1,
+                    tables: 1,
+                    games: 1,
+                },
+            },
+            bridge,
+        ),
+    ] {
+        assert!(browser.refused(&request, Some(token)));
+    }
+}
+
 fn session(browser: &Browser, http: &Http, bridge: &Token, cookie: &Token) {
     // The cookie is a browser session only: as a native bearer it is nothing.
     assert!(
@@ -664,46 +719,7 @@ fn session(browser: &Browser, http: &Http, bridge: &Token, cookie: &Token) {
         browser.answer(&Request::RenewSession, None).err(),
         Some(Error::Rejected)
     );
-    // Operations outside the browser listener's list are refused, with any token.
-    for (request, token) in [
-        (Request::ReadDocument, cookie),
-        (Request::CreateObject, cookie),
-        (
-            Request::GatewayTicket {
-                gateway: GATEWAY.into(),
-                purpose: TicketPurpose::Admit,
-            },
-            cookie,
-        ),
-        (
-            Request::AcceptTerms {
-                subject: TermsSubject::Gateway {
-                    origin: GATEWAY.into(),
-                },
-                version: "1".into(),
-                digest: [0; 32],
-            },
-            cookie,
-        ),
-        (
-            Request::LegacyStatus {
-                legacy_id: "synthetic-legacy".into(),
-            },
-            bridge,
-        ),
-        (
-            Request::GatewayHeartbeat {
-                metadata: central_api::gateway::GatewayMetadata {
-                    name: "Synthetic official gateway".into(),
-                    version: "test-1".into(),
-                    website: format!("{GATEWAY}/"),
-                },
-            },
-            bridge,
-        ),
-    ] {
-        assert!(browser.refused(&request, Some(token)));
-    }
+    outside(browser, bridge, cookie);
     // Central's terms are read and accepted on the website.
     let Response::TermsStatus {
         current: Some(current),
@@ -732,8 +748,16 @@ fn session(browser: &Browser, http: &Http, bridge: &Token, cookie: &Token) {
 }
 
 /// The public directory is read on the browser listener without a session,
-/// as on the native route, and lists the same gateways.
-fn directory(browser: &Browser, http: &Http) {
+/// as on the native route, and lists the same gateways; so are the public
+/// figures, with the same accounts and counts, and a cookie sent along
+/// changes nothing.
+fn directory(
+    browser: &Browser,
+    http: &Http,
+    cookie: &Token,
+    runtime: &Runtime,
+    operator: &DatabaseConnection,
+) {
     let Response::GatewayDirectory { gateways } = browser
         .answer(&Request::GatewayDirectory { after: None }, None)
         .unwrap()
@@ -746,6 +770,39 @@ fn directory(browser: &Browser, http: &Http) {
         gateways.iter().map(|entry| entry.id).collect::<Vec<_>>(),
         native.iter().map(|entry| entry.id).collect::<Vec<_>>()
     );
+    // As if every listed gateway had just reported (their pulses are the
+    // native route's, and are tested there).
+    runtime
+        .block_on(operator.execute_unprepared(
+            "UPDATE central_identity.gateways g SET last_seen = pg_catalog.clock_timestamp(),
+                 activity_players = 5, activity_tables = 2, activity_games = 1,
+                 activity_at = pg_catalog.clock_timestamp()
+             WHERE EXISTS (SELECT 1 FROM central_identity.gateway_approvals p
+                 WHERE p.gateway_id = g.id AND p.enabled)",
+        ))
+        .unwrap();
+    let native = central_client::public_figures(http, None).unwrap();
+    assert_eq!(
+        native.gateways.iter().map(|g| g.id).collect::<Vec<_>>(),
+        gateways.iter().map(|entry| entry.id).collect::<Vec<_>>()
+    );
+    assert!(native.accounts >= 1);
+    for sent in [None, Some(cookie)] {
+        let Response::PublicFigures { accounts, gateways } = browser
+            .answer(&Request::PublicFigures { after: None }, sent)
+            .unwrap()
+        else {
+            panic!("the figures");
+        };
+        assert_eq!((accounts, &gateways), (native.accounts, &native.gateways));
+        assert_eq!(gateways[0].activity.players, 5);
+    }
+    runtime
+        .block_on(operator.execute_unprepared(
+            "UPDATE central_identity.gateways SET activity_players = NULL, activity_tables = NULL,
+                 activity_games = NULL, activity_at = NULL",
+        ))
+        .unwrap();
 }
 
 /// The same account plays natively beside its browser session; signing out of

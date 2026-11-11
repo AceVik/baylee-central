@@ -26,7 +26,9 @@ mod social;
 mod terms;
 pub use central_crypto::pairing::PairingSecret;
 pub use deletion::Deletion;
-pub use gateways::{GatewayRegistration, gateway_directory};
+pub use gateways::{
+    GatewayRegistration, PublicFigures, gateway_directory, gateway_pulse, public_figures,
+};
 pub use legacy::{LegacyEnrollment, legacy_login};
 pub use objects::ObjectDocument;
 pub use pairing::{PairedAccount, Pairing, claim};
