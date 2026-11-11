@@ -114,7 +114,7 @@ impl Accounts for IdentityService {
         cookie: Option<&Token>,
         seen: Seen,
     ) -> impl Future<Output = Result<BrowserReply, Error>> + Send {
-        self.handle_browser_seen(request, cookie, seen)
+        self.handle_browser_from(request, cookie, None, seen)
     }
 
     fn report_part(

@@ -4,8 +4,8 @@
 //! password, bound to the session that started it and charged to the
 //! account's login budget.
 use super::{
-    BrowserReply, Error, IdentityService, Pending, Purpose, Request, Response, Surface, Token,
-    limits, signed_in,
+    BrowserReply, Error, IdentityService, Pending, Place, Purpose, Request, Response, Surface,
+    Token, limits, signed_in,
 };
 use central_crypto::opaque::server::ServerKeys;
 use std::time::{Duration, Instant};
@@ -23,6 +23,7 @@ impl IdentityService {
         request: Request,
         bearer: Option<&Token>,
         surface: Surface,
+        place: Option<Place>,
     ) -> Result<Response, Error> {
         let Request::ChangePasswordStart {
             login,
@@ -35,21 +36,24 @@ impl IdentityService {
         let credential = self.store.password_credential(session).await?;
         let identity = credential.identity;
         let context = self.context(identity)?;
-        // The login budget bounds guesses at the current password, also with
-        // a stolen session. The registration response is a second evaluation
-        // of the account's OPRF key: with it a guess unmasks KE2's envelope as
-        // KE2's own evaluation does, so a start costs two sign-ins and a
-        // session guesses no faster than anyone can without one.
-        self.limits
-            .lock()
-            .map_err(|_| Error::Unavailable)?
-            .account(identity.account, Instant::now(), CHANGE_UNITS)?;
         let permit = self
             .workers
             .clone()
             .try_acquire_owned()
             .map_err(|_| Error::Busy)?;
         self.prune_pending()?;
+        // The login budget bounds guesses at the current password, also with
+        // a stolen session. The registration response is a second evaluation
+        // of the account's OPRF key: with it a guess unmasks KE2's envelope as
+        // KE2's own evaluation does, so a start costs two sign-ins and a
+        // session guesses no faster than anyone can without one. Counted
+        // once a worker is held, and given back by the proof.
+        let guess = self
+            .limits
+            .lock()
+            .map_err(|_| Error::Unavailable)?
+            .guesses
+            .guess(identity.account, true, place, Instant::now(), CHANGE_UNITS)?;
         let keys = self.keys.clone();
         let (attempt, login, registration, credential) = tokio::task::spawn_blocking(move || {
             let _permit = permit;
@@ -79,6 +83,7 @@ impl IdentityService {
                 credential: Some(credential),
                 surface,
                 purpose: Purpose::ChangePassword(started_by),
+                guess,
             },
         );
         Ok(Response::PasswordChallenge {
@@ -99,6 +104,12 @@ impl IdentityService {
         record: &[u8],
         wrapped: &[u8],
     ) -> Result<BrowserReply, Error> {
+        // The worker first, as for a sign-in: without one the attempt stays.
+        let permit = self
+            .workers
+            .clone()
+            .try_acquire_owned()
+            .map_err(|_| Error::Busy)?;
         // Consumption precedes every check, as for a sign-in.
         let pending = self
             .pending
@@ -117,21 +128,19 @@ impl IdentityService {
         {
             return Err(Error::Rejected);
         }
-        let permit = self
-            .workers
-            .clone()
-            .try_acquire_owned()
-            .map_err(|_| Error::Busy)?;
-        let credential = tokio::task::spawn_blocking(move || {
+        let (credential, guess) = tokio::task::spawn_blocking(move || {
             let _permit = permit;
             pending
                 .attempt
                 .finish(&proof)
                 .map_err(|_| Error::Rejected)?;
-            pending.credential.ok_or(Error::Rejected)
+            Ok::<_, Error>((pending.credential.ok_or(Error::Rejected)?, pending.guess))
         })
         .await
         .map_err(|_| Error::Unavailable)??;
+        // The current password is proven, whatever the store says to the
+        // new one.
+        self.proved(&guess)?;
         let token = Token::generate()?;
         let issued = self
             .store

@@ -8,7 +8,7 @@
 //! the same work: an unknown, closed, locked-out or registered name derives
 //! against a fixed hash under the same parameters, and counts a failure
 //! against a row that is not there.
-use super::{Error, IdentityService, Response, Surface, Token};
+use super::{Error, IdentityService, Place, Response, Surface, Token};
 use central_api::{
     admin::AdminAnswer,
     legacy::{LegacyPassword, LegacyStore as Listing},
@@ -31,15 +31,24 @@ impl IdentityService {
         username: &str,
         password: LegacyPassword,
         surface: Surface,
+        place: Option<Place>,
     ) -> Result<Response, Error> {
         let legacy = self.legacy.as_ref().ok_or(Error::Rejected)?;
         if surface != Surface::Native || !password.bounded() {
             return Err(Error::Rejected);
         }
-        self.limits
+        // The worker first, so that a sign-in that finds none spends
+        // nothing of the names' budgets or of its place's guesses.
+        let permit = self
+            .workers
+            .clone()
+            .try_acquire_owned()
+            .map_err(|_| Error::Busy)?;
+        let guess = self
+            .limits
             .lock()
             .map_err(|_| Error::Unavailable)?
-            .legacy(username, Instant::now())?;
+            .legacy_from(username, place, Instant::now())?;
         let mut candidate = legacy.candidate(username).await?;
         let salt = candidate
             .as_ref()
@@ -48,11 +57,6 @@ impl IdentityService {
         let expected = candidate
             .as_mut()
             .map(|candidate| std::mem::take(&mut candidate.hash));
-        let permit = self
-            .workers
-            .clone()
-            .try_acquire_owned()
-            .map_err(|_| Error::Busy)?;
         let proven = tokio::task::spawn_blocking(move || {
             let _permit = permit;
             let derived = derive(password.expose(), &salt).map_err(|_| Error::Rejected)?;
@@ -66,6 +70,8 @@ impl IdentityService {
             legacy.failed(username).await?;
             return Err(Error::Rejected);
         };
+        // Proven: the place's guess comes back, whatever the store says next.
+        self.proved(&guess)?;
         legacy.succeeded(&candidate.legacy_id).await?;
         // The gateway's own refusals, after the proof: a forced change and a
         // ban in force move nothing (the operator sees them in the listing).
