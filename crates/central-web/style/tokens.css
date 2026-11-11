@@ -181,7 +181,8 @@
   --text-3xl: var(--text-2xl);
   --measure: 38rem;
   --page: var(--wrap);
-  --frame: 100rem;
+  /* the signed-in area is as wide as the bar above it, edge under edge */
+  --frame: var(--wrap);
   --bar-height: var(--top-h);
   --dock-height: 0rem;
   --radius-lg: var(--radius);
