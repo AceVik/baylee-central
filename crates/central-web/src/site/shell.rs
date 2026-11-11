@@ -149,6 +149,10 @@ fn head(page: Page, cx: &Context<'_>, meta: &Meta) -> impl IntoView + use<> {
     let verification = cx
         .verification
         .map(|value| view! { <meta name="google-site-verification" content=value.to_owned() /> });
+    // Baylee's album, on the start page only
+    let album = (page == Page::Home).then(|| {
+        view! { <script type="module" src=assets.url("album.js") integrity=assets.integrity("album.js")></script> }
+    });
     let islands = meta.islands.then(|| {
         view! { <script type="module" src=assets.url("islands.js") integrity=assets.integrity("islands.js") fetchpriority="low"></script> }
     });
@@ -198,6 +202,7 @@ fn head(page: Page, cx: &Context<'_>, meta: &Meta) -> impl IntoView + use<> {
             <link rel="stylesheet" href=assets.url("site.css") integrity=assets.integrity("site.css") />
             <script src=assets.url("boot.js") integrity=assets.integrity("boot.js")></script>
             <script type="module" src=assets.url("pwa.js") integrity=assets.integrity("pwa.js")></script>
+            {album}
             {islands}
             <link rel="icon" href="/favicon.ico" sizes="32x32" />
             <link rel="icon" href=assets.url("img/icon.svg") type="image/svg+xml" />
