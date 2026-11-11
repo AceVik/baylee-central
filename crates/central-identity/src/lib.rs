@@ -693,6 +693,14 @@ mod tests {
     };
 
     fn served() -> Vec<Request> {
+        let mut served = entering();
+        served.extend(within());
+        served
+    }
+
+    /// The served operations up to the terms: finding an account, signing
+    /// in, registering, the session.
+    fn entering() -> Vec<Request> {
         let identity = IDENTITY;
         vec![
             Request::Social {
@@ -738,6 +746,13 @@ mod tests {
                 version: "1".into(),
                 digest: [0; 32],
             },
+        ]
+    }
+
+    /// The rest of the served operations: the directory and what an
+    /// account does with itself.
+    fn within() -> Vec<Request> {
+        vec![
             Request::GatewayDirectory { after: None },
             Request::PublicFigures { after: None },
             Request::AccountSummary,
