@@ -1076,3 +1076,5 @@ sec-signin-link = Что происходит с вашим паролем пр�
 sec-teaser-lead = Шаг за шагом: что покидает ваше устройство, что видит Baylee Central и чего не видит, и пределы каждого процесса.
 sec-teaser-more = Посмотреть каждый шаг на схеме
 # ==== end of the security page =================================================
+# ==== registration: the proof of work, while it takes long (English until translated) ====
+register-solving = Your browser is solving a puzzle that keeps robots out. When many accounts are being created, this can take a few minutes … { $percent } %

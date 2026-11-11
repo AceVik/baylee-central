@@ -1062,3 +1062,5 @@ sec-signin-link = 登入時你的密碼會怎麼處理：<security>安全性</se
 sec-teaser-lead = 逐步說明：什麼會離開你的裝置，Baylee Central 看得到什麼、看不到什麼，以及每個流程的限制。
 sec-teaser-more = 以圖示查看每個步驟
 # ==== end of the security page =================================================
+# ==== registration: the proof of work, while it takes long (English until translated) ====
+register-solving = Your browser is solving a puzzle that keeps robots out. When many accounts are being created, this can take a few minutes … { $percent } %

@@ -1062,3 +1062,5 @@ sec-signin-link = 로그인할 때 비밀번호는 어떻게 되나요: <securit
 sec-teaser-lead = 단계별로 보여 드려요. 내 기기를 떠나는 것, Baylee Central이 보는 것과 보지 못하는 것, 그리고 각 흐름의 한계예요.
 sec-teaser-more = 각 단계를 도표로 보기
 # ==== end of the security page =================================================
+# ==== registration: the proof of work, while it takes long (English until translated) ====
+register-solving = Your browser is solving a puzzle that keeps robots out. When many accounts are being created, this can take a few minutes … { $percent } %

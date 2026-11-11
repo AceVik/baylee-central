@@ -1196,3 +1196,5 @@ sec-teaser-lead = Pas à pas : ce qui quitte votre appareil, ce que Baylee Cent
     les limites de chaque flux.
 sec-teaser-more = Voir chaque étape dans un schéma
 # ==== end of the security page =================================================
+# ==== registration: the proof of work, while it takes long (English until translated) ====
+register-solving = Your browser is solving a puzzle that keeps robots out. When many accounts are being created, this can take a few minutes … { $percent } %

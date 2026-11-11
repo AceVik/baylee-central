@@ -1066,3 +1066,5 @@ sec-signin-link = ログイン時にパスワードがどうなるか：<securit
 sec-teaser-lead = 手順ごとに：何が端末から出ていくか、Baylee Central に何が見え何が見えないか、そして各フローの限界。
 sec-teaser-more = 各手順を図で見る
 # ==== end of the security page =================================================
+# ==== registration: the proof of work, while it takes long (English until translated) ====
+register-solving = Your browser is solving a puzzle that keeps robots out. When many accounts are being created, this can take a few minutes … { $percent } %
