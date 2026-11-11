@@ -2810,3 +2810,42 @@ Recorded, not changed, for the owner:
   page.
 
 Engineering review, not an audit.
+
+## The site's polish: links in new tabs, movement, the words, 11 November 2026
+
+The owner asked for a polish of the Leptos site (layout, movement, every
+link away in a tab of its own, the words and the legal texts put right).
+
+**Pass 1, what changed.** Every off-site anchor carries `target="_blank"`
+beside `rel="noopener noreferrer"`, release files included
+(`central-web-server/tests/pages.rs` fails on one that does not, and on a
+link within the site that does); a CSS arrow with an alternative text marks
+such a link in running text. A platform's further files fold under a native
+`<details>`. Pages cross-fade through `@view-transition` (same-origin
+navigations only, by the standard), a page's head settles by `transform`
+alone, a line under the bar follows the scroll through a scroll timeline, and
+`home.js` counts the card numbers up from a `data-count` the server wrote.
+The words of both languages were proofread, the privacy notice on the site
+gained three sections, and `legal/*.md` moved to version 2026-11-11.
+
+**Pass 2, the attacker's view.** `target="_blank"` alone would hand the opened
+page `window.opener`; `noopener` on every such link (and the site's
+`Referrer-Policy`) keeps the opened site from reaching or learning of this
+one, and the test holds the pair together. The counting script writes only
+`textContent`, from a number formatted by `Intl.NumberFormat`: no markup
+sink, so Trusted Types has nothing to refuse; a `data-count` that is not a
+positive finite number is left as the server wrote it. No new script file, no
+inline style or script, no new origin in the CSP; view transitions and
+scroll timelines are CSS and reach no data. The new words promise less than
+before where the code did not bear them out (what a recovery code saves, what
+an export holds, what deleting leaves, who receives what).
+
+**Pass 3, what was tested.** The page tests in both languages; `e2e:site`
+with the wording changed in the specs; the real-Central chat suite on the new
+Central build; Lighthouse on the start page, download and register (mobile
+performance 96–99, accessibility and best practices 100). Movement is off
+under `prefers-reduced-motion` (the global rule and the media queries around
+each new animation), and `tests/hover.rs` still holds: nothing moves or
+grows as a whole under the pointer. **Not evidence of legal compliance:** the
+texts were reviewed by a model, not a lawyer; what is the owner's to confirm
+stands in `docs/proposals/website-text-review.md`.
