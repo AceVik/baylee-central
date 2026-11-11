@@ -34,7 +34,7 @@
 
 .band.alt {
   background:
-    linear-gradient(180deg, rgb(0 0 0 / 0.14), transparent 3.5rem),
+    linear-gradient(180deg, var(--shade), transparent 3.5rem),
     var(--bg-alt);
 }
 
@@ -67,7 +67,7 @@
 }
 
 .page-head {
-  padding-block: clamp(2.5rem, 6vw, 4.5rem) clamp(2rem, 4vw, 3rem);
+  padding-block: clamp(1.6rem, 3.6vw, 2.8rem) clamp(1.5rem, 3vw, 2.2rem);
   text-align: center;
 }
 
