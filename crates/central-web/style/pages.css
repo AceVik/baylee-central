@@ -201,13 +201,24 @@
 
 /* ---- Reading pages ---------------------------------------------------------------- */
 
+/* one reading column, as wide as the old site's (46rem) */
+.reading {
+  max-inline-size: calc(var(--prose) + 2 * var(--gutter));
+}
+
 .prose {
+  padding-block-end: clamp(2.4rem, 4.5vw, 3.6rem);
   font-family: var(--font-prose);
   line-height: var(--leading-prose);
 }
 
+.faq {
+  padding-block-end: clamp(2.4rem, 4.5vw, 3.6rem);
+}
+
 .prose h2 {
-  margin-block: var(--space-6) var(--space-2);
+  margin-block: 2rem 0.5em;
+  font-size: clamp(1.3rem, 1.1rem + 0.8vw, 1.7rem);
 }
 
 .prose p,
@@ -216,28 +227,109 @@
   margin-block-start: var(--space-3);
 }
 
-.prose section + section {
-  margin-block-start: var(--space-5);
+.legal-part {
+  scroll-margin-top: calc(var(--top-h) + 1rem);
+}
+
+/* the privacy notice's contents: two columns in a glass box */
+.toc {
+  margin: 0 0 2rem;
+  padding: 1rem 1.2rem;
+  font-family: var(--sans);
+}
+
+.toc ol {
+  margin: 0;
+  padding-left: 1.3rem;
+  columns: 2;
+  column-gap: 2rem;
+}
+
+.toc li {
+  padding: 0.1rem 0;
+  break-inside: avoid;
+}
+
+.toc a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--target);
+}
+
+@media (max-width: 600px) {
+  .toc ol {
+    columns: 1;
+  }
+}
+
+/* the terms, set from their Markdown */
+.legal-text h2 {
+  margin-top: 2rem;
+  font-size: 1.15rem;
+}
+
+.legal-text h3 {
+  margin-top: 1.6rem;
+  font-size: 1.08rem;
+}
+
+.legal-text :is(ol, ul) {
+  padding-left: 1.4rem;
+}
+
+.legal-text li {
+  margin: 0.3rem 0;
+}
+
+.legal-text hr {
+  margin: 1.5rem 0;
+  border: 0;
+  border-top: 1px solid var(--edge-soft);
+}
+
+/* the legal notice's puzzle, in a glass box */
+.legal-box {
+  margin-block: var(--space-4);
+  padding: 1.2rem 1.5rem;
+}
+
+.legal-box > p:first-child {
+  margin-top: 0;
 }
 
 .quote {
   margin-block: var(--space-4);
   padding: var(--space-4) var(--space-5);
-  border-inline-start: 0.25rem solid var(--action);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
+  border: 1px solid var(--edge-soft);
+  border-inline-start: 3px solid var(--gold);
+  border-radius: var(--radius-md);
+  background: var(--panel);
+  font-family: var(--sans);
+  font-size: 0.95rem;
 }
 
-.faq .qa + .qa {
-  margin-block-start: var(--space-6);
+/* the questions: a glass card each, the answer under its question */
+.faq {
+  display: grid;
+  gap: 1rem;
+}
+
+.faq .qa {
+  padding: 1.2rem 1.4rem;
+}
+
+.faq .qa:hover {
+  border-color: var(--gold);
 }
 
 .faq h2 {
-  font-size: var(--text-lg);
+  margin: 0;
+  font-size: 1.2rem;
 }
 
 .faq p {
-  margin-block-start: var(--space-2);
+  margin: 0.5rem 0 0;
+  color: var(--ink-soft);
 }
 
 .impressum-details {
