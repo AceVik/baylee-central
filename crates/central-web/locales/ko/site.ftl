@@ -269,7 +269,7 @@ privacy-chat = 메시지는 각 수신자의 기기에 맞게 여러분의 기�
 privacy-push-title = 알림
 privacy-push = 브라우저에서 알림을 켜면 브라우저가 푸시 서비스에 등록되고, Central은 이 브라우저에 대한 그 서비스의 주소, 브라우저의 공개 키와 인증 비밀값, 언어, 이 기기의 임의 번호, 선택한 범주를 저장해요. 푸시 서비스는 브라우저 제조사의 서비스로, Google(Firebase Cloud Messaging), Mozilla 또는 Apple이며 모두 미국에 있어요. 알림에는 암호화된 상태로 종류(예: "새 메시지")와 언어만 담기며, 이름이나 본문은 절대 담기지 않아요. 푸시 서비스는 주소, 시각, 크기 같은 연결 데이터를 볼 수 있어요. 이 정보는 이 기기에서 알림을 끄거나 로그아웃하거나 계정을 삭제하면 삭제돼요. 90일 동안 갱신되지 않은 주소는 더는 쓰이지 않고, 대기 중인 알림은 하루 후에 만료돼요. 법적 근거: GDPR 제6조 제1항 (a)호 및 TDDDG § 25 제1항(동의). 계정 설정에서 언제든 동의를 철회할 수 있으며, 그때까지 이루어진 처리는 적법하게 남아요.
 privacy-counters-title = 남용 방지
-privacy-counters = 비밀번호 추측과 과부하를 막기 위해 Central은 특정 요청(가입, 로그인 시도, 비밀번호 재설정, 목록 읽기)을 IP 주소별로 메모리에서만 세요. 가입은 최대 하루, 나머지는 최대 한 시간 동안 세요. 가입 전에 브라우저는 퍼즐도 풀어요. 퍼즐은 임의의 숫자로 이루어져 있고 여러분에 관해 아무것도 담지 않으며 늦어도 5분 후에는 잊혀요. 계정별로는 아무도 다른 사람에게 요청을 쏟아붓지 못하도록 연락처 요청과 다른 플레이어 검색을 세요. 법적 근거: GDPR 제6조 제1항 (f)호. 우리의 정당한 이익은 계정과 서비스를 남용으로부터 보호하는 것이에요.
+privacy-counters = To stop password guessing and overload, Central counts certain requests per IP address (registrations, sign-in attempts, password resets, reading the directory), only in memory: registrations, and sign-in attempts that were not completed with the right password, for up to a day, everything else for at most one hour. After a sign-in with the right password, Central remembers for 30 days, again only in memory, that your account signed in from that address (an IPv4 address, or the first half of an IPv6 address; at most eight per account), so that other people's attempts on your account do not keep you out there. Someone who uses the same address and knows your user name can tell from Central's answers that your account signed in from it. A new password forgets these addresses except the one you set it from, deleting the account forgets them all, and so does a restart of the service. Before a registration your browser also solves a puzzle; it consists of random numbers, holds nothing about you and is forgotten after five minutes at the latest. Per account, Central counts contact requests and searches for other players, so that nobody floods others with requests. Legal basis: Art. 6(1)(f) GDPR; our legitimate interest is protecting the accounts and the service against abuse.
 privacy-contact-title = 문의 양식
 privacy-contact = 이 양식은 메시지, 페이지의 언어, 시각을 같은 서버에 있는 Baylee의 피드백 서비스로 보내며, 이름과 이메일 주소는 입력했을 때만 보내요. 둘 다 선택 사항이에요. 이 서비스는 메시지를 처리했는지도 기록해요. IP 주소는 저장하지 않으며, 메시지 폭주를 막기 위해 한 시간 동안 메모리에서만 세요. 법적 고지에 이름이 적힌 사람만 메시지를 읽으며, 누구에게도 전달하지 않아요. 메시지는 처리한 지 90일 후에, 늦어도 1년 후에, 또는 요청하시면 더 일찍 삭제돼요. 법적 근거: GDPR 제6조 제1항 (f)호(메시지에 답하는 것에 대한 우리의 정당한 이익), 메시지가 계정에 관한 것이면 (b)호.
 privacy-impressum-title = 법적 고지의 퍼즐
@@ -430,7 +430,7 @@ baylee-photo10 = 가장 좋아하는 자리: 바로 우리 곁.
 
 ## Errors shared by the forms
 
-error-busy = 지금 시도가 너무 많아요. 잠시 기다렸다가 다시 시도해 주세요.
+error-busy = Too many attempts. Try again later; after several wrong passwords this can take an hour, at most a day.
 error-unavailable = Baylee Central이 지금은 응답하지 않아요. 잠시 후 다시 시도해 주세요.
 error-network = 연결되지 않았어요. 네트워크를 확인하고 다시 시도해 주세요.
 error-failed = 문제가 생겼어요. 다시 시도해 보고, 계속되면 알려 주세요.
@@ -981,6 +981,7 @@ sec-signin-s5 = 돌아오는 것은 세션(브라우저에서는 페이지 자�
 sec-signin-register = <b>가입</b>도 같은 프로토콜로 이루어져요. 내 기기가 임의의 마스터 키(256비트)를 만들어 비밀번호로 한 번, 복구 코드로 한 번 감싸고, 래퍼만 보내요. Central은 OPAQUE 기록과 래퍼를 저장하며, 키는 저장하지 않아요.
 sec-signin-legacy = <b>한 가지 예외:</b> 아직 Central로 옮겨지지 않은 예전 공식 Gateway의 계정이에요. 이런 계정이 옮겨질 때까지는 Baylee 클라이언트에서 로그인을 시도할 때마다 입력한 비밀번호가 확인된 TLS 연결을 통해 Central로 전송돼요. Central은 그것을 예전 해시와 대조할 뿐 저장도 로그 기록도 하지 않아요. 이전이 성공하면 그 계정은 위에서 본 대로 로그인해요. 이 웹사이트는 그런 계정을 로그인시키지 않고 클라이언트로 안내해요. 이 예외는 이전을 위해 정한 기한에 끝나요.
 sec-signin-limit = <b>남는 것:</b> Central의 데이터베이스를 그 키와 함께 가져간 사람은 비밀번호를 하나씩 시도해 볼 수 있어요. 시도할 때마다 Argon2id를 한 번 실행해야 해요. 그렇게 찾아낸 비밀번호는 계정의 암호화된 데이터와 저장된 채팅을 열어요. 다른 곳에서 쓰지 않는 긴 비밀번호는 여전히 중요해요.
+sec-signin-guess = <b>Guessing through the sign-in</b> is slowed, not stopped. Central counts attempts that are not completed with the right password: at most 100 a day on one account from addresses it has not signed in from, and at most 100 a day from one address on all accounts together. Past that it answers that there were too many attempts, until the hour or the day ends. A common password is still found that way. And whoever knows your user name can use up your account's attempts: until the day ends you then sign in only from an address your account signed in from in the last 30 days (Central remembers those addresses only until it restarts).
 
 sec-memory-eyebrow = 메모리 속
 sec-memory-title = 로그인한 뒤에도 메모리에 남는 것
@@ -1062,5 +1063,5 @@ sec-signin-link = 로그인할 때 비밀번호는 어떻게 되나요: <securit
 sec-teaser-lead = 단계별로 보여 드려요. 내 기기를 떠나는 것, Baylee Central이 보는 것과 보지 못하는 것, 그리고 각 흐름의 한계예요.
 sec-teaser-more = 각 단계를 도표로 보기
 # ==== end of the security page =================================================
-# ==== registration: the proof of work, while it takes long (English until translated) ====
+# ==== registration: the proof of work, while it takes long =====================
 register-solving = Your browser is solving a puzzle that keeps robots out. When many accounts are being created, this can take a few minutes … { $percent } %
