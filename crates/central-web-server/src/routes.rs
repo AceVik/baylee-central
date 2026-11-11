@@ -178,12 +178,68 @@ const MOVED: [&str; 12] = [
     "admin",
 ];
 
+/// A qvalue (RFC 9110 §12.4.2) in thousandths: `0` to `0.999` or `1` to
+/// `1.000`; anything else is `None`.
+fn qvalue(text: &str) -> Option<u16> {
+    let (whole, fraction) = text.split_once('.').unwrap_or((text, ""));
+    if fraction.len() > 3 || !fraction.bytes().all(|b| b.is_ascii_digit()) {
+        return None;
+    }
+    match whole {
+        "0" => fraction
+            .bytes()
+            .chain(std::iter::repeat(b'0'))
+            .take(3)
+            .try_fold(0_u16, |sum, digit| {
+                sum.checked_mul(10)?.checked_add(u16::from(digit - b'0'))
+            }),
+        "1" if fraction.bytes().all(|b| b == b'0') => Some(1000),
+        _ => None,
+    }
+}
+
+/// How much the request takes `coding` (`br`, `gzip`), in thousandths, by
+/// its `Accept-Encoding` (RFC 9110 §12.5.3): the coding's own weight, else
+/// that of `*`, else none. `q=0` refuses a coding, and so does a weight
+/// that does not parse; names are compared without case.
+fn quality(headers: &HeaderMap, coding: &str) -> u16 {
+    let (mut own, mut any) = (None, None);
+    let values = headers
+        .get_all(header::ACCEPT_ENCODING)
+        .iter()
+        .filter_map(|value| value.to_str().ok());
+    for item in values.flat_map(|value| value.split(',')) {
+        let mut parts = item.split(';');
+        let name = parts.next().unwrap_or("").trim();
+        if name.is_empty() {
+            continue;
+        }
+        let mut weight = Some(1000);
+        for parameter in parts {
+            let (key, value) = parameter.split_once('=').unwrap_or((parameter, ""));
+            if key.trim().eq_ignore_ascii_case("q") {
+                weight = qvalue(value.trim());
+            }
+        }
+        let weight = weight.unwrap_or(0);
+        let named = name.eq_ignore_ascii_case(coding)
+            || (coding == "gzip" && name.eq_ignore_ascii_case("x-gzip"));
+        if named {
+            own = Some(own.map_or(weight, |own: u16| own.max(weight)));
+        } else if name == "*" {
+            any = Some(weight);
+        }
+    }
+    own.or(any).unwrap_or(0)
+}
+
 fn file(app: &App, path: &str, headers: &HeaderMap) -> Option<Response> {
     let file = app.files.get(path)?;
-    let accepts = header_text(headers, "accept-encoding").unwrap_or("");
+    let br = file.brotli.as_ref().map_or(0, |_| quality(headers, "br"));
+    let gzip = file.gzip.as_ref().map_or(0, |_| quality(headers, "gzip"));
     let (bytes, encoding) = match (&file.brotli, &file.gzip) {
-        (Some(brotli), _) if accepts.contains("br") => (brotli.clone(), Some("br")),
-        (_, Some(gzip)) if accepts.contains("gzip") => (gzip.clone(), Some("gzip")),
+        (Some(brotli), _) if br > 0 && br >= gzip => (brotli.clone(), Some("br")),
+        (_, Some(compressed)) if gzip > 0 => (compressed.clone(), Some("gzip")),
         _ => (file.bytes.clone(), None),
     };
     let mut response = Response::new(Body::from(bytes));
@@ -311,12 +367,9 @@ async fn any(
         );
     }
     if first == "cards" {
+        // Chosen by the visitor's language: never permanent, and it varies.
         let lang = negotiated(&headers, &uri);
-        return redirect(
-            StatusCode::MOVED_PERMANENTLY,
-            &format!("/{}/#cards", lang.code()),
-            false,
-        );
+        return redirect(StatusCode::FOUND, &format!("/{}/#cards", lang.code()), true);
     }
     let lang = Lang::negotiate(header_text(&headers, "accept-language").unwrap_or(""));
     page(&app, &headers, Page::NotFound, lang)
@@ -333,4 +386,72 @@ pub fn router(app: Arc<App>) -> Router {
             std::time::Duration::from_secs(10),
         ))
         .with_state(app)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn accepts(values: &[&str]) -> HeaderMap {
+        let mut headers = HeaderMap::new();
+        for value in values {
+            headers.append(
+                header::ACCEPT_ENCODING,
+                HeaderValue::from_str(value).unwrap(),
+            );
+        }
+        headers
+    }
+
+    #[test]
+    fn qvalues_parse_as_the_grammar_says() {
+        for (text, value) in [
+            ("0", Some(0)),
+            ("0.", Some(0)),
+            ("0.000", Some(0)),
+            ("0.5", Some(500)),
+            ("0.05", Some(50)),
+            ("0.999", Some(999)),
+            ("1", Some(1000)),
+            ("1.000", Some(1000)),
+            ("1.001", None),
+            ("1.5", None),
+            ("0.0001", None),
+            ("2", None),
+            ("-0", None),
+            (".5", None),
+            ("0.5x", None),
+            ("", None),
+        ] {
+            assert_eq!(qvalue(text), value, "{text}");
+        }
+    }
+
+    #[test]
+    fn an_encoding_counts_by_its_own_weight_and_q_0_refuses_it() {
+        let cases: [(&[&str], u16, u16); 17] = [
+            (&["br, gzip"], 1000, 1000),
+            (&["br;q=0, gzip"], 0, 1000),
+            (&["br; q=0.000"], 0, 0),
+            (&["BR"], 1000, 0),
+            (&["brotli"], 0, 0),
+            (&["gzip;q=0.8, br;q=0.5"], 500, 800),
+            (&["*"], 1000, 1000),
+            (&["*;q=0"], 0, 0),
+            (&["gzip, *;q=0"], 0, 1000),
+            (&["br;q=0, *"], 0, 1000),
+            (&["x-gzip"], 0, 1000),
+            (&["gzip;q=1.5"], 0, 0),
+            (&["gzip;q"], 0, 0),
+            (&["gzip;level=9"], 0, 1000),
+            (&["gzip;q=0", "br"], 1000, 0),
+            (&[""], 0, 0),
+            (&[], 0, 0),
+        ];
+        for (values, br, gzip) in cases {
+            let headers = accepts(values);
+            assert_eq!(quality(&headers, "br"), br, "{values:?} br");
+            assert_eq!(quality(&headers, "gzip"), gzip, "{values:?} gzip");
+        }
+    }
 }
