@@ -2,7 +2,7 @@
 //! listener's raw routes, the metadata first and its gzip parts after; an
 //! administrator reads a part on the browser listener's. The triage itself
 //! is `Admin` requests, which `admin.rs` routes here.
-use super::{Error, IdentityService, Response, Token};
+use super::{Error, IdentityService, Place, Response, Token};
 use central_api::admin::{AdminAnswer, AdminRequest};
 use central_api::reports::{BulkAction, MAX_INTAKE_BYTES, Part, RecordOrigin, ReportIntake};
 use central_postgres::Filer;
@@ -32,7 +32,8 @@ impl IdentityService {
     }
 
     /// File a report's metadata (`POST /v1/reports`), within the public
-    /// budget and the gateway's reports an hour. Returns its id.
+    /// budget, its place's share of it (`place` is where the request came
+    /// from) and the gateway's reports an hour. Returns its id.
     ///
     /// # Errors
     /// `Rejected` for another credential or a report out of its bounds;
@@ -41,6 +42,7 @@ impl IdentityService {
         &self,
         bearer: Option<&Token>,
         body: &[u8],
+        place: Option<Place>,
     ) -> Result<[u8; 16], Error> {
         if body.len() > MAX_INTAKE_BYTES {
             return Err(Error::Rejected);
@@ -48,7 +50,7 @@ impl IdentityService {
         self.limits
             .lock()
             .map_err(|_| Error::Unavailable)?
-            .global(Instant::now())?;
+            .global(place, Instant::now())?;
         let report: ReportIntake = central_api::decode(body)?;
         report.validate()?;
         let filer = self.filer(bearer).await?;
@@ -61,7 +63,8 @@ impl IdentityService {
 
     /// Begin a part's upload (`PUT /v1/reports/{id}/{part}`) before its body
     /// is read: the credential, the report and the announcement are checked
-    /// first, and the answer says how many bytes to read, no more.
+    /// first, and the answer says how many bytes to read, no more. `place`
+    /// is where the request came from, for its share of the public budget.
     ///
     /// # Errors
     /// `Rejected` for another credential, another gateway's report, one too
@@ -72,11 +75,12 @@ impl IdentityService {
         bearer: Option<&Token>,
         report: [u8; 16],
         part: Part,
+        place: Option<Place>,
     ) -> Result<PartUpload, Error> {
         self.limits
             .lock()
             .map_err(|_| Error::Unavailable)?
-            .global(Instant::now())?;
+            .global(place, Instant::now())?;
         let filer = self.filer(bearer).await?;
         let bytes = self
             .store

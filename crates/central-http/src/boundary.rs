@@ -136,6 +136,12 @@ async fn inspect(State(state): State<Arc<Boundary>>, request: Request, next: Nex
     {
         return (StatusCode::FORBIDDEN, "request not permitted\n").into_response();
     }
+    let mut request = request;
+    let from = Origin(origin(
+        request.extensions().get::<Peer>(),
+        request.headers(),
+    ));
+    request.extensions_mut().insert(from);
     if !upload(&request) {
         return timed(state.request_time, admitted(&state, request, next)).await;
     }
@@ -169,10 +175,11 @@ async fn timed(limit: Duration, response: impl Future<Output = Response>) -> Res
 /// The address a late or large body's place is counted by: the last
 /// `X-Forwarded-For` hop when the peer is the local proxy, which appended
 /// it, else the peer itself. It shares the places out and does nothing
-/// else: no identity, no credential and no budget follows from it. A
-/// client beyond the proxy cannot choose it (the proxy's hop is the last),
-/// and a local process that sends its own can take no more than the
-/// places of all addresses together.
+/// else: no identity and no credential follows from it, and the budgets
+/// count by [`origin`], which knows no address where this falls back to
+/// the proxy's. A client beyond the proxy cannot choose it (the proxy's
+/// hop is the last), and a local process that sends its own can take no
+/// more than the places of all addresses together.
 fn client(parts: &Parts) -> Client {
     match parts.extensions.get::<Peer>() {
         Some(Peer(peer)) if peer.ip().is_loopback() => {
@@ -181,6 +188,32 @@ fn client(parts: &Parts) -> Client {
         Some(Peer(peer)) => Client::from(peer.ip()),
         // A request the server did not accept itself (a test's).
         None => Client::from(IpAddr::V4(Ipv4Addr::UNSPECIFIED)),
+    }
+}
+
+/// The client address a request came from, attached to every request that
+/// passed the boundary's header checks; `None` when the listener cannot
+/// tell ([`origin`]). The native routes count each address's requests and
+/// its guesses at passwords by it (`native.rs`), and nothing is granted
+/// for it: no identity and no credential.
+#[derive(Clone, Copy)]
+pub(crate) struct Origin(pub(crate) Option<Client>);
+
+/// The address the budgets count a request by: the last `X-Forwarded-For`
+/// hop when the peer is the local proxy, which appended it, else the peer.
+/// A local peer without a well-formed hop has none: a proxy that does not
+/// send the header would make all clients one address, and one address's
+/// budget would then keep everyone out; such requests meet the budgets
+/// everyone shares, and each account's own, alone. A client beyond the
+/// proxy cannot choose the last hop. A local process can, and so can say
+/// which address's budget it spends; it is the proxy's peer and the
+/// operator's own machine.
+fn origin(peer: Option<&Peer>, headers: &HeaderMap) -> Option<Client> {
+    match peer {
+        Some(Peer(peer)) if peer.ip().is_loopback() => forwarded(headers),
+        Some(Peer(peer)) => Some(Client::from(peer.ip())),
+        // A request the server did not accept itself (a test's).
+        None => None,
     }
 }
 
@@ -707,6 +740,87 @@ mod tests {
         drop(feed);
         assert_eq!(late.await.unwrap(), StatusCode::OK);
         assert_eq!(state.heavy.places(), 0);
+    }
+
+    #[tokio::test]
+    async fn the_budgets_address_is_the_proxy_s_hop_and_none_without_one() {
+        let from = |peer: Option<&str>, hops: &[&str]| {
+            let mut headers = HeaderMap::new();
+            for hop in hops {
+                headers.append("x-forwarded-for", HeaderValue::from_str(hop).unwrap());
+            }
+            let peer = peer.map(|peer| Peer(peer.parse().unwrap()));
+            origin(peer.as_ref(), &headers)
+        };
+        let local = Some(LOOPBACK);
+        for (peer, hops, expected) in [
+            // the proxy's own hop, the last, whatever a client wrote before it
+            (local, &["198.51.100.1"][..], Some("198.51.100.1")),
+            (local, &["203.0.113.9, 198.51.100.1"], Some("198.51.100.1")),
+            (local, &["198.51.100.1", "203.0.113.9"], Some("203.0.113.9")),
+            // a proxy that sends none: no address, never everyone's one
+            (local, &[], None),
+            (local, &["unknown"], None),
+            (local, &["198.51.100.1, unknown"], None),
+            (Some("[::1]:50000"), &[], None),
+            // a peer that is not the local proxy is itself, whatever it says
+            (
+                Some("192.0.2.5:50000"),
+                &["198.51.100.1"],
+                Some("192.0.2.5"),
+            ),
+            // a request the server did not accept itself
+            (None, &["198.51.100.1"], None),
+        ] {
+            assert_eq!(
+                from(peer, hops),
+                expected.map(client_of),
+                "{peer:?} {hops:?}"
+            );
+        }
+        // Every request that passes the header checks carries it to its
+        // route, a report part's upload too.
+        let said = |extensions: axum::http::Extensions| async move {
+            match extensions.get::<Origin>() {
+                Some(Origin(Some(client))) if *client == client_of("198.51.100.7") => "its hop",
+                Some(Origin(Some(_))) => "another",
+                Some(Origin(None)) => "none",
+                None => "missing",
+            }
+        };
+        let (_, app) = places_before(
+            32,
+            Router::new()
+                .route("/echo", axum::routing::post(said))
+                .route("/v1/reports/{report}/{part}", axum::routing::put(said)),
+        );
+        let answer = |request: Request| {
+            let app = app.clone();
+            async move {
+                let response = app.oneshot(request).await.unwrap();
+                assert_eq!(response.status(), StatusCode::OK);
+                let said = to_bytes(response.into_body(), 64).await.unwrap();
+                String::from_utf8(said.to_vec()).unwrap()
+            }
+        };
+        assert_eq!(
+            answer(proxied("198.51.100.7", Body::from("12345678"))).await,
+            "its hop"
+        );
+        let upload = request("/v1/reports/0192d0c57b3e7a1f8c2d3e4f5a6b7c8d/record")
+            .method("PUT")
+            .header(header::CONTENT_LENGTH, "8")
+            .header("x-forwarded-for", "203.0.113.9, 198.51.100.7")
+            .extension(Peer(LOOPBACK.parse().unwrap()))
+            .body(Body::from("12345678"))
+            .unwrap();
+        assert_eq!(answer(upload).await, "its hop");
+        let direct = request("/echo")
+            .method("POST")
+            .extension(Peer(LOOPBACK.parse().unwrap()))
+            .body(Body::from("12345678"))
+            .unwrap();
+        assert_eq!(answer(direct).await, "none");
     }
 
     const TEST_PACE: Pace = Pace {

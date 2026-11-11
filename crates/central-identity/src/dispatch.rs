@@ -40,9 +40,7 @@ impl IdentityService {
                 .await;
         }
         Ok(BrowserReply {
-            response: self
-                .respond(request, bearer, surface, seen, place)
-                .await?,
+            response: self.respond(request, bearer, surface, seen, place).await?,
             session: None,
         })
     }

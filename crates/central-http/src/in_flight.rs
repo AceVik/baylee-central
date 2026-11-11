@@ -49,6 +49,17 @@ impl Client {
     }
 }
 
+/// The address as the account service counts guesses at passwords and each
+/// address's share of the requests that need no session (`central-identity`).
+impl From<Client> for central_identity::Place {
+    fn from(client: Client) -> Self {
+        match client {
+            Client::V4(address) => Self::V4(address),
+            Client::V6(prefix) => Self::V6(prefix),
+        }
+    }
+}
+
 /// The last `X-Forwarded-For` hop, which the local proxy appended; `None`
 /// without one or when it is not a bare address.
 pub(crate) fn forwarded(headers: &HeaderMap) -> Option<Client> {

@@ -14,8 +14,9 @@
 //! the holder signs in.
 //!
 //! Nothing here is written down or logged, and a restart forgets all of it.
-//! Every table is bounded; a full one forgets its oldest entry and refuses
-//! nobody. A refusal is `Busy` and spends nothing.
+//! Every table is bounded; a full one forgets the entry that spent least
+//! and refuses nobody. A start that a count refuses is `Busy` and spends
+//! nothing.
 use central_api::Error;
 use std::{
     collections::BTreeMap,
@@ -237,8 +238,10 @@ impl<K: Ord + Copy> Table<K> {
 
     /// The key's tally, made if it is new. Passed tallies are forgotten
     /// once an hour, and when a newcomer finds the table full (then once
-    /// a minute at most); if it is full of live ones, the one whose day
-    /// began first makes room.
+    /// a minute at most). If it is full of live ones, the one that spent
+    /// least of its day makes room, the oldest of those: whoever fills
+    /// the table with entries of one guess each never makes it forget
+    /// the account, or the place, that was guessed at or guessed most.
     fn entry(&mut self, key: K, now: Instant) -> &mut Tally {
         let known = self.tallies.contains_key(&key);
         let full = !known && self.tallies.len() >= ENTRIES;
@@ -248,13 +251,13 @@ impl<K: Ord + Copy> Table<K> {
             self.swept = Some(now);
         }
         if !known && self.tallies.len() >= ENTRIES {
-            let oldest = self
+            let least = self
                 .tallies
                 .iter()
-                .min_by_key(|(_, tally)| tally.day.start)
+                .min_by_key(|(_, tally)| (tally.day.used(now, DAY), tally.day.start))
                 .map(|(key, _)| *key);
-            if let Some(oldest) = oldest {
-                self.tallies.remove(&oldest);
+            if let Some(least) = least {
+                self.tallies.remove(&least);
             }
         }
         self.tallies.entry(key).or_insert_with(|| Tally::new(now))
@@ -867,18 +870,24 @@ mod tests {
     }
 
     #[test]
-    fn full_tables_forget_their_oldest_and_refuse_nobody() {
+    fn full_tables_forget_who_spent_least_and_refuse_nobody() {
         let start = Instant::now();
         let mut places = Table::<u32>::default();
+        // The oldest entry of all is the one guessed at most.
+        let most = u32::MAX;
+        places.spend(most, start, ACCOUNT_PER_DAY);
         let over = u32::try_from(ENTRIES).unwrap() + 100;
         for n in 0..over {
             assert!(places.fits(&n, start, PLACE, 1));
             places.spend(n, after(start, u64::from(n / 100)), 1);
             assert!(places.tallies.len() <= ENTRIES);
         }
-        // The first hundred, the oldest, made room; the newest are counted.
+        // Of those with one guess the oldest made room; the newest are
+        // counted, and the one that spent most is still remembered, its
+        // day as spent as it was.
         assert!(!places.tallies.contains_key(&0));
         assert!(places.tallies.contains_key(&(over - 1)));
+        assert!(!places.fits(&most, after(start, 200), ACCOUNT, 1));
         // Once their windows passed, all are forgotten at the next newcomer.
         places.spend(over, after(start, 2 * 86_400), 1);
         assert_eq!(places.tallies.len(), 1);

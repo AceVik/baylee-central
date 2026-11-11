@@ -18,7 +18,7 @@ use central_api::{
     reports::{Part, RecordOrigin},
     wire::Request,
 };
-use central_identity::{BrowserReply, IdentityService, Seen, browser_operation};
+use central_identity::{BrowserReply, IdentityService, Place, Seen, browser_operation};
 use std::{
     collections::BTreeMap,
     future::Future,
@@ -89,12 +89,16 @@ pub(crate) struct Peer(pub(crate) SocketAddr);
 
 /// What answers browser requests: the identity service, or a test's stand-in.
 pub(crate) trait Accounts: Send + Sync + 'static {
-    /// `seen` is what the listener saw of a request for a registration
-    /// challenge (`seen.rs`), and nothing for every other request.
+    /// `place` is the client address the request came from: the service
+    /// counts guesses at passwords and requests without a session by it,
+    /// and nothing else follows from it. `seen` is what the listener saw
+    /// of a request for a registration challenge (`seen.rs`), and nothing
+    /// for every other request.
     fn browser(
         &self,
         request: Request,
         cookie: Option<&Token>,
+        place: Place,
         seen: Seen,
     ) -> impl Future<Output = Result<BrowserReply, Error>> + Send;
 
@@ -112,9 +116,10 @@ impl Accounts for IdentityService {
         &self,
         request: Request,
         cookie: Option<&Token>,
+        place: Place,
         seen: Seen,
     ) -> impl Future<Output = Result<BrowserReply, Error>> + Send {
-        self.handle_browser_from(request, cookie, None, seen)
+        self.handle_browser_from(request, cookie, Some(place), seen)
     }
 
     fn report_part(
@@ -280,7 +285,9 @@ async fn call<A: Accounts>(State(state): State<Arc<Browser<A>>>, request: HttpRe
     let cookie = cookie(headers);
     let Ok(result) = tokio::time::timeout(
         ANSWER_TIME,
-        state.accounts.browser(request, cookie.as_ref(), seen),
+        state
+            .accounts
+            .browser(request, cookie.as_ref(), permit.client.into(), seen),
     )
     .await
     else {
@@ -452,8 +459,8 @@ fn set_cookie(response: &mut Response, token: Option<&Token>) {
 /// Most addresses one budget remembers; past it the oldest window goes, so a
 /// crowd of addresses cannot lock new ones out.
 const ADDRESSES: usize = 4_096;
-const MINUTE: Duration = Duration::from_secs(60);
-const HOUR: Duration = Duration::from_secs(3_600);
+pub(crate) const MINUTE: Duration = Duration::from_secs(60);
+pub(crate) const HOUR: Duration = Duration::from_secs(3_600);
 const DAY: Duration = Duration::from_hours(24);
 
 /// The per-address budgets, in memory only; an address is forgotten once its
@@ -552,10 +559,16 @@ impl Budgets {
 /// One budget: each address's window (its start and the units spent), and
 /// when the windows that had passed were last forgotten.
 #[derive(Default)]
-struct Book(BTreeMap<Client, (Instant, u32)>, Option<Instant>);
+pub(crate) struct Book(BTreeMap<Client, (Instant, u32)>, Option<Instant>);
 
 impl Book {
-    fn charge(&mut self, client: Client, now: Instant, limit: u32, period: Duration) -> bool {
+    pub(crate) fn charge(
+        &mut self,
+        client: Client,
+        now: Instant,
+        limit: u32,
+        period: Duration,
+    ) -> bool {
         let used = self.window(client, now, period);
         if *used >= limit {
             return false;
@@ -631,6 +644,8 @@ mod tests {
         calls: Mutex<Vec<(String, Option<[u8; 32]>)>>,
         /// What the listener saw of each request, as it handed it over.
         seen: Mutex<Vec<Seen>>,
+        /// The place each call came from, as the service is told it.
+        places: Mutex<Vec<Place>>,
         fail: Option<Error>,
         /// Never answer, as a service that hangs.
         stall: bool,
@@ -643,8 +658,10 @@ mod tests {
             &self,
             request: Request,
             cookie: Option<&Token>,
+            place: Place,
             seen: Seen,
         ) -> impl Future<Output = Result<BrowserReply, Error>> + Send {
+            self.places.lock().unwrap().push(place);
             self.calls
                 .lock()
                 .unwrap()
@@ -1122,6 +1139,22 @@ mod tests {
         )
         .await;
         assert_eq!(sent.status, StatusCode::TOO_MANY_REQUESTS);
+        // The service is told the same address, for its guesses at
+        // passwords: the last hop, never a forged one; IPv6 by its /64.
+        let told = |mock: &Mock| mock.places.lock().unwrap().clone();
+        assert_eq!(told(&mock).len(), 5);
+        assert!(
+            told(&mock)
+                .iter()
+                .all(|place| *place == Place::V4([198, 51, 100, 20]))
+        );
+        let hops = ["203.0.113.9, 2001:db8:1:2:3:4:5:6"];
+        let sent = send(&app, &with("x-forwarded-for", &hops), discover()).await;
+        assert_eq!(sent.status, StatusCode::OK);
+        assert!(
+            told(&mock).last()
+                == Some(&Place::V6([0x20, 0x01, 0x0d, 0xb8, 0x00, 0x01, 0x00, 0x02]))
+        );
     }
 
     fn hex(byte: u8) -> String {
