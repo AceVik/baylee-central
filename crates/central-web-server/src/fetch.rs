@@ -31,8 +31,38 @@ const DOWNLOADS: &str = "https://github.com/AceVik/baylee/releases/download/";
 /// The largest answer read from GitHub.
 const LIMIT: u64 = 4 * 1024 * 1024;
 
-/// The data, shared by every request.
-pub type Shared = Arc<RwLock<Snapshot>>;
+/// The data, shared by every request: a request takes the `Arc` and lets
+/// the lock go; a change installs a new `Arc` ([`install`]), which also
+/// tells the rendered pages they are stale (`routes::Pages`).
+pub type Shared = Arc<RwLock<Arc<Snapshot>>>;
+
+/// Whether two snapshots hold the same data. Every field is named, so a
+/// new one cannot be forgotten here.
+fn same(one: &Snapshot, other: &Snapshot) -> bool {
+    let Snapshot {
+        release,
+        cards,
+        gateways,
+        repo,
+    } = one;
+    *release == other.release
+        && *cards == other.cards
+        && *gateways == other.gateways
+        && *repo == other.repo
+}
+
+/// Change the data in `shared` with `change`: a new snapshot when that
+/// changes anything, else the one there stays (and so do its pages).
+pub fn install(shared: &Shared, change: impl FnOnce(&mut Snapshot)) {
+    let Ok(mut current) = shared.write() else {
+        return;
+    };
+    let mut next = Snapshot::clone(&current);
+    change(&mut next);
+    if !same(&current, &next) {
+        *current = Arc::new(next);
+    }
+}
 
 fn agent(https: bool) -> ureq::Agent {
     let config = ureq::Agent::config_builder()
@@ -379,18 +409,18 @@ pub fn spawn(config: &Config, shared: &Shared) {
                     (release, cards, repo(&agent))
                 })
                 .await;
-                if let Ok((release, cards, repo)) = found
-                    && let Ok(mut snapshot) = shared.write()
-                {
-                    if release.is_some() {
-                        snapshot.release = release;
-                    }
-                    if cards.is_some() {
-                        snapshot.cards = cards;
-                    }
-                    if repo.ci.is_some() || repo.commit.is_some() || repo.stars.is_some() {
-                        snapshot.repo = repo;
-                    }
+                if let Ok((release, cards, repo)) = found {
+                    install(&shared, |snapshot| {
+                        if release.is_some() {
+                            snapshot.release = release;
+                        }
+                        if cards.is_some() {
+                            snapshot.cards = cards;
+                        }
+                        if repo.ci.is_some() || repo.commit.is_some() || repo.stars.is_some() {
+                            snapshot.repo = repo;
+                        }
+                    });
                 }
             }
         });
@@ -407,10 +437,8 @@ pub fn spawn(config: &Config, shared: &Shared) {
                     directory(&agent(false), central, &host, &origin)
                 })
                 .await;
-                if let Ok(Some(gateways)) = found
-                    && let Ok(mut snapshot) = shared.write()
-                {
-                    snapshot.gateways = Some(gateways);
+                if let Ok(Some(gateways)) = found {
+                    install(&shared, |snapshot| snapshot.gateways = Some(gateways));
                 }
             }
         });
@@ -488,6 +516,22 @@ mod tests {
                 .is_some_and(|url| url.ends_with(".sha256"))
         );
         assert!(release.files[0].signature.is_none());
+    }
+
+    #[test]
+    fn a_change_installs_a_new_snapshot_and_no_change_keeps_the_old() {
+        let shared: Shared = Arc::new(RwLock::new(Arc::new(fallback(None))));
+        let first = Arc::clone(&shared.read().unwrap());
+        install(&shared, |snapshot| snapshot.gateways = None);
+        assert!(
+            Arc::ptr_eq(&first, &shared.read().unwrap()),
+            "nothing changed"
+        );
+        install(&shared, |snapshot| snapshot.gateways = Some(Vec::new()));
+        let second = Arc::clone(&shared.read().unwrap());
+        assert!(!Arc::ptr_eq(&first, &second), "a new snapshot");
+        assert_eq!(first.gateways, None, "the old one is left as it was");
+        assert_eq!(second.gateways, Some(Vec::new()));
     }
 
     #[test]

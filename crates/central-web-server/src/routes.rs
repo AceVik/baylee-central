@@ -1,23 +1,25 @@
 //! Addresses: every page lives under its language (`/en/…`, `/de/…`); an
 //! address without one (`/`, the old `/download`, the client's `/register`,
 //! the app's `/account`) is sent on to the visitor's language. Every
-//! response carries the security headers; HTML is never cached unchecked.
+//! response carries the security headers; HTML is never cached unchecked:
+//! it is revalidated by its entity tag (`If-None-Match`, 304).
 
-use std::sync::Arc;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 
 use axum::Router;
-use axum::body::Body;
+use axum::body::{Body, Bytes};
 use axum::extract::{Request, State};
 use axum::http::{HeaderMap, HeaderValue, Method, StatusCode, Uri, header};
 use axum::middleware::{self, Next};
 use axum::response::{IntoResponse, Response};
-use central_web::data::machine;
-use central_web::site::{self, Assets, Context, Page};
+use central_web::data::{Machine, machine};
+use central_web::site::{self, Assets, Context, Page, Snapshot};
 use central_web::words::Lang;
 
 use crate::config::Config;
 use crate::fetch::Shared;
-use crate::files::Files;
+use crate::files::{Files, Stored, etag};
 use crate::generated;
 
 /// Everything a request needs.
@@ -30,6 +32,111 @@ pub struct App {
     pub files: Files,
     /// The public data.
     pub data: Shared,
+    /// The pages rendered from it.
+    pub pages: Pages,
+}
+
+/// Most pages kept for one snapshot of the data, and their most bytes
+/// together. A page is about 20 KB (the start page about 70 KB) and
+/// depends on its language and the visitor's machine: some forty pages in
+/// two languages for the dozen or so machines told apart fit well within
+/// both. Past either bound a page is rendered for its request and not kept.
+const PAGES: usize = 1_024;
+const PAGE_BYTES: usize = 32 * 1024 * 1024;
+
+/// A page as rendered: its bytes and their entity tag.
+struct Rendered {
+    body: Bytes,
+    etag: Option<HeaderValue>,
+}
+
+/// One page in one language, as rendered for each machine (compared whole).
+type ByMachine = Vec<(Machine, Arc<Rendered>)>;
+
+/// The pages rendered from one snapshot of the data. A page is a pure
+/// function of itself, its language, the visitor's machine, the data and
+/// the settings (origin, assets, verification: fixed for the process), so
+/// each is rendered once per snapshot. A new snapshot is a new `Arc`
+/// (`fetch.rs`), and finding one drops every page rendered from the old.
+#[derive(Default)]
+pub struct Pages(Mutex<Kept>);
+
+#[derive(Default)]
+struct Kept {
+    data: Option<Arc<Snapshot>>,
+    pages: HashMap<(Page, Lang), ByMachine>,
+    count: usize,
+    bytes: usize,
+}
+
+impl Kept {
+    fn from(&self, data: &Arc<Snapshot>) -> bool {
+        self.data
+            .as_ref()
+            .is_some_and(|kept| Arc::ptr_eq(kept, data))
+    }
+
+    fn get(&self, page: Page, lang: Lang, machine: Machine) -> Option<&Arc<Rendered>> {
+        self.pages
+            .get(&(page, lang))?
+            .iter()
+            .find(|(kept, _)| *kept == machine)
+            .map(|(_, rendered)| rendered)
+    }
+}
+
+impl Pages {
+    /// How many pages are kept now.
+    #[must_use]
+    pub fn kept(&self) -> usize {
+        self.0.lock().map_or(0, |kept| kept.count)
+    }
+
+    /// The page rendered for `machine` from `data`, if it is kept. Data
+    /// that is not the kept pages' own replaces them, all of them.
+    fn find(
+        &self,
+        (page, lang, machine): (Page, Lang, Machine),
+        data: &Arc<Snapshot>,
+    ) -> Option<Arc<Rendered>> {
+        // A poisoned table renders every page afresh.
+        let mut kept = self.0.lock().ok()?;
+        if !kept.from(data) {
+            *kept = Kept {
+                data: Some(Arc::clone(data)),
+                ..Kept::default()
+            };
+            return None;
+        }
+        kept.get(page, lang, machine).map(Arc::clone)
+    }
+
+    /// Keep `rendered` unless the data changed while it was rendered or the
+    /// table is full.
+    fn keep(
+        &self,
+        (page, lang, machine): (Page, Lang, Machine),
+        data: &Arc<Snapshot>,
+        rendered: &Arc<Rendered>,
+    ) {
+        let Ok(mut kept) = self.0.lock() else {
+            return;
+        };
+        let bytes = kept.bytes.saturating_add(rendered.body.len());
+        if !kept.from(data)
+            || kept.count >= PAGES
+            || bytes > PAGE_BYTES
+            || kept.get(page, lang, machine).is_some()
+        {
+            return;
+        }
+        kept.bytes = bytes;
+        kept.count += 1;
+        kept.pages
+            .entry((page, lang))
+            .or_default()
+            .push((machine, Arc::clone(rendered)));
+    }
 }
 
 /// The content security policy (`docs/proposals/frontend-rewrite.md` §3):
@@ -75,14 +182,17 @@ async fn security(State(app): State<Arc<App>>, request: Request, next: Next) -> 
     response
 }
 
-fn html(status: StatusCode, body: String, headers: &[(&'static str, &str)]) -> Response {
-    let mut response = (status, body).into_response();
+fn html(status: StatusCode, page: &Rendered, headers: &[(&'static str, &str)]) -> Response {
+    let mut response = (status, page.body.clone()).into_response();
     let map = response.headers_mut();
     map.insert(
         header::CONTENT_TYPE,
         HeaderValue::from_static("text/html; charset=utf-8"),
     );
     map.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-cache"));
+    if let Some(etag) = &page.etag {
+        map.insert(header::ETAG, etag.clone());
+    }
     for (name, value) in headers {
         if let Ok(value) = HeaderValue::from_str(value) {
             map.insert(*name, value);
@@ -109,18 +219,27 @@ fn redirect(status: StatusCode, to: &str, vary: bool) -> Response {
 }
 
 fn text(kind: &'static str, body: String) -> Response {
+    let tag = etag(body.as_bytes());
     let mut response = body.into_response();
-    response
-        .headers_mut()
-        .insert(header::CONTENT_TYPE, HeaderValue::from_static(kind));
-    response
-        .headers_mut()
-        .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-cache"));
+    let map = response.headers_mut();
+    map.insert(header::CONTENT_TYPE, HeaderValue::from_static(kind));
+    map.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-cache"));
+    if let Some(tag) = tag {
+        map.insert(header::ETAG, tag);
+    }
     response
 }
 
 fn header_text<'a>(headers: &'a HeaderMap, name: &str) -> Option<&'a str> {
     headers.get(name).and_then(|value| value.to_str().ok())
+}
+
+/// The data as it is now; replacing it never changes this one.
+fn snapshot(app: &App) -> Arc<Snapshot> {
+    app.data
+        .read()
+        .map(|data| Arc::clone(&data))
+        .unwrap_or_default()
 }
 
 fn page(app: &App, headers: &HeaderMap, page: Page, lang: Lang) -> Response {
@@ -130,16 +249,25 @@ fn page(app: &App, headers: &HeaderMap, page: Page, lang: Lang) -> Response {
         header_text(headers, "sec-ch-ua-arch"),
         header_text(headers, "sec-ch-ua-bitness"),
     );
-    let data = app.data.read().map(|data| data.clone()).unwrap_or_default();
-    let cx = Context {
-        lang,
-        origin: &app.config.origin,
-        assets: &app.assets,
-        data: &data,
-        machine,
-        verification: app.config.verification.as_deref(),
-    };
-    let body = site::render(page, &cx);
+    let data = snapshot(app);
+    let key = (page, lang, machine);
+    let rendered = app.pages.find(key, &data).unwrap_or_else(|| {
+        let cx = Context {
+            lang,
+            origin: &app.config.origin,
+            assets: &app.assets,
+            data: &data,
+            machine,
+            verification: app.config.verification.as_deref(),
+        };
+        let body = Bytes::from(site::render(page, &cx));
+        let rendered = Arc::new(Rendered {
+            etag: etag(&body),
+            body,
+        });
+        app.pages.keep(key, &data, &rendered);
+        rendered
+    });
     let status = match page {
         Page::NotFound => StatusCode::NOT_FOUND,
         Page::Gone => StatusCode::GONE,
@@ -159,7 +287,7 @@ fn page(app: &App, headers: &HeaderMap, page: Page, lang: Lang) -> Response {
     if !page.indexed() {
         extra.push(("x-robots-tag", "noindex, noarchive, nosnippet"));
     }
-    html(status, body, &extra)
+    html(status, &rendered, &extra)
 }
 
 /// Old and unprefixed paths that live on under a language.
@@ -237,12 +365,12 @@ fn file(app: &App, path: &str, headers: &HeaderMap) -> Option<Response> {
     let file = app.files.get(path)?;
     let br = file.brotli.as_ref().map_or(0, |_| quality(headers, "br"));
     let gzip = file.gzip.as_ref().map_or(0, |_| quality(headers, "gzip"));
-    let (bytes, encoding) = match (&file.brotli, &file.gzip) {
-        (Some(brotli), _) if br > 0 && br >= gzip => (brotli.clone(), Some("br")),
-        (_, Some(compressed)) if gzip > 0 => (compressed.clone(), Some("gzip")),
-        _ => (file.bytes.clone(), None),
+    let (stored, encoding): (&Stored, _) = match (&file.brotli, &file.gzip) {
+        (Some(brotli), _) if br > 0 && br >= gzip => (brotli, Some("br")),
+        (_, Some(compressed)) if gzip > 0 => (compressed, Some("gzip")),
+        _ => (&file.plain, None),
     };
-    let mut response = Response::new(Body::from(bytes));
+    let mut response = Response::new(Body::from(stored.bytes.clone()));
     let map = response.headers_mut();
     map.insert(header::CONTENT_TYPE, HeaderValue::from_static(file.kind));
     map.insert(
@@ -253,6 +381,9 @@ fn file(app: &App, path: &str, headers: &HeaderMap) -> Option<Response> {
             "no-cache"
         }),
     );
+    if let Some(etag) = &stored.etag {
+        map.insert(header::ETAG, etag.clone());
+    }
     if file.brotli.is_some() || file.gzip.is_some() {
         map.insert(header::VARY, HeaderValue::from_static("Accept-Encoding"));
     }
@@ -263,6 +394,44 @@ fn file(app: &App, path: &str, headers: &HeaderMap) -> Option<Response> {
         map.insert("service-worker-allowed", HeaderValue::from_static("/"));
     }
     Some(response)
+}
+
+/// Whether the request's `If-None-Match` names `etag`, or `*`. The
+/// comparison is the weak one (RFC 9110 §13.1.2): `W/"x"` names `"x"`.
+fn names(headers: &HeaderMap, etag: &HeaderValue) -> bool {
+    let etag = etag.as_bytes();
+    headers
+        .get_all(header::IF_NONE_MATCH)
+        .iter()
+        .filter_map(|value| value.to_str().ok())
+        .flat_map(|value| value.split(','))
+        .map(str::trim)
+        .any(|tag| tag == "*" || tag.strip_prefix("W/").unwrap_or(tag).as_bytes() == etag)
+}
+
+/// `response`, or 304 without a body when it is a 200 with an entity tag
+/// the request's `If-None-Match` names: the cache's copy is the very bytes.
+/// The 304 keeps every header but those of the body itself, and the
+/// security headers are added to it as to every answer.
+fn conditional(headers: &HeaderMap, response: Response) -> Response {
+    let unchanged = response.status() == StatusCode::OK
+        && response
+            .headers()
+            .get(header::ETAG)
+            .is_some_and(|etag| names(headers, etag));
+    if !unchanged {
+        return response;
+    }
+    let (mut parts, _) = response.into_parts();
+    parts.status = StatusCode::NOT_MODIFIED;
+    for name in [
+        header::CONTENT_TYPE,
+        header::CONTENT_ENCODING,
+        header::CONTENT_LENGTH,
+    ] {
+        parts.headers.remove(name);
+    }
+    Response::from_parts(parts, Body::empty())
 }
 
 fn negotiated(headers: &HeaderMap, uri: &Uri) -> Lang {
@@ -288,8 +457,12 @@ async fn any(
             .insert(header::ALLOW, HeaderValue::from_static("GET, HEAD"));
         return response;
     }
+    conditional(&headers, answer(&app, &headers, &uri))
+}
+
+fn answer(app: &App, headers: &HeaderMap, uri: &Uri) -> Response {
     let path = uri.path();
-    if let Some(response) = file(&app, path, &headers) {
+    if let Some(response) = file(app, path, headers) {
         return response;
     }
     match path {
@@ -300,10 +473,9 @@ async fn any(
             );
         }
         "/sitemap.xml" => {
-            let data = app.data.read().map(|data| data.clone()).unwrap_or_default();
             return text(
                 "application/xml; charset=utf-8",
-                generated::sitemap(&app.config.origin, &data),
+                generated::sitemap(&app.config.origin, &snapshot(app)),
             );
         }
         "/.well-known/tdmrep.json" => {
@@ -312,7 +484,7 @@ async fn any(
         "/" => {
             return redirect(
                 StatusCode::FOUND,
-                &format!("/{}/", negotiated(&headers, &uri).code()),
+                &format!("/{}/", negotiated(headers, uri).code()),
                 true,
             );
         }
@@ -342,12 +514,12 @@ async fn any(
             );
         }
         return match Page::from_slug(rest) {
-            Some(found) => page(&app, &headers, found, lang),
-            None => page(&app, &headers, Page::NotFound, lang),
+            Some(found) => page(app, headers, found, lang),
+            None => page(app, headers, Page::NotFound, lang),
         };
     }
     if MOVED.contains(&first) {
-        let lang = negotiated(&headers, &uri);
+        let lang = negotiated(headers, uri);
         // The query stays (`/account/chat?with=…`), but for the language.
         let kept: Vec<&str> = uri
             .query()
@@ -368,11 +540,11 @@ async fn any(
     }
     if first == "cards" {
         // Chosen by the visitor's language: never permanent, and it varies.
-        let lang = negotiated(&headers, &uri);
+        let lang = negotiated(headers, uri);
         return redirect(StatusCode::FOUND, &format!("/{}/#cards", lang.code()), true);
     }
-    let lang = Lang::negotiate(header_text(&headers, "accept-language").unwrap_or(""));
-    page(&app, &headers, Page::NotFound, lang)
+    let lang = Lang::negotiate(header_text(headers, "accept-language").unwrap_or(""));
+    page(app, headers, Page::NotFound, lang)
 }
 
 /// The router: one handler for every address, the security headers on
@@ -453,5 +625,23 @@ mod tests {
             assert_eq!(quality(&headers, "br"), br, "{values:?} br");
             assert_eq!(quality(&headers, "gzip"), gzip, "{values:?} gzip");
         }
+    }
+
+    #[test]
+    fn if_none_match_takes_a_list_star_and_weak_tags() {
+        let etag = HeaderValue::from_static("\"0123abcd\"");
+        let named = |value: &str| {
+            let mut headers = HeaderMap::new();
+            headers.insert(header::IF_NONE_MATCH, HeaderValue::from_str(value).unwrap());
+            names(&headers, &etag)
+        };
+        assert!(named("\"0123abcd\""));
+        assert!(named("W/\"0123abcd\""));
+        assert!(named("\"x\", \"0123abcd\""));
+        assert!(named("*"));
+        assert!(!named("\"0123abcd"));
+        assert!(!named("0123abcd"));
+        assert!(!named("\"0123abce\""));
+        assert!(!names(&HeaderMap::new(), &etag));
     }
 }

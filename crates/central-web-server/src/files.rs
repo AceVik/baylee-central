@@ -1,26 +1,64 @@
 //! The built assets (`cargo xtask site`), read once at start into memory
 //! and served by their hashed addresses only: no request path ever becomes
 //! a file system path. A hashed file is cached for a year; the few files
-//! with fixed names (`/sw.js`, `/favicon.ico`, …) are revalidated.
+//! with fixed names (`/sw.js`, `/favicon.ico`, …) are revalidated, by an
+//! entity tag of the bytes sent.
 
 use std::collections::HashMap;
+use std::fmt::Write as _;
 use std::path::Path;
 use std::sync::Arc;
 
 use axum::body::Bytes;
+use axum::http::HeaderValue;
 use central_web::site::Assets;
+use sha2::{Digest as _, Sha256};
+
+/// A strong entity tag of `bytes`: the first 128 bits of their SHA-256 in
+/// hex, quoted. Two answers carry the same tag only when their bytes are
+/// the same, so a cache's copy is confirmed only when it is what this
+/// request would get.
+#[must_use]
+pub fn etag(bytes: &[u8]) -> Option<HeaderValue> {
+    let digest = Sha256::digest(bytes);
+    let mut text = String::with_capacity(34);
+    text.push('"');
+    for byte in &digest[..16] {
+        let _ = write!(text, "{byte:02x}");
+    }
+    text.push('"');
+    HeaderValue::try_from(text).ok()
+}
+
+/// One form of a file as it is sent: its bytes and their entity tag.
+#[derive(Debug)]
+pub struct Stored {
+    /// The bytes.
+    pub bytes: Bytes,
+    /// Their entity tag.
+    pub etag: Option<HeaderValue>,
+}
+
+impl Stored {
+    fn new(bytes: Bytes) -> Self {
+        Self {
+            etag: etag(&bytes),
+            bytes,
+        }
+    }
+}
 
 /// One file to serve.
 #[derive(Debug)]
 pub struct File {
     /// Its media type.
     pub kind: &'static str,
-    /// Its bytes.
-    pub bytes: Bytes,
+    /// Its bytes as they are.
+    pub plain: Stored,
     /// The same, Brotli-compressed, when the build made it.
-    pub brotli: Option<Bytes>,
+    pub brotli: Option<Stored>,
     /// The same, gzip-compressed, when the build made it.
-    pub gzip: Option<Bytes>,
+    pub gzip: Option<Stored>,
     /// A hashed name: cached for a year.
     pub immutable: bool,
 }
@@ -85,7 +123,9 @@ impl Files {
             let beside = |suffix: &str| {
                 let mut compressed = on_disk.as_os_str().to_owned();
                 compressed.push(suffix);
-                std::fs::read(compressed).ok().map(Bytes::from)
+                std::fs::read(compressed)
+                    .ok()
+                    .map(|bytes| Stored::new(Bytes::from(bytes)))
             };
             files.by_path.insert(
                 path,
@@ -93,7 +133,7 @@ impl Files {
                     kind,
                     brotli: beside(".br"),
                     gzip: beside(".gz"),
-                    bytes: Bytes::from(bytes),
+                    plain: Stored::new(Bytes::from(bytes)),
                     immutable,
                 }),
             );
