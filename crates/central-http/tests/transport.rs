@@ -17,10 +17,15 @@ struct Fixture {
 
 impl Fixture {
     async fn start() -> Self {
+        Self::taking("1").await
+    }
+
+    /// A listener that takes `connections` at once.
+    async fn taking(connections: &str) -> Self {
         let config = Config::from_pairs([
             ("BAYLEE_CENTRAL_LISTEN", "127.0.0.1:0"),
             ("BAYLEE_CENTRAL_REQUEST_BYTES", "1024"),
-            ("BAYLEE_CENTRAL_CONCURRENT_REQUESTS", "1"),
+            ("BAYLEE_CENTRAL_CONCURRENT_REQUESTS", connections),
         ])
         .unwrap();
         let server = DevelopmentServer::bind(config).await.unwrap();
@@ -201,5 +206,136 @@ async fn unfinished_body_times_out_and_releases_connection_capacity() {
     assert!(response.contains("cache-control: no-store"));
     assert!(started.elapsed() >= Duration::from_secs(4));
     assert!(server.request("\r\n").await.starts_with("HTTP/1.1 200"));
+    server.stop().await;
+}
+
+/// A request whose one announced byte is withheld, its socket left open;
+/// `forwarded` is the address the local proxy would name.
+fn withhold(address: SocketAddr, forwarded: Option<&str>) -> TcpStream {
+    let mut socket = TcpStream::connect_timeout(&address, Duration::from_secs(2)).unwrap();
+    socket
+        .set_write_timeout(Some(Duration::from_secs(2)))
+        .unwrap();
+    let forwarded = forwarded.map_or_else(String::new, |hop| format!("X-Forwarded-For: {hop}\r\n"));
+    write!(
+        socket,
+        "GET /health/live HTTP/1.1\r\nHost: {address}\r\n{forwarded}Content-Length: 1\r\n\r\n"
+    )
+    .unwrap();
+    socket
+}
+
+/// What the listener answers on `socket` within `wait`; nothing when it
+/// is still waiting for the body.
+fn answer(mut socket: &TcpStream, wait: Duration) -> String {
+    socket.set_read_timeout(Some(wait)).unwrap();
+    let mut response = Vec::new();
+    let mut buffer = [0; 1024];
+    loop {
+        match socket.read(&mut buffer) {
+            Ok(0) => break,
+            Ok(count) => response.extend_from_slice(&buffer[..count]),
+            Err(error)
+                if matches!(
+                    error.kind(),
+                    std::io::ErrorKind::WouldBlock
+                        | std::io::ErrorKind::TimedOut
+                        | std::io::ErrorKind::ConnectionReset
+                        | std::io::ErrorKind::ConnectionAborted
+                ) =>
+            {
+                break;
+            }
+            Err(error) => panic!("bounded HTTP read failed: {error}"),
+        }
+        assert!(response.len() < 8192);
+    }
+    String::from_utf8(response).unwrap()
+}
+
+/// Longer than the boundary's grace for a body, far shorter than a request's time.
+const PAST_GRACE: Duration = Duration::from_millis(700);
+
+#[tokio::test]
+async fn bodies_withheld_hold_their_address_s_places_and_the_listener_serves_on() {
+    // 32 connections: eight places for late bodies, four an address. Once
+    // through the proxy's forwarded address, once by the peer itself.
+    for stalling in [Some("198.51.100.7"), None] {
+        let server = Fixture::taking("32").await;
+        let address = server.address;
+        tokio::task::spawn_blocking(move || {
+            let held: Vec<TcpStream> = (0..4).map(|_| withhold(address, stalling)).collect();
+            std::thread::sleep(PAST_GRACE);
+            // A fifth is refused when its grace ends, not at the request's five seconds.
+            let started = std::time::Instant::now();
+            let fifth = answer(&withhold(address, stalling), Duration::from_secs(4));
+            assert!(fifth.starts_with("HTTP/1.1 429"), "{fifth}");
+            assert!(fifth.ends_with("account request rejected\n"), "{fifth}");
+            assert!(fifth.contains("cache-control: no-store"));
+            assert!(started.elapsed() < Duration::from_secs(2));
+            // Another address's late body has a place: it waits, and is
+            // served when its byte comes.
+            let mut other = withhold(address, Some("198.51.100.8"));
+            assert_eq!(answer(&other, PAST_GRACE), "");
+            other.write_all(b"x").unwrap();
+            let late = answer(&other, Duration::from_secs(2));
+            assert!(late.starts_with("HTTP/1.1 200"), "{late}");
+            // A request whose body is there needs no place: the stalling
+            // address itself is served meanwhile.
+            let forwarded =
+                stalling.map_or_else(String::new, |hop| format!("X-Forwarded-For: {hop}\r\n"));
+            let prompt = exchange(
+                address,
+                &format!(
+                    "GET /health/live HTTP/1.1\r\nHost: {address}\r\n{forwarded}Content-Length: 1\r\n\r\nx"
+                ),
+            );
+            assert!(prompt.starts_with("HTTP/1.1 200"), "{prompt}");
+            // The four still wait; when their connections go, the places come back.
+            for socket in &held {
+                assert_eq!(answer(socket, Duration::from_millis(1)), "");
+            }
+            drop(held);
+            std::thread::sleep(Duration::from_millis(300));
+            let again = withhold(address, stalling);
+            assert_eq!(answer(&again, PAST_GRACE), "");
+        })
+        .await
+        .unwrap();
+        server.stop().await;
+    }
+}
+
+#[tokio::test]
+async fn bodies_withheld_from_many_addresses_hold_a_quarter_of_the_connections() {
+    // eight connections: two places
+    let server = Fixture::taking("8").await;
+    let address = server.address;
+    tokio::task::spawn_blocking(move || {
+        let held = [
+            withhold(address, Some("198.51.100.1")),
+            withhold(address, Some("2001:db8::1")),
+        ];
+        std::thread::sleep(PAST_GRACE);
+        for newcomer in ["198.51.100.3", "2001:db8:0:1::1"] {
+            let refused = answer(&withhold(address, Some(newcomer)), Duration::from_secs(4));
+            assert!(refused.starts_with("HTTP/1.1 429"), "{refused}");
+        }
+        // Six connections are left for requests whose body is there.
+        for _ in 0..12 {
+            let prompt = exchange(
+                address,
+                &format!("GET /health/live HTTP/1.1\r\nHost: {address}\r\nX-Forwarded-For: 198.51.100.3\r\n\r\n"),
+            );
+            assert!(prompt.starts_with("HTTP/1.1 200"), "{prompt}");
+        }
+        // The two end at the request's time with 408, as a withheld body always did.
+        for socket in &held {
+            let timed_out = answer(socket, Duration::from_secs(6));
+            assert!(timed_out.starts_with("HTTP/1.1 408"), "{timed_out}");
+        }
+    })
+    .await
+    .unwrap();
     server.stop().await;
 }

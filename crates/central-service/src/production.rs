@@ -31,8 +31,16 @@ const MAX_SETTINGS: usize = 131_072;
 /// The browser listener's connections at once: the policy's most. Each holds
 /// at most a 64 KiB body, one address at most four of them
 /// (`central_http`'s places in flight), so a stalled body takes no more than
-/// its own address's share; the native listener keeps the default.
+/// its own address's share.
 const BROWSER_CONNECTIONS: &str = "128";
+
+/// The account listener's connections at once: the policy's most too. A
+/// quarter of them (32) are the places of bodies that are late or larger
+/// than 64 KiB, four an address (`central_http`'s boundary), so bodies that
+/// are withheld leave 96 connections to requests whose small body is there,
+/// and no more bodies of up to 1 MiB are in memory at once than the 32 the
+/// listener's connections allowed before.
+const ACCOUNT_CONNECTIONS: &str = "128";
 
 /// One deployed database login. The address must be a loopback or private IP
 /// literal and the certificate authority a PEM bundle (see [`ServerConfig`]).
@@ -154,6 +162,7 @@ fn listener_configs(settings: &Service) -> Result<(Config, Option<Config>), ()> 
     let config = Config::from_pairs([
         ("BAYLEE_CENTRAL_LISTEN", settings.listen.as_str()),
         ("BAYLEE_CENTRAL_REQUEST_BYTES", request_bytes.as_str()),
+        ("BAYLEE_CENTRAL_CONCURRENT_REQUESTS", ACCOUNT_CONNECTIONS),
     ])
     .map_err(|_| ())?;
     let browser_bytes = BROWSER_REQUEST_BYTES.to_string();
@@ -521,13 +530,12 @@ mod tests {
         for listen in ["0.0.0.0:28791", "192.168.1.2:28791", "baylee.app:443"] {
             assert!(config(listen).is_err(), "{listen}");
         }
-        // The deployed listeners: the browser one takes the policy's most
-        // connections, the native one the default.
+        // The deployed listeners both take the policy's most connections.
         let (native, browser) = listener_configs(&settings).unwrap();
         let browser = browser.unwrap();
         assert_eq!(browser.concurrent_requests().get(), 128);
         assert_eq!(browser.request_bytes().get(), BROWSER_REQUEST_BYTES);
-        assert_eq!(native.concurrent_requests().get(), 32);
+        assert_eq!(native.concurrent_requests().get(), 128);
         assert_eq!(native.request_bytes().get(), MAX_WIRE_BYTES);
         for extra in [
             r#","browser":{"listen":"127.0.0.1:28791","origin":"https://evil.example"}"#,
