@@ -29,6 +29,31 @@ pub struct GatewayListing {
     pub online: bool,
 }
 
+/// What a gateway says is happening on it right now: counts, never names.
+/// It is the gateway's own claim, which Central bounds and passes on and
+/// cannot check. Reporting it is the operator's choice
+/// (`docs/gateway-registry.md` §"Activity and the public figures").
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct GatewayActivity {
+    /// Players connected.
+    pub players: u32,
+    /// Tables open to join.
+    pub tables: u32,
+    /// Games running.
+    pub games: u32,
+}
+
+/// One online gateway's activity as it last reported it.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct GatewayFigures {
+    /// The gateway's id, as in its [`GatewayListing`].
+    pub id: [u8; 16],
+    /// What it reported within the last 90 seconds.
+    pub activity: GatewayActivity,
+}
+
 /// Where a registered gateway stands with Central's administrators. Only an
 /// approved gateway is listed. A pending or approved one signs players in
 /// with a gateway token (the token makes its owner answerable and can be
@@ -98,6 +123,23 @@ pub const fn shown_char(c: char) -> bool {
         )
 }
 
+impl GatewayActivity {
+    /// The most any one count may say. A gateway cannot show a larger number
+    /// through Central, whatever it claims.
+    pub const MOST: u32 = 100_000;
+
+    /// Check the counts' bounds; nothing else about them can be checked.
+    ///
+    /// # Errors
+    /// Rejects a count above [`Self::MOST`].
+    pub const fn validate(&self) -> Result<(), Error> {
+        if self.players > Self::MOST || self.tables > Self::MOST || self.games > Self::MOST {
+            return Err(Error::Rejected);
+        }
+        Ok(())
+    }
+}
+
 impl GatewayMetadata {
     /// Validate metadata without dereferencing the website or accepting another origin.
     ///
@@ -160,6 +202,69 @@ mod tests {
             metadata.website = website.into();
             assert!(metadata.validate("https://gateway.invalid").is_err());
         }
+    }
+
+    #[test]
+    fn an_activity_is_three_bounded_counts_and_nothing_else() {
+        let most = GatewayActivity::MOST;
+        let activity = |players, tables, games| GatewayActivity {
+            players,
+            tables,
+            games,
+        };
+        activity(0, 0, 0).validate().unwrap();
+        activity(most, most, most).validate().unwrap();
+        for over in [
+            activity(most + 1, 0, 0),
+            activity(0, most + 1, 0),
+            activity(0, 0, most + 1),
+            activity(u32::MAX, u32::MAX, u32::MAX),
+        ] {
+            assert_eq!(over.validate(), Err(Error::Rejected), "{over:?}");
+        }
+        let text = String::from_utf8(crate::encode(&activity(12, 3, 4)).unwrap()).unwrap();
+        assert_eq!(text, r#"{"players":12,"tables":3,"games":4}"#);
+        assert_eq!(
+            crate::decode::<GatewayActivity>(text.as_bytes()).unwrap(),
+            activity(12, 3, 4)
+        );
+        // No name, no list, no negative or fractional count, nothing left out.
+        for bad in [
+            r#"{"players":12,"tables":3,"games":4,"names":["synthetic"]}"#,
+            r#"{"players":12,"tables":3}"#,
+            r#"{"players":-1,"tables":3,"games":4}"#,
+            r#"{"players":1.5,"tables":3,"games":4}"#,
+            r#"{"players":4294967296,"tables":3,"games":4}"#,
+            r#"{"players":"12","tables":3,"games":4}"#,
+        ] {
+            assert!(
+                crate::decode::<GatewayActivity>(bad.as_bytes()).is_err(),
+                "{bad}"
+            );
+        }
+        let figures = GatewayFigures {
+            id: [7; 16],
+            activity: activity(1, 2, 3),
+        };
+        let text = String::from_utf8(crate::encode(&figures).unwrap()).unwrap();
+        assert_eq!(
+            text,
+            r#"{"id":[7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7],"activity":{"players":1,"tables":2,"games":3}}"#
+        );
+        assert_eq!(
+            crate::decode::<GatewayFigures>(text.as_bytes()).unwrap(),
+            figures
+        );
+        assert!(
+            crate::decode::<GatewayFigures>(
+                text.replace(
+                    r#""activity""#,
+                    r#""origin":"https://gateway.invalid","activity""#
+                )
+                .as_bytes()
+            )
+            .is_err()
+        );
     }
 
     #[test]
