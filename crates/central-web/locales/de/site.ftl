@@ -122,6 +122,7 @@ dl-linux-unsure = Dein Browser nennt deinen Prozessor nicht; angenommen ist x86-
 dl-missing = Dieses Release hat keine Datei für dein System. Ältere Releases findest du auf der <releases>Release-Seite</releases>.
 dl-none = GitHub hat gerade nicht geantwortet. Alle Releases findest du auf der <releases>Release-Seite</releases>.
 dl-yours = Dein System
+dl-more-files = Weitere Dateien ({ $count })
 dl-installer = Installer
 dl-deb = Debian-Paket
 dl-archive = Archiv

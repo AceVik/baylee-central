@@ -110,3 +110,106 @@
   color: var(--ink-soft);
 }
 
+
+/* ---- a link that leaves the site ---------------------------------------------
+   It opens a tab of its own; a small arrow says so before the click, and a
+   screen reader hears it in words. Buttons and cards carry their own icons; the strip is too tight for it. */
+
+:where(p, li, dd, blockquote):not(.strip *) > a[target="_blank"]:not([class])::after {
+  content: "\2197";
+  content: "\2197" / " (opens in a new tab)";
+  display: inline-block;
+  margin-inline-start: 0.18em;
+  font: 0.72em/1 var(--sans);
+  vertical-align: 0.25em;
+  text-decoration: none;
+}
+
+:lang(de) :where(p, li, dd, blockquote):not(.strip *) > a[target="_blank"]:not([class])::after {
+  content: "\2197" / " (öffnet in neuem Tab)";
+}
+
+/* ---- movement between and within pages ---------------------------------------
+   Only where motion is welcome. From page to page the bar stays and the page
+   under it fades over; a page's head settles into place (it moves, it never
+   hides: the title is painted from the first frame); a thin line under the
+   bar shows how far down the page one is. */
+
+@media (prefers-reduced-motion: no-preference) {
+  @view-transition {
+    navigation: auto;
+  }
+
+  .top {
+    view-transition-name: top;
+  }
+
+  ::view-transition-old(root) {
+    animation: 130ms ease-in both page-out;
+  }
+
+  ::view-transition-new(root) {
+    animation: 280ms cubic-bezier(0.22, 1, 0.36, 1) both page-in;
+  }
+
+  .page-head > :is(.eyebrow, h1, .lead, .page-note),
+  .hero-inner > * {
+    animation: settle 0.7s var(--ease) both;
+  }
+
+  .page-head > h1,
+  .hero-inner > :nth-child(2) {
+    animation-delay: 50ms;
+  }
+
+  .page-head > .lead,
+  .hero-inner > :nth-child(3) {
+    animation-delay: 100ms;
+  }
+
+  .page-head > .page-note,
+  .hero-inner > :nth-child(n + 4) {
+    animation-delay: 150ms;
+  }
+}
+
+@keyframes page-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem);
+  }
+}
+
+@keyframes settle {
+  from {
+    transform: translateY(0.9rem);
+  }
+}
+
+@supports (animation-timeline: scroll()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .top::after {
+      content: "";
+      position: absolute;
+      inset: auto 0 -1px;
+      block-size: 2px;
+      background: linear-gradient(90deg, var(--violet), var(--gold));
+      transform-origin: 0 50%;
+      animation: progress linear both;
+      animation-timeline: scroll(root block);
+      pointer-events: none;
+    }
+  }
+}
+
+@keyframes progress {
+  from {
+    transform: scaleX(0);
+  }
+}

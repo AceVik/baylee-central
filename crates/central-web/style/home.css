@@ -330,6 +330,11 @@
   .features {
     grid-template-columns: 1fr 1fr;
   }
+
+  /* an odd one out takes the whole row instead of leaving a hole */
+  .features > li:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
 }
 
 @media (max-width: 600px) {
@@ -474,11 +479,19 @@
   line-height: 1.1;
 }
 
+.number dt {
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
 .number dd {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 0.1rem;
+  /* room on both sides, so the label stays in the middle with the
+     button beside it */
+  padding-inline-start: var(--target);
+  text-wrap: balance;
   margin: 0.2rem 0 0;
   color: var(--ink-soft);
   font-size: 0.95rem;

@@ -294,3 +294,45 @@ if (shotViewer instanceof HTMLDialogElement) {
     show(at + (event.key === "ArrowRight" ? 1 : -1));
   });
 }
+
+// ---- the card numbers count up as they come into view -----------------------
+// Once each, in the page's own number format, and only where motion is
+// welcome: the number the server wrote is already the right one, so without
+// the script, or with reduced motion, nothing changes.
+const counters = [...document.querySelectorAll("dt[data-count]")];
+if (counters.length > 0 && typeof IntersectionObserver === "function" && matchMedia(MOVING).matches) {
+  const write = new Intl.NumberFormat(document.documentElement.lang || "en");
+  const run = (node) => {
+    const end = Number(node.dataset.count);
+    const final = node.textContent;
+    if (!Number.isFinite(end) || end <= 0) {
+      return;
+    }
+    const began = performance.now();
+    const span = 1100;
+    const step = (now) => {
+      const part = Math.min(1, (now - began) / span);
+      // fast at first, settling at the end
+      const eased = 1 - (1 - part) ** 3;
+      node.textContent = part < 1 ? write.format(Math.round(end * eased)) : final;
+      if (part < 1) {
+        requestAnimationFrame(step);
+      }
+    };
+    requestAnimationFrame(step);
+  };
+  const seen = new IntersectionObserver(
+    (entries) => {
+      for (const entry of entries) {
+        if (entry.isIntersecting) {
+          seen.unobserve(entry.target);
+          run(entry.target);
+        }
+      }
+    },
+    { threshold: 0.6 },
+  );
+  for (const node of counters) {
+    seen.observe(node);
+  }
+}
