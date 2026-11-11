@@ -104,3 +104,45 @@ the explicit offline-client exception above, not a replacement for INSERT RETURN
 The delivery `seq` identity column is a JavaScript-safe ordering cursor. Recipient
 account locks cover allocation through commit; no cross-recipient ordering or
 unguessability is claimed. See central-chat.md for migrations and exact grants.
+
+## Gateway activity (migration 000025)
+
+`m20261111_000025_gateway_activity` adds four nullable columns to
+`central_identity.gateways`: `activity_players`, `activity_tables` and
+`activity_games` (`integer`) and `activity_at` (`timestamptz`), for what a
+gateway reports with `GatewayPulse`
+([gateway registry](gateway-registry.md#activity-and-the-public-figures)).
+Two CHECKs hold the shape: all four are set or all four are NULL
+(`gateway_activity_whole`), and each count is between 0 and 100 000
+(`gateway_activity_bounds`, the wire's `GatewayActivity::MOST`). Existing rows
+keep every column and start with no activity.
+
+- **Grants.** None are added. The runtime's table-level `UPDATE` on `gateways`
+  covers the new columns, and the startup check's list is unchanged.
+- **Writes.** Only the heartbeat's own `UPDATE` touches them, in the statement
+  that sets `last_seen` under the five-second condition: a pulse sets the
+  three counts and the time, a plain heartbeat sets all four to NULL. No
+  other statement of the service writes them.
+- **Reads.** `PublicFigures` reads one page of at most 100 rows by primary
+  key, joined to enabled approvals, with `last_seen` and `activity_at` inside
+  90 seconds. There is deliberately no index on the new columns: every pulse
+  writes `activity_at`, and an index over it would take the in-place (HOT)
+  update from each of them. The read walks the table as the directory's
+  does; rows that are pending or silent are passed over, so a table with
+  very many of them makes both reads slower in the same way (an account
+  registers at most eight gateways).
+- **The account count.** `count(*)` over `accounts` with `credential IS NOT
+  NULL` is one scan of that table. The service runs it once in 60 seconds
+  and keeps the number in memory: when the minute is over, the one request
+  that notices counts and the others answer the earlier number meanwhile.
+  Only before a service's first count has returned does every request
+  count, bounded by the public budget. No table or column holds the number.
+- **Earlier binaries.** The previous release's heartbeat names none of the new
+  columns and runs unchanged over the migrated table (its statement is in the
+  upgrade fixture). It leaves a stored activity as it is, which matters only
+  if the two releases beat for one gateway in turn; the 90 seconds bound it.
+- **Number.** 000024 is left free: the session-token line of work has its own
+  migration with the number 000023 beside this line's `open_registration`,
+  and one of them takes the next number when the two meet. The order that
+  counts is the list in `central-migration/src/lib.rs`; this migration
+  depends only on the `gateways` table of 000004 and 000009.
