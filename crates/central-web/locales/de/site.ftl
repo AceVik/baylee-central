@@ -915,3 +915,136 @@ acct-eyebrow = Baylee Central
 
 # The account area's navigation, as the old site named it
 app-account = Dein Account
+
+# ==== Die Seite Sicherheit (/security) =================================
+# Jeder Satz und jeder Pfeil dieser Seite hat eine Zeile in der Belegtabelle
+# in docs/security-page.md; eine Aussage ändert sich
+# zuerst dort. Keine Wörter wie "sicher", "unknackbar" oder zu Rechtskonformität.
+title-security = Sicherheit bei Baylee: Passwort, Schlüssel und Chats
+desc-security = Wie Baylee mit Passwörtern, Schlüsseln und Chatnachrichten umgeht: Schritt für Schritt in vier Grafiken, mit den Grenzen, die jede hat.
+nav-security = Sicherheit
+sec-eyebrow = Sicherheit
+sec-title = Passwort, Schlüssel und Chats: was wohin geht
+sec-lead = Vier Abläufe, Schritt für Schritt: was dein Gerät verlässt, was Baylee Central sieht und was nicht. Dazu die Grenzen, die jeder Ablauf hat.
+sec-toc-label = Auf dieser Seite
+sec-figure = Grafik in Schritten: { $name }
+sec-play = Abspielen
+sec-all = Alle Schritte
+sec-step = Schritt { $n }
+sec-hint = Die Grafik läuft von selbst. Wähle einen Schritt, um sie dort anzuhalten.
+sec-hint-still = Wähle einen Schritt, um ihn hervorzuheben.
+sec-in-browser = Der gestrichelte Rahmen ist dein Browser: Alles hier geschieht darin.
+# Die Namen der Beteiligten sind die einzigen Wörter in den Zeichnungen, wo
+# Text nicht umbricht: je ein oder zwei Wörter, höchstens etwa doppelt so
+# breit wie das englische (der Test `names_fit_with_room_to_grow` misst
+# jede Sprache).
+sec-actor-device = Dein Gerät
+sec-actor-central = Central
+sec-actor-page = Seite
+sec-actor-worker = Worker
+sec-actor-store = Speicher
+sec-actor-you = Du
+sec-actor-contact = Kontakt
+sec-actor-website = Website
+sec-actor-client = Client
+
+sec-signin-eyebrow = Anmelden und Registrieren
+sec-signin-title = Central prüft dein Passwort, ohne es zu bekommen
+sec-signin-lead = Baylee meldet dich mit OPAQUE an (RFC 9807). Dein Gerät und Central tauschen drei Nachrichten aus; dein Passwort steht in keiner davon, auch nicht als einfacher Hash.
+sec-signin-c1 = Verblindete Anfrage
+sec-signin-t1 = Dein Gerät verblindet das Passwort.
+sec-signin-s1 = Es verrechnet das Passwort mit einer frischen Zufallszahl und schickt nur das Ergebnis. Aus dieser Nachricht lässt sich das Passwort nicht ablesen.
+sec-signin-c2 = Centrals Antwort
+sec-signin-t2 = Central antwortet mit einem eigenen Schlüssel.
+sec-signin-s2 = Central rechnet auf dem verblindeten Wert mit einem Schlüssel weiter, den nur es hat, und legt seine Hälfte eines Schlüsselaustauschs dazu. Das Passwort erfährt es dabei nicht.
+sec-signin-c3 = Argon2id · 64 MiB
+sec-signin-t3 = Dein Gerät leistet die schwere Arbeit.
+sec-signin-s3 = Es nimmt die Verblindung zurück und streckt das Ergebnis mit Argon2id (64 MiB Speicher, drei Durchläufe); Central kann keine billigeren Einstellungen verlangen. Ein falsches Passwort fällt hier auf, bevor irgendetwas weiter gesendet wird.
+sec-signin-c4 = Beweis
+sec-signin-t4 = Dein Gerät beweist, dass es die richtigen Schlüssel hat.
+sec-signin-s4 = Mit dem richtigen Passwort kommt dein Gerät auf denselben Sitzungsschlüssel wie Central und schickt dafür einen kurzen Beweis (64 Byte).
+sec-signin-c5 = Sitzung + Hülle
+sec-signin-t5 = Central öffnet die Sitzung.
+sec-signin-s5 = Zurück kommen die Sitzung (im Browser ein Cookie, das die Seite selbst nicht lesen kann) und dein Hauptschlüssel in einer Hülle, die sich nur auf deinem Gerät mit dem richtigen Passwort öffnet.
+sec-signin-register = <b>Beim Registrieren</b> läuft dasselbe Protokoll. Dein Gerät würfelt einen zufälligen Hauptschlüssel (256 Bit), verpackt ihn einmal unter deinem Passwort und einmal unter deinem Wiederherstellungscode und schickt nur die Hüllen. Central speichert einen OPAQUE-Eintrag und die Hüllen, nie den Schlüssel.
+sec-signin-legacy = <b>Eine Ausnahme:</b> Accounts des alten offiziellen Gateways, die noch nicht zu Central umgezogen sind. Bei ihrer ersten Anmeldung schickt der Baylee-Client das alte Passwort einmal über eine geprüfte TLS-Verbindung an Central, das es gegen den alten Hash prüft und weder speichert noch protokolliert. Danach meldet sich der Account wie oben gezeigt an. Diese Website meldet solche Accounts nicht an, sondern verweist auf den Client. Die Ausnahme endet mit der Frist, die für den Umzug gesetzt ist.
+sec-signin-limit = <b>Was bleibt:</b> Wer Centrals Datenbank samt ihren Schlüsseln erbeutet, kann Passwörter der Reihe nach durchprobieren; jeder Versuch kostet eine Argon2id-Rechnung. Ein langes Passwort, das du nirgends sonst benutzt, bleibt wichtig.
+
+sec-memory-eyebrow = Im Arbeitsspeicher
+sec-memory-title = Was nach der Anmeldung noch im Speicher liegt
+sec-memory-lead = Das Passwort wird einmal gebraucht: um deinen Hauptschlüssel zu öffnen. Die Grafik folgt ihm durch den Browser; was der Baylee-Client anders macht, steht darunter.
+sec-memory-c1 = Passwort
+sec-memory-t1 = Die Seite gibt das Passwort an einen Worker.
+sec-memory-s1 = Das Formular reicht es an einen eigenen Hintergrund-Thread (Worker) weiter, leert das Eingabefeld und gibt seine Kopie frei.
+sec-memory-c2 = OPAQUE + Argon2id
+sec-memory-t2 = Der Worker rechnet und überschreibt.
+sec-memory-s2 = Sein Rust-Code hält das Passwort nur bis zum Ende des OPAQUE-Schritts und überschreibt es dann, ebenso die Zwischenschlüssel und die 64 MiB Arbeitsspeicher von Argon2id.
+sec-memory-c3 = Hauptschlüssel: geprüft, gelöscht
+sec-memory-t3 = Der Hauptschlüssel wird geöffnet, benutzt und gelöscht.
+sec-memory-s3 = Der Worker öffnet ihn, um die Anmeldung zu prüfen, leitet daraus die Chat-Schlüssel ab, wenn dein Account einen Chat hat, und überschreibt ihn wieder.
+sec-memory-c4 = Chat-Schlüssel, versiegelt
+sec-memory-t4 = Nur die Chat-Schlüssel bleiben, versiegelt.
+sec-memory-s4 = Damit der Chat nach dem Neuladen ohne Passwort öffnet, legt der Worker sie im Browser ab (IndexedDB), verschlüsselt mit AES-256-GCM. Der Schlüssel dazu ist nicht exportierbar: Skripte können mit ihm arbeiten, ihn aber nicht auslesen. Abmelden und das Ende der Sitzung löschen den Eintrag.
+sec-memory-c5 = Worker beendet
+sec-memory-t5 = Der Worker wird beendet.
+sec-memory-s5 = Ist die Anmeldung fertig, beendet die Seite den Worker, und der Browser verwirft dessen Speicher.
+sec-memory-limit = <b>Was ein Browser nicht verspricht:</b> Das getippte Passwort, seine Übergabe an den Worker und JavaScripts Zeichenketten verwaltet der Browser. Baylee gibt sie frei, kann sie aber nicht überschreiben; wann dieser Speicher wirklich neu belegt wird, entscheidet der Browser. Und wer auf dieser Website Skripte ausführen oder dein Browser-Profil lesen kann, solange du angemeldet bist, kommt an die versiegelten Chat-Schlüssel heran.
+sec-memory-client = <b>Im Baylee-Client</b> liegt das getippte Passwort in Speicher, der beim Freigeben überschrieben wird, und es wird direkt nach der Anmeldung verworfen; gespeichert wird es nie. Der Hauptschlüssel bleibt im Speicher des Clients, solange du angemeldet bist, weil der Client damit deine verschlüsselten Daten öffnet.
+
+sec-chat-eyebrow = Chat
+sec-chat-title = Nachrichten werden auf deinem Gerät verschlüsselt
+sec-chat-lead = Jede Nachricht bekommt einen eigenen Schlüssel. Central speichert und verteilt nur Verschlüsseltes; lesen können es die Geräte, für die es verpackt wurde.
+sec-chat-c1 = Text + Einmalschlüssel
+sec-chat-t1 = Ein neuer Schlüssel für jede Nachricht.
+sec-chat-s1 = Dein Gerät würfelt einen zufälligen Nachrichtenschlüssel und verschlüsselt den Text damit (XChaCha20-Poly1305).
+sec-chat-c2 = Verpackt je Gerät, signiert
+sec-chat-t2 = Verpackt für jedes Gerät, signiert von deinem.
+sec-chat-s2 = Es verpackt den Nachrichtenschlüssel einzeln für jedes Gerät des Empfängers (X25519) und unterschreibt Kopf und Chiffrat mit dem Schlüssel deines Geräts (Ed25519).
+sec-chat-c3 = Chiffrat + Hüllen
+sec-chat-t3 = Central bekommt nur Verschlüsseltes.
+sec-chat-s3 = Central prüft die Unterschrift und die Liste der Empfänger und speichert das Chiffrat mit den Hüllen. Es hat weder die Nachrichtenschlüssel noch die Schlüssel deines Accounts.
+sec-chat-c4 = Chiffrat + eine Hülle
+sec-chat-t4 = Jedes Gerät bekommt seine eigene Hülle.
+sec-chat-s4 = Holt das Gerät deines Kontakts seine Nachrichten ab, gibt Central ihm das Chiffrat und nur die Hülle, die für dieses Gerät gemacht wurde.
+sec-chat-c5 = Geprüft, geöffnet
+sec-chat-t5 = Prüfen, auspacken, lesen.
+sec-chat-s5 = Das Gerät prüft deine Unterschrift, packt den Nachrichtenschlüssel mit seinem eigenen Schlüssel aus und entschlüsselt den Text.
+sec-chat-meta = <b>Was Central trotzdem sieht:</b> wer mit wem in Kontakt steht, Gruppen, Anzeigenamen, die öffentlichen Schlüssel der Geräte und wann Nachrichten zugestellt werden und wie groß sie sind.
+sec-chat-limit = <b>Grenzen:</b> Es gibt kein Double Ratchet und damit keine Forward Secrecy: Wird der Schlüssel eines Empfängergeräts später gestohlen, öffnet er auch frühere Nachrichten, die für dieses Gerät verpackt wurden. Beim ersten Kontakt vertraut dein Gerät den Schlüsseln, die Central nennt; wer sie prüfen will, vergleicht die Sicherheitsnummer über einen anderen Weg. Ändern sich die Schlüssel eines Kontakts später, sendet Baylee erst wieder, wenn du sie bestätigt hast. Wer zu einer Gruppe gehört, bestimmt Central.
+
+sec-pair-eyebrow = Anmelden per Link
+sec-pair-title = Vom Browser in den Client, ohne das Passwort noch einmal zu tippen
+sec-pair-lead = Wer auf der Website angemeldet ist, soll den Baylee-Client angemeldet starten können. Dafür bringt die Seite den Hauptschlüssel zum Client: versiegelt, und so, dass Central ihn weder öffnen noch einen eigenen unterschieben kann.
+sec-pair-status = <b>Stand:</b> Central und Baylees Client-Bibliothek können das heute schon und sind gegeneinander getestet. Von dieser Website und aus einem veröffentlichten Client lässt es sich noch nicht benutzen.
+sec-pair-c1 = Kopplung starten
+sec-pair-t1 = Die Seite startet eine Kopplung.
+sec-pair-s1 = Central vergibt dafür eine Kennung, die fünf Minuten gilt. Gleichzeitig würfelt die Seite ein Einmal-Geheimnis, das sie Central nie zeigt.
+sec-pair-c2 = Link mit dem Geheimnis
+sec-pair-t2 = Ein Link öffnet den Client.
+sec-pair-s2 = Der Link <code>baylee://pair</code> trägt die Kennung und das Geheimnis auf deinem eigenen Gerät von der Seite zum Client, an Central vorbei.
+sec-pair-c3 = Öffentlicher Schlüssel
+sec-pair-t3 = Der Client antwortet mit einem frischen Schlüsselpaar.
+sec-pair-s3 = Er schickt Central die öffentliche Hälfte und einen Prüfwert, der mit dem Geheimnis berechnet ist (HMAC-SHA-256). Die Seite prüft diesen Wert; beide Bildschirme zeigen denselben kurzen Code, und du bestätigst auf der Seite.
+sec-pair-c4 = Hauptschlüssel, versiegelt
+sec-pair-t4 = Die Seite versiegelt den Hauptschlüssel für den Client.
+sec-pair-s4 = Mit HPKE (RFC 9180), an den öffentlichen Schlüssel des Clients und zusätzlich unter dem Geheimnis. Central speichert das Siegel einmal; es kann es nicht öffnen und, weil es das Geheimnis nicht kennt, auch kein eigenes herstellen.
+sec-pair-c5 = Sitzung + Siegel
+sec-pair-t5 = Der Client löst einmal ein.
+sec-pair-s5 = Er bekommt eine Sitzung zusammen mit dem Siegel, öffnet es mit seinem privaten Schlüssel und dem Geheimnis und ist angemeldet. Die Kopplung wird danach gelöscht, auch wenn das Einlösen scheitert.
+sec-pair-note = <b>Das Passwort kommt in diesem Austausch nicht vor.</b> Die Seite hat den Hauptschlüssel nur in dem Moment, in dem sie ihn gerade mit deinem Passwort geöffnet hat, und eine so gekoppelte Sitzung zählt nie als frische Passwort-Anmeldung.
+
+sec-limits-eyebrow = Grenzen
+sec-limits-title = Was das alles nicht leistet
+sec-limit-device = <b>Ein kompromittiertes Gerät.</b> Schadsoftware, eine Browser-Erweiterung, die Seiten mitliest, oder ein manipulierter Client sieht, was du siehst und tippst. Dagegen hilft keine Verschlüsselung auf dem Weg zu einem Server.
+sec-limit-site = <b>Eine Website bekommt ihren Code von ihrem Server.</b> Wer unseren Server übernimmt, könnte Code ausliefern, der dein Passwort beim Tippen abgreift; Prüfsummen und eine strenge Content Security Policy schützen vor Änderungen von außen, nicht davor. Der Client ist ein Programm auf deinem Rechner und prüft eine Signatur, bevor er ein Update einspielt.
+sec-limit-central = <b>Ein übernommenes Central.</b> Es könnte Metadaten offenlegen, den Dienst verweigern und Anmeldungen angreifen. Den Inhalt deiner verschlüsselten Daten und Chats hat es nicht.
+sec-limit-recovery = <b>Verlorene Schlüssel.</b> Ohne dein Passwort und ohne deinen Wiederherstellungscode kann niemand deine verschlüsselten Daten zurückholen, auch wir nicht: Central hat nur die Hüllen.
+sec-limit-audit = <b>Keine unabhängige Prüfung.</b> Anmeldung und Kopplung folgen veröffentlichten Standards (RFC 9807, RFC 9180, RFC 9106); das Chat-Format ist Baylees eigene Kombination aus Standardbausteinen (Ed25519, X25519, XChaCha20-Poly1305). Die Umsetzung haben bisher nur die durchgesehen, die sie gebaut haben. Der Code ist offen; wer etwas findet, <contact>sagt uns bitte Bescheid</contact>.
+sec-docs-title = Zum Nachlesen
+sec-docs = Die Einzelheiten stehen in den Dokumenten des Projekts: <protocol>Krypto-Protokoll</protocol>, <chat>Chat</chat>, <accounts>Accounts und Kopplung</accounts> und <threats>Bedrohungsmodell</threats>. Was rechtlich mit deinen Daten geschieht, steht in der <privacy>Datenschutzerklärung</privacy>.
+
+# Die zwei Links von anderswo auf die Seite: aus den Fragen und von der Anmeldung.
+faq-security-q = Wie geht Baylee mit meinem Passwort und meinen Chats um?
+faq-security-a = Beim Anmelden beweist dein Gerät mit dem Protokoll OPAQUE, dass es das Passwort kennt, ohne es zu senden; Chatnachrichten werden auf deinem Gerät verschlüsselt. Die Seite <security>Sicherheit</security> zeigt jeden Schritt als Grafik, mit der einen Ausnahme und den Grenzen.
+sec-signin-link = Was beim Anmelden mit deinem Passwort geschieht: <security>Sicherheit</security>
+# ==== Ende der Seite Sicherheit =================================================

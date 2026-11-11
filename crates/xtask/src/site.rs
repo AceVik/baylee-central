@@ -28,7 +28,7 @@ use crate::fail::{Fail, OrFail, Result};
 use crate::{process, random, wasm, workspace};
 
 /// The stylesheets, in the order they are joined.
-pub const STYLES: [&str; 14] = [
+pub const STYLES: [&str; 15] = [
     "tokens.css",
     "base.css",
     "buttons.css",
@@ -43,6 +43,7 @@ pub const STYLES: [&str; 14] = [
     "footer.css",
     "app.css",
     "chat.css",
+    "security.css",
 ];
 
 /// The scripts served under hashed names.
