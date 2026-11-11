@@ -1035,3 +1035,26 @@ gateway reports, the strip shows the accounts, the cards, the stars and
 the gateways online.
 
 **The Impressum** is in §10, point 2.
+
+**The bar** no longer links Discord (owner, 11.11.2026); the start page,
+the contact section and the footer do.
+
+**Registration** was reviewed as an attacker would use it and hardened
+([registration abuse](../registration-abuse.md), "Hardened"): a challenge
+costs more for a request that looks automated (never a refusal), a flood
+raises the price to 64 times the base, an address's block is counted, and
+the page counts its three seconds from the challenge's arrival, which had
+refused people on slow connections. The page shows the proof's progress
+once it takes long.
+
+**Signing in** counts guesses at a password
+([native login](../native-login.md), "Guessing a password online"): per
+account, per address, per account at an address and per IPv6 /48, by the
+hour and the day, on both listeners, with every address's own share of
+what all callers share. A sign-in with the right password spends nothing,
+and an address an account signed in from stays open to it for 30 days
+while strangers are refused. The owner accepted on 11.11.2026 what that
+tells someone at the same address; the privacy page says it, the security
+page names what guessing still finds and who can keep whom out. Nothing
+on the wire changed, so the released client and gateway are served as
+before.

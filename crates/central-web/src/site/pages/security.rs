@@ -200,6 +200,7 @@ const SIGN_IN: Flow = Flow {
         Note::More(words::sec_signin_register),
         Note::Limit(words::sec_signin_legacy),
         Note::Limit(words::sec_signin_limit),
+        Note::Limit(words::sec_signin_guess),
     ],
 };
 

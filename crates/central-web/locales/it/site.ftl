@@ -273,7 +273,7 @@ privacy-chat = I messaggi vengono cifrati sul tuo dispositivo per i dispositivi 
 privacy-push-title = Notifiche
 privacy-push = Se attivi le notifiche in un browser, il tuo browser si registra presso il proprio servizio push, e Central memorizza l'indirizzo di quel servizio per questo browser, la chiave pubblica e il segreto di autenticazione del browser, la tua lingua, un numero casuale per questo dispositivo e la tua scelta delle categorie. Il servizio push appartiene al produttore del tuo browser: Google (Firebase Cloud Messaging), Mozilla o Apple, tutte con sede negli USA. Una notifica contiene, cifrati, solo il suo tipo (per esempio «nuovo messaggio») e la tua lingua, mai nomi o testo; il servizio push vede i dati di connessione come indirizzo, ora e dimensione. Questi dati vengono cancellati quando disattivi le notifiche su questo dispositivo, quando esci o quando elimini il tuo account; un indirizzo non rinnovato per 90 giorni non viene più usato, e le notifiche in attesa scadono dopo un giorno. Base giuridica: art. 6, par. 1, lett. a) del GDPR e § 25, comma 1 TDDDG (il tuo consenso). Puoi revocarlo in qualsiasi momento nelle impostazioni del tuo account; ciò che è avvenuto fino ad allora resta lecito.
 privacy-counters-title = Protezione dagli abusi
-privacy-counters = Per impedire che le password vengano indovinate e il sovraccarico, Central conta alcune richieste per indirizzo IP (registrazioni, tentativi di accesso, reimpostazioni della password, lettura dell'elenco), solo in memoria: le registrazioni fino a un giorno, tutto il resto al massimo per un'ora. Prima di una registrazione il tuo browser risolve anche un rompicapo; è composto da numeri casuali, non contiene nulla su di te e viene dimenticato al più tardi dopo cinque minuti. Per ogni account, Central conta le richieste di contatto e le ricerche di altri giocatori, così che nessuno inondi gli altri di richieste. Base giuridica: art. 6, par. 1, lett. f) del GDPR; il nostro legittimo interesse è proteggere gli account e il servizio dagli abusi.
+privacy-counters = To stop password guessing and overload, Central counts certain requests per IP address (registrations, sign-in attempts, password resets, reading the directory), only in memory: registrations, and sign-in attempts that were not completed with the right password, for up to a day, everything else for at most one hour. After a sign-in with the right password, Central remembers for 30 days, again only in memory, that your account signed in from that address (an IPv4 address, or the first half of an IPv6 address; at most eight per account), so that other people's attempts on your account do not keep you out there. Someone who uses the same address and knows your user name can tell from Central's answers that your account signed in from it. A new password forgets these addresses except the one you set it from, deleting the account forgets them all, and so does a restart of the service. Before a registration your browser also solves a puzzle; it consists of random numbers, holds nothing about you and is forgotten after five minutes at the latest. Per account, Central counts contact requests and searches for other players, so that nobody floods others with requests. Legal basis: Art. 6(1)(f) GDPR; our legitimate interest is protecting the accounts and the service against abuse.
 privacy-contact-title = Il modulo di contatto
 privacy-contact = Il modulo invia il tuo messaggio, la lingua della pagina e l'ora al servizio di feedback di Baylee sullo stesso server, e il tuo nome e il tuo indirizzo e-mail solo se li indichi; entrambi sono facoltativi. Il servizio annota anche se il messaggio è stato gestito. Il tuo indirizzo IP non viene memorizzato; viene solo contato in memoria per un'ora, per fermare un'ondata di messaggi. Solo la persona indicata nelle note legali legge i messaggi; nulla viene trasmesso ad altri. Un messaggio viene cancellato 90 giorni dopo che è stato gestito, al più tardi dopo un anno, o prima se lo chiedi. Base giuridica: art. 6, par. 1, lett. f) del GDPR (il nostro legittimo interesse a rispondere ai messaggi), oppure lett. b) se il tuo messaggio riguarda il tuo account.
 privacy-impressum-title = Il rompicapo delle note legali
@@ -455,7 +455,7 @@ baylee-photo10 = Il suo posto preferito: proprio accanto a noi.
 
 ## Errors shared by the forms
 
-error-busy = Troppi tentativi al momento. Aspetta un minuto e riprova.
+error-busy = Too many attempts. Try again later; after several wrong passwords this can take an hour, at most a day.
 error-unavailable = Baylee Central non risponde al momento. Riprova tra poco.
 error-network = Nessuna connessione. Controlla la rete e riprova.
 error-failed = Qualcosa è andato storto. Riprova; se continua, faccelo sapere.
@@ -1040,6 +1040,7 @@ sec-signin-limit = <b>Che cosa resta:</b> chi si impossessa del database di Cent
     chiavi può provare le password una per una; ogni tentativo costa un'esecuzione di Argon2id. Una
     password trovata in questo modo apre i dati cifrati dell'account e le sue chat memorizzate.
     Conta ancora una password lunga che non usi altrove.
+sec-signin-guess = <b>Guessing through the sign-in</b> is slowed, not stopped. Central counts attempts that are not completed with the right password: at most 100 a day on one account from addresses it has not signed in from, and at most 100 a day from one address on all accounts together. Past that it answers that there were too many attempts, until the hour or the day ends. A common password is still found that way. And whoever knows your user name can use up your account's attempts: until the day ends you then sign in only from an address your account signed in from in the last 30 days (Central remembers those addresses only until it restarts).
 
 sec-memory-eyebrow = In memoria
 sec-memory-title = Che cosa resta in memoria dopo l'accesso
@@ -1196,5 +1197,5 @@ sec-teaser-lead = Passo dopo passo: che cosa lascia il tuo dispositivo, che cosa
     e che cosa no, e i limiti di ogni flusso.
 sec-teaser-more = Vedi ogni passaggio in un diagramma
 # ==== end of the security page =================================================
-# ==== registration: the proof of work, while it takes long (English until translated) ====
+# ==== registration: the proof of work, while it takes long =====================
 register-solving = Your browser is solving a puzzle that keeps robots out. When many accounts are being created, this can take a few minutes … { $percent } %

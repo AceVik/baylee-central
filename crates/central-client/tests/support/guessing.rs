@@ -137,7 +137,9 @@ pub(crate) fn run(http: &Http, browser: &Browser) {
     // An account nobody guessed at is served from the guessers' places:
     // their counts are far from spent, and one account's count is not
     // another's.
-    let untouched = password::register("not-guessed-at", http, &at("203.0.113.50"));
+    // (An address of its own: registration's step spent the hour's
+    // challenges of 203.0.113.50.)
+    let untouched = password::register("not-guessed-at", http, &at("203.0.113.55"));
     for from in [&stranger, &other, &third] {
         assert!(guess(from, http, untouched.identity).is_ok());
     }
