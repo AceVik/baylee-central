@@ -4,6 +4,7 @@ use std::{
     collections::BTreeMap,
     time::{Duration, Instant},
 };
+use subtle::ConstantTimeEq;
 
 /// Requests a second without a session, all clients together: discovery,
 /// sign-in, registration and the other public operations.
@@ -42,6 +43,222 @@ pub(super) const PLACE_PAIRING_PER_MINUTE: u32 = 240;
 pub(super) const PLACES: usize = 8_192;
 const _: () = assert!(PLACES > 2 * 60 * 64);
 const MINUTE: Duration = Duration::from_secs(60);
+
+/// Requests a second that come with a bearer no answer has vouched for
+/// ([`Proven`]), all of them together: a made-up token, or a session's
+/// first request after a restart or a long pause. Their own window, so
+/// they spend neither what sessions share nor what everyone signs in with.
+pub(super) const UNPROVEN_PER_SECOND: u32 = 64;
+const _: () = assert!(PLACES > 2 * 60 * UNPROVEN_PER_SECOND as usize);
+/// Such requests a minute from one place: as many as a place may draw of
+/// the sign-ins' budget ([`PLACE_PER_MINUTE`]). A session needs one, since
+/// its first answer vouches for it.
+pub(super) const PLACE_UNPROVEN_PER_MINUTE: u32 = 600;
+/// How long an answer vouches for a bearer: a session's 30 minutes between
+/// two renewals. Every further answer that vouches starts it again.
+pub(super) const PROVEN_SECONDS: u64 = 1_800;
+/// Bearers vouched for at once; one more takes the place of the one whose
+/// last such answer is the oldest. About a megabyte.
+pub(super) const PROVEN: usize = 16_384;
+/// Refusals in a row after which a bearer is no longer vouched for: a
+/// session that ended, or was replaced, stops counting as one after this
+/// many requests.
+pub(super) const REFUSALS: u8 = 4;
+/// Control and data requests a second for one bearer, of the 512 and 256
+/// all vouched-for bearers share.
+const BEARER_CONTROL: u32 = 128;
+const BEARER_DATA: u32 = 64;
+
+/// How a request is counted.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Class {
+    /// A client's pairing: no session, a window of its own.
+    Pairing,
+    /// Served without a session, whatever token comes along.
+    Public,
+    /// A session's or a gateway credential's: status, renewal and the
+    /// checks gateways make of their players.
+    Control,
+    /// A session's or a gateway credential's: everything else.
+    Data,
+}
+
+fn class(request: &Request) -> Class {
+    // A client's claim, polls and redeem carry no session; their own
+    // window keeps a few pairings' polling from spending the sign-ins'.
+    if matches!(
+        request,
+        Request::PairClaim { .. } | Request::PairPoll { .. } | Request::PairRedeem { .. }
+    ) {
+        return Class::Pairing;
+    }
+    if matches!(
+        request,
+        Request::Discover { .. }
+            | Request::LoginStart { .. }
+            | Request::LoginFinish { .. }
+            // Named, not left to the rule for requests without a
+            // session: the table of challenges is sized by this budget
+            // (`challenge::HELD`), whatever token comes with the request.
+            | Request::RegisterChallenge
+            | Request::RegisterChallengeFor { .. }
+            | Request::Register { .. }
+            | Request::EnrollmentStart { .. }
+            | Request::EnrollmentFinish { .. }
+            | Request::GatewayDirectory { .. }
+            | Request::PublicFigures { .. }
+            | Request::Terms
+            | Request::GatewayTerms { .. }
+            | Request::ResetStart { .. }
+            | Request::ResetFinish { .. }
+            | Request::LegacyLogin { .. }
+    ) {
+        return Class::Public;
+    }
+    // Separate bounded budgets keep a ciphertext transfer from exhausting
+    // login or revocation checks.
+    if matches!(
+        request,
+        Request::SessionStatus
+            | Request::RenewSession
+            | Request::GatewaySession { .. }
+            | Request::GatewayProfile { .. }
+            | Request::GatewayAuthorize { .. }
+            | Request::TermsStatus
+            | Request::AccountSummary
+            | Request::Logout
+            | Request::SetGatewayAdmins { .. }
+    ) {
+        Class::Control
+    } else {
+        Class::Data
+    }
+}
+
+/// What the answer to a request says about the bearer it came with.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Tells {
+    /// Answered, it vouches for the bearer: the store refuses each of
+    /// these for a token that is no live session or credential, whatever
+    /// else was asked, and so does the bridge's comparison.
+    Proves,
+    /// Answered, the bearer is no session any more, or the answer is the
+    /// same for a token nobody issued.
+    Ends,
+    /// Nothing either way.
+    Nothing,
+}
+
+/// A short list, and a request that is not on it vouches for nothing:
+/// what clients, the website and gateways ask on their own, each read in
+/// `central-postgres` to refuse a token it does not know.
+fn tells(request: &Request) -> Tells {
+    match request {
+        Request::SessionStatus
+        | Request::RenewSession
+        | Request::AccountSummary
+        | Request::TermsStatus
+        | Request::Social { .. }
+        | Request::Notifications { .. }
+        | Request::CreateObject
+        | Request::ReadObject { .. }
+        | Request::ListObjects { .. }
+        | Request::WriteObject { .. }
+        | Request::DeleteObject { .. }
+        | Request::ReadDocument
+        | Request::WriteDocument { .. }
+        | Request::GatewayTicket { .. }
+        | Request::GatewaySession { .. }
+        | Request::GatewayProfile { .. }
+        | Request::RedeemGateway { .. }
+        | Request::GatewayHeartbeat { .. }
+        | Request::GatewayPulse { .. }
+        | Request::GatewayStatus
+        | Request::CheckGatewayAdmin { .. } => Tells::Proves,
+        // The first two are answered alike whoever asks; after the other
+        // two the session that asked is gone.
+        Request::Logout
+        | Request::PairCancel { .. }
+        | Request::ChangePasswordFinish { .. }
+        | Request::DeleteAccountFinish { .. } => Tells::Ends,
+        _ => Tells::Nothing,
+    }
+}
+
+/// A request that is counted by the bearer it came with, kept from before
+/// it is served until it is answered ([`Limits::answered`]).
+pub(super) struct Told {
+    bearer: [u8; 32],
+    tells: Tells,
+}
+
+/// What `request`'s answer will say about `bearer`; nothing for a request
+/// that is not counted by its bearer (a public one, a pairing's, one
+/// without a bearer).
+pub(super) fn told(request: &Request, bearer: Option<&Token>) -> Option<Told> {
+    let bearer = bearer?;
+    matches!(class(request), Class::Control | Class::Data).then(|| Told {
+        bearer: bearer.digest(),
+        tells: tells(request),
+    })
+}
+
+/// The bearers an answer vouched for, by their digests, in memory only: a
+/// session a sign-in just issued, or a token that one of the requests in
+/// [`tells`] was answered with. Supplying a token vouches for nothing; a
+/// bearer that is not here is counted apart ([`UNPROVEN_PER_SECOND`]) and
+/// served like any other, and what it may do is the store's to decide
+/// either way.
+#[derive(Default)]
+struct Proven {
+    /// When each was last vouched for, and the refusals in a row since.
+    known: BTreeMap<[u8; 32], (Instant, u8)>,
+    swept: Option<Instant>,
+    /// The official gateway's bridge: configured, so never forgotten.
+    kept: Option<[u8; 32]>,
+}
+
+impl Proven {
+    fn holds(&self, bearer: &[u8; 32], now: Instant) -> bool {
+        self.kept.is_some_and(|kept| bool::from(kept.ct_eq(bearer)))
+            || self.known.get(bearer).is_some_and(|(at, _)| {
+                now.saturating_duration_since(*at) < Duration::from_secs(PROVEN_SECONDS)
+            })
+    }
+
+    fn mark(&mut self, bearer: [u8; 32], now: Instant) {
+        let due = self
+            .swept
+            .is_none_or(|swept| now.saturating_duration_since(swept) >= MINUTE);
+        if due {
+            self.known.retain(|_, (at, _)| {
+                now.saturating_duration_since(*at) < Duration::from_secs(PROVEN_SECONDS)
+            });
+            self.swept = Some(now);
+        }
+        if self.known.len() >= PROVEN && !self.known.contains_key(&bearer) {
+            let oldest = self
+                .known
+                .iter()
+                .min_by_key(|(_, (at, _))| *at)
+                .map(|(bearer, _)| *bearer);
+            if let Some(oldest) = oldest {
+                self.known.remove(&oldest);
+            }
+        }
+        self.known.insert(bearer, (now, 0));
+    }
+
+    fn refused(&mut self, bearer: &[u8; 32]) {
+        let Some((_, refusals)) = self.known.get_mut(bearer) else {
+            return;
+        };
+        *refusals = refusals.saturating_add(1);
+        if *refusals >= REFUSALS {
+            self.known.remove(bearer);
+        }
+    }
+}
 
 /// What each place drew of one shared budget in its current minute, in
 /// memory only; a place is forgotten at most a minute after its minute.
@@ -109,6 +326,13 @@ pub(super) struct Limits {
     control: Window,
     pairing: Window,
     peers: BTreeMap<([u8; 32], bool), Window>,
+    /// The bearers an answer vouched for; only they draw on `control`,
+    /// `data` and `peers`.
+    proven: Proven,
+    /// Every other bearer's requests ([`UNPROVEN_PER_SECOND`]) and each
+    /// place's share of them ([`PLACE_UNPROVEN_PER_MINUTE`]).
+    unproven: Window,
+    strangers: Places,
     /// Reports each gateway filed in the current hour.
     reports: BTreeMap<[u8; 16], (Instant, u32)>,
 }
@@ -141,8 +365,11 @@ impl Limits {
     /// else is looked at. `place` is where it came from: a request that
     /// needs no session draws on its place's share first
     /// ([`PLACE_PER_MINUTE`], [`PLACE_PAIRING_PER_MINUTE`]), so one address
-    /// cannot spend what everyone signs in with. Nothing is spent when a
-    /// budget is used up.
+    /// cannot spend what everyone signs in with. A request that comes
+    /// with a bearer is counted by it only once an answer has vouched for
+    /// that bearer ([`Proven`]); until then it shares the strangers'
+    /// second ([`UNPROVEN_PER_SECOND`]). Nothing is spent when a budget is
+    /// used up.
     pub(super) fn request(
         &mut self,
         request: &Request,
@@ -150,67 +377,43 @@ impl Limits {
         place: Option<Place>,
         now: Instant,
     ) -> Result<(), Error> {
-        // A client's claim, polls and redeem carry no session; their own
-        // window keeps a few pairings' polling from spending the sign-ins'.
-        if matches!(
-            request,
-            Request::PairClaim { .. } | Request::PairPoll { .. } | Request::PairRedeem { .. }
-        ) {
-            if !self.paired.fits(place, now, PLACE_PAIRING_PER_MINUTE) {
-                return Err(Error::Busy);
+        let control = match class(request) {
+            Class::Pairing => {
+                if !self.paired.fits(place, now, PLACE_PAIRING_PER_MINUTE) {
+                    return Err(Error::Busy);
+                }
+                self.pairing.charge(now, 64)?;
+                self.paired.spend(place, now);
+                return Ok(());
             }
-            self.pairing.charge(now, 64)?;
-            self.paired.spend(place, now);
-            return Ok(());
-        }
-        if matches!(
-            request,
-            Request::Discover { .. }
-                | Request::LoginStart { .. }
-                | Request::LoginFinish { .. }
-                // Named, not left to the rule for requests without a
-                // session: the table of challenges is sized by this budget
-                // (`challenge::HELD`), whatever token comes with the request.
-                | Request::RegisterChallenge
-                | Request::RegisterChallengeFor { .. }
-                | Request::Register { .. }
-                | Request::EnrollmentStart { .. }
-                | Request::EnrollmentFinish { .. }
-                | Request::GatewayDirectory { .. }
-                | Request::PublicFigures { .. }
-                | Request::Terms
-                | Request::GatewayTerms { .. }
-                | Request::ResetStart { .. }
-                | Request::ResetFinish { .. }
-                | Request::LegacyLogin { .. }
-        ) {
-            return self.global(place, now);
-        }
+            Class::Public => return self.global(place, now),
+            Class::Control => true,
+            Class::Data => false,
+        };
         let Some(bearer) = bearer else {
             return self.global(place, now);
         };
-        // Separate bounded budgets keep a ciphertext transfer from exhausting
-        // login or revocation checks. A bearer is still verified by dispatch;
-        // merely supplying a token never confers authorization.
-        let control = matches!(
-            request,
-            Request::SessionStatus
-                | Request::RenewSession
-                | Request::GatewaySession { .. }
-                | Request::GatewayProfile { .. }
-                | Request::GatewayAuthorize { .. }
-                | Request::TermsStatus
-                | Request::AccountSummary
-                | Request::Logout
-                | Request::SetGatewayAdmins { .. }
-        );
+        let digest = bearer.digest();
+        // A bearer no answer has vouched for may be anybody's invention.
+        // It is served, and dispatch decides what it may do, but out of a
+        // window of its own and its place's share of that: it spends
+        // nothing of what sessions share, takes no room among their
+        // bearers, and nothing of the sign-ins' budget either.
+        if !self.proven.holds(&digest, now) {
+            if !self.strangers.fits(place, now, PLACE_UNPROVEN_PER_MINUTE) {
+                return Err(Error::Busy);
+            }
+            self.unproven.charge(now, UNPROVEN_PER_SECOND)?;
+            self.strangers.spend(place, now);
+            return Ok(());
+        }
         self.peers.retain(|_, window| {
             window
                 .0
                 .is_some_and(|(start, _)| now.duration_since(start) < Duration::from_secs(1))
         });
-        let key = (bearer.digest(), control);
-        let own = if control { 128 } else { 64 };
+        let key = (digest, control);
+        let own = if control { BEARER_CONTROL } else { BEARER_DATA };
         // The bearer's own budget is looked at before the shared one is
         // drawn on: a bearer asking faster than its own allows is refused
         // here and spends nothing of what every session shares.
@@ -228,6 +431,36 @@ impl Limits {
         }
         self.peers.entry(key).or_default().charge(now, own)
     }
+
+    /// Limits that count `bridge`, the official gateway's configured
+    /// credential, as vouched for from the start and for good.
+    pub(super) fn keeping(bridge: [u8; 32]) -> Self {
+        let mut limits = Self::default();
+        limits.proven.kept = Some(bridge);
+        limits
+    }
+
+    /// A request counted by its bearer was answered: `refused` is the
+    /// error, if it was one. An answer to one of the requests in [`tells`]
+    /// vouches for the bearer from now on; [`REFUSALS`] rejections in a
+    /// row, or the session's end, take that back.
+    pub(super) fn answered(&mut self, told: &Told, refused: Option<&Error>, now: Instant) {
+        match (refused, told.tells) {
+            (None, Tells::Proves) => self.proven.mark(told.bearer, now),
+            (None, Tells::Ends) => {
+                self.proven.known.remove(&told.bearer);
+            }
+            (Some(Error::Rejected), _) => self.proven.refused(&told.bearer),
+            _ => {}
+        }
+    }
+
+    /// A sign-in, a password change or a pairing just issued `session`: it
+    /// is vouched for before its first request.
+    pub(super) fn issued(&mut self, session: &Token, now: Instant) {
+        self.proven.mark(session.digest(), now);
+    }
+
     /// Spend one of the [`GLOBAL_PER_SECOND`] requests everyone shares,
     /// and one of the [`PLACE_PER_MINUTE`] its place may draw of them.
     /// Nothing is spent when either is used up.
@@ -334,6 +567,7 @@ mod tests {
         let now = Instant::now();
         let mut limits = Limits::default();
         let token = Token::generate().unwrap();
+        limits.issued(&token, now);
         for _ in 0..64 {
             limits
                 .request(&Request::CreateObject, Some(&token), None, now)
@@ -381,6 +615,7 @@ mod tests {
         ] {
             let mut limits = Limits::default();
             let greedy = Token::generate().unwrap();
+            limits.issued(&greedy, now);
             // Everything the shared window holds, from one bearer.
             let mut served = 0;
             for _ in 0..shared {
@@ -393,6 +628,7 @@ mod tests {
             // bearers are served their whole budgets beside it.
             for _ in 0..3 {
                 let other = Token::generate().unwrap();
+                limits.issued(&other, now);
                 for _ in 0..own {
                     limits
                         .request(&request, Some(&other), None, now)
@@ -401,11 +637,339 @@ mod tests {
             }
             // Then the shared window is spent, by requests that were served.
             let last = Token::generate().unwrap();
+            limits.issued(&last, now);
             assert_eq!(
                 limits.request(&request, Some(&last), None, now),
                 Err(Error::Busy)
             );
         }
+    }
+
+    /// Supplying a token is not being signed in. Requests with bearers
+    /// nobody issued have a second of their own, however many addresses
+    /// they come from: the budgets sessions share, the room among their
+    /// bearers and the sign-ins' budget stay whole.
+    #[test]
+    fn bearers_nobody_issued_spend_nothing_of_what_sessions_share() {
+        let now = Instant::now();
+        let mut limits = Limits::default();
+        let session = Token::generate().unwrap();
+        limits.issued(&session, now);
+        // One address, 2,000 made-up bearers in one second.
+        let mut passed = 0;
+        for index in 0..2_000 {
+            let request = if index % 2 == 0 {
+                Request::SessionStatus
+            } else {
+                Request::CreateObject
+            };
+            let invented = Token::generate().unwrap();
+            if limits
+                .request(&request, Some(&invented), Some(place(1)), now)
+                .is_ok()
+            {
+                passed += 1;
+            }
+        }
+        assert_eq!(passed, UNPROVEN_PER_SECOND);
+        // Nothing more this second from other addresses, or from none.
+        for from in (2..200).map(|n| Some(place(n))).chain([None]) {
+            let invented = Token::generate().unwrap();
+            assert_eq!(
+                limits.request(&Request::SessionStatus, Some(&invented), from, now),
+                Err(Error::Busy)
+            );
+        }
+        // The session beside them is served its whole budget of each kind,
+        // from the flood's own address too.
+        for _ in 0..BEARER_CONTROL {
+            limits
+                .request(&Request::SessionStatus, Some(&session), Some(place(1)), now)
+                .unwrap();
+        }
+        for _ in 0..BEARER_DATA {
+            limits
+                .request(&Request::CreateObject, Some(&session), Some(place(1)), now)
+                .unwrap();
+        }
+        // No made-up bearer took room among the sessions' bearers.
+        assert_eq!(limits.peers.len(), 2);
+        // And those who are signing in have their whole second.
+        let discover = Request::Discover {
+            username: "synthetic".into(),
+        };
+        assert_eq!(
+            served(&mut limits, &discover, Some(place(1)), now, 40, 0),
+            GLOBAL_PER_SECOND
+        );
+        // A refusal spent nothing: the next second is whole again.
+        let next = now + Duration::from_secs(1);
+        let invented = Token::generate().unwrap();
+        limits
+            .request(
+                &Request::SessionStatus,
+                Some(&invented),
+                Some(place(1)),
+                next,
+            )
+            .unwrap();
+    }
+
+    /// One address has its share of the strangers' requests in a minute
+    /// and no more; another address, and a request the listener knows no
+    /// place of, are served meanwhile.
+    #[test]
+    fn one_place_has_its_share_of_the_strangers_requests() {
+        let start = Instant::now();
+        let mut limits = Limits::default();
+        let mut passed = 0;
+        // 25 a second, well within the second all strangers share.
+        for index in 0..700_u64 {
+            let now = start + Duration::from_millis(index * 40);
+            let invented = Token::generate().unwrap();
+            if limits
+                .request(
+                    &Request::SessionStatus,
+                    Some(&invented),
+                    Some(place(1)),
+                    now,
+                )
+                .is_ok()
+            {
+                passed += 1;
+            }
+        }
+        assert_eq!(passed, PLACE_UNPROVEN_PER_MINUTE);
+        let later = start + Duration::from_secs(30);
+        let invented = Token::generate().unwrap();
+        assert_eq!(
+            limits.request(
+                &Request::ReadDocument,
+                Some(&invented),
+                Some(place(1)),
+                later
+            ),
+            Err(Error::Busy)
+        );
+        for from in [Some(place(2)), None] {
+            limits
+                .request(&Request::ReadDocument, Some(&invented), from, later)
+                .unwrap();
+        }
+        // The share is the strangers' alone: the place signs in meanwhile,
+        // and a session there is served.
+        limits
+            .request(&Request::Terms, None, Some(place(1)), later)
+            .unwrap();
+        let session = Token::generate().unwrap();
+        limits.issued(&session, later);
+        limits
+            .request(
+                &Request::SessionStatus,
+                Some(&session),
+                Some(place(1)),
+                later,
+            )
+            .unwrap();
+        // Its minute over, the place is served again.
+        limits
+            .request(
+                &Request::ReadDocument,
+                Some(&invented),
+                Some(place(1)),
+                start + Duration::from_secs(60),
+            )
+            .unwrap();
+    }
+
+    /// Whether `token` counts as a session's: its control requests then
+    /// have the bearer's own budget, a stranger's the strangers' second.
+    fn vouched(limits: &Limits, token: &Token, now: Instant) -> bool {
+        limits.proven.holds(&token.digest(), now)
+    }
+
+    fn answer(limits: &mut Limits, request: &Request, token: &Token, refused: Option<Error>) {
+        let told = told(request, Some(token)).expect("counted by its bearer");
+        limits.answered(&told, refused.as_ref(), Instant::now());
+    }
+
+    #[test]
+    fn an_answer_vouches_for_a_bearer_and_refusals_take_it_back() {
+        let now = Instant::now();
+        let mut limits = Limits::default();
+        let token = Token::generate().unwrap();
+        // Asking vouches for nothing, and neither does an answer to a
+        // request that is not on the list, nor one that anyone is given.
+        limits
+            .request(&Request::SessionStatus, Some(&token), None, now)
+            .unwrap();
+        answer(&mut limits, &Request::AccountExport, &token, None);
+        answer(&mut limits, &Request::Logout, &token, None);
+        assert!(!vouched(&limits, &token, now));
+        // A refusal vouches for nothing either.
+        answer(
+            &mut limits,
+            &Request::SessionStatus,
+            &token,
+            Some(Error::Rejected),
+        );
+        assert!(!vouched(&limits, &token, now));
+        // A session's status, answered, does.
+        answer(&mut limits, &Request::SessionStatus, &token, None);
+        assert!(vouched(&limits, &token, now));
+        // Three refusals in a row leave it, whatever else was not served.
+        for refused in [
+            Error::Rejected,
+            Error::Busy,
+            Error::Rejected,
+            Error::Unavailable,
+            Error::Conflict,
+            Error::TermsRequired,
+            Error::Rejected,
+        ] {
+            answer(&mut limits, &Request::ReadDocument, &token, Some(refused));
+        }
+        assert!(vouched(&limits, &token, now));
+        // An answer that vouches starts the count again.
+        answer(&mut limits, &Request::ReadDocument, &token, None);
+        for _ in 0..REFUSALS - 1 {
+            answer(
+                &mut limits,
+                &Request::SetDisplayName {
+                    display_name: "Synthetic".into(),
+                },
+                &token,
+                Some(Error::Rejected),
+            );
+        }
+        assert!(vouched(&limits, &token, now));
+        // The fourth in a row takes it back.
+        answer(
+            &mut limits,
+            &Request::SessionStatus,
+            &token,
+            Some(Error::Rejected),
+        );
+        assert!(!vouched(&limits, &token, now));
+        // So does the session's end, at once: its logout, a pairing's
+        // cancelling (answered alike for any token), a password change's
+        // finish and a deletion's.
+        for ending in [
+            Request::Logout,
+            Request::PairCancel {
+                handle: Token::generate().unwrap(),
+            },
+            Request::ChangePasswordFinish {
+                attempt: Token::generate().unwrap(),
+                proof: Vec::new(),
+                record: Vec::new(),
+                wrapped_master: Vec::new(),
+            },
+            Request::DeleteAccountFinish {
+                attempt: Token::generate().unwrap(),
+                proof: Vec::new(),
+            },
+        ] {
+            limits.issued(&token, now);
+            assert!(vouched(&limits, &token, now));
+            answer(&mut limits, &ending, &token, None);
+            assert!(!vouched(&limits, &token, now));
+        }
+        // A request that is not counted by its bearer says nothing of it.
+        for request in [
+            Request::Terms,
+            Request::Discover {
+                username: "synthetic".into(),
+            },
+            Request::PairPoll {
+                handle: Token::generate().unwrap(),
+            },
+        ] {
+            assert!(told(&request, Some(&token)).is_none());
+        }
+        assert!(told(&Request::SessionStatus, None).is_none());
+    }
+
+    #[test]
+    fn a_bearer_is_vouched_for_for_half_an_hour_after_its_last_answer() {
+        let start = Instant::now();
+        let at = |seconds| start + Duration::from_secs(seconds);
+        let mut limits = Limits::default();
+        let token = Token::generate().unwrap();
+        limits.issued(&token, start);
+        assert!(vouched(&limits, &token, at(PROVEN_SECONDS - 1)));
+        assert!(!vouched(&limits, &token, at(PROVEN_SECONDS)));
+        // Every answer that vouches starts the half hour again.
+        let told = told(&Request::RenewSession, Some(&token)).unwrap();
+        limits.answered(&told, None, at(600));
+        assert!(vouched(&limits, &token, at(600 + PROVEN_SECONDS - 1)));
+        assert!(!vouched(&limits, &token, at(600 + PROVEN_SECONDS)));
+        // After it the session's next request is a stranger's, is served
+        // as one, and its answer vouches for it again.
+        let later = at(600 + PROVEN_SECONDS);
+        limits
+            .request(&Request::RenewSession, Some(&token), Some(place(1)), later)
+            .unwrap();
+        assert!(limits.peers.is_empty());
+        limits.answered(&told, None, later);
+        limits
+            .request(&Request::RenewSession, Some(&token), Some(place(1)), later)
+            .unwrap();
+        assert_eq!(limits.peers.len(), 1);
+    }
+
+    #[test]
+    fn the_bridge_is_vouched_for_from_the_start_and_for_good() {
+        let now = Instant::now();
+        let bridge = Token::generate().unwrap();
+        let mut limits = Limits::keeping(bridge.digest());
+        assert!(vouched(&limits, &bridge, now));
+        for _ in 0..2 * REFUSALS {
+            answer(
+                &mut limits,
+                &Request::RedeemGateway {
+                    ticket: Token::generate().unwrap(),
+                    purpose: central_api::wire::TicketPurpose::Admit,
+                },
+                &bridge,
+                Some(Error::Rejected),
+            );
+        }
+        answer(&mut limits, &Request::Logout, &bridge, None);
+        let later = now + Duration::from_secs(10 * PROVEN_SECONDS);
+        assert!(vouched(&limits, &bridge, later));
+        // No other token is.
+        assert!(!vouched(&limits, &Token::generate().unwrap(), now));
+    }
+
+    #[test]
+    fn the_vouched_for_bearers_are_bounded_and_forgotten() {
+        let start = Instant::now();
+        let digest = |n: usize| {
+            let mut digest = [0; 32];
+            digest[..8].copy_from_slice(&u64::try_from(n).unwrap().to_be_bytes());
+            digest
+        };
+        let mut proven = Proven::default();
+        for n in 0..PROVEN {
+            // The first is the oldest; the rest came a second later.
+            proven.mark(digest(n), start + Duration::from_secs(u64::from(n > 0)));
+        }
+        assert_eq!(proven.known.len(), PROVEN);
+        let soon = start + Duration::from_secs(2);
+        // Vouched for again, a bearer needs no new room.
+        proven.mark(digest(1), soon);
+        assert_eq!(proven.known.len(), PROVEN);
+        assert!(proven.holds(&digest(0), soon));
+        // One more takes the place of the one last vouched for longest ago.
+        proven.mark(digest(PROVEN), soon);
+        assert_eq!(proven.known.len(), PROVEN);
+        assert!(!proven.holds(&digest(0), soon));
+        assert!(proven.holds(&digest(1), soon) && proven.holds(&digest(PROVEN), soon));
+        // Half an hour on, the next one sweeps everything that passed.
+        let later = start + Duration::from_secs(PROVEN_SECONDS + 60);
+        proven.mark(digest(7), later);
+        assert_eq!(proven.known.len(), 1);
     }
 
     fn place(n: u32) -> Place {
@@ -468,6 +1032,7 @@ mod tests {
         }
         // A request with a session draws on its session's budgets instead.
         let token = Token::generate().unwrap();
+        limits.issued(&token, later);
         limits
             .request(&Request::SessionStatus, Some(&token), Some(place(1)), later)
             .unwrap();
@@ -613,6 +1178,7 @@ mod tests {
             );
         }
         // A pulse and a heartbeat are one credential's same 64 a second.
+        limits.issued(&token, now);
         let metadata = || central_api::gateway::GatewayMetadata {
             name: "Synthetic".into(),
             version: "1".into(),

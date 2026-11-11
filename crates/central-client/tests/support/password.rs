@@ -123,7 +123,7 @@ fn closed(http: &Http, bridge: &Token, legacy: &str) -> (Identity, Token, Master
 
 /// A raw native sign-in: its bearer, and the master key it opens, as a
 /// signed-in client holds it. One unit.
-fn sign_in(http: &Http, identity: Identity, password: &str) -> (Token, MasterKey) {
+pub(crate) fn sign_in(http: &Http, identity: Identity, password: &str) -> (Token, MasterKey) {
     let context = context(http, identity);
     let (login, message) = Login::start(password.into(), context).unwrap();
     let Response::LoginChallenge { attempt, message } = http

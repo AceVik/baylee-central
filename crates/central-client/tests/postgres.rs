@@ -74,7 +74,9 @@ fn real_native_login_restore_migration_and_adversarial_paths() {
             }),
         );
     let (stop, stopped) = oneshot::channel();
-    let serving_endpoint = endpoint.clone();
+    // The service itself as well, for a flood that no socket makes in one
+    // instant (`support/strangers.rs`).
+    let (service, serving_endpoint) = (identity.clone(), endpoint.clone());
     let task = runtime.spawn(async move {
         server
             .run_with_identity(&serving_endpoint, identity, async {
@@ -105,6 +107,7 @@ fn real_native_login_restore_migration_and_adversarial_paths() {
         support::legacy::run(&http, &browser, &bridge, &store, &runtime, &operator);
         support::notifications::run(&http, &browser, &bridge, &store, &runtime);
         support::guessing::run(&http, &browser);
+        support::strangers::run(&service, &store, &keys, &bridge, &http, &browser, &runtime);
     }));
     // Cleanup runs even if an assertion panics; listeners and pools belong to this fixture only.
     let _ = stop.send(());

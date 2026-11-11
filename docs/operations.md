@@ -146,6 +146,14 @@ or the day ends, counted from the first guess of that window.
   clients share are spent: a flood from several addresses (one alone is
   held to 600 a minute; an IPv6 subscriber with more than a /64, a /56
   say, is several). Rate limits at the proxy or the network answer that.
+- *Signed-in clients are refused for a moment right after a restart, or
+  while signing in works.* A session's first request after a restart, or
+  after half an hour without one, shares 64 a second with every bearer no
+  answer has vouched for yet (600 a minute for one address); its first
+  answer vouches for it. Very many clients at once fill that second, and
+  so does a flood of made-up bearers from seven addresses or more. The
+  client asks again within a second; sessions already answered are not
+  held up ([native login](native-login.md#a-bearer-nobody-issued)).
 - *Someone changed or reset a password and is refused elsewhere.* Another
   password ends the account's own places but the one it was set from. If
   the account's count is spent by guessing, the other devices are refused
@@ -181,7 +189,10 @@ per IPv6 /48 120 and 400; an own place's 30 days and eight per account; the
 tables' 16,384 entries, which must stay above the number of accounts that
 sign in within 30 days), `central-identity/src/limits.rs` (a place's 600
 requests a minute without a session and 240 pairing requests, beside the
-shared 32 and 64 a second), `central-http/src/addresses.rs` (the native
+shared 32 and 64 a second; for bearers no answer has vouched for, 64 a
+second together and 600 a minute a place; the 30 minutes an answer vouches
+for a bearer, the 16,384 held at once and the four refusals that take it
+back), `central-http/src/addresses.rs` (the native
 listener's `Discover` 30 and `LoginStart` 30 a minute, `LegacyLogin` 10 a
 minute, `ResetStart` 10 an hour) and `central-http/src/browser.rs` (the
 browser listener's). Lower numbers slow guessing and make it cheaper to
@@ -935,17 +946,22 @@ client address as well as globally and per account or bearer
 ([above](#sign-in-guesses-and-address-budgets)). What stays: four addresses
 that each keep up their 600 requests a minute spend the login budget all
 clients share (service denial, not account takeover), which the proxy or the
-network must limit. Requests that carry a bearer nobody issued are not
-counted by address: they draw on the windows all sessions share (512 control
-and 256 data requests a second, and a table of 1,024 bearers a second that
-refuses newcomers when full), so a flood of them can keep signed-in clients
-and gateways at `Busy` while sign-in goes on (recorded on 11.11.2026, not
-changed). One bearer alone no longer can: its own budget (128 control and
-64 data requests a second) is looked at before the shared windows are drawn
-on, so what it asks beyond that is refused and spends nothing of anyone
-else's (11.11.2026; before, the shared window was charged first, and one
-session asking 512 times a second kept every other at `Busy`). Four
-bearers that each keep up their own budget still spend a shared window.
+network must limit. Requests that carry a bearer nobody issued were counted
+as a session's until 11.11.2026, and one address sending them kept signed-in
+clients and gateways at `Busy`. They now have a second of their own (64 for
+all of them together, 600 a minute for one address) and spend nothing of
+what sessions share (512 control and 256 data requests a second, 128 and 64
+for one bearer, a table of 1,024 bearers a second), nor of the login budget
+([native login](native-login.md#a-bearer-nobody-issued)). A bearer is a
+session's for these counts once an answer has vouched for it; its own
+budget is looked at before the shared windows are drawn on, so what it asks
+beyond that spends nothing of anyone else's. What stays: four bearers that
+are vouched for and each keep up their own budget still spend a shared
+window, and one account can hold that many (its gateways' tokens); and
+seven addresses of made-up bearers fill the strangers' second, which a
+session meets with its first request after a restart or after half an hour
+without one. Each restart, so each deploy, forgets which bearers were
+vouched for.
 The table of unfinished sign-ins is larger than the shared budget
 can fill (4096 against 32 a second for 60 seconds), so it is never the cheaper
 target (31.10.2026; before, 128 entries filled at two requests a second).

@@ -256,6 +256,15 @@ fn signed_in(
     }
 }
 
+/// The session an answer issues, when it issues one: a sign-in's or a
+/// password change's on either listener, a pairing's.
+fn issued(reply: &BrowserReply) -> Option<&Token> {
+    match &reply.response {
+        Response::Session { token, .. } | Response::PairSession { token, .. } => Some(token),
+        _ => reply.session.as_ref(),
+    }
+}
+
 /// Shared service state. Pending challenges are bounded, expiring and single-use.
 pub struct IdentityService {
     store: AccountStore,
@@ -325,7 +334,7 @@ impl IdentityService {
             pending: Mutex::default(),
             resets: Mutex::default(),
             challenges: Mutex::default(),
-            limits: Mutex::default(),
+            limits: Mutex::new(limits::Limits::keeping(bridge.digest())),
             accounts: Mutex::default(),
             workers: Arc::new(Semaphore::new(4)),
             terms: terms::central()?,
@@ -585,14 +594,37 @@ impl IdentityService {
         bearer: Option<&Token>,
         place: Option<Place>,
     ) -> Result<Response, Error> {
+        let told = limits::told(&request, bearer);
         self.limits
             .lock()
             .map_err(|_| Error::Unavailable)?
             .request(&request, bearer, place, Instant::now())?;
-        Ok(self
+        let reply = self
             .dispatch(request, bearer, Surface::Native, Seen::default(), place)
-            .await?
-            .response)
+            .await;
+        self.answered(told.as_ref(), &reply);
+        Ok(reply?.response)
+    }
+
+    /// What an answer says about bearers, for the budgets alone
+    /// (`limits.rs`): whether the one its request was counted by is a
+    /// session's or a credential's, and the session it issues, if any.
+    /// It grants nothing and is never a refusal: the answer stands.
+    fn answered(&self, told: Option<&limits::Told>, reply: &Result<BrowserReply, Error>) {
+        let session = reply.as_ref().ok().and_then(issued);
+        if told.is_none() && session.is_none() {
+            return;
+        }
+        let Ok(mut limits) = self.limits.lock() else {
+            return;
+        };
+        let now = Instant::now();
+        if let Some(told) = told {
+            limits.answered(told, reply.as_ref().err(), now);
+        }
+        if let Some(session) = session {
+            limits.issued(session, now);
+        }
     }
 
     /// A start's password was proven: its guess comes back (`guesses.rs`).
@@ -660,6 +692,7 @@ impl IdentityService {
             return Err(Error::Rejected);
         }
         let session = if uses_session(&request) { cookie } else { None };
+        let told = limits::told(&request, session);
         self.limits
             .lock()
             .map_err(|_| Error::Unavailable)?
@@ -671,8 +704,11 @@ impl IdentityService {
         } else {
             session
         };
-        self.dispatch(request, context, Surface::Browser, seen, place)
-            .await
+        let reply = self
+            .dispatch(request, context, Surface::Browser, seen, place)
+            .await;
+        self.answered(told.as_ref(), &reply);
+        reply
     }
 }
 

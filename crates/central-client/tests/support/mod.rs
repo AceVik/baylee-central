@@ -21,6 +21,7 @@ pub(super) mod pairing;
 pub(super) mod password;
 pub(super) mod registration;
 pub(super) mod reset;
+pub(super) mod strangers;
 pub(super) mod terms;
 
 pub(super) fn config(user: &str, password: &str) -> DevConfig {

@@ -431,6 +431,76 @@ client cannot do either):
   and a change of address. On the website it could be a second `__Host-`
   cookie today, without any change to the client.
 
+## A bearer nobody issued
+
+*Added 11.11.2026.* A request that needs a session comes with a token: the
+native client's bearer, the website's cookie, a gateway's credential.
+Central looks the token up when it serves the request, not before, so the
+budgets cannot know whether a token is anyone's when they count its
+request. Until 11.11.2026 they counted every request with a token as a
+session's: against the windows all sessions share (512 control and 256 data
+requests a second) and a table of 1,024 bearers a second. One address
+sending made-up tokens spent all three, and every signed-in client and
+every gateway was answered `Busy` for as long as it went on. What follows
+changed no request and no response; every refusal is the `Busy` the client
+and the page already know.
+
+**Vouched for.** `central-identity` (`limits.rs`) keeps, in memory only,
+never written down or logged, the digests of the bearers an answer has
+vouched for:
+
+- a session that a sign-in, a password change or a pairing has just issued;
+- a token with which one of these requests was answered, each of which the
+  store refuses for a token that is no live session or credential:
+  `SessionStatus`, `RenewSession`, `AccountSummary`, `TermsStatus`,
+  `Social`, `Notifications`, the object and document requests,
+  `GatewayTicket`, `GatewaySession`, `GatewayProfile`, `RedeemGateway`,
+  `GatewayHeartbeat`, `GatewayPulse`, `GatewayStatus`, `CheckGatewayAdmin`
+  (a request that is not on this list vouches for nothing);
+- the official gateway's bridge credential, always.
+
+A bearer stays vouched for for 30 minutes after the last such answer (a
+session lives 30 minutes between two renewals, and the client renews every
+ten), at most 16,384 at once; one more takes the place of the one whose
+last such answer is the oldest. Four `Rejected` answers in a row take it
+back, and the session's end does at once: `Logout`, a password change's
+finish, a deletion's finish, and `PairCancel`, which is answered alike for
+any token. Being vouched for is a count's input and nothing else: what a
+token may do is the store's to decide at every request, as before.
+
+**Counted.**
+
+| A request that needs a session, with | draws on |
+| --- | --- |
+| a bearer that is vouched for | its own 128 control and 64 data requests a second, looked at first; then the 512 and 256 all such bearers share |
+| any other bearer | 64 a second for all of them together, 600 a minute for one place |
+| no bearer | the budget of those who are signing in, as before |
+
+So made-up tokens spend nothing of what sessions share, take no room among
+their bearers, and nothing of the sign-ins' budget. A session whose bearer
+is not vouched for is served like any other; its first answer vouches for
+it. That is every session's first request after Central restarts, and a
+session's first after half an hour without one.
+
+**What stays** (for the owner; the security record of 11.11.2026 has the
+options):
+
+- Bearers that are vouched for can still spend what they share: four that
+  each keep up their own budget fill a window (4 x 128, 4 x 64). An account
+  has one session of each kind, but up to eight gateways with eight tokens
+  each, every one a bearer of its own. So one account from one address can
+  still keep the other sessions at `Busy`. It needs an account now, where
+  it needed nothing.
+- Seven addresses that each keep up their 600 a minute fill the strangers'
+  second all the time; one alone fills it for nine or ten seconds of each
+  minute. A session that is not vouched for then waits: after a restart,
+  after half an hour without a request, or after four refusals in a row (a
+  gateway whose players present bad tickets while nobody else plays there).
+  Sessions that are vouched for go on, and so does sign-in.
+- A request without a proxy's address has no place and no share: it meets
+  the 64 a second alone, like the other budgets by address.
+- The list lives in memory; a restart forgets it.
+
 ## Implementation status
 
 This document specifies the integration in progress. It does not claim that
