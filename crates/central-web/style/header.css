@@ -38,6 +38,7 @@ body:has(dialog[open]) .top {
   align-items: center;
   justify-self: start;
   gap: 0.55rem;
+  min-width: 44px;
   min-height: 48px;
   color: var(--title);
   font: 600 1.48rem var(--serif);
