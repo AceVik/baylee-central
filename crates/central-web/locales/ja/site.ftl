@@ -789,6 +789,10 @@ live-players = { $n ->
     [one] { $n } 人のプレイヤー
    *[other] { $n } 人のプレイヤー
 }
+live-playing = { $n ->
+    [one] { $n } in a game
+   *[other] { $n } in a game
+}
 live-tables = { $n ->
     [one] 開いているテーブル { $n } 件
    *[other] 開いているテーブル { $n } 件

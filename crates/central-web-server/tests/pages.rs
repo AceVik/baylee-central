@@ -473,7 +473,13 @@ async fn forms_and_the_account_area_are_islands_and_not_indexed() {
 async fn the_figures_are_shown_only_while_a_source_reports_them() {
     let reported = app(true);
     let (_, _, home) = get(&reported, "/de/", &[]).await;
-    for number in ["1.234 Konten", "12 Spieler", "3 offene Tische", "4 Partien"] {
+    for number in [
+        "1.234 Konten",
+        "12 Spieler",
+        "8 im Spiel",
+        "3 offene Tische",
+        "4 Partien",
+    ] {
         assert_eq!(
             count(&home, number),
             2 - usize::from(number.contains("Konten")),
@@ -483,7 +489,7 @@ async fn the_figures_are_shown_only_while_a_source_reports_them() {
     let (_, _, gateways) = get(&reported, "/en/gateways", &[]).await;
     // the online gateway that reports, not the offline one beside it
     assert_eq!(count(&gateways, "class=\"gw-now\""), 1);
-    for number in ["12 players", "3 open tables", "4 games"] {
+    for number in ["12 players", "8 in a game", "3 open tables", "4 games"] {
         assert_eq!(count(&gateways, number), 1, "{number}");
     }
 
@@ -496,6 +502,8 @@ async fn the_figures_are_shown_only_while_a_source_reports_them() {
             " accounts<",
             "Spieler<",
             " players<",
+            " im Spiel<",
+            " in a game<",
             "0 Partien",
             "0 games",
         ] {

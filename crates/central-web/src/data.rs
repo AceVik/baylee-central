@@ -399,28 +399,32 @@ pub struct Gateway {
 pub struct Activity {
     /// Players connected.
     pub players: u32,
+    /// Of those, the players seated in a running game.
+    pub playing: u32,
     /// Tables open to join.
     pub tables: u32,
     /// Games running.
     pub games: u32,
 }
 
-/// The gateways' reports added up, for the start page's strip: `None`
-/// while no online gateway reports anything (a number nobody reported is
-/// not shown as zero).
+/// The gateways' reports added up, for the start page's strip: players
+/// connected, those of them in a game, open tables and games, in that
+/// order. `None` while no online gateway reports anything (a number nobody
+/// reported is not shown as zero).
 #[must_use]
-pub fn activity_of(gateways: &[Gateway]) -> Option<(u64, u64, u64)> {
+pub fn activity_of(gateways: &[Gateway]) -> Option<(u64, u64, u64, u64)> {
     let mut reported = gateways
         .iter()
         .filter(|gateway| gateway.online)
         .filter_map(|gateway| gateway.activity)
         .peekable();
     reported.peek()?;
-    Some(reported.fold((0, 0, 0), |sum, activity| {
+    Some(reported.fold((0, 0, 0, 0), |sum, activity| {
         (
             sum.0 + u64::from(activity.players),
-            sum.1 + u64::from(activity.tables),
-            sum.2 + u64::from(activity.games),
+            sum.1 + u64::from(activity.playing),
+            sum.2 + u64::from(activity.tables),
+            sum.3 + u64::from(activity.games),
         )
     }))
 }
