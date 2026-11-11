@@ -59,6 +59,8 @@ test("no page needs sideways scrolling from 320 to 2560 px, portrait or landscap
 });
 
 test("nor while signed in, where the bar names the account (German)", async ({ page }) => {
+  // every width loads four pages, two of them with their islands
+  test.slow();
   await page.addInitScript(() => localStorage.setItem("baylee-central-session", JSON.stringify({ expiresAt: 4_102_444_800 })));
   for (const width of WIDTHS) {
     await page.setViewportSize({ width, height: width < 1024 ? 812 : 900 });
@@ -181,12 +183,24 @@ test("whoever types her name sees a cat walk by, and a field keeps what is typed
 test("each card number explains itself by keyboard", async ({ page }) => {
   await page.goto("/en/#cards");
   const tip = page.locator("button[popovertarget=tip-generated]");
+  const note = page.locator("#tip-generated");
   await tip.focus();
+  // Where the browser has interest invokers, the keyboard's focus shows the
+  // explanation by itself after half a second, and Escape puts it away for
+  // as long as the focus stays. Pressing Enter before that moment would be a
+  // race with the focus (opened, closed, then opened by the focus after all),
+  // so the focus's own showing is waited for.
+  if (await page.evaluate(() => "interestForElement" in HTMLButtonElement.prototype)) {
+    await expect(note).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(note).toBeHidden();
+  }
+  // The button itself, in every browser.
   await page.keyboard.press("Enter");
-  await expect(page.locator("#tip-generated")).toBeVisible();
-  await expect(page.locator("#tip-generated")).toContainText("not yet tested by hand");
+  await expect(note).toBeVisible();
+  await expect(note).toContainText("not yet tested by hand");
   await page.keyboard.press("Escape");
-  await expect(page.locator("#tip-generated")).toBeHidden();
+  await expect(note).toBeHidden();
 });
 
 test("the colour switch cycles and is kept", async ({ page }) => {
