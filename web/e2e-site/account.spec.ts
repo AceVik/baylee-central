@@ -88,12 +88,12 @@ test("registration refuses a robot's haste and its hidden field, and says when i
   await page.getByLabel("Display name").fill("Erika");
   const fill = async () => {
     await page.getByLabel("Password", { exact: true }).fill("violet lantern harbour");
-    await page.getByLabel("Password again").fill("violet lantern harbour");
+    await page.getByLabel("Repeat password").fill("violet lantern harbour");
   };
   await fill();
   await page.getByLabel("I am 16 or older.").check();
   await page.getByRole("checkbox", { name: /I accept the terms of use/ }).check();
-  const refused = "The registration was not accepted. Please try once more.";
+  const refused = "The registration was not accepted. Try again.";
   // faster than a person: not sent
   await page.getByRole("button", { name: "Create account" }).click();
   await expect(page.getByRole("alert")).toHaveText(refused);
@@ -114,7 +114,7 @@ test("registration refuses a robot's haste and its hidden field, and says when i
   });
   await fill();
   await page.getByRole("button", { name: "Create account" }).click();
-  await expect(page.getByRole("alert")).toHaveText("Registration is paused right now. Please try again later.", { timeout: 15_000 });
+  await expect(page.getByRole("alert")).toHaveText("Registration is paused right now. Try again later.", { timeout: 15_000 });
   expect(asked).toEqual(["register_challenge"]);
 });
 
@@ -155,10 +155,10 @@ test("signed in, each action puts the focus where its result is", async ({ page 
   expect(ids.filter((value, index) => ids.indexOf(value) !== index)).toEqual([]);
   const second = page.locator("article").filter({ hasText: "Gateway 2" });
   await second.getByLabel("Token name").fill("qa");
-  await second.getByRole("button", { name: "Make a token" }).click();
+  await second.getByRole("button", { name: "Create token" }).click();
   // the new token takes the focus; kept, its gateway's card does
   await expect(page.getByRole("heading", { name: "Your new token" })).toBeFocused();
-  await page.getByRole("button", { name: "I have kept it" }).focus();
+  await page.getByRole("button", { name: "I have saved it" }).focus();
   await page.keyboard.press("Enter");
   await expect(page.getByRole("heading", { name: "Gateway 2" })).toBeFocused();
 
@@ -222,7 +222,7 @@ test("an administrator closes registration, signs in again when asked, and keeps
   });
   await page.goto("/en/account");
   await expect(page.locator("html")).toHaveAttribute("data-islands", "ready");
-  const status = page.getByText("Open: anyone may create an account, with the proof of work.");
+  const status = page.getByText("Open: anyone may create an account after solving the proof of work.");
   await expect(status).toBeVisible();
   await page.getByRole("button", { name: "Close registration" }).click();
   await expect(page.getByText("Closed: nobody can create an account until you open it again.")).toBeVisible();

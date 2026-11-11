@@ -63,7 +63,7 @@ test("an owner registers a gateway, mints a token, and approves it as an adminis
   await page.getByLabel("Username").fill(NAME);
   await page.getByLabel("Display name").fill(DISPLAY);
   await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
-  await page.getByLabel("Password again").fill(PASSWORD);
+  await page.getByLabel("Repeat password").fill(PASSWORD);
   await page.getByLabel("I am at least 16 years old.").check();
   await page.getByRole("checkbox", { name: /I accept the terms of use/ }).check();
   await page.getByRole("button", { name: "Create account" }).click();
@@ -95,7 +95,7 @@ test("an owner registers a gateway, mints a token, and approves it as an adminis
   await expect(page.getByRole("heading", { name: "QA table" })).toBeVisible();
   await expect(page.getByText("Awaiting approval").first()).toBeVisible();
 
-  await page.getByRole("button", { name: "Make a token" }).click();
+  await page.getByRole("button", { name: "Create token" }).click();
   const dialog = page.getByRole("dialog");
   await dialog.getByLabel("Name").fill("QA machine");
   await dialog.getByRole("button", { name: "Make the token" }).click();

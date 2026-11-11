@@ -52,7 +52,7 @@ test("register, keep the code, sign out, sign in again", async ({ page, context 
   await page.getByLabel("Username").fill(name.toUpperCase());
   await page.getByLabel("Display name").fill(DISPLAY);
   await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
-  await page.getByLabel("Password again").fill(PASSWORD);
+  await page.getByLabel("Repeat password").fill(PASSWORD);
   await page.getByLabel("I am at least 16 years old.").check();
   await page.getByRole("checkbox", { name: /I accept the terms of use/ }).check();
   const started = Date.now();
@@ -112,7 +112,7 @@ test("register, keep the code, sign out, sign in again", async ({ page, context 
     await page.getByLabel("Username").fill(name);
     await page.getByLabel("Display name").fill(DISPLAY);
     await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
-    await page.getByLabel("Password again").fill(PASSWORD);
+    await page.getByLabel("Repeat password").fill(PASSWORD);
     await page.getByLabel("I am at least 16 years old.").check();
     await page.getByRole("checkbox", { name: /I accept the terms of use/ }).check();
     await page.getByRole("button", { name: "Create account" }).click();

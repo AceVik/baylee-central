@@ -59,6 +59,8 @@ for (const lang of LANGS) {
 }
 
 test("no page needs sideways scrolling from 320 to 2560 px, portrait or landscape", async ({ page }) => {
+  // every size loads every page, and a page now fades into the next
+  test.slow();
   for (const width of WIDTHS) {
     for (const height of [width < 1024 ? 812 : 900, 360]) {
       await page.setViewportSize({ width, height });
