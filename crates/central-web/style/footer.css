@@ -128,10 +128,16 @@
   list-style: none;
 }
 
+.foot-list li {
+  max-inline-size: 100%;
+}
+
 .foot-list a {
   display: inline-flex;
   align-items: center;
+  max-inline-size: 100%;
   min-height: var(--target);
+  overflow-wrap: anywhere;
   padding: 0 0.55rem;
   border-radius: var(--radius-sm);
   color: var(--ink-soft);
@@ -234,9 +240,10 @@
     grid-column: 1 / -1;
   }
 
+  /* as many columns as the longest word of a language leaves room for */
   .foot-map > :last-child .foot-list {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 11.5rem), 1fr));
     column-gap: var(--space-5);
   }
 }

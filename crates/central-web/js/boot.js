@@ -4,8 +4,8 @@
 // colour switch, names the account link while a session is remembered
 // ("baylee-central-session", which holds only when it ends), opens
 // dialogs in browsers without invoker commands, closes the dropdowns as a
-// menu closes, copies a gateway's address, and pauses the hero's light
-// off screen. Nothing here is
+// menu closes, copies a gateway's address, pauses the hero's light off
+// screen, and marks what is on screen as the page opens. Nothing here is
 // required: without it the device's scheme decides and every page still
 // works.
 (() => {
@@ -131,6 +131,13 @@
         if (command === "show-modal" && !dialog.open) dialog.showModal();
         else if (command === "close") dialog.close();
       });
+    }
+    // What stands on screen as the page opens is there at once: rising and
+    // brightening on the way into view (home.css) is for what comes after.
+    // A card that started half in view would otherwise wait half faded.
+    const fold = window.innerHeight + 80;
+    for (const part of document.querySelectorAll(".reveal, .band > .wrap > .eyebrow, .band > .wrap > h2, .share-bar")) {
+      if (part.getBoundingClientRect().top < fold) part.dataset.seen = "";
     }
   };
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", ready, { once: true });

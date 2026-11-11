@@ -672,6 +672,13 @@
       animation-timeline: view();
       animation-range: entry 20% cover 45%;
     }
+
+    /* what was on screen as the page opened (boot.js) */
+    .reveal[data-seen],
+    .band > .wrap > :is(.eyebrow, h2)[data-seen],
+    .share-bar[data-seen] {
+      animation: none;
+    }
   }
 }
 
