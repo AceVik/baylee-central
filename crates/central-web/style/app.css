@@ -260,6 +260,20 @@
   text-align: center;
 }
 
+/* the lines under a form's button, where there are two: close together */
+.hints {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.hints > .hint {
+  margin: 0;
+}
+
+.auth-card .hints {
+  text-align: center;
+}
+
 /* what the card shows arrives after the card */
 @media (prefers-reduced-motion: no-preference) {
   .auth-dialog[open] .auth-mark {
@@ -332,6 +346,29 @@
 
 .check label {
   min-block-size: var(--target);
+}
+
+/* A choice among a few: its question in the legend, one line per answer. */
+.choice {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.choice legend {
+  margin-block-end: var(--space-2);
+  padding: 0;
+  color: var(--ink);
+  font: 700 1rem var(--sans);
+}
+
+/* A part of a form that only one of the answers shows. */
+.form-part {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.form-part > .notice {
+  margin-block-start: 0;
 }
 
 .form select {

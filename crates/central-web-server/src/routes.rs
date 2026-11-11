@@ -321,7 +321,7 @@ fn page(app: &App, headers: &HeaderMap, page: Page, lang: Lang) -> Response {
 }
 
 /// Old and unprefixed paths that live on under a language.
-const MOVED: [&str; 12] = [
+const MOVED: [&str; 13] = [
     "download",
     "gateways",
     "contact",
@@ -332,6 +332,7 @@ const MOVED: [&str; 12] = [
     "fan-content",
     "register",
     "signin",
+    "reset",
     "account",
     "admin",
 ];

@@ -414,7 +414,9 @@ fn session_row(lang: Lang, info: &SessionInfo) -> impl IntoView + use<> {
     }
 }
 
-fn security(lang: Lang, worker: String) -> AnyView {
+/// The sessions, and the password's change (`password::change_form`).
+/// `signed_out` reloads the area when the change finds no session.
+fn security(lang: Lang, worker: String, username: String, signed_out: Callback<()>) -> AnyView {
     let sessions = RwSignal::new(None::<Result<Vec<SessionInfo>, Problem>>);
     let notice = RwSignal::new(None::<&'static str>);
     let load = move || {
@@ -449,10 +451,15 @@ fn security(lang: Lang, worker: String) -> AnyView {
             }
         });
     };
-    let leave = move |_| {
+    let leave = {
         let worker = worker.clone();
-        leptos::task::spawn_local(async move { sign_out(&worker, lang).await });
+        move |_| {
+            let worker = worker.clone();
+            leptos::task::spawn_local(async move { sign_out(&worker, lang).await });
+        }
     };
+    // a change ends every other session: the list above is another then
+    let changed = Callback::new(move |()| load());
     view! {
         <section aria-labelledby="sessions-title">
             <h2 id="sessions-title">{words::security_sessions(lang)}</h2>
@@ -473,7 +480,8 @@ fn security(lang: Lang, worker: String) -> AnyView {
         </section>
         <section class="card" aria-labelledby="password-title">
             <h2 id="password-title">{words::security_password_title(lang)}</h2>
-            <p>{words::security_password_later(lang)}</p>
+            <p>{words::security_password_lead(lang)}</p>
+            {super::password::change_form(lang, worker, username, changed, signed_out)}
         </section>
     }
     .into_any()
@@ -1138,7 +1146,9 @@ pub fn Account(lang: Lang, section: Section, worker: String) -> impl IntoView {
             match section {
             Section::Home => home(lang, &summary, &worker),
             Section::Profile => profile(lang, &worker, &summary, reload, focus_next),
-            Section::Security => security(lang, worker.clone()),
+            Section::Security => {
+                security(lang, worker.clone(), summary.username.clone(), reload)
+            }
             Section::Privacy => privacy(lang, worker.clone()),
             Section::Gateways => gateways(lang, worker.clone()),
             Section::Notifications => notifications(lang, summary.admin),

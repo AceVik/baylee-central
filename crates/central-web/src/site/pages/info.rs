@@ -239,10 +239,7 @@ fn questions(lang: Lang) -> Vec<(&'static str, Vec<Piece>)> {
         (words::faq_account_q(lang), text(words::faq_account_a(lang))),
         (words::faq_data_q(lang), words::faq_data_a(lang)),
         (words::faq_security_q(lang), words::faq_security_a(lang)),
-        (
-            words::faq_password_q(lang),
-            text(words::faq_password_a(lang)),
-        ),
+        (words::faq_password_q(lang), words::faq_password_a(lang)),
         (words::faq_gateway_q(lang), words::faq_gateway_a(lang)),
         (words::faq_systems_q(lang), text(words::faq_systems_a(lang))),
         (words::faq_open_q(lang), text(words::faq_open_a(lang))),
@@ -260,6 +257,7 @@ pub fn faq(cx: &Context<'_>) -> Built {
         "security" => Some(Page::Security.path(lang)),
         "gateways" => Some(Page::Gateways.path(lang)),
         "contact" => Some(Page::Contact.path(lang)),
+        "reset" => Some(Page::Reset.path(lang)),
         _ => None,
     };
     let all = questions(lang);

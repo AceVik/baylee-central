@@ -182,7 +182,7 @@ faq-account-a = 单人游玩不需要：套牌构筑器和与内置 AI 的对局
 faq-data-q = 我的数据会怎样处理？
 faq-data-a = 尽可能少；<privacy>隐私声明</privacy>里写得很准确。你的密码不会离开你的浏览器；你的私人数据和聊天消息在到达我们之前，就已在你的设备上加密。
 faq-password-q = 我忘记了密码，怎么办？
-faq-password-a = 你需要用管理员给你的重置码来设置新密码；目前还不能在本网站上使用重置码兑换，之后会支持。只有在你拥有创建账号时收到的恢复码，或者仍在 Baylee 客户端中保持登录时，你的加密数据才能保留。否则数据就丢失了。
+faq-password-a = You set a new password with a reset code that an administrator gives you, <reset>on this page</reset>. Your encrypted data survives only if you have the recovery code you received when you created your account. Without it you start with an empty vault, and that data is lost.
 faq-gateway-q = 什么是 Gateway？
 faq-gateway-a = 在线牌桌所在的服务器。任何人都可以运行一个；<gateways>目录</gateways>列出了 Central 所知道的那些。
 faq-systems-q = 它能在哪些系统上运行？
@@ -451,6 +451,7 @@ signin-working = 正在保护你的密码 …… 这需要片刻，并且只在�
 signin-wrong = 该登录名和密码不匹配。请检查两者后再试。
 signin-not-moved = 此账号尚未迁移到 Baylee Central。请先用 Baylee 客户端登录一次；它会迁移你的账号。
 signin-no-account = 还没有账号？<register>创建一个</register>。
+signin-forgot = Forgot your password? <reset>Set a new one with a reset code</reset>.
 register-have-account = 已经有账号了？<signin>登录</signin>。
 dialog-close = 关闭
 signin-noscript = 登录需要 JavaScript：你的密码在你的浏览器中处理，绝不会发送给我们。
@@ -491,6 +492,49 @@ code-kept = 我已保存恢复码
 code-not-kept = 请先保存恢复码，再确认。
 code-continue = 继续
 code-later = 暂不
+code-copy = Copy
+code-copied = Copied.
+code-copy-failed = Copying did not work here. Select the code and copy it by hand.
+
+## Setting a new password with a reset code
+
+reset-title = Set a new password
+reset-lead = For when you forgot your password: an administrator gives you a reset code, and with it you set a new one here.
+reset-noscript = Setting a new password needs JavaScript: your password and your recovery code are processed in your browser and never sent to us.
+reset-code = Reset code
+reset-code-hint = From an administrator. It starts with RESET and works once, within 24 hours of being made.
+reset-data = Your encrypted data
+reset-keep = I have my recovery code. My data stays.
+reset-new = I do not have it. Start with an empty vault.
+reset-recovery = Recovery code
+reset-recovery-hint = The code you saved when you created your account. It stays in your browser and is never sent to us.
+reset-warning = With an empty vault your encrypted data is lost for good: the settings saved in your account, your deck backups and your chat history. Nobody can bring it back, and neither can we. Your account, your display name and your contacts stay. You get a new recovery code.
+reset-warning-confirm = I understand that this data is lost for good.
+reset-submit = Set new password
+reset-missing = Enter your sign-in name, the reset code and a new password.
+reset-recovery-missing = Enter your recovery code, or choose the empty vault.
+reset-error-code = That is not a reset code. It starts with RESET, followed by eight groups of four characters.
+reset-error-recovery = This recovery code does not open your account's data. Check it and try again. Nothing was changed, and your reset code still works.
+reset-error-confirm = Confirm first that you know what is lost.
+reset-refused = This sign-in name and reset code do not go together, or the code has expired or was used already. Check both. If nothing helps, ask for a new code.
+reset-done-title = Your new password is set
+reset-done-kept = Your data and your recovery code stay as they were. You are signed out everywhere; sign in with your new password.
+reset-done-new = You start with an empty vault and are signed out everywhere. Below is your new recovery code; the old one no longer works.
+reset-unsure-title = No answer came back
+reset-unsure = The connection broke before Baylee Central answered, so we cannot tell whether your new password was set. Try to sign in with it. If that fails, nothing was changed: your reset code still works, enter it here again.
+reset-unsure-code = If your new password works, this is your new recovery code and the old one no longer works; it cannot be shown again, so save it now. If your new password does not work, this code is worth nothing.
+reset-to-signin = Sign in
+
+## Changing the password
+
+password-new = New password
+password-new-repeat = Repeat new password
+password-current = Current password
+password-change-submit = Change password
+password-missing = Enter your current password and a new one.
+password-error-current = The current password is not right. Check it and try again.
+password-changed = Your password is changed. You stay signed in here and are signed out everywhere else, the Baylee client included; sign in there with the new password.
+password-unsure = No answer came back, so we cannot tell whether your password was changed. When you sign in next, try the new password first, then the old one.
 
 ## Central's terms
 
@@ -551,7 +595,7 @@ security-end-client = 让客户端退出登录
 security-client-ended = 客户端已退出登录。
 security-sign-out = 在此退出登录
 security-password-title = 密码
-security-password-later = 在网站上更改密码的功能将会推出；在此之前，请在 Baylee 客户端中更改。
+security-password-lead = Your encrypted data and your recovery code stay as they are. Changing the password signs you out everywhere except here.
 
 privacy-export-title = 导出你的数据
 privacy-export-lead = Baylee Central 所掌握的关于你账号的信息，以 JSON 文件形式提供：其基本数据、会话、已接受的条款、你的 Gateways，以及点名你账号的审计条目。你的加密内容只能由你的 Baylee 客户端解密并导出。导出需要 30 分钟以内的登录。

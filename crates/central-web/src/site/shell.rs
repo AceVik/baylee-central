@@ -305,7 +305,7 @@ pub fn document(page: Page, cx: &Context<'_>, meta: &Meta, body: AnyView) -> imp
 fn has_auth_dialogs(page: Page) -> bool {
     !matches!(
         page,
-        Page::SignIn | Page::Register | Page::Account(_) | Page::Offline
+        Page::SignIn | Page::Register | Page::Reset | Page::Account(_) | Page::Offline
     )
 }
 
@@ -570,7 +570,10 @@ fn languages(page: Page, lang: Lang) -> impl IntoView + use<> {
 
 fn bar(page: Page, cx: &Context<'_>) -> impl IntoView + use<> {
     let lang = cx.lang;
-    let signing = matches!(page, Page::SignIn | Page::Register | Page::Account(_));
+    let signing = matches!(
+        page,
+        Page::SignIn | Page::Register | Page::Reset | Page::Account(_)
+    );
     view! {
         <header class="top">
             <div class="top-inner">
