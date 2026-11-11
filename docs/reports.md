@@ -203,7 +203,9 @@ proxy as every answer is (`encode zstd gzip`).
   a time (a semaphore), so at most 128 MiB of parts is in memory.
 - Budgets: per gateway 120 reports an hour, besides the native listener's
   global budget every request spends; `429` past them. Nothing of a
-  body is logged; the log names the report id and the gateway.
+  body is logged, and nothing else of a report: Central writes no line
+  when one is filed. (This said until 11.11.2026 that the log names the
+  report id and the gateway; no such line exists.)
 - The crash signature is made at intake as the feedback service makes it,
   with SHA-256 (no MD5 crate), its first 16 bytes in hex.
 
