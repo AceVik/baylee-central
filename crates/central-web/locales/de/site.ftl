@@ -108,17 +108,12 @@ open-central = Baylee Central auf GitHub
 
 ## Download
 
-dl-eyebrow = Download
-dl-title = Baylee herunterladen
-dl-lead = Baylee läuft unter Windows, macOS und Linux. Jede Datei kommt direkt aus dem Release auf GitHub.
-dl-release = { $tag }, erschienen am { $date }
 dl-prerelease = Beta
 dl-for = Download für { $system }
 dl-size = { $size } MB
 dl-checksum = SHA-256
 dl-signature = Signatur
 dl-notes = Release Notes
-dl-all = Alle Dateien dieses Release
 dl-unknown = Wir konnten dein System an diesem Browser nicht erkennen; wähle deins unten aus.
 dl-mobile = Für Handys und Tablets gibt es noch keine Version. Baylee läuft auf einem Computer.
 dl-mac-unsure = Dieser Browser verrät nicht, ob dein Mac einen Apple-Chip oder einen von Intel hat. Die Datei oben ist für Apple-Chips (M1 und neuer); ein Intel-Mac findet seine Datei unten.
@@ -868,3 +863,16 @@ reports-usage = Beim Offline-Spielen sagt der Client einmal pro Minute, dass ein
 reports-discord = Lust zu reden, Gegner zu finden oder als Erstes von neuen Builds zu erfahren? Komm in die <discord>Baylee-Community auf Discord</discord>.
 reports-issues = Regelfragen, falsches Kartenverhalten, Ideen: <issues>eröffne ein Issue auf GitHub</issues>. Eine Karte, die falsch verrechnet wurde, ist der nützlichste Bericht, den wir bekommen können, denn jede Karte hat einen Test, und deine wird einer.
 reports-privacy = <docs>docs/privacy.md</docs> listet alles, was Client, Gateway und Feedback-Dienst speichern. Diese Seite speichert nichts über dich: keine Cookies, keine Analyse, keine Schriften von fremden Servern. <notice>Die Datenschutzerklärung</notice> nennt jeden anderen Host, mit dem sie spricht, und wann.
+
+# The download page, as the old site set it (owner, 11.11.2026)
+dlPage-eyebrow = Hol es dir
+dlPage-filesEyebrow = Jede Datei
+dlPage-filesTitle = Alle Systeme
+install-eyebrow = Installieren
+install-releases = Jedes Release auf GitHub
+release-notes = Release-Notizen und Prüfsummen
+release-all = Alle Releases
+
+# The download page's head, as the old site wrote it
+dlPage-title = Download
+dlPage-lead = Jeder Download geht direkt zur Datei auf GitHub, nichts dazwischen. Wo ein Release Installer hat, sind sie der einfache Weg; die Archive enthalten dasselbe Spiel zum Entpacken an beliebiger Stelle. Ein installiertes Baylee aktualisiert sich selbst aus den signierten Archiven, wo es seinen eigenen Ordner beschreiben darf. Jedes Paket enthält neben dem Spiel die Seat-Bridge für Sprachmodelle.

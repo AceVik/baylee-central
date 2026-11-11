@@ -9,8 +9,7 @@ use serde_json::{Value, json};
 use super::Built;
 use crate::data::{Kind, Platform, Release, ReleaseFile};
 use crate::format;
-use crate::rich::{icon, plain, rich};
-use crate::site::icons;
+use crate::rich::{plain, rich};
 use crate::site::shell::{Meta, REPOSITORY};
 use crate::site::{Context, Page};
 use crate::solid;
@@ -245,24 +244,26 @@ pub fn software(cx: &Context<'_>) -> Value {
     app
 }
 
+/// One file of a platform's card: its name, what it is and how large, and
+/// its checksum and signature, as the old site listed them.
 fn file_row(lang: Lang, file: &ReleaseFile) -> impl IntoView + use<> {
     let checksum = file.checksum.clone().map(|url| {
-        view! { <a href=url rel="noopener noreferrer">{words::dl_checksum(lang)}</a> }
+        view! { <a href=url rel="noopener noreferrer" translate="no">".sha256"</a> }
     });
     let signature = file.signature.clone().map(|url| {
-        view! { <a href=url rel="noopener noreferrer">{words::dl_signature(lang)}</a> }
+        view! { <a href=url rel="noopener noreferrer" translate="no">".sig"</a> }
     });
+    let between = (checksum.is_some() && signature.is_some()).then_some(" · ");
+    let aux = (file.checksum.is_some() || file.signature.is_some())
+        .then(|| view! { <span class="aux">{checksum}{between}{signature}</span> });
     let help = (file.kind == Kind::Fallback)
-        .then(|| view! { <p class="hint">{words::dl_fallback_help(lang)}</p> });
+        .then(|| view! { <span class="help">{words::dl_fallback_help(lang)}</span> });
     view! {
-        <li class="file">
-            <a class="file-link" href=file.url.clone() rel="noopener noreferrer">
-                {icon(if file.kind == Kind::Installer { icons::HARD_DRIVE_DOWNLOAD } else { icons::FILE_ARCHIVE })}
-                <span class="file-kind">{kind_name(lang, file.kind)}</span>
-                <code class="file-name" translate="no">{file.name.clone()}</code>
-            </a>
-            <span class="file-meta num">{words::dl_size(lang, &format::megabytes(lang, file.size))}</span>
-            <span class="file-extra">{checksum}{signature}</span>
+        <li>
+            <a class="file" href=file.url.clone() rel="noopener noreferrer" translate="no">{file.name.clone()}</a>
+            <span class="kind">{kind_name(lang, file.kind)}</span>
+            <span class="size num">{words::dl_size(lang, &format::megabytes(lang, file.size))}</span>
+            {aux}
             {help}
         </li>
     }
@@ -271,88 +272,80 @@ fn file_row(lang: Lang, file: &ReleaseFile) -> impl IntoView + use<> {
 /// What a first start needs.
 fn install(lang: Lang) -> impl IntoView + use<> {
     view! {
-        <section class="wrap prose-block" aria-labelledby="install-title">
-            <h2 id="install-title">{words::install_title(lang)}</h2>
-            <div class="cards-grid">
-                <article class="card">
-                    <h3>{words::install_first_title(lang)}</h3>
-                    <p>{plain(words::install_first(lang))}</p>
-                </article>
-                <article class="card">
-                    <h3>{words::install_check_title(lang)}</h3>
-                    <p>{plain(words::install_check(lang))}</p>
-                </article>
-                <article class="card">
-                    <h3>{words::install_needs_title(lang)}</h3>
-                    <ul>
-                        <li>{plain(words::install_windows(lang))}</li>
-                        <li>{plain(words::install_mac(lang))}</li>
-                        <li>{plain(words::install_linux(lang))}</li>
-                        <li>{plain(words::install_cpu(lang))}</li>
-                    </ul>
-                </article>
+        <section class="band alt" id="install" aria-labelledby="install-title">
+            <div class="wrap">
+                <p class="eyebrow">{words::install_eyebrow(lang)}</p>
+                <h2 id="install-title">{words::install_title(lang)}</h2>
+                <div class="two-col">
+                    <div class="reveal">
+                        <h3>{words::install_first_title(lang)}</h3>
+                        <p>{plain(words::install_first(lang))}</p>
+                        <h3>{words::install_check_title(lang)}</h3>
+                        <p>{plain(words::install_check(lang))}</p>
+                    </div>
+                    <div class="reveal">
+                        <h3>{words::install_needs_title(lang)}</h3>
+                        <ul class="plain">
+                            <li>{plain(words::install_windows(lang))}</li>
+                            <li>{plain(words::install_mac(lang))}</li>
+                            <li>{plain(words::install_linux(lang))}</li>
+                            <li>{plain(words::install_cpu(lang))}</li>
+                        </ul>
+                        <p><a class="more-link" href=format!("{REPOSITORY}/releases") rel="noopener noreferrer">{words::install_releases(lang)}</a></p>
+                    </div>
+                </div>
             </div>
         </section>
     }
 }
 
-/// The release's files, or why there are none.
-fn release_view(cx: &Context<'_>) -> AnyView {
+/// Every file of the release, a card per platform, the visitor's marked.
+fn platforms(cx: &Context<'_>, release: &Release) -> impl IntoView + use<> {
     let lang = cx.lang;
-    match &cx.data.release {
-        Some(release) => {
-            let missing = cx
-                .machine
-                .platform
-                .filter(|platform| release.best(*platform).is_none())
-                .map(|_| view! { <p class="notice">{rich(words::dl_missing(lang), releases_link)}</p> });
-            let platforms = Platform::ALL
-                .into_iter()
-                .map(|platform| {
-                    let (name, sub) = platform_name(lang, platform);
-                    let yours = cx.machine.platform == Some(platform);
-                    let files = release.for_platform(platform);
-                    let list = if files.is_empty() {
-                        view! { <p class="hint">{words::plat_none(lang)}</p> }.into_any()
-                    } else {
-                        let rows = files
-                            .into_iter()
-                            .map(|file| file_row(lang, file))
-                            .collect_view();
-                        view! { <ul class="files">{rows}</ul> }.into_any()
-                    };
-                    let mark = yours.then(
-                        || view! { <span class="pill accent">{words::dl_yours(lang)}</span> },
-                    );
-                    view! {
-                        <article class="card platform" id=platform.slug() class:yours=yours>
-                            <h3>{name}{mark}</h3>
-                            <p class="meta">{sub}</p>
-                            {list}
-                        </article>
-                    }
-                })
-                .collect_view();
-            let prerelease = release
-                .prerelease
-                .then(|| view! { <span class="pill">{words::dl_prerelease(lang)}</span> });
+    let cards = Platform::ALL
+        .into_iter()
+        .map(|platform| {
+            let (name, sub) = platform_name(lang, platform);
+            let yours = cx.machine.platform == Some(platform);
+            let files = release.for_platform(platform);
+            let list = if files.is_empty() {
+                view! { <p class="plat-none">{words::plat_none(lang)}</p> }.into_any()
+            } else {
+                let rows = files
+                    .into_iter()
+                    .map(|file| file_row(lang, file))
+                    .collect_view();
+                view! { <ul class="plat-files">{rows}</ul> }.into_any()
+            };
+            let mark =
+                yours.then(|| view! { <span class="mine-tag">{words::dl_yours(lang)}</span> });
             view! {
-                <div class="release-head">
-                    <p class="meta">
-                        <code translate="no">{words::dl_release(lang, &release.tag, &format::date(lang, &release.date))}</code>
-                        {prerelease}
-                    </p>
-                    {download_block(cx, true)}
-                    {missing}
-                </div>
-                <h2 class="visually-hidden">{words::dl_all(lang)}</h2>
-                <div class="platforms">{platforms}</div>
+                <li class="plat glass reveal" id=platform.slug() class:mine=yours>
+                    <h3 class="plat-name">{name}{mark}</h3>
+                    <p class="plat-sub">{sub}</p>
+                    {list}
+                </li>
             }
-            .into_any()
-        }
-        None => {
-            view! { <p class="notice">{rich(words::dl_none(lang), releases_link)}</p> }.into_any()
-        }
+        })
+        .collect_view();
+    let prerelease = release
+        .prerelease
+        .then(|| view! { <span class="tag">{words::dl_prerelease(lang)}</span> });
+    view! {
+        <section class="band" id="platforms" aria-labelledby="platforms-title">
+            <div class="wrap">
+                <p class="eyebrow">{words::dl_page_files_eyebrow(lang)}</p>
+                <h2 id="platforms-title">{words::dl_page_files_title(lang)}</h2>
+                <p class="release-head">
+                    <span class="ver" translate="no">{release.tag.clone()}</span>
+                    {prerelease}
+                    <span>{format::date(lang, &release.date)}</span>
+                    <a href=release.page.clone() rel="noopener noreferrer">{words::release_notes(lang)}</a>
+                    <a href=format!("{REPOSITORY}/releases") rel="noopener noreferrer">{words::release_all(lang)}</a>
+                </p>
+                <ul class="platforms stagger">{cards}</ul>
+            </div>
+        </section>
     }
 }
 
@@ -366,14 +359,31 @@ pub fn page(cx: &Context<'_>) -> Built {
     meta.trail
         .push((words::nav_download(lang).to_owned(), Page::Download));
     meta.data.push(software(cx));
-    let body = release_view(cx);
+    let (first, all) = match &cx.data.release {
+        Some(release) => {
+            let missing = cx
+                .machine
+                .platform
+                .filter(|platform| release.best(*platform).is_none())
+                .map(|_| view! { <p class="notice">{rich(words::dl_missing(lang), releases_link)}</p> });
+            (
+                view! { <div class="page-dl">{download_block(cx, true)}</div>{missing} }.into_any(),
+                Some(platforms(cx, release)),
+            )
+        }
+        None => (
+            view! { <p class="notice">{rich(words::dl_none(lang), releases_link)}</p> }.into_any(),
+            None,
+        ),
+    };
     let body = view! {
-        <section class="page-head wrap">
-            <p class="eyebrow">{words::dl_eyebrow(lang)}</p>
-            <h1>{words::dl_title(lang)}</h1>
-            <p class="lead">{words::dl_lead(lang)}</p>
+        <section class="page-head wrap" aria-labelledby="download-title">
+            <p class="eyebrow">{words::dl_page_eyebrow(lang)}</p>
+            <h1 id="download-title">{words::dl_page_title(lang)}</h1>
+            <p class="lead">{words::dl_page_lead(lang)}</p>
+            {first}
         </section>
-        <section class="wrap" id="platforms" aria-label=words::dl_all(lang)>{body}</section>
+        {all}
         {install(lang)}
     }
     .into_any();

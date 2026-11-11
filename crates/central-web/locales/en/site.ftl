@@ -108,17 +108,12 @@ open-central = Baylee Central on GitHub
 
 ## Download
 
-dl-eyebrow = Download
-dl-title = Download Baylee
-dl-lead = Baylee runs on Windows, macOS and Linux. Each file comes straight from the release on GitHub.
-dl-release = { $tag }, released { $date }
 dl-prerelease = Beta
 dl-for = Download for { $system }
 dl-size = { $size } MB
 dl-checksum = SHA-256
 dl-signature = Signature
 dl-notes = Release notes
-dl-all = All files of this release
 dl-unknown = We could not tell your system from this browser; pick yours below.
 dl-mobile = There is no version for phones and tablets yet. Baylee runs on a computer.
 dl-mac-unsure = This browser does not say whether your Mac has an Apple chip or an Intel one. The file above is for Apple chips (M1 and later); an Intel Mac takes its file below.
@@ -867,3 +862,16 @@ reports-usage = While you play offline, the client says once a minute that a gam
 reports-discord = Want to talk, find opponents or hear first about new builds? Join the <discord>Baylee community on Discord</discord>.
 reports-issues = Rules questions, wrong card behaviour, ideas: <issues>open an issue on GitHub</issues>. A card that resolved wrongly is the most useful report we can get, because every card has a test and yours becomes one.
 reports-privacy = <docs>docs/privacy.md</docs> lists everything the client, the gateway and the feedback service keep. This site keeps nothing about you: no cookies, no analytics, no fonts from anyone else's server. <notice>The privacy notice</notice> names every other host it talks to, and when.
+
+# The download page, as the old site set it (owner, 11.11.2026)
+dlPage-eyebrow = Get it
+dlPage-filesEyebrow = Every file
+dlPage-filesTitle = All systems
+install-eyebrow = Installing
+install-releases = Every release on GitHub
+release-notes = Release notes and checksums
+release-all = All releases
+
+# The download page's head, as the old site wrote it
+dlPage-title = Download
+dlPage-lead = Every download goes straight to the file on GitHub, nothing in between. Where a release has installers, they are the easy way; the archives hold the same game to unpack anywhere. An installed Baylee updates itself from the signed archives wherever it may write its own folder. Every package carries the seat bridge for language models beside the game.
