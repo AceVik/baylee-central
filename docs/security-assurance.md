@@ -2683,9 +2683,10 @@ code before anything changed, and all seven held.
   are open (`Config` default; the deployed launcher never raised it). The
   browser listener read a request's body, for up to the request's five
   seconds, before it looked at a header, its client address or a budget.
-  Caddy streams a body to its upstream as it arrives, so about seven
-  body-less `POST /api/v1` a second (a `Content-Length`, then nothing)
-  held every connection: nobody could sign in or chat. The native
+  Caddy passes a body on as it arrives unless told to buffer it (assumed
+  from its documentation, not tried here), so about seven body-less
+  `POST /api/v1` a second (a `Content-Length`, then nothing) held every
+  connection: nobody could sign in or chat. The native
   listener checks `Host`, `Origin` and Fetch Metadata before the body and
   an upload's credential before its bytes, but it has no client address
   (forwarded headers confer nothing there), and the same stall holds its
@@ -2764,10 +2765,16 @@ pages, the same data keeps them; with the snapshot check taken out that
 test fails. Each encoding case, `brotli` and `br;q=0` among them; one tag
 per encoding, a tag confirming only its own form; 304 with the security
 headers for pages and the server's documents; another tag, language or
-machine gets the page; a 404 or a redirect is never a 304. `cargo fmt`,
-clippy with `-D warnings` and the tests of `central-http`,
-`central-web-server`, `central-policy` and `central-service` pass; none
-of them needs PostgreSQL. The browser suites were not run.
+machine gets the page; a 404 or a redirect is never a 304. A refusal
+sent before the body is read (429, 403) still arrives whole over a real
+socket when the body came with the headers, also one of 60 kB past
+hyper's 16 KiB read buffer (macOS loopback). `cargo fmt`, clippy with
+`-D warnings` and the tests of `central-http`, `central-web-server`,
+`central-policy` and `central-service` pass, and `cargo xtask policy`.
+Not run: `cargo xtask gate`, `postgres` (among it `central-client`'s
+test of this listener against a real Central, which sends one request
+at a time with small bodies), `smoke`, `secrets`, `cargo audit`,
+`cargo deny`, and the browser suites.
 
 Recorded, not changed, for the owner:
 - 32 addresses (IPv6 /64s are cheap) stalling four bodies each still fill
@@ -2784,10 +2791,19 @@ Recorded, not changed, for the owner:
   exited. The fixed log line counts panics. The listener's own critical
   sections (budgets, places) cannot panic; the identity service's were
   not all reviewed for this.
-- Every local and end-to-end run, and the website's own directory fetch,
-  arrive as 127.0.0.1 and share its four places. A page sends one request
-  at a time and the chat strictly in turn, but the browser suites were
-  not run against this change.
+- Four places per address is a constant to tune. The islands ask one
+  thing when they start (the account summary) and the chat works
+  strictly in turn, so a tab rarely has more than one request in flight;
+  but an address many people share (a NAT), with a slow service holding
+  requests longer, can meet the limit, and a 429 when the account page
+  starts shows the busy message until it is reloaded. Every local and
+  end-to-end run, and the website's own directory fetch, arrive as
+  127.0.0.1 and share its four places; the browser suites were not run.
+- A refusal now goes out with the body unread. Hyper reads what has
+  arrived when it drops the body; a larger body still on its way when
+  the connection closes could reach the proxy as a reset, and the
+  visitor would see a 502 in place of the 4xx. The page's bodies are
+  small, and the test above passes, but Caddy was not tried.
 - Caddy's `encode` may rewrite or weaken the tag of compressed HTML; that
   was not checked here. The server confirms only the tag of the bytes it
   would send now, so a rewritten tag can cost a 304, never serve a stale
