@@ -6,6 +6,8 @@ enforced by the gate and dependency CI job since 28 October 2026. The historical
 
 Status: owner accepted on 2026-10-19 subject to review and tests. Used only by the isolated central-crypto spike; see ../crypto-protocol.md for evidence and gaps. This acceptance is separate from the HTTP graph.
 
+Owner's decision of 2026-11-11: Argon2id is also registration's proof of work, in SHA-256's place, through the pinned `argon2` 0.6.0 and its one feature that the crate already had (its release since [beta 9c](../dependency-proposal/beta9c.md)). No package, feature or graph edge is new. The question as it was put, the answer, the parameters and the evidence are in [the crypto protocol](../crypto-protocol.md) §"Registration's proof of work"; the source and graph review is in [the advisory record](bigint-advisory.md).
+
 Direct candidates: opaque-ke 4.0.1 (RFC 9807 OPAQUE), sha2 0.10.9, rand 0.8.8 (opaque-ke compatibility), chacha20poly1305 0.11.0 with zeroization, hkdf 0.12.4, zeroize 1.9.1, secrecy 0.10.3 and getrandom 0.4.3. OPAQUE brings Argon2 0.5.3. Cargo.lock resolves 61 external packages.
 
 The older SHA2/HKDF/Rand/Argon2 major versions match the maintained opaque-ke API; they must not be replaced independently without compatibility and security review. All application-facing calls remain safe Rust. Unsafe, assembly and CPU-specific operations inside crypto/system dependencies are expected and disclosed below. Do not replace them with home-grown primitives.

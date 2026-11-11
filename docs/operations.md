@@ -316,11 +316,37 @@ minutes old and is an audit event (`registration.closed`,
 `registration.opened`). While closed, the page says registration is paused
 and Central refuses every `Register`.
 
-**Deploying it.** Central and the server-rendered site switch together:
-from this release, `Register` carries the proof of work, which the previous
-site's register page cannot make. Migrate and grant (`ops/grants.sql` now
-grants the switch's row instead of the keys) before the new service starts,
-as for every migration.
+**Deploying it: the site first, then Central.** The register page of this
+release asks for the proof that costs memory (`RegisterChallengeFor`,
+answered `RegisterWork`); at a Central that does not know it, it asks the
+older way and solves the older proof. So a Central with the SHA-256 proof
+(the builds of 11.11.2026 before this one) goes on registering people
+while the new site is already out, and there is no gap. The other order
+has one: a Central of this release answers the older request with
+"registration is paused" and takes no SHA-256 solution, so a register page
+from before cannot register until it is replaced, and **a tab of it left
+open cannot register until it is reloaded** (nothing else on that page is
+affected; the message it shows is `register-closed`). Three things to know:
+
+- `ops/deploy-hook` switches Central before it swaps the website, and the
+  website it swaps is the static build of `web/`, whose register page
+  still sends a key that no Central since migration 000023 takes. The
+  server-rendered site is put out by hand (§"The server-rendered website")
+  and belongs before the hook's run or the manual switch of Central.
+- Coming from a Central that still has the keys, neither order registers
+  anybody in between: that Central knows neither challenge request, and
+  this one takes no key. Keep that switch short.
+- Migrate and grant (`ops/grants.sql` now grants the switch's row instead
+  of the keys) before the new service starts, as for every migration. The
+  proof itself needs no migration, grant or setting.
+
+**What it costs the service.** Checking a registration's proof takes one of
+the service's four workers, the ones sign-in uses, and 16 MiB while it
+runs: 64 MiB for all four at the most, a few milliseconds of one core for a
+wrong answer and eight times that for a right one
+([registration abuse](registration-abuse.md) §"A proof that costs memory"
+has the measurements and what one address can make Central compute). With
+no worker free the page is told to wait and sends its solution again.
 
 ## Administration
 
