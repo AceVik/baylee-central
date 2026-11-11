@@ -168,17 +168,17 @@ fn hero(cx: &Context<'_>) -> impl IntoView + use<> {
                 <p class="hero-note">{offline}</p>
                 <p class="hero-signup" data-signed-out="">{account}</p>
                 <div class="hero-actions">
-                    <a class="button discord" href=DISCORD rel="noopener noreferrer">
+                    <a class="button discord" href=DISCORD target="_blank" rel="noopener noreferrer">
                         <span class="beacon" aria-hidden="true"></span>
                         {solid::icon_as(solid::DISCORD, "wave")}
                         <span>{words::hero_discord(lang)}</span>
                     </a>
-                    <a class="button whatsapp" href=WHATSAPP rel="noopener noreferrer">
+                    <a class="button whatsapp" href=WHATSAPP target="_blank" rel="noopener noreferrer">
                         <span class="beacon" aria-hidden="true"></span>
                         {solid::icon(solid::WHATSAPP)}
                         <span>{words::hero_whatsapp(lang)}</span>
                     </a>
-                    <a class="button github" href=REPOSITORY rel="noopener noreferrer">
+                    <a class="button github" href=REPOSITORY target="_blank" rel="noopener noreferrer">
                         {solid::icon(solid::GITHUB)}
                         <span>{words::hero_github(lang)}</span>
                     </a>
@@ -196,12 +196,12 @@ fn strip(cx: &Context<'_>) -> impl IntoView + use<> {
     let lang = cx.lang;
     let build = match cx.data.release.as_ref() {
         Some(release) => view! {
-            <a href=release.page.clone() rel="noopener noreferrer"><code translate="no">{release.tag.clone()}</code></a>
+            <a href=release.page.clone() target="_blank" rel="noopener noreferrer"><code translate="no">{release.tag.clone()}</code></a>
             <span class="small">"· "{format::date(lang, &release.date)}</span>
         }
         .into_any(),
         None => view! {
-            <a href=format!("{REPOSITORY}/releases") rel="noopener noreferrer">{words::strip_releases(lang)}</a>
+            <a href=format!("{REPOSITORY}/releases") target="_blank" rel="noopener noreferrer">{words::strip_releases(lang)}</a>
         }
         .into_any(),
     };
@@ -213,22 +213,22 @@ fn strip(cx: &Context<'_>) -> impl IntoView + use<> {
             } else {
                 ("dot bad", words::ci_failing(lang))
             };
-            view! { <a href=actions rel="noopener noreferrer"><span class=class aria-hidden="true"></span>{word}</a> }
+            view! { <a href=actions target="_blank" rel="noopener noreferrer"><span class=class aria-hidden="true"></span>{word}</a> }
                 .into_any()
         }
         None => {
-            view! { <a href=actions rel="noopener noreferrer">{words::strip_on_github(lang)}</a> }
+            view! { <a href=actions target="_blank" rel="noopener noreferrer">{words::strip_on_github(lang)}</a> }
                 .into_any()
         }
     };
     let commit = match cx.data.repo.commit.clone() {
         Some((id, date)) => view! {
-            <a href=format!("{REPOSITORY}/commit/{id}") rel="noopener noreferrer"><code translate="no">{id.clone()}</code></a>
+            <a href=format!("{REPOSITORY}/commit/{id}") target="_blank" rel="noopener noreferrer"><code translate="no">{id.clone()}</code></a>
             <span class="small">"· "{format::date(lang, &date)}</span>
         }
         .into_any(),
         None => view! {
-            <a href=format!("{REPOSITORY}/commits/main") rel="noopener noreferrer">{words::strip_on_github(lang)}</a>
+            <a href=format!("{REPOSITORY}/commits/main") target="_blank" rel="noopener noreferrer">{words::strip_on_github(lang)}</a>
         }
         .into_any(),
     };
@@ -540,7 +540,7 @@ fn ai(lang: Lang) -> impl IntoView + use<> {
                     <p>{words::ai_training(lang)}</p>
                 </div>
                 <div class="ai-training-actions">
-                    <a class="button button-ghost" href=format!("{REPOSITORY}{}", words::link_readme_model(lang)) rel="noopener noreferrer">
+                    <a class="button button-ghost" href=format!("{REPOSITORY}{}", words::link_readme_model(lang)) target="_blank" rel="noopener noreferrer">
                         {solid::icon(solid::EXTERNAL)}<span>{words::ai_setup(lang)}</span>
                     </a>
                     <a class="button button-ghost" href=format!("{}#host", Page::Gateways.path(lang))>
@@ -602,7 +602,7 @@ pub fn gateway_card(lang: Lang, gateway: &Gateway, h2: bool) -> impl IntoView + 
                     data-copy=gateway.origin.clone() data-copied-label=words::gws_copied_short(lang) data-copied-said=words::gws_copied(lang) data-copy-failed=words::gws_copy_failed(lang)>
                     {solid::icon_as(solid::COPY, "copy-idle")}{solid::icon_as(solid::CHECK, "copy-done")}<span>{words::gws_copy(lang)}</span>
                 </button>
-                <a class="button button-ghost" href=website rel="noopener noreferrer nofollow">
+                <a class="button button-ghost" href=website target="_blank" rel="noopener noreferrer nofollow">
                     {solid::icon(solid::EXTERNAL)}<span>{words::gws_website(lang)}</span>
                 </a>
             </div>
@@ -662,7 +662,12 @@ pub fn contact_columns(lang: Lang, reports: String) -> impl IntoView + use<> {
     let channel = |href: String, glyph: &'static str, name: &'static str, what: &'static str| {
         view! {
             <li>
-                <a class="glass" href=href.clone() rel=href.starts_with("https://").then_some("noopener noreferrer")>
+                <a
+                    class="glass"
+                    href=href.clone()
+                    target=href.starts_with("https://").then_some("_blank")
+                    rel=href.starts_with("https://").then_some("noopener noreferrer")
+                >
                     {solid::icon(glyph)}
                     <span>{name}<small>{what}</small></span>
                 </a>
@@ -719,7 +724,7 @@ fn source(cx: &Context<'_>) -> impl IntoView + use<> {
             } else {
                 ("dot bad", words::ci_failing(lang))
             };
-            view! { <a href=actions rel="noopener noreferrer"><span class=class aria-hidden="true"></span>{word}</a> }.into_any()
+            view! { <a href=actions target="_blank" rel="noopener noreferrer"><span class=class aria-hidden="true"></span>{word}</a> }.into_any()
         }
         None => "–".into_any(),
     };
@@ -730,7 +735,7 @@ fn source(cx: &Context<'_>) -> impl IntoView + use<> {
                 .clone()
                 .map(|subject| view! { " · " <bdi class="small">{subject}</bdi> });
             view! {
-                <a href=format!("{REPOSITORY}/commit/{sha}") rel="noopener noreferrer" translate="no">{sha.clone()}</a>
+                <a href=format!("{REPOSITORY}/commit/{sha}") target="_blank" rel="noopener noreferrer" translate="no">{sha.clone()}</a>
                 " · "{format::date(lang, date)}
                 {subject}
             }
@@ -740,14 +745,14 @@ fn source(cx: &Context<'_>) -> impl IntoView + use<> {
     };
     let count = |value: Option<u64>, href: String| {
         match value {
-        Some(value) => view! { <a href=href rel="noopener noreferrer" class="num">{words::number(lang, value)}</a> }.into_any(),
+        Some(value) => view! { <a href=href target="_blank" rel="noopener noreferrer" class="num">{words::number(lang, value)}</a> }.into_any(),
         None => "–".into_any(),
     }
     };
     let stars = count(repo.stars, format!("{REPOSITORY}/stargazers"));
     let issues = count(repo.issues, format!("{REPOSITORY}/issues"));
     let link = |href: String, words: AnyView| {
-        view! { <a class="button button-ghost" href=href rel="noopener noreferrer">{words}</a> }
+        view! { <a class="button button-ghost" href=href target="_blank" rel="noopener noreferrer">{words}</a> }
     };
     view! {
         <section class="band" id="source" aria-labelledby="source-title">
