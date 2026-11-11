@@ -2,6 +2,8 @@
 //! project's state, the card numbers, the table, the gateways, the open
 //! source promise, and Baylee's album behind the big logo.
 
+use std::fmt::Write as _;
+
 use leptos::prelude::*;
 use leptos::tachys::html::attribute::custom::custom_attribute;
 use serde_json::json;
@@ -13,7 +15,7 @@ use crate::format;
 use crate::islands::ContactForm;
 use crate::rich::{icon, paragraphs, plain, rich};
 use crate::site::icons;
-use crate::site::shell::{CENTRAL_REPOSITORY, DISCORD, Meta, REPOSITORY, WHATSAPP};
+use crate::site::shell::{CENTRAL_REPOSITORY, DISCORD, Meta, REPOSITORY, WHATSAPP, policy_url};
 use crate::site::{Context, Page};
 use crate::solid;
 use crate::words::{self, Lang};
@@ -93,8 +95,8 @@ pub fn page(cx: &Context<'_>) -> Built {
     let body = view! {
         {strip(cx)}
         {hero(cx)}
-        {screens(cx)}
         {gateways(lang, cx.data.gateways.as_deref())}
+        {screens(cx)}
         {about(lang)}
         {cards(lang, cx.data.cards.as_ref())}
         {contact(lang)}
@@ -108,15 +110,9 @@ pub fn page(cx: &Context<'_>) -> Built {
 fn hero(cx: &Context<'_>) -> impl IntoView + use<> {
     let lang = cx.lang;
     let assets = cx.assets;
-    let host = format!("{}#host", Page::Gateways.path(lang));
-    let offline = rich(words::hero_offline(lang), move |tag| {
-        (tag == "host").then(|| host.clone())
-    });
-    let code = lang.code();
-    let account = rich(words::hero_account(lang), move |tag| match tag {
-        "register" => Some(format!("/{code}/register")),
-        "signin" => Some(format!("/{code}/signin")),
-        _ => None,
+    let policy = policy_url(lang);
+    let fan = rich(words::fan_content(lang), move |tag| {
+        (tag == "policy").then(|| policy.to_owned())
     });
     let world = |kind: &str| {
         format!(
@@ -154,7 +150,7 @@ fn hero(cx: &Context<'_>) -> impl IntoView + use<> {
                         class="hero-logo"
                         src=assets.url("img/logo-960.webp")
                         srcset=format!("{} 480w, {} 960w", assets.url("img/logo-480.webp"), assets.url("img/logo-960.webp"))
-                        sizes="(min-width: 30rem) 22rem, 78vw"
+                        sizes="(min-width: 30rem) 19.5rem, 72vw"
                         width="960"
                         height="400"
                         alt=""
@@ -162,11 +158,15 @@ fn hero(cx: &Context<'_>) -> impl IntoView + use<> {
                     />
                     <span class="visually-hidden">{words::hero_memorial(lang)}</span>
                 </button>
+                <ul class="hero-badges" aria-label=words::hero_badges(lang)>
+                    <li class="hero-badge"><span class="dot ok live" aria-hidden="true"></span>{words::hero_badge_beta(lang)}</li>
+                    <li class="hero-badge">{icon(icons::HEART)}{words::hero_badge_free(lang)}</li>
+                    <li class="hero-badge">{solid::icon(solid::GITHUB)}{words::hero_badge_open(lang)}</li>
+                    <li class="hero-badge">{icon(icons::SPARKLES)}{words::hero_badge_fan(lang)}</li>
+                </ul>
                 <h1 id="hero-title">{plain(words::hero_title(lang))}</h1>
                 <p class="lead">{words::hero_lead(lang)}</p>
                 {download_block(cx, false)}
-                <p class="hero-note">{offline}</p>
-                <p class="hero-signup" data-signed-out="">{account}</p>
                 <div class="hero-actions">
                     <a class="button discord" href=DISCORD target="_blank" rel="noopener noreferrer">
                         <span class="beacon" aria-hidden="true"></span>
@@ -183,21 +183,36 @@ fn hero(cx: &Context<'_>) -> impl IntoView + use<> {
                         <span>{words::hero_github(lang)}</span>
                     </a>
                 </div>
-                <p class="kicker">{words::hero_kicker(lang)}</p>
             </div>
+            // Wizards' Fan Content notice, in the hero where a visitor
+            // sees it (owner, 11.11.2026); the footer carries it on every page
+            <p class="hero-fan">{solid::icon(solid::SHIELD)}<span>{fan}</span></p>
         </section>
     }
 }
 
-/// The strip under the bar: the latest build, CI on main and the last
-/// commit, and the gateways online and not. Only what a source said is
-/// shown; while a source has not answered, the strip links to it instead.
+/// The strip under the bar: the project's state on the left (the latest
+/// build, CI on main, the last commit), its numbers on the right (playable
+/// cards, the repository's stars, the gateways online and not). Only what a
+/// source said is shown: a number nobody reported is left out, and while
+/// GitHub or the directory has not answered, the strip links there instead.
 fn strip(cx: &Context<'_>) -> impl IntoView + use<> {
     let lang = cx.lang;
+    // `wide`: a stat a phone has no room for. `quiet`: its glyph and its
+    // value say what it is; the label is for a screen reader and the
+    // pointer's tooltip.
+    let stat = |glyph: AnyView, label: &'static str, value: AnyView, wide: bool, quiet: bool| {
+        view! {
+            <div class="strip-stat" class:strip-opt=wide title=quiet.then_some(label)>
+                <dt>{glyph}<span class:visually-hidden=quiet>{label}</span></dt>
+                <dd>{value}</dd>
+            </div>
+        }
+    };
     let build = match cx.data.release.as_ref() {
         Some(release) => view! {
             <a href=release.page.clone() target="_blank" rel="noopener noreferrer"><code translate="no">{release.tag.clone()}</code></a>
-            <span class="small">"· "{format::date(lang, &release.date)}</span>
+            <span class="small when">{format::date(lang, &release.date)}</span>
         }
         .into_any(),
         None => view! {
@@ -224,7 +239,7 @@ fn strip(cx: &Context<'_>) -> impl IntoView + use<> {
     let commit = match cx.data.repo.commit.clone() {
         Some((id, date)) => view! {
             <a href=format!("{REPOSITORY}/commit/{id}") target="_blank" rel="noopener noreferrer"><code translate="no">{id.clone()}</code></a>
-            <span class="small">"· "{format::date(lang, &date)}</span>
+            <span class="small when">{format::date(lang, &date)}</span>
         }
         .into_any(),
         None => view! {
@@ -232,20 +247,46 @@ fn strip(cx: &Context<'_>) -> impl IntoView + use<> {
         }
         .into_any(),
     };
+    let cards = cx.data.cards.as_ref().map(|status| {
+        let s = status.stats;
+        let playable = s
+            .implemented
+            .saturating_add(s.generated)
+            .saturating_add(s.partial);
+        stat(
+            icon(icons::LAYERS).into_any(),
+            words::strip_cards(lang),
+            view! {
+                <a href="#cards"><span class="num">{words::number(lang, playable)}</span><span class="small">{words::strip_cards_unit(lang)}</span></a>
+            }
+            .into_any(),
+            false,
+            true,
+        )
+    });
+    let stars = cx.data.repo.stars.map(|stars| {
+        stat(
+            solid::icon(solid::STAR).into_any(),
+            words::strip_stars(lang),
+            view! {
+                <a href=REPOSITORY target="_blank" rel="noopener noreferrer"><span class="num">{words::number(lang, stars)}</span></a>
+            }
+            .into_any(),
+            true,
+            true,
+        )
+    });
     let gateways = match cx.data.gateways.as_deref() {
         Some(all) => {
             let online = all.iter().filter(|g| g.online).count();
             let offline = all.len() - online;
             let count = |n: usize| words::number(lang, u64::try_from(n).unwrap_or(u64::MAX));
-            let dot = if online > 0 { "dot ok" } else { "dot off" };
+            let dot = if online > 0 { "dot ok live" } else { "dot off" };
             view! {
-                <a href=Page::Gateways.path(lang)>
+                <a href="#gateways">
                     <span class="stat-pill num">
-                        <span class=dot aria-hidden="true"></span>
-                        {count(online)}" "{words::strip_online(lang)}
-                        <span class="small">"·"</span>
-                        <span class="dot off" aria-hidden="true"></span>
-                        {count(offline)}" "{words::strip_offline(lang)}
+                        <span class="stat-part"><span class=dot aria-hidden="true"></span>{count(online)}" "{words::strip_online(lang)}</span>
+                        <span class="stat-part"><span class="dot off" aria-hidden="true"></span>{count(offline)}" "{words::strip_offline(lang)}</span>
                     </span>
                 </a>
             }
@@ -258,12 +299,14 @@ fn strip(cx: &Context<'_>) -> impl IntoView + use<> {
         <section class="strip" aria-label=words::status_label(lang)>
             <div class="strip-inner">
                 <dl class="strip-group">
-                    <div class="strip-stat"><dt>{words::strip_build(lang)}</dt><dd>{build}</dd></div>
-                    <div class="strip-stat"><dt>{words::strip_ci(lang)}</dt><dd>{ci}</dd></div>
-                    <div class="strip-stat strip-commit"><dt>{words::strip_commit(lang)}</dt><dd>{commit}</dd></div>
+                    {stat(icon(icons::PACKAGE).into_any(), words::strip_build(lang), build, false, false)}
+                    {stat(icon(icons::CIRCLE_CHECK).into_any(), words::strip_ci(lang), ci, false, false)}
+                    {stat(icon(icons::HISTORY).into_any(), words::strip_commit(lang), commit, true, false)}
                 </dl>
                 <dl class="strip-group strip-right">
-                    <div class="strip-stat"><dt>{words::strip_gateways(lang)}</dt><dd>{gateways}</dd></div>
+                    {cards}
+                    {stars}
+                    {stat(icon(icons::SERVER).into_any(), words::strip_gateways(lang), gateways, false, true)}
                 </dl>
             </div>
         </section>
@@ -558,6 +601,26 @@ fn ai(lang: Lang) -> impl IntoView + use<> {
 /// only where the browser can copy.
 /// `h2` names the card with a second-level heading (the directory, right
 /// under the page's title), else a third (the start page's section).
+/// `baylee://gateway/add?origin=` and the origin, percent-encoded: the link
+/// Baylee's client reads since 0.1.1-beta.9b (Baylee `docs/client.md`, "The
+/// links"; it shows the origin and asks before it adds anything). Only for
+/// an `https` origin without a path, which is all the client takes.
+fn client_link(origin: &str) -> Option<String> {
+    let host = origin.strip_prefix("https://")?;
+    if host.is_empty() || host.contains(['/', '?', '#', '@']) {
+        return None;
+    }
+    let mut link = String::from("baylee://gateway/add?origin=");
+    for byte in origin.bytes() {
+        if byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'.' | b'_' | b'~') {
+            link.push(char::from(byte));
+        } else {
+            let _ = write!(link, "%{byte:02X}");
+        }
+    }
+    Some(link)
+}
+
 pub fn gateway_card(lang: Lang, gateway: &Gateway, h2: bool) -> impl IntoView + use<> {
     let state = if gateway.online {
         view! { <p class="gw-state pill ok"><span class="dot ok live" aria-hidden="true"></span>{words::gws_online(lang)}</p> }.into_any()
@@ -573,6 +636,17 @@ pub fn gateway_card(lang: Lang, gateway: &Gateway, h2: bool) -> impl IntoView + 
         "gw card card-link reveal"
     };
     let website = gateway.website.clone();
+    // an offline gateway cannot be joined: its link would open a client
+    // that then finds nobody there
+    let open = client_link(&gateway.origin)
+        .filter(|_| gateway.online)
+        .map(|link| {
+            view! {
+                <a class="button gw-join" href=link>
+                    {solid::icon(solid::EXTERNAL)}<span>{words::gws_open_client(lang)}</span>
+                </a>
+            }
+        });
     let find = format!("{} {}", gateway.name, gateway.origin).to_lowercase();
     let name = gateway.name.clone();
     let name = if h2 {
@@ -598,6 +672,7 @@ pub fn gateway_card(lang: Lang, gateway: &Gateway, h2: bool) -> impl IntoView + 
                 </div>
             </dl>
             <div class="gw-actions">
+                {open}
                 <button type="button" class="button button-ghost gw-open" hidden=true
                     data-copy=gateway.origin.clone() data-copied-label=words::gws_copied_short(lang) data-copied-said=words::gws_copied(lang) data-copy-failed=words::gws_copy_failed(lang)>
                     {solid::icon_as(solid::COPY, "copy-idle")}{solid::icon_as(solid::CHECK, "copy-done")}<span>{words::gws_copy(lang)}</span>
@@ -611,6 +686,16 @@ pub fn gateway_card(lang: Lang, gateway: &Gateway, h2: bool) -> impl IntoView + 
 }
 
 fn gateways(lang: Lang, all: Option<&[Gateway]>) -> impl IntoView + use<> {
+    let host = format!("{}#host", Page::Gateways.path(lang));
+    let offline = rich(words::hero_offline(lang), move |tag| {
+        (tag == "host").then(|| host.clone())
+    });
+    let code = lang.code();
+    let account = rich(words::hero_account(lang), move |tag| match tag {
+        "register" => Some(format!("/{code}/register")),
+        "signin" => Some(format!("/{code}/signin")),
+        _ => None,
+    });
     let listed = all.unwrap_or_default();
     let online = listed.iter().filter(|gateway| gateway.online).count();
     let count = match all {
@@ -636,8 +721,15 @@ fn gateways(lang: Lang, all: Option<&[Gateway]>) -> impl IntoView + use<> {
             <div class="wrap">
                 {section_head(words::gw_eyebrow(lang), words::gw_title(lang), "gw-title")}
                 <p class="lead">{words::home_gw_lead(lang)}</p>
+                // what playing online takes, before the gateways themselves:
+                // what works without an account, and how to get one
+                <div class="play-notes">
+                    <p class="play-note glass">{icon(icons::WIFI_OFF)}<span>{offline}</span></p>
+                    <p class="play-note glass" data-signed-out="">{icon(icons::USER_PLUS)}<span>{account}</span></p>
+                </div>
                 <p class="small hgw-count">{count}</p>
                 {grid}
+                <p class="small hgw-help">{words::gws_open_client_help(lang)}</p>
                 <p class="hgw-foot">
                     <a class="button" href=Page::Gateways.path(lang)>{words::beta_open(lang)}</a>
                     <a class="button button-ghost" href=format!("{}#host", Page::Gateways.path(lang))>{words::beta_own(lang)}</a>

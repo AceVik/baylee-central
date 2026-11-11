@@ -29,7 +29,7 @@ foot-discord = Discord community
 foot-central-source = This site's source
 foot-dedication = For Baylee. Forever in the sunlight.
 fan-content = Baylee is unofficial Fan Content permitted under the <policy>Fan Content Policy</policy>. Not approved/endorsed by Wizards. Portions of the materials used are property of Wizards of the Coast. ©Wizards of the Coast LLC.
-foot-colophon = Fonts: Faustina and Alegreya Sans, SIL Open Font License 1.1, served from this site. The painting and the logo are our own. <notices>Notices</notices>
+foot-colophon = Fonts: Literata and Inter, SIL Open Font License 1.1, served from this site. The painting and the logo are our own. <notices>Notices</notices>
 
 ## Titles and descriptions
 
@@ -58,7 +58,6 @@ breadcrumb-home = Home
 
 ## Home
 
-hero-kicker = Open beta · Free · Open source · Unofficial fan content
 hero-title = Build your decks. Gather your friends. <glow>Just play.</glow>
 hero-lead = A comprehensive deck builder, matches for up to eight players in duels, free-for-all or teams, and a rules engine that checks every step, so every turn stays fair without anyone having to look anything up.
 hero-offline = Solo matches and the deck builder work offline, without an account. Online tables live on gateways; <host>you can run your own</host>.
@@ -754,13 +753,25 @@ foot-central = Baylee Central (source-available)
 foot-summary = Free, open-source tabletop card game built in Rust & Bevy — with a deterministic rules engine, full offline mode, House AI, LLM bridge, and community gateways.
 strip-build = Build
 strip-ci = CI
-strip-commit = Last commit
+strip-commit = Commit
 strip-gateways = Gateways
 strip-online = online
 strip-offline = offline
 strip-releases = see releases
 strip-on-github = see on GitHub
 strip-directory = the directory
+strip-cards = Playable cards
+strip-cards-unit = cards
+strip-stars = Stars on GitHub
+hero-badges = At a glance
+hero-badge-beta = Open beta
+hero-badge-free = Free
+hero-badge-open = Open source
+hero-badge-fan = Unofficial fan content
+gws-open-client = Open in Baylee
+gws-open-client-help = “Open in Baylee” starts the installed client (0.1.1-beta.9b or newer). It shows the address and asks before it adds the gateway.
+dl-menu-title = All systems
+dl-old-cpu = older processors (no AVX2)
 ci-passing = passing
 ci-failing = failing
 dl-button = Download Baylee

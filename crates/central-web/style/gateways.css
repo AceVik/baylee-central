@@ -289,3 +289,64 @@ pre.code code {
     max-width: 28rem;
   }
 }
+
+/* "Open in Baylee": the link the client reads; the card's first action */
+.gw-join {
+  gap: 0.45rem;
+}
+
+.hgw-help {
+  max-inline-size: var(--prose);
+  margin: var(--space-4) auto 0;
+  color: var(--ink-faint);
+  text-align: center;
+}
+
+/* what playing online takes, before the gateways: two notes side by side */
+.play-notes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+  gap: var(--space-3);
+  max-inline-size: 52rem;
+  margin: 0 auto var(--space-4);
+}
+
+.play-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+  margin: 0;
+  padding: 0.8rem 1rem;
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  font: 0.9rem / 1.45 var(--sans);
+}
+
+.play-note[hidden] {
+  display: none;
+}
+
+.play-note > .icon {
+  flex: none;
+  width: 1.15rem;
+  height: 1.15rem;
+  margin-block-start: 0.15rem;
+  color: var(--gold);
+}
+
+/* with the client's link a card has three actions: the link takes the
+   first row, the other two share the second */
+.gw-actions:has(.gw-join) {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.gw-actions:has(.gw-join) .gw-join {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 420px) {
+  .gw-actions:has(.gw-join) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

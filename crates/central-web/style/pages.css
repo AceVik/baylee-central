@@ -207,13 +207,13 @@
 }
 
 .prose {
-  padding-block-end: clamp(2.4rem, 4.5vw, 3.6rem);
+  padding-block-end: var(--space-section);
   font-family: var(--font-prose);
   line-height: var(--leading-prose);
 }
 
 .faq {
-  padding-block-end: clamp(2.4rem, 4.5vw, 3.6rem);
+  padding-block-end: var(--space-section);
 }
 
 .prose h2 {

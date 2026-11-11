@@ -14,7 +14,7 @@
 }
 
 .auth-head {
-  padding-block-end: clamp(2.4rem, 4.5vw, 3.6rem);
+  padding-block-end: var(--space-section);
 }
 
 .auth-form {

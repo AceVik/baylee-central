@@ -6,9 +6,10 @@ as `/notices.txt` (written by `cargo xtask site`), which the footer links.
 
 | What | Where | Licence | Notes |
 | --- | --- | --- | --- |
-| Alegreya Sans (400, 500, 700) | `assets/fonts/AlegreyaSans-*.woff2` | SIL OFL 1.1, `assets/fonts/OFL-AlegreyaSans.txt` | © 2013 The Alegreya Sans Project Authors; the game's files, subset on 10.11.2026 to Latin-1 and the punctuation used (no Reserved Font Name) |
-| Faustina (variable 300–800, roman and italic) | `assets/fonts/Faustina*.woff2` | SIL OFL 1.1, `assets/fonts/OFL-Faustina.txt` | © 2016 The Faustina Project Authors; subset as above |
+| Inter (variable 100–900) | `assets/fonts/Inter-*.woff2` | SIL OFL 1.1, `assets/fonts/OFL-Inter.txt` | © 2016 The Inter Project Authors; the Latin, Latin Extended, Cyrillic and Cyrillic Extended subsets of `@fontsource-variable/inter` 5.3.0, unchanged |
+| Literata (variable 200–900, roman and italic) | `assets/fonts/Literata-*.woff2` | SIL OFL 1.1, `assets/fonts/OFL-Literata.txt` | © 2017 The Literata Project Authors; the same subsets of `@fontsource-variable/literata` 5.3.0, unchanged |
 | Lucide icons (`lucide-static` 1.60.0) | `src/site/icons.rs`, drawn inline | ISC, `assets/LICENSE-lucide.txt` (parts derived from Feather, MIT) | © Lucide Icons and Contributors |
+| The marks of Windows, Apple and Linux (Font Awesome Free 7.3.1, brands) | `src/solid.rs`, drawn inline | CC BY 4.0, `assets/LICENSE-fontawesome.txt` | © Fonticons, Inc.; the paths unchanged |
 | The world painting, the Baylee logo, the cloud portrait, the icon | `assets/img/world-*`, `logo-*`, `cloud-*`, `icon*` | the project's own | owner-approved; provenance in `web/assets-sunlight.md` (format and size conversions only) |
 | Baylee's photographs | `assets/img/memorial/` | the owner's | family-approved, exact copies of the existing derivatives |
 | The sharing image | `assets/img/og.jpg` | the project's own | a crop of the world painting |
