@@ -875,8 +875,12 @@ pub fn Register(lang: Lang, worker: String, pow: String) -> impl IntoView {
 fn solving_view(lang: Lang, solving: RwSignal<Solving>) -> impl IntoView {
     let progress = move || match solving.get() {
         Solving::Shown(percent) => Some(view! {
-            <p>{words::register_solving(lang, &percent.to_string())}</p>
-            <progress max="100" value=percent.to_string()></progress>
+            <p id="register-solving">{words::register_solving(lang, &percent.to_string())}</p>
+            <progress
+                max="100"
+                value=percent.to_string()
+                aria-labelledby="register-solving"
+            ></progress>
         }),
         Solving::Idle | Solving::Quiet(_) => None,
     };

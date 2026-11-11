@@ -1223,6 +1223,13 @@ mod tests {
         ] {
             assert!(crate::decode::<Request>(refused).is_err());
         }
+        // Why the report has a request of its own: serde takes a stray
+        // field on a variant without fields, so a Central from before
+        // would have ignored a `signals` on the old request silently.
+        assert!(matches!(
+            crate::decode::<Request>(br#"{"operation":"register_challenge","signals":1}"#),
+            Ok(Request::RegisterChallenge)
+        ));
         // Its answer is the challenge as it was: no field tells the page
         // what Central made of its report.
         let answer: Response = crate::decode(
