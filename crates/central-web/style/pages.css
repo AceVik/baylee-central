@@ -346,3 +346,7 @@
   padding-block: var(--space-9);
 }
 
+.error-page .actions {
+  justify-content: center;
+}
+
