@@ -104,10 +104,11 @@ type Section = (
 );
 
 /// The privacy notice's contents, in the order its parts stand.
-const PRIVACY_PARTS: [Part; 18] = [
+const PRIVACY_PARTS: [Part; 19] = [
     ("controller", words::privacy_controller_title),
     ("short", words::privacy_short_title),
     ("hosting", words::privacy_hosting_title),
+    ("views", words::privacy_views_title),
     ("device", words::privacy_device_title),
     ("github", words::privacy_github_title),
     ("links", words::privacy_links_title),
@@ -172,10 +173,16 @@ pub fn privacy(cx: &Context<'_>) -> Built {
             </section>
         }
     };
+    let counting = cx.data.views.is_some();
     let contents = PRIVACY_PARTS
         .iter()
+        .filter(|(id, _)| counting || *id != "views")
         .map(|(id, title)| view! { <li><a href=format!("#{id}")>{title(lang)}</a></li> })
         .collect_view();
+    // said only where the deployment counts
+    let views = cx.data.views.is_some().then(|| {
+        section("views", words::privacy_views_title(lang), words::privacy_views(lang).into_any())
+    });
     let [hosting, github, directory, push, counters, contact, puzzle] =
         simple.map(|(id, title, text)| section(id, title(lang), text(lang).into_any()));
     let body = view! {
@@ -188,6 +195,7 @@ pub fn privacy(cx: &Context<'_>) -> Built {
                 rich(words::privacy_controller(lang), move |tag| (tag == "impressum").then(|| impressum.clone())))}
             {section("short", words::privacy_short_title(lang), words::privacy_short(lang).into_any())}
             {hosting}
+            {views}
             {section("device", words::privacy_device_title(lang), plain(words::privacy_device(lang)))}
             {github}
             {section("links", words::privacy_links_title(lang), words::privacy_links(lang).into_any())}

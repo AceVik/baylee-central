@@ -254,6 +254,8 @@ privacy-short-title = 要点
 privacy-short = トラッキング、広告、アクセス解析はなく、ログインしない限りクッキーもなく、ほかのサーバーから読み込むものもありません。フォント、画像、スクリプトはすべて baylee.app から配信されます。パスワードが私たちに届くことはなく、チャットのメッセージと非公開のデータは、送信前にブラウザー内で暗号化されます。
 privacy-hosting-title = サイトの閲覧
 privacy-hosting = このサイトは、ドイツの netcup GmbH から借りているサーバーで動いています。ページを開くと、ブラウザーはすべてのリクエストに付くもの、つまりIPアドレス、要求したアドレス、時刻、ブラウザーの言語、ブラウザーの識別情報（ユーザーエージェント）を送ります。サーバーは応答のためにこれを必要とします。言語版は言語の情報から選び、ダウンロードページはユーザーエージェントから適切なファイルを提案します。ウェブサーバーはアクセスログを残さないため、これらのリクエストは保存されません。サーバー自身の動作メッセージ（システムジャーナル）には、まれにエラーの際にIPアドレスが含まれることがあり、遅くとも14日後に削除されます。法的根拠：GDPR第6条第1項(f)。私たちの正当な利益は、サイトを安全かつ確実に提供することです。
+privacy-views-title = Counting page views
+privacy-views = The website counts how often its pages are opened: one single number for all pages and all visitors together, shown on the start page. A page opened in a browser adds one to it. Nothing about you is stored for this: no IP address, no cookie, no identifier, not even which page it was.
 privacy-device-title = ブラウザーが保持するもの
 privacy-device = ログインするまで、このサイトはクッキーを設定しません。ブラウザーがお使いの端末に保持するものは次のとおりで、JavaScript を使う場合に限ります。配色を選んだ場合はその選択（<code>baylee-site-theme</code>）。ログイン中は、セッションの終了時刻（<code>baylee-central-session</code>）、チャットの鍵、連絡先の信頼済みの鍵（チャットの項を参照）。通知をオンにした場合は、この端末の乱数（<code>baylee-push-installation-v1</code>、<code>baylee-push</code>）。そして、ログインした、サイトをアプリとしてインストールした、通知をオンにした、のいずれかの場合に限り、サイトの公開ファイル（ページの枠、フォント、スクリプト）の控え。これにより、接続がなくても起動でき、通知を受け取れます。この三つのいずれにも当てはまらなくなった場合、控えは次にサイトを開いたときに削除されます。以下の項に記載がない限り、これらが私たちに送られることはありません。チャットとセッションの項目はログアウト時に削除されます。それ以外は、ブラウザーでサイトのデータを消去すれば削除できます。法的根拠：TDDDG第25条第2項第2号（利用する機能に厳密に必要なもの）。通知の乱数については、同意（TDDDG第25条第1項）。
 privacy-github-title = GitHub
@@ -774,6 +776,11 @@ strip-cards-unit = 枚
 strip-stars = GitHub のスター
 strip-accounts = Baylee Central のアカウント
 strip-live = Gateway が報告する、今の数
+strip-views = Page views since { $date }
+live-views = { $n ->
+    [one] { $n } view
+   *[other] { $n } views
+}
 live-accounts = { $n ->
     [one] { $n } アカウント
    *[other] { $n } アカウント

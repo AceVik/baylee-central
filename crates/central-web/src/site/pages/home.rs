@@ -202,13 +202,15 @@ fn hero(cx: &Context<'_>) -> impl IntoView + use<> {
 /// and the pointer's tooltip.
 fn strip_stat(
     glyph: AnyView,
-    label: &'static str,
+    label: &str,
     value: AnyView,
     wide: bool,
     quiet: bool,
 ) -> impl IntoView + use<> {
+    let label = label.to_owned();
+    let title = quiet.then(|| label.clone());
     view! {
-        <div class="strip-stat" class:strip-opt=wide title=quiet.then_some(label)>
+        <div class="strip-stat" class:strip-opt=wide title=title>
             <dt>{glyph}<span class:visually-hidden=quiet>{label}</span></dt>
             <dd>{value}</dd>
         </div>
@@ -297,6 +299,16 @@ fn strip_play(cx: &Context<'_>) -> impl IntoView + use<> {
             true,
         )
     });
+    // how often the site's pages were opened, where the deployment counts it
+    let views = cx.data.views.as_ref().map(|views| {
+        strip_stat(
+            icon(icons::EYE).into_any(),
+            &words::strip_views(lang, &format::date(lang, &views.since)),
+            view! { <span class="num">{words::live_views(lang, views.count)}</span> }.into_any(),
+            true,
+            true,
+        )
+    });
     let gateways = match cx.data.gateways.as_deref() {
         Some(all) => {
             let online = all.iter().filter(|g| g.online).count();
@@ -321,6 +333,7 @@ fn strip_play(cx: &Context<'_>) -> impl IntoView + use<> {
             {strip_live(cx)}
             {cards}
             {stars}
+            {views}
             {strip_stat(icon(icons::SERVER).into_any(), words::strip_gateways(lang), gateways, false, true)}
         </dl>
     }

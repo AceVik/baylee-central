@@ -34,6 +34,8 @@ pub struct App {
     pub data: Shared,
     /// The pages rendered from it.
     pub pages: Pages,
+    /// How often a page was opened, where the deployment counts it.
+    pub views: Option<Arc<crate::views::Views>>,
 }
 
 /// Most pages kept for one snapshot of the data, and their most bytes
@@ -295,6 +297,12 @@ fn page(app: &App, headers: &HeaderMap, page: Page, lang: Lang) -> Response {
         Page::Gone => StatusCode::GONE,
         _ => StatusCode::OK,
     };
+    // a page that exists, opened by a browser for a person
+    if status == StatusCode::OK
+        && let Some(views) = &app.views
+    {
+        views.count(headers);
+    }
     let mut extra: Vec<(&'static str, &str)> = Vec::new();
     if varies(page) {
         extra.push((

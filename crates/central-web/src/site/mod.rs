@@ -178,6 +178,9 @@ pub struct Snapshot {
     /// The accounts that can sign in, as Central counts them about once a
     /// minute (its public figures).
     pub accounts: Option<u64>,
+    /// How often the site's pages were opened, where the deployment counts
+    /// it (`central-web-server`'s `views`), as it stood at the last minute.
+    pub views: Option<crate::data::Views>,
 }
 
 /// What a page needs besides its own words.

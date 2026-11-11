@@ -254,6 +254,8 @@ privacy-short-title = 简而言之
 privacy-short = 没有追踪，没有广告，没有分析，除非你登录否则没有 Cookie，也不从其他服务器加载任何内容：字体、图片和脚本全部来自 baylee.app。你的密码不会到达我们这里，你的聊天消息和私人数据在发送之前已在你的浏览器中加密。
 privacy-hosting-title = 访问本站
 privacy-hosting = 本站运行在我们向德国 netcup GmbH 租用的服务器上。当你打开页面时，你的浏览器会发送每个请求都带有的信息：你的 IP 地址、所请求的地址、时间、浏览器的语言及其标识（user agent）。服务器需要这些信息来作出响应；它根据语言选择语言版本，下载页面则根据 user agent 推荐合适的文件。网络服务器不保留访问日志，因此这些请求不会被存储。服务器自身的运行信息（系统日志）在少数出错的情况下可能包含 IP 地址；它们最迟在 14 天后删除。法律依据：GDPR 第 6 条第 1 款 (f) 项；我们的合法利益是安全、可靠地提供本站。
+privacy-views-title = Counting page views
+privacy-views = The website counts how often its pages are opened: one single number for all pages and all visitors together, shown on the start page. A page opened in a browser adds one to it. Nothing about you is stored for this: no IP address, no cookie, no identifier, not even which page it was.
 privacy-device-title = 你的浏览器保存什么
 privacy-device = 在你登录之前，本站不设置任何 Cookie。你的浏览器会在你的设备上保存以下内容，并且仅在启用 JavaScript 时：如果你做过选择，则保存你的配色选择（<code>baylee-site-theme</code>）；在你登录期间，保存会话何时结束（<code>baylee-central-session</code>）、你的聊天密钥以及联系人的受信任密钥（见“聊天”）；如果你开启了通知，则保存本设备的一个随机数（<code>baylee-push-installation-v1</code>、<code>baylee-push</code>）；并且，仅当你已登录、将本站安装为应用或开启了通知时，保存本站公开文件（页面外壳、字体、脚本）的一份副本，使本站无需网络连接即可启动，也使通知能够送达。如果这三种情况都不再适用，该副本会在你下次打开本站时被移除。除非下文某一节另有说明，这些内容都不会发送给我们。聊天和会话相关的条目会在你退出登录时删除；其余所有内容，你可以通过清除浏览器中本站的数据来移除。法律依据：TDDDG 第 25 条第 2 款第 2 项（对你所使用的功能而言是严格必需的）；对于通知所用的随机数，则是你的同意（TDDDG 第 25 条第 1 款）。
 privacy-github-title = GitHub
@@ -774,6 +776,11 @@ strip-cards-unit = 张牌
 strip-stars = GitHub 星标
 strip-accounts = Baylee Central 上的账号
 strip-live = 各 Gateway 此刻的上报数据
+strip-views = Page views since { $date }
+live-views = { $n ->
+    [one] { $n } view
+   *[other] { $n } views
+}
 live-accounts = { $n ->
    *[other] { $n } 个账号
 }

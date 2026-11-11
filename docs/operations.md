@@ -790,7 +790,8 @@ build of `web/` as before; nothing here changes production by being merged.
   the whole workspace `cargo fetch --locked` comes first.
   Stage `target/release/central-web` and `target/site/`.
 - **Run** as an unprivileged user of its own (no database, no secret, no
-  write access anywhere), `central-web --config-stdin` with
+  write access anywhere but the optional file for the count of page views,
+  below), `central-web --config-stdin` with
   `StandardInput=file:/etc/baylee-app/web.json`:
 
   ```json
@@ -804,6 +805,20 @@ build of `web/` as before; nothing here changes production by being merged.
   `raw.githubusercontent.com` (Baylee's repository only, every ten minutes)
   and Central's browser listener on loopback (every minute): outbound HTTPS
   to GitHub must be allowed. It logs nothing about requests.
+
+  `views` may name a file, for example `/var/lib/baylee-app/views.json`
+  in a directory this user owns (`StateDirectory=baylee-app`, or
+  `ReadWritePaths=` under `ProtectSystem=strict`): the site then counts
+  how often a browser opens one of its pages and shows the number in the
+  start page's strip, and the privacy notice gains its section on it. The
+  file is the one thing the process ever writes: the number and the day
+  the count began, rewritten at most once a minute by a rename beside it,
+  and once more at shutdown. Nothing about a request is kept, no address,
+  no cookie, not even which page it was
+  (`crates/central-web-server/src/views.rs`). Without `views` nothing is
+  counted, nothing is shown and the process writes nowhere, as before. A
+  file that is malformed, too large or cannot be written stops the start
+  with a line that says so; it is never overwritten.
 - **Caddy**: `/api/*` stays as it is (Central's browser listener);
   `/site/impressum*` and, new, `/site/contact` go to the feedback service
   (which needs `https://baylee.app` in `FEEDBACK_CONTACT_ORIGINS`);

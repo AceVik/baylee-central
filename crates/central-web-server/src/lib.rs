@@ -11,6 +11,7 @@ pub mod fetch;
 pub mod files;
 pub mod generated;
 pub mod routes;
+pub mod views;
 
 use std::sync::{Arc, RwLock};
 
@@ -22,17 +23,26 @@ use routes::{App, Pages};
 /// fallback data, but starts no task and opens no socket.
 ///
 /// # Errors
-/// When the build's assets cannot be read.
+/// When the build's assets cannot be read, or the file for the count of
+/// page views cannot be used.
 pub fn app(config: Config) -> Result<Arc<App>, Broken> {
     let (assets, files) = Files::load(&config.site)?;
-    let data = Arc::new(RwLock::new(Arc::new(fetch::fallback(
-        config.fallback.as_deref(),
-    ))));
+    let mut data = fetch::fallback(config.fallback.as_deref());
+    // the count the deployment keeps, from the first page on
+    let views = match config.views.as_deref() {
+        Some(file) => {
+            let views = views::Views::open(file).map_err(|unusable| Broken(unusable.0.into()))?;
+            data.views = Some(views.now());
+            Some(Arc::new(views))
+        }
+        None => None,
+    };
     Ok(Arc::new(App {
         config,
         assets,
         files,
-        data,
+        data: Arc::new(RwLock::new(Arc::new(data))),
         pages: Pages::default(),
+        views,
     }))
 }

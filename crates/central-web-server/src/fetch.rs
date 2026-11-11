@@ -51,12 +51,14 @@ fn same(one: &Snapshot, other: &Snapshot) -> bool {
         gateways,
         repo,
         accounts,
+        views,
     } = one;
     *release == other.release
         && *cards == other.cards
         && *gateways == other.gateways
         && *repo == other.repo
         && *accounts == other.accounts
+        && *views == other.views
 }
 
 /// Change the data in `shared` with `change`: a new snapshot when that
@@ -486,6 +488,7 @@ pub fn fallback(dir: Option<&Path>) -> Snapshot {
         gateways: read(dir, "gateways.json"),
         repo: read(dir, "repo.json").unwrap_or_default(),
         accounts: read(dir, "accounts.json"),
+        views: read(dir, "views.json"),
     }
 }
 

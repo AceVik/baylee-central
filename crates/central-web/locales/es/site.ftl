@@ -254,6 +254,8 @@ privacy-short-title = En resumen
 privacy-short = Sin seguimiento, sin publicidad, sin analítica, sin cookies salvo que inicies sesión, y nada se carga desde otros servidores: las tipografías, las imágenes y los scripts vienen todos de baylee.app. Tu contraseña nunca nos llega, y tus mensajes de chat y tus datos privados se cifran en tu navegador antes de enviarse.
 privacy-hosting-title = Visitar el sitio
 privacy-hosting = El sitio funciona en un servidor que alquilamos a netcup GmbH, en Alemania. Cuando abres una página, tu navegador envía lo que lleva toda petición: tu dirección IP, la dirección solicitada, la hora, el idioma de tu navegador y su identificación (user agent). El servidor lo necesita para responder; elige la versión de idioma a partir del idioma, y la página de descarga usa el user agent para sugerir el archivo adecuado. El servidor web no guarda registro de accesos, de modo que estas peticiones no se almacenan. Los mensajes de funcionamiento del propio servidor (su diario del sistema) pueden, en casos raros de error, contener una dirección IP; se eliminan como máximo a los 14 días. Base jurídica: art. 6, apdo. 1, letra f) del RGPD; nuestro interés legítimo es ofrecer el sitio de forma segura y fiable.
+privacy-views-title = Counting page views
+privacy-views = The website counts how often its pages are opened: one single number for all pages and all visitors together, shown on the start page. A page opened in a browser adds one to it. Nothing about you is stored for this: no IP address, no cookie, no identifier, not even which page it was.
 privacy-device-title = Lo que guarda tu navegador
 privacy-device = Este sitio no instala ninguna cookie hasta que inicias sesión. Lo que tu navegador guarda en tu dispositivo, y solo con JavaScript: tu elección de color, si la hiciste (<code>baylee-site-theme</code>); mientras tienes la sesión iniciada, cuándo termina tu sesión (<code>baylee-central-session</code>), tu clave de chat y las claves de confianza de tus contactos (véase Chat); si activaste las notificaciones, un número aleatorio de este dispositivo (<code>baylee-push-installation-v1</code>, <code>baylee-push</code>); y, solo una vez que hayas iniciado sesión, instalado el sitio como aplicación o activado las notificaciones, una copia de los archivos públicos del sitio (estructura de la página, tipografías, scripts), para que arranque sin conexión y puedan llegar las notificaciones. Si ya no se da ninguna de las tres circunstancias, la copia se elimina la próxima vez que abras el sitio. Nada de esto se nos envía, salvo que un apartado siguiente diga lo contrario. Las entradas del chat y de la sesión se eliminan al cerrar sesión; todo lo demás lo eliminas borrando los datos del sitio en tu navegador. Base jurídica: § 25, apdo. 2, n.º 2 TDDDG (estrictamente necesario para la función que usas); para el número aleatorio de las notificaciones, tu consentimiento (§ 25, apdo. 1 TDDDG).
 privacy-github-title = GitHub
@@ -776,6 +778,11 @@ strip-cards-unit = cartas
 strip-stars = Estrellas en GitHub
 strip-accounts = Cuentas en Baylee Central
 strip-live = Ahora mismo en los gateways, según informan
+strip-views = Page views since { $date }
+live-views = { $n ->
+    [one] { $n } view
+   *[other] { $n } views
+}
 live-accounts = { $n ->
     [one] { $n } cuenta
    *[other] { $n } cuentas

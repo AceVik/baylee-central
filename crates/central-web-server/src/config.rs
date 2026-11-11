@@ -32,6 +32,10 @@ pub struct Config {
     /// A search console's verification value, if the owner sets one.
     #[serde(default)]
     pub verification: Option<String>,
+    /// The file the count of page views is kept in (`views.rs`): the one
+    /// file this server writes. Without it no view is counted or shown.
+    #[serde(default)]
+    pub views: Option<PathBuf>,
 }
 
 fn yes() -> bool {
@@ -100,6 +104,7 @@ impl Config {
             github: false,
             fallback,
             verification: None,
+            views: None,
         }
     }
 
