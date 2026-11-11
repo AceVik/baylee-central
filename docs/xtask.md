@@ -181,7 +181,9 @@ is served by `central-web` from `target/site/`, which this task writes:
   hashed files the offline page needs written over its two placeholders
   (a changed placeholder fails);
 - `notices.txt`: the fonts' and icons' licences and every crate in the
-  islands' module with its licence files, each text once;
+  islands' module with its licence files, each text once (read with
+  `cargo metadata --locked --offline`: on a machine that built only this
+  site, run `cargo fetch --locked` first, as CI's `site` job does);
 - Brotli and gzip copies of every text file where `brotli` and `gzip` are
   on the `PATH` (without them, Caddy compresses);
 - with `BAYLEE_SRC` set to a Baylee checkout (the deploy hook has one), the

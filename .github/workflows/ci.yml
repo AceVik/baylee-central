@@ -160,6 +160,10 @@ jobs:
         with:
           persist-credentials: false
       - run: rustup toolchain install 1.99.0 --profile minimal --target wasm32-unknown-unknown --component clippy
+      # `cargo xtask site` reads the whole locked graph offline for the
+      # third-party notices; this job builds only a part of it.
+      - name: Fetch locked dependencies
+        run: cargo fetch --locked
       - name: Clippy for the browser's half
         run: cargo clippy --locked -p central-web -p central-web-islands --target wasm32-unknown-unknown --lib -- -D warnings
       - run: cargo build --locked -p central-web-server
