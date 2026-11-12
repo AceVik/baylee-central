@@ -734,8 +734,11 @@ with a legacy link still has to match it. An e2e test covers both.
 - password change (served since 28.10.2026, the page's form since
   12.11.2026: [native login](native-login.md) §"Password change") and reset
   (by an administrator's code: served since 28.10.2026, the page since
-  12.11.2026, [account reset](account-reset.md); by e-mail: not built)
-- e-mail, 2FA, profile picture (the display name came on 23.10.2026)
+  12.11.2026, [account reset](account-reset.md); by a mailed code: served
+  since 12.11.2026, [e-mail](email.md), no form on the page yet)
+- e-mail (served since 12.11.2026, [e-mail](email.md); no form in the
+  account area yet), 2FA, profile picture (the display name came on
+  23.10.2026)
 - export and self-service deletion: by request to the operator until M1
 - the administration UI (M2)
 - registration in the native client (M6)
