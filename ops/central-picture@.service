@@ -27,6 +27,12 @@ RestrictAddressFamilies=none
 ProtectSystem=strict
 ProtectHome=yes
 PrivateTmp=yes
+# A small /tmp of its own: ffmpeg writes one sequence of at most 512 KiB.
+TemporaryFileSystem=/tmp:size=64M,mode=1777
+PrivateIPC=yes
+# Nothing runs but the worker and ffmpeg, and the libraries they map.
+NoExecPaths=/
+ExecPaths=/opt/baylee-central/bin/central-picture-worker /usr/bin/ffmpeg /usr/lib -/lib -/lib64
 PrivateDevices=yes
 PrivateUsers=yes
 ProtectKernelTunables=yes
