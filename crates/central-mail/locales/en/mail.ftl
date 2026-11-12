@@ -20,7 +20,7 @@ confirm-ignore = If this was not you, ignore this mail. The address is not used 
 # The reset code. `name` is the account's sign-in name.
 reset-subject = Your reset code for Baylee
 reset-title = Set a new password
-reset-intro = A reset code was asked for the Baylee account { $name }.
+reset-intro = A reset code was requested for the Baylee account { $name }.
 reset-how = Enter the code on the reset page to set a new password.
 reset-valid = The code works once, for { $minutes } minutes.
 reset-link = Open the reset page
