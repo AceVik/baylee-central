@@ -5,6 +5,7 @@
 
 pub mod admin;
 pub mod chat;
+pub mod email;
 mod endpoint;
 pub mod export;
 pub mod gateway;
