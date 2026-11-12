@@ -7215,3 +7215,5 @@ until they are translated. Every other test of the workspace
 (`--no-fail-fast`, that one skipped), the doc tests and the release build
 pass. Nothing ran against a real Central. This is an engineering review
 of two pages, not an audit.
+
+12.11.2026: the old React website (the `web/` app, its tests and its build) was removed from the repository, as the owner decided; the server-rendered site in `crates/central-web` replaces it, administration included. The records above name that app as it was.

@@ -16,7 +16,7 @@ the gate starts never replace the running executable, which Windows refuses.
 | `cargo xtask postgres [--exercise-failure]` | the `PostgreSQL` integration fixture ([database development](database-development.md)) | `scripts/test-postgres.ps1` |
 | `cargo xtask smoke [--exercise-failure]` | the development listener's HTTP boundary ([dev mode](dev-mode.md)); build `--release` first | `scripts/smoke-dev.ps1` |
 | `cargo xtask secrets` | the secret scan of the tree and the full history, after the scanner's own regressions | `scripts/scan-secrets.ps1`, `scripts/test-secret-scanner.ps1` |
-| `cargo xtask wasm [--check]` | `central-web-crypto` built to WebAssembly with its wasm-bindgen glue, written to `web/src/central-wasm/`; `--check` requires the committed files to equal a fresh build | (new, 2026-10-21) |
+| `cargo xtask wasm [--check]` | `central-web-crypto` built to WebAssembly with its wasm-bindgen glue, written to `crates/central-web/crypto/`; `--check` requires the committed files to equal a fresh build | (new, 2026-10-21) |
 | `cargo xtask site` | the server-rendered site's assets into `target/site/` ([below](#the-sites-assets-site)) | (new, 2026-11-10) |
 
 `cargo xtask` is an alias (`.cargo/config.toml`) for
@@ -98,7 +98,7 @@ the package may be in the lock file at 0.37.0 and in no build.
 
 The browser crypto of [web accounts](web-accounts.md) is a Rust crate the
 website runs as WebAssembly. Its build is committed under
-`web/src/central-wasm/` so that the website builds without Rust; this task
+`crates/central-web/crypto/` so that the website builds without Rust; this task
 makes it and proves it:
 
 - `cargo build -p central-web-crypto --target wasm32-unknown-unknown
@@ -112,7 +112,7 @@ makes it and proves it:
   by its `--version` on every run; `--target web`, with the name and
   producers sections removed.
 - The four files and `SHA256SUMS` (the SHA-256 of each) go to
-  `web/src/central-wasm/`; `--check` writes them to a temporary directory
+  `crates/central-web/crypto/`; `--check` writes them to a temporary directory
   instead and fails unless the committed directory holds exactly those files
   (and its `README.md`), equal byte for byte, with equal sums, and names the
   sizes and the first differing byte when they are not. CI runs the check.

@@ -21,7 +21,7 @@ German), built at deploy time by `ops/deploy-hook` (`npm ci && npm run content
 && npm run build`) and served by Caddy as static files from
 `/opt/baylee-app/web`, with `/api/*` passed to Central's browser listener
 (`127.0.0.1:28791`) and `/site/impressum*` to Baylee's feedback service. The
-Caddy site block exists only as documentation (`web/README.md` §"Serving it").
+Caddy site block exists only as documentation (the old `web/README.md` §"Serving it", removed 12.11.2026).
 
 ### 1.1 Pages
 
@@ -88,7 +88,7 @@ new site has the password change and the reset since 12.11.2026, §16.)
 ### 1.4 Browser crypto and the chat
 
 - `central-web-crypto` (Rust, `#![forbid(unsafe_code)]`) is committed as
-  WebAssembly with its wasm-bindgen glue in `web/src/central-wasm/`, checked
+  WebAssembly with its wasm-bindgen glue in `crates/central-web/crypto/`, checked
   byte for byte by CI (`cargo xtask wasm --check`, canonical x86-64 Linux
   build). Exports: `enrollment_start/finish`, `login_start/finish`,
   `login_confirm`, `recovery_create`, `chat_unlock`, `chat_resume`, and the
@@ -1727,7 +1727,7 @@ migrations and `Cargo.lock` are untouched); no dependency.
 
 ## 26. As built: the feedback moderation (12.11.2026)
 
-The old build's report moderation (`web/src/admin/feedback/`, its routes
+The old build's report moderation (`web/src/admin/feedback/`, removed 12.11.2026, its routes
 `/admin/feedback`, `/admin/feedback/<hex>` and the `/admin/reports`
 alias) rebuilt on the new site, so the old React site can go (owner,
 12.11.2026: "Erst Admin neu, dann löschen"). Nothing on the wire changed:

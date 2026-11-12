@@ -53,12 +53,12 @@ The website's worker owns the unlocked WASM keys. A sign-in to an account with
 a public tag unlocks the chat in the sign-in's own worker: `chat_unlock` opens
 the master key exactly as `login_confirm` would, so it proves the password the
 same way, derives the chat identity and wipes the master key; from then on the
-worker answers only the chat's steps (`web/src/chat/steps.ts`). The page keeps
-that worker (`web/src/chat/held.ts`) while it is open.
+worker answers only the chat's steps (`web/src/chat/steps.ts`, removed 12.11.2026). The page keeps
+that worker (`web/src/chat/held.ts`, removed 12.11.2026) while it is open.
 
 The owner decided on 3 November 2026 that a signed-in account sees its chats and
 contacts without unlocking anything, on the website as in the client. So the
-browser keeps the chat identity while the sign-in lasts (`web/src/chat/kept.ts`):
+browser keeps the chat identity while the sign-in lasts (`web/src/chat/kept.ts`, removed 12.11.2026):
 right after `chat_unlock` the worker takes the identity's 96 secret bytes from
 the module (`Chat::keep`), seals them with AES-256-GCM through the Web Crypto
 API under a key generated non-extractable for that one record, with the
@@ -167,7 +167,7 @@ was refused whole while one member's device was full. Since then
   devices cannot keep would be missing when they read their history again.
 - `Busy` is an answer both clients knew already, and the one a full inbox
   and a sender's full outbox were answered with before. The website names
-  it among the errors it shows (`web/src/chat/steps.ts`). The released
+  it among the errors it shows (`web/src/chat/steps.ts`, removed 12.11.2026). The released
   native client takes it as a rate refusal (`baylee-client`,
   `social/central/poll.rs`; `baylee-client-core`,
   `social/machine/sending.rs`): it keeps the sealed message, shows no
