@@ -378,6 +378,36 @@ dialog[open] {
   }
 }
 
+/* What floats and scrolls on its own (the sign-in and registration
+   dialogs, a dropdown, the phone's menu, the terms): a thin bar in the
+   page's ink on no track, so that it does not cut a grey stripe through a
+   rounded panel. */
+.auth-dialog,
+.menu,
+.nav[popover],
+.terms-text {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--ink-soft) 55%, transparent) transparent;
+}
+
+/* Safari before `scrollbar-color`: the same by its own pseudo-elements */
+@supports not (scrollbar-color: auto) {
+  :is(.auth-dialog, .menu, .nav[popover], .terms-text)::-webkit-scrollbar {
+    inline-size: 10px;
+  }
+
+  :is(.auth-dialog, .menu, .nav[popover], .terms-text)::-webkit-scrollbar-track {
+    margin-block: 0.4rem;
+    background: transparent;
+  }
+
+  :is(.auth-dialog, .menu, .nav[popover], .terms-text)::-webkit-scrollbar-thumb {
+    border: 3px solid transparent;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--ink-soft) 55%, transparent) padding-box;
+  }
+}
+
 /* Stillness (WCAG 2.3.3): no movement for those who asked for none. */
 @media (prefers-reduced-motion: reduce) {
   *,
@@ -421,6 +451,13 @@ dialog[open] {
 @media (forced-colors: active) {
   :focus-visible {
     outline-color: Highlight;
+  }
+
+  /* the dialogs' transparent border (`app.css`) is the ground, their
+     outline the edge */
+  .auth-dialog {
+    border-color: Canvas;
+    outline-color: CanvasText;
   }
 
   [aria-current="page"],
