@@ -94,6 +94,15 @@ impl Page {
     /// The page at a slug.
     #[must_use]
     pub fn from_slug(slug: &str) -> Option<Page> {
+        // one report of the moderation: its id is the island's to read
+        if slug
+            .strip_prefix("account/admin/feedback/")
+            .is_some_and(|id| {
+                id.len() == 32 && id.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'))
+            })
+        {
+            return Some(Page::Account(Section::Report));
+        }
         Page::LISTED
             .into_iter()
             .chain([Page::SignIn, Page::Register, Page::Reset, Page::Offline])

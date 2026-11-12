@@ -480,6 +480,15 @@ pub enum Section {
     AdminAudit,
     /// `/account/admin/legacy`: what is left of the legacy store.
     AdminLegacy,
+    /// `/account/admin/feedback`: bug and crash reports, triaged
+    /// (`docs/reports.md`). As `Admin`: in no navigation, and nothing for
+    /// anyone without the role.
+    Feedback,
+    /// `/account/admin/feedback/<id in hex>`: one report. Every report's
+    /// address is this one page (`Page::from_slug`); the island reads the
+    /// id from the address, so neither the page nor its cache holds one.
+    /// Its own path is the list's.
+    Report,
 }
 
 impl Section {
@@ -499,7 +508,7 @@ impl Section {
     /// Every section with a fixed address: the navigation's and the
     /// administration's. One account's page (`AdminUser`) has an address
     /// per account and is read by [`Section::account_page`] apart.
-    pub const ROUTED: [Section; 14] = [
+    pub const ROUTED: [Section; 16] = [
         Section::Home,
         Section::Chat,
         Section::Contacts,
@@ -514,6 +523,8 @@ impl Section {
         Section::AdminGateways,
         Section::AdminAudit,
         Section::AdminLegacy,
+        Section::Feedback,
+        Section::Report,
     ];
 
     /// The path after `/{lang}/`; one account's page gives its list's.
@@ -534,6 +545,7 @@ impl Section {
             Section::AdminGateways => "account/admin/gateways",
             Section::AdminAudit => "account/admin/audit",
             Section::AdminLegacy => "account/admin/legacy",
+            Section::Feedback | Section::Report => "account/admin/feedback",
         }
     }
 
