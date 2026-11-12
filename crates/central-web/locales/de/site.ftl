@@ -604,7 +604,7 @@ email-removed = Deine E-Mail-Adresse ist entfernt.
 email-busy = Im Moment zu viele E-Mails. Versuch es später noch einmal.
 email-same = Das ist schon deine Adresse.
 email-unsure = Es kam keine Antwort. Deshalb wissen wir nicht, ob das geklappt hat. Sieh nach, was hier steht, und versuch es noch einmal, falls nicht.
-email-again = Deine Anmeldung ist inzwischen ein paar Minuten alt. Gib dein Passwort noch einmal ein, um den Code zu schicken.
+email-again = Gib dein Passwort noch einmal ein, um den Code zu schicken.
 
 ## Die Nutzungsbedingungen von Central
 

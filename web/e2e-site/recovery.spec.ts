@@ -197,7 +197,7 @@ async function open(page: Page, w: World, options: { manager?: boolean; path?: s
   });
   await page.goto(options.path ?? "/en/register");
   // a page without islands of its own loads them when a dialog opens
-  if (options.path === undefined) await expect(page.locator("html")).toHaveAttribute("data-islands", "ready");
+  if ((options.path ?? "/register").endsWith("/register")) await expect(page.locator("html")).toHaveAttribute("data-islands", "ready");
   return { seen, problems, consoled };
 }
 
@@ -338,8 +338,7 @@ test("the code step offers every way to keep the code, each made only when it is
   // Nothing of the code went to Central, and the page logged none of it.
   expect(JSON.stringify(seen)).not.toContain(CODE);
   expect(JSON.stringify(seen)).not.toContain(CODE.replaceAll("-", ""));
-  // (Chromium itself says that no program takes mailto: here, with the address it was handed)
-  expect(consoled.filter((line) => line.includes(CODE) && !line.startsWith("Failed to launch 'mailto:"))).toEqual([]);
+  expect(consoled.filter((line) => line.includes(CODE) || line.includes("mailto:"))).toEqual([]);
   expect(emails(seen)).toEqual(["status"]);
   expect(problems).toEqual([]);
 });
@@ -444,7 +443,7 @@ test("a sign-in older than Central takes: the step asks for the password, then n
   await page.locator("#code-kept").check();
   await button(page, "Continue").click();
   const card = page.locator("section[aria-labelledby=email-title]");
-  await expect(page.locator("#email-said")).toHaveText("Your sign-in is a few minutes old now. Enter your password once more to send the code.");
+  await expect(page.locator("#email-said")).toHaveText("To send the code, enter your password once more.");
   await expect(page.locator("#email-password")).toBeFocused();
   await expect(page.locator("#email-address")).toHaveValue(ADDRESS);
   await expect(card.locator("#email-error")).toBeEmpty();
@@ -491,3 +490,55 @@ test("in the registration's dialog the print is the sheet alone too", async ({ p
   await page.emulateMedia({ media: "screen" });
   await expect(page.locator("#code-title")).toBeVisible();
 });
+
+/** What in `card` reaches past its right edge, and how far it scrolls sideways. */
+async function overflow(card: Locator): Promise<{ beyond: string[]; scroll: number }> {
+  return card.evaluate((el) => {
+    const edge = el.getBoundingClientRect().right + 0.5;
+    const beyond = [...el.querySelectorAll("*")]
+      .filter((node) => {
+        const box = node.getBoundingClientRect();
+        return box.width > 0 && box.right > edge;
+      })
+      .map((node) => `${node.tagName.toLowerCase()}.${node.className}`);
+    return { beyond, scroll: el.scrollWidth - el.clientWidth };
+  });
+}
+
+// German has the longest words, and the dialog hides what runs out of its
+// card: at 320 px nothing of the two steps may reach past the card's edge,
+// on the page or in the dialog.
+for (const where of ["page", "dialog"] as const) {
+  test(`at 320 px in German both steps stay inside their card: ${where}`, async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 760 });
+    await open(page, world(), { path: where === "page" ? "/de/register" : "/de/faq" });
+    let card = page.locator(".auth-form");
+    if (where === "dialog") {
+      const menu = page.locator(".menu-btn");
+      if (await menu.isVisible()) await menu.click();
+      await page.locator("a.nav-account").click();
+      await page.locator("#auth-signin a[href$='/register']").click();
+      card = page.locator("#auth-register");
+      await expect(card.locator("leptos-island")).toHaveAttribute("data-hydrated", "", { timeout: 15_000 });
+    }
+    await card.locator("#register-name").fill("erika");
+    await card.locator("#register-display").fill("Erika");
+    await card.locator("#register-password").fill(PASSWORD);
+    await card.locator("#register-repeat").fill(PASSWORD);
+    await card.locator("#register-age").check();
+    await card.locator("#register-consent").check();
+    await page.waitForTimeout(3_000);
+    await card.getByRole("button", { name: "Account anlegen" }).click();
+    await expect(card.locator("#code-title")).toBeVisible({ timeout: 30_000 });
+    await expect(card.getByRole("button", { name: "Im Passwortmanager speichern" })).toBeVisible();
+    await card.locator("#code-email").fill(ADDRESS);
+    expect(await overflow(card)).toEqual({ beyond: [], scroll: 0 });
+    expect(await narrow(page)).toBe(0);
+    expect(await targets(page)).toEqual([]);
+    await card.locator("#code-kept").check();
+    await card.getByRole("button", { name: "Weiter", exact: true }).click();
+    await expect(page.locator("#email-code")).toBeFocused();
+    expect(await overflow(card)).toEqual({ beyond: [], scroll: 0 });
+    expect(await narrow(page)).toBe(0);
+  });
+}

@@ -382,11 +382,17 @@ dialog[open] {
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
-  *::after,
-  *::backdrop {
+  *::after {
     animation: none !important;
     transition: none !important;
     scroll-behavior: auto !important;
+  }
+
+  /* a rule of its own: a browser without the pseudo-element would drop
+     the rule above with it */
+  *::backdrop {
+    animation: none !important;
+    transition: none !important;
   }
 }
 

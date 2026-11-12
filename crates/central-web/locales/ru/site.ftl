@@ -607,7 +607,7 @@ email-busy = Пока слишком много писем. Повторите �
 email-same = Это уже ваш адрес.
 email-unsure = Ответ не пришёл, поэтому мы не можем сказать, удалось ли это. Посмотрите на то, что показано здесь, и попробуйте ещё раз, если не удалось.
 # English for now: to be translated.
-email-again = Your sign-in is a few minutes old now. Enter your password once more to send the code.
+email-again = To send the code, enter your password once more.
 
 ## Central's terms
 

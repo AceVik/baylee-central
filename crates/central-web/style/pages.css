@@ -494,7 +494,7 @@
   .update,
   .link-hint,
   .paws,
-  dialog:not(:has(.code-sheet)),
+  dialog,
   [popover],
   [data-theme-switch],
   [data-find-bar] {
@@ -547,7 +547,9 @@
   /* A new recovery code's sheet (`islands/keep.rs`), drawn when its step's
      "Print" is pressed: while it is in the page, a print is the sheet
      alone. Whatever neither holds it nor is in it goes; what holds it (the
-     page's frame, or the dialog it is in) keeps no box of its own. */
+     page's frame, or the dialog it is in, which the list above hides)
+     keeps no box of its own. Rules of their own: a browser without
+     `:has()` drops these and prints as before. */
   html:has(.code-sheet) body :not(:has(.code-sheet), .code-sheet, .code-sheet *) {
     display: none !important;
   }

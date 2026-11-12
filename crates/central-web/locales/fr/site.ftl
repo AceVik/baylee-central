@@ -630,7 +630,7 @@ email-busy = Trop d’e-mails pour le moment. Réessayez plus tard.
 email-same = C’est déjà votre adresse.
 email-unsure = Aucune réponse n’est revenue, nous ne pouvons donc pas savoir si l’action a abouti. Regardez ce qui s’affiche ici et réessayez si elle n’a pas abouti.
 # English for now: to be translated.
-email-again = Your sign-in is a few minutes old now. Enter your password once more to send the code.
+email-again = To send the code, enter your password once more.
 
 ## Central's terms
 

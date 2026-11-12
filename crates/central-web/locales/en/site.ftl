@@ -603,7 +603,7 @@ email-removed = Your e-mail address is removed.
 email-busy = Too many mails for now. Try again later.
 email-same = This is your address already.
 email-unsure = No answer came back, so we cannot tell whether that went through. Look at what is shown here, and try again if it did not.
-email-again = Your sign-in is a few minutes old now. Enter your password once more to send the code.
+email-again = To send the code, enter your password once more.
 
 ## Central's terms
 
