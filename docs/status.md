@@ -323,14 +323,19 @@ The server side of [web accounts](web-accounts.md) lands in three PRs.
   session on either listener; terms accepted for `set`, `resend` and
   `confirm`): `status`, `set` (a password sign-in under 5 minutes; a code of 40 bits by mail, 15 minutes, five
   wrong tries), `resend`, `confirm`, `withdraw`, `remove`; the address that
-  is replaced or removed is told. `ResetMail` (no session, both listeners)
+  is replaced or removed is told, and since the same day the confirmed
+  address is told that a reset was finished, that the password was changed
+  or that an administrator made a reset code (read in the change's
+  transaction, queued once it is committed, tried once; no code, no name).
+  `ResetMail` (no session, both listeners)
   answers `Done` for every name and reads no account; a worker then makes a
   reset code through the statement an administrator's is made through,
   valid one hour, never over an administrator's code that lasts, once in
   ten minutes and three times a day for an account, and mails it. It is
   redeemed with `ResetStart` and `ResetFinish`, unchanged. A new crate,
-  `central-mail`, writes the three mails (English and German by hand; the
-  other nine languages by machine, unread by a speaker) and hands them to
+  `central-mail`, writes the mails (English and German by hand; the other
+  nine languages by machine, unread by a speaker, and in English for the
+  three notices of a changed login) and hands them to
   `baylee-mailer` over loopback HTTP. An optional `mail` block in the
   service's document; without it Central sends no mail and refuses what
   needs one. `central-client`: `Session::email` and `reset_mail`. No
@@ -344,7 +349,8 @@ The server side of [web accounts](web-accounts.md) lands in three PRs.
   ([operations](operations.md#mail)). **Open:** the website's forms for the
   address and for asking for a code by mail, the client's (M6), the nine
   translations, and the privacy notice's lines on the address, which are
-  the owner's review. No mail says that a reset was finished. Three
+  the owner's review; the nine languages' words for the three notices of a
+  changed login. Three
   addresses that ask on both listeners spend Central's 30 requests an hour.
 - **Not yet deployed.** Deploy: migrate, grant, add `browser.listen`, pass
   `/api/*` in the `baylee.app` site block (no keys since the open beta, 11.11.2026). Central’s own terms

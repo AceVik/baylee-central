@@ -78,7 +78,9 @@ username arrives at run time, so the repository names nobody.
 
 A second change, `ResetLogin { account }`, makes a reset code
 ([account reset](account-reset.md), M1 step 2b), audited as
-`account.reset_issued`.
+`account.reset_issued`. The account's confirmed address, if it has one, is
+told afterwards that a code exists, not the code and not who made it
+([e-mail](email.md#notices-that-the-login-changed)).
 
 ## Reads
 

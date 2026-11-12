@@ -239,6 +239,9 @@ current password (ASVS 6.2.3, in OPAQUE's form), inside the exchange itself:
    the sign-in's: `Session { token, identity, wrapped_master }` natively,
    `BrowserSession` with the new `__Host-central` cookie on the website. The
    new session counts its 12 hours from the change, a fresh password proof.
+   The same transaction reads the account's confirmed e-mail address, if it
+   has one; it is told afterwards that the password was changed
+   ([e-mail](email.md#notices-that-the-login-changed), since 12.11.2026).
 
 Anything else is `Rejected` and changes nothing: no or a foreign session, a
 session of the other kind, an unfinished move, a record or wrapper of the

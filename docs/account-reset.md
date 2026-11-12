@@ -24,7 +24,10 @@ a pending account, an unfinished legacy move (the bridge's
 
 Issuing ends nothing: the old password keeps working until the code is used,
 and a signed-in device keeps its session and the master key it holds, which
-is one of the two ways the data survives. Locking an account at once is the
+is one of the two ways the data survives. Since 12.11.2026 the account's
+confirmed address, if it has one, is told afterwards that a code exists,
+not the code ([e-mail](email.md#notices-that-the-login-changed)); changing
+the password ends the code, and the notice says so. Locking an account at once is the
 design's step 6. **So until step 6 ships, a reset is the answer to a
 forgotten password, not to a taken-over account**: an intruder's session
 and the old password stay until the code is used, and for good if it never
@@ -102,7 +105,10 @@ The person, on the website or in the native client (`central-client`):
    A moved account keeps `restored`: migration 000005's
    `account_closed_enrolled` requires it once the move is closed, and that
    move's restore, which the flag guards, is long done. `Done`; the person
-   signs in with the new password. Two finishes of one
+   signs in with the new password. The account's confirmed address, if it
+   has one, is told afterwards whether the data was kept
+   ([e-mail](email.md#notices-that-the-login-changed)); the address is read
+   in this transaction. Two finishes of one
    code (a signed-in device keeping its key and a browser keeping it with
    the recovery code) race for the code; the second is `Rejected`.
 
@@ -138,9 +144,12 @@ an hour) besides the global one; natively `ResetStart` has the same since
   that mailbox can ask for a code and use it: they take the login, and with
   `new` they destroy the account's data. That is what an address is for, and
   the reason it is optional. A mailed code has no audit event.
-- No message tells the person that an administrator issued a code, or that
-  a reset was finished. A mailed code is its own message, and an address
-  that is replaced or removed is told ([e-mail](email.md)).
+- Only an account with a confirmed address is told that an administrator
+  issued a code or that a reset was finished (since 12.11.2026,
+  [e-mail](email.md#notices-that-the-login-changed)); an account without
+  one is told nothing. A notice is tried once and can be lost, and it goes
+  to the mailbox the account has, which after a reset by mail is the one
+  the code went to. A mailed code is its own message.
 
 ## As built
 

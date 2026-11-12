@@ -8,10 +8,17 @@ and a reset code by mail".*
 An account may have one e-mail address. No account needs one: a sign-in
 name and a password are enough, and nothing else in the protocol knows an
 address. The address has two uses. Central mails a **reset code** to it when
-the person asks for one, and it mails a notice to it when it is replaced or
-removed. It is not a sign-in name, it is not shown to anyone else, and it
-decrypts nothing: a reset restores the login only, as an administrator's
-does ([account reset](account-reset.md)).
+the person asks for one, and it mails **notices** to it: when it is
+replaced or removed, and since 12.11.2026 when the account's login changed
+(a reset was finished, the password was changed, an administrator made a
+reset code; [below](#notices-that-the-login-changed)). It is not a sign-in
+name, it is not shown to anyone else, and it decrypts nothing: a reset
+restores the login only, as an administrator's does
+([account reset](account-reset.md)).
+
+*Notices that the login changed: 12.11.2026, no migration and no change to
+the wire. The record is in [security assurance](security-assurance.md),
+"Notices of a changed login".*
 
 Central speaks no SMTP. A separate service on the same host,
 `baylee-mailer`, takes one mail a request on loopback and delivers it.
@@ -128,11 +135,11 @@ Every number is a named constant.
 | Requests for a reset code by mail from one client address, on each listener | 5 an hour | `central_http`'s `RESET_MAIL` (`addresses.rs`) |
 | Reset codes mailed for all accounts together | 30 an hour | `RESET_MAILS_PER_HOUR` |
 | Requests that wait for the worker | 256 | `RESET_QUEUE` |
-| Notices that wait for the worker | 64 | `NOTICE_QUEUE` |
+| Notices that wait for the worker; the same notice to the same address of an account once | 64 | `NOTICE_QUEUE` |
 | A mailed reset code lasts | 1 hour | `central_postgres::MAILED_RESET_HOURS` |
 | No second mailed code for an account within | 10 minutes | `central_postgres::RESET_MAIL_GAP_MINUTES` |
 | Mailed codes for an account in 24 hours | 3 | `central_postgres::RESET_MAILS_A_DAY` |
-| An administrator's code lasts (unchanged) | 24 hours | `ISSUED_RESET_HOURS` (`central-postgres`, `reset.rs`) |
+| An administrator's code lasts (unchanged), as its notice says | 24 hours | `central_postgres::ISSUED_RESET_HOURS`; `ISSUED_HOURS` (`email.rs`) |
 | The mailer's client connects within | 1 second | `CONNECT` (`central-mail`, `client.rs`) |
 | A request to the mailer takes at most | 3 seconds | `OVERALL` |
 | The mailer's answer: head, and body of a refusal | 8,192 and 4,096 bytes | `HEAD_BYTES`, `ANSWER_BYTES` |
@@ -167,28 +174,87 @@ has 5 tries at one code and 10 codes a day, 50 guesses a day at 2^40.
 
 ## The mails
 
-Crate `central-mail`. Three mails, each with a plain text part and an HTML
-part:
+Crate `central-mail`. Each mail has a plain text part and an HTML part:
 
 - the code that confirms an address;
 - a reset code, which names the account's sign-in name;
-- a notice to an address that was replaced or removed.
+- a notice to an address that was replaced or removed;
+- a notice to the account's confirmed address that a reset code set a new
+  password, saying whether the data was kept or a new vault began;
+- a notice to it that the password was changed;
+- a notice to it that an administrator made a reset code.
 
 The HTML is a table layout with inline styles in the site's light colours.
 It has no image, no script and nothing loaded from elsewhere. A code is
-printed and never part of a link. The only links are to the site's reset
-page (in the reset mail) and to the account's security page (in a notice);
-the confirmation mail has none. Every value is escaped.
+printed and never part of a link; no notice carries one. The only links go
+to the site's reset page (the reset mail, and the notices of a reset and of
+a changed password) and to the account's security page (the notices of a
+replaced or removed address and of an administrator's code); the
+confirmation mail has none. Every value is escaped.
+
+A code is set in a monospace font in a box of its own. The confirmation
+code (9 characters) at 30 px; the reset code (45 characters) at 15 px with
+no space added between its characters, about 406 px, so that it fits on one
+line of the 520 px card in the mail clients (Gmail and mailbox.org broke it
+in two at 17 px). On a narrow screen it breaks at its hyphens.
 
 The words are `id = text` lines in `crates/central-mail/locales/<lang>/mail.ftl`,
 one file for each of the site's eleven languages, read by a small parser of
 the crate's own. English and German are written by hand; the other nine
 were translated by machine (12.11.2026, by the owner's instruction) and
 have not been read by a speaker. A test holds that every language has its
-own words. A tag Central has no file for is written in English.
+own words, by id. The nineteen messages of the three notices that a login
+changed (`reset-done-*`, `password-*`, `issued-*`) are English in those
+nine until they are translated; the test allows exactly those ids to be
+English there, and German has its own for every id. A tag Central has no
+file for is written in English.
 
 A code mail is in the language the request asked in. A notice is in the
 language the address was confirmed in.
+
+## Notices that the login changed
+
+Three changes to an account's login are told to its **confirmed** address,
+if it has one and this Central has a mailer:
+
+| Change | When | The notice says |
+| --- | --- | --- |
+| A reset was finished | `ResetFinish` succeeded, for `keep` and for `new` | a reset code set a new password; the data was kept, or the account starts with an empty vault and the data from before cannot be opened; every session was ended. If this was not you: ask an administrator for a reset code; with `keep`, the recovery code still opens the data, with `new`, an earlier recovery code opens nothing |
+| The password was changed | `ChangePasswordFinish` succeeded | every other session was signed out. If this was not you: someone knows the password; set a new one with a reset code from the reset page or from an administrator |
+| An administrator made a reset code | `AdminRequest::ResetLogin` succeeded | a code exists and works once for 24 hours, and the password works until it is used. If you did not ask for it: sign in and change the password on the security page, which ends the code (`account-reset.md`, "As built"), then tell an administrator |
+
+- **The address is read in the change's transaction.** `finish_reset`,
+  `change_password` and `issue_reset` read the confirmed address and its
+  language after they hold the account's row, which every write of the
+  address locks first, and return it with their answer, as `email_confirm`
+  and `email_remove` return the address that lost its place (`Told`). It
+  is the address the account had when the change was committed. An address
+  that only waits for its code is none. The statements that change the
+  login are as they were; the read is one more `SELECT` in the same
+  transaction.
+- **After the commit only.** The identity service queues the notice once
+  the store answered with a commit (`Mails::committed`), in the code that
+  returns the answer, with nothing to await in between. A refused change
+  (a wrong password, a spent or wrong code, a refused administrator) tells
+  nobody. Without a mailer nothing is queued.
+- **Never a reason to fail or wait.** The notice joins the queue the other
+  notices wait in and is tried once by the worker, after the reset codes
+  that wait. The answer is the store's whatever becomes of it. A full
+  queue drops it; a mailer that does not take it leaves the change done.
+- **Once while it waits.** The same notice to the same address of the same
+  account is not queued a second time while the first waits, so an account
+  that changes its password again and again holds one place of the 64.
+- **Not for a mailed code.** A code mailed on the account's own request is
+  made by the worker (`issue_mailed_reset`), not by `ResetLogin`: the
+  reset mail itself is what the address learns.
+- **No account named.** The notices say "the Baylee account of this
+  address" and name no account. The sign-in name is half of what a reset
+  by mail needs, and these mails go out without anyone asking for them;
+  the confirmation mail and the two older notices name none either. Only
+  the reset mail names it, and only someone who typed the name asks for
+  that.
+- **No code, no new link.** No notice carries a code; their links are the
+  site's reset and security pages, like the other mails'.
 
 ## The mailer
 
@@ -242,7 +308,8 @@ A service whose block names anything else does not start.
 
 `status`, `withdraw` and `remove` work, and `status` says `mail: false`.
 `set`, `resend` and `confirm` are `Rejected`, and so is `ResetMail` for
-every name. An address removed there is not told.
+every name. An address removed there is not told, and no change of the
+login is told either.
 
 ## What is stored
 
@@ -294,6 +361,7 @@ mail. Both refuse a malformed address or tag before anything is sent.
   was made is mailed or taken back. What still waits is dropped.
 - **Notices are tried once.** A notice the mailer does not take, or one
   that finds the queue full, is not sent. The change it tells of is done.
+  The same notice to the same address of an account waits once.
 - **Logs.** The service logs one line when a mail was not handed over:
   no address, no name, not which mail. `Mail`, `Token`, `Client` and the
   store's types print nothing of what they hold.
@@ -355,8 +423,30 @@ mail. Both refuse a malformed address or tag before anything is sent.
   session that names an address and gets `Busy` may therefore be seeing
   that the address got much mail lately. The answer does not say which
   reason it was.
-- **No mail says that a reset was finished** or that a password was
-  changed. The three mails are the ones above.
+- **The notices of a changed login name no account.** A mailbox whose
+  address two accounts confirmed is not told which of them changed.
+- **They tell the address the account has.** A thief who takes the login
+  and then replaces the address gets the later notices; the old address is
+  told once that it was replaced. The notice of the change that let the
+  thief in goes to the address the account had when it was committed: a
+  password change gives the new session five minutes in which it may name
+  an address, but the notice was queued before. Whoever reads the mailbox
+  is told what the account's owner is told; a reset made with a mailed
+  code tells the mailbox that asked for it.
+- **A notice can be lost.** It is tried once. A mailer that is down, a
+  full queue, a service that stops while it waits, and a request cut off
+  between the store's commit and its return each leave the change done and
+  untold. A mail the mailer took can still be lost on its way.
+- **The queue is shared.** Notices for all accounts wait in one queue of
+  64. One account holds at most one place for each kind of notice, but
+  someone who holds many accounts with confirmed addresses and changes
+  their passwords (up to four changes a minute each, by the login budget) while
+  the mailer is slow can keep it full, and others' notices are dropped.
+- **An administrator can mail an account's address** with each code they
+  make. Each code is in the audit, and the mailer's limit for the account
+  bounds the mails.
+- **Nine languages** say the notices of a changed login in English until
+  they are translated.
 
 ## What the clients need
 
