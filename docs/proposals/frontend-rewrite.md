@@ -1195,3 +1195,64 @@ do neither. Nothing on the wire and nothing in Central changed.
 build's admin page does it, where that build is still served); a reading
 of the nine machine translations by speakers; a reset that keeps the data
 through a device still signed in is the client's (M6).
+
+## 17. As built: an account's optional e-mail address (12.11.2026)
+
+The website's half of `central_api::email` (the wire of `4d0528f`; what
+Central does with an address is `docs/email.md`, which comes with the
+server's half). It was built against the types and a stand-in's answers:
+when this was written, the service refused both new requests.
+
+- **The section.** "E-mail address" is a card under the password's change
+  in the account area's security section (`islands/email.rs`). It asks
+  `EmailRequest::Status` when it is shown and draws what Central holds,
+  never what it guessed: every answer is the state after it. Its faces
+  are the explanation with the form (no address), the code's field (an
+  address waits), the confirmed address with "Change" and "Remove", the
+  question before a removal, and, where `mail` is false, one sentence and
+  what is stored with the ways to drop it, without a form.
+- **Naming an address proves the password.** The form checks the address
+  with `central_api::email::address`, Central's own rule, signs in once
+  more as the password's change does (`password::sign_in_again`, in a
+  Worker that is ended right after), and only then sends `Set`. The
+  sessions listed above it are read again. A wrong password is the
+  Worker's refusal: nothing about the address is sent.
+- **The code** is read by `MailCode::parse` before it is sent, so a text
+  that is no code never counts as a wrong one. The field shows capitals
+  by style and leaves what was typed alone.
+- **What a refusal means.** `Rejected` says little here (a wrong code, no
+  address that waits, no mail, no session). Only a refused `Confirm` is
+  called a wrong code. After it, and after an answer that did not arrive
+  (which the page calls neither done nor refused), the state is read
+  again and drawn. A refused `Status` signs nobody out by itself: the page
+  asks `AccountSummary`, and only its refusal is a lost session. A Central
+  that knows the session and refuses the question gets one quiet line and
+  "Try again"; the rest of the page stays.
+- **The reset page** has a block before its form, "No reset code?": a
+  sign-in name and `ResetMail` ([account reset](../account-reset.md), "The
+  website's page").
+- **The export.** The file the privacy section saves is Central's export
+  with one more key, `email` (`address`, `confirmed_at`, `pending`,
+  `pending_until`), read with `Status` once the export answered; the
+  export's own message did not change. Whether this Central sends mail is
+  not the account's and is not in the file. Where the state cannot be
+  read, the file is the export alone and the page says that the address
+  is not in it.
+- **Words.** 49 new messages and three changed ones (`faq-password-a`,
+  `reset-lead`, `reset-code-hint`), English and German by hand. The nine
+  other languages carry the English text for these 52, each under the
+  comment `# English for now: to be translated.` The privacy notice has a
+  paragraph "E-mail address" after "Your account", and its date is the
+  12th.
+- **Tests.** Unit tests of every decision the section and the block make
+  and of the requests' JSON, `web/e2e-site/email.spec.ts` (every state and
+  transition against a stand-in that keeps an address as the contract
+  describes it; the sign-in once more in a canned Worker, a wrong password
+  in the real one) and the block's tests in `reset.spec.ts`: at both sizes,
+  at 320 px, in German, in the light scheme, with axe and the 44 px
+  targets.
+
+**Open.** A run against a Central that keeps addresses (`e2e-real`), which
+needs the server's half; the nine translations; `privacy-recipients` does
+not name the mail's processor (the new paragraph does); the section says
+"15 minutes" and does not show `pending_until`.
