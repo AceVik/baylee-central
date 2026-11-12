@@ -1006,7 +1006,8 @@ administrator work as before.
 "mail": {
   "endpoint": "http://127.0.0.1:<the mailer's port>",
   "site": "https://baylee.app",
-  "token": "…"
+  "token": "…",
+  "logo": false
 }
 ```
 
@@ -1026,6 +1027,19 @@ administrator work as before.
   it can send mail through the mailer in Central's name, within the
   mailer's limits. To rotate it, change it in both places and restart
   Central.
+- `logo` (optional, `true` or `false`; absent is `false`): whether the
+  mailer attaches Baylee's logo. With `true` every mail asks the mailer
+  for it (`"inline": ["baylee-logo"]` in the request) and shows it in its
+  band beside the wordmark (`cid:baylee-logo`, a part of the mail, nothing
+  loaded from elsewhere); with `false` the band shows the letter's tile and
+  the request has no such field. **Deploy the mailer that has the picture
+  first** (its own configuration names the image and attaches it as
+  `Content-ID: <baylee-logo>`), **then set `logo` to `true` and restart
+  Central.** An older mailer refuses the unknown field with `400`: with
+  the flag set too early, every mail is refused and Central logs `central:
+  a mail was not handed to the mailer` for the notices and reset codes;
+  set it back to `false` and restart. To turn it off later, the other way
+  round: first the flag, then the mailer.
 
 A service whose block is malformed prints `central: invalid configuration`
 and does not start; the line names no value. The development launcher takes

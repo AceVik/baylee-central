@@ -5,9 +5,11 @@
 //!
 //! The HTML is tables with inline styles and the device's own fonts, in
 //! the website's colours: a band of the blue hour with the wordmark in
-//! letters, and a card in sunlight below it. It has no image, no style
-//! sheet, no script, nothing loaded from elsewhere and nothing that
-//! tracks. Its links go to the configured site and nowhere else: the
+//! letters, and a card in sunlight below it. It has no image but, where
+//! the mailer attaches it, the logo beside the wordmark (`cid:baylee-logo`,
+//! a part of the mail itself), no style sheet, no script, nothing loaded
+//! from elsewhere and nothing that tracks. Its links go to the configured
+//! site and nowhere else: the
 //! button to a page of it, the footer to its start page. No link ever
 //! holds a code. Everything written into the HTML is escaped, the crate's
 //! own words included.
@@ -66,6 +68,11 @@ const SIDE: u32 = 28;
 const TABLE: &str = "table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"";
 /// The mark before each fact of a list: a dot, as text.
 const MARK: &str = "\u{2022}";
+/// The `Content-ID` under which the mailer attaches the logo, when it is
+/// told to (`docs/email.md`, "Configuration").
+pub(crate) const LOGO: &str = "baylee-logo";
+/// The logo's side in the band, in CSS pixels.
+const LOGO_SIDE: u32 = 48;
 
 /// A mail as the mailer takes it. No Debug: the text holds a code. The
 /// bodies are wiped when dropped.
@@ -137,14 +144,16 @@ struct Content<'a> {
     after: Vec<String>,
 }
 
-/// Write `mail` for the site at the origin `site`.
-pub(crate) fn render(mail: &Mail, site: &str) -> Rendered {
+/// Write `mail` for the site at the origin `site`. With `logo` the band
+/// shows the logo the mailer attaches as [`LOGO`] instead of the letter's
+/// tile.
+pub(crate) fn render(mail: &Mail, site: &str, logo: bool) -> Rendered {
     let lang = mail.lang;
     let content = content(mail, site);
     let start = Start::of(site, lang);
     Rendered {
         text: text(lang, &content, &start),
-        html: html(lang, &content, &start),
+        html: html(lang, &content, &start, logo),
         subject: content.subject,
     }
 }
@@ -375,19 +384,36 @@ fn paragraph(inner: &str, size: u8, colour: &str) -> String {
 }
 
 /// The band at the card's top: the blue hour with a gold edge under it,
-/// and the wordmark in letters, the name's first letter on a gold tile
-/// beside the name as the site's header has its picture there.
-fn band(out: &mut String, lang: Lang) {
+/// and the wordmark in letters beside a picture, as the site's header has
+/// it. With `logo`, the picture is the logo the mailer attaches, rounded,
+/// with no text of its own since the name stands beside it; without, the
+/// name's first letter on a gold tile, not read aloud.
+fn band(out: &mut String, lang: Lang, logo: bool) {
     let brand = lang.text("brand", &[]);
-    let letter: String = brand.chars().take(1).collect();
+    let (mark, high) = if logo {
+        (
+            format!(
+                "<td width=\"{LOGO_SIDE}\" height=\"{LOGO_SIDE}\" valign=\"middle\" style=\"width:{LOGO_SIDE}px;height:{LOGO_SIDE}px;\">\
+                 <img src=\"cid:{LOGO}\" width=\"{LOGO_SIDE}\" height=\"{LOGO_SIDE}\" alt=\"\" style=\"display:block;width:{LOGO_SIDE}px;height:{LOGO_SIDE}px;border:0;border-radius:12px;\"></td>"
+            ),
+            LOGO_SIDE,
+        )
+    } else {
+        let letter: String = brand.chars().take(1).collect();
+        (
+            format!(
+                "<td width=\"34\" height=\"34\" align=\"center\" valign=\"middle\" bgcolor=\"{GOLD}\" aria-hidden=\"true\" style=\"width:34px;height:34px;background:{GOLD};border-radius:9px;font-family:{SERIF};font-size:20px;line-height:34px;font-weight:700;color:{NIGHT};mso-line-height-rule:exactly;\">{}</td>",
+                escape(&letter)
+            ),
+            34,
+        )
+    };
     let _ = writeln!(
         out,
         "<tr><td bgcolor=\"{NIGHT}\" style=\"padding:20px {SIDE}px;background:{NIGHT};border-bottom:3px solid {GOLD};border-radius:13px 13px 0 0;\">\
-         <{TABLE}><tr>\
-         <td width=\"34\" height=\"34\" align=\"center\" valign=\"middle\" bgcolor=\"{GOLD}\" aria-hidden=\"true\" style=\"width:34px;height:34px;background:{GOLD};border-radius:9px;font-family:{SERIF};font-size:20px;line-height:34px;font-weight:700;color:{NIGHT};mso-line-height-rule:exactly;\">{}</td>\
-         <td bgcolor=\"{NIGHT}\" style=\"padding-left:12px;background:{NIGHT};font-family:{SERIF};font-size:24px;line-height:34px;font-weight:700;letter-spacing:0.01em;color:{DAWN};mso-line-height-rule:exactly;\">{}</td>\
+         <{TABLE}><tr>{mark}\
+         <td bgcolor=\"{NIGHT}\" style=\"padding-left:12px;background:{NIGHT};font-family:{SERIF};font-size:24px;line-height:{high}px;font-weight:700;letter-spacing:0.01em;color:{DAWN};mso-line-height-rule:exactly;\">{}</td>\
          </tr></table></td></tr>",
-        escape(&letter),
         escape(&brand),
     );
 }
@@ -471,7 +497,7 @@ fn footer(lang: Lang, start: &Start) -> String {
 }
 
 /// The HTML beside the plain text, for a reader that shows it.
-fn html(lang: Lang, content: &Content<'_>, start: &Start) -> Zeroizing<String> {
+fn html(lang: Lang, content: &Content<'_>, start: &Start, logo: bool) -> Zeroizing<String> {
     let mut out = Zeroizing::new(String::with_capacity(8192));
     let _ = write!(
         out,
@@ -500,7 +526,7 @@ fn html(lang: Lang, content: &Content<'_>, start: &Start) -> Zeroizing<String> {
          <!--[if mso]><{TABLE} width=\"{CARD}\" align=\"center\"><tr><td><![endif]-->\n\
          <{TABLE} width=\"100%\" bgcolor=\"{PANEL}\" style=\"max-width:{CARD}px;background:{PANEL};border:1px solid {RULE};border-radius:14px;border-collapse:separate;\">\n",
     );
-    band(&mut out, lang);
+    band(&mut out, lang, logo);
     row(
         &mut out,
         34,

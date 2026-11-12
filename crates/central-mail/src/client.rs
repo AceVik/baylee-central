@@ -2,7 +2,10 @@
 //! `POST /v1/send` a mail, over plain HTTP to a numeric loopback address
 //! and nowhere else. No proxy, no redirect, no name is looked up, no
 //! connection is kept. The token is wiped when dropped and never printed.
-use crate::{Mail, Mailer, Outcome, render::render};
+use crate::{
+    Mail, Mailer, Outcome,
+    render::{LOGO, render},
+};
 use central_api::Error;
 use serde::{Deserialize, Serialize};
 use std::{net::SocketAddr, time::Duration};
@@ -113,6 +116,12 @@ struct Send<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     ttl_secs: Option<u32>,
     limit_key: &'a str,
+    /// The pictures the mailer attaches to the mail under their
+    /// `Content-ID`, which the HTML names: the logo, when the operator
+    /// said that the mailer has it. Absent otherwise, since a mailer
+    /// without it refuses the field.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    inline: Option<[&'static str; 1]>,
 }
 
 /// A refusal's body; only its code is read.
@@ -143,6 +152,8 @@ pub struct Client {
     url: String,
     authorization: Zeroizing<String>,
     site: String,
+    /// The mailer attaches the logo: the mails show it and ask for it.
+    logo: bool,
 }
 
 impl std::fmt::Debug for Client {
@@ -185,7 +196,25 @@ impl Client {
             url: format!("http://{address}/v1/send"),
             authorization,
             site: site.to_owned(),
+            logo: false,
         })
+    }
+
+    /// The same client, whose mails show the logo beside the wordmark
+    /// (`logo`) and ask the mailer to attach it (`"inline":
+    /// ["baylee-logo"]`), or show the letter's tile and ask for nothing.
+    /// Only for a mailer that has the picture: an older one refuses the
+    /// field, and then every mail.
+    #[must_use]
+    pub const fn with_logo(mut self, logo: bool) -> Self {
+        self.logo = logo;
+        self
+    }
+
+    /// Whether the mails show the logo and ask the mailer for it.
+    #[must_use]
+    pub const fn logo(&self) -> bool {
+        self.logo
     }
 }
 
@@ -198,7 +227,7 @@ impl Mailer for Client {
         if getrandom::fill(&mut key).is_err() {
             return Outcome::Unavailable;
         }
-        let rendered = render(mail, &self.site);
+        let rendered = render(mail, &self.site, self.logo);
         let body = serde_json::to_vec(&Send {
             to: mail.to(),
             subject: &rendered.subject,
@@ -206,6 +235,7 @@ impl Mailer for Client {
             html: &rendered.html,
             ttl_secs: mail.ttl_secs(),
             limit_key: &format!("account:{}", hex(&mail.account())),
+            inline: self.logo.then_some([LOGO]),
         })
         .map(Zeroizing::new);
         let Ok(body) = body else {

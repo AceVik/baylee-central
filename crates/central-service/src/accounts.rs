@@ -287,7 +287,13 @@ mod tests {
             .unwrap()
         };
         let mut parsed = with("http://127.0.0.1:28795", "http://127.0.0.1:5173");
-        assert!(parsed.mail.as_mut().unwrap().client(true).is_ok());
+        let client = parsed.mail.as_mut().unwrap().client(true).unwrap();
+        assert!(!client.logo(), "no logo unless the block says so");
+        let mut parsed = parse(&settings(&format!(
+            r#","mail":{{"endpoint":"http://127.0.0.1:28795","site":"http://127.0.0.1:5173","token":"{token}","logo":true}}"#
+        )))
+        .unwrap();
+        assert!(parsed.mail.as_mut().unwrap().client(true).unwrap().logo());
         for (endpoint, site) in [
             ("http://192.168.1.2:28795", "http://127.0.0.1:5173"),
             ("https://127.0.0.1:28795", "http://127.0.0.1:5173"),
@@ -303,6 +309,7 @@ mod tests {
         for extra in [
             r#","mail":{"endpoint":"http://127.0.0.1:28795"}"#,
             r#","mail":{"endpoint":"http://127.0.0.1:28795","site":"http://127.0.0.1:5173","token":"x","from":"central@example.org"}"#,
+            r#","mail":{"endpoint":"http://127.0.0.1:28795","site":"http://127.0.0.1:5173","token":"x","logo":"on"}"#,
         ] {
             assert!(parse(&settings(extra)).is_err(), "{extra}");
         }
