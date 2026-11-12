@@ -5,7 +5,7 @@
 //! encrypted data and the recovery code stay. Central ends every session
 //! of the account and answers a new one for this browser.
 
-use central_api::wire::{Request, Response};
+use central_api::wire::{Identity, Request, Response};
 use leptos::prelude::*;
 use serde_json::json;
 
@@ -74,10 +74,17 @@ fn at_finish(failure: Failure) -> Option<Trouble> {
     }
 }
 
+/// Whether a finish's answer is the change that was asked for: the account
+/// and vault that signed in again, and the wrapper the Worker made (as the
+/// SDK checks it, `central-client/src/password.rs`).
+fn as_asked(asked: &Identity, answered: &Identity, sent: &[u8], stored: &[u8]) -> bool {
+    answered.account == asked.account && answered.epoch == asked.epoch && stored == sent
+}
+
 /// Signs the session's account in once more in `crypto` with `current`:
 /// the Worker then holds the key that opens the master key, and the answer
-/// is the wrapper it opens.
-async fn sign_in_again(crypto: &Crypto, current: &str) -> Result<Vec<u8>, Trouble> {
+/// is the account with the wrapper that key opens.
+async fn sign_in_again(crypto: &Crypto, current: &str) -> Result<(Identity, Vec<u8>), Trouble> {
     let identity = match call(&Request::AccountSummary).await {
         Ok(Response::AccountSummary { identity, .. }) => identity,
         Ok(_) => return Err(Trouble::Other(Problem::Failed)),
@@ -123,10 +130,13 @@ async fn sign_in_again(crypto: &Crypto, current: &str) -> Result<Vec<u8>, Troubl
         return Err(Trouble::Other(Problem::Failed));
     };
     if signed.account != identity.account || signed.epoch != identity.epoch {
-        return Err(Trouble::Other(Problem::Failed));
+        // a session for another account than the one asked for is not
+        // kept, as after a sign-in (`auth.rs`); nothing was changed
+        let _ = call(&Request::Logout).await;
+        return Err(Trouble::SignedOut);
     }
     session::remember(expires_at);
-    Ok(wrapped_master)
+    Ok((identity, wrapped_master))
 }
 
 /// After a finish whose answer is lost. The change ends the session that
@@ -146,7 +156,7 @@ async fn lost() -> Trouble {
 /// Why the password is not known to be changed.
 async fn change(worker: &str, current: String, new: String) -> Result<(), Trouble> {
     let crypto = Crypto::start(worker).ok_or(Trouble::Other(Problem::Failed))?;
-    let wrapped_master = sign_in_again(&crypto, &current).await?;
+    let (identity, wrapped_master) = sign_in_again(&crypto, &current).await?;
     let begun = crypto
         .ask(
             "password_start",
@@ -188,15 +198,21 @@ async fn change(worker: &str, current: String, new: String) -> Result<(), Troubl
     };
     match call(&finish).await {
         Ok(Response::BrowserSession {
+            identity: answered,
             wrapped_master: stored,
             expires_at,
             ..
         }) => {
-            session::remember(expires_at);
-            // Central stores what the Worker made, or something is wrong
-            if stored == sent {
+            if as_asked(&identity, &answered, &sent, &stored) {
+                session::remember(expires_at);
                 Ok(())
             } else {
+                // Another account, or another wrapper than the Worker
+                // made: the session this answer came with is not kept
+                // (the SDK signs it out too), and the page cannot say
+                // what became of the password.
+                let _ = call(&Request::Logout).await;
+                session::forget();
                 Err(Trouble::Unsure)
             }
         }
@@ -383,6 +399,27 @@ mod tests {
                 Some(Trouble::Other(Problem::WrongLogin))
             );
         }
+    }
+
+    /// The change's answer counts only for the account and vault that
+    /// asked, and only with the wrapper the Worker made.
+    #[test]
+    fn an_answer_for_another_account_or_wrapper_is_no_change() {
+        let asked = Identity {
+            account: [7; 16],
+            epoch: 3,
+        };
+        let (sent, other) = ([1_u8; 73], [2_u8; 73]);
+        assert!(as_asked(&asked, &asked, &sent, &sent));
+        let stranger = Identity {
+            account: [8; 16],
+            ..asked
+        };
+        let later = Identity { epoch: 4, ..asked };
+        assert!(!as_asked(&asked, &stranger, &sent, &sent));
+        assert!(!as_asked(&asked, &later, &sent, &sent));
+        assert!(!as_asked(&asked, &asked, &sent, &other));
+        assert!(!as_asked(&asked, &asked, &sent, &sent[..72]));
     }
 
     /// A finish that Central refused changed nothing; one whose answer did

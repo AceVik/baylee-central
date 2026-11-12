@@ -5099,10 +5099,9 @@ Not tested, and recorded for the owner:
   clipboard was tried with its permission granted; the refusal's sentence
   is not reached by a test. The file to save is checked by its address,
   not downloaded.
-- **Six languages** (es, ja, ko, ru, zh-hans, zh-hant) show these
-  messages in English, the FAQ's changed answer among them. Spanish is
-  three messages below the gate's limit: four more English ones fail it.
-  The three languages translated by machine were not read by a speaker.
+- **Nine languages** have these messages by machine translation (fr, it
+  and pt-br with the change, es, ja, ko, ru, zh-hans and zh-hant the same
+  day, below); no speaker has read any of them.
 - **A failed run's trace** of the real suite holds what was typed and the
   reset code as sent (`web/test-results-real`). Everything in it is
   synthetic; the folder of these runs was deleted.
@@ -5116,5 +5115,41 @@ Not tested, and recorded for the owner:
   (`Problem::outside_sign_in`). `Debug` on the reset's outcome holds a
   new vault's recovery code, as the registration's `NewCode` does;
   nothing prints either.
+
+### A second look, the same day
+
+The session that took the change into the branch read it once more
+before it did: the five exports beside `central-client`'s `reset.rs` and
+`password.rs`, the two islands, the Worker's five new cases and the
+route.
+
+- **The exports add no step and leave none out.** Each calls what the SDK
+  calls, in its order, and checks what it checks (the reset's epoch rule,
+  the minimum length, the recovery wrapper's opening before anything is
+  uploaded). The Worker's cases take their state out of its one variable
+  before they use it, so no state serves twice.
+- **One check the SDK makes was missing on the page.** After
+  `ChangePasswordFinish` the SDK takes the answer only for the account
+  and epoch it asked for and only with the wrapper it sent; the page
+  compared the wrapper alone. It compares all three now (`as_asked`,
+  with a test), and an answer that fails signs out the session it came
+  with, as the SDK does and as the sign-in does (`auth.rs`). The sign-in
+  the form makes first did compare the account, but kept the session of
+  an answer for another one; it signs that out too. A Central that
+  answers as specified never reaches either branch.
+- **The reset page** checks the account and epoch `ResetChallenge` names
+  against the discovered ones before the Worker is asked again, and ends
+  the Worker before the finish is sent: nothing found.
+- **The module.** The committed module was built by the change on its own
+  base. On the merged tree, where `central-api` differs (an origin's
+  trailing dot, above), `cargo xtask wasm --check` in the pinned container
+  says `Committed WebAssembly module and glue match a fresh build.`
+- **The words.** Six languages were translated by machine after the
+  merge, with the vocabulary of each language's file; "vault" had no word
+  in them and has one per language now. The checker compared ids, order,
+  tags and paragraphs; nobody who speaks the languages read them.
+
+Not looked at again: the points the list above names as not checked stay
+as they are.
 
 Engineering review, not an audit.
