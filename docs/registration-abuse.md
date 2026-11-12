@@ -310,7 +310,7 @@ puzzle's own: eight parts, each found by chance.
 A challenge lives five minutes up to four bits over the base, ten minutes
 with five and twenty with six: about nine times what that phone needs on
 average, so a slow device still hands its solution in. The table holds
-40,000 challenges (it was 10,000), more than the shared budget lets all
+50,000 challenges (it was 10,000, then 40,000), more than the shared budget lets all
 callers together ask for in twenty minutes, so no challenge makes room for
 another before its own time is over. Full, it is a few megabytes.
 
@@ -388,7 +388,7 @@ bytes too.
 | Difficulty at the most (flood and look together, six bits, as before) | 10 bits a part: 8,192 evaluations on average |
 | Lifetime | 5 minutes up to 8 bits, 10 minutes at 9, 20 minutes at 10 |
 | Soonest | 3 seconds after the challenge |
-| Table | 40,000 challenges |
+| Table | 50,000 challenges |
 
 Central sets the price. Memory, passes, parts and difficulty are kept with
 the nonce and are the only ones a solution is checked against. They travel
