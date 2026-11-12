@@ -326,6 +326,12 @@
   margin: 0;
 }
 
+/* the state's green on its own tint: the shared pill's mix of 12 % comes
+   to just under 4.5 : 1 on a light panel */
+.admin-gw .pill.ok {
+  background: var(--ok-tint);
+}
+
 .admin-gw .actions {
   margin-block-start: var(--space-4);
 }
