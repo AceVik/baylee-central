@@ -1724,3 +1724,117 @@ migrations and `Cargo.lock` are untouched); no dependency.
   nine languages (unsure wording is listed in the pull request); a run
   against a real Central and PostgreSQL; deleting the old build once the
   feedback is here.
+
+## 26. As built: the feedback moderation (12.11.2026)
+
+The old build's report moderation (`web/src/admin/feedback/`, its routes
+`/admin/feedback`, `/admin/feedback/<hex>` and the `/admin/reports`
+alias) rebuilt on the new site, so the old React site can go (owner,
+12.11.2026: "Erst Admin neu, dann löschen"). Nothing on the wire changed:
+`AdminRequest`'s report actions and `POST /api/v1/reports/<hex>/<part>`
+as they were; no dependency, no `web-sys` feature (the browser's
+`DecompressionStream`, `Blob`, `URL` and `createImageBitmap` are reached
+through `js_sys`, as `clip` does).
+
+- **The pages.** `/{lang}/account/admin/feedback` (`Section::Feedback`)
+  and `/{lang}/account/admin/feedback/<32 lowercase hex>`
+  (`Section::Report`), islands of the account area as §18's page is: for
+  an administrator only (anyone else gets §18's one sentence and Central
+  is asked nothing but `AccountSummary`), not indexed, in no sitemap, in
+  no navigation, linked from no page the server renders. Every report's
+  address is one id-less page (`Page::from_slug` matches the hex; the
+  island reads the id from `location`), so the render cache never holds
+  an id; anything but 32 lowercase hex digits is a 404. Each page links
+  back to `/{lang}/account/admin/overview`; the shared administration
+  navigation is wired in when the two branches meet.
+- **The list** (`islands/feedback/list.rs`): the seven views with their
+  counts (the open reports' facets and the trash's total), the search
+  (it follows the typing after a pause, Enter at once, Escape empties
+  it), every filter of `ReportFilter` with its facet count (status, kind,
+  priority as chips; assignee, label, gateway, channel, record, reporter,
+  days, order as fields; only unread), the active filters as pills that
+  take themselves out, sortable column heads, pages and their size, saved
+  lists (read when the menu opens, saved, removed), the chart of the last
+  30 days (inline SVG and a table, read when unfolded), crash groups with
+  "show its reports", the CSV of a selection or of everything the filter
+  matches (up to 5,000), and a selection's actions in one request each
+  (status, priority, assignee, add or take off a label, merge into one,
+  the trash with Undo, restore, delete for good, opened or not, copy the
+  ids). The query string is the old one byte for byte (keys, order,
+  `URLSearchParams` encoding), so lists saved in the old build still open
+  and match; a part out of Central's bounds is dropped, never sent.
+- **One report** (`report.rs`): the way back to its list and that list's
+  previous and next report with its place (`ReportNeighbours`); its
+  pills, first line, short id and a copied link; what was written (the
+  client's `[Card]` and `[@Player]` references as chips in their place),
+  the crash; what the client sent (inflated in the browser, at most 16
+  MiB; the window's picture drawn into a canvas from its checked PNG
+  bytes; build, game, backtrace, log, system, settings, and the whole
+  object as a tree that draws a fold's children only when it opens);
+  the facts (the gateway's address as text, never a link); the record
+  handed over as Central keeps it (`.jsonl.gz`); the history in words;
+  the triage (status, priority, assignee, labels with the labels in use
+  offered, duplicate of, the GitHub issue and GitHub's own "new issue"
+  form filled with the administrator's neutral words only); notes, added
+  and removed by their author; the related lists; the trash with Undo,
+  restore and delete for good. Opening a report marks it opened. Every
+  change names the revision it was read at; a conflict reads it again and
+  says so.
+- **Untrusted words.** A report is a game client's: every field is drawn
+  as text (Leptos text nodes; no `inner_html` anywhere, and Trusted Types
+  would refuse one). Nothing of a report goes into an address but its id
+  and the list's own filter; nothing is logged or written to the console.
+  The only addresses built from report data are the old ones: Baylee's
+  issue by its number (1 to 10,000,000) and GitHub's new-issue form from
+  the administrator's summary, a category and a build that reads as a
+  version.
+- **Deleting for good** is asked first (nothing is sent before the
+  confirmation), wants a password sign-in younger than Central's 30
+  minutes (asked once more in a Worker where `AccountSummary` says it is
+  older, the session's account checked as §18 does), and is sent once
+  however often it is pressed. Central refuses a stale sign-in and a
+  report out of the trash with the same 401: the page tells them apart by
+  what `AccountSummary` says afterwards.
+- **Refusals and lost answers.** A refused read is explained by
+  `AccountSummary` (no session: the area says so; no role: one sentence;
+  else "does not exist"); an answer that never came is never a refusal: a
+  change is read again and said as possibly made, a note's draft stays.
+- **Look.** `style/feedback.css`, last of `STYLES`: the old look on the
+  site's tokens; 44 px for every control; a table scrolls in its own box
+  (`contain: inline-size`, and it is the containing block of its hidden
+  words, which would otherwise widen the page); the pill tones mixed a
+  little toward the ink so a small bold word keeps 4.5:1 on its tint.
+- **Words.** 297 messages (`fb-*`), English and German by hand; the nine
+  other languages carry the English text under
+  `# English for now: to be translated.` That puts every one of them past
+  the gate's English share (`xtask` `no_language_is_english_under_another_name`:
+  24 to 27 in 100, the limit is 12): the translations are owed before
+  this merges.
+- **Tests.** Unit tests of the query string (the old encoding, saved
+  views of the old build round-tripping byte for byte, every bound),
+  the filter, the CSV (formula injection `=+-@`, tab and CR, quoting),
+  the alias, sizes and times, the chart's days, history words, ids as
+  pasted, the GitHub addresses, the client part's readers and the
+  reference pieces, and that a lost answer is no refusal; a server test
+  that both pages exist in every language, are not indexed, not in the
+  sitemap, linked from nowhere, and that a malformed id is a 404;
+  `web/e2e-site/feedback.spec.ts` and `feedback-report.spec.ts` against a
+  stand-in Central (`feedback-stand-in.ts`) with markup and script in
+  every text field: each action's exact request, nothing before a
+  confirmation, a purge sent once on a double press and only after the
+  password where the sign-in is stale, refusals and lost answers, the
+  CSV's defused formula, the canvas drawn, axe in both schemes, 44 px,
+  320 px in German, the keyboard order, at both sizes.
+- **Not rebuilt**, being second presentations or conveniences of what is
+  here: the drawer beside the list (a report opens on its own page, which
+  steps through the list); the single-key shortcuts and their dialog
+  (every action is a control in the tab order); the quiet 30-second
+  re-read with its "new reports arrived" line (the Refresh button);
+  relative times ("5 minutes ago": absolute UTC as the rest of the
+  site); Scryfall's card pictures and links on the chips (the site's
+  `img-src 'self'` admits no other origin, and the chips stay text). The
+  navigation's unread count and the overview's report figures belong to
+  the shared administration navigation and overview.
+- **Open.** The nine translations (the gate fails until then); the
+  language menu of a report's page leads to the list in that language
+  (the page has no id of its own); a run against a real Central.
