@@ -58,9 +58,7 @@ impl IdentityService {
         }
         match request {
             Request::Notifications { request } => self.notifications(request, bearer).await,
-            Request::Social { request } => Ok(Response::Social {
-                response: self.store.social(surface.session(bearer)?, request).await?,
-            }),
+            Request::Social { request } => self.social(request, bearer, surface).await,
             request @ (Request::Terms
             | Request::GatewayTerms { .. }
             | Request::TermsStatus
@@ -77,6 +75,8 @@ impl IdentityService {
             request @ (Request::SessionStatus | Request::RenewSession | Request::Logout) => {
                 self.session_request(&request, bearer, surface).await
             }
+            // the wire is set (`central_api::email`); the service is not built yet
+            Request::Email { .. } | Request::ResetMail { .. } => Err(Error::Rejected),
             request @ (Request::AccountSummary
             | Request::SetRecovery { .. }
             | Request::SetDisplayName { .. }
@@ -151,6 +151,17 @@ impl IdentityService {
             | Request::WriteDocument { .. }
             | Request::ConfirmRestore { .. }) => self.document_request(request, bearer).await,
         }
+    }
+
+    async fn social(
+        &self,
+        request: central_api::social::SocialRequest,
+        bearer: Option<&Token>,
+        surface: Surface,
+    ) -> Result<Response, Error> {
+        Ok(Response::Social {
+            response: self.store.social(surface.session(bearer)?, request).await?,
+        })
     }
 
     async fn notifications(

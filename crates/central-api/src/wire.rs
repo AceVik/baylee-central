@@ -467,6 +467,27 @@ pub enum Request {
         /// What happens to the encrypted data.
         vault: ResetVault,
     },
+    /// The session's account and its optional e-mail address
+    /// (`docs/email.md`), on either listener, with Central's terms accepted.
+    /// Naming an address also needs a password sign-in less than 30 minutes
+    /// old. Answered with [`Response::Email`].
+    Email {
+        /// The action.
+        request: crate::email::EmailRequest,
+    },
+    /// Ask for a reset code by mail, without a session (`docs/email.md`
+    /// §"A reset code by mail"). Central answers `Done` whatever the name:
+    /// a code goes to the account's confirmed address if the name is an
+    /// account that has one and may be reset; nobody else learns which.
+    /// `Busy` when the asking address or Central as a whole asked too
+    /// often, `Rejected` for every name where Central sends no mail. The
+    /// code is redeemed as an administrator's is ([`Request::ResetStart`]).
+    ResetMail {
+        /// The account's sign-in name, as [`Request::Discover`] takes it.
+        username: String,
+        /// The language of the mail ([`crate::email::language`]).
+        lang: String,
+    },
     /// An account's request about its own sessions and gateways
     /// (`docs/web-accounts.md` §"The account area"): browser listener only,
     /// the cookie's session, Central's terms accepted; minting a token also
@@ -652,6 +673,11 @@ pub enum Response {
     Social {
         /// Closed social reply, without credentials or private login names.
         response: crate::social::SocialResponse,
+    },
+    /// The account's e-mail address after an [`Request::Email`].
+    Email {
+        /// What Central holds now.
+        state: crate::email::EmailState,
     },
     /// Live session metadata, checked against the current credential and exclusive login.
     SessionStatus {

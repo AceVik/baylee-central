@@ -125,6 +125,8 @@ pub fn browser_operation(request: &Request) -> bool {
         | Request::ChangePasswordFinish { .. }
         | Request::Admin { .. }
         | Request::Owner { .. }
+        | Request::Email { .. }
+        | Request::ResetMail { .. }
         | Request::ResetStart { .. }
         | Request::ResetFinish { .. }
         | Request::AccountExport
