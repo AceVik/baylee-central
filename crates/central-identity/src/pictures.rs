@@ -2,9 +2,13 @@
 //! and reports, the upload's admission and conversion, and the public read.
 //!
 //! An upload is admitted on its headers' session alone, before its body is
-//! read: Central's terms accepted, no block in force, room in the budget,
-//! and one of [`SLOTS`] upload slots (one per account). Once its body was
-//! read it spends a unit of the budget, stored or not; the picture worker
+//! read: Central's terms accepted, no block in force, room in the budget.
+//! Only once its whole body has arrived does it take one of [`SLOTS`]
+//! conversion slots (one per account), so bodies that stall or trickle hold
+//! no slot (they are bounded by the listener's places per address); the
+//! slot then lives as long as the conversion itself, on its blocking
+//! thread, even past a request that was dropped. It spends a unit of the
+//! budget, stored or not; the picture worker
 //! converts it in a fresh process ([`central_picture::Worker`]), the
 //! service checks the answer and computes the digest, and one transaction
 //! stores it under a new random key.
@@ -67,13 +71,29 @@ fn kept_still(motion: &Motion) {
     );
 }
 
-/// An admitted upload: its account and its slot, given back when dropped.
+/// An admitted upload: its account. It holds no conversion slot.
 pub struct Admitted {
+    account: [u8; 16],
+}
+
+/// A conversion slot: its account, given back when dropped.
+struct Slot {
     account: [u8; 16],
     slots: Arc<Mutex<BTreeSet<[u8; 16]>>>,
 }
 
-impl Drop for Admitted {
+impl Slot {
+    /// One of [`SLOTS`] slots for `account`, which may hold one at a time.
+    fn take(slots: &Arc<Mutex<BTreeSet<[u8; 16]>>>, account: [u8; 16]) -> Option<Self> {
+        let mut held = slots.lock().unwrap_or_else(PoisonError::into_inner);
+        (held.len() < SLOTS && held.insert(account)).then(|| Self {
+            account,
+            slots: Arc::clone(slots),
+        })
+    }
+}
+
+impl Drop for Slot {
     fn drop(&mut self) {
         // The set is whole at every step, so a poisoned lock's is too.
         self.slots
@@ -183,17 +203,8 @@ impl IdentityService {
         if !admission.room {
             return Err(Error::Busy.into());
         }
-        let mut slots = self
-            .pictures
-            .slots
-            .lock()
-            .map_err(|_| UploadRefusal::Account(Error::Unavailable))?;
-        if slots.len() >= SLOTS || !slots.insert(admission.account) {
-            return Err(Error::Busy.into());
-        }
         Ok(Admitted {
             account: admission.account,
-            slots: Arc::clone(&self.pictures.slots),
         })
     }
 
@@ -216,8 +227,16 @@ impl IdentityService {
             .worker
             .clone()
             .ok_or(UploadRefusal::Account(Error::Unavailable))?;
+        // The whole body is here: only now a slot, and it goes with the
+        // conversion onto its thread, so it is held until the worker ended.
+        let slot = Slot::take(&self.pictures.slots, admitted.account)
+            .ok_or(UploadRefusal::Account(Error::Busy))?;
         self.store.charge_picture(admitted.account).await?;
-        let converted = tokio::task::spawn_blocking(move || worker.convert(format, &bytes))
+        let converted = tokio::task::spawn_blocking(move || {
+            let converted = worker.convert(format, &bytes);
+            drop(slot);
+            converted
+        })
             .await
             .map_err(|_| UploadRefusal::Picture(Refusal::Failed))?
             .map_err(UploadRefusal::Picture)?;
@@ -238,7 +257,6 @@ impl IdentityService {
                 },
             )
             .await?;
-        drop(admitted);
         Ok(answer(own))
     }
 
@@ -253,5 +271,28 @@ impl IdentityService {
         encoding: Encoding,
     ) -> Result<Option<(Vec<u8>, PictureDigest)>, Error> {
         self.store.picture_bytes(key, encoding).await
+    }
+}
+
+#[cfg(test)]
+mod slot_tests {
+    use super::{SLOTS, Slot};
+    use std::collections::BTreeSet;
+    use std::sync::{Arc, Mutex};
+
+    #[test]
+    fn slots_are_taken_only_for_conversions_and_one_per_account() {
+        // Admission takes none (`Admitted` holds no slot): uploads whose
+        // bodies stall keep nobody out. Conversions share the slots.
+        let slots = Arc::new(Mutex::new(BTreeSet::new()));
+        let first = Slot::take(&slots, [1; 16]).unwrap();
+        assert!(Slot::take(&slots, [1; 16]).is_none(), "one per account");
+        let second = Slot::take(&slots, [2; 16]).unwrap();
+        assert_eq!(SLOTS, 2);
+        assert!(Slot::take(&slots, [3; 16]).is_none(), "all taken");
+        drop(first);
+        let third = Slot::take(&slots, [3; 16]).unwrap();
+        drop((second, third));
+        assert!(slots.lock().unwrap().is_empty());
     }
 }

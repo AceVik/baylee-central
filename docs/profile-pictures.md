@@ -135,7 +135,7 @@ Each limit is checked before the work it guards:
 | SVG | nesting 128, 20,000 elements | our scan, before `usvg`, whose conversion recurses |
 | Animation | 100 frames, 10 s of play, a canvas of 2048², 200 million composited pixels | `animation.rs`, frame by frame, before each frame's work |
 | Decoder memory | 128 MiB per decoder | `png`, `gif`, `image-webp`, `image` limits |
-| Worker time | 20 s, then the process is ended; ffmpeg's part 12 s | the service's client, the worker, and `RuntimeMaxSec=25` |
+| Worker time | the worker ends itself at 19 s (ffmpeg's part at most 12 s, and done by 17 s); the service ends it at 20 s and holds its conversion slot until then | the worker, the service's client, and `RuntimeMaxSec=20` |
 | Worker memory | `MemoryMax=512M`, ffmpeg included | systemd, production only |
 | Sequence | 512 KiB, 2 to 100 samples, one or two tracks | the worker, the service's check, the schema |
 | At once | 2 conversions; 1 per account | the service, and the socket's `MaxConnections=2` |
@@ -185,7 +185,7 @@ Nothing was measured on x86-64.
   `MemoryDenyWriteExecute`, `PrivateIPC`, nothing executable but the
   worker, ffmpeg and the system's libraries (`NoExecPaths=/`, `ExecPaths=`),
   a private 64 MiB `/tmp`, one CPU, 512 MiB, 32 tasks
-  and 25 s; ffmpeg runs inside the same unit.
+  and 20 s; ffmpeg runs inside the same unit.
 
 **The output.** The centred square, averaged exactly to 256 px (integer
 area averaging weighted by alpha; a fully transparent pixel's colour
@@ -214,8 +214,11 @@ type in `Content-Type`. The checks run in this order:
    metadata, `X-Baylee-Central: 1`, no bearer, the client's address and a
    place in flight, `Content-Length` within the format's bound.
 2. The account, before a byte of the body is read: the session, Central's
-   terms, no block, room in the budget, an upload slot.
-3. The body is read; the budget is spent from here, stored or not.
+   terms, no block, room in the budget.
+3. The body is read, within the listener's places per address. Only then
+   a conversion slot (two in all, one per account), which stays with the
+   conversion until the worker ended; the budget is spent from here,
+   stored or not.
 4. The worker converts it; the service checks the answer and computes the
    digest: SHA-256 of the PNG master followed by the sequence, if any, so
    a report names the animation that was shown.

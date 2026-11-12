@@ -31,6 +31,10 @@ const FFMPEG: &str = "/usr/bin/ffmpeg";
 /// service's `central_picture::TIME` (20 s) with room to answer, so an
 /// animation that runs late loses only its sequence, never its still.
 const ANSWER_BY: Duration = Duration::from_secs(17);
+/// The worker's own end, inside the service's 20 s: past it the process
+/// exits unanswered, whatever a decoder is doing, so no worker outlives the
+/// slot the service holds for it.
+const END_BY: Duration = Duration::from_secs(19);
 
 /// What the command line asks.
 struct Options {
@@ -75,6 +79,10 @@ fn main() -> ExitCode {
             ExitCode::FAILURE
         };
     }
+    std::thread::spawn(move || {
+        std::thread::sleep(END_BY.saturating_sub(started.elapsed()));
+        std::process::exit(2);
+    });
     // A decoder's panic becomes a refusal; its message, which may quote the
     // file, is printed nowhere.
     std::panic::set_hook(Box::new(|_| {}));
