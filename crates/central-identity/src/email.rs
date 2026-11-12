@@ -38,14 +38,19 @@ pub(super) const CODE_MAILS_PER_DAY: usize = 10;
 /// one; one more is refused until a place is free, so the count is never
 /// forgotten for room. A few megabytes at most.
 const CODE_MAIL_ACCOUNTS: usize = 16_384;
-/// Requests for a reset code by mail Central takes in an hour, whoever
-/// asks and whatever the name: far more than people who forgot a password
-/// need, and a bound on what many addresses together can ask of the mailer.
-pub(super) const RESET_REQUESTS_PER_HOUR: usize = 30;
-/// Requests for a reset code that wait for their turn: more than an hour
-/// takes, so the queue is never the reason for a refusal.
-const RESET_QUEUE: usize = 32;
-const _: () = assert!(RESET_QUEUE > RESET_REQUESTS_PER_HOUR);
+/// Reset codes Central mails in an hour, for all accounts together: far
+/// more than people who forgot a password need, and a bound on what
+/// Central asks of the mailer. Counted when a code is made for a mail, not
+/// when it is asked for: requests for names that get no mail spend none of
+/// it, so a few addresses asking about made-up names keep nobody's mail
+/// back. To spend it, someone needs accounts with confirmed addresses, and
+/// each of those has three mails a day.
+pub(super) const RESET_MAILS_PER_HOUR: usize = 30;
+/// Requests for a reset code that wait for the worker. Every request
+/// without a session shares 40 a second ([`crate::limits`]), and the
+/// worker takes one in a few milliseconds, so the queue fills only while
+/// the store does not answer.
+const RESET_QUEUE: usize = 256;
 /// Notices that wait for their turn; one more is not sent. A notice
 /// follows a confirmed or removed address, which are rare.
 const NOTICE_QUEUE: usize = 64;
@@ -83,6 +88,9 @@ pub enum Delivery {
     /// The mailer did not take the mail, or the store could not be asked.
     /// A reset code made for the mail has ended.
     Failed,
+    /// The hour's reset mails ([`RESET_MAILS_PER_HOUR`]) were spent; the
+    /// request was dropped without asking the store.
+    Held,
 }
 
 /// The mails that were asked for and the work that waits, in memory only:
@@ -93,9 +101,9 @@ struct Counted {
     /// When each account asked for a mail with a confirmation code, within
     /// the last day, oldest first.
     codes: BTreeMap<[u8; 16], VecDeque<Instant>>,
-    /// When the last requests for a reset code by mail were taken, within
-    /// the last hour, oldest first.
-    resets: VecDeque<Instant>,
+    /// When reset codes were made for a mail, within the last hour,
+    /// oldest first.
+    reset_mails: VecDeque<Instant>,
     asked: VecDeque<Asked>,
     notices: VecDeque<Mail>,
 }
@@ -131,24 +139,31 @@ impl Counted {
         Ok(())
     }
 
-    /// Take one request for a reset code by mail at `now` and queue it. A
-    /// request without a name that could be an account's is counted like
-    /// any other and not queued. Nothing is counted when the hour is used
-    /// up.
-    fn reset_request(&mut self, asked: Option<Asked>, now: Instant) -> Result<(), Error> {
+    /// Queue one request for a reset code by mail. A request without a
+    /// name that could be an account's is taken and not queued. `Busy` when
+    /// the queue is full.
+    fn reset_request(&mut self, asked: Option<Asked>) -> Result<(), Error> {
+        if self.asked.len() >= RESET_QUEUE {
+            return Err(Error::Busy);
+        }
+        self.asked.extend(asked);
+        Ok(())
+    }
+
+    /// Take a place for one reset mail at `now`, if the hour has one left.
+    fn reset_mail(&mut self, now: Instant) -> bool {
         while self
-            .resets
+            .reset_mails
             .front()
             .is_some_and(|at| now.saturating_duration_since(*at) >= HOUR)
         {
-            self.resets.pop_front();
+            self.reset_mails.pop_front();
         }
-        if self.resets.len() >= RESET_REQUESTS_PER_HOUR || self.asked.len() >= RESET_QUEUE {
-            return Err(Error::Busy);
+        if self.reset_mails.len() >= RESET_MAILS_PER_HOUR {
+            return false;
         }
-        self.resets.push_back(now);
-        self.asked.extend(asked);
-        Ok(())
+        self.reset_mails.push_back(now);
+        true
     }
 }
 
@@ -270,10 +285,10 @@ impl Mails {
         self.queued.notify_one();
     }
 
-    /// Take a request for a reset code by mail: check, count and queue
-    /// it. Nothing of any account is read. `Rejected` for every name
-    /// without a mailer and for a language tag that is none; `Busy` once
-    /// an hour's requests were taken.
+    /// Take a request for a reset code by mail: check and queue it.
+    /// Nothing of any account is read. `Rejected` for every name without a
+    /// mailer and for a language tag that is none; `Busy` while the queue
+    /// is full.
     fn reset_request(&self, username: String, lang: String) -> Result<(), Error> {
         if self.mailer.is_none() {
             return Err(Error::Rejected);
@@ -286,9 +301,24 @@ impl Mails {
         self.counted
             .lock()
             .map_err(|_| Error::Unavailable)?
-            .reset_request(asked, Instant::now())?;
+            .reset_request(asked)?;
         self.queued.notify_one();
         Ok(())
+    }
+
+    /// Take a place for one reset mail in the hour's, or say that none is
+    /// left.
+    fn reset_mail_place(&self) -> bool {
+        self.counted
+            .lock()
+            .is_ok_and(|mut counted| counted.reset_mail(Instant::now()))
+    }
+
+    /// Give back the place a reset mail took when no code was made for it.
+    fn reset_mail_unused(&self) {
+        if let Ok(mut counted) = self.counted.lock() {
+            counted.reset_mails.pop_back();
+        }
     }
 
     /// The next piece of work that waits and the mailer for it: requests
@@ -398,8 +428,7 @@ impl IdentityService {
     /// time it takes are the same for a name that is nobody's, one without
     /// an address, an administrator's and one a code is mailed for.
     /// `Rejected` for every name where Central sends no mail and for a
-    /// language tag that is none; `Busy` once Central took an hour's
-    /// requests.
+    /// language tag that is none; `Busy` while the worker's queue is full.
     pub(super) fn reset_mail(&self, username: String, lang: String) -> Result<Response, Error> {
         self.mails.reset_request(username, lang)?;
         Ok(Response::Done)
@@ -431,14 +460,26 @@ impl IdentityService {
     }
 
     async fn mail_reset(&self, mailer: Arc<dyn Mailer>, asked: &Asked) -> Delivery {
+        // The hour's mails are spent: the request is dropped, as one for a
+        // name that gets no mail is. Its requester was answered long ago.
+        if !self.mails.reset_mail_place() {
+            return Delivery::Held;
+        }
         let Ok(code) = ResetCode::generate() else {
+            self.mails.reset_mail_unused();
             return Delivery::Failed;
         };
         let digest = code.digest();
         let reset = match self.store.issue_mailed_reset(&asked.name, &digest).await {
             Ok(Some(reset)) => reset,
-            Ok(None) => return Delivery::Nothing,
-            Err(_) => return Delivery::Failed,
+            Ok(None) => {
+                self.mails.reset_mail_unused();
+                return Delivery::Nothing;
+            }
+            Err(_) => {
+                self.mails.reset_mail_unused();
+                return Delivery::Failed;
+            }
         };
         let mail = Mail::reset(
             &reset.address,
@@ -536,49 +577,39 @@ mod tests {
     }
 
     #[test]
-    fn central_takes_thirty_reset_requests_an_hour_whatever_the_name() {
+    fn central_mails_thirty_reset_codes_an_hour_and_requests_spend_none() {
         let start = Instant::now();
         let mut counted = Counted::default();
-        for n in 0..RESET_REQUESTS_PER_HOUR {
-            // A request without a name that could be an account's is
-            // counted like any other.
+        // Requests are taken whatever the name and spend nothing of the
+        // hour's mails.
+        for n in 0..RESET_MAILS_PER_HOUR * 4 {
             let request = if n % 2 == 0 { asked("synthetic") } else { None };
-            assert!(counted.reset_request(request, start).is_ok());
+            assert!(counted.reset_request(request).is_ok());
         }
-        assert_eq!(counted.asked.len(), RESET_REQUESTS_PER_HOUR / 2);
-        for name in [asked("synthetic"), asked("another"), None] {
-            assert_eq!(counted.reset_request(name, start), Err(Error::Busy));
-            assert_eq!(
-                counted.reset_request(asked("late"), start + HOUR.saturating_sub(SECOND)),
-                Err(Error::Busy)
-            );
+        assert_eq!(counted.asked.len(), RESET_MAILS_PER_HOUR * 2);
+        assert!(counted.reset_mails.is_empty());
+        for _ in 0..RESET_MAILS_PER_HOUR {
+            assert!(counted.reset_mail(start));
         }
-        // Refused requests were neither counted nor queued.
-        assert_eq!(counted.resets.len(), RESET_REQUESTS_PER_HOUR);
-        assert_eq!(counted.asked.len(), RESET_REQUESTS_PER_HOUR / 2);
+        assert!(!counted.reset_mail(start));
+        assert!(!counted.reset_mail(start + HOUR.saturating_sub(SECOND)));
+        assert_eq!(counted.reset_mails.len(), RESET_MAILS_PER_HOUR);
         // The window rolls: an hour after the first, one more fits.
-        assert!(counted.reset_request(asked("later"), start + HOUR).is_ok());
-        assert_eq!(counted.resets.len(), 1);
+        assert!(counted.reset_mail(start + HOUR));
+        assert_eq!(counted.reset_mails.len(), 1);
     }
 
     #[test]
-    fn a_full_queue_refuses_and_counts_nothing() {
-        let start = Instant::now();
+    fn a_full_queue_refuses_and_queues_nothing() {
         let mut counted = Counted::default();
-        // More than an hour's requests wait only when nothing works on
-        // them for longer than an hour.
-        for n in 0..RESET_QUEUE {
-            let at = start + HOUR * u32::try_from(n).unwrap();
-            assert!(counted.reset_request(asked("synthetic"), at).is_ok());
+        for _ in 0..RESET_QUEUE {
+            assert!(counted.reset_request(asked("synthetic")).is_ok());
         }
-        let late = start + HOUR * u32::try_from(RESET_QUEUE).unwrap();
-        assert_eq!(
-            counted.reset_request(asked("synthetic"), late),
-            Err(Error::Busy)
-        );
-        assert!(counted.resets.is_empty());
+        assert_eq!(counted.reset_request(asked("synthetic")), Err(Error::Busy));
+        assert_eq!(counted.reset_request(None), Err(Error::Busy));
+        assert_eq!(counted.asked.len(), RESET_QUEUE);
         counted.asked.pop_front();
-        assert!(counted.reset_request(asked("synthetic"), late).is_ok());
+        assert!(counted.reset_request(asked("synthetic")).is_ok());
     }
 
     /// One mail as it was handed to the test's mailer.
@@ -754,7 +785,7 @@ mod tests {
                 Err(Error::Rejected)
             );
         }
-        assert!(none.counted.lock().unwrap().resets.is_empty());
+        assert!(none.counted.lock().unwrap().asked.is_empty());
         assert!(none.next().is_none() && !told(&none));
         // With one, a tag that is no language is refused and not counted.
         let fake = Arc::new(Fake::default());
@@ -765,16 +796,18 @@ mod tests {
                 Err(Error::Rejected)
             );
         }
-        assert!(mails.counted.lock().unwrap().resets.is_empty());
+        assert!(mails.counted.lock().unwrap().asked.is_empty());
         assert!(!told(&mails));
-        // Every name is taken alike; one too long to be a name is counted
-        // and not kept. No mail goes out on the request.
+        // Every name is taken alike; one too long to be a name is taken
+        // and not kept. No mail goes out on the request, and none of the
+        // hour's mails is spent.
         let long = "a".repeat(NAME_BYTES + 1);
         for name in ["synthetic", "", "name\r\nwith: more", long.as_str()] {
             assert_eq!(mails.reset_request(name.into(), "pt-br".into()), Ok(()));
         }
         assert_eq!(fake.count(), 0);
-        assert_eq!(mails.counted.lock().unwrap().resets.len(), 4);
+        assert_eq!(mails.counted.lock().unwrap().asked.len(), 3);
+        assert!(mails.counted.lock().unwrap().reset_mails.is_empty());
         // The worker is told once, and finds the three in their order.
         assert!(told(&mails) && !told(&mails));
         for name in ["synthetic", "", "name\r\nwith: more"] {
@@ -784,8 +817,8 @@ mod tests {
             assert_eq!((asked.name.as_str(), asked.lang.as_str()), (name, "pt-br"));
         }
         assert!(mails.next().is_none());
-        // The hour's requests, whatever the name; then every name is busy.
-        for _ in 4..RESET_REQUESTS_PER_HOUR {
+        // A full queue, whatever the name; then every name is busy.
+        for _ in 0..RESET_QUEUE {
             assert_eq!(mails.reset_request("synthetic".into(), "en".into()), Ok(()));
         }
         for name in ["synthetic", "nobody", long.as_str()] {
@@ -794,6 +827,19 @@ mod tests {
                 Err(Error::Busy)
             );
         }
+    }
+
+    #[test]
+    fn a_reset_mail_takes_a_place_of_the_hours_and_one_unused_is_given_back() {
+        let fake = Arc::new(Fake::default());
+        let mails = mailing(&fake);
+        for _ in 0..RESET_MAILS_PER_HOUR {
+            assert!(mails.reset_mail_place());
+        }
+        assert!(!mails.reset_mail_place());
+        mails.reset_mail_unused();
+        assert!(mails.reset_mail_place());
+        assert!(!mails.reset_mail_place());
     }
 
     #[test]
@@ -873,16 +919,21 @@ mod tests {
     #[test]
     fn the_numbers_are_the_documented_ones() {
         assert_eq!((CODE_MAILS_PER_HOUR, CODE_MAILS_PER_DAY), (5, 10));
-        assert_eq!(RESET_REQUESTS_PER_HOUR, 30);
+        assert_eq!(RESET_MAILS_PER_HOUR, 30);
         assert_eq!((CODE_MINUTES, RESET_MINUTES), (15, 60));
-        assert_eq!((RESET_QUEUE, NOTICE_QUEUE, SENDING), (32, 64, 4));
+        assert_eq!((RESET_QUEUE, NOTICE_QUEUE, SENDING), (256, 64, 4));
     }
 
     #[test]
     fn what_became_of_mail_work_prints_nothing_of_it() {
-        for delivery in [Delivery::Sent, Delivery::Nothing, Delivery::Failed] {
+        for delivery in [
+            Delivery::Sent,
+            Delivery::Nothing,
+            Delivery::Failed,
+            Delivery::Held,
+        ] {
             let printed = format!("{delivery:?}");
-            assert!(["Sent", "Nothing", "Failed"].contains(&printed.as_str()));
+            assert!(["Sent", "Nothing", "Failed", "Held"].contains(&printed.as_str()));
         }
     }
 }

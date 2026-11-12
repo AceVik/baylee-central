@@ -71,10 +71,20 @@ pub(super) async fn run(identity: Arc<IdentityService>, stop: watch::Receiver<bo
 }
 
 async fn work(queue: &impl Queue, mut stop: watch::Receiver<bool>) {
+    // When the log last said that the hour's reset mails were spent: once
+    // an hour at most, so that requests past the bound do not fill it.
+    let mut held_said: Option<std::time::Instant> = None;
     while !*stop.borrow() {
         match queue.deliver().await {
             Some(Delivery::Failed) => {
                 eprintln!("central: a mail was not handed to the mailer");
+            }
+            Some(Delivery::Held) => {
+                if held_said.is_none_or(|at| at.elapsed() >= std::time::Duration::from_secs(3_600))
+                {
+                    held_said = Some(std::time::Instant::now());
+                    eprintln!("central: the hour's reset mails are spent; requests are dropped");
+                }
             }
             Some(Delivery::Sent | Delivery::Nothing) => {}
             // Only now is there nothing to do: everything queued before

@@ -13,9 +13,13 @@ pub const MAIL_CODE_MINUTES: i32 = 15;
 /// Wrong codes an address that waits takes; the last of them gives the
 /// address up. Five guesses at 40 bits find a code once in 2^37 tries.
 pub const MAIL_CODE_TRIES: i16 = 5;
-/// Minutes after a password sign-in in which an address may be named: the
-/// rule every change of who can reset a login follows.
-pub const EMAIL_FRESH_MINUTES: i32 = 30;
+/// Minutes after a password sign-in in which an address may be named. An
+/// address can reset the login, so naming one asks nearly what a password
+/// change asks: the page proves the password once more right before it
+/// names the address, and a session someone took from its owner names
+/// none unless it is taken within these minutes of its sign-in. Shorter
+/// than the 30 minutes an administrator's change or a gateway token has.
+pub const EMAIL_FRESH_MINUTES: i32 = 5;
 
 /// An account's address as stored, for the live session that asked.
 pub struct Email {

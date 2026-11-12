@@ -208,7 +208,7 @@ pub enum EmailRequest {
     /// Name an address ([`address`]). Central mails a code to it and keeps
     /// it apart until [`Self::Confirm`]; a confirmed address stays in use
     /// until then. A change of who can reset the login, so it needs a
-    /// password sign-in less than 30 minutes old. A new address replaces
+    /// password sign-in less than five minutes old. A new address replaces
     /// one that waited. `Conflict` when it is the account's address
     /// already. `Busy` when no mail could be handed over or the account
     /// asked too often: nothing was sent, and nothing new waits.

@@ -27,8 +27,10 @@ it was.
 ### `Email { request }`
 
 For a session, on both listeners: the website's cookie or the client's
-bearer. Central's terms in force must be accepted, for every action. The
-answer is always `Email { state }`, the address as Central holds it after
+bearer. `set`, `resend` and `confirm` need Central's terms in force
+accepted; `status`, `withdraw` and `remove` do not, so a person who will
+not accept new terms can still read the address and take it away, as they
+can export and delete the account. The answer is always `Email { state }`, the address as Central holds it after
 the action:
 
 | Field | Meaning |
@@ -44,7 +46,9 @@ The actions:
   and keeps it apart: the address **waits**. A confirmed address stays in
   use until the new one is confirmed. An address that waited before is
   replaced, and its code ends. This changes who can reset the login, so it
-  needs a password sign-in less than 30 minutes old (`Rejected` otherwise).
+  needs a password sign-in less than 5 minutes old (`Rejected` otherwise);
+  the website proves the password once more right before it names the
+  address.
   `Conflict` when the address is the account's confirmed one already.
 - **`resend { lang }`** mails a new code to the address that waits. The
   earlier code ends, the new one lasts its own 15 minutes, and the wrong
@@ -76,12 +80,12 @@ says whether an address is in use.
 Without a session, on both listeners. Central answers **`Done` whatever the
 name**: for a name that is nobody's, an account without an address, an
 account whose address only waits, an administrator's and an ordinary
-account. `Busy` when the asking address or Central as a whole asked too
-often. `Rejected` for a language tag of the wrong shape, and for every name
-where Central sends no mail.
+account. `Busy` when the asking address asked too often or the worker's
+queue is full. `Rejected` for a language tag of the wrong shape, and for
+every name where Central sends no mail.
 
 The request reads nothing of any account. Its handler checks the tag,
-counts the request, puts the name in a queue and answers. It is not
+puts the name in a queue and answers. It is not
 asynchronous and asks the store nothing, so neither the answer nor the time
 it takes depends on the name.
 
@@ -95,6 +99,11 @@ Three more rules hold for a mailed code:
 - It never replaces an administrator's code that has not expired.
 - None is made within 10 minutes of the last one for the account.
 - At most 3 are made for an account in 24 hours.
+- At most 30 are made in an hour for all accounts together. The worker
+  counts a code when it makes one, not a request when it comes: a request
+  for a name that gets no mail spends nothing of the hour. Past the 30 the
+  worker drops a request without asking the store, and the log says so
+  once an hour.
 
 A mailed code lasts 1 hour. It is redeemed exactly as an administrator's
 code is: `ResetStart` and `ResetFinish`, on the website's reset page or
@@ -110,15 +119,15 @@ Every number is a named constant.
 
 | What | Number | Constant |
 | --- | --- | --- |
-| A sign-in is fresh enough to name an address | 30 minutes | `central_postgres::EMAIL_FRESH_MINUTES` |
+| A sign-in is fresh enough to name an address | 5 minutes | `central_postgres::EMAIL_FRESH_MINUTES` |
 | A confirmation code lasts | 15 minutes | `central_postgres::MAIL_CODE_MINUTES` |
 | Wrong codes for an address that waits; the last gives it up | 5 | `central_postgres::MAIL_CODE_TRIES` |
 | Mails with a confirmation code for one account | 5 an hour, 10 a day | `CODE_MAILS_PER_HOUR`, `CODE_MAILS_PER_DAY` (`central-identity`, `email.rs`) |
 | Accounts whose mails are counted at once | 16,384 | `CODE_MAIL_ACCOUNTS` |
 | Mails with a confirmation code handed to the mailer at once | 4 | `SENDING` |
 | Requests for a reset code by mail from one client address, on each listener | 5 an hour | `central_http`'s `RESET_MAIL` (`addresses.rs`) |
-| Requests for a reset code by mail that Central takes, whoever asks | 30 an hour | `RESET_REQUESTS_PER_HOUR` |
-| Requests that wait for the worker | 32 | `RESET_QUEUE` |
+| Reset codes mailed for all accounts together | 30 an hour | `RESET_MAILS_PER_HOUR` |
+| Requests that wait for the worker | 256 | `RESET_QUEUE` |
 | Notices that wait for the worker | 64 | `NOTICE_QUEUE` |
 | A mailed reset code lasts | 1 hour | `central_postgres::MAILED_RESET_HOURS` |
 | No second mailed code for an account within | 10 minutes | `central_postgres::RESET_MAIL_GAP_MINUTES` |
@@ -302,17 +311,30 @@ mail. Both refuse a malformed address or tag before anything is sent.
   mail sent to its address: once in ten minutes, three a day. A new mailed
   code replaces the last mailed one, so a person may be holding a code that
   has just ended.
-- **Thirty an hour for everyone.** One address has 5 requests an hour on
-  each listener, 10 on both. Three addresses that ask on both, or six on
-  one, use up what Central takes in an hour, and others then get `Busy`. An
-  administrator's code still works.
+- **Thirty mails an hour for everyone.** Requests for names that get no
+  mail spend nothing of it, so asking about made-up names keeps nobody's
+  mail back. Someone who holds accounts with confirmed addresses can spend
+  it: each such account gives three mails a day, so keeping the hour spent
+  takes about 240 accounts. Others' requests are then dropped without an
+  answer that says so. An administrator's code still works. (Until
+  12.11.2026 the 30 counted requests, and three addresses asking about any
+  name spent them.)
+- **The queue.** Requests without a session share 40 a second
+  (`limits.rs`); whoever spends those keeps this request out with every
+  other public one. The queue of 256 fills only while the store does not
+  answer.
 - **A session can remove the address.** `remove` and `withdraw` need no
   fresh sign-in. The removed address is told, if the mailer takes the
   notice.
-- **A stolen session with a fresh sign-in can replace the address.** That
-  needs the password. The old address is told.
-- **The terms come first.** A person who does not accept new terms cannot
-  read or remove the address; deleting the account stays open.
+- **A stolen session within five minutes of its sign-in can replace the
+  address**, confirm it from a mailbox the thief reads, and then take the
+  login with a mailed reset code, and with a new vault destroy the data. A
+  session taken later cannot name an address: that needs a new sign-in
+  with the password. The old address is told; an account that had none
+  learns it only from its account area. A password change, which needs
+  the password itself, ends every session.
+- **The terms.** A person who does not accept new terms can read,
+  withdraw and remove the address, and not name a new one.
 - **Timing off the request.** The worker takes longer for a name it mails
   for than for one it does not. A requester sees none of it: the queue
   holds more than an hour's requests, so it is never the reason for an
