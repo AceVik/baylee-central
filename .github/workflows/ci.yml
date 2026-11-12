@@ -74,6 +74,8 @@ jobs:
       - run: cargo fetch --locked
       - name: Verify the exact scope of the bigint advisory exception
         run: cargo xtask crypto-scope
+      - name: Verify that libsqlite3-sys is in no build (RUSTSEC-2026-0459)
+        run: cargo xtask sqlite-scope
       - run: cargo audit --deny warnings
       - run: cargo deny check
 

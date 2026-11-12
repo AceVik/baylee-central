@@ -13,7 +13,7 @@ use std::process::Command;
 
 use crate::fail::Result;
 use crate::process;
-use crate::{client, crypto_scope, policy, workspace};
+use crate::{client, crypto_scope, policy, sqlite_scope, workspace};
 
 fn cargo(root: &Path, args: &[&str], failure: &str) -> Result<()> {
     process::succeed(
@@ -55,6 +55,7 @@ pub(crate) fn run(root: &Path, client: bool) -> Result<()> {
     policy::check(root, true)?;
     println!("{}", policy::PASSED);
     crypto_scope::check(root)?;
+    sqlite_scope::check(root)?;
     scoped(
         root,
         "clippy",

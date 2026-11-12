@@ -1,7 +1,9 @@
 //! The command line: `cargo xtask <task> [flag]`, nothing else.
 
 use crate::fail::{Fail, Result};
-use crate::{crypto_scope, gate, policy, postgres, secrets, site, smoke, wasm, workspace};
+use crate::{
+    crypto_scope, gate, policy, postgres, secrets, site, smoke, sqlite_scope, wasm, workspace,
+};
 
 /// What to run.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -15,6 +17,9 @@ pub enum Task {
     },
     /// The exact source and dependency bounds for the bigint advisory.
     CryptoScope,
+    /// The bound of the `libsqlite3-sys` advisory's exception: in the lock
+    /// file only, in no build.
+    SqliteScope,
     /// The code policy.
     Policy {
         /// Also check that rustc rejects unsafe code under the forbid lint.
@@ -47,6 +52,7 @@ pub const USAGE: &str = "usage: cargo xtask <task>
 
 tasks:
   crypto-scope                 verify the reviewed Ristretto advisory scope
+  sqlite-scope                 verify libsqlite3-sys is in Cargo.lock only, in no build
   gate [--client]               fmt, policy, clippy, tests, doc tests, release build;
                                 --client: only the client's crates, no release build
   policy [--compiler-probe]     the code policy: unsafe, native sources, links, dependencies
@@ -72,6 +78,7 @@ pub fn parse(args: &[String]) -> Result<Task> {
         ("gate", None) => Ok(Task::Gate { client: false }),
         ("gate", Some("--client")) => Ok(Task::Gate { client: true }),
         ("crypto-scope", None) => Ok(Task::CryptoScope),
+        ("sqlite-scope", None) => Ok(Task::SqliteScope),
         ("policy", None) => Ok(Task::Policy {
             compiler_probe: false,
         }),
@@ -108,6 +115,7 @@ pub fn run(args: &[String]) -> Result<()> {
     match task {
         Task::Gate { client } => gate::run(&root, client),
         Task::CryptoScope => crypto_scope::check(&root),
+        Task::SqliteScope => sqlite_scope::check(&root),
         Task::Policy { compiler_probe } => {
             policy::check(&root, compiler_probe)?;
             println!("{}", policy::PASSED);

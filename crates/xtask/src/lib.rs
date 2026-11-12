@@ -23,6 +23,7 @@ mod process;
 mod site;
 mod smoke;
 mod socket;
+mod sqlite_scope;
 mod wasm;
 mod workspace;
 
