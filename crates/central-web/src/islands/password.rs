@@ -34,9 +34,10 @@ fn form_problem(lang: Lang, current: &str, new: &str, repeat: &str) -> Option<&'
     None
 }
 
-/// Why the password is not known to be changed.
+/// Why the password is not known to be changed. A sign-in once more for
+/// another change of the account (`email.rs`) fails in the same ways.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Trouble {
+pub enum Trouble {
     /// The current password is not right: nothing was changed.
     Current,
     /// This browser is not signed in any more: nothing was changed.
@@ -83,8 +84,12 @@ fn as_asked(asked: &Identity, answered: &Identity, sent: &[u8], stored: &[u8]) -
 
 /// Signs the session's account in once more in `crypto` with `current`:
 /// the Worker then holds the key that opens the master key, and the answer
-/// is the account with the wrapper that key opens.
-async fn sign_in_again(crypto: &Crypto, current: &str) -> Result<(Identity, Vec<u8>), Trouble> {
+/// is the account with the wrapper that key opens. The session Central
+/// answers is one whose password sign-in is fresh.
+///
+/// # Errors
+/// Why nobody was signed in again: nothing was changed.
+pub async fn sign_in_again(crypto: &Crypto, current: &str) -> Result<(Identity, Vec<u8>), Trouble> {
     let identity = match call(&Request::AccountSummary).await {
         Ok(Response::AccountSummary { identity, .. }) => identity,
         Ok(_) => return Err(Trouble::Other(Problem::Failed)),

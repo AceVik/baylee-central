@@ -42,6 +42,10 @@ function central(seen: Body[], state: { gone: boolean }) {
         });
       case "login_start":
         return json({ result: "login_challenge", attempt: Array(32).fill(7), message: Array.from({ length: 320 }, (_, i) => (i * 37) % 251) });
+      case "email":
+        // the section below the password's (email.spec.ts): no address
+        if (body.request?.action !== "status") return rejected();
+        return json({ result: "email", state: { mail: true, address: null, confirmed_at: null, pending: null, pending_until: null } });
       default:
         return rejected();
     }
@@ -60,6 +64,8 @@ async function open(page: Page, seen: Body[], state = { gone: false }) {
   await page.goto("/en/account/security");
   await expect(page.locator("html")).toHaveAttribute("data-islands", "ready");
   await expect(page.locator("#password-current")).toBeVisible();
+  // the section below asked what it asks: what a test counts from here on is the password's
+  await expect(page.locator("#email-address")).toBeVisible();
   return state;
 }
 
