@@ -198,7 +198,7 @@ noch ein rc ist)". `leptos` goes from 0.8.23 to `=0.9.0-rc1` in
 - `web-sys` 0.3.107 gains the features `EventSourceInit` and `ToggleEvent`.
 - Everything leaving the graph is a 0.8 version of a package listed here.
 - `wasm-bindgen` 0.2.130, `js-sys` and `web-sys` 0.3.107 do not move, so the
-  committed browser crypto module (`web/src/central-wasm/`, byte-checked) is
+  committed browser crypto module (`crates/central-web/crypto/`, byte-checked) is
   untouched.
 
 Marker counts are the same textual inventory as above (files with an unsafe

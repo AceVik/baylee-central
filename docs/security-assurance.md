@@ -1109,7 +1109,7 @@ including responsive light/dark palettes and a local photograph album. Keep
 account protocols, server boundaries, CSP, dependency versions and external
 origins unchanged. Photographs are the existing metadata-stripped derivatives;
 no production account, private database or credentials enter the test setup.
-Asset provenance is in `web/assets-sunlight.md`.
+Asset provenance is in `web/assets-sunlight.md` (since 12.11.2026 `docs/assets-sunlight.md`).
 
 Implementation pass: decorative images ignore pointer input; the interactive
 cloud is a labelled native button opening the shared native dialog. No HTML
@@ -7216,3 +7216,5 @@ until they are translated. Every other test of the workspace
 (`--no-fail-fast`, that one skipped), the doc tests and the release build
 pass. Nothing ran against a real Central. This is an engineering review
 of two pages, not an audit.
+
+12.11.2026: the old React website (the `web/` app, its tests and its build) was removed from the repository, as the owner decided; the server-rendered site in `crates/central-web` replaces it, administration included. The records above name that app as it was.

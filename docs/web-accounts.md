@@ -699,7 +699,7 @@ Worker, one per flow, terminated at the flow's end. Registration has one
 more before it, for its proof's 16 MiB, ended when the proof is found: a
 Worker's memory does not shrink, so the two never share one. The JS glue is made by
 `wasm-bindgen` (CLI, the same version) and committed under
-`web/src/central-wasm/` with its SHA-256 sums, so `npm run build` needs no
+`crates/central-web/crypto/` with its SHA-256 sums, so `npm run build` needs no
 Rust toolchain; `cargo xtask wasm` rebuilds it on x86-64 Linux (other machines use the
 pinned container), and `cargo xtask wasm --check` (a CI job) proves the
 committed bytes are what the source builds ([xtask](xtask.md)).
@@ -736,7 +736,7 @@ The privacy notice gains:
 
 The CSP gains `'wasm-unsafe-eval'` in `script-src`.
 
-*As built (21.10.2026, `web/README.md` §"Accounts"):*
+*As built (21.10.2026, the old `web/README.md` §"Accounts", removed 12.11.2026):*
 
 - The password needs eight characters at least (OWASP ASVS 6.2.1) and at most
   1024 bytes (the crypto's bound); the strength hint is advice only.

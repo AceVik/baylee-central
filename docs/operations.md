@@ -414,7 +414,7 @@ listener does). A request without a well-formed last hop is refused (400). Do no
 Caddy's `trusted_proxies` for this site unless a CDN in front of it appends its
 own hop: without it Caddy ignores a client's own `X-Forwarded-For`.
 
-The `baylee.app` site block (`web/README.md` §"Serving it") passes `/api/*`
+The `baylee.app` site block ([the server-rendered website](#the-server-rendered-website-central-web)) passes `/api/*`
 to it instead of answering 404, with the `Host` unchanged (Caddy's default for
 a plain-HTTP upstream):
 

@@ -112,7 +112,7 @@ jobs:
             exit 1
           fi
 
-  # The website's browser crypto (web/src/central-wasm/README.md): the
+  # The website's browser crypto (crates/central-web/crypto/README.md): the
   # committed WebAssembly module and glue must be what the source builds,
   # byte for byte, here on Linux whatever machine built them.
   wasm:
@@ -123,12 +123,11 @@ jobs:
         with:
           persist-credentials: false
       - run: rustup toolchain install 1.99.0 --profile minimal --target wasm32-unknown-unknown
-      - name: Rebuild central-web-crypto and compare with web/src/central-wasm
+      - name: Rebuild central-web-crypto and compare with crates/central-web/crypto
         run: cargo xtask wasm --check
 
-  # The web app (web/README.md): typecheck, lint, unit tests, build, then the
-  # Playwright smoke tests against the build at a phone's and a desktop's
-  # width. Every outside service is mocked in the browser (web/e2e/mocks.ts).
+  # The browser test suites' own checks (web/README.md): the typecheck and the
+  # lint of the Playwright suites. The suites themselves run in the site job.
   web:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -146,8 +145,6 @@ jobs:
           cache-dependency-path: web/package-lock.json
       - run: npm ci --no-audit --no-fund
       - run: npm run check
-      - run: npx playwright install --with-deps chromium
-      - run: npm run e2e
 
   # The server-rendered site (docs/proposals/frontend-rewrite.md): the
   # islands linted for the browser's target, the assets built as a deployment
