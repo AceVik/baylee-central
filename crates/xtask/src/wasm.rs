@@ -1,5 +1,5 @@
 //! `central-web-crypto`'s WebAssembly module and its JavaScript glue, which
-//! are committed under `web/src/central-wasm/` so the website builds without
+//! are committed under `crates/central-web/crypto/` so the website builds without
 //! Rust (`docs/xtask.md`, `docs/web-accounts.md` §"Browser crypto").
 //!
 //! The glue comes from the wasm-bindgen CLI at the crate's own version,
@@ -29,7 +29,7 @@ use crate::{process, random, workspace};
 /// match it.
 pub const BINDGEN: &str = "0.2.130";
 /// The committed files, relative to the repository.
-pub const OUTPUT: &str = "web/src/central-wasm";
+pub const OUTPUT: &str = "crates/central-web/crypto";
 /// What wasm-bindgen writes for the crate, in the order the sums list them.
 pub const GENERATED: [&str; 4] = [
     "central_web_crypto.d.ts",

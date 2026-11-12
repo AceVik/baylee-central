@@ -557,7 +557,7 @@ fn islands(root: &Path, target: &Path, site: &mut Site) -> Result<()> {
     Ok(())
 }
 
-/// The committed browser crypto (`web/src/central-wasm`, which `wasm
+/// The committed browser crypto (`crates/central-web/crypto`, which `wasm
 /// --check` proves to be what the source builds), checked against its
 /// `SHA256SUMS`, and the Worker that loads it.
 fn crypto(root: &Path, site: &mut Site) -> Result<()> {

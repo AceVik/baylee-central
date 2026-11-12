@@ -7,8 +7,8 @@
 //! master key, its two wrappers and the initial account document come from
 //! `central-crypto`, the live issuer from `central-api`'s `Endpoint`. It
 //! makes no network call; the page carries every message. Built with
-//! `wasm-bindgen`, whose glue is committed under `web/src/central-wasm/`
-//! (`web/README.md`).
+//! `wasm-bindgen`, whose glue is committed under `crates/central-web/crypto/`
+//! (`crates/central-web/crypto/README.md`).
 #![forbid(unsafe_code)]
 
 mod chat_exports;

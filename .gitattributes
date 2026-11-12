@@ -2,9 +2,9 @@
 *.png binary
 *.jpg binary
 # The browser crypto is committed built and checked by its SHA-256 sums
-# (web/src/central-wasm/README.md): its bytes must never be converted.
+# (crates/central-web/crypto/README.md): its bytes must never be converted.
 *.wasm binary
-web/src/central-wasm/** -text
+crates/central-web/crypto/** -text
 # The BIMI mark is served byte for byte as the owner approved it
 # (docs/proposals/frontend-rewrite.md §23): never converted.
 crates/central-web/assets/bimi/** -text
