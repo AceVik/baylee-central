@@ -30,6 +30,36 @@ opt-level = 3
 [profile.dev.package.blake2]
 opt-level = 3
 
+# The picture worker's codecs (docs/profile-pictures.md) unoptimised take
+# seconds per AVIF and per hostile file in the tests; optimised, the suite
+# and its mutation loops stay short. Checks stay on.
+[profile.dev.package.rav1e]
+opt-level = 3
+[profile.dev.package.rav1d]
+opt-level = 3
+[profile.dev.package.ravif]
+opt-level = 3
+[profile.dev.package.avif-decode]
+opt-level = 3
+[profile.dev.package.yuv]
+opt-level = 3
+[profile.dev.package.zune-jpeg]
+opt-level = 3
+[profile.dev.package.png]
+opt-level = 3
+[profile.dev.package.fdeflate]
+opt-level = 3
+[profile.dev.package.miniz_oxide]
+opt-level = 3
+[profile.dev.package.image-webp]
+opt-level = 3
+[profile.dev.package.gif]
+opt-level = 3
+[profile.dev.package.tiny-skia]
+opt-level = 3
+[profile.dev.package.central-picture-codec]
+opt-level = 3
+
 # `cargo xtask` (.cargo/config.toml): its own directory under target.
 [profile.xtask]
 inherits = "dev"

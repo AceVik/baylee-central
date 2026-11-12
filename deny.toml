@@ -5,11 +5,12 @@ all-features = true
 # Bound by cargo xtask crypto-scope in the gate and dependency job.
 # See docs/crypto-proposal/bigint-advisory.md for the unreachable arithmetic.
 # RUSTSEC-2024-0436: paste 1.0.15 is unmaintained; a compile-time proc macro
-# of Leptos (owner, 10.11.2026, docs/dependency-proposal/leptos.md). Remove
-# when Leptos drops it.
+# of Leptos (owner, 10.11.2026, docs/dependency-proposal/leptos.md), and of
+# rav1e 0.8.1 and rav1d 1.1.0 in the picture worker (owner, 12.11.2026,
+# docs/dependency-proposal/profile-picture.md). Remove when all drop it.
 ignore = [
   "RUSTSEC-2026-0387",
-  { id = "RUSTSEC-2024-0436", reason = "paste: Leptos' compile-time proc macro, owner-accepted 10.11.2026; remove when Leptos drops it" },
+  { id = "RUSTSEC-2024-0436", reason = "paste: compile-time proc macro of Leptos (owner 10.11.2026) and of rav1e 0.8.1 and rav1d 1.1.0 (owner 12.11.2026); remove when all drop it" },
 ]
 unmaintained = "all"
 unsound = "all"
@@ -48,6 +49,16 @@ skip = [
   { name = "itertools", version = "=0.14.0", reason = "SeaORM 2 vs Leptos 0.9's leptos_macro (itertools 0.15)" },
   { name = "prettyplease", version = "=0.3.0", reason = "leptos_macro (syn 3) vs bindgen 0.72's prettyplease 0.2" },
   { name = "proc-macro2-diagnostics", version = "=0.11.0", reason = "Leptos' rstml (syn 3) vs the workspace's 0.10" },
+  # The picture worker's codecs (docs/dependency-proposal/profile-picture.md,
+  # owner 12.11.2026), all in central-picture-codec only.
+  { name = "miniz_oxide", version = "=0.8.9", reason = "png 0.18.1 declares it and calls nothing of it; flate2 1.1.11 uses 0.9" },
+  { name = "nom", version = "=7.1.3", reason = "bindgen's cexpr (push) vs av1-grain's nom 8 (rav1e)" },
+  { name = "rand", version = "=0.9.5", reason = "rav1e's cfg(fuzzing) dependency; in the lock, built by no target" },
+  { name = "rand_core", version = "=0.9.5", reason = "rav1e's cfg(fuzzing) dependency; in the lock, built by no target" },
+  { name = "getrandom", version = "=0.3.4", reason = "rand_core 0.9 under rav1e's cfg(fuzzing); built by no target" },
+  { name = "r-efi", version = "=5.3.0", reason = "getrandom 0.3 under rav1e's cfg(fuzzing); built by no target" },
+  { name = "strum", version = "=0.26.3", reason = "rav1d 1.1.0 (through avif-decode) vs the workspace's strum 0.28" },
+  { name = "zerocopy", version = "=0.7.35", reason = "rav1d 1.1.0 (through avif-decode) vs the workspace's zerocopy 0.8" },
 ]
 
 [licenses]
@@ -69,6 +80,49 @@ allow = ["BSL-1.0"]
 name = "base16"
 version = "=0.2.1"
 allow = ["CC0-1.0"]
+
+# The picture worker's codecs (docs/dependency-proposal/profile-picture.md,
+# owner 12.11.2026), all in central-picture-codec only.
+[[licenses.exceptions]]
+name = "rav1e"
+version = "=0.8.1"
+allow = ["BSD-2-Clause"]
+
+[[licenses.exceptions]]
+name = "av1-grain"
+version = "=0.2.5"
+allow = ["BSD-2-Clause"]
+
+[[licenses.exceptions]]
+name = "v_frame"
+version = "=0.3.9"
+allow = ["BSD-2-Clause"]
+
+[[licenses.exceptions]]
+name = "arrayref"
+version = "=0.3.9"
+allow = ["BSD-2-Clause"]
+
+[[licenses.exceptions]]
+name = "rav1d"
+version = "=1.1.0"
+allow = ["BSD-2-Clause"]
+
+[[licenses.exceptions]]
+name = "avif-parse"
+version = "=2.1.0"
+allow = ["MPL-2.0"]
+
+[[licenses.exceptions]]
+name = "to_method"
+version = "=1.1.0"
+allow = ["CC0-1.0"]
+
+# rav1e's cfg(fuzzing) dependency: in the lock, never built.
+[[licenses.exceptions]]
+name = "libfuzzer-sys"
+version = "=0.4.13"
+allow = ["NCSA"]
 
 [licenses.private]
 ignore = true
