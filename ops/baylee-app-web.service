@@ -1,0 +1,57 @@
+# baylee.app's server-rendered website (`central-web`, docs/operations.md
+# §"The server-rendered website"). Installed once by the owner as
+# /etc/systemd/system/baylee-app-web.service; the deploy hook then puts the
+# binary and the site in place and restarts it (ops/deploy-hook).
+#
+# The process needs no database, no secret and no write access but the
+# optional count of page views (`views` in /etc/baylee-app/web.json, under
+# the state directory below). It asks GitHub (outbound HTTPS) and Central's
+# browser listener on loopback. Its configuration arrives on standard input,
+# opened by systemd, so the file can stay root's.
+[Unit]
+Description=baylee.app website (central-web)
+Wants=network-online.target
+After=network-online.target baylee-central.service
+
+[Service]
+ExecStart=/opt/baylee-app/bin/central-web --config-stdin
+StandardInput=file:/etc/baylee-app/web.json
+StandardOutput=journal
+StandardError=journal
+DynamicUser=yes
+StateDirectory=baylee-app
+UMask=0077
+Restart=on-failure
+RestartSec=2s
+
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+PrivateIPC=yes
+ProtectProc=invisible
+ProcSubset=pid
+ProtectHostname=yes
+ProtectClock=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+RemoveIPC=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources
+NoExecPaths=/
+ExecPaths=/opt/baylee-app/bin/central-web /usr/lib -/lib -/lib64
+
+[Install]
+WantedBy=multi-user.target

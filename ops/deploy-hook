@@ -10,7 +10,9 @@
 # the hook does nothing, so a newer Central deployed by hand stays.
 #
 #   prepare        fetch and build the revision (as the build user), stage it
-#   before-switch  stop Central, install, migrate, grant, start; the website
+#   before-switch  stop Central, install, migrate, grant, start; then the
+#                  website (`central-web` and its site), restarted where its
+#                  unit is installed
 #   after-switch   nothing
 #
 # By hand, for a Central or website change between gateway releases:
@@ -21,8 +23,13 @@
 # anything of it is built, never from the tree a build ran in, and are
 # applied as the login that owns the tables (DB_GRANTOR), never as a
 # database superuser: that file can then do what the migrations it follows
-# can do, and no more. The binary and the website are still what the build
-# made of that revision.
+# can do, and no more. The binaries and the website are still what the
+# build made of that revision.
+#
+# The website is the server-rendered `central-web` (since 12.11.2026; the
+# React build of `web/` is gone): its binary and the site `cargo xtask site`
+# writes, in SITE_ROOT, served by the WEB_UNIT on WEB_LISTEN, which Caddy
+# passes `baylee.app` to (docs/operations.md §"The server-rendered website").
 #
 # Settings: /etc/baylee-central/deploy-hook.env (root's, optional), the
 # variables below. docs/operations.md §"Deploying with the gateway".
@@ -33,7 +40,10 @@ SETTINGS=/etc/baylee-central/deploy-hook.env
 BUILD_USER=viktor
 BAYLEE_SRC=/opt/baylee/src
 CENTRAL_ROOT=/opt/baylee-central
-WEB_ROOT=/opt/baylee-app/web
+WEB_BIN=/opt/baylee-app/bin
+SITE_ROOT=/opt/baylee-app/site
+WEB_UNIT=baylee-app-web
+WEB_LISTEN=127.0.0.1:28794
 UNIT=baylee-central
 LISTEN=127.0.0.1:28790
 DB_CONTAINER=baylee-postgres-1
@@ -98,7 +108,8 @@ contains() {
 # Builds revision $1 and stages the service, the grants and the website.
 stage() {
     local rev=$1
-    if [[ $(cat "$STATE/staged" 2>/dev/null || true) == "$rev" && -x $STAGED/central-service ]]; then
+    if [[ $(cat "$STATE/staged" 2>/dev/null || true) == "$rev" && -x $STAGED/central-service \
+        && -x $STAGED/central-web && -f $STAGED/site/manifest.json ]]; then
         say "$rev is staged already"
         return
     fi
@@ -115,16 +126,17 @@ stage() {
         > "$STATE/grants.sql" || die "no ops/grants.sql in $rev"
     plain_sql "$STATE/grants.sql" || die "ops/grants.sql of $rev is empty or holds a backslash"
     say "building $rev"
-    as_builder bash -c "cd '$SRC' && cargo build -q --release --locked -p central-service"
-    as_builder bash -c "cd '$SRC/web' && npm ci --no-audit --no-fund --silent \
-        && npm run -s content -- '$BAYLEE_SRC' && npm run -s build"
+    as_builder bash -c "cd '$SRC' && cargo build -q --release --locked -p central-service -p central-web-server"
+    # the site, with the gateway's screenshots and fallback card status
+    as_builder bash -c "cd '$SRC' && BAYLEE_SRC='$BAYLEE_SRC' cargo xtask site"
     rm -rf "$STAGED"
     install -d -m755 -o root -g root "$STAGED"
     install -m755 -o root -g root "$SRC/target/release/central-service" "$STAGED/central-service"
+    install -m755 -o root -g root "$SRC/target/release/central-web" "$STAGED/central-web"
     install -m644 -o root -g root "$STATE/grants.sql" "$STAGED/grants.sql"
     rm -f "$STATE/grants.sql"
-    cp -R "$SRC/web/dist" "$STAGED/web"
-    chown -R root:root "$STAGED/web"
+    cp -R "$SRC/target/site" "$STAGED/site"
+    chown -R root:root "$STAGED/site"
     echo "$rev" > "$STATE/staged"
     say "staged $rev"
 }
@@ -153,15 +165,61 @@ switch() {
     as_grantor < "$STAGED/grants.sql" || back "the grants failed"
     systemctl start "$UNIT"
     live || back "$rev does not answer /health/live"
-    rm -rf "$WEB_ROOT.new" "$WEB_ROOT.old"
-    install -d -m755 -o root -g root "$(dirname "$WEB_ROOT")"
-    cp -R "$STAGED/web" "$WEB_ROOT.new"
-    [[ -d $WEB_ROOT ]] && mv "$WEB_ROOT" "$WEB_ROOT.old"
-    mv "$WEB_ROOT.new" "$WEB_ROOT"
-    rm -rf "$WEB_ROOT.old"
     echo "$rev" > "$STATE/deployed"
+    website "$rev"
     rm -f "$STATE/staged"
     say "deployed $rev"
+}
+
+# Installs the staged website: the site beside the old one, then the
+# binary, each kept as `.previous`/`.old` until the restarted unit answers.
+# Where the unit is not installed yet (before the owner's first start), the
+# files are put in place and nothing is started. A website that does not
+# answer is put back and fails the hook; Central stays deployed.
+website() {
+    local rev=$1
+    rm -rf "$SITE_ROOT.new" "$SITE_ROOT.old"
+    install -d -m755 -o root -g root "$(dirname "$SITE_ROOT")" "$WEB_BIN"
+    cp -R "$STAGED/site" "$SITE_ROOT.new"
+    rm -f "$WEB_BIN/central-web.previous"
+    [[ -x $WEB_BIN/central-web ]] && install -m755 -o root -g root "$WEB_BIN/central-web" "$WEB_BIN/central-web.previous"
+    install -m755 -o root -g root "$STAGED/central-web" "$WEB_BIN/central-web.new"
+    mv -f "$WEB_BIN/central-web.new" "$WEB_BIN/central-web"
+    [[ -d $SITE_ROOT ]] && mv "$SITE_ROOT" "$SITE_ROOT.old"
+    mv "$SITE_ROOT.new" "$SITE_ROOT"
+    if ! systemctl cat "$WEB_UNIT" > /dev/null 2>&1; then
+        say "$WEB_UNIT is not installed; the website of $rev is in place for its first start"
+        rm -rf "$SITE_ROOT.old"
+        return
+    fi
+    systemctl restart "$WEB_UNIT"
+    if web_live; then
+        rm -rf "$SITE_ROOT.old"
+        return
+    fi
+    say "the website of $rev does not answer; starting the previous one"
+    if [[ -d $SITE_ROOT.old ]]; then
+        rm -rf "$SITE_ROOT"
+        mv "$SITE_ROOT.old" "$SITE_ROOT"
+    fi
+    [[ -x $WEB_BIN/central-web.previous ]] && mv -f "$WEB_BIN/central-web.previous" "$WEB_BIN/central-web"
+    systemctl restart "$WEB_UNIT" || true
+    exit 1
+}
+
+# Whether the website answers within 30 seconds (its robots.txt, which it
+# writes itself and which needs neither Central nor GitHub).
+web_live() {
+    local try
+    for try in $(seq 30); do
+        if curl -fs -o /dev/null -H 'Host: baylee.app' "http://$WEB_LISTEN/robots.txt"; then
+            say "website live after $try tries"
+            return 0
+        fi
+        sleep 1
+    done
+    curl -fsS -o /dev/null -H 'Host: baylee.app' "http://$WEB_LISTEN/robots.txt" || true
+    return 1
 }
 
 # Whether Central answers its liveness probe within 30 seconds. A service
