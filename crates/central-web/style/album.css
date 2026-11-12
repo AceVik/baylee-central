@@ -917,6 +917,56 @@
   transition: none;
 }
 
+/* With the script the frame holds three prints: the photograph shown and,
+   hidden, the ones before and after it, each the size its photograph takes
+   in the frame, so that a print's place is kept before it has loaded and
+   its shadow falls from the photograph's own edge. Going on, the next print
+   is laid over the one shown, which sinks back into the dark; going back,
+   the one shown is lifted off to the right. A finger moves them as it moves
+   (home.js); only transform and opacity change. */
+.photo-viewport[data-prints] {
+  position: relative;
+  container-type: size;
+}
+
+.photo-print {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  margin: auto;
+  background: #2b3433;
+}
+
+@supports (width: 1cqw) {
+  .photo-print {
+    width: min(100cqw, 100cqh * var(--ratio, 1));
+    height: min(100cqh, 100cqw / var(--ratio, 1));
+  }
+}
+
+.photo-print[data-top] {
+  z-index: 2;
+}
+
+.photo-viewport[data-turning] .photo-print {
+  will-change: transform, opacity;
+}
+
+.photo-print-shadow {
+  position: absolute;
+  inset: 0;
+  box-shadow:
+    0 1.4rem 3rem #000000a6,
+    0 0.3rem 0.9rem #00000070;
+  opacity: 0.35;
+}
+
+.photo-print img {
+  position: relative;
+}
+
 .photo-step-controls,
 .photo-zoom-controls {
   display: flex;
