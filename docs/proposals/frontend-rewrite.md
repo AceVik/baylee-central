@@ -1689,9 +1689,22 @@ through `js_sys`, as `clip` does).
   re-read with its "new reports arrived" line (the Refresh button);
   relative times ("5 minutes ago": absolute UTC as the rest of the
   site); Scryfall's card pictures and links on the chips (the site's
-  `img-src 'self'` admits no other origin, and the chips stay text). The
-  navigation's unread count and the overview's report figures belong to
-  the shared administration navigation and overview.
+  `img-src 'self'` admits no other origin, and the chips stay text); the
+  "clear the filters" button repeated on an empty result (the pills'
+  own is there); a record written by the client has no button label and
+  notice of its own (the facts say who wrote it). The `/admin/reports`
+  alias and the old `/admin/feedback…` addresses get no page here: when
+  the old build goes, a redirect to `/{lang}/account/admin/feedback…`
+  keeps their query strings, which are the same. As in the old build,
+  only deleting for good is confirmed; moving to the trash has Undo, and a
+  selection's changes apply at once. The navigation's unread count and
+  the overview's report figures belong to the shared administration
+  navigation and overview.
+- **Wire, as it is.** A purge's 401 does not say whether the sign-in was
+  stale or a report had left the trash (the page reads the reports again
+  to tell); `AddReportNote` has no idempotency key, so a retry after a
+  lost answer could add the note twice (the page reads the report first
+  and keeps the draft, and the administrator decides).
 - **Open.** The nine translations (the gate fails until then); the
   language menu of a report's page leads to the list in that language
   (the page has no id of its own); a run against a real Central.

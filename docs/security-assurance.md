@@ -7082,8 +7082,14 @@ central-web -p central-web-islands --target wasm32-unknown-unknown --lib
 `cargo xtask site`; in `web/`, `npm run lint` and the specs type-checked
 under the strict settings; `web/e2e-site/feedback*.spec.ts` (17 tests,
 both projects, 34 passed) and `admin.spec.ts` and `account.spec.ts` with
-them. `cargo xtask gate`: see the pull request; it is expected to fail on
-the English share of the nine languages (24 to 27 in 100, the limit 12)
-until the moderation's words are translated, and on the footer above.
-Nothing ran against a real Central. This is an engineering review of two
-pages, not an audit.
+them. `cargo xtask gate` fails, on three findings of which one is this
+change's: its clippy step stops at the footer above and at xtask's
+`BIMI_SHA256`, used by tests only (both as at `d41fce5`); with those two
+silenced in the working tree only, never committed, policy, the crypto
+and SQLite scopes and clippy pass, and the tests stop at
+`no_language_is_english_under_another_name`: the nine languages carry the
+moderation's 297 messages in English (24 to 27 in 100, the limit 12)
+until they are translated. Every other test of the workspace
+(`--no-fail-fast`, that one skipped), the doc tests and the release build
+pass. Nothing ran against a real Central. This is an engineering review
+of two pages, not an audit.
