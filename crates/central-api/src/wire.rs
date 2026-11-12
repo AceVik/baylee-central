@@ -468,9 +468,11 @@ pub enum Request {
         vault: ResetVault,
     },
     /// The session's account and its optional e-mail address
-    /// (`docs/email.md`), on either listener, with Central's terms accepted.
-    /// Naming an address also needs a password sign-in less than 30 minutes
-    /// old. Answered with [`Response::Email`].
+    /// (`docs/email.md`), on either listener. Naming, mailing and
+    /// confirming an address need Central's terms accepted; reading,
+    /// withdrawing and removing do not. Naming one also needs a password
+    /// sign-in less than five minutes old. Answered with
+    /// [`Response::Email`].
     Email {
         /// The action.
         request: crate::email::EmailRequest,

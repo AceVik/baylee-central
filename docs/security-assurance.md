@@ -5874,7 +5874,8 @@ is on the same host and reached over loopback only.
   the request budgets that sessions share. An attempt counts whatever the
   mailer says, so the count bounds what Central asks of the mailer. A full
   table refuses a new account and forgets nobody. `ResetMail` has 5 an hour
-  for a client address on each listener and 30 an hour for everyone. The
+  for a client address on each listener and 30 an hour for everyone
+  (changed the same day to 30 mails an hour; "A second look" below). The
   mailer's own limits are a second line, keyed by `account:` and the id.
 - **The mails.** No text a person typed, except the sign-in name in a
   reset mail, cut down to a name's alphabet and escaped. No image, no
@@ -6032,8 +6033,9 @@ For the owner.
   where two and five were planned: the listeners cut a request at five.
 - Three addresses that ask on both listeners at their limit, or six on
   one, spend the 30 requests an hour that Central takes for everyone. The
-  numbers are constants.
-- Every `Email` action needs accepted terms, `remove` included.
+  numbers are constants. (Changed the same day: "A second look" below.)
+- Every `Email` action needs accepted terms, `remove` included. (Changed
+  the same day: "A second look" below.)
 - No mail says that a reset was finished or a password changed.
 - Nine of the eleven languages hold the English text.
 - A refused `Email` request counts against the session's bearer in the
@@ -6051,3 +6053,52 @@ container was gone after every run, the three mutant runs that failed on
 purpose included, and the smoke test found its listener closed.
 
 Engineering review, not an audit.
+
+### A second look, the same day
+
+Read in the main session after the three pieces were put together (the
+two reviewers that were to read them stopped early). It looked at the
+request for a reset code by mail, the store's statements for the address
+and for a mailed code, the mailer's client and the mails. Three changes:
+
+- **The hour's 30 counted requests, now mails.** Three addresses asking
+  about made-up names at their own limit on both listeners spent the 30
+  requests an hour, and nobody's reset code was mailed until the hour
+  passed: a feature anyone could switch off for everyone with three
+  addresses (with IPv6, with one subscriber's prefix). The worker now
+  counts a code when it makes one (`RESET_MAILS_PER_HOUR`, 30), and the
+  request path counts nothing for all; the queue (256) is bounded and
+  fills only while the store does not answer, since requests without a
+  session share 40 a second in `limits.rs`. To keep the 30 spent someone
+  needs accounts with confirmed addresses, about 240 of them at three mails
+  a day each. Requests past the 30 are dropped, and the journal says so
+  once an hour. The answer and its time on the request path still depend
+  on nothing of any account.
+- **Five minutes, not thirty.** An address can take the login, so a
+  session stolen within thirty minutes of its sign-in could name the
+  thief's address, confirm it and take the login by mail, a path from a
+  stolen session to a taken account that did not exist before. The
+  website proves the password once more right before it names an address,
+  so the window is now five minutes (`EMAIL_FRESH_MINUTES`); a session
+  taken later needs the password. It stays open for those five minutes
+  and is in the accepted limits.
+- **Reading and removing without new terms.** `status`, `withdraw` and
+  `remove` no longer need the terms in force, as export and deletion do
+  not: a person who will not accept new terms can take the address away.
+  `set`, `resend` and `confirm` still need them.
+
+Found sound by reading: the store checks the five minutes in the
+transaction that writes, with the account's row locked; wrong codes are
+counted under that lock, and a renewed code starts its count again with a
+new code; a mailed code is told from an administrator's by the address
+row holding its digest too, and every write of either digest keeps that
+(an administrator's code replaces a mailed one, a mailed one never an
+administrator's that lasts, a confirmed or removed address ends a mailed
+code); the mailer's client connects only to the configured numeric
+loopback address, with no proxy, no redirect and a bounded answer, and
+never prints its token; every text in a mail is escaped, the language is
+one of the eleven or English, and links go to the configured site.
+
+Tested: the unit tests of the hour's mails and the queue, the terms rule
+for each action, and the fixtures of both PostgreSQL suites with the
+five minutes. What ran on the merged tree is in the pull request's text.

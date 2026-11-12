@@ -306,11 +306,36 @@ fn owner(fixture: &Fixture<'_>, asked: &Asked<'_>, home: &Browser) -> Account {
     let registered = register("mail-a", fixture.http, home);
     let identity = registered.identity;
     let cookie = browser_sign_in(home, identity, context(fixture.http, identity), OLD);
-    // Not before Central's terms are accepted, not even to read.
+    // Before Central's terms are accepted the address can be read,
+    // withdrawn and removed, and not named.
+    holds(
+        &asked.web(&cookie, EmailRequest::Status).unwrap(),
+        None,
+        None,
+    );
+    holds(
+        &asked.web(&cookie, EmailRequest::Withdraw).unwrap(),
+        None,
+        None,
+    );
+    holds(
+        &asked.web(&cookie, EmailRequest::Remove).unwrap(),
+        None,
+        None,
+    );
     assert_eq!(
-        asked.web(&cookie, EmailRequest::Status).err(),
+        asked
+            .web(
+                &cookie,
+                EmailRequest::Set {
+                    address: FIRST.into(),
+                    lang: "en".into(),
+                },
+            )
+            .err(),
         Some(Error::TermsRequired)
     );
+    assert_eq!(mailer.count(), 0);
     accept_terms(home, &cookie);
     let (bearer, _) = sign_in(fixture.http, identity, OLD);
     holds(
@@ -560,7 +585,7 @@ fn stale(fixture: &Fixture<'_>, account: &Account) {
     };
     let mailer = fixture.mailer;
     let aged = format!(
-        "UPDATE central_identity.sessions SET created_at = created_at - interval '31 minutes'
+        "UPDATE central_identity.sessions SET created_at = created_at - interval '6 minutes'
          WHERE account_id = '{}'",
         Uuid::from_bytes(account.identity().account)
     );

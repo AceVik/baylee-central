@@ -320,8 +320,8 @@ The server side of [web accounts](web-accounts.md) lands in three PRs.
 - **An account's e-mail address and a reset code by mail** (12.11.2026,
   roadmap M1 step 4; [e-mail](email.md)). Migration 000026: an account's
   optional confirmed address and one that waits for its code. `Email` (a
-  session on either listener, terms accepted): `status`, `set` (a password
-  sign-in under 30 minutes; a code of 40 bits by mail, 15 minutes, five
+  session on either listener; terms accepted for `set`, `resend` and
+  `confirm`): `status`, `set` (a password sign-in under 5 minutes; a code of 40 bits by mail, 15 minutes, five
   wrong tries), `resend`, `confirm`, `withdraw`, `remove`; the address that
   is replaced or removed is told. `ResetMail` (no session, both listeners)
   answers `Done` for every name and reads no account; a worker then makes a

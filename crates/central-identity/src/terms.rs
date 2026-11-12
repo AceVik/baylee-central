@@ -1,7 +1,7 @@
 //! Central's own terms of use, compiled in from `legal/` (`docs/terms.md`),
 //! and the operations on terms.
 use super::{Error, IdentityService, Request, Response, Session, Surface, Token};
-use central_api::owner::OwnerRequest;
+use central_api::{email::EmailRequest, owner::OwnerRequest};
 use central_api::{
     gateway::validate_origin,
     terms::{self, DRAFT, TermsDocument, TermsSubject, TermsText, TermsVersion},
@@ -95,8 +95,6 @@ pub(super) fn needs_acceptance(request: &Request) -> bool {
             | Request::SetRecovery { .. }
             | Request::SetDisplayName { .. }
             | Request::ChangePasswordStart { .. }
-            // An account's address, read or changed (`docs/email.md`).
-            | Request::Email { .. }
             | Request::Admin { .. }
             // A move's export and close wait for the terms, as the gateway
             // tickets before them did (`docs/native-login.md` §"Legacy login").
@@ -109,6 +107,16 @@ pub(super) fn needs_acceptance(request: &Request) -> bool {
         request,
         Request::Owner {
             request: OwnerRequest::AddGateway { .. } | OwnerRequest::CreateToken { .. }
+        }
+    ) || matches!(
+        // An account's address (`docs/email.md`): naming and confirming one
+        // needs the terms; reading it, withdrawing one that waits and
+        // removing it stay open, as deleting the account does.
+        request,
+        Request::Email {
+            request: EmailRequest::Set { .. }
+                | EmailRequest::Resend { .. }
+                | EmailRequest::Confirm { .. }
         }
     )
 }
@@ -350,8 +358,26 @@ mod tests {
             Request::Owner {
                 request: OwnerRequest::RevokeToken { token: [0; 16] },
             },
+            // An address can be read and taken away without them.
+            Request::Email {
+                request: EmailRequest::Status,
+            },
+            Request::Email {
+                request: EmailRequest::Withdraw,
+            },
+            Request::Email {
+                request: EmailRequest::Remove,
+            },
         ] {
             assert!(!needs_acceptance(&free));
+        }
+        for named in [
+            br#"{"action":"set","address":"player@example.org","lang":"en"}"#.as_slice(),
+            br#"{"action":"resend","lang":"en"}"#,
+            br#"{"action":"confirm","code":"000g-40r4"}"#,
+        ] {
+            let request = central_api::decode::<EmailRequest>(named).unwrap();
+            assert!(needs_acceptance(&Request::Email { request }));
         }
         assert!(needs_acceptance(&Request::Notifications {
             request: central_api::notifications::NotificationRequest::Set {

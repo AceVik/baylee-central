@@ -1495,8 +1495,9 @@ website since 12.11.2026 (`/{lang}/reset`). The new site has no page that
 issues the code yet: the old build's admin page does, where it is still
 served (`handle /admin*`, above). A reset code by mail is served on both
 listeners since migration 000026, where the `mail` block is configured
-([mail](#mail)); the website has no form for it yet. The requests for it are
-counted in memory, 30 an hour for everyone: three addresses that ask on
-both listeners at their own limit (six on one) spend that, and others then
-get `Busy` until the hour has passed. Discovery reveals enrollment state for a supplied
+([mail](#mail)), and the website's reset page asks for it. Central mails
+30 reset codes an hour for all accounts together, counted in memory when a
+code is made: requests for names that get no mail spend none of it. Past
+the 30 a request is dropped and the journal says so once an hour
+("the hour's reset mails are spent"). Discovery reveals enrollment state for a supplied
 username (see [native login](native-login.md)), on both listeners.

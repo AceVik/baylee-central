@@ -136,9 +136,9 @@ async fn naming(
             "{lang}"
         );
     }
-    // A sign-in 31 minutes old names nothing; it still reads.
+    // A sign-in 6 minutes old names nothing; it still reads.
     let aged = format!(
-        "UPDATE central_identity.sessions SET created_at = created_at - interval '31 minutes'
+        "UPDATE central_identity.sessions SET created_at = created_at - interval '6 minutes'
          WHERE account_id = '{}' AND kind = 'browser'",
         uuid(owner)
     );
@@ -477,7 +477,7 @@ async fn ending(
     assert_eq!(rows(operator, "account_email_pending", owner).await, 1);
     operator
         .execute_unprepared(&format!(
-            "UPDATE central_identity.sessions SET created_at = created_at - interval '31 minutes'
+            "UPDATE central_identity.sessions SET created_at = created_at - interval '6 minutes'
              WHERE account_id = '{}' AND kind = 'browser'",
             uuid(owner)
         ))
@@ -498,7 +498,7 @@ async fn ending(
     assert!(told.is_none());
     operator
         .execute_unprepared(&format!(
-            "UPDATE central_identity.sessions SET created_at = created_at + interval '31 minutes'
+            "UPDATE central_identity.sessions SET created_at = created_at + interval '6 minutes'
              WHERE account_id = '{}' AND kind = 'browser'",
             uuid(owner)
         ))

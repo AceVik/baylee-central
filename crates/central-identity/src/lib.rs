@@ -1155,7 +1155,8 @@ mod tests {
             request: central_api::email::EmailRequest::Status,
         };
         assert!(uses_session(&address) && browser_operation(&address));
-        assert!(!browser_only(&address) && terms::needs_acceptance(&address));
+        // Reading it needs no accepted terms; naming one does (`terms.rs`).
+        assert!(!browser_only(&address) && !terms::needs_acceptance(&address));
         let mailed = Request::ResetMail {
             username: "synthetic".into(),
             lang: "en".into(),
