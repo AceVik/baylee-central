@@ -1,11 +1,11 @@
 # Profile pictures: dependency proposal and design
 
 **Status: second version of 12.11.2026, with the owner's decisions of the
-same day (below). The build stopped at its first step: the accepted AVIF
-decoder cannot be called without first-party `unsafe` (§0.2). Nothing is
-built.** No `Cargo.toml`, `Cargo.lock`, `deny.toml`, `.cargo/audit.toml` or
-`approved-packages.json` of the repository was changed. All measurements
-ran in a copy of the tree, or in small programs outside the repository.
+same day (§0). The build stopped at its first step, since the accepted AVIF
+decoder cannot be called without first-party `unsafe` (§0.2), and went on
+once the owner accepted `avif-decode` 3.0.0 (§0.3).** The measurements of
+§1 to §5 ran in a copy of the tree, or in small programs outside the
+repository.
 
 The owner must accept the exact packages, versions, features and gate
 changes in §5 before adoption (AGENTS.md: "any required dependency
@@ -269,6 +269,23 @@ altogether: the browser that can show an AVIF converts it. (b) adds a
 second assembly decoder and about 1,700 unsafe markers in source for the
 few people whose browser shows an AVIF but will not let the page read its
 canvas.
+
+### 0.3 The owner's decision on AVIF originals (12.11.2026, form)
+
+Verbatim: "avif-decode 3.0.0 aufnehmen". That is option (b):
+- `avif-decode` 3.0.0 with its 16 packages (assert_matches 1.5.0, atomig
+  0.4.3, atomig-macro 0.4.0, avif-decode 3.0.0, avif-parse 2.1.0,
+  bitreader 0.3.11, fallible_collections 0.5.2, leb128 0.2.7, rav1d 1.1.0,
+  raw-cpuid 11.6.0, strum 0.26.3, strum_macros 0.26.4, to_method 1.1.0,
+  yuv 0.8.20, zerocopy 0.7.35, zerocopy-derive 0.7.35);
+- the licence exceptions MPL-2.0 (`avif-parse`), BSD-2-Clause (`rav1d`)
+  and CC0-1.0 (`to_method`), and the `strum` and `zerocopy` duplicate
+  skips;
+- `rav1d`'s assembly on (nasm on x86-64);
+- all of it only in the codec crate the worker links, never in the service
+  or in anything `central-client` reaches.
+
+Everything else in §0 stands.
 
 ## The owner's first answers (12.11.2026, form)
 
