@@ -10,6 +10,7 @@
 #![forbid(unsafe_code)]
 
 mod answer;
+pub mod av1;
 mod format;
 mod protocol;
 mod sequence;

@@ -304,16 +304,21 @@ fn checked(bytes: Vec<u8>, moving: &Animation, opaque: bool) -> Motion {
     }
 }
 
-/// Starts `command`, again while the program is busy being written
-/// ("text file busy": another thread's fork still held it open for
-/// writing, as a just-written script can be), until `deadline`.
+/// Starts `command`, again while the system says to try again (a program
+/// still open for writing in another thread's fork, "text file busy"; no
+/// process to spare for the moment), until `deadline`.
 fn spawn(command: &mut Command, deadline: Instant) -> Option<Child> {
     loop {
         match command.spawn() {
             Ok(child) => return Some(child),
             Err(error)
-                if error.kind() == std::io::ErrorKind::ExecutableFileBusy
-                    && Instant::now() < deadline =>
+                if matches!(
+                    error.kind(),
+                    std::io::ErrorKind::ExecutableFileBusy
+                        | std::io::ErrorKind::WouldBlock
+                        | std::io::ErrorKind::ResourceBusy
+                        | std::io::ErrorKind::Interrupted
+                ) && Instant::now() < deadline =>
             {
                 std::thread::sleep(Duration::from_millis(10));
             }

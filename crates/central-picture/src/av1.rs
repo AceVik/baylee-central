@@ -4,7 +4,7 @@
 //! what the decoder would allocate. This reads every sequence header OBU in
 //! the item (AV1 §5.5) and refuses one whose frame sizes could exceed
 //! [`MAX_SIDE`] or whose largest frame could exceed [`MAX_PIXELS`].
-use super::{MAX_PIXELS, MAX_SIDE, Refusal};
+use super::Refusal;
 
 /// Every sequence header in `item` allows only frames within the bounds,
 /// and there is at least one.
@@ -12,18 +12,18 @@ use super::{MAX_PIXELS, MAX_SIDE, Refusal};
 /// # Errors
 /// `TooManyPixels` beyond the bounds; `Malformed` for an item without a
 /// whole sequence header.
-pub(crate) fn bounded(item: &[u8]) -> Result<(), Refusal> {
+pub fn bounded(item: &[u8], max_side: u32, max_pixels: u64) -> Result<(), Refusal> {
     let mut rest = item;
     let mut seen = false;
     while !rest.is_empty() {
         let (kind, payload, after) = obu(rest).ok_or(Refusal::Malformed)?;
         if kind == 1 {
-            let (width_bits, height_bits) = frame_bits(payload).ok_or(Refusal::Malformed)?;
+            let (width_bits, height_bits, _) = frame_bits(payload).ok_or(Refusal::Malformed)?;
             let widest = 1_u64 << width_bits;
             let tallest = 1_u64 << height_bits;
-            if widest > u64::from(MAX_SIDE)
-                || tallest > u64::from(MAX_SIDE)
-                || widest * tallest > MAX_PIXELS
+            if widest > u64::from(max_side)
+                || tallest > u64::from(max_side)
+                || widest * tallest > max_pixels
             {
                 return Err(Refusal::TooManyPixels);
             }
@@ -36,6 +36,25 @@ pub(crate) fn bounded(item: &[u8]) -> Result<(), Refusal> {
     } else {
         Err(Refusal::Malformed)
     }
+}
+
+/// The largest frame every sequence header in `item` allows (its
+/// `max_frame_width` and `max_frame_height`); `None` for an item without a
+/// whole sequence header or with an OBU that cannot be read.
+#[must_use]
+pub fn largest(item: &[u8]) -> Option<(u32, u32)> {
+    let mut rest = item;
+    let mut largest: Option<(u32, u32)> = None;
+    while !rest.is_empty() {
+        let (kind, payload, after) = obu(rest)?;
+        if kind == 1 {
+            let (_, _, (width, height)) = frame_bits(payload)?;
+            let (w, h) = largest.unwrap_or((0, 0));
+            largest = Some((w.max(width), h.max(height)));
+        }
+        rest = after;
+    }
+    largest
 }
 
 /// One OBU: its type, its payload and what follows. An OBU without a size
@@ -100,7 +119,7 @@ impl Bits<'_> {
 }
 
 /// `frame_width_bits` and `frame_height_bits` of a sequence header.
-fn frame_bits(payload: &[u8]) -> Option<(u32, u32)> {
+fn frame_bits(payload: &[u8]) -> Option<(u32, u32, (u32, u32))> {
     let mut b = Bits {
         bytes: payload,
         at: 0,
@@ -149,14 +168,19 @@ fn frame_bits(payload: &[u8]) -> Option<(u32, u32)> {
     let width_bits = b.bits(4)? + 1;
     let height_bits = b.bits(4)? + 1;
     // The maxima themselves must be readable too.
-    let _max_width = b.bits(width_bits)?;
-    let _max_height = b.bits(height_bits)?;
-    Some((width_bits, height_bits))
+    let max_width = b.bits(width_bits)?.checked_add(1)?;
+    let max_height = b.bits(height_bits)?.checked_add(1)?;
+    Some((width_bits, height_bits, (max_width, max_height)))
 }
 
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
+
+    /// The worker's bounds: 8,192 px a side, 4096² pixels.
+    fn bounds(item: &[u8]) -> Result<(), Refusal> {
+        bounded(item, 8_192, 16_777_216)
+    }
 
     /// A reduced still-picture sequence header OBU with these bit counts.
     pub(crate) fn sequence(width_bits: u32, height_bits: u32) -> Vec<u8> {
@@ -172,8 +196,9 @@ pub(crate) mod tests {
         push(31, 5);
         push(width_bits - 1, 4);
         push(height_bits - 1, 4);
-        push(0, width_bits);
-        push(0, height_bits);
+        // the largest frames the bits allow
+        push((1 << width_bits) - 1, width_bits);
+        push((1 << height_bits) - 1, height_bits);
         let payload: Vec<u8> = bits
             .chunks(8)
             .map(|chunk| {
@@ -190,24 +215,24 @@ pub(crate) mod tests {
 
     #[test]
     fn frame_bits_bound_the_frame() {
-        assert_eq!(bounded(&sequence(12, 12)), Ok(()));
-        assert_eq!(bounded(&sequence(13, 11)), Ok(()));
-        assert_eq!(bounded(&sequence(14, 8)), Err(Refusal::TooManyPixels));
-        assert_eq!(bounded(&sequence(13, 12)), Err(Refusal::TooManyPixels));
-        assert_eq!(bounded(&sequence(16, 16)), Err(Refusal::TooManyPixels));
+        assert_eq!(bounds(&sequence(12, 12)), Ok(()));
+        assert_eq!(bounds(&sequence(13, 11)), Ok(()));
+        assert_eq!(bounds(&sequence(14, 8)), Err(Refusal::TooManyPixels));
+        assert_eq!(bounds(&sequence(13, 12)), Err(Refusal::TooManyPixels));
+        assert_eq!(bounds(&sequence(16, 16)), Err(Refusal::TooManyPixels));
         // two headers: the second one counts as much as the first
         let both = [sequence(8, 8), sequence(16, 16)].concat();
-        assert_eq!(bounded(&both), Err(Refusal::TooManyPixels));
+        assert_eq!(bounds(&both), Err(Refusal::TooManyPixels));
         // no sequence header at all, a forbidden bit, and every cut
-        assert_eq!(bounded(&[0x12, 0x00]), Err(Refusal::Malformed));
-        assert_eq!(bounded(&[0x8a, 0x00]), Err(Refusal::Malformed));
+        assert_eq!(bounds(&[0x12, 0x00]), Err(Refusal::Malformed));
+        assert_eq!(bounds(&[0x8a, 0x00]), Err(Refusal::Malformed));
         let whole = sequence(10, 10);
         for end in 0..whole.len() {
-            assert!(bounded(&whole[..end]).is_err(), "{end}");
+            assert!(bounds(&whole[..end]).is_err(), "{end}");
         }
         // a size field that never ends
         assert_eq!(
-            bounded(&[0x0a, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]),
+            bounds(&[0x0a, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]),
             Err(Refusal::Malformed)
         );
     }

@@ -700,7 +700,12 @@ async fn blocks(
     set(store, owner, *owner_id, 12, 120).await.unwrap();
     assert_eq!(
         store
-            .decide_picture(moderator, owner_id.account, [120; 32], &PictureDecision::Keep)
+            .decide_picture(
+                moderator,
+                owner_id.account,
+                [120; 32],
+                &PictureDecision::Keep
+            )
             .await,
         Err(Error::Conflict)
     );

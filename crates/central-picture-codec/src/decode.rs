@@ -2,7 +2,7 @@
 //! the header check before it, each giving the first frame as 8-bit RGBA.
 //! Text, colour profiles and every other kind of metadata are skipped or
 //! dropped; only a JPEG's orientation is read.
-use super::{MAX_PIXELS, MAX_SIDE, Raster, Refusal, av1, exif, within};
+use super::{MAX_PIXELS, MAX_SIDE, Raster, Refusal, exif, within};
 use std::io::Cursor;
 
 /// What any decoder may allocate: the largest RGBA picture and as much
@@ -206,9 +206,9 @@ fn webp(bytes: &[u8]) -> Result<Raster, Refusal> {
 /// its alpha, each AV1 item bounded by its sequence header first.
 fn avif(bytes: &[u8]) -> Result<Raster, Refusal> {
     let parsed = avif_parse::read_avif(&mut &bytes[..]).map_err(|_| Refusal::Malformed)?;
-    av1::bounded(&parsed.primary_item)?;
+    central_picture::av1::bounded(&parsed.primary_item, MAX_SIDE, MAX_PIXELS)?;
     if let Some(alpha) = &parsed.alpha_item {
-        av1::bounded(alpha)?;
+        central_picture::av1::bounded(alpha, MAX_SIDE, MAX_PIXELS)?;
     }
     drop(parsed);
     let image = avif_decode::Decoder::from_avif(bytes)
