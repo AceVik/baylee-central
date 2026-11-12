@@ -451,3 +451,28 @@ Human training ingestion remains disabled pending legal basis, rights,
 anonymization and preference-enforcement review. Independent security and
 operational release gates remain; local tests or a green CI run are not a
 production launch approval.
+
+## Profile pictures, 12 November 2026
+
+Built, not deployed ([profile pictures](profile-pictures.md), the owner's
+decisions in the [proposal](dependency-proposal/profile-picture.md) §0 to
+§0.8):
+- an optional picture per account, shown to everyone wherever its display
+  name is, under a random key; reports with a reason and a note, removal
+  with a reason the person is told, blocks, a year's retention of decided
+  reports; deletion and export;
+- every format a browser shows: the page sends a square PNG it drew, or
+  the file itself where it cannot draw it, or where it moves; Central
+  decodes every original in a fresh sandboxed worker and stores a 256 px
+  AVIF and PNG, and for an animated GIF, WebP or APNG an AVIF image
+  sequence made by ffmpeg with `libaom-av1` from the worker's own frames;
+- migration 000027, the routes on the browser listener, the wire's new
+  variants, `central-client`'s functions, the website's card, avatars and
+  moderation.
+
+Open: the owner's steps before deploy (nasm, ffmpeg, Ubuntu Pro, the
+worker's units; [operations](operations.md#profile-pictures)); the privacy
+notice's new section for the owner to read, and the versioned
+`legal/privacy.*.md`, which still says a profile picture will follow; the
+nine languages besides English and German; the game client's decoder
+([proposal §11](dependency-proposal/profile-picture.md)).

@@ -5,7 +5,8 @@
 
 An account may have one profile picture. Everyone can see it, signed in or
 not, wherever its display name is shown. Central keeps it as a 256 × 256
-AVIF and a 256 × 256 PNG, both made by Central from pixels alone.
+AVIF and a 256 × 256 PNG, both made by Central from pixels alone, and a
+picture that moves also as an AVIF image sequence.
 
 ## In short
 
@@ -20,9 +21,10 @@ AVIF and a 256 × 256 PNG, both made by Central from pixels alone.
 - **Pictures that move go as they are.** A canvas holds one frame, so
   the page sends an animated GIF, WebP or APNG itself, says so, and does
   not offer to place the square. The worker composites its frames within
-  bounds ([Animations](#animations)). Until the owner chooses the format
-  an animation is kept in ([proposal §10](dependency-proposal/profile-picture.md)),
-  Central keeps its first frame as the still and nothing of the rest.
+  bounds and hands them, as raw pixels, to ffmpeg with `libaom-av1`,
+  which writes an AVIF image sequence ([Animations](#animations)). The
+  first frame is the still. Where ffmpeg is missing or fails, Central
+  keeps the still alone, the page says so and the service logs it.
 - **Every decoder runs only in the worker.** That is a fresh process per
   picture (`central-picture-worker`), with no secret, no network, no file
   of its own, and memory and time limits. The service links none of the
@@ -87,14 +89,37 @@ in `crates/central-picture-codec/src/animation.rs`:
   200 million composited canvas pixels, the animation keeps its
   beginning. A canvas over 2048² is taken as a still. A frame that cannot
   be read ends the animation there; a file of one frame is a still.
-- **Not kept yet.** The encoder of the animation is one function
-  (`encode::animation`) that returns nothing until the owner chooses the
-  format ([proposal §10](dependency-proposal/profile-picture.md)). Nothing
-  of the frames reaches the service, and the wire carries no animation.
+- **Encoding** (owner, 12.11.2026, [proposal §0.8](dependency-proposal/profile-picture.md)),
+  in `src/ffmpeg.rs`:
+  - ffmpeg is a child of the worker: an absolute path from the worker's
+    command line (`--ffmpeg`, default `/usr/bin/ffmpeg`), no shell, no
+    environment, fixed arguments, only the pipe as input and one file as
+    output, in a fresh directory only the worker may enter (the `avif`
+    muxer cannot write to a pipe), removed after;
+  - it gets the composited 256 px frames as raw RGBA and never sees the
+    uploaded file;
+  - `libaom-av1` on one thread, speed 6, constant rate factor 32, then 40
+    and 48 until the sequence fits 512 KiB; 12 s for the probe and every
+    attempt together, then it is ended;
+  - every frame keeps its duration, the last one included: frames are
+    timed in milliseconds and the input's frame rate is the last frame's;
+  - an opaque picture has one track, a transparent one an alpha track as
+    well; 4:2:0, 8 bits, the stills' colour description.
+- **Checks.** The worker keeps the sequence only when its sample tables
+  hold every frame and every duration. Otherwise the still stands alone,
+  with the reason in the answer (`no_encoder`, `failed`, `too_large`);
+  the service logs a fixed line for each, with a count, and never fails
+  the upload for it. The service checks the sequence's framing again.
+- **An AVIF image sequence** uploaded (major brand `avis`) is refused as
+  `unsupported`: `avif-parse` 2.1.0 refuses it and no accepted package
+  decodes AV1 sequences safely. The page draws its first frame and sends
+  the square, as for any still.
 - **The website.** The page sees an animation in the file's first MiB:
   an APNG's `acTL` before its image data, a WebP's animation flag, or a
   second GIF image. It then sends the file itself and says so
-  (`picture-moving`).
+  (`picture-moving`). It plays a stored sequence only where the system
+  allows motion (`prefers-reduced-motion: no-preference`), and says when
+  an animation was kept as its still (`picture-kept-still`).
 
 ## Limits
 
@@ -109,8 +134,9 @@ Each limit is checked before the work it guards:
 | SVG | nesting 128, 20,000 elements | our scan, before `usvg`, whose conversion recurses |
 | Animation | 100 frames, 10 s of play, a canvas of 2048², 200 million composited pixels | `animation.rs`, frame by frame, before each frame's work |
 | Decoder memory | 128 MiB per decoder | `png`, `gif`, `image-webp`, `image` limits |
-| Worker time | 10 s, then the process is ended | the service's client, and `RuntimeMaxSec=15` |
-| Worker memory | `MemoryMax=384M` | systemd, production only |
+| Worker time | 20 s, then the process is ended; ffmpeg's part 12 s | the service's client, the worker, and `RuntimeMaxSec=25` |
+| Worker memory | `MemoryMax=512M`, ffmpeg included | systemd, production only |
+| Sequence | 512 KiB, 2 to 100 samples, one or two tracks | the worker, the service's check, the schema |
 | At once | 2 conversions; 1 per account | the service, and the socket's `MaxConnections=2` |
 | Budget | 10 uploads an hour, 30 a day per account | the database, counted once the body was read |
 | Reads | 600 a minute and 16 in flight per address | the route |
@@ -129,11 +155,13 @@ Nothing was measured on x86-64.
 
 ## The worker and its protocol
 
-- **Request** on standard input: `BCPQ`, version 1, the format's byte, the
+- **Request** on standard input: `BCPQ`, version 2, the format's byte, the
   length (u32, big-endian), the file. Read with its bound; anything after
   the frame is refused.
-- **Answer** on standard output: `BCPA`, version 1, then either 0 with the
-  AVIF and the PNG, each length-prefixed, or 1 with a refusal's byte. The
+- **Answer** on standard output: `BCPA`, version 2, then either 0 with the
+  AVIF and the PNG, each length-prefixed, and the motion's byte (`still`,
+  `sequence` followed by the length-prefixed sequence, `no_encoder`,
+  `failed`, `too_large`), or 1 with a refusal's byte. The
   refusals are `unsupported`, `wrong_type`, `too_large`,
   `too_many_pixels`, `too_small`, `malformed` and `failed`.
 - **Panics.** A decoder that panics refuses the file (`malformed`). The
@@ -153,7 +181,8 @@ Nothing was measured on x86-64.
   `ops/central-picture@.service`): `DynamicUser`, `PrivateNetwork`,
   `RestrictAddressFamilies=none`, `ProtectSystem=strict`, no
   capabilities, `@system-service` minus `@privileged` and `@resources`,
-  `MemoryDenyWriteExecute`, one CPU, 384 MiB, 4 tasks and 15 s.
+  `MemoryDenyWriteExecute`, a private `/tmp`, one CPU, 512 MiB, 32 tasks
+  and 25 s; ffmpeg runs inside the same unit.
 
 **The output.** The centred square, averaged exactly to 256 px (integer
 area averaging weighted by alpha; a fully transparent pixel's colour
@@ -161,8 +190,11 @@ becomes 0). Then two pictures:
 - a PNG master, RGB when opaque and RGBA otherwise, compressed at the
   highest level; the same pixels give the same bytes;
 - an AVIF from `ravif` 0.13.0 with `rav1e` 0.8.1's assembly, one thread,
-  quality 80 and speed 8. If it is larger than 160 KiB it is made again at
-  60, then 40.
+  8 bits, quality 80 and speed 8. If it is larger than 160 KiB it is made
+  again at 60, then 40.
+
+Every stored file says BT.709 primaries, the sRGB curve, BT.601
+coefficients and full range; the stills are 4:4:4, the sequences 4:2:0.
 
 ## What the service stores and serves
 
@@ -182,7 +214,8 @@ type in `Content-Type`. The checks run in this order:
    terms, no block, room in the budget, an upload slot.
 3. The body is read; the budget is spent from here, stored or not.
 4. The worker converts it; the service checks the answer and computes the
-   digest.
+   digest: SHA-256 of the PNG master followed by the sequence, if any, so
+   a report names the animation that was shown.
 5. One transaction locks the account, checks the session and the block
    again, stores the picture under a new key, and marks open reports of
    the replaced picture `gone`.
@@ -192,7 +225,8 @@ Central refused, or `403 {"refusal": "blocked"}`, or the listener's usual
 statuses. A picture's refusal is never 401, which the page reads as an
 ended session.
 
-**`GET /api/v1/pictures/{key}.avif` and `.png`**, to anyone:
+**`GET /api/v1/pictures/{key}.avif` and `.png`**, and
+**`{key}.sequence.avif`** for a picture that moves, to anyone:
 - same-origin or direct (`Sec-Fetch-Site` absent, `same-origin` or
   `none`), no bearer;
 - answered with `Content-Security-Policy: default-src 'none'; sandbox`,
@@ -204,7 +238,11 @@ ended session.
 
 The page draws
 `<picture><source type="image/avif" srcset="….avif"><img src="….png"></picture>`,
-so the browser chooses.
+so the browser chooses; for a picture that moves, a first source
+`….sequence.avif` with `media="(prefers-reduced-motion: no-preference)"`.
+Clients learn whether a picture moves from `TaggedPicture.moving` and
+`Picture.sequence_bytes`, without a download. Administrators see the
+animation in the moderation list, and a link to open it alone.
 
 **Who learns a key.** A key is learned only from answers that name an
 account already:
@@ -288,21 +326,36 @@ Reports about one's own picture are not exported with their reporters.
     APNG `SOURCE` and `OVER` with every disposal; a separate default
     image; an APNG that claims more frames than it has; WebP; the still
     agreeing with the first frame;
+  - sequences (`sequences.rs`): stand-in encoders that crash, hang,
+    write nothing, garbage, too few frames, other durations or too much,
+    each keeping the still with its reason, the encoder's empty
+    environment and private directory, and nothing left behind; with a
+    real `libaom-av1`: every duration kept, the last one included, one or
+    two tracks, one colour description for still and sequence, and the
+    worker binary's `--ffmpeg`. Those need an ffmpeg with `libaom-av1`
+    (`PICTURE_FFMPEG`; on a host without one, Ubuntu 26.04's in a
+    container through `tests/ffmpeg/ffmpeg`, built from the `Dockerfile`
+    beside it). Without one they say SKIPPED, except where
+    `PICTURE_REQUIRE_FFMPEG=1`, which CI sets: there they fail;
+  - an uploaded AVIF image sequence refused as `unsupported`;
   - seeded mutations of every format;
   - the worker binary behind the real client.
 - **`crates/central-http`:** every header refusal before the body and the
   service; admission before the body; length mismatches; a stalled body;
-  every named refusal; reads to anyone with the headers byte for byte; the
-  same 404 for every refusal; 405; the read budget.
+  every named refusal; reads of all three files to anyone with the headers
+  byte for byte; the same 404 for every refusal, other sequence names and
+  an unknown key's sequence; 405; the read budget.
 - **PostgreSQL fixture:**
-  - set, replace and remove under new keys;
+  - set, replace and remove under new keys, a picture that moves among
+    them (its sequence served, its size the owner's, gone with it);
   - the budget;
   - who learns a key, with the lookup budget and blocks;
   - reports and their bounds;
   - decisions with a fresh sign-in and the exact audit;
   - blocks;
   - the runtime's grants both ways;
-  - the sweep, deletion's cascade, and the upgrade over 000026.
+  - the sweep, deletion's cascade, and the upgrade over 000026 with the
+    sequence column's bounds.
 - **The site (`web/e2e-site/picture.spec.ts`):**
   - PNG, JPEG, GIF, WebP, AVIF, BMP, ICO and SVG through the browser,
     checked by decoding what was sent;
@@ -313,12 +366,15 @@ Reports about one's own picture are not exported with their reporters.
     let the page read its canvas;
   - animated GIF, WebP and APNG sent as they are, without the square's
     controls, and a still PNG still drawn;
+  - a stored sequence played only where motion is allowed, and an
+    animation kept as its still said so;
   - keyboard and zoom;
   - named refusals;
   - removal with confirmation;
   - 320 px in both schemes with axe;
   - `blob:` in the profile page's CSP only;
-  - the administrators' list.
+  - the administrators' list, with a moving picture and the link to its
+    animation.
 - **Fuzzing:** `fuzz/` (outside the workspace) holds a seeded mutation
   fuzzer for every decoder entry point, not coverage-guided;
   [its README](../fuzz/README.md) says why and what ran.
@@ -332,3 +388,10 @@ Reports about one's own picture are not exported with their reporters.
   English words.
 - The legal texts: the owner must read the privacy notice's new section
   (`privacy-picture` in `site.ftl`, and `legal/privacy.*.md`).
+- The game client's decoder: the owner chose `rav1d` 1.1.0 behind a small
+  wrapper in the game client ([proposal §11](dependency-proposal/profile-picture.md)).
+- Not tested here: ffmpeg inside the production unit's sandbox (its
+  system-call filter, `MemoryDenyWriteExecute`, the task limit), anything
+  on x86-64, and Firefox and Safari playing the sequences; the operator's
+  post-deploy check ([operations](operations.md#profile-pictures)) covers
+  the first.

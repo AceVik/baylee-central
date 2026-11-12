@@ -1355,6 +1355,51 @@ conditions are in those sections. The owner's order, as in Baylee
 A client from before this release drops a refusal's body, so after step 3 it shows its own generic
 sign-in failure until the updater has replaced it.
 
+## Profile pictures
+
+What is built is in [profile pictures](profile-pictures.md); the owner's
+decisions of 12.11.2026 are in the
+[proposal](dependency-proposal/profile-picture.md) (§0 and §0.8). Not
+deployed yet. A fresh `central-picture-worker` converts each upload in its
+own sandboxed unit; for an animation it starts ffmpeg inside that unit.
+
+**Once, before the first deploy with pictures** (the owner's steps; read
+on the server on 12.11.2026, where neither package was installed):
+1. **nasm** for the build: `apt-get install nasm` (3.01-1 on Ubuntu
+   26.04). The deploy hook builds the worker, whose `rav1e` and `rav1d`
+   assembly needs it on x86-64; without it the build fails.
+2. **ffmpeg** for animations: `apt-get install --no-install-recommends
+   ffmpeg` (`7:8.0.1-3ubuntu2`, component universe; `apt-get -s` listed 90
+   new packages). It links `libaom-av1` (`libaom3` 3.13.1, installed
+   already). Without it every animation is kept as its still.
+3. **Ubuntu Pro** (owner, 12.11.2026): attach the server (`pro attach`),
+   so that universe, ffmpeg and its libraries among it, gets security
+   updates (`esm-apps`); `pro status` must list `esm-apps` as enabled.
+   They then come with the server's other updates.
+4. **The worker's units:** copy `ops/central-picture.socket` and
+   `ops/central-picture@.service` to `/etc/systemd/system/`, run
+   `systemctl daemon-reload` and `systemctl enable --now
+   central-picture.socket`, and give the service
+   `"pictures": {"socket": "/run/baylee-central/picture.sock"}`. Without
+   it uploads answer `Unavailable` and stored pictures are still served.
+
+**After every deploy, and after every ffmpeg update:**
+- `/opt/baylee-central/bin/central-picture-worker --ffmpeg /usr/bin/ffmpeg
+  --probe` prints `animations: ffmpeg with libaom-av1 found` and exits 0.
+- With a test account, upload an animated GIF on the profile page. It
+  must play there, and `curl -sI
+  https://baylee.app/api/v1/pictures/<its key>.sequence.avif` must answer
+  `200` with `image/avif`; then remove the picture. This is the only check
+  of ffmpeg inside the unit's sandbox (its system-call filter,
+  `MemoryDenyWriteExecute`, 32 tasks, 512 MiB, 25 s), which could not be
+  tested before deploy.
+- The service's journal must hold no line `central: an animation was
+  kept as its still (…)`. `no_encoder` means ffmpeg or `libaom-av1` is
+  missing or did not answer in time; `failed` that ffmpeg failed or was
+  ended: look at `journalctl -u 'central-picture@*'` for a kill by the
+  system-call filter (`SIGSYS`) or by the memory limit. Pictures still
+  work then, as stills; change the unit only with a review.
+
 ## Deploying with the gateway
 
 The 2 November 2026 preparation sets the service and website to

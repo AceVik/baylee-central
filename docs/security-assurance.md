@@ -6963,6 +6963,117 @@ ran on this work as reported in the pull request.
 
 Engineering review, not an audit.
 
+## Profile pictures, 12 November 2026
+
+An account may set a profile picture that everyone sees, signed in or not
+([profile pictures](profile-pictures.md); the owner's decisions and the
+packages he accepted in the [proposal](dependency-proposal/profile-picture.md)
+§0 to §0.8). New: migration 000027, the crates `central-picture` (the
+protocol and the service's checks) and `central-picture-codec` (every
+decoder and encoder, linked only by the worker binary), routes on the
+browser listener, wire variants, moderation, the website's card, and
+ffmpeg as a native runtime dependency of the worker's host.
+
+Design pass. The assets are the service's secrets and database, which a
+stranger's file must not reach; the people shown in pictures; the
+reporters, whom the reported never learn; and the moderators' decisions.
+- **Containment.** Every decoder runs in a fresh process per upload, which
+  holds no secret, has no network and no file but a private `/tmp`, and is
+  bounded in memory, tasks and time by its systemd unit; the service links
+  no codec. The worker's answer is checked by the service as if written by
+  an attacker: a PNG master of exactly three chunks with right CRCs, an
+  AVIF of exactly three boxes, a sequence of exactly four whose sample
+  tables agree; anything else refuses the picture.
+- **ffmpeg** (owner, §0.7 and §0.8) is a child of the worker, inside the
+  same unit, and is fed only frames the worker decoded, bounded and
+  averaged itself, as raw pixels: its parsers never see a stranger's file
+  (ffprobe 8.0.1 crashed on a partial file in the research). No shell, an
+  absolute path from the worker's command line, no environment, the pipe
+  in and one file out in a fresh directory only the worker may enter, a
+  deadline. Its failure keeps the still; it never fails the upload, and
+  the service logs a fixed line so a broken sandbox is seen.
+- **Bounds before work:** upload sizes from `Content-Length`, admission and
+  budgets before the body, header readers of our own before any decoder,
+  an AV1 sequence header bound before `rav1d`, an SVG scan before `usvg`,
+  frame, play, canvas and composited-pixel bounds for animations.
+- **Visibility:** public URLs under a 16-byte random key, new at every
+  upload, never an account's id; keys learned only from answers that name
+  the account already, with the lookup budget and blocks; the same 404 for
+  every refusal; at most an hour in a cache.
+- **Reports** name a picture by the digest of its master and its sequence,
+  so the animation shown is what was reported; administrators see the
+  animation and can open it alone.
+
+Implementation pass. Read for `unsafe` (none: every target root forbids
+it, the policy check passes), panics that cross the process (decoders'
+panics become `malformed`; `rav1d`'s abort ends only the worker), lengths
+and offsets (every box and chunk reader checks its size against what is
+left), logging (no picture, key, address or account in any line; the
+worker prints nothing but its answer), and the ffmpeg runner: the frame
+writer is never waited for beyond the deadline, so a child that holds the
+pipe cannot hold the worker; the directory is removed on every path; the
+probe and every attempt share one deadline inside the service's.
+
+Verification pass. Hostile files on every input path and per format
+(bombs, lying headers, cuts, broken checksums, polyglots, scripts and
+references in SVG, frame bombs and huge canvases), a mutation fuzzer for
+every decoder entry point with no finding (`fuzz/README.md`), stand-in
+encoders for every failure of ffmpeg, the real `libaom-av1` in Ubuntu
+26.04's ffmpeg for durations, tracks and colour, the HTTP routes byte for
+byte, the PostgreSQL fixture with the grants both ways, and the website at
+320 px in both schemes. Not verified: ffmpeg inside the production unit's
+system-call filter and limits (an operator's check after deploy,
+[operations](operations.md#profile-pictures)), anything on x86-64, and
+Firefox and Safari playing the sequences. This is an engineering review,
+not an audit.
+
+### An independent review, 12 November 2026 (addendum)
+
+An independent reviewer probed the build. Findings and what changed:
+- **M1, slots held for free.** Two accounts could hold both conversion
+  slots with bodies that stall or trickle: the slot was taken at
+  admission and the budget charged after the body. Fixed: the slot is
+  taken only once the whole body has arrived (bodies stay bounded by the
+  listener's places per address).
+- **M2, reports lost on re-upload.** Removing a picture and uploading the
+  same file again left every open report `gone`. Fixed in the store: a
+  picture with the same digest reopens its `gone` reports, unless their
+  reporter opened another. Second half (later the same day): each report
+  opens its account's case (`PictureAdmin::Case`), where an administrator
+  removes the current picture by its digest without an open report, under
+  the same lock, fresh sign-in, role check and an audit of the reason code
+  alone; keeping still needs a report. Tested on PostgreSQL and in the
+  browser.
+- **L1, workers outliving their slot.** The slot was freed at the
+  service's deadline or when the request dropped, while the worker ran on.
+  Fixed: the slot moves onto the conversion's thread and lives until the
+  worker ended; the worker ends itself at 19 s; `RuntimeMaxSec=20`.
+- **L2, SVG entities.** Entity expansion passed the element and depth
+  scan (25 KB took 548 MiB and 9.3 s). Fixed: any internal subset and any
+  `<!ENTITY` are refused before a parser runs; the probes are a test.
+- **L3, looser answer checks** than the worker writes. Fixed (later the
+  same day): a still, and a sequence's still item, hold exactly one AV1
+  item or one and its alpha auxiliary; every `ispe` is 256 × 256; colour
+  only `nclx`; no Exif, XMP, ICC or other box; every AV1 sequence header
+  allows at most 256 px. Hostile answers through a stand-in worker are
+  refused; real `ravif` and libaom output passes. A compromised worker can
+  still choose any pixels within those bounds.
+- **Info items:**
+  - fixed:
+    - Caddy's 64 KiB body bound would have refused uploads in
+      production; a `handle /api/v1/picture` block now comes first;
+    - the unit has `NoExecPaths=/` with `ExecPaths=` for the worker,
+      ffmpeg and the libraries, `PrivateIPC=yes` and a 64 MiB `/tmp`;
+    - pictures are cached `private`;
+    - the key lookup now needs a display name, as `Lookup` does;
+    - the fuzzer now counts panics;
+    - a flaky encoder test: a busy just-written stand-in is spawned again;
+  - not fixed: `rav1d`'s threads, which `avif-decode` 3.0.0 offers no
+    setting for.
+- **Still not verified:** the unit's new settings, under systemd, with
+  ffmpeg.
+
+
 ## The administration's other pages on the new site, 12 November 2026
 
 The old build's administration (`/admin`, the accounts, one account, the
@@ -7401,3 +7512,13 @@ check`. The rest of the checks ran once more after #65 and the rebuilt
 browser crypto, and are recorded with them. Nothing ran against a real
 gateway or a real Central. This is the merging agent's engineering review,
 not an independent audit, and the owner's release gates still apply.
+
+**Then PR #65** (profile pictures, stacked on #64): its migration stays 000027,
+after 000026 (26 migrations in all; the runtime's grant list has 42 tables).
+`Request::Picture` is a client's operation for `credential_operation`.
+`--check-accounts-stdin` uses #65's `outside()`, so a picture socket the
+service would refuse is refused before a deploy stops anything, as a mailer
+is; the hook builds the worker with the other two binaries, each named, and
+installs it after its checks. #65 adds no route to the account listener, so
+nothing of it escapes the protocol layer; its upload route is the browser
+listener's. Its SDK stand-in issues a signed token.

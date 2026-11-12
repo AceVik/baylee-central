@@ -3,7 +3,9 @@
 **Status: second version of 12.11.2026, with the owner's decisions of the
 same day (§0). The build stopped at its first step, since the accepted AVIF
 decoder cannot be called without first-party `unsafe` (§0.2), and went on
-once the owner accepted `avif-decode` 3.0.0 (§0.3).** The measurements of
+once the owner accepted `avif-decode` 3.0.0 (§0.3). Animations are AVIF
+image sequences made by ffmpeg (§0.8, research in §10, the game client's
+brief in §11).** The measurements of
 §1 to §5 ran in a copy of the tree, or in small programs outside the
 repository.
 
@@ -315,9 +317,7 @@ What this build does with it, whatever the stored format becomes (§0.6):
 - **Compositing** follows each format's disposal and blending rules.
 - **The still** of an animated picture is its first composited frame, so
   the still and the animation cannot disagree.
-- **Not yet decided:** the format the animation is stored in (§0.6, §10).
-  Until then the worker decodes and bounds the frames, and Central keeps
-  the still.
+- **Stored as** an AVIF image sequence beside the still (§0.8).
 
 ### 0.5 The owner on the game client (12.11.2026)
 
@@ -352,6 +352,57 @@ The project lead's guidance, as relayed:
 - preferably for encoding only, fed our own decoded and bounded frames as
   raw RGBA, so its parsers never see a stranger's file;
 - it is documented as a native runtime dependency of the worker's host.
+
+### 0.8 The owner's decisions on the format (12.11.2026, form)
+
+As relayed by the project lead, after the research of §10. The project
+lead's own call is marked.
+
+1. **Animations:** an AVIF image sequence (`avis`), made by ffmpeg with
+   `libaom-av1` as a sandboxed subprocess of the worker, fed only the
+   worker's own raw RGBA frames. Stills stay on `ravif` and `rav1e`. The
+   fallback stays the PNG 256 still only: no animated fallback.
+2. **ffmpeg on the server:** Ubuntu 26.04's package (component universe).
+   The owner attaches Ubuntu Pro for its security maintenance. Installing
+   it is an operator step for the owner at deploy
+   ([operations](../operations.md#profile-pictures)); nothing here touches
+   the server.
+3. **Game client decoder:** `rav1d` 1.1.0 (BSD-2-Clause) behind a small
+   `unsafe` wrapper in the game client, whose repository allows `unsafe`.
+   The decoder lives in the game client, not in `central-client`. Not part
+   of this work (§11).
+4. **Where the client animates:** everywhere ("Überall").
+5. **Bit depth and colour** (the project lead's call, for a simple
+   client): every stored file is 8-bit, with one colour description for
+   stills and sequences.
+
+What the build does with them:
+- **Encoding.** ffmpeg runs without a shell, from an absolute path given
+  on the worker's command line (default `/usr/bin/ffmpeg`), with no
+  environment, only the pipe as input and one file as output in a fresh
+  private directory (its `avif` muxer cannot write to a pipe), the encoder
+  on one thread and a deadline of 12 s for all attempts. Constant rate
+  factors 32, then 40 and 48 until the sequence fits 512 KiB.
+- **Durations.** Every frame keeps its own, the last one included. The
+  frames are numbered in milliseconds (`settb`, `setpts` as a flat sum of
+  the delays), the encoder counts in milliseconds (`-enc_time_base`), and
+  the input frame rate is set so one input frame lasts as long as the last
+  frame. Tested: six frames of 100, 40, 250, 130, 60 and 500 ms, with and
+  without alpha, came out exactly, with SVT-AV1 (Homebrew's ffmpeg 9.0.2)
+  and with `libaom-av1` (Ubuntu 26.04's ffmpeg 8.0.1). No sentinel frame
+  is needed; the method of §10.3 that lost the last duration is not used.
+- **Checks.** The worker keeps a sequence only when its sample tables
+  hold every frame and every delay, in one track or, with transparency,
+  two. Anything else keeps the still and says why (`no_encoder`, `failed`,
+  `too_large`); the service logs a fixed line for each. An animation's
+  failure never refuses its upload.
+- **Colour.** Stills (`ravif` with `BitDepth::Eight`, 4:4:4) and
+  sequences (4:2:0) both say BT.709 primaries, the sRGB curve, BT.601
+  coefficients and full range: `ravif`'s own description, which ffmpeg is
+  told to match (`scale`, `setparams`). A test compares every `colr` box
+  of both.
+- **The website** plays a sequence only where the system allows motion
+  (`prefers-reduced-motion: no-preference`); elsewhere the still stands.
 
 ## The owner's first answers (12.11.2026, form)
 
@@ -1756,6 +1807,168 @@ error. Central's safety does not depend on any of them.
 - whether the notice, the export and the moderation text meet the GDPR's
   and the DSA's duties, which is the owner's legal check;
 - a third-party audit of any package.
+
+## 10. Formats for animations and the game client (research, 12.11.2026)
+
+Written for the owner's form of §0.8. Two researchers worked in parallel:
+this build and the project lead's own probe. Numbers marked *(lead)* come
+from the lead's report of 12.11.2026 (its clips: synthetic, or built from
+macOS's stock account pictures; measured in an Ubuntu 26.04 arm64
+container on an Apple M1 Max at load averages of 11 to 34). The rest was
+measured here, on the same machine.
+
+### 10.1 Browsers
+
+| Format | Support | First versions |
+| --- | --- | --- |
+| AVIF | 96.71 % (caniuse, StatCounter October 2026); Baseline "widely available" since 25.07.2026 (web-features) | Chrome 85 (25.08.2020), Edge 121 (25.01.2024), Firefox 93 for stills and 113 for sequences (09.05.2023), Safari 16.4 on macOS (27.03.2023; 16.1 to 16.3 partial), iOS 16.1 |
+| WebP, animated | 97.24 % *(lead)* | every current browser |
+| APNG | 97.39 % *(lead)* | every current browser |
+| JPEG XL | 69.25 % (53.99 % full, 15.26 % partial) | Chrome 155, Firefox 158, Safari 17 partial (stills only *(lead)*); Edge and Samsung Internet none |
+
+- **Animated AVIF in browsers.** Chromium 156 decodes ffmpeg's sequences
+  as animated, 50 frames of 80 ms with alpha, and macOS 26.6 ImageIO, which
+  Safari builds on, reads all 50 frames with alpha *(lead)*. Firefox and
+  Safari themselves were not checked. A developer reports on Apple's forum
+  (July 2025, no answer from Apple) that animated AVIF with transparency
+  shows black instead of transparent in Safari 16.6, 18.3 and 18.5, while
+  17.5 is right.
+- **Sources** (read 12.11.2026): caniuse.com/avif and caniuse.com/jpegxl;
+  MDN's "Image file type and format guide"; the web-features explorer's
+  AVIF page; developer.apple.com/forums/thread/794196.
+
+### 10.2 Encoding on the server
+
+Bytes for one clip *(lead)*: 50 frames of 256 px at 12.5 fps (4 s) of a
+photo zoomed and turned; SSIM over RGB against the clean frames.
+
+| Route | Bytes (SSIM) | CPU | New for the server | Verdict |
+| --- | --- | --- | --- | --- |
+| ffmpeg 8.0.1 + `libaom-av1` 3.13.1, inter, CRF 32 | 50,213 (0.954) | 2.2 s for 50 frames with alpha, 137 MB peak; 3.7 s for 100 *(lead)* | the ffmpeg package (§10.3) | **chosen (§0.8)** |
+| `rav1e` 0.8.1, inter, one thread, speed 8 | 98,248 (0.948) at quantizer 80; 134,726 (0.960) at 60; 71,277 (0.933) at 100 | 3.3, 3.8 and 2.8 s | an `avis` writer of our own, a few hundred lines | about twice libaom's bytes at equal SSIM |
+| ffmpeg + SVT-AV1 | fast | 0.2 s for 30 frames | the ffmpeg package | no alpha track: 4:2:0 only, which the `avif` muxer refuses for alpha |
+| `ravif` per frame (all intra) | about 636,000 | | the writer | no smaller than WebP *(lead)* |
+| Animated WebP, lossy (ffmpeg's `libwebp`) | 595,404 (0.945) *(lead)* | | the ffmpeg package | 12 times AVIF |
+| Animated WebP, lossless (`image-webp` 0.2.4 and our own writer) | 4,658,116 for 30 grainy frames | 0.03 s | the writer | too large |
+| GIF | 2,882,693 (0.982) *(lead)* | | | |
+| `zenavif`, `zenwebp`, `jxl-encoder` | | | AGPL-3.0-only or commercial | out for source-available crates |
+
+- `rav1e`'s numbers were measured here on the same clip: raw OBU streams
+  without a container, decoded by ffmpeg and compared as the lead
+  compared libaom's file. Its alpha track, for this opaque clip, was
+  1.2 KB.
+- `avif-serialize` 0.8.9, the newest, writes stills only (no `moov`).
+
+### 10.3 The server's ffmpeg
+
+Read on 12.11.2026 with read-only commands:
+- **Production server** (Ubuntu 26.04.1 LTS, x86-64): `ffmpeg: command
+  not found`. The candidate is `7:8.0.1-3ubuntu2` from universe. Its
+  `libavcodec62` links `libaom3` (3.13.1-2ubuntu0.1, already installed),
+  `libsvtav1enc2` 2.3.0, `librav1e0.8`, `libdav1d7`, `libwebp7` 1.5.0 and
+  `libjxl0.11` 0.11.1. `apt-get -s install --no-install-recommends ffmpeg`
+  there lists 90 new packages (the lead counted about 190 from a bare
+  container). **`nasm` is not installed either** (candidate 3.01-1); the
+  deploy hook's build needs it for `rav1e`'s and `rav1d`'s assembly.
+- **This Mac:** Homebrew's ffmpeg 9.0.2 has SVT-AV1 but neither
+  `libaom-av1` nor a WebP encoder, so animations with alpha cannot be
+  encoded here; the tests run Ubuntu 26.04's ffmpeg in a container
+  (`crates/central-picture-codec/tests/ffmpeg`).
+- **Traps** (the lead's and this build's), each handled in
+  `src/ffmpeg.rs`:
+  - the `avif` muxer refuses a pipe ("does not support non seekable
+    output"), so the worker gives it a file in a private directory;
+  - the alpha branch needs `setparams`, or `libaom` fails;
+  - input cut inside a frame still exits 0, with fewer samples, so the
+    worker counts the samples itself;
+  - `ffprobe` 8.0.1 crashed on such a partial file *(lead)*: ffmpeg's
+    parsers never see a stranger's file here;
+  - the encoder's time base follows the frame rate by default, which
+    rounds per-frame times away (seen with SVT-AV1: 0, 0, 499 ms instead
+    of 100, 40, 250 ms); `-enc_time_base 1/1000` keeps them;
+  - repeating frames on a grid and dropping duplicates (`mpdecimate`)
+    loses the last frame's duration *(lead)*; this build does not do that
+    (§0.8).
+
+### 10.4 Decoding in the game client
+
+- **Bevy 0.20.1** has no AVIF feature (`bevy_image` 0.20.1). `image`
+  0.25.10's `avif-native` decodes through C `libdav1d` and `mp4parse`.
+- **`avif-decode` 3.0.0**, measured here: a 256 px still from the worker
+  decodes in 3.6 ms (median of 300, Apple M1 Max, load average 11) and adds
+  1.55 MB to a stripped binary (1.89 MB against 0.34 MB, thin LTO).
+- **`rav1d` 1.1.0:**
+  - its published crate lacks `src/arm/asm-offsets.h`, so its arm64
+    assembly does not build from crates.io (tried here; upstream issue
+    1449 *(lead)*), and `avif-decode` turns the assembly off away from x86
+    anyway: on Apple Silicon and Android it decodes in plain Rust;
+  - it does not compile for `wasm32-unknown-unknown` (`libc::ptrdiff_t`
+    unresolved, tried here): the client's browser build cannot link it;
+  - its interface is only the `unsafe` C ABI of dav1d;
+  - 1.3 to 4.4 ms per 256 px frame *(lead)*.
+- **Containers:** `avif-parse` 2.1.0 refuses `avis` files ("Animated AVIF
+  is not supported"). `mp4parse` 0.17.0 (MPL-2.0, 29.05.2023) reads
+  sequences and has no `unsafe` in its sources. A reader of the sample
+  tables of Central's own files was 73 lines in the lead's probe.
+- **`rav1d-safe` 0.6.0** (AGPL-3.0-only or commercial) has a safe interface
+  and compiles for wasm32 *(lead; not run there)*. Not chosen (§0.8).
+- **Animated WebP** the client could decode today: it links `image-webp`
+  0.2.4 through Bevy's `webp` feature, 0.8 to 1.8 ms a frame *(lead)*. Not
+  chosen: the bytes of §10.2.
+- **Not measured:** x86-64, Windows and Android builds and timings; an
+  Android cross-build needs its Rust target, which was not downloaded.
+
+### 10.5 JPEG XL
+
+Not now: no Edge, no Samsung Internet and no animation in Safari; no lossy
+encoder in Rust under a licence Central's crates can take (`jxl-encoder`
+0.3.4 is AGPL-3.0-only or commercial, `jpegxl-rs` 0.16.0 binds C++ libjxl
+under GPL-3.0-or-later, `zune-jpegxl` 0.5.2 is lossless only). Decoders
+exist (`jxl-oxide` 0.12.6, `jxl` 0.8.0). Worth a look again in a year.
+
+## 11. For the game client
+
+The client plan of §0.8, as a brief for whoever builds it there.
+
+- **Files per picture key** (all 256 × 256, 8 bits, BT.709 primaries, sRGB
+  curve, BT.601 coefficients, full range):
+  - `/api/v1/pictures/{key}.avif`: the still, 4:4:4, alpha as an
+    auxiliary image when transparent; for a moving picture, its first
+    frame;
+  - `/api/v1/pictures/{key}.png`: the same still, RGB or RGBA;
+  - `/api/v1/pictures/{key}.sequence.avif`, only when the picture moves:
+    `avis`, 4:2:0, a colour track and, when transparent, an alpha track
+    (`auxv`, referenced by `auxl`); each sample's duration in `stts`; the
+    loop count in the edit list (ffmpeg's `-loop`, 0 for ever); a still
+    item (the first frame) in `meta`; 2 to 100 samples, at most 512 KiB.
+- **Learning whether it moves** without downloading:
+  `SocialRequest::Pictures { tags }` answers `TaggedPicture { tag, key,
+  moving }`; the account's own `PictureRequest::Mine` answers `Picture {
+  sequence_bytes, .. }`. `central-client` has `picture_keys` and
+  `picture_path(key, PictureFile::{Avif, Png, Sequence})`.
+- **Caching:** the `ETag` is the digest; `Cache-Control: public,
+  max-age=3600`. A key is new at every upload, and a replaced, removed or
+  deleted picture's key answers 404 at once: drop the cached copy then.
+  A key is never an account's id.
+- **Decoding** (owner, §0.8): `rav1d` 1.1.0 behind a small `unsafe`
+  wrapper in the game client. Stills: the AV1 item of the AVIF (through
+  `avif-parse` 2.1.0 or a reader of its own). Sequences: a reader of the
+  sample tables (`stsz`, `stco`, `stsc`, `stts`) bounded as Central bounds
+  them (refuse more than 100 samples, more than 512 KiB, another size than
+  256 px). Central serves only files its own checks passed, and another
+  player can choose only pixels, never the AV1 bitstream.
+- **Platforms:** x86-64 with `rav1d`'s assembly (nasm when building);
+  arm64 in plain Rust from the published crate (§10.4); the browser build
+  cannot link `rav1d` 1.1.0 and shows the PNG still, or the browser's own
+  decoder later.
+- **Playback** (owner: everywhere): keep the compressed file and decode in
+  a background task into one image per avatar at each frame's time; a
+  loop restarts at sample 0, a key frame; keep each sample's duration and
+  the loop count. A decoded frame is 262 KB. Open for the owner: whether
+  the client follows the system's "reduce motion" setting, as the website
+  does.
+- **Fallback:** on any decoding failure, the PNG still, which Bevy's `png`
+  feature reads today.
 
 ## Appendix A: the new packages of design A
 
