@@ -12,6 +12,7 @@ use sea_orm::{
 
 mod admin;
 mod deletion;
+mod email;
 mod export;
 mod gateways;
 mod grants;
@@ -35,6 +36,7 @@ pub use social::CHAT_SENDER_SHARE;
 mod terms;
 mod tokens;
 pub use admin::{AUDIT_YEARS, Action, Appointed, AuditPage, Swept, appoint_admin, sweep};
+pub use email::{EMAIL_FRESH_MINUTES, Email, MAIL_CODE_MINUTES, MAIL_CODE_TRIES, Told};
 pub use legacy::LegacyMove;
 pub use migration::Status;
 pub use pairing::{Approval, Claim, MAX_POLLS, OPEN_IN_ALL, OPEN_PER_ACCOUNT, Redeemed};
@@ -44,6 +46,7 @@ pub use reports::{
     ALL_STORED, Filer, GATEWAY_STORED, ImportedHistory, ImportedNote, ImportedReport,
     OFFICIAL_STORED, REPORT_BYTES, ReportImport, ReportImportRefusal,
 };
+pub use reset::{MAILED_RESET_HOURS, MailedReset, RESET_MAIL_GAP_MINUTES, RESET_MAILS_A_DAY};
 pub use sessions::{Issued, Session};
 pub use terms::MAX_GATEWAY_VERSIONS;
 

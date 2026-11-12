@@ -6,7 +6,8 @@
 //! tags, then 000012's administration over all of it, then 000013's reset
 //! codes, then 000014's gateway tokens over the registered gateways, then
 //! 000023's open registration over all of it, then 000025's gateway activity
-//! over the gateways. All inside one transaction that is rolled back.
+//! over the gateways, then 000026's e-mail addresses over the accounts. All
+//! inside one transaction that is rolled back.
 use super::scalar;
 use sea_orm::{ConnectionTrait, DatabaseConnection, TransactionTrait};
 
@@ -39,6 +40,7 @@ const OPEN: &str =
     include_str!("../../../central-migration/src/m20261111_000023_open_registration.sql");
 const ACTIVITY: &str =
     include_str!("../../../central-migration/src/m20261111_000025_gateway_activity.sql");
+const EMAIL: &str = include_str!("../../../central-migration/src/m20261112_000026_email.sql");
 
 fn scratch(sql: &str) -> String {
     sql.replace("central_identity", "upgrade_probe")
@@ -127,6 +129,7 @@ pub(crate) async fn run(operator: &DatabaseConnection) {
     tokens(&tx).await;
     open_registration(&tx).await;
     activity(&tx).await;
+    email(&tx).await;
     tx.rollback().await.unwrap();
     assert_eq!(
         scalar(
@@ -685,6 +688,259 @@ async fn tokens(tx: &sea_orm::DatabaseTransaction) {
     ] {
         refused(tx, &sql).await;
     }
+}
+
+/// 000026 over the accounts the earlier steps left: every account row is as
+/// it was and none has an address; the prior binary's statements for a
+/// reset code (make, clear, sweep) still run, and a code they make is no
+/// mailed one; an address and one that waits are taken for any account,
+/// the same address for two, and both go with their account; the CHECKs
+/// refuse what the service never writes.
+async fn email(tx: &sea_orm::DatabaseTransaction) {
+    let accounts =
+        "SELECT pg_catalog.md5(pg_catalog.string_agg(a::text, '|' ORDER BY a.id)) AS value
+        FROM upgrade_probe.accounts a";
+    let text = |sql: &'static str| async move {
+        tx.query_one_raw(sea_orm::Statement::from_string(
+            sea_orm::DbBackend::Postgres,
+            sql,
+        ))
+        .await
+        .unwrap()
+        .unwrap()
+        .try_get::<String>("", "value")
+        .unwrap()
+    };
+    let changed = |sql: String| async move {
+        assert_eq!(
+            tx.execute_unprepared(&sql).await.unwrap().rows_affected(),
+            1,
+            "{sql}"
+        );
+    };
+    let before = text(accounts).await;
+    tx.execute_unprepared(&scratch(EMAIL)).await.unwrap();
+    assert_eq!(text(accounts).await, before);
+    for table in ["account_emails", "account_email_pending"] {
+        assert_eq!(
+            scalar(
+                tx,
+                &format!("SELECT count(*)::bigint AS value FROM upgrade_probe.{table}")
+            )
+            .await,
+            0
+        );
+    }
+    // An enrolled account, and one whose registration is not finished: the
+    // schema takes an address for either, the service only for the first.
+    let player = "(SELECT id FROM upgrade_probe.accounts WHERE username_key = 'registered-player')";
+    let second = "(SELECT id FROM upgrade_probe.accounts WHERE username_key = 'later-registered')";
+    // This binary's rows: an address with what a reset by mail keeps, and
+    // one that waits; the same address for a second account.
+    changed(format!(
+        "INSERT INTO upgrade_probe.account_emails (account_id, address, lang)
+         VALUES ({player}, 'player@example.org', 'de')"
+    ))
+    .await;
+    changed(format!(
+        "INSERT INTO upgrade_probe.account_emails (account_id, address, lang, reset_mailed)
+         VALUES ({second}, 'player@example.org', 'zh-hant',
+             ARRAY[clock_timestamp(), clock_timestamp(), clock_timestamp()])"
+    ))
+    .await;
+    changed(format!(
+        "INSERT INTO upgrade_probe.account_email_pending
+             (account_id, address, lang, code_digest, expires_at, tries)
+         VALUES ({player}, 'o''brien+tag@mail.example.co.uk', 'en',
+             decode(repeat('71', 32), 'hex'), clock_timestamp() + interval '15 minutes', 4)"
+    ))
+    .await;
+    email_prior(tx, player).await;
+    // This binary's mark of a mailed code: the same digest in both places.
+    changed(format!(
+        "UPDATE upgrade_probe.account_emails SET reset_digest = decode(repeat('73', 32), 'hex')
+         WHERE account_id = {player}"
+    ))
+    .await;
+    email_held(tx, player, second).await;
+    email_gone(tx).await;
+}
+
+/// The prior binary's statements for a reset code over 000026, which name
+/// no address: an administrator's code is made, cleared by a password
+/// change, made again and swept once it is over.
+async fn email_prior(tx: &sea_orm::DatabaseTransaction, player: &str) {
+    let changed = |sql: String| async move {
+        assert_eq!(
+            tx.execute_unprepared(&sql).await.unwrap().rows_affected(),
+            1,
+            "{sql}"
+        );
+    };
+    let issue = format!(
+        "UPDATE upgrade_probe.accounts SET reset_digest = decode(repeat('72', 32), 'hex'),
+         reset_expires = pg_catalog.clock_timestamp() + interval '24 hours'
+         WHERE id = {player} AND credential IS NOT NULL AND (source = 'registered' OR legacy_closed)
+         AND NOT EXISTS (SELECT 1 FROM upgrade_probe.account_roles r
+             WHERE r.account_id = {player} AND r.role = 'admin')"
+    );
+    changed(issue.clone()).await;
+    // Such a code is on the account's row only: nothing marks it as mailed.
+    assert_eq!(
+        scalar(
+            tx,
+            "SELECT count(*)::bigint AS value FROM upgrade_probe.accounts a
+             JOIN upgrade_probe.account_emails e ON e.account_id = a.id
+             WHERE a.reset_digest = e.reset_digest"
+        )
+        .await,
+        0
+    );
+    changed(format!(
+        "UPDATE upgrade_probe.accounts SET reset_digest = NULL, reset_expires = NULL
+         WHERE id = {player} AND credential IS NOT NULL"
+    ))
+    .await;
+    changed(issue).await;
+    changed(format!(
+        "UPDATE upgrade_probe.accounts SET reset_expires = clock_timestamp() - interval '1 second'
+         WHERE id = {player}"
+    ))
+    .await;
+    tx.execute_unprepared(
+        "UPDATE upgrade_probe.accounts SET reset_digest = NULL, reset_expires = NULL
+         WHERE reset_expires <= pg_catalog.clock_timestamp()",
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        scalar(
+            tx,
+            &format!(
+                "SELECT count(*)::bigint AS value FROM upgrade_probe.accounts
+                 WHERE id = {player} AND reset_digest IS NULL"
+            )
+        )
+        .await,
+        1
+    );
+}
+
+/// An account's address and the one that waits go with the account.
+async fn email_gone(tx: &sea_orm::DatabaseTransaction) {
+    let changed = |sql: String| async move {
+        assert_eq!(
+            tx.execute_unprepared(&sql).await.unwrap().rows_affected(),
+            1,
+            "{sql}"
+        );
+    };
+    changed(
+        "INSERT INTO upgrade_probe.accounts (source, username_key, enrollment_digest, enrollment_expires)
+         VALUES ('registered', 'mail-registered', decode(repeat('74', 32), 'hex'),
+             clock_timestamp() + interval '10 minutes')"
+            .into(),
+    )
+    .await;
+    let gone = "(SELECT id FROM upgrade_probe.accounts WHERE username_key = 'mail-registered')";
+    changed(format!(
+        "INSERT INTO upgrade_probe.account_emails (account_id, address, lang)
+         VALUES ({gone}, 'gone@example.org', 'en')"
+    ))
+    .await;
+    changed(format!(
+        "INSERT INTO upgrade_probe.account_email_pending
+             (account_id, address, lang, code_digest, expires_at)
+         VALUES ({gone}, 'next@example.org', 'en', decode(repeat('75', 32), 'hex'),
+             clock_timestamp() + interval '15 minutes')"
+    ))
+    .await;
+    changed("DELETE FROM upgrade_probe.accounts WHERE username_key = 'mail-registered'".into())
+        .await;
+    for (table, left) in [("account_emails", 2), ("account_email_pending", 1)] {
+        assert_eq!(
+            scalar(
+                tx,
+                &format!("SELECT count(*)::bigint AS value FROM upgrade_probe.{table}")
+            )
+            .await,
+            left,
+            "{table}"
+        );
+    }
+}
+
+/// What 000026's rules refuse, over the rows `email` wrote: each statement
+/// breaks one rule and no other.
+async fn email_held(tx: &sea_orm::DatabaseTransaction, player: &str, second: &str) {
+    let long = format!("{}@example.org", "a".repeat(243));
+    assert_eq!(long.len(), 255);
+    for sql in [
+        // One address and one that waits for an account; none for no account.
+        format!(
+            "INSERT INTO upgrade_probe.account_emails (account_id, address, lang)
+             VALUES ({player}, 'other@example.org', 'en')"
+        ),
+        format!(
+            "INSERT INTO upgrade_probe.account_email_pending
+                 (account_id, address, lang, code_digest, expires_at)
+             VALUES ({player}, 'other@example.org', 'en', decode(repeat('76', 32), 'hex'),
+                 clock_timestamp())"
+        ),
+        "INSERT INTO upgrade_probe.account_emails (account_id, address, lang)
+         VALUES (pg_catalog.uuidv7(), 'other@example.org', 'en')"
+            .into(),
+        // An address that is no single plain one.
+        format!("UPDATE upgrade_probe.account_emails SET address = 'plain' WHERE account_id = {player}"),
+        format!("UPDATE upgrade_probe.account_emails SET address = 'a@b@example.org' WHERE account_id = {player}"),
+        format!("UPDATE upgrade_probe.account_emails SET address = 'a b@example.org' WHERE account_id = {player}"),
+        format!("UPDATE upgrade_probe.account_emails SET address = 'a@exa_mple.org' WHERE account_id = {player}"),
+        format!(
+            "UPDATE upgrade_probe.account_emails SET address = E'a@example.org\\r\\nBcc: b@example.org'
+             WHERE account_id = {player}"
+        ),
+        format!("UPDATE upgrade_probe.account_emails SET address = 'ä@example.org' WHERE account_id = {player}"),
+        format!("UPDATE upgrade_probe.account_emails SET address = '{long}' WHERE account_id = {player}"),
+        format!("UPDATE upgrade_probe.account_emails SET address = NULL WHERE account_id = {player}"),
+        format!("UPDATE upgrade_probe.account_email_pending SET address = 'a@b' || chr(9) || '.org' WHERE account_id = {player}"),
+        // A language that is no tag.
+        format!("UPDATE upgrade_probe.account_emails SET lang = 'EN' WHERE account_id = {player}"),
+        format!("UPDATE upgrade_probe.account_emails SET lang = 'e' WHERE account_id = {player}"),
+        format!("UPDATE upgrade_probe.account_emails SET lang = 'abcdefghijk' WHERE account_id = {player}"),
+        format!("UPDATE upgrade_probe.account_email_pending SET lang = 'en-' WHERE account_id = {player}"),
+        // A digest of another length, a count outside the five tries, a
+        // code without an end.
+        format!(
+            "UPDATE upgrade_probe.account_emails SET reset_digest = decode(repeat('77', 31), 'hex')
+             WHERE account_id = {player}"
+        ),
+        format!(
+            "UPDATE upgrade_probe.account_email_pending SET code_digest = decode(repeat('77', 33), 'hex')
+             WHERE account_id = {player}"
+        ),
+        format!("UPDATE upgrade_probe.account_email_pending SET code_digest = NULL WHERE account_id = {player}"),
+        format!("UPDATE upgrade_probe.account_email_pending SET tries = 5 WHERE account_id = {player}"),
+        format!("UPDATE upgrade_probe.account_email_pending SET tries = -1 WHERE account_id = {player}"),
+        format!("UPDATE upgrade_probe.account_email_pending SET expires_at = NULL WHERE account_id = {player}"),
+        // A fourth time a reset code was mailed.
+        format!(
+            "UPDATE upgrade_probe.account_emails SET reset_mailed = reset_mailed || clock_timestamp()
+             WHERE account_id = {second}"
+        ),
+    ] {
+        refused(tx, &sql).await;
+    }
+    // A text of 254 characters is taken here; the service's own check of
+    // an address is the stricter one.
+    let longest = format!("{}@example.org", "a".repeat(242));
+    let taken = tx
+        .execute_unprepared(&format!(
+            "UPDATE upgrade_probe.account_email_pending SET address = '{longest}'
+             WHERE account_id = {player}"
+        ))
+        .await
+        .unwrap();
+    assert_eq!(taken.rows_affected(), 1);
 }
 
 /// 000025 over the gateways the earlier steps left, a registered one that

@@ -29,6 +29,8 @@ impl AccountStore {
              ('terms_acceptances', ARRAY['SELECT','INSERT'], NULL),
              ('registration', ARRAY['SELECT'], ARRAY['open','changed_at','changed_by']),
              ('account_roles', ARRAY['SELECT','INSERT','DELETE'], NULL),
+             ('account_emails', ARRAY['SELECT','INSERT','UPDATE','DELETE'], NULL),
+             ('account_email_pending', ARRAY['SELECT','INSERT','UPDATE','DELETE'], NULL),
              ('audit_events', ARRAY['SELECT','INSERT'], NULL),
              ('pairings', ARRAY['SELECT','INSERT','UPDATE','DELETE'], NULL),
              ('social_contacts', ARRAY['SELECT','INSERT','UPDATE','DELETE'], NULL),
@@ -49,7 +51,7 @@ impl AccountStore {
              ('report_audit', ARRAY['SELECT','INSERT'], NULL),
              ('report_views', ARRAY['SELECT','INSERT','DELETE'], ARRAY['query']),
              ('report_seen', ARRAY['SELECT','INSERT','DELETE'], NULL))
-             SELECT count(*) = 35 AND bool_and(
+             SELECT count(*) = 37 AND bool_and(
                NOT pg_catalog.pg_has_role(c.relowner, 'USAGE')
                AND (SELECT bool_and(pg_catalog.has_table_privilege(c.oid, p)) FROM unnest(r.privileges) p)
                AND NOT pg_catalog.has_table_privilege(c.oid, 'TRUNCATE, REFERENCES, TRIGGER, MAINTAIN, SELECT WITH GRANT OPTION, INSERT WITH GRANT OPTION, UPDATE WITH GRANT OPTION, DELETE WITH GRANT OPTION')
