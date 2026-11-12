@@ -5149,6 +5149,23 @@ route.
   in them and has one per language now. The checker compared ids, order,
   tags and paragraphs; nobody who speaks the languages read them.
 
+- **The recovery code's copy button** is one piece now (`clip::copier`)
+  and the registration's code step has it too, as `web-accounts.md` had
+  said it would. The code goes to `navigator.clipboard.writeText` and
+  nowhere else; a browser that refuses is told to the person.
+
+Checks on the merged tree (`2a54baa`; only this record came after it):
+`cargo xtask gate`, `postgres`, `smoke`, `secrets` and `crypto-scope` and
+`cargo deny check` pass. `cargo audit --deny warnings` fails on
+RUSTSEC-2026-0459 alone (`libsqlite3-sys`, in the lockfile through
+`sqlx-sqlite` and in no build; the owner's decision, as before). The
+site's browser suite: 348 passed, 4 skipped, none failed. Against a real
+Central on loopback (PostgreSQL 18, the release binaries, synthetic
+accounts), each project against a Central started afresh: the chat's
+spec, the reset's and the password's pass at the desktop's and at a
+phone's size; the registration in them copies its recovery code and
+reads it back from the clipboard.
+
 Not looked at again: the points the list above names as not checked stay
 as they are.
 
