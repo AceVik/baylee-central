@@ -14,6 +14,7 @@ use zeroize::Zeroizing;
 
 pub mod chat;
 mod deletion;
+mod email;
 mod export;
 mod gateways;
 mod legacy;
@@ -26,6 +27,7 @@ mod social;
 mod terms;
 pub use central_crypto::pairing::PairingSecret;
 pub use deletion::Deletion;
+pub use email::reset_mail;
 pub use gateways::{
     GatewayRegistration, PublicFigures, gateway_directory, gateway_pulse, public_figures,
 };

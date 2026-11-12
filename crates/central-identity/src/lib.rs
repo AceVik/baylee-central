@@ -25,6 +25,8 @@ mod challenge;
 pub use challenge::{Agent, Seen};
 mod deletion;
 mod dispatch;
+mod email;
+pub use email::Delivery;
 mod gateways;
 mod guesses;
 pub use guesses::Place;
@@ -38,6 +40,13 @@ mod reports;
 pub use reports::PartUpload;
 mod reset;
 mod terms;
+
+/// A mailer as the service knows one ([`IdentityService::with_mailer`]):
+/// the deployed one is `central_mail::Client`, and a test puts its own in
+/// its place.
+pub mod mail {
+    pub use central_mail::{Mail, Mailer, Outcome, What};
+}
 
 struct Pending {
     expires: Instant,
@@ -226,6 +235,7 @@ fn uses_session(request: &Request) -> bool {
             | Request::PairStatus { .. }
             | Request::PairApprove { .. }
             | Request::PairCancel { .. }
+            | Request::Email { .. }
     )
 }
 
@@ -297,6 +307,8 @@ pub struct IdentityService {
     /// legacy operations are refused.
     legacy: Option<LegacyStore>,
     push_key: Option<String>,
+    /// The mailer, what was asked of it and what waits for it (`email.rs`).
+    mails: email::Mails,
 }
 
 impl IdentityService {
@@ -342,6 +354,7 @@ impl IdentityService {
             terms: terms::central()?,
             legacy: None,
             push_key: None,
+            mails: email::Mails::default(),
         })
     }
 
@@ -363,6 +376,17 @@ impl IdentityService {
     #[must_use]
     pub fn with_push_key(mut self, key: String) -> Self {
         self.push_key = Some(key);
+        self
+    }
+
+    /// Send mail through `mailer` (`docs/email.md`): the codes that confirm
+    /// an account's address, reset codes and notices. Without one no
+    /// address is named or confirmed and no reset code is mailed; an
+    /// address already held can still be read, withdrawn and removed.
+    /// Whoever calls this also drives [`Self::deliver_mail`].
+    #[must_use]
+    pub fn with_mailer(mut self, mailer: Arc<dyn mail::Mailer>) -> Self {
+        self.mails.mailer = Some(mailer);
         self
     }
 
@@ -876,6 +900,13 @@ mod tests {
                 proof: vec![],
             },
             Request::PairCancel { handle: token() },
+            Request::Email {
+                request: central_api::email::EmailRequest::Status,
+            },
+            Request::ResetMail {
+                username: "synthetic".into(),
+                lang: "en".into(),
+            },
         ]
     }
 
@@ -1053,7 +1084,7 @@ mod tests {
                 text[start..].split('"').next().unwrap().to_owned()
             })
             .collect();
-        assert_eq!(named.len(), 67, "every operation is in one of the lists");
+        assert_eq!(named.len(), 69, "every operation is in one of the lists");
     }
 
     #[test]
@@ -1118,6 +1149,19 @@ mod tests {
         assert!(uses_session(&Request::Owner {
             request: central_api::owner::OwnerRequest::Sessions,
         }));
+        // An account's address is its session's on both listeners; a reset
+        // code by mail is asked for without one, whatever cookie comes along.
+        let address = Request::Email {
+            request: central_api::email::EmailRequest::Status,
+        };
+        assert!(uses_session(&address) && browser_operation(&address));
+        assert!(!browser_only(&address) && terms::needs_acceptance(&address));
+        let mailed = Request::ResetMail {
+            username: "synthetic".into(),
+            lang: "en".into(),
+        };
+        assert!(!uses_session(&mailed) && browser_operation(&mailed));
+        assert!(!browser_only(&mailed) && !terms::needs_acceptance(&mailed));
         assert!(!uses_session(&Request::Terms));
         assert!(!uses_session(&Request::GatewayDirectory { after: None }));
         // The figures are for everyone: a cookie sent along is not looked at.

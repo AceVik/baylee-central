@@ -27,6 +27,10 @@ pub(crate) const LEGACY: u32 = 10;
 /// Reset starts an hour: a reset needs a code, and a few tries leave room
 /// for typing it.
 pub(crate) const RESET: u32 = 10;
+/// Requests for a reset code by mail an hour (`docs/email.md`), on each
+/// listener: a person asks once or twice, and each request may send a mail
+/// to somebody else's address.
+pub(crate) const RESET_MAIL: u32 = 5;
 
 /// Readings a minute of the gateway directory and the public figures
 /// together, as on the browser listener: both are read in pages, side by
@@ -41,6 +45,7 @@ pub(crate) struct Budgets {
     legacy: Book,
     reset: Book,
     directory: Book,
+    reset_mail: Book,
 }
 
 impl Budgets {
@@ -54,6 +59,7 @@ impl Budgets {
             Request::LoginStart { .. } => self.login.charge(client, now, LOGIN, MINUTE),
             Request::LegacyLogin { .. } => self.legacy.charge(client, now, LEGACY, MINUTE),
             Request::ResetStart { .. } => self.reset.charge(client, now, RESET, HOUR),
+            Request::ResetMail { .. } => self.reset_mail.charge(client, now, RESET_MAIL, HOUR),
             Request::GatewayDirectory { .. } | Request::PublicFigures { .. } => {
                 self.directory.charge(client, now, DIRECTORY, MINUTE)
             }
@@ -87,7 +93,7 @@ mod tests {
         served
     }
 
-    fn requests() -> [(Request, u32, Duration); 4] {
+    fn requests() -> [(Request, u32, Duration); 5] {
         [
             (
                 Request::Discover {
@@ -124,6 +130,14 @@ mod tests {
                 RESET,
                 HOUR,
             ),
+            (
+                Request::ResetMail {
+                    username: "synthetic".into(),
+                    lang: "en".into(),
+                },
+                RESET_MAIL,
+                HOUR,
+            ),
         ]
     }
 
@@ -144,7 +158,7 @@ mod tests {
             assert!(!budgets.charge(&request, client(1), late));
             assert!(budgets.charge(&request, client(1), start + period));
         }
-        // One operation's budget is not another's: all four were served
+        // One operation's budget is not another's: all five were served
         // for the same address above. A request that needs a session, or
         // any other, has none here.
         for _ in 0..1_000 {

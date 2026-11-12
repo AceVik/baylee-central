@@ -9,6 +9,7 @@ use std::process::ExitCode;
 mod accounts;
 mod legacy;
 mod listeners;
+mod mail;
 mod production;
 mod push;
 mod reports_import;
