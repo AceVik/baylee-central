@@ -16,11 +16,16 @@ use crate::words::{self, Lang};
 /// A step that asks once more: which one, for whom.
 type Asking = RwSignal<Option<(u32, &'static str)>>;
 
+/// A person's face and handle: the name, and the tag beside it in a
+/// quieter ink, together one piece of text (`Name#1a2b`).
 fn person_line(p: &Person) -> impl IntoView + use<> {
     let tag = p.tag.to_string();
     view! {
         {avatar(&p.display_name, &tag, false, Some(p.tag))}
-        <bdi class="person-name" translate="no">{handle(p)}</bdi>
+        <span class="person-handle" translate="no">
+            <bdi class="person-name">{p.display_name.clone()}</bdi>
+            <span class="tag">{format!("#{}", model::tag_text(p.tag))}</span>
+        </span>
     }
 }
 
@@ -33,6 +38,7 @@ pub fn contacts_panel(
     choose: Callback<String>,
 ) -> impl IntoView {
     let asking: Asking = RwSignal::new(None);
+    let own_handle = StoredValue::new(own_handle);
     let section = move |relation: Relation, title: &'static str| {
         move || {
             let list: Vec<Contact> = ctl.contacts.with(|c| match c {
@@ -48,8 +54,14 @@ pub fn contacts_panel(
                     .into_iter()
                     .map(|c| contact_row(lang, own, &c, ctl, asking, choose))
                     .collect_view();
+                let kind = match relation {
+                    Relation::Incoming => "incoming",
+                    Relation::Friend => "friend",
+                    Relation::Outgoing => "outgoing",
+                    Relation::Blocked => "blocked",
+                };
                 view! {
-                    <section class="people">
+                    <section class="people" data-relation=kind>
                         <h2>{title}</h2>
                         <ul>{items}</ul>
                     </section>
@@ -62,13 +74,21 @@ pub fn contacts_panel(
         None => Some(view! { <p class="msgr-note" role="status">{words::account_loading(lang)}</p> }.into_any()),
         Some(false) => Some(view! {
             <p class="banner bad" role="alert">
-                <span>{words::people_failed(lang)}</span>
-                <button type="button" class="button small" on:click=move |_| ctl.reload_contacts()>{words::chat_retry(lang)}</button>
+                {glyph(glyph::INFO)}<span>{words::people_failed(lang)}</span>
+                <button type="button" class="button small quiet" on:click=move |_| ctl.reload_contacts()>{words::chat_retry(lang)}</button>
             </p>
         }
         .into_any()),
         Some(true) if ctl.contacts.with(|c| matches!(c, Some(Ok(list)) if list.is_empty())) => {
-            Some(view! { <p class="msgr-note">{words::people_empty(lang)}</p> }.into_any())
+            Some(view! {
+                <div class="msgr-empty">
+                    <span class="msgr-empty-icon">{glyph(glyph::USERS)}</span>
+                    <p class="msgr-empty-title">{words::chat_quiet(lang)}</p>
+                    <p>{words::people_empty(lang)}</p>
+                    {copy_handle(lang, own_handle.get_value())}
+                </div>
+            }
+            .into_any())
         }
         Some(true) => None,
     }
@@ -77,7 +97,7 @@ pub fn contacts_panel(
         <div class="msgr-panel">
             <p class="msgr-own">
                 <span>{words::people_your_handle(lang)}</span>" "
-                <strong translate="no" class="selectable">{own_handle}</strong>
+                <strong translate="no" class="selectable">{own_handle.get_value()}</strong>
             </p>
             {find(lang, own, ctl)}
             {state}
@@ -86,6 +106,28 @@ pub fn contacts_panel(
             {section(Relation::Outgoing, words::people_outgoing(lang))}
             {section(Relation::Blocked, words::people_blocked(lang))}
         </div>
+    }
+}
+
+/// One's own handle to the clipboard, to give it to someone, and the line
+/// that says whether the browser took it.
+fn copy_handle(lang: Lang, own_handle: String) -> impl IntoView {
+    let said = RwSignal::new(None::<&'static str>);
+    let copy = move |_| {
+        let text = own_handle.clone();
+        leptos::task::spawn_local(async move {
+            said.set(Some(if crate::islands::clip::write(&text).await {
+                words::code_copied(lang)
+            } else {
+                words::people_copy_failed(lang)
+            }));
+        });
+    };
+    view! {
+        <button type="button" class="button small quiet" on:click=copy>
+            {glyph(glyph::COPY)}<span>{words::people_copy_handle(lang)}</span>
+        </button>
+        <p class="meta" role="status">{move || said.get()}</p>
     }
 }
 
@@ -187,10 +229,12 @@ fn act(
             }
         });
     };
-    let class = if matches!(change, ContactAction::Block | ContactAction::Remove) {
-        "button small danger"
-    } else {
-        "button small"
+    // accepting is the answer a request waits for; the rest stay quiet,
+    // and what cannot be taken back is a danger ghost
+    let class = match change {
+        ContactAction::Block | ContactAction::Remove => "button small danger",
+        ContactAction::Accept => "button small",
+        _ => "button small quiet",
     };
     view! {
         <button type="button" class=class aria-disabled=move || ctl.social_busy.get().then_some("true")
@@ -219,7 +263,7 @@ fn contact_row(
     let who = handle(&c.person);
     let actions = match c.relation {
         Relation::Friend => view! {
-            <a class="button small primary" href=format!("/{}/account/chat?c={}", lang.code(), direct(own, tag))
+            <a class="button small quiet" href=format!("/{}/account/chat?c={}", lang.code(), direct(own, tag))
                 on:click=move |event: leptos::ev::MouseEvent| {
                     event.prevent_default();
                     choose.run(direct(own, tag));
@@ -250,7 +294,7 @@ fn contact_row(
                     <p>{text}</p>
                     <button type="button" class="button small danger"
                         on:click=move |_| ctl.contact(tag, change, move |ok| if ok { asking.set(None) })>{which}</button>
-                    <button type="button" class="button small" on:click=move |_| asking.set(None)>{words::people_keep(lang)}</button>
+                    <button type="button" class="button small quiet" on:click=move |_| asking.set(None)>{words::people_keep(lang)}</button>
                 </div>
             }
         })
@@ -314,7 +358,7 @@ pub fn invites(lang: Lang, own: u32, ctl: Ctl, choose: Callback<String>) -> impl
                         <li class="person">
                             <span class="person-line">
                                 {avatar(&invite.name, &format!("grp:{}", invite.group), true, None)}
-                                <span><bdi class="person-name">{invite.name.clone()}</bdi>
+                                <span class="person-handle"><bdi class="person-name">{invite.name.clone()}</bdi>
                                     <small>{words::chat_invited_by(lang, &handle(&invite.inviter))}</small></span>
                             </span>
                             <span class="person-actions">
@@ -322,7 +366,7 @@ pub fn invites(lang: Lang, own: u32, ctl: Ctl, choose: Callback<String>) -> impl
                                     let id = join.clone();
                                     ctl.group(id.clone(), Change::Join, move |ok| if ok { choose.run(format!("grp:{id}")) });
                                 }>{words::people_accept(lang)}</button>
-                                <button type="button" class="button small" on:click=move |_| {
+                                <button type="button" class="button small quiet" on:click=move |_| {
                                     ctl.group(decline.clone(), Change::Withdraw { tag: own }, |_| {});
                                 }>{words::people_decline(lang)}</button>
                             </span>
@@ -331,7 +375,7 @@ pub fn invites(lang: Lang, own: u32, ctl: Ctl, choose: Callback<String>) -> impl
                 })
                 .collect_view();
             view! {
-                <section class="people">
+                <section class="people" data-relation="invited">
                     <h2>{words::chat_invites(lang)}</h2>
                     <ul>{items}</ul>
                 </section>
@@ -373,7 +417,7 @@ pub fn group_panel(
                 <div class="with-tool">
                     <input id="group-rename" type="text" maxlength="96" prop:value=move || name.get()
                         on:input=move |ev| name.set(event_target_value(&ev)) />
-                    <button type="submit" class="button small">{words::chat_group_rename(lang)}</button>
+                    <button type="submit" class="button small quiet">{words::chat_group_rename(lang)}</button>
                 </div>
             </form>
         }
@@ -418,7 +462,7 @@ fn members(
             let who = handle(&m.person);
             let tools = (owner && tag != own).then(|| view! {
                 <span class="person-actions">
-                    <button type="button" class="button small" on:click=move |_| asking.set(Some((tag, "transfer")))>
+                    <button type="button" class="button small quiet" on:click=move |_| asking.set(Some((tag, "transfer")))>
                         {words::chat_group_transfer(lang)}</button>
                     <button type="button" class="button small danger" on:click=move |_| asking.set(Some((tag, "remove")))>
                         {words::chat_group_remove(lang)}</button>
@@ -435,7 +479,7 @@ fn members(
                         <div class="ask" role="group" aria-label=label>
                             <p>{text}</p>
                             <button type="button" class="button small danger" on:click=move |_| change(what(tag))>{label}</button>
-                            <button type="button" class="button small" on:click=move |_| asking.set(None)>{words::people_keep(lang)}</button>
+                            <button type="button" class="button small quiet" on:click=move |_| asking.set(None)>{words::people_keep(lang)}</button>
                         </div>
                     }
                 })
@@ -493,7 +537,7 @@ fn invite<F: Fn(Change) + Copy + Send + Sync + 'static>(
                             <option value="">{words::chat_group_choose(lang)}</option>
                             {options}
                         </select>
-                        <button type="submit" class="button small">{words::chat_group_invite_button(lang)}</button>
+                        <button type="submit" class="button small quiet">{words::chat_group_invite_button(lang)}</button>
                     </div>
                 </form>
             }
@@ -514,7 +558,7 @@ fn invited(
             .map(|p| {
                 let tag = p.tag;
                 let withdraw = owner.then(|| view! {
-                    <button type="button" class="button small" on:click=move |_| change(Change::Withdraw { tag })>
+                    <button type="button" class="button small quiet" on:click=move |_| change(Change::Withdraw { tag })>
                         {words::people_cancel(lang)}</button>
                 });
                 view! { <li class="person"><span class="person-line">{person_line(p)}</span>{withdraw}</li> }
@@ -572,7 +616,7 @@ impl Leave {
                     let what = if owner { Change::Delete } else { Change::Remove { tag: own } };
                     ctl.group(id.get_value(), what, move |ok| if ok { selected.set(None) });
                 }>{label}</button>
-                <button type="button" class="button small" on:click=move |_| asking.set(None)>{words::people_keep(lang)}</button>
+                <button type="button" class="button small quiet" on:click=move |_| asking.set(None)>{words::people_keep(lang)}</button>
             </div>
         }
         .into_any()

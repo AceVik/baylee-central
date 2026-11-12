@@ -271,6 +271,35 @@ pub fn conversations(from: &Sources<'_>) -> Vec<Conversation> {
     out
 }
 
+/// The longest pause within a run of one sender's lines.
+pub const RUN_PAUSE: u64 = 5 * 60_000;
+
+/// For each of `messages` (oldest first), whether it starts a run of one
+/// sender's lines and whether it ends one. A run breaks where the sender
+/// changes, where a day ends (`same_day`, in the reader's calendar) and
+/// after a pause longer than [`RUN_PAUSE`].
+#[must_use]
+pub fn runs(messages: &[Message], same_day: impl Fn(u64, u64) -> bool) -> Vec<(bool, bool)> {
+    let starts: Vec<bool> = messages
+        .iter()
+        .enumerate()
+        .map(|(at, m)| {
+            at.checked_sub(1)
+                .and_then(|before| messages.get(before))
+                .is_none_or(|p| {
+                    p.sender != m.sender
+                        || !same_day(p.at, m.at)
+                        || m.at.saturating_sub(p.at) > RUN_PAUSE
+                })
+        })
+        .collect();
+    starts
+        .iter()
+        .enumerate()
+        .map(|(at, first)| (*first, starts.get(at + 1).copied().unwrap_or(true)))
+        .collect()
+}
+
 /// An avatar's letters: the first of a name, or of its first two words.
 #[must_use]
 pub fn initials(name: &str) -> String {
@@ -449,6 +478,37 @@ mod tests {
         merge(&mut shown, many);
         assert_eq!(shown.len(), KEPT);
         assert_eq!(shown[KEPT - 1].id, format!("{:06}", KEPT + 2));
+    }
+
+    #[test]
+    fn runs_break_at_a_sender_a_pause_and_a_day() {
+        let minute = 60_000;
+        let day = 86_400_000;
+        let conv = "dm:0010:0020";
+        let lines = [
+            message("1", conv, 0x20, 0),
+            message("2", conv, 0x20, minute),
+            message("3", conv, 0x20, 2 * minute),
+            message("4", conv, 0x10, 3 * minute),
+            message("5", conv, 0x10, 3 * minute + RUN_PAUSE + 1),
+            message("6", conv, 0x10, 4 * minute + RUN_PAUSE),
+            message("7", conv, 0x10, day + 1),
+        ];
+        let same_day = |a: u64, b: u64| a / day == b / day;
+        assert_eq!(
+            runs(&lines, same_day),
+            [
+                (true, false),
+                (false, false),
+                (false, true),
+                (true, true),
+                (true, false),
+                (false, true),
+                (true, true),
+            ]
+        );
+        assert_eq!(runs(&lines[..1], same_day), [(true, true)]);
+        assert_eq!(runs(&[], same_day), []);
     }
 
     #[test]

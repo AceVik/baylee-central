@@ -194,10 +194,19 @@ pub fn messenger(
             "list"
         }
     };
+    // the empty list's way forward: the contacts, at the field that adds one
+    let add_contact = Callback::new(move |()| {
+        remember(lang, Tab::Contacts, None);
+        tab.set(Tab::Contacts);
+        selected.set(None);
+        crate::islands::focus::after_render("#contact-find");
+    });
     let me_store = StoredValue::new(me.clone());
     let own_handle = central_api::profile::handle(&me.name, own);
     let side = move || match tab.get() {
-        Tab::Chats => chats_panel(lang, own, ctl, lists.rows, selected, choose).into_any(),
+        Tab::Chats => {
+            chats_panel(lang, own, ctl, lists.rows, selected, choose, add_contact).into_any()
+        }
         Tab::Contacts => {
             people::contacts_panel(lang, own, own_handle.clone(), ctl, choose).into_any()
         }
@@ -268,6 +277,94 @@ fn welcome(lang: Lang, ctl: Ctl) -> impl IntoView {
     }
 }
 
+/// What the list waits for before it may say that it is empty.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Known {
+    /// The contacts, the groups or the inbox's first read are still to come.
+    Waiting,
+    /// All three are here.
+    Loaded,
+    /// The contacts or the groups could not be read.
+    Failed,
+}
+
+impl Known {
+    /// An empty list is said to be empty only once everything it is made
+    /// of arrived; a failure says so, never an empty list in its place.
+    /// The inbox is waited for only while the chat opens or is open: one
+    /// that could not be opened, or whose session ended, reads nothing.
+    fn watch(ctl: Ctl) -> Memo<Known> {
+        Memo::new(move |_| {
+            let contacts = ctl.contacts.with(|c| c.as_ref().map(Result::is_ok));
+            let groups = ctl.groups.with(|g| g.as_ref().map(Result::is_ok));
+            let reading = ctl
+                .shown
+                .with(|s| s.loading && matches!(s.phase, Phase::Opening | Phase::Ready));
+            match (contacts, groups) {
+                (Some(false), _) | (_, Some(false)) => Known::Failed,
+                (Some(true), Some(true)) if !reading => Known::Loaded,
+                _ => Known::Waiting,
+            }
+        })
+    }
+}
+
+/// The list's failure, above whatever it could show, with a way to try again.
+fn list_failed(lang: Lang, ctl: Ctl, known: Memo<Known>) -> impl IntoView {
+    move || {
+        (known.get() == Known::Failed).then(|| {
+            view! {
+                <p class="banner bad" role="alert">
+                    {glyph(glyph::INFO)}<span>{words::chat_failed(lang)}</span>
+                    <button type="button" class="button small quiet" on:click=move |_| {
+                        ctl.reload_contacts();
+                        ctl.reload_groups();
+                    }>{words::chat_retry(lang)}</button>
+                </p>
+            }
+        })
+    }
+}
+
+/// No conversation at all: still loading, or a new account's first step.
+fn list_empty(lang: Lang, known: Known, add_contact: Callback<()>) -> AnyView {
+    match known {
+        Known::Failed => ().into_any(),
+        Known::Waiting => {
+            view! { <p class="msgr-note" role="status">{words::account_loading(lang)}</p> }
+                .into_any()
+        }
+        Known::Loaded => view! {
+            <div class="msgr-empty">
+                <span class="msgr-empty-icon">{glyph(glyph::MESSAGE)}</span>
+                <p class="msgr-empty-title">{words::chat_quiet(lang)}</p>
+                <p>{words::chat_no_conversations(lang)}</p>
+                <a class="button small" href=href(lang, Tab::Contacts, None)
+                    on:click=move |event: leptos::ev::MouseEvent| {
+                        if !(event.ctrl_key() || event.meta_key() || event.shift_key()) {
+                            event.prevent_default();
+                            add_contact.run(());
+                        }
+                    }>
+                    {glyph(glyph::USER_PLUS)}<span>{words::chat_add_contact(lang)}</span>
+                </a>
+            </div>
+        }
+        .into_any(),
+    }
+}
+
+/// Ctrl/Cmd+K finds a conversation while the Chats half is shown.
+fn find_shortcut() {
+    let find = window_event_listener(leptos::ev::keydown, move |event| {
+        if (event.ctrl_key() || event.meta_key()) && event.key().eq_ignore_ascii_case("k") {
+            event.prevent_default();
+            focus("chat-search");
+        }
+    });
+    on_cleanup(move || find.remove());
+}
+
 /// The Chats half: search, a new group, invitations, the list.
 fn chats_panel(
     lang: Lang,
@@ -276,6 +373,7 @@ fn chats_panel(
     rows: Memo<Vec<Conversation>>,
     selected: RwSignal<Option<String>>,
     choose: Callback<String>,
+    add_contact: Callback<()>,
 ) -> impl IntoView {
     let query = RwSignal::new(String::new());
     let making = RwSignal::new(false);
@@ -298,6 +396,12 @@ fn chats_panel(
                 .or_else(|| v.first().map(|c| c.id.clone()))
         })
     });
+    let pick = Pick {
+        selected,
+        anchor,
+        rove,
+        choose,
+    };
     let keys = move |event: leptos::ev::KeyboardEvent| {
         let ids: Vec<String> = visible.with_untracked(|v| v.iter().map(|c| c.id.clone()).collect());
         let Some(last) = ids.len().checked_sub(1) else {
@@ -318,33 +422,30 @@ fn chats_panel(
         rove.set(Some(ids[next].clone()));
         focus(&row_id(&ids[next]));
     };
-    // Ctrl/Cmd+K: find a conversation
-    let find = window_event_listener(leptos::ev::keydown, move |event| {
-        if (event.ctrl_key() || event.meta_key()) && event.key().eq_ignore_ascii_case("k") {
-            event.prevent_default();
-            focus("chat-search");
-        }
-    });
-    on_cleanup(move || find.remove());
-    let empty = Memo::new(move |_| {
-        visible.with(Vec::is_empty).then(|| {
-            if query.with(|q| q.trim().is_empty()) {
-                words::chat_no_conversations(lang)
-            } else {
-                words::chat_no_match(lang)
-            }
-        })
+    find_shortcut();
+    let known = Known::watch(ctl);
+    // what stands in the list's place: nothing while there are rows (so a
+    // new line or a keystroke never draws the list anew, and the focus in
+    // it stays), "no match" for a search, else the empty list's state
+    let instead = Memo::new(move |_| {
+        visible
+            .with(Vec::is_empty)
+            .then(|| query.with(|q| q.trim().is_empty()).then(|| known.get()))
     });
     let list = move || {
-        if let Some(text) = empty.get() {
-            return view! { <p class="msgr-empty">{text}</p> }.into_any();
+        match instead.get() {
+            Some(None) => {
+                return view! { <p class="msgr-note">{words::chat_no_match(lang)}</p> }.into_any();
+            }
+            Some(Some(known)) => return list_empty(lang, known, add_contact),
+            None => {}
         }
         view! {
             <nav class="conv-nav" aria-label=words::chat_conversations(lang)>
                 <ul class="conv-list" on:keydown=keys>
                     <For each=move || visible.get()
                         key=|c| (c.id.clone(), c.last.as_ref().map(|m| m.id.clone()), c.unread, c.title.clone(), c.open)
-                        children=move |c| row(lang, &c, own, selected, anchor, rove, choose) />
+                        children=move |c| row(lang, &c, own, ctl, pick) />
                 </ul>
             </nav>
         }
@@ -352,15 +453,15 @@ fn chats_panel(
     };
     view! {
         <div class="msgr-panel">
-            <div class="msgr-find">
-                <label class="visually-hidden" for="chat-search">{words::chat_search(lang)}</label>
-                {glyph(glyph::SEARCH)}
-                <input id="chat-search" type="search" autocomplete="off" spellcheck="false"
-                    placeholder=words::chat_search_hint(lang)
-                    on:input=move |ev| query.set(event_target_value(&ev)) prop:value=move || query.get() />
-            </div>
-            <div class="msgr-tools">
-                <button type="button" class="button small" aria-expanded=move || making.get().to_string()
+            <div class="msgr-bar">
+                <div class="msgr-find">
+                    <label class="visually-hidden" for="chat-search">{words::chat_search(lang)}</label>
+                    {glyph(glyph::SEARCH)}
+                    <input id="chat-search" type="search" autocomplete="off" spellcheck="false"
+                        placeholder=words::chat_search_hint(lang)
+                        on:input=move |ev| query.set(event_target_value(&ev)) prop:value=move || query.get() />
+                </div>
+                <button type="button" class="button small quiet msgr-new" aria-expanded=move || making.get().to_string()
                     aria-controls="new-group" on:click=move |_| making.update(|m| *m = !*m)>
                     {glyph(glyph::PLUS)}<span>{words::chat_new_group(lang)}</span>
                 </button>
@@ -370,20 +471,29 @@ fn chats_panel(
                 choose.run(format!("grp:{id}"));
             })))}
             {people::invites(lang, own, ctl, choose)}
+            {list_failed(lang, ctl, known)}
             {list}
         </div>
     }
 }
 
-fn row(
-    lang: Lang,
-    c: &Conversation,
-    own: u32,
+/// The list's choosing: the open conversation, the row that holds the one
+/// tab stop, the row last focused, and opening one.
+#[derive(Clone, Copy)]
+struct Pick {
     selected: RwSignal<Option<String>>,
     anchor: Memo<Option<String>>,
     rove: RwSignal<Option<String>>,
     choose: Callback<String>,
-) -> AnyView {
+}
+
+fn row(lang: Lang, c: &Conversation, own: u32, ctl: Ctl, pick: Pick) -> AnyView {
+    let Pick {
+        selected,
+        anchor,
+        rove,
+        choose,
+    } = pick;
     let id = c.id.clone();
     let name = match &c.kind {
         Kind::Former => words::chat_former_group(lang).to_owned(),
@@ -395,8 +505,23 @@ fn row(
         ),
         _ => None,
     };
+    // the last line, and who wrote it where that is not plain: oneself, or
+    // a member of a group
+    let who = match (&c.last, &c.kind) {
+        (Some(m), _) if m.sender == own => Some(
+            view! { <span class="conv-who">{format!("{}: ", words::chat_you(lang))}</span> }
+                .into_any(),
+        ),
+        (Some(m), Kind::Group(_) | Kind::Former) => ctl
+            .shown
+            .with_untracked(|s| s.known.get(&m.sender).cloned())
+            .map(|name| {
+                view! { <span class="conv-who"><bdi translate="no">{name}</bdi>{": "}</span> }
+                    .into_any()
+            }),
+        _ => None,
+    };
     let preview = match (&c.last, &c.kind) {
-        (Some(m), _) if m.sender == own => format!("{}: {}", words::chat_you(lang), m.text),
         (Some(m), _) => m.text.clone(),
         (None, Kind::Group(g)) => {
             words::chat_members(lang, u64::try_from(g.members.len()).unwrap_or(0))
@@ -449,7 +574,7 @@ fn row(
                         <bdi class="conv-name" translate="no">{name.clone()}</bdi>{tag}{when}
                     </span>
                     <span class="conv-bottom">
-                        <span class="conv-preview">{preview}</span>{unread}
+                        <span class="conv-preview">{who}{preview}</span>{unread}
                     </span>
                 </span>
             </a>
@@ -457,25 +582,24 @@ fn row(
     }
     .into_any()
 }
-/// A conversation's messages by day: each with whether it starts a run of
-/// one sender's.
-type Days = Vec<(String, String, Vec<(Message, bool)>)>;
+/// A message, whether it starts a run of one sender's lines, and whether it
+/// ends one.
+type Line = (Message, bool, bool);
+
+/// A conversation's messages by day.
+type Days = Vec<(String, String, Vec<Line>)>;
 
 fn days(lang: Lang, messages: &[Message]) -> Days {
     let now = time::now();
     let mut out: Days = Vec::new();
     let mut previous: Option<&Message> = None;
-    for m in messages {
-        let new_day = previous.is_none_or(|p| !time::same_day(p.at, m.at));
-        if new_day {
+    for (m, (first, last)) in messages.iter().zip(model::runs(messages, time::same_day)) {
+        if previous.is_none_or(|p| !time::same_day(p.at, m.at)) {
             let key = time::machine(m.at).chars().take(10).collect();
             out.push((key, time::day_label(lang, m.at, now), Vec::new()));
         }
-        let first = new_day
-            || previous
-                .is_some_and(|p| p.sender != m.sender || m.at.saturating_sub(p.at) > 5 * 60_000);
         if let Some(day) = out.last_mut() {
-            day.2.push((m.clone(), first));
+            day.2.push((m.clone(), first, last));
         }
         previous = Some(m);
     }
@@ -725,9 +849,9 @@ impl Open {
                 </button>
                 {avatar(&name, &id, self.group(), self.direct_tag())}
                 <div class="conv-head-text">
-                    <h2 id="conv-title" tabindex="-1"><bdi translate="no">{name.clone()}</bdi>
+                    <h2 id="conv-title" tabindex="-1"><bdi class="conv-head-name" translate="no">{name.clone()}</bdi>
                         {tag.map(|t| view! { <span class="tag" translate="no">{t}</span> })}</h2>
-                    <p>{glyph(glyph::LOCK)}<span>{subtitle}</span></p>
+                    <p class="conv-head-state">{glyph(glyph::LOCK)}<span>{subtitle}</span></p>
                 </div>
                 <button type="button" id="conv-details-toggle" class="icon-button" data-warn=move || changed.get().then_some("true")
                     aria-expanded=move || details.get().to_string() aria-controls="conv-details"
@@ -785,11 +909,13 @@ impl Open {
             {self.changed.get().then(|| view! {
                 <p class="banner bad" role="alert">{glyph(glyph::SHIELD_ALERT)}<span>{words::chat_keys_changed(lang)}</span></p>
             })}
-            {refused.then(|| view! { <p class="banner" role="status">{words::chat_refused(lang)}</p> })}
+            {refused.then(|| view! {
+                <p class="banner" role="status">{glyph(glyph::INFO)}<span>{words::chat_refused(lang)}</span></p>
+            })}
             {error.then(|| view! {
                 <p class="banner bad" role="alert">
-                    <span>{words::chat_failed(lang)}</span>
-                    <button type="button" class="button small" on:click=move |_| ctl.poll()>{words::chat_retry(lang)}</button>
+                    {glyph(glyph::INFO)}<span>{words::chat_failed(lang)}</span>
+                    <button type="button" class="button small quiet" on:click=move |_| ctl.poll()>{words::chat_retry(lang)}</button>
                 </p>
             })}
         }
@@ -801,7 +927,7 @@ impl Open {
         let (text, failed, busy) = self.waiting.get()?;
         let actions = failed.then(|| view! {
             <span class="msg-actions">
-                <button type="button" class="button small" aria-disabled=busy.then_some("true")
+                <button type="button" class="button small quiet" aria-disabled=busy.then_some("true")
                     on:click=move |_| if !busy { ctl.retry() }>{words::chat_retry(lang)}</button>
                 <button type="button" class="button small danger" aria-disabled=busy.then_some("true")
                     on:click=move |_| if !busy { ctl.discard() }>{words::chat_discard(lang)}</button>
@@ -809,8 +935,11 @@ impl Open {
         });
         Some(
             view! {
-                <div class="msg pending" data-own="true" data-first="true">
-                    <p class="msg-text">{text}</p>
+                <div class="msg pending" data-own="true" data-first="true" data-last="true"
+                    data-failed=failed.then_some("true")>
+                    <div class="msg-bubble">
+                        <p class="msg-text">{text}</p>
+                    </div>
                     <span class="msg-state" role=failed.then_some("alert")>
                         {if failed { words::chat_not_sent(lang) } else { words::chat_sending(lang) }}
                     </span>
@@ -830,13 +959,46 @@ impl Open {
                     .into_any(),
             )
         } else if self.messages.with(Vec::is_empty) && self.waiting.with(Option::is_none) {
-            Some(view! { <p class="msgr-note">{words::chat_empty(lang)}</p> }.into_any())
+            Some(self.start())
         } else {
             None
         }
     }
 
-    fn day(self, (key, label, list): (String, String, Vec<(Message, bool)>)) -> AnyView {
+    /// A conversation without a message: its face, and where writing is
+    /// possible, a way to the composer.
+    fn start(self) -> AnyView {
+        let lang = self.lang;
+        let face = avatar(
+            &self.name(),
+            &self.id.get_value(),
+            self.group(),
+            self.direct_tag(),
+        );
+        if self.can_send.get() {
+            view! {
+                <div class="conv-start">
+                    {face}
+                    <p class="conv-start-title">{words::chat_say_hello(lang)}</p>
+                    <p>{words::chat_choose_lead(lang)}</p>
+                    <button type="button" class="button small quiet" on:click=move |_| focus("composer-text")>
+                        {glyph(glyph::MESSAGE)}<span>{words::chat_write_first(lang)}</span>
+                    </button>
+                </div>
+            }
+            .into_any()
+        } else {
+            view! {
+                <div class="conv-start">
+                    {face}
+                    <p class="conv-start-title">{words::chat_empty(lang)}</p>
+                </div>
+            }
+            .into_any()
+        }
+    }
+
+    fn day(self, (key, label, list): (String, String, Vec<Line>)) -> AnyView {
         let (lang, own, ctl, group) = (self.lang, self.own, self.ctl, self.group());
         let known = move |tag: u32| {
             ctl.shown
@@ -845,24 +1007,32 @@ impl Open {
         };
         let items = list
             .into_iter()
-            .map(|(m, first)| {
+            .map(|(m, first, last)| {
                 let mine = m.sender == own;
                 let who = if mine { words::chat_you(lang).to_owned() } else { known(m.sender) };
-                let sender = (group && !mine && first).then(|| {
+                // in a group, others' lines stand beside their face, which
+                // the run's first line shows with the name; a screen reader
+                // hears the name once, in the line's own words
+                let beside = group && !mine;
+                let face = (beside && first).then(|| {
                     view! {
-                        <span class="msg-sender">
-                            {avatar(&who, &m.sender.to_string(), false, Some(m.sender))}
-                            <bdi translate="no">{who.clone()}</bdi>
-                        </span>
+                        <span class="msg-face">{avatar(&who, &m.sender.to_string(), false, Some(m.sender))}</span>
                     }
+                });
+                let sender = (beside && first).then(|| {
+                    view! { <bdi class="msg-sender" translate="no" aria-hidden="true">{who.clone()}</bdi> }
                 });
                 let prefix = format!("{who}, {}: ", time::clock(m.at));
                 view! {
-                    <li class="msg" data-own=mine.then_some("true") data-first=first.then_some("true")>
-                        {sender}
-                        <span class="visually-hidden">{prefix}</span>
-                        <p class="msg-text" class:emote=m.emote>{m.text}</p>
-                        <time datetime=time::machine(m.at) aria-hidden="true">{time::clock(m.at)}</time>
+                    <li class="msg" data-own=mine.then_some("true") data-first=first.then_some("true")
+                        data-last=last.then_some("true") data-beside=beside.then_some("true")>
+                        {face}
+                        <div class="msg-bubble">
+                            {sender}
+                            <span class="visually-hidden">{prefix}</span>
+                            <p class="msg-text" class:emote=m.emote>{m.text}</p>
+                            <time datetime=time::machine(m.at) aria-hidden="true">{time::clock(m.at)}</time>
+                        </div>
                     </li>
                 }
             })
@@ -953,7 +1123,8 @@ impl Open {
                 Some(Kind::Direct(_)) => words::chat_friend_required(lang),
                 _ => words::chat_group_left(lang),
             });
-            view! { <p class="composer-closed">{text}</p> }.into_any()
+            view! { <p class="composer-closed">{glyph(glyph::INFO)}<span>{text}</span></p> }
+                .into_any()
         }
     }
 

@@ -47,7 +47,7 @@ fn ratio(a: [f64; 3], b: [f64; 3]) -> f64 {
 }
 
 /// Text on grounds: 4.5:1.
-const TEXT: [(&str, &str); 45] = [
+const TEXT: [(&str, &str); 47] = [
     ("--ink", "--bg"),
     ("--ink", "--bg-alt"),
     ("--ink", "--panel-solid"),
@@ -95,6 +95,10 @@ const TEXT: [(&str, &str); 45] = [
     ("--on-avatar", "--avatar-3"),
     ("--on-avatar", "--avatar-4"),
     ("--on-avatar", "--avatar-5"),
+    // a line that could not be sent, under its bubble; a list row's time
+    // under the pointer
+    ("--bad", "--bg-alt"),
+    ("--ink-faint", "--panel-2"),
 ];
 
 /// Non-text that carries meaning (the focus ring, field borders, the gold
