@@ -316,6 +316,61 @@ test("a finger turns the full photograph: far enough or flicked it turns either 
 });
 
 
+test("the browser's own input turns the full photograph: a mouse dragged or a finger on a touch screen, and a touchpad's sideways stroke", async ({ page, baseURL }, info) => {
+  const problems = watch(page, baseURL ?? "");
+  const { frame, viewer } = await openViewer(page);
+  const box = await viewer.locator("[data-viewport]").boundingBox();
+  expect(box).not.toBeNull();
+  const { x, y, width, height } = box ?? { x: 0, y: 0, width: 0, height: 0 };
+  const middle = y + height / 2;
+  const phone = info.project.name === "phone";
+  // input as the browser makes it, which the frame captures: a touch
+  // screen's on the phone, a mouse's on the desktop
+  const drag = async (from: number, to: number) => {
+    const start = x + width * from;
+    const end = x + width * to;
+    if (phone) {
+      const cdp = await page.context().newCDPSession(page);
+      await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: start, y: middle }] });
+      for (let step = 1; step <= 10; step += 1) {
+        await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x: start + ((end - start) * step) / 10, y: middle }] });
+      }
+      await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+      await cdp.detach();
+    } else {
+      await page.mouse.move(start, middle);
+      await page.mouse.down();
+      await page.mouse.move(end, middle, { steps: 10 });
+      await page.mouse.up();
+    }
+  };
+  await drag(0.85, 0.2);
+  await showing(viewer, 2);
+  await drag(0.15, 0.8);
+  await showing(viewer, 1);
+  if (!phone) {
+    // a touchpad's sideways stroke turns, once however many events it sends
+    await page.mouse.move(x + width / 2, middle);
+    await page.mouse.wheel(120, 0);
+    await showing(viewer, 2);
+    await viewer.locator("[data-viewport]").evaluate((area) => {
+      for (let tick = 0; tick < 8; tick += 1) area.dispatchEvent(new WheelEvent("wheel", { deltaX: 40, bubbles: true, cancelable: true }));
+    });
+    await showing(viewer, 3);
+    // zoomed in, it moves the photograph sideways and does not turn it; a
+    // wheel up and down still zooms
+    await page.mouse.wheel(0, -120);
+    await expect(viewer.locator("[data-zoom-level]")).toHaveText("150 %");
+    await page.mouse.wheel(120, 0);
+    await showing(viewer, 3);
+    await expect(viewer.locator("[data-zoom-level]")).toHaveText("150 %");
+  }
+  await page.keyboard.press("Escape");
+  await expect(viewer).toBeHidden();
+  await expect(frame).toBeFocused();
+  expect(problems).toEqual([]);
+});
+
 test("with less motion the book opens and shuts at once and the photographs change at once", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/en/");

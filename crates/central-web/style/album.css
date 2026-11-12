@@ -110,6 +110,13 @@
   transform-origin: left center;
 }
 
+/* what the pages hold stays where the book cuts it off at rest (its
+   padding's edge), where a window too short for them cannot show it all */
+.album[data-folding] > .album-layout {
+  overflow: clip;
+  overflow-clip-margin: 1rem;
+}
+
 .album-cover,
 .album-cover-shade {
   display: none;
@@ -1019,6 +1026,10 @@
     grid-template-columns: 1fr;
     grid-template-rows: auto minmax(0, 1fr);
     padding-top: 0;
+  }
+
+  .album[data-folding] > .album-layout {
+    overflow-clip-margin: 0.65rem;
   }
 
   .album-photo {

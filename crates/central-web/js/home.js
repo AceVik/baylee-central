@@ -456,7 +456,8 @@ if (album instanceof HTMLDialogElement && viewer instanceof HTMLDialogElement) {
       else zoom(by * 0.5);
     });
   }
-  // A wheel zooms; a sideways stroke on a touchpad turns, once a stroke.
+  // A wheel zooms. A sideways stroke on a touchpad turns, once a stroke;
+  // zoomed in, it moves the photograph sideways instead.
   let sweep = { sum: 0, last: -Infinity, spent: false };
   viewport?.addEventListener(
     "wheel",
@@ -466,10 +467,14 @@ if (album instanceof HTMLDialogElement && viewer instanceof HTMLDialogElement) {
         zoom(event.deltaY < 0 ? 0.5 : -0.5);
         return;
       }
+      if (view.zoom > 1) {
+        draw({ ...view, x: view.x - event.deltaX });
+        return;
+      }
       if (event.timeStamp - sweep.last > 220) sweep = { sum: 0, last: 0, spent: false };
       sweep.last = event.timeStamp;
       sweep.sum += event.deltaX;
-      if (!sweep.spent && view.zoom <= 1 && Math.abs(sweep.sum) > 60) {
+      if (!sweep.spent && Math.abs(sweep.sum) > 60) {
         sweep.spent = true;
         step(sweep.sum > 0 ? 1 : -1);
       }
@@ -738,10 +743,10 @@ if (album instanceof HTMLDialogElement && viewer instanceof HTMLDialogElement) {
   // other way it is opened.
   for (const opener of openers) {
     opener.addEventListener("click", opening);
-    // the book's first photograph and the cover's picture are made ready
-    // once a reader comes near the logo, not while they wait for the book
+    // the cover's picture (the hero's own, already loaded) is drawn once a
+    // reader comes near the logo, not while they wait for the book; the
+    // photographs still load only once the book is open
     const ready = () => {
-      photos[0]?.setAttribute("loading", "eager");
       cloth();
       if (mark.src) mark.decode().catch(() => {});
     };
