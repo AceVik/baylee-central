@@ -27,7 +27,8 @@ test("without the role every page of the administration says so, has no navigati
   // the account's own overview leads nowhere there
   await expect(page.locator(".account-who")).toBeVisible();
   await expect(page.locator("a[href*='/account/admin']")).toHaveCount(0);
-  for (const [path, title] of PAGES) {
+  // the reported pictures' page too (its moderation is picture.spec.ts's)
+  for (const [path, title] of [...PAGES, ["/en/account/admin/pictures", "Reported profile pictures"] as const]) {
     await page.goto(path);
     await expect(page.locator("html")).toHaveAttribute("data-islands", "ready");
     await expect(page.locator("h1")).toHaveText(title);
