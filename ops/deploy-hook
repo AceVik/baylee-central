@@ -17,6 +17,13 @@
 #
 #   10-central manual CENTRAL_REVISION    prepare and switch that revision
 #
+# The grants (ops/grants.sql) are taken from the revision's commit before
+# anything of it is built, never from the tree a build ran in, and are
+# applied as the login that owns the tables (DB_GRANTOR), never as a
+# database superuser: that file can then do what the migrations it follows
+# can do, and no more. The binary and the website are still what the build
+# made of that revision.
+#
 # Settings: /etc/baylee-central/deploy-hook.env (root's, optional), the
 # variables below. docs/operations.md §"Deploying with the gateway".
 set -euo pipefail
@@ -30,7 +37,7 @@ WEB_ROOT=/opt/baylee-app/web
 UNIT=baylee-central
 LISTEN=127.0.0.1:28790
 DB_CONTAINER=baylee-postgres-1
-DB_SUPERUSER=baylee
+DB_GRANTOR=central_migrator
 DB_NAME=baylee_central
 if [[ -e $SETTINGS ]]; then
     [[ $(stat -c '%U %a' "$SETTINGS") =~ ^root\ [0-7][0145][0145]$ ]] \
@@ -55,6 +62,25 @@ as_builder() {
 }
 
 is_rev() { [[ $1 =~ ^[0-9a-f]{40}$ ]]; }
+
+# psql in the database's container as the grants' login, reading standard
+# input: no start-up file, never a password prompt, stopping at an error.
+as_grantor() {
+    docker exec -i "$DB_CONTAINER" psql -X -w -q -v ON_ERROR_STOP=1 \
+        -U "$DB_GRANTOR" -d "$DB_NAME" "$@"
+}
+
+# Whether the grants' login reaches the database and is no superuser.
+grantor_ready() {
+    local super
+    super=$(as_grantor -At -c 'SELECT rolsuper FROM pg_catalog.pg_roles WHERE rolname = current_user' \
+        < /dev/null) || return 1
+    [[ $super == f ]]
+}
+
+# Whether file $1 is SQL only: psql takes a backslash for a command of its
+# own (to run a program, to connect elsewhere), and the grants need none.
+plain_sql() { [[ -s $1 ]] && ! grep -q -F "\\" "$1"; }
 
 # The Central revision the gateway at baylee commit $1 links, or nothing.
 pinned() {
@@ -81,6 +107,13 @@ stage() {
     as_builder git -C "$SRC" fetch -q origin || { say "fetch failed"; exit 75; }
     as_builder git -C "$SRC" cat-file -e "$rev^{commit}" || die "no commit $rev in $SRC"
     as_builder git -C "$SRC" checkout -q --detach "$rev"
+    # The grants as the commit holds them, before anything of the revision
+    # is built: git's plumbing prints the blob as it is stored, with no
+    # filter, no conversion and no replacement of objects. The file is
+    # root's from here on.
+    as_builder git --no-replace-objects -C "$SRC" cat-file blob "$rev:ops/grants.sql" \
+        > "$STATE/grants.sql" || die "no ops/grants.sql in $rev"
+    plain_sql "$STATE/grants.sql" || die "ops/grants.sql of $rev is empty or holds a backslash"
     say "building $rev"
     as_builder bash -c "cd '$SRC' && cargo build -q --release --locked -p central-service"
     as_builder bash -c "cd '$SRC/web' && npm ci --no-audit --no-fund --silent \
@@ -88,7 +121,8 @@ stage() {
     rm -rf "$STAGED"
     install -d -m755 -o root -g root "$STAGED"
     install -m755 -o root -g root "$SRC/target/release/central-service" "$STAGED/central-service"
-    install -m644 -o root -g root "$SRC/ops/grants.sql" "$STAGED/grants.sql"
+    install -m644 -o root -g root "$STATE/grants.sql" "$STAGED/grants.sql"
+    rm -f "$STATE/grants.sql"
     cp -R "$SRC/web/dist" "$STAGED/web"
     chown -R root:root "$STAGED/web"
     echo "$rev" > "$STATE/staged"
@@ -104,6 +138,9 @@ switch() {
         say "nothing staged"
         return
     fi
+    # Asked before anything is stopped, so a refusal changes nothing.
+    plain_sql "$STAGED/grants.sql" || die "the staged grants are empty or hold a backslash; nothing was changed"
+    grantor_ready || die "$DB_GRANTOR does not reach $DB_NAME in $DB_CONTAINER, or is a superuser; nothing was changed"
     systemctl stop "$UNIT"
     [[ -x $BIN/central-service ]] && install -m755 -o root -g root "$BIN/central-service" "$BIN/central-service.previous"
     install -m755 -o root -g root "$STAGED/central-service" "$BIN/central-service.new"
@@ -113,8 +150,7 @@ switch() {
         "$BIN/central-service" --migrate-stdin; then
         back "the migration failed"
     fi
-    docker exec -i "$DB_CONTAINER" psql -q -v ON_ERROR_STOP=1 -U "$DB_SUPERUSER" -d "$DB_NAME" \
-        < "$STAGED/grants.sql" || back "the grants failed"
+    as_grantor < "$STAGED/grants.sql" || back "the grants failed"
     systemctl start "$UNIT"
     live || back "$rev does not answer /health/live"
     rm -rf "$WEB_ROOT.new" "$WEB_ROOT.old"
