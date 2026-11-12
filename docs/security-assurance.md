@@ -6603,7 +6603,12 @@ Adversarial pass, with what was tested.
 
 Not tested.
 - The real password managers: Chrome's and Edge's prompt, sync, and what
-  the sign-in form then suggests. The tests record the offer instead.
+  the sign-in form then suggests. The tests record the offer instead. One
+  probe without the stand-in: Playwright's Chromium (build 1248) makes the
+  credential from the id and the code as the page does, and
+  `credentials.store` resolves in its full browser; its headless shell,
+  which has no password service, refuses it, and the page would then say
+  that the browser did not take the code.
   Firefox and Safari were not run; their lack of `PasswordCredential` is
   from MDN's compatibility data and was simulated in Chromium.
 - A real mail program, and a web mail registered as the `mailto:` handler.
