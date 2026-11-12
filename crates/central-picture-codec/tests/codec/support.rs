@@ -5,9 +5,11 @@ use central_picture::{Format, Output, Refusal};
 use std::borrow::Cow;
 use std::time::{Duration, Instant};
 
-/// How long one conversion may take in these tests: well inside the
-/// worker's ten seconds, on a loaded machine too.
-pub(crate) const BOUND: Duration = Duration::from_secs(8);
+/// How long one conversion may take in these tests: inside the worker's
+/// twenty seconds on a loaded machine too (the gate's own build beside
+/// them took a JPEG past 8 s at a load average of 50), and far below what
+/// a bound that failed would take.
+pub(crate) const BOUND: Duration = Duration::from_secs(15);
 
 /// Convert, with the time bound checked.
 pub(crate) fn timed(format: Format, bytes: &[u8]) -> Result<Output, Refusal> {

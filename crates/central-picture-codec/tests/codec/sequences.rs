@@ -162,14 +162,15 @@ fn every_failure_of_the_encoder_keeps_the_still_and_says_why() {
             "{name}"
         );
     }
-    // one that hangs is ended at its time
+    // one that hangs is ended at its time, long before it would end (the
+    // bound leaves room for a loaded machine's decoding and still)
     let started = Instant::now();
     assert_eq!(
-        motion(Format::Png, &six, &stand_in("hang", "sleep 30")),
+        motion(Format::Png, &six, &stand_in("hang", "sleep 90")),
         Motion::Failed
     );
     assert!(
-        started.elapsed() < Duration::from_secs(14),
+        started.elapsed() < Duration::from_secs(40),
         "{:?}",
         started.elapsed()
     );
