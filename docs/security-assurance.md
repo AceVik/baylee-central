@@ -5184,20 +5184,47 @@ route.
   opened it again after the page deleted it. The copy held the site's
   public files only and went with the next page load; the sentence "a
   reader gets nothing stored" was not true for that while. It was so
-  since 11.11. and is no part of the reset's change. Now the page retires
-  the worker before it removes it: on `RETIRE` (taken from a window of
-  this origin only, like the worker's other messages) the worker answers
-  no request any more, waits for the answers under way and deletes its
-  caches, and the page deletes them as before, after the worker's word or
-  three seconds. A script of this origin could always unregister the
-  worker and delete the caches; the message lets it do nothing more. A
-  worker started again forgets that it was retired and finds no cache,
-  which it does not make (the check that was there). After the change the
-  test passed 48 times of 48 in parallel, and a probe of the same steps,
-  six at a time, found no cache in 24 runs of 24 (4 of 20 before). The
-  test also fetches a file through the removed worker and finds no cache
-  made, and signs in again on that page: a new worker comes with its
-  cache and the offline page (the retired one goes with its page).
+  since 11.11. and is no part of the reset's change. Now the page tells
+  the worker to retire: on `RETIRE` the worker answers no request from
+  its cache any more, waits for the answers under way and deletes its
+  caches; the page deletes them as before, after the worker's word or
+  three seconds. The removal does not wait for the word: the previous
+  site's worker (also `/sw.js`, scope `/`) knows no such message, and a
+  copy of this worker without it was removed 80 to 375 ms after the
+  reload began, its cache after the three seconds (or with the next
+  page, which finds no worker and waits for none).
+- **A worker handed back with no cache.** Looking at the above with two
+  pages open showed a second thing, older than the fix: while a page
+  that removed the worker is still open, Chromium gives a page that
+  registers it again (signed in in another tab) the same worker back. It
+  had no cache, the install that fills one does not run again, and so
+  that person had no offline page and no stored files until the next
+  build (4 runs of 4). A page that wants the worker now says so (`KEEP`),
+  and the worker caches again and fills its cache if it has none; `KEEP`
+  and `RETIRE` are taken one after the other, in the order they came, so
+  the later one decides. Should the two pages cross within the same
+  moment and the first delete what the second had filled, the second's
+  next page fills it again.
+- **What the two messages allow.** Both are taken from a window of this
+  origin only, like the worker's other messages. `RETIRE` stops the
+  caching and deletes the site's own caches; `KEEP` stores the offline
+  pages and their files, which the install stores anyway. A script of
+  this origin could always do both to the caches directly; neither
+  message carries data, and neither touches the push state. A worker
+  started again forgets that it was retired, finds no cache and makes
+  none (the check that was there before).
+- **How it was tested.** The evidence for the first point is the rate:
+  the same test, repeated in parallel, failed 3 to 6 times in 16 before
+  and has not failed since (the count on the head is in the pull
+  request's text); a probe of the same steps found a cache left in 4 runs
+  of 20 before and in none of 24 after. The test's added fetch through
+  the removed worker would pass on the old code too and only guards what
+  was there. For the second point a test opens the two pages, finds all
+  offline pages stored for the second, more files after its reload, and
+  the German offline page with the network off; without the page's
+  `KEEP` it fails at both sizes. Chromium only: no other engine ran these
+  tests, and what another browser does with a registration that is still
+  in use was not looked at.
 
 Checks on the merged tree. On `2a54baa`: `cargo xtask gate`, `postgres`,
 `smoke`, `secrets` and `crypto-scope` and `cargo deny check` pass;
@@ -5209,8 +5236,8 @@ Central's release binary, the site from the development server, synthetic
 accounts), each project against a Central started afresh: the chat's
 spec, the reset's and the password's pass at the desktop's and at a
 phone's size; the registration in them copies its recovery code and
-reads it back from the clipboard. What ran after the three points above
-is in the pull request's text.
+reads it back from the clipboard. What ran after the points above is in
+the pull request's text.
 
 Not looked at again: the points the list above names as not checked stay
 as they are.
