@@ -114,9 +114,17 @@ impl List {
             .collect()
     }
 
+    /// The ids of the selected reports the list shows.
+    fn chosen(self) -> Vec<[u8; 16]> {
+        self.selected().into_iter().map(|r| r.id).collect()
+    }
+
     /// Shows the list `q`: its address, its reports, its facets.
     fn go(self, q: ListQuery) {
-        self.typed.set(q.q.clone().unwrap_or_default());
+        // another list brings its own search; typing that reads the same stays
+        if query::clean_query(&self.typed.get_untracked()) != q.q {
+            self.typed.set(q.q.clone().unwrap_or_default());
+        }
         self.checked.set(Vec::new());
         remember(&list_path(self.code(), &q));
         self.query.set(q);
@@ -147,7 +155,13 @@ impl List {
                 return;
             }
             let load = match answer {
-                Ok((rows, total)) => Load::Ready(rows, total),
+                Ok((rows, total)) => {
+                    // a report the list no longer shows is no longer selected
+                    let _ = self
+                        .checked
+                        .try_update(|c| c.retain(|id| rows.iter().any(|r| r.id == *id)));
+                    Load::Ready(rows, total)
+                }
                 Err(Failure::Rejected) => match self.c.explain().await {
                     Some(why) => {
                         Load::Failed(self.c.why_text(why, words::fb_err_list(self.c.lang)))
@@ -1176,7 +1190,7 @@ fn acting(
 
 /// A selection's change to every selected report.
 fn change_all(l: &List, change: ReportChange) {
-    l.bulk(l.checked.get_untracked(), BulkAction::Change { change });
+    l.bulk(l.chosen(), BulkAction::Change { change });
 }
 
 /// The menus that set a status, a priority and an assignee.
@@ -1353,7 +1367,7 @@ fn merge_menu(l: &List) -> Option<impl IntoView + use<>> {
             .into_any();
         acting(&l, "fb-bulk-merge", words::fb_merge_into(lang), options, Callback::new(move |v: String| {
             let Some(original) = super::text::id_of(&v) else { return };
-            let rest: Vec<[u8; 16]> = l.checked.get_untracked().into_iter().filter(|id| *id != original).collect();
+            let rest: Vec<[u8; 16]> = l.chosen().into_iter().filter(|id| *id != original).collect();
             l.bulk(rest, BulkAction::Change {
                 change: ReportChange { duplicate_of: Some(Some(original)), ..ReportChange::default() },
             });
@@ -1364,8 +1378,8 @@ fn merge_menu(l: &List) -> Option<impl IntoView + use<>> {
 fn bulk_view(l: &List) -> impl IntoView + use<> {
     let l = *l;
     let lang = l.c.lang;
-    let ids = move || l.checked.get();
-    let n = move || words::number(lang, count(l.checked.with(Vec::len)));
+    let ids = move || l.chosen();
+    let n = move || words::number(lang, count(l.chosen().len()));
     let working = move || l.working.get().then_some("true");
     let actions = move || {
         if l.query.with(|q| q.trash) {
@@ -1539,7 +1553,7 @@ fn row_people(l: &List, r: &ReportSummary) -> impl IntoView + use<> {
     };
     let (name, short) = alias(&r.reporter);
     let pick = r.reporter.clone();
-    let title = words::fb_only_reporter(lang, &name);
+    let title = words::fb_only_reporter(lang, &format!("{name} {short}"));
     view! {
         <td>{assignee}</td>
         <td>{gateway}</td>
@@ -1931,9 +1945,9 @@ pub fn page(c: Ctx) -> AnyView {
     let overview = format!("/{}/account/admin/overview", lang.code());
     view! {
         <p class="fb-back"><a href=overview class="text-link">{glyph::glyph(glyph::BACK)}<span>{words::fb_to_overview(lang)}</span></a></p>
-        <section class="card fb-panel" aria-labelledby="fb-list-title">
+        <div class="card fb-panel">
             <div class="fb-panel-head">
-                <h2 id="fb-list-title">{words::fb_reports(lang)}</h2>
+                <h2 id="fb-list-title" tabindex="-1">{words::fb_reports(lang)}</h2>
                 <button type="button" class="button button-ghost button-sm" aria-busy=move || l.busy.get().to_string()
                     on:click=move |_| l.again()>{glyph::glyph(REFRESH)}<span>{words::fb_refresh(lang)}</span></button>
             </div>
@@ -1951,7 +1965,7 @@ pub fn page(c: Ctx) -> AnyView {
             {chart::view(lang)}
             {trash_hint}
             {results_view(&l)}
-        </section>
+        </div>
         {notices_view(lang, l.c.notices)}
     }
     .into_any()
