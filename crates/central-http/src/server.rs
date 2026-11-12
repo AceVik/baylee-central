@@ -112,7 +112,7 @@ impl DevelopmentServer {
             authority,
             self.config.request_bytes().get(),
             self.config.concurrent_requests().get(),
-            super::native::router(identity),
+            super::native::router(identity, endpoint.legacy_origin().is_some()),
         );
         // a report part may take its upload's time
         self.run_router(app, super::boundary::UPLOAD_TIME + CONNECTION, shutdown)
