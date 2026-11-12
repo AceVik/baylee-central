@@ -1,0 +1,36 @@
+[package]
+name = "central-picture-codec"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+license.workspace = true
+description = "Profile pictures: every decoder and both encoders, linked only by the sandboxed picture worker"
+
+# The worker (docs/profile-pictures.md): one request on standard input, one
+# answer on standard output, then it exits. Nothing else in the workspace
+# links this crate: not the service, and nothing central-client reaches.
+[[bin]]
+name = "central-picture-worker"
+path = "src/main.rs"
+
+[lints]
+workspace = true
+
+# The owner's decisions of 12.11.2026 (docs/dependency-proposal/
+# profile-picture.md §0 and §0.3): these decoders at their newest releases,
+# zune-jpeg without SIMD, resvg without text, fonts, svgz or rasters, the
+# encoder without threads, and rav1e's and rav1d's assembly on (nasm on
+# x86-64).
+[dependencies]
+central-picture = { path = "../central-picture", version = "=0.1.0" }
+png = "=0.18.1"
+zune-jpeg = { version = "=0.5.15", default-features = false, features = ["std"] }
+zune-core = { version = "=0.5.3", default-features = false, features = ["std"] }
+gif = { version = "=0.14.2", default-features = false, features = ["std"] }
+image-webp = "=0.2.4"
+resvg = { version = "=0.50.0", default-features = false }
+image = { version = "=0.25.10", default-features = false, features = ["bmp", "ico"] }
+avif-decode = { version = "=3.0.0", default-features = false }
+avif-parse = "=2.1.0"
+ravif = { version = "=0.13.0", default-features = false, features = ["asm"] }

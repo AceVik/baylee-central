@@ -38,9 +38,11 @@ jobs:
         run: rustup toolchain install 1.99.0 --profile minimal --component clippy --component rustfmt
       - name: Fetch locked dependencies
         run: cargo fetch --locked
-      - name: Native Web Push crypto build tools
+      # nasm: rav1e's and rav1d's x86-64 assembly in the picture worker's
+      # codecs (docs/dependency-proposal/profile-picture.md, owner 12.11.2026).
+      - name: Native Web Push crypto and picture codec build tools
         if: matrix.os == 'ubuntu-24.04'
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends clang libclang-dev cmake
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends clang libclang-dev cmake nasm
       - name: Policy, tests, lint and release build
         if: matrix.os == 'ubuntu-24.04'
         run: cargo xtask gate

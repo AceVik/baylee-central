@@ -3,8 +3,9 @@
 # gate and CI dependency job enforce cargo xtask crypto-scope first.
 # See docs/crypto-proposal/bigint-advisory.md; never extend without review.
 # RUSTSEC-2024-0436: paste is unmaintained; Leptos' compile-time proc macro,
-# accepted by the owner on 10.11.2026 (docs/dependency-proposal/leptos.md).
-# Remove when Leptos drops it.
+# accepted by the owner on 10.11.2026 (docs/dependency-proposal/leptos.md),
+# and rav1e's and rav1d's in the picture worker, accepted on 12.11.2026
+# (docs/dependency-proposal/profile-picture.md). Remove when all drop it.
 # RUSTSEC-2026-0459: libsqlite3-sys 0.37.0 is in Cargo.lock through
 # sqlx-sqlite and in no build (owner, 12.11.2026). Bound by cargo xtask
 # sqlite-scope in the gate and the dependency job, which fails once it is
