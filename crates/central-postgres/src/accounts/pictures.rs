@@ -486,7 +486,7 @@ pub(super) async fn pictures(
         .query_all_raw(statement(
             "SELECT a.tag, p.key, p.sequence IS NOT NULL AS moving FROM central_identity.accounts a
              JOIN central_identity.pictures p ON p.account_id = a.id
-             WHERE a.tag = ANY($2) AND a.credential IS NOT NULL
+             WHERE a.tag = ANY($2) AND a.credential IS NOT NULL AND a.display_name IS NOT NULL
              AND NOT EXISTS (SELECT 1 FROM central_identity.social_blocks b
                 WHERE (b.owner = $1 AND b.blocked = a.id) OR (b.owner = a.id AND b.blocked = $1))",
             vec![me.into(), asked.into()],

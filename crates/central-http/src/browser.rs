@@ -2743,7 +2743,7 @@ mod tests {
                 assert_eq!(body, b"picture bytes");
                 let expected = [
                     ("content-type", kind),
-                    ("cache-control", "public, max-age=3600"),
+                    ("cache-control", "private, max-age=3600"),
                     ("content-disposition", "inline"),
                     ("x-content-type-options", "nosniff"),
                     ("content-security-policy", "default-src 'none'; sandbox"),
@@ -2779,7 +2779,7 @@ mod tests {
                 let (status, headers, body) =
                     get_picture(&app, "GET", &uri(PICTURE, extension), &again, LOOPBACK).await;
                 assert_eq!((status, body.len()), (StatusCode::NOT_MODIFIED, 0));
-                assert_eq!(headers["cache-control"], "public, max-age=3600");
+                assert_eq!(headers["cache-control"], "private, max-age=3600");
             }
             assert!(
                 mock.calls

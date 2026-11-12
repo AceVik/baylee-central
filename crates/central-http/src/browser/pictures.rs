@@ -52,8 +52,12 @@ pub(super) const READS_IN_FLIGHT: u8 = 16;
 /// Reads of pictures one address may make in a minute.
 pub(super) const READS_PER_MINUTE: u32 = 600;
 /// How long a browser may keep a picture: the bound on a removed picture's
-/// life in a cache that already holds it.
-pub(super) const CACHE: &str = "public, max-age=3600";
+/// life in a cache that already holds it. `private`, so no shared cache
+/// (a proxy or a CDN in front later) keeps it for others after its removal
+/// promised a 404 at once; the hour stays for the viewer's own browser,
+/// whose copy only that viewer sees. `no-cache` with the `ETag` would ask
+/// Central for every avatar on every page instead.
+pub(super) const CACHE: &str = "private, max-age=3600";
 
 /// An upload's format, from its `Content-Type`: exactly one value naming one.
 fn format(headers: &HeaderMap) -> Option<Format> {
