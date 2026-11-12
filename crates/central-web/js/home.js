@@ -22,6 +22,7 @@ if (album instanceof HTMLDialogElement && viewer instanceof HTMLDialogElement) {
   const chapterCount = album.querySelector("[data-chapter-count]");
   const previousChapter = album.querySelector('[data-chapter-step="-1"]');
   const nextChapter = album.querySelector('[data-chapter-step="1"]');
+  const fullCaption = viewer.querySelector("[data-viewer-caption]");
   let chapter = 0;
   let photo = 0;
 
@@ -132,8 +133,10 @@ if (album instanceof HTMLDialogElement && viewer instanceof HTMLDialogElement) {
   // ---- photographs ------------------------------------------------------
 
   // The photograph asked for is laid on the one before it, which goes once
-  // the new one has settled.
-  const showPhoto = (to, forward) => {
+  // the new one has settled. Where the full photograph is open, its print
+  // turns as well (`turnFull`); a finger that already moved the prints
+  // hands over where it let go (`swept`).
+  const showPhoto = (to, forward, swept = null) => {
     const before = photos[photo];
     photo = (to + photos.length) % photos.length;
     const next = photos[photo];
@@ -152,8 +155,9 @@ if (album instanceof HTMLDialogElement && viewer instanceof HTMLDialogElement) {
     }
     const words = next?.alt ?? "";
     if (caption) caption.textContent = words;
+    if (fullCaption) fullCaption.textContent = words;
     for (const count of counts) count.textContent = `${photo + 1} / ${photos.length}`;
-    if (viewer.open) showFull();
+    if (viewer.open) turnFull(forward, swept);
   };
   for (const image of photos) {
     image.addEventListener("animationend", () => {
@@ -213,13 +217,58 @@ if (album instanceof HTMLDialogElement && viewer instanceof HTMLDialogElement) {
   // ---- the full photograph ------------------------------------------------
 
   const viewport = viewer.querySelector("[data-viewport]");
-  const full = viewer.querySelector("[data-viewer-image]");
-  const fullCaption = viewer.querySelector("[data-viewer-caption]");
   const level = viewer.querySelector("[data-zoom-level]");
   const zoomOut = viewer.querySelector('[data-zoom="-1"]');
   const zoomIn = viewer.querySelector('[data-zoom="1"]');
   let view = { zoom: 1, x: 0, y: 0 };
   let drag = null;
+
+  // The frame holds three prints: the photograph shown, and hidden beside
+  // it the ones before and after, so that a turn either way has its
+  // photograph at hand. The neighbours are the album's own smaller
+  // pictures; the one shown is the full photograph, which takes over from
+  // the smaller one once it has loaded. Only one image is the viewer's
+  // (`data-viewer-image`) at a time, the one the zoom acts on.
+  const prints = [];
+  let ring = 0;
+  const near = (by) => prints[(((ring + by) % 3) + 3) % 3];
+  let full = viewer.querySelector("[data-viewer-image]");
+  if (viewport instanceof HTMLElement && full instanceof HTMLImageElement) {
+    for (let at = 0; at < 3; at += 1) {
+      const image = at === 0 ? full : document.createElement("img");
+      if (at > 0) {
+        image.alt = "";
+        image.decoding = "async";
+        image.draggable = false;
+      }
+      const sheet = document.createElement("div");
+      sheet.className = "photo-print";
+      sheet.hidden = at > 0;
+      const shadow = document.createElement("span");
+      shadow.className = "photo-print-shadow";
+      sheet.append(shadow, image);
+      viewport.append(sheet);
+      prints.push({ sheet, shadow, image, index: -1, large: false });
+      image.addEventListener("load", () => {
+        if (image === full) draw(view);
+      });
+    }
+    viewport.dataset.prints = "";
+  }
+  const wrap = (index) => ((index % photos.length) + photos.length) % photos.length;
+  const load = (print, index, large) => {
+    const at = wrap(index);
+    const source = photos[at];
+    if (!print || !source) return;
+    if (print.index === at && (print.large || !large)) return;
+    print.index = at;
+    print.large = large;
+    const ratio = Number(source.getAttribute("width")) / Number(source.getAttribute("height"));
+    print.sheet.style.setProperty("--ratio", String(Number.isFinite(ratio) && ratio > 0 ? ratio : 1));
+    print.image.src = large ? (source.dataset.full ?? source.src) : source.src;
+    print.image.alt = source.alt;
+    if (!large) print.image.decode().catch(() => {});
+  };
 
   // the photograph may move only as far as it reaches past the frame
   const clamp = (next) => {
@@ -241,21 +290,165 @@ if (album instanceof HTMLDialogElement && viewer instanceof HTMLDialogElement) {
   };
   const zoom = (by) => draw({ ...view, zoom: Math.max(1, Math.min(4, view.zoom + by)) });
   const fit = () => draw({ zoom: 1, x: 0, y: 0 });
+
+  // the print in front is the viewer's image, the one the zoom acts on
+  const own = () => {
+    if (prints.length === 0) return;
+    full = near(0).image;
+    for (const print of prints) print.image.toggleAttribute("data-viewer-image", print === near(0));
+  };
+  // The photograph shown lies in front, the others hidden; every turn ends
+  // here, however it ended. Then each print is given its photograph: the
+  // one shown at full size, its neighbours small.
+  let turning = null;
+  // a finger's stroke over the frame, while it lasts (below)
+  let swipe = null;
+  // aria-hidden="" would hide nothing: it is "true" or absent
+  const unseen = (node, hidden) => {
+    if (hidden) node.setAttribute("aria-hidden", "true");
+    else node.removeAttribute("aria-hidden");
+  };
+  const rest = () => {
+    if (turning) for (const run of turning.runs) run.cancel();
+    turning = null;
+    viewport?.removeAttribute("data-turning");
+    for (const print of prints) {
+      const shown = print === near(0);
+      print.sheet.hidden = !shown;
+      print.sheet.removeAttribute("data-top");
+      unseen(print.sheet, !shown);
+      for (const part of [print.sheet, print.shadow]) {
+        part.style.removeProperty("transform");
+        part.style.removeProperty("opacity");
+      }
+      if (!shown) print.image.style.removeProperty("transform");
+    }
+    own();
+  };
+  const lay = () => {
+    rest();
+    if (prints.length === 0) return;
+    load(near(0), photo, true);
+    load(near(1), photo + 1, false);
+    load(near(-1), photo - 1, false);
+  };
   const showFull = () => {
-    const source = photos[photo];
-    if (!(full instanceof HTMLImageElement) || !source) return;
-    full.src = source.dataset.full ?? source.src;
-    full.alt = source.alt;
-    if (fullCaption) fullCaption.textContent = source.alt;
+    lay();
     fit();
   };
 
+  // A turn: going on, the next print (the top one) is laid over the one
+  // shown (the base), which sinks back and darkens; going back, the one
+  // shown is lifted off to the right and the one before rises. `laid` is
+  // how far the top print lies in place, 0 (off to the right) to 1; the
+  // top print's shadow is deep while it is lifted and settles as it lands.
+  const TURN = 600;
+  const pose = (laid, travel) => {
+    const off = 1 - laid;
+    return {
+      top: { transform: `translate3d(${(off * travel).toFixed(1)}px, 0, 0) rotate(${(off * 3).toFixed(2)}deg) scale(${(1 + off * 0.04).toFixed(4)})` },
+      shadow: { opacity: (0.35 + 0.65 * (1 - laid ** 3)).toFixed(3) },
+      // gone into the dark by the time the top print lies, so that hiding
+      // it then changes nothing
+      base: { transform: `translate3d(${(-laid * 7).toFixed(2)}%, 0, 0) scale(${(1 - laid * 0.08).toFixed(4)})`, opacity: (1 - laid).toFixed(3) },
+    };
+  };
+  const place = (parts, laid) => {
+    const at = pose(laid, parts.travel);
+    parts.top.sheet.style.transform = at.top.transform;
+    parts.top.shadow.style.opacity = at.shadow.opacity;
+    parts.base.sheet.style.transform = at.base.transform;
+    parts.base.sheet.style.opacity = at.base.opacity;
+  };
+  // which print lies on which, both shown, the one coming in holding
+  // photograph `index`; the top one starts beyond the frame's right edge,
+  // however wide its photograph
+  const begin = (forward, index) => {
+    const incoming = forward ? near(1) : near(-1);
+    load(incoming, index, incoming.large);
+    const top = forward ? incoming : near(0);
+    const base = forward ? near(0) : incoming;
+    const wide = viewport?.clientWidth ?? 0;
+    const ratio = Number(top.sheet.style.getPropertyValue("--ratio")) || 1;
+    const travel = (wide + Math.min(wide, (viewport?.clientHeight ?? 0) * ratio)) / 2 + 64;
+    for (const print of [top, base]) {
+      print.sheet.hidden = false;
+      unseen(print.sheet, print !== incoming);
+    }
+    top.sheet.toggleAttribute("data-top", true);
+    viewport?.toggleAttribute("data-turning", true);
+    const parts = { top, base, incoming, forward, travel };
+    place(parts, forward ? 0 : 1);
+    return parts;
+  };
+  // runs a begun turn from where it stands to `laid`, then lays the prints
+  const glide = (parts, from, to, duration, easing, done) => {
+    const frames = (part) => [0, 0.25, 0.5, 0.75, 1].map((step) => pose(from + (to - from) * step, parts.travel)[part]);
+    const timing = { duration, easing, fill: "both" };
+    const runs = [
+      parts.top.sheet.animate(frames("top"), timing),
+      parts.top.shadow.animate(frames("shadow"), timing),
+      parts.base.sheet.animate(frames("base"), timing),
+    ];
+    const run = { runs, parts };
+    turning = run;
+    Promise.all(runs.map((one) => one.finished)).then(
+      () => {
+        if (turning === run) done();
+      },
+      () => {},
+    );
+  };
+  // `photo` is already the photograph turned to
+  const turnFull = (forward, swept) => {
+    if (prints.length === 0) return;
+    if (swept) {
+      // the finger let go past the point of no return: the prints go on
+      // from where it left them
+      const { parts, laid, duration } = swept;
+      ring = prints.indexOf(parts.incoming);
+      own();
+      fit();
+      glide(parts, laid, parts.forward ? 1 : 0, duration, "cubic-bezier(0.2, 0.7, 0.3, 1)", lay);
+      return;
+    }
+    // a turn not yet ended, or a stroke not yet let go, makes way for this one
+    swipe = null;
+    rest();
+    if (near(0).index === photo) {
+      lay();
+      return;
+    }
+    if (still()) {
+      const incoming = forward ? near(1) : near(-1);
+      if (incoming.index === photo) ring = prints.indexOf(incoming);
+      lay();
+      fit();
+      return;
+    }
+    const parts = begin(forward, photo);
+    ring = prints.indexOf(parts.incoming);
+    own();
+    fit();
+    const run = { runs: [], parts };
+    turning = run;
+    // the photograph coming in is shown once it is drawn, or after a moment
+    // even if not
+    const image = parts.incoming.image;
+    const drawn = image.complete ? Promise.resolve() : Promise.race([image.decode().catch(() => {}), new Promise((done) => setTimeout(done, 250))]);
+    drawn.then(() => {
+      if (turning !== run) return;
+      glide(parts, forward ? 0 : 1, forward ? 1 : 0, TURN, "cubic-bezier(0.32, 0.72, 0, 1)", lay);
+    });
+  };
+
   viewer.addEventListener("toggle", (event) => {
+    swipe = null;
     if (event.newState === "open") showFull();
+    else lay();
   });
   // where a dialog fires no toggle event, the frame that opens it says so
   album.querySelector(".album-photo-open")?.addEventListener("click", () => requestAnimationFrame(showFull));
-  full?.addEventListener("load", () => draw(view));
   for (const button of viewer.querySelectorAll("[data-zoom]")) {
     button.addEventListener("click", () => {
       const by = Number(button.getAttribute("data-zoom"));
@@ -263,18 +456,37 @@ if (album instanceof HTMLDialogElement && viewer instanceof HTMLDialogElement) {
       else zoom(by * 0.5);
     });
   }
+  // A wheel zooms; a sideways stroke on a touchpad turns, once a stroke.
+  let sweep = { sum: 0, last: -Infinity, spent: false };
   viewport?.addEventListener(
     "wheel",
     (event) => {
       event.preventDefault();
-      zoom(event.deltaY < 0 ? 0.5 : -0.5);
+      if (Math.abs(event.deltaX) <= Math.abs(event.deltaY)) {
+        zoom(event.deltaY < 0 ? 0.5 : -0.5);
+        return;
+      }
+      if (event.timeStamp - sweep.last > 220) sweep = { sum: 0, last: 0, spent: false };
+      sweep.last = event.timeStamp;
+      sweep.sum += event.deltaX;
+      if (!sweep.spent && view.zoom <= 1 && Math.abs(sweep.sum) > 60) {
+        sweep.spent = true;
+        step(sweep.sum > 0 ? 1 : -1);
+      }
     },
     { passive: false },
   );
+  const capture = (event) => {
+    try {
+      viewport?.setPointerCapture(event.pointerId);
+    } catch {
+      // a pointer that is already gone has nothing to capture
+    }
+  };
   viewport?.addEventListener("pointerdown", (event) => {
     if (event.button !== 0 || view.zoom <= 1 || drag) return;
     event.preventDefault();
-    viewport.setPointerCapture(event.pointerId);
+    capture(event);
     viewport.toggleAttribute("data-dragging", true);
     drag = { id: event.pointerId, x: event.clientX, y: event.clientY, origin: view };
   });
@@ -290,6 +502,78 @@ if (album instanceof HTMLDialogElement && viewer instanceof HTMLDialogElement) {
   viewport?.addEventListener("pointercancel", release);
   viewport?.addEventListener("lostpointercapture", release);
   if (viewport) new ResizeObserver(() => draw(view)).observe(viewport);
+
+  // ---- a finger turns the full photograph -------------------------------------
+
+  // Unzoomed, a stroke sideways moves the prints with the finger: to the
+  // left the next one comes in from the right, to the right the one shown
+  // is lifted off. Let go past a third of the way, or with a flick, and the
+  // turn ends; short of it the prints fall back. With less motion asked
+  // for nothing follows the finger and the photograph changes as it lifts.
+  // A second finger is not a stroke; a first one starts a new stroke, and
+  // whatever an earlier one left (a pointer lost on the way) is laid.
+  const NUDGE = 8;
+  viewport?.addEventListener("pointerdown", (event) => {
+    if (event.button !== 0 || !event.isPrimary || view.zoom > 1 || drag || prints.length === 0) return;
+    lay();
+    capture(event);
+    swipe = { id: event.pointerId, x: event.clientX, y: event.clientY, forward: null, parts: null, laid: 0, trail: [{ x: event.clientX, t: event.timeStamp }] };
+  });
+  viewport?.addEventListener("pointermove", (event) => {
+    if (!swipe || swipe.id !== event.pointerId) return;
+    const across = event.clientX - swipe.x;
+    const down = event.clientY - swipe.y;
+    swipe.trail.push({ x: event.clientX, t: event.timeStamp });
+    while (swipe.trail.length > 2 && event.timeStamp - swipe.trail[0].t > 100) swipe.trail.shift();
+    if (swipe.forward === null) {
+      if (Math.abs(across) < NUDGE) return;
+      if (Math.abs(down) > Math.abs(across)) {
+        // a stroke up or down is no turn
+        swipe = null;
+        return;
+      }
+    }
+    const forward = across < 0;
+    if (still()) {
+      swipe.forward = forward;
+      return;
+    }
+    if (forward !== swipe.forward || !swipe.parts) {
+      if (swipe.parts) rest();
+      swipe.forward = forward;
+      swipe.parts = begin(forward, photo + (forward ? 1 : -1));
+    }
+    const reach = Math.min(1, Math.abs(across) / swipe.parts.travel);
+    swipe.laid = forward ? reach : 1 - reach;
+    place(swipe.parts, swipe.laid);
+  });
+  const letGo = (event, kept) => {
+    if (!swipe || swipe.id !== event.pointerId) return;
+    const stroke = swipe;
+    swipe = null;
+    if (stroke.forward === null) return;
+    const across = event.clientX - stroke.x;
+    const first = stroke.trail[0];
+    const speed = first && event.timeStamp > first.t ? (event.clientX - first.x) / (event.timeStamp - first.t) : 0;
+    const flick = Math.abs(speed) > 0.45;
+    const onward = kept && (flick ? Math.sign(speed) === Math.sign(across) : Math.abs(across) > 48);
+    if (!stroke.parts) {
+      if (onward) step(stroke.forward ? 1 : -1);
+      return;
+    }
+    const reach = Math.abs(across) / stroke.parts.travel;
+    const goes = kept && (flick ? Math.sign(speed) === Math.sign(across) : reach > 1 / 3);
+    const to = stroke.forward === goes ? 1 : 0;
+    const way = Math.abs(to - stroke.laid) * stroke.parts.travel;
+    const duration = Math.round(Math.max(160, Math.min(440, (way / Math.max(Math.abs(speed), 0.8)) * 1.7)));
+    if (goes) {
+      showPhoto(photo + (stroke.forward ? 1 : -1), stroke.forward, { parts: stroke.parts, laid: stroke.laid, duration });
+    } else {
+      glide(stroke.parts, stroke.laid, to, duration, "cubic-bezier(0.2, 0.7, 0.3, 1)", lay);
+    }
+  };
+  viewport?.addEventListener("pointerup", (event) => letGo(event, true));
+  viewport?.addEventListener("pointercancel", (event) => letGo(event, false));
 
   viewer.addEventListener("keydown", (event) => {
     if (event.ctrlKey || event.metaKey) return;

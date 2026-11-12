@@ -1,7 +1,8 @@
-// Baylee's album as a book that opens and shuts (home.js, album.css): every
-// way in and out, focus coming back, less motion meaning no motion, and
-// nothing but transform and opacity moving.
-import { expect, test, type Page } from "@playwright/test";
+// Baylee's album as a book that opens and shuts, and its full photograph
+// turning from print to print (home.js, album.css): every way in and out,
+// every photograph by every way of turning, focus coming back, less motion
+// meaning no motion, and nothing but transform and opacity moving.
+import { expect, test, type Locator, type Page } from "@playwright/test";
 
 import { axe, watch } from "./check.ts";
 
@@ -60,6 +61,12 @@ async function settled(page: Page, open: boolean): Promise<void> {
   }, open);
 }
 
+async function openBook(page: Page): Promise<Locator> {
+  await page.locator("button.memorial-open").click();
+  await settled(page, true);
+  return page.locator("dialog#album");
+}
+
 type Folds = Window & { folds?: string[] };
 
 /**
@@ -82,6 +89,54 @@ async function folds(page: Page): Promise<string[]> {
     }
     return seen.folds.splice(0);
   });
+}
+
+/**
+ * A finger's stroke over the full photograph, from and to a fraction of
+ * the frame's width, made of pointer events as a touch screen sends them,
+ * a frame apart; `rest` holds the finger still before it lifts, so that
+ * the stroke ends without a flick.
+ */
+async function stroke(page: Page, from: number, to: number, rest = 0, down = 0): Promise<void> {
+  await page.locator("#photo-viewer [data-viewport]").evaluate(
+    async (area, [left, right, still, fall]) => {
+      const box = area.getBoundingClientRect();
+      const y = box.top + box.height / 2;
+      const start = box.left + box.width * left;
+      const end = box.left + box.width * right;
+      const fire = (type: string, x: number, dy: number) =>
+        area.dispatchEvent(
+          new PointerEvent(type, {
+            bubbles: true,
+            cancelable: true,
+            pointerId: 41,
+            pointerType: "touch",
+            isPrimary: true,
+            button: type === "pointermove" ? -1 : 0,
+            buttons: type === "pointerup" ? 0 : 1,
+            clientX: x,
+            clientY: y + dy,
+          }),
+        );
+      fire("pointerdown", start, 0);
+      for (let step = 1; step <= 10; step += 1) {
+        await new Promise((done) => setTimeout(done, 16));
+        fire("pointermove", start + ((end - start) * step) / 10, (fall * step) / 10);
+      }
+      if (still > 0) await new Promise((done) => setTimeout(done, still));
+      fire("pointerup", end, fall);
+    },
+    [from, to, rest, down] as const,
+  );
+}
+
+/** The photograph the viewer shows, by its count and its one image, once a turn has ended. */
+async function showing(viewer: Locator, number: number): Promise<void> {
+  await expect(viewer.locator("[data-photo-count]")).toHaveText(`${number} / 10`);
+  await expect(viewer.locator("[data-viewport]")).not.toHaveAttribute("data-turning");
+  await expect(viewer.locator("[data-viewer-image]")).toHaveCount(1);
+  await expect(viewer.locator("[data-viewer-image]")).toHaveAttribute("src", new RegExp(`memorial/full/baylee-${number}\\.`));
+  await expect(viewer.locator(".photo-print:not([hidden])")).toHaveCount(1);
 }
 
 test("the logo opens the album as a book, its button and Escape shut it, and focus comes back to the logo", async ({ page, baseURL }) => {
@@ -145,7 +200,123 @@ test("the logo opens the album as a book, its button and Escape shut it, and foc
   expect(problems).toEqual([]);
 });
 
-test("with less motion the book opens and shuts at once", async ({ page }) => {
+/** The album open and its full photograph opened from the photograph's frame. */
+async function openViewer(page: Page): Promise<{ album: Locator; frame: Locator; viewer: Locator }> {
+  await page.goto("/en/");
+  const album = await openBook(page);
+  const frame = album.locator(".album-photo-open");
+  await frame.click();
+  const viewer = page.locator("dialog#photo-viewer");
+  await expect(viewer).toBeVisible();
+  await showing(viewer, 1);
+  return { album, frame, viewer };
+}
+
+/** Where a box lies, to the pixel (a dialog's own way in may leave a hair). */
+async function spot(locator: Locator): Promise<number[]> {
+  const box = await locator.boundingBox();
+  return box ? [box.x, box.y, box.width, box.height].map(Math.round) : [];
+}
+
+test("the full photograph's buttons turn to every picture both ways, only transform and opacity moving and the frame staying put", async ({ page, baseURL }) => {
+  // ten turns and more, each played out
+  test.slow();
+  const problems = watch(page, baseURL ?? "");
+  const { frame, viewer } = await openViewer(page);
+  const tools = viewer.locator(".photo-viewer-tools");
+  const area = viewer.locator("[data-viewport]");
+  const before = [await spot(tools), await spot(area)];
+  // mid-turn only transform and opacity move, and the frame and the
+  // controls stay where they were
+  const turn = await moved(page, '#photo-viewer [data-photo-step="1"]', "#photo-viewer");
+  expect(turn.moved).toEqual(["opacity", "transform"]);
+  expect(turn.finite).toBeGreaterThanOrEqual(3);
+  expect([await spot(tools), await spot(area)]).toEqual(before);
+  await showing(viewer, 2);
+  // the next button, round all ten and to the first again
+  const next = viewer.locator('[data-photo-step="1"]');
+  for (let number = 3; number <= 10; number += 1) {
+    await next.click();
+    await showing(viewer, number);
+  }
+  await next.click();
+  await showing(viewer, 1);
+  // the previous button, back past the first to the last and on
+  const previous = viewer.locator('[data-photo-step="-1"]');
+  await previous.click();
+  await showing(viewer, 10);
+  await previous.click();
+  await showing(viewer, 9);
+  // the close button gives focus back to the frame that opened the viewer
+  await viewer.locator(".photo-viewer-header button").click();
+  await expect(viewer).toBeHidden();
+  await expect(frame).toBeFocused();
+  expect(problems).toEqual([]);
+});
+
+test("the arrow keys turn the full photograph to every picture, a key pressed mid-turn ends it and turns on, and Escape gives focus back", async ({ page, baseURL }) => {
+  // ten turns and more, each played out
+  test.slow();
+  const problems = watch(page, baseURL ?? "");
+  const { album, frame, viewer } = await openViewer(page);
+  await viewer.locator('[data-zoom="0"]').focus();
+  for (let number = 2; number <= 10; number += 1) {
+    await page.keyboard.press("ArrowRight");
+    await showing(viewer, number);
+  }
+  await page.keyboard.press("ArrowRight");
+  await showing(viewer, 1);
+  await page.keyboard.press("ArrowLeft");
+  await page.keyboard.press("ArrowLeft");
+  await showing(viewer, 9);
+  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("ArrowRight");
+  await showing(viewer, 1);
+  // the album beneath followed
+  await expect(album.locator("[data-caption]")).toHaveText(await viewer.locator("[data-viewer-caption]").innerText());
+  await page.keyboard.press("Escape");
+  await expect(viewer).toBeHidden();
+  await expect(frame).toBeFocused();
+  expect(problems).toEqual([]);
+});
+
+test("a finger turns the full photograph: far enough or flicked it turns either way, short of it or up and down it falls back, zoomed in it moves the photograph", async ({ page, baseURL }) => {
+  // a dozen strokes, each turn played out
+  test.slow();
+  const problems = watch(page, baseURL ?? "");
+  const { frame, viewer } = await openViewer(page);
+  // to the left, the next photograph comes in from the right
+  await stroke(page, 0.85, 0.2);
+  await showing(viewer, 2);
+  // to the right, the one shown is lifted off and the one before shows
+  await stroke(page, 0.15, 0.8);
+  await showing(viewer, 1);
+  await stroke(page, 0.15, 0.8);
+  await showing(viewer, 10);
+  // every picture can be reached by the finger alone
+  for (let number = 1; number <= 9; number += 1) {
+    await stroke(page, 0.85, 0.2);
+    await showing(viewer, number);
+  }
+  // short of the way and held still before lifting: it falls back
+  await stroke(page, 0.6, 0.5, 160);
+  await showing(viewer, 9);
+  // up and down is no turn
+  await stroke(page, 0.5, 0.52, 0, 200);
+  await showing(viewer, 9);
+  // zoomed in, a finger moves the photograph and does not turn it
+  await viewer.locator('[data-zoom="1"]').click();
+  await expect(viewer.locator("[data-zoom-level]")).toHaveText("150 %");
+  await stroke(page, 0.8, 0.3);
+  await showing(viewer, 9);
+  await page.keyboard.press("Escape");
+  await expect(viewer).toBeHidden();
+  await expect(frame).toBeFocused();
+  expect(problems).toEqual([]);
+});
+
+
+test("with less motion the book opens and shuts at once and the photographs change at once", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/en/");
   const logo = page.locator("button.memorial-open");
@@ -153,12 +324,27 @@ test("with less motion the book opens and shuts at once", async ({ page }) => {
   await logo.click();
   expect(await album.evaluate((dialog) => (dialog as HTMLDialogElement).open && !dialog.hasAttribute("data-folding"))).toBe(true);
   expect(await page.evaluate(() => document.getAnimations().length)).toBe(0);
-  await album.locator(".album-dismiss").click();
-  expect(await album.evaluate((dialog) => (dialog as HTMLDialogElement).open)).toBe(false);
-  await expect(logo).toBeFocused();
-  await page.keyboard.press("Enter");
-  expect(await album.evaluate((dialog) => (dialog as HTMLDialogElement).open && !dialog.hasAttribute("data-folding"))).toBe(true);
+  await album.locator(".album-photo-open").click();
+  const viewer = page.locator("dialog#photo-viewer");
+  await expect(viewer).toBeVisible();
+  await viewer.locator('[data-photo-step="1"]').click();
+  const now = await viewer.evaluate((dialog) => ({
+    count: dialog.querySelector("[data-photo-count]")?.textContent,
+    turning: dialog.querySelector("[data-viewport]")?.hasAttribute("data-turning"),
+    prints: dialog.querySelectorAll(".photo-print:not([hidden])").length,
+    moving: document.getAnimations().length,
+  }));
+  expect(now).toEqual({ count: "2 / 10", turning: false, prints: 1, moving: 0 });
+  await page.keyboard.press("ArrowRight");
+  await expect(viewer.locator("[data-photo-count]")).toHaveText("3 / 10");
+  expect(await page.evaluate(() => document.getAnimations().length)).toBe(0);
+  // a finger turns as it lifts, and nothing followed it before
+  await stroke(page, 0.85, 0.2);
+  await expect(viewer.locator("[data-photo-count]")).toHaveText("4 / 10");
+  expect(await viewer.locator(".photo-print:not([hidden])").count()).toBe(1);
   await page.keyboard.press("Escape");
+  await expect(viewer).toBeHidden();
+  await album.locator(".album-dismiss").click();
   expect(await album.evaluate((dialog) => (dialog as HTMLDialogElement).open)).toBe(false);
   await expect(logo).toBeFocused();
 });
@@ -171,7 +357,7 @@ test("without script the logo still opens the album, plain and every chapter rea
   const album = page.locator("dialog#album");
   await expect(album).toBeVisible();
   await expect(album.locator(".album-cover")).toHaveCount(0);
-  await expect(album.locator('[role="tabpanel"]')).toHaveCount(8);
-  for (const chapter of await album.locator('[role="tabpanel"]').all()) await expect(chapter).toBeVisible();
+  const shown = await album.evaluate((dialog) => [...dialog.querySelectorAll('[role="tabpanel"]')].map((chapter) => chapter.checkVisibility()));
+  expect(shown).toEqual(Array.from({ length: 8 }, () => true));
   await context.close();
 });
