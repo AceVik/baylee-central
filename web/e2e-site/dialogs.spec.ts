@@ -180,3 +180,52 @@ for (const [what, word] of [
     expect(measured?.lines).toBeGreaterThanOrEqual(2);
   });
 }
+
+// The owner, 12.11.2026: with a scrollbar the dialogs looked broken at their
+// right edge, and registering may take more room where there is some. The
+// card scrolls inside the dialog's rounded edge, on a thin bar in the
+// page's ink with no track; the registration is wider than signing in.
+test("a dialog that needs more room scrolls its card on a thin bar, and the registration is wider where there is room", async ({ page }, info) => {
+  await page.setViewportSize({ width: info.project.name === "phone" ? 412 : 1300, height: 560 });
+  await page.goto("/de/faq");
+  await ask(page);
+  const signin = page.locator("#auth-signin");
+  await expect(signin).toBeVisible();
+  const signinWidth = (await signin.boundingBox())?.width ?? 0;
+  await signin.locator("a[href$='/register']").click();
+  const register = page.locator("#auth-register");
+  await expect(register).toBeVisible();
+  // the keyboard is in the first field, not on the scrolling dialog
+  await expect(register.locator("#register-name")).toBeFocused();
+  const measured = await register.evaluate((dialog) => {
+    const style = getComputedStyle(dialog);
+    return {
+      scrolls: dialog.scrollHeight > dialog.clientHeight,
+      bar: style.scrollbarWidth,
+      track: style.scrollbarColor.split(") ").pop(),
+      // the bar runs inside a transparent border as tall as the corner
+      border: [style.borderTopColor, parseFloat(style.borderTopWidth) >= parseFloat(style.borderTopRightRadius)],
+      edge: [style.outlineStyle, style.outlineWidth],
+      width: dialog.getBoundingClientRect().width,
+    };
+  });
+  expect(measured.scrolls).toBe(true);
+  expect(measured.bar).toBe("thin");
+  expect(measured.track).toBe("rgba(0, 0, 0, 0)");
+  expect(measured.border).toEqual(["rgba(0, 0, 0, 0)", true]);
+  expect(measured.edge).toEqual(["solid", "1px"]);
+  if (info.project.name === "phone") {
+    // no room to spare: both as wide as the screen allows
+    expect(measured.width).toBeCloseTo(signinWidth, 0);
+  } else {
+    expect(measured.width).toBeGreaterThanOrEqual(640);
+    expect(measured.width).toBeGreaterThan(signinWidth + 100);
+  }
+  // it scrolls to its last control, and back to the close button
+  await register.evaluate((dialog) => dialog.scrollTo({ top: dialog.scrollHeight }));
+  await expect(register.getByRole("button", { name: "Account anlegen" })).toBeInViewport();
+  await register.evaluate((dialog) => dialog.scrollTo({ top: 0 }));
+  await expect(register.locator(".auth-close")).toBeInViewport();
+  await page.waitForTimeout(400);
+  expect(await targets(page)).toEqual([]);
+});

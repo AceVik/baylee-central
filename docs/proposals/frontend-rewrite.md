@@ -1581,3 +1581,29 @@ a recovery code".
   least 64 px on five pages in four languages at both sizes.
 - **Not done here.** The DNS record (`docs/operations.md`, "The BIMI
   mark") waits for this site's deploy; the deploy is the owner's.
+
+## 24. As built: the overlays' scrollbars and a wider registration (12.11.2026)
+
+- **The owner:** with a scrollbar, the overlays (the sign-in and
+  registration dialogs, the download's other systems) looked broken at
+  their right edge; the registration may be wider where there is room.
+- **Scrollbars.** What floats and scrolls on its own (`.auth-dialog`,
+  `.menu`, the phone's `.nav[popover]`, `.terms-text`) has a thin bar in
+  the page's ink on no track (`scrollbar-width: thin`, `scrollbar-color`;
+  for a Safari without them, the same by `::-webkit-scrollbar`). A
+  dialog's bar ran through its rounded corners: the dialog now has a
+  transparent border as tall as its corner radius, so the bar runs between
+  the corners, and its edge is drawn by an outline at the border's outer
+  line (`outline-offset: -1px`); in Windows' high contrast the border is
+  the ground and the outline the edge. Scrolling the card instead of the
+  dialog was tried and dropped: Chrome makes a scrolling element
+  focusable, and the dialog then gave the keyboard to the card instead of
+  its first field.
+- **Width.** The registration dialog is up to 42rem wide (signing in stays
+  31rem); on a phone both take the screen's width less the gutters.
+- **Tests.** `dialogs.spec.ts`: at 1300 × 560 and on a phone, the
+  registration dialog scrolls, its bar is thin on no track, its border is
+  transparent and at least the corner's radius, its edge a 1 px outline,
+  the keyboard is in its first field, it is wider than signing in where
+  there is room, its last control and the close button are reachable, and
+  every target is 44 px.

@@ -151,7 +151,16 @@
   padding: 0;
   overflow: hidden auto;
   overscroll-behavior: contain;
-  border: 1px solid var(--edge);
+  /* A scrollbar runs inside the border: a transparent border as tall as
+     the corner's radius keeps it off the rounded corners, and the line at
+     the edge is an outline instead. (The dialog scrolls, not its card:
+     a scrolling card would take the focus that belongs to the first
+     field.) */
+  border: solid transparent;
+  border-width: var(--radius) 0.3rem;
+  outline: 1px solid var(--edge);
+  outline-offset: -1px;
+  background-origin: border-box;
   border-radius: var(--radius);
   background:
     linear-gradient(180deg, color-mix(in srgb, var(--panel-2) 82%, transparent), transparent 13rem), var(--panel-solid);
@@ -164,6 +173,12 @@
     transform 300ms var(--ease),
     overlay 300ms allow-discrete,
     display 300ms allow-discrete;
+}
+
+/* registering asks more, and its code step has more ways: wider where
+   there is room */
+#auth-register {
+  inline-size: min(42rem, calc(100vw - 2 * var(--gutter)));
 }
 
 /* its own way in and out, not the plain dialogs' `pop` */
@@ -208,13 +223,14 @@
   /* a long word (a German heading) wraps and does not widen the card past the dialog */
   grid-template-columns: minmax(0, 1fr);
   gap: 0.4rem;
-  padding: clamp(1.3rem, 5vw, 2.1rem);
+  /* the dialog's transparent border already stands around it */
+  padding: clamp(0.2rem, 5vw - 18px, 0.98rem) clamp(1rem, 5vw - 0.3rem, 1.8rem);
 }
 
 .auth-close {
   position: absolute;
-  inset-block-start: 0.7rem;
-  inset-inline-end: 0.7rem;
+  inset-block-start: 0;
+  inset-inline-end: 0.4rem;
 }
 
 .auth-mark {
