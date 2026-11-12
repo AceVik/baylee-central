@@ -160,6 +160,21 @@ async function open(page: Page, w: World, options: { admin?: boolean; path?: str
         }
         return json(mine(w));
       case "admin":
+        // an account's case: its current picture, which no report names
+        if (body.request?.request?.action === "case") {
+          w.asked.push("admin:case");
+          return json({
+            result: "admin",
+            answer: {
+              answer: "picture_case",
+              account: { id: ACCOUNT, display_name: "Mallory", tag: 0x0f0f },
+              picture: { key: KEY, side: 256, avif_bytes: 409, png_bytes: 200, sequence_bytes: 4096, sha256: Array(32).fill(9), set_at: 1_794_000_000 },
+              reports: [],
+              notice: null,
+              block: null,
+            },
+          });
+        }
         return json({
           result: "admin",
           answer: {
@@ -464,6 +479,24 @@ test("only the profile page allows blob: pictures", async ({ page }) => {
     const answer = await page.request.get(other);
     expect(answer.headers()["content-security-policy"], other).toContain("img-src 'self';");
   }
+});
+
+test("an administrator opens an account's case and may remove its current picture without a report", async ({ page }) => {
+  const w = world();
+  const problems = await open(page, w, { admin: true, path: "/en/account/admin" });
+  const section = page.locator("section", { has: page.getByRole("heading", { name: "Reported profile pictures" }) });
+  await section.getByRole("button", { name: "Open the account's case" }).click();
+  const opened = page.locator(".picture-case");
+  await expect(opened.getByRole("heading", { name: "Mallory#0f0f" })).toBeVisible();
+  expect(w.asked).toContain("admin:case");
+  // the current picture, its animation, and the removal form; keeping
+  // needs a report, so the case offers none
+  await expect(opened.locator("source").first()).toHaveAttribute("srcset", `/api/v1/pictures/${"5a".repeat(16)}.sequence.avif`);
+  await expect(opened.getByRole("link", { name: "Open the animation" })).toBeVisible();
+  await expect(opened.getByRole("button", { name: "Remove the picture" })).toBeVisible();
+  await expect(opened.getByRole("button", { name: "Keep the picture" })).toBeHidden();
+  expect(await axe(page)).toEqual([]);
+  expect(problems).toEqual([]);
 });
 
 test("the administrators see reported pictures with their reasons and notes as text", async ({ page }) => {

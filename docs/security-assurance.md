@@ -7012,9 +7012,12 @@ An independent reviewer probed the build. Findings and what changed:
 - **M2, reports lost on re-upload.** Removing a picture and uploading the
   same file again left every open report `gone`. Fixed in the store: a
   picture with the same digest reopens its `gone` reports, unless their
-  reporter opened another. Not fixed: deciding on an account's current
-  picture without an open report. The case view the website does not yet
-  offer; administrators still need a report to act.
+  reporter opened another. Second half (later the same day): each report
+  opens its account's case (`PictureAdmin::Case`), where an administrator
+  removes the current picture by its digest without an open report, under
+  the same lock, fresh sign-in, role check and an audit of the reason code
+  alone; keeping still needs a report. Tested on PostgreSQL and in the
+  browser.
 - **L1, workers outliving their slot.** The slot was freed at the
   service's deadline or when the request dropped, while the worker ran on.
   Fixed: the slot moves onto the conversion's thread and lives until the
@@ -7022,10 +7025,13 @@ An independent reviewer probed the build. Findings and what changed:
 - **L2, SVG entities.** Entity expansion passed the element and depth
   scan (25 KB took 548 MiB and 9.3 s). Fixed: any internal subset and any
   `<!ENTITY` are refused before a parser runs; the probes are a test.
-- **L3, looser answer checks** than the worker writes (any `meta`, any AV1
-  within the size caps). Not fixed in this round; the worker writes only
-  what `ravif` and ffmpeg make from its own pixels, and a worker that is
-  compromised could already answer any pixels.
+- **L3, looser answer checks** than the worker writes. Fixed (later the
+  same day): a still, and a sequence's still item, hold exactly one AV1
+  item or one and its alpha auxiliary; every `ispe` is 256 × 256; colour
+  only `nclx`; no Exif, XMP, ICC or other box; every AV1 sequence header
+  allows at most 256 px. Hostile answers through a stand-in worker are
+  refused; real `ravif` and libaom output passes. A compromised worker can
+  still choose any pixels within those bounds.
 - **Info items:**
   - fixed:
     - Caddy's 64 KiB body bound would have refused uploads in
