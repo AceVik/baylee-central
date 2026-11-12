@@ -1262,7 +1262,11 @@ fn notes_view(r: &Rep) -> impl IntoView + use<> {
                 <div class="fb-note-foot">
                     <p class="hint" id="fb-note-hint">
                         {words::fb_note_hint(lang)}" "
-                        <span class:fb-near=move || left() < 200>{move || words::fb_chars_left(lang, &left().to_string())}</span>
+                        <span class:fb-near=move || left() < 200>{move || {
+                            let n = left();
+                            let text = words::number(lang, n.unsigned_abs());
+                            words::fb_chars_left(lang, &if n < 0 { format!("−{text}") } else { text })
+                        }}</span>
                     </p>
                     <button type="submit" class="button button-ghost button-sm" aria-disabled=move || r.busy.get().then_some("true")>
                         {words::fb_save_note(lang)}
@@ -1370,7 +1374,7 @@ fn head_view(r: &Rep) -> impl IntoView + use<> {
                 }
             });
             view! {
-                <header class="fb-report-head">
+                <header class="card fb-report-head">
                     <p class="fb-report-pills">
                         {kind_pill(lang, s.kind)}{status_pill(lang, s.status)}{priority_pill(lang, s.priority)}{notes}
                     </p>

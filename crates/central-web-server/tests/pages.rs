@@ -682,6 +682,81 @@ async fn the_administration_s_other_pages_are_islands_linked_from_nowhere() {
     assert_eq!(headers["location"], "/de/account/admin/gateways");
 }
 
+/// The feedback moderation: the list and one report's page, under the
+/// account area as the reset code's page is, not indexed, in no sitemap
+/// and linked from no page the server renders. Every report's address is
+/// one page: the id is the island's to read, so the server neither keeps
+/// nor varies a page by it, and anything but 32 lowercase hex digits is no
+/// report's address.
+#[tokio::test]
+async fn the_feedback_moderation_is_two_pages_linked_from_nowhere() {
+    let app = app(true);
+    let id = "0192d0c57b3e7a1f8c2d3e4f5a6b7c8d";
+    for lang in Lang::ALL {
+        for path in [
+            format!("/{}/account/admin/feedback", lang.code()),
+            format!("/{}/account/admin/feedback/{id}", lang.code()),
+        ] {
+            let (status, headers, html) = get(&app, &path, &[]).await;
+            assert_eq!(status, StatusCode::OK, "{path}");
+            assert_eq!(headers["x-robots-tag"], "noindex, noarchive, nosnippet");
+            assert_eq!(count(&html, "<h1"), 1, "{path}: one h1");
+            assert!(
+                html.contains("<leptos-island"),
+                "{path}: the account island"
+            );
+            assert!(!html.contains(" style=\""), "{path}: no inline style");
+            // the island renders "loading" on the server: nothing of the tool
+            assert!(!html.contains("id=\"fb-search\""), "{path}");
+            assert!(!html.contains(id), "{path}: the id is not in the page");
+        }
+    }
+    let (_, _, list) = get(&app, "/en/account/admin/feedback", &[]).await;
+    assert!(list.contains("<h1>Feedback and crash reports</h1>"));
+    let (_, _, one) = get(&app, &format!("/de/account/admin/feedback/{id}"), &[]).await;
+    assert!(one.contains("<h1>Bericht</h1>"));
+    assert_eq!(
+        Page::from_slug(&format!("account/admin/feedback/{id}")),
+        Some(Page::Account(Section::Report))
+    );
+    assert_eq!(
+        Page::Account(Section::Feedback).path(Lang::En),
+        "/en/account/admin/feedback"
+    );
+    assert!(!Page::Account(Section::Feedback).indexed());
+    assert!(!Page::Account(Section::Report).indexed());
+    assert!(!Section::ALL.contains(&Section::Feedback));
+    assert!(!Section::ALL.contains(&Section::Report));
+    for bad in [
+        format!("/en/account/admin/feedback/{}", id.to_uppercase()),
+        format!("/en/account/admin/feedback/{}", &id[1..]),
+        format!("/en/account/admin/feedback/{id}0"),
+        format!("/en/account/admin/feedback/{id}/x"),
+        "/en/account/admin/feedback/%3Cscript%3E".to_owned(),
+    ] {
+        let (status, _, _) = get(&app, &bad, &[]).await;
+        assert_eq!(status, StatusCode::NOT_FOUND, "{bad}");
+    }
+    for page in Section::ALL.map(Page::Account) {
+        let (_, _, html) = get(&app, &page.path(Lang::De), &[]).await;
+        assert!(
+            !html.contains("/account/admin/feedback"),
+            "{page:?}: a link to it"
+        );
+    }
+    let (_, _, sitemap) = get(&app, "/sitemap.xml", &[]).await;
+    assert!(!sitemap.contains("feedback"));
+    // as every page of the area, the address without a language is moved
+    let (status, headers, _) = get(
+        &app,
+        "/account/admin/feedback?status=new",
+        &[("accept-language", "de")],
+    )
+    .await;
+    assert_eq!(status, StatusCode::FOUND);
+    assert_eq!(headers["location"], "/de/account/admin/feedback?status=new");
+}
+
 /// The reset page (`docs/account-reset.md`): a form page as signing in is,
 /// complete in the first response with every field labelled and the
 /// warning before a new vault; reached by a plain link from the sign-in
