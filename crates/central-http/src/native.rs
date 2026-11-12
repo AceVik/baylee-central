@@ -2,6 +2,7 @@ use super::{
     addresses::Budgets,
     boundary::{Origin, Pace, REJECTED, UPLOAD_PACE, paced, timed_out},
     in_flight::Client,
+    unplaced::Unplaced,
 };
 use axum::{
     Router,
@@ -29,9 +30,16 @@ struct Native {
     uploads: Arc<Semaphore>,
     /// What each client address may ask in its window (`addresses.rs`).
     budgets: Arc<Mutex<Budgets>>,
+    /// On the deployed listener, the requests that came without the
+    /// proxy's address (`unplaced.rs`); none where that is as it should
+    /// be, on a development listener.
+    unplaced: Option<Arc<Unplaced>>,
 }
 
-pub(crate) fn router(identity: Arc<IdentityService>) -> Router {
+/// The account listener's routes. `deployed` is the listener behind the
+/// public name's proxy: there a request without the proxy's address is
+/// counted and reported, never refused (`unplaced.rs`).
+pub(crate) fn router(identity: Arc<IdentityService>, deployed: bool) -> Router {
     Router::new()
         .route("/v1/native", post(call))
         // A gateway's reports (`docs/reports.md`): the metadata, then each
@@ -42,13 +50,22 @@ pub(crate) fn router(identity: Arc<IdentityService>) -> Router {
             identity,
             uploads: Arc::new(Semaphore::new(UPLOADS)),
             budgets: Arc::default(),
+            unplaced: deployed.then(Arc::default),
         })
 }
 
-/// The client address the boundary attached, if it knows one. It shares
-/// out budgets and grants nothing (`boundary.rs`).
-fn origin(extensions: &Extensions) -> Option<Client> {
-    extensions.get::<Origin>().and_then(|origin| origin.0)
+impl Native {
+    /// The client address the boundary attached, if it knows one. It
+    /// shares out budgets and grants nothing (`boundary.rs`).
+    fn origin(&self, extensions: &Extensions) -> Option<Client> {
+        let from = extensions.get::<Origin>().and_then(|origin| origin.0);
+        if from.is_none()
+            && let Some(unplaced) = &self.unplaced
+        {
+            unplaced.note();
+        }
+        from
+    }
 }
 
 /// Fixed public vocabulary; no parser/database/crypto diagnostics reach the peer.
@@ -102,7 +119,7 @@ async fn call(
     headers: HeaderMap,
     body: Bytes,
 ) -> Response {
-    match process(&native, origin(&extensions), &headers, &body).await {
+    match process(&native, native.origin(&extensions), &headers, &body).await {
         Ok(bytes) => ([(header::CONTENT_TYPE, "application/json")], bytes).into_response(),
         Err(error) => failure(error),
     }
@@ -163,7 +180,7 @@ async fn file(
 ) -> Response {
     let filed = async {
         let token = credential(&headers, "application/json")?;
-        let place = origin(&extensions).map(Place::from);
+        let place = native.origin(&extensions).map(Place::from);
         native
             .identity
             .file_report(token.as_ref(), &body, place)
@@ -198,7 +215,7 @@ async fn file_part(
         else {
             return Err(Stopped::Failed(Error::Rejected));
         };
-        let place = origin(&head.extensions).map(Place::from);
+        let place = native.origin(&head.extensions).map(Place::from);
         let upload = native
             .identity
             .report_upload(token.as_ref(), report, part, place)
