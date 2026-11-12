@@ -154,17 +154,48 @@ was refused whole while one member's device was full. Since then
 - **Refused when nobody else has room.** If no device of another account
   has room, the send is `Busy` (429), so a direct message is never
   accepted for nobody. This is asked of every other device, a blocker's
-  too, so the answer says nothing about a block. (Before, a full device
-  was not looked at when its owner had blocked the sender: a group send
-  that a full device refused went through once that member blocked.)
+  too, so setting or lifting a block does not change the answer to the
+  next send. (Before, a full device was not looked at when its owner had
+  blocked the sender: a group send that a full device refused went
+  through once that member blocked.) What a block can still show over
+  thousands of messages is under "What stays possible".
+- **A message sent again.** A send whose answer was lost is sent again
+  with the same bytes and is answered as the first was, before any room
+  is looked at: also when that message used up the share or filled the
+  inbox.
 - **The sender's own device full:** `Busy`, as before. A message its own
   devices cannot keep would be missing when they read their history again.
-- `Busy` is an answer both clients knew already. The native client takes
-  it as a rate refusal and keeps the sealed message to send again
-  (`baylee-client`, `social/central/poll.rs`); the website names it among
-  the errors it shows (`web/src/chat/steps.ts`). For a full inbox or a
-  used-up share the answer does not change until something is deleted,
-  and neither client says which of the reasons it was.
+- `Busy` is an answer both clients knew already, and the one a full inbox
+  and a sender's full outbox were answered with before. The website names
+  it among the errors it shows (`web/src/chat/steps.ts`). The released
+  native client takes it as a rate refusal (`baylee-client`,
+  `social/central/poll.rs`; `baylee-client-core`,
+  `social/machine/sending.rs`): it keeps the sealed message, shows no
+  failure, and sends it again a second later and after the bridge's
+  pause, which starts at two seconds and doubles to thirty with each
+  refusal. It has no last try. Its other chat requests (later sends, the
+  inbox's poll) are not held back for good, but each wait behind that
+  pause. For a full inbox or a used-up share the answer does not change
+  until something is deleted, so such a message is sent again for as long
+  as the client runs, and neither client says which of the reasons it
+  was. That was so at 5000 before; one sender now meets it at 2500 in one
+  inbox.
+- **What a `Busy` that does not end costs, and was not changed.** The
+  released client keeps at most 64 sealed messages to send again
+  (`social/central/worker.rs`). While 64 wait, it answers its own later
+  sends through Central as busy without asking, in every conversation.
+  Central is asked again for each waiting message, at most about one
+  request in two seconds from one client by the pauses above. Each is
+  taken as far as the room query (the accounts are locked, the signature
+  is checked) and stores nothing. Central looks at a message's time after
+  it has looked for room (`send.rs`), so a waiting message stays `Busy`
+  and is never `Rejected` for its age. Three
+  ways out, none built, each the owner's to choose: retention, which
+  makes room; the time looked at before the room, so that the released
+  client ends such a message as not allowed ten minutes after it was
+  written (it would then show its words for a refused send, the same as
+  for a sender who may not write there); or a client that gives up on a
+  `Busy` after a time and says so.
 - **No deletion and no time limit were built.** The review recommended
   deleting on acknowledged delivery. The wire has no acknowledgement
   (`Inbox { device, after }` reads by a cursor), both clients read their
@@ -177,6 +208,13 @@ was refused whole while one member's device was full. Since then
   conversation among them. A member whose inbox is full misses group
   messages and is not told. The sender's 5000 and the device's 5000 are
   for a lifetime as before.
+- **What a block can still show.** A member who has blocked the sender
+  takes none of the sender's messages, so the sender's share of that
+  member's inbox never fills, and that device goes on counting as one
+  with room. A sender who has used up the share with everyone else in a
+  group and is still answered as sent can conclude that some member's
+  device takes nothing from them: a member who blocked them, or one who
+  joined late. It takes 2500 messages to that group to see it.
 - Cost: one query a send, which counts each recipient device's deliveries
   and how many are the sender's. Before, it counted the deliveries only.
 

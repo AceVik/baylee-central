@@ -232,7 +232,10 @@ async fn recipients(
         }
         others = true;
         // Whether anybody else has room is asked of every device, a
-        // blocker's too: the answer then says nothing about a block.
+        // blocker's too: setting or lifting a block does not change the
+        // answer to the next send. (A blocker's device takes none of the
+        // sender's messages, so over a whole share it can still show:
+        // docs/central-chat.md.)
         heard |= fits;
         if blocked || !fits {
             wraps.remove(&id);
