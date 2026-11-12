@@ -87,6 +87,22 @@ async fn fill(operator: &DatabaseConnection, from: Member<'_>, to: Member<'_>, m
         .unwrap();
 }
 
+/// What a send was answered with: the message's id and when it was accepted.
+fn accepted(reply: Result<ChatResponse, Error>) -> (String, u64) {
+    let Ok(ChatResponse::Sent { id, at }) = reply else {
+        panic!("a send that has room is answered Sent");
+    };
+    (id, at)
+}
+
+/// Sends `sealed`, and the same bytes once more, as a client does whose
+/// answer was lost: the second is answered as the first was, even where
+/// the first used up the room there was.
+async fn sent_twice(store: &AccountStore, token: &Token, conv: &str, sealed: Sealed) {
+    let first = accepted(post(store, token, conv, sealed.clone()).await);
+    assert_eq!(accepted(post(store, token, conv, sealed).await), first);
+}
+
 async fn emptied(operator: &DatabaseConnection) {
     operator
         .execute_unprepared(
@@ -138,9 +154,11 @@ pub(super) async fn run(
 
     // One sender's share of an inbox. A's messages take all but one of
     // their share of C's inbox: one more is delivered, the next is not.
+    // The one that used the share up is answered again when it is sent
+    // again, and delivered once.
     let already = held_from(operator, c, a).await;
     fill(operator, a, c, CHAT_SENDER_SHARE - 1 - already).await;
-    post(store, a.token, direct, to_c(200)).await.unwrap();
+    sent_twice(store, a.token, direct, to_c(200)).await;
     assert_eq!(held_from(operator, c, a).await, CHAT_SENDER_SHARE);
     assert_eq!(
         post(store, a.token, direct, to_c(201)).await.err(),
@@ -189,15 +207,21 @@ async fn full_devices(
 ) {
     let [a, b, c] = members;
     let all = [a.device, b.device, c.device];
-    // C's inbox is full (B's messages fill what is left of it): B's message
-    // to the group is still sent, to A, where it was refused whole.
-    fill(operator, b, c, INBOX - held(operator, c).await).await;
-    assert_eq!(held(operator, c).await, INBOX);
+    // C's inbox has room for one more (C's own messages, written by the
+    // operator, fill the rest: A and B each stay below what one sender
+    // may ever send). B's message to the group takes it, and is answered
+    // again when it is sent again, though the inbox is full now.
+    fill(operator, c, c, INBOX - 1 - held(operator, c).await).await;
     let a_held = held(operator, a).await;
-    post(store, b.token, conv, message(conv, b.device, B, &all, 204))
+    sent_twice(store, b.token, conv, message(conv, b.device, B, &all, 204)).await;
+    assert_eq!(held(operator, c).await, INBOX);
+    assert_eq!(held(operator, a).await, a_held + 1);
+    // C's inbox is full: B's next message to the group is still sent, to
+    // A, where it was refused whole.
+    post(store, b.token, conv, message(conv, b.device, B, &all, 208))
         .await
         .unwrap();
-    assert_eq!(held(operator, a).await, a_held + 1);
+    assert_eq!(held(operator, a).await, a_held + 2);
     assert_eq!(held(operator, c).await, INBOX, "never past its bound");
     // B blocks A. A's message has room at B's device, so it is sent as far
     // as A can tell; B's device and C's full one get nothing.
