@@ -76,10 +76,6 @@
     box-shadow var(--dur) ease;
 }
 
-.gw-is-official {
-  border-color: var(--edge);
-}
-
 .gw-head {
   display: flex;
   align-items: baseline;
@@ -91,10 +87,6 @@
   margin: 0;
   overflow-wrap: anywhere;
   font-size: var(--text-lg);
-}
-
-.gw-official {
-  flex: none;
 }
 
 .gw-state {
@@ -565,9 +557,9 @@ pre.code code {
 }
 
 /* ---- even cards -------------------------------------------------------------
-   The name's row is as tall with the "official" pill as without, so the state
-   and the facts of two cards side by side stand on one line; a button's words
-   stay on one line and the two buttons share the row or each take one. */
+   The name's row has one height, so the state and the facts of two cards side
+   by side stand on one line; a button's words stay on one line and the two
+   buttons share the row or each take one. */
 
 .gw-head {
   align-items: center;

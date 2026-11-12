@@ -289,10 +289,34 @@ async fn operator_text_is_never_markup() {
         "a gateway's name is text"
     );
     assert!(!html.contains("Kitchen <Table>"));
-    assert!(html.contains("Official"), "the official gateway is marked");
-    let official = html.find("Sanctuary").expect("official");
+    // the server's order: the origin Central's API calls official first
+    let first = html.find("Sanctuary").expect("first");
     let other = html.find("Kitchen").expect("other");
-    assert!(official < other, "official first");
+    assert!(first < other, "the server's order");
+}
+
+/// There are no official gateways (owner, 12.11.2026): no card, list,
+/// chip or count says that one is, although Central's directory still
+/// names an official origin.
+#[tokio::test]
+async fn no_gateway_is_marked_official() {
+    let app = app(true);
+    for path in ["/en/", "/en/gateways", "/de/", "/de/gateways"] {
+        let (_, _, html) = get(&app, path, &[]).await;
+        assert!(html.contains("Sanctuary"), "{path}: the gateway is listed");
+        for never in [
+            ">Official<",
+            ">Offiziell<",
+            "gw-official",
+            "gw-is-official",
+            "data-official",
+            "data-show=\"official\"",
+            "marked official",
+            "als offiziell markierte",
+        ] {
+            assert!(!html.contains(never), "{path}: {never}");
+        }
+    }
 }
 
 /// An address, the request's headers, the status and where it sends to.

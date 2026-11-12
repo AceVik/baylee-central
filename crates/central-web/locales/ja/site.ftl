@@ -155,7 +155,6 @@ install-cpu = <b>プロセッサー：</b>x86-64 向けビルドには AVX2 が�
 ## Gateways
 
 gws-title = Gateway
-gws-official = 公式
 gws-online = オンライン
 gws-offline = オフライン
 gws-version = バージョン
@@ -989,7 +988,7 @@ ai-training = ハウスAIと外部の LLM ブリッジのほかに、決定論�
 ai-hostingLink = Gateway のホスティングと LLM の設定
 
 # The gateways and the contact page, as the old site wrote them (owner, 11.11.2026)
-gw-lead = Gateway は、オンラインのテーブルがあるサーバーです。アカウント、デッキ、ルーム、そしてゲームごとに一つのエンジンプロセスがあります。ここに載っているのは、Baylee Central に登録され、その管理者が承認したものです。公式と記されたものは Baylee が運営し、そのほかは他の人が自分たちのグループのために運営しており、そこでは各自のルールが適用されます。一覧に載っていることは、その Gateway が何をするかの約束ではありません。
+gw-lead = Gateway は、オンラインのテーブルがあるサーバーです。アカウント、デッキ、ルーム、そしてゲームごとに一つのエンジンプロセスがあります。ここに載っているのは、Baylee Central に登録され、その管理者が承認したものです。それぞれ運営者が自分たちのグループのために運営しており、そこでは各自のルールが適用されます。一覧に載っていることは、その Gateway が何をするかの約束ではありません。
 gw-howTo = Gateway で遊ぶには、そのアドレスをクライアントの入口にコピーします。オンラインとは、Central が直近1分半以内にその Gateway から連絡を受けたという意味で、応答する約束ではありません。名前とバージョンは、各運営者が報告したものです。
 gw-find = Gateway を探す
 gw-findHint = 名前またはアドレス
@@ -1006,7 +1005,6 @@ gw-stat-games = 進行中のゲーム
 gw-show = 表示
 gw-show-every = すべて
 gw-show-online = オンライン
-gw-show-official = 公式
 gw-show-tables = 開いているテーブルあり
 gw-sort = 並べ替え
 gw-sort-best = おすすめ

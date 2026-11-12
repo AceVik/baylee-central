@@ -155,7 +155,6 @@ install-cpu = <b>處理器：</b>x86-64 版本需要 AVX2；較舊的處理器�
 ## Gateways
 
 gws-title = Gateways
-gws-official = 官方
 gws-online = 在線
 gws-offline = 離線
 gws-version = 版本
@@ -985,7 +984,7 @@ ai-training = 除了內建 AI 與外部 LLM 橋接之外，一個專屬的原生
 ai-hostingLink = Gateway 託管與 LLM 設定
 
 # The gateways and the contact page, as the old site wrote them (owner, 11.11.2026)
-gw-lead = Gateway 是線上牌桌所在的伺服器：帳號、牌組、房間，以及每場遊戲各一個引擎程序。這裡列的是已向 Baylee Central 註冊並經其管理員核准的 Gateways。標示為官方的由 Baylee 營運；其他的由別人為他們的社群營運，適用他們自己的規則。列在名單上，並不代表對 Gateway 的行為作出任何承諾。
+gw-lead = Gateway 是線上牌桌所在的伺服器：帳號、牌組、房間，以及每場遊戲各一個引擎程序。這裡列的是已向 Baylee Central 註冊並經其管理員核准的 Gateways。每一個都由其營運者為自己的社群營運，適用他們自己的規則。列在名單上，並不代表對 Gateway 的行為作出任何承諾。
 gw-howTo = 想在其中一個上面遊玩，請把它的位址複製到用戶端的入口畫面。在線表示 Central 在最近一分半鐘內收到過該 Gateway 的訊息；並不保證它會回應。名稱與版本由各營運者自行回報。
 gw-find = 尋找 Gateway
 gw-findHint = 名稱或位址
@@ -1002,7 +1001,6 @@ gw-stat-games = 進行中的遊戲
 gw-show = 顯示
 gw-show-every = 全部
 gw-show-online = 線上
-gw-show-official = 官方
 gw-show-tables = 有開放牌桌
 gw-sort = 排序
 gw-sort-best = 推薦

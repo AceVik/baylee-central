@@ -385,7 +385,9 @@ pub struct Gateway {
     pub website: String,
     /// A heartbeat arrived within the last 90 seconds.
     pub online: bool,
-    /// Baylee's own gateway, known by its origin only.
+    /// The origin Central's API calls official (`is_official_origin`):
+    /// the server lists it first, and the pages do not mark it (owner,
+    /// 12.11.2026: there are no official gateways).
     pub official: bool,
     /// What it says is happening on it right now, if it reports that
     /// (Central's public figures): absent for a gateway that does not.

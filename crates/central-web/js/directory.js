@@ -1,6 +1,6 @@
 // The gateway directory's finding (the gateways page), over the cards the
 // server wrote: a name or an address narrows them, a chip shows only those
-// online, official or with open tables, the menu sorts them, and the two
+// online or with open tables, the menu sorts them, and the two
 // round buttons lay them out as cards or as a list. Escape empties the
 // field, Ctrl+K or ⌘K goes to it. What is chosen stands in the address
 // (?q= &show= &sort= &view=), so a view can be kept or passed on; nothing
@@ -47,7 +47,6 @@ if (bar && list && field instanceof HTMLInputElement && menu instanceof HTMLSele
   const shows = (card) =>
     show === "" ||
     (show === "online" && card.getAttribute("data-online") === "true") ||
-    (show === "official" && card.getAttribute("data-official") === "true") ||
     (show === "tables" && number(card, "data-tables") > 0);
 
   const apply = () => {

@@ -1340,3 +1340,15 @@ on both sizes (the phone's switch is in the menu), checks the scheme on
 screen, what is kept, and that the kept one is on the root before the body
 begins; the old test had looked for the switch under a class the bar does
 not have and was skipped everywhere.
+
+**No official gateways.** No card, list, chip or count calls a gateway
+official any more, on the start page or in the directory: the gold pill,
+the card's stronger edge, the "Official" chip with `?show=official` (an
+old address with it shows every gateway) and `data-official` are gone,
+with `gws-official` and `gw-show-official` in all eleven languages. The
+directory's lead no longer says that Baylee runs the one marked official;
+each gateway is run by its operators (English and German by hand, the
+nine others edited by machine to drop that clause). Central's API is
+unchanged: its directory still names an official origin, and the site's
+server still lists that one first (`fetch.rs`) without marking it.
+`pages.rs` and `site.spec.ts` hold that the word and the marks are absent.

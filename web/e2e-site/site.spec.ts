@@ -391,17 +391,42 @@ test("the gateway directory finds by name or address, narrows, sorts and lays ou
   await expect(field).toBeFocused();
 
   // the address asks for a view, and gets it
-  await page.goto("/en/gateways?q=sanc&show=official&sort=name");
+  await page.goto("/en/gateways?q=sanc&show=online&sort=name");
   await expect(cards).toHaveCount(1);
   await expect(field).toHaveValue("sanc");
-  await expect(page.getByRole("button", { name: /^Official/ })).toHaveAttribute("aria-pressed", "true");
+  await expect(online).toHaveAttribute("aria-pressed", "true");
   await expect(sort).toHaveValue("name");
+  // there are no official gateways, and no chip for them: an old address
+  // that asked for them shows every gateway
+  await page.goto("/en/gateways?show=official");
+  await expect(cards).toHaveCount(2);
+  await expect(every).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator("[data-show]")).toHaveText([/^All/, /^Online/, /^With open tables/]);
   // what it asks for and the page does not offer is left out
   await page.goto("/en/gateways?show=nothing&sort=%3Cscript%3E&view=sideways");
   await expect(cards).toHaveCount(2);
   await expect(every).toHaveAttribute("aria-pressed", "true");
   await expect(sort).toHaveValue("");
   await expect(page).toHaveURL(/\/en\/gateways$/);
+});
+
+test("no gateway is called official, on the start page or in the directory", async ({ page }) => {
+  // the synthetic directory names Central's official origin; the site does not show it as such
+  for (const [path, word] of [
+    ["/en/", /\bofficial\b/i],
+    ["/en/gateways", /\bofficial\b/i],
+    ["/de/", /\boffiziell/i],
+    ["/de/gateways", /\boffiziell/i],
+  ] as const) {
+    await page.goto(path);
+    const gateways = page.locator("li.gw");
+    await expect(gateways.first()).toContainText("Sanctuary");
+    for (const card of await gateways.all()) await expect(card).not.toContainText(word);
+    await expect(page.locator(".gw-official, .gw-is-official, [data-official]")).toHaveCount(0);
+    // nor anywhere else in what the page says about gateways ("Unofficial Fan Content" is another matter)
+    const section = path.endsWith("/") ? page.locator("#gateways") : page.locator("main");
+    await expect(section).not.toContainText(word);
+  }
 });
 
 test("what is typed before the islands run stays when they take the forms over", async ({ page }) => {
