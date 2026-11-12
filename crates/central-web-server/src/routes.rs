@@ -275,7 +275,14 @@ fn page(app: &App, headers: &HeaderMap, page: Page, lang: Lang) -> Response {
     };
     let data = snapshot(app);
     let key = (page, lang, machine);
-    let rendered = app.pages.find(key, &data).unwrap_or_else(|| {
+    // one account's page in the administration has an address per id: it
+    // is rendered for its request and never kept
+    let found = if page.kept() {
+        app.pages.find(key, &data)
+    } else {
+        None
+    };
+    let rendered = found.unwrap_or_else(|| {
         let cx = Context {
             lang,
             origin: &app.config.origin,
@@ -289,7 +296,9 @@ fn page(app: &App, headers: &HeaderMap, page: Page, lang: Lang) -> Response {
             etag: etag(&body),
             body,
         });
-        app.pages.keep(key, &data, &rendered);
+        if page.kept() {
+            app.pages.keep(key, &data, &rendered);
+        }
         rendered
     });
     let status = match page {

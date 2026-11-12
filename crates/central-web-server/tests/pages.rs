@@ -564,6 +564,124 @@ async fn the_administration_s_page_is_linked_from_nowhere() {
     assert_eq!(headers["location"], "/de/account/admin");
 }
 
+/// The administration's other pages (the overview, the accounts, one
+/// account, the gateways, the audit log, the legacy store): under the
+/// account area in every language, islands, not indexed, in no sitemap,
+/// and their own navigation is the island's, for an administrator: the
+/// server renders no link to any of them. One account's page answers its
+/// id as 32 lowercase hex digits only, and is never kept, so that requests
+/// for ids cannot fill the table of rendered pages.
+#[tokio::test]
+async fn the_administration_s_other_pages_are_islands_linked_from_nowhere() {
+    const ID: &str = "019a2b3c4d5e708090a0b0c0d0e0f0ff";
+    let mut config = Config::development(site(), Some(data()));
+    config.origin = "https://baylee.app".into();
+    let state = central_web_server::app(config).expect("app");
+    let app = router(Arc::clone(&state));
+    let user = format!("users/{ID}");
+    let titles = [
+        ("overview", "Administration", "Administration"),
+        ("users", "Accounts", "Accounts"),
+        (user.as_str(), "An account", "Ein Account"),
+        ("gateways", "Gateways", "Gateways"),
+        ("audit", "Audit log", "Protokoll"),
+        ("legacy", "Legacy accounts", "Alte Konten"),
+    ];
+    for (tail, english, german) in titles {
+        for lang in Lang::ALL {
+            let path = format!("/{}/account/admin/{tail}", lang.code());
+            let (status, headers, html) = get(&app, &path, &[]).await;
+            assert_eq!(status, StatusCode::OK, "{path}");
+            assert_eq!(headers["x-robots-tag"], "noindex, noarchive, nosnippet");
+            assert!(
+                html.contains("<meta name=\"robots\" content=\"noindex"),
+                "{path}"
+            );
+            assert_eq!(count(&html, "<h1"), 1, "{path}: one h1");
+            assert!(
+                html.contains("<leptos-island"),
+                "{path}: the account island"
+            );
+            assert!(!html.contains(" style=\""), "{path}: no inline style");
+            // the island renders "loading" on the server: no navigation of
+            // the administration, no link to another of its pages (the
+            // language menu names the page itself)
+            assert!(!html.contains("admin-nav"), "{path}");
+            for other in [
+                "overview", "users", "gateways", "audit", "legacy", "feedback",
+            ] {
+                if other == tail {
+                    continue;
+                }
+                let link = format!("href=\"/{}/account/admin/{other}\"", lang.code());
+                assert!(!html.contains(&link), "{path}: {link}");
+            }
+            assert!(!html.contains(&format!("href=\"/{}/account/admin\"", lang.code())));
+            // the language menu leads to the same page, the same account
+            let menu = format!("href=\"/de/account/admin/{tail}\"");
+            assert!(html.contains(&menu), "{path}: {menu}");
+        }
+        let (_, _, html) = get(&app, &format!("/en/account/admin/{tail}"), &[]).await;
+        assert!(html.contains(&format!("<h1>{english}</h1>")), "{tail}");
+        assert!(html.contains(&format!("{english} – Baylee")), "{tail}");
+        let (_, _, html) = get(&app, &format!("/de/account/admin/{tail}"), &[]).await;
+        assert!(html.contains(&format!("<h1>{german}</h1>")), "{tail}");
+    }
+    let id = central_web::data::id_from_hex(ID).expect("an id");
+    let page = Page::Account(Section::AdminUser(id));
+    assert_eq!(page.path(Lang::Fr), format!("/fr/account/admin/users/{ID}"));
+    assert_eq!(
+        Page::from_slug(&format!("account/admin/users/{ID}")),
+        Some(page)
+    );
+    assert!(!page.indexed());
+    assert!(!page.kept());
+    for section in Section::ROUTED.into_iter().filter(|s| s.admin()) {
+        assert!(!Page::Account(section).indexed(), "{section:?}");
+        assert!(Page::Account(section).kept(), "{section:?}");
+    }
+    // one account's page has one address
+    for bad in [
+        ID.to_uppercase(),
+        ID[..31].to_owned(),
+        format!("{ID}0"),
+        format!("{ID}/x"),
+        format!("{}g", &ID[..31]),
+        format!("{ID}x"),
+    ] {
+        let path = format!("/en/account/admin/users/{bad}");
+        let (status, _, _) = get(&app, &path, &[]).await;
+        assert_eq!(status, StatusCode::NOT_FOUND, "{path}");
+    }
+    let (status, headers, _) = get(&app, &format!("/en/account/admin/users/{ID}/"), &[]).await;
+    assert_eq!(status, StatusCode::MOVED_PERMANENTLY);
+    assert_eq!(headers["location"], format!("/en/account/admin/users/{ID}"));
+    // rendered for each request, never kept: other pages are
+    let kept = state.pages.kept();
+    for n in 0..20_u8 {
+        let path = format!("/en/account/admin/users/{ID:.30}{n:02x}");
+        let (status, _, html) = get(&app, &path, &[]).await;
+        assert_eq!(status, StatusCode::OK, "{path}");
+        assert!(html.contains(&format!("href=\"/de/account/admin/users/{ID:.30}{n:02x}\"")));
+    }
+    assert_eq!(state.pages.kept(), kept);
+    // no page of the area links to the administration's pages
+    for page in Section::ALL.map(Page::Account) {
+        let (_, _, html) = get(&app, &page.path(Lang::En), &[]).await;
+        assert!(!html.contains("/account/admin"), "{page:?}: a link to it");
+    }
+    let (_, _, sitemap) = get(&app, "/sitemap.xml", &[]).await;
+    assert!(!sitemap.contains("/admin"));
+    let (status, headers, _) = get(
+        &app,
+        "/account/admin/gateways",
+        &[("accept-language", "de")],
+    )
+    .await;
+    assert_eq!(status, StatusCode::FOUND);
+    assert_eq!(headers["location"], "/de/account/admin/gateways");
+}
+
 /// The reset page (`docs/account-reset.md`): a form page as signing in is,
 /// complete in the first response with every field labelled and the
 /// warning before a new vault; reached by a plain link from the sign-in

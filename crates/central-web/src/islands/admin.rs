@@ -16,6 +16,20 @@
 //! browser's account still holds the role, and the account's row read
 //! again. An answer that did not arrive is never a refusal: a code may have
 //! been made.
+//!
+//! The administration's other pages are this module's children: the
+//! counts (`overview`), the accounts (`users`) and one account (`user`),
+//! the gateways (`gateways`), the audit log (`audit`) and the legacy store
+//! (`legacy`), with what they share (`common`: the navigation, reads, and
+//! a change's confirmation). [`area`] draws the one an address names.
+
+mod audit;
+mod common;
+mod gateways;
+mod legacy;
+mod overview;
+mod user;
+mod users;
 
 use std::sync::Arc;
 
@@ -31,7 +45,8 @@ use super::chat::glyph;
 use super::crypto::Crypto;
 use super::field::{self, Labelled};
 use super::password::{Trouble, sign_in_again};
-use super::{clip, focus, session};
+use super::{clip, focus, fragment, session};
+use crate::data::Section;
 use crate::words::{self, Lang};
 
 /// Central's password sign-in that a change needs, in seconds.
@@ -459,11 +474,55 @@ impl Admin {
         focus::after_render(focus_on.to_owned());
     }
 
-    /// Back to the list, at the account the person came from.
+    /// Back to the list, at the account the person came from, or at the
+    /// search where the list does not show it (an account the page was
+    /// opened at by the account page's link).
     fn back(self, row: &Row) {
         self.said.set(None);
         self.password.set(String::new());
-        self.go(Step::List, &format!("#admin-open-{}", row.key()));
+        self.step.set(Step::List);
+        focus::after_render_first(vec![
+            format!("#admin-open-{}", row.key()),
+            "#admin-search".to_owned(),
+        ]);
+    }
+
+    /// Opens the account the page's address names (the account page's
+    /// link), read as any opened account is; where it cannot be read, the
+    /// list says why under the search.
+    fn open_named(self, account: [u8; 16]) {
+        leptos::task::spawn_local(async move {
+            let request = Request::Admin {
+                request: AdminRequest::Account { account },
+            };
+            match call(&request).await {
+                Ok(Response::Admin {
+                    answer:
+                        AdminAnswer::Account {
+                            account, recovery, ..
+                        },
+                }) => {
+                    let row = Row::from(account);
+                    self.go(
+                        Step::Account(Opened { row, recovery }),
+                        "#admin-account-title",
+                    );
+                }
+                Ok(_) => self.unnamed(Said::Other(Problem::Failed)),
+                Err(Failure::Rejected) => {
+                    if let Some(said) = self.refused_read().await {
+                        self.unnamed(said);
+                    }
+                }
+                Err(failure) => self.unnamed(Said::Other(Problem::outside_sign_in(failure))),
+            }
+        });
+    }
+
+    /// The account the address named could not be read: said at the search.
+    fn unnamed(self, said: Said) {
+        self.search_error.set(Some(said_text(self.lang, said)));
+        focus::after_render("#admin-search");
     }
 
     /// Opens one account: reads it afresh with its recovery state.
@@ -1067,8 +1126,14 @@ pub fn page(
         password: RwSignal::new(String::new()),
         signed_out,
     };
-    // Effects run in the browser only: the newest accounts first.
+    // Effects run in the browser only: the newest accounts first, and the
+    // account the account page's link names, opened at once
     Effect::new(move |_| a.read(None));
+    Effect::new(move |_| {
+        if let Some(account) = fragment::take_account() {
+            a.open_named(account);
+        }
+    });
     // A page put away (another page opened, the tab closed, the
     // back-forward cache) takes no code with it. A page taken down drops
     // its signals, and the code with them.
@@ -1081,6 +1146,41 @@ pub fn page(
         {list_view(a)}
         <div id="admin-steps" class="steps">{move || step_view(a)}</div>
     }
+}
+
+/// A page of the administration for an administrator: its navigation and
+/// the page `section` names. `own` is the account this browser is signed
+/// in as, `username` its sign-in name (for a password manager);
+/// `signed_out` runs when this browser turns out not to be signed in.
+pub fn area(
+    lang: Lang,
+    section: Section,
+    worker: String,
+    username: String,
+    own: [u8; 16],
+    signed_out: Callback<()>,
+) -> AnyView {
+    let cx = common::Cx {
+        lang,
+        worker: StoredValue::new(worker.clone()),
+        username: StoredValue::new(username.clone()),
+        own,
+        signed_out,
+    };
+    let shown = match section {
+        Section::AdminOverview => overview::page(cx).into_any(),
+        Section::AdminUsers => users::page(cx).into_any(),
+        Section::AdminUser(account) => user::page(cx, account).into_any(),
+        Section::AdminGateways => gateways::page(cx).into_any(),
+        Section::AdminAudit => audit::page(cx).into_any(),
+        Section::AdminLegacy => legacy::page(cx).into_any(),
+        _ => page(lang, worker, username, own, signed_out).into_any(),
+    };
+    view! {
+        {common::nav(lang, section)}
+        {shown}
+    }
+    .into_any()
 }
 
 /// What the page shows anyone without the role: one sentence and the way
