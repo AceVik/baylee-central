@@ -32,6 +32,7 @@ mod m20261102_000022_notifications;
 mod m20261111_000023_open_registration;
 mod m20261111_000025_gateway_activity;
 mod m20261112_000026_email;
+mod m20261112_000027_pictures;
 
 use sea_orm_migration::{
     MigrationTrait, MigratorTrait,
@@ -69,6 +70,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261111_000023_open_registration::Migration),
             Box::new(m20261111_000025_gateway_activity::Migration),
             Box::new(m20261112_000026_email::Migration),
+            Box::new(m20261112_000027_pictures::Migration),
         ]
     }
 }

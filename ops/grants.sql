@@ -76,3 +76,14 @@ GRANT EXECUTE ON FUNCTION central_identity.queue_push(uuid,smallint), central_id
 -- by mail needs. The operator's sweep deletes addresses whose code is over.
 GRANT SELECT, INSERT, UPDATE, DELETE ON central_identity.account_emails,
   central_identity.account_email_pending TO central_runtime;
+-- Profile pictures (docs/profile-pictures.md): the runtime sets, replaces
+-- and deletes an account's picture (never its account), files picture
+-- reports and decides them by column but never deletes one, keeps the
+-- person's notice and block, and counts uploads. The operator's sweep
+-- deletes decided reports a year after their decision.
+GRANT SELECT, INSERT, DELETE ON central_identity.pictures TO central_runtime;
+GRANT UPDATE (key, avif, png, sha256, side, set_at) ON central_identity.pictures TO central_runtime;
+GRANT SELECT, INSERT ON central_identity.picture_reports TO central_runtime;
+GRANT UPDATE (state, decided_at, decided_by) ON central_identity.picture_reports TO central_runtime;
+GRANT SELECT, INSERT, UPDATE, DELETE ON central_identity.picture_notices TO central_runtime;
+GRANT SELECT, INSERT, UPDATE ON central_identity.picture_budgets TO central_runtime;

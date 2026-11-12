@@ -7,6 +7,8 @@
 //! gateway tokens and may set only when one was revoked or last used. It
 //! files reports and their parts once, triages a report by column and
 //! deletes reports; it never changes a report's words, a part or its history.
+//! It replaces and deletes profile pictures, files picture reports and
+//! decides them by column, but never deletes one (the operator's sweep does).
 use super::{AccountStore, statement};
 use sea_orm::ConnectionTrait;
 
@@ -50,8 +52,12 @@ impl AccountStore {
              ('report_notes', ARRAY['SELECT','INSERT','DELETE'], NULL),
              ('report_audit', ARRAY['SELECT','INSERT'], NULL),
              ('report_views', ARRAY['SELECT','INSERT','DELETE'], ARRAY['query']),
-             ('report_seen', ARRAY['SELECT','INSERT','DELETE'], NULL))
-             SELECT count(*) = 37 AND bool_and(
+             ('report_seen', ARRAY['SELECT','INSERT','DELETE'], NULL),
+             ('pictures', ARRAY['SELECT','INSERT','DELETE'], ARRAY['key','avif','png','sha256','side','set_at']),
+             ('picture_reports', ARRAY['SELECT','INSERT'], ARRAY['state','decided_at','decided_by']),
+             ('picture_notices', ARRAY['SELECT','INSERT','UPDATE','DELETE'], NULL),
+             ('picture_budgets', ARRAY['SELECT','INSERT','UPDATE'], NULL))
+             SELECT count(*) = 41 AND bool_and(
                NOT pg_catalog.pg_has_role(c.relowner, 'USAGE')
                AND (SELECT bool_and(pg_catalog.has_table_privilege(c.oid, p)) FROM unnest(r.privileges) p)
                AND NOT pg_catalog.has_table_privilege(c.oid, 'TRUNCATE, REFERENCES, TRIGGER, MAINTAIN, SELECT WITH GRANT OPTION, INSERT WITH GRANT OPTION, UPDATE WITH GRANT OPTION, DELETE WITH GRANT OPTION')

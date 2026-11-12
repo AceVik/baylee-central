@@ -14,7 +14,9 @@ workspace = true
 central-api = { path = "../central-api", version = "=0.1.0" }
 central-crypto = { path = "../central-crypto", version = "=0.1.0", features = ["server"] }
 central-mail = { path = "../central-mail", version = "=0.1.0" }
+central-picture = { path = "../central-picture", version = "=0.1.0" }
 central-postgres = { path = "../central-postgres", version = "=0.1.0" }
+getrandom = "=0.4.3"
 subtle = { version = "=2.6.1", default-features = false }
 tokio = { version = "=1.54.1", default-features = false, features = ["rt", "sync"] }
 

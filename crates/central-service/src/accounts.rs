@@ -38,6 +38,29 @@ struct Settings {
     /// origin; absent means no mail.
     #[serde(default)]
     mail: Option<super::mail::Mail>,
+    /// The picture worker's binary (`docs/profile-pictures.md`), an
+    /// absolute path, started as a child for each upload; absent means the
+    /// `central-picture-worker` beside this program, when there is one.
+    #[serde(default)]
+    picture_worker: Option<String>,
+}
+
+/// The development picture worker: the configured binary, or the one built
+/// beside this program; none when neither is a file.
+fn picture_worker(configured: Option<&str>) -> Result<Option<central_picture::Worker>, ()> {
+    if let Some(path) = configured {
+        let path = std::path::PathBuf::from(path);
+        if !path.is_absolute() || !path.is_file() {
+            return Err(());
+        }
+        return Ok(Some(central_picture::Worker::program(path)));
+    }
+    let name = format!("central-picture-worker{}", std::env::consts::EXE_SUFFIX);
+    Ok(std::env::current_exe()
+        .ok()
+        .map(|exe| exe.with_file_name(name))
+        .filter(|path| path.is_file())
+        .map(central_picture::Worker::program))
 }
 
 /// The development legacy store's role and password.
@@ -152,6 +175,7 @@ async fn serve() -> Result<(), ()> {
         .map(|mail| mail.client(true))
         .transpose()?;
     let legacy = legacy_config(&mut settings)?;
+    let pictures = picture_worker(settings.picture_worker.as_deref())?;
     let store = AccountStore::connect_dev(database).await.map_err(|_| ())?;
     let legacy = legacy_store(&store, legacy).await?;
     let identity = IdentityService::new(
@@ -168,6 +192,10 @@ async fn serve() -> Result<(), ()> {
     })
     .map(|identity| match mailer {
         Some(mailer) => identity.with_mailer(mailer),
+        None => identity,
+    })
+    .map(|identity| match pictures {
+        Some(worker) => identity.with_pictures(worker),
         None => identity,
     });
     drop(settings);

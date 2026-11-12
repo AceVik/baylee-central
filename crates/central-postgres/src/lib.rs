@@ -17,6 +17,13 @@ pub use accounts::{
     ReportImportRefusal, Session, Status, Summary, Swept, TAG_DRAWS, TagDraw, Told, appoint_admin,
     sweep,
 };
+/// Profile pictures (`docs/profile-pictures.md`).
+pub mod pictures {
+    pub use super::accounts::{
+        Admission, DECIDED_REPORT_DAYS, Encoding, OwnPicture, PictureCase, REPORTS_OPEN,
+        REPORTS_PER_HOUR, UPLOADS_PER_DAY, UPLOADS_PER_HOUR,
+    };
+}
 
 pub use connection::{DevConfig, ServerConfig, connect_dev, connect_server, supports_version};
 pub use legacy::{

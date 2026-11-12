@@ -6,8 +6,9 @@
 //! tags, then 000012's administration over all of it, then 000013's reset
 //! codes, then 000014's gateway tokens over the registered gateways, then
 //! 000023's open registration over all of it, then 000025's gateway activity
-//! over the gateways, then 000026's e-mail addresses over the accounts. All
-//! inside one transaction that is rolled back.
+//! over the gateways, then 000026's e-mail addresses over the accounts, then
+//! 000027's profile pictures over the same. All inside one transaction that
+//! is rolled back.
 use super::scalar;
 use sea_orm::{ConnectionTrait, DatabaseConnection, TransactionTrait};
 
@@ -41,6 +42,7 @@ const OPEN: &str =
 const ACTIVITY: &str =
     include_str!("../../../central-migration/src/m20261111_000025_gateway_activity.sql");
 const EMAIL: &str = include_str!("../../../central-migration/src/m20261112_000026_email.sql");
+const PICTURES: &str = include_str!("../../../central-migration/src/m20261112_000027_pictures.sql");
 
 fn scratch(sql: &str) -> String {
     sql.replace("central_identity", "upgrade_probe")
@@ -130,6 +132,7 @@ pub(crate) async fn run(operator: &DatabaseConnection) {
     open_registration(&tx).await;
     activity(&tx).await;
     email(&tx).await;
+    pictures(&tx).await;
     tx.rollback().await.unwrap();
     assert_eq!(
         scalar(
@@ -1131,4 +1134,126 @@ async fn open_registration(tx: &sea_orm::DatabaseTransaction) {
         "INSERT INTO upgrade_probe.accounts (source, username_key) VALUES ('registered', 'no-ticket')",
     )
     .await;
+}
+
+/// 000027 over the accounts: four new tables that change no row of the
+/// previous version's, their bounds, and the cascade with an account.
+async fn pictures(tx: &sea_orm::DatabaseTransaction) {
+    let accounts = "SELECT count(*)::bigint AS value FROM upgrade_probe.accounts";
+    let before = scalar(tx, accounts).await;
+    tx.execute_unprepared(&scratch(PICTURES)).await.unwrap();
+    assert_eq!(scalar(tx, accounts).await, before);
+    let player = "(SELECT id FROM upgrade_probe.accounts WHERE username_key = 'registered-player')";
+    let second = "(SELECT id FROM upgrade_probe.accounts WHERE username_key = 'later-registered')";
+    let picture = |key: &str, side: u16, avif: usize| {
+        format!(
+            "INSERT INTO upgrade_probe.pictures (account_id, key, avif, png, sha256, side)
+             VALUES ({player}, decode(repeat('{key}', 16), 'hex'), decode(repeat('01', {avif}), 'hex'),
+                 decode(repeat('02', 100), 'hex'), decode(repeat('03', 32), 'hex'), {side})"
+        )
+    };
+    for bad in [
+        picture("aa", 255, 100),
+        picture("aa", 256, 31),
+        picture("aa", 256, 163_841),
+    ] {
+        refused(tx, &bad).await;
+    }
+    tx.execute_unprepared(&picture("aa", 256, 100))
+        .await
+        .unwrap();
+    // one picture per account, and a key never twice
+    refused(tx, &picture("bb", 256, 100)).await;
+    refused(
+        tx,
+        &format!(
+            "INSERT INTO upgrade_probe.pictures (account_id, key, avif, png, sha256, side)
+             SELECT {second}, key, avif, png, sha256, side FROM upgrade_probe.pictures"
+        ),
+    )
+    .await;
+    let report = |reporter: &str, reason: &str, note: &str| {
+        format!(
+            "INSERT INTO upgrade_probe.picture_reports (account_id, sha256, reporter_id, reason, note)
+             VALUES ({player}, decode(repeat('03', 32), 'hex'), {reporter}, '{reason}', {note})"
+        )
+    };
+    refused(tx, &report(player, "hate", "NULL")).await;
+    refused(tx, &report(second, "spam", "NULL")).await;
+    refused(tx, &report(second, "hate", "repeat('x', 1001)")).await;
+    refused(tx, &report(second, "hate", "''")).await;
+    tx.execute_unprepared(&report(second, "hate", "'synthetic'"))
+        .await
+        .unwrap();
+    // a second open report of the same reporter and picture
+    refused(tx, &report(second, "other", "NULL")).await;
+    refused(
+        tx,
+        "UPDATE upgrade_probe.picture_reports SET state = 'kept'",
+    )
+    .await;
+    tx.execute_unprepared(
+        "UPDATE upgrade_probe.picture_reports SET state = 'kept', decided_at = clock_timestamp()",
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        scalar(
+            tx,
+            "SELECT count(*)::bigint AS value FROM upgrade_probe.picture_reports
+             WHERE pg_catalog.uuid_extract_version(id) = 7"
+        )
+        .await,
+        1
+    );
+    tx.execute_unprepared(&format!(
+        "INSERT INTO upgrade_probe.picture_notices (account_id, removed_at, reason, blocked_until)
+         VALUES ({player}, clock_timestamp(), 'private', 'infinity');
+         INSERT INTO upgrade_probe.picture_budgets (account_id) VALUES ({player})"
+    ))
+    .await
+    .unwrap();
+    refused(
+        tx,
+        &format!(
+            "UPDATE upgrade_probe.picture_budgets SET hour_count = 11 WHERE account_id = {player}"
+        ),
+    )
+    .await;
+    // the reporter's deletion keeps the report without it; the account's
+    // takes everything of its picture
+    tx.execute_unprepared(&format!(
+        "DELETE FROM upgrade_probe.accounts WHERE id = {second}"
+    ))
+    .await
+    .unwrap();
+    assert_eq!(
+        scalar(
+            tx,
+            "SELECT count(*)::bigint AS value FROM upgrade_probe.picture_reports WHERE reporter_id IS NULL"
+        )
+        .await,
+        1
+    );
+    tx.execute_unprepared(&format!(
+        "DELETE FROM upgrade_probe.accounts WHERE id = {player}"
+    ))
+    .await
+    .unwrap();
+    for table in [
+        "pictures",
+        "picture_reports",
+        "picture_notices",
+        "picture_budgets",
+    ] {
+        assert_eq!(
+            scalar(
+                tx,
+                &format!("SELECT count(*)::bigint AS value FROM upgrade_probe.{table}")
+            )
+            .await,
+            0,
+            "{table}"
+        );
+    }
 }

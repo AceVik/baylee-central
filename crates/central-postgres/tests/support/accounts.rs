@@ -23,6 +23,7 @@ mod notifications;
 mod objects;
 mod pairing;
 mod password;
+mod pictures;
 mod profiles;
 mod recovery;
 mod register;
@@ -148,6 +149,7 @@ pub(crate) async fn run(operator: &DatabaseConnection) {
     social::run(&store, operator, &keys).await;
     notifications::run(&store, operator, &keys).await;
     email::run(&store, operator, &keys).await;
+    pictures::run(&store, operator, &keys).await;
     // Last: its sweep deletes every unenrolled legacy reservation.
     legacy_store::run(&store, operator, &keys).await;
     store.close().await.unwrap();

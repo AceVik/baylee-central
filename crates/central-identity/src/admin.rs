@@ -109,6 +109,8 @@ impl IdentityService {
                 self.store.admin_revoke_gateway_token(cookie, token).await?;
                 return Ok(Response::Done);
             }
+            // Profile pictures (`docs/profile-pictures.md`, `pictures.rs`).
+            AdminRequest::Picture { request } => return self.picture_admin(request, cookie).await,
             AdminRequest::SetTag { account, tag } => {
                 self.store.set_tag(cookie, account, tag).await?;
                 return Ok(Response::Done);
