@@ -1395,3 +1395,60 @@ name) and `gw-lead` (its sentence on the official gateway), English and
 German by hand; the nine other languages carry the English text of both
 under "# English for now: to be translated.", as with §17's changed
 messages. No new message.
+
+## 18. As built: the album opens as a book, its photographs turn (12.11.2026)
+
+The owner asked for better movement where Baylee's album opens and shuts,
+and for a beautiful change between the photographs in the full view. Both
+are `home.js` and `album.css`; neither has words, so no language changed.
+
+- **The book.** The logo lays the book down shut: a cover of cloth the
+  colour of the site's evening, the spine's hinge pressed into it, a gold
+  rule, and her name as the hero's picture shows it. The cover swings up
+  on the spine towards the reader and over to the left (Web Animations,
+  0.9 s after 0.16 s) while the book comes nearer; the light comes from
+  over the reader's left shoulder, so the cloth catches it as it lifts and
+  darkens as it turns away, the endpaper is dark as it comes round and
+  brightens as it comes down, and the cover's shade on the first page
+  narrows to the spine. The first page lifts a little and settles. The
+  close button and Escape run it back (0.65 s) and take the book away;
+  shut while it opens, the same movement goes back from where it is. The
+  light and the shade are keyframes at the cover's angle every 15° under
+  one easing for the whole swing, which a CSS animation cannot give (it
+  eases each keyframe on its own). The cover is made by the script and is
+  there only while the book folds (`data-folding`); without the script the
+  logo opens the plain dialog, as before. An Escape the browser does not
+  let a page hold (pressed again at once) shuts it at once.
+- **The photographs.** The viewer's frame holds three prints, the one
+  shown and, hidden, the ones before and after (the album's smaller
+  pictures; the one shown takes the full photograph once it has loaded).
+  Each is the size its photograph takes in the frame (container units and
+  the photograph's ratio in `--ratio`), so its place is kept before it
+  loads and its shadow falls from the photograph's edge. Going on, the
+  next print comes in from the right over the one shown, a little turned
+  and lifted, while the one shown sinks back into the dark; going back,
+  the one shown is lifted off to the right. A finger moves the prints as
+  it moves and ends the turn past a third of the way or with a flick;
+  short of it they fall back. Zoomed in, the finger still moves the
+  photograph. A sideways stroke on a touchpad turns once. A key pressed
+  mid-turn ends that turn and starts the next. Only one image is the
+  viewer's (`data-viewer-image`), the one the zoom acts on.
+- **The rules held.** Only transform and opacity move, the frame and the
+  controls never; no inline style in the markup (the script sets
+  transform, opacity and `--ratio` through the CSSOM); nothing hovers into
+  motion. With less motion asked for, the book is open or shut and the
+  photograph changed at once, and nothing follows a finger.
+- **Tests.** `web/e2e-site/album.spec.ts`: every way in and out of the
+  book with the order of its states, focus back on the logo, every
+  photograph by the buttons, the arrow keys and synthetic touch strokes,
+  the falls back, the zoomed finger, focus back on the photograph's frame,
+  less motion, no script, and the keyframes of what runs read in the same
+  task as the press that starts it (only `transform` and `opacity`).
+  `site.spec.ts`'s page-turn test reads its leaf the same way.
+
+**Measured** (headless Chromium on the M1 Max's GPU, the machine loaded):
+the swing, the shutting and a turn keep 16.7 ms frames at 1440 px and at
+375 px with the CPU slowed fourfold. The first open's first frame takes
+about 0.2 s at that slowdown, as it did before this change (the album's
+first layout and paint); it comes before anything moves. **Open:** a real
+phone.
