@@ -6743,14 +6743,18 @@ What remains, and why it is acceptable:
   Links, Gmail's link checks and similar gateways rewrite or fetch the
   link and see the whole address, fragment included, as they see the mail
   and its code in the text. They learn nothing they did not have, and
-  their fetch submits nothing. Seen in Gmail's web view on 12.11.2026:
-  each link carries a `data-saferedirecturl` to `www.google.com/url`, and
-  a click goes through that address with the whole link, `#code=` and
-  all, in its query. The browser's history may then hold Google's address
-  with the code as well, an entry on another site that the page cannot
-  replace; it is accepted on the same grounds as the first bullet (one
-  use, 15 minutes or one hour, the person's own history, a provider that
-  holds the mail).
+  their fetch submits nothing. Checked in Gmail's web view on 12.11.2026
+  by a script that answered only yes or no: the reset mail's button
+  carries a `data-saferedirecturl` that begins with
+  `https://www.google.com/url?` and holds the whole link, `#code=`
+  included, percent-encoded in its query. Gmail's web view opens that
+  address when the link is clicked (its known behaviour; the link was not
+  clicked here), so the browser's history may hold Google's address with
+  the code as well, an entry on another site that the page cannot
+  replace. It is recorded as a residual on the same grounds as the first
+  bullet (one use, 15 minutes or one hour, the person's own history, a
+  provider that holds the mail); the owner has not yet said whether it is
+  accepted.
 - **A link in a tab that shows the page already** is a move within the
   page, which runs no island; on such a change to `#code=` the fragment is
   removed as at the start (`fragment::watch`) and fills nothing. Loading
@@ -6876,5 +6880,59 @@ looked at in Chromium at 360 and 640 px, as drawn and inverted. Not run:
 `cargo xtask postgres`, `smoke`, `secrets`, `cargo audit` and `cargo deny`
 (no dependency and no migration changed; the service only reads one more
 optional field), and `e2e-real`.
+
+Engineering review, not an audit.
+
+## The reset page's new recovery code kept the registration's ways, and stillness reaches a view transition, 12 November 2026
+
+The reset page's step that shows a new vault's recovery code offered a
+copy button and a `data:` link that stood in the page, the code in its
+address, from the moment the step was drawn. It now offers what the
+registration's step offers ("Ways to keep a recovery code" above):
+`keep::ways` in `islands/reset.rs`. Carrying the owner's decision for the
+registration over to the reset page was this session's call, not a new
+decision of the owner's. No change to `central-api`, no migration, no
+dependency.
+
+Design pass. The asset is the same recovery code with the same reach;
+the step shows it once, after a reset that ended every session. The
+registration's record holds for each way. Two differences: the reset page
+knows no e-mail address, so the mail to oneself leaves the recipient to
+the mail program (`mailto:` with an empty address, as the registration
+does when no valid address is typed); and the file and the sheet name the
+sign-in name the reset was for, which the person typed into the form.
+Taking the old link away removes an address that held the code before
+anyone asked for a file. Two layout rules met on the way: a check row's
+label could not be narrower than its longest word ("Wiederherstellungs-
+code" ran 6 px out of the card at 320 px; the column is now
+`minmax(0, 1fr)` and the label breaks and hyphenates), and the
+reduced-motion rules did not reach the pseudo-elements of a view
+transition, so one that began while motion was welcome kept the
+browser's own fades (ten animations; the open finding of the record
+above). Each of `::view-transition-group`, `-image-pair`, `-old` and
+`-new` now has `animation: none` under reduced motion, in a rule of its
+own.
+
+Implementation pass. `Outcome` carries the sign-in name, lower-cased as
+it was sent; `code_view` renders the code once as text and `keep::ways`
+beside it; nothing else of the step changed (the box that confirms the
+code is kept, the way on only after it). The reset island no longer uses
+`clip.rs` directly. No new `web-sys` feature; the islands build for
+`wasm32-unknown-unknown` without warnings.
+
+Verification pass. `web/e2e-site/reset.spec.ts`: the new vault's step
+offers copy, file, print and mail; before any click the page holds the
+code once and no `data:text`, `mailto:`, download link or sheet; the file
+is saved as `baylee-recovery-code.txt`, begins with the title, the sign-in
+name and the code, and its link is gone again; the mail opens a `mailto:`
+without an address whose body is the file's text; axe, the targets and
+320 px pass; in German at 320 px, at a desktop's and a phone's size,
+nothing of the step reaches past its card, both schemes pass the colour
+check with reduced motion, and the print shows the sheet alone (six lines,
+the code among them) and the screen hides it again. A probe that left a
+page and asked for reduced motion during the view transition found ten
+animations before the rule and none after. The site's browser suite and
+`e2e-real`'s `site-reset` (a new vault redeemed against a real Central)
+ran on this work as reported in the pull request.
 
 Engineering review, not an audit.

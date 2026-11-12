@@ -363,6 +363,65 @@ test("a new vault: its recovery code is shown once, copied or saved, and kept be
   expect(problems).toEqual([]);
 });
 
+// German has the longest words: the new vault's code step, with the
+// registration's ways to keep the code (keep.rs), at 320 px in both
+// schemes, and its print is the sheet alone.
+test("a new vault's code step holds in German at 320 px in both schemes, and its print is the sheet alone", async ({ page }) => {
+  const problems = errors(page);
+  const seen: Body[] = [];
+  await page.route("**/api/v1", central(seen));
+  // the print dialog, counted instead of shown
+  await page.addInitScript(() => {
+    let printed = 0;
+    Object.defineProperty(window, "print", { configurable: true, value: () => (printed += 1) });
+    Object.defineProperty(window, "printed", { get: () => printed });
+  });
+  await page.setViewportSize({ width: 320, height: 760 });
+  await open(page, "de");
+  await page.locator("#reset-name").fill("Erika");
+  await page.locator("#reset-code").fill(CODE);
+  await page.locator("#reset-new").check();
+  await page.locator("#reset-confirm").check();
+  await page.locator("#reset-password").fill(PASSWORD);
+  await page.locator("#reset-repeat").fill(PASSWORD);
+  await form(page).locator("button[type=submit]").click();
+  await expect(page.locator("#reset-done-title")).toBeFocused({ timeout: 60_000 });
+  const shown = (await form(page).locator(".secret code").textContent()) ?? "";
+  expect(shown).toMatch(/^([0-9A-HJKMNP-TV-Z]{4}-){7}[0-9A-HJKMNP-TV-Z]{4}$/);
+  for (const name of ["Als Textdatei speichern", "Drucken", "Im Passwortmanager speichern"]) {
+    await expect(form(page).getByRole("button", { name, exact: true })).toBeVisible();
+  }
+  // nothing of the step reaches past its card, and the page needs no sideways scrolling
+  const card = form(page).locator("section.card");
+  expect(
+    await card.evaluate((el) => {
+      const edge = el.getBoundingClientRect().right + 0.5;
+      const beyond = [...el.querySelectorAll("*")]
+        .filter((node) => {
+          const box = node.getBoundingClientRect();
+          return box.width > 0 && box.right > edge;
+        })
+        .map((node) => `${node.tagName.toLowerCase()}.${node.className}#${node.id}:${Math.round(node.getBoundingClientRect().right - edge)}`);
+      return { beyond, scroll: el.scrollWidth - el.clientWidth };
+    }),
+  ).toEqual({ beyond: [], scroll: 0 });
+  expect(await narrow(page)).toBe(0);
+  expect(await targets(page)).toEqual([]);
+  expect(await schemes(page)).toEqual([]);
+
+  await form(page).getByRole("button", { name: "Drucken", exact: true }).click();
+  await expect.poll(() => page.evaluate(() => Reflect.get(window, "printed"))).toBe(1);
+  await page.emulateMedia({ media: "print" });
+  await expect(page.locator(".code-sheet")).toBeVisible();
+  const printed = (await page.evaluate(() => document.body.innerText.trim())).split("\n").filter((line) => line.trim() !== "");
+  expect(printed.slice(0, 4)).toEqual(["Baylee", "Baylee-Wiederherstellungscode", "Anmeldename: erika", shown]);
+  expect(printed).toHaveLength(6);
+  await page.emulateMedia({ media: "screen" });
+  await expect(page.locator(".code-sheet")).toBeHidden();
+  expect(JSON.stringify(seen)).not.toContain(shown);
+  expect(problems).toEqual([]);
+});
+
 test("a finish whose answer is lost is not called done, and the code that may count is still shown", async ({ page }) => {
   const problems = errors(page);
   const seen: Body[] = [];
