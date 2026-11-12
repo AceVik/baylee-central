@@ -1467,7 +1467,7 @@ longest the first open's first frame, which took about 0.2 s before this
 change too (the album's first layout and paint) and comes before anything
 moves. **Open:** a real phone, Safari and Firefox.
 
-## 18. As built: ways to keep the recovery code (12.11.2026)
+## 21. As built: ways to keep the recovery code (12.11.2026)
 
 The owner's decision on the code's step, after the trade-off was explained
 ("Wie empfohlen + Mail an mich"). What each way does and keeps is
