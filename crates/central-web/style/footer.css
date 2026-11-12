@@ -35,10 +35,19 @@
 }
 
 .foot-logo-link {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.85rem;
   border-radius: var(--radius-md);
   text-decoration: none;
   transition: opacity 200ms ease;
+}
+
+/* The BIMI mark (`/bimi/baylee.svg`), as it is: no clip, no filter. */
+.foot-mark {
+  flex: none;
+  width: 4.5rem;
+  height: 4.5rem;
 }
 
 .foot-logo-link:hover {

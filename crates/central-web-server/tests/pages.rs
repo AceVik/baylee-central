@@ -30,9 +30,23 @@ fn site() -> PathBuf {
     std::fs::create_dir_all(&dir).expect("temporary folder");
     std::fs::write(dir.join("manifest.json"), "{\"files\":{}}").expect("manifest");
     for name in central_web_server::files::ROOT {
-        std::fs::write(dir.join(name), b"x").expect("root file");
+        let path = dir.join(name);
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent).expect("root file's folder");
+        }
+        std::fs::write(path, b"x").expect("root file");
     }
+    // the BIMI mark as the build copies it
+    std::fs::write(dir.join("bimi/baylee.svg"), bimi()).expect("BIMI mark");
     dir
+}
+
+/// The BIMI mark in the site's sources.
+fn bimi() -> Vec<u8> {
+    std::fs::read(
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../central-web/assets/bimi/baylee.svg"),
+    )
+    .expect("BIMI mark")
 }
 
 fn data() -> PathBuf {
@@ -1053,6 +1067,35 @@ async fn the_documents_the_server_writes_are_revalidated_too() {
         secured(&headers);
         if path == "/sw.js" {
             assert_eq!(headers["service-worker-allowed"], "/");
+        }
+    }
+}
+
+/// Mail providers fetch the BIMI mark at its fixed address: a 200, as an
+/// SVG, its bytes exactly, no redirect to a language, revalidated, without
+/// a session and in either mode.
+#[tokio::test]
+async fn the_bimi_mark_answers_at_its_fixed_address_as_it_is() {
+    for fallback in [true, false] {
+        let app = app(fallback);
+        let (status, headers, body) = get(&app, "/bimi/baylee.svg", &[]).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(headers["content-type"], "image/svg+xml");
+        assert_eq!(headers["cache-control"], "no-cache");
+        assert!(headers.get("location").is_none());
+        assert!(headers.get("set-cookie").is_none());
+        assert_eq!(body.as_bytes(), bimi().as_slice());
+        secured(&headers);
+        // only that address: no language before it, nothing beside it
+        for path in [
+            "/en/bimi/baylee.svg",
+            "/bimi/",
+            "/bimi/baylee.svg/",
+            "/bimi/other.svg",
+        ] {
+            let (status, _, body) = get(&app, path, &[]).await;
+            assert_ne!(status, StatusCode::OK, "{path}");
+            assert_ne!(body.as_bytes(), bimi().as_slice(), "{path}");
         }
     }
 }
