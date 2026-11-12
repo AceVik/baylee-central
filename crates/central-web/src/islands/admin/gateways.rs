@@ -501,7 +501,7 @@ fn card(p: &Page, gateway: &Gateway) -> impl IntoView + use<> {
         <li class="card admin-gw">
             <div class="admin-gw-head">
                 <div class="admin-gw-who">
-                    <h3 class="admin-gw-name" id=heading.clone() tabindex="-1"><bdi>{gateway.name.clone()}</bdi></h3>
+                    <h2 class="admin-gw-name" id=heading.clone() tabindex="-1"><bdi>{gateway.name.clone()}</bdi></h2>
                     <p class="admin-copyable">
                         <code class="address" translate="no">{gateway.origin.clone()}</code>
                         {common::copy_button(lang, gateway.origin.clone(), words::gws_address(lang))}
