@@ -531,6 +531,34 @@ pub fn Messenger(lang: Lang, section: Section, worker: String) -> impl IntoView 
     });
     let selected = RwSignal::new(None::<String>);
     let worker = StoredValue::new(worker);
+    // Pictures (`docs/profile-pictures.md`): one's own and the contacts',
+    // read again when the contacts change.
+    let keys = crate::islands::picture::Keys::provide();
+    let asked = StoredValue::new(Vec::<u32>::new());
+    Effect::new(move |_| {
+        let Who::Ready(me) = who_is.get() else {
+            return;
+        };
+        let mut tags = vec![me.tag];
+        ctl.contacts.with(|c| {
+            if let Some(Ok(list)) = c {
+                tags.extend(list.iter().map(|c| c.person.tag));
+            }
+        });
+        ctl.groups.with(|g| {
+            if let Some(Ok(snapshot)) = g {
+                for group in &snapshot.groups {
+                    tags.extend(group.members.iter().map(|m| m.person.tag));
+                }
+            }
+        });
+        tags.sort_unstable();
+        tags.dedup();
+        if asked.with_value(|held| *held != tags) {
+            asked.set_value(tags.clone());
+            keys.read(tags);
+        }
+    });
     Effect::new(move |_| {
         leptos::task::spawn_local(async move {
             let found = who().await;

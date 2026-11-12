@@ -729,3 +729,49 @@
 .frame-main section > h2 {
   font-size: var(--text-lg);
 }
+
+/* ---- The profile picture card and the moderation list -------------------- */
+
+.picture-current {
+  inline-size: 8rem;
+  block-size: 8rem;
+  margin-block: var(--space-2);
+}
+
+.picture-editor {
+  display: grid;
+  gap: var(--space-2);
+  margin-block-start: var(--space-3);
+}
+
+.picture-preview {
+  inline-size: min(16rem, 100%);
+  block-size: auto;
+  aspect-ratio: 1;
+  border-radius: var(--radius-full);
+  background: var(--avatar-0);
+  touch-action: none;
+  cursor: grab;
+}
+
+.picture-preview:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
+}
+
+.picture-reports {
+  display: grid;
+  gap: var(--space-3);
+  padding: 0;
+  list-style: none;
+}
+
+.picture-report-item blockquote {
+  margin: var(--space-2) 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.picture-report {
+  margin-block: var(--space-2);
+}

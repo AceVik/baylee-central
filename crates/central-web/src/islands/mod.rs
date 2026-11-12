@@ -29,8 +29,11 @@ mod focus;
 mod fragment;
 mod impressum;
 mod keep;
+#[cfg(any(not(target_arch = "wasm32"), feature = "admin"))]
+mod moderation;
 pub(crate) mod net;
 mod password;
+mod picture;
 mod pow;
 mod push;
 mod reset;

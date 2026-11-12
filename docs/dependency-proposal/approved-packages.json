@@ -2302,6 +2302,7 @@
       "BeforeUnloadEvent",
       "BinaryType",
       "Blob",
+      "CanvasRenderingContext2d",
       "CharacterData",
       "ClipboardEvent",
       "CloseEvent",
@@ -2323,6 +2324,8 @@
       "EventSource",
       "EventSourceInit",
       "EventTarget",
+      "File",
+      "FileList",
       "FileReader",
       "FocusEvent",
       "FormData",
@@ -2396,6 +2399,9 @@
       "HtmlTrackElement",
       "HtmlUListElement",
       "HtmlVideoElement",
+      "ImageBitmap",
+      "ImageBitmapOptions",
+      "ImageOrientation",
       "InputEvent",
       "KeyboardEvent",
       "Location",
@@ -2947,7 +2953,8 @@
       "entries": [
         "png@0.18.1, zune-jpeg@0.5.15 and zune-core@0.5.3 (std only, no SIMD), gif@0.14.2 (std), image-webp@0.2.4, resvg@0.50.0 without default features, image@0.25.10 with bmp and ico, avif-decode@3.0.0 with avif-parse@2.1.0 and rav1d@1.1.0 (its default features, assembly on), ravif@0.13.0 with asm (rav1e@0.8.1 with asm, nasm on x86-64), and the 78 further packages they resolve to (90 in all)",
         "new features on approved packages: arrayvec@0.7.8 default; crossbeam-utils@0.8.23 default; log@0.4.35 alloc, std; num-traits@0.2.19 default; rand@0.9.5 default, os_rng, small_rng, std_rng, thread_rng; rand_chacha@0.9.0 default; rand_core@0.9.5 os_rng; syn@2.0.119 fold",
-        "gate exceptions: BSD-2-Clause for rav1e, av1-grain, v_frame, arrayref and rav1d; NCSA for libfuzzer-sys (cfg(fuzzing) only, never built); MPL-2.0 for avif-parse; CC0-1.0 for to_method; duplicate skips for miniz_oxide, nom, rand, rand_core, getrandom, r-efi, strum and zerocopy; the paste advisory ignore widened to rav1e and rav1d"
+        "gate exceptions: BSD-2-Clause for rav1e, av1-grain, v_frame, arrayref and rav1d; NCSA for libfuzzer-sys (cfg(fuzzing) only, never built); MPL-2.0 for avif-parse; CC0-1.0 for to_method; duplicate skips for miniz_oxide, nom, rand, rand_core, getrandom, r-efi, strum and zerocopy; the paste advisory ignore widened to rav1e and rav1d",
+        "web-sys@0.3.107 gains CanvasRenderingContext2d, File, FileList, ImageBitmap, ImageBitmapOptions and ImageOrientation (the profile page decodes and crops the picture in the browser)"
       ],
       "implied": "Dependency-internal unsafe code and assembly (rav1e, rav1d, the SIMD crates) were disclosed in profile-picture.md; first-party unsafe stays forbidden. Not a third-party source audit."
     }
