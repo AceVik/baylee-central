@@ -1418,7 +1418,10 @@ are `home.js` and `album.css`; neither has words, so no language changed.
   eases each keyframe on its own). The cover is made by the script and is
   there only while the book folds (`data-folding`); without the script the
   logo opens the plain dialog, as before. An Escape the browser does not
-  let a page hold (pressed again at once) shuts it at once.
+  let a page hold (pressed again at once) shuts it at once. While the
+  cover swings beyond the book's edge the book does not cut it off, but
+  the pages are still cut where the book cuts them at rest (a window too
+  short for them).
 - **The photographs.** The viewer's frame holds three prints, the one
   shown and, hidden, the ones before and after (the album's smaller
   pictures; the one shown takes the full photograph once it has loaded).
@@ -1430,9 +1433,11 @@ are `home.js` and `album.css`; neither has words, so no language changed.
   the one shown is lifted off to the right. A finger moves the prints as
   it moves and ends the turn past a third of the way or with a flick;
   short of it they fall back. Zoomed in, the finger still moves the
-  photograph. A sideways stroke on a touchpad turns once. A key pressed
-  mid-turn ends that turn and starts the next. Only one image is the
-  viewer's (`data-viewer-image`), the one the zoom acts on.
+  photograph. A sideways stroke on a touchpad turns once (zoomed in, it
+  moves the photograph sideways; it used to zoom). A key pressed mid-turn
+  ends that turn and starts the next. Only one image is the viewer's
+  (`data-viewer-image`), the one the zoom acts on. The photographs still
+  load only once the book is open.
 - **The rules held.** Only transform and opacity move, the frame and the
   controls never; no inline style in the markup (the script sets
   transform, opacity and `--ratio` through the CSSOM); nothing hovers into
@@ -1441,14 +1446,19 @@ are `home.js` and `album.css`; neither has words, so no language changed.
 - **Tests.** `web/e2e-site/album.spec.ts`: every way in and out of the
   book with the order of its states, focus back on the logo, every
   photograph by the buttons, the arrow keys and synthetic touch strokes,
-  the falls back, the zoomed finger, focus back on the photograph's frame,
-  less motion, no script, and the keyframes of what runs read in the same
-  task as the press that starts it (only `transform` and `opacity`).
-  `site.spec.ts`'s page-turn test reads its leaf the same way.
+  the falls back, the zoomed finger, the browser's own input (a mouse's
+  drag, a touch screen's finger through the DevTools protocol, a
+  touchpad's wheel), focus back on the photograph's frame, less motion, no
+  script, and the keyframes of what runs read in the same task as the
+  press that starts it (only `transform` and `opacity`). `site.spec.ts`'s
+  page-turn test reads its leaf the same way.
 
-**Measured** (headless Chromium on the M1 Max's GPU, the machine loaded):
-the swing, the shutting and a turn keep 16.7 ms frames at 1440 px and at
-375 px with the CPU slowed fourfold. The first open's first frame takes
-about 0.2 s at that slowdown, as it did before this change (the album's
-first layout and paint); it comes before anything moves. **Open:** a real
-phone.
+**Measured** (headless Chromium on the M1 Max's GPU, the machine loaded;
+the gaps between animation frames on the main thread, not the
+compositor's own): at 1440 px the median gap was 16.7 ms while the book
+opened, shut and a photograph turned, with at most one gap of 33 to 50 ms,
+the first open's first. At 375 px with the CPU slowed fourfold the median
+was 16.7 ms as well, with one to four gaps of 50 to 270 ms per run, the
+longest the first open's first frame, which took about 0.2 s before this
+change too (the album's first layout and paint) and comes before anything
+moves. **Open:** a real phone, Safari and Firefox.
