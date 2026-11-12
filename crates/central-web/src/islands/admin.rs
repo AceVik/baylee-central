@@ -1111,7 +1111,6 @@ pub fn page(
     own: [u8; 16],
     signed_out: Callback<()>,
 ) -> impl IntoView {
-    let moderation = super::moderation::section(lang, worker.clone());
     let a = Admin {
         lang,
         worker: StoredValue::new(worker),
@@ -1149,7 +1148,6 @@ pub fn page(
     view! {
         {list_view(a)}
         <div id="admin-steps" class="steps">{move || step_view(a)}</div>
-        {moderation}
     }
 }
 
@@ -1179,6 +1177,7 @@ pub fn area(
         Section::AdminGateways => gateways::page(cx).into_any(),
         Section::AdminAudit => audit::page(cx).into_any(),
         Section::AdminLegacy => legacy::page(cx).into_any(),
+        Section::AdminPictures => super::moderation::section(lang, worker).into_any(),
         _ => page(lang, worker, username, own, signed_out).into_any(),
     };
     view! {

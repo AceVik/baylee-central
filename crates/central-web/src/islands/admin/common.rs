@@ -95,6 +95,7 @@ pub fn nav(lang: Lang, section: Section) -> impl IntoView {
                 {link(Section::AdminGateways, words::gw_title(lang))}
                 {link(Section::AdminAudit, words::admin_audit(lang))}
                 {link(Section::AdminLegacy, words::admin_legacy(lang))}
+                {link(Section::AdminPictures, words::admin_pictures_title(lang))}
                 {link(Section::Feedback, words::admin_feedback(lang))}
                 {link(Section::Admin, words::admin_reset_title(lang))}
             </ul>

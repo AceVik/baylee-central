@@ -1249,6 +1249,7 @@ pub fn Account(lang: Lang, section: Section, worker: String) -> impl IntoView {
             | Section::AdminGateways
             | Section::AdminAudit
             | Section::AdminLegacy
+            | Section::AdminPictures
             | Section::Feedback
             | Section::Report => super::admin::refused(lang).into_any(),
             }

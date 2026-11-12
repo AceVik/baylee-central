@@ -480,6 +480,9 @@ pub enum Section {
     AdminAudit,
     /// `/account/admin/legacy`: what is left of the legacy store.
     AdminLegacy,
+    /// `/account/admin/pictures`: the reported profile pictures, an
+    /// account's case and their moderation (`docs/profile-pictures.md`).
+    AdminPictures,
     /// `/account/admin/feedback`: bug and crash reports, triaged
     /// (`docs/reports.md`). As `Admin`: in no navigation, and nothing for
     /// anyone without the role.
@@ -508,7 +511,7 @@ impl Section {
     /// Every section with a fixed address: the navigation's and the
     /// administration's. One account's page (`AdminUser`) has an address
     /// per account and is read by [`Section::account_page`] apart.
-    pub const ROUTED: [Section; 16] = [
+    pub const ROUTED: [Section; 17] = [
         Section::Home,
         Section::Chat,
         Section::Contacts,
@@ -523,6 +526,7 @@ impl Section {
         Section::AdminGateways,
         Section::AdminAudit,
         Section::AdminLegacy,
+        Section::AdminPictures,
         Section::Feedback,
         Section::Report,
     ];
@@ -545,6 +549,7 @@ impl Section {
             Section::AdminGateways => "account/admin/gateways",
             Section::AdminAudit => "account/admin/audit",
             Section::AdminLegacy => "account/admin/legacy",
+            Section::AdminPictures => "account/admin/pictures",
             Section::Feedback | Section::Report => "account/admin/feedback",
         }
     }
@@ -562,6 +567,7 @@ impl Section {
                 | Section::AdminGateways
                 | Section::AdminAudit
                 | Section::AdminLegacy
+                | Section::AdminPictures
         )
     }
 
@@ -658,7 +664,7 @@ mod tests {
         assert_eq!(Section::account_page(&format!("account/users/{hex}")), None);
         // the administration's pages say so; the area's own do not
         let admin = Section::ROUTED.iter().filter(|s| s.admin()).count();
-        assert_eq!(admin, 6);
+        assert_eq!(admin, 7);
         assert!(Section::AdminUser(id).admin());
         assert!(Section::ALL.iter().all(|s| !s.admin()));
         assert_eq!(Section::AdminUser(id).slug(), Section::AdminUsers.slug());
