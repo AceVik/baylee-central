@@ -204,6 +204,13 @@ async function open(page: Page, w: World, options: { manager?: boolean; path?: s
 // a route does not see what a service worker fetches: the canned Worker
 test.use({ serviceWorkers: "block" });
 
+// Each test registers first, which takes six seconds a person and Central
+// ask for, and several measure both schemes: the whole suite at once is
+// slower than 30 seconds a test allow.
+test.beforeEach(() => {
+  test.slow();
+});
+
 /** Fills the registration in `scope` as a person would, after the three seconds a person takes, and sends it. */
 async function register(page: Page, scope: Locator | Page = page) {
   await scope.getByLabel("Sign-in name").fill("erika");

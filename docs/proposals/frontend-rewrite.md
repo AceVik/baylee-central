@@ -1522,7 +1522,8 @@ a recovery code".
   password manager's offer and its absence, the print in print media from
   the page and from the dialog, the address named with and without terms
   in force, a stale sign-in, a refused address, skipping; axe in both
-  schemes, the targets, 320 px and the keyboard's order. `e2e-real`'s
+  schemes, the targets, 320 px and the keyboard's order, and both steps in
+  German at 320 px on the page and in the dialog. `e2e-real`'s
   `register()` and `site-email.spec.ts` were adapted (the address named at
   registration, another in the account area) and type-check; they were not
   run here.

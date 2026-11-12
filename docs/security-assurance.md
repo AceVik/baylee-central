@@ -6478,4 +6478,194 @@ device, with nothing, light or dark kept, on both sizes, and the kept scheme
 on the root before the body begins; no "official" on the start page or in
 the directory. `tests/hover.rs` and `tests/contrast.rs` still hold.
 
+## Ways to keep a recovery code, and an address at registration, 12 November 2026
+
+The registration's step that shows the recovery code once offered copying
+and a text file. On the owner's decision after the trade-off was put to
+him ("Wie empfohlen + Mail an mich"), it now offers four more ways out of
+the page and an e-mail address for the account
+([web accounts](web-accounts.md#keeping-the-recovery-code)): a text file
+with two lines of explanation, a print, the browser's password manager,
+and a mail to oneself through the person's own mail program. The same work
+gave the mails their new look ([e-mail](email.md#how-a-mail-looks)); that
+changed no rule of theirs and is not part of this record. No change to
+`central-api`, no migration, no new dependency, no change to `Cargo.lock`,
+no `web-sys` feature added.
+
+Design pass. The asset is the recovery code: with a reset code it resets
+the login and keeps the encrypted data ([account reset](account-reset.md));
+without one it does nothing, since Central hands its wrapper out only to a
+reset. A reset code comes from an administrator or, by mail, from the
+account's confirmed address. So every place the code is kept is weighed by
+who can read it and whether they can also get a reset code. Central never
+learns the code, before or after this change.
+- **Made on the press, never before.** The file's `data:` link, the
+  `mailto:` address and the print's sheet exist from the press of their
+  button on; until then the code is in the page once, as the step's text,
+  and in no attribute. Nothing is sent to Central, nothing logged, nothing
+  written to the page's storage, nothing put into the page's address.
+- **The file** lands where the browser saves files, possibly a folder a
+  cloud keeps. Its two lines say what the code does and to keep it where
+  only its owner reaches it.
+- **The print** passes the operating system's print queue and, printed to
+  PDF, becomes a file. Paper is the way that is easiest to keep offline.
+- **The password manager** (Chromium's `PasswordCredential`): the browser
+  asks the person, and may sync the entry to the browser's account. The
+  entry is listed under "Baylee recovery code (<sign-in name>)", which is
+  no sign-in name the site takes (a test holds it for every language), so
+  it never replaces the entry of the account's password, and if the
+  browser offers it on the sign-in form, the page refuses it before
+  anything is sent. Whoever reads the manager usually reads the account's
+  password there too, which signs in and opens the data already; the code
+  adds little where the password is kept, and is a second place where it
+  is not. Firefox and Safari offer no such interface; there is no button.
+- **The mail to oneself** puts the code into a mailbox, its sent folder,
+  the provider's servers and backups. Whoever reads that mailbox, if it is
+  the account's address, can have a reset code mailed there and then, with
+  the code, reset the login and open the data. The warning says so in two
+  sentences, stands before the button and is its accessible description.
+  The owner chose to offer it with that warning; it is the weakest of the
+  ways and stands last and apart.
+- **The address at registration** keeps the rule that naming an address
+  needs a password sign-in less than five minutes old: the registration's
+  own sign-in is one (`COALESCE(proven_at, created_at)` of the session
+  `LoginFinish` just made), and Central, not the page, decides. A sign-in
+  that has grown older is refused, and the page then asks for the
+  password and signs in once more, as the account area does. Naming one
+  needs Central's terms accepted, which a new account meets after its
+  code, so the page checks the address with Central's rule and names it
+  only after the code is kept and the terms are accepted. Nothing about it
+  goes out while the field is empty.
+- **The mail's address.** Only an address that `central_api::email::address`
+  takes goes into the `mailto:`, percent-encoded; anything else leaves it
+  empty and the mail program asks. No header can be added through it.
+- Decided against: keeping the code for later or showing it again (shown
+  once stays the rule); sending it by Central's mailer (Central would learn
+  it); a QR code (one more picture of the code to be photographed).
+
+Implementation pass: looked at each boundary in turn.
+- **`keep.rs`.** Pure functions for the file's text, the `data:` address
+  and the `mailto:` address, unit-tested; the browser's side behind
+  `cfg(target_arch = "wasm32")` with empty stand-ins on the server. The
+  print and the password manager are reached through `js_sys::Reflect`,
+  as the clipboard is; the file through a link made, clicked and removed
+  at once; the mail through `session::open` (`location.assign`), shared
+  with the Impressum. No `innerHTML`, no script URL, no inline script: no
+  new Trusted Types sink and nothing the CSP has to allow.
+- **The print** draws the sheet into the step when pressed and asks for the
+  print after the next frame; `pages.css` shows the sheet alone in print
+  media, including from the registration's dialog, which a print hid
+  before. The sheet stays until the step ends.
+- **The password manager's answer** says only whether the browser took the
+  offer; the page says that and asks the person to check. It never claims
+  the code was saved.
+- **The address's step** is the account area's section (`email.rs`,
+  `Begin::Name`), so the code's field, the wrong-code and lost-answer
+  handling and the form with the password are the ones already tested.
+  `Set` without the password is sent once, when the step opens; a refusal
+  that leaves a state to read draws the form with the address and asks for
+  the password; any other refusal says what it was.
+- **Secrets.** The code is held by the step's signals and the DOM as
+  before, and in a closure for the password manager's offer; none of it
+  outlives the step. `NewCode`'s `Debug` prints the code, as it did; it is
+  printed nowhere.
+
+Adversarial pass, with what was tested.
+- **Unit** (`keep.rs`): the file is the title, the name, the code alone on
+  its line and the two lines, in every language; the `data:` address
+  encodes every reserved byte; the `mailto:` address carries the subject
+  and body with CR LF and nothing that ends a field early, takes an
+  address only if Central's rule does (a second `@` with `?cc=`, a CR LF
+  with a `Bcc:` header, `localhost` all leave it empty), and encodes what
+  a dot-atom may hold; the password manager's id is no sign-in name.
+- **Browser** (`web/e2e-site/recovery.spec.ts`, desktop and phone, the
+  real island against a stand-in Central and a canned Worker): before any
+  press the page's markup holds the code once and no `mailto:`, no
+  `data:` and no sheet; the mail's address is built on the press (seen as
+  the browser's navigation) with the typed address, the subject and the
+  body, and never enters the page; the file downloads with its content and
+  its link is gone; the password manager is offered the code under its id
+  where `PasswordCredential` exists, and there is no button where it does
+  not; the print, in print media, shows the sheet alone, from the page and
+  from the dialog; no request body holds the code; the address is named
+  without a sign-in once more, after the terms where they are in force,
+  and confirmed on the next step; a stale sign-in asks for the password;
+  an address Central would refuse is refused before anything is sent;
+  skipping sends nothing about an address; where Central sends no mail
+  there is no field. Axe in both schemes, 44 px targets, 320 px and the
+  keyboard's order on the steps; in German at 320 px, on the page and in
+  the dialog (which hides what runs out of its card), nothing of either
+  step reaches past the card. No console line holds the code or a
+  `mailto:`.
+- **Mutants** (one run each): the `mailto:` address built without
+  Central's check of the address, and `&` left unencoded; both were caught
+  by the unit tests. No mutant was run against the browser tests.
+
+Not tested.
+- The real password managers: Chrome's and Edge's prompt, sync, and what
+  the sign-in form then suggests. The tests record the offer instead.
+  Firefox and Safari were not run; their lack of `PasswordCredential` is
+  from MDN's compatibility data and was simulated in Chromium.
+- A real mail program, and a web mail registered as the `mailto:` handler.
+- Paper, and print to PDF: only print media were emulated.
+- `e2e-real` (the registration's address against a real Central and the
+  mailer stand-in): adapted and type-checked, not run.
+- Screen readers.
+
+For the owner.
+- **A web mail as the `mailto:` handler.** Where a person made a web mail
+  (Gmail, for one) the browser's handler for `mailto:`, the browser opens
+  that site with the whole `mailto:` address in its URL: the code is then
+  in the browser's history and the provider's request logs, and the step
+  is left in the same tab before "I have saved my recovery code". A
+  desktop mail program does not do that. The page cannot tell which one
+  the browser uses.
+- **The mail to oneself** is offered as decided, with its warning. It is
+  safe only where the mailbox is not the account's address or is guarded
+  as well as the account.
+- **The password manager** may sync the code to the browser's account,
+  and the browser may suggest the entry on the sign-in form.
+- **The address is confirmed on its own step** after the code, and after
+  Central's terms where they are in force, not on the code's step:
+  Central refuses `Set` before the terms are accepted, and the code must
+  come before the terms (a person who declines them keeps a stored code
+  they saw).
+- **A refused `Set` has more than one reason.** The step reads a refusal
+  as a sign-in grown old and asks for the password once more, without
+  saying why; if the mailer refused the address itself, the second `Set`
+  is refused too and the section says that it did not work, as the
+  account area does.
+- **A moved account's code step** (after a sign-in) has the ways to keep
+  the code and no e-mail field; it may have an address already.
+- **Nine languages** carry the new words in English, and their
+  `code-lead` still says to keep the code "away from this device"
+  (English and German now say "where you will find it even without this
+  device").
+- **The privacy notice** has a second paragraph under "What your browser
+  keeps" (`privacy-device-manager`): a code kept in the password manager,
+  a mail, a file or on paper is kept there, never by the site, and
+  clearing the site's data does not remove it. `legal/privacy.*.md` was not
+  changed; no sentence of it became untrue (it says Central never learns
+  the code).
+
+Checks. On the code of `5217887` (what follows it changes the documents
+and gives the browser tests a longer time): `cargo fmt --all --check`,
+`cargo clippy --locked --workspace --all-targets -- -D warnings` and the
+islands' `cargo clippy --locked -p central-web -p central-web-islands
+--target wasm32-unknown-unknown --lib -- -D warnings` pass; `cargo test
+--locked -p central-mail -p central-web -p central-web-islands -p
+central-web-server` passes; `cargo xtask gate` passes (format, policy,
+clippy, 680 tests with the doc tests, the release build); `cargo xtask
+site` built the site; `cargo xtask secrets` passes on the tree and the
+full history; `cargo xtask smoke` passes; `cargo xtask postgres` passes
+and its container was gone afterwards; `cargo audit --deny warnings` and
+`cargo deny check` pass. In `web/`, `npm run typecheck` and `npm run lint`
+pass. The site's browser suite (`e2e-site`, both projects) ran in full
+twice while other work loaded the machine: 393 passed and 7 ran out of
+their 30 seconds the first time (four on `/de/signin` and `/de/register`,
+none of them new), all seven passing when run again; 403 passed and one
+new test ran out of its time the second time, after which the new tests
+were given the longer time of the suite's other slow ones and passed
+again with `dialogs.spec.ts` and `email.spec.ts` (62 passed).
+
 Engineering review, not an audit.

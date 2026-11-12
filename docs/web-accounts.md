@@ -139,9 +139,10 @@ section (`email.rs`, `Begin::Name`) as a step of its own: it sends `Set`
 without asking for the password, since the registration's sign-in is less
 than five minutes old, and shows the code's field; the person confirms the
 code there or later on the security page. Where Central refuses `Set`
-(the sign-in became older than five minutes), the section's form asks for
-the password and signs in once more, as in the account area. Leaving the
-field empty skips all of it.
+(most likely because the sign-in became older than five minutes; the
+mailer refusing the address is answered the same), the section's form asks
+for the password and signs in once more, as in the account area. Leaving
+the field empty skips all of it.
 
 ### A recovery code after a sign-in
 
