@@ -9,10 +9,12 @@
 //! the mailer attaches it, the logo beside the wordmark (`cid:baylee-logo`,
 //! a part of the mail itself), no style sheet, no script, nothing loaded
 //! from elsewhere and nothing that tracks. Its links go to the configured
-//! site and nowhere else: the
-//! button to a page of it, the footer to its start page. No link ever
-//! holds a code. Everything written into the HTML is escaped, the crate's
-//! own words included.
+//! site and nowhere else: the button to a page of it, the footer to its
+//! start page. A code mail's button carries its code in the fragment of
+//! its link (`#code=…`), which the page fills into its field and removes
+//! from the address bar; never in a path or a query, and in no other link.
+//! Everything written into the HTML is escaped, the crate's own words
+//! included.
 //!
 //! Without a style sheet there is no dark variant. The mail says it is
 //! light only, and every text stands on a ground the mail sets itself (the
@@ -138,8 +140,9 @@ struct Content<'a> {
     code: Option<Code<'a>>,
     /// What to do if this was not you, set apart.
     warning: Option<String>,
-    /// The button's words and where it goes: a page of the site.
-    link: Option<(String, String)>,
+    /// The button's words and where it goes: a page of the site, with the
+    /// code in the fragment for a code mail (so wiped like the code).
+    link: Option<(String, Zeroizing<String>)>,
     /// Paragraphs at the end, in a quieter hand.
     after: Vec<String>,
 }
@@ -194,13 +197,16 @@ fn content<'a>(mail: &'a Mail, site: &str) -> Content<'a> {
         facts,
         code: None,
         warning: Some(say(not_you)),
-        link: Some((say(words), page(path))),
+        link: Some((say(words), Zeroizing::new(page(path)))),
         after: Vec::new(),
     };
     let security = ("notice-link", "account/security");
     let reset = ("reset-link", "reset");
     match &mail.kind {
-        Kind::Confirm { code, minutes } => confirm_mail(lang, code, *minutes),
+        // where an address that waits takes its code
+        Kind::Confirm { code, minutes } => {
+            confirm_mail(lang, &page("account/security"), code, *minutes)
+        }
         Kind::Reset {
             code,
             name,
@@ -257,9 +263,24 @@ fn content<'a>(mail: &'a Mail, site: &str) -> Content<'a> {
     }
 }
 
+/// The address of `page` with `code` in its fragment: `#code=` and the code
+/// as printed, whose characters a URL takes as they are. A browser sends
+/// no fragment to the site and puts none into a `Referer`; the page fills
+/// the code into its field, never sends it by itself, and removes the
+/// fragment from the address bar (`docs/email.md`, "The code in the
+/// button's link"). Wiped when dropped, as the code is.
+fn with_code(page: &str, code: &str) -> Zeroizing<String> {
+    let mut url = Zeroizing::new(String::with_capacity(page.len() + 6 + code.len()));
+    url.push_str(page);
+    url.push_str("#code=");
+    url.push_str(code);
+    url
+}
+
 /// The mail with the `code` that confirms an address, which lasts
-/// `minutes`.
-fn confirm_mail(lang: Lang, code: &str, minutes: u32) -> Content<'_> {
+/// `minutes`, and a button to the security page at `page`, where an
+/// address that waits takes its code, with the code for its field.
+fn confirm_mail<'a>(lang: Lang, page: &str, code: &'a str, minutes: u32) -> Content<'a> {
     let say = |id: &str| lang.text(id, &[]);
     Content {
         subject: say("confirm-subject"),
@@ -273,13 +294,14 @@ fn confirm_mail(lang: Lang, code: &str, minutes: u32) -> Content<'_> {
             notes: notes(lang, "confirm-valid", minutes),
         }),
         warning: None,
-        link: None,
+        link: Some((say("confirm-link"), with_code(page, code))),
         after: vec![say("confirm-ignore")],
     }
 }
 
 /// The mail with the reset `code` for the account `name`, which lasts
-/// `minutes`, and a button to the reset page at `page`.
+/// `minutes`, and a button to the reset page at `page` with the code for
+/// its field.
 fn reset_mail<'a>(lang: Lang, page: &str, code: &'a str, name: &str, minutes: u32) -> Content<'a> {
     let say = |id: &str| lang.text(id, &[]);
     Content {
@@ -303,7 +325,7 @@ fn reset_mail<'a>(lang: Lang, page: &str, code: &'a str, name: &str, minutes: u3
             notes: notes(lang, "reset-valid", minutes),
         }),
         warning: None,
-        link: Some((say("reset-link"), page.to_owned())),
+        link: Some((say("reset-link"), with_code(page, code))),
         after: vec![say("reset-ignore")],
     }
 }
@@ -341,7 +363,7 @@ fn text(lang: Lang, content: &Content<'_>, start: &Start) -> Zeroizing<String> {
     }
     blocks.extend(content.warning.iter().cloned());
     if let Some((words, url)) = &content.link {
-        blocks.push(format!("{words}:\n{url}"));
+        blocks.push(format!("{words}:\n{}", url.as_str()));
     }
     blocks.extend(content.after.iter().cloned());
     blocks.push(format!("-- \n{}\n{}", lang.text("footer", &[]), start.url));

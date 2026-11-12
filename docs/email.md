@@ -164,8 +164,9 @@ a request, so a mailer that does not answer is answered as `Busy`.
 `central_api::email::MailCode`: 40 bits of operating-system randomness,
 written `XXXX-XXXX` in Crockford's base32 and read back as the reset code
 is. Central stores SHA-256 over a label, the account's id and the code, so
-one account's digest says nothing of another's. The code is never in a
-link, a log or a Debug output.
+one account's digest says nothing of another's. The code is never in a log
+or a Debug output, and in a link only in the fragment of the mail's button
+([below](#the-code-in-the-buttons-link)).
 
 It is short because little depends on it and few guesses are taken. It
 authorizes one thing: making the address it was mailed to the account's
@@ -187,14 +188,58 @@ Crate `central-mail`. Each mail has a plain text part and an HTML part:
 The HTML is a table layout with inline styles. It has no image except,
 where the operator turned it on, Baylee's logo, which the mailer attaches
 to the mail itself (`cid:baylee-logo`, [below](#configuration)); no style
-sheet, no script and nothing loaded from elsewhere. A code is printed and
-never part of a link; no notice carries one. The links go to the configured
-site and nowhere else: a button to the site's reset page (the reset mail,
-and the notices of a reset and of a changed password) or to the account's
-security page (the notices of a replaced or removed address and of an
-administrator's code), and in every mail's footer the site's start page
-(`{site}/{lang}/`); the confirmation mail has no button. Every value is
+sheet, no script and nothing loaded from elsewhere. The links go to the
+configured site and nowhere else: a button to the site's reset page (the
+reset mail, and the notices of a reset and of a changed password) or to the
+account's security page (the confirmation mail, and the notices of a
+replaced or removed address and of an administrator's code), and in every
+mail's footer the site's start page (`{site}/{lang}/`). A code is printed,
+and the two code mails' buttons carry it in their link's fragment, and only
+there: never in a path or a query, never in any other link; no notice
+carries one ([below](#the-code-in-the-buttons-link)). Every value is
 escaped.
+
+### The code in the button's link
+
+*12.11.2026, by the owner's word: whoever comes to the page through the
+mail's button finds the code filled in, "a good, safe way".*
+
+- **Where.** The reset mail's button links to `{site}/{lang}/reset#code=`
+  and the reset code as printed (`RESET-…`); the confirmation mail's button
+  ("Confirm address") to `{site}/{lang}/account/security#code=` and the
+  confirmation code (`XXXX-XXXX`). The plain text has the same addresses
+  under the button's words. The code is in the fragment and nowhere else in
+  the address: a browser sends no fragment to the site, so it is in no
+  request, no server's or proxy's log, and in no `Referer` (the site sends
+  `Referrer-Policy: no-referrer` besides).
+- **The page.** The island reads `location.hash` once, when it starts
+  (`islands/fragment.rs`). It takes `#code=` and up to 64 letters, digits
+  and hyphens, and keeps them only if they parse as its own kind of code
+  (`ResetCode::parse` on the reset page, `MailCode::parse` on the security
+  page); it fills the field with the code as printed, unless the person
+  typed into it already. Whatever followed `#code=`, it removes the
+  fragment at once with `history.replaceState`, the rest of the address
+  and the entry's state kept: the address bar, the current entry of the
+  history and a reload no longer hold it. Another fragment (a place on the
+  page) stays.
+- **Never by itself.** The island sends nothing because of the fragment:
+  the person still presses the form's button. A link scanner that opens
+  the link (some mail providers open every link they deliver) spends no
+  code and learns nothing it did not read in the mail. Nothing logs or
+  stores the code; it lives in the field as a typed one does.
+- **The security page** has the code's field only while an address waits
+  for its code. The account area takes the fragment on every one of its
+  pages and keeps the code only on the security page, until the e-mail
+  section's first read of Central's state: where an address waits, the
+  code goes into its empty field; signed out, with no address that waits,
+  without mail, or when the state could not be read, it is dropped
+  silently. A later read never finds it.
+- **The old way stays.** The code is printed in the mail, and typing it is
+  as before.
+
+What remains, and why it is acceptable, is in the record in [security
+assurance](security-assurance.md), "The code in the mail button's
+fragment".
 
 ### How a mail looks
 
@@ -250,7 +295,8 @@ the footer links to the site.*
   table cell in the accent with the words in the light ink (7.4:1). The
   cell carries the colour and Outlook's padding (`mso-padding-alt`), the
   link a padding of its own for every other reader: 48 px high, the whole
-  of it a target.
+  of it a target. Every mail has one; the confirmation mail's
+  ("Confirm address") came with the code in the link's fragment.
 - **The footer** under a thin rule, at 13 px, and under it a quiet line:
   the site's host name (`baylee.app`), underlined in the accent, which
   links to the site's start page in the mail's language.
@@ -290,10 +336,11 @@ the crate's own. English and German are written by hand; the other nine
 were translated by machine (12.11.2026, by the owner's instruction) and
 have not been read by a speaker. A test holds that every language has its
 own words, by id. The nineteen messages of the three notices that a login
-changed (`reset-done-*`, `password-*`, `issued-*`) are English in those
-nine until they are translated; the test allows exactly those ids to be
-English there, and German has its own for every id. A tag Central has no
-file for is written in English.
+changed (`reset-done-*`, `password-*`, `issued-*`) and the confirmation
+mail's button (`confirm-link`) are English in those nine until they are
+translated; the test allows exactly those twenty ids to be English there,
+and German has its own for every id. A tag Central has no file for is
+written in English.
 
 A code mail is in the language the request asked in. A notice is in the
 language the address was confirmed in.
@@ -549,7 +596,8 @@ mail. Both refuse a malformed address or tag before anything is sent.
 - **An administrator can mail an account's address** with each code they
   make. Each code is in the audit, and the mailer's limit for the account
   bounds the mails.
-- **Nine languages** say the notices of a changed login in English until
+- **Nine languages** say the notices of a changed login and the
+  confirmation mail's button in English until
   they are translated.
 
 ## What the clients need
