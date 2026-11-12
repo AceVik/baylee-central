@@ -5,4 +5,8 @@
 # RUSTSEC-2024-0436: paste is unmaintained; Leptos' compile-time proc macro,
 # accepted by the owner on 10.11.2026 (docs/dependency-proposal/leptos.md).
 # Remove when Leptos drops it.
-ignore = ["RUSTSEC-2026-0387", "RUSTSEC-2024-0436"]
+# RUSTSEC-2026-0459: libsqlite3-sys 0.37.0 is in Cargo.lock through
+# sqlx-sqlite and in no build (owner, 12.11.2026). Bound by cargo xtask
+# sqlite-scope in the gate and the dependency job, which fails once it is
+# built or its version changes. docs/dependency-proposal/sqlite-advisory.md.
+ignore = ["RUSTSEC-2026-0387", "RUSTSEC-2024-0436", "RUSTSEC-2026-0459"]

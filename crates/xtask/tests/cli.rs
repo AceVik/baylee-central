@@ -15,6 +15,7 @@ fn every_task_and_flag_parses() {
         Ok(Task::Gate { client: true })
     );
     assert_eq!(parse(&args("crypto-scope")), Ok(Task::CryptoScope));
+    assert_eq!(parse(&args("sqlite-scope")), Ok(Task::SqliteScope));
     assert_eq!(
         parse(&args("policy")),
         Ok(Task::Policy {
@@ -53,6 +54,7 @@ fn anything_else_is_the_usage() {
         "gate --client --client",
         "gate --clients",
         "crypto-scope --skip",
+        "sqlite-scope --skip",
         "policy --exercise-failure",
         "smoke --exercise-failure extra",
         "wasm --exercise-failure",
