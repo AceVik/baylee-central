@@ -1,7 +1,9 @@
 -- The runtime role's privileges, exactly those its startup check requires
 -- (docs/operations.md §"Provisioning"). Idempotent: the deploy hook
 -- (ops/deploy-hook) runs it after every migration. A migration that adds a
--- table adds its grant here.
+-- table adds its grant here. The hook applies it as central_migrator, never
+-- as a superuser, and takes SQL only: it refuses the file if a backslash is
+-- anywhere in it, here in a comment too.
 GRANT USAGE ON SCHEMA central_identity TO central_runtime;
 GRANT SELECT, INSERT ON central_identity.pending_accounts TO central_runtime;
 GRANT SELECT, INSERT, UPDATE, DELETE ON central_identity.accounts, central_identity.sessions,

@@ -463,9 +463,12 @@ REVOKE CREATE ON SCHEMA public FROM PUBLIC;
 
 Then run `--migrate-stdin` with the migrator login, and grant the runtime role
 exactly the privileges its startup checks require: `ops/grants.sql`, as
-`central_migrator`, which owns the tables, or as a superuser, whose grant
-PostgreSQL records as the owner's. It is idempotent; the deploy hook runs it
-after every migration.
+`central_migrator`, which owns the tables. It needs no superuser, and the
+deploy hook, which runs it after every migration, refuses one (since
+12.11.2026; before, it ran the file as the database's superuser, whose grant
+PostgreSQL records as the owner's). It is idempotent, and it is SQL only:
+the hook refuses a file with a backslash in it, a comment's too
+([below](#the-grants-file-and-login-12112026)).
 
 A later migration that adds a table also adds its grant to `ops/grants.sql`; the runtime
 store's startup check names every table and privilege it needs. Upgrading a
@@ -1155,27 +1158,113 @@ including the one the gateway's timer starts for a new release tag.
   gateway's protocol. Central never goes back: when the installed revision
   (`/opt/baylee-central/state/deployed`) already contains it, the hook does
   nothing, so a newer Central deployed by hand stays.
-- **`prepare`.** As the build user it fetches, checks the revision out in
-  `/opt/baylee-central/src`, builds `central-service` and the website (`npm
-  ci`, `npm run content` from the gateway's checkout, `npm run build`), and
-  stages both with `ops/grants.sql` in `/opt/baylee-central/staged`. A failed
-  fetch answers "not ready" (75), so the next timer run tries again.
-- **`before-switch`** (no game is running, admission is held): stops the
-  unit, installs the binary (the old one kept as `central-service.previous`),
-  migrates (`--migrate-stdin` from `/etc/baylee-central/migrate.json` under
-  `systemd-run` as `central`), grants, starts it and waits up to 30 s for
-  `/health/live`; then swaps the website into `/opt/baylee-app/web`. A failed
-  migration, grant or start puts the previous binary back, starts it and
-  fails the hook, which stops the deploy (migrations are transactional).
+- **`prepare`.** As the build user it fetches and checks the revision out in
+  `/opt/baylee-central/src`. It then takes `ops/grants.sql` out of the
+  revision's commit, before anything is built, and only then builds
+  `central-service` and the website (`npm ci`, `npm run content` from the
+  gateway's checkout, `npm run build`). It stages all three in
+  `/opt/baylee-central/staged`. A failed fetch answers "not ready" (75), so
+  the next timer run tries again.
+- **`before-switch`** (no game is running, admission is held): asks first
+  whether the grants' login reaches the database and is no superuser, and
+  stops with nothing changed when not. Then it stops the unit, installs the
+  binary (the old one kept as `central-service.previous`), migrates
+  (`--migrate-stdin` from `/etc/baylee-central/migrate.json` under
+  `systemd-run` as `central`), grants as `central_migrator`, starts it and
+  waits up to 30 s for `/health/live`; then swaps the website into
+  `/opt/baylee-app/web`. A failed migration, grant or start puts the
+  previous binary back, starts it and fails the hook, which stops the deploy
+  (migrations are transactional).
 - **By hand,** for a Central or website change between gateway releases:
   `sudo /etc/baylee/deploy-hooks.d/10-central manual <central revision>`
   stages and switches that revision at once; nothing holds games for it.
 
 Settings, all optional, in `/etc/baylee-central/deploy-hook.env` (root's,
 not writable by others): `BUILD_USER`, `BAYLEE_SRC`, `CENTRAL_ROOT`,
-`WEB_ROOT`, `UNIT`, `LISTEN`, `DB_CONTAINER`, `DB_SUPERUSER`, `DB_NAME`; the
+`WEB_ROOT`, `UNIT`, `LISTEN`, `DB_CONTAINER`, `DB_GRANTOR`, `DB_NAME`; the
 defaults are this deployment's. The website's site block is the one in
 `web/README.md` §"Serving it", with `root` on `WEB_ROOT`.
+
+### The grants' file and login (12.11.2026)
+
+Until this date root copied `ops/grants.sql` out of the tree a build had
+just run in, and gave it to `psql` as the database's superuser (`baylee`,
+the setting `DB_SUPERUSER`). A dependency's build script or an install
+script of `npm ci` runs as the build user and can write that tree. A
+rewritten file would have run with every right the database has, and a line
+beginning with a backslash is a command to `psql` itself, which can start a
+program.
+
+Since then:
+
+- **The file comes from the commit.** After the checkout and before the
+  build, `git cat-file blob <revision>:ops/grants.sql` prints the file as
+  the commit stores it (run as the build user, with
+  `--no-replace-objects`; no filter and no conversion applies to it). The
+  copy is root's from then on. The tree, the index, a filter and a
+  replacement object do not change what is printed.
+- **SQL only.** A file that is empty or holds a backslash is refused at
+  `prepare` and again before the switch. `ops/grants.sql` needs none; keep
+  it so, in comments too. The store's fixture refuses a backslash as well
+  (`central-postgres`, `tests/support/accounts.rs`), so it shows before a
+  deploy does.
+- **The migrator's login, never a superuser.** `psql` runs as `DB_GRANTOR`
+  (default `central_migrator`, the owner of the tables) with `-X` (no
+  start-up file) and `-w` (never asks for a password). Before the unit is
+  stopped the hook asks the database whether that login is a superuser. If
+  it is, or the login does not reach the database, the hook ends there and
+  the running service stays as it was. The file can then do what the
+  migrations before it can do, and no more: it cannot make a role or a
+  superuser, read or write the server's files, start a program, or change
+  the server's settings.
+
+**Before the first deploy with this hook** (once, on the server):
+
+1. Install the new hook as `/etc/baylee/deploy-hooks.d/10-central`
+   (root's, `0755`), as before.
+2. If `/etc/baylee-central/deploy-hook.env` sets `DB_SUPERUSER`, remove the
+   line. Nothing reads it any more. Do not set `DB_GRANTOR` to a superuser:
+   the hook refuses it.
+3. Remove what the old hook may have staged, so that its copy of the
+   grants is not the one switched: `rm -f /opt/baylee-central/state/staged`.
+   The next `prepare` stages the revision again.
+4. Check that the migrator reaches the database over the container's
+   socket without a password:
+
+   ```sh
+   docker exec -i baylee-postgres-1 psql -X -w -At -U central_migrator -d baylee_central \
+     -c 'SELECT current_user, rolsuper FROM pg_catalog.pg_roles WHERE rolname = current_user' < /dev/null
+   ```
+
+   It must print `central_migrator|f`. The old hook reached the database
+   the same way as `baylee`, so a `pg_hba.conf` that still has the image's
+   `local all all trust` line answers this. If it asks for a password
+   instead (the command fails, `-w`), the `local` lines of `pg_hba.conf`
+   name who may use the socket: add `central_migrator` for
+   `baylee_central` there with the method the superuser's line has, and
+   reload. Whoever may run `docker exec` on that container is root on the
+   host already.
+
+**What stays possible.** The binary and the website are still what the
+build made, and the binary runs the migrations with the migrator's login:
+a build that was tampered with needs no grants file. The build user's git
+(its settings, its object store, a `git` earlier in its path) is as
+writable by an earlier build as the tree is, so "the file of the commit"
+is as good as that user's git. `npm ci` still runs install scripts, and
+the build user is a person's login with a home and keys. Building as a
+user without either, and `npm ci --ignore-scripts`, are not done.
+
+**Tested here, and not.** `shellcheck` and `bash -n` pass. A local dry run
+used the hook's own three functions against a throwaway PostgreSQL 18.6
+container without a network and a scratch clone: the commit's file came
+out byte for byte with the tree, the index, a filter and a replacement
+object changed; the migrator applied a stand-in grants file to tables it
+had made and was refused seven things a superuser may do; a superuser, a
+missing login, a missing database and a missing container were refused
+before anything else ran. Both PostgreSQL fixtures apply the real
+`ops/grants.sql` as `central_migrator` after the migrations. **Not
+tested:** the hook as a whole (it needs root, systemd, the build user and
+the server's container), the server's `pg_hba.conf`, and a deploy with it.
 
 ## Sessions
 

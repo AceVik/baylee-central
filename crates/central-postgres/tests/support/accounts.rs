@@ -9,7 +9,7 @@ use central_crypto::{
     vault::{MasterKey, ObjectContext, WrappedMasterKey},
 };
 use central_postgres::{AccountStore, Credential};
-use sea_orm::{ConnectionTrait, DatabaseConnection};
+use sea_orm::{ConnectionTrait, DatabaseConnection, DbBackend, Statement};
 
 mod admin;
 mod chat;
@@ -48,6 +48,23 @@ fn context(identity: Identity) -> Context {
 /// The runtime role's grants as the deploy hook applies them.
 const GRANTS: &str = include_str!("../../../../ops/grants.sql");
 
+/// Applies the grants as the deploy hook does: as the login that owns the
+/// tables, which is no superuser, and from a file without a backslash (`psql`
+/// takes one for a command of its own, and the hook refuses such a file).
+async fn grant(operator: &DatabaseConnection) {
+    assert!(!GRANTS.contains('\\'), "ops/grants.sql is SQL only");
+    let login = operator
+        .query_one_raw(Statement::from_string(
+            DbBackend::Postgres,
+            "SELECT rolsuper FROM pg_catalog.pg_roles WHERE rolname = current_user",
+        ))
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(!login.try_get::<bool>("", "rolsuper").unwrap());
+    operator.execute_unprepared(GRANTS).await.unwrap();
+}
+
 pub(crate) async fn run(operator: &DatabaseConnection) {
     // Default grants are insufficient. Grant only the runtime CRUD operations.
     assert!(
@@ -56,7 +73,7 @@ pub(crate) async fn run(operator: &DatabaseConnection) {
             .is_err()
     );
     // The deployed grants, exactly: the store's startup check must accept them.
-    operator.execute_unprepared(GRANTS).await.unwrap();
+    grant(operator).await;
     let store =
         AccountStore::connect_dev(config("central_runtime", "CENTRAL_TEST_RUNTIME_PASSWORD"))
             .await
