@@ -1202,3 +1202,54 @@ sec-teaser-more = Ver cada paso en un diagrama
 # ==== end of the security page =================================================
 # ==== registration: the proof of work, while it takes long =====================
 register-solving = Tu navegador está resolviendo un rompecabezas que mantiene fuera a los robots. Cuando se están creando muchas cuentas, puede tardar unos minutos … { $percent } %
+
+## An administrator makes a reset code (/account/admin)
+# English for now: to be translated.
+admin-reset-title = Reset a login
+admin-reset-lead = Find the account of the person who asked you, and make a reset code for it. With the code they set a new password on the reset page.
+admin-find = Find the account
+admin-only = This page is only for administrators.
+admin-search = Search accounts
+admin-search-hint = Part of a sign-in name or a display name, or # and a tag. Leave it empty to list every account, newest first.
+admin-search-submit = Search
+admin-search-error = A search is 1 to 64 plain characters without accents, or # and a tag such as #1a2b.
+admin-count = Accounts shown: { $count }
+admin-none = No account matches this search.
+admin-more = Show more
+admin-open = Open
+admin-back = Back
+admin-pill = Administrator
+admin-state = State
+admin-state-pending = Reserved, never set up
+admin-state-enrolled = Set up
+admin-state-restored = In use
+admin-created = Created
+admin-last-sign-in = Last sign-in
+admin-recovery = Recovery code
+admin-yes = Yes
+admin-no = No
+admin-reset-outstanding = An unused reset code is valid until { $time }. Whether an administrator made it or it went by e-mail, Central does not say. A new code replaces it.
+admin-reset = Reset login
+admin-refused-admin = This account holds the administrator role, and Central makes no reset code for an administrator's account. Remove the role first.
+admin-refused-own = This is your own account, and nobody makes a reset code for their own. Change your password under Security, or ask another administrator.
+admin-refused-pending = This account was reserved and never set up, so it has no sign-in to reset.
+admin-refused-moving = This account's move from the official gateway is not finished. Until it is, its sign-in is reset there, not here.
+admin-refused-stale = Baylee Central counts your sign-in as older than 30 minutes. Try again; you enter your password once more.
+admin-refused-role = Your account no longer holds the administrator role.
+admin-refused-gone = This account no longer exists.
+admin-switched = This browser is signed in as another account now, so no code was asked for. Load the page again.
+admin-lost = No answer came back, so we cannot tell whether a code was made. If one was, nobody can show it again, and it already replaced any earlier code. Make a new one: it replaces that one in turn.
+admin-warning-title = Before you make a code
+admin-warning-who = Check outside this site that the person asking really holds this account, for example by a call or on a channel you already know them by. Whoever has the code can set a new password.
+admin-warning-ends = Making a code ends nothing: the old password keeps working until the code is used, and every device stays signed in.
+admin-warning-data = The person's encrypted data survives the reset only with their recovery code or on a device that is still signed in. Without either, they start with an empty vault.
+admin-warning-replaces = A new code replaces any earlier one, one sent by e-mail included. It is valid for 24 hours and works once.
+admin-warning-takeover = A reset code answers a forgotten password, not a taken-over account: an intruder's sessions and the old password stay until the code is used, and for good if it never is.
+admin-warning-continue = I have checked who is asking
+admin-password-hint = Making a code needs a sign-in less than 30 minutes old, so you enter your password once more. It stays in this browser.
+admin-password-missing = Enter your password.
+admin-make = Make the reset code
+admin-code-title = The reset code
+admin-code-until = Valid until { $time }, and only once.
+admin-code-lead = Hand it to the person who asked, on a channel you trust. It is shown only now: neither Baylee Central nor this page can show it again. If it gets lost, make a new one.
+admin-code-done = Done

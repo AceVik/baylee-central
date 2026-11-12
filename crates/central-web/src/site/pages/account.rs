@@ -122,6 +122,7 @@ fn section_name(lang: Lang, section: Section) -> (&'static str, &'static str) {
         Section::Privacy => (words::account_privacy(lang), icons::FILE_TEXT),
         Section::Gateways => (words::account_gateways(lang), icons::SERVER),
         Section::Notifications => (words::push_title(lang), icons::BELL),
+        Section::Admin => (words::admin_reset_title(lang), icons::KEY_ROUND),
     }
 }
 

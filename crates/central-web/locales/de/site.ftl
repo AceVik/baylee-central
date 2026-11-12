@@ -1204,3 +1204,54 @@ sec-teaser-more = Jeden Schritt als Grafik ansehen
 # ==== Ende der Seite Sicherheit =================================================
 # ==== Registrierung: das Rätsel, solange es dauert ==============================
 register-solving = Dein Browser löst ein Rätsel, das Roboter fernhält. Wenn gerade viele Konten angelegt werden, kann das ein paar Minuten dauern … { $percent } %
+
+## Ein Administrator stellt einen Reset-Code aus (/account/admin)
+
+admin-reset-title = Anmeldung zurücksetzen
+admin-reset-lead = Such den Account der Person, die dich gefragt hat, und stell dafür einen Reset-Code aus. Damit setzt sie auf der Reset-Seite ein neues Passwort.
+admin-find = Account finden
+admin-only = Diese Seite ist nur für Administratoren.
+admin-search = Accounts suchen
+admin-search-hint = Ein Teil eines Anmelde- oder Anzeigenamens, oder # und ein Tag. Lass das Feld leer, um alle Accounts zu sehen, die neuesten zuerst.
+admin-search-submit = Suchen
+admin-search-error = Eine Suche sind 1 bis 64 einfache Zeichen ohne Akzente und Umlaute, oder # und ein Tag wie #1a2b.
+admin-count = Angezeigte Accounts: { $count }
+admin-none = Kein Account passt zu dieser Suche.
+admin-more = Mehr anzeigen
+admin-open = Öffnen
+admin-back = Zurück
+admin-pill = Administrator
+admin-state = Stand
+admin-state-pending = Reserviert, nie eingerichtet
+admin-state-enrolled = Eingerichtet
+admin-state-restored = In Gebrauch
+admin-created = Angelegt
+admin-last-sign-in = Letzte Anmeldung
+admin-recovery = Wiederherstellungscode
+admin-yes = Ja
+admin-no = Nein
+admin-reset-outstanding = Ein unbenutzter Reset-Code gilt bis { $time }. Ob ihn ein Administrator ausgestellt hat oder ob er per E-Mail kam, sagt Central nicht. Ein neuer Code ersetzt ihn.
+admin-reset = Anmeldung zurücksetzen
+admin-refused-admin = Dieser Account hat die Administratorrolle, und für den Account eines Administrators stellt Central keinen Reset-Code aus. Nimm ihm zuerst die Rolle.
+admin-refused-own = Das ist dein eigener Account, und für den eigenen stellt niemand einen Reset-Code aus. Ändere dein Passwort unter Sicherheit oder frag einen anderen Administrator.
+admin-refused-pending = Dieser Account wurde reserviert und nie eingerichtet; es gibt keine Anmeldung, die sich zurücksetzen ließe.
+admin-refused-moving = Der Umzug dieses Accounts vom offiziellen Gateway ist nicht abgeschlossen. Bis dahin wird seine Anmeldung dort zurückgesetzt, nicht hier.
+admin-refused-stale = Für Baylee Central ist deine Anmeldung älter als 30 Minuten. Versuch es noch einmal; du gibst dein Passwort dabei erneut ein.
+admin-refused-role = Dein Account hat die Administratorrolle nicht mehr.
+admin-refused-gone = Diesen Account gibt es nicht mehr.
+admin-switched = Dieser Browser ist jetzt mit einem anderen Account angemeldet, deshalb wurde kein Code angefordert. Lade die Seite neu.
+admin-lost = Es kam keine Antwort. Deshalb wissen wir nicht, ob ein Code ausgestellt wurde. Falls ja, kann ihn niemand mehr anzeigen, und er hat einen früheren Code schon ersetzt. Stell einen neuen aus: Er ersetzt dann diesen.
+admin-warning-title = Bevor du einen Code ausstellst
+admin-warning-who = Prüf außerhalb dieser Seite, dass die Person, die fragt, diesen Account wirklich hat, zum Beispiel mit einem Anruf oder über einen Weg, auf dem du sie schon kennst. Wer den Code hat, kann ein neues Passwort setzen.
+admin-warning-ends = Ein Code beendet nichts: Das alte Passwort gilt weiter, bis der Code benutzt wird, und jedes Gerät bleibt angemeldet.
+admin-warning-data = Die verschlüsselten Daten der Person überstehen den Reset nur mit ihrem Wiederherstellungscode oder auf einem Gerät, das noch angemeldet ist. Ohne beides fängt sie mit einem leeren Tresor an.
+admin-warning-replaces = Ein neuer Code ersetzt jeden früheren, auch einen per E-Mail geschickten. Er gilt 24 Stunden und nur einmal.
+admin-warning-takeover = Ein Reset-Code hilft bei einem vergessenen Passwort, nicht bei einem übernommenen Account: Die Sitzungen eines Eindringlings und das alte Passwort bleiben, bis der Code benutzt wird, und für immer, wenn das nie geschieht.
+admin-warning-continue = Ich habe geprüft, wer fragt
+admin-password-hint = Ein Code braucht eine Anmeldung, die keine 30 Minuten alt ist; deshalb gibst du dein Passwort noch einmal ein. Es bleibt in diesem Browser.
+admin-password-missing = Gib dein Passwort ein.
+admin-make = Reset-Code ausstellen
+admin-code-title = Der Reset-Code
+admin-code-until = Gültig bis { $time }, und nur einmal.
+admin-code-lead = Gib ihn der Person, die gefragt hat, über einen Weg, dem du vertraust. Er ist nur jetzt sichtbar: Weder Baylee Central noch diese Seite können ihn noch einmal zeigen. Geht er verloren, stell einen neuen aus.
+admin-code-done = Fertig

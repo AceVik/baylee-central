@@ -5,6 +5,7 @@
 //! struct that must not become public.
 
 mod account;
+mod admin;
 mod auth;
 mod b64;
 mod central;

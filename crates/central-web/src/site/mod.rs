@@ -97,7 +97,7 @@ impl Page {
         Page::LISTED
             .into_iter()
             .chain([Page::SignIn, Page::Register, Page::Reset, Page::Offline])
-            .chain(Section::ALL.map(Page::Account))
+            .chain(Section::ROUTED.map(Page::Account))
             .find(|page| page.slug() == slug)
     }
 

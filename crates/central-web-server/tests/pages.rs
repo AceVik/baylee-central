@@ -459,6 +459,7 @@ async fn forms_and_the_account_area_are_islands_and_not_indexed() {
         "/en/account/security",
         "/en/account/privacy",
         "/de/account/gateways",
+        "/en/account/admin",
     ] {
         let (status, headers, html) = get(&app, path, &[]).await;
         assert_eq!(status, StatusCode::OK, "{path}");
@@ -479,6 +480,50 @@ async fn forms_and_the_account_area_are_islands_and_not_indexed() {
             "{path}: the crypto Worker's address"
         );
     }
+}
+
+/// The administration's page that makes a reset code
+/// (`docs/account-reset.md`): an address under a language, never Caddy's
+/// `/admin…` of the old build; a page of the account area, not indexed and
+/// in no sitemap. The server cannot know the role, so no page it renders
+/// links to it: the navigation is the same for everyone, and only the
+/// island leads an administrator there.
+#[tokio::test]
+async fn the_administration_s_page_is_linked_from_nowhere() {
+    let app = app(true);
+    for lang in Lang::ALL {
+        let path = format!("/{}/account/admin", lang.code());
+        let (status, headers, html) = get(&app, &path, &[]).await;
+        assert_eq!(status, StatusCode::OK, "{lang:?}");
+        assert_eq!(headers["x-robots-tag"], "noindex, noarchive, nosnippet");
+        assert!(
+            html.contains("<leptos-island"),
+            "{lang:?}: the account island"
+        );
+        assert!(!html.contains(" style=\""), "{lang:?}: no inline style");
+        // the island renders "loading" on the server: nothing of the tool
+        assert!(!html.contains("id=\"admin-search\""), "{lang:?}");
+    }
+    let (_, _, html) = get(&app, "/en/account/admin", &[]).await;
+    assert!(html.contains("<h1>Reset a login</h1>"));
+    assert!(html.contains("Reset a login – Baylee"));
+    // its address is the account area's: Caddy's `/admin*` is the old build's
+    assert_eq!(
+        Page::Account(Section::Admin).path(Lang::En),
+        "/en/account/admin"
+    );
+    assert!(!Page::Account(Section::Admin).indexed());
+    assert!(!Section::ALL.contains(&Section::Admin));
+    for page in Section::ALL.map(Page::Account) {
+        let (_, _, html) = get(&app, &page.path(Lang::De), &[]).await;
+        assert!(!html.contains("/account/admin"), "{page:?}: a link to it");
+    }
+    let (_, _, sitemap) = get(&app, "/sitemap.xml", &[]).await;
+    assert!(!sitemap.contains("/account"));
+    // as every page of the area, the address without a language is moved
+    let (status, headers, _) = get(&app, "/account/admin", &[("accept-language", "de")]).await;
+    assert_eq!(status, StatusCode::FOUND);
+    assert_eq!(headers["location"], "/de/account/admin");
 }
 
 /// The reset page (`docs/account-reset.md`): a form page as signing in is,
@@ -1115,7 +1160,7 @@ fn a_page_is_a_pure_function_of_what_it_is_rendered_from() {
             Page::NotFound,
             Page::Gone,
         ])
-        .chain(Section::ALL.map(Page::Account))
+        .chain(Section::ROUTED.map(Page::Account))
         .collect();
     for page in pages {
         for lang in Lang::ALL {

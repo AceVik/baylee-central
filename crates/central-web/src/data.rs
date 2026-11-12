@@ -458,10 +458,15 @@ pub enum Section {
     Gateways,
     /// `/account/notifications`: Web Push on this device.
     Notifications,
+    /// `/account/admin`: an administrator makes a reset code for an
+    /// account (`docs/account-reset.md`). In no navigation: the overview
+    /// leads an administrator to it, and it shows nothing to anyone else.
+    Admin,
 }
 
 impl Section {
-    /// Every section, in the navigation's order.
+    /// Every section in the navigation, in its order. The administration
+    /// is not among them: the navigation is the same for everyone.
     pub const ALL: [Section; 8] = [
         Section::Home,
         Section::Chat,
@@ -471,6 +476,20 @@ impl Section {
         Section::Privacy,
         Section::Notifications,
         Section::Gateways,
+    ];
+
+    /// Every section with an address: the navigation's and the
+    /// administration.
+    pub const ROUTED: [Section; 9] = [
+        Section::Home,
+        Section::Chat,
+        Section::Contacts,
+        Section::Profile,
+        Section::Security,
+        Section::Privacy,
+        Section::Notifications,
+        Section::Gateways,
+        Section::Admin,
     ];
 
     /// The path after `/{lang}/`.
@@ -485,6 +504,7 @@ impl Section {
             Section::Privacy => "account/privacy",
             Section::Gateways => "account/gateways",
             Section::Notifications => "account/notifications",
+            Section::Admin => "account/admin",
         }
     }
 }
