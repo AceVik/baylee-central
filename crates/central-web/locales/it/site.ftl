@@ -156,7 +156,6 @@ install-cpu = <b>Processore:</b> le build x86-64 richiedono AVX2; per i processo
 ## Gateways
 
 gws-title = Gateway
-gws-official = Ufficiale
 gws-online = Online
 gws-offline = Offline
 gws-version = Versione
@@ -1021,7 +1020,7 @@ ai-training = Accanto all'IA della casa e al ponte LLM esterno, una IA nativa di
 ai-hostingLink = Hosting di gateway e configurazione LLM
 
 # The gateways and the contact page, as the old site wrote them (owner, 11.11.2026)
-gw-lead = Un gateway è un server dove si trovano i tavoli online: account, mazzi, stanze e un processo del motore per ogni partita. Questi sono quelli registrati presso Baylee Central e approvati dal suo amministratore. Baylee gestisce quello contrassegnato come ufficiale; gli altri sono gestiti da altre persone per i loro gruppi, e lì valgono le loro regole. Un elenco non è una promessa su ciò che un gateway fa.
+gw-lead = Un gateway è un server dove si trovano i tavoli online: account, mazzi, stanze e un processo del motore per ogni partita. Questi sono quelli registrati presso Baylee Central e approvati dal suo amministratore. Ognuno è gestito dai suoi operatori per i loro gruppi, e lì valgono le loro regole. Un elenco non è una promessa su ciò che un gateway fa.
 gw-howTo = Per giocare su uno, copia il suo indirizzo nella schermata iniziale del client. Online significa che Central ha avuto notizie del gateway nell'ultimo minuto e mezzo; non è una promessa che risponda. Nomi e versioni sono quelli che ogni gestore indica.
 gw-find = Cerca un gateway
 gw-findHint = Nome o indirizzo
@@ -1038,7 +1037,6 @@ gw-stat-games = Partite in corso
 gw-show = Mostra
 gw-show-every = Tutti
 gw-show-online = Online
-gw-show-official = Ufficiale
 gw-show-tables = Con tavoli aperti
 gw-sort = Ordina per
 gw-sort-best = Consigliati

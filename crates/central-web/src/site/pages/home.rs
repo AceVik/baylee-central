@@ -678,9 +678,9 @@ fn ai(lang: Lang) -> impl IntoView + use<> {
 }
 
 /// A gateway's card, shared with the directory page: its name and version
-/// are the operator's words, shown as text; the official mark comes from
-/// the origin alone. Copying the address (`boot.js`, `[data-copy]`) shows
-/// only where the browser can copy.
+/// are the operator's words, shown as text. No gateway is marked as
+/// official (owner, 12.11.2026). Copying the address (`boot.js`,
+/// `[data-copy]`) shows only where the browser can copy.
 /// `h2` names the card with a second-level heading (the directory, right
 /// under the page's title), else a third (the start page's section).
 /// `baylee://gateway/add?origin=` and the origin, percent-encoded: the link
@@ -708,14 +708,6 @@ pub fn gateway_card(lang: Lang, gateway: &Gateway, h2: bool) -> impl IntoView + 
         view! { <p class="gw-state pill ok"><span class="dot ok live" aria-hidden="true"></span>{words::gws_online(lang)}</p> }.into_any()
     } else {
         view! { <p class="gw-state pill off"><span class="dot off" aria-hidden="true"></span>{words::gws_offline(lang)}</p> }.into_any()
-    };
-    let official = gateway
-        .official
-        .then(|| view! { <span class="pill gold gw-official">{words::gws_official(lang)}</span> });
-    let class = if gateway.official {
-        "gw card card-link reveal gw-is-official"
-    } else {
-        "gw card card-link reveal"
     };
     let website = gateway.website.clone();
     // an offline gateway cannot be joined: its link would open a client
@@ -754,12 +746,11 @@ pub fn gateway_card(lang: Lang, gateway: &Gateway, h2: bool) -> impl IntoView + 
         view! { <h3 class="gw-name"><bdi>{name}</bdi></h3> }.into_any()
     };
     view! {
-        <li class=class data-find=find data-online=flag(gateway.online) data-official=flag(gateway.official)
+        <li class="gw card card-link reveal" data-find=find data-online=flag(gateway.online)
             data-name=gateway.name.clone() data-version=gateway.version.clone()
             data-players=counted.map(|a| a.players.to_string()) data-tables=counted.map(|a| a.tables.to_string())>
             <div class="gw-head">
                 {name}
-                {official}
             </div>
             {state}
             <dl class="gw-facts">
