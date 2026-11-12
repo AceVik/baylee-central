@@ -301,7 +301,7 @@ fn new_tab_rules(web: &Path, languages: &[String]) -> Result<String> {
     for code in languages.iter().filter(|code| *code != "en") {
         let _ = writeln!(
             rules,
-            ":lang({}) :where(p, li, dd, blockquote):not(.strip *) > a[target=\"_blank\"]:not([class])::after{{content:\"\\2197\" / \" ({})\"}}",
+            ":lang({}) :where(p, li, dd, blockquote) > a[target=\"_blank\"]:not([class])::after{{content:\"\\2197\" / \" ({})\"}}",
             language_tag(code),
             word(web, code, "new-tab")?
         );

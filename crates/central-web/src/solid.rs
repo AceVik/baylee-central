@@ -59,10 +59,6 @@ pub const SHIELD: &str =
 /// Two sheets: copy.
 pub const COPY: &str = "M16 1H4a2 2 0 0 0-2 2v14h2V3h12zm3 4H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2zm0 16H8V7h11z";
 
-/// A five-pointed star.
-pub const STAR: &str =
-    "M12 2.3l2.95 6.2 6.75.9-4.95 4.7 1.25 6.75L12 17.55 5.99 20.85l1.26-6.75L2.3 9.4l6.75-.9z";
-
 /// A glyph, `class="icon"`, hidden from assistive technology.
 pub fn icon(path: &'static str) -> impl IntoView + use<> {
     view! {

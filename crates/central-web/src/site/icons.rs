@@ -53,9 +53,6 @@ pub const LOG_IN: &str = r#"<path d="m10 17 5-5-5-5" /> <path d="M15 12H3" /> <p
 pub const COPY: &str = r#"<rect width="14" height="14" x="8" y="8" rx="2" ry="2" /> <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />"#;
 /// The `check` icon.
 pub const CHECK: &str = r#"<path d="M20 6 9 17l-5-5" />"#;
-/// The `circle-check` icon.
-pub const CIRCLE_CHECK: &str =
-    r#"<circle cx="12" cy="12" r="10" /> <path d="m16 9-5.5 5.5L8 12" />"#;
 /// The `triangle-alert` icon.
 pub const TRIANGLE_ALERT: &str = r#"<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" /> <path d="M12 9v4" /> <path d="M12 17h.01" />"#;
 /// The `octagon-alert` icon.
@@ -81,8 +78,6 @@ pub const MONITOR: &str = r#"<rect width="20" height="14" x="2" y="3" rx="2" /> 
 pub const LAPTOP: &str = r#"<path d="M18 5a2 2 0 0 1 2 2v8.526a2 2 0 0 0 .212.897l1.068 2.127a1 1 0 0 1-.9 1.45H3.62a1 1 0 0 1-.9-1.45l1.068-2.127A2 2 0 0 0 4 15.526V7a2 2 0 0 1 2-2z" /> <path d="M20.054 15.987H3.946" />"#;
 /// The `terminal` icon.
 pub const TERMINAL: &str = r#"<path d="M12 19h8" /> <path d="m4 17 6-6-6-6" />"#;
-/// The `package` icon.
-pub const PACKAGE: &str = r#"<path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z" /> <path d="M12 22V12" /> <polyline points="3.29 7 12 12 20.71 7" /> <path d="m7.5 4.27 9 5.15" />"#;
 /// The `file-archive` icon.
 pub const FILE_ARCHIVE: &str = r#"<path d="M13.659 22H18a2 2 0 0 0 2-2V8a2.4 2.4 0 0 0-.706-1.706l-3.588-3.588A2.4 2.4 0 0 0 14 2H6a2 2 0 0 0-2 2v11.5" /> <path d="M14 2v5a1 1 0 0 0 1 1h5" /> <path d="M8 12v-1" /> <path d="M8 18v-2" /> <path d="M8 7V6" /> <circle cx="8" cy="20" r="2" />"#;
 /// The `cpu` icon.
@@ -155,8 +150,6 @@ pub const SETTINGS: &str = r#"<path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34
 pub const LAYOUT_DASHBOARD: &str = r#"<rect width="7" height="9" x="3" y="3" rx="1" /> <rect width="7" height="5" x="14" y="3" rx="1" /> <rect width="7" height="9" x="14" y="12" rx="1" /> <rect width="7" height="5" x="3" y="16" rx="1" />"#;
 /// The `flag` icon.
 pub const FLAG: &str = r#"<path d="M4 22V4a1 1 0 0 1 .4-.8A6 6 0 0 1 8 2c3 0 5 2 7.333 2q2 0 3.067-.8A1 1 0 0 1 20 4v10a1 1 0 0 1-.4.8A6 6 0 0 1 16 16c-3 0-5-2-8-2a6 6 0 0 0-4 1.528" />"#;
-/// The `history` icon.
-pub const HISTORY: &str = r#"<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /> <path d="M3 3v5h5" /> <path d="M12 7v5l4 2" />"#;
 /// The `eye` icon.
 pub const EYE: &str = r#"<path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0" /> <circle cx="12" cy="12" r="3" />"#;
 /// The `layout-grid` icon.

@@ -65,7 +65,7 @@ hero-offline = 單人對戰與牌組建構器可離線使用，不需要帳號�
 hero-account = 想線上遊玩？<register>建立帳號</register>，公開測試期間免費，人人都可以申請；或<signin>登入</signin>。
 hero-memorial = 懷念 Baylee：打開她的相簿
 
-status-label = 專案狀態
+status-label = Baylee 數據一覽
 
 cards-eyebrow = 卡牌
 cards-title = Baylee 認得多少張牌
@@ -857,18 +857,14 @@ foot-project = 專案
 foot-source = 原始碼（AGPL-3.0）
 foot-central = Baylee Central（原始碼可取得）
 foot-summary = 以 Rust 與 Bevy 打造的免費開放原始碼桌上卡牌遊戲——具備確定性的規則引擎、完整的離線模式、內建 AI、LLM 橋接與社群 Gateways。
-strip-build = 建置
 strip-ci = CI
 strip-commit = 提交
 strip-gateways = Gateways
 strip-online = 在線
 strip-offline = 離線
-strip-releases = 查看版本
-strip-on-github = 在 GitHub 查看
 strip-directory = 目錄
 strip-cards = 可玩的牌
 strip-cards-unit = 張
-strip-stars = GitHub 星數
 strip-accounts = Baylee Central 的帳號
 strip-live = 各 Gateway 回報的目前數字
 strip-views = 自 { $date } 起的頁面瀏覽次數

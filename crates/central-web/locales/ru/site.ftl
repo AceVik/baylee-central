@@ -65,7 +65,7 @@ hero-offline = Одиночные матчи и редактор колод ра
 hero-account = Хотите играть онлайн? <register>Создайте аккаунт</register> — это бесплатно и открыто для всех в открытой бете — или <signin>войдите</signin>.
 hero-memorial = Вспомним Baylee: открыть её фотоальбом
 
-status-label = Состояние проекта
+status-label = Baylee в цифрах
 
 cards-eyebrow = Карты
 cards-title = Сколько карт знает Baylee
@@ -861,18 +861,14 @@ foot-project = Проект
 foot-source = Исходный код (AGPL-3.0)
 foot-central = Baylee Central (исходный код доступен)
 foot-summary = Бесплатная настольная карточная игра с открытым кодом на Rust и Bevy — с детерминированным движком правил, полным офлайн-режимом, встроенным ИИ, мостом к LLM и сообществом Gateway.
-strip-build = Сборка
 strip-ci = CI
 strip-commit = Коммит
 strip-gateways = Gateway
 strip-online = онлайн
 strip-offline = офлайн
-strip-releases = к релизам
-strip-on-github = на GitHub
 strip-directory = каталог
 strip-cards = Игровых карт
 strip-cards-unit = карт
-strip-stars = Звёзд на GitHub
 strip-accounts = Аккаунтов в Baylee Central
 strip-live = Сейчас на Gateway, по их данным
 strip-views = Просмотров страниц с { $date }

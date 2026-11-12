@@ -30,7 +30,8 @@ async function watchFirstPaint(page: Page): Promise<void> {
     new MutationObserver((_, observer) => {
       if (!document.body) return;
       observer.disconnect();
-      document.documentElement.setAttribute("data-test-at-body", document.documentElement.dataset.theme ?? "none");
+      const root = document.documentElement;
+      root.setAttribute("data-test-at-body", root.getAttribute("data-theme") ?? "none");
     }).observe(document, { childList: true, subtree: true });
   });
 }

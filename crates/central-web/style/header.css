@@ -1,7 +1,7 @@
 /* The bar at the top of every page: the brand, the sections and the
    account; the colour switch and the language menu; on narrow screens
    the sections fold into a menu. Below it on the start page, the strip with
-   the project's state. */
+   Baylee in numbers. */
 
 .top {
   position: sticky;
@@ -658,10 +658,21 @@ body:has(dialog[open]) .top {
   }
 }
 
-/* ---- the strip: the project's state and its numbers, under the bar on the
-   start page. A label with its glyph, then what a source said; nothing is
-   underlined (owner, 11.11.2026), a value that leads somewhere takes the
-   gold under the pointer. ------------------------------------------------- */
+/* ---- the strip: Baylee in numbers, under the bar on the start page --------
+   A cell a figure: a glyph and a value whose words say what it counts; the
+   label is for a screen reader and the pointer's tooltip. Nothing is
+   underlined (owner, 11.11.2026); a value that leads somewhere takes the
+   gold under the pointer.
+
+   The rows are even for any number of cells (owner, 12.11.2026). The server
+   writes how many there are (data-count, 1 to 8: a number nobody reported is
+   no cell, so it leaves no hole), and a line holds --cols of them, as many as
+   the width allows and chosen so that the lines differ by one at most, the
+   shorter centred, and no cell is left alone on a line. A cell is as wide as
+   its share of the line, so the columns of two lines stand in line; a cell's
+   own --cols is its share where one line holds more than the next. On a wide
+   screen they all stand in one line, each as wide as its words and the room
+   shared out evenly between them. ------------------------------------------ */
 
 .strip {
   position: relative;
@@ -676,116 +687,105 @@ body:has(dialog[open]) .top {
 }
 
 .strip-inner {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.2rem 1rem;
   max-width: var(--wrap);
-  min-height: 2.4rem;
   margin: 0 auto;
-  padding: 0.3rem var(--gutter);
+  padding: 0.35rem var(--gutter);
 }
 
-.strip-group {
+.strip-list {
+  --gap-x: 1.25rem;
+  --cols: var(--n, 1);
+
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.2rem 0;
+  justify-content: center;
+  gap: 0.25rem var(--gap-x);
   margin: 0;
   padding: 0;
 }
 
-/* The project's group takes what room there is, so the numbers stand at the
-   far end while both fit on one line; once they do not, the numbers start a
-   line of their own at the same edge as the first. */
-.strip-group:first-child {
-  flex: 1 1 auto;
+.strip-list[data-count="2"] {
+  --n: 2;
 }
 
-.strip-stat {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  min-height: 1.7rem;
-  padding-inline: 0.8rem;
-  font: 500 0.76rem/1 var(--sans);
-  white-space: nowrap;
+.strip-list[data-count="3"] {
+  --n: 3;
 }
 
-.strip-group > .strip-stat:first-child {
-  padding-inline-start: 0;
+.strip-list[data-count="4"] {
+  --n: 4;
 }
 
-.strip-group > .strip-stat:last-child {
-  padding-inline-end: 0;
+.strip-list[data-count="5"] {
+  --n: 5;
 }
 
-.strip-group .strip-stat + .strip-stat {
-  border-inline-start: 1px solid var(--edge-soft);
+.strip-list[data-count="6"] {
+  --n: 6;
 }
 
-.strip dt {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  color: var(--ink-faint);
-  font-size: 0.64rem;
-  font-weight: 600;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
+.strip-list[data-count="7"] {
+  --n: 7;
 }
 
-.strip dt .icon {
-  width: 0.85rem;
-  height: 0.85rem;
-  color: color-mix(in srgb, var(--gold) 72%, var(--ink-faint));
+.strip-list[data-count="8"] {
+  --n: 8;
+}
+
+/* the gateways' four counts: one term, four values, each value a cell */
+.strip-live {
+  display: contents;
+}
+
+/* A cell's glyph runs with its words, centred: where a narrow cell breaks
+   them, the glyph stays beside the first line and every line is centred. */
+.strip-cell {
+  flex: 0 0 calc((100% - (var(--cols) - 1) * var(--gap-x)) / var(--cols));
+  min-width: 0;
+  margin: 0;
+  color: var(--ink);
+  font: 600 0.76rem/1.6 var(--sans);
+  text-align: center;
+  text-wrap: balance;
 }
 
 .strip dd {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  color: var(--ink);
-  font-weight: 600;
+  margin: 0;
 }
 
-/* the strip's links look as small as their line, and reach the 44 px every
-   control is given: height that negative margins take back */
+.strip .icon {
+  display: inline-block;
+  width: 0.85rem;
+  height: 0.85rem;
+  margin-inline-end: 0.4rem;
+  color: color-mix(in srgb, var(--gold) 72%, var(--ink-faint));
+  vertical-align: -0.14em;
+}
+
+/* the links look as small as their line, and reach the 44 px every control
+   is given: height that negative margins take back */
 .strip dd > a {
   display: inline-flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: center;
-  gap: 0.35rem;
+  gap: 0 0.4rem;
   min-width: var(--target);
   min-height: var(--target);
   margin-block: -0.6rem;
   color: var(--title);
-  font-weight: 600;
   text-decoration: none;
+  vertical-align: middle;
+  transition: color var(--dur-fast) ease;
+}
+
+.strip dd > a > .icon {
+  margin: 0;
 }
 
 .strip dd > a:hover {
   color: var(--link-hover);
-}
-
-.strip code {
-  padding: 0.14em 0.5em;
-  border: 1px solid var(--edge-soft);
-  border-radius: 6px;
-  background: color-mix(in srgb, var(--panel-solid) 72%, transparent);
-  color: inherit;
-  font-size: 0.95em;
-  overflow-wrap: normal;
-  white-space: nowrap;
-  transition:
-    border-color var(--dur-fast) ease,
-    background-color var(--dur-fast) ease;
-}
-
-.strip dd > a:hover code {
-  border-color: var(--gold);
-  background: var(--panel-2);
 }
 
 .strip .small {
@@ -794,82 +794,71 @@ body:has(dialog[open]) .top {
   font-weight: 400;
 }
 
-.stat-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.7rem;
-  min-height: 1.6rem;
-  padding: 0 0.7rem;
-  border: 1px solid color-mix(in srgb, var(--edge) 68%, transparent);
-  border-radius: var(--pill);
-  background: color-mix(in srgb, var(--panel-solid) 68%, transparent);
-  box-shadow: inset 0 1px 0 var(--sheen);
-  color: var(--ink);
-  transition:
-    border-color var(--dur-fast) ease,
-    background-color var(--dur-fast) ease,
-    color var(--dur-fast) ease;
-}
-
+/* the gateways online and not: each part stays whole */
 .stat-part {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
+  white-space: nowrap;
 }
 
-.strip dd > a:hover .stat-pill {
-  border-color: var(--gold);
-  background: var(--panel-2);
-  color: var(--title);
+.stat-part > .dot {
+  margin-inline-end: 0.35rem;
 }
 
-/* between a phone and a desk: the dates give their room to the numbers */
-@media (max-width: 1180px) {
-  .strip .when {
-    display: none;
+/* a wide screen: one line, the room shared out evenly */
+@media (min-width: 1100px) {
+  .strip-list {
+    flex-wrap: nowrap;
+  }
+
+  .strip-cell {
+    flex: 1 1 auto;
+    min-width: auto;
   }
 }
 
-/* a phone: the stats as they fit, two on a line pushed to its ends, a long
-   one alone; the last commit and the stars stay for a wider screen */
-@media (max-width: 760px) {
+/* a tablet and a narrow desk: at most four to a line, five and six as three
+   and two or three and three, seven and eight as four and three or four */
+@media (min-width: 600px) and (max-width: 1099px) {
+  .strip-list[data-count="5"],
+  .strip-list[data-count="6"] {
+    --cols: 3;
+  }
+
+  .strip-list[data-count="7"],
+  .strip-list[data-count="8"] {
+    --cols: 4;
+  }
+}
+
+/* a phone: two to a line. Three stand in one line, each as wide as its words
+   (the gateways' cell needs more room than a third); five and seven start
+   with a line of the gateways' first three short counts, so that every line
+   after it holds two and the gateways' cell has half a line. */
+@media (max-width: 599px) {
   .strip-inner {
-    justify-content: space-between;
-    gap: 0.2rem 0.75rem;
     padding-block: 0.4rem;
   }
 
-  .strip-group {
-    display: contents;
+  .strip-list {
+    --gap-x: 0.75rem;
+    --cols: 2;
   }
 
-  .strip-stat,
-  .strip-group > .strip-stat:first-child,
-  .strip-group > .strip-stat:last-child {
-    padding-inline: 0;
-    border-inline-start: 0;
+  .strip-list[data-count="1"] {
+    --cols: 1;
   }
 
-  .strip-opt {
-    display: none;
+  .strip-list[data-count="3"] {
+    flex-wrap: nowrap;
   }
 
-  /* four counts in one pill are wider than a phone: they may break */
-  .strip-stat:has(.stat-pill) {
-    white-space: normal;
+  .strip-list[data-count="3"] .strip-cell {
+    flex: 1 1 auto;
+    min-width: auto;
   }
 
-  .stat-pill {
-    flex-wrap: wrap;
-    gap: 0 0.7rem;
-    padding-block: 0.15rem;
-    border-radius: 0.9rem;
-  }
-
-  /* and four break evenly, two and two, not three and a leftover */
-  .stat-pill:has(> .stat-part:nth-child(4)) {
-    display: inline-grid;
-    grid-template-columns: auto auto;
-    justify-items: start;
+  .strip-list:is([data-count="5"], [data-count="7"]) .strip-live > .strip-cell:nth-of-type(-n + 3) {
+    --cols: 3;
   }
 }

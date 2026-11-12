@@ -131,9 +131,9 @@
    It opens a tab of its own; a small arrow says so before the click, and a
    screen reader hears it in words: English here, every other language's by
    a rule the build writes from its words (`new-tab`, xtask's site.rs).
-   Buttons and cards carry their own icons; the strip is too tight for it. */
+   Buttons and cards carry their own icons. */
 
-:where(p, li, dd, blockquote):not(.strip *) > a[target="_blank"]:not([class])::after {
+:where(p, li, dd, blockquote) > a[target="_blank"]:not([class])::after {
   content: "\2197";
   content: "\2197" / " (opens in a new tab)";
   display: inline-block;
