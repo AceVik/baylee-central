@@ -3,8 +3,15 @@
 //! without script; in the browser the WebAssembly takes it over. Islands
 //! live in this private module: `#[island]` generates an undocumented props
 //! struct that must not become public.
+//!
+//! The administration (`admin`, `feedback` and their island,
+//! `Administration`) is in the browser's build only with the `admin`
+//! feature: the administration's own module (`cargo xtask site`), which
+//! only its pages load. No other island reaches into it, so the public
+//! module carries none of it.
 
 mod account;
+#[cfg(any(not(target_arch = "wasm32"), feature = "admin"))]
 mod admin;
 mod auth;
 mod b64;
@@ -15,12 +22,14 @@ mod contact;
 mod crypto;
 mod early;
 mod email;
+#[cfg(any(not(target_arch = "wasm32"), feature = "admin"))]
 mod feedback;
 mod field;
 mod focus;
 mod fragment;
 mod impressum;
 mod keep;
+#[cfg(any(not(target_arch = "wasm32"), feature = "admin"))]
 mod moderation;
 pub(crate) mod net;
 mod password;
@@ -36,6 +45,8 @@ mod trusted;
 // through their WebAssembly exports only.
 #[cfg(not(target_arch = "wasm32"))]
 pub(crate) use account::Account;
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) use admin::Administration;
 #[cfg(not(target_arch = "wasm32"))]
 pub(crate) use auth::{Register, SignIn};
 #[cfg(not(target_arch = "wasm32"))]

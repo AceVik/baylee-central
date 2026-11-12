@@ -1,8 +1,10 @@
 //! `cargo xtask site`: the website's assets (`docs/proposals/frontend-rewrite.md`
 //! §3), written to `target/site/` for `central-web` to serve:
 //!
-//! - the islands' WebAssembly (`central-web-islands`, `--profile islands`,
-//!   paths remapped) and its wasm-bindgen glue (the pinned CLI of `wasm`);
+//! - the islands' two WebAssembly modules (`central-web-islands`,
+//!   `--profile islands`, paths remapped; [`MODULES`]): the public one, and
+//!   the administration's, which only its pages load; each with its
+//!   wasm-bindgen glue (the pinned CLI of `wasm`) and its bootstrap;
 //! - the stylesheet (`crates/central-web/style/`, in [`STYLES`]' order), the
 //!   scripts (`crates/central-web/js/`), the fonts and pictures
 //!   (`crates/central-web/assets/`);
@@ -61,6 +63,25 @@ const SCRIPTS: [&str; 7] = [
 
 const TARGET: &str = "wasm32-unknown-unknown";
 const PROFILE: &str = "islands";
+
+/// The islands' modules: the logical name of each (`<name>.wasm`, its glue
+/// `<name>-glue.js`, its bootstrap `<name>.js`) and the features
+/// `central-web-islands` is built with. The public module goes to every
+/// page with islands; the administration's (`admin`) only to
+/// `/{lang}/account/admin…` (`central-web`'s `shell::islands_script`). Each
+/// is a cargo run of its own: in one run the features would meet, and the
+/// public module would carry the administration again.
+pub const MODULES: [(&str, &[&str]); 2] = [
+    ("islands", &[]),
+    ("admin-islands", &["--features", "admin"]),
+];
+
+/// What only the administration's code writes into a module: a class of
+/// its overview and one of a report's page. The public module holding
+/// either, or the administration's lacking one, fails the build: an island
+/// of the public module reached into the administration, or the marks no
+/// longer say anything.
+const ADMIN_ONLY: [&str; 2] = ["admin-stat-sub", "fb-legend"];
 const WEB: &str = "crates/central-web";
 
 /// Builds the site into `target/site`.
@@ -435,7 +456,6 @@ fn content(site: &mut Site, baylee: &Path) -> Result<()> {
     Ok(())
 }
 
-/// The islands' module and glue, and the bootstrap that loads them.
 /// A stylesheet without its comments, blank lines and indentation: a
 /// fifth less to send before the first paint. Strings are kept as written
 /// (a comment's opening inside one is text); a string broken over a line
@@ -488,9 +508,58 @@ fn lean_css(css: &str) -> Result<String> {
     Ok(lean)
 }
 
+/// The islands' modules ([`MODULES`]), each with its glue and its
+/// bootstrap (`js/islands.js` with the module's hashed addresses written
+/// in), and the check that only the administration's module holds the
+/// administration ([`ADMIN_ONLY`]).
 fn islands(root: &Path, target: &Path, site: &mut Site) -> Result<()> {
     let bindgen = wasm::cli(target)?;
     let home = wasm::cargo_home()?;
+    let template = fs::read_to_string(root.join(WEB).join("js/islands.js"))
+        .or_fail("js/islands.js is missing")?;
+    for (name, features) in MODULES {
+        let (module, glue) = module(root, target, &bindgen, &home, name, features)?;
+        let administration = features.contains(&"admin");
+        for mark in ADMIN_ONLY {
+            if wasm::contains(&module, mark.as_bytes()) != administration {
+                return Err(Fail::new(format!(
+                    "{name}.wasm {} the administration's {mark}",
+                    if administration { "lacks" } else { "carries" }
+                )));
+            }
+        }
+        let wasm_url = site.add(&format!("{name}.wasm"), &module)?;
+        let glue_url = site.add(&format!("{name}-glue.js"), &glue)?;
+        let boot = bootstrap(&template, &glue_url, &wasm_url)?;
+        site.add(&format!("{name}.js"), boot.as_bytes())?;
+    }
+    Ok(())
+}
+
+/// `js/islands.js` loading the glue at `glue_url` and the module at
+/// `wasm_url`.
+fn bootstrap(template: &str, glue_url: &str, wasm_url: &str) -> Result<String> {
+    let boot = template
+        .replace("./islands-glue.js", glue_url)
+        .replace("./islands.wasm", wasm_url);
+    if boot == template {
+        return Err(Fail::new(
+            "js/islands.js names neither ./islands-glue.js nor ./islands.wasm",
+        ));
+    }
+    Ok(boot)
+}
+
+/// `central-web-islands` built with `features` in a cargo run of its own,
+/// then through wasm-bindgen as `name`: the module and its glue.
+fn module(
+    root: &Path,
+    target: &Path,
+    bindgen: &Path,
+    home: &Path,
+    name: &str,
+    features: &[&str],
+) -> Result<(Vec<u8>, Vec<u8>)> {
     process::succeed(
         Command::new(workspace::cargo())
             .args([
@@ -504,57 +573,44 @@ fn islands(root: &Path, target: &Path, site: &mut Site) -> Result<()> {
                 "--profile",
                 PROFILE,
             ])
-            .env("CARGO_ENCODED_RUSTFLAGS", wasm::remap_flags(root, &home))
+            .args(features)
+            .env("CARGO_ENCODED_RUSTFLAGS", wasm::remap_flags(root, home))
             .current_dir(root),
         "the islands' WebAssembly build failed",
     )?;
-    let module = target
+    // the next run writes the same file, so the glue is made from it now
+    let built = target
         .join(TARGET)
         .join(PROFILE)
         .join("central_web_islands.wasm");
-    let glue = target.join("site-bindgen");
+    let glue = target.join("site-bindgen").join(name);
     if glue.exists() {
         fs::remove_dir_all(&glue).or_fail("the glue folder could not be cleared")?;
     }
     process::succeed(
-        Command::new(&bindgen)
+        Command::new(bindgen)
             .args([
                 "--target",
                 "web",
                 "--remove-name-section",
                 "--remove-producers-section",
                 "--out-name",
-                "islands",
+                name,
                 "--out-dir",
             ])
             .arg(&glue)
-            .arg(&module),
+            .arg(&built),
         "wasm-bindgen failed for the islands",
     )?;
-    let wasm_bytes =
-        fs::read(glue.join("islands_bg.wasm")).or_fail("the islands' module is missing")?;
-    for local in [root, home.as_path()] {
-        if wasm::contains(&wasm_bytes, local.to_string_lossy().as_bytes()) {
-            return Err(Fail::new("the islands' module names a local path"));
+    let module =
+        fs::read(glue.join(format!("{name}_bg.wasm"))).or_fail("the islands' module is missing")?;
+    for local in [root, home] {
+        if wasm::contains(&module, local.to_string_lossy().as_bytes()) {
+            return Err(Fail::new(format!("{name}.wasm names a local path")));
         }
     }
-    let wasm_url = site.add("islands.wasm", &wasm_bytes)?;
-    let glue_url = site.add(
-        "islands-glue.js",
-        &fs::read(glue.join("islands.js")).or_fail("the islands' glue is missing")?,
-    )?;
-    let template = fs::read_to_string(root.join(WEB).join("js/islands.js"))
-        .or_fail("js/islands.js is missing")?;
-    let boot = template
-        .replace("./islands-glue.js", &glue_url)
-        .replace("./islands.wasm", &wasm_url);
-    if boot == template {
-        return Err(Fail::new(
-            "js/islands.js names neither ./islands-glue.js nor ./islands.wasm",
-        ));
-    }
-    site.add("islands.js", boot.as_bytes())?;
-    Ok(())
+    let glue = fs::read(glue.join(format!("{name}.js"))).or_fail("the islands' glue is missing")?;
+    Ok((module, glue))
 }
 
 /// The committed browser crypto (`crates/central-web/crypto`, which `wasm
@@ -786,8 +842,67 @@ fn islands_graph(metadata: &Value) -> std::collections::BTreeSet<String> {
 mod tests {
     use sha2::{Digest as _, Sha256};
 
-    use super::{BIMI, BIMI_SHA256, WEB, language_tag, languages, lean_css, new_tab_rules, word};
+    use super::{
+        ADMIN_ONLY, BIMI, BIMI_SHA256, MODULES, WEB, bootstrap, language_tag, languages, lean_css,
+        new_tab_rules, word,
+    };
     use crate::{random, workspace};
+
+    /// Two modules, each its own names: the public one built without
+    /// features, the administration's with `admin` alone; the bootstrap of
+    /// each is `js/islands.js` with that module's addresses, and a template
+    /// that names neither is refused. The marks the build checks the split
+    /// by are written in the administration's code and nowhere else.
+    #[test]
+    fn the_islands_are_two_modules_with_one_bootstrap() {
+        let names: Vec<&str> = MODULES.iter().map(|(name, _)| *name).collect();
+        assert_eq!(names, ["islands", "admin-islands"]);
+        assert_eq!(
+            MODULES[0].1,
+            &[] as &[&str],
+            "the public module: no feature"
+        );
+        assert_eq!(MODULES[1].1, ["--features", "admin"]);
+        let web = workspace::root().expect("root").join(WEB);
+        let template = std::fs::read_to_string(web.join("js/islands.js")).expect("bootstrap");
+        let boot = bootstrap(
+            &template,
+            "/assets/admin-islands-glue.0123456789ab.js",
+            "/assets/admin-islands.0123456789ab.wasm",
+        )
+        .expect("bootstrap");
+        assert!(boot.contains("import(\"/assets/admin-islands-glue.0123456789ab.js\")"));
+        assert!(boot.contains("\"/assets/admin-islands.0123456789ab.wasm\""));
+        assert!(!boot.contains("./islands"));
+        assert!(bootstrap("export {};", "/a.js", "/a.wasm").is_err());
+        let islands = web.join("src/islands");
+        for mark in ADMIN_ONLY {
+            let mut found = Vec::new();
+            let mut stack = vec![islands.clone()];
+            while let Some(dir) = stack.pop() {
+                for entry in std::fs::read_dir(dir).expect("folder").flatten() {
+                    let path = entry.path();
+                    if path.is_dir() {
+                        stack.push(path);
+                    } else if std::fs::read_to_string(&path)
+                        .expect("source")
+                        .contains(mark)
+                    {
+                        found.push(path);
+                    }
+                }
+            }
+            assert!(!found.is_empty(), "{mark}");
+            for path in found {
+                let part = path.strip_prefix(&islands).expect("inside");
+                assert!(
+                    part.starts_with("admin") || part.starts_with("feedback"),
+                    "{mark} in {}",
+                    part.display()
+                );
+            }
+        }
+    }
 
     /// The BIMI mark is the file the owner approved, byte for byte, and
     /// holds nothing that runs or loads: no script, no handler, no link or

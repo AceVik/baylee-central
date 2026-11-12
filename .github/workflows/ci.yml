@@ -161,7 +161,7 @@ jobs:
   # 2560 px, no request to another origin, keyboard paths and the islands.
   site:
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -173,6 +173,10 @@ jobs:
         run: cargo fetch --locked
       - name: Clippy for the browser's half
         run: cargo clippy --locked -p central-web -p central-web-islands --target wasm32-unknown-unknown --lib -- -D warnings
+      # the administration's module (`admin`) in a run of its own: in one
+      # run the features would meet, and the public module go unlinted
+      - name: Clippy for the administration's module
+        run: cargo clippy --locked -p central-web -p central-web-islands --target wasm32-unknown-unknown --lib --all-features -- -D warnings
       - run: cargo build --locked -p central-web-server
       - run: cargo xtask site
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0

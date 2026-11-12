@@ -525,11 +525,21 @@ from before cannot register until it is replaced, and **a tab of it left
 open cannot register until it is reloaded** (nothing else on that page is
 affected; the message it shows is `register-closed`). Three things to know:
 
-- `ops/deploy-hook` switches Central before it swaps the website, and the
-  website it swaps is the static build of `web/`, whose register page
-  still sends a key that no Central since migration 000023 takes. The
-  server-rendered site is put out by hand (§"The server-rendered website")
-  and belongs before the hook's run or the manual switch of Central.
+- `ops/deploy-hook` switches Central, then installs the server-rendered
+  site (since 12.11.2026; it no longer touches the static build of `web/`,
+  which is gone from the repository). What `baylee.app` serves is still
+  Caddy's to say: until Caddy passes the site to `central-web`
+  (§"The server-rendered website"), production keeps the **frozen** static
+  build, whose register page sends a key that no Central since migration
+  000023 takes. So the first run of the hook (or the manual switch) after
+  this release should be followed at once by the Caddy switch, or preceded
+  by it with the unit installed and the site in place: in between,
+  registration does not work. That timing is the owner's.
+- Once `baylee-app-web` is installed, a website that does not answer
+  within 30 s after the hook restarts it puts the previous site back and
+  **fails the hook, which stops the gateway's deploy** as a failed Central
+  does (Central itself stays deployed). The unit was written without a
+  systemd at hand; the owner's first start is its test.
 - Coming from a Central that still has the keys, neither order registers
   anybody in between: that Central knows neither challenge request, and
   this one takes no key. Keep that switch short.
