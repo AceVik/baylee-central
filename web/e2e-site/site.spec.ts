@@ -90,6 +90,8 @@ test("the big logo opens Baylee's album, Escape closes it and focus returns", as
   await page.keyboard.press("Enter");
   const album = page.locator("dialog#album");
   await expect(album).toBeVisible();
+  // the book has opened (its cover swings away first: album.spec.ts)
+  await expect(album).not.toHaveAttribute("data-folding");
   await expect(album.locator("h2")).toHaveText("Baylee");
   expect(await axe(page)).toEqual([]);
   // one chapter at a time: the tabs and the arrows turn the pages
@@ -122,30 +124,43 @@ test("a page of the album turns as a leaf that leaves nothing behind, and a phot
   await page.locator("button.memorial-open").click();
   const album = page.locator("dialog#album");
   await expect(album).toBeVisible();
+  await expect(album).not.toHaveAttribute("data-folding");
   const turning = album.locator("[data-turning]");
+  // A button pressed from within the page, and what the press left in the
+  // book read in the same task: a leaf lasts under a second, which a busy
+  // machine may spend between a click and a look.
+  const press = (selector: string) =>
+    page.evaluate((which) => {
+      const book = document.querySelector("#album");
+      const button = book?.querySelector(which);
+      if (button instanceof HTMLElement) button.click();
+      const leaf = book?.querySelector(".story-turning-leaf");
+      return {
+        leaves: book?.querySelectorAll(".story-turning-leaf").length ?? 0,
+        way: leaf?.classList.contains("forward") ? "forward" : leaf?.classList.contains("backward") ? "backward" : "",
+        strips: leaf?.querySelectorAll(".leaf-strip").length ?? 0,
+        hidden: leaf?.getAttribute("aria-hidden") ?? "",
+        under: book?.querySelectorAll(".story-under").length ?? 0,
+        laid: book?.querySelectorAll(".photo-preview img.under").length ?? 0,
+      };
+    }, selector);
   // going on: the chapter being left lifts away as a leaf of strips, hidden from a screen reader
-  await album.locator('[data-chapter-step="1"]').click();
+  expect(await press('[data-chapter-step="1"]')).toMatchObject({ leaves: 1, way: "forward", strips: 10, hidden: "true" });
   await expect(album.locator("#chapter-2")).toBeVisible();
-  await expect(album.locator(".story-turning-leaf.forward .leaf-strip")).toHaveCount(10);
-  await expect(album.locator(".story-turning-leaf")).toHaveAttribute("aria-hidden", "true");
   await expect(turning).toHaveCount(0);
   // going back: the earlier chapter is laid down over the one being left
-  await album.locator('[data-chapter-step="-1"]').click();
-  await expect(album.locator(".story-turning-leaf.backward")).toHaveCount(1);
-  await expect(album.locator(".story-under")).toHaveCount(1);
+  expect(await press('[data-chapter-step="-1"]')).toMatchObject({ leaves: 1, way: "backward", under: 1 });
   await expect(turning).toHaveCount(0);
   await expect(album.locator("#chapter-1")).toBeVisible();
   // the copies carry no second id into the page
   expect(await page.evaluate(() => document.querySelectorAll("#chapter-1").length)).toBe(1);
   // a turn before the last one ended makes way for the next
-  await album.locator('[data-chapter-step="1"]').click();
-  await album.locator('[data-chapter-step="1"]').click();
-  await expect(album.locator(".story-turning-leaf")).toHaveCount(1);
+  await press('[data-chapter-step="1"]');
+  expect(await press('[data-chapter-step="1"]')).toMatchObject({ leaves: 1 });
   await expect(turning).toHaveCount(0);
   await expect(album.locator("[data-chapter-count]")).toHaveText("3 / 8");
   // a photograph lies on the one before until it has settled
-  await album.locator('[data-photo-step="1"]').first().click();
-  await expect(album.locator(".photo-preview img.under")).toHaveCount(1);
+  expect(await press('[data-photo-step="1"]')).toMatchObject({ laid: 1 });
   await expect(album.locator(".photo-preview img:not([hidden])")).toHaveCount(1);
   await expect(album.locator(".photo-preview img.under")).toHaveCount(0);
 });
