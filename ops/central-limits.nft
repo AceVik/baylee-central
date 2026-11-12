@@ -1,0 +1,118 @@
+#!/usr/sbin/nft -f
+#
+# Baylee Central: limits on connections, by source address, in front of Caddy.
+# docs/operations.md §"Connection limits in front of the proxy" is the runbook:
+# how to load, check and remove this, and what it does to a shared address.
+#
+# What it is for. Central counts requests by client address once the proxy
+# has handed them on. Nothing counted connections to the proxy itself: one
+# address could open as many as it liked, as fast as it liked. This file
+# bounds both, for each source:
+#
+#   - new connections: 300 a minute after a burst of 300;
+#   - connections held at once: 512.
+#
+# A source is an IPv4 address or an IPv6 /64, which is what Central counts
+# as one place (`central-http`, `addresses.rs`).
+#
+# What it is not. It counts connections, not requests. A client that keeps
+# one connection and sends many requests over it (HTTP keep-alive, HTTP/2,
+# HTTP/3) is not slowed by anything here; Central's own budgets count those
+# (docs/native-login.md). So this file does not keep a few addresses from
+# spending the requests a second that all clients without a session share.
+#
+# Why these numbers.
+#
+#   300 new connections a minute. A browser opens one or two connections to
+#   a site and keeps them; a game client keeps one to its gateway; the
+#   released gateway opens one for each part of a report (two at once). A
+#   household is far below this. A campus or a carrier's shared address is
+#   the case to watch: 300 people there may each open a connection in the
+#   same minute, and 300 more at once before the rate applies. The runbook's
+#   check after a proxy change (31 `Discover` in a minute, a connection
+#   each) is a tenth of it, so that check still tests Central and not this.
+#
+#   512 held at once. A player holds about three: the page, the gateway's
+#   socket, the client's calls. So about 170 players behind one address,
+#   which no household, office or club reaches; a campus or a carrier's
+#   address with more than that has its further connections dropped until
+#   others close. Caddy holds a connection in tens of kilobytes; 512 from
+#   one source cost it megabytes, and holding ten thousand takes twenty
+#   sources instead of one.
+#
+# What a refused connection sees. Its first packet is dropped, without an
+# answer: a TCP client tries again after one and after three seconds and
+# then gives up, so a short excess is a slow connect and a long one a
+# failed one. Dropped and not reset, so that a flood with forged source
+# addresses is answered with nothing.
+#
+# What it leaves alone. Connections that exist go on. The loopback
+# interface is never counted: the official gateway and every local check
+# on this host reach Central that way. Every other port is untouched. The
+# chain's policy is accept, so this file only ever drops: it opens nothing
+# that another table closes.
+#
+# Its own table. Loading replaces `inet baylee_central` and nothing else.
+# Never `flush ruleset` on this host: Docker and the host's firewall keep
+# their rules in other tables.
+#
+# The hook. `input` sees what is delivered to a process on this host, so
+# Caddy must listen on the host's own addresses (it proxies to 127.0.0.1,
+# so it does). A port that Docker publishes for a container is forwarded,
+# not delivered, and would pass this chain unseen.
+#
+# When a set is full (65,536 sources), a new source cannot be counted and
+# its connections pass, as they did before this file. A set's entry for a
+# source that sent nothing for two minutes is forgotten; its bucket would
+# have been full again by then.
+
+table inet baylee_central
+delete table inet baylee_central
+
+table inet baylee_central {
+	set fresh4 {
+		type ipv4_addr
+		size 65536
+		flags dynamic,timeout
+		timeout 2m
+	}
+
+	set fresh6 {
+		type ipv6_addr
+		size 65536
+		flags dynamic,timeout
+		timeout 2m
+	}
+
+	set held4 {
+		type ipv4_addr
+		size 65536
+		flags dynamic
+	}
+
+	set held6 {
+		type ipv6_addr
+		size 65536
+		flags dynamic
+	}
+
+	chain web {
+		# New connections a minute, by source.
+		update @fresh4 { ip saddr limit rate over 300/minute burst 300 packets } counter drop
+		update @fresh6 { ip6 saddr & ffff:ffff:ffff:ffff:: limit rate over 300/minute burst 300 packets } counter drop
+
+		# Connections held at once, by source.
+		add @held4 { ip saddr ct count over 512 } counter drop
+		add @held6 { ip6 saddr & ffff:ffff:ffff:ffff:: ct count over 512 } counter drop
+	}
+
+	chain input {
+		type filter hook input priority filter - 10; policy accept;
+
+		iifname "lo" accept
+
+		# The proxy's ports: HTTP, HTTPS, and HTTP/3 over UDP.
+		tcp dport { 80, 443 } ct state new jump web
+		udp dport 443 ct state new jump web
+	}
+}
