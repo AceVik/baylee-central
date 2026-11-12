@@ -1527,3 +1527,29 @@ a recovery code".
   `register()` and `site-email.spec.ts` were adapted (the address named at
   registration, another in the account area) and type-check; they were not
   run here.
+
+## 22. As built: the nine languages translated (12.11.2026)
+
+- **What.** Every message that §17 to §21, the strip and the mails' notices
+  had left in English under `# English for now: to be translated.` now
+  has its own text in Spanish, French, Italian, Japanese, Korean,
+  Brazilian Portuguese, Russian and both Chinese scripts: the
+  administrator's page, the recovery code's ways and its e-mail step,
+  `status-label`, `gw-lead`, `privacy-device-manager`, and in the mails
+  `confirm-link` and the nineteen notice ids. The comments are gone.
+- **Who.** Translated by a cheaper model, as the owner asked for words
+  (Claude Sonnet), then checked here: every language has every id of the
+  English file, the same placeables and the same tags in each message;
+  the Italian file's messages were read against their English ids one by
+  one; the page named in `admin-refused-own` is the account area's own
+  name for its security page in each language.
+- **What stays English.** Names and technical words (Baylee, GitHub, the
+  platforms, SHA-256, Argon2id, OPAQUE, Central, the README anchors), and
+  short words a language's UI keeps as they are (Online, Gateway, Beta in
+  some). The gate's share of English messages is now 25 to 58 in about
+  1,020 per language (French the most, many of them French words that
+  are spelt as in English), under its limit of 12 in 100.
+- **Not done.** No native speaker has read them. Wording the translator
+  marked as unsure (for example the Italian `code-sheet-keep` and
+  `admin-lost`, the French `admin-warning-takeover`) is listed in the
+  pull request for a reader of that language.

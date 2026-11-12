@@ -65,8 +65,7 @@ hero-offline = Partidas solo e o montador de decks funcionam offline, sem conta.
 hero-account = Vai jogar online? <register>Crie uma conta</register>, gratuita e aberta a todos no beta aberto, ou <signin>entre</signin>.
 hero-memorial = Lembre-se da Baylee: abra o álbum de fotos dela
 
-# English for now: to be translated.
-status-label = Baylee in numbers
+status-label = O Baylee em números
 
 cards-eyebrow = Os cards
 cards-title = Quantos cards o Baylee conhece
@@ -257,8 +256,7 @@ privacy-views-title = A contagem de páginas vistas
 privacy-views = O site conta quantas vezes suas páginas são abertas: um único número para todas as páginas e todos os visitantes juntos, exibido na página inicial. Uma página aberta em um navegador soma um a ele. Nada sobre você é armazenado para isso: nem endereço IP, nem cookie, nem identificador, nem mesmo qual era a página.
 privacy-device-title = O que o seu navegador guarda
 privacy-device = Este site não define nenhum cookie até você entrar. O que o seu navegador guarda no seu dispositivo, e somente com JavaScript: sua escolha de cores, se você fez uma (<code>baylee-site-theme</code>); enquanto você está conectado, quando a sua sessão termina (<code>baylee-central-session</code>), sua chave de chat e as chaves confiáveis dos seus contatos (veja Chat); se você ativou as notificações, um número aleatório para este dispositivo (<code>baylee-push-installation-v1</code>, <code>baylee-push</code>); e, somente depois de você ter entrado, instalado o site como aplicativo ou ativado as notificações, uma cópia dos arquivos públicos do site (estrutura das páginas, fontes, scripts), para que ele inicie sem conexão e as notificações possam chegar. Se nenhuma das três situações valer mais, a cópia é removida na próxima vez que você abrir o site. Nada disso é enviado a nós, a menos que uma seção abaixo diga isso. Os registros de chat e de sessão são apagados quando você sai; você remove todo o resto limpando os dados do site no seu navegador. Base legal: § 25, n.º 2, item 2, da TDDDG (estritamente necessário para a função que você usa); para o número aleatório das notificações, o seu consentimento (§ 25, n.º 1, da TDDDG).
-# English for now: to be translated.
-privacy-device-manager = If you keep your recovery code in your browser's password manager, mail it to yourself, save it as a file or print it on the step that shows it, your browser, your mail program, your files or your paper keep it, never this site: the code is made in your browser and never sent to us. Clearing the site's data does not remove it from there.
+privacy-device-manager = Se você guarda seu código de recuperação no gerenciador de senhas do navegador, o envia por e-mail para si mesmo, o salva como arquivo ou o imprime no passo que o mostra, quem o guarda é o seu navegador, o seu programa de e-mail, os seus arquivos ou o seu papel, nunca este site: o código é gerado no seu navegador e nunca é enviado a nós. Limpar os dados do site não o remove de lá.
 privacy-github-title = GitHub
 privacy-github = A página de download e a página inicial mostram a versão mais recente, o estado dos testes e os números dos cards. Nosso servidor os pede ao GitHub, não o seu navegador; com isso, o GitHub não fica sabendo nada sobre você. Somente quando você clica em um link de download ou do GitHub o seu navegador se conecta ao GitHub (GitHub, Inc., EUA) e lhe envia seu endereço IP e o que toda requisição carrega; a partir daí vale o aviso de privacidade do próprio GitHub.
 privacy-directory-title = O diretório de gateways
@@ -498,24 +496,23 @@ code-later = Agora não
 code-copy = Copiar
 code-copied = Copiado.
 code-copy-failed = Copiar não funcionou aqui. Selecione o código e copie-o à mão.
-# English for now: to be translated.
-code-print = Print
-code-manager = Save in password manager
-code-manager-id = Baylee recovery code ({ $name })
-code-manager-offered = Your browser was offered the code. If it asked you, check that it saved it.
-code-manager-failed = Your browser did not take the code. Keep it another way.
-code-mail = Mail it to myself
-code-mail-warning = Careful: the code then lies in your mailbox. Whoever can read your mail can also have a reset code sent there, and with both reset your sign-in and open your encrypted data.
-code-mail-subject = My Baylee recovery code
-code-sheet-title = Baylee recovery code
-code-sheet-name = Sign-in name: { $name }
-code-sheet-what = With this code your encrypted Baylee data survives a forgotten password: you enter it on the reset page, together with a reset code.
-code-sheet-keep = Keep it where only you can reach it. Nobody at Baylee will ever ask you for it.
-code-email-label = E-mail address (optional)
-code-email-hint = For a reset code if you forget your password. After this step we mail a code to confirm the address; you can also add one later in your account.
-code-email-step-title = Confirm your e-mail address
-code-email-step-lead = Enter the code from the mail here, or later on your account's security page.
-code-email-step-done = Continue to your account
+code-print = Imprimir
+code-manager = Salvar no gerenciador de senhas
+code-manager-id = Código de recuperação do Baylee ({ $name })
+code-manager-offered = O código foi oferecido ao seu navegador. Se ele perguntou a você, confira se o salvou.
+code-manager-failed = Seu navegador não aceitou o código. Guarde-o de outra forma.
+code-mail = Enviar a mim mesmo por e-mail
+code-mail-warning = Cuidado: o código fica então na sua caixa de e-mail. Quem puder ler o seu e-mail também pode pedir que um código de redefinição seja enviado para lá e, com os dois, redefinir a sua entrada e abrir os seus dados criptografados.
+code-mail-subject = Meu código de recuperação do Baylee
+code-sheet-title = Código de recuperação do Baylee
+code-sheet-name = Nome de entrada: { $name }
+code-sheet-what = Com este código, seus dados criptografados do Baylee sobrevivem a uma senha esquecida: você o informa na página de redefinição, junto com um código de redefinição.
+code-sheet-keep = Guarde-o onde só você possa alcançá-lo. Ninguém do Baylee jamais vai pedi-lo.
+code-email-label = Endereço de e-mail (opcional)
+code-email-hint = Para um código de redefinição, caso você esqueça a senha. Depois deste passo, enviamos um código por e-mail para confirmar o endereço; você também pode adicionar um depois, na sua conta.
+code-email-step-title = Confirme seu endereço de e-mail
+code-email-step-lead = Digite aqui o código do e-mail, ou depois, na página de segurança da sua conta.
+code-email-step-done = Continuar para a sua conta
 
 ## Setting a new password with a reset code
 
@@ -606,8 +603,7 @@ email-removed = Seu endereço de e-mail foi removido.
 email-busy = Muitos e-mails por enquanto. Tente de novo mais tarde.
 email-same = Este já é o seu endereço.
 email-unsure = Nenhuma resposta voltou, então não sabemos dizer se isso deu certo. Veja o que é mostrado aqui e tente de novo se não deu.
-# English for now: to be translated.
-email-again = To send the code, enter your password once more.
+email-again = Para enviar o código, informe sua senha mais uma vez.
 
 ## Central's terms
 
@@ -1012,8 +1008,7 @@ ai-training = Ao lado da IA da casa e da ponte externa para LLMs, uma IA nativa 
 ai-hostingLink = Hospedagem de gateway e configuração de LLM
 
 # The gateways and the contact page, as the old site wrote them (owner, 11.11.2026)
-# English for now: to be translated.
-gw-lead = A gateway is a server where online tables live: accounts, decks, rooms and one engine process per game. These are the ones registered with Baylee Central and approved by its administrator. Each is run by its operators for their groups, and their own rules apply there. A listing is not a promise about what a gateway does.
+gw-lead = Um gateway é um servidor onde ficam as mesas online: contas, decks, salas e um processo do motor por partida. Estes são os registrados no Baylee Central e aprovados pelo administrador dele. Cada um é executado por seus operadores para os grupos deles, e valem as regras de cada um. Estar na lista não é uma promessa sobre o que um gateway faz.
 gw-howTo = Para jogar em um, copie o endereço dele para a porta de entrada do cliente. Online significa que o Central ouviu o gateway no último minuto e meio; não é promessa de que ele responda. Os nomes e as versões são o que cada operador informa.
 gw-find = Encontrar um gateway
 gw-findHint = Nome ou endereço
@@ -1221,52 +1216,51 @@ sec-teaser-more = Veja cada passo em um diagrama
 register-solving = O seu navegador está resolvendo um quebra-cabeça que mantém os robôs de fora. Quando muitas contas estão sendo criadas, isso pode levar alguns minutos … { $percent } %
 
 ## An administrator makes a reset code (/account/admin)
-# English for now: to be translated.
-admin-reset-title = Reset a login
-admin-reset-lead = Find the account of the person who asked you, and make a reset code for it. With the code they set a new password on the reset page.
-admin-find = Find the account
-admin-only = This page is only for administrators.
-admin-search = Search accounts
-admin-search-hint = Part of a sign-in name or a display name, or # and a tag. Leave it empty to list every account, newest first.
-admin-search-submit = Search
-admin-search-error = A search is 1 to 64 plain characters without accents, or # and a tag such as #1a2b.
-admin-count = Accounts shown: { $count }
-admin-none = No account matches this search.
-admin-more = Show more
-admin-open = Open
-admin-back = Back
-admin-pill = Administrator
-admin-state = State
-admin-state-pending = Reserved, never set up
-admin-state-enrolled = Set up
-admin-state-restored = In use
-admin-created = Created
-admin-last-sign-in = Last sign-in
-admin-recovery = Recovery code
-admin-yes = Yes
-admin-no = No
-admin-reset-outstanding = An unused reset code is valid until { $time }. Whether an administrator made it or it went by e-mail, Central does not say. A new code replaces it.
-admin-reset = Reset login
-admin-refused-admin = This account holds the administrator role, and Central makes no reset code for an administrator's account. Remove the role first.
-admin-refused-own = This is your own account, and nobody makes a reset code for their own. Change your password under Security instead.
-admin-refused-pending = This account was reserved and never set up, so it has no sign-in to reset.
-admin-refused-moving = This account's move from the official gateway is not finished. Until it is, its sign-in is reset there, not here.
-admin-refused-stale = Baylee Central counts your sign-in as older than 30 minutes. Try again; you enter your password once more.
-admin-refused-role = Your account no longer holds the administrator role.
-admin-refused-gone = This account no longer exists.
-admin-switched = This browser is signed in as another account now, so no code was asked for. Load the page again.
-admin-lost = No answer came back, so we cannot tell whether a code was made. If one was, nobody can show it again, and it already replaced any earlier code. Make a new one: it replaces that one in turn.
-admin-warning-title = Before you make a code
-admin-warning-who = Check outside this site that the person asking really holds this account, for example by a call or on a channel you already know them by. Whoever has the code can set a new password.
-admin-warning-ends = Making a code ends nothing: the old password keeps working until the code is used, and every device stays signed in.
-admin-warning-data = The person's encrypted data survives the reset only with their recovery code or on a device that is still signed in. Without either, they start with an empty vault.
-admin-warning-replaces = A new code replaces any earlier one, one sent by e-mail included. It is valid for 24 hours and works once.
-admin-warning-takeover = A reset code answers a forgotten password, not a taken-over account: an intruder's sessions and the old password stay until the code is used, and for good if it never is.
-admin-warning-continue = I have checked who is asking
-admin-password-hint = Making a code needs a sign-in less than 30 minutes old, so you enter your password once more. It stays in this browser.
-admin-password-missing = Enter your password.
-admin-make = Make the reset code
-admin-code-title = The reset code
-admin-code-until = Valid until { $time }, and only once.
-admin-code-lead = Hand it to the person who asked, on a channel you trust. It is shown only now: neither Baylee Central nor this page can show it again. If it gets lost, make a new one.
-admin-code-done = Done
+admin-reset-title = Redefinir uma entrada
+admin-reset-lead = Encontre a conta da pessoa que pediu a você e gere um código de redefinição para ela. Com o código, ela define uma nova senha na página de redefinição.
+admin-find = Encontrar a conta
+admin-only = Esta página é só para administradores.
+admin-search = Buscar contas
+admin-search-hint = Parte de um nome de entrada ou de um nome de exibição, ou # e uma tag. Deixe vazio para listar todas as contas, das mais novas às mais antigas.
+admin-search-submit = Buscar
+admin-search-error = Uma busca tem de 1 a 64 caracteres simples, sem acentos, ou # e uma tag como #1a2b.
+admin-count = Contas exibidas: { $count }
+admin-none = Nenhuma conta corresponde a esta busca.
+admin-more = Mostrar mais
+admin-open = Abrir
+admin-back = Voltar
+admin-pill = Administrador
+admin-state = Estado
+admin-state-pending = Reservada, nunca configurada
+admin-state-enrolled = Configurada
+admin-state-restored = Em uso
+admin-created = Criada em
+admin-last-sign-in = Última entrada
+admin-recovery = Código de recuperação
+admin-yes = Sim
+admin-no = Não
+admin-reset-outstanding = Um código de redefinição não usado vale até { $time }. Se um administrador o gerou ou se ele foi por e-mail, o Central não informa. Um novo código o substitui.
+admin-reset = Redefinir a entrada
+admin-refused-admin = Esta conta tem a função de administrador, e o Central não gera código de redefinição para a conta de um administrador. Remova a função primeiro.
+admin-refused-own = Esta é a sua própria conta, e ninguém gera um código de redefinição para a própria conta. Altere sua senha em Segurança.
+admin-refused-pending = Esta conta foi reservada e nunca configurada, então não tem entrada para redefinir.
+admin-refused-moving = A mudança desta conta a partir do gateway oficial não terminou. Até terminar, a entrada dela é redefinida lá, não aqui.
+admin-refused-stale = O Baylee Central considera sua entrada mais antiga que 30 minutos. Tente de novo; você informa sua senha mais uma vez.
+admin-refused-role = Sua conta não tem mais a função de administrador.
+admin-refused-gone = Esta conta não existe mais.
+admin-switched = Este navegador agora está conectado como outra conta, então nenhum código foi pedido. Carregue a página de novo.
+admin-lost = Nenhuma resposta voltou, então não sabemos dizer se um código foi gerado. Se foi, ninguém pode mostrá-lo de novo, e ele já substituiu qualquer código anterior. Gere um novo: ele substitui aquele por sua vez.
+admin-warning-title = Antes de gerar um código
+admin-warning-who = Confira fora deste site que a pessoa que pede realmente tem esta conta, por exemplo por uma ligação ou por um canal em que você já a conheça. Quem tiver o código pode definir uma nova senha.
+admin-warning-ends = Gerar um código não encerra nada: a senha antiga continua funcionando até o código ser usado, e todos os dispositivos continuam conectados.
+admin-warning-data = Os dados criptografados da pessoa sobrevivem à redefinição só com o código de recuperação dela ou em um dispositivo que ainda esteja conectado. Sem nenhum dos dois, ela recomeça com um cofre vazio.
+admin-warning-replaces = Um novo código substitui qualquer anterior, inclusive um enviado por e-mail. Vale por 24 horas e funciona uma única vez.
+admin-warning-takeover = Um código de redefinição responde a uma senha esquecida, não a uma conta tomada: as sessões de um invasor e a senha antiga ficam até o código ser usado, e para sempre se ele nunca for.
+admin-warning-continue = Conferi quem está pedindo
+admin-password-hint = Gerar um código exige uma entrada com menos de 30 minutos, então você informa sua senha mais uma vez. Ela fica neste navegador.
+admin-password-missing = Informe sua senha.
+admin-make = Gerar o código de redefinição
+admin-code-title = O código de redefinição
+admin-code-until = Vale até { $time }, e uma única vez.
+admin-code-lead = Entregue-o à pessoa que pediu, por um canal em que você confia. Ele é mostrado só agora: nem o Baylee Central nem esta página podem mostrá-lo de novo. Se ele se perder, gere um novo.
+admin-code-done = Concluído

@@ -38,27 +38,25 @@ notice-check = Si no fuiste tú, inicia sesión y revisa la página de seguridad
 notice-link = Abrir la página de seguridad
 
 # The notices to the account's confirmed address that its login changed.
-# Not translated yet: English until a translation replaces these lines.
-reset-done-subject = The password of your Baylee account was reset
-reset-done-title = A new password was set
-reset-done-body = A reset code was used to set a new password for the Baylee account of this address.
-reset-done-kept = The account's data was kept.
-reset-done-new = The account starts with an empty vault. Its data from before cannot be opened any more.
-reset-done-sessions = The account is signed out everywhere: every session it had was ended.
-reset-done-not-you = If this was not you, someone else can sign in to your account now. Ask a Baylee administrator for a reset code and set your own password again.
-reset-done-recovery-kept = If the account has a recovery code, it still opens the data. Keep it: with it, a reset keeps the data.
-reset-done-recovery-new = A recovery code from before this reset opens nothing any more.
-password-subject = The password of your Baylee account was changed
-password-title = The password was changed
-password-body = The password of the Baylee account of this address was changed.
-password-sessions = Every other session of the account was signed out.
-password-not-you = If this was not you, someone else knows your password. Set a new one with a reset code: ask for one on the reset page, or ask a Baylee administrator.
-issued-subject = A reset code was made for your Baylee account
-issued-title = An administrator made a reset code
-issued-body = A Baylee administrator made a reset code for the Baylee account of this address. With it, a new password can be set for the account.
-issued-valid = The code works once, for { $hours } hours. Until it is used, your password works as it did.
-issued-not-you = If you did not ask for it, sign in and change your password on the security page: that ends the code. Then tell an administrator.
+reset-done-subject = Se restableció la contraseña de tu cuenta de Baylee
+reset-done-title = Se estableció una contraseña nueva
+reset-done-body = Se usó un código de restablecimiento para establecer una contraseña nueva en la cuenta de Baylee de esta dirección.
+reset-done-kept = Los datos de la cuenta se conservaron.
+reset-done-new = La cuenta empieza con una bóveda vacía. Sus datos de antes ya no se pueden abrir.
+reset-done-sessions = Se cerró la sesión de la cuenta en todas partes: terminaron todas las sesiones que tenía.
+reset-done-not-you = Si no fuiste tú, otra persona puede iniciar sesión ahora en tu cuenta. Pide un código de restablecimiento a un administrador de Baylee y establece de nuevo tu propia contraseña.
+reset-done-recovery-kept = Si la cuenta tiene un código de recuperación, sigue abriendo los datos. Guárdalo: con él, un restablecimiento conserva los datos.
+reset-done-recovery-new = Un código de recuperación anterior a este restablecimiento ya no abre nada.
+password-subject = Se cambió la contraseña de tu cuenta de Baylee
+password-title = Se cambió la contraseña
+password-body = Se cambió la contraseña de la cuenta de Baylee de esta dirección.
+password-sessions = Se cerró la sesión de todas las demás sesiones de la cuenta.
+password-not-you = Si no fuiste tú, otra persona conoce tu contraseña. Establece una nueva con un código de restablecimiento: pídelo en la página de restablecimiento o pídeselo a un administrador de Baylee.
+issued-subject = Se generó un código de restablecimiento para tu cuenta de Baylee
+issued-title = Un administrador generó un código de restablecimiento
+issued-body = Un administrador de Baylee generó un código de restablecimiento para la cuenta de Baylee de esta dirección. Con él se puede establecer una contraseña nueva para la cuenta.
+issued-valid = El código funciona una sola vez, durante { $hours } horas. Hasta que se use, tu contraseña funciona como antes.
+issued-not-you = Si no lo pediste, inicia sesión y cambia tu contraseña en la página de seguridad: eso anula el código. Después díselo a un administrador.
 
-# English for now: to be translated.
 # The confirmation mail's button, which opens the security page with the code filled in.
-confirm-link = Confirm address
+confirm-link = Confirmar la dirección
