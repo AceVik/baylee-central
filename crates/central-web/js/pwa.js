@@ -52,11 +52,14 @@ if (root && window.isSecureContext) {
       .then(watch)
       .catch(() => {});
   } else {
-    // the cache goes even where no worker is left: one that was still
-    // answering as it was removed may have written once more
+    // The worker goes on answering for this page after it is removed, so it
+    // is retired first: it stops reading and writing its cache and takes
+    // the cache away once what it was writing is written. The cache goes
+    // here too, even where no worker is left or the worker did not answer.
     root
       .getRegistration("/")
       .then(async (registration) => {
+        await retire(registration?.active);
         await registration?.unregister();
         const names = await caches.keys();
         await Promise.all(
@@ -65,6 +68,25 @@ if (root && window.isSecureContext) {
       })
       .catch(() => {});
   }
+}
+
+// Asks `worker` to retire and waits for its word, three seconds at most.
+function retire(worker) {
+  if (!worker) return Promise.resolve();
+  return new Promise((resolve) => {
+    const channel = new MessageChannel();
+    const over = () => {
+      channel.port1.close();
+      resolve();
+    };
+    channel.port1.onmessage = over;
+    setTimeout(over, 3000);
+    try {
+      worker.postMessage({ type: "RETIRE" }, [channel.port2]);
+    } catch {
+      over();
+    }
+  });
 }
 
 function unsent() {

@@ -72,6 +72,31 @@ test("a reader gets no worker, and after signing out it goes with its cache", as
   await page.reload();
   await expect.poll(() => page.evaluate(async () => (await navigator.serviceWorker.getRegistrations()).length)).toBe(0);
   await expect.poll(() => page.evaluate(async () => (await caches.keys()).length)).toBe(0);
+  // The removed worker still answers for this page. It was retired first,
+  // so a file the page fetches later makes no cache again (12.11.2026: a
+  // fetch under way while the cache went made it once more).
+  expect(await page.evaluate(() => navigator.serviceWorker.controller !== null)).toBe(true);
+  const sheet = await page.locator('link[rel="stylesheet"]').first().getAttribute("href");
+  expect(sheet).toMatch(/^\/assets\/.+\.[0-9a-f]{12}\.css$/);
+  expect(await page.evaluate(async (href) => (await fetch(href)).ok, sheet ?? "")).toBe(true);
+  await page.waitForLoadState("networkidle");
+  expect(await page.evaluate(async () => (await caches.keys()).length)).toBe(0);
+
+  // signed in again, a worker comes with its cache: what was retired is not in its way
+  await page.evaluate(SIGNED_IN);
+  await page.reload();
+  await page.evaluate(async () => {
+    await navigator.serviceWorker.ready;
+  });
+  await expect
+    .poll(() =>
+      page.evaluate(async () => {
+        const name = (await caches.keys()).find((key) => key.startsWith("baylee-site-"));
+        if (name === undefined) return false;
+        return (await (await caches.open(name)).keys()).some((request) => new URL(request.url).pathname === "/en/offline");
+      }),
+    )
+    .toBe(true);
 });
 
 test("a device with notifications on keeps its worker past the sign-in", async ({ page }) => {
