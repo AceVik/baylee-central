@@ -6743,7 +6743,14 @@ What remains, and why it is acceptable:
   Links, Gmail's link checks and similar gateways rewrite or fetch the
   link and see the whole address, fragment included, as they see the mail
   and its code in the text. They learn nothing they did not have, and
-  their fetch submits nothing.
+  their fetch submits nothing. Seen in Gmail's web view on 12.11.2026:
+  each link carries a `data-saferedirecturl` to `www.google.com/url`, and
+  a click goes through that address with the whole link, `#code=` and
+  all, in its query. The browser's history may then hold Google's address
+  with the code as well, an entry on another site that the page cannot
+  replace; it is accepted on the same grounds as the first bullet (one
+  use, 15 minutes or one hour, the person's own history, a provider that
+  holds the mail).
 - **A link in a tab that shows the page already** is a move within the
   page, which runs no island; on such a change to `#code=` the fragment is
   removed as at the start (`fragment::watch`) and fills nothing. Loading
