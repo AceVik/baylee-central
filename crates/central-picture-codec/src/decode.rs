@@ -305,11 +305,11 @@ const SVG_ELEMENTS: usize = 20_000;
 /// centred square of its own size, rasterised straight at 256 × 256. No
 /// reference is resolved: images, fonts and files stay unloaded.
 pub(crate) fn svg(bytes: &[u8]) -> Result<Raster, Refusal> {
+    use resvg::{tiny_skia, usvg};
     // An entity declared anywhere, even where the scan would not look.
     if bytes.windows(8).any(|w| w == b"<!ENTITY") {
         return Err(Refusal::Unsupported);
     }
-    use resvg::{tiny_skia, usvg};
     shallow(bytes)?;
     let options = usvg::Options {
         resources_dir: None,

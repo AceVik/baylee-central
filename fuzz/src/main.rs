@@ -225,7 +225,8 @@ fn convert(
             png: c.png,
             motion: c.motion,
         }),
-        None => central_picture_codec::convert(format, bytes),
+        // uncaught, so a decoder's panic is a finding, not a refusal
+        None => central_picture_codec::convert_uncaught(format, bytes),
     }
 }
 
