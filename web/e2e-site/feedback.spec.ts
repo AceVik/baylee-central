@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 
 import { expect, type Locator, type Page, test } from "@playwright/test";
 
-import { HOSTILE, ME, OTHER_ADMIN, actions, asked, filter, harmless, hex, id, open, sound, world } from "./feedback-stand-in.ts";
+import { HOSTILE, ME, OTHER_ADMIN, actions, asked, filter, harmless, hex, id, named, open, sound, world } from "./feedback-stand-in.ts";
 
 // The feedback moderation's list (crates/central-web/src/islands/feedback/
 // list.rs) in a real browser against the stand-in Central of
@@ -20,7 +20,7 @@ test.use({ serviceWorkers: "block" });
 const rows = (page: Page) => page.locator(".fb-results .fb-table tbody tr");
 const button = (page: Page, name: string) => page.getByRole("button", { name, exact: true });
 /** The newest page of the list asked for (the trash's count asks for one report). */
-const lastReports = (seen: Parameters<typeof asked>[0]) => asked(seen).filter((r) => r["action"] === "reports" && r["limit"] !== 1).at(-1);
+const lastReports = (seen: Parameters<typeof asked>[0]) => asked(seen).findLast((r) => r["action"] === "reports" && r["limit"] !== 1);
 const check = (page: Page, n: number) => page.locator(`#fb-check-${hex(id(n))}`);
 
 /** Tab leads through `stops` in this order, starting behind `from`. */
@@ -138,7 +138,7 @@ test("a view, a search, filters, an order and a page go into the address and int
   expect(lastReports(o.seen)).toMatchObject({ sort: "status", descending: true });
 
   // pages: 25 a page, the second after the first 25
-  const base = w.reports[1]!;
+  const base = named(w, "Report number 11");
   w.reports = Array.from({ length: 30 }, (_, i) => {
     const r = structuredClone(base);
     Object.assign(r.summary, { id: id(30 + i), status: "new", seen: false, excerpt: `Many ${i}` });
@@ -199,7 +199,7 @@ test("a selection: one request for all of it, the trash with Undo, opened marks,
   await expect(bar.locator("strong")).toHaveText("Selected: 2");
   await sound(page);
   const two = [id(10), id(15)];
-  const bulkAt = () => asked(o.seen).filter((r) => r["action"] === "reports_bulk").at(-1);
+  const bulkAt = () => asked(o.seen).findLast((r) => r["action"] === "reports_bulk");
 
   await page.locator("#fb-bulk-status").selectOption("triaged");
   await expect(page.locator(".fb-notice").last()).toHaveText(/Reports changed: 2/);
@@ -253,15 +253,23 @@ test("deleting for good is asked first, wants a fresh sign-in, and is sent once"
   const o = await open(page, w, `${LIST}?trash=1`);
   await expect(rows(page)).toHaveCount(2);
   await expect(page.getByText("Reports in the trash are deleted for good after 30 days.")).toBeVisible();
+  // restored from the trash, both in one request
   await check(page, 16).check();
   await check(page, 17).check();
   const bar = page.locator(".fb-bulk");
-  await expect(bar.getByRole("button", { name: "Restore" })).toBeVisible();
+  await bar.getByRole("button", { name: "Restore" }).click();
+  await expect(rows(page)).toHaveCount(0);
+  expect(asked(o.seen).find((r) => r["action"] === "reports_bulk")).toEqual({ action: "reports_bulk", reports: [id(16), id(17)], bulk: { do: "restore" } });
+  for (const n of [16, 17]) named(w, `Report number ${n}`).summary.deleted_at = 1;
+  await button(page, "Refresh").click();
+  await expect(rows(page)).toHaveCount(2);
+  await check(page, 16).check();
+  await check(page, 17).check();
   const from = o.seen.length;
   await page.locator("#fb-bulk-purge").click();
   const confirm = page.locator(".fb-confirm");
   await expect(page.locator("#fb-purge-title")).toBeFocused();
-  await expect(confirm).toContainText("This removes 2 reports with their notes, history and parts from Baylee Central for good.");
+  await expect(confirm).toContainText("Reports to delete: 2. They leave Baylee Central for good, with their notes, history and parts.");
   await sound(page);
   // the question sends nothing; cancelled, nothing was asked
   await confirm.getByRole("button", { name: "Cancel" }).click();
@@ -296,15 +304,28 @@ test("deleting for good: Central's refusal and an answer that never came are sai
   await expect(rows(page)).toHaveCount(2);
   await check(page, 16).check();
   // a report restored meanwhile: Central deletes nothing
-  w.reports.find((r) => r.summary.excerpt === "Report number 16")!.summary.deleted_at = null;
+  named(w, "Report number 16").summary.deleted_at = null;
   await page.locator("#fb-bulk-purge").click();
   await page.locator("#fb-purge-go").click();
   await expect(page.locator(".fb-notice.bad")).toContainText("Baylee Central deleted nothing: a report is no longer in the trash, or no longer exists.");
   await expect(rows(page)).toHaveCount(1);
-  // no answer: perhaps deleted, so the list is read again
+  // Central counts the sign-in as stale though this browser's clock does not:
+  // the reports still in the trash tell it, and the password is asked
   await check(page, 17).check();
+  w.staleUnseen = true;
+  let from = o.seen.length;
+  await page.locator("#fb-bulk-purge").click();
+  await page.locator("#fb-purge-go").click();
+  await expect(page.locator("#fb-purge-password")).toBeFocused();
+  await expect(page.locator(".fb-confirm [role=alert]")).toHaveText(
+    "Baylee Central counts your sign-in as older than 30 minutes. Try again; you enter your password once more.",
+  );
+  expect(actions(o.seen, from)).toEqual(["reports_bulk", "report"]);
+  await page.locator(".fb-confirm").getByRole("button", { name: "Cancel" }).click();
+  w.staleUnseen = false;
+  // no answer: perhaps deleted, so the list is read again
   w.next["reports_bulk"] = "lost";
-  const from = o.seen.length;
+  from = o.seen.length;
   await page.locator("#fb-bulk-purge").click();
   await page.locator("#fb-purge-go").click();
   await expect(page.locator(".fb-notice.bad").last()).toContainText("No answer came back, so this page cannot tell whether the reports were deleted.");

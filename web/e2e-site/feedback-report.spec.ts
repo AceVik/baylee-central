@@ -1,6 +1,6 @@
 import { expect, type Locator, type Page, test } from "@playwright/test";
 
-import { HOSTILE, HOSTILE_TOKEN, ME, OTHER_ADMIN, actions, asked, filter, harmless, hex, id, open, sound, world } from "./feedback-stand-in.ts";
+import { HOSTILE, HOSTILE_TOKEN, ME, OTHER_ADMIN, actions, asked, filter, harmless, hex, id, named, open, sound, world } from "./feedback-stand-in.ts";
 
 // One report of the feedback moderation (crates/central-web/src/islands/
 // feedback/report.rs) in a real browser against the stand-in Central of
@@ -17,7 +17,7 @@ test.use({ serviceWorkers: "block" });
 
 const button = (page: Page, name: string) => page.getByRole("button", { name, exact: true });
 const section = (page: Page, name: string) => page.getByRole("region", { name, exact: true });
-const lastChange = (seen: Parameters<typeof asked>[0]) => asked(seen).filter((r) => r["action"] === "set_report").at(-1);
+const lastChange = (seen: Parameters<typeof asked>[0]) => asked(seen).findLast((r) => r["action"] === "set_report");
 
 /** Tab leads through `stops` in this order, starting behind `from`. */
 async function tabs(page: Page, from: Locator, stops: Locator[]) {
@@ -152,7 +152,7 @@ test("triage: each change is one request at the revision read; a conflict and a 
   await sound(page);
 
   // another administrator changed it meanwhile: read again, said, decided again
-  w.reports.find((r) => r.summary.excerpt.startsWith("=HYPERLINK"))!.summary.revision += 5;
+  named(w, "=HYPERLINK").summary.revision += 5;
   let from = o.seen.length;
   await page.locator("#fb-status-resolved").click();
   await expect(page.locator("#fb-report-error")).toHaveText("Another administrator changed this report meanwhile. It shows the report as it is now: decide again.");
@@ -210,12 +210,17 @@ test("the trash: moved with Undo, and deleting for good is asked first, sent onc
   expect(asked(o.seen)).toContainEqual({ action: "restore_report", report: id(13) });
   await button(page, "Move to the trash").click();
   await expect(page.locator(".fb-trashed")).toBeVisible();
+  await page.locator("#fb-restore").click();
+  await expect(page.locator(".fb-trashed")).toHaveCount(0);
+  expect(asked(o.seen).filter((x) => x["action"] === "restore_report")).toHaveLength(2);
+  await button(page, "Move to the trash").click();
+  await expect(page.locator(".fb-trashed")).toBeVisible();
   await sound(page);
 
   const from = o.seen.length;
   await page.locator("#fb-purge").click();
   await expect(page.locator("#fb-purge-title")).toBeFocused();
-  await expect(page.locator(".fb-confirm")).toContainText("This removes 1 reports");
+  await expect(page.locator(".fb-confirm")).toContainText("Reports to delete: 1.");
   expect(o.seen.slice(from)).toEqual([]);
   await sound(page);
   await page.locator("#fb-purge-go").dblclick();
