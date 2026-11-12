@@ -182,7 +182,9 @@ Nothing was measured on x86-64.
   `ops/central-picture@.service`): `DynamicUser`, `PrivateNetwork`,
   `RestrictAddressFamilies=none`, `ProtectSystem=strict`, no
   capabilities, `@system-service` minus `@privileged` and `@resources`,
-  `MemoryDenyWriteExecute`, a private `/tmp`, one CPU, 512 MiB, 32 tasks
+  `MemoryDenyWriteExecute`, `PrivateIPC`, nothing executable but the
+  worker, ffmpeg and the system's libraries (`NoExecPaths=/`, `ExecPaths=`),
+  a private 64 MiB `/tmp`, one CPU, 512 MiB, 32 tasks
   and 25 s; ffmpeg runs inside the same unit.
 
 **The output.** The centred square, averaged exactly to 256 px (integer
