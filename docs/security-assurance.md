@@ -5842,7 +5842,9 @@ is on the same host and reached over loopback only.
   our own: 40 bits, 15 minutes, given up at the fifth wrong code, its
   digest bound to the account. With 10 mails a day that is 50 guesses a
   day at 2^40, by a session that is signed in to the account already. The
-  code is never in a link and never stored.
+  code is never stored, and was never in a link. (Since the second round
+  of the mails, 12.11.2026, it is in the fragment of the mail's button and
+  nowhere else in a link: "The code in the mail button's fragment" below.)
 - **Mail first.** `set` and `resend` hand the mail over before the store
   keeps anything. The other order would have to undo a write when the
   mailer is down, and a `resend` would by then have ended a code that
@@ -6145,7 +6147,8 @@ account's owner is told and nobody else is told anything.
   it; a password change gives its new session five minutes in which it
   may name one).
 - **What it says.** No code; links only to the site's reset and security
-  pages; no administrator's name. **No account named**: the sign-in name
+  pages (and, since the second round, the site's start page in the
+  footer); no administrator's name. **No account named**: the sign-in name
   is half of what a reset by mail needs, these mails go out unasked, and
   the confirmation mail and the older notices name none. The cost, in the
   accepted limits: a mailbox that two accounts confirmed is not told which
@@ -6672,5 +6675,199 @@ none of them new), all seven passing when run again; 403 passed and one
 new test ran out of its time the second time, after which the new tests
 were given the longer time of the suite's other slow ones and passed
 again with `dialogs.spec.ts` and `email.spec.ts` (62 passed).
+
+Engineering review, not an audit.
+
+## The code in the mail button's fragment, and the mails' logo, 12 November 2026
+
+The owner asked that whoever comes to the page through the mail's button
+find the code filled in ("wähle einen guten sicheren weg"). Until now the
+rule was that no code is ever part of a link. The way chosen: the code
+travels in the fragment of the button's link and nowhere else
+([e-mail](email.md#the-code-in-the-buttons-link)). The reset mail's button
+links to `{site}/{lang}/reset#code=RESET-…`; the confirmation mail has a
+button now, to `{site}/{lang}/account/security#code=XXXX-XXXX`. The same
+round made the mails' second look (no rule of theirs changed but this
+one) and lets them show Baylee's logo where the mailer attaches it. No
+change to `central-api`, no migration, no new dependency, no change to
+`Cargo.lock`, no `web-sys` feature added.
+
+Design pass. The assets are the two codes. A reset code with the sign-in
+name takes the login (one hour, one use, the account's latest mailed one);
+a confirmation code makes the mailed address the account's, for a session
+already signed in to it (15 minutes, five tries). Both are in the mail
+already, as text: whoever reads the mail has them, link or no link. So
+the question is only what a link adds, and to whom.
+- **The fragment and nothing else.** A browser sends no fragment to the
+  server and puts none into a `Referer`, so the code is in no request, no
+  log of Central's, the website's, Caddy's or a proxy's, and the site
+  sends `Referrer-Policy: no-referrer` besides. A path or a query would be
+  in all of them. Never in any other link of a mail: the footer's link and
+  the notices' buttons carry none.
+- **Taken once, removed at once.** The island reads `location.hash` when
+  it starts, keeps only a code that its own parser takes (`ResetCode` on
+  the reset page, `MailCode` on the security page, with at most 64
+  letters, digits and hyphens before parsing), and removes any `#code=`
+  fragment with `history.replaceState`: the current entry of the history
+  is replaced, not added to, so going back or forward or reloading finds
+  no code. A code of the other kind or a malformed one fills nothing and
+  is removed the same way.
+- **Never by itself.** Nothing is sent because of the fragment; the
+  person presses the form's button. Mail providers and security gateways
+  open links to scan them: such a visit runs the page, perhaps, and
+  spends nothing, and a signed-out scanner's visit to the security page
+  asks Central nothing at all.
+- **The security page** has the code's field only while an address waits.
+  The code is kept in the island's memory until the section's first read
+  of Central's state and dropped there unless an address waits; signed
+  out, without mail or with the state unread, it is dropped without a
+  word. It never fills a field drawn later.
+- **Not stored, not logged.** The code lives in the field as a typed one
+  does. No `localStorage`, no console line, no request.
+- Decided against: a query (`?code=`), which every server and proxy logs
+  and a `Referer` carries; a code that submits itself (a scanner would
+  spend it, and a person could not see what is sent); a separate token
+  that stands for the code (one more secret with the same reach); putting
+  the sign-in name into the reset link too (it would make the link alone
+  a whole reset).
+
+What remains, and why it is acceptable:
+- **The browser's history may keep the first address.** The fragment is
+  in the address bar from the navigation until the island runs, which
+  waits for the page's largest paint; a browser may record that address
+  in its history or sync it before the replacement. Without script it is
+  never removed. The code there is one-use and short-lived (15 minutes,
+  one hour), the history is the person's own, and the mail that holds the
+  same code sits in the same person's mailbox, usually for longer.
+- **Mail providers and link rewriters see the address.** Outlook's Safe
+  Links, Gmail's link checks and similar gateways rewrite or fetch the
+  link and see the whole address, fragment included, as they see the mail
+  and its code in the text. They learn nothing they did not have, and
+  their fetch submits nothing.
+- **A link in a tab that shows the page already** is a move within the
+  page, which runs no island; on such a change to `#code=` the fragment is
+  removed as at the start (`fragment::watch`) and fills nothing. Loading
+  the page anew would fill it, and was decided against: it would throw
+  away a step the page shows once, a new vault's recovery code on the
+  reset page. The person types the code from the mail there.
+- **Whoever opens the mail's link on a shared computer** leaves the page
+  with the code in its field until it is sent or the tab closed, as a
+  typed code would be.
+
+The logo. A mail could show it by a remote address (a tracker, and
+nothing a reader loads by default) or as part of the mail: the mailer
+attaches it under `Content-ID: <baylee-logo>` and the HTML names
+`cid:baylee-logo`, so nothing is loaded from elsewhere. An older mailer
+refuses the request field `inline`, so Central asks for it only when the
+operator says the mailer has it (`"logo": true` in the `mail` block,
+default false); deployed in the wrong order, every mail is refused and
+logged as not handed over, and turning the flag off restores it. With the
+flag off the request and the HTML are as before.
+
+Implementation pass: looked at each boundary in turn.
+- **`central-mail`.** The code-bearing address is built by one function
+  (`with_code`), held in `Zeroizing` as the code is, and written into the
+  button and the text's line under it; the HTML escapes it as everything
+  else. The footer's start page and the notices' buttons take no code.
+  The logo is one fixed `<img>` with a fixed `cid:`, no value of the mail
+  in it.
+- **`central-web`.** `islands/fragment.rs`: a pure, host-tested parser
+  (`code`), and the browser's half through `js_sys::Reflect` (`take`,
+  `watch`), no new `web-sys` feature. The reset island takes the fragment
+  in `Form::early` beside the fields typed before it ran; the account
+  island takes it on every page of the area and keeps it for the security
+  page only, handing a `StoredValue` to the e-mail section, whose first
+  `load` takes it (`Option::take`) before it awaits anything.
+  `replaceState` is given the page's own address without its fragment,
+  so it cannot point elsewhere.
+- **Secrets.** The fragment's text is a `String` dropped at once; the
+  parsed code fills the field's signal, as typing does. Nothing prints it.
+
+Adversarial pass, with what was tested.
+- **Unit** (`central-mail`): every language and every mail, the links are
+  exactly the button's page (with `#code=` and that mail's own code for
+  the two code mails, nothing for the notices) and the start page; no
+  code before a `#`, no query, in the HTML and in the text; each code mail
+  shows its code once in its box and once in its link; with the logo, the
+  one image is the `cid:` one and the rest of the mail is unchanged; the
+  client sends `inline` only with the flag; both documents take the flag,
+  refuse a value that is no boolean and still refuse unknown fields.
+- **Unit** (`central-web`, `fragment.rs`): each page takes its own kind,
+  printed or as typed; the other kind, an encoded character, a second
+  field, a space, a wrong letter, a full-width digit, an upper-case name
+  and too long a text are no code; any `#code=` fragment is removed and a
+  place on the page is not.
+- **Browser** (`web/e2e-site`, `reset.spec.ts` and `email.spec.ts`, desktop
+  and phone, the real islands against a stand-in Central): the field is
+  filled, the address bar and `location.href` hold no fragment, the
+  history's entry was replaced (its length grew by one, back and forward
+  find no code, a reload fills nothing); no request to Central before the
+  person sends the form, and no request the page makes after its
+  navigation holds the code in its address or its `Referer` (the
+  navigations themselves are left out: Playwright reports them with the
+  fragment it was given, which a browser does not send); the form then
+  sends it; a code of the other kind, a recovery code, a cut code, an
+  encoded character, a second field and an empty one fill nothing and are
+  removed; another fragment stays; a code typed before the islands ran
+  stays; the link opened in a tab on the same page removes the fragment
+  and leaves the page as it was, a new vault's recovery code still shown.
+  On the security page: only `status` is read until the person
+  confirms; no address that waits, no mail, a session Central no longer
+  knows and no session remembered each drop the code (and the last asks
+  Central nothing); a first read that fails drops it, so the field is
+  empty after "Try again"; with no address that waits, an address named
+  afterwards whose answer is lost (the field drawn without being
+  cleared) has an empty field; another page of the area removes it and
+  keeps nothing for the security page.
+- **Mutants** (one build, both at once): the code filled where no address
+  waits, and the code kept after a first read that failed. Each was
+  caught by its own case, the field holding the code where it must be
+  empty. No mutant was run against `central-mail` or `fragment.rs`.
+
+Not tested.
+- Real mail programs and gateways: Outlook's Safe Links, Gmail's checks,
+  mailbox.org; the mails' second look and the logo in a real mail program
+  (the owner saw the first round and a quick logo test only).
+- Firefox and Safari; the history a browser syncs.
+- `e2e-real` (the mails through the mailer stand-in against a real
+  Central): its check of a mail's links was adapted to the new rule and
+  type-checked, not run.
+
+For the owner.
+- **The sign-in name is still typed** on the reset page: the link carries
+  only the code, so that the link alone is not a whole reset.
+- **Deploy the mailer with the picture first**, then set `"logo": true`
+  (operations, "Mail").
+- **Nine languages** have the confirmation mail's new button in English.
+- **A code that arrives while the page is open fills nothing.** Filling
+  it there without a reload is possible on the reset page's form step and,
+  by drawing the account area anew, on the security page; it was left out
+  as the smaller change.
+
+Checks, on the code of `b6c1a81`: `cargo fmt --all --check` and `cargo
+clippy --locked --workspace --all-targets -- -D warnings` pass, and the
+islands' `cargo clippy --locked -p central-web -p central-web-islands
+--target wasm32-unknown-unknown --lib -- -D warnings`; `cargo test --locked
+-p central-mail -p central-identity -p central-service -p central-web -p
+central-web-islands -p central-web-server` passes; `cargo xtask site`
+built the site. `cargo xtask gate` passed the format, the policy, both
+advisory scopes and clippy, and every test of every crate but one test of
+`xtask`'s own: `site::tests::no_language_is_english_under_another_name`
+finds 127 of French's 1023 website messages English, over its 12 %. This
+work changed no website words and no `xtask` code, so the test fails the
+same on the commit this work began from; the gate stopped there, and its
+last two steps were run by hand: the doc tests and the release build pass.
+In `web/`, `npm run typecheck` and `npm run lint` pass (`typecheck` does
+not cover `e2e-site`; the new tests there were checked against the
+strict settings separately and add no error). The site's browser suite
+(`e2e-site`, both projects): 527 passed, 4 skipped, and one failed,
+`admin.spec.ts`'s first administrator test, on finding ten animations
+with reduced motion asked for in the dark scheme; it fails the same with
+this work's website sources set back to the commit it began from. The
+mails were written in English and German, with and without the logo, and
+looked at in Chromium at 360 and 640 px, as drawn and inverted. Not run:
+`cargo xtask postgres`, `smoke`, `secrets`, `cargo audit` and `cargo deny`
+(no dependency and no migration changed; the service only reads one more
+optional field), and `e2e-real`.
 
 Engineering review, not an audit.
