@@ -53,7 +53,7 @@ reset-done-kept = Die Daten des Accounts sind geblieben.
 reset-done-new = Der Account fängt mit einem leeren Tresor an. Seine bisherigen Daten lassen sich nicht mehr öffnen.
 reset-done-sessions = Der Account ist überall abgemeldet: Jede seiner Sitzungen wurde beendet.
 reset-done-not-you = Wenn du das nicht warst, kann sich jetzt jemand anderes bei deinem Account anmelden. Bitte einen Administrator von Baylee um einen Reset-Code und setze wieder dein eigenes Passwort.
-reset-done-recovery-kept = Dein Wiederherstellungscode öffnet deine Daten weiterhin. Bewahre ihn auf: Mit ihm bleiben die Daten bei einem Reset erhalten.
+reset-done-recovery-kept = Hat der Account einen Wiederherstellungscode, öffnet er die Daten weiterhin. Bewahre ihn auf: Mit ihm bleiben die Daten bei einem Reset erhalten.
 reset-done-recovery-new = Ein Wiederherstellungscode von vor diesem Reset öffnet nichts mehr.
 
 # Das Passwort wurde geändert.

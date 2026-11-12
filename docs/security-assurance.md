@@ -6184,7 +6184,14 @@ Implementation pass: looked at each boundary in turn.
   the transaction that changes the login, after its lock. Nothing else in
   those statements changed. A storage failure of that `SELECT` fails the
   change, as any statement of the transaction would; it then commits
-  nothing.
+  nothing. This is the one way the notice can change an answer, and it was
+  chosen over a read after the commit (design pass).
+- **Words that are true for every account.** An account may have no
+  recovery code (a moved account's is optional, and a registered account
+  may not have made one yet), so the notice of a kept reset says that a
+  recovery code the account has still opens the data. The notice of a
+  changed password points to a reset code, which no administrator's
+  account gets; that is in the accepted limits.
 - **Without a mailer** nothing is queued, and an address read is dropped.
 - **Secrets and diagnostics.** `Told` prints nothing of what it holds, as
   before; `What` says which mail and, for a reset, whether a new vault
@@ -6236,12 +6243,12 @@ Adversarial pass, with what was tested.
   security page; the German words say what each change was, and the keep
   and new resets differ. The reset code's box is at 15 px with no added
   space, the confirmation code's unchanged.
-- **Mutants.** Seven changes were each caught by the unit tests: a notice
-  queued twice while it waits, a notice queued for a refusal or for an
-  account without an address, a committed change never told, a notice
-  queued without a mailer, the reset code's box back at 17 px, a new
-  message left in English in German, and an old message left in English
-  in French. Two more were tried against the real store, one fixture run
+- **Mutants.** Seven changes were each caught by the unit tests, one run
+  each: a notice queued twice while it waits, a notice queued for a
+  refusal or for an account without an address, a committed change never
+  told, a notice queued without a mailer, the reset code's box back at
+  17 px, a new message left in English in German, and an old message left
+  in English in French. Two more were tried against the real store, one fixture run
   each: a password change whose transaction reads no address (caught
   where the password notice must arrive) and a reset that reports the
   other vault (caught over the real listeners, where the reset that kept
@@ -6264,6 +6271,9 @@ For the owner.
   pt-br, ru, ja, ko, zh-hans and zh-hant until they are translated.
 - The notices name no account (above). If a mailbox is shared by two
   accounts, it is not told which one changed.
+- An administrator whose password was changed by someone else is told to
+  set a new one with a reset code, which their account cannot get while it
+  holds the role.
 - The privacy notice (`legal/privacy.*.md` § 3) gives the address's
   purposes as confirming it, sending reset codes and telling the old
   address when it is replaced or removed. Telling the address of a reset,
