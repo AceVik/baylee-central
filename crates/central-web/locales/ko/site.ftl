@@ -65,7 +65,8 @@ hero-offline = 솔로 대전과 덱 빌더는 계정 없이 오프라인에서 �
 hero-account = 온라인으로 플레이하나요? <register>계정을 만드세요</register>. 오픈 베타 동안 누구나 무료로 만들 수 있어요. 이미 계정이 있다면 <signin>로그인하세요</signin>.
 hero-memorial = Baylee를 기억해요: 사진 앨범 열기
 
-status-label = 숫자로 보는 Baylee
+# English for now: to be translated.
+status-label = Baylee in numbers
 
 cards-eyebrow = 카드
 cards-title = Baylee가 아는 카드의 수
@@ -980,7 +981,8 @@ ai-training = 하우스 AI와 외부 LLM 브리지 외에도, 결정론적 룰 �
 ai-hostingLink = Gateway 호스팅과 LLM 설정
 
 # The gateways and the contact page, as the old site wrote them (owner, 11.11.2026)
-gw-lead = Gateway는 온라인 테이블이 열리는 서버예요. 계정, 덱, 방, 게임당 엔진 프로세스 하나가 있어요. 여기 나온 것은 Baylee Central에 등록되고 관리자가 승인한 Gateway예요. 각 Gateway는 운영자가 자기 그룹을 위해 운영하며 그곳에서는 그들의 규칙이 적용돼요. 목록에 있다고 해서 Gateway가 무엇을 하는지 보증하는 것은 아니에요.
+# English for now: to be translated.
+gw-lead = A gateway is a server where online tables live: accounts, decks, rooms and one engine process per game. These are the ones registered with Baylee Central and approved by its administrator. Each is run by its operators for their groups, and their own rules apply there. A listing is not a promise about what a gateway does.
 gw-howTo = Gateway에서 플레이하려면 주소를 복사해 클라이언트의 첫 화면에 붙여 넣으세요. 온라인은 Central이 최근 1분 30초 안에 그 Gateway에서 소식을 받았다는 뜻이며, 응답한다는 보장은 아니에요. 이름과 버전은 각 운영자가 알려 준 그대로예요.
 gw-find = Gateway 찾기
 gw-findHint = 이름 또는 주소

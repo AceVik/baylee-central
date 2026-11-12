@@ -1348,8 +1348,8 @@ the card's stronger edge, the "Official" chip with `?show=official` (an
 old address with it shows every gateway) and `data-official` are gone,
 with `gws-official` and `gw-show-official` in all eleven languages. The
 directory's lead no longer says that Baylee runs the one marked official;
-each gateway is run by its operators (English and German by hand, the
-nine others edited by machine to drop that clause). Central's API is
+each gateway is run by its operators (English and German by hand; the
+nine others carry the English text until it is translated). Central's API is
 unchanged: its directory still names an official origin, and the site's
 server still lists that one first (`fetch.rs`) without marking it.
 `pages.rs` and `site.spec.ts` hold that the word and the marks are absent.
@@ -1359,8 +1359,9 @@ nothing of GitHub's is in it any more (the release, the checks, the last
 commit and the stars left; the source section and the download keep
 theirs, so nothing fetched went unused and the privacy notice stays true).
 What stays is ordered for a reader, the most telling first: the players
-the gateways report, of them in a game, the open tables and the running
-games (one term of the list, "as they report it", with four values), the
+the gateways report, of them in a game, the running games and the open
+tables (one term of the list, "as they report it", with four values, the
+three short ones first), the
 gateways online and not, Central's accounts, the playable cards (read from
 the release's `sets.json` on GitHub, but a figure of the game, not of the
 repository) and the page views. Each figure is a cell of its own, its glyph
@@ -1372,20 +1373,25 @@ line, the room shared out evenly; from 600 px at most four to a line, five
 and six as three and two or three and three, seven and eight as four and
 three or four and four; on a phone two to a line, three in one line as
 wide as their words, and five and seven with a first line of the gateways'
-three short counts, so that no line differs from another by more than one
+three short counts (the gateways' cell needs half a line), so that no line
+differs from another by more than one
 cell, the shorter is centred and no cell stands alone. A cell is as wide as
 its share of the line, so two lines' columns stand in line.
 `web/e2e-site/strip.spec.ts` holds the order, the absence of GitHub, axe
-and the 44 px targets, and measures the lines for every count the server
-can write at ten widths from 320 to 2560 px (and a phone's own) in
-English, German, French and Russian: counts per line, centring, equal
-gaps, nothing sticking out of its cell and no sideways scroll. `pages.rs` holds a cell for each
-reported figure under all sixteen sets of silent sources.
+and the 44 px targets, and measures the lines for all sixteen sets of
+silent sources at ten widths from 320 to 2560 px (and a phone's own) in
+all eleven languages: counts per line, centring, equal gaps, nothing
+sticking out of its cell and no sideways scroll. A cell's words may
+break inside it where its share is narrow (the gateways' two parts one
+above the other; in Japanese between phrases, `word-break: auto-phrase`,
+as the site's titles do). `pages.rs` holds a cell for each reported
+figure under all sixteen sets of silent sources.
 
 **Words.** Removed in all eleven languages: `theme-system`,
 `gws-official`, `gw-show-official`, `strip-build`, `strip-releases`,
 `strip-on-github` and `strip-stars` (the build does not refuse a message
 nobody calls, so they went by hand). Changed: `status-label` (the strip's
 name) and `gw-lead` (its sentence on the official gateway), English and
-German by hand, the nine others by machine, unread by a speaker. No new
-message.
+German by hand; the nine other languages carry the English text of both
+under "# English for now: to be translated.", as with §17's changed
+messages. No new message.

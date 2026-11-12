@@ -66,7 +66,8 @@ hero-offline = Le partite in solitaria e il deck builder funzionano offline, sen
 hero-account = Giochi online? <register>Crea un account</register>, gratuito e aperto a tutti durante la beta aperta, oppure <signin>accedi</signin>.
 hero-memorial = Ricorda Baylee: apri il suo album di foto
 
-status-label = Baylee in cifre
+# English for now: to be translated.
+status-label = Baylee in numbers
 
 cards-eyebrow = Le carte
 cards-title = Quante carte conosce Baylee
@@ -1016,7 +1017,8 @@ ai-training = Accanto all'IA della casa e al ponte LLM esterno, una IA nativa di
 ai-hostingLink = Hosting di gateway e configurazione LLM
 
 # The gateways and the contact page, as the old site wrote them (owner, 11.11.2026)
-gw-lead = Un gateway è un server dove si trovano i tavoli online: account, mazzi, stanze e un processo del motore per ogni partita. Questi sono quelli registrati presso Baylee Central e approvati dal suo amministratore. Ognuno è gestito dai suoi operatori per i loro gruppi, e lì valgono le loro regole. Un elenco non è una promessa su ciò che un gateway fa.
+# English for now: to be translated.
+gw-lead = A gateway is a server where online tables live: accounts, decks, rooms and one engine process per game. These are the ones registered with Baylee Central and approved by its administrator. Each is run by its operators for their groups, and their own rules apply there. A listing is not a promise about what a gateway does.
 gw-howTo = Per giocare su uno, copia il suo indirizzo nella schermata iniziale del client. Online significa che Central ha avuto notizie del gateway nell'ultimo minuto e mezzo; non è una promessa che risponda. Nomi e versioni sono quelli che ogni gestore indica.
 gw-find = Cerca un gateway
 gw-findHint = Nome o indirizzo

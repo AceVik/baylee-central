@@ -747,7 +747,13 @@ body:has(dialog[open]) .top {
   color: var(--ink);
   font: 600 0.76rem/1.6 var(--sans);
   text-align: center;
-  text-wrap: balance;
+  text-wrap: pretty;
+}
+
+/* a Japanese count breaks between phrases where the browser can tell them,
+   not inside a word */
+:root:lang(ja) .strip-cell {
+  word-break: auto-phrase;
 }
 
 .strip dd {
