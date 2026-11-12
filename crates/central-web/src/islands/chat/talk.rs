@@ -349,6 +349,17 @@ fn list_empty(lang: Lang, known: Known, add_contact: Callback<()>) -> AnyView {
     }
 }
 
+/// Ctrl/Cmd+K finds a conversation while the Chats half is shown.
+fn find_shortcut() {
+    let find = window_event_listener(leptos::ev::keydown, move |event| {
+        if (event.ctrl_key() || event.meta_key()) && event.key().eq_ignore_ascii_case("k") {
+            event.prevent_default();
+            focus("chat-search");
+        }
+    });
+    on_cleanup(move || find.remove());
+}
+
 /// The Chats half: search, a new group, invitations, the list.
 fn chats_panel(
     lang: Lang,
@@ -406,21 +417,23 @@ fn chats_panel(
         rove.set(Some(ids[next].clone()));
         focus(&row_id(&ids[next]));
     };
-    // Ctrl/Cmd+K: find a conversation
-    let find = window_event_listener(leptos::ev::keydown, move |event| {
-        if (event.ctrl_key() || event.meta_key()) && event.key().eq_ignore_ascii_case("k") {
-            event.prevent_default();
-            focus("chat-search");
-        }
-    });
-    on_cleanup(move || find.remove());
+    find_shortcut();
     let known = Known::watch(ctl);
+    // what stands in the list's place: nothing while there are rows (so a
+    // new line or a keystroke never draws the list anew, and the focus in
+    // it stays), "no match" for a search, else the empty list's state
+    let instead = Memo::new(move |_| {
+        visible
+            .with(Vec::is_empty)
+            .then(|| query.with(|q| q.trim().is_empty()).then(|| known.get()))
+    });
     let list = move || {
-        if visible.with(Vec::is_empty) {
-            if !query.with(|q| q.trim().is_empty()) {
+        match instead.get() {
+            Some(None) => {
                 return view! { <p class="msgr-note">{words::chat_no_match(lang)}</p> }.into_any();
             }
-            return list_empty(lang, known.get(), add_contact);
+            Some(Some(known)) => return list_empty(lang, known, add_contact),
+            None => {}
         }
         view! {
             <nav class="conv-nav" aria-label=words::chat_conversations(lang)>
