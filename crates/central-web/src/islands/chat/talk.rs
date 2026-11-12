@@ -40,8 +40,10 @@ pub fn avatar(name: &str, seed: &str, group: bool, tag: Option<u32>) -> AnyView 
         glyph(glyph::USERS)
     } else {
         let shown = StoredValue::new_local(Some(initials));
-        (move || match tag.and_then(crate::islands::picture::key_of) {
-            Some(key) => crate::islands::picture::face(&key, String::new()).into_any(),
+        (move || match tag.and_then(crate::islands::picture::face_of) {
+            Some((key, moving)) => {
+                crate::islands::picture::face(&key, moving, String::new()).into_any()
+            }
             None => shown
                 .try_update_value(Option::take)
                 .flatten()

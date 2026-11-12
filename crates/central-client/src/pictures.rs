@@ -8,13 +8,19 @@ use super::{Error, Session, Transport};
 use central_api::picture::{PictureKey, PictureReason, TaggedPicture, key_hex};
 use central_api::social::{SocialRequest, SocialResponse};
 
-/// One of a picture's two encodings, which share its key.
+/// One of a picture's files, which share its key. Every picture has the
+/// still's two; one that moves ([`TaggedPicture::moving`]) also has its
+/// sequence. All are 256 px, 8 bits, BT.601 coefficients at full range with
+/// BT.709 primaries and the sRGB curve (`docs/profile-pictures.md`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PictureFile {
-    /// The AVIF, 256 px.
+    /// The still as AVIF, 4:4:4; for a picture that moves, its first frame.
     Avif,
-    /// The PNG, 256 px: the fallback for clients without AVIF.
+    /// The still as PNG: the fallback for clients without AVIF.
     Png,
+    /// The AVIF image sequence (`avis`, 4:2:0, an alpha track when it has
+    /// transparency), only when the picture moves.
+    Sequence,
 }
 
 /// The path a picture is read at, relative to Central's site: anyone may
@@ -24,6 +30,7 @@ pub fn picture_path(key: &PictureKey, file: PictureFile) -> String {
     let extension = match file {
         PictureFile::Avif => "avif",
         PictureFile::Png => "png",
+        PictureFile::Sequence => "sequence.avif",
     };
     format!("/api/v1/pictures/{}.{extension}", key_hex(key))
 }
@@ -139,6 +146,7 @@ mod tests {
         let found = TaggedPicture {
             tag: 0x1234,
             key: [0xab; 16],
+            moving: true,
         };
         let keys = central(&Response::Social {
             response: SocialResponse::Pictures {
@@ -192,6 +200,10 @@ mod tests {
         assert_eq!(
             picture_path(&key, PictureFile::Png),
             format!("/api/v1/pictures/{}.png", "0f".repeat(16))
+        );
+        assert_eq!(
+            picture_path(&key, PictureFile::Sequence),
+            format!("/api/v1/pictures/{}.sequence.avif", "0f".repeat(16))
         );
     }
 }

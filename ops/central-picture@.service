@@ -3,15 +3,20 @@
 # One picture, one process (docs/profile-pictures.md): the worker reads one
 # request from the socket systemd accepted (central-picture.socket), writes
 # one answer and exits. It holds no secret, reaches no network, owns no
-# file, has no user of its own and ends when it runs too long or too large.
+# file but its private /tmp, has no user of its own and ends when it runs
+# too long or too large. For an animation it starts Ubuntu's ffmpeg
+# (docs/operations.md, "Profile pictures"), which runs in this same unit,
+# reads raw frames from a pipe and writes one file in that /tmp.
 # The limits come from measurement (docs/profile-pictures.md §"Limits"):
-# the largest picture Central takes peaked at 122 MiB on Apple Silicon.
+# the largest picture Central takes peaked at 122 MiB on Apple Silicon, and
+# ffmpeg with libaom at 137 MB for 50 frames with alpha (proposal §10); a
+# conversion takes at most 20 s, ffmpeg's part at most 12.
 [Unit]
 Description=Baylee Central picture worker (one picture)
 CollectMode=inactive-or-failed
 
 [Service]
-ExecStart=/opt/baylee-central/bin/central-picture-worker
+ExecStart=/opt/baylee-central/bin/central-picture-worker --ffmpeg /usr/bin/ffmpeg
 StandardInput=socket
 StandardOutput=socket
 StandardError=null
@@ -46,9 +51,12 @@ SystemCallFilter=~@privileged @resources
 InaccessiblePaths=-/etc/baylee-central
 UMask=0077
 LimitCORE=0
-# One core: rav1d sizes its threads by the CPUs it may use.
+# One core: rav1d sizes its threads by the CPUs it may use, and ffmpeg's
+# encoder is told one thread.
 CPUQuota=100%
-MemoryMax=384M
+MemoryMax=512M
 MemorySwapMax=0
-TasksMax=4
-RuntimeMaxSec=15
+# ffmpeg 8 runs its demuxer, filters, encoder and muxer on threads of their
+# own beside the worker's.
+TasksMax=32
+RuntimeMaxSec=25

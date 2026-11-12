@@ -8,7 +8,7 @@ use central_api::picture::{
     BlockChoice, PictureDecision, PictureReason, PictureReportState, TaggedPicture, UploadBlock,
 };
 use central_api::social::{SocialRequest as Request, SocialResponse as Response};
-use central_postgres::pictures::{Encoding, UPLOADS_PER_DAY, UPLOADS_PER_HOUR};
+use central_postgres::pictures::{Encoding, PictureFiles, UPLOADS_PER_DAY, UPLOADS_PER_HOUR};
 use central_postgres::{Session, appoint_admin, sweep};
 use sea_orm::{ConnectionTrait, DatabaseConnection};
 
@@ -50,7 +50,17 @@ async fn set(
 ) -> Result<(), Error> {
     let (avif, png, sha) = pair(n);
     store
-        .set_picture(cookie, account.account, [key; 16], &avif, &png, sha)
+        .set_picture(
+            cookie,
+            account.account,
+            [key; 16],
+            PictureFiles {
+                avif: &avif,
+                png: &png,
+                sequence: None,
+                sha256: sha,
+            },
+        )
         .await
         .map(|_| ())
 }
@@ -143,7 +153,7 @@ async fn pictures(store: &AccountStore, people: &People) {
         (mine.key, mine.side, mine.avif_bytes, mine.png_bytes),
         ([1; 16], 256, 100, 200)
     );
-    assert_eq!(mine.sha256, [10; 32]);
+    assert_eq!((mine.sha256, mine.sequence_bytes), ([10; 32], None));
     let (avif, png, sha) = pair(10);
     assert_eq!(
         store.picture_bytes([1; 16], Encoding::Avif).await.unwrap(),
@@ -184,14 +194,51 @@ async fn pictures(store: &AccountStore, people: &People) {
         store.my_picture(&stranger).await.err(),
         Some(Error::Rejected)
     );
-    store.remove_picture(cookie).await.unwrap();
     assert_eq!(
-        store.picture_bytes([2; 16], Encoding::Avif).await.unwrap(),
-        None
+        store
+            .picture_bytes([2; 16], Encoding::Sequence)
+            .await
+            .unwrap(),
+        None,
+        "a still has no sequence"
     );
+    moving(store, cookie, *owner).await;
+    store.remove_picture(cookie).await.unwrap();
+    for (key, encoding) in [([2; 16], Encoding::Avif), ([11; 16], Encoding::Sequence)] {
+        assert_eq!(store.picture_bytes(key, encoding).await.unwrap(), None);
+    }
     assert!(store.my_picture(cookie).await.unwrap().picture.is_none());
     store.remove_picture(cookie).await.unwrap();
     set(store, cookie, *owner, 4, 40).await.unwrap();
+}
+
+/// A picture that moves: its sequence is stored and served beside the
+/// still under the same key, and its size is the owner's to see.
+async fn moving(store: &AccountStore, cookie: &Token, owner: Identity) {
+    let sequence = vec![0x5e; 300];
+    store
+        .set_picture(
+            cookie,
+            owner.account,
+            [11; 16],
+            PictureFiles {
+                avif: &[11; 100],
+                png: &[12; 200],
+                sequence: Some(&sequence),
+                sha256: [11; 32],
+            },
+        )
+        .await
+        .unwrap();
+    let mine = store.my_picture(cookie).await.unwrap().picture.unwrap();
+    assert_eq!((mine.key, mine.sequence_bytes), ([11; 16], Some(300)));
+    assert_eq!(
+        store
+            .picture_bytes([11; 16], Encoding::Sequence)
+            .await
+            .unwrap(),
+        Some((sequence, [11; 32]))
+    );
 }
 
 /// Ten uploads an hour, thirty a day, in a row that survives restarts.
@@ -273,7 +320,8 @@ async fn visibility(store: &AccountStore, operator: &DatabaseConnection, people:
         found,
         vec![TaggedPicture {
             tag: OWNER,
-            key: [4; 16]
+            key: [4; 16],
+            moving: false,
         }]
     );
     // the owner's tag and the unknown one are outside; its own is not
@@ -410,16 +458,10 @@ async fn reports(store: &AccountStore, operator: &DatabaseConnection, people: &P
 /// Keep and remove, each needing a fresh administrator; the audit holds
 /// reason codes only; blocks refuse uploads until they end or are lifted.
 async fn decisions(store: &AccountStore, operator: &DatabaseConnection, people: &People) {
-    let (owner_id, owner) = &people.owner;
+    let (owner_id, _) = &people.owner;
     let (_, moderator) = &people.moderator;
     let (_, viewer) = &people.viewer;
-    let audit = |action: &str| {
-        format!(
-            "SELECT count(*)::bigint AS value FROM central_identity.audit_events WHERE action = '{action}'
-             AND account_id = '{}' AND actor_kind = 'admin'",
-            uuid(*owner_id)
-        )
-    };
+    let audit = |action: &str| audit(*owner_id, action);
     // not an administrator
     assert_eq!(
         store.admin_picture_reports(viewer, None, None).await.err(),
@@ -466,6 +508,31 @@ async fn decisions(store: &AccountStore, operator: &DatabaseConnection, people: 
             .await,
         Err(Error::Conflict)
     );
+    removal(store, operator, people, moderator, sha).await;
+    blocks(store, operator, people, moderator).await;
+}
+
+/// The audit events of `action` about `owner`, by an administrator.
+fn audit(owner: Identity, action: &str) -> String {
+    format!(
+        "SELECT count(*)::bigint AS value FROM central_identity.audit_events WHERE action = '{action}'
+         AND account_id = '{}' AND actor_kind = 'admin'",
+        uuid(owner)
+    )
+}
+
+/// A removal with a reason, a note and a block: the bytes go at once, the
+/// person is told, the audit holds the reason code only.
+async fn removal(
+    store: &AccountStore,
+    operator: &DatabaseConnection,
+    people: &People,
+    moderator: &Token,
+    sha: [u8; 32],
+) {
+    let (owner_id, owner) = &people.owner;
+    let (_, viewer) = &people.viewer;
+    let audit = |action: &str| audit(*owner_id, action);
     report(store, viewer, OWNER, 4, None).await.unwrap();
     let remove = PictureDecision::Remove {
         reason: PictureReason::Hate,
@@ -551,7 +618,19 @@ async fn decisions(store: &AccountStore, operator: &DatabaseConnection, people: 
         set(store, owner, *owner_id, 6, 60).await,
         Err(Error::Conflict)
     );
-    // until lifted, then lifted
+}
+
+/// A block until lifted, then lifted; a replaced picture's open reports are
+/// gone.
+async fn blocks(
+    store: &AccountStore,
+    operator: &DatabaseConnection,
+    people: &People,
+    moderator: &Token,
+) {
+    let (owner_id, owner) = &people.owner;
+    let (_, viewer) = &people.viewer;
+    let audit = |action: &str| audit(*owner_id, action);
     let forever = PictureDecision::Remove {
         reason: PictureReason::Other,
         note: None,

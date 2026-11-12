@@ -53,7 +53,7 @@ impl AccountStore {
              ('report_audit', ARRAY['SELECT','INSERT'], NULL),
              ('report_views', ARRAY['SELECT','INSERT','DELETE'], ARRAY['query']),
              ('report_seen', ARRAY['SELECT','INSERT','DELETE'], NULL),
-             ('pictures', ARRAY['SELECT','INSERT','DELETE'], ARRAY['key','avif','png','sha256','side','set_at']),
+             ('pictures', ARRAY['SELECT','INSERT','DELETE'], ARRAY['key','avif','png','sequence','sha256','side','set_at']),
              ('picture_reports', ARRAY['SELECT','INSERT'], ARRAY['state','decided_at','decided_by']),
              ('picture_notices', ARRAY['SELECT','INSERT','UPDATE','DELETE'], NULL),
              ('picture_budgets', ARRAY['SELECT','INSERT','UPDATE'], NULL))

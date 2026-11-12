@@ -42,7 +42,7 @@ pub use legacy::LegacyMove;
 pub use migration::Status;
 pub use pairing::{Approval, Claim, MAX_POLLS, OPEN_IN_ALL, OPEN_PER_ACCOUNT, Redeemed};
 pub use pictures::{
-    Admission, DECIDED_REPORT_DAYS, Encoding, OwnPicture, PictureCase, REPORTS_OPEN,
+    Admission, DECIDED_REPORT_DAYS, Encoding, OwnPicture, PictureCase, PictureFiles, REPORTS_OPEN,
     REPORTS_PER_HOUR, UPLOADS_PER_DAY, UPLOADS_PER_HOUR,
 };
 pub use profiles::{Profile, TAG_DRAWS, TagDraw};

@@ -3,7 +3,7 @@
 //! bytes for the same pixels) and an AVIF (`ravif` with `rav1e`, one
 //! thread, no metadata).
 use super::scale::{SIDE, Square};
-use super::{Output, Refusal};
+use super::{Motion, Output, Refusal};
 use central_picture::{MAX_AVIF, MAX_PNG};
 
 /// AVIF quality: 80 keeps a face's detail at 256 px in 6–16 KB for photos
@@ -14,14 +14,18 @@ const QUALITIES: [f32; 3] = [80.0, 60.0, 40.0];
 /// 10–24 % smaller than 10 (§4.2).
 const SPEED: u8 = 8;
 
-/// Both pictures of `square`.
+/// Both pictures of `square`, a still.
 ///
 /// # Errors
 /// `Failed` when an encoder fails or no quality fits the AVIF's bound.
 pub(crate) fn both(square: &Square) -> Result<Output, Refusal> {
     let png = png_master(&square.0)?;
     let avif = avif(&square.0)?;
-    Ok(Output { avif, png })
+    Ok(Output {
+        avif,
+        png,
+        motion: Motion::Still,
+    })
 }
 
 fn png_master(rgba: &[u8]) -> Result<Vec<u8>, Refusal> {
@@ -66,6 +70,9 @@ fn avif(rgba: &[u8]) -> Result<Vec<u8>, Refusal> {
             .with_quality(quality)
             .with_alpha_quality(quality)
             .with_speed(SPEED)
+            // 8 bits, so a client meets one depth in stills and sequences
+            // (proposal §0.8); ravif would choose 10.
+            .with_bit_depth(ravif::BitDepth::Eight)
             .with_num_threads(Some(1))
             .encode_rgba(ravif::Img::new(&pixels[..], side, side))
             .map_err(|_| Refusal::Failed)?;
@@ -74,13 +81,4 @@ fn avif(rgba: &[u8]) -> Result<Vec<u8>, Refusal> {
         }
     }
     Err(Refusal::Failed)
-}
-
-/// The animated variant of `moving`: none yet. Its stored format is the
-/// owner's choice (proposal §0.6 and §10); the frames reach this one
-/// function decoded, bounded, composited and averaged to 256 px, so the
-/// chosen encoder drops in here and nowhere else.
-pub(crate) fn animation(moving: &crate::Animation) -> Option<Vec<u8>> {
-    let _ = moving;
-    None
 }

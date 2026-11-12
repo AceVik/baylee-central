@@ -45,20 +45,32 @@ pub fn url(key: &PictureKey, avif: bool) -> String {
     )
 }
 
+/// The address of a moving picture's AVIF image sequence on this site.
+#[must_use]
+pub fn sequence_url(key: &PictureKey) -> String {
+    format!("/api/v1/pictures/{}.sequence.avif", key_hex(key))
+}
+
 /// The picture of `key`, which the browser takes as AVIF or else as PNG.
-pub fn face(key: &PictureKey, alt: String) -> impl IntoView + use<> {
+/// One that `moving` plays its sequence, unless the person asked their
+/// system for less motion: then its still, the first frame, stands.
+pub fn face(key: &PictureKey, moving: bool, alt: String) -> impl IntoView + use<> {
+    let sequence = moving.then(|| {
+        view! { <source type="image/avif" media="(prefers-reduced-motion: no-preference)" srcset=sequence_url(key) /> }
+    });
     view! {
         <picture class="face">
+            {sequence}
             <source type="image/avif" srcset=url(key, true) />
             <img src=url(key, false) alt=alt loading="lazy" decoding="async" width="256" height="256" />
         </picture>
     }
 }
 
-/// The picture keys of the tags a page shows, by tag: given by the
-/// messenger, read by every avatar inside it.
+/// The picture keys of the tags a page shows, by tag, and whether each
+/// moves: given by the messenger, read by every avatar inside it.
 #[derive(Clone, Copy)]
-pub struct Keys(RwSignal<std::collections::BTreeMap<u32, PictureKey>>);
+pub struct Keys(RwSignal<std::collections::BTreeMap<u32, (PictureKey, bool)>>);
 
 impl Keys {
     /// Empty keys for the island's own avatars.
@@ -82,7 +94,10 @@ impl Keys {
                 response: SocialResponse::Pictures { pictures },
             }) = call(&asked).await
             {
-                let found = pictures.into_iter().map(|p| (p.tag, p.key)).collect();
+                let found = pictures
+                    .into_iter()
+                    .map(|p| (p.tag, (p.key, p.moving)))
+                    .collect();
                 if self.0.with_untracked(|held| *held != found) {
                     self.0.set(found);
                 }
@@ -94,6 +109,12 @@ impl Keys {
 /// The picture key of `tag` in the page's keys, read reactively.
 #[must_use]
 pub fn key_of(tag: u32) -> Option<PictureKey> {
+    face_of(tag).map(|(key, _)| key)
+}
+
+/// The picture key of `tag` and whether it moves, read reactively.
+#[must_use]
+pub fn face_of(tag: u32) -> Option<(PictureKey, bool)> {
     use_context::<Keys>().and_then(|keys| keys.0.with(|held| held.get(&tag).copied()))
 }
 
@@ -572,6 +593,8 @@ struct Card {
     trouble: RwSignal<Option<Trouble>>,
     said: RwSignal<Option<&'static str>>,
     sending: RwSignal<Sending>,
+    /// The last saved animation was kept as its still.
+    kept_still: RwSignal<bool>,
     dragging: StoredValue<Option<(f64, f64, Crop)>>,
 }
 
@@ -606,10 +629,17 @@ impl Card {
         }
         self.step.set(Step::Saving);
         self.trouble.set(None);
+        self.kept_still.set(false);
+        let moving = self.sending.get_untracked() == Sending::Moving;
         leptos::task::spawn_local(async move {
             match browser::upload(self.crop.get_untracked()).await {
                 Ok(stored) => {
                     browser::close();
+                    let sequence = stored
+                        .picture
+                        .as_ref()
+                        .and_then(|picture| picture.sequence_bytes);
+                    self.kept_still.set(moving && sequence.is_none());
                     self.own.set(Some(Ok(stored)));
                     self.said.set(Some(words::picture_saved(self.lang)));
                     self.step.set(Step::Idle);
@@ -688,12 +718,15 @@ impl Card {
             Some(Ok(own)) => {
                 let shown = own.picture.as_ref().map_or_else(
                     || view! { <p id="picture-none">{words::picture_none(lang)}</p> }.into_any(),
-                    |picture| view! { <div class="picture-current">{face(&picture.key, words::picture_current(lang).to_owned())}</div> }.into_any(),
+                    |picture| view! { <div class="picture-current">{face(&picture.key, picture.sequence_bytes.is_some(), words::picture_current(lang).to_owned())}</div> }.into_any(),
                 );
                 let can_remove = own.picture.is_some();
                 let blocked = own.block.is_some();
                 view! {
                     {shown}
+                    <Show when=move || self.kept_still.get()>
+                        <p class="meta" id="picture-kept-still" role="status">{words::picture_kept_still(lang)}</p>
+                    </Show>
                     {notice_view(lang, &own)}
                     <div class="actions" hidden=move || step.get() != Step::Idle>
                         <label class="button primary" for="picture-file" hidden=blocked>{words::picture_choose(lang)}</label>
@@ -762,6 +795,7 @@ pub fn card(lang: Lang, name: String) -> impl IntoView {
         trouble: RwSignal::new(None),
         said: RwSignal::new(None),
         sending: RwSignal::new(Sending::Square),
+        kept_still: RwSignal::new(false),
         dragging: StoredValue::new(None),
     };
     let step = card.step;

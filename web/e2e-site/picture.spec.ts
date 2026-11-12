@@ -101,7 +101,16 @@ function oriented(jpeg: Buffer, orientation: number): Buffer {
 }
 
 type Upload = { kind: string; body: Buffer };
-type World = { picture: boolean; uploads: Upload[]; asked: string[]; answer?: { status: number; body: string } };
+type World = {
+  picture: boolean;
+  uploads: Upload[];
+  asked: string[];
+  answer?: { status: number; body: string };
+  /** The stored picture moves: the stand-in has its sequence. */
+  moving?: boolean;
+  /** What an upload makes: a sequence, or the still alone. */
+  makes?: "sequence" | "still";
+};
 
 /** The upload at `index` (from the end when negative); a missing one fails the test. */
 function upload(w: World, index: number): Upload {
@@ -112,7 +121,9 @@ function upload(w: World, index: number): Upload {
 
 const mine = (w: World) => ({
   result: "my_picture",
-  picture: w.picture ? { key: KEY, side: 256, avif_bytes: 409, png_bytes: 200, sha256: Array(32).fill(1), set_at: 1_794_000_000 } : null,
+  picture: w.picture
+    ? { key: KEY, side: 256, avif_bytes: 409, png_bytes: 200, sequence_bytes: w.moving ? 4096 : null, sha256: Array(32).fill(1), set_at: 1_794_000_000 }
+    : null,
   notice: null,
   block: null,
 });
@@ -155,7 +166,7 @@ async function open(page: Page, w: World, options: { admin?: boolean; path?: str
             answer: "picture_reports",
             more: false,
             reports: [{
-              id: ACCOUNT, account: { id: ACCOUNT, display_name: "Mallory", tag: 0x0f0f }, sha256: Array(32).fill(3), current: KEY,
+              id: ACCOUNT, account: { id: ACCOUNT, display_name: "Mallory", tag: 0x0f0f }, sha256: Array(32).fill(3), current: KEY, moving: true,
               reporter: null, reason: "hate", note: "Synthetic note <b>not bold</b>", created_at: 1_794_000_000, state: "open", decided_at: null,
             }],
           },
@@ -171,6 +182,7 @@ async function open(page: Page, w: World, options: { admin?: boolean; path?: str
     w.uploads.push({ kind: request.headers()["content-type"] ?? "", body: request.postDataBuffer() ?? Buffer.alloc(0) });
     if (w.answer) return route.fulfill({ status: w.answer.status, contentType: "application/json", body: w.answer.body });
     w.picture = true;
+    w.moving = w.makes === "sequence";
     return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(mine(w)) });
   });
   await page.route("**/api/v1/pictures/*", (route: Route) => {
@@ -311,6 +323,7 @@ test("a picture that moves goes to Central as it is, and its square is not place
     ["moving.webp", "image/webp", fixture("animated.webp")],
     ["moving.png", "image/png", apng(64, [RED, BLUE])],
   ];
+  w.makes = "sequence";
   for (const [name, mimeType, buffer] of cases) {
     await choose(page, name, mimeType, buffer);
     await expect(page.locator("#picture-moving"), name).toBeVisible();
@@ -322,7 +335,19 @@ test("a picture that moves goes to Central as it is, and its square is not place
     const sent = upload(w, -1);
     expect(sent.kind, name).toBe(mimeType);
     expect(sent.body.equals(buffer), name).toBe(true);
+    await expect(page.locator("#picture-kept-still"), name).toBeHidden();
   }
+  // the stored picture plays where motion is welcome, its still elsewhere
+  const sequence = `/api/v1/pictures/${"5a".repeat(16)}.sequence.avif`;
+  const playing = page.locator(`.picture-current source[srcset='${sequence}']`);
+  await expect(playing).toHaveAttribute("media", "(prefers-reduced-motion: no-preference)");
+  await expect(page.locator(".picture-current source").nth(1)).toHaveAttribute("srcset", `/api/v1/pictures/${"5a".repeat(16)}.avif`);
+  // an animation Central could not encode is kept as its still, and said
+  w.makes = "still";
+  await choose(page, "moving.gif", "image/gif", fixture("animated.gif"));
+  await page.getByRole("button", { name: "Save picture" }).click();
+  await expect(page.locator("#picture-kept-still")).toHaveText("This picture moves, but Baylee Central could keep only its first frame this time.");
+  await expect(playing).toHaveCount(0);
   // a still PNG is still drawn here and sent as the square
   await choose(page, "still.png", "image/png", png(64, 64, quadrant(64, 64)));
   await expect(page.locator("#picture-moving")).toBeHidden();
@@ -418,6 +443,10 @@ test("the administrators see reported pictures with their reasons and notes as t
   await expect(section.locator("b")).toHaveCount(0);
   await expect(section.getByText("a deleted account")).toBeVisible();
   await expect(section.getByRole("button", { name: "Remove the picture" })).toBeVisible();
+  // a moving picture plays here, and opens on its own, frame by frame
+  const sequence = `/api/v1/pictures/${"5a".repeat(16)}.sequence.avif`;
+  await expect(section.locator(`source[srcset='${sequence}']`)).toHaveAttribute("media", "(prefers-reduced-motion: no-preference)");
+  await expect(section.getByRole("link", { name: "Open the animation" })).toHaveAttribute("href", sequence);
   expect(await axe(page)).toEqual([]);
   expect(problems).toEqual([]);
 });

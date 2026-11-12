@@ -1310,7 +1310,7 @@ than these:
 
 | Table | Runtime role |
 | --- | --- |
-| `pictures` | `SELECT, INSERT, UPDATE (key, avif, png, sha256, side, set_at), DELETE` |
+| `pictures` | `SELECT, INSERT, UPDATE (key, avif, png, sequence, sha256, side, set_at), DELETE` |
 | `picture_reports` | `SELECT, INSERT, UPDATE (state, decided_at, decided_by)`, no `DELETE`: the moderation record is append-only for the runtime, as the accounts-admin design's step 8 has it |
 | `picture_notices` | `SELECT, INSERT, UPDATE, DELETE` |
 | `picture_budgets` | `SELECT, INSERT, UPDATE` |

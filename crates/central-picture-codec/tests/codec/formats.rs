@@ -75,16 +75,8 @@ fn the_avif_decodes_again_to_the_master_s_picture() {
                 let p = i.buf()[20 * i.stride() + 20];
                 [p.r, p.g, p.b, p.a]
             }),
-            // ravif writes 10 bits a sample; avif-decode gives 16-bit samples
-            avif_decode::Image::Rgb16(i) => (i.width(), i.height(), {
-                let p = i.buf()[20 * i.stride() + 20];
-                [high(p.r), high(p.g), high(p.b), 255]
-            }),
-            avif_decode::Image::Rgba16(i) => (i.width(), i.height(), {
-                let p = i.buf()[20 * i.stride() + 20];
-                [high(p.r), high(p.g), high(p.b), high(p.a)]
-            }),
-            _ => panic!("{format:?}: colour expected"),
+            // the stored AVIF is 8 bits a sample (proposal §0.8)
+            _ => panic!("{format:?}: 8-bit colour expected"),
         };
         assert_eq!((width, height), (256, 256), "{format:?}");
         let master = at(&decode_png(&output.png).2, 20, 20);
@@ -93,10 +85,6 @@ fn the_avif_decodes_again_to_the_master_s_picture() {
             "{format:?}: {pixel:?} vs {master:?}"
         );
     }
-}
-
-fn high(sample: u16) -> u8 {
-    sample.to_be_bytes()[0]
 }
 
 #[test]

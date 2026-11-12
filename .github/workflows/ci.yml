@@ -40,11 +40,17 @@ jobs:
         run: cargo fetch --locked
       # nasm: rav1e's and rav1d's x86-64 assembly in the picture worker's
       # codecs (docs/dependency-proposal/profile-picture.md, owner 12.11.2026).
+      # ffmpeg: Ubuntu's, with libaom-av1, which encodes animated profile
+      # pictures; the codec's animation tests need it and fail without it
+      # here (PICTURE_REQUIRE_FFMPEG), where elsewhere they say SKIPPED.
       - name: Native Web Push crypto and picture codec build tools
         if: matrix.os == 'ubuntu-24.04'
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends clang libclang-dev cmake nasm
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends clang libclang-dev cmake nasm ffmpeg
       - name: Policy, tests, lint and release build
         if: matrix.os == 'ubuntu-24.04'
+        env:
+          PICTURE_FFMPEG: /usr/bin/ffmpeg
+          PICTURE_REQUIRE_FFMPEG: "1"
         run: cargo xtask gate
       - name: Policy, tests and lint of the client's crates
         if: matrix.os != 'ubuntu-24.04'

@@ -9,6 +9,7 @@ mod formats;
 mod mutations;
 mod pngs;
 mod rasters;
+mod sequences;
 mod support;
 mod svg;
 mod worker;

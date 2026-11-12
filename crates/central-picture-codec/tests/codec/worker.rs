@@ -8,7 +8,7 @@ use std::io::Write;
 use std::process::{Command, Stdio};
 
 fn worker() -> Worker {
-    Worker::program(env!("CARGO_BIN_EXE_central-picture-worker"))
+    crate::support::worker_without_ffmpeg()
 }
 
 #[test]
@@ -22,7 +22,10 @@ fn the_worker_converts_every_format_as_the_codec_does() {
             (converted.avif.clone(), converted.png.clone()),
             (direct.avif, direct.png)
         );
-        assert_eq!(converted.sha256, central_picture::digest(&converted.png));
+        assert_eq!(
+            converted.sha256,
+            central_picture::digest(&converted.png, converted.sequence())
+        );
     }
 }
 
@@ -77,7 +80,7 @@ fn a_broken_request_is_answered_with_a_refusal_and_nothing_else() {
         (b"", Refusal::Malformed),
         (&good[..good.len() - 1], Refusal::Malformed),
         (&[good.as_slice(), b"more"].concat(), Refusal::Malformed),
-        (b"BCPQ\x01\x06\xff\xff\xff\xff", Refusal::TooLarge),
+        (b"BCPQ\x02\x06\xff\xff\xff\xff", Refusal::TooLarge),
     ];
     for (request, refusal) in cases {
         let (answer, ok) = raw(request);

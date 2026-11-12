@@ -2732,7 +2732,11 @@ mod tests {
         #[tokio::test]
         async fn a_picture_is_served_to_anyone_with_its_own_headers() {
             let (app, mock) = listener();
-            for (extension, kind) in [("avif", "image/avif"), ("png", "image/png")] {
+            for (extension, kind) in [
+                ("avif", "image/avif"),
+                ("png", "image/png"),
+                ("sequence.avif", "image/avif"),
+            ] {
                 let (status, headers, body) =
                     get_picture(&app, "GET", &uri(PICTURE, extension), &PAGE, LOOPBACK).await;
                 assert_eq!(status, StatusCode::OK);
@@ -2784,6 +2788,20 @@ mod tests {
                     .iter()
                     .all(|(_, cookie)| cookie.is_none())
             );
+            // each file asked for by its own encoding
+            let asked: Vec<String> = mock
+                .calls
+                .lock()
+                .unwrap()
+                .iter()
+                .map(|(call, _)| call.clone())
+                .collect();
+            for encoding in ["Avif", "Png", "Sequence"] {
+                assert!(
+                    asked.contains(&format!("picture_bytes {encoding}")),
+                    "{encoding}"
+                );
+            }
         }
 
         #[tokio::test]
@@ -2808,6 +2826,18 @@ mod tests {
                     LOOPBACK,
                 ),
                 (good.replace(".png", ".svg"), PAGE.to_vec(), LOOPBACK),
+                // another sequence's name, and an unknown key's sequence
+                (
+                    good.replace(".png", ".moving.avif"),
+                    PAGE.to_vec(),
+                    LOOPBACK,
+                ),
+                (
+                    good.replace(".png", ".sequence.png"),
+                    PAGE.to_vec(),
+                    LOOPBACK,
+                ),
+                (uri([1; 16], "sequence.avif"), PAGE.to_vec(), LOOPBACK),
                 (upper, PAGE.to_vec(), LOOPBACK),
                 (good.clone(), PAGE.to_vec(), "192.0.2.1:50000"),
                 (

@@ -1137,7 +1137,8 @@ async fn open_registration(tx: &sea_orm::DatabaseTransaction) {
 }
 
 /// 000027 over the accounts: four new tables that change no row of the
-/// previous version's, their bounds, and the cascade with an account.
+/// previous version's, their bounds (a picture's optional sequence among
+/// them), and the cascade with an account.
 async fn pictures(tx: &sea_orm::DatabaseTransaction) {
     let accounts = "SELECT count(*)::bigint AS value FROM upgrade_probe.accounts";
     let before = scalar(tx, accounts).await;
@@ -1162,6 +1163,13 @@ async fn pictures(tx: &sea_orm::DatabaseTransaction) {
     tx.execute_unprepared(&picture("aa", 256, 100))
         .await
         .unwrap();
+    // a sequence is optional and bounded
+    let sequence = |bytes: usize| {
+        format!("UPDATE upgrade_probe.pictures SET sequence = decode(repeat('04', {bytes}), 'hex')")
+    };
+    refused(tx, &sequence(31)).await;
+    refused(tx, &sequence(524_289)).await;
+    tx.execute_unprepared(&sequence(524_288)).await.unwrap();
     // one picture per account, and a key never twice
     refused(tx, &picture("bb", 256, 100)).await;
     refused(
@@ -1206,6 +1214,13 @@ async fn pictures(tx: &sea_orm::DatabaseTransaction) {
         .await,
         1
     );
+    notices_and_cascade(tx, player, second).await;
+}
+
+/// A notice and a budget, their bounds, and the cascade: a reporter's
+/// deletion keeps its report without it, an account's takes everything of
+/// its picture.
+async fn notices_and_cascade(tx: &sea_orm::DatabaseTransaction, player: &str, second: &str) {
     tx.execute_unprepared(&format!(
         "INSERT INTO upgrade_probe.picture_notices (account_id, removed_at, reason, blocked_until)
          VALUES ({player}, clock_timestamp(), 'private', 'infinity');

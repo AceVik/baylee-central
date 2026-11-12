@@ -6,10 +6,14 @@
 --
 -- pictures: an account's current picture, made by the sandboxed worker
 -- from the upload's pixels alone: a 256 px AVIF and a 256 px PNG master
--- that is also the fallback. `key` names it in its public URLs: 16 bytes of
+-- that is also the fallback, and for a picture that moves an AVIF image
+-- sequence that ffmpeg made from the worker's own frames (an animation
+-- whose encoding failed keeps only its still). `key` names it in its
+-- public URLs: 16 bytes of
 -- independent randomness, new at every upload, never the account's id.
--- `sha256` is the PNG master's digest, computed by the service, not taken
--- from the worker; reports and decisions name a picture by it. Nothing of
+-- `sha256` is the digest of the PNG master followed by the sequence,
+-- computed by the service, not taken from the worker; reports and
+-- decisions name a picture by it, so a report names the animation shown. Nothing of
 -- the upload itself is kept.
 CREATE TABLE central_identity.pictures (
     account_id uuid PRIMARY KEY
@@ -17,6 +21,7 @@ CREATE TABLE central_identity.pictures (
     key bytea NOT NULL UNIQUE CHECK (octet_length(key) = 16),
     avif bytea NOT NULL CHECK (octet_length(avif) BETWEEN 32 AND 163840),
     png bytea NOT NULL CHECK (octet_length(png) BETWEEN 67 AND 327680),
+    sequence bytea CHECK (octet_length(sequence) BETWEEN 32 AND 524288),
     sha256 bytea NOT NULL CHECK (octet_length(sha256) = 32),
     side smallint NOT NULL CHECK (side = 256),
     set_at timestamptz NOT NULL DEFAULT pg_catalog.clock_timestamp()
@@ -24,6 +29,7 @@ CREATE TABLE central_identity.pictures (
 -- Compressed pictures do not compress again; out of line, a row stays small.
 ALTER TABLE central_identity.pictures ALTER COLUMN avif SET STORAGE EXTERNAL;
 ALTER TABLE central_identity.pictures ALTER COLUMN png SET STORAGE EXTERNAL;
+ALTER TABLE central_identity.pictures ALTER COLUMN sequence SET STORAGE EXTERNAL;
 
 -- picture_reports: a signed-in account's report of another account's
 -- picture, by the picture's digest, with a reason from the closed list and
