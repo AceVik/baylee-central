@@ -341,10 +341,10 @@ numbers read beside it ([gateway
 registry](gateway-registry.md#activity-and-the-public-figures); both
 listeners, no session), since 28.10.2026 `ChangePasswordStart`
 and `ChangePasswordFinish` ([native login](native-login.md) §"Password
-change"; served on both listeners, the page's form comes with M4), and
+change"; served on both listeners, the page's form since 12.11.2026), and
 `Admin`, an administrator's requests ([administration](administration.md);
 browser listener only), and `ResetStart` and `ResetFinish`, a reset code's
-use ([account reset](account-reset.md); both listeners, no session), and
+use ([account reset](account-reset.md); both listeners, no session; the page since 12.11.2026), and
 `AccountExport`, `DeleteAccountStart` and `DeleteAccountFinish` ([account
 deletion](account-deletion.md); both listeners, with the session, Central's
 terms not required; a finished deletion clears the cookie), and, since
@@ -598,6 +598,31 @@ call is the page's.
   code: it fails as `login_confirm` does, then wraps the same master key
   under a new code; freeing it wipes the code (§"A recovery code after a
   sign-in", added 22.10.2026)
+- `reset_start(password, account, epoch, recovery_code?)` → a `Reset` state
+  whose `message` is the registration request (32 bytes) for `ResetStart`.
+  With a recovery code the vault is kept and the password registered at
+  `epoch`; without one a new vault is made and the password registered at
+  `epoch + 1`, as `central-client`'s `reset` does. The recovery code is read
+  here, before the reset code is sent anywhere
+  ([account reset](account-reset.md), added 12.11.2026)
+- `reset_keep(state, response, recovery)` → `ResetKept { record,
+  wrapped_master }`: the challenge's recovery wrapper opened with the code
+  and the same master key wrapped under the new password; a code that does
+  not open it fails here, before `ResetFinish`, so the reset code is not
+  spent
+- `reset_new(state, response)` → `Enrolled`, as a registration's: a new
+  master key under the new password and under a new recovery code, and its
+  first document, for `ResetVault::New`
+- `password_start(key, wrapped_master, current, new)` → a `PasswordChange`
+  state whose `login` is KE1 (96 bytes) and whose `registration` is the
+  request for the new password (32 bytes), for `ChangePasswordStart`. It
+  takes the `LoginKey` of a sign-in made in the same Worker and opens the
+  master key with it ([native login](native-login.md) §"Password change",
+  added 12.11.2026)
+- `password_finish(state, challenge, registration)` → `PasswordChanged {
+  proof, record, wrapped_master }`: KE3 for the current password (a wrong
+  one fails here) and the same master key under the new one, as
+  `Session::change_password` makes them
 - `central_origin()`, the Central the module is bound to (the live one)
 - `work_start(nonce, memory, passes, parts, difficulty)` → a `Work` state,
   and `Work.search(part, from, tries)` → the first of `tries` counters
@@ -706,8 +731,10 @@ with a legacy link still has to match it. An e2e test covers both.
 
 ## Not in this round
 
-- password change (served since 28.10.2026, the page's form is M4), reset
-  (by recovery code, e-mail or administrator)
+- password change (served since 28.10.2026, the page's form since
+  12.11.2026: [native login](native-login.md) §"Password change") and reset
+  (by an administrator's code: served since 28.10.2026, the page since
+  12.11.2026, [account reset](account-reset.md); by e-mail: not built)
 - e-mail, 2FA, profile picture (the display name came on 23.10.2026)
 - export and self-service deletion: by request to the operator until M1
 - the administration UI (M2)

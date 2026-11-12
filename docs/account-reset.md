@@ -131,10 +131,50 @@ an hour) besides the global one; natively `ResetStart` has the same since
   new vault, which the schema forbids for a moved account (above); a new
   vault also has to empty `object_bytes`, the quota's byte counter.
 
+## The website's page
+
+*Built 12.11.2026 (`crates/central-web`, `islands/reset.rs`; the record is in
+[security assurance](security-assurance.md), "The website redeems a reset
+code and changes a password").* `/{lang}/reset`, linked from the sign-in
+form and the FAQ, not indexed and in no menu, takes the sign-in name, the
+reset code, the choice and the new password twice. The crypto is
+`central-web-crypto`'s `reset_start`, `reset_keep` and `reset_new`, which do
+what `central-client`'s `reset` does with the same `central-crypto`
+functions; no message changed.
+
+- **Two of the three ways.** The page keeps the data with the recovery code
+  or starts a new vault. It has no "still signed in" way: a browser holds no
+  master key after a sign-in ([web accounts](web-accounts.md)).
+- **The warning comes first.** A new vault is asked for only after the
+  person confirmed, on the form, what is lost; nothing is sent before.
+- **One answer for a name and its code.** Central answers a name nobody has
+  as an account that has not moved (`Discover`), and a wrong, expired, used
+  or replaced code with `Rejected` (`ResetStart`). The page says one
+  sentence for all of them, and for a name that is none, so it tells a
+  guesser less than Central's answers do, never more.
+- **A wrong recovery code spends nothing.** The Worker reads the recovery
+  code before `ResetStart` and opens the wrapper with it before
+  `ResetFinish`; a code that is none or opens nothing stops there, the
+  reset code still works, and the page says so. An account without a
+  recovery wrapper reads the same. For a well-formed code that opens
+  nothing, `ResetStart` has been sent by then: it counts one of the
+  address's ten an hour and one of the account's eight evaluations a
+  minute.
+- **A lost answer is neither.** When the finish's answer does not arrive,
+  the page says that it cannot tell, and to try the new password. A new
+  vault's recovery code is shown all the same, with what it is worth in
+  either case, since it cannot be shown again.
+- **Secrets.** The password, the recovery code and a new vault's recovery
+  code exist in the Worker and in the form's fields, which carry no name;
+  the new code goes to the page once, to be shown, copied or saved as a
+  file. After a reset Central confirmed, the page forgets this browser's
+  session if Central no longer knows it.
+
 ## What the clients need
 
-- M4 (website): a reset page (username, code, keep or new, the warning,
-  the new password twice) and a `central-web-crypto` export for the
-  recovery-code path; the admin page's "Reset login" with the warning text.
+- Website: the page above. Open: the new site's administration with "Reset
+  login" and its warning text. Until then the new site has no page that
+  issues a code; the old build's admin page (`web/`) does, where that
+  build is still served under `/admin`.
 - M6 (Baylee client): the same choice; a signed-in client offers "keep my
   data" through `Session::redeem_reset`.
