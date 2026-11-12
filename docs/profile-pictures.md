@@ -27,7 +27,8 @@ picture that moves also as an AVIF image sequence.
   keeps the still alone, the page says so and the service logs it.
 - **Every decoder runs only in the worker.** That is a fresh process per
   picture (`central-picture-worker`), with no secret, no network, no file
-  of its own, and memory and time limits. The service links none of the
+  but a private `/tmp` (where ffmpeg writes an animation's sequence), and
+  memory and time limits. The service links none of the
   codecs (`central-picture` holds only the protocol and the checks), so a
   bug in a decoder reaches nothing of value.
 - **The service checks the worker's answer.** It must be a PNG master of
@@ -240,6 +241,20 @@ The page draws
 `<picture><source type="image/avif" srcset="….avif"><img src="….png"></picture>`,
 so the browser chooses; for a picture that moves, a first source
 `….sequence.avif` with `media="(prefers-reduced-motion: no-preference)"`.
+**Where the website shows pictures**, each in a mark of one fixed size,
+hidden from screen readers since the name stands beside it, with the
+initials (a group's sign, or in the header a neutral mark) where there is
+no picture:
+- the header's account link: the account's own, which the profile page
+  notes in the tab's `sessionStorage` (`baylee-central-own-picture`: the
+  key and whether it moves; removed at sign-out), so no page asks for it;
+- the profile page's card;
+- the messenger: one's own, the conversation list, the conversation's
+  head, a group message's author, contacts, requests, group members, a
+  group invitation (its sign), and the safety number's view.
+
+The messenger reads the keys of all the tags it shows in one request (at
+most 300), again only when the contacts or groups change.
 Clients learn whether a picture moves from `TaggedPicture.moving` and
 `Picture.sequence_bytes`, without a download. Administrators see the
 animation in the moderation list, and a link to open it alone.

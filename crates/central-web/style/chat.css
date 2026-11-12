@@ -598,9 +598,20 @@
 }
 
 .msg-sender {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
   color: var(--accent);
   font-size: var(--text-sm);
   font-weight: 700;
+}
+
+/* A message author's picture: one small fixed size beside the name. */
+.msg-sender .avatar,
+.safety-who .avatar {
+  inline-size: 1.75rem;
+  block-size: 1.75rem;
+  font-size: 0.7rem;
 }
 
 .msg-text {

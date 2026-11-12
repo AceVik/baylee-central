@@ -606,7 +606,10 @@ test("the export's file holds the address beside the export, or the page says th
   await page.getByRole("button", { name: "Prepare the export" }).click();
   await expect(page.locator("#export-save")).toBeFocused();
   // the address is asked for once the export answered
-  expect(seen.slice(asked)).toEqual([{ operation: "account_export" }, { operation: "email", request: { action: "status" } }]);
+  // the picture's facts and the reports filed join the file (picture.spec.ts)
+  const after = seen.slice(asked);
+  expect(after.filter((body) => body.operation !== "picture")).toEqual([{ operation: "account_export" }, { operation: "email", request: { action: "status" } }]);
+  expect(after.filter((body) => body.operation === "picture").map((body) => body.request?.action).sort()).toEqual(["mine", "reports"]);
   const whole = await file();
   // Central's export as it is, and the account's own data of the address:
   // whether this Central sends mail is not the account's

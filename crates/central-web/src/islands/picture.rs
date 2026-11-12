@@ -600,7 +600,13 @@ struct Card {
 
 impl Card {
     fn reload(self) {
-        leptos::task::spawn_local(async move { self.own.set(Some(mine().await)) });
+        leptos::task::spawn_local(async move {
+            let own = mine().await;
+            if let Ok(own) = &own {
+                browser::remember(own.picture.as_ref());
+            }
+            self.own.set(Some(own));
+        });
     }
 
     fn choose(self) {
@@ -640,6 +646,7 @@ impl Card {
                         .as_ref()
                         .and_then(|picture| picture.sequence_bytes);
                     self.kept_still.set(moving && sequence.is_none());
+                    browser::remember(stored.picture.as_ref());
                     self.own.set(Some(Ok(stored)));
                     self.said.set(Some(words::picture_saved(self.lang)));
                     self.step.set(Step::Idle);
@@ -1106,6 +1113,23 @@ mod browser {
         }
     }
 
+    /// Tells this tab's header (`boot.js`) the account's own picture: its
+    /// key and whether it moves, or that there is none. Nothing else.
+    pub fn remember(picture: Option<&central_api::picture::Picture>) {
+        let held = picture.map_or_else(
+            || serde_json::json!({ "key": null }),
+            |p| {
+                serde_json::json!({
+                    "key": central_api::picture::key_hex(&p.key),
+                    "moving": p.sequence_bytes.is_some(),
+                })
+            },
+        );
+        if let Some(storage) = web_sys::window().and_then(|w| w.session_storage().ok().flatten()) {
+            let _ = storage.set_item("baylee-central-own-picture", &held.to_string());
+        }
+    }
+
     fn paint(canvas: &HtmlCanvasElement, crop: Crop, side: f64) -> Option<()> {
         let context: CanvasRenderingContext2d = canvas.get_context("2d").ok()??.dyn_into().ok()?;
         context.clear_rect(0.0, 0.0, side, side);
@@ -1202,6 +1226,7 @@ mod browser {
         std::future::ready(super::checked(0.0, &[]).and(Err(Trouble::Open)))
     }
     pub fn close() {}
+    pub fn remember(_: Option<&central_api::picture::Picture>) {}
     pub fn draw(_: Crop) {}
     pub fn shown() -> f64 {
         f64::from(super::PREVIEW)

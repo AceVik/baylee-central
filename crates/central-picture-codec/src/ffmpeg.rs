@@ -38,11 +38,12 @@ const OUTPUT: &str = "sequence.avif";
 const COLOUR: &str =
     "setparams=colorspace=smpte170m:color_primaries=bt709:color_trc=iec61966-2-1:range=pc";
 
-/// Where ffmpeg is, and how long it may take.
+/// Where ffmpeg is, how long it may take, and the latest it may end.
 #[derive(Clone, Debug)]
 pub struct Ffmpeg {
     program: PathBuf,
     time: Duration,
+    until: Option<Instant>,
 }
 
 impl Ffmpeg {
@@ -53,7 +54,25 @@ impl Ffmpeg {
         Self {
             program: program.into(),
             time: FFMPEG_TIME,
+            until: None,
         }
+    }
+
+    /// The same ffmpeg, never running past `at`: the worker's own end,
+    /// so the decoding and the still before it cannot push ffmpeg past the
+    /// service's deadline, which would cost the upload its still too.
+    #[must_use]
+    pub fn until(self, at: Instant) -> Self {
+        Self {
+            until: Some(at),
+            ..self
+        }
+    }
+
+    /// Now plus this ffmpeg's time, but never past its end.
+    fn deadline(&self) -> Instant {
+        let own = Instant::now() + self.time;
+        self.until.map_or(own, |until| own.min(until))
     }
 
     /// The same ffmpeg with `time` for all attempts of one animation.
@@ -66,7 +85,7 @@ impl Ffmpeg {
     /// within its time.
     #[must_use]
     pub fn probe(&self) -> bool {
-        self.probe_until(Instant::now() + self.time)
+        self.probe_until(self.deadline())
     }
 
     fn probe_until(&self, deadline: Instant) -> bool {
@@ -99,7 +118,7 @@ impl Ffmpeg {
     /// The image sequence of `moving`, or why there is none.
     pub(crate) fn encode(&self, moving: &Animation) -> Motion {
         // One deadline for the probe and every attempt.
-        let deadline = Instant::now() + self.time;
+        let deadline = self.deadline();
         if !self.probe_until(deadline) {
             return Motion::NoEncoder;
         }

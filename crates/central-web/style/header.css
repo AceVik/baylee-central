@@ -148,6 +148,37 @@ body:has(dialog[open]) .top {
   }
 }
 
+/* The account's own picture (boot.js), or a neutral mark: one fixed size,
+   so the link never moves when it arrives. */
+.nav-account .nav-face {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  inline-size: 1.5rem;
+  block-size: 1.5rem;
+  margin-inline-end: 0.5rem;
+  overflow: hidden;
+  border-radius: var(--radius-full);
+  background: var(--avatar-0);
+  vertical-align: middle;
+}
+
+.nav-account .nav-face[data-none]::before {
+  content: "";
+  inline-size: 0.75rem;
+  block-size: 0.75rem;
+  border-radius: var(--radius-full);
+  background: var(--on-avatar);
+  opacity: 0.7;
+}
+
+.nav-account .nav-face img {
+  display: block;
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: cover;
+}
+
 .nav-account span {
   max-width: 14ch;
   overflow: hidden;
