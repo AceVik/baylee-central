@@ -1,5 +1,5 @@
 <!-- version: 2026-11-11 -->
-<!-- updated: 2026-11-11 -->
+<!-- updated: 2026-11-12 -->
 
 # Nutzungsbedingungen für Baylee-Konten
 
@@ -33,7 +33,8 @@ Anspruch auf eine bestimmte Verfügbarkeit gibt es nicht.
 
 1. **Pseudonym genügt.** Für ein Konto brauchst du nur einen frei gewählten
    Benutzernamen und ein Passwort. Eine E-Mail-Adresse brauchst du nicht;
-   hinterlegen kannst du noch keine. Du kannst Baylee damit pseudonym
+   wenn du willst, kannst du in deinen Kontoeinstellungen eine hinterlegen.
+   Du kannst Baylee damit pseudonym
    nutzen (§ 19 Abs. 2 TDDDG). Offline gegen den Computer spielen kannst du
    ganz ohne Konto.
 2. **Alter.** Du musst mindestens 16 Jahre alt sein. Bist du noch nicht
@@ -54,8 +55,10 @@ Deine Einstellungen, Deck-Sicherungen und dein Chat-Verlauf werden auf
 deinem Gerät verschlüsselt, bevor sie uns erreichen. Wir können sie nicht
 lesen. Daraus folgt:
 
-- Vergisst du dein Passwort, kann dir ein Administrator einen Rücksetzcode
-  geben, mit dem du ein neues setzt; das Zurücksetzen per E-Mail folgt. **Deine verschlüsselten Daten
+- Vergisst du dein Passwort, setzt du mit einem Rücksetzcode ein neues: Er
+  kommt per E-Mail an eine Adresse, die du bestätigt hast, oder ein
+  Administrator gibt ihn dir. Wer dieses Postfach lesen kann, kann einen
+  dorthin geschickten Code benutzen. **Deine verschlüsselten Daten
   bleiben dabei nur erhalten, wenn du deinen Wiederherstellungscode hast oder
   noch auf einem Gerät angemeldet bist.** Sonst sind sie verloren, und
   niemand, auch wir nicht, kann sie zurückholen.

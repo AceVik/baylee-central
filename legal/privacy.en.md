@@ -1,5 +1,5 @@
 <!-- version: 2026-11-11 -->
-<!-- updated: 2026-11-11 -->
+<!-- updated: 2026-11-12 -->
 
 # Baylee Central privacy policy
 
@@ -35,8 +35,8 @@ data protection officer, as none is required.
 - **Roles (administrator)** – administering Baylee Central. *Art. 6(1)(b) GDPR*
 - **The time of your last sign-in with your password** (no address) – administering accounts and noticing misuse. *Art. 6(1)(f) GDPR (our interest in secure operation)*
 - **OPAQUE sign-in record, encrypted key container, credential state** – sign-in, protecting your encrypted data. *Art. 6(1)(b) GDPR*
-- **A reset code's fingerprint, if an administrator made one for you** (we keep only its SHA-256 digest, never the code) – letting you set a new password when you have forgotten yours. *Art. 6(1)(b) GDPR*
-- *Not available yet:* **e-mail address (optional) and its confirmation** – password reset, account notices. *Art. 6(1)(b) GDPR*
+- **A reset code's fingerprint, if an administrator made one for you or one was sent to your e-mail address** (we keep only its SHA-256 digest, never the code) – letting you set a new password when you have forgotten yours. *Art. 6(1)(b) GDPR*
+- **E-mail address (optional)**, the language its mails are written in and when you confirmed it; an address you named that waits for its code, with the code's digest; the times reset codes were mailed to you in the last 24 hours – confirming the address, sending a reset code when you or anyone who knows your sign-in name asks for one (three a day at most), telling the old address when it is replaced or removed. *Art. 6(1)(b) GDPR*
 - **Your key container, encrypted under your recovery code** (we never learn the code); a second sign-in factor (optional) will follow – protecting your account and your encrypted data. *Art. 6(1)(b) GDPR*
 - **Sessions, sign-in tickets for gateways, gateway access** – keeping you signed in and signing you in to gateways. *Art. 6(1)(b) GDPR*
 - **Encrypted objects (settings, gateway list, deck backups, chat history) with size, revision and time** – backup across devices. *Art. 6(1)(b) GDPR*
@@ -111,9 +111,10 @@ only after you choose to enable notifications; OS/browser settings can block del
 
 - **Hosting:** our servers are with a hosting provider in Germany acting as a
   processor (Art. 28 GDPR) on our instructions only.
-- **E-mail** (once it exists): if you add an e-mail address, we send confirmations and reset
-  links through a mail provider in the European Economic Area acting as a
-  processor.
+- **E-mail:** if you add an e-mail address, Baylee's own mail service on
+  our server sends its confirmation code, the reset codes asked for and the
+  notices through mailbox.org (Heinlein Hosting GmbH, Berlin, Germany),
+  acting as a processor, which receives the address and the mail.
 - **Our administrators** see, for administering accounts, your username,
   display name and tag, where your account came from, when it was created and
   last signed in, whether it has a recovery code, and the gateways you own;
@@ -144,8 +145,12 @@ whether you sign in there is your decision.
 - The record of what our administrators did is kept for three years, then
   deleted automatically.
 - A reset code's fingerprint is deleted when the code is used or you change
-  your password, and otherwise within a day after it expires, 24 hours after
-  it was made.
+  your password, and otherwise within a day after it expires: 24 hours after
+  it was made for an administrator's code, one hour for a code sent by
+  e-mail.
+- An e-mail address is kept until you remove it or delete your account. An
+  address that waits for its code is kept until you confirm or withdraw it,
+  and at most a day after its code expired (15 minutes after it was sent).
 - Server logs are deleted after 14 days at the latest.
 - Reports and moderation decisions are kept as long as needed to keep them
   traceable, at most three years.

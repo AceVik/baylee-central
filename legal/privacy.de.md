@@ -1,5 +1,5 @@
 <!-- version: 2026-11-11 -->
-<!-- updated: 2026-11-11 -->
+<!-- updated: 2026-11-12 -->
 
 # Datenschutzerklärung von Baylee Central
 
@@ -36,8 +36,8 @@ Datenschutzbeauftragten gibt es nicht, weil keine Pflicht dazu besteht.
 - **Rollen (Administrator)** – Verwaltung von Baylee Central. *Art. 6 Abs. 1 lit. b DSGVO*
 - **Zeitpunkt deiner letzten Anmeldung mit Passwort** (keine Adresse) – Konten verwalten und Missbrauch bemerken. *Art. 6 Abs. 1 lit. f DSGVO (unser Interesse an einem sicheren Betrieb)*
 - **OPAQUE-Anmeldedatensatz, verschlüsselter Schlüsselcontainer, Stand der Zugangsdaten** – Anmeldung, Schutz deiner verschlüsselten Daten. *Art. 6 Abs. 1 lit. b DSGVO*
-- **Fingerabdruck eines Rücksetzcodes, wenn ein Administrator dir einen erstellt hat** (wir speichern nur seinen SHA-256-Hash, nie den Code) – damit du ein neues Passwort setzen kannst, wenn du deines vergessen hast. *Art. 6 Abs. 1 lit. b DSGVO*
-- *Noch nicht verfügbar:* **E-Mail-Adresse (freiwillig) und ihre Bestätigung** – Passwort zurücksetzen, Kontohinweise. *Art. 6 Abs. 1 lit. b DSGVO*
+- **Fingerabdruck eines Rücksetzcodes, wenn ein Administrator dir einen erstellt hat oder einer an deine E-Mail-Adresse geschickt wurde** (wir speichern nur seinen SHA-256-Hash, nie den Code) – damit du ein neues Passwort setzen kannst, wenn du deines vergessen hast. *Art. 6 Abs. 1 lit. b DSGVO*
+- **E-Mail-Adresse (freiwillig)**, die Sprache ihrer E-Mails und wann du sie bestätigt hast; eine angegebene Adresse, die auf ihren Code wartet, mit dem Hash des Codes; die Zeitpunkte, zu denen dir in den letzten 24 Stunden Rücksetzcodes geschickt wurden – die Adresse bestätigen, einen Rücksetzcode schicken, wenn du oder jemand, der deinen Anmeldenamen kennt, einen anfordert (höchstens drei am Tag), der alten Adresse Bescheid sagen, wenn sie ersetzt oder entfernt wird. *Art. 6 Abs. 1 lit. b DSGVO*
 - **dein Schlüsselcontainer, mit deinem Wiederherstellungscode verschlüsselt** (den Code selbst kennen wir nicht); eine zweite Anmeldestufe (freiwillig) folgt – Schutz deines Kontos und deiner verschlüsselten Daten. *Art. 6 Abs. 1 lit. b DSGVO*
 - **Sitzungen, Anmeldetickets für Gateways, Gateway-Zugänge** – dich angemeldet halten und an Gateways anmelden. *Art. 6 Abs. 1 lit. b DSGVO*
 - **verschlüsselte Objekte (Einstellungen, Gateway-Liste, Deck-Sicherungen, Chat-Verlauf) mit Größe, Stand und Zeitpunkt** – geräteübergreifende Sicherung. *Art. 6 Abs. 1 lit. b DSGVO*
@@ -121,9 +121,11 @@ Zustellung verhindern.
 - **Hosting:** Unsere Server stehen bei einem Hostinganbieter in Deutschland,
   der als Auftragsverarbeiter (Art. 28 DSGVO) nur nach unserer Weisung
   handelt.
-- **E-Mail-Versand** (sobald es ihn gibt): Wenn du eine E-Mail-Adresse hinterlegst, versenden wir
-  Bestätigungen und Rücksetz-Links über einen Versanddienstleister im
-  Europäischen Wirtschaftsraum als Auftragsverarbeiter.
+- **E-Mail-Versand:** Wenn du eine E-Mail-Adresse hinterlegst, verschickt
+  Baylees eigener Maildienst auf unserem Server ihren Bestätigungscode, die
+  angeforderten Rücksetzcodes und die Hinweise über mailbox.org (Heinlein
+  Hosting GmbH, Berlin) als Auftragsverarbeiter, der die Adresse und die
+  E-Mail erhält.
 - **Unsere Administratoren** sehen zur Verwaltung der Konten deinen
   Benutzernamen, Anzeigenamen und Tag, woher dein Konto stammt, wann es
   erstellt wurde und wann du dich zuletzt angemeldet hast, ob es einen
@@ -158,7 +160,12 @@ anmeldest, entscheidest du.
   drei Jahre auf; danach wird es automatisch gelöscht.
 - Den Fingerabdruck eines Rücksetzcodes löschen wir, wenn der Code benutzt
   wird oder du dein Passwort änderst, sonst spätestens einen Tag nach seinem
-  Ablauf, 24 Stunden nach seiner Erstellung.
+  Ablauf: 24 Stunden nach seiner Erstellung beim Code eines Administrators,
+  eine Stunde beim Code per E-Mail.
+- Eine E-Mail-Adresse speichern wir, bis du sie entfernst oder deinen
+  Account löschst. Eine Adresse, die auf ihren Code wartet, bis du sie
+  bestätigst oder zurückziehst, höchstens einen Tag nach Ablauf ihres Codes
+  (15 Minuten nach dem Versand).
 - Server-Protokolle löschen wir nach höchstens 14 Tagen.
 - Meldungen und Moderationsentscheidungen bewahren wir so lange auf, wie es
   zur Nachvollziehbarkeit nötig ist, höchstens drei Jahre.

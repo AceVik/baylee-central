@@ -646,6 +646,7 @@ email-withdraw = Withdraw
 email-error-code = That is not a confirmation code. It has eight characters, as in XXXX-XXXX.
 # English for now: to be translated.
 email-wrong-code = That code is not right. Check it and try again. After several wrong codes you have to enter the address again.
+email-code-dropped = That code was not right either, so the address no longer waits. Enter it again to get a new code.
 # English for now: to be translated.
 email-now-confirmed = Your e-mail address is confirmed.
 # English for now: to be translated.
