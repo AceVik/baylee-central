@@ -364,7 +364,7 @@ test("the reset code's page opens at the account its link names", async ({ page 
   await expect(page.locator("#admin-account-title")).toHaveText("Jonas#4d5e");
   // the fragment is gone from the address
   await expect(page).toHaveURL(/\/en\/account\/admin$/);
-  expect(asked(seen).filter((r) => r?.action === "account").at(-1)).toEqual({ action: "account", account: ID.jonas });
+  expect(asked(seen).findLast((r) => r?.action === "account")).toEqual({ action: "account", account: ID.jonas });
   // back to the list, which does not show it: the keyboard goes to the search
   await page.locator("#admin-steps").getByRole("button", { name: "Back" }).click();
   await expect(page.locator("#admin-search")).toBeFocused();

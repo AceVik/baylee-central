@@ -6964,9 +6964,16 @@ nothing Central does not decide again.
 - **One account's address** carries an id the visitor chooses. It is read
   strictly (32 lowercase hex digits) and the page is rendered for each
   request and never kept: the table of rendered pages stays bounded by
-  the pages there are. An id is no secret (`AGENTS.md`); the reset code's
-  page takes an account by the fragment (`#account=`), which never
-  reaches the site, and removes it once read.
+  the pages there are. The cost moves to the processor: it is the one
+  address anyone, signed in or not, can have rendered afresh with every
+  request (a frame and "Loading …", like any account page), where every
+  other answer is rendered once; limiting requests is Caddy's, as for
+  any address. An id is no secret (`AGENTS.md`); the reset code's page
+  takes an account by the fragment (`#account=`), which never reaches the
+  site, and removes it once read. A link someone else made opens that
+  account on the reset code's page for reading only: nothing is made
+  without the warning and the password, as for an account opened from
+  the list.
 - **The order of a change.** Nothing that changes is sent from a button:
   it opens a confirmation that says what follows; only the confirmation's
   own button sends, after `AccountSummary` (another account in this
@@ -7025,18 +7032,29 @@ Adversarial pass, each question with what answers it:
 - *Can ids fill the server's table?* The server's test asks for twenty
   ids and finds the table unchanged.
 - **The checks have teeth** (one change at a time, each undone, the site
-  and the server rebuilt): every page kept (caught by the server's test);
-  the pages drawn without the role; a change sent from its button
-  without the confirmation (both caught in the browser).
+  and the server rebuilt): one account's page reported as kept, and the
+  server keeping every page whatever it reports (both caught by the
+  server's test, the second by its count of kept pages); the pages drawn
+  without the role; a change sent from its button without the
+  confirmation (both caught in the browser).
 
-Run on this change: `cargo fmt --all --check`, `cargo clippy` for the web
-crates on the host and on `wasm32-unknown-unknown` (no warning), `cargo
-test -p central-web -p central-web-server`, `cargo test -p xtask` (with
-the English share), `cargo xtask site`, and the administration's browser
-specs (`admin*.spec.ts`, 74 on both projects). `cargo clippy --workspace
---all-targets` reports one finding, in code this change did not touch:
-`site/shell.rs`'s `footer` is 104 lines since the BIMI mark (d41fce5).
-Not run: `e2e-real` (no real Central here), `cargo xtask postgres`,
-`smoke`, `cargo audit`, `cargo deny` (no dependency changed).
+Run on this change: `cargo fmt --all --check`; `cargo clippy` for
+`central-web` and `central-web-islands` on `wasm32-unknown-unknown` (no
+warning); `cargo test -p central-web -p central-web-server -p xtask`
+(with the English share); `cargo xtask secrets` (the tree and the
+history); `cargo xtask site`; the site's whole browser suite
+(`web/e2e-site`, 596 passed, 4 skipped, both projects, the 74 of
+`admin*.spec.ts` among them); the new specs type-checked under the strict
+settings and `oxlint --deny-warnings e2e-site`. Two findings of `cargo
+clippy --workspace --all-targets` with the gate's `-D warnings` are in
+code this change did not touch, both from the BIMI mark (d41fce5):
+`site/shell.rs`'s `footer` is 104 lines, and `xtask`'s `BIMI_SHA256` is
+never used outside its tests. So `cargo xtask gate` as committed stops at
+clippy on them; with both set aside locally (an `allow` each, not
+committed), it passes: format, policy, the crypto and SQLite scopes,
+clippy, tests, doc tests and the release build. Not run: `e2e-real` (no
+real Central here; `site.ts`'s `issue` was read, and its locators still
+find one element each), `cargo xtask postgres`, `smoke`, `cargo audit`,
+`cargo deny` (no dependency changed).
 
 Engineering review, not an audit.
