@@ -191,7 +191,8 @@ test("a dialog that needs more room scrolls its card on a thin bar, and the regi
   await ask(page);
   const signin = page.locator("#auth-signin");
   await expect(signin).toBeVisible();
-  const signinWidth = (await signin.boundingBox())?.width ?? 0;
+  // the layout's width, which an opening transition's scale does not change
+  const signinWidth = await signin.evaluate((dialog) => (dialog as HTMLElement).offsetWidth);
   await signin.locator("a[href$='/register']").click();
   const register = page.locator("#auth-register");
   await expect(register).toBeVisible();
@@ -206,7 +207,7 @@ test("a dialog that needs more room scrolls its card on a thin bar, and the regi
       // the bar runs inside a transparent border as tall as the corner
       border: [style.borderTopColor, parseFloat(style.borderTopWidth) >= parseFloat(style.borderTopRightRadius)],
       edge: [style.outlineStyle, style.outlineWidth],
-      width: dialog.getBoundingClientRect().width,
+      width: (dialog as HTMLElement).offsetWidth,
     };
   });
   expect(measured.scrolls).toBe(true);
@@ -216,7 +217,7 @@ test("a dialog that needs more room scrolls its card on a thin bar, and the regi
   expect(measured.edge).toEqual(["solid", "1px"]);
   if (info.project.name === "phone") {
     // no room to spare: both as wide as the screen allows
-    expect(measured.width).toBeCloseTo(signinWidth, 0);
+    expect(measured.width).toBe(signinWidth);
   } else {
     expect(measured.width).toBeGreaterThanOrEqual(640);
     expect(measured.width).toBeGreaterThan(signinWidth + 100);

@@ -50,7 +50,10 @@ test("the list: its views with their counts, its reports as text, and the checks
   const w = world();
   const o = await open(page, w, LIST);
   await expect(page.locator("h1")).toHaveText("Feedback and crash reports");
-  await expect(page.getByRole("link", { name: "Administration overview" })).toHaveAttribute("href", "/en/account/admin/overview");
+  // the administration's navigation, with this page as the current one
+  const nav = page.locator("nav.admin-nav");
+  await expect(nav.getByRole("link", { name: "Overview" })).toHaveAttribute("href", "/en/account/admin/overview");
+  await expect(nav.locator("a[aria-current=page]")).toHaveAttribute("href", "/en/account/admin/feedback");
   await expect(rows(page)).toHaveCount(6);
   expect(lastReports(o.seen)).toEqual({ action: "reports", filter: filter(), sort: "received", descending: true, offset: 0, limit: 50 });
   // the counts: the open reports' facets and the trash's total
