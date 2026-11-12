@@ -221,7 +221,11 @@ mail's button finds the code filled in, "a good, safe way".*
   fragment at once with `history.replaceState`, the rest of the address
   and the entry's state kept: the address bar, the current entry of the
   history and a reload no longer hold it. Another fragment (a place on the
-  page) stays.
+  page) stays. The link opened in a tab that shows the same page already
+  is, to the browser, a move within the page, which runs no island: on
+  such a `hashchange` to `#code=` the page loads anew, and takes the code
+  as above. Until the island runs (after the page's largest paint), the
+  fragment stands in the address bar; without script it stays there.
 - **Never by itself.** The island sends nothing because of the fragment:
   the person still presses the form's button. A link scanner that opens
   the link (some mail providers open every link they deliver) spends no

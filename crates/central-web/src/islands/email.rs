@@ -346,15 +346,37 @@ struct Section {
     busy: RwSignal<bool>,
     signed_again: Callback<()>,
     signed_out: Callback<()>,
+    /// The confirmation code the mail's link handed over, until the first
+    /// read takes it.
+    handed: StoredValue<Option<MailCode>>,
 }
 
 impl Section {
     /// Reads the state: when the section is first shown, and on "Try again".
+    /// The first read takes the code the mail's link handed over: where an
+    /// address waits for a code, it goes into the empty field, to be sent
+    /// when the person confirms; otherwise it is dropped. Either way no
+    /// later read finds it.
     fn load(self) {
         self.held.set(Held::Loading);
+        let handed = self.handed.try_update_value(Option::take).flatten();
         leptos::task::spawn_local(async move {
             match read().await {
-                Ok(state) => self.held.set(Held::Ready(state)),
+                Ok(state) => {
+                    let waits = self
+                        .mode
+                        .try_get_untracked()
+                        .is_some_and(|mode| face(&state, mode) == Face::Pending);
+                    if let Some(code) = handed.filter(|_| waits)
+                        && self
+                            .code
+                            .try_get_untracked()
+                            .is_some_and(|typed| typed.is_empty())
+                    {
+                        self.code.set(code.display().to_string());
+                    }
+                    self.held.set(Held::Ready(state));
+                }
                 Err(Unread::SignedOut) => self.leave(),
                 Err(Unread::Refused) => self.held.set(Held::Unread(None)),
                 Err(Unread::Problem(problem)) => self.held.set(Held::Unread(Some(problem))),
@@ -787,7 +809,9 @@ fn draw(s: Section) -> AnyView {
 /// on to the account, whether the address is confirmed now or later in the
 /// account area. `signed_again` runs after the form signed in once more
 /// (the sessions listed beside it are others now), `signed_out` when this
-/// browser turns out not to be signed in.
+/// browser turns out not to be signed in. `handed` holds the code the
+/// confirmation mail's link handed to the security page, which the first
+/// read takes (`Section::load`); a registration's step has none.
 pub fn section(
     lang: Lang,
     worker: String,
@@ -795,6 +819,7 @@ pub fn section(
     begin: Begin,
     signed_again: Callback<()>,
     signed_out: Callback<()>,
+    handed: StoredValue<Option<MailCode>>,
 ) -> impl IntoView {
     let s = Section {
         lang,
@@ -810,6 +835,7 @@ pub fn section(
         busy: RwSignal::new(false),
         signed_again,
         signed_out,
+        handed,
     };
     let step = matches!(begin, Begin::Name(_));
     // Effects run in the browser only.

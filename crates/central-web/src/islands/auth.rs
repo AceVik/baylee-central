@@ -551,6 +551,8 @@ fn steps_view(
             Begin::Name(address),
             Callback::new(|()| {}),
             Callback::new(move |()| session::go(&format!("/{}/signin", lang.code()))),
+            // a registration's step is reached by no mail's link
+            StoredValue::new(None),
         )
         .into_any(),
         Step::Failed(problem) => view! {

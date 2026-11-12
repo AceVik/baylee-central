@@ -75,14 +75,26 @@ async function newest(to: string, count: number): Promise<Mail> {
   return all[all.length - 1] as Mail;
 }
 
-/** What a mail may hold: no image, no script, nothing from elsewhere, links to the site Central names (its `mail` block's `site`, here baylee.app as the browser sees it), no code in a link. */
+/**
+ * What a mail may hold: no image (the logo is off here), no script, nothing
+ * from elsewhere, links to the site Central names (its `mail` block's
+ * `site`, here baylee.app as the browser sees it): the button's page and
+ * the start page. A code only in the fragment of a code mail's button
+ * (`#code=` and that mail's code), never before it.
+ */
 function sound(mail: Mail, code: string) {
   expect(mail.html).not.toMatch(/<img|<script|<iframe|<link|@import|url\(/i);
-  for (const [, href] of mail.html.matchAll(/href="([^"]*)"/g)) {
+  const links = [...mail.html.matchAll(/href="([^"]*)"/g)].map(
+    ([, href]) => href ?? "",
+  );
+  expect(links).toContain("https://baylee.app/en/");
+  for (const href of links) {
     expect(href).toMatch(
-      /^https:\/\/baylee\.app\/en\/(reset|account\/security)$/,
+      /^https:\/\/baylee\.app\/en\/((reset|account\/security)(#code=[0-9A-Z-]+)?)?$/,
     );
-    expect(href).not.toContain(code);
+    const [before, fragment] = href.split("#");
+    expect(before).not.toContain(code);
+    if (fragment !== undefined) expect(fragment).toBe(`code=${code}`);
   }
   expect(mail.text).toContain(code);
   expect(mail.html).toContain(code);

@@ -9,6 +9,11 @@
 //! asks Central to mail one to the account's confirmed address
 //! (`Request::ResetMail`). Central answers the same whatever the name, and
 //! the block says no more than that.
+//!
+//! The reset mail's button links here with its code in the fragment
+//! (`#code=RESET-…`, `fragment`): the form starts with it in the code's
+//! field, the fragment is gone from the address bar, and nothing is sent
+//! until the person sends the form.
 
 use central_api::Token;
 use central_api::reset_code::ResetCode;
@@ -21,7 +26,7 @@ use super::central::{Failure, call, uuid_v7, valid_username};
 use super::chat::glyph;
 use super::crypto::{Crypto, field_bytes};
 use super::field::{self, Labelled};
-use super::{clip, early, session};
+use super::{clip, early, fragment, session};
 use crate::words::{self, Lang};
 
 /// What the form holds when it is sent.
@@ -343,11 +348,19 @@ struct Form {
 impl Form {
     /// The form as it stands when the island starts: what was typed or
     /// chosen before it ran stays (`early`). The data is kept unless the
-    /// person says otherwise.
+    /// person says otherwise. A reset code the mail's link handed in the
+    /// address's fragment fills an empty code field; the fragment leaves
+    /// the address bar either way.
     fn early() -> Self {
+        let handed = fragment::code(&fragment::take(), ResetCode::parse);
+        let typed = early::typed("reset-code");
+        let code = match handed {
+            Some(code) if typed.is_empty() => code.display().to_string(),
+            _ => typed,
+        };
         Self {
             username: RwSignal::new(early::typed("reset-name")),
-            code: RwSignal::new(early::typed("reset-code")),
+            code: RwSignal::new(code),
             keep: RwSignal::new(!early::ticked("reset-new")),
             recovery: RwSignal::new(early::typed("reset-recovery")),
             confirmed: RwSignal::new(early::ticked("reset-confirm")),
@@ -579,6 +592,8 @@ fn done_view(lang: Lang, outcome: Outcome) -> impl IntoView {
 pub fn Reset(lang: Lang, worker: String) -> impl IntoView {
     let step = RwSignal::new(Step::Form);
     let form = Form::early();
+    // a code the link hands while the page is open: taken as at the start
+    fragment::watch();
     let submit = move |event: leptos::ev::SubmitEvent| {
         event.prevent_default();
         let fields = form.fields();

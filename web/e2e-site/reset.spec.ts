@@ -580,3 +580,137 @@ test.describe("before the islands run", () => {
     expect(posted).toEqual([]);
   });
 });
+
+/**
+ * Every request but the page's own navigations, with the Referer it
+ * carries. A browser sends no fragment; Playwright reports a navigation's
+ * address with the fragment it was given, so the navigations are left out.
+ */
+function requests(page: Page): string[] {
+  const sent: string[] = [];
+  page.on("request", (request) => {
+    if (request.isNavigationRequest()) return;
+    sent.push(`${request.method()} ${request.url()} ${request.headers()["referer"] ?? ""} ${request.postData() ?? ""}`);
+  });
+  return sent;
+}
+
+// The reset mail's button links to `/{lang}/reset#code=RESET-…` (docs/email.md,
+// "The code in the button's link"): the island fills the field from the
+// fragment, removes it from the address bar at once and sends nothing until
+// the person sends the form.
+test.describe("the code from the mail's button", () => {
+  // the service worker would fetch the WebAssembly past the page's routes
+  test.use({ serviceWorkers: "block" });
+
+  test("fills the code's field, leaves the address bar and the history at once, and sends nothing until the form is sent", async ({ page, baseURL }) => {
+    const problems = watch(page, baseURL ?? "");
+    const seen: Body[] = [];
+    await page.route("**/api/v1", central(seen));
+    const sent = requests(page);
+    await page.goto("/en/");
+    const before = await page.evaluate(() => history.length);
+    await page.goto(`/en/reset#code=${CODE}`);
+    await expect(page.locator("html")).toHaveAttribute("data-islands", "ready");
+    await expect(form(page).getByLabel("Reset code")).toHaveValue(CODE);
+    // the address bar and the history's current entry hold no code, and
+    // the entry was replaced, not added
+    await expect(page).toHaveURL(/\/en\/reset$/);
+    expect(await page.evaluate(() => ({ hash: location.hash, href: location.href, length: history.length }))).toEqual({
+      hash: "",
+      href: `${baseURL}/en/reset`,
+      length: before + 1,
+    });
+    // nothing was asked of Central, and no request held the code
+    await page.waitForTimeout(500);
+    expect(seen).toEqual([]);
+    expect(sent.filter((line) => line.includes(CODE) || line.includes("code="))).toEqual([]);
+    // back and forth: the entry is the page without the code
+    await page.goBack();
+    await expect(page).toHaveURL(/\/en\/$/);
+    await page.goForward();
+    await expect(page).toHaveURL(/\/en\/reset$/);
+    expect(await page.evaluate(() => location.hash)).toBe("");
+    await page.reload();
+    await expect(page.locator("html")).toHaveAttribute("data-islands", "ready");
+    await expect(form(page).getByLabel("Reset code")).toHaveValue("");
+
+    // The link opened in the tab that shows the page already: a move within
+    // the page, which runs no island; the page loads anew and takes it.
+    await page.goto(`/en/reset#code=${CODE}`);
+    await expect(form(page).getByLabel("Reset code")).toHaveValue(CODE);
+    await expect(page.locator("html")).toHaveAttribute("data-islands", "ready");
+    await expect(page).toHaveURL(/\/en\/reset$/);
+    // the form sends the code only once the person sends it
+    await form(page).getByLabel("Sign-in name").fill("Erika");
+    await page.getByRole("radio", { name: FRESH }).check();
+    await page.getByRole("checkbox", { name: "I understand that this data is lost for good." }).check();
+    await page.getByLabel("New password", { exact: true }).fill(PASSWORD);
+    await page.getByLabel("Repeat new password").fill(PASSWORD);
+    expect(seen).toEqual([]);
+    await submit(page).click();
+    await expect.poll(() => operations(seen), { timeout: 60_000 }).toContain("reset_start");
+    expect(seen[0]).toEqual({ operation: "discover", username: "erika" });
+    expect((seen[1] as { code: string }).code).toBe(CODE);
+    await expect(page.getByRole("heading", { name: "Your new password is set" })).toBeVisible({ timeout: 60_000 });
+    expect(problems).toEqual([]);
+  });
+
+  test("lower case and without hyphens, as a person might type it, it is filled in as printed", async ({ page }) => {
+    const seen: Body[] = [];
+    await page.route("**/api/v1", central(seen));
+    await page.goto(`/en/reset#code=${CODE.toLowerCase().replaceAll("-", "")}`);
+    await expect(page.locator("html")).toHaveAttribute("data-islands", "ready");
+    await expect(form(page).getByLabel("Reset code")).toHaveValue(CODE);
+    await expect(page).toHaveURL(/\/en\/reset$/);
+    expect(seen).toEqual([]);
+  });
+
+  for (const [what, hash] of [
+    ["a confirmation code", "#code=000G-40R4"],
+    ["a recovery code", `#code=${RECOVERY}`],
+    ["a code cut short", `#code=${CODE.slice(0, 30)}`],
+    ["an encoded character", `#code=${CODE.slice(0, 20)}%2D${CODE.slice(21)}`],
+    ["a second field", `#code=${CODE}&code=${CODE}`],
+    ["nothing", "#code="],
+  ] as const) {
+    test(`${what} in the fragment fills nothing, and the fragment goes all the same`, async ({ page, baseURL }) => {
+      const problems = watch(page, baseURL ?? "");
+      const seen: Body[] = [];
+      await page.route("**/api/v1", central(seen));
+      await page.goto(`/en/reset${hash}`);
+      await expect(page.locator("html")).toHaveAttribute("data-islands", "ready");
+      await expect(page).toHaveURL(/\/en\/reset$/);
+      expect(await page.evaluate(() => location.hash)).toBe("");
+      await expect(form(page).getByLabel("Reset code")).toHaveValue("");
+      await page.waitForTimeout(300);
+      expect(seen).toEqual([]);
+      expect(problems).toEqual([]);
+    });
+  }
+
+  test("another fragment, a place on the page, stays", async ({ page }) => {
+    await page.goto("/en/reset#reset-mail-title");
+    await expect(page.locator("html")).toHaveAttribute("data-islands", "ready");
+    await expect(page).toHaveURL(/\/en\/reset#reset-mail-title$/);
+    await expect(form(page).getByLabel("Reset code")).toHaveValue("");
+  });
+
+  test("a code typed before the islands ran stays, and the fragment goes", async ({ page }) => {
+    let release: (() => void) | undefined;
+    const typed = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await page.route("**/assets/islands.*.wasm", async (route) => {
+      await typed;
+      await route.continue();
+    });
+    await page.goto(`/en/reset#code=${CODE}`);
+    const other = "RESET-ZYXW-VTSR-QPNM-KJHG-FEDC-BA98-7654-3210";
+    await page.locator("#reset-code").fill(other);
+    release?.();
+    await expect(page.locator("html")).toHaveAttribute("data-islands", "ready");
+    await expect(form(page).getByLabel("Reset code")).toHaveValue(other);
+    await expect(page).toHaveURL(/\/en\/reset$/);
+  });
+});
