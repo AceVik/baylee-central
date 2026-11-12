@@ -187,6 +187,35 @@ number 000027 was kept for this work and is not used.
   count still reads every delivery of every recipient device, 5,000 each
   at the most. The plan was not looked at under load.
 
+
+## Profile pictures (migration 000027)
+
+[Profile pictures](profile-pictures.md) add four tables to
+`central_identity`, each hanging on the account's row and gone with it;
+the previous binary names none of them, so it runs unchanged over the
+migration. (The report-levels section above says 000027 was kept and not
+used there; this work takes it.)
+- **`pictures`**: one row per account: a 16-byte random `key`, unique and
+  new at every upload; the still's `avif` (32 B to 160 KiB) and `png`
+  (67 B to 320 KiB); an optional `sequence` (32 B to 512 KiB) for a picture
+  that moves; `sha256`, the digest of the PNG master followed by the
+  sequence, computed by the service; `side` (256); `set_at`. The three
+  files are stored out of line (`STORAGE EXTERNAL`).
+- **`picture_reports`**: `uuidv7()` ids, the reported digest, the reporter
+  (set to NULL when that account is deleted), a reason from the closed
+  list, an optional note of at most 1,000 characters, the state and its
+  decision; one open report per reporter and picture.
+- **`picture_notices`**: the last removal's reason and note, and a block
+  until a time or until lifted.
+- **`picture_budgets`**: the hour's and the day's upload counts.
+
+The runtime may `SELECT`, `INSERT` and `DELETE` pictures and update only
+`key`, `avif`, `png`, `sequence`, `sha256`, `side` and `set_at` (never the
+account); it files and decides reports by column but never deletes one;
+the operator's sweep deletes decided reports a year after their decision
+(`ops/grants.sql`, checked at startup). The upgrade fixture runs 000027
+over 000026 with its bounds, the sequence's among them, and the cascade.
+
 ## An account's e-mail address (migration 000026)
 
 `m20261112_000026_email` adds two tables in `central_identity`, for an

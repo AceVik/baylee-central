@@ -205,7 +205,13 @@ const alert = (page: Page) => page.locator("#admin-error");
 const button = (page: Page, name: string) => page.getByRole("button", { name, exact: true });
 const password = (page: Page) => page.locator("#admin-password");
 /** The administration's requests since `from`. */
-const asked = (seen: Body[], from = 0) => seen.slice(from).filter((body) => body.operation === "admin").map((body) => body.request);
+// The page's section of reported pictures asks for them on its own
+// (picture.spec.ts covers it); the accounts' requests are what is checked here.
+const asked = (seen: Body[], from = 0) =>
+  seen
+    .slice(from)
+    .filter((body) => body.operation === "admin" && body.request?.action !== "picture")
+    .map((body) => body.request);
 const operations = (seen: Body[], from: number) => seen.slice(from).map((body) => body.operation);
 
 /** The page as it stands passes the checks every page passes: axe in both schemes, the targets, 320 px. */

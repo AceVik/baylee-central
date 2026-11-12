@@ -8,6 +8,10 @@
 // ciphertext field (base64url), and "seals" by writing it there; the
 // stand-in Central delivers what was sent back to its sender, as Central
 // does for the sender's own devices.
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
 import { expect, type Page, type Route, test } from "@playwright/test";
 
 import { axe, targets } from "./check.ts";
@@ -23,6 +27,10 @@ const b64url = (text: string) => Buffer.from(text, "utf8").toString("base64url")
 const device = (id: string) => ({ id, ik: "a".repeat(43), dk: "b".repeat(43), dsig: "c".repeat(86), label: "Linux", added_at: 1 });
 const person = (tag: number, display_name: string) => ({ tag, display_name });
 const hex = (tag: number) => tag.toString(16).padStart(4, "0");
+// Bea's picture moves; Erika and Cid have none (docs/profile-pictures.md).
+const BEA_KEY = Array(16).fill(0x6b);
+const BEA_FILE = `/api/v1/pictures/${"6b".repeat(16)}`;
+const AVIF = readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "pictures", "imageio.avif"));
 
 interface Delivery {
   seq: number;
@@ -75,6 +83,7 @@ self.addEventListener("message", (event) => {
 /** A stand-in for Central's browser surface with one friend's history. */
 function central(inbox: Delivery[]) {
   const sent: string[] = [];
+  const pictures: number[][] = [];
   const handle = async (route: Route) => {
     const body = JSON.parse(route.request().postData() ?? "{}");
     const json = (value: unknown) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(value) });
@@ -95,6 +104,11 @@ function central(inbox: Delivery[]) {
       ] });
     }
     if (r.action === "group") return social({ kind: "group", response: { kind: "groups", snapshot: { groups: [], invites: [] } } });
+    // one batch for every tag the page shows, within the lookup budget's 300
+    if (r.action === "pictures") {
+      pictures.push(r.tags);
+      return social({ kind: "pictures", pictures: r.tags.includes(BEA) ? [{ tag: BEA, key: BEA_KEY, moving: true }] : [] });
+    }
     if (r.action !== "chat") return route.fulfill({ status: 401, body: "rejected\n" });
     const c = r.request;
     switch (c.command) {
@@ -111,7 +125,7 @@ function central(inbox: Delivery[]) {
       default: return route.fulfill({ status: 401, body: "rejected\n" });
     }
   };
-  return { handle, sent };
+  return { handle, sent, pictures };
 }
 
 async function open(page: Page, changed: string[] = []) {
@@ -128,6 +142,7 @@ async function open(page: Page, changed: string[] = []) {
   });
   await page.addInitScript(() => localStorage.setItem("baylee-central-session", JSON.stringify({ expiresAt: 4_102_444_800 })));
   await page.route("**/api/v1", stand.handle);
+  await page.route("**/api/v1/pictures/*", (route: Route) => route.fulfill({ status: 200, contentType: "image/avif", body: AVIF }));
   await page.route("**/assets/crypto-worker.*.js", (route) => route.fulfill({ contentType: "text/javascript", body: worker(changed) }));
   return { stand, problems };
 }
@@ -143,7 +158,7 @@ test("a conversation reads as text, passes axe, and sends from the keyboard", as
   await expect(page.locator(".msgr-lead")).toBeHidden();
   // markup in a message is text: shown as written, never an element
   await expect(log.getByText(HOSTILE, { exact: true })).toBeVisible();
-  expect(await page.locator(".conv img").count()).toBe(0);
+  expect(await page.locator(".conv-msgs img").count()).toBe(0);
   expect(await page.title()).not.toBe("1");
   await expect(page.getByRole("heading", { level: 2, name: "Bea" })).toBeVisible();
   expect(await axe(page)).toEqual([]);
@@ -216,8 +231,43 @@ test("changed keys stop writing until the safety number is confirmed", async ({ 
   await expect(page.getByLabel("Write a message")).toHaveCount(0);
   await page.getByRole("button", { name: "Compare the safety number" }).click();
   await expect(page.locator(".safety-item[data-warn]")).toBeVisible();
+  // the person is pictured there too, beside the name, at one size
+  await expect(page.locator(".safety-item[data-warn] .avatar")).toHaveAttribute("aria-hidden", "true");
   await page.getByRole("button", { name: "It matches: trust the new keys" }).click();
   await expect(page.getByLabel("Write a message")).toBeVisible({ timeout: 15_000 });
+  expect(problems).toEqual([]);
+});
+
+test("pictures stand beside every name: one size, initials without one, the still where motion is reduced", async ({ page }, info) => {
+  // a phone shows the list or the conversation; the desktop both at once
+  test.skip(info.project.name === "phone", "the list and the conversation side by side");
+  const { stand, problems } = await open(page);
+  await page.goto(`/en/account/chat?c=${CONV}`);
+  await expect(page.locator(".conv-msgs").getByText("Hello Erika")).toBeVisible({ timeout: 15_000 });
+  const pictured = page.locator(`.avatar:has(source[srcset='${BEA_FILE}.sequence.avif'])`);
+  await expect(pictured.first()).toBeVisible();
+  // the list's row and the conversation's head; one request for all tags
+  expect(await pictured.count()).toBeGreaterThanOrEqual(2);
+  expect(stand.pictures.length).toBe(1);
+  expect(stand.pictures[0]).toEqual(expect.arrayContaining([OWN, BEA, CID, 0x4a5b]));
+  // without a picture, the initials: never an empty mark
+  const bare = page.locator(".avatar:visible:not(:has(picture))");
+  expect(await bare.count()).toBeGreaterThan(0);
+  for (const text of await bare.allTextContents()) expect(text.trim()).not.toBe("");
+  // one fixed size, and no name read twice: the name stands beside each
+  for (const avatar of await page.locator(".avatar:visible").all()) {
+    const box = await avatar.boundingBox();
+    expect(box && Math.round(box.width) === Math.round(box.height) && box.width >= 24).toBe(true);
+    await expect(avatar).toHaveAttribute("aria-hidden", "true");
+  }
+  for (const image of await page.locator(".avatar img").all()) await expect(image).toHaveAttribute("alt", "");
+  const shown = () => pictured.first().locator("img").evaluate((img: HTMLImageElement) => img.currentSrc);
+  await expect.poll(shown).toMatch(/\.sequence\.avif$/);
+  // asked for less motion, the browser takes the still
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.reload();
+  await expect(pictured.first()).toBeVisible({ timeout: 15_000 });
+  await expect.poll(shown).toMatch(/[0-9a-f]{32}\.avif$/);
   expect(problems).toEqual([]);
 });
 

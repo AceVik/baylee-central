@@ -2,7 +2,8 @@
 // first paint (WebAssembly cannot): it applies the colour scheme the
 // visitor chose (localStorage "baylee-site-theme", as before), shows the
 // colour switch and lets a new scheme spread from it, names the account link while a session is remembered
-// ("baylee-central-session", which holds only when it ends), opens
+// ("baylee-central-session", which holds only when it ends) and puts the
+// account's own picture beside it, opens
 // dialogs in browsers without invoker commands, closes the dropdowns as a
 // menu closes, copies a gateway's address, pauses the hero's light off
 // screen, and marks what is on screen as the page opens. Nothing here is
@@ -85,10 +86,58 @@
       } else {
         indexedDB.deleteDatabase("baylee-chat");
       }
+      // and the header's note of the account's own picture
+      sessionStorage.removeItem("baylee-central-own-picture");
     } catch {
       // no storage here, nothing kept
     }
   }
+
+  // The account's own picture beside the account link
+  // (docs/profile-pictures.md). Asked of nobody: the profile page writes
+  // its key, and whether it moves, to "baylee-central-own-picture" in this
+  // tab's sessionStorage whenever it reads or changes it. Only Central's own
+  // files under their random key; a moving one plays only where the system
+  // allows motion. Until the key is known, or without a picture, a neutral
+  // mark of the same fixed size, so nothing shifts.
+  const OWN = "baylee-central-own-picture";
+  const ownPicture = () => {
+    try {
+      return JSON.parse(sessionStorage.getItem(OWN) ?? "null");
+    } catch {
+      return null;
+    }
+  };
+  const ownFace = (link, held) => {
+    const face = document.createElement("span");
+    face.className = "nav-face";
+    face.setAttribute("aria-hidden", "true");
+    if (held?.key && /^[0-9a-f]{32}$/.test(held.key)) {
+      const base = `/api/v1/pictures/${held.key}`;
+      const picture = document.createElement("picture");
+      if (held.moving) {
+        const moving = document.createElement("source");
+        moving.type = "image/avif";
+        moving.media = "(prefers-reduced-motion: no-preference)";
+        moving.srcset = `${base}.sequence.avif`;
+        picture.append(moving);
+      }
+      const still = document.createElement("source");
+      still.type = "image/avif";
+      still.srcset = `${base}.avif`;
+      const image = document.createElement("img");
+      image.src = `${base}.png`;
+      image.alt = "";
+      image.width = 24;
+      image.height = 24;
+      image.decoding = "async";
+      picture.append(still, image);
+      face.append(picture);
+    } else {
+      face.dataset.none = "";
+    }
+    link.prepend(face);
+  };
 
   const ready = () => {
     for (const button of document.querySelectorAll("[data-theme-switch]")) {
@@ -101,6 +150,10 @@
         link.href = link.dataset.accountHref;
         const text = link.querySelector("span");
         if (text) text.textContent = link.dataset.account;
+      }
+      const held = ownPicture();
+      for (const link of document.querySelectorAll("a[data-account-href]")) {
+        if (!link.querySelector(".nav-face")) ownFace(link, held);
       }
       for (const line of document.querySelectorAll("[data-signed-out]")) line.hidden = true;
     }

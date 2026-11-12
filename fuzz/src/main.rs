@@ -223,6 +223,7 @@ fn convert(
         Some(worker) => worker.convert(format, bytes).map(|c| Output {
             avif: c.avif,
             png: c.png,
+            motion: c.motion,
         }),
         None => central_picture_codec::convert(format, bytes),
     }
@@ -245,9 +246,11 @@ fn main() -> ExitCode {
         .and_then(|s| s.parse().ok())
         .unwrap_or(0x5eed_0000 + u64::try_from(at).unwrap_or(0));
     let worker = (format == Format::Avif).then(|| {
-        central_picture::Worker::program(
+        // no ffmpeg: what is fuzzed here is the decoders
+        central_picture::Worker::program_with(
             std::env::var("PICTURE_WORKER")
                 .unwrap_or_else(|_| "../target/release/central-picture-worker".into()),
+            vec!["--no-ffmpeg".into()],
         )
     });
     std::panic::set_hook(Box::new(|_| {}));

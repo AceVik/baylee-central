@@ -34,20 +34,19 @@ fn focus(id: &str) {
 /// An avatar: the person's picture where `tag` has one
 /// (`docs/profile-pictures.md`), else initials or the group sign, in one of
 /// six tints.
+/// Always a mark of the same size: the initials stand again whenever the
+/// picture goes. Its name stands beside it, so it is hidden from screen
+/// readers and its picture has no text of its own.
 pub fn avatar(name: &str, seed: &str, group: bool, tag: Option<u32>) -> AnyView {
-    let initials = initials(name).into_any();
     let face = if group {
         glyph(glyph::USERS)
     } else {
-        let shown = StoredValue::new_local(Some(initials));
+        let name = name.to_owned();
         (move || match tag.and_then(crate::islands::picture::face_of) {
             Some((key, moving)) => {
                 crate::islands::picture::face(&key, moving, String::new()).into_any()
             }
-            None => shown
-                .try_update_value(Option::take)
-                .flatten()
-                .unwrap_or_else(|| ().into_any()),
+            None => initials(&name).into_any(),
         })
         .into_any()
     };
@@ -849,8 +848,14 @@ impl Open {
             .map(|(m, first)| {
                 let mine = m.sender == own;
                 let who = if mine { words::chat_you(lang).to_owned() } else { known(m.sender) };
-                let sender = (group && !mine && first)
-                    .then(|| view! { <span class="msg-sender"><bdi translate="no">{who.clone()}</bdi></span> });
+                let sender = (group && !mine && first).then(|| {
+                    view! {
+                        <span class="msg-sender">
+                            {avatar(&who, &m.sender.to_string(), false, Some(m.sender))}
+                            <bdi translate="no">{who.clone()}</bdi>
+                        </span>
+                    }
+                });
                 let prefix = format!("{who}, {}: ", time::clock(m.at));
                 view! {
                     <li class="msg" data-own=mine.then_some("true") data-first=first.then_some("true")>
@@ -1009,9 +1014,12 @@ fn safety(lang: Lang, reviews: Memo<Vec<Review>>, ctl: Ctl) -> impl IntoView {
                             </button>
                         }
                     });
+                    let tag = u32::from_str_radix(&r.tag, 16).ok();
                     view! {
                         <li class="safety-item" data-warn=r.changed.then_some("true")>
-                            <span class="safety-who"><bdi translate="no">{r.snapshot.handle.clone()}</bdi>
+                            <span class="safety-who">
+                                {avatar(&r.snapshot.handle, &r.tag, false, tag)}
+                                <bdi translate="no">{r.snapshot.handle.clone()}</bdi>
                                 {r.changed.then(|| view! { <span class="pill bad">{words::chat_changed(lang)}</span> })}</span>
                             <p class="safety-number" translate="no">{r.grouped()}</p>
                             {confirm}

@@ -425,6 +425,38 @@ test("the card at 320 px and in both schemes", async ({ page }) => {
   expect(problems).toEqual([]);
 });
 
+test("the header shows the account's own picture, or a neutral mark, at one size", async ({ page }) => {
+  const w = world(true);
+  w.moving = true;
+  const problems = await open(page, w);
+  await expect(page.locator(".picture-current picture")).toBeVisible();
+  const face = page.locator(".nav-account .nav-face").first();
+  const shown = async () => {
+    await page.goto("/en/faq");
+    if (!(await page.locator("#nav").isVisible())) await page.locator(".menu-btn").click();
+    await expect(face).toBeVisible();
+    // one fixed size, hidden from screen readers: "Account" stands beside it
+    const box = await face.boundingBox();
+    expect(box && Math.abs(box.width - box.height) < 0.5 && box.width >= 20 && box.width <= 32, `${box?.width}`).toBe(true);
+    await expect(face).toHaveAttribute("aria-hidden", "true");
+  };
+  await shown();
+  const base = `/api/v1/pictures/${"5a".repeat(16)}`;
+  await expect(face.locator("source").first()).toHaveAttribute("media", "(prefers-reduced-motion: no-preference)");
+  await expect(face.locator("source").first()).toHaveAttribute("srcset", `${base}.sequence.avif`);
+  await expect(face.locator("img")).toHaveAttribute("src", `${base}.png`);
+  await expect(face.locator("img")).toHaveAttribute("alt", "");
+  // without a picture, the neutral mark of the same size
+  w.picture = false;
+  w.moving = false;
+  await page.goto("/en/account/profile");
+  await expect(page.locator("#picture-none")).toBeVisible();
+  await shown();
+  await expect(face).toHaveAttribute("data-none", "");
+  await expect(face.locator("img")).toHaveCount(0);
+  expect(problems).toEqual([]);
+});
+
 test("only the profile page allows blob: pictures", async ({ page }) => {
   const profile = await page.request.get("/en/account/profile");
   expect(profile.headers()["content-security-policy"]).toContain("img-src 'self' blob:;");

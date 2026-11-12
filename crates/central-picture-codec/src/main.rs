@@ -21,11 +21,16 @@
 use central_picture_codec::{Ffmpeg, Refusal, convert_with};
 use std::io::Write;
 use std::process::ExitCode;
+use std::time::{Duration, Instant};
 
 /// The conversion's own stack: generous, since a decoder may recurse.
 const STACK: usize = 64 * 1024 * 1024;
 /// Ubuntu's ffmpeg, which the production server installs.
 const FFMPEG: &str = "/usr/bin/ffmpeg";
+/// The latest ffmpeg may end, from the worker's start: inside the
+/// service's `central_picture::TIME` (20 s) with room to answer, so an
+/// animation that runs late loses only its sequence, never its still.
+const ANSWER_BY: Duration = Duration::from_secs(17);
 
 /// What the command line asks.
 struct Options {
@@ -49,6 +54,7 @@ fn options() -> Option<Options> {
 }
 
 fn main() -> ExitCode {
+    let started = Instant::now();
     let Some(options) = options() else {
         eprintln!("usage: central-picture-worker [--ffmpeg PATH | --no-ffmpeg] [--probe]");
         return ExitCode::FAILURE;
@@ -74,7 +80,7 @@ fn main() -> ExitCode {
     std::panic::set_hook(Box::new(|_| {}));
     let mut input = std::io::stdin().lock();
     let result = central_picture::read_request(&mut input).and_then(|(format, bytes)| {
-        let ffmpeg = options.ffmpeg;
+        let ffmpeg = options.ffmpeg.map(|f| f.until(started + ANSWER_BY));
         std::thread::Builder::new()
             .stack_size(STACK)
             .spawn(move || convert_with(format, &bytes, ffmpeg.as_ref()))

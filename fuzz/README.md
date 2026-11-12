@@ -52,10 +52,12 @@ at load averages of about 11 to 30. No case found anything.
 | Before animations, 120 s each | 3,257 | 8,799 | 4,190 | 9,908 | 9,388 | 43,483 | 704 | 3,303 |
 | With animation decoding, 60 s each | 1,303 | 3,194 | 2,703 | 4,418 | 4,212 | 19,654 | 741 | 5,837 |
 | Animated seeds (APNG, animated WebP), 120 s each | 4,155 | | 4,998 | 6,031 | | | | |
+| After the encoder became 8-bit and AVIF sequences refused, 30 s each | 574 | 1,279 | 754 | 1,735 | 2,687 | 5,062 | 262 | 2,794 |
 
 - Cases per run; findings in every run: 0.
-- AVIF ran through the worker binary. Of its cases 34 (first run) and 18
-  (second) ended in `failed`: `rav1d` aborting the worker, which the
+- AVIF ran through the worker binary (`--no-ffmpeg`: the decoders are
+  what is fuzzed). Of its cases 34 (first run), 18 (second) and 12 (last)
+  ended in `failed`: `rav1d` aborting the worker, which the
   service sees as a worker without an answer.
 - The third run added a two-frame APNG and the codec's animated WebP
   fixture to the seeds; the GIF seed was already two frames.

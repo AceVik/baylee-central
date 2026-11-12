@@ -520,25 +520,22 @@ pub fn missing_view(lang: Lang, worker: String, me: Me, ctl: Ctl) -> impl IntoVi
     }
 }
 
-#[island]
-pub fn Messenger(lang: Lang, section: Section, worker: String) -> impl IntoView {
-    let who_is = RwSignal::new(Who::Loading);
-    let ctl = Ctl::new();
-    let tab = RwSignal::new(if section == Section::Contacts {
-        Tab::Contacts
-    } else {
-        Tab::Chats
-    });
-    let selected = RwSignal::new(None::<String>);
-    let worker = StoredValue::new(worker);
-    // Pictures (`docs/profile-pictures.md`): one's own and the contacts',
-    // read again when the contacts change.
+/// Pictures (`docs/profile-pictures.md`): one's own, the contacts' and the
+/// group members', in one batch once the contacts are known (not one for
+/// one's own tag first, and never one per row), read again only when the
+/// tags change.
+fn read_pictures(who_is: RwSignal<Who>, ctl: Ctl) {
     let keys = crate::islands::picture::Keys::provide();
     let asked = StoredValue::new(Vec::<u32>::new());
     Effect::new(move |_| {
         let Who::Ready(me) = who_is.get() else {
             return;
         };
+        // One batch once the contacts are known, not one for one's own tag
+        // first: a long list makes one request.
+        if ctl.contacts.with(Option::is_none) {
+            return;
+        }
         let mut tags = vec![me.tag];
         ctl.contacts.with(|c| {
             if let Some(Ok(list)) = c {
@@ -559,6 +556,20 @@ pub fn Messenger(lang: Lang, section: Section, worker: String) -> impl IntoView 
             keys.read(tags);
         }
     });
+}
+
+#[island]
+pub fn Messenger(lang: Lang, section: Section, worker: String) -> impl IntoView {
+    let who_is = RwSignal::new(Who::Loading);
+    let ctl = Ctl::new();
+    let tab = RwSignal::new(if section == Section::Contacts {
+        Tab::Contacts
+    } else {
+        Tab::Chats
+    });
+    let selected = RwSignal::new(None::<String>);
+    let worker = StoredValue::new(worker);
+    read_pictures(who_is, ctl);
     Effect::new(move |_| {
         leptos::task::spawn_local(async move {
             let found = who().await;
