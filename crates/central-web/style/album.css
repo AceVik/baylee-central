@@ -84,27 +84,6 @@
   pointer-events: none;
 }
 
-.album[data-folding="open"]::backdrop {
-  animation: veil-in 420ms ease-out both;
-}
-
-/* the veil goes with the book, once the cover is down */
-.album[data-folding="shut"]::backdrop {
-  animation: veil-out 220ms ease-in 640ms both;
-}
-
-@keyframes veil-in {
-  from {
-    opacity: 0;
-  }
-}
-
-@keyframes veil-out {
-  to {
-    opacity: 0;
-  }
-}
-
 .album[data-folding] > .album-masthead,
 .album[data-folding] > .album-layout {
   transform-origin: left center;
