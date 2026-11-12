@@ -34,8 +34,9 @@ struct Content<'a> {
     title: String,
     /// Paragraphs above the code.
     before: Vec<String>,
-    /// The code and the size it is set in.
-    code: Option<(&'a str, u8)>,
+    /// The code, the size it is set in and the space between its
+    /// characters.
+    code: Option<(&'a str, u8, &'static str)>,
     /// Paragraphs below the code.
     after: Vec<String>,
     /// A link's words and where it goes: a page of the site.
@@ -62,7 +63,7 @@ fn content<'a>(mail: &'a Mail, site: &str) -> Content<'a> {
             subject: say("confirm-subject"),
             title: say("confirm-title"),
             before: vec![say("confirm-intro")],
-            code: Some((code.as_str(), 30)),
+            code: Some((code.as_str(), 30, "0.04em")),
             after: vec![
                 lang.text("confirm-valid", &[("minutes", &minutes.to_string())]),
                 say("code-secret"),
@@ -81,9 +82,11 @@ fn content<'a>(mail: &'a Mail, site: &str) -> Content<'a> {
                 lang.text("reset-intro", &[("name", name)]),
                 say("reset-how"),
             ],
-            // 45 characters: small enough for one line on a wide screen,
-            // and it breaks at its hyphens on a narrow one.
-            code: Some((code.as_str(), 17)),
+            // 45 characters at 15 px of a monospace font without extra
+            // space are about 406 px, less than the 438 px inside the
+            // 520 px card: one line on a wide screen, and on a narrow one
+            // it breaks at its hyphens.
+            code: Some((code.as_str(), 15, "0")),
             after: vec![
                 lang.text("reset-valid", &[("minutes", &minutes.to_string())]),
                 say("code-secret"),
@@ -106,6 +109,52 @@ fn content<'a>(mail: &'a Mail, site: &str) -> Content<'a> {
                 link: Some((say("notice-link"), page("account/security"))),
             }
         }
+        Kind::ResetDone { new_vault } => {
+            let (vault, recovery) = if *new_vault {
+                ("reset-done-new", "reset-done-recovery-new")
+            } else {
+                ("reset-done-kept", "reset-done-recovery-kept")
+            };
+            Content {
+                subject: say("reset-done-subject"),
+                title: say("reset-done-title"),
+                before: vec![
+                    say("reset-done-body"),
+                    say(vault),
+                    say("reset-done-sessions"),
+                    say("reset-done-not-you"),
+                    say(recovery),
+                ],
+                code: None,
+                after: Vec::new(),
+                link: Some((say("reset-link"), page("reset"))),
+            }
+        }
+        Kind::PasswordChanged => Content {
+            subject: say("password-subject"),
+            title: say("password-title"),
+            before: vec![
+                say("password-body"),
+                say("password-sessions"),
+                say("password-not-you"),
+            ],
+            code: None,
+            after: Vec::new(),
+            link: Some((say("reset-link"), page("reset"))),
+        },
+        Kind::ResetIssued { hours } => Content {
+            subject: say("issued-subject"),
+            title: say("issued-title"),
+            before: vec![
+                say("issued-body"),
+                lang.text("issued-valid", &[("hours", &hours.to_string())]),
+                say("issued-not-you"),
+            ],
+            code: None,
+            after: Vec::new(),
+            // where the password is changed, which ends the code
+            link: Some((say("notice-link"), page("account/security"))),
+        },
     }
 }
 
@@ -113,7 +162,7 @@ fn content<'a>(mail: &'a Mail, site: &str) -> Content<'a> {
 fn text(lang: Lang, content: &Content<'_>) -> Zeroizing<String> {
     let mut blocks = vec![content.title.clone()];
     blocks.extend(content.before.iter().cloned());
-    if let Some((code, _)) = content.code {
+    if let Some((code, ..)) = content.code {
         blocks.push(format!("{}: {code}", lang.text("code-label", &[])));
     }
     blocks.extend(content.after.iter().cloned());
@@ -185,7 +234,7 @@ fn html(lang: Lang, content: &Content<'_>) -> Zeroizing<String> {
     for words in &content.before {
         row(&mut out, "12px 28px 0 28px", &paragraph, &escape(words));
     }
-    if let Some((code, size)) = content.code {
+    if let Some((code, size, spacing)) = content.code {
         row(
             &mut out,
             "20px 28px 6px 28px",
@@ -197,7 +246,7 @@ fn html(lang: Lang, content: &Content<'_>) -> Zeroizing<String> {
             "<tr><td style=\"padding:0 28px;\"><{table}><tr><td align=\"center\" \
              style=\"padding:16px 12px;background:{FIELD};border:1px solid {ACCENT};\
              border-radius:6px;font-family:{MONO};font-size:{size}px;line-height:1.4;\
-             font-weight:700;letter-spacing:0.04em;color:{TITLE};\">{}</td></tr></table></td></tr>",
+             font-weight:700;letter-spacing:{spacing};color:{TITLE};\">{}</td></tr></table></td></tr>",
             escape(code)
         );
     }
@@ -229,7 +278,8 @@ mod tests {
 
     const SITE: &str = "https://baylee.example";
 
-    /// The four mails in `lang`, with the codes they carry.
+    /// Every mail in `lang`, with the codes the first two carry; the
+    /// notices follow them.
     fn mails(lang: Lang) -> (Vec<Mail>, String, String) {
         let code = MailCode::generate().unwrap();
         let reset = ResetCode::generate().unwrap();
@@ -241,6 +291,10 @@ mod tests {
                 Mail::reset(to, account, lang.code(), "player.one", &reset, 60),
                 Mail::replaced(to, account, lang.code()),
                 Mail::removed(to, account, lang.code()),
+                Mail::reset_done(to, account, lang.code(), false),
+                Mail::reset_done(to, account, lang.code(), true),
+                Mail::password_changed(to, account, lang.code()),
+                Mail::reset_issued(to, account, lang.code(), 24),
             ],
             code.display().to_string(),
             reset.display().to_string(),
@@ -323,8 +377,12 @@ mod tests {
                 let links = attributes(&html, "href");
                 let expected: &[&str] = match mail.what() {
                     crate::What::Confirm => &[],
-                    crate::What::Reset => &["reset"],
-                    crate::What::Replaced | crate::What::Removed => &["account/security"],
+                    crate::What::Reset
+                    | crate::What::ResetDone { .. }
+                    | crate::What::PasswordChanged => &["reset"],
+                    crate::What::Replaced | crate::What::Removed | crate::What::ResetIssued => {
+                        &["account/security"]
+                    }
                 };
                 let expected: Vec<String> = expected
                     .iter()
@@ -364,16 +422,29 @@ mod tests {
         let mailed = render(&mails[1], SITE);
         assert_eq!(mailed.text.matches(&reset).count(), 1);
         assert_eq!(mailed.html.matches(&reset).count(), 1);
+        // 45 characters on one line of the 520 px card: 15 px and no
+        // space between them.
+        assert_eq!(reset.len(), 45);
+        assert!(mailed.html.contains(&format!("font-size:15px;line-height:1.4;font-weight:700;letter-spacing:0;color:{TITLE};\">{reset}</td>")));
         assert!(mailed.text.contains("player.one"));
         assert!(mailed.text.contains("60 Minuten"));
         assert!(mailed.text.contains("https://baylee.example/de/reset"));
         assert!(!mailed.subject.contains(&reset) && !mailed.subject.contains("player"));
-        for notice in &mails[2..] {
+        for (notice, page) in mails[2..].iter().zip([
+            "account/security",
+            "account/security",
+            "reset",
+            "reset",
+            "reset",
+            "account/security",
+        ]) {
             let notice = render(notice, SITE);
+            assert!(!notice.subject.contains("player"));
             for body in [&notice.text, &notice.html] {
                 assert!(!body.contains(&code) && !body.contains(&reset));
+                assert!(!body.contains("RESET-"), "a notice carries no code");
                 assert!(!body.contains("player"), "a notice names no account");
-                assert!(body.contains("https://baylee.example/de/account/security"));
+                assert!(body.contains(&format!("https://baylee.example/de/{page}")));
             }
         }
         // No mail says the address it goes to.
@@ -382,6 +453,42 @@ mod tests {
             assert!(!rendered.text.contains("example.org"));
             assert!(!rendered.html.contains("example.org"));
         }
+    }
+
+    #[test]
+    fn the_notices_of_a_changed_login_say_what_changed() {
+        let (mails, ..) = mails(Lang::De);
+        let [kept, new, password, issued] = [4, 5, 6, 7].map(|at| render(&mails[at], SITE));
+        // A reset says whether the data stayed and what the recovery code
+        // still does; the two say it differently.
+        assert!(kept.text.contains("Die Daten des Accounts sind geblieben."));
+        assert!(
+            kept.text
+                .contains("Wiederherstellungscode öffnet deine Daten weiterhin")
+        );
+        assert!(new.text.contains("leeren Tresor"));
+        assert!(new.text.contains("öffnet nichts mehr"));
+        assert!(!new.text.contains("sind geblieben") && !kept.text.contains("Tresor"));
+        for reset in [&kept, &new] {
+            assert!(reset.text.contains("überall abgemeldet"));
+            assert!(reset.text.contains("Administrator"));
+            assert_eq!(reset.subject, kept.subject);
+        }
+        // A changed password: every other session was signed out.
+        assert!(password.text.contains("Alle anderen Sitzungen"));
+        // An administrator's code: how long it lasts, that the password
+        // still works, and what ends it.
+        assert!(issued.text.contains("24 Stunden"));
+        assert!(issued.text.contains("gilt dein Passwort wie bisher"));
+        assert!(issued.text.contains("ändere dein Passwort"));
+        let english = render(
+            &Mail::reset_issued("player@example.org", [7; 16], "en", 24),
+            SITE,
+        );
+        assert!(english.text.contains("for 24 hours"));
+        // Each says so in its own subject.
+        let subjects = [&kept, &password, &issued].map(|mail| mail.subject.clone());
+        assert!(subjects[0] != subjects[1] && subjects[1] != subjects[2]);
     }
 
     #[test]

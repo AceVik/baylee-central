@@ -36,3 +36,25 @@ removed-body = 这个地址不再是某个 Baylee 账号的电子邮件地址。
 # Both notices.
 notice-check = 如果不是你本人操作的，请登录并查看你账号的安全页面。
 notice-link = 打开安全页面
+
+# The notices to the account's confirmed address that its login changed.
+# Not translated yet: English until a translation replaces these lines.
+reset-done-subject = The password of your Baylee account was reset
+reset-done-title = A new password was set
+reset-done-body = A reset code was used to set a new password for the Baylee account of this address.
+reset-done-kept = The account's data was kept.
+reset-done-new = The account starts with an empty vault. Its data from before cannot be opened any more.
+reset-done-sessions = The account is signed out everywhere: every session it had was ended.
+reset-done-not-you = If this was not you, someone else can sign in to your account now. Ask a Baylee administrator for a reset code and set your own password again.
+reset-done-recovery-kept = Your recovery code still opens your data. Keep it: with it, a reset keeps the data.
+reset-done-recovery-new = A recovery code from before this reset opens nothing any more.
+password-subject = The password of your Baylee account was changed
+password-title = The password was changed
+password-body = The password of the Baylee account of this address was changed.
+password-sessions = Every other session of the account was signed out.
+password-not-you = If this was not you, someone else knows your password. Set a new one with a reset code: ask for one on the reset page, or ask a Baylee administrator.
+issued-subject = A reset code was made for your Baylee account
+issued-title = An administrator made a reset code
+issued-body = A Baylee administrator made a reset code for the Baylee account of this address. With it, a new password can be set for the account.
+issued-valid = The code works once, for { $hours } hours. Until it is used, your password works as it did.
+issued-not-you = If you did not ask for it, sign in and change your password on the security page: that ends the code. Then tell an administrator.
