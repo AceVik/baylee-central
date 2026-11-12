@@ -4,6 +4,7 @@
 //! under it, ends every session of the account and issues the caller's next.
 //! The vault epoch, documents, objects and the recovery wrapper stay; a reset
 //! code still outstanding is cleared, since the current password was just proven.
+use super::email::{Told, confirmed};
 use super::{AccountStore, Credential, Error, Issued, Session, identity, number, statement, uuid};
 use central_crypto::{opaque::server::ServerKeys, vault::WrappedMasterKey};
 use sea_orm::{ConnectionTrait, TransactionTrait};
@@ -50,7 +51,9 @@ impl AccountStore {
     /// still the account's, so a change racing another change or a sign-in
     /// that replaced `current` commits nothing. Central cannot see whether
     /// `wrapped` holds the same master key; the client is trusted with its
-    /// own vault's continuity.
+    /// own vault's continuity. Returns `next`'s issue and the account's
+    /// confirmed address as it stands in this transaction, to be told of
+    /// the change.
     ///
     /// # Errors
     /// Rejects a malformed record or wrapper, a `next` of another kind, a
@@ -63,7 +66,7 @@ impl AccountStore {
         record: &[u8],
         wrapped: &[u8],
         next: Session<'_>,
-    ) -> Result<Issued, Error> {
+    ) -> Result<(Issued, Option<Told>), Error> {
         ServerKeys::enrollment_record(record).map_err(|_| Error::Rejected)?;
         WrappedMasterKey::from_bytes(wrapped).map_err(|_| Error::Rejected)?;
         if current.kind() != next.kind() {
@@ -149,11 +152,17 @@ impl AccountStore {
         let expires_at = inserted
             .try_get("", "expires_at")
             .map_err(|_| Error::Unavailable)?;
+        // Under the account's row lock, which every write of its address
+        // takes first.
+        let told = confirmed(&tx, account).await?;
         tx.commit().await.map_err(|_| Error::Unavailable)?;
-        Ok(Issued {
-            username,
-            wrapped_master: wrapped.to_vec(),
-            expires_at,
-        })
+        Ok((
+            Issued {
+                username,
+                wrapped_master: wrapped.to_vec(),
+                expires_at,
+            },
+            told,
+        ))
     }
 }

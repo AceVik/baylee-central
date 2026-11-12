@@ -12,6 +12,12 @@
 //! the request ([`IdentityService::deliver_mail`]), and so are the notices
 //! to an address that was replaced or removed.
 //!
+//! A change to the login that the store committed (a reset's finish, a
+//! password change, an administrator's reset code) is told to the account's
+//! confirmed address, which the store read in the change's own
+//! transaction ([`Mails::committed`]). The notice is queued like the others:
+//! it never makes the request fail or wait, and a refusal tells nobody.
+//!
 //! Nothing here keeps or prints a code. A queued request holds a name as
 //! typed, a queued notice an address; neither has a Debug output.
 use super::{Error, IdentityService, Response, Surface, Token};
@@ -20,7 +26,9 @@ use central_api::{
     reset_code::ResetCode,
 };
 use central_mail::{Mail, Mailer, Outcome};
-use central_postgres::{Email, MAIL_CODE_MINUTES, MAILED_RESET_HOURS, Session, Told};
+use central_postgres::{
+    Email, ISSUED_RESET_HOURS, MAIL_CODE_MINUTES, MAILED_RESET_HOURS, Session, Told,
+};
 use std::{
     collections::{BTreeMap, VecDeque},
     sync::{Arc, Mutex},
@@ -52,7 +60,9 @@ pub(super) const RESET_MAILS_PER_HOUR: usize = 30;
 /// the store does not answer.
 const RESET_QUEUE: usize = 256;
 /// Notices that wait for their turn; one more is not sent. A notice
-/// follows a confirmed or removed address, which are rare.
+/// follows a confirmed or removed address, a reset, a password change or
+/// an administrator's reset code, which are rare; one that already waits
+/// is not queued twice ([`Mails::notice`]).
 const NOTICE_QUEUE: usize = 64;
 /// Mails with a confirmation code handed to the mailer at once: each holds
 /// a thread for as long as the mailer takes, three seconds at most.
@@ -64,6 +74,8 @@ const NAME_BYTES: usize = 24;
 const CODE_MINUTES: u32 = MAIL_CODE_MINUTES.unsigned_abs();
 /// Minutes a mailed reset code lasts, as the mail says them.
 const RESET_MINUTES: u32 = MAILED_RESET_HOURS.unsigned_abs() * 60;
+/// Hours an administrator's reset code lasts, as its notice says them.
+pub(super) const ISSUED_HOURS: u32 = ISSUED_RESET_HOURS.unsigned_abs();
 
 const HOUR: Duration = Duration::from_secs(3_600);
 const DAY: Duration = Duration::from_hours(24);
@@ -256,15 +268,18 @@ impl Mails {
         }
     }
 
-    /// Queue the notice to an address that lost its place. It is tried
-    /// once, later, and is never a reason to refuse: the change it tells
-    /// of is committed. Without a mailer, or with the queue full, it is
-    /// not sent.
+    /// Queue the notice `mail` writes to the address `told` of `account`:
+    /// one that lost its place, or the account's own when its login
+    /// changed. It is tried once, later, and is never a reason to refuse:
+    /// the change it tells of is committed. Without a mailer, or with the
+    /// queue full, it is not sent. The same notice to the same address of
+    /// the same account is queued once while it waits, so that an account
+    /// that changes its password again and again holds one place, not all.
     fn notice(
         &self,
         told: Option<Told>,
         account: [u8; 16],
-        mail: fn(&str, [u8; 16], &str) -> Mail,
+        mail: impl FnOnce(&str, [u8; 16], &str) -> Mail,
     ) {
         let Some(told) = told else {
             return;
@@ -272,17 +287,38 @@ impl Mails {
         if self.mailer.is_none() {
             return;
         }
+        let mail = mail(&told.address, account, &told.lang);
         let Ok(mut counted) = self.counted.lock() else {
             return;
         };
-        if counted.notices.len() >= NOTICE_QUEUE {
+        let waits = counted.notices.iter().any(|queued| {
+            queued.account() == account && queued.what() == mail.what() && queued.to() == mail.to()
+        });
+        if waits || counted.notices.len() >= NOTICE_QUEUE {
             return;
         }
-        counted
-            .notices
-            .push_back(mail(&told.address, account, &told.lang));
+        counted.notices.push_back(mail);
         drop(counted);
         self.queued.notify_one();
+    }
+
+    /// The store's answer `done` to a change of the login of `account`,
+    /// with the account's confirmed address as the change's transaction
+    /// read it. Once the store committed the change, `mail` writes the
+    /// notice to that address and it is queued ([`Self::notice`]): no
+    /// address, no mailer or a full queue tells nobody. A refusal tells
+    /// nobody either and is answered as it is. Nothing here waits: the
+    /// mailer is asked later, by the worker, so the answer is the store's
+    /// whatever becomes of the notice.
+    pub(super) fn committed<T>(
+        &self,
+        done: Result<(T, Option<Told>), Error>,
+        account: [u8; 16],
+        mail: impl FnOnce(&str, [u8; 16], &str) -> Mail,
+    ) -> Result<T, Error> {
+        let (answer, told) = done?;
+        self.notice(told, account, mail);
+        Ok(answer)
     }
 
     /// Take a request for a reset code by mail: check and queue it.
@@ -505,7 +541,7 @@ impl IdentityService {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use central_mail::What;
+    use central_mail::{Lang, What};
     use std::task::{Context, Waker};
 
     const SECOND: Duration = Duration::from_secs(1);
@@ -883,11 +919,227 @@ mod tests {
         assert!(mails.next().is_none());
         // Queuing sends nothing, and the queue is bounded: one more is
         // dropped.
-        for _ in 0..=NOTICE_QUEUE {
-            mails.notice(told_of("old@example.org"), [1; 16], Mail::replaced);
+        for n in 0..=NOTICE_QUEUE {
+            let account = [u8::try_from(n).unwrap(); 16];
+            mails.notice(told_of("old@example.org"), account, Mail::replaced);
         }
         assert_eq!(mails.counted.lock().unwrap().notices.len(), NOTICE_QUEUE);
         assert_eq!(fake.count(), 0);
+    }
+
+    /// What writes a notice to an address of an account.
+    type Writes = fn(&str, [u8; 16], &str) -> Mail;
+
+    fn told_to(address: &str, lang: &str) -> Told {
+        Told {
+            address: address.into(),
+            lang: lang.into(),
+        }
+    }
+
+    /// The notice that waits next, as the worker finds it.
+    fn waiting(mails: &Mails) -> Option<(String, [u8; 16], What, Lang)> {
+        let Some((_, Work::Notice(mail))) = mails.next() else {
+            return None;
+        };
+        assert!(mail.code().is_none() && mail.ttl_secs().is_none());
+        Some((
+            mail.to().to_owned(),
+            mail.account(),
+            mail.what(),
+            mail.lang(),
+        ))
+    }
+
+    #[test]
+    fn a_committed_change_is_told_later_and_a_refusal_never() {
+        let fake = Arc::new(Fake::default());
+        let mails = mailing(&fake);
+        let account = [3; 16];
+        // A refusal is answered as it is: no notice is written, none waits
+        // and the worker is not told.
+        for refused in [
+            Error::Rejected,
+            Error::Conflict,
+            Error::Busy,
+            Error::Unavailable,
+        ] {
+            let done: Result<((), Option<Told>), Error> = Err(refused);
+            assert_eq!(
+                mails.committed(done, account, |_, _, _| panic!("no notice for a refusal")),
+                Err(refused)
+            );
+        }
+        assert!(mails.next().is_none() && !told(&mails));
+        // A committed change is answered with the store's answer, and its
+        // notice waits for the worker: nothing went to the mailer yet.
+        let changes: [(Writes, What); 4] = [
+            (
+                |to, account, lang| Mail::reset_done(to, account, lang, false),
+                What::ResetDone { new_vault: false },
+            ),
+            (
+                |to, account, lang| Mail::reset_done(to, account, lang, true),
+                What::ResetDone { new_vault: true },
+            ),
+            (Mail::password_changed, What::PasswordChanged),
+            (
+                |to, account, lang| Mail::reset_issued(to, account, lang, ISSUED_HOURS),
+                What::ResetIssued,
+            ),
+        ];
+        for (at, (mail, what)) in changes.into_iter().enumerate() {
+            let done = Ok((at, Some(told_to("own@example.org", "de"))));
+            assert_eq!(mails.committed(done, account, mail), Ok(at));
+            assert_eq!(fake.count(), 0, "nothing is handed over on the request");
+            assert!(told(&mails));
+            assert_eq!(
+                waiting(&mails),
+                Some(("own@example.org".into(), account, what, Lang::De))
+            );
+        }
+        // An account without a confirmed address: the answer, and nobody
+        // to tell.
+        assert_eq!(
+            mails.committed(Ok(("issued", None)), account, |_, _, _| panic!(
+                "no address, no notice"
+            )),
+            Ok("issued")
+        );
+        assert!(mails.next().is_none() && !told(&mails));
+        assert_eq!(fake.count(), 0);
+    }
+
+    #[test]
+    fn without_a_mailer_a_change_is_answered_and_tells_nobody() {
+        let none = Mails::default();
+        for mail in [Mail::password_changed as Writes, Mail::replaced] {
+            assert_eq!(
+                none.committed(
+                    Ok((5, Some(told_to("own@example.org", "en")))),
+                    [4; 16],
+                    mail
+                ),
+                Ok(5)
+            );
+        }
+        assert!(none.counted.lock().unwrap().notices.is_empty());
+        assert!(none.next().is_none() && !told(&none));
+    }
+
+    #[test]
+    fn a_notice_never_waits_for_the_mailer_nor_fails_the_answer() {
+        // A mailer that panics when asked: the request never asks it.
+        let mails = Mails {
+            mailer: Some(Arc::new(Broken)),
+            ..Mails::default()
+        };
+        assert_eq!(
+            mails.committed(
+                Ok(((), Some(told_to("own@example.org", "en")))),
+                [5; 16],
+                Mail::password_changed
+            ),
+            Ok(())
+        );
+        assert_eq!(mails.counted.lock().unwrap().notices.len(), 1);
+        // The worker asks it later, and a mailer that cannot send is a
+        // notice not sent; the change stays done.
+        let Some((mailer, Work::Notice(mail))) = mails.next() else {
+            panic!("a notice that waits");
+        };
+        assert_eq!(wait(send(mailer, mail)), Outcome::Unavailable);
+        // A full queue drops the notice and still answers.
+        let fake = Arc::new(Fake::default());
+        let full = mailing(&fake);
+        for n in 0..NOTICE_QUEUE {
+            let account = [u8::try_from(n).unwrap(); 16];
+            full.notice(
+                Some(told_to("other@example.org", "en")),
+                account,
+                Mail::removed,
+            );
+        }
+        assert_eq!(
+            full.committed(
+                Ok((9, Some(told_to("own@example.org", "en")))),
+                [200; 16],
+                Mail::password_changed
+            ),
+            Ok(9)
+        );
+        let queued = &full.counted.lock().unwrap().notices;
+        assert_eq!(queued.len(), NOTICE_QUEUE);
+        assert!(queued.iter().all(|mail| mail.what() == What::Removed));
+        assert_eq!(fake.count(), 0);
+    }
+
+    #[test]
+    fn a_notice_that_waits_is_not_queued_twice() {
+        let fake = Arc::new(Fake::default());
+        let mails = mailing(&fake);
+        let (one, other) = ([1; 16], [2; 16]);
+        // An account that changes its password again and again holds one
+        // place while its notice waits.
+        for _ in 0..NOTICE_QUEUE * 2 {
+            mails.notice(
+                Some(told_to("own@example.org", "en")),
+                one,
+                Mail::password_changed,
+            );
+        }
+        assert_eq!(mails.counted.lock().unwrap().notices.len(), 1);
+        // Another notice, another address or another account each have
+        // their own.
+        mails.notice(
+            Some(told_to("own@example.org", "en")),
+            one,
+            |to, account, lang| Mail::reset_done(to, account, lang, false),
+        );
+        mails.notice(
+            Some(told_to("own@example.org", "en")),
+            one,
+            |to, account, lang| Mail::reset_done(to, account, lang, true),
+        );
+        mails.notice(
+            Some(told_to("new@example.org", "en")),
+            one,
+            Mail::password_changed,
+        );
+        mails.notice(
+            Some(told_to("own@example.org", "en")),
+            other,
+            Mail::password_changed,
+        );
+        let mut found = Vec::new();
+        while let Some((to, account, what, _)) = waiting(&mails) {
+            found.push((to, account, what));
+        }
+        assert_eq!(
+            found,
+            [
+                ("own@example.org".into(), one, What::PasswordChanged),
+                (
+                    "own@example.org".into(),
+                    one,
+                    What::ResetDone { new_vault: false }
+                ),
+                (
+                    "own@example.org".into(),
+                    one,
+                    What::ResetDone { new_vault: true }
+                ),
+                ("new@example.org".into(), one, What::PasswordChanged),
+                ("own@example.org".into(), other, What::PasswordChanged),
+            ]
+        );
+        // Once it was taken, the same notice waits again.
+        mails.notice(
+            Some(told_to("own@example.org", "en")),
+            one,
+            Mail::password_changed,
+        );
+        assert_eq!(mails.counted.lock().unwrap().notices.len(), 1);
     }
 
     #[test]
@@ -920,7 +1172,7 @@ mod tests {
     fn the_numbers_are_the_documented_ones() {
         assert_eq!((CODE_MAILS_PER_HOUR, CODE_MAILS_PER_DAY), (5, 10));
         assert_eq!(RESET_MAILS_PER_HOUR, 30);
-        assert_eq!((CODE_MINUTES, RESET_MINUTES), (15, 60));
+        assert_eq!((CODE_MINUTES, RESET_MINUTES, ISSUED_HOURS), (15, 60, 24));
         assert_eq!((RESET_QUEUE, NOTICE_QUEUE, SENDING), (256, 64, 4));
     }
 

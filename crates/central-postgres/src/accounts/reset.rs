@@ -3,6 +3,7 @@
 //! address (`docs/email.md`, migration 000026), and its use, which keeps
 //! the vault or makes a new one at the next epoch.
 use super::admin::{Action, audit};
+use super::email::{Told, confirmed};
 use super::{
     AccountStore, Credential, Error, Token, identity, number, statement, username, uuid,
     validate_document,
@@ -15,7 +16,7 @@ use sea_orm::{ConnectionTrait, DatabaseTransaction, TransactionTrait, prelude::U
 const RESETTABLE: &str = "credential IS NOT NULL AND (source = 'registered' OR legacy_closed)";
 
 /// Hours an administrator's reset code lasts: it is handed over by a person.
-const ISSUED_RESET_HOURS: i32 = 24;
+pub const ISSUED_RESET_HOURS: i32 = 24;
 /// Hours a mailed reset code lasts: a mail is read soon or not at all, and
 /// the mailbox is the weaker place to leave a code.
 pub const MAILED_RESET_HOURS: i32 = 1;
@@ -128,10 +129,12 @@ async fn issue(
 
 impl AccountStore {
     /// Make `digest` the reset code of `target` for the administrator behind
-    /// `browser`, valid 24 hours, replacing any earlier one, and audit it.
-    /// The administrator's password sign-in must be under 30 minutes old;
-    /// the account must be enrolled, its move finished, and neither an
-    /// administrator's nor the actor's own. Returns the expiry in Unix seconds.
+    /// `browser`, valid [`ISSUED_RESET_HOURS`], replacing any earlier one,
+    /// and audit it. The administrator's password sign-in must be under 30
+    /// minutes old; the account must be enrolled, its move finished, and
+    /// neither an administrator's nor the actor's own. Returns the expiry
+    /// in Unix seconds, and the account's confirmed address as it stands
+    /// in this transaction, to be told that a code exists.
     ///
     /// # Errors
     /// `Rejected` without an administrator's fresh browser session and for a
@@ -141,7 +144,7 @@ impl AccountStore {
         browser: &Token,
         target: [u8; 16],
         digest: &[u8; 32],
-    ) -> Result<i64, Error> {
+    ) -> Result<(i64, Option<Told>), Error> {
         // Anyone else is refused before any lock is taken.
         Self::administrator(&self.db, browser).await?;
         let target = Uuid::from_bytes(target);
@@ -157,8 +160,11 @@ impl AccountStore {
             .await?
             .ok_or(Error::Rejected)?;
         audit(&tx, Some(actor), Action::ResetIssued, target).await?;
+        // The statement above holds the target's row, which every write of
+        // its address locks first.
+        let told = confirmed(&tx, target).await?;
         tx.commit().await.map_err(|_| Error::Unavailable)?;
-        Ok(expires_at)
+        Ok((expires_at, told))
     }
 
     /// Make `digest` the reset code of the account `name`, to be mailed to
@@ -297,7 +303,9 @@ impl AccountStore {
     /// account), the object quota emptied and every private object deleted,
     /// and a registered account's `restored` cleared until a native client
     /// confirms its new document; a moved account keeps it, since its
-    /// migration is closed (`account_closed_enrolled`).
+    /// migration is closed (`account_closed_enrolled`). Returns the
+    /// account's confirmed address as it stands in this transaction, to be
+    /// told of the reset.
     ///
     /// # Errors
     /// `Rejected` for a malformed record, wrapper or document, a registered
@@ -310,7 +318,7 @@ impl AccountStore {
         record: &[u8],
         wrapped: &[u8],
         vault: &ResetVault,
-    ) -> Result<(), Error> {
+    ) -> Result<Option<Told>, Error> {
         ServerKeys::enrollment_record(record).map_err(|_| Error::Rejected)?;
         WrappedMasterKey::from_bytes(wrapped).map_err(|_| Error::Rejected)?;
         if let ResetVault::New { document, recovery } = vault {
@@ -399,6 +407,10 @@ impl AccountStore {
         ))
         .await
         .map_err(|_| Error::Unavailable)?;
-        tx.commit().await.map_err(|_| Error::Unavailable)
+        // Under the account's row lock, which every write of its address
+        // takes first.
+        let told = confirmed(&tx, account).await?;
+        tx.commit().await.map_err(|_| Error::Unavailable)?;
+        Ok(told)
     }
 }

@@ -226,10 +226,11 @@ async fn issued(
     let events = "SELECT count(*)::bigint AS value FROM central_identity.audit_events
                   WHERE action = 'account.reset_issued'";
     // A code, its audit event, and the account row's expiry.
-    let issued = store
+    let (issued, told) = store
         .issue_reset(cookie, moved.account, &code.digest())
         .await
         .unwrap();
+    assert!(told.is_none(), "an account without an address tells nobody");
     assert_eq!(count(operator, events).await, before + 1);
     let (row, ..) = store.admin_account(cookie, moved.account).await.unwrap();
     assert_eq!(row.reset_until, Some(issued));

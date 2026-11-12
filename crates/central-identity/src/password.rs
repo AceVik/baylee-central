@@ -8,6 +8,7 @@ use super::{
     Token, limits, signed_in,
 };
 use central_crypto::opaque::server::ServerKeys;
+use central_mail::Mail;
 use std::time::{Duration, Instant};
 use subtle::ConstantTimeEq;
 
@@ -142,7 +143,7 @@ impl IdentityService {
         // new one.
         self.proved(&guess)?;
         let token = Token::generate()?;
-        let issued = self
+        let done = self
             .store
             .change_password(
                 surface.session(Some(presented))?,
@@ -151,7 +152,11 @@ impl IdentityService {
                 wrapped,
                 surface.session(Some(&token))?,
             )
-            .await?;
+            .await;
+        // The account's confirmed address is told, later.
+        let issued =
+            self.mails
+                .committed(done, credential.identity.account, Mail::password_changed)?;
         // Whoever knew the old password has no place of the account's any
         // more; the one this change came from stays its own.
         self.changed(credential.identity.account, guess.place());

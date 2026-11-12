@@ -738,10 +738,18 @@ async fn administrators_code(
 ) {
     age_mails(operator, owner, "25 hours").await;
     let issued = ResetCode::generate().unwrap();
-    store
+    // The administrator's code comes with the account's confirmed address,
+    // read in its transaction, to be told that a code exists.
+    let (_, told) = store
         .issue_reset(admin_cookie, owner.account, &issued.digest())
         .await
         .unwrap();
+    let told = told.expect("the account's confirmed address");
+    assert_eq!(
+        (told.address.as_str(), told.lang.as_str()),
+        ("owner@example.org", "en")
+    );
+    assert!(!format!("{told:?}").contains("owner"));
     let mailed = ResetCode::generate().unwrap();
     assert!(
         store
@@ -830,6 +838,13 @@ async fn ended_with_the_address(
     assert!(finds(store, "mail-owner", &issued).await);
     let (_, told) = store.email_remove(session).await.unwrap();
     assert_eq!(told.unwrap().address, "second@example.org");
+    assert!(finds(store, "mail-owner", &issued).await);
+    // Without a confirmed address there is nobody to tell.
+    let (_, told) = store
+        .issue_reset(admin_cookie, owner.account, &issued.digest())
+        .await
+        .unwrap();
+    assert!(told.is_none());
     assert!(finds(store, "mail-owner", &issued).await);
     // A mailed code, and the address replaced.
     operator
