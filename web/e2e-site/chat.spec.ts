@@ -12,7 +12,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { expect, type Page, type Route, test } from "@playwright/test";
+import { expect, type Locator, type Page, type Route, test } from "@playwright/test";
 
 import { axe, narrow, schemes, targets } from "./check.ts";
 
@@ -51,8 +51,12 @@ function delivery(seq: number, sender: number, name: string, text: string, at: n
   };
 }
 
-/** The canned Worker: `changed` names tags whose keys changed. */
-function worker(changed: string[]): string {
+/**
+ * The canned Worker: `changed` names tags whose keys changed; without
+ * `opens` it resumes no identity the chat can use (no device), so the chat
+ * cannot be opened.
+ */
+function worker(changed: string[], opens = true): string {
   return `
 const changed = new Set(${JSON.stringify(changed)});
 const text = (b64) => new TextDecoder().decode(Uint8Array.from(atob(b64.replace(/-/g, "+").replace(/_/g, "/")), (c) => c.charCodeAt(0)));
@@ -62,7 +66,7 @@ self.addEventListener("message", (event) => {
   const m = JSON.parse(event.data);
   const ok = (value) => self.postMessage(JSON.stringify({ id: m.id, ok: value }));
   switch (m.op) {
-    case "resume": return ok({ device: "0123456789abcdef", registration: { ik: "a".repeat(43), dk: "b".repeat(43), dsig: "c".repeat(86), label: "Linux" } });
+    case "resume": return ok(${opens} ? { device: "0123456789abcdef", registration: { ik: "a".repeat(43), dk: "b".repeat(43), dsig: "c".repeat(86), label: "Linux" } } : {});
     case "restore": return ok({});
     case "observe": return ok({ reviews: m.keys.map((k) => ({ tag: k.tag, number: k.tag === "2c3d" ? "1234567890".repeat(6) : "0987654321".repeat(6), changed: changed.has(k.tag), snapshot: k })), trust: [1, 2, 3] });
     case "confirm": changed.delete(m.snapshot.tag); return ok({ trust: [4, 5, 6] });
@@ -107,6 +111,7 @@ interface World {
   failSend?: boolean;
   contactsWait?: number;
   contactsFail?: number;
+  people?: Named[];
 }
 
 /** The names the stand-in gives each tag's keys. */
@@ -155,6 +160,7 @@ function central(held: World) {
       return social({ kind: "contacts", contacts: held.contacts });
     }
     if (r.action === "group") return social({ kind: "group", response: { kind: "groups", snapshot: held.groups } });
+    if (r.action === "lookup") return social({ kind: "person", person: held.people?.find((p) => p.tag === r.tag) ?? null });
     // one batch for every tag the page shows, within the lookup budget's 300
     if (r.action === "pictures") {
       pictures.push(r.tags);
@@ -190,7 +196,7 @@ function history(): Delivery[] {
   ];
 }
 
-async function open(page: Page, changed: string[] = [], held: World = world(history())) {
+async function open(page: Page, changed: string[] = [], held: World = world(history()), opens = true) {
   const stand = central(held);
   const problems: string[] = [];
   page.on("pageerror", (error) => problems.push(error.message));
@@ -200,7 +206,7 @@ async function open(page: Page, changed: string[] = [], held: World = world(hist
   await page.addInitScript(() => localStorage.setItem("baylee-central-session", JSON.stringify({ expiresAt: 4_102_444_800 })));
   await page.route("**/api/v1", stand.handle);
   await page.route("**/api/v1/pictures/*", (route: Route) => route.fulfill({ status: 200, contentType: "image/avif", body: AVIF }));
-  await page.route("**/assets/crypto-worker.*.js", (route) => route.fulfill({ contentType: "text/javascript", body: worker(changed) }));
+  await page.route("**/assets/crypto-worker.*.js", (route) => route.fulfill({ contentType: "text/javascript", body: worker(changed, opens) }));
   return { stand, problems };
 }
 
@@ -443,8 +449,8 @@ test("screens of the messenger, both schemes", async ({ page }, info) => {
     await page.waitForTimeout(600);
     await shot("contacts", scheme);
     await page.goto("/en/account/chat");
-    await expect(page.locator(".conv-row").first()).toBeVisible({ timeout: 15_000 });
-    await page.waitForTimeout(2_500);
+    // the inbox's first read is through once the list shows its last line: what comes now is new
+    await expect(page.locator("#conv-dm-1a2b-2c3d")).toContainText("Are you coming on Tuesday?", { timeout: 15_000 });
     arrive(held, `On my way (${scheme}).`);
     await expect(page.locator(".conv-row[data-unread]")).toBeVisible({ timeout: 15_000 });
     await page.waitForTimeout(300);
@@ -664,9 +670,8 @@ test("a line arriving marks its row and leaves the rest of the list, and its foc
   const { problems } = await open(page, [], held);
   await page.goto("/en/account/chat");
   const bea = page.locator("#conv-dm-1a2b-2c3d");
-  await expect(bea).toBeVisible({ timeout: 15_000 });
-  // the inbox's first read is through: what comes now is new
-  await page.waitForTimeout(2_500);
+  // the inbox's first read is through once the row shows its last line: what comes now is new
+  await expect(bea).toContainText("Are you coming on Tuesday?", { timeout: 15_000 });
   await bea.focus();
   await bea.evaluate((row) => row.setAttribute("data-probe", "kept"));
   arrive(held, "Running late.");
@@ -676,6 +681,9 @@ test("a line arriving marks its row and leaves the rest of the list, and its foc
   // the same element, still focused: the list was not drawn anew
   await expect(bea).toBeFocused();
   await expect(bea).toHaveAttribute("data-probe", "kept");
+  // the marked row, measured
+  expect(await schemes(page)).toEqual([]);
+  expect(await targets(page)).toEqual([]);
   expect(problems).toEqual([]);
 });
 
@@ -732,14 +740,79 @@ test("the keyboard meets the same stops in the same order", async ({ page }, inf
     await page.keyboard.press("Shift+Tab");
     await expect(page.getByRole("button", { name: "Back to the conversations" })).toBeFocused();
   } else {
-    // both panes: no way back is needed, so none takes a stop
-    await expect(page.getByRole("button", { name: "Back to the conversations" })).toBeHidden();
+    // both panes; the way back stands here too, as it did (a container
+    // rule meant to hide it is outweighed by .icon-button's display)
     await page.locator(".msgr-tabs a").first().focus();
-    expect(await stops(page)).toEqual([...LIST, ...OPEN]);
+    expect(await stops(page)).toEqual([...LIST, 'button "Back to the conversations"', ...OPEN]);
   }
   await page.goto("/en/account/contacts");
   await expect(page.locator(".person").first()).toBeVisible({ timeout: 15_000 });
   await page.locator(".msgr-tabs a").first().focus();
   expect(await stops(page)).toEqual(CONTACTS);
+  expect(problems).toEqual([]);
+});
+
+// ---- What the other tests do not show ------------------------------------
+
+/** A button's own padding at its start, in px. */
+function padding(button: Locator): Promise<number> {
+  return button.evaluate((b) => parseFloat(getComputedStyle(b).paddingInlineStart));
+}
+
+/** With CHAT_SHOTS, `name` in the light and the dark scheme; the page is left light. */
+async function shoot(page: Page, project: string, name: string) {
+  if (!SHOTS) return;
+  for (const scheme of ["light", "dark"] as const) {
+    await page.emulateMedia({ colorScheme: scheme, reducedMotion: "reduce" });
+    await page.screenshot({ path: path.join(SHOTS, `${name}-${project}-${scheme}.png`) });
+  }
+  await page.emulateMedia({ colorScheme: "light", reducedMotion: null });
+}
+
+test("a person found by handle, and a group's details as its owner", async ({ page }, info) => {
+  const held = rich();
+  held.people = [person(0x7a8b, "Ella")];
+  // a friend outside the group, so its owner has someone to invite
+  held.contacts.push({ person: person(0x8c9d, "Hana"), relation: "friend" });
+  held.groups.groups[0]?.invited.push(person(0x5c6d, "Finnegan-Whitley"));
+  const { problems } = await open(page, [], held);
+
+  await page.goto("/en/account/contacts");
+  await page.getByLabel("Add a contact by their handle").fill("Ella#7a8b");
+  await page.getByRole("button", { name: "Find", exact: true }).click();
+  const found = page.locator(".person.found");
+  await expect(found.getByText("Ella#7a8b")).toBeVisible({ timeout: 15_000 });
+  const request = found.getByRole("button", { name: "Send a contact request" });
+  // under the name, with the button's own padding
+  expect(await padding(request)).toBeGreaterThan(8);
+  expect(await schemes(page)).toEqual([]);
+  expect(await targets(page)).toEqual([]);
+  expect(await narrow(page)).toBe(0);
+  await shoot(page, info.project.name, "found");
+
+  await page.goto(`/en/account/chat?c=${GROUP_CONV}`);
+  await expect(page.locator(".conv-msgs").getByText("Perfect.")).toBeVisible({ timeout: 15_000 });
+  await page.getByRole("button", { name: "Details" }).click();
+  const details = page.locator("#conv-details");
+  await expect(details.getByLabel("Group name")).toHaveValue("Tuesday table");
+  await expect(details.getByRole("button", { name: "Make owner" })).toHaveCount(2);
+  await expect(details.getByLabel("Invite a contact")).toBeVisible();
+  const withdraw = details.getByRole("button", { name: "Withdraw" });
+  await expect(withdraw).toBeVisible();
+  expect(await padding(withdraw)).toBeGreaterThan(8);
+  await expect(details.getByRole("button", { name: "Delete group" })).toBeVisible();
+  expect(await schemes(page)).toEqual([]);
+  expect(await targets(page)).toEqual([]);
+  expect(await narrow(page)).toBe(0);
+  await shoot(page, info.project.name, "group-details");
+  expect(problems).toEqual([]);
+});
+
+test("a chat that could not be opened lets the empty list say so, not that it loads", async ({ page }) => {
+  const { problems } = await open(page, [], empty(), false);
+  await page.goto("/en/account/chat");
+  await expect(page.locator(".msgr-empty").getByText("It’s quiet here, for now.")).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator(".msgr-panel").getByRole("status").filter({ hasText: "Loading" })).toHaveCount(0);
+  await expect(page.locator(".msgr-welcome .error")).toHaveText("The chat could not be opened. Reload the page to try again.");
   expect(problems).toEqual([]);
 });
