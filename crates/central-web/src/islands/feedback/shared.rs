@@ -23,6 +23,9 @@ use crate::words::{self, Lang};
 /// a minute's margin for the clocks.
 const FRESH: i64 = 30 * 60 - 60;
 
+// The glyphs below are Lucide's (lucide-static 1.60.0, ISC licence, see
+// NOTICE.md), as `site/icons.rs` has them; the funnel is the old site's.
+
 /// `trash-2`.
 pub const TRASH: &[Shape] = &[
     Shape::Path("M10 11v6"),
@@ -48,10 +51,9 @@ pub const DOWNLOAD: &[Shape] = &[
     Shape::Path("M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"),
     Shape::Path("m7 10 5 5 5-5"),
 ];
-/// `funnel`.
-pub const FILTER: &[Shape] = &[Shape::Path(
-    "M10 20a1 1 0 0 0 .553.895l2 1A1 1 0 0 0 14 21v-7a2 2 0 0 1 .517-1.341L21.74 4.67A1 1 0 0 0 21 3H3a1 1 0 0 0-.742 1.67l7.225 7.989A2 2 0 0 1 10 14z",
-)];
+/// The filter's funnel, as the old administration drew it
+/// (`web/src/components/icons.tsx`).
+pub const FILTER: &[Shape] = &[Shape::Path("M3 5h18l-7 8v6l-4 2v-8z")];
 /// `external-link`.
 pub const EXTERNAL: &[Shape] = &[
     Shape::Path("M15 3h6v6"),
@@ -517,6 +519,7 @@ impl Purge {
         let Some(reports) = self.asking.get_untracked() else {
             return;
         };
+        let asked = reports.clone();
         let sent = match (self.one, reports.as_slice()) {
             (true, [report]) => api::done(AdminRequest::PurgeReport { report: *report })
                 .await
@@ -525,13 +528,16 @@ impl Purge {
         };
         match sent {
             Ok(n) => self.end(Purged::Done(n)),
+            // Central refuses a stale sign-in and a report out of the trash
+            // alike: what it holds now tells them apart, not this browser's clock
             Err(Failure::Rejected) => match api::standing().await {
                 Standing::SignedOut => self.c.leave(),
                 Standing::NotAdmin => self.say(words::admin_refused_role(lang), Stage::Confirm),
-                Standing::Admin(at) if now() - at >= FRESH => {
-                    self.say(words::admin_refused_stale(lang), Stage::Password);
-                }
-                Standing::Admin(_) => self.end(Purged::Refused),
+                Standing::Admin(_) => match all_in_trash(&asked).await {
+                    Some(true) => self.say(words::admin_refused_stale(lang), Stage::Password),
+                    Some(false) => self.end(Purged::Refused),
+                    None => self.end(Purged::Lost),
+                },
                 Standing::Unknown => self.say(words::error_failed(lang), Stage::Confirm),
             },
             Err(Failure::Busy) => self.say(words::error_busy(lang), Stage::Confirm),
@@ -596,6 +602,19 @@ impl Purge {
             })
         }
     }
+}
+
+/// Whether every one of `reports` is still in the trash, as Central holds
+/// them now; `None` where it did not answer.
+async fn all_in_trash(reports: &[[u8; 16]]) -> Option<bool> {
+    for report in reports {
+        match api::report(*report).await {
+            Ok(detail) if detail.summary.deleted_at.is_some() => {}
+            Ok(_) | Err(Failure::Rejected) => return Some(false),
+            Err(_) => return None,
+        }
+    }
+    Some(true)
 }
 
 /// The browser's clock, in Unix seconds.

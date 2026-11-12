@@ -20,9 +20,9 @@ export const hex = (bytes: number[]) => bytes.map((b) => b.toString(16).padStart
 export const same = (a: unknown, b: number[]) => Array.isArray(a) && a.length === b.length && a.every((v, i) => v === b[i]);
 
 /** Markup in a report: if it ever runs or becomes an element, a test sees it. */
-export const HOSTILE = `<img src=x onerror="window.__pwned=1"><script>window.__pwned=1</script>`;
+export const HOSTILE = `<img src=x onerror="window.pwnedByReport=1"><script>window.pwnedByReport=1</script>`;
 /** The same as one token (no space), for fields Central keeps without spaces. */
-export const HOSTILE_TOKEN = `<script>window.__pwned=1</script>`;
+export const HOSTILE_TOKEN = `<script>window.pwnedByReport=1</script>`;
 /** A hostile report's words: markup, a card and a player the client resolved. */
 export const HOSTILE_TEXT = `${HOSTILE} first line\nand [Llanowar Elves] by [@${HOSTILE_TOKEN}]`;
 
@@ -193,7 +193,10 @@ export type World = {
   reports: Report[];
   views: View[];
   admin: boolean;
+  /** Central counts the sign-in as older than 30 minutes, and says so in `signed_in_at`. */
   stale: boolean;
+  /** Central counts it stale while `signed_in_at` looks fresh to the browser (a clock behind). */
+  staleUnseen: boolean;
   gone: boolean;
   /** How the next request of this action ends instead: a status, or no answer after it was done. */
   next: Record<string, number | "lost">;
@@ -210,6 +213,7 @@ export function world(more: Partial<World> = {}): World {
     views: [{ id: id(90), name: `Mine ${HOSTILE}`, query: "status=new%2Ctriaged%2Cin_progress&assignee=" + hex(ME) }],
     admin: true,
     stale: false,
+    staleUnseen: false,
     gone: false,
     next: {},
     client: CLIENT(),
@@ -230,16 +234,18 @@ function crc32(bytes: Uint8Array): number {
   return (c ^ 0xffffffff) >>> 0;
 }
 
+/** A PNG chunk: its length, its type, its data and their CRC. */
+function chunk(type: string, data: Buffer): Buffer {
+  const head = Buffer.alloc(8);
+  head.writeUInt32BE(data.length, 0);
+  head.write(type, 4, "ascii");
+  const crc = Buffer.alloc(4);
+  crc.writeUInt32BE(crc32(Buffer.concat([Buffer.from(type, "ascii"), data])), 0);
+  return Buffer.concat([head, data, crc]);
+}
+
 /** A real PNG, `w` × `h`, of one colour. */
 export function png(w: number, h: number): Buffer {
-  const chunk = (type: string, data: Buffer) => {
-    const head = Buffer.alloc(8);
-    head.writeUInt32BE(data.length, 0);
-    head.write(type, 4, "ascii");
-    const crc = Buffer.alloc(4);
-    crc.writeUInt32BE(crc32(Buffer.concat([Buffer.from(type, "ascii"), data])), 0);
-    return Buffer.concat([head, data, crc]);
-  };
   const ihdr = Buffer.alloc(13);
   ihdr.writeUInt32BE(w, 0);
   ihdr.writeUInt32BE(h, 4);
@@ -277,7 +283,7 @@ export function CLIENT(): unknown {
 
 // ---------------------------------------------------------------- answers
 
-const DONE: Status[] = ["resolved", "wont_fix", "duplicate"];
+const DONE: ReadonlySet<Status> = new Set(["resolved", "wont_fix", "duplicate"]);
 
 type Filter = {
   statuses?: Status[];
@@ -341,8 +347,15 @@ function facets(w: World, f: Filter) {
   };
 }
 
-function find(w: World, report: unknown): Report | undefined {
-  return w.reports.find((r) => same(report, r.summary.id));
+function find(w: World, which: unknown): Report | undefined {
+  return w.reports.find((r) => same(which, r.summary.id));
+}
+
+/** The report whose words begin so; a test that names one that is not there fails. */
+export function named(w: World, excerpt: string): Report {
+  const found = w.reports.find((r) => r.summary.excerpt.startsWith(excerpt));
+  if (!found) throw new Error(`no report "${excerpt}"`);
+  return found;
 }
 
 type Change = { status?: Status; issue?: number | null; assignee?: number[] | null; priority?: Priority | null; labels?: string[]; labels_add?: string[]; labels_remove?: string[]; duplicate_of?: number[] | null };
@@ -353,7 +366,7 @@ function apply(r: Report, c: Change, actor: number[]) {
   if (c.status !== undefined) {
     line("status", `${s.status} → ${c.status}`);
     s.status = c.status;
-    s.done_at = DONE.includes(c.status) ? THEN : null;
+    s.done_at = DONE.has(c.status) ? THEN : null;
   }
   if ("issue" in c) s.issue = c.issue ?? null;
   if ("assignee" in c) s.assignee = c.assignee ?? null;
@@ -372,9 +385,10 @@ function apply(r: Report, c: Change, actor: number[]) {
 const detail = (r: Report) => ({ ...r, summary: { ...r.summary }, notes: r.notes.map((n) => ({ ...n })), audit: r.audit.map((a) => ({ ...a })) });
 
 /** Central's answer to an administrator's report action. */
+const ok = (value: unknown) => ({ json: { result: "admin", answer: value } });
+
 function answer(w: World, asked: Asked): { status: number } | { json: unknown } | "lost" {
   if (!w.admin) return { status: 401 };
-  const ok = (value: unknown) => ({ json: { result: "admin", answer: value } });
   const done = { json: { result: "done" } };
   const action = String(asked["action"]);
   const next = w.next[action];
@@ -414,7 +428,7 @@ function answer(w: World, asked: Asked): { status: number } | { json: unknown } 
       case "crash_groups": {
         const crashes = w.reports.filter((r) => r.summary.signature !== null && matches(r, asked["filter"] as Filter));
         const groups = crashes.length === 0 ? [] : [{
-          signature: SIGNATURE, count: crashes.length, open: crashes.filter((r) => !DONE.includes(r.summary.status)).length,
+          signature: SIGNATURE, count: crashes.length, open: crashes.filter((r) => !DONE.has(r.summary.status)).length,
           first: THEN - 7200, last: THEN, latest: crashes[0]?.summary.id, message: `panicked ${HOSTILE}`, location: `src/${HOSTILE_TOKEN}.rs:1:2`,
         }];
         return ok({ answer: "crash_groups", groups });
@@ -437,7 +451,7 @@ function answer(w: World, asked: Asked): { status: number } | { json: unknown } 
         const bulk = asked["bulk"] as { do: string; change?: Change };
         const rows = ids.map((i) => find(w, i));
         if (rows.some((r) => !r)) return { status: 401 };
-        if (bulk.do === "purge" && (w.stale || rows.some((r) => r?.summary.deleted_at === null))) return { status: 401 };
+        if (bulk.do === "purge" && (w.stale || w.staleUnseen || rows.some((r) => r?.summary.deleted_at === null))) return { status: 401 };
         let changed = 0;
         for (const r of rows as Report[]) {
           if (bulk.do === "change" && bulk.change) apply(r, bulk.change, ME);
@@ -454,7 +468,7 @@ function answer(w: World, asked: Asked): { status: number } | { json: unknown } 
         const r = find(w, asked["report"]);
         if (!r) return { status: 401 };
         if (action === "purge_report") {
-          if (w.stale || r.summary.deleted_at === null) return { status: 401 };
+          if (w.stale || w.staleUnseen || r.summary.deleted_at === null) return { status: 401 };
           w.reports = w.reports.filter((x) => x !== r);
         }
         if (action === "trash_report") r.summary.deleted_at = THEN;
@@ -542,6 +556,7 @@ export async function open(page: Page, w: World, path: string): Promise<Opened> 
         return json({ result: "login_challenge", attempt: Array(32).fill(7), message: Array.from({ length: 320 }, (_, i) => (i * 37) % 251) });
       case "login_finish":
         w.stale = false;
+        w.staleUnseen = false;
         return json({ result: "browser_session", identity: { account: ME, epoch: 1 }, username: "chef", wrapped_master: Array(73).fill(9), expires_at: 4_102_444_800 });
       default:
         return refused(401);
@@ -552,8 +567,8 @@ export async function open(page: Page, w: World, path: string): Promise<Opened> 
     expect(request.method()).toBe("POST");
     expect(request.headers()["x-baylee-central"]).toBe("1");
     expect(request.headers()["content-type"]).toBe("application/json");
-    const [, , , , report, part] = new URL(request.url()).pathname.split("/");
-    w.parts.push(`${report}/${part}`);
+    const [, , , , which, part] = new URL(request.url()).pathname.split("/");
+    w.parts.push(`${which}/${part}`);
     if (!w.admin) return route.fulfill({ status: 401, body: "account request rejected\n" });
     if (typeof w.client === "number" && part === "client") return route.fulfill({ status: w.client, body: "" });
     if (part === "client") {
@@ -601,8 +616,8 @@ export async function sound(page: Page) {
 
 /** Markup in a report never ran and never became an element; nothing of it reached the console. */
 export async function harmless(page: Page, opened: Opened) {
-  expect(await page.evaluate(() => (window as unknown as { __pwned?: number }).__pwned)).toBeUndefined();
+  expect(await page.evaluate(() => (window as unknown as { pwnedByReport?: number }).pwnedByReport)).toBeUndefined();
   expect(await page.locator("img[src='x'], [onerror], body script:not([src])").count()).toBe(0);
-  expect(opened.consoled.filter((m) => m.includes("__pwned") || m.includes("first line"))).toEqual([]);
+  expect(opened.consoled.filter((m) => m.includes("pwnedByReport") || m.includes("first line"))).toEqual([]);
   expect(opened.problems).toEqual([]);
 }
