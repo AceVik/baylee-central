@@ -52,6 +52,11 @@ export async function register(page: Page, username: string, display: string, pa
   await expect(page.getByRole("heading", { name: "Your recovery code" })).toBeVisible({ timeout: 90_000 });
   const code = (await page.locator("#register-steps .secret code").textContent()) ?? "";
   expect(code).toMatch(RECOVERY);
+  // the code can be copied as it stands there (the clipboard is this test browser's own)
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+  await page.getByRole("button", { name: "Copy" }).click();
+  await expect(page.locator("#register-steps [role=status]")).toHaveText("Copied.");
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(code);
   await page.getByLabel("I have saved my recovery code").check();
   await page.getByRole("button", { name: "Continue" }).click();
   // where Central's terms are in force, they come after the code

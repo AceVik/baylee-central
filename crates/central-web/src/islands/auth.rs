@@ -325,6 +325,7 @@ fn code_view(
         "data:text/plain;charset=utf-8,Baylee%20recovery%20code%3A%20{}%0A",
         code.code
     );
+    let (copy, copied) = super::clip::copier(lang, code.code.clone());
     let handle_line = handle.map(|handle| view! { <p>{words::code_handle(lang, &handle)}</p> });
     let optional = code.optional;
     let recovery = code.recovery.clone();
@@ -367,8 +368,10 @@ fn code_view(
             <p class="eyebrow">{words::code_shown_once(lang)}</p>
             <p class="secret" translate="no"><code>{code.code.clone()}</code></p>
             <p class="actions">
+                {copy}
                 <a class="button" href=download download="baylee-recovery-code.txt">{words::code_download(lang)}</a>
             </p>
+            {copied}
             <div class="check">
                 <input id="code-kept" type="checkbox" on:change=move |ev| kept.set(event_target_checked(&ev)) />
                 <label for="code-kept">{words::code_kept(lang)}</label>

@@ -415,21 +415,8 @@ fn form_view(
 fn code_view(lang: Lang, code: String, sure: bool, signin: String) -> impl IntoView {
     let kept = RwSignal::new(false);
     let error = RwSignal::new(None::<&'static str>);
-    let copied = RwSignal::new(None::<&'static str>);
     let download = format!("data:text/plain;charset=utf-8,Baylee%20recovery%20code%3A%20{code}%0A");
-    let copy = {
-        let code = code.clone();
-        move |_| {
-            let code = code.clone();
-            leptos::task::spawn_local(async move {
-                copied.set(Some(if clip::write(&code).await {
-                    words::code_copied(lang)
-                } else {
-                    words::code_copy_failed(lang)
-                }));
-            });
-        }
-    };
+    let (copy, copied) = clip::copier(lang, code.clone());
     let go_on = move |_| {
         if kept.get_untracked() {
             session::go(&signin);
@@ -444,13 +431,10 @@ fn code_view(lang: Lang, code: String, sure: bool, signin: String) -> impl IntoV
         <p class="eyebrow">{words::code_shown_once(lang)}</p>
         <p class="secret" translate="no"><code>{code}</code></p>
         <p class="actions">
-            <button type="button" class="button" on:click=copy>
-                {glyph::glyph(glyph::COPY)}
-                <span>{words::code_copy(lang)}</span>
-            </button>
+            {copy}
             <a class="button" href=download download="baylee-recovery-code.txt">{words::code_download(lang)}</a>
         </p>
-        <p class="meta" role="status">{move || copied.get()}</p>
+        {copied}
         <div class="check">
             <input id="reset-code-kept" type="checkbox" on:change=move |ev| kept.set(event_target_checked(&ev)) />
             <label for="reset-code-kept">{words::code_kept(lang)}</label>
