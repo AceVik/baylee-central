@@ -1315,3 +1315,28 @@ makes a reset code for an account, which until now only the old build's
 **Open.** The rest of the administration (overview, the role, tags,
 gateways, audit, the legacy store, reports) is still the old build's; the
 nine translations; a run of `site-reset.spec.ts` against a real Central.
+
+## 19. As built: the owner's round of 12.11.2026
+
+Three things the owner asked for after using the site. Each point names
+where it is held.
+
+**The colour switch.** It went from the device's scheme to light, to dark
+and back, so on a light device its first press chose light, which was
+already on screen, and nothing changed; a second press was needed. Now one
+press shows the scheme that is not on screen, the one chosen or else the
+device's as the stylesheet reads it (light only where the device asks for
+light), in both directions, from the first visit and with or without a
+choice kept from before. A choice the device would make anyway is not
+kept, so the page follows the device again; the key is
+`baylee-site-theme` as before, applied by `boot.js` in the head before the
+first paint. The switch shows the sun or the moon of the scheme on screen
+and names it ("Colours: light", "Colours: dark"); while nothing is chosen
+it follows the device changing under an open page. Without script the
+switch stays hidden, as before, and the device decides. `theme-system` and
+the half-filled glyph are gone. `web/e2e-site/theme.spec.ts` presses it
+once on a dark and on a light device, with nothing, light or dark kept,
+on both sizes (the phone's switch is in the menu), checks the scheme on
+screen, what is kept, and that the kept one is on the root before the body
+begins; the old test had looked for the switch under a class the bar does
+not have and was skipped everywhere.

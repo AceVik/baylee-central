@@ -1,7 +1,8 @@
 // baylee.app's only blocking script, loaded in <head> so it runs before the
 // first paint (WebAssembly cannot): it applies the colour scheme the
 // visitor chose (localStorage "baylee-site-theme", as before), shows the
-// colour switch and lets a new scheme spread from it, names the account link while a session is remembered
+// colour switch, which turns the scheme shown into the other one, and lets
+// a new scheme spread from it, names the account link while a session is remembered
 // ("baylee-central-session", which holds only when it ends), opens
 // dialogs in browsers without invoker commands, closes the dropdowns as a
 // menu closes, copies a gateway's address, pauses the hero's light off
@@ -22,26 +23,39 @@
   const stored = read(KEY);
   if (stored === "light" || stored === "dark") root.dataset.theme = stored;
 
-  const ORDER = ["system", "light", "dark"];
-  const current = () => root.dataset.theme ?? "system";
+  // The scheme on screen: the one chosen, else the device's as the
+  // stylesheet reads it (light only where the device asks for light).
+  // One press always shows the other one. A choice the device would make
+  // anyway is not kept, so the page follows the device again; before, the
+  // switch went from the device's scheme to light and dark, and on a light
+  // device its first press changed nothing.
+  const light = matchMedia("(prefers-color-scheme: light)");
+  const device = () => (light.matches ? "light" : "dark");
+  const shown = () => root.dataset.theme ?? device();
   const label = (button) => {
-    const name = current();
+    const name = shown();
     button.dataset.state = name;
     button.setAttribute("aria-label", button.dataset[name] ?? name);
   };
-  const cycle = (event) => {
-    const next = ORDER[(ORDER.indexOf(current()) + 1) % ORDER.length];
+  const relabel = () => {
+    for (const button of document.querySelectorAll("[data-theme-switch]")) label(button);
+  };
+  // the device changing while nothing is chosen changes what is shown
+  light.addEventListener("change", relabel);
+  const turn = (event) => {
+    const next = shown() === "dark" ? "light" : "dark";
+    const follow = next === device();
     try {
-      if (next === "system") localStorage.removeItem(KEY);
+      if (follow) localStorage.removeItem(KEY);
       else localStorage.setItem(KEY, next);
     } catch {
       // Private windows may refuse storage; the choice then lasts this page.
     }
     const pressed = event.currentTarget;
     const apply = () => {
-      if (next === "system") delete root.dataset.theme;
+      if (follow) delete root.dataset.theme;
       else root.dataset.theme = next;
-      for (const button of document.querySelectorAll("[data-theme-switch]")) label(button);
+      relabel();
     };
     // The new colours spread from the switch where the browser can show
     // one state giving way to another (a view transition), and where
@@ -94,7 +108,7 @@
     for (const button of document.querySelectorAll("[data-theme-switch]")) {
       button.hidden = false;
       label(button);
-      button.addEventListener("click", cycle);
+      button.addEventListener("click", turn);
     }
     if (signedIn()) {
       for (const link of document.querySelectorAll("a[data-account-href]")) {

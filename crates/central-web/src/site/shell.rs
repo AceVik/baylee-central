@@ -412,7 +412,9 @@ fn nav_link(page: Page, current: Page, lang: Lang, label: &'static str) -> impl 
     }
 }
 
-/// The colour switch: device, light, dark (boot.js turns it).
+/// The colour switch: one press shows the scheme that is not on screen
+/// (boot.js turns it and names it; without script it stays hidden and the
+/// device's scheme decides).
 fn theme_switch(lang: Lang, in_menu: bool) -> impl IntoView + use<> {
     let class = if in_menu {
         "round-btn theme-btn theme-in-menu"
@@ -426,13 +428,11 @@ fn theme_switch(lang: Lang, in_menu: bool) -> impl IntoView + use<> {
             type="button"
             class=class
             data-theme-switch=""
-            data-system=words::theme_system(lang)
             data-light=words::theme_light(lang)
             data-dark=words::theme_dark(lang)
-            aria-label=words::theme_system(lang)
+            aria-label=words::theme_label(lang)
             hidden=true
         >
-            <span class="when-system">{solid::icon(solid::HALF)}</span>
             <span class="when-light">{solid::icon(solid::SUN)}</span>
             <span class="when-dark">{solid::icon(solid::MOON)}</span>
             {word}

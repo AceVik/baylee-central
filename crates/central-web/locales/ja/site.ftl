@@ -18,7 +18,6 @@ nav-sign-in = ログイン
 nav-account = アカウント
 lang-label = 言語
 theme-label = 配色
-theme-system = 配色：端末に合わせる
 theme-light = 配色：ライト
 theme-dark = 配色：ダーク
 
