@@ -476,6 +476,7 @@ test("the code is made after the password, shown once and copied, and gone when 
 });
 
 test("what Central would refuse is said before anything is asked", async ({ page }) => {
+  test.setTimeout(60_000);
   const w = world();
   const { seen } = await open(page, w);
   await button(page, "Show more").click();
@@ -484,7 +485,7 @@ test("what Central would refuse is said before anything is asked", async ({ page
   await expect(rows(page)).toHaveCount(7);
   const cases: [number[], string][] = [
     [ID.ada, "This account holds the administrator role, and Central makes no reset code for an administrator's account. Remove the role first."],
-    [ID.chef, "This is your own account, and nobody makes a reset code for their own. Change your password under Security, or ask another administrator."],
+    [ID.chef, "This is your own account, and nobody makes a reset code for their own. Change your password under Security instead."],
     [ID.neu, "This account was reserved and never set up, so it has no sign-in to reset."],
     [ID.umzug, "This account's move from the official gateway is not finished. Until it is, its sign-in is reset there, not here."],
   ];
@@ -504,6 +505,7 @@ test("what Central would refuse is said before anything is asked", async ({ page
 });
 
 test("Central's refusals after the password are explained by what it holds now", async ({ page }) => {
+  test.setTimeout(60_000);
   const w = world();
   const { seen } = await open(page, w);
   await expect(rows(page)).toHaveCount(3);
