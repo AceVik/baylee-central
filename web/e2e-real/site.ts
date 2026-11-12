@@ -2,8 +2,10 @@
 // new site"): registering and signing in on the page, asking Central with
 // the page's own session, the operator's appointment of an administrator,
 // and a sign-in over the native listener as Baylee's client makes it, with
-// the committed WebAssembly. Synthetic accounts only; no password, code or
-// token is printed or written anywhere.
+// the committed WebAssembly. Synthetic accounts only. A passing run prints
+// no password, code or token and writes none. A failing one may: its
+// assertion's message and its trace (`../test-results-real`, kept on
+// failure) hold what was typed and sent. Delete that folder after reading.
 
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";

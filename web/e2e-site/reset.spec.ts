@@ -1,6 +1,6 @@
 import { expect, type Page, type Route, test } from "@playwright/test";
 
-import { axe, targets, watch } from "./check.ts";
+import { axe, narrow, targets, watch } from "./check.ts";
 
 // The reset page (docs/account-reset.md) in a real browser, against a
 // stand-in for Central's browser surface. The crypto is real: the committed
@@ -303,6 +303,8 @@ test("a new vault: its recovery code is shown once, copied or saved, and kept be
   );
   expect(await axe(page)).toEqual([]);
   expect(await targets(page)).toEqual([]);
+  // the code's one line and its two ways to keep it hold on the narrowest phone
+  expect(await narrow(page)).toBe(0);
 
   // no way on before the person says the code is saved
   const on = page.locator("#reset-steps").getByRole("button", { name: "Sign in" });
@@ -389,6 +391,8 @@ test("the page speaks German by hand", async ({ page }) => {
   await expect(page.locator("#reset-warning")).toContainText("Niemand kann sie zurückholen, auch wir nicht.");
   expect(await axe(page)).toEqual([]);
   expect(await targets(page)).toEqual([]);
+  // the warning and its box, in the longer words, on the narrowest phone
+  expect(await narrow(page)).toBe(0);
 });
 
 test.describe("without script", () => {

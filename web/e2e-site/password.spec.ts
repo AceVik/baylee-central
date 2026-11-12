@@ -1,6 +1,6 @@
 import { expect, type Page, type Route, test } from "@playwright/test";
 
-import { axe, targets } from "./check.ts";
+import { axe, narrow, targets } from "./check.ts";
 
 // The password's change in the account area (docs/native-login.md §"Password
 // change") in a real browser, against a stand-in for Central's browser
@@ -97,6 +97,8 @@ test("the form is labelled, each password has its eye, and nothing is sent befor
   await expect(current).toHaveAttribute("type", "password");
   expect(await axe(page)).toEqual([]);
   expect(await targets(page)).toEqual([]);
+  // the three fields with their glyphs and eyes hold on the narrowest phone
+  expect(await narrow(page)).toBe(0);
 
   const asked = seen.length;
   const alert = card(page).getByRole("alert");

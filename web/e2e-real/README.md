@@ -157,9 +157,13 @@ client makes it (the committed module, `REAL_NATIVE`, default
 `127.0.0.1:47920`) tells whether the session lives, the fingerprint of the
 chat identity, which is derived from the master key (the same after a kept
 reset and a password change, another after a new vault), and the stored
-document with its revision. No password, code or token is printed or
-written. One project registers three accounts and starts six resets (ten an
-hour from one address): run one project against a Central started afresh.
+document with its revision. A passing run prints no password, code or
+token and writes none; a failing one may, in its assertion's message and in
+its trace (`web/test-results-real`, kept on failure), which holds what was
+typed and sent, the reset code in `ResetStart` included. All of it is
+synthetic; delete the folder after reading. One project registers three
+accounts and starts six resets (ten an hour from one address): run one
+project against a Central started afresh.
 
 Central allows five registrations an hour and ten a day per address, and
 counts them in memory: one run of `site-chat.spec.ts` registers four, so start Central afresh
