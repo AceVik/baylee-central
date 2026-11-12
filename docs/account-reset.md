@@ -308,8 +308,11 @@ link to the old build's administration.
 
 ## What the clients need
 
-- Website: the reset page and the administration's page above. The rest of
-  the administration is still the old build's (`web/`), where that build is
-  served under `/admin`.
+- Website: the reset page and the administration's page above. Since
+  12.11.2026 the rest of the administration is the new site's too
+  ([frontend rewrite](proposals/frontend-rewrite.md) §25); an account's
+  page there leads to this one, opened at that account
+  (`/{lang}/account/admin#account=<id in hex>`, the fragment removed once
+  read).
 - M6 (Baylee client): the same choice; a signed-in client offers "keep my
   data" through `Session::redeem_reset`.

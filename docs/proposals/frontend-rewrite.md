@@ -1607,3 +1607,120 @@ a recovery code".
   the keyboard is in its first field, it is wider than signing in where
   there is room, its last control and the close button are reachable, and
   every target is 44 px.
+
+## 25. As built: the administration's other pages (12.11.2026)
+
+The owner: "Erst Admin neu, dann löschen" (the administration rebuilt
+first, then the old React site deleted). Everything the old build's
+`/admin`, `/admin/users`, `/admin/users/<id>`, `/admin/gateways`,
+`/admin/audit` and `/admin/legacy` offered is now on this site; the
+feedback's triage (`/admin/feedback`) is rebuilt separately. Nothing on
+the wire changed (`central-api`, `central-client`, `central-crypto`,
+migrations and `Cargo.lock` are untouched); no dependency.
+
+- **The pages.** Under the account area, each an island page that is not
+  indexed and in no sitemap: `/{lang}/account/admin/overview` (the
+  counts: accounts, gateways awaiting approval, open reports and new
+  crashes, gateways in the list, administrators, what is left to move;
+  each tile leads to its work, a tile whose read gives nothing is left
+  out), `/users` (newest first, 50 a page, a search checked by
+  `AccountQuery`'s rule that follows the field once typing pauses, Escape
+  empties it, Ctrl+K or ⌘K reaches it), `/users/<id in hex>` (the facts
+  with copy buttons for the sign-in name and the id, the tag, the role,
+  the way to a reset code, the gateways it registered, its latest twenty
+  audit events), `/gateways` (by state, the queue first, counts on the
+  filters, owners, tokens on request; approve, disable, enable again,
+  revoke a token), `/audit` (today's names beside the ids, the end of an
+  id where a name is gone, an action the page does not know as Central
+  names it) and `/legacy` (deadline, progress, what holds a move back; a
+  Central without a store says so). `/{lang}/account/admin` stays the
+  reset code's page, and opens at the account an account page's link
+  names (`#account=<id>`, removed from the address once read).
+- **Who sees them.** The server cannot know the role, so every address
+  answers everyone with the same frame and the island shows the page only
+  to a session whose `AccountSummary` says `admin`; anyone else gets one
+  sentence and no administration's request is sent. The administration's
+  own navigation (Overview, Accounts, Gateways, Audit log, Legacy accounts,
+  Feedback, Reset a login) is drawn by the island for an administrator,
+  on every page of it, the reset code's included: no page the server
+  renders links there. The account overview's "Administration" leads to
+  the overview here.
+- **One account's address** is the only one with a part the visitor
+  chooses (`Section::AdminUser([u8; 16])`): the id as 32 lowercase hex
+  digits and nothing else (`data::id_from_hex`); `Page::path` writes it
+  back, so the language menu keeps the account. The server renders that
+  page for its request and never keeps it (`Page::kept`): ids cannot fill
+  the table of rendered pages, whose bounds hold every other page there
+  is.
+- **A change** (`common::Flow`: the role, a tag, a gateway's approval, a
+  token) opens its confirmation in the card of what it changes, with what
+  follows (the tag's warning about whispers, the approval's check of who
+  runs the address); only the confirmation's button sends, and the
+  confirmation gives way to "Asking Baylee Central …" before anything
+  leaves, so a second press finds nothing. `AccountSummary` first: another
+  account in this browser sends nothing, no role sends nothing, a sign-in
+  older than 29 minutes by the browser's clock asks for the password once
+  more (in a Worker ended at once, with the session's account checked),
+  as the old pages' "password again" did. Central refuses every one of
+  these changes with the same `Rejected`; the page explains it by what
+  stands afterwards (the role, then whether the account or gateway still
+  exists, then the sign-in, asked for once and never in a loop); a tag's
+  `Conflict` is "taken, or kept by Central chat". An answer that does not
+  arrive (no network, a 5xx, an answer of another kind) is never a
+  refusal: the page reads what it shows again and says that it cannot
+  tell; where that reading fails too, it says to load the page. After a
+  gateway's change the keyboard goes on at the gateway now in its place.
+- **Reads** go through `common::read`: a `Rejected` is a lost session only
+  where `AccountSummary` is refused too, the role gone where it says so,
+  and for an administrator "what was asked for is not there" (an account
+  or gateway gone, no legacy store).
+- **Not rebuilt, and why.** The navigation's counts (gateways awaiting
+  approval, unread reports): they would make every page ask Central, the
+  reset code's page included; the overview and the gateways' filters show
+  the counts. The search in the address (`?q=`): decided against for the
+  reset code's page (§18, `docs/security-assurance.md`); the gateways'
+  filter stands in the fragment instead (`#state=approved`), which never
+  reaches the site. The reports tile's link with its filters
+  (`?status=new&kind=crash`): the feedback's page and its addresses are
+  another change's, so the tile leads to its page. The tiles' counting-up
+  animation and the skeletons: "Loading …" instead. The modal
+  confirmations: inline in the card, as the reset code's page does it.
+- **Wire limits found** (none worked around): `OwnedGateway` says only
+  `approved`, so a disabled gateway an account registered reads "Awaiting
+  approval" on its page, as on the old one; `Rejected` for a change says
+  nothing of why (explained as above; a token gone while its gateway
+  stays would be taken for the sign-in's age, which no store path produces
+  today).
+- **Words.** 106 messages (`admin-*`, sections `admin-ov-`, `admin-gw-`,
+  `admin-audit-`, `admin-legacy-`, `admin-tag-`, `admin-role-`,
+  `admin-change-`), English and German by hand. The nine other languages
+  were to carry the English text for a later pass, but that broke the
+  gate's 12 in 100 (French 14.5 %); they are translated (Claude Sonnet,
+  each language's own terms from its file, the French read against the
+  English), in a commit of their own that a revert turns back into the
+  English. No native speaker has read them. Reused: `gateways-*`,
+  `tokens-*`, `gws-online`, `profile-*`, `admin-state-*`, `admin-pill`,
+  `admin-refused-*`, `admin-search*`, `admin-count`, `admin-more`,
+  `error-*`, `account-*`, `code-copy*`.
+- **Look.** `style/admin.css`, last in `STYLES` (the reset code's block
+  moved there from `app.css`): the old build's tiles, tables in a box that
+  scrolls on its own (inline-size containment, so a table never widens the
+  column), filter chips, pills; nothing moves or grows under the pointer.
+- **Tests.** Unit tests: the id's address, the fragment, every change's
+  request, what stands before a change, a lost answer never a refusal,
+  the explanation of a refusal, every outcome's own sentence in every
+  language, every audited action's words, the filters, a tag as Central
+  takes it, what holds a legacy move back, the reports at a glance. Server:
+  every page in every language, not indexed, an island, linked from no
+  page the server renders, one account's address and its 404s, never
+  kept. Browser (`web/e2e-site/admin-*.spec.ts` with the stand-in
+  `admin-central.ts`, 54 tests, both sizes): every page with and without
+  the role, axe in both schemes, 44 px targets, 320 px in German, the
+  keyboard's order, each change's exact request after its confirmation
+  and nothing before, a double press sending once, the password's step,
+  refusals and lost answers; `admin.spec.ts` (20) unchanged but for the
+  overview's link.
+- **Open.** The feedback's page (another change); a native reader for the
+  nine languages (unsure wording is listed in the pull request); a run
+  against a real Central and PostgreSQL; deleting the old build once the
+  feedback is here.
