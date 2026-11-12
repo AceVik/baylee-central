@@ -45,6 +45,7 @@ const PAGES = [
   "fan-content",
   "signin",
   "register",
+  "reset",
   "account",
   "account/chat",
   "account/notifications",

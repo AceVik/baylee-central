@@ -50,6 +50,20 @@ export async function targets(page: Page): Promise<string[]> {
   });
 }
 
+/**
+ * How far the page as it stands reaches past a window 320 px wide, the
+ * narrowest WCAG 1.4.10 asks for; nothing, where no sideways scrolling is
+ * needed. For a page in a state no address leads to. The window is put
+ * back as it was.
+ */
+export async function narrow(page: Page): Promise<number> {
+  const before = page.viewportSize();
+  await page.setViewportSize({ width: 320, height: 812 });
+  const wide = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  if (before) await page.setViewportSize(before);
+  return Math.max(0, wide);
+}
+
 /** Fails the test on any console error, uncaught error or request to another origin. */
 export function watch(page: Page, origin: string, expected404 = false): string[] {
   const problems: string[] = [];
