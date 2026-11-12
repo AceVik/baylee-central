@@ -18,6 +18,7 @@ mod email;
 mod field;
 mod focus;
 mod impressum;
+mod keep;
 pub(crate) mod net;
 mod password;
 mod pow;

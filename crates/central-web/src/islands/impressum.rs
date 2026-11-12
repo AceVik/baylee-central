@@ -22,7 +22,7 @@ use leptos::prelude::*;
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 
-use super::net;
+use super::{net, session};
 use crate::words::{self, Lang};
 
 /// The script's half of the obfuscation key, published and no secret: byte
@@ -303,16 +303,6 @@ fn dialled(phone: &str) -> String {
         .collect()
 }
 
-/// Opens `address` (`mailto:…`, `tel:…`) as a link would.
-fn open(address: &str) {
-    #[cfg(target_arch = "wasm32")]
-    if let Some(window) = web_sys::window() {
-        let _ = window.location().assign(address);
-    }
-    #[cfg(not(target_arch = "wasm32"))]
-    let _ = address;
-}
-
 fn details_view(lang: Lang, details: &Details) -> impl IntoView + use<> {
     // the country's name is kept in German and English only
     let country = match lang.of_record() {
@@ -341,14 +331,14 @@ fn details_view(lang: Lang, details: &Details) -> impl IntoView + use<> {
             <dt>{words::impressum_email(lang)}</dt>
             <dd>
                 <span class="impressum-value">{mail_a}<span hidden>{BETWEEN_MAIL}</span>{mail_b}</span>
-                <button type="button" class="button quiet button-sm" on:click=move |_| open(&mail)>
+                <button type="button" class="button quiet button-sm" on:click=move |_| session::open(&mail)>
                     {words::impressum_write(lang)}
                 </button>
             </dd>
             <dt>{words::impressum_phone(lang)}</dt>
             <dd>
                 <span class="impressum-value">{phone_a}<span hidden>{BETWEEN_PHONE}</span>{phone_b}</span>
-                <button type="button" class="button quiet button-sm" on:click=move |_| open(&phone)>
+                <button type="button" class="button quiet button-sm" on:click=move |_| session::open(&phone)>
                     {words::impressum_call(lang)}
                 </button>
             </dd>

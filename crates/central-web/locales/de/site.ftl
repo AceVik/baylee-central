@@ -256,6 +256,7 @@ privacy-views-title = Seitenaufrufe zählen
 privacy-views = Die Website zählt, wie oft ihre Seiten geöffnet werden: eine einzige Zahl für alle Seiten und alle Besucher zusammen, zu sehen auf der Startseite. Öffnet ein Browser eine Seite, steigt sie um eins. Dafür wird nichts über dich gespeichert: keine IP-Adresse, kein Cookie, keine Kennung, nicht einmal, welche Seite es war.
 privacy-device-title = Was dein Browser speichert
 privacy-device = Diese Seite setzt kein Cookie, bis du dich anmeldest. Was dein Browser auf deinem Gerät speichert, und nur mit JavaScript: deine Farbwahl, falls du eine getroffen hast (<code>baylee-site-theme</code>); während du angemeldet bist, wann deine Sitzung endet (<code>baylee-central-session</code>), deinen Chatschlüssel und die vertrauten Schlüssel deiner Kontakte (siehe Chat); wenn du Benachrichtigungen eingeschaltet hast, eine Zufallszahl für dieses Gerät (<code>baylee-push-installation-v1</code>, <code>baylee-push</code>); und erst, wenn du dich angemeldet, die Seite als App installiert oder Benachrichtigungen eingeschaltet hast, eine Kopie der öffentlichen Dateien der Seite (Seitengerüst, Schriften, Skripte), damit sie auch ohne Verbindung startet und Benachrichtigungen ankommen. Trifft keines der drei mehr zu, wird die Kopie beim nächsten Öffnen der Seite entfernt. Nichts davon wird an uns gesendet, außer ein Abschnitt unten sagt es. Die Einträge zu Chat und Sitzung werden beim Abmelden gelöscht; alles andere entfernst du, indem du die Websitedaten in deinem Browser löschst. Rechtsgrundlage: § 25 Abs. 2 Nr. 2 TDDDG (unbedingt erforderlich für die Funktion, die du nutzt); für die Zufallszahl der Benachrichtigungen deine Einwilligung (§ 25 Abs. 1 TDDDG).
+privacy-device-manager = Bewahrst du deinen Wiederherstellungscode auf dem Schritt, der ihn zeigt, im Passwortmanager deines Browsers auf, schickst ihn dir per E-Mail, speicherst ihn als Datei oder druckst ihn aus, dann behalten ihn dein Browser, dein E-Mail-Programm, deine Dateien oder dein Papier, nie diese Website: Der Code entsteht in deinem Browser und wird nie an uns geschickt. Wenn du die Daten der Website löschst, verschwindet er dort nicht.
 privacy-github-title = GitHub
 privacy-github = Die Download-Seite und die Startseite zeigen das neueste Release, den Teststand und die Kartenzahlen. Danach fragt unser Server GitHub, nicht dein Browser; GitHub erfährt dabei nichts über dich. Erst wenn du einen Download- oder GitHub-Link anklickst, verbindet sich dein Browser mit GitHub (GitHub, Inc., USA) und überträgt dorthin deine IP-Adresse und was jede Anfrage enthält; dann gilt GitHubs eigene Datenschutzerklärung.
 privacy-directory-title = Das Gateway-Verzeichnis
@@ -486,7 +487,7 @@ register-error-taken = Dieser Anmeldename ist vergeben. Wähle einen anderen.
 
 code-title = Dein Wiederherstellungscode
 code-handle = Dein Handle: { $handle }
-code-lead = Nur mit diesem Code bleiben deine verschlüsselten Daten erhalten, wenn du dein Passwort vergisst. Wir kennen ihn nicht und können ihn nicht wiederherstellen. Bewahre ihn sicher auf, nicht auf diesem Gerät.
+code-lead = Nur mit diesem Code bleiben deine verschlüsselten Daten erhalten, wenn du dein Passwort vergisst. Wir kennen ihn nicht und können ihn nicht wiederherstellen. Bewahre ihn sicher auf, so dass du ihn auch ohne dieses Gerät findest.
 code-shown-once = Nur jetzt sichtbar
 code-download = Als Textdatei speichern
 code-kept = Ich habe meinen Wiederherstellungscode gesichert
@@ -496,6 +497,23 @@ code-later = Nicht jetzt
 code-copy = Kopieren
 code-copied = Kopiert.
 code-copy-failed = Kopieren hat hier nicht geklappt. Markier den Code und kopier ihn von Hand.
+code-print = Drucken
+code-manager = Im Passwortmanager speichern
+code-manager-id = Baylee-Wiederherstellungscode ({ $name })
+code-manager-offered = Dein Browser hat den Code angeboten bekommen. Falls er gefragt hat, prüf, ob er ihn gespeichert hat.
+code-manager-failed = Dein Browser hat den Code nicht angenommen. Bewahre ihn auf einem anderen Weg auf.
+code-mail = An mich mailen
+code-mail-warning = Vorsicht: Der Code liegt dann in deinem Postfach. Wer deine Mails lesen kann, kann sich dorthin auch einen Reset-Code schicken lassen und mit beiden deine Anmeldung zurücksetzen und deine verschlüsselten Daten öffnen.
+code-mail-subject = Mein Baylee-Wiederherstellungscode
+code-sheet-title = Baylee-Wiederherstellungscode
+code-sheet-name = Anmeldename: { $name }
+code-sheet-what = Mit diesem Code überstehen deine verschlüsselten Baylee-Daten ein vergessenes Passwort: Du gibst ihn auf der Reset-Seite zusammen mit einem Reset-Code ein.
+code-sheet-keep = Bewahre ihn so auf, dass nur du ihn erreichst. Niemand von Baylee wird dich je danach fragen.
+code-email-label = E-Mail-Adresse (freiwillig)
+code-email-hint = Für einen Reset-Code, falls du dein Passwort vergisst. Nach diesem Schritt schicken wir dir einen Code, um die Adresse zu bestätigen; du kannst auch später in deinem Account eine eintragen.
+code-email-step-title = Bestätige deine E-Mail-Adresse
+code-email-step-lead = Gib den Code aus der Mail hier ein oder später auf der Sicherheitsseite deines Accounts.
+code-email-step-done = Weiter zu deinem Account
 
 ## Mit einem Reset-Code ein neues Passwort setzen
 
@@ -586,6 +604,7 @@ email-removed = Deine E-Mail-Adresse ist entfernt.
 email-busy = Im Moment zu viele E-Mails. Versuch es später noch einmal.
 email-same = Das ist schon deine Adresse.
 email-unsure = Es kam keine Antwort. Deshalb wissen wir nicht, ob das geklappt hat. Sieh nach, was hier steht, und versuch es noch einmal, falls nicht.
+email-again = Deine Anmeldung ist inzwischen ein paar Minuten alt. Gib dein Passwort noch einmal ein, um den Code zu schicken.
 
 ## Die Nutzungsbedingungen von Central
 

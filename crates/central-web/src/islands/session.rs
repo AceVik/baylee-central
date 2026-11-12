@@ -93,9 +93,23 @@ pub fn go(path: &str) {
     }
 }
 
+/// Opens `address` (`mailto:…`, `tel:…`) as a link would: the browser
+/// hands it to the program that takes it, and the page stays. The address
+/// exists from the click on and is never in the page.
+#[cfg(target_arch = "wasm32")]
+pub fn open(address: &str) {
+    if let Some(window) = web_sys::window() {
+        let _ = window.location().assign(address);
+    }
+}
+
 /// On the server nothing is remembered.
 #[cfg(not(target_arch = "wasm32"))]
 pub fn remember(_expires_at: i64) {}
+
+/// On the server nothing is opened.
+#[cfg(not(target_arch = "wasm32"))]
+pub fn open(_address: &str) {}
 
 /// On the server nothing is remembered.
 #[cfg(not(target_arch = "wasm32"))]

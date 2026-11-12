@@ -256,6 +256,7 @@ privacy-views-title = Counting page views
 privacy-views = The website counts how often its pages are opened: one single number for all pages and all visitors together, shown on the start page. A page opened in a browser adds one to it. Nothing about you is stored for this: no IP address, no cookie, no identifier, not even which page it was.
 privacy-device-title = What your browser keeps
 privacy-device = This site sets no cookie until you sign in. What your browser keeps on your device, and only with JavaScript: your colour choice if you made one (<code>baylee-site-theme</code>); while you are signed in, when your session ends (<code>baylee-central-session</code>), your chat key and your contacts' trusted keys (see Chat); if you turned on notifications, a random number for this device (<code>baylee-push-installation-v1</code>, <code>baylee-push</code>); and, only once you have signed in, installed the site as an app or turned on notifications, a copy of the site's public files (page shell, fonts, scripts), so that it starts without a connection and notifications can arrive. If none of the three applies any more, the copy is removed the next time you open the site. None of this is sent to us unless a section below says so. The chat and session entries are deleted when you sign out; you remove everything else by clearing the site's data in your browser. Legal basis: § 25(2) no. 2 TDDDG (strictly necessary for the function you use); for the notifications' random number, your consent (§ 25(1) TDDDG).
+privacy-device-manager = If you keep your recovery code in your browser's password manager, mail it to yourself, save it as a file or print it on the step that shows it, your browser, your mail program, your files or your paper keep it, never this site: the code is made in your browser and never sent to us. Clearing the site's data does not remove it from there.
 privacy-github-title = GitHub
 privacy-github = The download page and the start page show the newest release, the test status and the card numbers. Our server asks GitHub for them, not your browser; GitHub learns nothing about you from that. Only when you click a download or GitHub link does your browser connect to GitHub (GitHub, Inc., USA) and send it your IP address and what every request carries; GitHub's own privacy notice then applies.
 privacy-directory-title = The gateway directory
@@ -485,7 +486,7 @@ register-error-taken = This sign-in name is taken. Choose another.
 
 code-title = Your recovery code
 code-handle = Your handle: { $handle }
-code-lead = Only with this code does your encrypted data survive if you forget your password. We do not know it and cannot restore it. Keep it somewhere safe, away from this device.
+code-lead = Only with this code does your encrypted data survive if you forget your password. We do not know it and cannot restore it. Keep it somewhere safe where you will find it even without this device.
 code-shown-once = Shown only now
 code-download = Save as a text file
 code-kept = I have saved my recovery code
@@ -495,6 +496,23 @@ code-later = Not now
 code-copy = Copy
 code-copied = Copied.
 code-copy-failed = Copying did not work here. Select the code and copy it by hand.
+code-print = Print
+code-manager = Save in password manager
+code-manager-id = Baylee recovery code ({ $name })
+code-manager-offered = Your browser was offered the code. If it asked you, check that it saved it.
+code-manager-failed = Your browser did not take the code. Keep it another way.
+code-mail = Mail it to myself
+code-mail-warning = Careful: the code then lies in your mailbox. Whoever can read your mail can also have a reset code sent there, and with both reset your sign-in and open your encrypted data.
+code-mail-subject = My Baylee recovery code
+code-sheet-title = Baylee recovery code
+code-sheet-name = Sign-in name: { $name }
+code-sheet-what = With this code your encrypted Baylee data survives a forgotten password: you enter it on the reset page, together with a reset code.
+code-sheet-keep = Keep it where only you can reach it. Nobody at Baylee will ever ask you for it.
+code-email-label = E-mail address (optional)
+code-email-hint = For a reset code if you forget your password. After this step we mail a code to confirm the address; you can also add one later in your account.
+code-email-step-title = Confirm your e-mail address
+code-email-step-lead = Enter the code from the mail here, or later on your account's security page.
+code-email-step-done = Continue to your account
 
 ## Setting a new password with a reset code
 
@@ -585,6 +603,7 @@ email-removed = Your e-mail address is removed.
 email-busy = Too many mails for now. Try again later.
 email-same = This is your address already.
 email-unsure = No answer came back, so we cannot tell whether that went through. Look at what is shown here, and try again if it did not.
+email-again = Your sign-in is a few minutes old now. Enter your password once more to send the code.
 
 ## Central's terms
 

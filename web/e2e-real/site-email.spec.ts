@@ -1,7 +1,9 @@
 // An account's e-mail address and a reset code by mail (docs/email.md) on
 // the new site against a real Central with a mailer stand-in
-// (e2e-real/mailer.ts): the account area names an address after proving the
-// password again, the code Central mails confirms it, and the reset page
+// (e2e-real/mailer.ts): the registration names the address typed beside the
+// recovery code with its own fresh sign-in and confirms it on the step
+// after; the account area names another after proving the password again,
+// the code Central mails confirms it, the first is told, and the reset page
 // asks for a code by mail, which sets a new password with the recovery
 // code. What came of it is read from outside the page as well: the mails
 // the stand-in took, Central's answer to the page's own session, and a
@@ -98,16 +100,66 @@ test("an address is named, confirmed by the mailed code, and a mailed reset code
   const project = info.project.name.slice(0, 1);
   const username = `mail${project}${stamp}`;
   const address = `${username}@example.org`;
+  const first = `${username}.first@example.org`;
   const seen = problems(page);
-  const recovery = await register(page, username, `Mail${project}`, FIRST);
+  const registering = sent(page);
 
-  // The account area: no address yet. A wrong password names nothing and
-  // sends no mail.
+  // An address typed beside the recovery code: the page names it after the
+  // code and Central's terms, with the registration's own sign-in (no
+  // password asked again), and its code is confirmed on the step after.
+  const recovery = await register(
+    page,
+    username,
+    `Mail${project}`,
+    FIRST,
+    first,
+  );
+  const step = card(page);
+  await expect(step).toContainText(
+    `We sent a code to ${first}. It is valid for 15 minutes.`,
+    { timeout: 30_000 },
+  );
+  expect(
+    operations(registering).filter((operation) => operation === "login_start"),
+  ).toHaveLength(1);
+  const welcome = await newest(first, 1);
+  expect(welcome.ttl_secs).toBe(900);
+  const firstCode =
+    /([0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4})/.exec(welcome.text)?.[1] ??
+    "";
+  expect(firstCode).not.toBe("");
+  sound(welcome, firstCode);
+  await page
+    .locator("#email-code")
+    .fill(firstCode.startsWith("0") ? "1111-1111" : "0000-0000");
+  await step.getByRole("button", { name: "Confirm", exact: true }).click();
+  await expect(step.getByRole("alert")).toContainText(
+    "That code is not right.",
+  );
+  await page.locator("#email-code").fill(firstCode);
+  await step.getByRole("button", { name: "Confirm", exact: true }).click();
+  await expect(step).toContainText("Your e-mail address is confirmed.", {
+    timeout: 30_000,
+  });
+  await step
+    .getByRole("button", { name: "Continue to your account", exact: true })
+    .click();
+  await expect(page).toHaveURL(/\/en\/account$/, { timeout: 30_000 });
+  // Neither the password nor the recovery code was in a request.
+  for (const body of registering) {
+    expect(body).not.toContain(FIRST);
+    expect(body).not.toContain(recovery);
+  }
+
+  // The account area shows it; another address is named there. A wrong
+  // password names nothing and sends no mail.
   await open(page, "/en/account/security");
   await expect(
     card(page).getByRole("heading", { name: "E-mail address" }),
   ).toBeVisible();
+  await expect(card(page)).toContainText(first);
   const bodies = sent(page);
+  await card(page).getByRole("button", { name: "Change", exact: true }).click();
   await page.locator("#email-address").fill(address);
   await page.locator("#email-password").fill("not the password at all");
   await card(page)
@@ -167,6 +219,15 @@ test("an address is named, confirmed by the mailed code, and a mailed reset code
     address,
     null,
   ]);
+  // The address it replaced is told so, with no code and no time to live.
+  const replaced = await newest(first, 2);
+  expect(replaced.subject).toBe("Your e-mail address on Baylee was replaced");
+  expect(replaced.ttl_secs).toBeUndefined();
+  expect(replaced.text).not.toContain(code);
+  expect(replaced.text).not.toContain(firstCode);
+  for (const [, href] of replaced.html.matchAll(/href="([^"]*)"/g)) {
+    expect(href).toBe("https://baylee.app/en/account/security");
+  }
 
   // Signed out, someone asks the reset page for a code by mail. A name that
   // is nobody's is answered alike and gets no mail.

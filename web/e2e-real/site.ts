@@ -37,8 +37,13 @@ export async function open(page: Page, path: string) {
   await expect(page.locator("html")).toHaveAttribute("data-islands", "ready");
 }
 
-/** Registers on the site's page and answers the recovery code it showed once. */
-export async function register(page: Page, username: string, display: string, password: string): Promise<string> {
+/**
+ * Registers on the site's page and answers the recovery code it showed once.
+ * With `email`, the address is typed beside the code; the page names it after
+ * the code (and Central's terms), and this returns on the step that asks for
+ * the mailed code, which is the caller's to confirm.
+ */
+export async function register(page: Page, username: string, display: string, password: string, email?: string): Promise<string> {
   await open(page, "/en/register");
   await page.getByLabel("Sign-in name").fill(username);
   await page.getByLabel("Display name").fill(display);
@@ -54,15 +59,26 @@ export async function register(page: Page, username: string, display: string, pa
   expect(code).toMatch(RECOVERY);
   // the code can be copied as it stands there (the clipboard is this test browser's own)
   await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
-  await page.getByRole("button", { name: "Copy" }).click();
-  await expect(page.locator("#register-steps [role=status]")).toHaveText("Copied.");
+  await page.getByRole("button", { name: "Copy", exact: true }).click();
+  await expect(page.locator("#register-steps").getByRole("status").filter({ hasText: "Copied." })).toHaveText("Copied.");
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(code);
+  // the other ways to keep it are there; none of them is used here
+  for (const way of ["Save as a text file", "Print", "Mail it to myself"]) {
+    await expect(page.getByRole("button", { name: way, exact: true })).toBeVisible();
+  }
+  if (email !== undefined) await page.locator("#code-email").fill(email);
   await page.getByLabel("I have saved my recovery code").check();
-  await page.getByRole("button", { name: "Continue" }).click();
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
   // where Central's terms are in force, they come after the code
   const terms = page.getByRole("heading", { name: "New terms of use" });
-  await expect(terms.or(page.locator(".account-who"))).toBeVisible({ timeout: 30_000 });
+  const next =
+    email === undefined ? page.locator(".account-who") : page.getByRole("heading", { name: "Confirm your e-mail address" });
+  await expect(terms.or(next)).toBeVisible({ timeout: 30_000 });
   if (await terms.isVisible()) await page.getByRole("button", { name: "Accept", exact: true }).click();
+  if (email !== undefined) {
+    await expect(next).toBeVisible({ timeout: 30_000 });
+    return code;
+  }
   await expect(page).toHaveURL(/\/en\/account$/, { timeout: 30_000 });
   await expect(page.locator(".account-who .handle")).toHaveText(new RegExp(`^${display}#[a-f0-9]{4,8}$`), { timeout: 30_000 });
   return code;

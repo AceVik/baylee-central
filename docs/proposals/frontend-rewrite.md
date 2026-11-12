@@ -1466,3 +1466,63 @@ was 16.7 ms as well, with one to four gaps of 50 to 270 ms per run, the
 longest the first open's first frame, which took about 0.2 s before this
 change too (the album's first layout and paint) and comes before anything
 moves. **Open:** a real phone, Safari and Firefox.
+
+## 18. As built: ways to keep the recovery code (12.11.2026)
+
+The owner's decision on the code's step, after the trade-off was explained
+("Wie empfohlen + Mail an mich"). What each way does and keeps is
+[web-accounts](../web-accounts.md), "Keeping the recovery code"; the three
+passes are in [security assurance](../security-assurance.md), "Ways to keep
+a recovery code".
+
+- **The step** (`islands/auth.rs`, `code_view`, with `islands/keep.rs`):
+  under the code, Copy, Save as a text file, Print and, only where the
+  browser has `PasswordCredential`, Save in password manager, in one row
+  that wraps; under them, apart, the warning and "Mail it to myself"; then
+  the e-mail field (a registration only, where Central mails); then the box
+  "I have saved my recovery code" and Continue, as before. The same step
+  after a sign-in that makes a code for a moved account has the ways and
+  no field.
+- **Nothing before the click.** The file's `data:` link, the `mailto:`
+  address and the print's sheet are made when their button is pressed;
+  before that the code is in the page once, as the text of the step. The
+  password manager and the print are reached through `js_sys`
+  (`Reflect`), as the clipboard is: no `web-sys` feature was added. The
+  file and the mail are opened through `web-sys` types Leptos already
+  builds (`session::open`, shared with the Impressum).
+- **Print.** `pages.css` shows the sheet alone while it is in the page,
+  from the page and from the registration's dialog (which a print hides
+  otherwise); on a screen it is never shown.
+- **The address.** Checked by Central's rule on Continue; named after the
+  code is kept and Central's terms are accepted, on a step that is the
+  account area's e-mail section (`email.rs`, `Begin::Name`): `Set` without
+  the password while the registration's sign-in is fresh, the code's field
+  at once, "Continue to your account" to skip or to go on. Where Central
+  refuses `Set`, the section's own form asks for the password.
+- **Words.** 18 new messages (`code-print`, `code-manager`,
+  `code-manager-id`, `code-manager-offered`, `code-manager-failed`,
+  `code-mail`, `code-mail-warning`, `code-mail-subject`,
+  `code-sheet-title`, `code-sheet-name`, `code-sheet-what`,
+  `code-sheet-keep`, `code-email-label`, `code-email-hint`,
+  `code-email-step-title`, `code-email-step-lead`, `code-email-step-done`,
+  `email-again`) and `privacy-device-manager`, a second paragraph of the
+  privacy notice's "What your browser keeps"; `code-lead` changed in
+  English and German ("somewhere safe where you will find it even without
+  this device" for "away from this device", which the file and the
+  password manager contradicted). The nine other languages carry the
+  English text of the new ones under `# English for now: to be
+  translated.` and their old `code-lead`.
+- **Reduced motion** now stops the dialogs' backdrop too (`*::backdrop` in
+  `base.css`): its colour faded under reduced motion, which `schemes`
+  found once the registration's dialog was measured in both schemes.
+- **Tests.** `web/e2e-site/recovery.spec.ts`: the whole registration in
+  the real island against a stand-in Central and a canned crypto Worker;
+  every way, the code once in the page before any click, the `mailto:`
+  address (to the typed address and to nobody), the file's content, the
+  password manager's offer and its absence, the print in print media from
+  the page and from the dialog, the address named with and without terms
+  in force, a stale sign-in, a refused address, skipping; axe in both
+  schemes, the targets, 320 px and the keyboard's order. `e2e-real`'s
+  `register()` and `site-email.spec.ts` were adapted (the address named at
+  registration, another in the account area) and type-check; they were not
+  run here.
