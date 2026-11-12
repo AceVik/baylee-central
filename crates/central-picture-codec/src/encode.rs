@@ -75,3 +75,12 @@ fn avif(rgba: &[u8]) -> Result<Vec<u8>, Refusal> {
     }
     Err(Refusal::Failed)
 }
+
+/// The animated variant of `moving`: none yet. Its stored format is the
+/// owner's choice (proposal §0.6 and §10); the frames reach this one
+/// function decoded, bounded, composited and averaged to 256 px, so the
+/// chosen encoder drops in here and nowhere else.
+pub(crate) fn animation(moving: &crate::Animation) -> Option<Vec<u8>> {
+    let _ = moving;
+    None
+}

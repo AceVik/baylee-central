@@ -287,6 +287,72 @@ Verbatim: "avif-decode 3.0.0 aufnehmen". That is option (b):
 
 Everything else in §0 stands.
 
+### 0.4 The owner's decision on animated pictures (12.11.2026)
+
+Verbatim: "Für das Profilbild darf auch animierte Bilder wie gif oder das
+modernere Format verwendet werden."
+
+What this build does with it, whatever the stored format becomes (§0.6):
+- **Taken:** animated GIF, animated WebP and APNG. They go the server's
+  path, since a browser's canvas holds one frame: the page sends the file
+  itself.
+- **An animated AVIF** whose major brand is `avis` is refused as
+  `unsupported`. Corrected on 12.11.2026: this section first said such a
+  file gives its primary item, but `avif-parse` 2.1.0 refuses it
+  ("Animated AVIF is not supported"), so `avif-decode` 3.0.0 cannot read
+  it, and no accepted package decodes AV1 sequences through a safe
+  interface. A file that only lists `avis` among its compatible brands
+  gives its still item. In the browser the page draws such a file's first
+  frame and sends its square as a PNG, as for any still (test
+  `an_avif_image_sequence_is_refused_as_unsupported`).
+- **Bounds before work:** the worker decodes frame by frame, within:
+  - a canvas of at most 2048² (a larger one gives its first frame as a
+    still);
+  - 100 frames;
+  - 10 seconds of play;
+  - 200 million composited pixels;
+  - a delay of under 20 ms counts as 100 ms, as browsers do.
+- **Compositing** follows each format's disposal and blending rules.
+- **The still** of an animated picture is its first composited frame, so
+  the still and the animation cannot disagree.
+- **Not yet decided:** the format the animation is stored in (§0.6, §10).
+  Until then the worker decodes and bounds the frames, and Central keeps
+  the still.
+
+### 0.5 The owner on the game client (12.11.2026)
+
+Verbatim: "Sowohl die Standbilder als auch die animierten Bilder werden
+später im game client auch angezeigt werden. Wir müssen also gucken, für
+den standarisierten Codec in den alles konvertiert wird (also die
+profilbilder), im Game Client auch gut angezeigt/widergegeben werden kann."
+
+### 0.6 The owner's correction (12.11.2026)
+
+Verbatim: "Nein, nicht einfach anhand der Crates entscheiden die der game
+client schon nutzt. AVIF etc. sind die moderneren besseren Formate, daher
+erst Mal gucken, wie man diese nutzen kann."
+
+The project lead's reading, as relayed:
+- do not make PNG and APNG canonical because of what the client links
+  today;
+- research how the modern formats can be the canonical stored format for
+  stills and animations, for browsers and the game client (§10);
+- build everything that does not depend on that choice, and keep the
+  format-specific encoding behind one function.
+
+### 0.7 The owner on ffmpeg (12.11.2026)
+
+Verbatim: "ffmpeg Nutzung (und Voraussetzung dass es auf dem System
+installiert ist) ist erlaubt."
+
+The project lead's guidance, as relayed:
+- ffmpeg runs only as an external program in the sandboxed worker: pipes,
+  no shell, fixed arguments, no network protocols, under the same limits;
+- never through FFI bindings;
+- preferably for encoding only, fed our own decoded and bounded frames as
+  raw RGBA, so its parsers never see a stranger's file;
+- it is documented as a native runtime dependency of the worker's host.
+
 ## The owner's first answers (12.11.2026, form)
 
 The owner's answers to the first version, verbatim:

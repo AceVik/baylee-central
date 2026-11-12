@@ -268,6 +268,85 @@ pub fn claimed(head: &[u8]) -> Option<(u32, u32)> {
     None
 }
 
+/// Whether a file's first bytes show an animation: an APNG's `acTL`
+/// before its image data, a WebP's animation flag, or a second image in a
+/// GIF. An animation goes to Central as it is (proposal §0.4): a canvas
+/// holds one frame.
+#[must_use]
+pub fn moving(head: &[u8]) -> bool {
+    let be32 = |at: usize| -> Option<usize> {
+        usize::try_from(u32::from_be_bytes(head.get(at..at + 4)?.try_into().ok()?)).ok()
+    };
+    if head.starts_with(b"\x89PNG\r\n\x1a\n") {
+        let mut at = 8;
+        while let (Some(length), Some(kind)) = (be32(at), head.get(at + 4..at + 8)) {
+            match kind {
+                b"acTL" => return true,
+                b"IDAT" => return false,
+                _ => match at.checked_add(12).and_then(|a| a.checked_add(length)) {
+                    Some(next) => at = next,
+                    None => return false,
+                },
+            }
+        }
+        return false;
+    }
+    if head.len() > 20
+        && &head[..4] == b"RIFF"
+        && &head[8..12] == b"WEBP"
+        && &head[12..16] == b"VP8X"
+    {
+        return head[20] & 0x02 != 0;
+    }
+    if head.starts_with(b"GIF8") {
+        return gif_images(head) >= 2;
+    }
+    false
+}
+
+/// How many images a GIF's first bytes hold, up to two.
+fn gif_images(head: &[u8]) -> usize {
+    let mut at = 13;
+    if head.get(10).is_some_and(|flags| flags & 0x80 != 0) {
+        at += 3 << ((head[10] & 7) + 1);
+    }
+    let mut images = 0;
+    // sub-blocks: a length byte, that many bytes, until a zero length
+    let skip_blocks = |mut at: usize| -> Option<usize> {
+        loop {
+            let length = usize::from(*head.get(at)?);
+            at += 1 + length;
+            if length == 0 {
+                return Some(at);
+            }
+        }
+    };
+    while images < 2 {
+        match head.get(at) {
+            Some(0x21) => match skip_blocks(at + 2) {
+                Some(next) => at = next,
+                None => break,
+            },
+            Some(0x2c) => {
+                images += 1;
+                let Some(&flags) = head.get(at + 9) else {
+                    break;
+                };
+                let mut next = at + 10;
+                if flags & 0x80 != 0 {
+                    next += 3 << ((flags & 7) + 1);
+                }
+                match skip_blocks(next + 1) {
+                    Some(after) => at = after,
+                    None => break,
+                }
+            }
+            _ => break,
+        }
+    }
+    images
+}
+
 /// Why a picture was not taken, as the page says it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Trouble {
@@ -472,6 +551,17 @@ enum Step {
     Removing,
 }
 
+/// How the chosen file goes to Central.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Sending {
+    /// The square the person placed, as a PNG.
+    Square,
+    /// The file itself, which this browser cannot open or read back.
+    Original,
+    /// The file itself, since it moves.
+    Moving,
+}
+
 /// The card's signals. All of it is `Copy`, so every handler takes the whole.
 #[derive(Clone, Copy)]
 struct Card {
@@ -481,7 +571,7 @@ struct Card {
     crop: RwSignal<Crop>,
     trouble: RwSignal<Option<Trouble>>,
     said: RwSignal<Option<&'static str>>,
-    original: RwSignal<bool>,
+    sending: RwSignal<Sending>,
     dragging: StoredValue<Option<(f64, f64, Crop)>>,
 }
 
@@ -496,9 +586,9 @@ impl Card {
         self.step.set(Step::Opening);
         leptos::task::spawn_local(async move {
             match browser::open().await {
-                Ok((width, height, readable)) => {
+                Ok((width, height, sending)) => {
                     self.crop.set(Crop::new(width, height));
-                    self.original.set(!readable);
+                    self.sending.set(sending);
                     self.step.set(Step::Editing);
                     super::focus::after_render("#picture-preview");
                 }
@@ -551,6 +641,9 @@ impl Card {
     }
 
     fn key(self, event: &leptos::ev::KeyboardEvent) {
+        if self.sending.get_untracked() != Sending::Square {
+            return;
+        }
         let far = if event.shift_key() { 0.25 } else { 0.05 };
         let moved = match event.key().as_str() {
             "ArrowLeft" => Some((-far, 0.0)),
@@ -566,6 +659,9 @@ impl Card {
     }
 
     fn press(self, event: &leptos::ev::PointerEvent) {
+        if self.sending.get_untracked() != Sending::Square {
+            return;
+        }
         let at = (f64::from(event.client_x()), f64::from(event.client_y()));
         self.dragging
             .set_value(Some((at.0, at.1, self.crop.get_untracked())));
@@ -630,13 +726,16 @@ impl Card {
                     on:pointerup=move |_| self.dragging.set_value(None)
                     on:pointercancel=move |_| self.dragging.set_value(None)></canvas>
                 <p id="picture-position" class="meta" aria-live="polite">{position}</p>
-                <div class="field">
+                <div class="field" hidden=move || self.sending.get() != Sending::Square>
                     <label for="picture-zoom">{words::picture_zoom(lang)}</label>
                     <input id="picture-zoom" type="range" min="100" max="800" step="10"
                         prop:value=move || crop.get().spoken().2.to_string() on:input=zoom />
                 </div>
-                <Show when=move || self.original.get()>
+                <Show when=move || self.sending.get() == Sending::Original>
                     <p class="meta" id="picture-original">{words::picture_original(lang)}</p>
+                </Show>
+                <Show when=move || self.sending.get() == Sending::Moving>
+                    <p class="meta" id="picture-moving">{words::picture_moving(lang)}</p>
                 </Show>
                 <div class="actions">
                     <button type="button" class="button primary" on:click=move |_| self.save()
@@ -662,7 +761,7 @@ pub fn card(lang: Lang, name: String) -> impl IntoView {
         crop: RwSignal::new(Crop::new(1.0, 1.0)),
         trouble: RwSignal::new(None),
         said: RwSignal::new(None),
-        original: RwSignal::new(false),
+        sending: RwSignal::new(Sending::Square),
         dragging: StoredValue::new(None),
     };
     let step = card.step;
@@ -786,7 +885,7 @@ pub fn report(lang: Lang, tag: u32, key: PictureKey) -> impl IntoView {
 /// The browser's half: opening the file, drawing the square, sending it.
 #[cfg(target_arch = "wasm32")]
 mod browser {
-    use super::{Crop, MAX_SIDE, Own, PREVIEW, Trouble, answered, checked};
+    use super::{Crop, MAX_SIDE, Own, PREVIEW, Sending, Trouble, answered, checked, moving};
     use leptos::prelude::*;
     use wasm_bindgen::{JsCast, JsValue, closure::Closure};
     use wasm_bindgen_futures::JsFuture;
@@ -838,7 +937,7 @@ mod browser {
     }
 
     async fn head(file: &File) -> Vec<u8> {
-        let Ok(part) = file.slice_with_i32_and_i32(0, 65_536) else {
+        let Ok(part) = file.slice_with_i32_and_i32(0, 1_048_576) else {
             return Vec::new();
         };
         match JsFuture::from(part.array_buffer()).await {
@@ -884,9 +983,8 @@ mod browser {
         matches!((canvas(true), canvas(false)), (Some(a), Some(b)) if a != b)
     }
 
-    /// Opens the chosen file: its sides, and whether the page can read
-    /// what it draws.
-    pub async fn open() -> Result<(f64, f64, bool), Trouble> {
+    /// Opens the chosen file: its sides, and how it will be sent.
+    pub async fn open() -> Result<(f64, f64, Sending), Trouble> {
         close();
         let input: HtmlInputElement = element("picture-file").ok_or(Trouble::Failed)?;
         let file = input
@@ -894,7 +992,9 @@ mod browser {
             .and_then(|files| files.get(0))
             .ok_or(Trouble::Open)?;
         input.set_value("");
-        checked(file.size(), &head(&file).await)?;
+        let head = head(&file).await;
+        checked(file.size(), &head)?;
+        let moves = moving(&head);
         let options = ImageBitmapOptions::new();
         options.set_image_orientation(ImageOrientation::FromImage);
         let bitmap = match window()
@@ -906,7 +1006,12 @@ mod browser {
                 .and_then(|b| b.dyn_into::<ImageBitmap>().ok()),
             Err(_) => None,
         };
-        let readable = readable();
+        let readable = readable() && !moves;
+        let sending = match (moves, readable) {
+            (true, _) => Sending::Moving,
+            (false, true) => Sending::Square,
+            (false, false) => Sending::Original,
+        };
         let (source, width, height) = if let Some(bitmap) = bitmap {
             let (w, h) = (f64::from(bitmap.width()), f64::from(bitmap.height()));
             (Source::Bitmap(bitmap), w, h)
@@ -932,7 +1037,7 @@ mod browser {
                     readable: false,
                 });
             });
-            return Ok((1.0, 1.0, false));
+            return Ok((1.0, 1.0, Sending::Original));
         } else {
             return Err(Trouble::Open);
         };
@@ -945,9 +1050,9 @@ mod browser {
                 source,
                 file,
                 readable,
-            })
+            });
         });
-        Ok((width, height, readable))
+        Ok((width, height, sending))
     }
 
     fn close_source(source: Source) {
@@ -1058,7 +1163,8 @@ mod browser {
     use super::{Crop, Own, Trouble};
 
     /// The checks run as in the browser, on nothing; nothing is opened.
-    pub fn open() -> std::future::Ready<Result<(f64, f64, bool), Trouble>> {
+    pub fn open() -> std::future::Ready<Result<(f64, f64, super::Sending), Trouble>> {
+        let _ = super::moving(&[]);
         std::future::ready(super::checked(0.0, &[]).and(Err(Trouble::Open)))
     }
     pub fn close() {}
@@ -1126,6 +1232,39 @@ mod tests {
         assert_eq!(claimed(&webp), Some((65_536, 16)));
         assert_eq!(claimed(b"<svg/>"), None);
         assert_eq!(claimed(b"\x89PNG"), None);
+    }
+
+    #[test]
+    fn animations_are_seen_in_their_first_bytes() {
+        let chunk = |kind: &[u8]| [&[0, 0, 0, 0][..], kind, &[0, 0, 0, 0]].concat();
+        let png = |chunks: &[&[u8]]| {
+            let mut out = b"\x89PNG\r\n\x1a\n".to_vec();
+            for kind in chunks {
+                out.extend_from_slice(&chunk(kind));
+            }
+            out
+        };
+        assert!(moving(&png(&[b"IHDR", b"acTL", b"IDAT"])));
+        assert!(!moving(&png(&[b"IHDR", b"IDAT", b"acTL"])));
+        assert!(!moving(&png(&[b"IHDR"])));
+        let mut webp = b"RIFF\0\0\0\0WEBPVP8X\x0a\0\0\0\x02\0\0\0".to_vec();
+        assert!(moving(&webp));
+        webp[20] = 0x10;
+        assert!(!moving(&webp));
+        // a GIF without a colour table: an extension, then images
+        let image = [0x2c, 0, 0, 0, 0, 1, 0, 1, 0, 0, 2, 1, 0, 0];
+        let one = [
+            &b"GIF89a\x01\0\x01\0\0\0\0"[..],
+            &[0x21, 0xf9, 1, 0, 0],
+            &image,
+            &[0x3b],
+        ]
+        .concat();
+        assert!(!moving(&one));
+        let two = [&b"GIF89a\x01\0\x01\0\0\0\0"[..], &image, &image, &[0x3b]].concat();
+        assert!(moving(&two));
+        assert!(!moving(b"GIF89a"));
+        assert!(!moving(b"\xff\xd8\xff"));
     }
 
     #[test]

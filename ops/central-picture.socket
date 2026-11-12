@@ -1,0 +1,21 @@
+# /etc/systemd/system/central-picture.socket
+#
+# The picture worker's socket (docs/profile-pictures.md, docs/operations.md
+# "Profile pictures"): systemd accepts each connection itself and starts a
+# fresh central-picture@.service for it, two at most. Only the service's
+# user, central, may connect.
+[Unit]
+Description=Baylee Central picture worker socket
+
+[Socket]
+ListenStream=/run/baylee-central/picture.sock
+Accept=yes
+MaxConnections=2
+SocketUser=central
+SocketGroup=central
+SocketMode=0600
+DirectoryMode=0755
+RemoveOnStop=yes
+
+[Install]
+WantedBy=sockets.target

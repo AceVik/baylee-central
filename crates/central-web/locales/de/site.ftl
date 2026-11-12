@@ -1269,6 +1269,7 @@ picture-preview = Vorschau deines Profilbilds
 picture-position = Quadrat bei { $x } % von links und { $y } % von oben, Zoom { $zoom } %.
 picture-zoom = Zoom
 picture-original = Dieser Browser lässt die Seite das Bild nicht lesen. Deshalb geht die Datei selbst an Baylee Central, das ihr mittleres Quadrat behält und keine ihrer Angaben.
+picture-moving = Dieses Bild bewegt sich. Deshalb geht die Datei selbst an Baylee Central, das ihr mittleres Quadrat behält.
 picture-save = Bild speichern
 picture-saving = Wird gespeichert …
 picture-saved = Dein neues Bild ist gespeichert.

@@ -1391,6 +1391,7 @@ picture-preview = Preview of your profile picture
 picture-position = Square at { $x } % across and { $y } % down, zoomed to { $zoom } %.
 picture-zoom = Zoom
 picture-original = This browser does not let the page read the picture, so the file itself goes to Baylee Central, which keeps its centred square and none of its details.
+picture-moving = This picture moves, so the file itself goes to Baylee Central, which keeps its centred square.
 picture-save = Save picture
 picture-saving = Saving…
 picture-saved = Your new picture is saved.

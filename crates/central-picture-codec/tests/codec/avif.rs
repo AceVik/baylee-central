@@ -88,6 +88,23 @@ fn an_av1_sequence_header_that_allows_huge_frames_is_refused() {
 }
 
 #[test]
+fn an_avif_image_sequence_is_refused_as_unsupported() {
+    // three frames of `testsrc2`, major brand `avis` (fixtures/README.md)
+    let sequence = fixture("animated.avif");
+    assert_eq!(&sequence[8..12], b"avis");
+    assert_eq!(timed(Format::Avif, &sequence), Err(Refusal::Unsupported));
+    assert_eq!(
+        through_worker(Format::Avif, &sequence),
+        Err(Refusal::Unsupported)
+    );
+    // the same file naming `avif` first gives its still item
+    let mut still = sequence.clone();
+    still[8..12].copy_from_slice(b"avif");
+    let rgba = valid(&timed(Format::Avif, &still).unwrap());
+    assert_eq!(rgba.len(), 256 * 256 * 4);
+}
+
+#[test]
 fn other_brands_cuts_and_damage_are_refused() {
     let file = avif_of(32, 32, |x, y| {
         [

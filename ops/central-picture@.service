@@ -1,0 +1,54 @@
+# /etc/systemd/system/central-picture@.service
+#
+# One picture, one process (docs/profile-pictures.md): the worker reads one
+# request from the socket systemd accepted (central-picture.socket), writes
+# one answer and exits. It holds no secret, reaches no network, owns no
+# file, has no user of its own and ends when it runs too long or too large.
+# The limits come from measurement (docs/profile-pictures.md §"Limits"):
+# the largest picture Central takes peaked at 122 MiB on Apple Silicon.
+[Unit]
+Description=Baylee Central picture worker (one picture)
+CollectMode=inactive-or-failed
+
+[Service]
+ExecStart=/opt/baylee-central/bin/central-picture-worker
+StandardInput=socket
+StandardOutput=socket
+StandardError=null
+DynamicUser=yes
+PrivateNetwork=yes
+IPAddressDeny=any
+RestrictAddressFamilies=none
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+PrivateUsers=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectProc=invisible
+ProcSubset=pid
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources
+InaccessiblePaths=-/etc/baylee-central
+UMask=0077
+LimitCORE=0
+# One core: rav1d sizes its threads by the CPUs it may use.
+CPUQuota=100%
+MemoryMax=384M
+MemorySwapMax=0
+TasksMax=4
+RuntimeMaxSec=15

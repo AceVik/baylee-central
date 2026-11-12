@@ -21,31 +21,69 @@ const fixture = (name: string) => readFileSync(path.join(HERE, "pictures", name)
 
 type Pixel = [number, number, number, number];
 
-/** A PNG drawn by `pixel`, RGBA, 8 bits. */
-function png(width: number, height: number, pixel: (x: number, y: number) => Pixel): Buffer {
-  const rows: number[] = [];
+/** One PNG chunk with its length and CRC. */
+function chunk(kind: string, data: Buffer): Buffer {
+  const head = Buffer.alloc(4);
+  head.writeUInt32BE(data.length);
+  const body = Buffer.concat([Buffer.from(kind, "latin1"), data]);
+  const crc = Buffer.alloc(4);
+  crc.writeUInt32BE(crc32(body) >>> 0);
+  return Buffer.concat([head, body, crc]);
+}
+
+const SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
+/** RGBA rows, 8 bits, each behind its filter byte, compressed. */
+function rows(width: number, height: number, pixel: (x: number, y: number) => Pixel): Buffer {
+  const out: number[] = [];
   for (let y = 0; y < height; y++) {
-    rows.push(0);
-    for (let x = 0; x < width; x++) rows.push(...pixel(x, y));
+    out.push(0);
+    for (let x = 0; x < width; x++) out.push(...pixel(x, y));
   }
-  const chunk = (kind: string, data: Buffer) => {
-    const head = Buffer.alloc(4);
-    head.writeUInt32BE(data.length);
-    const body = Buffer.concat([Buffer.from(kind, "latin1"), data]);
-    const crc = Buffer.alloc(4);
-    crc.writeUInt32BE(crc32(body) >>> 0);
-    return Buffer.concat([head, body, crc]);
-  };
+  return deflateSync(Buffer.from(out));
+}
+
+function header(width: number, height: number): Buffer {
   const ihdr = Buffer.alloc(13);
   ihdr.writeUInt32BE(width, 0);
   ihdr.writeUInt32BE(height, 4);
   ihdr.set([8, 6, 0, 0, 0], 8);
-  return Buffer.concat([
-    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
-    chunk("IHDR", ihdr),
-    chunk("IDAT", deflateSync(Buffer.from(rows))),
-    chunk("IEND", Buffer.alloc(0)),
-  ]);
+  return chunk("IHDR", ihdr);
+}
+
+/** A PNG drawn by `pixel`, RGBA, 8 bits. */
+function png(width: number, height: number, pixel: (x: number, y: number) => Pixel): Buffer {
+  return Buffer.concat([SIGNATURE, header(width, height), chunk("IDAT", rows(width, height, pixel)), chunk("IEND", Buffer.alloc(0))]);
+}
+
+/** An APNG of `side` squares, one frame per colour, 100 ms each. */
+function apng(side: number, colours: Pixel[]): Buffer {
+  const actl = Buffer.alloc(8);
+  actl.writeUInt32BE(colours.length, 0);
+  let sequence = 0;
+  const control = () => {
+    const fctl = Buffer.alloc(26);
+    fctl.writeUInt32BE(sequence++, 0);
+    fctl.writeUInt32BE(side, 4);
+    fctl.writeUInt32BE(side, 8);
+    fctl.writeUInt16BE(1, 20);
+    fctl.writeUInt16BE(10, 22);
+    return chunk("fcTL", fctl);
+  };
+  const parts = [SIGNATURE, header(side, side), chunk("acTL", actl)];
+  colours.forEach((colour, index) => {
+    parts.push(control());
+    const data = rows(side, side, () => colour);
+    if (index === 0) {
+      parts.push(chunk("IDAT", data));
+    } else {
+      const number = Buffer.alloc(4);
+      number.writeUInt32BE(sequence++);
+      parts.push(chunk("fdAT", Buffer.concat([number, data])));
+    }
+  });
+  parts.push(chunk("IEND", Buffer.alloc(0)));
+  return Buffer.concat(parts);
 }
 
 const RED: Pixel = [255, 0, 0, 255];
@@ -64,6 +102,13 @@ function oriented(jpeg: Buffer, orientation: number): Buffer {
 
 type Upload = { kind: string; body: Buffer };
 type World = { picture: boolean; uploads: Upload[]; asked: string[]; answer?: { status: number; body: string } };
+
+/** The upload at `index` (from the end when negative); a missing one fails the test. */
+function upload(w: World, index: number): Upload {
+  const found = w.uploads.at(index);
+  if (!found) throw new Error(`no upload at ${index}`);
+  return found;
+}
 
 const mine = (w: World) => ({
   result: "my_picture",
@@ -86,9 +131,6 @@ async function open(page: Page, w: World, options: { admin?: boolean; path?: str
   });
   await page.addInitScript(() => {
     localStorage.setItem("baylee-central-session", JSON.stringify({ expiresAt: 4_102_444_800 }));
-    document.addEventListener("securitypolicyviolation", (event) => {
-      console.error(`csp: ${event.violatedDirective} ${event.blockedURI}`);
-    });
   });
   await page.route("**/api/v1", (route: Route) => {
     const body = JSON.parse(route.request().postData() ?? "{}");
@@ -126,7 +168,7 @@ async function open(page: Page, w: World, options: { admin?: boolean; path?: str
     const request = route.request();
     expect(request.method()).toBe("PUT");
     expect(request.headers()["x-baylee-central"]).toBe("1");
-    w.uploads.push({ kind: request.headers()["content-type"], body: request.postDataBuffer() ?? Buffer.alloc(0) });
+    w.uploads.push({ kind: request.headers()["content-type"] ?? "", body: request.postDataBuffer() ?? Buffer.alloc(0) });
     if (w.answer) return route.fulfill({ status: w.answer.status, contentType: "application/json", body: w.answer.body });
     w.picture = true;
     return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(mine(w)) });
@@ -166,25 +208,23 @@ async function decoded(page: Page, body: Buffer) {
   }, Array.from(body));
 }
 
-const near = (a: number[], b: Pixel, tolerance = 48) => a.every((v, i) => Math.abs(v - b[i]) <= tolerance);
+const near = (a: number[], b: Pixel, tolerance = 48) => a.every((v, i) => Math.abs(v - (b[i] ?? 0)) <= tolerance);
 
 test("every kind of picture the browser opens becomes a square PNG without its details", async ({ page }) => {
   const w = world();
   const problems = await open(page, w);
-  const cases: [string, string, Buffer, "quadrant" | "red"][] = [
-    ["wide.png", "image/png", png(96, 64, quadrant(96, 64)), "quadrant"],
-    ["photo.jpg", "image/jpeg", fixture("quadrant.jpg"), "quadrant"],
-    ["moving.gif", "image/gif", fixture("animated.gif"), "red"],
-    ["moving.webp", "image/webp", fixture("animated.webp"), "red"],
-    ["picture.avif", "image/avif", fixture("imageio.avif"), "quadrant"],
-    ["paint.bmp", "image/bmp", fixture("quadrant.bmp"), "quadrant"],
-    ["icon.ico", "image/x-icon", fixture("quadrant.ico"), "quadrant"],
+  const cases: [string, string, Buffer][] = [
+    ["wide.png", "image/png", png(96, 64, quadrant(96, 64))],
+    ["photo.jpg", "image/jpeg", fixture("quadrant.jpg")],
+    ["picture.avif", "image/avif", fixture("imageio.avif")],
+    ["paint.bmp", "image/bmp", fixture("quadrant.bmp")],
+    ["icon.ico", "image/x-icon", fixture("quadrant.ico")],
   ];
-  for (const [name, mimeType, buffer, drawn] of cases) {
+  for (const [name, mimeType, buffer] of cases) {
     await choose(page, name, mimeType, buffer);
     await page.getByRole("button", { name: "Save picture" }).click();
     await expect(page.getByRole("status").filter({ hasText: "Your new picture is saved." })).toBeVisible();
-    const sent = w.uploads.at(-1)!;
+    const sent = upload(w, -1);
     expect(sent.kind, name).toBe("image/png");
     expect(sent.body.subarray(1, 4).toString("latin1"), name).toBe("PNG");
     // nothing of the file's own metadata travels: only IHDR, IDAT and IEND
@@ -192,12 +232,8 @@ test("every kind of picture the browser opens becomes a square PNG without its d
     const seen = await decoded(page, sent.body);
     expect(seen.width, name).toBe(seen.height);
     expect(seen.width >= 256 && seen.width <= 512, `${name}: ${seen.width}`).toBe(true);
-    if (drawn === "red") {
-      expect(near(seen.br, RED), `${name}: ${seen.br}`).toBe(true);
-    } else {
-      expect(near(seen.tl, RED), `${name} top left: ${seen.tl}`).toBe(true);
-      expect(near(seen.br, BLUE), `${name} bottom right: ${seen.br}`).toBe(true);
-    }
+    expect(near(seen.tl, RED), `${name} top left: ${seen.tl}`).toBe(true);
+    expect(near(seen.br, BLUE), `${name} bottom right: ${seen.br}`).toBe(true);
   }
   // the stored picture is shown, AVIF first
   await expect(page.locator(".picture-current source[type='image/avif']")).toHaveAttribute("srcset", `/api/v1/pictures/${"5a".repeat(16)}.avif`);
@@ -210,7 +246,7 @@ test("a photo's own orientation turns it upright before the square is cut", asyn
   await choose(page, "turned.jpg", "image/jpeg", oriented(fixture("quadrant.jpg"), 6));
   await page.getByRole("button", { name: "Save picture" }).click();
   await expect.poll(() => w.uploads.length).toBe(1);
-  const seen = await decoded(page, w.uploads[0].body);
+  const seen = await decoded(page, upload(w, 0).body);
   // 6 turns it clockwise: the red quarter goes to the top right
   expect(near(seen.tr, RED), `${seen.tr}`).toBe(true);
   expect(near(seen.tl, BLUE), `${seen.tl}`).toBe(true);
@@ -231,8 +267,8 @@ test("an SVG is drawn through an image, without its script and without loading a
   await choose(page, "drawing.svg", "image/svg+xml", Buffer.from(svg));
   await page.getByRole("button", { name: "Save picture" }).click();
   await expect.poll(() => w.uploads.length).toBe(1);
-  expect(w.uploads[0].kind).toBe("image/png");
-  const seen = await decoded(page, w.uploads[0].body);
+  expect(upload(w, 0).kind).toBe("image/png");
+  const seen = await decoded(page, upload(w, 0).body);
   // the rectangle stays red away from the corner where the browser drew the refused remote image its own way
   expect(near(seen.br, RED) && near(seen.tr, RED) && near(seen.bl, RED), `${seen.br} ${seen.tr} ${seen.bl}`).toBe(true);
   expect(problems).toEqual([]);
@@ -263,8 +299,35 @@ test("a file the browser cannot open goes to Central as it is, and Central's ref
   await expect(page.locator("#picture-original")).toBeVisible();
   await page.getByRole("button", { name: "Save picture" }).click();
   await expect(page.getByRole("alert").filter({ hasText: "Baylee Central does not take this kind of file." })).toBeVisible();
-  expect(w.uploads[0].kind).toBe("image/png");
-  expect(w.uploads[0].body.equals(html)).toBe(true);
+  expect(upload(w, 0).kind).toBe("image/png");
+  expect(upload(w, 0).body.equals(html)).toBe(true);
+});
+
+test("a picture that moves goes to Central as it is, and its square is not placed here", async ({ page }) => {
+  const w = world();
+  const problems = await open(page, w);
+  const cases: [string, string, Buffer][] = [
+    ["moving.gif", "image/gif", fixture("animated.gif")],
+    ["moving.webp", "image/webp", fixture("animated.webp")],
+    ["moving.png", "image/png", apng(64, [RED, BLUE])],
+  ];
+  for (const [name, mimeType, buffer] of cases) {
+    await choose(page, name, mimeType, buffer);
+    await expect(page.locator("#picture-moving"), name).toBeVisible();
+    await expect(page.locator("#picture-original"), name).toBeHidden();
+    // a canvas holds one frame: nothing here can place the square
+    await expect(page.locator("#picture-zoom"), name).toBeHidden();
+    await page.getByRole("button", { name: "Save picture" }).click();
+    await expect(page.getByRole("status").filter({ hasText: "Your new picture is saved." })).toBeVisible();
+    const sent = upload(w, -1);
+    expect(sent.kind, name).toBe(mimeType);
+    expect(sent.body.equals(buffer), name).toBe(true);
+  }
+  // a still PNG is still drawn here and sent as the square
+  await choose(page, "still.png", "image/png", png(64, 64, quadrant(64, 64)));
+  await expect(page.locator("#picture-moving")).toBeHidden();
+  await expect(page.locator("#picture-zoom")).toBeVisible();
+  expect(problems).toEqual([]);
 });
 
 test("a browser that will not let the page read its canvas sends the file itself", async ({ page }) => {
@@ -278,8 +341,8 @@ test("a browser that will not let the page read its canvas sends the file itself
   await expect(page.locator("#picture-original")).toBeVisible();
   await page.getByRole("button", { name: "Save picture" }).click();
   await expect.poll(() => w.uploads.length).toBe(1);
-  expect(w.uploads[0].kind).toBe("image/jpeg");
-  expect(w.uploads[0].body.equals(fixture("quadrant.jpg"))).toBe(true);
+  expect(upload(w, 0).kind).toBe("image/jpeg");
+  expect(upload(w, 0).body.equals(fixture("quadrant.jpg"))).toBe(true);
 });
 
 test("the keyboard and the slider place the square, and a live region says where", async ({ page }) => {
@@ -300,7 +363,7 @@ test("the keyboard and the slider place the square, and a live region says where
   await expect(where).toContainText("zoomed to 200 %");
   await page.getByRole("button", { name: "Save picture" }).click();
   await expect.poll(() => w.uploads.length).toBe(1);
-  const seen = await decoded(page, w.uploads[0].body);
+  const seen = await decoded(page, upload(w, 0).body);
   // the left edge's quarter, zoomed: red at the top left
   expect(near(seen.tl, RED), `${seen.tl}`).toBe(true);
 });

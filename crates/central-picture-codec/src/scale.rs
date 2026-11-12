@@ -19,9 +19,25 @@ pub(crate) struct Square(pub(crate) Vec<u8>);
 /// upright one (turning about the centre moves no centre), so the
 /// orientation is applied to the small result alone.
 pub(crate) fn square(raster: &Raster) -> Result<Square, Refusal> {
-    let width = usize::try_from(raster.width).map_err(|_| Refusal::Failed)?;
-    let height = usize::try_from(raster.height).map_err(|_| Refusal::Failed)?;
-    if raster.rgba.len() != width * height * 4 || width == 0 || height == 0 {
+    square_of(
+        raster.width,
+        raster.height,
+        &raster.rgba,
+        raster.orientation,
+    )
+}
+
+/// [`square`] of `rgba`, `width` × `height`, turned upright from
+/// `orientation`: one frame of an animation (orientation 1).
+pub(crate) fn square_of(
+    width: u32,
+    height: u32,
+    rgba: &[u8],
+    orientation: u8,
+) -> Result<Square, Refusal> {
+    let width = usize::try_from(width).map_err(|_| Refusal::Failed)?;
+    let height = usize::try_from(height).map_err(|_| Refusal::Failed)?;
+    if rgba.len() != width * height * 4 || width == 0 || height == 0 {
         return Err(Refusal::Failed);
     }
     let side = width.min(height);
@@ -33,7 +49,7 @@ pub(crate) fn square(raster: &Raster) -> Result<Square, Refusal> {
     for (oy, rows) in spans.iter().enumerate() {
         sums.fill([0; 5]);
         for &(sy, wy) in rows {
-            let row = &raster.rgba[((y0 + sy) * width + x0) * 4..][..side * 4];
+            let row = &rgba[((y0 + sy) * width + x0) * 4..][..side * 4];
             for (ox, columns) in spans.iter().enumerate() {
                 let sum = &mut sums[ox];
                 for &(sx, wx) in columns {
@@ -61,7 +77,7 @@ pub(crate) fn square(raster: &Raster) -> Result<Square, Refusal> {
             }
         }
     }
-    Ok(Square(orient(&out, raster.orientation)))
+    Ok(Square(orient(&out, orientation)))
 }
 
 /// `numerator / denominator`, rounded half up, as a sample.
