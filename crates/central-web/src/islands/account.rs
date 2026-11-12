@@ -1217,7 +1217,17 @@ pub fn Account(lang: Lang, section: Section, worker: String) -> impl IntoView {
                 reload,
             )
             .into_any(),
-            Section::Admin => super::admin::refused(lang).into_any(),
+            Section::Feedback | Section::Report if summary.admin => super::feedback::page(
+                lang,
+                section,
+                worker.clone(),
+                summary.username.clone(),
+                summary.account,
+                reload,
+            ),
+            Section::Admin | Section::Feedback | Section::Report => {
+                super::admin::refused(lang).into_any()
+            }
             // the messenger is its own island
             Section::Chat | Section::Contacts => ().into_any(),
             }

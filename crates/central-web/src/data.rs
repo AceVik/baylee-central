@@ -464,6 +464,15 @@ pub enum Section {
     /// account (`docs/account-reset.md`). In no navigation: the overview
     /// leads an administrator to it, and it shows nothing to anyone else.
     Admin,
+    /// `/account/admin/feedback`: bug and crash reports, triaged
+    /// (`docs/reports.md`). As `Admin`: in no navigation, and nothing for
+    /// anyone without the role.
+    Feedback,
+    /// `/account/admin/feedback/<id in hex>`: one report. Every report's
+    /// address is this one page (`Page::from_slug`); the island reads the
+    /// id from the address, so neither the page nor its cache holds one.
+    /// Its own path is the list's.
+    Report,
 }
 
 impl Section {
@@ -482,7 +491,7 @@ impl Section {
 
     /// Every section with an address: the navigation's and the
     /// administration.
-    pub const ROUTED: [Section; 9] = [
+    pub const ROUTED: [Section; 11] = [
         Section::Home,
         Section::Chat,
         Section::Contacts,
@@ -492,6 +501,8 @@ impl Section {
         Section::Notifications,
         Section::Gateways,
         Section::Admin,
+        Section::Feedback,
+        Section::Report,
     ];
 
     /// The path after `/{lang}/`.
@@ -507,6 +518,7 @@ impl Section {
             Section::Gateways => "account/gateways",
             Section::Notifications => "account/notifications",
             Section::Admin => "account/admin",
+            Section::Feedback | Section::Report => "account/admin/feedback",
         }
     }
 }

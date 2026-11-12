@@ -123,6 +123,8 @@ fn section_name(lang: Lang, section: Section) -> (&'static str, &'static str) {
         Section::Gateways => (words::account_gateways(lang), icons::SERVER),
         Section::Notifications => (words::push_title(lang), icons::BELL),
         Section::Admin => (words::admin_reset_title(lang), icons::KEY_ROUND),
+        Section::Feedback => (words::fb_title(lang), icons::MESSAGE_CIRCLE),
+        Section::Report => (words::fb_report_title(lang), icons::FILE_TEXT),
     }
 }
 
