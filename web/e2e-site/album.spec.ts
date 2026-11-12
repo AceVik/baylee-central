@@ -209,6 +209,9 @@ async function openViewer(page: Page): Promise<{ album: Locator; frame: Locator;
   const viewer = page.locator("dialog#photo-viewer");
   await expect(viewer).toBeVisible();
   await showing(viewer, 1);
+  // the dialog's own way in (`pop`, a few pixels up) ends before anything
+  // is measured against it: on a loaded machine it can still be running
+  await viewer.evaluate((dialog) => Promise.all(dialog.getAnimations().map((animation) => animation.finished)));
   return { album, frame, viewer };
 }
 
