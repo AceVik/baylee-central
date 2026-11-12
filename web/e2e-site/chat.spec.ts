@@ -268,6 +268,9 @@ test("the list is one tab stop with arrows, and opens by Enter", async ({ page }
   await expect(rows).toHaveCount(2, { timeout: 15_000 });
   await expect(rows.nth(0)).toHaveAttribute("tabindex", "0");
   await expect(rows.nth(1)).toHaveAttribute("tabindex", "-1");
+  // the keys work once the messenger's island has taken the list over: on a
+  // slow machine the rows may stand before it has
+  await expect(page.locator("html")).toHaveAttribute("data-islands", "ready", { timeout: 15_000 });
   await rows.nth(0).focus();
   await page.keyboard.press("ArrowDown");
   await expect(rows.nth(1)).toBeFocused();
