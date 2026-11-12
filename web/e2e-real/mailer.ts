@@ -40,6 +40,7 @@ export type Sent = {
   html: string;
   ttl_secs?: number;
   limit_key?: string;
+  inline?: string[];
   at: number;
 };
 
@@ -51,7 +52,30 @@ const FIELDS = new Set([
   "idempotency_key",
   "ttl_secs",
   "limit_key",
+  "inline",
 ]);
+/** The images the real mailer is configured with on the live host. */
+const IMAGES = new Set(["baylee-logo"]);
+
+/**
+ * The real mailer's rule for `inline`: only with `html`, 1 to 4 configured
+ * names, each once, each referenced as `cid:<name>` and not as the start of
+ * a longer name.
+ */
+function inlineOk(inline: unknown, html: unknown): boolean {
+  if (inline === undefined) return true;
+  if (typeof html !== "string" || !Array.isArray(inline)) return false;
+  if (inline.length < 1 || inline.length > 4) return false;
+  if (new Set(inline).size !== inline.length) return false;
+  return inline.every(
+    (name) =>
+      typeof name === "string" &&
+      IMAGES.has(name) &&
+      new RegExp(`cid:${name.replace(/[.-]/g, "\\$&")}(?![A-Za-z0-9._-])`).test(
+        html,
+      ),
+  );
+}
 const LIMIT = 600_000;
 const mails: Sent[] = [];
 let count = 0;
@@ -124,6 +148,10 @@ createServer(async (req, res) => {
     answer(res, 400, { error: "invalid_json" });
     return;
   }
+  if (!inlineOk(sent["inline"], sent["html"])) {
+    answer(res, 400, { error: "invalid_inline", field: "inline" });
+    return;
+  }
   const mail: Sent = {
     to: sent["to"] as string,
     subject: sent["subject"] as string,
@@ -135,6 +163,9 @@ createServer(async (req, res) => {
       : {}),
     ...(typeof sent["limit_key"] === "string"
       ? { limit_key: sent["limit_key"] }
+      : {}),
+    ...(Array.isArray(sent["inline"])
+      ? { inline: sent["inline"] as string[] }
       : {}),
   };
   mails.push(mail);
