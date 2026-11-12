@@ -493,6 +493,7 @@ async fn the_reset_page_is_linked_from_signing_in_and_listed_nowhere() {
     assert_eq!(status, StatusCode::OK);
     assert!(html.contains("Set a new password – Baylee"));
     for id in [
+        "reset-mail-name",
         "reset-name",
         "reset-code",
         "reset-keep",
@@ -520,6 +521,20 @@ async fn the_reset_page_is_linked_from_signing_in_and_listed_nowhere() {
     );
     assert_eq!(count(&html, " id=\"reset-warning\""), 1);
     assert!(html.contains("your encrypted data is lost for good"));
+    // the block for someone without a code stands before the form that
+    // redeems one, in the first response, and nothing typed has a name
+    let block = html
+        .find("aria-labelledby=\"reset-mail-title\"")
+        .expect("the block");
+    let steps = html.find("id=\"reset-steps\"").expect("the form");
+    assert!(block < steps);
+    assert_eq!(count(&html, " id=\"reset-mail-title\""), 1);
+    assert!(html.contains("Send a code by e-mail"));
+    let named: Vec<&str> = tags(&html[block..], "input")
+        .into_iter()
+        .filter(|tag| tag.contains(" name=") && !tag.contains("type=\"radio\""))
+        .collect();
+    assert_eq!(named, Vec::<&str>::new());
     let noscript = html.split("<noscript>").nth(1).expect("a noscript");
     assert!(noscript.starts_with("<p class=\"notice\">Setting a new password needs JavaScript"));
     // a form page of its own has no dialogs over it

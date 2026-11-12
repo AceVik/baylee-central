@@ -1,9 +1,14 @@
-//! Setting a new password with a reset code an administrator made
-//! (`docs/account-reset.md`): the account's data kept with the recovery
-//! code, or a new, empty vault after the warning. The password and the
-//! recovery code go only to the crypto Worker; Central sees the reset code
-//! and OPAQUE messages. Everything the form asks is in hand before the
-//! first request: Central's attempt lives 60 seconds.
+//! Setting a new password with a reset code, one an administrator made or
+//! one Central mailed (`docs/account-reset.md`): the account's data kept
+//! with the recovery code, or a new, empty vault after the warning. The
+//! password and the recovery code go only to the crypto Worker; Central
+//! sees the reset code and OPAQUE messages. Everything the form asks is in
+//! hand before the first request: Central's attempt lives 60 seconds.
+//!
+//! Before the form stands the block for someone who has no code yet: it
+//! asks Central to mail one to the account's confirmed address
+//! (`Request::ResetMail`). Central answers the same whatever the name, and
+//! the block says no more than that.
 
 use central_api::Token;
 use central_api::reset_code::ResetCode;
@@ -114,6 +119,49 @@ fn at_finish(failure: Failure) -> Option<Refusal> {
         }
         Failure::Busy => Some(Refusal::Other(Problem::Busy)),
         Failure::Unavailable | Failure::Malformed | Failure::Network => None,
+    }
+}
+
+/// The sign-in name a code is asked for by mail, as Central keeps names;
+/// `None` for a text that is none. Only a name goes to Central: its
+/// refusal there means that it sends no mail, never that the text was
+/// something else (an e-mail address, say).
+fn mail_name(typed: &str) -> Option<String> {
+    let name = typed.trim().to_ascii_lowercase();
+    valid_username(&name).then_some(name)
+}
+
+/// What came of asking for a reset code by mail.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Mailed {
+    /// Central took the request. Whether a code went out it does not say:
+    /// the answer is the same for a name without an account or without a
+    /// confirmed address.
+    Asked,
+    /// This Central sends no mail.
+    NoMail,
+    /// Too many were asked for.
+    Busy,
+    /// Anything else, in the forms' shared words.
+    Other(Problem),
+}
+
+fn mailed(answer: &Result<Response, Failure>) -> Mailed {
+    match answer {
+        Ok(Response::Done) => Mailed::Asked,
+        Ok(_) => Mailed::Other(Problem::Failed),
+        Err(Failure::Rejected) => Mailed::NoMail,
+        Err(Failure::Busy) => Mailed::Busy,
+        Err(failure) => Mailed::Other(Problem::outside_sign_in(*failure)),
+    }
+}
+
+fn mailed_text(lang: Lang, mailed: Mailed) -> &'static str {
+    match mailed {
+        Mailed::Asked => words::reset_mail_sent(lang),
+        Mailed::NoMail => words::reset_mail_none(lang),
+        Mailed::Busy => words::reset_mail_busy(lang),
+        Mailed::Other(problem) => problem_text(lang, problem),
     }
 }
 
@@ -335,11 +383,64 @@ impl Form {
     }
 }
 
+/// The block that asks for a code by mail. Its name is its own field; a
+/// name it was sent with is carried into the form, where the code that
+/// arrives is redeemed.
+#[derive(Clone, Copy)]
+struct Mail {
+    name: RwSignal<String>,
+    error: RwSignal<Option<&'static str>>,
+    said: RwSignal<Option<&'static str>>,
+    busy: RwSignal<bool>,
+}
+
+impl Mail {
+    /// As [`Form::early`]: a name typed before the island ran stays.
+    fn early() -> Self {
+        Self {
+            name: RwSignal::new(early::typed("reset-mail-name")),
+            error: RwSignal::new(None),
+            said: RwSignal::new(None),
+            busy: RwSignal::new(false),
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum Step {
     Form,
     Working,
     Done(Outcome),
+}
+
+/// The block before the form, for someone who has no reset code: a
+/// sign-in name, and the request that Central mails a code.
+fn mail_view(
+    lang: Lang,
+    mail: Mail,
+    submit: impl Fn(leptos::ev::SubmitEvent) + 'static,
+) -> impl IntoView {
+    let name = Labelled {
+        id: "reset-mail-name",
+        label: words::signin_name(lang),
+        hint: Some(words::reset_mail_name_hint(lang)),
+        mark: glyph::USER,
+        auto: "username",
+        max: "64",
+    };
+    view! {
+        <h2 id="reset-mail-title">{words::reset_mail_title(lang)}</h2>
+        <p>{words::reset_mail_lead(lang)}</p>
+        <form class="form" method="post" novalidate=true on:submit=submit>
+            {field::labelled(lang, name, move || mail.name.get(), move |value| mail.name.set(value))}
+            <p class="error" role="alert">{move || mail.error.get()}</p>
+            <button type="submit" class="button" aria-disabled=move || mail.busy.get().then_some("true")>
+                {glyph::glyph(glyph::MAIL)}
+                <span>{words::reset_mail_submit(lang)}</span>
+            </button>
+            <p class="meta" role="status">{move || mail.said.get()}</p>
+        </form>
+    }
 }
 
 /// What happens to the data: kept with the recovery code, or a new vault.
@@ -505,6 +606,44 @@ pub fn Reset(lang: Lang, worker: String) -> impl IntoView {
             }
         });
     };
+    let mail = Mail::early();
+    // As a registration's form: one sent faster than a person types is not
+    // sent (`docs/registration-abuse.md`). Here the person is told, and
+    // may try again.
+    let shown = StoredValue::new(0u64);
+    Effect::new(move |_| shown.set_value(super::pow::now_ms()));
+    let ask_mail = move |event: leptos::ev::SubmitEvent| {
+        event.prevent_default();
+        if mail.busy.get_untracked() {
+            return;
+        }
+        mail.said.set(None);
+        let Some(name) = mail_name(&mail.name.get_untracked()) else {
+            mail.error.set(Some(words::reset_mail_error_name(lang)));
+            return;
+        };
+        if super::pow::now_ms().saturating_sub(shown.get_value()) < 3_000 {
+            mail.error.set(Some(words::reset_mail_early(lang)));
+            return;
+        }
+        mail.error.set(None);
+        // the code that arrives is redeemed below, for this name
+        form.username.set(name.clone());
+        mail.busy.set(true);
+        leptos::task::spawn_local(async move {
+            let request = Request::ResetMail {
+                username: name,
+                lang: lang.code().to_owned(),
+            };
+            let answer = mailed(&call(&request).await);
+            mail.busy.set(false);
+            if answer == Mailed::Asked {
+                mail.said.set(Some(mailed_text(lang, answer)));
+            } else {
+                mail.error.set(Some(mailed_text(lang, answer)));
+            }
+        });
+    };
     // A new step replaces the old one's elements, focus among them: it
     // takes the focus where it begins (as the sign-in's steps do). The
     // first render leaves the focus where the page put it.
@@ -526,7 +665,13 @@ pub fn Reset(lang: Lang, worker: String) -> impl IntoView {
         Step::Done(outcome) => done_view(lang, outcome).into_any(),
     }
     };
-    view! { <div id="reset-steps" class="steps">{steps}</div> }
+    // the block belongs to the form: once that is sent, both are over
+    view! {
+        <section class="reset-mail" aria-labelledby="reset-mail-title" hidden=move || step.get() != Step::Form>
+            {mail_view(lang, mail, ask_mail)}
+        </section>
+        <div id="reset-steps" class="steps">{steps}</div>
+    }
 }
 
 #[cfg(test)]
@@ -683,5 +828,78 @@ mod tests {
             at_finish(Failure::Busy),
             Some(Refusal::Other(Problem::Busy))
         );
+    }
+
+    /// Only a sign-in name is sent for a code by mail, as Central keeps
+    /// names: an e-mail address, or anything else that is none, never goes.
+    #[test]
+    fn a_code_by_mail_is_asked_for_a_sign_in_name_only() {
+        assert_eq!(mail_name("erika"), Some("erika".into()));
+        assert_eq!(mail_name("  Erika "), Some("erika".into()));
+        assert_eq!(mail_name("e.r-k_9"), Some("e.r-k_9".into()));
+        for none in [
+            "",
+            "  ",
+            "er",
+            "erika@example.org",
+            "erika mustermann",
+            "ërika",
+            "-erika",
+            "a-name-longer-than-central-keeps",
+        ] {
+            assert_eq!(mail_name(none), None, "{none}");
+        }
+        let request = Request::ResetMail {
+            username: "erika".into(),
+            lang: Lang::ZhHans.code().into(),
+        };
+        assert_eq!(
+            serde_json::to_string(&request).expect("json"),
+            r#"{"operation":"reset_mail","username":"erika","lang":"zh-hans"}"#
+        );
+    }
+
+    /// Central's answer to the request is the same for every name, and so
+    /// is what the page says: it promises no mail. Only where Central
+    /// sends none is that said, and nothing reads as a wrong sign-in or as
+    /// the refusal of a name with its code.
+    #[test]
+    fn what_a_code_by_mail_s_answer_says() {
+        assert_eq!(mailed(&Ok(Response::Done)), Mailed::Asked);
+        assert_eq!(mailed(&Err(Failure::Rejected)), Mailed::NoMail);
+        assert_eq!(mailed(&Err(Failure::Busy)), Mailed::Busy);
+        assert_eq!(
+            mailed(&Err(Failure::Network)),
+            Mailed::Other(Problem::Network)
+        );
+        assert_eq!(
+            mailed(&Err(Failure::Unavailable)),
+            Mailed::Other(Problem::Unavailable)
+        );
+        for failure in [Failure::Forbidden, Failure::Conflict, Failure::Malformed] {
+            assert_eq!(mailed(&Err(failure)), Mailed::Other(Problem::Failed));
+        }
+        for lang in Lang::ALL {
+            let asked = mailed_text(lang, Mailed::Asked);
+            assert_eq!(asked, words::reset_mail_sent(lang));
+            for other in [Mailed::NoMail, Mailed::Busy] {
+                let text = mailed_text(lang, other);
+                assert_ne!(text, asked);
+                assert_ne!(text, words::reset_refused(lang));
+                assert_ne!(text, words::signin_wrong(lang));
+            }
+        }
+    }
+
+    /// The mail is asked for in the page's language, and every language's
+    /// code is a tag Central takes.
+    #[test]
+    fn every_language_is_a_tag_central_mails_in() {
+        for lang in Lang::ALL {
+            assert!(
+                central_api::email::language(lang.code()).is_ok(),
+                "{lang:?}"
+            );
+        }
     }
 }
