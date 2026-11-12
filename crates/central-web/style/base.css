@@ -394,6 +394,26 @@ dialog[open] {
     animation: none !important;
     transition: none !important;
   }
+
+  /* A view transition that began while motion was welcome (a page left
+     just before the setting changed) keeps the browser's own fades and
+     moves on these pseudo-elements, which the rules above do not reach:
+     they end at once. Each its own rule, for the reason above. */
+  ::view-transition-group(*) {
+    animation: none !important;
+  }
+
+  ::view-transition-image-pair(*) {
+    animation: none !important;
+  }
+
+  ::view-transition-old(*) {
+    animation: none !important;
+  }
+
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
 }
 
 /* Windows' high contrast keeps outlines and borders but drops shadows and
