@@ -65,4 +65,5 @@ MemorySwapMax=0
 # ffmpeg 8 runs its demuxer, filters, encoder and muxer on threads of their
 # own beside the worker's.
 TasksMax=32
-RuntimeMaxSec=25
+# The worker ends itself at 19 s, inside the service's 20.
+RuntimeMaxSec=20
