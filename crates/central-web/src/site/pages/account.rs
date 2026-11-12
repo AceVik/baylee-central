@@ -129,6 +129,8 @@ fn section_name(lang: Lang, section: Section) -> (&'static str, &'static str) {
         Section::AdminGateways => (words::gw_title(lang), icons::SERVER),
         Section::AdminAudit => (words::admin_audit(lang), icons::FILE_TEXT),
         Section::AdminLegacy => (words::admin_legacy(lang), icons::FILE_ARCHIVE),
+        Section::Feedback => (words::fb_title(lang), icons::MESSAGE_CIRCLE),
+        Section::Report => (words::fb_report_title(lang), icons::FILE_TEXT),
     }
 }
 

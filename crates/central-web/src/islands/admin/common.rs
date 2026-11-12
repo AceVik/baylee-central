@@ -78,7 +78,9 @@ pub fn nav(lang: Lang, section: Section) -> impl IntoView {
         // one account's page is the accounts' list's
         let current = if target == section {
             Some("page")
-        } else if target == Section::AdminUsers && matches!(section, Section::AdminUser(_)) {
+        } else if (target == Section::AdminUsers && matches!(section, Section::AdminUser(_)))
+            || (target == Section::Feedback && section == Section::Report)
+        {
             Some("true")
         } else {
             None
@@ -93,7 +95,7 @@ pub fn nav(lang: Lang, section: Section) -> impl IntoView {
                 {link(Section::AdminGateways, words::gw_title(lang))}
                 {link(Section::AdminAudit, words::admin_audit(lang))}
                 {link(Section::AdminLegacy, words::admin_legacy(lang))}
-                <li><a href=format!("/{code}/account/admin/feedback")>{words::admin_feedback(lang)}</a></li>
+                {link(Section::Feedback, words::admin_feedback(lang))}
                 {link(Section::Admin, words::admin_reset_title(lang))}
             </ul>
         </nav>

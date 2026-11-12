@@ -1222,6 +1222,14 @@ pub fn Account(lang: Lang, section: Section, worker: String) -> impl IntoView {
                 summary.account,
                 reload,
             ),
+            Section::Feedback | Section::Report if summary.admin => super::feedback::page(
+                lang,
+                section,
+                worker.clone(),
+                summary.username.clone(),
+                summary.account,
+                reload,
+            ),
             // the messenger is its own island
             Section::Chat | Section::Contacts => ().into_any(),
             // what is left is the administration, for someone without the role
@@ -1231,7 +1239,9 @@ pub fn Account(lang: Lang, section: Section, worker: String) -> impl IntoView {
             | Section::AdminUser(_)
             | Section::AdminGateways
             | Section::AdminAudit
-            | Section::AdminLegacy => super::admin::refused(lang).into_any(),
+            | Section::AdminLegacy
+            | Section::Feedback
+            | Section::Report => super::admin::refused(lang).into_any(),
             }
         }
     }
