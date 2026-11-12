@@ -186,16 +186,22 @@ Crate `central-mail`. Each mail has a plain text part and an HTML part:
 
 The HTML is a table layout with inline styles. It has no image, no style
 sheet, no script and nothing loaded from elsewhere. A code is printed and
-never part of a link; no notice carries one. The only links go to the
-site's reset page (the reset mail, and the notices of a reset and of a
-changed password) and to the account's security page (the notices of a
-replaced or removed address and of an administrator's code); the
-confirmation mail has none. Every value is escaped.
+never part of a link; no notice carries one. The links go to the configured
+site and nowhere else: a button to the site's reset page (the reset mail,
+and the notices of a reset and of a changed password) or to the account's
+security page (the notices of a replaced or removed address and of an
+administrator's code), and in every mail's footer the site's start page
+(`{site}/{lang}/`); the confirmation mail has no button. Every value is
+escaped.
 
 ### How a mail looks
 
 *Since 12.11.2026, by the owner's word ("Mache bitte die E-Mails
-schöner"). Both bodies say the same in the same order.*
+schöner"). Both bodies say the same in the same order. The second round
+(12.11.2026), after the owner read the first in Gmail and mailbox.org:
+the plain text begins with its title and first sentence, the reset mail
+sets the account's name in bold, a finished reset lists its facts, and
+the footer links to the site.*
 
 - **The card.** A card of at most 560 px on the site's sunlit ground
   (`#f2efe4`), with a thin edge and round corners; where the reader is
@@ -208,7 +214,18 @@ schöner"). Both bodies say the same in the same order.*
   site's serif (Literata where a device has it, else Georgia).
 - **The title** is the mail's one heading (`h1`), in the serif at 26 px,
   with a short line in the accent (`#235b66`) under it. Then what happened,
-  in paragraphs of 16 px.
+  in paragraphs of 16 px. The reset mail sets the account's sign-in name
+  in bold, in the title's colour, so the reader sees at once which account
+  it is (only in the HTML: the plain text and the list's preview say it
+  plainly).
+- **The facts.** Where a notice says several things that came of what
+  happened, they stand as a short list under its first paragraph: a line
+  each behind a small dot in the accent (a character, not a picture; a
+  table, as every reader draws one; the dots are not read aloud). The
+  notices of a finished reset do this with their three facts (the data
+  kept or a new vault, the sessions ended, what the recovery code does
+  now). The other mails say one or two things and keep their paragraphs.
+  No words changed.
 - **The code** in a monospace font in a box of its own: a light tint with a
   dashed frame in the accent, its label above it in small capitals, and
   under it how long it lasts and that nobody at Baylee asks for it. A click
@@ -222,11 +239,14 @@ schöner"). Both bodies say the same in the same order.*
   site's warning tint with an edge in its colour: in the notices, where it
   matters. The code mails end with the calmer "if this was not you, ignore
   this mail" in a quieter hand.
-- **The button.** The one link is a button made of a table cell in the
-  accent with the words in the light ink (7.4:1). The cell carries the
-  colour and Outlook's padding (`mso-padding-alt`), the link a padding of
-  its own for every other reader: 48 px high, the whole of it a target.
-- **The footer** under a thin rule, at 13 px.
+- **The button.** The link to the page that helps is a button made of a
+  table cell in the accent with the words in the light ink (7.4:1). The
+  cell carries the colour and Outlook's padding (`mso-padding-alt`), the
+  link a padding of its own for every other reader: 48 px high, the whole
+  of it a target.
+- **The footer** under a thin rule, at 13 px, and under it a quiet line:
+  the site's host name (`baylee.app`), underlined in the accent, which
+  links to the site's start page in the mail's language.
 - **Dark readers.** Without a style sheet there is no dark variant, so the
   mail says it is light only (`color-scheme` and `supported-color-schemes`
   metadata, and on the root element). Readers that darken mails anyway do
@@ -239,11 +259,14 @@ schöner"). Both bodies say the same in the same order.*
 - **The list of mails** shows the first paragraph beside the subject: it
   stands first in the body, hidden. It is never a code.
 
-The plain text is complete on its own: the title with a line of `=` as wide
-as it under it (a wide East Asian character counts twice), the paragraphs
-with an empty line between them, the code alone on a line under its label,
-the link's address alone on a line under its words, and the footer under
-the signature's mark (`-- `), which mail readers set apart.
+The plain text is complete on its own: the title, an empty line, then the
+paragraphs with an empty line between them, the facts a line each after
+`- `, the code alone on a line under its label, the link's address alone on
+a line under its words, and the footer and the start page's address under
+the signature's mark (`-- `), which mail readers set apart. A list of mails
+that shows the text's beginning (mailbox.org does) shows the title and the
+first sentence; until the second round a line of `=` under the title stood
+there.
 
 To look at them: `BAYLEE_MAIL_SHOTS=<folder> cargo test -p central-mail --
 --ignored` writes every mail in English and German as HTML and text into
@@ -348,7 +371,7 @@ An optional `mail` block in the service's document, live
 
 - `endpoint`: `http://`, a numeric loopback address and a port, nothing
   after it. There is no default.
-- `site`: the origin the mails' two links start with. A canonical HTTPS
+- `site`: the origin every link of the mails starts with. A canonical HTTPS
   origin on the live service, a numeric loopback HTTP origin in
   development.
 - `token`: Central's bearer token for the mailer, 32 to 256 characters of a

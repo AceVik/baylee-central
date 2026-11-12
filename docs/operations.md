@@ -1015,9 +1015,10 @@ administrator work as before.
   mailer's default port must not be assumed**: read the port from the
   mailer's own configuration on this host. A name (also `localhost`),
   another host, `https://` or a path is refused.
-- `site`: the origin the mails' links start with (`{site}/{lang}/reset` and
-  `{site}/{lang}/account/security`). The website's canonical HTTPS origin,
-  without a path or a trailing slash.
+- `site`: the origin the mails' links start with (`{site}/{lang}/reset`,
+  `{site}/{lang}/account/security`, and the start page `{site}/{lang}/` in
+  every mail's footer, shown as the origin's host). The website's
+  canonical HTTPS origin, without a path or a trailing slash.
 - `token`: the bearer token the mailer holds for Central, 32 to 256
   characters. It is a secret like the bridge: it lives in the root-owned
   configuration file and in the mailer's own configuration, never in an
