@@ -369,6 +369,19 @@ impl AccountStore {
         ))
         .await
         .map_err(|_| Error::Conflict)?;
+        // The same picture back (the same original gives the same digest):
+        // the reports its removal or replacement left `gone` are open
+        // again, unless their reporter has opened another meanwhile.
+        tx.execute_raw(statement(
+            "UPDATE central_identity.picture_reports r SET state = 'open', decided_at = NULL, decided_by = NULL
+             WHERE r.account_id = $1 AND r.sha256 = $2 AND r.state = 'gone'
+             AND NOT EXISTS (SELECT 1 FROM central_identity.picture_reports o
+                WHERE o.account_id = r.account_id AND o.sha256 = r.sha256
+                AND o.reporter_id IS NOT DISTINCT FROM r.reporter_id AND o.state = 'open')",
+            vec![account.into(), sha256.to_vec().into()],
+        ))
+        .await
+        .map_err(unavailable)?;
         tx.execute_raw(statement(
             "DELETE FROM central_identity.picture_notices WHERE account_id = $1",
             vec![account.into()],

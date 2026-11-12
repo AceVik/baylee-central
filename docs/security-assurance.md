@@ -7000,3 +7000,43 @@ system-call filter and limits (an operator's check after deploy,
 [operations](operations.md#profile-pictures)), anything on x86-64, and
 Firefox and Safari playing the sequences. This is an engineering review,
 not an audit.
+
+### An independent review, 12 November 2026 (addendum)
+
+An independent reviewer probed the build. Findings and what changed:
+- **M1, slots held for free.** Two accounts could hold both conversion
+  slots with bodies that stall or trickle: the slot was taken at
+  admission and the budget charged after the body. Fixed: the slot is
+  taken only once the whole body has arrived (bodies stay bounded by the
+  listener's places per address).
+- **M2, reports lost on re-upload.** Removing a picture and uploading the
+  same file again left every open report `gone`. Fixed in the store: a
+  picture with the same digest reopens its `gone` reports, unless their
+  reporter opened another. Not fixed: deciding on an account's current
+  picture without an open report. The case view the website does not yet
+  offer; administrators still need a report to act.
+- **L1, workers outliving their slot.** The slot was freed at the
+  service's deadline or when the request dropped, while the worker ran on.
+  Fixed: the slot moves onto the conversion's thread and lives until the
+  worker ended; the worker ends itself at 19 s; `RuntimeMaxSec=20`.
+- **L2, SVG entities.** Entity expansion passed the element and depth
+  scan (25 KB took 548 MiB and 9.3 s). Fixed: any internal subset and any
+  `<!ENTITY` are refused before a parser runs; the probes are a test.
+- **L3, looser answer checks** than the worker writes (any `meta`, any AV1
+  within the size caps). Not fixed in this round; the worker writes only
+  what `ravif` and ffmpeg make from its own pixels, and a worker that is
+  compromised could already answer any pixels.
+- **Info items:**
+  - fixed:
+    - Caddy's 64 KiB body bound would have refused uploads in
+      production; a `handle /api/v1/picture` block now comes first;
+    - the unit has `NoExecPaths=/` with `ExecPaths=` for the worker,
+      ffmpeg and the libraries, `PrivateIPC=yes` and a 64 MiB `/tmp`;
+    - pictures are cached `private`;
+    - the key lookup now needs a display name, as `Lookup` does;
+    - the fuzzer now counts panics;
+    - a flaky encoder test: a busy just-written stand-in is spawned again;
+  - not fixed: `rav1d`'s threads, which `avif-decode` 3.0.0 offers no
+    setting for.
+- **Still not verified:** the unit's new settings, under systemd, with
+  ffmpeg.

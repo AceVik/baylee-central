@@ -237,9 +237,9 @@ impl IdentityService {
             drop(slot);
             converted
         })
-            .await
-            .map_err(|_| UploadRefusal::Picture(Refusal::Failed))?
-            .map_err(UploadRefusal::Picture)?;
+        .await
+        .map_err(|_| UploadRefusal::Picture(Refusal::Failed))?
+        .map_err(UploadRefusal::Picture)?;
         kept_still(&converted.motion);
         let mut key: PictureKey = [0; 16];
         getrandom::fill(&mut key).map_err(|_| UploadRefusal::Account(Error::Unavailable))?;
