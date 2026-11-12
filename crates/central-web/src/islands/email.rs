@@ -316,6 +316,19 @@ pub async fn for_export() -> Option<EmailState> {
     read().await.ok()
 }
 
+/// How the section begins.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Begin {
+    /// In the account area: it reads what Central holds.
+    Read,
+    /// As a step of a registration that just ended, whose sign-in is
+    /// fresh: it names this address at once, without asking for the
+    /// password again (Central takes that within five minutes of a
+    /// password sign-in, `docs/email.md`). Where Central refuses, the form
+    /// asks for the password, as in the account area.
+    Name(String),
+}
+
 /// The section's signals and what it was given. All of it is `Copy`, so
 /// every handler takes the whole.
 #[derive(Clone, Copy)]
@@ -477,6 +490,36 @@ impl Section {
                     // Central holds now has another face
                     self.mode.set(back);
                     self.failed(Action::Set, said, state, Some(Face::Working));
+                }
+                outcome => self.settle(Action::Set, outcome),
+            }
+        });
+    }
+
+    /// Names `typed` at once, without signing in again: for a session whose
+    /// password sign-in is fresh. Where Central refuses that (the sign-in
+    /// is older than it takes), the form comes with the address in it and
+    /// asks for the password; whatever else came back, the form says it.
+    fn name_fresh(self, typed: String) {
+        self.typed.set(typed.clone());
+        self.busy.set(true);
+        let request = EmailRequest::Set {
+            address: typed,
+            lang: self.lang.code().to_owned(),
+        };
+        leptos::task::spawn_local(async move {
+            let outcome = act(Action::Set, request).await;
+            self.busy.set(false);
+            match outcome {
+                Outcome::Said(Said::Other(_), Some(state)) => {
+                    if self.held.try_set(Held::Ready(state)).is_none() {
+                        self.note.set(Some(words::email_again(self.lang)));
+                        focus::after_render("#email-password");
+                    }
+                }
+                Outcome::Said(said, None) => {
+                    self.load();
+                    self.error.set(Some(said_text(self.lang, said)));
                 }
                 outcome => self.settle(Action::Set, outcome),
             }
@@ -738,14 +781,18 @@ fn draw(s: Section) -> AnyView {
     }
 }
 
-/// The section in the account area's security page. `signed_again` runs
-/// after the form signed in once more (the sessions listed beside it are
-/// others now), `signed_out` when this browser turns out not to be signed
-/// in.
+/// The section in the account area's security page, or (`Begin::Name`)
+/// the step of a registration that names the address typed beside the
+/// recovery code: there it is a step with a heading of its own and a way
+/// on to the account, whether the address is confirmed now or later in the
+/// account area. `signed_again` runs after the form signed in once more
+/// (the sessions listed beside it are others now), `signed_out` when this
+/// browser turns out not to be signed in.
 pub fn section(
     lang: Lang,
     worker: String,
     username: String,
+    begin: Begin,
     signed_again: Callback<()>,
     signed_out: Callback<()>,
 ) -> impl IntoView {
@@ -764,13 +811,34 @@ pub fn section(
         signed_again,
         signed_out,
     };
+    let step = matches!(begin, Begin::Name(_));
     // Effects run in the browser only.
-    Effect::new(move |_| s.load());
+    Effect::new(move |_| match begin.clone() {
+        Begin::Read => s.load(),
+        Begin::Name(typed) => s.name_fresh(typed),
+    });
+    let (class, title) = if step {
+        ("card step", words::code_email_step_title(lang))
+    } else {
+        ("card", words::email_title(lang))
+    };
+    let lead = step.then(|| view! { <p>{words::code_email_step_lead(lang)}</p> });
+    let onward = step.then(|| {
+        let account = format!("/{}/account", lang.code());
+        view! {
+            <p class="actions">
+                <button type="button" class="button" on:click=move |_| session::go(&account)>{words::code_email_step_done(lang)}</button>
+            </p>
+        }
+    });
     view! {
-        <section class="card" aria-labelledby="email-title">
-            <h2 id="email-title">{words::email_title(lang)}</h2>
+        <section class=class aria-labelledby="email-title">
+            // a step's heading takes the focus when the step begins
+            <h2 id="email-title" tabindex=step.then_some("-1") data-step-focus=step.then_some("")>{title}</h2>
+            {lead}
             <p class="meta" role="status" id="email-said" tabindex="-1">{move || s.note.get()}</p>
             {move || draw(s)}
+            {onward}
         </section>
     }
 }

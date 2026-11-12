@@ -4,6 +4,7 @@
 //! Central sees OPAQUE messages, never the password.
 
 use central_api::Token;
+use central_api::email::EmailRequest;
 use central_api::terms::{TermsDocument, TermsSubject, TermsText, TermsVersion, digest};
 use central_api::wire::{AccountSource, Discovery, Identity, Request, Response};
 use leptos::prelude::*;
@@ -12,6 +13,7 @@ use serde_json::json;
 use super::central::{Failure, call, uuid_v7, valid_username};
 use super::chat::glyph;
 use super::crypto::{Crypto, field_bytes};
+use super::email::Begin;
 use super::{field, session};
 use crate::markdown;
 use crate::rich::rich;
@@ -85,6 +87,8 @@ pub struct NewCode {
 pub struct SignedIn {
     /// The account's handle, `Name#3fa2`, once it has one.
     pub handle: Option<String>,
+    /// The sign-in name, as Central wrote it back.
+    pub username: String,
     /// A code made for an account that had none.
     pub new_code: Option<NewCode>,
 }
@@ -151,9 +155,9 @@ pub async fn sign_in_with(
     let proof = field_bytes(&finish, "message", Some(64))?;
     let Response::BrowserSession {
         identity: signed,
+        username: canonical,
         wrapped_master,
         expires_at,
-        ..
     } = call(&Request::LoginFinish {
         attempt,
         message: proof,
@@ -168,7 +172,10 @@ pub async fn sign_in_with(
     }
     session::remember(expires_at);
     match finish_sign_in(crypto, &identity, wrapped_master).await {
-        Ok(done) => Ok(done),
+        Ok(done) => Ok(SignedIn {
+            username: canonical,
+            ..done
+        }),
         Err(problem) => {
             let _ = call(&Request::Logout).await;
             session::forget();
@@ -216,6 +223,7 @@ async fn finish_sign_in(
         let recovery = field_bytes(&made, "recovery", Some(73))?;
         return Ok(SignedIn {
             handle,
+            username: String::new(),
             new_code: Some(NewCode {
                 code,
                 recovery,
@@ -245,6 +253,7 @@ async fn finish_sign_in(
     }
     Ok(SignedIn {
         handle,
+        username: String::new(),
         new_code: None,
     })
 }
@@ -281,13 +290,38 @@ fn text_in(document: &TermsDocument, lang: Lang) -> Option<&TermsText> {
         .or_else(|| document.texts.first())
 }
 
+/// Who signed in, and what the steps after the sign-in carry along.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+struct Who {
+    /// The account's handle, once it has one.
+    handle: Option<String>,
+    /// The sign-in name.
+    username: String,
+    /// An address typed at the code's step, named once the code is kept
+    /// and the terms are accepted.
+    address: Option<String>,
+}
+
+impl Who {
+    /// Who a sign-in signed in, before any address was typed.
+    fn of(done: SignedIn) -> Self {
+        Self {
+            handle: done.handle,
+            username: done.username,
+            address: None,
+        }
+    }
+}
+
 /// Where a step leads after the sign-in.
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum Step {
     Form,
     Working,
-    Code(NewCode, Option<String>),
-    Terms(TermsDocument, Option<NewCode>, Option<String>),
+    Code(NewCode, Who),
+    Terms(TermsDocument, Option<NewCode>, Who),
+    /// The address to name, and the sign-in name of the account.
+    Email(String, String),
     Failed(Problem),
 }
 
@@ -295,45 +329,84 @@ enum Step {
 /// declining the terms must not lose it); otherwise the terms first (storing
 /// a moved account's new code needs them), then the code, then the account.
 async fn after_sign_in(lang: Lang, done: SignedIn) -> Step {
-    if let Some(code) = done.new_code.as_ref().filter(|code| !code.optional) {
-        return Step::Code(code.clone(), done.handle);
+    let new_code = done.new_code.clone();
+    let who = Who::of(done);
+    if let Some(code) = new_code.as_ref().filter(|code| !code.optional) {
+        return Step::Code(code.clone(), who);
     }
     match terms_due().await {
-        Ok(Some(document)) => Step::Terms(document, done.new_code, done.handle),
-        Ok(None) => {
-            if let Some(code) = done.new_code {
-                Step::Code(code, done.handle)
-            } else {
-                session::go(&format!("/{}/account", lang.code()));
-                Step::Working
-            }
-        }
+        Ok(Some(document)) => Step::Terms(document, new_code, who),
+        Ok(None) => match new_code {
+            Some(code) => Step::Code(code, who),
+            None => onward(lang, who),
+        },
         Err(problem) => Step::Failed(problem),
     }
 }
 
-/// The code step: shown once, downloadable, kept only when the person says so.
-fn code_view(
-    lang: Lang,
-    step: RwSignal<Step>,
-    code: &NewCode,
-    handle: Option<String>,
-) -> impl IntoView + use<> {
+/// Past the code and the terms: an address typed at the code's step is
+/// named now, on a step of its own; otherwise the account area.
+fn onward(lang: Lang, who: Who) -> Step {
+    if let Some(address) = who.address {
+        Step::Email(address, who.username)
+    } else {
+        session::go(&format!("/{}/account", lang.code()));
+        Step::Working
+    }
+}
+
+/// Whether this Central mails, for an account that has no address yet:
+/// only then does the code's step offer to name one.
+async fn mails_here() -> bool {
+    let request = Request::Email {
+        request: EmailRequest::Status,
+    };
+    matches!(
+        call(&request).await,
+        Ok(Response::Email { state }) if state.mail && state.address.is_none() && state.pending.is_none()
+    )
+}
+
+/// The code step: shown once, with the ways to keep it (`keep.rs`), and
+/// left only once the person says it is kept. After a registration, where
+/// this Central mails, it also takes an address for the account. Naming one
+/// needs Central's terms accepted, and a new account meets them after its
+/// code: the address is checked here and named after the terms
+/// (`Step::Email`), in the same sign-in.
+fn code_view(lang: Lang, step: RwSignal<Step>, code: &NewCode, who: Who) -> impl IntoView + use<> {
     let kept = RwSignal::new(false);
     let error = RwSignal::new(None::<&'static str>);
-    let download = format!(
-        "data:text/plain;charset=utf-8,Baylee%20recovery%20code%3A%20{}%0A",
-        code.code
-    );
-    let (copy, copied) = super::clip::copier(lang, code.code.clone());
-    let handle_line = handle.map(|handle| view! { <p>{words::code_handle(lang, &handle)}</p> });
+    let typed = RwSignal::new(String::new());
+    let mails = RwSignal::new(false);
     let optional = code.optional;
+    if !optional {
+        // Effects run in the browser only.
+        Effect::new(move |_| {
+            leptos::task::spawn_local(async move { mails.set(mails_here().await) });
+        });
+    }
+    let ways = super::keep::ways(lang, &code.code, &who.username, typed);
+    let handle_line = who
+        .handle
+        .clone()
+        .map(|handle| view! { <p>{words::code_handle(lang, &handle)}</p> });
     let recovery = code.recovery.clone();
     let go_on = move |_| {
         if !kept.get_untracked() {
             error.set(Some(words::code_not_kept(lang)));
             return;
         }
+        let named = typed.get_untracked().trim().to_owned();
+        if !named.is_empty() && central_api::email::address(&named).is_err() {
+            error.set(Some(words::email_error_address(lang)));
+            super::focus::after_render("#code-email");
+            return;
+        }
+        error.set(None);
+        let who = Who {
+            address: (!named.is_empty()).then_some(named),
+            ..who.clone()
+        };
         let recovery = recovery.clone();
         leptos::task::spawn_local(async move {
             if optional {
@@ -347,11 +420,8 @@ fn code_view(
             }
             // a new account meets Central's terms after its code
             match terms_due().await {
-                Ok(Some(document)) => step.set(Step::Terms(document, None, None)),
-                Ok(None) => {
-                    session::go(&format!("/{}/account", lang.code()));
-                    step.set(Step::Working);
-                }
+                Ok(Some(document)) => step.set(Step::Terms(document, None, who)),
+                Ok(None) => step.set(onward(lang, who)),
                 Err(problem) => error.set(Some(problem_text(lang, problem))),
             }
         });
@@ -360,6 +430,23 @@ fn code_view(
         let skip = move |_| session::go(&format!("/{}/account", lang.code()));
         view! { <button type="button" class="button quiet" on:click=skip>{words::code_later(lang)}</button> }
     });
+    let email = move || {
+        mails.get().then(|| {
+            view! {
+                <div class="field">
+                    <label for="code-email">{words::code_email_label(lang)}</label>
+                    <div class="inset">
+                        {field::mark(glyph::MAIL)}
+                        <input id="code-email" type="email" inputmode="email" autocomplete="email" autocapitalize="none" spellcheck="false" maxlength="254"
+                            aria-describedby="code-email-hint code-email-warning"
+                            on:input=move |ev| typed.set(event_target_value(&ev)) prop:value=move || typed.get() />
+                    </div>
+                    <p class="hint" id="code-email-hint">{words::code_email_hint(lang)}</p>
+                    <p class="hint" id="code-email-warning">{words::email_warning(lang)}</p>
+                </div>
+            }
+        })
+    };
     view! {
         <section class="card step" aria-labelledby="code-title">
             <h2 id="code-title" tabindex="-1" data-step-focus>{words::code_title(lang)}</h2>
@@ -367,11 +454,8 @@ fn code_view(
             <p>{words::code_lead(lang)}</p>
             <p class="eyebrow">{words::code_shown_once(lang)}</p>
             <p class="secret" translate="no"><code>{code.code.clone()}</code></p>
-            <p class="actions">
-                {copy}
-                <a class="button" href=download download="baylee-recovery-code.txt">{words::code_download(lang)}</a>
-            </p>
-            {copied}
+            {ways}
+            {email}
             <div class="check">
                 <input id="code-kept" type="checkbox" on:change=move |ev| kept.set(event_target_checked(&ev)) />
                 <label for="code-kept">{words::code_kept(lang)}</label>
@@ -391,12 +475,12 @@ fn terms_view(
     step: RwSignal<Step>,
     document: &TermsDocument,
     code: Option<NewCode>,
-    handle: Option<String>,
+    who: Who,
 ) -> impl IntoView + use<> {
     let text = text_in(document, lang).map(|text| markdown::render(&text.markdown));
     let TermsVersion { version, digest } = document.version.clone();
     let accept = move |_| {
-        let (version, code, handle) = (version.clone(), code.clone(), handle.clone());
+        let (version, code, who) = (version.clone(), code.clone(), who.clone());
         step.set(Step::Working);
         leptos::task::spawn_local(async move {
             let accepted = call(&Request::AcceptTerms {
@@ -406,11 +490,8 @@ fn terms_view(
             })
             .await;
             step.set(match (accepted, code) {
-                (Ok(_), Some(code)) => Step::Code(code, handle),
-                (Ok(_), None) => {
-                    session::go(&format!("/{}/account", lang.code()));
-                    Step::Working
-                }
+                (Ok(_), Some(code)) => Step::Code(code, who),
+                (Ok(_), None) => onward(lang, who),
                 (Err(failure), _) => Step::Failed(failure.into()),
             });
         });
@@ -442,8 +523,10 @@ fn steps_view(
     lang: Lang,
     id: &'static str,
     step: RwSignal<Step>,
+    worker: String,
     form: impl Fn() -> AnyView + Send + Sync + 'static,
 ) -> impl IntoView {
+    let worker = StoredValue::new(worker);
     // A new step replaces the old one's elements, focus among them: it
     // takes the focus where it begins, so the keyboard and a screen reader
     // go on there and not at the page's end. The first render leaves the
@@ -459,8 +542,17 @@ fn steps_view(
         match step.get() {
         Step::Form => form(),
         Step::Working => view! { <p class="working" role="status" tabindex="-1" data-step-focus>{words::signin_working(lang)}</p> }.into_any(),
-        Step::Code(code, handle) => code_view(lang, step, &code, handle).into_any(),
-        Step::Terms(document, code, handle) => terms_view(lang, step, &document, code, handle).into_any(),
+        Step::Code(code, who) => code_view(lang, step, &code, who).into_any(),
+        Step::Terms(document, code, who) => terms_view(lang, step, &document, code, who).into_any(),
+        Step::Email(address, username) => super::email::section(
+            lang,
+            worker.get_value(),
+            username,
+            Begin::Name(address),
+            Callback::new(|()| {}),
+            Callback::new(move |()| session::go(&format!("/{}/signin", lang.code()))),
+        )
+        .into_any(),
         Step::Failed(problem) => view! {
             <p class="error" role="alert">{problem_text(lang, problem)}</p>
             <p><button type="button" class="button" data-step-focus on:click=move |_| step.set(Step::Form)>{words::error_again(lang)}</button></p>
@@ -474,6 +566,7 @@ fn steps_view(
 #[island]
 pub fn SignIn(lang: Lang, worker: String) -> impl IntoView {
     let step = RwSignal::new(Step::Form);
+    let steps_worker = worker.clone();
     // what was typed before the islands ran stays (`early`)
     let name = RwSignal::new(super::early::typed("signin-name"));
     let password = RwSignal::new(super::early::typed("signin-password"));
@@ -537,7 +630,7 @@ pub fn SignIn(lang: Lang, worker: String) -> impl IntoView {
         }
         .into_any()
     };
-    steps_view(lang, "signin-steps", step, form)
+    steps_view(lang, "signin-steps", step, steps_worker, form)
 }
 
 /// The registration form's checks, as Central would refuse (`docs/web-accounts.md`).
@@ -954,6 +1047,7 @@ fn register_checks(
 #[island]
 pub fn Register(lang: Lang, worker: String, pow: String) -> impl IntoView {
     let step = RwSignal::new(Step::Form);
+    let steps_worker = worker.clone();
     let fields = RwSignal::new(RegisterFields::early());
     let error = RwSignal::new(None::<&'static str>);
     // A form filled in faster than a person types, or one whose hidden
@@ -988,7 +1082,7 @@ pub fn Register(lang: Lang, worker: String, pow: String) -> impl IntoView {
                 Ok((code, signed)) => {
                     // The code first: it is shown once, before anything
                     // else; Central's terms follow it (`code_view`).
-                    step.set(Step::Code(code, signed.handle));
+                    step.set(Step::Code(code, Who::of(signed)));
                 }
                 Err((_, Some("closed"))) => {
                     error.set(Some(words::register_closed(lang)));
@@ -1051,7 +1145,7 @@ pub fn Register(lang: Lang, worker: String, pow: String) -> impl IntoView {
         .into_any()
     };
     (
-        steps_view(lang, "register-steps", step, form),
+        steps_view(lang, "register-steps", step, steps_worker, form),
         solving_view(lang, solving),
     )
 }

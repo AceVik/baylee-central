@@ -471,7 +471,14 @@ fn security(lang: Lang, worker: String, username: String, signed_out: Callback<(
     // a change ends every other session: the list above is another then
     let changed = Callback::new(move |()| load());
     // naming an address signs in once more: this session is a newer one then
-    let email = super::email::section(lang, worker.clone(), username.clone(), changed, signed_out);
+    let email = super::email::section(
+        lang,
+        worker.clone(),
+        username.clone(),
+        super::email::Begin::Read,
+        changed,
+        signed_out,
+    );
     view! {
         <section aria-labelledby="sessions-title">
             <h2 id="sessions-title">{words::security_sessions(lang)}</h2>

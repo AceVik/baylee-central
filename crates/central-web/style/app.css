@@ -464,6 +464,34 @@
   user-select: all;
 }
 
+/* The ways to keep a new recovery code (`islands/keep.rs`): its buttons in
+   a row that wraps, under the code; then the mail to oneself, apart, its
+   warning before its button. The sheet is for a print only (`pages.css`). */
+.keep > .actions {
+  margin-block-start: 0;
+}
+
+/* what the browser said, under the buttons; nothing takes room until then */
+.keep > .meta:empty {
+  margin: 0;
+}
+
+.keep-mail {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.keep-mail > .notice,
+.keep-mail > .actions {
+  margin-block-start: 0;
+}
+
+@media not print {
+  .code-sheet {
+    display: none;
+  }
+}
+
 .terms-text {
   max-block-size: 50dvh;
   overflow-y: auto;

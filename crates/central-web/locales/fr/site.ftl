@@ -258,6 +258,8 @@ privacy-views-title = Le comptage des pages vues
 privacy-views = Le site compte combien de fois ses pages sont ouvertes : un seul nombre pour toutes les pages et tous les visiteurs ensemble, affiché sur la page d’accueil. Une page ouverte dans un navigateur y ajoute un. Rien sur vous n’est enregistré pour cela : ni adresse IP, ni cookie, ni identifiant, pas même la page dont il s’agissait.
 privacy-device-title = Ce que conserve votre navigateur
 privacy-device = Ce site ne dépose aucun cookie tant que vous ne vous connectez pas. Ce que votre navigateur conserve sur votre appareil, et seulement avec JavaScript : votre choix de couleurs si vous en avez fait un (<code>baylee-site-theme</code>) ; pendant que vous êtes connecté, la fin de votre session (<code>baylee-central-session</code>), votre clé de chat et les clés de confiance de vos contacts (voir Chat) ; si vous avez activé les notifications, un nombre aléatoire pour cet appareil (<code>baylee-push-installation-v1</code>, <code>baylee-push</code>) ; et, uniquement une fois que vous vous êtes connecté, que vous avez installé le site comme application ou activé les notifications, une copie des fichiers publics du site (structure des pages, polices, scripts), pour qu’il démarre sans connexion et que les notifications puissent arriver. Si aucun de ces trois cas ne s’applique plus, la copie est supprimée à la prochaine ouverture du site. Rien de tout cela ne nous est envoyé, sauf si une section ci-dessous le dit. Les entrées du chat et de la session sont supprimées quand vous vous déconnectez ; vous supprimez tout le reste en effaçant les données du site dans votre navigateur. Base légale : § 25, par. 2, n° 2 TDDDG (strictement nécessaire à la fonction que vous utilisez) ; pour le nombre aléatoire des notifications, votre consentement (§ 25, par. 1 TDDDG).
+# English for now: to be translated.
+privacy-device-manager = If you keep your recovery code in your browser's password manager, mail it to yourself, save it as a file or print it on the step that shows it, your browser, your mail program, your files or your paper keep it, never this site: the code is made in your browser and never sent to us. Clearing the site's data does not remove it from there.
 privacy-github-title = GitHub
 privacy-github = La page de téléchargement et la page d’accueil affichent la dernière version, l’état des tests et les nombres de cartes. Notre serveur les demande à GitHub, pas votre navigateur ; GitHub n’apprend rien sur vous par ce biais. Ce n’est que lorsque vous cliquez sur un lien de téléchargement ou de GitHub que votre navigateur se connecte à GitHub (GitHub, Inc., États-Unis) et lui envoie votre adresse IP et ce que porte toute requête ; la politique de confidentialité propre à GitHub s’applique alors.
 privacy-directory-title = L’annuaire des gateways
@@ -519,6 +521,24 @@ code-later = Pas maintenant
 code-copy = Copier
 code-copied = Copié.
 code-copy-failed = La copie n’a pas fonctionné ici. Sélectionnez le code et copiez-le à la main.
+# English for now: to be translated.
+code-print = Print
+code-manager = Save in password manager
+code-manager-id = Baylee recovery code ({ $name })
+code-manager-offered = Your browser was offered the code. If it asked you, check that it saved it.
+code-manager-failed = Your browser did not take the code. Keep it another way.
+code-mail = Mail it to myself
+code-mail-warning = Careful: the code then lies in your mailbox. Whoever can read your mail can also have a reset code sent there, and with both reset your sign-in and open your encrypted data.
+code-mail-subject = My Baylee recovery code
+code-sheet-title = Baylee recovery code
+code-sheet-name = Sign-in name: { $name }
+code-sheet-what = With this code your encrypted Baylee data survives a forgotten password: you enter it on the reset page, together with a reset code.
+code-sheet-keep = Keep it where only you can reach it. Nobody at Baylee will ever ask you for it.
+code-email-label = E-mail address (optional)
+code-email-hint = For a reset code if you forget your password. After this step we mail a code to confirm the address; you can also add one later in your account.
+code-email-step-title = Confirm your e-mail address
+code-email-step-lead = Enter the code from the mail here, or later on your account's security page.
+code-email-step-done = Continue to your account
 
 ## Setting a new password with a reset code
 
@@ -609,6 +629,8 @@ email-removed = Votre adresse e-mail est retirée.
 email-busy = Trop d’e-mails pour le moment. Réessayez plus tard.
 email-same = C’est déjà votre adresse.
 email-unsure = Aucune réponse n’est revenue, nous ne pouvons donc pas savoir si l’action a abouti. Regardez ce qui s’affiche ici et réessayez si elle n’a pas abouti.
+# English for now: to be translated.
+email-again = Your sign-in is a few minutes old now. Enter your password once more to send the code.
 
 ## Central's terms
 

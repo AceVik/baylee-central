@@ -494,7 +494,7 @@
   .update,
   .link-hint,
   .paws,
-  dialog,
+  dialog:not(:has(.code-sheet)),
   [popover],
   [data-theme-switch],
   [data-find-bar] {
@@ -542,5 +542,79 @@
     content: " (" attr(href) ")";
     font-size: 0.85em;
     overflow-wrap: anywhere;
+  }
+
+  /* A new recovery code's sheet (`islands/keep.rs`), drawn when its step's
+     "Print" is pressed: while it is in the page, a print is the sheet
+     alone. Whatever neither holds it nor is in it goes; what holds it (the
+     page's frame, or the dialog it is in) keeps no box of its own. */
+  html:has(.code-sheet) body :not(:has(.code-sheet), .code-sheet, .code-sheet *) {
+    display: none !important;
+  }
+
+  html:has(.code-sheet) body :has(.code-sheet) {
+    position: static !important;
+    display: block !important;
+    inline-size: auto !important;
+    max-inline-size: none !important;
+    block-size: auto !important;
+    max-block-size: none !important;
+    min-block-size: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    border: 0 !important;
+    background: none !important;
+    box-shadow: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  html:has(.code-sheet) body :has(.code-sheet)::before,
+  html:has(.code-sheet) body :has(.code-sheet)::after {
+    display: none !important;
+  }
+
+  html:has(.code-sheet) dialog::backdrop {
+    background: none;
+    backdrop-filter: none;
+  }
+
+  .code-sheet {
+    display: block;
+    max-inline-size: 36rem;
+    color: var(--ink);
+    font: 12pt/1.5 var(--sans);
+  }
+
+  .code-sheet p {
+    margin: 0 0 0.8em;
+  }
+
+  .code-sheet-brand {
+    font: 600 14pt var(--serif);
+  }
+
+  .code-sheet-title {
+    font: 700 20pt/1.2 var(--serif);
+  }
+
+  .code-sheet-code {
+    margin-block: 1.2em !important;
+    padding: 0.8em 1em;
+    border: 1.5pt dashed var(--ink);
+    border-radius: 6pt;
+    font: 700 15pt/1.4 var(--mono);
+    letter-spacing: 0.02em;
+    overflow-wrap: anywhere;
+    break-inside: avoid;
+  }
+
+  .code-sheet-code code {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
   }
 }

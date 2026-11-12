@@ -257,6 +257,8 @@ privacy-views-title = Подсчёт просмотров страниц
 privacy-views = Сайт считает, как часто открываются его страницы: одно-единственное число для всех страниц и всех посетителей вместе, оно показано на главной странице. Страница, открытая в браузере, прибавляет к нему единицу. Для этого о вас ничего не сохраняется: ни IP-адрес, ни cookie, ни идентификатор, даже какая это была страница.
 privacy-device-title = Что хранит ваш браузер
 privacy-device = Этот сайт не устанавливает cookie, пока вы не войдёте. Что ваш браузер хранит на вашем устройстве, и только при включённом JavaScript: ваш выбор цветовой схемы, если вы его сделали (<code>baylee-site-theme</code>); пока вы вошли — срок окончания вашего сеанса (<code>baylee-central-session</code>), ваш ключ чата и доверенные ключи ваших контактов (см. «Чат»); если вы включили уведомления — случайное число для этого устройства (<code>baylee-push-installation-v1</code>, <code>baylee-push</code>); и только после того, как вы вошли, установили сайт как приложение или включили уведомления — копия публичных файлов сайта (оболочка страниц, шрифты, скрипты), чтобы он запускался без соединения и уведомления могли приходить. Если ничего из этих трёх больше не применимо, копия удаляется при следующем открытии сайта. Ничто из этого не отправляется нам, если иное не сказано в одном из разделов ниже. Записи чата и сеанса удаляются, когда вы выходите; всё остальное вы удаляете, очистив данные сайта в браузере. Правовое основание: § 25(2) № 2 TDDDG (строго необходимо для используемой вами функции); для случайного числа уведомлений — ваше согласие (§ 25(1) TDDDG).
+# English for now: to be translated.
+privacy-device-manager = If you keep your recovery code in your browser's password manager, mail it to yourself, save it as a file or print it on the step that shows it, your browser, your mail program, your files or your paper keep it, never this site: the code is made in your browser and never sent to us. Clearing the site's data does not remove it from there.
 privacy-github-title = GitHub
 privacy-github = Страница загрузки и главная страница показывают последний релиз, состояние тестов и число карт. Их у GitHub запрашивает наш сервер, а не ваш браузер; GitHub при этом ничего о вас не узнаёт. Только когда вы нажимаете ссылку на загрузку или на GitHub, ваш браузер соединяется с GitHub (GitHub, Inc., США) и отправляет ему ваш IP-адрес и то, что несёт любой запрос; дальше действует собственная политика конфиденциальности GitHub.
 privacy-directory-title = Каталог Gateway
@@ -496,6 +498,24 @@ code-later = Не сейчас
 code-copy = Копировать
 code-copied = Скопировано.
 code-copy-failed = Здесь скопировать не получилось. Выделите код и скопируйте его вручную.
+# English for now: to be translated.
+code-print = Print
+code-manager = Save in password manager
+code-manager-id = Baylee recovery code ({ $name })
+code-manager-offered = Your browser was offered the code. If it asked you, check that it saved it.
+code-manager-failed = Your browser did not take the code. Keep it another way.
+code-mail = Mail it to myself
+code-mail-warning = Careful: the code then lies in your mailbox. Whoever can read your mail can also have a reset code sent there, and with both reset your sign-in and open your encrypted data.
+code-mail-subject = My Baylee recovery code
+code-sheet-title = Baylee recovery code
+code-sheet-name = Sign-in name: { $name }
+code-sheet-what = With this code your encrypted Baylee data survives a forgotten password: you enter it on the reset page, together with a reset code.
+code-sheet-keep = Keep it where only you can reach it. Nobody at Baylee will ever ask you for it.
+code-email-label = E-mail address (optional)
+code-email-hint = For a reset code if you forget your password. After this step we mail a code to confirm the address; you can also add one later in your account.
+code-email-step-title = Confirm your e-mail address
+code-email-step-lead = Enter the code from the mail here, or later on your account's security page.
+code-email-step-done = Continue to your account
 
 ## Setting a new password with a reset code
 
@@ -586,6 +606,8 @@ email-removed = Ваш адрес электронной почты удалён
 email-busy = Пока слишком много писем. Повторите позже.
 email-same = Это уже ваш адрес.
 email-unsure = Ответ не пришёл, поэтому мы не можем сказать, удалось ли это. Посмотрите на то, что показано здесь, и попробуйте ещё раз, если не удалось.
+# English for now: to be translated.
+email-again = Your sign-in is a few minutes old now. Enter your password once more to send the code.
 
 ## Central's terms
 

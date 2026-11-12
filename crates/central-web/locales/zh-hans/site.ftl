@@ -257,6 +257,8 @@ privacy-views-title = 统计页面浏览量
 privacy-views = 本站会统计其页面被打开的次数：所有页面、所有访客合在一起只有一个数字，显示在起始页面上。在浏览器中打开一个页面，就会使它加一。为此不会存储任何关于你的信息：没有 IP 地址，没有 Cookie，没有标识符，也不存储是哪个页面。
 privacy-device-title = 你的浏览器保存什么
 privacy-device = 在你登录之前，本站不设置任何 Cookie。你的浏览器会在你的设备上保存以下内容，并且仅在启用 JavaScript 时：如果你做过选择，则保存你的配色选择（<code>baylee-site-theme</code>）；在你登录期间，保存会话何时结束（<code>baylee-central-session</code>）、你的聊天密钥以及联系人的受信任密钥（见“聊天”）；如果你开启了通知，则保存本设备的一个随机数（<code>baylee-push-installation-v1</code>、<code>baylee-push</code>）；并且，仅当你已登录、将本站安装为应用或开启了通知时，保存本站公开文件（页面外壳、字体、脚本）的一份副本，使本站无需网络连接即可启动，也使通知能够送达。如果这三种情况都不再适用，该副本会在你下次打开本站时被移除。除非下文某一节另有说明，这些内容都不会发送给我们。聊天和会话相关的条目会在你退出登录时删除；其余所有内容，你可以通过清除浏览器中本站的数据来移除。法律依据：TDDDG 第 25 条第 2 款第 2 项（对你所使用的功能而言是严格必需的）；对于通知所用的随机数，则是你的同意（TDDDG 第 25 条第 1 款）。
+# English for now: to be translated.
+privacy-device-manager = If you keep your recovery code in your browser's password manager, mail it to yourself, save it as a file or print it on the step that shows it, your browser, your mail program, your files or your paper keep it, never this site: the code is made in your browser and never sent to us. Clearing the site's data does not remove it from there.
 privacy-github-title = GitHub
 privacy-github = 下载页面和起始页面会显示最新版本、测试状态和牌张数字。是我们的服务器向 GitHub 请求这些信息，而不是你的浏览器；GitHub 不会因此得知任何关于你的信息。只有当你点击下载链接或 GitHub 链接时，你的浏览器才会连接到 GitHub（GitHub, Inc.，美国），并向它发送你的 IP 地址以及每个请求都带有的信息；此后适用 GitHub 自己的隐私声明。
 privacy-directory-title = Gateway 目录
@@ -496,6 +498,24 @@ code-later = 暂不
 code-copy = 复制
 code-copied = 已复制。
 code-copy-failed = 这里无法复制。请选中代码，手动复制。
+# English for now: to be translated.
+code-print = Print
+code-manager = Save in password manager
+code-manager-id = Baylee recovery code ({ $name })
+code-manager-offered = Your browser was offered the code. If it asked you, check that it saved it.
+code-manager-failed = Your browser did not take the code. Keep it another way.
+code-mail = Mail it to myself
+code-mail-warning = Careful: the code then lies in your mailbox. Whoever can read your mail can also have a reset code sent there, and with both reset your sign-in and open your encrypted data.
+code-mail-subject = My Baylee recovery code
+code-sheet-title = Baylee recovery code
+code-sheet-name = Sign-in name: { $name }
+code-sheet-what = With this code your encrypted Baylee data survives a forgotten password: you enter it on the reset page, together with a reset code.
+code-sheet-keep = Keep it where only you can reach it. Nobody at Baylee will ever ask you for it.
+code-email-label = E-mail address (optional)
+code-email-hint = For a reset code if you forget your password. After this step we mail a code to confirm the address; you can also add one later in your account.
+code-email-step-title = Confirm your e-mail address
+code-email-step-lead = Enter the code from the mail here, or later on your account's security page.
+code-email-step-done = Continue to your account
 
 ## Setting a new password with a reset code
 
@@ -586,6 +606,8 @@ email-removed = 你的电子邮件地址已移除。
 email-busy = 目前邮件过多。请稍后再试。
 email-same = 这已经是你的地址了。
 email-unsure = 没有收到回应，所以我们无法确定刚才的操作是否成功。请看一下这里显示的内容；如果没有成功，请再试一次。
+# English for now: to be translated.
+email-again = Your sign-in is a few minutes old now. Enter your password once more to send the code.
 
 ## Central's terms
 
