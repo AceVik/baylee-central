@@ -106,12 +106,14 @@ pub fn take() -> String {
 /// What the account page's link to the reset page puts in its fragment:
 /// `/{lang}/account/admin#account=<the account's id in hex>`. An id is no
 /// secret; in the fragment it stays out of the site's logs all the same.
-#[cfg(any(target_arch = "wasm32", test))]
+/// This and [`replace`] serve the administration's pages alone, so the
+/// browser has them in the administration's module only (`admin`).
+#[cfg(any(all(target_arch = "wasm32", feature = "admin"), test))]
 const ACCOUNT: &str = "#account=";
 
 /// The account that the fragment `hash` names: `#account=` and the id as
 /// 32 lowercase hex digits, and nothing else.
-#[cfg(any(target_arch = "wasm32", test))]
+#[cfg(any(all(target_arch = "wasm32", feature = "admin"), test))]
 fn account_in(hash: &str) -> Option<[u8; 16]> {
     crate::data::id_from_hex(hash.strip_prefix(ACCOUNT)?)
 }
@@ -119,7 +121,7 @@ fn account_in(hash: &str) -> Option<[u8; 16]> {
 /// The account the page's fragment names, read once; a fragment that
 /// begins `#account=` is removed from the address as a code's is, so the
 /// page loaded again starts at its list.
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(target_arch = "wasm32", feature = "admin"))]
 pub fn take_account() -> Option<[u8; 16]> {
     let (_, hash) = location("hash")?;
     if !hash.starts_with(ACCOUNT) {
@@ -138,7 +140,7 @@ pub fn take_account() -> Option<[u8; 16]> {
 /// Puts `fragment` (`#state=approved`, or nothing) in place of the page's
 /// own, in the same entry of the history: a filter the page shows stays
 /// when it is loaded again, and never reaches the site.
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(target_arch = "wasm32", feature = "admin"))]
 pub fn replace(fragment: &str) {
     use wasm_bindgen::JsValue;
     let Some((location, _)) = location("hash") else {

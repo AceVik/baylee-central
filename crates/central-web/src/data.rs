@@ -565,6 +565,15 @@ impl Section {
         )
     }
 
+    /// Whether it is under `/{lang}/account/admin`: the administration's
+    /// pages and the feedback's. Their island is the administration's
+    /// (`Administration`), in a module of its own that no other page loads
+    /// (`docs/proposals/frontend-rewrite.md` §27).
+    #[must_use]
+    pub const fn administration(self) -> bool {
+        self.admin() || matches!(self, Section::Feedback | Section::Report)
+    }
+
     /// One account's page, at `slug` (after `/{lang}/`): the account's id
     /// as 32 lowercase hex digits after the list's path, and nothing else.
     #[must_use]

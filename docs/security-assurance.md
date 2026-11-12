@@ -7218,3 +7218,74 @@ pass. Nothing ran against a real Central. This is an engineering review
 of two pages, not an audit.
 
 12.11.2026: the old React website (the `web/` app, its tests and its build) was removed from the repository, as the owner decided; the server-rendered site in `crates/central-web` replaces it, administration included. The records above name that app as it was.
+
+## The administration's islands in a module of their own, 12 November 2026
+
+Every page with an island loaded one WebAssembly module, and since the
+administration and the feedback moderation were rebuilt (above) it held
+them: 913 KB Brotli for the contact page, the sign-in dialogs, the area
+and the messenger. This change gives the administration its own module,
+which only `/{lang}/account/admin…` loads ([frontend
+rewrite](proposals/frontend-rewrite.md) §27). No request, answer, route,
+header, migration, dependency or tool changed; `Cargo.lock` is
+untouched; the only new switch is a feature of a first-party crate.
+
+Design pass. Nothing new is held or sent; what changes is which code a
+page runs. The invariants: the server renders the same frame for
+everyone on the administration's pages, and the tool shows only where
+`AccountSummary` says `admin`, with nothing more asked of Central
+otherwise; every page loads exactly one islands module, by a hashed
+address with its SRI value from `manifest.json`, under the unchanged CSP
+(`script-src 'self' 'wasm-unsafe-eval'`, no inline script); a mail's
+code in the address's fragment is removed on every page of the area, the
+administration's included; the public module holds none of the
+administration's code.
+- **One frame, two islands.** `Account` and the new `Administration`
+  share `account::frame` (the summary read, signed out, failure, the
+  fragment's code taken and watched), so the administration's pages
+  keep the area's handling of the address; `Administration` checks the
+  role first and draws §18's refusal without it, as `Account` did.
+- **Features never meet in a build.** `cargo xtask site` builds the two
+  modules in two cargo runs; the build fails if the public module holds
+  an administration's mark or the administration's lacks one, so a
+  regression is a failed build, not a quietly larger page. The account
+  id that only the administration uses is not compiled into the public
+  module.
+
+Implementation pass. The feature only adds code to the browser's half;
+the server compiles everything, as before. Each module is checked for
+local paths as before. No `unsafe`, no lint allowance: what became dead
+in the public build was given the feature's `cfg`, not an `allow`.
+
+Adversarial pass.
+- *Does a public page fetch the administration?* The server test checks
+  every language's pages with islands for the public script only and no
+  administration's island; the browser test watches the requests of the
+  contact page, the sign-in dialog, the area and the messenger.
+- *Does an administration's page fetch the public module, or fail to
+  draw?* The same tests the other way; the browser test also sees the
+  overview, the reset code's page and the feedback's list work, and a
+  page refused to someone without the role ask Central no
+  administration's request.
+- **The checks have teeth.** With the feedback's pages given the public
+  module, the server test fails. The build's guard compares bytes: the
+  one module of `fe100ce` holds both marks, so it would have refused that
+  module as a public one; the xtask test keeps the marks inside the
+  administration's sources.
+
+Run on this change: `cargo fmt --all --check`; `cargo clippy --workspace
+--all-targets -- -D warnings`; `cargo clippy -p central-web -p
+central-web-islands --target wasm32-unknown-unknown --lib -- -D
+warnings`, and the same with `--all-features` in a run of its own;
+`cargo test -p central-web -p central-web-server -p xtask`; `cargo build
+-p central-web-server` and `cargo xtask site` (its guard passing on both
+modules); in `web/`, `npm ci` and `npm run check`; the whole
+`web/e2e-site` suite (`--workers=4`: 644 passed, 4 skipped by their own
+conditions, `modules.spec.ts` among the passed); `cargo xtask gate`
+(format, policy, both advisory scopes, clippy, tests, doc tests and the
+release build: passed); `cargo xtask postgres`, `cargo xtask smoke` and
+`cargo xtask secrets`; `cargo audit --deny warnings` (0.22.2) and `cargo
+deny check` (0.20.2). Nothing ran against a real Central, and CI's
+`site` job, which now builds two modules and lints one more, did not
+run: nothing was pushed. This is an engineering review of a build
+change, not an audit.

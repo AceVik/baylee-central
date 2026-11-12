@@ -22,6 +22,12 @@
 //! the gateways (`gateways`), the audit log (`audit`) and the legacy store
 //! (`legacy`), with what they share (`common`: the navigation, reads, and
 //! a change's confirmation). [`area`] draws the one an address names.
+//!
+//! [`Administration`] is the island of every page under
+//! `/{lang}/account/admin`, the feedback's (`feedback`) among them. It and
+//! everything it reaches are in the browser's build only with the `admin`
+//! feature: the administration's own module, which only these pages load
+//! (`docs/proposals/frontend-rewrite.md` §27).
 
 mod audit;
 mod common;
@@ -1186,9 +1192,43 @@ pub fn area(
     .into_any()
 }
 
+/// The island of the administration's pages (`/{lang}/account/admin…`,
+/// the feedback's among them), in the area's frame (`account::frame`):
+/// for an administrator the page `section` names, for anyone else one
+/// sentence. Only the administration's module has it.
+#[island]
+pub fn Administration(lang: Lang, section: Section, worker: String) -> impl IntoView {
+    super::account::frame(lang, section, move |summary, frame| {
+        // the role is Central's to grant: without it, nothing is asked
+        if !summary.admin {
+            return refused(lang).into_any();
+        }
+        match section {
+            Section::Feedback | Section::Report => super::feedback::page(
+                lang,
+                section,
+                worker.clone(),
+                summary.username,
+                summary.account,
+                frame.reload,
+            ),
+            section if section.admin() => area(
+                lang,
+                section,
+                worker.clone(),
+                summary.username,
+                summary.account,
+                frame.reload,
+            ),
+            // the server draws no other section with this island
+            _ => ().into_any(),
+        }
+    })
+}
+
 /// What the page shows anyone without the role: one sentence and the way
 /// back. Nothing is asked of Central.
-pub fn refused(lang: Lang) -> impl IntoView {
+fn refused(lang: Lang) -> impl IntoView {
     view! {
         <section class="card app-empty">
             <p>{words::admin_only(lang)}</p>

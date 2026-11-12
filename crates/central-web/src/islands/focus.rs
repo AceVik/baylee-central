@@ -31,6 +31,8 @@ pub(crate) fn after_render(selector: impl Into<String>) {
 
 /// As [`after_render`], for the first of `selectors` that finds an element,
 /// in their order (a selector list would pick the first in the page's).
+/// The administration's pages alone use it (`admin` in the browser).
+#[cfg(any(not(target_arch = "wasm32"), feature = "admin"))]
 pub(crate) fn after_render_first(selectors: Vec<String>) {
     let callback = Closure::once_into_js(move || {
         let target = selectors.iter().find_map(|selector| {

@@ -1852,3 +1852,124 @@ through `js_sys`, as `clip` does).
 - **Open.** The nine translations (the gate fails until then); the
   language menu of a report's page leads to the list in that language
   (the page has no id of its own); a run against a real Central.
+
+## 27. As built: the administration's own islands module (12.11.2026)
+
+The site had one islands module, and every page with an island loaded
+it: the contact page, the sign-in and registration dialogs, the account
+area, the messenger. Rebuilding the administration (§18, §25) and the
+feedback moderation (§26) took it from 614 KB to 913 KB Brotli (4.6 MB
+raw). Now the administration's islands are a module of their own, which
+only `/{lang}/account/admin…` loads, and the public module is back where
+it was. Nothing on the wire, in the CSP or in `Cargo.lock` changed; no
+dependency, no tool.
+
+- **The split.** `central-web` has a feature `admin`. The target still
+  picks the half (§3): the server renders every island whatever the
+  features; in the browser's build the administration (`islands/admin.rs`,
+  `islands/admin/`, `islands/feedback/`) and what only it uses
+  (`focus::after_render_first`, `fragment::take_account` and
+  `fragment::replace`, the account id in the area's `Summary`) exist only
+  with `admin`. The feature only adds, so `--all-features` builds stay
+  whole. `central-web-islands` passes it on (`admin =
+  ["central-web/admin"]`).
+- **An island of its own.** The administration's pages had been sections
+  of the area's `Account` island, which called into `admin` and
+  `feedback`: whatever module had `Account` had the administration. They
+  now have `Administration` (`islands/admin.rs`), which draws the
+  administration's and the feedback's pages for an administrator and §18's
+  one sentence for anyone else. Both islands sit in one frame
+  (`account::frame`): `AccountSummary` read in the browser, signed out,
+  a failure with "again", and a mail's code removed from the address on
+  every page of the area as before. `Account` draws nothing for those
+  sections, as it draws nothing for the messenger's, and reaches into
+  nothing of them. The server puts `Administration` on every
+  `Section::administration()` page (every address under
+  `/{lang}/account/admin`, the feedback's included; `Section::admin()`
+  alone leaves the feedback out), and `shell::islands_script` gives those
+  pages `admin-islands.js` and every other page with islands `islands.js`.
+  A page loads one module, never both, so no page runs two Leptos
+  runtimes; account pages carry no auth dialogs, so an administration's
+  page has its one island only.
+- **The build.** `cargo xtask site` builds `central-web-islands` twice, in
+  two cargo runs (in one, Cargo would unify the features and the public
+  module carry the administration again): without features `islands.wasm`
+  and `islands-glue.js`, with `--features admin` `admin-islands.wasm` and
+  `admin-islands-glue.js`, each run through the pinned wasm-bindgen CLI
+  before the next build overwrites Cargo's output. Each bootstrap is
+  `js/islands.js` with its module's hashed addresses, so
+  `data-islands="ready"`, the waiting for the largest paint and the
+  dialogs' late hydration are the same on both. Every file is hashed and
+  has its SRI value in `manifest.json`; the service worker's stamp is the
+  digest of every asset's address, so a change to either module installs
+  a new worker; its offline list names no islands module and is
+  unchanged; its `HASHED` pattern matches the new names.
+- **The guard.** The build fails when the public module holds one of the
+  administration's marks (`site::ADMIN_ONLY`: `admin-stat-sub` and
+  `fb-legend`, classes written only in `islands/admin/` and
+  `islands/feedback/`), or the administration's lacks one; an xtask test
+  keeps the marks inside those folders. A public island that reaches into
+  the administration again fails `cargo xtask site`, not a size budget.
+- **The administration's module is the whole set.** It exports the public
+  islands too: every `#[island]` of `central-web` is a wasm-bindgen
+  export, and the linker keeps every export of every crate it links.
+  Leaving the public islands out of that build would mean a second
+  feature, the public islands and their helpers behind it, and the dead
+  code that follows in every module they share with the administration.
+  The pages it serves are an administrator's; it is fetched once and
+  kept (an immutable hashed file). Accepted: the target was the public
+  module.
+- **Not used: Leptos' lazy islands** (`#[island(lazy)]`). They rest on
+  `wasm_split`, whose runtime crates (`wasm_split_helpers` 0.2.3,
+  `wasm_split_macros` 0.2.2) are already in `Cargo.lock` through Leptos.
+  What they lack is the tool: `#[lazy]` only marks split points (a
+  placeholder import module, `__wasm_split_placeholder__`, and a custom
+  section), and a build tool that understands them (their README names
+  `wasm-split-cli`) has to cut the linked module into chunks, which a
+  generated `__wasm_split.js` then loads by addresses of its own. That is
+  a new tool, which needs the owner's acceptance, chunks outside the
+  manifest's hashes and SRI values, and a macro that writes `unsafe
+  extern "C"` imports and `#[unsafe(no_mangle)]` exports into
+  `central-web` (wasm_split_macros 0.2.2), which AGENTS.md's rule on
+  first-party FFI leaves to the owner. Two builds of one crate needed
+  nothing new.
+- **Sizes** (`cargo xtask site` on this Mac, `brotli -q 11`, `gzip -9`;
+  bytes):
+
+  | Module | Raw | gzip | Brotli |
+  | --- | ---: | ---: | ---: |
+  | Before: `islands.wasm` (`fe100ce`) | 4,579,552 | 1,273,708 | 912,627 |
+  | After: `islands.wasm`, public | 2,976,870 | 856,819 | 629,785 |
+  | After: `admin-islands.wasm` | 4,587,079 | 1,274,113 | 912,336 |
+
+  The public module is 282,842 bytes (31 %) smaller in Brotli, back at its
+  size before the administration (614 KB): 630 KB. Its glue went from
+  59,119 to 56,609 bytes (8,132 Brotli). What of the administration it
+  still holds is Central's wire: `call` parses every `Response`, the
+  administration's answers among them (the names of their fields that
+  nothing else uses, `accounts_week`, `live_tokens`, `owner_name`, are in
+  both modules), and the account's home keeps its registration switch for
+  administrators. `central-api` was not restructured for it.
+- **Tests.** Server (`central-web-server/tests/pages.rs`,
+  `only_the_administration_s_pages_load_its_module`): in every language,
+  every page under `/account/admin` (one account's and one report's
+  included) has the administration's island and script and not the
+  public one; the forms, the pages that open the dialogs, the area and
+  the messenger have the public script and no administration's island;
+  `Section::administration()` holds exactly the addresses under
+  `account/admin`. It has teeth: with the feedback's pages given the
+  public module, it fails. xtask: `the_islands_are_two_modules_with_one_bootstrap`.
+  Browser (`web/e2e-site/modules.spec.ts`, both sizes, by the requests
+  the page makes): the contact page, the sign-in dialog over a page, the
+  account area and the messenger (signed in as an administrator) fetch
+  the public module's bootstrap, glue and module and nothing of the
+  administration's; the overview, the reset code's page, the feedback's
+  list and a page refused to someone without the role fetch the
+  administration's and nothing of the public one; and each page's
+  islands work. The whole `web/e2e-site` suite ran on the split site
+  (`--workers=4`): 644 passed, 4 skipped by their own conditions (a test
+  for phones only, one desktop-only test, and the screenshots, which need
+  `BAYLEE_SRC`): the administration's pages, the feedback's, the area,
+  the messenger, the dialogs and the service worker's update among them.
+- **CI** lints the administration's module in a step of its own (`cargo
+  clippy … --all-features`), beside the public one's.
