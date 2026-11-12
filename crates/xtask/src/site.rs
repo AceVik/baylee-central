@@ -104,6 +104,10 @@ pub(crate) fn run(root: &Path) -> Result<()> {
         fs::copy(web.join("assets").join(name), out.join(name))
             .or_fail("a root file is missing")?;
     }
+    // The BIMI mark at its fixed address, byte for byte (`BIMI_SHA256`):
+    // mail providers fetch it by that name and its profile is strict.
+    fs::create_dir_all(out.join("bimi")).or_fail("target/site/bimi could not be made")?;
+    fs::copy(web.join("assets").join(BIMI), out.join(BIMI)).or_fail("the BIMI mark is missing")?;
     let worker = service_worker(&web.join("js/sw.js"), &site.files, &languages)?;
     fs::write(out.join("sw.js"), worker).or_fail("sw.js could not be written")?;
     fs::write(out.join("notices.txt"), notices(root)?)
@@ -119,6 +123,13 @@ pub(crate) fn run(root: &Path) -> Result<()> {
     );
     Ok(())
 }
+
+/// The BIMI mark (`/bimi/baylee.svg`): SVG Tiny PS, approved by the owner on
+/// 12.11.2026 and served exactly as approved.
+const BIMI: &str = "bimi/baylee.svg";
+/// Its SHA-256: a tool that re-encodes it (an optimiser, an editor) breaks
+/// the profile, and the certificate compares the mark.
+const BIMI_SHA256: &str = "0a52483ccd21b5e32c852ce5d17df563ed347c160a70fc11b7966a3ec1e1f17b";
 
 struct Site {
     out: PathBuf,
@@ -765,8 +776,55 @@ fn islands_graph(metadata: &Value) -> std::collections::BTreeSet<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{WEB, language_tag, languages, lean_css, new_tab_rules, word};
-    use crate::workspace;
+    use sha2::{Digest as _, Sha256};
+
+    use super::{BIMI, BIMI_SHA256, WEB, language_tag, languages, lean_css, new_tab_rules, word};
+    use crate::{random, workspace};
+
+    /// The BIMI mark is the file the owner approved, byte for byte, and
+    /// holds nothing that runs or loads: no script, no handler, no link or
+    /// image of another file (its `url(#…)` name its own gradients).
+    #[test]
+    fn the_bimi_mark_is_the_approved_file_and_inert() {
+        let path = workspace::root()
+            .expect("root")
+            .join(WEB)
+            .join("assets")
+            .join(BIMI);
+        let bytes = std::fs::read(path).expect("the BIMI mark");
+        assert_eq!(random::to_hex(&Sha256::digest(&bytes)), BIMI_SHA256);
+        let text = std::str::from_utf8(&bytes).expect("text");
+        assert!(text.starts_with(
+            "<svg xmlns=\"http://www.w3.org/2000/svg\" version=\"1.2\" baseProfile=\"tiny-ps\""
+        ));
+        let lower = text.to_ascii_lowercase();
+        for forbidden in [
+            "<script",
+            "javascript:",
+            "<foreignobject",
+            "<image",
+            "href=",
+            "@import",
+        ] {
+            assert!(!lower.contains(forbidden), "{forbidden}");
+        }
+        // no event handler: an attribute named on… anywhere
+        for (at, _) in lower.match_indices(" on") {
+            let name: String = lower[at + 3..]
+                .chars()
+                .take_while(char::is_ascii_alphabetic)
+                .collect();
+            let after = lower[at + 3 + name.len()..].trim_start();
+            assert!(name.is_empty() || !after.starts_with('='), "on{name}");
+        }
+        for reference in lower.match_indices("url(").map(|(at, _)| &lower[at..]) {
+            assert!(
+                reference.starts_with("url(#"),
+                "{}",
+                &reference[..20.min(reference.len())]
+            );
+        }
+    }
 
     #[test]
     fn a_lean_stylesheet_keeps_rules_and_strings() {

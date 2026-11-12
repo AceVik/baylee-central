@@ -1237,6 +1237,15 @@ build of `web/` as before; nothing here changes production by being merged.
   `central-web` itself, on every answer it gives; Caddy adds none to those.
   HSTS is sent without `includeSubDomains`: whether every name under
   `baylee.app` is served over HTTPS for good is the owner's to say.
+- **The BIMI mark**: `central-web` answers `/bimi/baylee.svg` itself (the
+  catch-all handle above passes it), `image/svg+xml`, 200, the approved
+  bytes, revalidated by its entity tag; every page's footer shows the same
+  file. The DNS record `default._bimi.baylee.app` (`v=BIMI1;
+  l=https://baylee.app/bimi/baylee.svg;`) belongs only after this site
+  is live: the old `web/` build has no such file, and its `file_server`
+  answers an unknown path with the app's HTML. DMARC must stay at
+  `quarantine` or `reject`. A mark certificate (Gmail's CMC) asks that the
+  mark was public on the domain for a year, from the day it first shows.
 - **Until the administration is rebuilt** (phase 5 of the proposal),
   `/admin*` can keep being served from the old build: a `handle /admin*`
   with the old `file_server` block in front of the `central-web` handle.

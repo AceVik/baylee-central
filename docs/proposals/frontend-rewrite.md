@@ -1553,3 +1553,31 @@ a recovery code".
   marked as unsure (for example the Italian `code-sheet-keep` and
   `admin-lost`, the French `admin-warning-takeover`) is listed in the
   pull request for a reader of that language.
+
+## 23. As built: the BIMI mark (12.11.2026)
+
+- **What.** Baylee's mark for BIMI (SVG Tiny PS, Baylee on the moon,
+  31,288 bytes, SHA-256 `0a52483c…1f17b`), approved by the owner, is
+  served at `/bimi/baylee.svg` for mail providers and shown in every
+  page's footer beside the sunlight wordmark, 72 px, the same file by the
+  same address (the owner, through the session that asked: "Wenn es
+  wichtig ist, dann ja"; a mark certificate wants the mark public on the
+  domain for a year, and the clock starts when it shows).
+- **How.** The file lives in `crates/central-web/assets/bimi/` and is
+  marked `-text` in `.gitattributes`; `cargo xtask site` copies it byte
+  for byte to `target/site/bimi/baylee.svg` (and makes its `.br` and
+  `.gz` beside it, as for every text file); `central-web-server` lists it
+  with the fixed-name files (`files::ROOT`), so it is read once at start
+  and answered before any language redirect, `image/svg+xml`,
+  `no-cache` with an entity tag, the site's security headers. It is never
+  optimised: a tool such as svgo would break the profile.
+- **Tests.** `xtask`: the file's SHA-256 is the approved one, it begins
+  with the Tiny PS root, and it holds no script, handler, external link,
+  image or import (its `url(#…)` name its own gradients). Server: 200,
+  the type, the exact bytes, no redirect, no cookie, revalidated, in both
+  modes; `/en/bimi/…`, `/bimi/`, a trailing slash and another name are
+  not it. `web/e2e-site/bimi.spec.ts`: the same over HTTP with and
+  without `br` and `gzip`, and the footer's mark visible, loaded and at
+  least 64 px on five pages in four languages at both sizes.
+- **Not done here.** The DNS record (`docs/operations.md`, "The BIMI
+  mark") waits for this site's deploy; the deploy is the owner's.

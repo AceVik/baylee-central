@@ -69,12 +69,15 @@ pub struct Files {
     by_path: HashMap<String, Arc<File>>,
 }
 
-/// The fixed-name files at the root, served as they are.
-pub const ROOT: [&str; 4] = [
+/// The fixed-name files, served as they are at `/` and their name. The
+/// BIMI mark is the one below the root: mail providers fetch it at
+/// `/bimi/baylee.svg` (its DNS record names that address).
+pub const ROOT: [&str; 5] = [
     "favicon.ico",
     "apple-touch-icon.png",
     "sw.js",
     "notices.txt",
+    "bimi/baylee.svg",
 ];
 
 fn kind(name: &str) -> Option<&'static str> {
