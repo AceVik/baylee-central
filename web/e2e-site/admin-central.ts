@@ -191,6 +191,9 @@ const same = (a: number[] | null | undefined, b: number[] | null | undefined) =>
 
 type Answer = (value: unknown) => Promise<void>;
 
+/** A facet's counts as Central writes them. */
+const counts = (list: [string, number][]) => list.map(([value, count]) => ({ value, count }));
+
 function named(w: World, events: Event[]) {
   const accounts = new Map<string, { id: number[]; display_name: string | null; tag: number | null }>();
   const gateways = new Map<string, { id: number[]; name: string; origin: string }>();
@@ -320,7 +323,6 @@ function admin(w: World, asked: Asked, answer: Answer, done: (other: boolean) =>
       return answer({ answer: "legacy_accounts", store: w.legacy });
     case "report_facets": {
       if (w.reports === null) return refused(401);
-      const counts = (list: [string, number][]) => list.map(([value, count]) => ({ value, count }));
       return answer({
         answer: "report_facets",
         facets: {
