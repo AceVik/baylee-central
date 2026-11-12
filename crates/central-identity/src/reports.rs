@@ -18,6 +18,15 @@ pub struct PartUpload {
     pub bytes: u32,
 }
 
+impl PartUpload {
+    /// The gateway whose upload this is, by its id: what its uploads at
+    /// once and its unfinished ones are counted by.
+    #[must_use]
+    pub fn gateway(&self) -> [u8; 16] {
+        self.filer.gateway
+    }
+}
+
 impl IdentityService {
     /// The gateway behind `bearer`: the official one for the bridge's
     /// credential, else an approved registered one.
@@ -37,7 +46,8 @@ impl IdentityService {
     ///
     /// # Errors
     /// `Rejected` for another credential or a report out of its bounds;
-    /// `Busy` past a budget; storage failure.
+    /// `Busy` past a budget, or past what the gateway's reports or all
+    /// reports may take in the store; storage failure.
     pub async fn file_report(
         &self,
         bearer: Option<&Token>,

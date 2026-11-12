@@ -14,6 +14,7 @@ mod native;
 mod seen;
 mod server;
 mod unplaced;
+mod uploads;
 
 pub use browser::{BrowserOrigin, REQUEST_BYTES as BROWSER_REQUEST_BYTES};
 pub use server::DevelopmentServer;

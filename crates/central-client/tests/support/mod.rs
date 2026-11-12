@@ -20,6 +20,7 @@ pub(super) mod notifications;
 pub(super) mod pairing;
 pub(super) mod password;
 pub(super) mod registration;
+pub(super) mod reports;
 pub(super) mod reset;
 pub(super) mod strangers;
 pub(super) mod terms;

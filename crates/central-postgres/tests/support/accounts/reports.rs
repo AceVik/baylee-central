@@ -18,6 +18,8 @@ use central_postgres::{
 use sea_orm::{ConnectionTrait, DbBackend, Statement, prelude::Uuid};
 use sha2::{Digest, Sha256};
 
+mod level;
+
 const ORIGIN: &str = "https://reports.invalid";
 
 /// An account whose move is finished, with a browser session.
@@ -176,6 +178,7 @@ pub(super) async fn run(store: &AccountStore, operator: &DatabaseConnection, key
     marking(store, &cookie, &other, admin, first).await;
     importing(store, operator, &cookie, admin, owner).await;
     sweeping(store, operator, &cookie, first).await;
+    level::run(store, operator).await;
 }
 
 /// Filing: bounds, direct only from the bridge, parts only as announced and once.

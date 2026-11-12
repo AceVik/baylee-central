@@ -3,6 +3,7 @@ use super::{
     boundary::{Origin, Pace, REJECTED, UPLOAD_PACE, paced, timed_out},
     in_flight::Client,
     unplaced::Unplaced,
+    uploads::Uploads,
 };
 use axum::{
     Router,
@@ -18,16 +19,13 @@ use std::{
     sync::{Arc, Mutex},
     time::Instant,
 };
-use tokio::sync::Semaphore;
-
-/// Uploads of report parts at once: each holds at most its announced
-/// length (64 MiB) in memory.
-const UPLOADS: usize = 2;
 
 #[derive(Clone)]
 struct Native {
     identity: Arc<IdentityService>,
-    uploads: Arc<Semaphore>,
+    /// The report parts being uploaded, and each gateway's unfinished ones
+    /// (`uploads.rs`).
+    uploads: Uploads,
     /// What each client address may ask in its window (`addresses.rs`).
     budgets: Arc<Mutex<Budgets>>,
     /// On the deployed listener, the requests that came without the
@@ -48,7 +46,7 @@ pub(crate) fn router(identity: Arc<IdentityService>, deployed: bool) -> Router {
         .route("/v1/reports/{report}/{part}", put(file_part))
         .with_state(Native {
             identity,
-            uploads: Arc::new(Semaphore::new(UPLOADS)),
+            uploads: Uploads::default(),
             budgets: Arc::default(),
             unplaced: deployed.then(Arc::default),
         })
@@ -101,6 +99,18 @@ impl IntoResponse for Stopped {
             Self::Stalled => timed_out(),
         }
     }
+}
+
+/// Whether an upload that held a slot and ended with `answer` is held
+/// against its gateway (`uploads.rs`): one whose part was not stored
+/// because of what was sent or not sent. A part stored meanwhile by the
+/// gateway's other upload (`Conflict`, which a gateway takes as sent) and
+/// a store that failed are nobody's unfinished upload.
+fn unfinished(answer: &Result<(), Stopped>) -> bool {
+    !matches!(
+        answer,
+        Ok(()) | Err(Stopped::Failed(Error::Conflict | Error::Unavailable))
+    )
 }
 
 /// A part's body, at most `length` bytes, as long as it keeps `pace`.
@@ -199,10 +209,14 @@ async fn file(
 
 /// `PUT /v1/reports/{report}/{client|record}`: the gzip as the raw body;
 /// `204`. The credential and the announcement come first, then the
-/// declared length must be the announced one, then one of [`UPLOADS`]
-/// slots, and only then is the body read, exactly that long and at
-/// [`UPLOAD_PACE`]: a body that is withheld gives its slot back at the
-/// pace's first empty window, not at the upload's whole time.
+/// declared length must be the announced one, then a slot (`uploads.rs`:
+/// a few in all, two for one gateway, none for a gateway that left too
+/// many uploads unfinished in the hour), and only then is the body read,
+/// exactly that long and at [`UPLOAD_PACE`]: a body that is withheld gives
+/// its slot back at the pace's first empty window, not at the upload's
+/// whole time. An upload that is dropped while it holds a slot (its
+/// connection went away, its whole time was over) gives the slot back
+/// too, and is counted unfinished like one that stalled.
 async fn file_part(
     State(native): State<Native>,
     Path((report, part)): Path<(String, String)>,
@@ -228,14 +242,18 @@ async fn file_part(
         if declared != Some(u64::from(upload.bytes)) {
             return Err(Stopped::Failed(Error::Rejected));
         }
-        let _slot = native
-            .uploads
-            .clone()
-            .try_acquire_owned()
-            .map_err(|_| Error::Busy)?;
         let length = usize::try_from(upload.bytes).map_err(|_| Error::Rejected)?;
-        let gzip = part_body(body, length, UPLOAD_PACE).await?;
-        Ok(native.identity.file_report_part(&upload, &gzip).await?)
+        let slot = native.uploads.begin(upload.gateway(), Instant::now())?;
+        let stored = match part_body(body, length, UPLOAD_PACE).await {
+            Ok(gzip) => native
+                .identity
+                .file_report_part(&upload, &gzip)
+                .await
+                .map_err(Stopped::Failed),
+            Err(stopped) => Err(stopped),
+        };
+        slot.ended(!unfinished(&stored), Instant::now());
+        stored
     };
     match filed.await {
         Ok(()) => StatusCode::NO_CONTENT.into_response(),
@@ -302,5 +320,25 @@ mod tests {
             (UPLOAD_PACE.window, UPLOAD_PACE.bytes),
             (Duration::from_secs(5), 16_384)
         );
+    }
+
+    #[test]
+    fn an_upload_is_unfinished_unless_its_part_is_stored_or_the_store_failed() {
+        // stored, stored meanwhile by the other upload, the store down
+        for answer in [
+            Ok(()),
+            Err(Stopped::Failed(Error::Conflict)),
+            Err(Stopped::Failed(Error::Unavailable)),
+        ] {
+            assert!(!unfinished(&answer));
+        }
+        // too slow, bytes other than announced or a connection that broke
+        for answer in [
+            Err(Stopped::Stalled),
+            Err(Stopped::Failed(Error::Rejected)),
+            Err(Stopped::Failed(Error::Busy)),
+        ] {
+            assert!(unfinished(&answer));
+        }
     }
 }
