@@ -8,7 +8,9 @@
 //! runs, decodes the first frame within bounds, applies a JPEG's EXIF
 //! orientation, takes the centred square, averages it to 256 × 256 and
 //! writes a PNG master (IHDR, IDAT and IEND only) and an AVIF from those
-//! pixels alone. Nothing of the file but its pixels reaches either.
+//! pixels alone. Nothing of the file but its pixels reaches either. An
+//! animation's frames go, as raw pixels, to ffmpeg ([`Ffmpeg`]), which
+//! writes its AVIF image sequence; the still is its first frame.
 #![forbid(unsafe_code)]
 
 mod animation;
@@ -16,6 +18,7 @@ mod av1;
 mod decode;
 mod encode;
 mod exif;
+mod ffmpeg;
 mod header;
 mod scale;
 
@@ -23,7 +26,8 @@ pub use animation::{
     Animation, Frame, MAX_CANVAS, MAX_COMPOSITED, MAX_FRAMES, MAX_PLAY_MS, MIN_DELAY_MS, SLOW_MS,
     frames,
 };
-pub use central_picture::{Format, Output, Refusal};
+pub use central_picture::{Format, Motion, Output, Refusal};
+pub use ffmpeg::{FFMPEG_TIME, Ffmpeg};
 
 /// Longest side of any picture or frame, in pixels.
 pub const MAX_SIDE: u32 = 8_192;
@@ -56,18 +60,34 @@ pub(crate) fn within(width: u32, height: u32) -> Result<(), Refusal> {
     Ok(())
 }
 
-/// Convert `bytes`, declared as `format`, to the two stored pictures.
+/// Convert `bytes`, declared as `format`, to the stored pictures, with no
+/// encoder for animations: an animation keeps its still
+/// ([`Motion::NoEncoder`]).
 ///
 /// # Errors
 /// The [`Refusal`] that names the first check the file failed.
 pub fn convert(format: Format, bytes: &[u8]) -> Result<Output, Refusal> {
+    convert_with(format, bytes, None)
+}
+
+/// Convert `bytes`, declared as `format`, to the stored pictures, an
+/// animation's image sequence with `ffmpeg` when there is one.
+///
+/// # Errors
+/// The [`Refusal`] that names the first check the file failed. An
+/// animation that cannot be encoded is no refusal: it keeps its still.
+pub fn convert_with(
+    format: Format,
+    bytes: &[u8],
+    ffmpeg: Option<&Ffmpeg>,
+) -> Result<Output, Refusal> {
     // A decoder that panics on a hostile file (two do, found by the tests:
     // `avif-parse` 2.1.0 and `resvg` 0.50.0's turbulence filter) refuses the
     // file; the process stays whole and answers.
-    std::panic::catch_unwind(|| checked(format, bytes)).unwrap_or(Err(Refusal::Malformed))
+    std::panic::catch_unwind(|| checked(format, bytes, ffmpeg)).unwrap_or(Err(Refusal::Malformed))
 }
 
-fn checked(format: Format, bytes: &[u8]) -> Result<Output, Refusal> {
+fn checked(format: Format, bytes: &[u8], ffmpeg: Option<&Ffmpeg>) -> Result<Output, Refusal> {
     if bytes.len() > format.max_bytes() {
         return Err(Refusal::TooLarge);
     }
@@ -90,9 +110,9 @@ fn checked(format: Format, bytes: &[u8]) -> Result<Output, Refusal> {
         // cannot disagree (proposal §0.4).
         if let Some(moving) = animation::frames(format, bytes)? {
             let first = scale::Square(moving.frames[0].rgba.clone());
-            let output = encode::both(&first)?;
-            // Nothing is kept of the animation until its format is chosen.
-            let _ = encode::animation(&moving);
+            // The still first: the animation can only add to it.
+            let mut output = encode::both(&first)?;
+            output.motion = ffmpeg.map_or(Motion::NoEncoder, |ffmpeg| ffmpeg.encode(&moving));
             return Ok(output);
         }
     }

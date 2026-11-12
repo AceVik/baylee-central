@@ -1,0 +1,14 @@
+#!/bin/sh
+# ffmpeg from the Ubuntu 26.04 test image (Dockerfile beside), for a host
+# whose own ffmpeg lacks libaom-av1. The worker runs it with no environment
+# and its private directory as the working directory, which the container
+# sees at the same path (the probe runs at the root, which is not shared);
+# the container has no network.
+PATH=/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin
+export PATH
+dir=$(pwd -P)
+if [ "$dir" = / ]; then
+    exec docker run --rm -i --network none central-picture-ffmpeg:26.04 ffmpeg "$@"
+fi
+exec docker run --rm -i --network none -v "$dir:$dir" -w "$dir" \
+    central-picture-ffmpeg:26.04 ffmpeg "$@"

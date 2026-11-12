@@ -11,8 +11,8 @@
 use super::{Format, Refusal, scale};
 use std::io::Cursor;
 
-/// Most frames kept.
-pub const MAX_FRAMES: usize = 100;
+/// Most frames kept: the bound of every stored sequence.
+pub const MAX_FRAMES: usize = central_picture::MAX_FRAMES;
 /// Longest play kept, in milliseconds.
 pub const MAX_PLAY_MS: u32 = 10_000;
 /// Largest canvas an animation may have; a larger one is taken as a still.

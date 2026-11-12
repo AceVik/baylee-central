@@ -11,7 +11,8 @@
 //! budget, an upload slot), and only then the body is read, within
 //! [`BODY_TIME`] and at a pace, to its announced length exactly.
 //!
-//! `GET /api/v1/pictures/{key}.avif` and `.png` serve a picture to anyone,
+//! `GET /api/v1/pictures/{key}.avif` and `.png` serve a picture's still,
+//! and `{key}.sequence.avif` the image sequence of one that moves, to anyone,
 //! signed in or not (owner, 12.11.2026), by its random key: same-origin or
 //! direct requests only, without a bearer, within a budget per address.
 //! Every refusal and every unknown key is the same 404, so no key's
@@ -40,8 +41,9 @@ use std::{
 /// How long an upload's body may take, its pace held throughout.
 pub(super) const BODY_TIME: Duration = Duration::from_secs(20);
 /// An upload from its headers to its answer: the body, the worker's own
-/// time and the store.
-pub(crate) const UPLOAD_TIME: Duration = Duration::from_secs(40);
+/// time (`central_picture::TIME`, an animation's encoding included) and
+/// the store.
+pub(crate) const UPLOAD_TIME: Duration = Duration::from_secs(50);
 /// How long a picture's read may take.
 pub(super) const SERVE_TIME: Duration = Duration::from_secs(5);
 /// Reads of pictures one address may have in flight, in a table of their
@@ -173,7 +175,9 @@ pub(super) async fn upload<A: Accounts>(
 
 /// A picture's path segment: its key and encoding.
 fn file(name: &str) -> Option<([u8; 16], PictureEncoding)> {
-    let (key, encoding) = if let Some(key) = name.strip_suffix(".avif") {
+    let (key, encoding) = if let Some(key) = name.strip_suffix(".sequence.avif") {
+        (key, PictureEncoding::Sequence)
+    } else if let Some(key) = name.strip_suffix(".avif") {
         (key, PictureEncoding::Avif)
     } else {
         (name.strip_suffix(".png")?, PictureEncoding::Png)
@@ -257,7 +261,7 @@ pub(super) async fn serve<A: Accounts>(
     };
     let headers = response.headers_mut();
     let kind = match encoding {
-        PictureEncoding::Avif => "image/avif",
+        PictureEncoding::Avif | PictureEncoding::Sequence => "image/avif",
         PictureEncoding::Png => "image/png",
     };
     for (name, value) in [

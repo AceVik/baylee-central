@@ -4,7 +4,7 @@
 //! request, nothing else, and [`TIME`] to answer; a worker that takes longer,
 //! answers more than [`MAX_ANSWER`] or anything malformed is ended and the
 //! picture is refused. Blocking: the service calls it on a blocking thread.
-use super::{Format, MAX_ANSWER, Output, Refusal, protocol};
+use super::{Format, MAX_ANSWER, Motion, Output, Refusal, protocol};
 use std::{
     ffi::OsString,
     io::{Read, Write},
@@ -15,8 +15,10 @@ use std::{
     time::{Duration, Instant},
 };
 
-/// How long a conversion may take, start to answer.
-pub const TIME: Duration = Duration::from_secs(10);
+/// How long a conversion may take, start to answer: the decoders, the
+/// still's encoders and ffmpeg's encoding of an animation, which the worker
+/// itself ends after `central_picture_codec::FFMPEG_TIME`.
+pub const TIME: Duration = Duration::from_secs(20);
 
 /// Where the worker is.
 #[derive(Clone, Debug)]
@@ -34,25 +36,45 @@ enum Kind {
     Socket(PathBuf),
 }
 
-/// A conversion's result, checked: both pictures within their bounds and
-/// framing, and the PNG master's digest as this process computed it.
+/// A conversion's result, checked: every picture within its bounds and
+/// framing, and the digest as this process computed it.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Converted {
-    /// The AVIF.
+    /// The still's AVIF.
     pub avif: Vec<u8>,
-    /// The PNG master and fallback.
+    /// The still's PNG master and fallback.
     pub png: Vec<u8>,
-    /// SHA-256 of `png`.
+    /// Whether it moves: with a [`Motion::Sequence`], the image sequence.
+    pub motion: Motion,
+    /// [`crate::digest`] of `png` and the sequence.
     pub sha256: [u8; 32],
+}
+
+impl Converted {
+    /// The image sequence, when the picture moves and one was made.
+    #[must_use]
+    pub fn sequence(&self) -> Option<&[u8]> {
+        match &self.motion {
+            Motion::Sequence(sequence) => Some(sequence),
+            _ => None,
+        }
+    }
 }
 
 impl Worker {
     /// The worker binary at `program`, started as a child for each picture.
     #[must_use]
     pub fn program(program: impl Into<PathBuf>) -> Self {
+        Self::program_with(program, Vec::new())
+    }
+
+    /// The worker binary at `program`, started with `args` (such as
+    /// `--ffmpeg PATH`) for each picture.
+    #[must_use]
+    pub fn program_with(program: impl Into<PathBuf>, args: Vec<OsString>) -> Self {
         Self(Kind::Program {
             program: program.into(),
-            args: Vec::new(),
+            args,
         })
     }
 
@@ -84,12 +106,26 @@ impl Worker {
             #[cfg(unix)]
             Kind::Socket(path) => run_socket(path, &request)?,
         };
-        let Output { avif, png } = protocol::read_answer(&raw).ok_or(Refusal::Failed)??;
+        let Output { avif, png, motion } = protocol::read_answer(&raw).ok_or(Refusal::Failed)??;
         if !crate::png_master(&png) || !crate::avif_framing(&avif) {
             return Err(Refusal::Failed);
         }
-        let sha256 = crate::digest(&png);
-        Ok(Converted { avif, png, sha256 })
+        let sequence = match &motion {
+            Motion::Sequence(sequence) => Some(sequence.as_slice()),
+            _ => None,
+        };
+        // A worker that answers a sequence the checks refuse may be anyone's:
+        // the whole picture is refused, as for a broken still.
+        if sequence.is_some_and(|sequence| !crate::sequence_framing(sequence)) {
+            return Err(Refusal::Failed);
+        }
+        let sha256 = crate::digest(&png, sequence);
+        Ok(Converted {
+            avif,
+            png,
+            motion,
+            sha256,
+        })
     }
 }
 
@@ -226,7 +262,7 @@ mod tests {
             // answers more than any answer may be
             "exec yes",
             // a refusal frame, then exits with failure
-            "cat > /dev/null; printf 'BCPA\\001\\001\\006'; exit 1",
+            "cat > /dev/null; printf 'BCPA\\002\\001\\006'; exit 1",
         ];
         for script in cases {
             let started = Instant::now();
@@ -256,19 +292,19 @@ mod tests {
     #[test]
     fn a_worker_s_refusal_is_passed_on_and_its_environment_is_empty() {
         assert_eq!(
-            shell("cat > /dev/null; printf 'BCPA\\001\\001\\006'").convert(Format::Gif, GIF),
+            shell("cat > /dev/null; printf 'BCPA\\002\\001\\006'").convert(Format::Gif, GIF),
             Err(Refusal::Malformed)
         );
         // anything in the environment beyond what the shell sets itself
         // would be refused below; an empty one gives the refusal
         let probe = "cat > /dev/null; if [ -z \"$HOME$USER$PATH_TO_SECRET$CENTRAL_DATABASE_PASSWORD\" ]; \
-                     then printf 'BCPA\\001\\001\\005'; else printf 'BCPA\\001\\001\\001'; fi";
+                     then printf 'BCPA\\002\\001\\005'; else printf 'BCPA\\002\\001\\001'; fi";
         assert_eq!(
             shell(probe).convert(Format::Gif, GIF),
             Err(Refusal::TooSmall)
         );
         // and it runs at the file system's root
-        let root = "cat > /dev/null; if [ \"$(pwd)\" = / ]; then printf 'BCPA\\001\\001\\005'; fi";
+        let root = "cat > /dev/null; if [ \"$(pwd)\" = / ]; then printf 'BCPA\\002\\001\\005'; fi";
         assert_eq!(
             shell(root).convert(Format::Gif, GIF),
             Err(Refusal::TooSmall)
@@ -279,8 +315,7 @@ mod tests {
     fn a_well_framed_answer_that_fails_its_checks_is_refused() {
         // A frame with pictures of the right sizes that are not a PNG
         // master and an AVIF: a worker cannot pass off anything else.
-        let script =
-            "cat > /dev/null; printf 'BCPA\\001\\000\\000\\000\\000\\001X\\000\\000\\000\\001Y'";
+        let script = "cat > /dev/null; printf 'BCPA\\002\\000\\000\\000\\000\\001X\\000\\000\\000\\001Y\\000'";
         assert_eq!(
             shell(script).convert(Format::Gif, GIF),
             Err(Refusal::Failed)

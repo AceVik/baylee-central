@@ -48,24 +48,40 @@ struct Settings {
     /// `central-picture-worker` beside this program, when there is one.
     #[serde(default)]
     picture_worker: Option<String>,
+    /// The ffmpeg the worker encodes animations with, an absolute path;
+    /// absent means the worker's own default, `/usr/bin/ffmpeg`. Without
+    /// one that has `libaom-av1`, animations are kept as their stills.
+    #[serde(default)]
+    picture_ffmpeg: Option<String>,
 }
 
 /// The development picture worker: the configured binary, or the one built
-/// beside this program; none when neither is a file.
-fn picture_worker(configured: Option<&str>) -> Result<Option<central_picture::Worker>, ()> {
+/// beside this program; none when neither is a file. `ffmpeg` is handed to
+/// it on its command line.
+fn picture_worker(
+    configured: Option<&str>,
+    ffmpeg: Option<&str>,
+) -> Result<Option<central_picture::Worker>, ()> {
+    let args: Vec<std::ffi::OsString> = match ffmpeg {
+        Some(path) if std::path::Path::new(path).is_absolute() => {
+            vec!["--ffmpeg".into(), path.into()]
+        }
+        Some(_) => return Err(()),
+        None => Vec::new(),
+    };
     if let Some(path) = configured {
         let path = std::path::PathBuf::from(path);
         if !path.is_absolute() || !path.is_file() {
             return Err(());
         }
-        return Ok(Some(central_picture::Worker::program(path)));
+        return Ok(Some(central_picture::Worker::program_with(path, args)));
     }
     let name = format!("central-picture-worker{}", std::env::consts::EXE_SUFFIX);
     Ok(std::env::current_exe()
         .ok()
         .map(|exe| exe.with_file_name(name))
         .filter(|path| path.is_file())
-        .map(central_picture::Worker::program))
+        .map(|path| central_picture::Worker::program_with(path, args)))
 }
 
 /// The development legacy store's role and password.
@@ -180,7 +196,10 @@ async fn serve() -> Result<(), ()> {
         .map(|mail| mail.client(true))
         .transpose()?;
     let legacy = legacy_config(&mut settings)?;
-    let pictures = picture_worker(settings.picture_worker.as_deref())?;
+    let pictures = picture_worker(
+        settings.picture_worker.as_deref(),
+        settings.picture_ffmpeg.as_deref(),
+    )?;
     let store = AccountStore::connect_dev(database).await.map_err(|_| ())?;
     let legacy = legacy_store(&store, legacy).await?;
     let identity = IdentityService::new(

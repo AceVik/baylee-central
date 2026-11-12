@@ -418,16 +418,25 @@ impl Xorshift {
     }
 }
 
+/// The worker binary with no ffmpeg: every animation keeps its still.
+pub(crate) fn worker_without_ffmpeg() -> central_picture::Worker {
+    central_picture::Worker::program_with(
+        env!("CARGO_BIN_EXE_central-picture-worker"),
+        vec!["--no-ffmpeg".into()],
+    )
+}
+
 /// Convert through the worker binary, as the service does: a decoder that
 /// aborts the process (rav1d 1.1.0 does on some damaged AV1, from inside its
 /// C ABI, where a panic cannot unwind) ends in `Failed` and harms nothing.
 pub(crate) fn through_worker(format: Format, bytes: &[u8]) -> Result<Output, Refusal> {
     let started = Instant::now();
-    let result = central_picture::Worker::program(env!("CARGO_BIN_EXE_central-picture-worker"))
+    let result = worker_without_ffmpeg()
         .convert(format, bytes)
         .map(|converted| Output {
             avif: converted.avif,
             png: converted.png,
+            motion: converted.motion,
         });
     let took = started.elapsed();
     assert!(

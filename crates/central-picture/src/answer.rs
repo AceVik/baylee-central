@@ -8,10 +8,17 @@
 use super::{MAX_AVIF, MAX_PNG, SIDE};
 use sha2::{Digest, Sha256};
 
-/// The SHA-256 of a PNG master: what identifies a picture to reports.
+/// What identifies a stored picture to reports: the SHA-256 of its PNG
+/// master, followed by its image sequence when it moves, so a report names
+/// the animation that was shown and not only its first frame.
 #[must_use]
-pub fn digest(png: &[u8]) -> [u8; 32] {
-    Sha256::digest(png).into()
+pub fn digest(png: &[u8], sequence: Option<&[u8]>) -> [u8; 32] {
+    let mut hasher = Sha256::new();
+    hasher.update(png);
+    if let Some(sequence) = sequence {
+        hasher.update(sequence);
+    }
+    hasher.finalize().into()
 }
 
 /// A PNG master as the worker must write it.
@@ -282,11 +289,14 @@ mod tests {
     }
 
     #[test]
-    fn the_digest_is_sha256() {
+    fn the_digest_is_sha256_of_the_master_and_the_sequence() {
         assert_eq!(
-            digest(b"abc")[..4],
+            digest(b"abc", None)[..4],
             [0xba, 0x78, 0x16, 0xbf],
             "the FIPS 180-2 test vector"
         );
+        // the sequence follows the master
+        assert_eq!(digest(b"ab", Some(b"c")), digest(b"abc", None));
+        assert_ne!(digest(b"abc", Some(b"d")), digest(b"abc", None));
     }
 }

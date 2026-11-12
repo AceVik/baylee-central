@@ -19,7 +19,7 @@ use super::auth::{Problem, problem_text};
 use super::central::{Failure, call};
 use super::crypto::Crypto;
 use super::password::{Trouble, sign_in_again};
-use super::picture::{face, reason_text};
+use super::picture::{face, reason_text, sequence_url};
 use crate::words::{self, Lang};
 
 /// The section's signals; all of it is `Copy`.
@@ -211,9 +211,17 @@ fn decide_form(s: Section, report: &AdminPictureReport) -> impl IntoView + use<>
 fn report_view(s: Section, report: &AdminPictureReport) -> impl IntoView + use<> {
     let lang = s.lang;
     let account = report.account.id;
+    let moving = report.moving;
+    // An administrator who asked for less motion sees the still here, and
+    // opens the animation itself to judge every frame.
     let shown = report.current.map_or_else(
         || view! { <p class="meta">{words::admin_pictures_not_current(lang)}</p> }.into_any(),
-        |key| face(&key, String::new()).into_any(),
+        |key| {
+            let open = moving.then(|| {
+                view! { <a class="picture-open-moving" href=sequence_url(&key) target="_blank" rel="noopener noreferrer">{words::picture_open_moving(lang)}</a> }
+            });
+            view! { {face(&key, moving, String::new())} {open} }.into_any()
+        },
     );
     let actions = match (report.state, report.current.is_some()) {
         (PictureReportState::Open, true) => decide_form(s, report).into_any(),

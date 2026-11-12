@@ -85,7 +85,7 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON central_identity.account_emails,
 -- person's notice and block, and counts uploads. The operator's sweep
 -- deletes decided reports a year after their decision.
 GRANT SELECT, INSERT, DELETE ON central_identity.pictures TO central_runtime;
-GRANT UPDATE (key, avif, png, sha256, side, set_at) ON central_identity.pictures TO central_runtime;
+GRANT UPDATE (key, avif, png, sequence, sha256, side, set_at) ON central_identity.pictures TO central_runtime;
 GRANT SELECT, INSERT ON central_identity.picture_reports TO central_runtime;
 GRANT UPDATE (state, decided_at, decided_by) ON central_identity.picture_reports TO central_runtime;
 GRANT SELECT, INSERT, UPDATE, DELETE ON central_identity.picture_notices TO central_runtime;

@@ -124,7 +124,9 @@ pub struct Picture {
     pub avif_bytes: u32,
     /// The PNG master's size in bytes.
     pub png_bytes: u32,
-    /// The PNG master's SHA-256.
+    /// The AVIF image sequence's size in bytes, when the picture moves.
+    pub sequence_bytes: Option<u32>,
+    /// The SHA-256 of the PNG master followed by the sequence, if any.
     pub sha256: PictureDigest,
     /// When it was set, in Unix seconds.
     pub set_at: i64,
@@ -178,6 +180,9 @@ pub struct TaggedPicture {
     pub tag: u32,
     /// Its picture's key.
     pub key: PictureKey,
+    /// Whether it moves: then `{key}.sequence.avif` exists beside the
+    /// still's `{key}.avif` and `{key}.png`.
+    pub moving: bool,
 }
 
 /// An account in the moderation views, as it is called today (a deleted
@@ -207,6 +212,8 @@ pub struct AdminPictureReport {
     /// The current picture's key, when the reported picture is still the
     /// account's current one.
     pub current: Option<PictureKey>,
+    /// Whether that current picture moves.
+    pub moving: bool,
     /// Who reported it; none once that account was deleted.
     pub reporter: Option<Named>,
     /// The reason chosen.

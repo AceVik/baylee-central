@@ -25,13 +25,28 @@ pub const REPORTS_OPEN: i64 = 100;
 /// it (owner, 12.11.2026).
 pub const DECIDED_REPORT_DAYS: i32 = 365;
 
-/// Which of a picture's two encodings.
+/// Which of a picture's files.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Encoding {
-    /// The AVIF.
+    /// The still's AVIF.
     Avif,
-    /// The PNG master and fallback.
+    /// The still's PNG master and fallback.
     Png,
+    /// The AVIF image sequence of a picture that moves.
+    Sequence,
+}
+
+/// A converted picture's files and digest, as the service checked them.
+#[derive(Clone, Copy, Debug)]
+pub struct PictureFiles<'a> {
+    /// The still's AVIF.
+    pub avif: &'a [u8],
+    /// The still's PNG master.
+    pub png: &'a [u8],
+    /// The image sequence, when the picture moves.
+    pub sequence: Option<&'a [u8]>,
+    /// The digest of the master and the sequence.
+    pub sha256: PictureDigest,
 }
 
 /// What an upload may do, read before its body is: the account, a block in
@@ -97,7 +112,7 @@ async fn browser_account(
 }
 
 const PICTURE_COLUMNS: &str = "p.key, octet_length(p.avif) AS avif_bytes,
-    octet_length(p.png) AS png_bytes, p.sha256, p.side,
+    octet_length(p.png) AS png_bytes, octet_length(p.sequence) AS sequence_bytes, p.sha256, p.side,
     floor(extract(epoch FROM p.set_at))::bigint AS set_at";
 
 fn bytes16(row: &QueryResult, column: &str) -> Result<[u8; 16], Error> {
@@ -118,6 +133,11 @@ fn picture(row: &QueryResult) -> Result<Picture, Error> {
             .map_err(unavailable)?,
         avif_bytes: u32::try_from(get("avif_bytes")?).map_err(unavailable)?,
         png_bytes: u32::try_from(get("png_bytes")?).map_err(unavailable)?,
+        sequence_bytes: row
+            .try_get::<Option<i32>>("", "sequence_bytes")
+            .map_err(unavailable)?
+            .map(|bytes| u32::try_from(bytes).map_err(unavailable))
+            .transpose()?,
         sha256: bytes32(row, "sha256")?,
         set_at: row.try_get("", "set_at").map_err(unavailable)?,
     })
@@ -204,12 +224,14 @@ impl AccountStore {
         let column = match encoding {
             Encoding::Avif => "avif",
             Encoding::Png => "png",
+            Encoding::Sequence => "sequence",
         };
         let Some(row) = self
             .db
             .query_one_raw(statement(
                 &format!(
-                    "SELECT {column} AS bytes, sha256 FROM central_identity.pictures WHERE key = $1"
+                    "SELECT {column} AS bytes, sha256 FROM central_identity.pictures
+                     WHERE key = $1 AND {column} IS NOT NULL"
                 ),
                 vec![key.to_vec().into()],
             ))
@@ -299,10 +321,14 @@ impl AccountStore {
         cookie: &Token,
         account: [u8; 16],
         key: PictureKey,
-        avif: &[u8],
-        png: &[u8],
-        sha256: PictureDigest,
+        files: PictureFiles<'_>,
     ) -> Result<OwnPicture, Error> {
+        let PictureFiles {
+            avif,
+            png,
+            sequence,
+            sha256,
+        } = files;
         let account = Uuid::from_bytes(account);
         let tx = self.db.begin().await.map_err(unavailable)?;
         tx.query_one_raw(statement(
@@ -327,16 +353,17 @@ impl AccountStore {
         .await
         .map_err(unavailable)?;
         tx.execute_raw(statement(
-            "INSERT INTO central_identity.pictures (account_id, key, avif, png, sha256, side)
-             VALUES ($1, $2, $3, $4, $5, 256)
+            "INSERT INTO central_identity.pictures (account_id, key, avif, png, sequence, sha256, side)
+             VALUES ($1, $2, $3, $4, $5, $6, 256)
              ON CONFLICT (account_id) DO UPDATE SET key = EXCLUDED.key, avif = EXCLUDED.avif,
-                png = EXCLUDED.png, sha256 = EXCLUDED.sha256, side = EXCLUDED.side,
-                set_at = pg_catalog.clock_timestamp()",
+                png = EXCLUDED.png, sequence = EXCLUDED.sequence, sha256 = EXCLUDED.sha256,
+                side = EXCLUDED.side, set_at = pg_catalog.clock_timestamp()",
             vec![
                 account.into(),
                 key.to_vec().into(),
                 avif.to_vec().into(),
                 png.to_vec().into(),
+                sequence.map(<[u8]>::to_vec).into(),
                 sha256.to_vec().into(),
             ],
         ))
@@ -457,7 +484,7 @@ pub(super) async fn pictures(
     super::social::charge_lookups(tx, me, outside).await?;
     let rows = tx
         .query_all_raw(statement(
-            "SELECT a.tag, p.key FROM central_identity.accounts a
+            "SELECT a.tag, p.key, p.sequence IS NOT NULL AS moving FROM central_identity.accounts a
              JOIN central_identity.pictures p ON p.account_id = a.id
              WHERE a.tag = ANY($2) AND a.credential IS NOT NULL
              AND NOT EXISTS (SELECT 1 FROM central_identity.social_blocks b
@@ -472,6 +499,7 @@ pub(super) async fn pictures(
         found.push(TaggedPicture {
             tag: u32::try_from(tag).map_err(unavailable)?,
             key: bytes16(row, "key")?,
+            moving: row.try_get("", "moving").map_err(unavailable)?,
         });
     }
     // In the order the tags were asked for.
@@ -550,7 +578,7 @@ pub(super) async fn report(
 /// The columns of an [`AdminPictureReport`], from `picture_reports r` with
 /// the account `a`, the reporter `rep` and the current picture `p` joined.
 const REPORT_COLUMNS: &str = "r.id, r.account_id, a.display_name, a.tag, r.sha256,
-    p.key AS current, r.reporter_id, rep.display_name AS reporter_name, rep.tag AS reporter_tag,
+    p.key AS current, coalesce(p.sequence IS NOT NULL, false) AS moving, r.reporter_id, rep.display_name AS reporter_name, rep.tag AS reporter_tag,
     r.reason, r.note, floor(extract(epoch FROM r.created_at))::bigint AS created_at, r.state,
     floor(extract(epoch FROM r.decided_at))::bigint AS decided_at";
 const REPORT_FROM: &str = "central_identity.picture_reports r
@@ -578,6 +606,7 @@ fn admin_report(row: &QueryResult) -> Result<AdminPictureReport, Error> {
         current: current
             .map(|key| key.try_into().map_err(unavailable))
             .transpose()?,
+        moving: row.try_get("", "moving").map_err(unavailable)?,
         reporter: reporter
             .map(|reporter| {
                 Ok::<_, Error>(Named {

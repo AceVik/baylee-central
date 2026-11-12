@@ -11,9 +11,10 @@
 use super::{Error, IdentityService, Response, Surface, Token};
 use central_api::admin::AdminAnswer;
 use central_api::picture::{PictureAdmin, PictureDigest, PictureKey, PictureRequest};
-use central_picture::{Format, Refusal, Worker};
-use central_postgres::pictures::{Encoding, OwnPicture};
+use central_picture::{Format, Motion, Refusal, Worker};
+use central_postgres::pictures::{Encoding, OwnPicture, PictureFiles};
 use std::collections::BTreeSet;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, PoisonError};
 
 /// Uploads converted at once in all; the production socket's
@@ -45,6 +46,25 @@ impl From<Error> for UploadRefusal {
 pub(super) struct Pictures {
     worker: Option<Worker>,
     slots: Arc<Mutex<BTreeSet<[u8; 16]>>>,
+}
+
+/// Animations kept as their stills since start, which the operator should
+/// see: an ffmpeg that is missing or fails in the worker's sandbox turns
+/// every animation into a still and nothing else would show it.
+static KEPT_STILL: AtomicU64 = AtomicU64::new(0);
+
+/// A fixed line for an animation kept as its still: why, and how many since
+/// start; nothing of the picture or its account.
+fn kept_still(motion: &Motion) {
+    if matches!(motion, Motion::Still | Motion::Sequence(_)) {
+        return;
+    }
+    let count = KEPT_STILL.fetch_add(1, Ordering::Relaxed).saturating_add(1);
+    eprintln!(
+        "central: an animation was kept as its still ({}); {count} since start \
+         (docs/operations.md, \"Profile pictures\")",
+        motion.as_str()
+    );
 }
 
 /// An admitted upload: its account and its slot, given back when dropped.
@@ -201,6 +221,7 @@ impl IdentityService {
             .await
             .map_err(|_| UploadRefusal::Picture(Refusal::Failed))?
             .map_err(UploadRefusal::Picture)?;
+        kept_still(&converted.motion);
         let mut key: PictureKey = [0; 16];
         getrandom::fill(&mut key).map_err(|_| UploadRefusal::Account(Error::Unavailable))?;
         let own = self
@@ -209,9 +230,12 @@ impl IdentityService {
                 cookie,
                 admitted.account,
                 key,
-                &converted.avif,
-                &converted.png,
-                converted.sha256,
+                PictureFiles {
+                    avif: &converted.avif,
+                    png: &converted.png,
+                    sequence: converted.sequence(),
+                    sha256: converted.sha256,
+                },
             )
             .await?;
         drop(admitted);

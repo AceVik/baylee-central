@@ -21,8 +21,8 @@ pub use accounts::{
 /// Profile pictures (`docs/profile-pictures.md`).
 pub mod pictures {
     pub use super::accounts::{
-        Admission, DECIDED_REPORT_DAYS, Encoding, OwnPicture, PictureCase, REPORTS_OPEN,
-        REPORTS_PER_HOUR, UPLOADS_PER_DAY, UPLOADS_PER_HOUR,
+        Admission, DECIDED_REPORT_DAYS, Encoding, OwnPicture, PictureCase, PictureFiles,
+        REPORTS_OPEN, REPORTS_PER_HOUR, UPLOADS_PER_DAY, UPLOADS_PER_HOUR,
     };
 }
 
