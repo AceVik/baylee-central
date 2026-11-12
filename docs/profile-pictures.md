@@ -232,7 +232,7 @@ ended session.
   `none`), no bearer;
 - answered with `Content-Security-Policy: default-src 'none'; sandbox`,
   `nosniff`, `Cross-Origin-Resource-Policy: same-origin`,
-  `Content-Disposition: inline`, `Cache-Control: public, max-age=3600` and
+  `Content-Disposition: inline`, `Cache-Control: private, max-age=3600` and
   the digest as `ETag`;
 - every refused or unknown read is the same `404`, `no-store`;
 - other methods `405`.
