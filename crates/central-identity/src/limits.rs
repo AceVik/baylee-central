@@ -18,8 +18,26 @@ pub(super) const RESERVE_PER_SECOND: u32 = 8;
 /// Requests in its minute below which a place has asked little: six
 /// sign-ins of five requests each. So it is also the most one place draws
 /// of the spare requests in a minute, and spending them all takes sixteen
-/// places that each ask this much and no more.
+/// places that each ask this much and no more. An IPv6 place is counted
+/// here by the /48 around it ([`block`]).
 pub(super) const LIGHT_PER_MINUTE: u32 = 30;
+
+/// The place whose requests say how little `place` asked: an IPv4 address
+/// itself, and for an IPv6 /64 the /48 around it, written as the place of
+/// that block's first /64. A subscriber often holds a /56 or a /48, so
+/// hundreds of places; counted one by one, a single subscriber would draw
+/// all the spare requests there are. The guesses at passwords count the
+/// same block (`guesses.rs`).
+fn block(place: Place) -> Place {
+    match place {
+        Place::V4(_) => place,
+        Place::V6(mut prefix) => {
+            prefix[6] = 0;
+            prefix[7] = 0;
+            Place::V6(prefix)
+        }
+    }
+}
 /// The most requests a second without a session, both together. Every
 /// table sized by what such requests can start is sized by this.
 pub(super) const PUBLIC_PER_SECOND: u32 = GLOBAL_PER_SECOND + RESERVE_PER_SECOND;
@@ -419,6 +437,9 @@ pub(super) struct Limits {
     global: Option<(Instant, u32)>,
     /// What places that asked little drew beside it ([`RESERVE_PER_SECOND`]).
     spare: Window,
+    /// What each block was served of both in its minute ([`block`],
+    /// [`LIGHT_PER_MINUTE`]).
+    light: Places,
     /// Each place's share of [`GLOBAL_PER_SECOND`] ([`PLACE_PER_MINUTE`]).
     public: Places,
     /// Each place's share of the pairing window ([`PLACE_PAIRING_PER_MINUTE`]).
@@ -635,15 +656,18 @@ impl Limits {
         if !self.public.fits(place, now, PLACE_PER_MINUTE) {
             return Err(Error::Busy);
         }
+        // How little a place asked is counted by its block ([`block`]):
+        // everything the block was served in the minute, so what it
+        // draws of the spare requests ends its drawing of them.
+        let around = place.map(block);
         if self.everyone(now).is_err() {
-            // Counted in the same minute as everything else the place
-            // was served, so what it draws here ends its drawing here.
-            if place.is_none() || !self.public.fits(place, now, LIGHT_PER_MINUTE) {
+            if around.is_none() || !self.light.fits(around, now, LIGHT_PER_MINUTE) {
                 return Err(Error::Busy);
             }
             self.spare.charge(now, RESERVE_PER_SECOND)?;
         }
         self.public.spend(place, now);
+        self.light.spend(around, now);
         Ok(())
     }
 
@@ -1726,6 +1750,33 @@ mod tests {
         let next = start + MINUTE;
         while limits.global(None, next).is_ok() {}
         limits.global(Some(place(5)), next).unwrap();
+    }
+
+    /// An IPv6 subscriber often holds a /56 or a /48: hundreds or
+    /// thousands of /64s, each a place of its own. For the spare requests
+    /// they are one: how little a place asked is counted by the /48
+    /// around it, so one block draws what one address does.
+    #[test]
+    fn an_ipv6_block_draws_the_spare_requests_as_one_place() {
+        let start = Instant::now();
+        let mut limits = Limits::default();
+        let subscriber =
+            |block: u8, part: u8| Some(Place::V6([0x20, 0x01, 0x0d, 0xb8, 0, block, 0, part]));
+        let mut through = 0;
+        for tenth in 0..100_u8 {
+            let now = start + Duration::from_millis(u64::from(tenth) * 100);
+            while limits.global(None, now).is_ok() {}
+            // Another /64 of the same /48 each time.
+            if limits.global(subscriber(1, tenth), now).is_ok() {
+                through += 1;
+            }
+        }
+        assert_eq!(through, LIGHT_PER_MINUTE);
+        // Another block, and an IPv4 address, have asked nothing yet.
+        let now = start + Duration::from_secs(10);
+        while limits.global(None, now).is_ok() {}
+        limits.global(subscriber(2, 0), now).unwrap();
+        limits.global(Some(place(6)), now).unwrap();
     }
 
     #[test]
