@@ -1191,8 +1191,8 @@ do neither. Nothing on the wire and nothing in Central changed.
   real Central ([security assurance](../security-assurance.md), "The website
   redeems a reset code and changes a password").
 
-**Open.** Issuing a reset code in the new site's administration (the old
-build's admin page does it, where that build is still served); a reading
+**Open.** Issuing a reset code in the new site's administration (built
+the same day, §18); a reading
 of the nine machine translations by speakers; a reset that keeps the data
 through a device still signed in is the client's (M6).
 
@@ -1262,3 +1262,56 @@ when this was written, the service refused both new requests.
 needs the server's half; the nine translations; `privacy-recipients` does
 not name the mail's processor (the new paragraph does); the section says
 "15 minutes" and does not show `pending_until`.
+
+## 18. As built: an administrator makes a reset code (12.11.2026)
+
+The first piece of the administration on the new site: an administrator
+makes a reset code for an account, which until now only the old build's
+`/admin` page could. Nothing on the wire changed (`AdminRequest::Accounts`,
+`Account` and `ResetLogin` as they were), and no dependency.
+
+- **The page.** `/{lang}/account/admin` (`Section::Admin`, the island
+  `islands/admin.rs` inside the account area's island). An address under a
+  language, so Caddy's `/admin*` for the old build is untouched; not
+  indexed, in no sitemap. `Section::ALL` stays the navigation, which is the
+  same for everyone; `Section::ROUTED` adds the administration for the
+  routes and the tests. The overview links to it for an administrator
+  only, beside the link to the old build's administration. The server
+  cannot know the role: anyone may open the address, and the island shows
+  a person without the role one sentence and asks Central nothing more than
+  `AccountSummary`. "No page" is the island's doing, not a 404.
+- **Its steps.** A search and its list (cards with the facts `AdminAccount`
+  carries, 50 a page, "Show more"); one account opened and read afresh with
+  `Account` (the only answer that says whether it has a recovery code); the
+  warning; the password once more in a Worker (`password::sign_in_again`,
+  then a check that the session is still the account the page was opened
+  as); the code shown once, with a copy button (`clip::copier`). Each step
+  takes the keyboard at its heading or field; "Back" returns to the list at
+  the account's button. What the page says and why is in
+  [account reset](../account-reset.md), "The administration's page".
+- **The code** lives in the step that shows it as a `ResetCode` behind an
+  `Arc`, wiped when the step is left (by "Done", or by `pagehide`). No
+  download link: a `data:` address would put the code in a URL.
+- **Refusals.** One `Rejected` for every refusal; the page tells them apart
+  by the account's row (before sending) and by `AccountSummary` and the row
+  read again (after). Unit tests cover the mapping (`refusal`, `explain`,
+  `at_reset`, `at_sign_in`, `query`).
+- **Words.** 48 new messages (`admin-*`), English and German by hand; the
+  nine other languages carry the English text under
+  `# English for now: to be translated.` The English share stays under the
+  gate's 12 in 100 (French 107 of 1011, the most). Reused: `reset-code`,
+  `tokens-until`, `profile-*`, `code-shown-once`, `code-copy*`,
+  `password-error-current`, `privacy-delete-password`, `signin-working`,
+  `error-*`, `account-home`.
+- **Tests.** Unit tests of every decision; a server test that the page
+  exists in every language, is not indexed, not in the sitemap and linked
+  from no page the server renders; `web/e2e-site/admin.spec.ts` against a
+  stand-in that refuses as Central's store does, at both sizes, at 320 px,
+  in German, with the 44 px targets, the keyboard order and axe in both
+  schemes; `web/e2e-real/site-reset.spec.ts` makes its codes through the
+  page now (`issue` in `site.ts` drives it), which this change could
+  type-check but not run.
+
+**Open.** The rest of the administration (overview, the role, tags,
+gateways, audit, the legacy store, reports) is still the old build's; the
+nine translations; a run of `site-reset.spec.ts` against a real Central.

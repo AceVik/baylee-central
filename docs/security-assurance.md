@@ -6296,3 +6296,154 @@ same code passed. The same fixture had passed on `2d614e4` before the
 words were changed.
 
 Engineering review, not an audit.
+
+## The new site makes a reset code, 12 November 2026
+
+Until now an administrator could make a reset code
+(`AdminRequest::ResetLogin`, [account reset](account-reset.md) "Issuing a
+reset code") only on the old build's `/admin` page. This change gives the
+new site a page for it, `/{lang}/account/admin` (`islands/admin.rs`).
+Central is as it was: no request, answer, server crate, migration or
+dependency changed, and `Cargo.toml` and `Cargo.lock` are untouched.
+
+Design pass. The asset is the code: whoever holds it takes the login, and
+with a new vault destroys the account's data. The other assets are the
+administrator's password, which the page takes once more, and the list of
+accounts with their sign-in names, which only an administrator may read.
+Central is trusted to decide who may read and make; the page decides
+nothing Central does not decide again.
+- **Who sees the page.** The server cannot know the role, so the address
+  answers everyone with the same frame, and the island shows the tool only
+  to a session whose `AccountSummary` says `admin`. Anyone else gets one
+  sentence, and the page asks Central nothing more. The navigation, the
+  same for everyone, has no link to it; the overview links to it for an
+  administrator only. Central refuses every administration request from
+  anyone else whatever a page does, so the island's check hides a tool, it
+  guards nothing. The address is under a language, never Caddy's `/admin*`
+  of the old build.
+- **The order of things.** Nothing that acts is sent before the person
+  has opened the account, read the warning and confirmed it, and typed the
+  password. The password is proven again in a Worker that is ended at
+  once, as the e-mail address's form does, and the page then checks that
+  the session is still the account it was opened as: a browser that
+  signed in as someone else in another tab asks for no code. Only then
+  `ResetLogin`.
+- **The warning** says what the design says ([account reset](account-reset.md)):
+  check out of band who asks, since the code takes the login; issuing ends
+  nothing (the old password and every session stay); the data survives
+  only with the recovery code or a device still signed in; a new code
+  replaces an earlier one, a mailed one too; a code is for a forgotten
+  password, not a taken-over account.
+- **Where the code is.** It arrives in `ResetLogin`'s answer, is parsed as
+  a `ResetCode` (which wipes its 20 bytes when dropped) and is held by the
+  step that shows it. Leaving that step drops it: "Done", leaving the page,
+  and `pagehide`, so that the back-forward cache keeps no page with it. It
+  goes into no address, no storage, no log, no `console` and no field; the
+  page offers no download, since a `data:` link is an address. It goes to
+  the clipboard only when the administrator presses "Copy". The answer's
+  text and the code's text on the page are copies that the browser frees
+  when they go; a page cannot wipe them.
+- **What a refusal may say.** Central answers every code it does not make
+  with one `Rejected`, so the page cannot learn more from the status than
+  that. It says what the account's row says before anything is sent (an
+  administrator's account, one's own, a pending one, a moved one not in
+  use), and after a refusal it asks Central what stands now:
+  `AccountSummary` (session, role, the sign-in's time) and the account read
+  again. A moved account in use whose move is not closed looks like any
+  other in every answer; the page names the move for it while the sign-in
+  is fresh by the browser's clock, and the stale sign-in otherwise. That
+  guess picks between two sentences; it decides nothing.
+- **A lost answer** (no network, a 5xx, an answer of another shape) may
+  have made a code. The page says so, says that such a code cannot be
+  shown and has already replaced any earlier one, reads the account again,
+  and offers a new code, which replaces the lost one in turn.
+- Decided against: a search in the address (`?q=`, as the old build had);
+  reading `Account` for every row of a list (50 requests a page) to show
+  the recovery code's state there; a download of the code.
+
+Implementation pass:
+- `islands/admin.rs`: the decisions are plain functions with unit tests
+  (`refusal`, `explain`, `at_reset`, `at_sign_in`, `query`); the flow
+  (`issue`, `why`) and the views around them. The search is checked by
+  `AccountQuery::parse` before it is sent, so Central's `Rejected` for a
+  malformed search never reads as a lost session. Only the newest list
+  request's answer is drawn. Every list or account read that Central
+  refuses is followed by `AccountSummary`, and only its refusal signs the
+  page out.
+- `islands/account.rs`: `Summary` keeps the session's account id; the
+  administration's section is drawn only for `admin`; the overview's link.
+  `data.rs`: `Section::Admin`, `Section::ROUTED`; the navigation is
+  `Section::ALL` as before.
+- No new dependency; the code's type is `central-api`'s. Nothing is
+  logged. No lint was switched off; no `unsafe`.
+- Words: 48 new messages, English and German by hand, the nine others the
+  English text under `# English for now: to be translated.`
+
+Adversarial pass, each question with what answers it:
+- *Does anyone without the role get the tool, or make the page ask?* No:
+  in the browser, a session without the role sees one sentence, no link on
+  the overview or in the navigation, and the stand-in sees no
+  administration request at all. The server's test finds no page of the
+  area that links to the address.
+- *Is anything sent before the warning is confirmed and the password
+  typed?* No: the browser test counts the requests from the account's
+  opening through the warning, its way back, the password's step with an
+  empty password and its way back: none.
+- *Is the password proven before the code, for the session's own
+  account?* The browser test sees `account_summary`, `login_start` with the
+  session's account, `login_finish`, then `reset_login`, in that order. A
+  session that has become another account's meanwhile gets no
+  `reset_login`. A wrong password is refused in the real Worker and the
+  stand-in sees `account_summary` and `login_start` only.
+- *Where does the code go?* In the browser: shown once, copied (the
+  clipboard holds it), in no request body, no address, neither storage; and
+  gone from the page's HTML after "Done" and after a `pagehide` event the
+  test dispatches. A real return through the back-forward cache was not
+  exercised. Against a real Central (`site-reset.spec.ts`, not run here)
+  the same checks are written for the administrator's browser.
+- *Can a refusal read as something it is not?* Unit tests: a lost answer
+  is never a refusal, a refusal never a wrong password, and every refusal
+  has its own sentence in every language. In the browser with a stand-in
+  that refuses as Central's store does: each refusal the row tells before
+  anything is sent, and each Central gives after the password (an
+  unfinished move, a stale sign-in, an account gone, the role gone, an
+  account that became an administrator's), `Busy` and `Forbidden`, and the
+  three kinds of lost answer. Reading it over found one sentence that gave
+  advice Central would refuse (one's own account: "ask another
+  administrator", whose account Central makes no code for); it was changed
+  to the password's change under Security.
+- *Script in the origin* reads the code as it reads the page; nothing here
+  claims otherwise ([threat model](threat-model.md), "Website compromise").
+- **The checks have teeth** (one change at a time, each undone). Caught by
+  the unit tests: a lost answer (no network) read as a refusal; a moved
+  account not in use no longer told apart; a search sent without Central's
+  rule. Caught by the server's tests: the administration put into the
+  navigation. Caught in the browser with a stand-in, on a site and a
+  server built with the change and rebuilt without it afterwards: the
+  tool shown without the role; the check that the session is still the
+  page's account removed; the `pagehide` listener removed; the password's
+  proof skipped (both the order of the requests and the real Worker's
+  refusal of a wrong password fail). These are the mutants that were
+  tried, not every decision. A site rebuilt without its server shows a
+  page whose island never starts: a browser mutant needs both rebuilt.
+
+Run on this change: `cargo xtask gate` passes (format, policy, clippy,
+tests, doc tests and the release build), as do `cargo xtask site`, `cargo
+xtask secrets` (the tree and the history), `cargo fmt --all --check`,
+`cargo clippy --locked --workspace --all-targets` and for
+`central-web-islands` on `wasm32-unknown-unknown` (no warning), `cargo
+test --locked -p central-web -p central-web-islands -p central-web-server`
+and `cargo test --locked -p xtask` (with the test that no language is the
+English under another name). In `web/`, `npm run typecheck` and `npm run
+lint` pass, and `admin.spec.ts` type-checks under the strict settings
+(`typecheck` does not include `e2e-site`). The site suite (`web/e2e-site`,
+every spec, both projects, on its own port 28792) passed 402 tests and
+skipped 6; after the mutants were undone, the sentence above changed and
+the site and the server rebuilt, `admin.spec.ts` passed its 20 again. The
+gate ran before that sentence's change, which touched only the words and
+the spec. `web/e2e-real/site-reset.spec.ts`, which now makes its codes on
+the page, type-checks and was not run: it needs a real Central,
+PostgreSQL and the operator's appointment. `cargo xtask postgres`, `cargo
+xtask smoke`, `cargo audit` and `cargo deny` were not run (no
+dependency changed). This is an engineering review of one page, not an
+audit.
