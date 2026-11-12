@@ -301,6 +301,185 @@ if (album instanceof HTMLDialogElement && viewer instanceof HTMLDialogElement) {
     act();
   });
 
+  // ---- the book opens and shuts -------------------------------------------------
+
+  // The book is laid before the reader shut, and its cover swings up on the
+  // spine towards the reader and over to the left while the reader leans
+  // in. The light comes from over the reader's left shoulder: the cloth
+  // catches it as it lifts and darkens as it turns away, the endpaper is
+  // dark as it comes round and brightens as it comes down, and the cover's
+  // shade on the first page shrinks towards the spine and is gone. The
+  // first page lifts a little with the cover and settles. Shutting runs the
+  // other way, and the book is taken away. These are Web Animations so that
+  // light and shade follow the cover's angle under one easing over the
+  // whole swing (a CSS animation eases each keyframe on its own); only
+  // transform and opacity change. With less motion asked for the book is
+  // simply open or shut, and without the script it opens as a dialog.
+  const openers = [...document.querySelectorAll('button[commandfor="album"]')];
+  const logo = document.querySelector(".hero-logo");
+  const piece = (name, parent, tag = "div") => {
+    const node = document.createElement(tag);
+    node.className = name;
+    parent.append(node);
+    return node;
+  };
+  const cover = piece("album-cover", album);
+  const front = piece("album-cover-face album-cover-front", cover);
+  const mark = piece("album-cover-mark", front, "img");
+  mark.alt = "";
+  piece("album-cover-line", front, "p").textContent = album.querySelector(".album-love")?.textContent ?? "";
+  const glint = piece("album-cover-glint", front);
+  const frontDim = piece("album-cover-dim", front);
+  const back = piece("album-cover-face album-cover-back", cover);
+  const backDim = piece("album-cover-dim", back);
+  const shade = piece("album-cover-shade", album);
+  for (const part of [cover, shade]) part.setAttribute("aria-hidden", "true");
+  const pages = [...album.querySelectorAll(":scope > .album-masthead, :scope > .album-layout")];
+
+  // the cover's angle, 0 shut to 180 lying open, in steps the light follows
+  const ANGLES = Array.from({ length: 13 }, (_, at) => at * 15);
+  const rad = (angle) => (angle * Math.PI) / 180;
+  // how squarely the cloth faces the light (the endpaper faces the other way)
+  const facing = (angle) => 0.45 * Math.sin(rad(angle)) + 0.89 * Math.cos(rad(angle));
+  const LIT = 0.89 ** 2;
+  const round = (value) => Number(value.toFixed(3));
+  // Opening, the cover is lifted gently, swings over fast and comes down
+  // softly; shutting, it leaves the table at once (off the book, where
+  // little of it is seen) and is laid down on the pages softly.
+  const SWING = "cubic-bezier(0.42, 0.05, 0.2, 1)";
+  const SWING_BACK = "cubic-bezier(0.36, 0.1, 0.24, 1)";
+  const swing = [
+    [cover, (angle) => ({ transform: `rotateY(${-angle}deg)` })],
+    [frontDim, (angle) => ({ opacity: angle > 90 ? 0.55 : round(0.7 * Math.max(0, 1 - Math.max(0, facing(angle)) ** 2 / LIT)) })],
+    [glint, (angle) => ({ opacity: angle < 60 ? round(Math.min(1, Math.max(0, facing(angle) ** 2 - LIT) / 0.2)) : 0, transform: `translateX(${Math.min(angle, 60) - 30}%)` })],
+    [back, (angle) => ({ opacity: angle < 160 ? 1 : round((180 - angle) / 20) })],
+    [backDim, (angle) => ({ opacity: round(0.65 * (1 - Math.min(1, Math.max(0, -facing(angle)) / 0.89))) })],
+    [
+      shade,
+      (angle) => {
+        // where the shadow of the cover's edge falls on the page
+        const reach = Math.max(0, Math.min(1, Math.cos(rad(angle)) + 0.506 * Math.sin(rad(angle))));
+        return { opacity: reach > 0 ? round(0.85 * Math.min(1, reach * 1.6) * (1 - angle / 200)) : 0, transform: `scaleX(${Math.max(0.001, round(reach))})` };
+      },
+    ],
+  ];
+  // the book is set down before the reader (it is there at once, it does
+  // not fade in under its cover) and the reader leans in as it opens; shut,
+  // the reader sits back and it is taken away
+  const BOOK_OPEN = [
+    { offset: 0, opacity: 0, transform: "translate3d(0, 18px, 0) scale(0.9)", easing: "cubic-bezier(0.22, 1, 0.36, 1)" },
+    { offset: 0.16, opacity: 1 },
+    { offset: 0.34, transform: "translate3d(0, 0, 0) scale(0.94)", easing: "ease-in-out" },
+    { offset: 1, opacity: 1, transform: "translate3d(0, 0, 0) scale(1)" },
+  ];
+  const BOOK_SHUT = [
+    { offset: 0, opacity: 1, transform: "translate3d(0, 0, 0) scale(1)", easing: "ease-in-out" },
+    { offset: 0.76, transform: "translate3d(0, 0, 0) scale(0.94)", easing: "cubic-bezier(0.4, 0, 1, 1)" },
+    { offset: 0.8, opacity: 1, easing: "ease-in" },
+    { offset: 1, opacity: 0, transform: "translate3d(0, 14px, 0) scale(0.88)" },
+  ];
+  // lifted with the cover, falling back, a last small bounce
+  const SETTLE = [
+    { offset: 0, transform: "rotateY(0deg)", easing: "cubic-bezier(0.3, 0, 0.6, 1)" },
+    { offset: 0.38, transform: "rotateY(-2.2deg)", easing: "cubic-bezier(0.5, 0, 0.9, 0.6)" },
+    { offset: 0.66, transform: "rotateY(0deg)", easing: "cubic-bezier(0.1, 0.4, 0.5, 1)" },
+    { offset: 0.82, transform: "rotateY(-0.45deg)", easing: "cubic-bezier(0.5, 0, 0.9, 0.6)" },
+    { offset: 1, transform: "rotateY(0deg)" },
+  ];
+
+  let folding = null;
+  const unfold = () => {
+    const runs = folding?.runs ?? [];
+    folding = null;
+    for (const run of runs) run.cancel();
+    delete album.dataset.folding;
+  };
+  const ended = (runs) => Promise.all(runs.map((run) => run.finished)).then(
+    () => true,
+    () => false,
+  );
+  const fold = (opening) => {
+    album.dataset.folding = opening ? "open" : "shut";
+    const timing = { duration: opening ? 900 : 650, delay: opening ? 160 : 0, easing: opening ? SWING : SWING_BACK, fill: "both" };
+    const frames = (pose) => {
+      const all = ANGLES.map((angle) => ({ offset: angle / 180, ...pose(angle) }));
+      return opening ? all : all.reverse().map((frame) => ({ ...frame, offset: round(1 - frame.offset) }));
+    };
+    const runs = [
+      album.animate(opening ? BOOK_OPEN : BOOK_SHUT, { duration: opening ? 1060 : 860, fill: "both" }),
+      ...swing.map(([node, pose]) => node.animate(frames(pose), timing)),
+      ...(opening ? pages.map((page) => page.animate(SETTLE, { duration: 560, delay: 560, fill: "both" })) : []),
+    ];
+    folding = { opening, runs };
+    return ended(runs);
+  };
+  const cloth = () => {
+    if (!(logo instanceof HTMLImageElement)) return;
+    const picture = logo.currentSrc || logo.src;
+    if (picture && mark.src !== picture) mark.src = picture;
+  };
+  const opening = () => {
+    if (album.open || folding || still()) return;
+    cloth();
+    const run = fold(true);
+    const mine = folding;
+    run.then((done) => {
+      // a book shut while it opened is closed by `shut`, not laid open here
+      if (done && folding === mine && mine.opening) unfold();
+    });
+  };
+  const shut = () => {
+    if (!album.open) return;
+    if (still()) {
+      album.close();
+      return;
+    }
+    if (folding && !folding.opening) return;
+    let run;
+    if (folding) {
+      // still opening: the same movement goes back from where it is
+      folding.opening = false;
+      album.dataset.folding = "shut";
+      for (const one of folding.runs) one.reverse();
+      run = ended(folding.runs);
+    } else {
+      run = fold(false);
+    }
+    run.then((done) => {
+      if (done && album.open) album.close();
+    });
+  };
+  // A press on the logo (by pointer or key) comes before the dialog opens,
+  // so the first frame is already the shut book; `beforetoggle` catches any
+  // other way it is opened.
+  for (const opener of openers) {
+    opener.addEventListener("click", opening);
+    // the book's first photograph and the cover's picture are made ready
+    // once a reader comes near the logo, not while they wait for the book
+    const ready = () => {
+      photos[0]?.setAttribute("loading", "eager");
+      cloth();
+      if (mark.src) mark.decode().catch(() => {});
+    };
+    for (const kind of ["pointerenter", "focus", "touchstart"]) opener.addEventListener(kind, ready, { once: true, passive: true });
+  }
+  album.addEventListener("beforetoggle", (event) => {
+    if (event.newState === "open") opening();
+  });
+  album.addEventListener("close", unfold);
+  // the close button and Escape shut the book; an Escape that may not be
+  // held (pressed again at once) shuts it at once
+  album.addEventListener("cancel", (event) => {
+    if (!event.cancelable || still()) return;
+    event.preventDefault();
+    shut();
+  });
+  album.querySelector(".album-masthead form[method='dialog']")?.addEventListener("submit", (event) => {
+    if (still()) return;
+    event.preventDefault();
+    shut();
+  });
+
   // ---- ready: one chapter, one photograph -----------------------------------
 
   showChapter(0);
