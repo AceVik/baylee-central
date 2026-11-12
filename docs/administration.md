@@ -8,7 +8,10 @@ last sign-in time, and the administrator's reads and role changes. The
 pages (`/admin` in the web app) are M4; locks and bans and
 gateway approval on the website and reports are the design's later steps.
 Every piece goes through the three passes of [security
-assurance](security-assurance.md).
+assurance](security-assurance.md). *Since 12.11.2026 the pages are the new
+site's, under `/{lang}/account/admin/…` ([frontend
+rewrite](proposals/frontend-rewrite.md) §25); the old build's `/admin`
+pages are to go.*
 
 ## Rules
 

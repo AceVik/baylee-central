@@ -464,6 +464,22 @@ pub enum Section {
     /// account (`docs/account-reset.md`). In no navigation: the overview
     /// leads an administrator to it, and it shows nothing to anyone else.
     Admin,
+    /// `/account/admin/overview`: the administration's counts, each leading
+    /// to the page where the work is.
+    AdminOverview,
+    /// `/account/admin/users`: every account, newest first, and a search.
+    AdminUsers,
+    /// `/account/admin/users/<its id in hex>`: one account and its changes.
+    /// The only address with a part the visitor chooses: [`Section::slug`]
+    /// gives its list's, and `Page::path` adds the id.
+    AdminUser([u8; 16]),
+    /// `/account/admin/gateways`: the registered gateways, their approval
+    /// and their tokens.
+    AdminGateways,
+    /// `/account/admin/audit`: what administrators and the operator did.
+    AdminAudit,
+    /// `/account/admin/legacy`: what is left of the legacy store.
+    AdminLegacy,
 }
 
 impl Section {
@@ -480,9 +496,10 @@ impl Section {
         Section::Gateways,
     ];
 
-    /// Every section with an address: the navigation's and the
-    /// administration.
-    pub const ROUTED: [Section; 9] = [
+    /// Every section with a fixed address: the navigation's and the
+    /// administration's. One account's page (`AdminUser`) has an address
+    /// per account and is read by [`Section::account_page`] apart.
+    pub const ROUTED: [Section; 14] = [
         Section::Home,
         Section::Chat,
         Section::Contacts,
@@ -492,9 +509,14 @@ impl Section {
         Section::Notifications,
         Section::Gateways,
         Section::Admin,
+        Section::AdminOverview,
+        Section::AdminUsers,
+        Section::AdminGateways,
+        Section::AdminAudit,
+        Section::AdminLegacy,
     ];
 
-    /// The path after `/{lang}/`.
+    /// The path after `/{lang}/`; one account's page gives its list's.
     #[must_use]
     pub const fn slug(self) -> &'static str {
         match self {
@@ -507,8 +529,63 @@ impl Section {
             Section::Gateways => "account/gateways",
             Section::Notifications => "account/notifications",
             Section::Admin => "account/admin",
+            Section::AdminOverview => "account/admin/overview",
+            Section::AdminUsers | Section::AdminUser(_) => "account/admin/users",
+            Section::AdminGateways => "account/admin/gateways",
+            Section::AdminAudit => "account/admin/audit",
+            Section::AdminLegacy => "account/admin/legacy",
         }
     }
+
+    /// Whether it is a page of the administration: for administrators
+    /// only, which the island decides, since the server cannot know.
+    #[must_use]
+    pub const fn admin(self) -> bool {
+        matches!(
+            self,
+            Section::Admin
+                | Section::AdminOverview
+                | Section::AdminUsers
+                | Section::AdminUser(_)
+                | Section::AdminGateways
+                | Section::AdminAudit
+                | Section::AdminLegacy
+        )
+    }
+
+    /// One account's page, at `slug` (after `/{lang}/`): the account's id
+    /// as 32 lowercase hex digits after the list's path, and nothing else.
+    #[must_use]
+    pub fn account_page(slug: &str) -> Option<Section> {
+        let hex = slug.strip_prefix("account/admin/users/")?;
+        id_from_hex(hex).map(Section::AdminUser)
+    }
+}
+
+/// An id as the addresses write it: 32 lowercase hex digits.
+#[must_use]
+pub fn id_hex(id: &[u8; 16]) -> String {
+    use std::fmt::Write as _;
+    id.iter().fold(String::with_capacity(32), |mut out, byte| {
+        let _ = write!(out, "{byte:02x}");
+        out
+    })
+}
+
+/// The id that `text` writes as 32 lowercase hex digits, and only then: no
+/// other length, case or character, so that one id has one address.
+#[must_use]
+pub fn id_from_hex(text: &str) -> Option<[u8; 16]> {
+    let bytes = text.as_bytes();
+    if bytes.len() != 32 || !bytes.iter().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f')) {
+        return None;
+    }
+    let mut id = [0_u8; 16];
+    for (at, pair) in bytes.as_chunks::<2>().0.iter().enumerate() {
+        let digits = std::str::from_utf8(pair).ok()?;
+        id[at] = u8::from_str_radix(digits, 16).ok()?;
+    }
+    Some(id)
 }
 
 /// The repository's state for the home page's status strip.
@@ -532,6 +609,48 @@ pub struct Repo {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// One account's page has one address: 32 lowercase hex digits, read
+    /// back to the same id; anything else is no page.
+    #[test]
+    fn an_account_page_has_one_address() {
+        let id = [
+            0x01, 0x9a, 0x2b, 0x3c, 0x4d, 0x5e, 0x70, 0x80, 0x90, 0xa0, 0xb0, 0xc0, 0xd0, 0xe0,
+            0xf0, 0xff,
+        ];
+        let hex = id_hex(&id);
+        assert_eq!(hex, "019a2b3c4d5e708090a0b0c0d0e0f0ff");
+        assert_eq!(id_from_hex(&hex), Some(id));
+        assert_eq!(
+            Section::account_page(&format!("account/admin/users/{hex}")),
+            Some(Section::AdminUser(id))
+        );
+        for bad in [
+            String::new(),
+            hex.to_uppercase(),
+            hex[..31].to_owned(),
+            format!("{hex}0"),
+            format!("{}g", &hex[..31]),
+            format!("+{}", &hex[..31]),
+            format!("{hex}/"),
+            format!(" {}", &hex[..31]),
+        ] {
+            assert_eq!(id_from_hex(&bad), None, "{bad}");
+            let slug = format!("account/admin/users/{bad}");
+            assert_eq!(Section::account_page(&slug), None, "{bad}");
+        }
+        assert_eq!(
+            Section::account_page(&format!("account/admin/user/{hex}")),
+            None
+        );
+        assert_eq!(Section::account_page(&format!("account/users/{hex}")), None);
+        // the administration's pages say so; the area's own do not
+        let admin = Section::ROUTED.iter().filter(|s| s.admin()).count();
+        assert_eq!(admin, 6);
+        assert!(Section::AdminUser(id).admin());
+        assert!(Section::ALL.iter().all(|s| !s.admin()));
+        assert_eq!(Section::AdminUser(id).slug(), Section::AdminUsers.slug());
+    }
 
     #[test]
     fn release_names() {

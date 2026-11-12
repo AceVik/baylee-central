@@ -623,7 +623,8 @@ no grant. What stays the operator's:
 ## Gateways and their tokens
 
 Since 30.10.2026 Central's administrators approve, disable and enable
-gateways on the website (`/admin/gateways`), and owners mint and revoke their
+gateways on the website (`/{lang}/account/admin/gateways` since 12.11.2026; the
+old build's `/admin/gateways` before), and owners mint and revoke their
 gateways' tokens there ([gateway registry](gateway-registry.md) §"Gateway
 tokens"). The deploy hook applies `ops/grants.sql` after the migration,
 which gives the runtime `INSERT` and `UPDATE (enabled)` on
@@ -685,7 +686,7 @@ operator:
   gateway sends pulses, `PublicFigures` lists no gateway and still answers
   the number of accounts.
 - **Taking a gateway's numbers away.** Disabling the gateway
-  (`/admin/gateways`) hides them at once. To withdraw the numbers alone
+  (`/{lang}/account/admin/gateways`) hides them at once. To withdraw the numbers alone
   while the gateway stays listed, clear them; they come back with the
   gateway's next pulse, so its operator has to stop reporting as well:
 
@@ -847,7 +848,7 @@ of that day in Europe/Berlin; `null` clears it (the store then stays until a
 date is set again). From then no legacy sign-in is taken, and the daily sweep (`--sweep-stdin`, [administration](#administration))
 deletes every row left and every legacy reservation that never enrolled; it
 deletes the row of a closed move at any time. Administrators see what is left
-on the website, at `/admin/legacy` (`AdminRequest::LegacyAccounts`). After the deadline's sweep,
+on the website, at `/{lang}/account/admin/legacy` (`AdminRequest::LegacyAccounts`). After the deadline's sweep,
 remove the `legacy` block, revoke the role's grants and drop the role; a later
 release removes the schema.
 
@@ -924,7 +925,7 @@ line for a report, and none for a refusal.
 (*Feedback*: move to the trash, then purge; the trash alone frees nothing
 for its 30 days). The sweep frees what is done for 90 days, in the trash
 for 30 or older than 1,095. A gateway that is filling its bound with
-reports nobody asked for is disabled like any other (`/admin/gateways`);
+reports nobody asked for is disabled like any other (`/{lang}/account/admin/gateways`);
 its reports stay until they are purged.
 
 **Memory.** With four uploads at once, parts of the largest size (64 MiB)
@@ -1246,14 +1247,22 @@ build of `web/` as before; nothing here changes production by being merged.
   answers an unknown path with the app's HTML. DMARC must stay at
   `quarantine` or `reject`. A mark certificate (Gmail's CMC) asks that the
   mark was public on the domain for a year, from the day it first shows.
-- **Until the administration is rebuilt** (phase 5 of the proposal),
-  `/admin*` can keep being served from the old build: a `handle /admin*`
-  with the old `file_server` block in front of the `central-web` handle.
-  What `central-web` does not answer carries none of its headers: that
-  handle needs the old site block's own `header` directives inside it
-  (`web/README.md` §"Serving it": the old build's Content-Security-Policy,
-  Permissions-Policy, COOP, `nosniff`, `no-referrer`), or the
-  administration is served without a content policy.
+- **The administration is `central-web`'s** since 12.11.2026, under the
+  account area: `/{lang}/account/admin/overview`, `/users` (and one
+  account's `/users/<id in hex>`), `/gateways`, `/audit`, `/legacy` and
+  the reset code's `/{lang}/account/admin` ([frontend
+  rewrite](proposals/frontend-rewrite.md) §25). It needs no Caddy handle
+  of its own: the catch-all passes it, with `central-web`'s headers. The
+  old build's `/admin*` is needed only for what is not rebuilt yet, the
+  feedback's triage (`/admin/feedback`, rebuilt separately as
+  `/{lang}/account/admin/feedback`). Until that is merged, a
+  `handle /admin*` with the old `file_server` block in front of the
+  `central-web` handle keeps it reachable; what `central-web` does not
+  answer carries none of its headers, so that handle needs the old site
+  block's own `header` directives inside it (`web/README.md` §"Serving
+  it": the old build's Content-Security-Policy, Permissions-Policy, COOP,
+  `nosniff`, `no-referrer`), or it is served without a content policy.
+  Once nothing is left there, the handle goes with the old build.
 
 ## Deploying with the gateway
 
@@ -1518,9 +1527,9 @@ is served on both listeners since 28.10.2026 ([native login](native-login.md)
 A reset with an administrator's code is served on both listeners since
 28.10.2026 ([account reset](account-reset.md)) and has its page on the
 website since 12.11.2026 (`/{lang}/reset`). An administrator makes the
-code on the new site's `/{lang}/account/admin` since 12.11.2026, or on the
-old build's admin page where that is still served (`handle /admin*`,
-above). A reset code by mail is served on both
+code on the new site's `/{lang}/account/admin` since 12.11.2026 (an
+account's page in the administration leads there, opened at that
+account). A reset code by mail is served on both
 listeners since migration 000026, where the `mail` block is configured
 ([mail](#mail)), and the website's reset page asks for it. Central mails
 30 reset codes an hour for all accounts together, counted in memory when a

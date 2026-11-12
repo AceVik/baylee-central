@@ -154,7 +154,7 @@ wrong audiences, purposes, registered gateways and replay remain refused.
 Europe/Berlin, set by migration 000015; the operator can move or clear it
 (`docs/operations.md` §"The legacy store"). After it no row is handed out, sweep or not; the daily sweep then deletes every
 row and every legacy reservation that never enrolled, which gives its name up.
-An administrator lists what is left on the website's `/admin/legacy`
+An administrator lists what is left on the website's `/{lang}/account/admin/legacy`
 (`AdminRequest::LegacyAccounts`: names,
 tags, progress, failures, lockout, refusals, sizes; no hash, no snapshot).
 
