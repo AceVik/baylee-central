@@ -1919,11 +1919,19 @@ dependency, no tool.
   kept (an immutable hashed file). Accepted: the target was the public
   module.
 - **Not used: Leptos' lazy islands** (`#[island(lazy)]`). They rest on
-  `wasm_split`: a splitter cuts the linked module into chunks after the
-  build (cargo-leptos' `--split`, with `wasm-split-cli`), and a generated
-  loader fetches them by addresses of its own. That is a new tool, which
-  needs the owner's acceptance, and chunks outside the manifest's hashes
-  and SRI values. Two builds of one crate needed nothing new.
+  `wasm_split`, whose runtime crates (`wasm_split_helpers` 0.2.3,
+  `wasm_split_macros` 0.2.2) are already in `Cargo.lock` through Leptos.
+  What they lack is the tool: `#[lazy]` only marks split points (a
+  placeholder import module, `__wasm_split_placeholder__`, and a custom
+  section), and a build tool that understands them (their README names
+  `wasm-split-cli`) has to cut the linked module into chunks, which a
+  generated `__wasm_split.js` then loads by addresses of its own. That is
+  a new tool, which needs the owner's acceptance, chunks outside the
+  manifest's hashes and SRI values, and a macro that writes `unsafe
+  extern "C"` imports and `#[unsafe(no_mangle)]` exports into
+  `central-web` (wasm_split_macros 0.2.2), which AGENTS.md's rule on
+  first-party FFI leaves to the owner. Two builds of one crate needed
+  nothing new.
 - **Sizes** (`cargo xtask site` on this Mac, `brotli -q 11`, `gzip -9`;
   bytes):
 
@@ -1937,9 +1945,10 @@ dependency, no tool.
   size before the administration (614 KB): 630 KB. Its glue went from
   59,119 to 56,609 bytes (8,132 Brotli). What of the administration it
   still holds is Central's wire: `call` parses every `Response`, the
-  administration's answers among them, and the account's home keeps its
-  registration switch for administrators. `central-api` was not
-  restructured for it.
+  administration's answers among them (the names of their fields that
+  nothing else uses, `accounts_week`, `live_tokens`, `owner_name`, are in
+  both modules), and the account's home keeps its registration switch for
+  administrators. `central-api` was not restructured for it.
 - **Tests.** Server (`central-web-server/tests/pages.rs`,
   `only_the_administration_s_pages_load_its_module`): in every language,
   every page under `/account/admin` (one account's and one report's

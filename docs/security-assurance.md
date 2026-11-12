@@ -7271,3 +7271,20 @@ Adversarial pass.
   one module of `fe100ce` holds both marks, so it would have refused that
   module as a public one; the xtask test keeps the marks inside the
   administration's sources.
+
+Run on this change: `cargo fmt --all --check`; `cargo clippy --workspace
+--all-targets -- -D warnings`; `cargo clippy -p central-web -p
+central-web-islands --target wasm32-unknown-unknown --lib -- -D
+warnings`, and the same with `--all-features` in a run of its own;
+`cargo test -p central-web -p central-web-server -p xtask`; `cargo build
+-p central-web-server` and `cargo xtask site` (its guard passing on both
+modules); in `web/`, `npm ci` and `npm run check`; the whole
+`web/e2e-site` suite (`--workers=4`: 644 passed, 4 skipped by their own
+conditions, `modules.spec.ts` among the passed); `cargo xtask gate`
+(format, policy, both advisory scopes, clippy, tests, doc tests and the
+release build: passed); `cargo xtask postgres`, `cargo xtask smoke` and
+`cargo xtask secrets`; `cargo audit --deny warnings` (0.22.2) and `cargo
+deny check` (0.20.2). Nothing ran against a real Central, and CI's
+`site` job, which now builds two modules and lints one more, did not
+run: nothing was pushed. This is an engineering review of a build
+change, not an audit.
