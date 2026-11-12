@@ -6472,10 +6472,10 @@ to every gateway; nothing in the snapshot or the wire changed.
 **Pass 3, what was tested.** `pages.rs`: a cell for each figure a source
 reports, under all sixteen sets of silent sources, none of GitHub's, and no
 official mark in either language. `e2e-site`: the strip's lines measured for
-every count at ten widths and four languages, axe and the 44 px targets; one
-press of the switch on a dark and a light device, with nothing, light or
-dark kept, on both sizes, and the kept scheme on the root before the body
-begins; no "official" on the start page or in the directory. `tests/hover.rs`
-and `tests/contrast.rs` still hold.
+all sixteen sets of silent sources at ten widths in all eleven languages,
+axe and the 44 px targets; one press of the switch on a dark and a light
+device, with nothing, light or dark kept, on both sizes, and the kept scheme
+on the root before the body begins; no "official" on the start page or in
+the directory. `tests/hover.rs` and `tests/contrast.rs` still hold.
 
 Engineering review, not an audit.

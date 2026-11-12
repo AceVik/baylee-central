@@ -209,13 +209,15 @@ fn strip_stat(label: &str, value: AnyView) -> impl IntoView + use<> {
 
 /// The strip under the bar: Baylee in numbers, the most telling first.
 /// What the online gateways say is happening on them, added up (players,
-/// of them in a game, open tables, running games), the gateways online and
-/// not, Central's accounts, the playable cards and how often the site's
-/// pages were opened. Only what a source said is shown: a number nobody
-/// reported is left out, never drawn as a zero, and while the directory has
-/// not answered the strip links to it instead. Nothing here is GitHub's
-/// any more (owner, 12.11.2026); the project's state is in the source
-/// section. The server counts the cells (`data-count`), and the stylesheet
+/// of them in a game, running games, open tables: the three short ones
+/// first, which a phone puts on a line of their own where the count is
+/// odd), the gateways online and not, Central's accounts, the playable
+/// cards and how often the site's pages were opened. Only what a source
+/// said is shown: a number nobody reported is left out, never drawn as a
+/// zero, and while the directory has not answered the strip links to it
+/// instead. Nothing here is GitHub's any more (owner, 12.11.2026); the
+/// project's state is in the source section. The server counts the cells
+/// (`data-count`), and the stylesheet
 /// lays that many out in even lines at every width (`header.css`).
 fn strip(cx: &Context<'_>) -> impl IntoView + use<> {
     let lang = cx.lang;
@@ -235,8 +237,8 @@ fn strip(cx: &Context<'_>) -> impl IntoView + use<> {
                     <dt class="visually-hidden">{live}</dt>
                     <dd class="strip-cell"><span class="dot ok live" aria-hidden="true"></span><span class="num">{words::live_players(lang, players)}</span></dd>
                     <dd class="strip-cell">{icon(icons::SWORDS)}<span class="num">{words::live_playing(lang, playing)}</span></dd>
-                    <dd class="strip-cell">{icon(icons::LAYOUT_DASHBOARD)}<span class="num">{words::live_tables(lang, tables)}</span></dd>
                     <dd class="strip-cell">{icon(icons::GAMEPAD_2)}<span class="num">{words::live_games(lang, games)}</span></dd>
+                    <dd class="strip-cell">{icon(icons::LAYOUT_DASHBOARD)}<span class="num">{words::live_tables(lang, tables)}</span></dd>
                 </div>
             }
         });

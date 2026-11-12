@@ -65,7 +65,8 @@ hero-offline = 單人對戰與牌組建構器可離線使用，不需要帳號�
 hero-account = 想線上遊玩？<register>建立帳號</register>，公開測試期間免費，人人都可以申請；或<signin>登入</signin>。
 hero-memorial = 懷念 Baylee：打開她的相簿
 
-status-label = Baylee 數據一覽
+# English for now: to be translated.
+status-label = Baylee in numbers
 
 cards-eyebrow = 卡牌
 cards-title = Baylee 認得多少張牌
@@ -980,7 +981,8 @@ ai-training = 除了內建 AI 與外部 LLM 橋接之外，一個專屬的原生
 ai-hostingLink = Gateway 託管與 LLM 設定
 
 # The gateways and the contact page, as the old site wrote them (owner, 11.11.2026)
-gw-lead = Gateway 是線上牌桌所在的伺服器：帳號、牌組、房間，以及每場遊戲各一個引擎程序。這裡列的是已向 Baylee Central 註冊並經其管理員核准的 Gateways。每一個都由其營運者為自己的社群營運，適用他們自己的規則。列在名單上，並不代表對 Gateway 的行為作出任何承諾。
+# English for now: to be translated.
+gw-lead = A gateway is a server where online tables live: accounts, decks, rooms and one engine process per game. These are the ones registered with Baylee Central and approved by its administrator. Each is run by its operators for their groups, and their own rules apply there. A listing is not a promise about what a gateway does.
 gw-howTo = 想在其中一個上面遊玩，請把它的位址複製到用戶端的入口畫面。在線表示 Central 在最近一分半鐘內收到過該 Gateway 的訊息；並不保證它會回應。名稱與版本由各營運者自行回報。
 gw-find = 尋找 Gateway
 gw-findHint = 名稱或位址

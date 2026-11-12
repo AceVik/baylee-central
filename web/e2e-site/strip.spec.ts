@@ -9,35 +9,34 @@ import { axe, targets } from "./check.ts";
 const WIDTHS = [320, 375, 599, 600, 768, 1024, 1099, 1100, 1440, 2560];
 
 /**
- * What the server writes when sources are silent, as the list's children
- * left out: the gateways' four counts (one group), then the gateways, the
- * accounts, the cards and the page views, one cell each. The cell for the
- * gateways is always there.
+ * The list's groups as the server writes them with every source reporting:
+ * the gateways' four counts (one group), then the gateways, the accounts,
+ * the cards and the page views, one cell each. The gateways' cell is always
+ * there; each other group is left out while its source is silent.
  */
-const SILENT: Record<number, string[]> = {
-  8: [],
-  7: ["views"],
-  6: ["cards", "views"],
-  5: ["accounts", "cards", "views"],
-  4: ["live"],
-  3: ["live", "views"],
-  2: ["live", "cards", "views"],
-  1: ["live", "accounts", "cards", "views"],
-};
 const ORDER = ["live", "gateways", "accounts", "cards", "views"];
+const OPTIONAL = ["live", "accounts", "cards", "views"];
+/** Every set of silent sources: sixteen. */
+const SILENCES = [...Array(16).keys()].map((bits) => OPTIONAL.filter((_, at) => ((bits >> at) & 1) === 1));
 
-/** Leave out what a silent source would leave out, and say how many cells remain, as the server would. */
-async function silence(page: Page, gone: string[]): Promise<void> {
-  await page.evaluate(
+/**
+ * Leave out what silent sources would leave out and say how many cells
+ * remain, as the server would (the groups are kept aside and put back, so
+ * one page serves every set).
+ */
+async function silence(page: Page, gone: string[]): Promise<number> {
+  return page.evaluate(
     ([order, silent]) => {
       const list = document.querySelector<HTMLElement>(".strip-list");
       if (!list) throw new Error("no strip");
-      const children = [...list.children];
-      if (children.length !== order.length) throw new Error(`${children.length} groups`);
-      order.forEach((name, at) => {
-        if (silent.includes(name)) children[at]?.remove();
-      });
-      list.setAttribute("data-count", String(list.querySelectorAll(".strip-cell").length));
+      const kept: unknown = Reflect.get(window, "stripGroups");
+      const all = Array.isArray(kept) ? (kept as Element[]) : [...list.children];
+      Reflect.set(window, "stripGroups", all);
+      if (all.length !== order.length) throw new Error(`${all.length} groups`);
+      list.replaceChildren(...all.filter((_, at) => !silent.includes(order[at] ?? "")));
+      const count = list.querySelectorAll(".strip-cell").length;
+      list.setAttribute("data-count", String(count));
+      return count;
     },
     [ORDER, gone] as const,
   );
@@ -114,8 +113,8 @@ test("the strip shows Baylee in numbers, the most telling first, and nothing of 
   await expect(strip.locator(".strip-cell")).toHaveText([
     /^\s*12 players$/,
     /^\s*8 in a game$/,
-    /^\s*3 open tables$/,
     /^\s*4 games$/,
+    /^\s*3 open tables$/,
     /^\s*Gateways\s*1 online\s*1 offline$/,
     /^\s*Accounts at Baylee Central\s*1,234 accounts$/,
     /^\s*Playable cards\s*8,348\s*cards$/,
@@ -139,20 +138,19 @@ test("in German the strip is named and counts as German does", async ({ page }) 
   await expect(strip).toContainText("1.234 Konten");
 });
 
-for (const lang of ["en", "de", "fr", "ru"]) {
-  test(`${lang}: the strip's lines are even and centred for every count, at every width`, async ({ page }, info) => {
+for (const lang of ["en", "de", "fr", "it", "es", "pt-br", "ru", "ja", "ko", "zh-hans", "zh-hant"]) {
+  test(`${lang}: the strip's lines are even and centred for every set of silent sources, at every width`, async ({ page }, info) => {
     // a phone has one width; the desk goes through them all
     const widths = info.project.name === "phone" ? [page.viewportSize()?.width ?? 412] : WIDTHS;
-    test.setTimeout(120_000);
     await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.goto(`/${lang}/`);
     const problems: string[] = [];
-    for (const [count, gone] of Object.entries(SILENT)) {
-      await page.goto(`/${lang}/`);
-      await silence(page, gone);
-      await expect(page.locator(".strip-list")).toHaveAttribute("data-count", count);
-      for (const width of widths) {
-        if (info.project.name !== "phone") await page.setViewportSize({ width, height: 800 });
-        for (const fault of faults(Number(count), await layout(page))) problems.push(`${width}px, ${count} cells: ${fault}`);
+    for (const width of widths) {
+      if (info.project.name !== "phone") await page.setViewportSize({ width, height: 800 });
+      for (const gone of SILENCES) {
+        const count = await silence(page, gone);
+        const silent = gone.length === 0 ? "none silent" : `${gone.join(", ")} silent`;
+        for (const fault of faults(count, await layout(page))) problems.push(`${width}px, ${silent}: ${fault}`);
       }
     }
     expect(problems).toEqual([]);
