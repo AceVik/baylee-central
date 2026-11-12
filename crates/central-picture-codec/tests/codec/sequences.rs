@@ -94,15 +94,27 @@ fn motion(format: Format, bytes: &[u8], ffmpeg: &Ffmpeg) -> Motion {
     output.motion
 }
 
-/// No directory of this process's encodes is left behind.
+/// No directory of this process's encodes is left behind. Other tests of
+/// this process may be encoding at the same time (with `PICTURE_FFMPEG` set,
+/// as in CI, every animated conversion does), and each removes its own
+/// directory when it ends: so the check waits until none is there, and only
+/// a directory that stays for 30 s counts as left behind.
 fn nothing_left() {
     let prefix = format!("central-picture-{}-", std::process::id());
-    let left: Vec<_> = std::fs::read_dir(std::env::temp_dir())
-        .unwrap()
-        .filter_map(Result::ok)
-        .filter(|entry| entry.file_name().to_string_lossy().starts_with(&prefix))
-        .collect();
-    assert!(left.is_empty(), "{left:?}");
+    let deadline = Instant::now() + Duration::from_secs(30);
+    loop {
+        let left: Vec<_> = std::fs::read_dir(std::env::temp_dir())
+            .unwrap()
+            .filter_map(Result::ok)
+            .filter(|entry| entry.file_name().to_string_lossy().starts_with(&prefix))
+            .map(|entry| entry.path())
+            .collect();
+        if left.is_empty() {
+            return;
+        }
+        assert!(Instant::now() < deadline, "{left:?}");
+        std::thread::sleep(Duration::from_millis(50));
+    }
 }
 
 #[cfg(unix)]
