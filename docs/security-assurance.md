@@ -5752,6 +5752,18 @@ Adversarial pass:
   therefore has the operator apply the deployed revision's grants by hand
   as the migrator before the first deploy, so that a refusal shows while
   the service runs. That step was written and not run.
+- The hook does not see a grant that only warns. Tried against the
+  throwaway PostgreSQL 18.6 with the hook's own call: on a table that is
+  not the migrator's, a grant of a privilege the migrator holds but may
+  not pass on prints a warning, grants nothing and ends with status 0; a
+  grant of a privilege it does not hold ends with an error and status 3;
+  a grant on its own table prints nothing. After a warning the hook
+  would start the unit, the store's check at start would refuse to run
+  without the privilege (it fails closed, and the fixture tests it), and
+  the hook would put the previous binary back when its probe fails. So
+  the runbook's step by hand passes only when `psql` prints nothing.
+  The hook was not changed for it: telling a warning from a notice by
+  its words depends on the server's language.
 
 **What stays possible:**
 - The binary and the website are what the build made, and the binary
@@ -5768,10 +5780,11 @@ Adversarial pass:
 ### What was run, and what was not
 
 On commit `0dcedc3` with nothing uncommitted, on macOS on Apple Silicon
-(rustc 1.99.0), 12.11.2026, each once and in this order. That commit is
-this branch but for the words of this section, which were written after
-the run; `cargo fmt --all --check` and `cargo xtask secrets` were run
-again on the commit that holds them and pass.
+(rustc 1.99.0), 12.11.2026, each once and in this order. What this
+branch holds after that commit changes documents only: the words of this
+section, and the runbook's and this record's lines on a grant that only
+warns. `cargo fmt --all --check` and `cargo xtask secrets` were run again
+on the last of those commits and pass.
 
 - `cargo fmt --all --check` and `cargo clippy --workspace --all-targets`
   pass, the second without a warning.
