@@ -6936,3 +6936,154 @@ animations before the rule and none after. The site's browser suite and
 ran on this work as reported in the pull request.
 
 Engineering review, not an audit.
+
+## The new site moderates bug and crash reports, 12 November 2026
+
+Until now an administrator triaged reports (`docs/reports.md` §"Triage")
+only on the old build's `/admin/feedback`. This change rebuilds it on the
+new site, `/{lang}/account/admin/feedback` and one report at
+`/{lang}/account/admin/feedback/<id in hex>` (`islands/feedback/`,
+[frontend rewrite](proposals/frontend-rewrite.md) §26), so the old build
+can go. Central is as it was: no request, answer, route, server crate,
+migration or dependency changed; `Cargo.toml` and `Cargo.lock` are
+untouched, and no `web-sys` feature was added.
+
+Design pass. The assets are the reports (a player's words, a pseudonym,
+what the client sent: a screenshot, the game, the log, the system; a
+game's record), which only an administrator may read; the triage, which
+only an administrator may change; and the administrator's password,
+which deleting for good may take once more. The trust boundary is the
+report: a game client wrote it, so every byte of it is hostile to the
+page. Central decides who reads and changes; the page decides nothing
+Central does not decide again.
+- **Who sees the pages.** As the reset code's page (above): the server
+  answers everyone with the same frame and cannot know the role; the
+  island shows the tool only where `AccountSummary` says `admin`, and asks
+  Central nothing more otherwise. No page links to the addresses. Every
+  report's address is one page without an id, so the server keeps and
+  varies nothing by it; anything but 32 lowercase hex digits is a 404.
+- **A report is text.** Every field is drawn as a Leptos text node: the
+  words, the crash and its place, the gateway's names and address, the
+  builds, the game id, labels, notes, history details, saved lists' names,
+  the client part's every value and every key of its tree. No `inner_html`
+  exists, and the site's Trusted Types would refuse one. The gateway's
+  address is shown, never linked. The only addresses built from report
+  data are the old build's two: Baylee's issue by its number (1 to
+  10,000,000), and GitHub's new-issue form from the administrator's own
+  summary, a category and a build that reads as a version; both go to the
+  one repository, in a new tab without opener or referrer. The old
+  build's card chips with Scryfall's pictures and links are not rebuilt:
+  the site's `img-src 'self'` admits no other origin, and a link to
+  another site built from a client's data was not needed.
+- **The client part** is untrusted gzip: read from Central's own route no
+  further than its announced bound, its magic checked, inflated by the
+  browser's `DecompressionStream` and cut off past 16 MiB while it
+  streams, decoded as strict UTF-8, parsed as a JSON object; every reader
+  takes its shape or nothing. The window's picture is shown only as a PNG
+  whose signature and `IHDR` (1 to 16,384 px a side) were checked, drawn
+  into a canvas by `createImageBitmap` from its bytes: no `blob:` or
+  `data:` address, so `img-src 'self'` stays. The tree draws a fold's
+  children only when it opens, 200 at a time, strings past 240
+  characters cut until asked, base64 counted, not shown. The record is
+  handed to the browser as Central keeps it, never unpacked.
+- **Addresses.** The list's filter is in the address (it was in the old
+  build's, and a saved list is that query string); a report's address
+  holds its id and that filter. Nothing a report says goes into an
+  address, a storage, a log or the console. The CSV is made in the page
+  and handed over through a `blob:` address that is given back after 30
+  seconds; a cell that begins with `=`, `+`, `-`, `@`, a tab or a carriage
+  return is defused with an apostrophe.
+- **Deleting for good** cannot be undone, and is the one triage change
+  Central wants a fresh password sign-in for (`AdminRequest::fresh`).
+  Nothing is sent before the question is answered; the page asks
+  `AccountSummary` and, where the sign-in is older than 29 minutes by the
+  browser's clock, takes the password once more in a Worker ended at once
+  and checks that the session is still the page's account; then one
+  request, however often the button is pressed. Central refuses a stale
+  sign-in and a report out of the trash with the same 401: the page tells
+  them apart by reading the reports again (still in the trash: the
+  sign-in; else: deleted nothing), not by its own clock.
+- **A lost answer** (no network, a 5xx, an answer of another shape) is
+  never a refusal: a change is read again and said as possibly made, a
+  note's draft stays, a purge reads the list again.
+- Decided against: rendering a report's Markdown or links; the drawer
+  and the single-key shortcuts (a second way to the same requests, and
+  single keys need WCAG 2.1.4's off switch); a quiet re-read every 30
+  seconds; widening the CSP for Scryfall or for `blob:` images.
+
+Implementation pass:
+- `islands/feedback/`: `query` (the address, the filter, views, pills),
+  `csv`, `text` (ids, alias, sizes, times, the chart's days, history
+  words), `github`, `client` (the readers) are plain functions with unit
+  tests; `api` holds every request, each answer taken only in its
+  request's shape, and the part route and the browser's pieces through
+  `js_sys`; `list`, `report`, `chart`, `tree`, `shared` are the views.
+  Every filter goes through `ReportFilter`'s bounds, every change through
+  `ReportChange::validate`, every label through `valid_label`, a saved
+  list through `valid_view`, before it is sent; element ids and focus
+  selectors are built from the 16-byte id only.
+- `data.rs`: `Section::Feedback` and `Section::Report` (in `ROUTED`, not
+  in `ALL`); `site/mod.rs`: the id-less match; `islands/account.rs`: the
+  two sections for `admin` only; `pages/account.rs`: their titles.
+- No new dependency or feature, no `unsafe`, no lint switched off.
+  Nothing is logged.
+
+Adversarial pass, each question with what answers it:
+- *Does anyone without the role get the tool, or make the page ask?* No:
+  in the browser both addresses show one sentence and the stand-in sees
+  no administration request and no part asked for. The server's test
+  finds no page of the area linking to them and no id in the pages.
+- *Does a report's markup run or become an element?* The stand-in puts
+  `<img onerror>` and `<script>` in every text field Central keeps and in
+  the client part's values and keys: the browser tests find them as text
+  in the list, the report's sections, the notes, the history, the saved
+  lists' names, the crash groups and the tree, no `img[src=x]`, no
+  `[onerror]`, no inline script, the marker never set, and no console
+  message carrying it. The gateway's `javascript:` address is code text;
+  no `javascript:` link exists.
+- *Is anything sent before deleting for good is confirmed, and is it sent
+  once?* The question and its "Cancel" send nothing; a double press sends
+  one `reports_bulk` (list) and one `purge_report` (report); a stale
+  sign-in asks the password first (`account_summary`, `login_start`,
+  `login_finish`, then the one request), and the password is in no
+  request body. A sign-in Central counts as stale while the browser's
+  clock does not is found by the reports still in the trash, and the
+  password is asked.
+- *Does each action send exactly its request?* The browser tests compare
+  every request with Central's serialized shape: the list's page with the
+  whole filter, the facets, a view, the search, every chip and field, the
+  order, the page and its size, saved lists, each selection's action,
+  marks, each triage change with the revision it was read at, notes,
+  trash, restore and purge. A label, a duplicate or an issue Central would
+  refuse is not sent.
+- *Can a refusal or a lost answer read as something else?* A role taken
+  away, a session gone, Central unavailable, a lost list change, a lost
+  purge, a conflict and a lost triage change: each is said as what it is,
+  in the browser.
+- *Does the CSV run a formula?* Unit tests, and the downloaded file in
+  the browser: the cell starts with an apostrophe.
+- **The checks have teeth** (one change at a time, each undone). Caught by
+  the unit tests: the CSV no longer defusing a formula; a space written as
+  `%20` (old saved lists stop matching); no answer read as a refusal.
+  Caught in the browser on a site rebuilt with each: the moderation shown
+  without the role; deleting for good without its question; a second
+  press sending a second request. These are the mutants that were tried,
+  not every decision.
+- *Script in the origin* reads the reports as it reads the page; nothing
+  here claims otherwise ([threat model](threat-model.md), "Website
+  compromise").
+
+Run on this change: `cargo fmt --all --check`; `cargo clippy --workspace
+--all-targets` finds nothing in this change (it stops at `shell.rs`'s
+`footer`, 104 lines, unchanged since `d41fce5`, and warns of xtask's
+unused `BIMI_SHA256`, also not this change's); `cargo clippy -p
+central-web -p central-web-islands --target wasm32-unknown-unknown --lib
+-- -D warnings`; `cargo test -p central-web -p central-web-server`;
+`cargo xtask site`; in `web/`, `npm run lint` and the specs type-checked
+under the strict settings; `web/e2e-site/feedback*.spec.ts` (17 tests,
+both projects, 34 passed) and `admin.spec.ts` and `account.spec.ts` with
+them. `cargo xtask gate`: see the pull request; it is expected to fail on
+the English share of the nine languages (24 to 27 in 100, the limit 12)
+until the moderation's words are translated, and on the footer above.
+Nothing ran against a real Central. This is an engineering review of two
+pages, not an audit.
