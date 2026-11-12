@@ -1317,8 +1317,8 @@ admin-pictures-title = 被举报的头像
 admin-pictures-lead = 移除头像会立即删除它，并把原因告知当事人；与举报一起留下的只有它的指纹。已处理的举报保存一年。
 admin-pictures-open = 待处理的举报
 admin-pictures-removed = 已移除的头像
-admin-pictures-case = Open the account's case
-admin-pictures-case-none = This account has no picture now.
+admin-pictures-case = 打开该账号的案件
+admin-pictures-case-none = 该账号现在没有图片。
 admin-pictures-none = 这里没有内容。
 admin-pictures-account = 账号
 admin-pictures-reporter = 举报人
@@ -1343,9 +1343,8 @@ privacy-export-picture = 你的头像（PNG）
 privacy-picture-title = 头像
 privacy-picture = 头像是可选的。如果你选择了头像，你的浏览器会制作它的正方形副本，不含照片的详细信息（如地点、相机或时间），并发送这份副本；如果你的浏览器不允许这样做，则会发送文件本身，而 Central 的转换器只保留其中的像素。Central 会把它转换为不含其他任何内容的 256 × 256 像素 AVIF 和 PNG 图片；如果头像是动态的，还会转换为一段动画（AVIF，最多 100 帧），由一个转换程序（ffmpeg）仅用其帧制作，该程序从不接触你的文件。Central 会连同指纹（PNG 以及动画（如有）的 SHA-256 摘要）和你设置头像的时间，一起存放在一个随每张新头像而变化的随机密钥之下。转换器为每张头像单独运行一个进程，不保留任何内容。所有人都能通过它的地址看到你的头像，包括未登录的人；它会显示在你的显示名旁边。它会保存到你替换或移除它、管理员移除它，或你删除账号为止，之后立即删除；显示过它的浏览器最多可能保留一个小时的副本。任何已登录的人都可以举报头像，并附上原因和可选的备注：举报包含举报账号、头像的指纹、原因、备注和时间。管理员能看到是谁举报的；头像的所有者永远看不到。如果管理员移除了你的头像，你会被告知时间和原因，并且新头像可能会被禁止一段时间。已处理的举报保存一年。Central 按账号统计上传次数（每小时十次，每天三十次）。法律依据：头像适用 GDPR 第 6 条第 1 款 (b) 项；举报、统计次数和审核适用 GDPR 第 6 条第 1 款 (f) 项（我们让服务不含违法和滥用内容的合法利益）。
 
-# English for now: to be translated.
-chat-quiet = It’s quiet here, for now.
-chat-add-contact = Add a contact
-chat-write-first = Write the first message
-people-copy-handle = Copy your handle
-people-copy-failed = Copying did not work here. Select your handle above and copy it by hand.
+chat-quiet = 这里暂时很安静。
+chat-add-contact = 添加联系人
+chat-write-first = 写下第一条消息
+people-copy-handle = 复制你的用户标识
+people-copy-failed = 这里无法复制。请选中上方你的用户标识，手动复制。

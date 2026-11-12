@@ -1317,8 +1317,8 @@ admin-pictures-title = 신고된 프로필 사진
 admin-pictures-lead = 사진을 삭제하면 즉시 지워지고 당사자에게 사유가 전달돼요. 신고와 함께 남는 것은 사진의 지문뿐이에요. 처리된 신고는 1년 동안 보관돼요.
 admin-pictures-open = 열린 신고
 admin-pictures-removed = 삭제된 사진
-admin-pictures-case = Open the account's case
-admin-pictures-case-none = This account has no picture now.
+admin-pictures-case = 계정의 케이스 열기
+admin-pictures-case-none = 이 계정에는 지금 사진이 없어요.
 admin-pictures-none = 여기에는 아무것도 없어요.
 admin-pictures-account = 계정
 admin-pictures-reporter = 신고한 사람
@@ -1343,9 +1343,8 @@ privacy-export-picture = 내 프로필 사진(PNG)
 privacy-picture-title = 프로필 사진
 privacy-picture = 프로필 사진은 선택 사항이에요. 사진을 고르면 브라우저가 사진의 세부 정보(장소, 카메라, 시간 등)를 뺀 정사각형 사본을 만들어 그것을 보내요. 브라우저가 이를 허용하지 않으면 파일 자체를 보내고, Central의 변환기는 그 픽셀만 남겨요. Central은 이것을 다른 것은 아무것도 담지 않은 256 × 256픽셀 AVIF와 PNG 사진으로 바꾸고, 사진이 움직이면 그 프레임만으로 변환 프로그램(ffmpeg)이 만든 애니메이션(AVIF, 최대 100프레임)으로도 바꿔요. 이 프로그램은 여러분의 파일을 보지 못해요. 이것들은 지문(PNG와, 있다면 애니메이션의 SHA-256 다이제스트)과 설정한 시각과 함께, 새 사진마다 바뀌는 무작위 키로 저장돼요. 변환기는 사진마다 별도의 프로세스로 실행되며 아무것도 남기지 않아요. 로그인하지 않은 사람을 포함해 누구나 그 주소에서 사진을 볼 수 있고, 사진은 표시 이름 옆에 표시돼요. 사진은 여러분이 바꾸거나 삭제하거나, 관리자가 삭제하거나, 계정을 삭제할 때까지 보관되고, 그 뒤 즉시 삭제돼요. 사진을 표시한 브라우저는 사본을 최대 한 시간 동안 가지고 있을 수 있어요. 로그인한 사람은 누구나 사유와 선택 메모를 붙여 사진을 신고할 수 있어요. 신고에는 신고한 계정, 사진의 지문, 사유, 메모, 시각이 담겨요. 관리자는 누가 신고했는지 볼 수 있지만, 사진 주인은 절대 볼 수 없어요. 관리자가 사진을 삭제하면 언제, 왜 삭제했는지 알려 주고, 새 사진이 한동안 차단될 수 있어요. 처리된 신고는 1년 동안 보관돼요. Central은 계정마다 업로드 횟수를 세요(시간당 10회, 하루 30회). 법적 근거: 사진은 GDPR 제6조 제1항 (b)호. 신고, 횟수, 관리는 GDPR 제6조 제1항 (f)호(서비스에 불법적이고 부적절한 콘텐츠가 없도록 하려는 우리의 정당한 이익).
 
-# English for now: to be translated.
-chat-quiet = It’s quiet here, for now.
-chat-add-contact = Add a contact
-chat-write-first = Write the first message
-people-copy-handle = Copy your handle
-people-copy-failed = Copying did not work here. Select your handle above and copy it by hand.
+chat-quiet = 지금은 조용해요.
+chat-add-contact = 연락처 추가
+chat-write-first = 첫 메시지를 써 보세요
+people-copy-handle = 내 핸들 복사
+people-copy-failed = 여기서는 복사가 되지 않았어요. 위의 핸들을 선택해서 직접 복사해 주세요.

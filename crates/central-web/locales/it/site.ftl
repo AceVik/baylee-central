@@ -1450,8 +1450,8 @@ admin-pictures-title = Immagini del profilo segnalate
 admin-pictures-lead = Rimuovere un'immagine la elimina subito e comunica il motivo alla persona; con le segnalazioni resta solo la sua impronta. Le segnalazioni decise vengono conservate per un anno.
 admin-pictures-open = Segnalazioni aperte
 admin-pictures-removed = Immagini rimosse
-admin-pictures-case = Open the account's case
-admin-pictures-case-none = This account has no picture now.
+admin-pictures-case = Apri il caso dell'account
+admin-pictures-case-none = Questo account ora non ha nessuna immagine.
 admin-pictures-none = Qui non c'è nulla.
 admin-pictures-account = Account
 admin-pictures-reporter = Segnalata da
@@ -1476,9 +1476,8 @@ privacy-export-picture = La tua immagine del profilo (PNG)
 privacy-picture-title = Immagine del profilo
 privacy-picture = Un'immagine del profilo è facoltativa. Se ne scegli una, il tuo browser ne crea una copia quadrata senza i dettagli della foto (come luogo, fotocamera od ora) e invia quella; dove il tuo browser non lo consente, invia il file stesso, e il convertitore di Central ne tiene solo i pixel. Central la trasforma in un'immagine AVIF e PNG di 256 × 256 pixel che non contiene altro e, se l'immagine è animata, anche in un'animazione (AVIF, al massimo 100 fotogrammi) ricavata dai suoi soli fotogrammi da un programma di conversione (ffmpeg) che non vede mai il tuo file; le memorizza con un'impronta (un digest SHA-256 del PNG e dell'animazione, se c'è) e l'ora in cui l'hai impostata, sotto una chiave casuale che cambia a ogni nuova immagine. Il convertitore viene eseguito come processo separato per ogni immagine e non conserva nulla. Tutti possono vedere la tua immagine, anche chi non ha effettuato l'accesso, al suo indirizzo; viene mostrata accanto al tuo nome visualizzato. Viene conservata finché non la sostituisci o la rimuovi, un amministratore la rimuove o elimini il tuo account, e poi viene eliminata subito; un browser che l'ha mostrata può tenerne una copia per al massimo un'ora. Chiunque abbia effettuato l'accesso può segnalare un'immagine con un motivo e una nota facoltativa: la segnalazione contiene l'account che segnala, l'impronta dell'immagine, il motivo, la nota e l'ora. Gli amministratori vedono chi l'ha segnalata; la persona a cui appartiene l'immagine non lo vede mai. Se un amministratore rimuove la tua immagine, ti viene comunicato quando e perché, e le nuove immagini possono essere bloccate per un periodo. Le segnalazioni decise vengono conservate per un anno. Per ogni account, Central conta i caricamenti (dieci all'ora, trenta al giorno). Base giuridica: art. 6, par. 1, lett. b) del GDPR per l'immagine; art. 6, par. 1, lett. f) del GDPR per le segnalazioni, i conteggi e la moderazione (il nostro legittimo interesse a tenere il servizio libero da contenuti illeciti e abusivi).
 
-# English for now: to be translated.
-chat-quiet = It’s quiet here, for now.
-chat-add-contact = Add a contact
-chat-write-first = Write the first message
-people-copy-handle = Copy your handle
-people-copy-failed = Copying did not work here. Select your handle above and copy it by hand.
+chat-quiet = Per ora qui è tutto tranquillo.
+chat-add-contact = Aggiungi un contatto
+chat-write-first = Scrivi il primo messaggio
+people-copy-handle = Copia il tuo handle
+people-copy-failed = Qui la copia non ha funzionato. Seleziona il tuo handle qui sopra e copialo a mano.

@@ -1326,8 +1326,8 @@ admin-pictures-title = Fotos de perfil denunciadas
 admin-pictures-lead = Remover uma foto a apaga na hora e informa o motivo à pessoa; só a impressão digital dela fica junto com as denúncias. As denúncias decididas são guardadas por um ano.
 admin-pictures-open = Denúncias abertas
 admin-pictures-removed = Fotos removidas
-admin-pictures-case = Open the account's case
-admin-pictures-case-none = This account has no picture now.
+admin-pictures-case = Abrir o caso da conta
+admin-pictures-case-none = Esta conta não tem nenhuma imagem agora.
 admin-pictures-none = Nada aqui.
 admin-pictures-account = Conta
 admin-pictures-reporter = Denunciada por
@@ -1352,9 +1352,8 @@ privacy-export-picture = Sua foto de perfil (PNG)
 privacy-picture-title = Foto de perfil
 privacy-picture = Uma foto de perfil é opcional. Se você escolher uma, o seu navegador faz uma cópia quadrada dela, sem os detalhes da foto (como local, câmera ou hora), e envia essa cópia; quando o seu navegador não permite isso, ele envia o próprio arquivo, e o conversor do Central guarda só os pixels dele. O Central transforma a foto em uma imagem AVIF e PNG de 256 × 256 pixels que não contém mais nada e, se a foto se move, também em uma animação (AVIF, no máximo 100 quadros) feita só com os quadros dela por um programa conversor (ffmpeg) que nunca vê o seu arquivo; guarda tudo com uma impressão digital (um resumo SHA-256 do PNG e da animação, se houver) e a hora em que você a definiu, sob uma chave aleatória que muda a cada nova foto. O conversor roda como um processo separado para cada foto e não guarda nada. Todos podem ver a sua foto, inclusive quem não entrou na conta, no endereço dela; ela é mostrada ao lado do seu nome de exibição. Ela é guardada até você trocá-la ou removê-la, um administrador removê-la ou você excluir a sua conta, e então é apagada na hora; um navegador que a mostrou pode guardar uma cópia por até uma hora. Qualquer pessoa conectada pode denunciar uma foto com um motivo e uma observação opcional: a denúncia contém a conta que denunciou, a impressão digital da foto, o motivo, a observação e a hora. Os administradores veem quem denunciou; a pessoa dona da foto nunca vê. Se um administrador remover a sua foto, você é informado de quando e por quê, e novas fotos podem ser bloqueadas por um tempo. As denúncias decididas são guardadas por um ano. Por conta, o Central conta os envios (dez por hora, trinta por dia). Base legal: art. 6.º, n.º 1, alínea b), do RGPD para a foto; art. 6.º, n.º 1, alínea f), do RGPD para as denúncias, as contagens e a moderação (nosso interesse legítimo em manter o serviço livre de conteúdo ilícito e abusivo).
 
-# English for now: to be translated.
-chat-quiet = It’s quiet here, for now.
-chat-add-contact = Add a contact
-chat-write-first = Write the first message
-people-copy-handle = Copy your handle
-people-copy-failed = Copying did not work here. Select your handle above and copy it by hand.
+chat-quiet = Por enquanto, está tudo calmo por aqui.
+chat-add-contact = Adicionar um contato
+chat-write-first = Escreva a primeira mensagem
+people-copy-handle = Copiar seu identificador
+people-copy-failed = A cópia não funcionou aqui. Selecione seu identificador acima e copie-o à mão.

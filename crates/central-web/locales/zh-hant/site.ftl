@@ -1317,8 +1317,8 @@ admin-pictures-title = 被檢舉的大頭貼
 admin-pictures-lead = 移除大頭貼會立即刪除它，並把原因告知當事人；與檢舉一起留下的只有它的指紋。已處理的檢舉保存一年。
 admin-pictures-open = 待處理的檢舉
 admin-pictures-removed = 已移除的大頭貼
-admin-pictures-case = Open the account's case
-admin-pictures-case-none = This account has no picture now.
+admin-pictures-case = 開啟該帳號的案件
+admin-pictures-case-none = 該帳號目前沒有圖片。
 admin-pictures-none = 這裡沒有內容。
 admin-pictures-account = 帳號
 admin-pictures-reporter = 檢舉人
@@ -1343,9 +1343,8 @@ privacy-export-picture = 你的大頭貼（PNG）
 privacy-picture-title = 大頭貼
 privacy-picture = 大頭貼是選填的。如果你選了大頭貼，你的瀏覽器會製作它的正方形副本，不含照片的詳細資訊（如地點、相機或時間），並傳送這份副本；如果你的瀏覽器不允許這麼做，則會傳送檔案本身，而 Central 的轉換器只保留其中的像素。Central 會把它轉換成不含其他任何內容的 256 × 256 像素 AVIF 和 PNG 圖片；如果大頭貼是動態的，還會轉換成一段動畫（AVIF，最多 100 格），由一個轉換程式（ffmpeg）僅用其影格製作，該程式從不接觸你的檔案。Central 會連同指紋（PNG 以及動畫（如有）的 SHA-256 摘要）和你設定大頭貼的時間，一起存放在一組隨每張新大頭貼而改變的隨機金鑰之下。轉換器為每張大頭貼單獨執行一個程序，不保留任何內容。所有人都能透過它的位址看到你的大頭貼，包括未登入的人；它會顯示在你的顯示名稱旁邊。它會保存到你更換或移除它、管理員移除它，或你刪除帳號為止，之後立即刪除；顯示過它的瀏覽器最多可能保留一小時的副本。任何已登入的人都可以檢舉大頭貼，並附上原因和選填的備註：檢舉包含檢舉的帳號、大頭貼的指紋、原因、備註和時間。管理員看得到是誰檢舉的；大頭貼的所有者永遠看不到。如果管理員移除了你的大頭貼，你會被告知時間和原因，而且新的大頭貼可能會被封鎖一段時間。已處理的檢舉保存一年。Central 依帳號統計上傳次數（每小時十次，每天三十次）。法律基礎：大頭貼適用 GDPR 第 6 條第 1 項 (b) 款；檢舉、統計次數和審核適用 GDPR 第 6 條第 1 項 (f) 款（我們讓服務不含違法和濫用內容的正當利益）。
 
-# English for now: to be translated.
-chat-quiet = It’s quiet here, for now.
-chat-add-contact = Add a contact
-chat-write-first = Write the first message
-people-copy-handle = Copy your handle
-people-copy-failed = Copying did not work here. Select your handle above and copy it by hand.
+chat-quiet = 這裡暫時很安靜。
+chat-add-contact = 新增聯絡人
+chat-write-first = 寫下第一則訊息
+people-copy-handle = 複製你的代號
+people-copy-failed = 這裡無法複製。請選取上方你的代號，手動複製。

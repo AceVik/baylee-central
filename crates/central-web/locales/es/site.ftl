@@ -1326,8 +1326,8 @@ admin-pictures-title = Imágenes de perfil denunciadas
 admin-pictures-lead = Quitar una imagen la elimina de inmediato e informa a la persona del motivo; solo su huella queda con las denuncias. Las denuncias resueltas se conservan un año.
 admin-pictures-open = Denuncias abiertas
 admin-pictures-removed = Imágenes quitadas
-admin-pictures-case = Open the account's case
-admin-pictures-case-none = This account has no picture now.
+admin-pictures-case = Abrir el caso de la cuenta
+admin-pictures-case-none = Esta cuenta no tiene ninguna imagen ahora.
 admin-pictures-none = Aquí no hay nada.
 admin-pictures-account = Cuenta
 admin-pictures-reporter = Denunciada por
@@ -1352,9 +1352,8 @@ privacy-export-picture = Tu imagen de perfil (PNG)
 privacy-picture-title = Imagen de perfil
 privacy-picture = Una imagen de perfil es opcional. Si eliges una, tu navegador hace una copia cuadrada sin los datos de la foto (como lugar, cámara u hora) y envía esa; si tu navegador no lo permite, envía el archivo mismo, y el convertidor de Central conserva solo sus píxeles. Central la convierte en una imagen AVIF y PNG de 256 × 256 píxeles que no contiene nada más, y, si la imagen se mueve, también en una animación (AVIF, como máximo 100 fotogramas) hecha solo con sus fotogramas por un programa convertidor (ffmpeg) que nunca ve tu archivo; las almacena con una huella (un resumen SHA-256 del PNG y de la animación, si la hay) y la hora en que la estableciste, bajo una clave aleatoria que cambia con cada imagen nueva. El convertidor se ejecuta como un proceso independiente para cada imagen y no conserva nada. Todos pueden ver tu imagen, también quienes no han iniciado sesión, en su dirección; se muestra junto a tu nombre visible. Se conserva hasta que la sustituyes o la quitas, un administrador la quita, o eliminas tu cuenta, y entonces se elimina de inmediato; un navegador que la mostró puede conservar una copia hasta una hora. Cualquier persona con sesión iniciada puede denunciar una imagen con un motivo y una nota opcional: la denuncia contiene la cuenta que denuncia, la huella de la imagen, el motivo, la nota y la hora. Los administradores ven quién la denunció; la persona a quien pertenece la imagen nunca lo ve. Si un administrador quita tu imagen, se te informa de cuándo y por qué, y las imágenes nuevas pueden bloquearse durante un tiempo. Las denuncias resueltas se conservan un año. Por cuenta, Central cuenta las cargas (diez por hora, treinta por día). Base jurídica: art. 6, apdo. 1, letra b) del RGPD para la imagen; art. 6, apdo. 1, letra f) del RGPD para las denuncias, los recuentos y la moderación (nuestro interés legítimo en mantener el servicio libre de contenido ilícito y abusivo).
 
-# English for now: to be translated.
-chat-quiet = It’s quiet here, for now.
-chat-add-contact = Add a contact
-chat-write-first = Write the first message
-people-copy-handle = Copy your handle
-people-copy-failed = Copying did not work here. Select your handle above and copy it by hand.
+chat-quiet = Por ahora, aquí todo está tranquilo.
+chat-add-contact = Añadir un contacto
+chat-write-first = Escribe el primer mensaje
+people-copy-handle = Copiar tu identificador
+people-copy-failed = No se pudo copiar aquí. Selecciona tu identificador de arriba y cópialo a mano.

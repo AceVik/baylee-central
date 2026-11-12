@@ -1449,8 +1449,8 @@ admin-pictures-title = Photos de profil signalées
 admin-pictures-lead = Supprimer une photo l’efface aussitôt et indique le motif à la personne ; seule son empreinte reste avec les signalements. Les signalements traités sont conservés un an.
 admin-pictures-open = Signalements ouverts
 admin-pictures-removed = Photos supprimées
-admin-pictures-case = Open the account's case
-admin-pictures-case-none = This account has no picture now.
+admin-pictures-case = Ouvrir le dossier du compte
+admin-pictures-case-none = Ce compte n’a pas d’image pour le moment.
 admin-pictures-none = Rien ici.
 admin-pictures-account = Compte
 admin-pictures-reporter = Signalée par
@@ -1475,9 +1475,8 @@ privacy-export-picture = Votre photo de profil (PNG)
 privacy-picture-title = Photo de profil
 privacy-picture = Une photo de profil est facultative. Si vous en choisissez une, votre navigateur en fait une copie carrée sans les détails de la photo (comme le lieu, l’appareil ou l’heure) et envoie celle-ci ; si votre navigateur ne le permet pas, il envoie le fichier lui-même, et le convertisseur de Central n’en garde que les pixels. Central en fait une image AVIF et PNG de 256 × 256 pixels qui ne contient rien d’autre et, si la photo est animée, aussi une animation (AVIF, 100 images au plus) faite à partir de ses seules images par un programme de conversion (ffmpeg) qui ne voit jamais votre fichier ; il les enregistre avec une empreinte (un condensat SHA-256 du PNG et de l’animation, s’il y en a une) et l’heure à laquelle vous l’avez définie, sous une clé aléatoire qui change à chaque nouvelle photo. Le convertisseur s’exécute comme un processus distinct pour chaque photo et ne conserve rien. Tout le monde peut voir votre photo, y compris les personnes non connectées, à son adresse ; elle est affichée à côté de votre nom d’affichage. Elle est conservée jusqu’à ce que vous la remplaciez ou la supprimiez, qu’un administrateur la supprime ou que vous supprimiez votre compte, puis elle est effacée aussitôt ; un navigateur qui l’a affichée peut en garder une copie pendant une heure au plus. Toute personne connectée peut signaler une photo avec un motif et une remarque facultative : le signalement contient le compte qui signale, l’empreinte de la photo, le motif, la remarque et l’heure. Les administrateurs voient qui l’a signalée ; la personne à qui appartient la photo ne le voit jamais. Si un administrateur supprime votre photo, on vous indique quand et pourquoi, et les nouvelles photos peuvent être bloquées pendant un temps. Les signalements traités sont conservés un an. Par compte, Central compte les envois (dix par heure, trente par jour). Base légale : art. 6, par. 1, point b) du RGPD pour la photo ; art. 6, par. 1, point f) du RGPD pour les signalements, les comptages et la modération (notre intérêt légitime à garder le service exempt de contenus illicites et abusifs).
 
-# English for now: to be translated.
-chat-quiet = It’s quiet here, for now.
-chat-add-contact = Add a contact
-chat-write-first = Write the first message
-people-copy-handle = Copy your handle
-people-copy-failed = Copying did not work here. Select your handle above and copy it by hand.
+chat-quiet = C’est calme ici, pour l’instant.
+chat-add-contact = Ajouter un contact
+chat-write-first = Écrivez le premier message
+people-copy-handle = Copier votre identifiant
+people-copy-failed = La copie n’a pas fonctionné ici. Sélectionnez votre identifiant ci-dessus et copiez-le à la main.
