@@ -184,19 +184,72 @@ Crate `central-mail`. Each mail has a plain text part and an HTML part:
 - a notice to it that the password was changed;
 - a notice to it that an administrator made a reset code.
 
-The HTML is a table layout with inline styles in the site's light colours.
-It has no image, no script and nothing loaded from elsewhere. A code is
-printed and never part of a link; no notice carries one. The only links go
-to the site's reset page (the reset mail, and the notices of a reset and of
-a changed password) and to the account's security page (the notices of a
+The HTML is a table layout with inline styles. It has no image, no style
+sheet, no script and nothing loaded from elsewhere. A code is printed and
+never part of a link; no notice carries one. The only links go to the
+site's reset page (the reset mail, and the notices of a reset and of a
+changed password) and to the account's security page (the notices of a
 replaced or removed address and of an administrator's code); the
 confirmation mail has none. Every value is escaped.
 
-A code is set in a monospace font in a box of its own. The confirmation
-code (9 characters) at 30 px; the reset code (45 characters) at 15 px with
-no space added between its characters, about 406 px, so that it fits on one
-line of the 520 px card in the mail clients (Gmail and mailbox.org broke it
-in two at 17 px). On a narrow screen it breaks at its hyphens.
+### How a mail looks
+
+*Since 12.11.2026, by the owner's word ("Mache bitte die E-Mails
+schöner"). Both bodies say the same in the same order.*
+
+- **The card.** A card of at most 560 px on the site's sunlit ground
+  (`#f2efe4`), with a thin edge and round corners; where the reader is
+  narrower, the card is too. Outlook, which knows no maximum width, gets a
+  560 px table in a conditional comment.
+- **The band.** The card's top is a band in the blue hour's colour
+  (`#0f1b2d`) with a gold edge (`#e3c07e`) under it. On it, the wordmark in
+  letters: the name's first letter on a gold tile, as the site's header has
+  its picture there (hidden from screen readers), and "Baylee" in the
+  site's serif (Literata where a device has it, else Georgia).
+- **The title** is the mail's one heading (`h1`), in the serif at 26 px,
+  with a short line in the accent (`#235b66`) under it. Then what happened,
+  in paragraphs of 16 px.
+- **The code** in a monospace font in a box of its own: a light tint with a
+  dashed frame in the accent, its label above it in small capitals, and
+  under it how long it lasts and that nobody at Baylee asks for it. A click
+  selects the whole code where the reader allows it. The confirmation code
+  (9 characters) at 30 px; the reset code (45 characters) at 15 px with no
+  space added between its characters, about 406 px, so that it fits on one
+  line of the 470 px inside the box (Gmail and mailbox.org broke it in two
+  at 17 px on the old 520 px card). On a narrow screen it breaks at its
+  hyphens.
+- **The warning.** What to do if this was not you stands apart on the
+  site's warning tint with an edge in its colour: in the notices, where it
+  matters. The code mails end with the calmer "if this was not you, ignore
+  this mail" in a quieter hand.
+- **The button.** The one link is a button made of a table cell in the
+  accent with the words in the light ink (7.4:1). The cell carries the
+  colour and Outlook's padding (`mso-padding-alt`), the link a padding of
+  its own for every other reader: 48 px high, the whole of it a target.
+- **The footer** under a thin rule, at 13 px.
+- **Dark readers.** Without a style sheet there is no dark variant, so the
+  mail says it is light only (`color-scheme` and `supported-color-schemes`
+  metadata, and on the root element). Readers that darken mails anyway do
+  it in two ways: they invert everything, or they darken light grounds and
+  lighten dark text. Every text stands on a ground the mail sets (band,
+  card, box, warning, button), and the band and the button are dark under
+  light words, which such readers leave alone. A test measures every pair
+  of ink and ground at 4.5:1 or more as drawn and as inverted, and the
+  frames at 3:1.
+- **The list of mails** shows the first paragraph beside the subject: it
+  stands first in the body, hidden. It is never a code.
+
+The plain text is complete on its own: the title with a line of `=` as wide
+as it under it (a wide East Asian character counts twice), the paragraphs
+with an empty line between them, the code alone on a line under its label,
+the link's address alone on a line under its words, and the footer under
+the signature's mark (`-- `), which mail readers set apart.
+
+To look at them: `BAYLEE_MAIL_SHOTS=<folder> cargo test -p central-mail --
+--ignored` writes every mail in English and German as HTML and text into
+the folder, with fresh random codes, for a browser. They were looked at in
+Chromium at 360 and 640 px, as drawn and inverted, on 12.11.2026; not yet
+in Gmail, mailbox.org or Outlook in this look.
 
 The words are `id = text` lines in `crates/central-mail/locales/<lang>/mail.ftl`,
 one file for each of the site's eleven languages, read by a small parser of
