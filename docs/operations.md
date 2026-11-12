@@ -419,6 +419,14 @@ to it instead of answering 404, with the `Host` unchanged (Caddy's default for
 a plain-HTTP upstream):
 
 ```caddyfile
+	# A profile picture's upload (docs/profile-pictures.md): the route's
+	# own bound, 8 MiB and its frame; the longer path is tried first.
+	handle /api/v1/picture {
+		request_body {
+			max_size 9MiB
+		}
+		reverse_proxy 127.0.0.1:28791
+	}
 	# Central's browser listener (docs/web-accounts.md).
 	handle /api/* {
 		request_body {
@@ -1218,6 +1226,12 @@ build of `web/` as before; nothing here changes production by being merged.
   			header_up -Cookie
   		}
   	}
+  	handle /api/v1/picture {
+  		request_body {
+  			max_size 9MiB
+  		}
+  		reverse_proxy 127.0.0.1:28791
+  	}
   	handle /api/* {
   		request_body {
   			max_size 64KiB
@@ -1276,7 +1290,12 @@ on the server on 12.11.2026, where neither package was installed):
    so that universe, ffmpeg and its libraries among it, gets security
    updates (`esm-apps`); `pro status` must list `esm-apps` as enabled.
    They then come with the server's other updates.
-4. **The worker's units:** copy `ops/central-picture.socket` and
+4. **Caddy** must let an upload through: the `/api/*` block bounds bodies
+   to 64 KiB, so every picture larger than that would get 413. Add the
+   `handle /api/v1/picture` block with `max_size 9MiB` before it, as both
+   snippets above show (the route itself refuses more than 8 MiB, and
+   1 MiB for SVG and ICO, from `Content-Length` before reading).
+5. **The worker's units:** copy `ops/central-picture.socket` and
    `ops/central-picture@.service` to `/etc/systemd/system/`, run
    `systemctl daemon-reload` and `systemctl enable --now
    central-picture.socket`, and give the service
