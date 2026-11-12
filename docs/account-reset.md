@@ -172,7 +172,8 @@ an hour) besides the global one; natively `ResetStart` has the same since
 [security assurance](security-assurance.md), "The website redeems a reset
 code and changes a password").* `/{lang}/reset`, linked from the sign-in
 form and the FAQ, not indexed and in no menu, takes the sign-in name, the
-reset code, the choice and the new password twice. The crypto is
+reset code (an administrator's, or one Central mailed), the choice and the
+new password twice. The crypto is
 `central-web-crypto`'s `reset_start`, `reset_keep` and `reset_new`, which do
 what `central-client`'s `reset` does with the same `central-crypto`
 functions; no message changed.
@@ -204,6 +205,21 @@ functions; no message changed.
   the new code goes to the page once, to be shown, copied or saved as a
   file. After a reset Central confirmed, the page forgets this browser's
   session if Central no longer knows it.
+- **A code by mail** *(12.11.2026; the website's half of an account's
+  e-mail address, `docs/email.md`)*. Before the form stands a block for
+  someone who has no code, "No reset code?": a sign-in name and "Send a
+  code by e-mail" (`ResetMail`). Central answers `Done` whatever the name,
+  and the page has one sentence for it: if the account has a confirmed
+  address, a code is on its way, valid for one hour. It promises no mail.
+  `Busy` is "try again later"; `Rejected`, which Central gives for every
+  name where it sends no mail, is "ask an administrator". Only what is a
+  sign-in name by its form is sent, so that this `Rejected` is never the
+  answer to an e-mail address typed in the name's place. As a
+  registration's form, one sent within three seconds of the page is not
+  sent; here the page says so. The name is carried into the form, where a
+  mailed code is redeemed as an administrator's is. The form's lead and
+  the code's hint name both origins and both lifetimes (one hour by mail,
+  24 hours from an administrator).
 
 ## What the clients need
 
