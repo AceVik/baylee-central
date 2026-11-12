@@ -254,8 +254,10 @@ The ids join the figures to the directory's entries; the figures carry no
 origin or name of their own. `PublicFigures` is served wherever the directory
 is, on the native route and on the browser listener, without a session (a
 cookie sent along is not looked at), and spends the directory's budgets: the
-unauthenticated budget of 32 a second for everyone together, and on both
-listeners the same 60 a minute per address that `GatewayDirectory`
+unauthenticated budget of 32 a second for everyone together (since
+12.11.2026 with 8 a second kept beside it for an address that asked
+little, [native login](native-login.md#guessing-a-password-online)), and
+on both listeners the same 60 a minute per address that `GatewayDirectory`
 spends, one budget for both ([web accounts](web-accounts.md)).
 
 **They are claims.** Central cannot see a gateway's tables. It bounds each

@@ -1251,6 +1251,37 @@ Since then:
    `baylee_central` there with the method the superuser's line has, and
    reload. Whoever may run `docker exec` on that container is root on the
    host already.
+5. Apply the grants of the revision that is deployed now, by hand, as the
+   migrator. Step 4 shows that the login reaches the database. It does not
+   show that the migrator may grant on everything the file names: until
+   now the superuser applied the file, so this was never asked on the
+   server. The hook applies the grants after the unit is stopped, and a
+   failure there puts the old service back after a stop. By hand it shows
+   beforehand, while the service runs. As root, with the build user's name
+   for `BUILD_USER`:
+
+   ```sh
+   f=$(mktemp)
+   runuser -u BUILD_USER -- git --no-replace-objects -C /opt/baylee-central/src \
+     cat-file blob "$(cat /opt/baylee-central/state/deployed):ops/grants.sql" > "$f"
+   grep -c '\\' "$f"
+   docker exec -i baylee-postgres-1 psql -X -w -q -v ON_ERROR_STOP=1 \
+     -U central_migrator -d baylee_central < "$f"; echo "exit $?"
+   rm -f "$f"
+   ```
+
+   `grep` must print `0` (no backslash; if it prints more, do not go on to
+   `psql`, which would take such a line for a command of its own). The
+   last line must be `exit 0`. If `state/deployed` is missing (a Central
+   deployed by hand), name the revision the running service was built
+   from. The file only grants (read it first, it is short), and the
+   deployed service has these grants already, so applying it again
+   changes nothing.
+   If `psql` ends with `permission denied` or `must be owner`, a table or
+   the schema on the server is not the migrator's: deploy nothing with
+   this hook until its owner is `central_migrator` (the migrations make
+   them as that login, so this is not expected). This step was not run on
+   the server.
 
 **What stays possible.** The binary and the website are still what the
 build made, and the binary runs the migrations with the migrator's login:
