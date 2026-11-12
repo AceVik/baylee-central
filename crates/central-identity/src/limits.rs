@@ -64,10 +64,31 @@ pub(super) const PROVEN: usize = 16_384;
 /// session that ended, or was replaced, stops counting as one after this
 /// many requests.
 pub(super) const REFUSALS: u8 = 4;
-/// Control and data requests a second for one bearer, of the 512 and 256
-/// all vouched-for bearers share.
+/// Control and data requests a second all vouched-for bearers share.
+const SHARED_CONTROL: u32 = 512;
+const SHARED_DATA: u32 = 256;
+/// Control and data requests a second for one bearer, of what they share.
 const BEARER_CONTROL: u32 = 128;
 const BEARER_DATA: u32 = 64;
+/// Control and data requests a second for the bearers of one place
+/// together, of what all share: half of each window, so one address alone
+/// never spends what every session shares, however many bearers it holds.
+/// Half and not a quarter: two bearers at one address each keep their
+/// whole own budget (two gateways behind one address, or a gateway's
+/// credential and its heartbeat token before they are counted together),
+/// and a household's clients ask a small part of it.
+const PLACE_CONTROL: u32 = SHARED_CONTROL / 2;
+const PLACE_DATA: u32 = SHARED_DATA / 2;
+const _: () = assert!(PLACE_CONTROL >= 2 * BEARER_CONTROL && PLACE_DATA >= 2 * BEARER_DATA);
+const _: () = assert!(PLACE_CONTROL < SHARED_CONTROL && PLACE_DATA < SHARED_DATA);
+/// Bearers' own windows held at once: more than can be opened in the
+/// second they live, since each is opened by a request that was served.
+const PEERS: usize = 1_024;
+/// Places' windows of the shared budgets held at once. Never full: a
+/// window is opened by a request that was served and forgotten a second
+/// later, and fewer are served in two seconds than this holds.
+const SHARING: usize = 2_048;
+const _: () = assert!(SHARING > 2 * (SHARED_CONTROL + SHARED_DATA) as usize);
 
 /// How a request is counted.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -349,8 +370,11 @@ pub(super) struct Limits {
     control: Window,
     pairing: Window,
     peers: BTreeMap<([u8; 32], bool), Window>,
+    /// What each place's bearers drew together of `control` (`true`) and
+    /// of `data` in the current second ([`PLACE_CONTROL`], [`PLACE_DATA`]).
+    sharing: BTreeMap<(Place, bool), Window>,
     /// The bearers an answer vouched for; only they draw on `control`,
-    /// `data` and `peers`.
+    /// `data`, `peers` and `sharing`.
     proven: Proven,
     /// Every other bearer's requests ([`UNPROVEN_PER_SECOND`]) and each
     /// place's share of them ([`PLACE_UNPROVEN_PER_MINUTE`]).
@@ -382,6 +406,13 @@ impl Window {
             now.duration_since(start) >= Duration::from_secs(1) || used < maximum
         })
     }
+
+    /// Whether its second is still running: one that is over, or never
+    /// began, holds nothing worth keeping.
+    fn live(&self, now: Instant) -> bool {
+        self.0
+            .is_some_and(|(start, _)| now.duration_since(start) < Duration::from_secs(1))
+    }
 }
 impl Limits {
     /// Count a request against what all clients share, before anything
@@ -391,8 +422,10 @@ impl Limits {
     /// cannot spend what everyone signs in with. A request that comes
     /// with a bearer is counted by it only once an answer has vouched for
     /// that bearer ([`Proven`]); until then it shares the strangers'
-    /// second ([`UNPROVEN_PER_SECOND`]). Nothing is spent when a budget is
-    /// used up.
+    /// second ([`UNPROVEN_PER_SECOND`]). A vouched-for bearer has its own
+    /// budget, its place's bearers have half a shared window between them
+    /// ([`PLACE_CONTROL`], [`PLACE_DATA`]), and all have the shared window.
+    /// Nothing is spent when a budget is used up.
     pub(super) fn request(
         &mut self,
         request: &Request,
@@ -430,27 +463,44 @@ impl Limits {
             self.strangers.spend(place, now);
             return Ok(());
         }
-        self.peers.retain(|_, window| {
-            window
-                .0
-                .is_some_and(|(start, _)| now.duration_since(start) < Duration::from_secs(1))
-        });
+        self.peers.retain(|_, window| window.live(now));
+        self.sharing.retain(|_, window| window.live(now));
         let key = (digest, control);
-        let own = if control { BEARER_CONTROL } else { BEARER_DATA };
+        let (own, share, shared) = if control {
+            (BEARER_CONTROL, PLACE_CONTROL, SHARED_CONTROL)
+        } else {
+            (BEARER_DATA, PLACE_DATA, SHARED_DATA)
+        };
         // The bearer's own budget is looked at before the shared one is
         // drawn on: a bearer asking faster than its own allows is refused
         // here and spends nothing of what every session shares.
         let room = match self.peers.get(&key) {
             Some(window) => window.fits(now, own),
-            None => self.peers.len() < 1024,
+            None => self.peers.len() < PEERS,
+        };
+        if !room {
+            return Err(Error::Busy);
+        }
+        // Then its place's share, for the same reason: however many
+        // bearers one address holds, they draw half a shared window
+        // between them and are refused here past it. A request the
+        // listener knows no place of (a process on Central's own host)
+        // has no share to draw on and meets the other two budgets.
+        let spot = place.map(|place| (place, control));
+        let room = match spot.and_then(|spot| self.sharing.get(&spot)) {
+            Some(window) => window.fits(now, share),
+            None => spot.is_none() || self.sharing.len() < SHARING,
         };
         if !room {
             return Err(Error::Busy);
         }
         if control {
-            self.control.charge(now, 512)?;
+            self.control.charge(now, shared)?;
         } else {
-            self.data.charge(now, 256)?;
+            self.data.charge(now, shared)?;
+        }
+        if let Some(spot) = spot {
+            self.sharing.entry(spot).or_default().charge(now, share)?;
         }
         self.peers.entry(key).or_default().charge(now, own)
     }
@@ -670,6 +720,211 @@ mod tests {
                 Err(Error::Busy)
             );
         }
+    }
+
+    /// Four bearers at one address filled a shared window between them
+    /// (4 x 128, 4 x 64): two accounts' sessions, or one account's and
+    /// its gateways' tokens. One place now draws half a window at most,
+    /// however many bearers it holds, what it is refused spends nothing,
+    /// and sessions elsewhere are served their whole budgets beside it.
+    #[test]
+    fn four_bearers_at_one_address_no_longer_fill_what_sessions_share() {
+        let now = Instant::now();
+        for (request, own, shared) in [
+            (Request::SessionStatus, BEARER_CONTROL, SHARED_CONTROL),
+            (Request::CreateObject, BEARER_DATA, SHARED_DATA),
+        ] {
+            let mut limits = Limits::default();
+            let mut served = 0;
+            for _ in 0..4 {
+                let bearer = Token::generate().unwrap();
+                limits.issued(&bearer, now);
+                for _ in 0..own {
+                    if limits
+                        .request(&request, Some(&bearer), Some(place(1)), now)
+                        .is_ok()
+                    {
+                        served += 1;
+                    }
+                }
+            }
+            assert_eq!(served, shared / 2);
+            // The other half is still there, for two sessions at two
+            // other addresses and all they may ask.
+            for elsewhere in 2..4 {
+                let session = Token::generate().unwrap();
+                limits.issued(&session, now);
+                for _ in 0..own {
+                    limits
+                        .request(&request, Some(&session), Some(place(elsewhere)), now)
+                        .expect("a session elsewhere is served");
+                }
+            }
+            // Then the window is spent, and by served requests only.
+            let last = Token::generate().unwrap();
+            limits.issued(&last, now);
+            assert_eq!(
+                limits.request(&request, Some(&last), Some(place(9)), now),
+                Err(Error::Busy)
+            );
+            // A second later the place has its half again.
+            let later = now + Duration::from_secs(1);
+            let again = Token::generate().unwrap();
+            limits.issued(&again, later);
+            limits
+                .request(&request, Some(&again), Some(place(1)), later)
+                .expect("the place's next second");
+        }
+    }
+
+    /// The share keeps out nobody it should not: a gateway alone at its
+    /// address asks all its own budget allows, second after second, and so
+    /// do two gateways behind one address, which is why the share is half
+    /// a window and not a quarter.
+    #[test]
+    fn a_gateway_alone_and_two_behind_one_address_keep_their_whole_budgets() {
+        let start = Instant::now();
+        for gateways in [1, 2] {
+            let mut limits = Limits::default();
+            let credentials: Vec<Token> =
+                (0..gateways).map(|_| Token::generate().unwrap()).collect();
+            for second in 0..5 {
+                let now = start + Duration::from_secs(second);
+                for credential in &credentials {
+                    limits.issued(credential, now);
+                    for _ in 0..BEARER_CONTROL {
+                        limits
+                            .request(&check(), Some(credential), Some(place(7)), now)
+                            .expect("a gateway's check of a player");
+                    }
+                    for _ in 0..BEARER_DATA {
+                        let asked = Request::GatewayStatus;
+                        limits
+                            .request(&asked, Some(credential), Some(place(7)), now)
+                            .expect("a gateway's own request");
+                    }
+                }
+            }
+        }
+    }
+
+    /// A household: six signed-in clients behind one address, each asking
+    /// eight control and eight data requests every second, far more than a
+    /// client's polling. None is refused, in any second.
+    #[test]
+    fn a_household_s_clients_are_served_within_their_address_s_share() {
+        let start = Instant::now();
+        let mut limits = Limits::default();
+        let home = Some(place(3));
+        let sessions: Vec<Token> = (0..6).map(|_| Token::generate().unwrap()).collect();
+        for session in &sessions {
+            limits.issued(session, start);
+        }
+        for second in 0..10 {
+            let now = start + Duration::from_secs(second);
+            for _ in 0..8 {
+                for session in &sessions {
+                    limits
+                        .request(&Request::SessionStatus, Some(session), home, now)
+                        .expect("a client's status");
+                    limits
+                        .request(&Request::ReadDocument, Some(session), home, now)
+                        .expect("a client's read");
+                }
+            }
+        }
+    }
+
+    /// The official gateway runs on Central's host. Its bridge asks its
+    /// whole budget whether its requests come with the host's own address
+    /// or with none, and also while another address spends its half of
+    /// the window: a request the listener knows no place of has no share
+    /// to draw on, and the bridge's address holds nobody else.
+    #[test]
+    fn the_official_gateway_on_central_s_host_is_served_beside_a_full_address() {
+        let now = Instant::now();
+        for host in [None, Some(Place::V4([127, 0, 0, 1]))] {
+            let bridge = Token::generate().unwrap();
+            let mut limits = Limits::keeping(bridge.digest());
+            for _ in 0..2 {
+                let bearer = Token::generate().unwrap();
+                limits.issued(&bearer, now);
+                for _ in 0..BEARER_CONTROL {
+                    limits
+                        .request(&Request::SessionStatus, Some(&bearer), Some(place(1)), now)
+                        .expect("within the address's half");
+                }
+            }
+            let third = Token::generate().unwrap();
+            limits.issued(&third, now);
+            assert_eq!(
+                limits.request(&Request::SessionStatus, Some(&third), Some(place(1)), now),
+                Err(Error::Busy)
+            );
+            for _ in 0..BEARER_CONTROL {
+                limits
+                    .request(&check(), Some(&bridge), host, now)
+                    .expect("the bridge's check of a player");
+            }
+        }
+    }
+
+    /// A gateway's check of one of its players' leases.
+    fn check() -> Request {
+        Request::GatewaySession {
+            lease: Token::generate().unwrap(),
+            purpose: central_api::wire::TicketPurpose::Admit,
+        }
+    }
+
+    /// The places' windows of the shared budgets live a second and are
+    /// bounded: a served request opens one, the next second forgets it.
+    #[test]
+    fn a_place_s_share_of_the_shared_windows_is_forgotten_after_its_second() {
+        let start = Instant::now();
+        let mut limits = Limits::default();
+        let session = Token::generate().unwrap();
+        limits.issued(&session, start);
+        let mut refused = 0;
+        for n in 0..SHARED_DATA {
+            let from = Some(place(n));
+            if limits
+                .request(&Request::ReadDocument, Some(&session), from, start)
+                .is_err()
+            {
+                refused += 1;
+            }
+        }
+        // One bearer's own budget was served, each request from another
+        // address; a refused request opened no window.
+        assert_eq!(refused, SHARED_DATA - BEARER_DATA);
+        assert_eq!(limits.sharing.len(), BEARER_DATA as usize);
+        limits
+            .request(
+                &Request::ReadDocument,
+                Some(&session),
+                Some(place(0)),
+                start + Duration::from_secs(1),
+            )
+            .unwrap();
+        assert_eq!(limits.sharing.len(), 1);
+        // An IPv6 subscriber's /64 is a place like any other.
+        let later = start + Duration::from_secs(2);
+        let subscriber = Some(Place::V6([0x20, 0x01, 0x0d, 0xb8, 0, 1, 0, 2]));
+        let mut served = 0;
+        for _ in 0..4 {
+            let bearer = Token::generate().unwrap();
+            limits.issued(&bearer, later);
+            for _ in 0..BEARER_DATA {
+                if limits
+                    .request(&Request::ReadDocument, Some(&bearer), subscriber, later)
+                    .is_ok()
+                {
+                    served += 1;
+                }
+            }
+        }
+        assert_eq!(served, PLACE_DATA);
     }
 
     /// Supplying a token is not being signed in. Requests with bearers
