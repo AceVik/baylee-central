@@ -261,8 +261,8 @@ stay.
 **Accepted limits.** The client is trusted with its own vault's continuity:
 a modified client can wrap another key and lose its own data, nothing of
 anyone else's. A device signed in elsewhere learns of the change when its
-session is refused; there is no notice by e-mail yet (M1 step 4). The
-native client's form is M6.
+session is refused; no mail tells of a changed password (the mails
+Central sends are in [e-mail](email.md)). The native client's form is M6.
 
 **The website's form** (12.11.2026; `crates/central-web`,
 `islands/password.rs`, in the account area's security section). A browser
@@ -595,7 +595,10 @@ standard input: `endpoint`, `gateway`, `database_port`, `database_user`,
 are byte arrays: the persisted versioned server setup and a random 32-byte bridge
 credential. An optional `browser` (`listen`, `origin`) starts the website's
 browser listener for a page served on a loopback origin ([web
-accounts](web-accounts.md) §"Local runs"). Keep this configuration outside source control with owner-only file
+accounts](web-accounts.md) §"Local runs"). An optional `mail` (`endpoint`,
+`site`, `token`) names a mailer on loopback, with a numeric loopback HTTP
+origin as the site ([e-mail](email.md#configuration)); without it the
+service sends no mail. Keep this configuration outside source control with owner-only file
 permissions; never pass credentials on the command line. A restart must reuse
 the setup. The service does not create keys or run migrations implicitly.
 This command only accepts loopback development endpoints and the restricted

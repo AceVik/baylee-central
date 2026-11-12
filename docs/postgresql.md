@@ -186,3 +186,71 @@ number 000027 was kept for this work and is not used.
   (`(sender, correlation)`). Before, it counted the deliveries only. The
   count still reads every delivery of every recipient device, 5,000 each
   at the most. The plan was not looked at under load.
+
+## An account's e-mail address (migration 000026)
+
+`m20261112_000026_email` adds two tables in `central_identity`, for an
+account's optional address ([e-mail](email.md)). Nothing else in the schema
+knows an address. Both tables have the account's id as primary key and
+`REFERENCES accounts(id) ON DELETE CASCADE`, so an account has at most one
+row in each and both go with it. The `accounts` table is not changed.
+
+`account_emails` holds the address an account confirmed:
+
+- `address` (`text`): 5 to 254 bytes of printable ASCII around one `@`.
+  The CHECK is looser than the wire's rule (`central_api::email::address`),
+  which the service applies before a row is written; it keeps out what is
+  no address at all. There is **no unique constraint**: two accounts may
+  hold the same address.
+- `lang` (`text`): the language tag the confirming code was asked in, which
+  a later notice to the address is written in.
+- `confirmed_at` (`timestamptz`), from `clock_timestamp()`.
+- `reset_digest` (`bytea`, 32 bytes or NULL): the digest of the reset code
+  Central last mailed for the account.
+- `reset_mailed` (`timestamptz[]`, at most 3): when it mailed the last
+  ones.
+
+`account_email_pending` holds an address that waits for its code: `address`
+and `lang` as above, `code_digest` (`bytea`, 32 bytes;
+`MailCode::digest`, SHA-256 over a label, the account's id and the code),
+`expires_at`, and `tries` (`smallint`, 0 to 4): the fifth wrong code deletes
+the row. An index on `expires_at` serves the sweep. No code is stored, only
+digests.
+
+- **Whose reset code.** The reset code stays where migration 000013 put
+  it, in `accounts.reset_digest` and `reset_expires`, and the statements
+  that use, clear and sweep it are unchanged. A code on the account's row
+  was mailed exactly when `account_emails.reset_digest` holds the same
+  digest. Every other code is an administrator's. The statement that makes
+  a mailed code requires that the account's row holds no code, an expired
+  one or a mailed one; so it never replaces an administrator's code that
+  lasts. An administrator's new code replaces the digest on the account's
+  row and not the one beside the address, and is an administrator's by the
+  same rule.
+- **How often.** The same statement requires that no time in
+  `reset_mailed` is younger than 10 minutes and fewer than 3 are younger
+  than 24 hours. A code that is made appends the time and drops those older
+  than 24 hours. The times are kept when the mail was not taken, and when
+  the address is replaced; they end with a removed address.
+- **Locks.** Every write of an account's address, and the making of a
+  mailed code, first locks the account's row (`FOR UPDATE`). A mailed code
+  also locks the administrators' rows as `set_admin` does, so no account
+  becomes an administrator while a code is made for it.
+- **Time.** Expiry is compared with `clock_timestamp()` in the statement
+  that reads the row. A row past its end counts as absent everywhere.
+- **Confirming** is one transaction: the waiting row is deleted, the
+  address row written, a mailed reset code that went to the old address
+  cleared from both rows. A wrong code's count is committed, not rolled
+  back with the refusal.
+- **Grants.** `SELECT, INSERT, UPDATE, DELETE` on both tables for the
+  runtime role (`ops/grants.sql`). The startup check's list has 37 entries
+  with them.
+- **The sweep** (`--sweep-stdin`, the migrator login) deletes waiting rows
+  past their end, clears a `reset_digest` whose code is no longer on the
+  account's row, and drops times older than 24 hours.
+- **Earlier binaries.** The previous release names neither table. Its
+  reset statements run unchanged over the migrated schema (they are in the
+  upgrade fixture): it makes, redeems and sweeps an administrator's code,
+  and it would replace a mailed code like any other, since it does not
+  know one. Its account deletion removes both rows by the cascade.
+- **No way back.** The migration has no `down`, as its siblings have none.

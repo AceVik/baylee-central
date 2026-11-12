@@ -4,9 +4,10 @@ This runbook covers the deployed launcher and its database connector. It is an
 operator procedure, not a release approval: the gates in [status](status.md)
 still apply. Registration, sign-in, a password change and a reset with an
 administrator's code on `baylee.app` are served by the browser
-listener ([below](#the-browser-listener)) once it is configured; nothing here
-enables a reset by e-mail or browser SSO for gateways. Sessions renew
-([below](#sessions)).
+listener ([below](#the-browser-listener)) once it is configured. An account's
+e-mail address and a reset code by mail need the `mail` block
+([below](#mail)). Nothing here enables browser SSO for gateways. Sessions
+renew ([below](#sessions)).
 
 ## Launcher modes
 
@@ -20,9 +21,11 @@ never in argv or the environment. Unknown fields fail closed.
   its old address, which is also the legacy migration's); none is configurable.
   Input:
   `listen`, `database`, `opaque_setup`, `bridge`, and optionally
-  `browser: {"listen": …}` for the browser listener (absent means off) and
+  `browser: {"listen": …}` for the browser listener (absent means off),
   `legacy: {"database": …}`, the legacy store's own login (absent means no
-  legacy sign-in; [the legacy store](#the-legacy-store)).
+  legacy sign-in; [the legacy store](#the-legacy-store)) and
+  `mail: {"endpoint": …, "site": …, "token": …}`, the mailer on this host
+  (absent means Central sends no mail; [mail](#mail)).
 - `--migrate-stdin` applies pending migrations once under the migration login
   and exits. Input: `database` only. The service never migrates by itself.
 - `--legacy-import-stdin` and `--legacy-deadline-stdin` import the official
@@ -556,8 +559,9 @@ audit event with the operator as its actor. Keep the username out of the
 repository and of shell history: the file holds it.
 
 The audit keeps administrators' and the operator's actions for three years;
-a daily timer deletes older events, the digests of expired reset codes and
-expired pairings, with the migration document
+a daily timer deletes older events, the digests of expired reset codes,
+expired pairings and e-mail addresses whose confirmation code has ended,
+with the migration document
 (`/etc/baylee-central/migrate.json`), under the same `systemd-run` user as
 the deploy hook's migration:
 
@@ -975,9 +979,103 @@ boundaries and subscription renewal. The OPAQUE setup must never be
 regenerated: replacing it locks every enrolled account out. Keep an offline
 copy. The bridge credential is shared only with the official gateway's
 `BAYLEE_CENTRAL_CONFIG_FILE`, and only when legacy migration is enabled.
+The mailer's token is not generated here: it is the one the mailer holds
+for Central ([mail](#mail)).
 
 The OPAQUE setup together with a copy of the credential table permits offline
 password guessing. Treat any backup that holds both as credential material.
+
+## Mail
+
+*Since migration 000026; the protocol and every number are in
+[an account's e-mail address](email.md).*
+
+Central sends three mails: the code that confirms an account's address, a
+reset code, and a notice to an address that was replaced or removed. It
+speaks no SMTP. It hands each mail to `baylee-mailer` on the same host, one
+`POST /v1/send` over loopback HTTP. The mailer's `API.md` is the contract.
+
+Without the `mail` block Central sends no mail. An address that is stored
+can be read and removed, none can be named or confirmed, and a request for
+a reset code by mail is refused for every name. Reset codes from an
+administrator work as before.
+
+```json
+"mail": {
+  "endpoint": "http://127.0.0.1:<the mailer's port>",
+  "site": "https://baylee.app",
+  "token": "…"
+}
+```
+
+- `endpoint`: where the mailer listens. `http://`, a numeric loopback
+  address and a port, nothing after it. **There is no default, and the
+  mailer's default port must not be assumed**: read the port from the
+  mailer's own configuration on this host. A name (also `localhost`),
+  another host, `https://` or a path is refused.
+- `site`: the origin the mails' links start with (`{site}/{lang}/reset` and
+  `{site}/{lang}/account/security`). The website's canonical HTTPS origin,
+  without a path or a trailing slash.
+- `token`: the bearer token the mailer holds for Central, 32 to 256
+  characters. It is a secret like the bridge: it lives in the root-owned
+  configuration file and in the mailer's own configuration, never in an
+  argument, the environment, a unit file or the repository. Whoever holds
+  it can send mail through the mailer in Central's name, within the
+  mailer's limits. To rotate it, change it in both places and restart
+  Central.
+
+A service whose block is malformed prints `central: invalid configuration`
+and does not start; the line names no value. The development launcher takes
+the same block, with a numeric loopback HTTP origin as `site`.
+
+**Database.** Migration 000026 adds two tables, and `ops/grants.sql` their
+grants ([PostgreSQL](postgresql.md#an-accounts-e-mail-address-migration-000026)).
+The deploy hook applies both. The daily sweep (`--sweep-stdin`,
+[administration](#administration)) deletes addresses that waited for a code
+which has ended, and prints how many.
+
+**What Central logs.** At start, with the block: `central: mail through the
+mailer on this host`. Later, for a reset code or a notice the mailer did
+not take: `central: a mail was not handed to the mailer`. No line holds an
+address, a name, a code or which mail it was. A confirmation mail that was
+not taken is answered `Busy` to the person and is not logged.
+
+**Limits.** Central's own are in [the numbers](email.md#the-numbers): for
+one account 5 confirmation mails an hour and 10 a day; for one client
+address 5 requests for a reset code an hour on each listener, and 30 an
+hour for everyone together; for one account one mailed reset code in 10
+minutes and 3 in 24 hours. Only the last is in the database. The others are
+in memory, and a restart forgets them. The mailer has limits of its own for
+each `limit_key` (Central sends `account:` and the account's id), for each
+recipient and for each day. They are the mailer's configuration and are not
+set here. The mailer's queue is in memory: a mail it took is lost when the
+mailer restarts, and the person asks again. A try counts also when the
+mailer did not take the mail. While the mailer is down, an account that
+asked three times gets no mailed reset code for 24 hours; an
+administrator's code is the way then.
+
+**After a deploy that adds or changes the block**, check:
+
+1. The unit is active and the journal has `central: mail through the mailer
+   on this host`.
+2. The port in `endpoint` is the one the mailer listens on (`ss -ltn`, the
+   mailer's unit), on loopback only.
+3. The mailer accepts Central's token. A wrong token or port shows as
+   `Busy` to a person who names an address, and as `a mail was not handed
+   to the mailer` in the journal for a reset code.
+4. With a test account of the operator's own: name an address, confirm it
+   with the mailed code, ask for a reset code by mail and see that mail
+   arrive. Until the website has its forms, `central-client` asks these
+   requests ([the SDK](email.md#the-sdk)).
+5. The links in the two mails open the site's reset page and the account's
+   security page.
+
+**The legal texts.** An address is personal data that Central did not store
+before. The privacy notice (`legal/privacy.*.md` §§ 3 and 6) names it as
+"not available yet", speaks of reset links where Central mails codes, and
+knows a reset code's digest only as an administrator's. Bringing those
+lines up to date is the owner's review. This runbook does not decide
+whether the block may be enabled before that.
 
 ## Supervision
 
@@ -1395,5 +1493,10 @@ A reset with an administrator's code is served on both listeners since
 28.10.2026 ([account reset](account-reset.md)) and has its page on the
 website since 12.11.2026 (`/{lang}/reset`). The new site has no page that
 issues the code yet: the old build's admin page does, where it is still
-served (`handle /admin*`, above). A reset by e-mail is not served. Discovery reveals enrollment state for a supplied
+served (`handle /admin*`, above). A reset code by mail is served on both
+listeners since migration 000026, where the `mail` block is configured
+([mail](#mail)); the website has no form for it yet. The requests for it are
+counted in memory, 30 an hour for everyone: three addresses that ask on
+both listeners at their own limit (six on one) spend that, and others then
+get `Busy` until the hour has passed. Discovery reveals enrollment state for a supplied
 username (see [native login](native-login.md)), on both listeners.

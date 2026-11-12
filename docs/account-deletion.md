@@ -20,7 +20,10 @@ Central cannot read the encrypted data, so an export has two halves:
   origin, public metadata, approved, created) and those it administers, the
   number and size of its encrypted objects, and the audit events naming it
   (ids and times only). No credential, wrapper or ciphertext, and no other
-  account's data.
+  account's data. Since 12.11.2026 an account may hold an e-mail address
+  ([e-mail](email.md)). It is **not** in this answer, which the released
+  client decodes strictly and which therefore did not change; the account
+  reads its address with `EmailRequest::Status`.
 - **The encrypted half** is read and decrypted by the client: the account
   document and every private object, through the existing `ReadDocument`,
   `ListObjects` and `ReadObject`. `central-client` gains `Session::export`
@@ -53,7 +56,8 @@ OPAQUE proof of the password, as a password change does:
    tickets and leases, so every gateway sees the lease refused at its next
    check), private objects, migration archives, the gateways it owns (with
    their approvals, administrator lists and leases), its places
-   on other gateways' administrator lists, its terms acceptances and roles.
+   on other gateways' administrator lists, its terms acceptances and roles,
+   and since migration 000026 its e-mail address and one that waits.
    Audit events stay: they name only ids, which no longer resolve. The
    username and tag are free again for a later registration.
 

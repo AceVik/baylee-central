@@ -275,7 +275,9 @@ The server side of [web accounts](web-accounts.md) lands in three PRs.
 - **Deleting and exporting an account** (28.10.2026, roadmap M1 step 3;
   [account deletion](account-deletion.md)). `AccountExport` (both
   listeners, a password sign-in under 30 minutes): everything Central stores
-  about the account apart from secrets and ciphertext, every list bounded;
+  about the account apart from secrets and ciphertext (and, since
+  12.11.2026, apart from its e-mail address, which `EmailRequest::Status`
+  reads), every list bounded;
   `DeleteAccountStart` and `DeleteAccountFinish` (both listeners): a fresh
   OPAQUE proof of the password, one unit of the login budget, refused for an
   administrator and an open move, then the account row deleted under its
@@ -315,6 +317,35 @@ The server side of [web accounts](web-accounts.md) lands in three PRs.
   accepted terms ([gateway registry](gateway-registry.md) §"Discovery,
   heartbeats and administrators"). No migration; the operator moves the
   official row in the deploy's window ([operations](operations.md#the-official-gateway)).
+- **An account's e-mail address and a reset code by mail** (12.11.2026,
+  roadmap M1 step 4; [e-mail](email.md)). Migration 000026: an account's
+  optional confirmed address and one that waits for its code. `Email` (a
+  session on either listener, terms accepted): `status`, `set` (a password
+  sign-in under 30 minutes; a code of 40 bits by mail, 15 minutes, five
+  wrong tries), `resend`, `confirm`, `withdraw`, `remove`; the address that
+  is replaced or removed is told. `ResetMail` (no session, both listeners)
+  answers `Done` for every name and reads no account; a worker then makes a
+  reset code through the statement an administrator's is made through,
+  valid one hour, never over an administrator's code that lasts, once in
+  ten minutes and three times a day for an account, and mails it. It is
+  redeemed with `ResetStart` and `ResetFinish`, unchanged. A new crate,
+  `central-mail`, writes the three mails (English and German; the other
+  nine languages hold the English text for now) and hands them to
+  `baylee-mailer` over loopback HTTP. An optional `mail` block in the
+  service's document; without it Central sends no mail and refuses what
+  needs one. `central-client`: `Session::email` and `reset_mail`. No
+  existing request or answer changed, and `AccountExport` is as it was.
+  Tests: the store on real PostgreSQL, the upgrade over 000025 with the
+  previous binary's reset statements, the service on real PostgreSQL with a
+  mailer of the test's own and through both real listeners, the counts with
+  a clock of their own, the mailer's client against a stand-in on loopback,
+  rendering and redaction. Not tested: a real mailer and real delivery.
+  Deploy: the hook migrates and grants; then add the `mail` block
+  ([operations](operations.md#mail)). **Open:** the website's forms for the
+  address and for asking for a code by mail, the client's (M6), the nine
+  translations, and the privacy notice's lines on the address, which are
+  the owner's review. No mail says that a reset was finished. Three
+  addresses that ask on both listeners spend Central's 30 requests an hour.
 - **Not yet deployed.** Deploy: migrate, grant, add `browser.listen`, pass
   `/api/*` in the `baylee.app` site block (no keys since the open beta, 11.11.2026). Central’s own terms
   are still `draft`, so none are in force.
@@ -379,7 +410,9 @@ evidence of production capacity.
 Native OPAQUE login, account persistence, gateway registration/admin APIs,
 exclusive sessions, guarded legacy migration and encrypted private-object/chat
 storage are implemented and tested with synthetic data. They have not been
-deployed for real users. Browser SSO, a reset by e-mail, the client's forms
+deployed for real users. Browser SSO, the forms for an e-mail address and
+for a reset code by mail (served since 12.11.2026, [e-mail](email.md); no
+page and no client form asks for them yet), the client's forms
 for a reset and for a password change (both are served since 28.10.2026 and
 the website has its pages since 12.11.2026) and MFA
 remain unfinished (sessions renew, up to 12 hours); registration and

@@ -5810,4 +5810,244 @@ build was touched; `cargo xtask postgres --exercise-failure` and `smoke
 things an operator loads or installs (the firewall's file, the deploy
 hook, the report levels' query) were tried only as each point says.
 
+## An account's e-mail address and a reset code by mail, 12 November 2026
+
+The wire for an account's optional e-mail address was set before
+(`central_api::email`, `Request::Email`, `Request::ResetMail`,
+`Response::Email`). This change builds the service behind it
+([e-mail](email.md)): migration 000026 and its store, a new crate
+`central-mail` (the three mails and the client of `baylee-mailer`), the
+identity service's handlers, counts and worker, a per-address budget on
+both listeners, a `mail` block in both launchers, and two functions in
+`central-client`. No existing request, answer or struct changed, and
+`AccountExport` is as it was. No third-party dependency was added or
+changed: `Cargo.lock` gains `central-mail`'s own entry and its name in the
+entries of the two crates that use it.
+
+Design pass. The assets are the address (personal data Central did not
+hold before), the confirmation code, the reset code, which takes a login,
+and the mailer's token. A session is trusted for its own account. Nobody is
+trusted on `ResetMail`. The mailer is trusted with addresses and codes; it
+is on the same host and reached over loopback only.
+- **What an address can do.** It resets the login and nothing else, as an
+  administrator's code does. It decrypts nothing, signs in to nothing and
+  is shown to nobody. Whoever reads the mailbox can take the login and,
+  with a new vault, destroy the account's data. That is what the address
+  is for; it is optional for that reason, and the document says so.
+- **Who may name one.** A session whose password sign-in is under 30
+  minutes old, the rule every change of who can reset a login follows.
+  `resend` goes to an address already named so; `withdraw` and `remove`
+  take power from a mailbox and give none, and need no fresh sign-in.
+- **The confirmation code.** `MailCode` from `central-api` and nothing of
+  our own: 40 bits, 15 minutes, given up at the fifth wrong code, its
+  digest bound to the account. With 10 mails a day that is 50 guesses a
+  day at 2^40, by a session that is signed in to the account already. The
+  code is never in a link and never stored.
+- **Mail first.** `set` and `resend` hand the mail over before the store
+  keeps anything. The other order would have to undo a write when the
+  mailer is down, and a `resend` would by then have ended a code that
+  worked. So that the mail is not sent for nothing, everything the store
+  would refuse is checked before it, and the store decides again after it.
+- **No answer about other accounts.** Addresses are not unique, and no
+  answer depends on whether another account holds one. `Conflict` is for
+  the account's own confirmed address only.
+- **`ResetMail` tells nothing.** It is answered `Done` for every name. Its
+  handler awaits nothing and reads no store: it checks the tag, counts,
+  queues and answers. The queue holds more than an hour's requests (a
+  compile-time assertion), so it is never the reason for an answer. A text
+  too long to be a name is counted and not kept. Without a mailer every
+  name is `Rejected`, which says only what `status` tells any account.
+- **Whose reset code.** The store has to know whether an outstanding code
+  is an administrator's, and the accounts table is written by the previous
+  binary too. So the mailed code's digest is kept a second time, beside
+  the address; a code is a mailed one exactly when the two digests are
+  equal, and the accounts table is unchanged. One statement makes both
+  kinds, so both refuse the same accounts. The mailed code's own rules
+  (one hour, never over an administrator's code that lasts, once in ten
+  minutes, three in 24 hours) are conditions of that statement, under the
+  account's row lock.
+- **A code does not outlive its way to the person.** It is taken back, by
+  its digest, when the mailer does not take the mail, and it ends when the
+  address it went to is replaced or removed. An administrator's code is
+  touched by neither.
+- **The counts.** Per account, in a table of the mail module's own, not in
+  the request budgets that sessions share. An attempt counts whatever the
+  mailer says, so the count bounds what Central asks of the mailer. A full
+  table refuses a new account and forgets nobody. `ResetMail` has 5 an hour
+  for a client address on each listener and 30 an hour for everyone. The
+  mailer's own limits are a second line, keyed by `account:` and the id.
+- **The mails.** No text a person typed, except the sign-in name in a
+  reset mail, cut down to a name's alphabet and escaped. No image, no
+  script, nothing loaded from elsewhere, links to the configured site
+  only. An address has passed `central_api::email::address` (ASCII, no
+  control character) and travels in JSON; Central writes no mail header.
+- **The mailer's client.** Plain HTTP to one numeric loopback address,
+  through a resolver that answers that address and no other; no proxy, no
+  redirect, no kept connection, a bounded answer, one request a mail with a
+  random `Idempotency-Key`, never a second try. The token is wiped and
+  never printed. There is no default address: without the block there is
+  no mail, and a block that names anything else stops the start.
+- **Notices** are queued and tried once. They never fail the request whose
+  change they tell of.
+- **Audit.** None. The audit records what administrators and the operator
+  do. An account's own password change writes no event
+  (`central-postgres`'s `password.rs` has none), so its own address writes
+  none, and a mailed code, which no administrator made, writes none.
+- Decided against: a link that confirms (a code in an address); unique
+  addresses (an answer about other accounts); the store first; making or
+  mailing the reset code on the request; a second try for a notice; a flag
+  for the code's kind in the accounts table (the previous binary's
+  statements write that row); the address in `AccountExport` (the released
+  client decodes it strictly).
+
+Implementation pass: looked at each boundary in turn.
+- **Default deny.** Without a mailer `set`, `resend`, `confirm` and
+  `ResetMail` are `Rejected` before anything is read or counted. `Email`
+  needs a session of the listener's own kind and accepted terms; the
+  cookie is read for it and for no request without a session.
+- **Ownership.** Every statement of the address is keyed by the account
+  behind the session; no request names an account. A confirmation code's
+  digest holds the account's id, so one account's code is another's wrong
+  one.
+- **Limits.** Every number is a named constant with its reason, listed in
+  the document; a test pins the mail module's constants to those numbers,
+  and reads no document. The
+  mailer's client had the listeners' own five seconds for a request; it
+  has three now, and one to connect, so a mailer that does not answer is
+  `Busy` and the listener does not cut the request between the mail and
+  the store's write.
+- **Cancellation.** A request that is cut after its mail was handed over
+  leaves a mail whose code confirms nothing; asking again mails another.
+  The worker works until nothing waits, since the queue is told once for
+  many pieces, and on a stop it finishes the piece in hand: a reset code
+  that was made is mailed or taken back, never left.
+- **Secrets and diagnostics.** `Mail`, `Token`, `Client`, the store's
+  `Email`, `Told` and `MailedReset` print nothing of what they hold; a
+  queued request and the launcher's block have no Debug output at all.
+  The service logs one fixed line when a mail was not handed over. No code
+  and no token is ever part of an address.
+- **The other listener's budgets.** The changes to `limits.rs` (one line:
+  `ResetMail` is counted as a request without a session) and to
+  `central-http` (one budget on each listener) add and reorder nothing.
+- **What the wire commit left.** The service's lists of operations were
+  two short (the test counted 67 of 69); both are extended, and `Email`
+  takes the cookie.
+- **Dependencies.** `ureq`, `serde`, `serde_json`, `zeroize` and
+  `getrandom` at the versions and features the other crates use.
+  `central-mail` is source-available and builds on `central-api` only; the
+  three AGPL crates build on each other as before.
+
+Adversarial pass, with what was tested.
+- **One answer.** On real PostgreSQL, the encoded answer to `ResetMail` is
+  the same bytes for a name that is nobody's, an account whose address
+  only waits, an administrator's and an ordinary account, on both
+  listeners, with and without a cookie, and for texts that are no name;
+  afterwards exactly one mail was handed over, to the ordinary account.
+- **An administrator's code.** A mailed request ten minutes after an
+  administrator's code makes nothing, and the administrator's code then
+  resets the login; taking a mailed code back does not touch it; once it
+  is spent the same request mails one. In the store: an administrator's
+  code replaces a mailed one and is then safe from the next mailed
+  request.
+- **How often.** In the store with times moved by the operator's login: at
+  once and after nine minutes nothing, after ten a second code that ends
+  the first, a third, then none until 24 hours after the first. In the
+  service: the fifth mail of an account's hour is handed over and the
+  sixth is not, on either listener; 30 requests for a reset code and then
+  `Busy` for every name; through the real listeners five an hour for one
+  address on each, and another address served.
+- **Wrong codes.** Five give the address up and the right code then finds
+  nothing; another account's code and a code past its end count nothing;
+  a withdrawn address's code confirms nothing; a code confirms once.
+- **A mailer that fails.** `Busy`, no answer and a refused address, on
+  `set` and `resend`: the answer is `Busy` or `Rejected`, the mail was
+  handed over once, and what waited before still waits and is confirmed by
+  the code it had. For a reset code: the code that was in the mail starts
+  no reset, and the try stays counted. A mailer that cannot run at all is
+  a mail not sent.
+- **A stale sign-in** names no address on either listener and no mail goes
+  out; it still reads and resends. In the store's tests it also withdraws
+  and removes.
+- **No mailer.** `status`, `withdraw` and `remove` work and say `mail:
+  false`; the rest is `Rejected` for every name, the right code included,
+  and nothing was counted against the address that waited.
+- **The client.** Against a stand-in mailer on an ephemeral loopback port,
+  stopped and found closed afterwards: one request as the mailer's
+  contract has it, each answer's outcome, a redirect not followed, a long
+  head not read, a silent mailer ended within the bound, an address other
+  than the configured one never reached. Endpoints that are not numeric
+  loopback HTTP, sites that are no origin and tokens that are none are
+  refused when the client is made, and again by each launcher's block.
+- **The mails.** Every language renders every mail; no `<img`, no
+  `<script`, no address outside the site's origin, the code in neither
+  link; a hostile name and site are escaped; every language has every
+  message with the same placeables, and a tag without words is English.
+- **Redaction.** Tests print each of the types above and look for the
+  address, the name and the codes.
+- **The store.** On real PostgreSQL: the migration over 000025 with the
+  previous binary's reset statements, the tables' CHECKs, the exact
+  grants, deletion with the account, the sweep.
+- **Mutants.** Fifteen changes to the mail module's counts and queues
+  were each caught by its unit tests: a sixth mail in the hour, an
+  eleventh in the day, a refused mail that forgets the account's count, a
+  count that is not looked at, a reset request taken without a mailer, one
+  whose language is not checked, a text too long for a name that is
+  queued, an hour that is not counted, a queue of requests and one of
+  notices without its bound, a notice queued without a mailer, notices
+  before reset codes, a worker that is not told, a state that says mail
+  where there is none, and a refused request that is counted. Three more
+  were tried against the real store, one run of the fixture each: a mailed
+  code that replaces an administrator's (caught where a mailed request
+  must make nothing), a reset code that stays when its mail was not taken
+  (caught where that code must start no reset), and a stale sign-in found
+  out only after the mail (caught by the count of mails handed over).
+  None survived.
+- **Found on the way.** The secret scan took two synthetic tokens in the
+  launchers' tests for keys; they are written differently now. A reason
+  given for the 30 requests an hour, that the mailer's reserve holds as
+  much, was not what the mailer's contract says and is gone.
+
+Not tested.
+- A real `baylee-mailer` and real delivery. The client was tested against
+  a stand-in that speaks the contract's request and answers.
+- That a proxy named in the environment is ignored. The agent is built
+  without one; a test would have to change the process's environment.
+- The worker's loop against a real identity service. The loop has its
+  tests with a queue of the test's own, and `deliver_mail` is driven piece
+  by piece by the fixture.
+- Wrong codes sent at the same moment. The store counts them under the
+  account's row lock; the tests send them one after another.
+- The time `ResetMail` takes on a deployed host. The handler has no branch
+  on an account; nothing was measured.
+- The website's committed WebAssembly was not rebuilt or compared
+  (`cargo xtask wasm --check`); `central-client` gained two functions that
+  `central-web-crypto` does not call.
+
+For the owner.
+- The privacy notice names the address as "not available yet", speaks of
+  reset links where Central mails codes, and knows a reset code's digest
+  only as an administrator's (`legal/privacy.*.md` §§ 3 and 6). The texts
+  were not changed here.
+- The mailer's client waits one second to connect and three for a request,
+  where two and five were planned: the listeners cut a request at five.
+- Three addresses that ask on both listeners at their limit, or six on
+  one, spend the 30 requests an hour that Central takes for everyone. The
+  numbers are constants.
+- Every `Email` action needs accepted terms, `remove` included.
+- No mail says that a reset was finished or a password changed.
+- Nine of the eleven languages hold the English text.
+- A refused `Email` request counts against the session's bearer in the
+  request budgets, like other refusals; the line of work on those budgets
+  may want it otherwise.
+
+Checks. On the code of `964d272` (the documents after it change no code):
+`cargo xtask gate` passes (format, policy, clippy, 634 tests, the doc tests
+and the release build), and so do `cargo xtask postgres`, `cargo xtask
+smoke`, `cargo xtask crypto-scope` and `cargo deny check`. `cargo audit
+--deny warnings` fails on RUSTSEC-2026-0459 alone (`libsqlite3-sys`, as
+before). `cargo xtask secrets` passes on the tree and the full history; its
+first run stopped at the two test tokens named above. The fixture's
+container was gone after every run, the three mutant runs that failed on
+purpose included, and the smoke test found its listener closed.
+
 Engineering review, not an audit.

@@ -2,7 +2,8 @@
 
 *28.10.2026, roadmap M1 step 2b; built on [administration](administration.md);
 migration `m20261028_000013_reset`.* The owner's decision (roadmap §"Decisions", 20.10.2026): a
-reset by an administrator, and later by e-mail (M1 step 4), restores the
+reset by an administrator, and since 12.11.2026 by a code mailed to the
+account's confirmed address (M1 step 4, [e-mail](email.md)), restores the
 login only; the encrypted data (account document, deck backups, chat
 history) survives only with the recovery code or a still signed-in device,
 and the UI says so before the reset. Every piece goes through the three
@@ -33,6 +34,33 @@ The code is 20 bytes of operating-system randomness, written
 `RESET-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX` (Crockford base32, read back
 as the recovery code and beta keys are, except that the `RESET` prefix is
 required), so a recovery code is never mistaken for it.
+
+### A code by mail
+
+*12.11.2026, migration 000026; the request, its numbers and its limits are
+in [e-mail](email.md).* An account that confirmed an e-mail address can have
+a reset code mailed to it. `ResetMail { username, lang }` needs no session
+and is answered `Done` for every name; the code is made afterwards, off the
+request, so the answer says nothing about the account.
+
+- It is the same code: 20 bytes, the same form, made by the statement that
+  makes an administrator's, with the same refusals (an administrator's
+  account, a pending account, an unfinished legacy move). It is used as
+  described below. Nothing in `ResetStart` and `ResetFinish` knows where a
+  code came from.
+- It lasts 1 hour, not 24: a mailbox is a weaker place to leave a code than
+  a person's hand.
+- It never replaces an administrator's code that has not expired. An
+  administrator's new code replaces a mailed one. A new mailed code
+  replaces the last mailed one.
+- At most one is made for an account in 10 minutes and 3 in 24 hours.
+- It ends when the mailer did not take its mail, and when the address it
+  went to is replaced or removed. An administrator's code does not end
+  with the address.
+- No administrator acts, so the audit has no event for it.
+
+A Central without a mailer makes no such code, and codes come from an
+administrator only.
 
 ## Using it
 
@@ -103,10 +131,16 @@ an hour) besides the global one; natively `ResetStart` has the same since
   holds the code takes the login; with `keep` and a wrong key the data stays
   unreadable to them, and the owner's recovery wrapper is untouched.
 - With `new`, the holder of a code destroys the account's data. A code comes
-  only from an administrator, with a recent password sign-in, and its event
+  from an administrator, with a recent password sign-in, and its event
   is in the audit; an administrator who keeps the code for themselves is the
   insider threat the audit makes visible, not one it prevents.
-- No message tells the person that a code was issued (e-mail is step 4).
+- Or it comes by mail, to the address the account confirmed. Whoever reads
+  that mailbox can ask for a code and use it: they take the login, and with
+  `new` they destroy the account's data. That is what an address is for, and
+  the reason it is optional. A mailed code has no audit event.
+- No message tells the person that an administrator issued a code, or that
+  a reset was finished. A mailed code is its own message, and an address
+  that is replaced or removed is told ([e-mail](email.md)).
 
 ## As built
 
@@ -120,7 +154,8 @@ an hour) besides the global one; natively `ResetStart` has the same since
 - A password change clears an outstanding code: the current password was
   just proven. A sign-in does not, since in a takeover the intruder has the
   password.
-- `AdminAccount.reset_until` shows an outstanding code's expiry.
+- `AdminAccount.reset_until` shows an outstanding code's expiry, a mailed
+  code's too. It does not say whose code it is.
 - `central-client`: `reset(transport, username, code, new, ResetData)` with
   `ResetData::Recovery(&RecoveryCode)` (keep) or `ResetData::New(document)`
   (a new vault, returning its new recovery code to show once), and
@@ -172,7 +207,8 @@ functions; no message changed.
 
 ## What the clients need
 
-- Website: the page above. Open: the new site's administration with "Reset
+- Website: the page above. Open: a way to ask for a code by mail on that
+  page, and the new site's administration with "Reset
   login" and its warning text. Until then the new site has no page that
   issues a code; the old build's admin page (`web/`) does, where that
   build is still served under `/admin`.
