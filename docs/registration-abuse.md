@@ -488,9 +488,11 @@ checks an hour and ten a day, one evaluation for a wrong answer and eight
 for a right one, so 80 evaluations a day at the most, about half a second of
 one core of the laptop below; and each right answer cost its sender 128 to
 8,192 evaluations. Everybody together: the 32 requests a second that all
-callers without a session share. Were every one of them a wrong answer to
-a living challenge, that is 32 evaluations a second, a fifth of one core
-of that laptop; and each needs a challenge of its own (20 an hour per
+callers without a session share and, since 12.11.2026, the 8 kept beside
+them for addresses that asked little. Were every one of the 40 a wrong
+answer to a living challenge, that is 40 evaluations a second, a quarter
+of one core of that laptop (it was 32 and a fifth before that date); and
+each needs a challenge of its own (20 an hour per
 address) and a unit of its address's five an hour. Central computes only
 for an answer that names a living challenge after its three seconds.
 

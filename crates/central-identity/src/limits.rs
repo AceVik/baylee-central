@@ -105,9 +105,9 @@ const BEARER_DATA: u32 = 64;
 /// Control and data requests a second for the bearers of one place
 /// together, of what all share: half of each window, so one address alone
 /// never spends what every session shares, however many bearers it holds.
-/// Half and not a quarter: two bearers at one address each keep their
-/// whole own budget (two gateways behind one address, or a gateway's
-/// credential and its heartbeat token before they are counted together),
+/// Half and not a quarter: two that are counted apart at one address each
+/// keep their whole own budget (two sessions there, or two accounts'
+/// gateways; one account's credentials and tokens are counted as one),
 /// and a household's clients ask a small part of it.
 const PLACE_CONTROL: u32 = SHARED_CONTROL / 2;
 const PLACE_DATA: u32 = SHARED_DATA / 2;

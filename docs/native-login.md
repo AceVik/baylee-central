@@ -343,7 +343,8 @@ address, or an IPv6 address's /64.
   nobody's shows only once the store was asked: a start at a made-up id
   that nobody's count alone refuses has taken a worker and one statement
   first, as many of them as its address's 30 starts a minute and the
-  shared 32 a second let through. The worker is taken before a start is
+  shared 32 a second let through (40 with the 8 kept beside them since
+  12.11.2026). The worker is taken before a start is
   counted and before a pending attempt is consumed, so a busy moment
   spends no guess and loses no right proof.
 - **Bounds.** Four tables of 16,384 entries each: accounts, accounts at

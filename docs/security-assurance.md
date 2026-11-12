@@ -4530,9 +4530,13 @@ Central writes no such line, and the sentence now says so.
 a trade or a server's configuration that is the owner's.
 
 *12.11.2026: the owner decided for the recommended variant of each, and
-all seven were built that day. The titles are struck and each point names
-what was built; the rest of the list is as it was written. What stays
-possible of each, which is not little, is in
+they were built that day, but not all of each: point 6's deleting on
+acknowledged delivery was not built, the limit of points 2 and 4 is a
+file for the firewall that was written and not loaded, and point 3's
+refusal stays the owner's to decide. The titles are struck and each
+point names what was built;
+the rest of the list is as it was written. What stays possible of each,
+which is not little, is in
 [the section of 12 November](#the-seven-open-findings-12-november-2026).*
 
 1. ~~*Four vouched-for bearers spend what sessions share*~~ [**Built
@@ -5601,19 +5605,30 @@ member, or one contact of a member, silenced a group for everyone.
 - **A group.** A device without room is left out and the message goes to
   the others. It is `Busy` when no device of another account has room,
   so a direct message is never accepted for nobody.
-- **A block must not show.** Whether anyone else has room is asked of
-  every other device, a blocker's too. Before, a full device was not
-  looked at when its owner had blocked the sender, so a group message
-  that a full device refused went through once that member blocked: the
-  answer told the sender of the block. It is the same answer now.
+- **A block must not change the next answer.** Whether anyone else has
+  room is asked of every other device, a blocker's too. Before, a full
+  device was not looked at when its owner had blocked the sender, so a
+  group message that a full device refused went through once that member
+  blocked: the answer told the sender of the block. Setting or lifting a
+  block does not change the next answer now. Over 2,500 messages a block
+  can still show; see what stays possible.
 - **The deletion was not built.** The list recommended the share and
   deleting on acknowledged delivery. The wire has no acknowledgement
   (`Inbox { device, after }` reads by a cursor), both clients read their
   history again from the start, and the privacy notice says history is
   not deleted automatically. It needs the owner's retention decision and
   an addition to the protocol, which this work was not to make.
-- **`Busy`** is an answer both released clients know: the native client
-  keeps the sealed message and sends it again, the website shows it.
+- **`Busy`** is an answer both released clients know, and the one a full
+  inbox and a sender's full outbox were answered with before. The website
+  shows it. The released native client was read before it was chosen
+  (`baylee-client`, `social/central/poll.rs` and `worker.rs`;
+  `baylee-client-core`, `social/machine/sending.rs`): it takes `Busy` as
+  a rate refusal, keeps the sealed message, shows no failure and sends it
+  again, a second later and after a pause of two seconds that doubles to
+  thirty. It has no last try. `Rejected` it ends at once, with its words
+  for a sender who may not write there, which would be wrong for a full
+  inbox and is what a refused direct message says. So `Busy` stayed, and
+  what its not ending costs is under what stays possible.
 
 Implementation pass: `central-postgres/src/accounts/social/chat/send.rs`
 (`CHAT_SENDER_SHARE`, `room`, `Held::fits`): one query a send counts each
@@ -5632,8 +5647,12 @@ test of the rule):
   sender can tell, nothing delivered to the blocker. With nobody left who
   has room: `Busy`, and the same answer after the block is lifted. The
   sender's own device full: `Busy`, as it was.
+- A message sent again: the direct message that used up the share, and
+  the group message that filled an inbox, are each sent a second time
+  with the same bytes and answered with the first answer's id and time,
+  not `Busy`; the counts show each delivered once.
 - Seen failing first: the message past the share was accepted
-  (`inboxes.rs:145`).
+  (`inboxes.rs:145`, as the file was then).
 - Not tried: the query's plan with full inboxes of a large group. It
   reads every delivery of every recipient device, as the count before it
   did.
@@ -5645,6 +5664,24 @@ test of the rule):
   the busier side of an honest conversation: one person can send another
   2,500 messages, and then no more, until something is deleted.
 - A member who is left out is not told, and neither is the sender.
+- A `Busy` for a used-up share or a full inbox does not end, and the
+  released client sends such a message again for as long as it runs,
+  without showing a failure: at most about one request in two seconds
+  from one client, each taken as far as the room query. It keeps at most
+  64 such messages; while 64 wait, its later sends through Central are
+  answered as busy by the client itself, in every conversation. This was
+  so before at 5,000; one sender now meets it at 2,500 in one inbox.
+  Central looks at a message's time after the room, so a waiting message
+  is never `Rejected` for its age. Looking at the time first would end
+  it in the released client ten minutes after it was written. That was
+  not built: it changes what a user is shown, which is the owner's.
+- A block can still show over 2,500 messages. A member who blocked the
+  sender takes none of the sender's messages, so the sender's share of
+  that member's inbox never fills and the device goes on counting as one
+  with room. A sender who has used up the share with every other member
+  of a group and is still answered as sent can conclude that some
+  member's device takes nothing from them: one who blocked them, or one
+  who joined late.
 - The privacy notice does not mention a share.
 - Narrower, and this reviewer would still call it medium until retention
   is decided: the group can no longer be silenced by one device, but an
@@ -5706,6 +5743,15 @@ Adversarial pass:
   seen; the old hook reached the database over the same socket as the
   superuser, which is why the migrator is expected to. No deploy was
   made with it.
+- Not seen either: whether the migrator may grant on every object the
+  file names on the server. The fixtures' tables are the migrator's and
+  the server's are expected to be, since the migrations make them with
+  that login; but the superuser applied the grants there until now, so it
+  was never asked. The hook applies them after the unit is stopped, and
+  the check before the stop asks only for the login. The runbook
+  therefore has the operator apply the deployed revision's grants by hand
+  as the migrator before the first deploy, so that a refusal shows while
+  the service runs. That step was written and not run.
 
 **What stays possible:**
 - The binary and the website are what the build made, and the binary
