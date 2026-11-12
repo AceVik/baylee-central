@@ -1,19 +1,276 @@
 # Profile pictures: dependency proposal and design
 
-**Status: proposal, second version of 12.11.2026. Nothing is built.**
-No `Cargo.toml`, `Cargo.lock`, `deny.toml`, `.cargo/audit.toml` or
-`approved-packages.json` was changed. All measurements ran in a copy of the
-tree, or in small programs outside the repository.
+**Status: second version of 12.11.2026, with the owner's decisions of the
+same day (below). The build stopped at its first step: the accepted AVIF
+decoder cannot be called without first-party `unsafe` (§0.2). Nothing is
+built.** No `Cargo.toml`, `Cargo.lock`, `deny.toml`, `.cargo/audit.toml` or
+`approved-packages.json` of the repository was changed. All measurements
+ran in a copy of the tree, or in small programs outside the repository.
 
 The owner must accept the exact packages, versions, features and gate
 changes in §5 before adoption (AGENTS.md: "any required dependency
 containing unsafe/assembly must be disclosed and explicitly accepted").
 This is the design pass, the first of the three in [security
 assurance](../security-assurance.md): assets, caller trust, failure modes and
-invariants, before any code. §8 holds the questions only the owner can still
-answer.
+invariants, before any code. §8 holds the questions the owner answered on
+12.11.2026 (§0).
 
-## The owner's answers (12.11.2026, form)
+## 0. The owner's decisions (12.11.2026, forms), binding
+
+Relayed by the project lead on 12.11.2026. The quoted words are the
+owner's, as relayed; the rest is the relay's wording.
+
+- **Formats:** "Alles was HTML5 fähig ist, darf hochgeladen werden. Der
+  Server wandelt es in ein modernes Format um. (AVIF ...). (Und ...
+  Fallback Format für Toaster Browser). So Bilduploads sind idr. immer
+  sicherheitskritisch. Bitte besonders gut überprüfen und testen."
+- **Where decoded:** **"Beides"**: the page decodes in the browser and
+  uploads a normalised lossless square PNG (design A), **and** Central also
+  accepts original files and decodes them itself (design B), in the
+  sandboxed worker, for exactly these formats, whose packages the owner
+  accepted:
+  - **PNG** (`png` 0.18.1);
+  - **JPEG, GIF, WebP** (`zune-jpeg` 0.5.15 scalar, without SIMD; `gif`
+    0.14.2; `image-webp` 0.2.4);
+  - **AVIF** (`rav1d` 1.1.0, the Rust port of dav1d, never the C
+    libdav1d);
+  - **SVG** (`resvg` 0.50.0 without default features: no text, no system
+    fonts, no svgz, no embedded rasters, external references refused, a
+    time limit; SVG is only ever rasterised, never served as SVG);
+  - **BMP, ICO** (through `image` 0.25.10 with only the bmp and ico
+    features).
+
+  Each decoder runs only in the worker process.
+- **Encoder:** "Freigeben, Assembler an": the newest `ravif` 0.13.0 and
+  `rav1e` 0.8.1 **with rav1e's assembly on** (nasm on x86-64; documented
+  for CI and the server), threads off. All the gate changes §5.4 lists:
+  - the licence exceptions BSD-2-Clause for `rav1e`, `av1-grain` and
+    `v_frame`, and whatever the decoders above need; NCSA for
+    `libfuzzer-sys` if it appears;
+  - the duplicate skips;
+  - the `paste` advisory exception widened as §5.3 says;
+  - the six web-sys features;
+  - `blob:` in the profile page's image CSP.
+
+  "Am liebsten sehr schnelle stabile und gepflegte Crates auf der neusten
+  Version": the newest releases, unless a newer one breaks the gate in a way
+  this proposal did not foresee.
+- **Output:** AVIF at 256 px, fallback **PNG 256 px**.
+- **Visibility:** **also signed-out visitors**:
+  - public URLs with an unguessable key;
+  - no enumeration by account id;
+  - removal and account deletion make the URL 404 at once;
+  - caching headers that do not keep a removed picture alive longer than
+    this proposal's bound (one hour, §3.5).
+- **Conversion:** **a fresh sandboxed process per upload** (systemd socket
+  activation in production as §6.2 designs it, a child process in
+  development; no secrets, no network, memory and time limits).
+- **Reports and moderation:**
+  - a reason from a fixed list plus an optional note of up to 1000
+    characters;
+  - administrators see the reporter; the reported person never does;
+  - administrators remove with a reason the person is told, optionally
+    blocking uploads for some days or until lifted;
+  - the bytes are deleted at once, and only the digest stays with the
+    report;
+  - decided reports are kept **one year**.
+
+The decisions answer §8's questions:
+
+| Q | Answer |
+| --- | --- |
+| Q1 | both (a) and (b) |
+| Q2 | (b): the newest releases, assembly on |
+| Q3 | (a): PNG, 256 px |
+| Q4 | (b): also signed-out visitors |
+| Q5 | (a): a fresh process per upload |
+| Q6 | (a) |
+| Q7 | (a) |
+| Q8 | (a): one year |
+
+### 0.1 What the decisions change in this document
+
+The sections below still describe design A alone. The build rewrites them
+in its design pass; until then, these points take precedence over them:
+
+- **§1, §2.3, §3.2:** Central decodes originals too. Caps per format apply
+  before any decoder runs, and the type is recognised by its magic bytes,
+  not by the declared type or the name. Only the first frame of an
+  animation is used, and JPEG's EXIF orientation is applied by our own
+  reader.
+- **§3.5, §7.5:** pictures are public. The `GET` routes ask for no cookie,
+  so a block between two accounts can only withhold the key from
+  `SocialRequest::Pictures`, never the bytes. Keys are still learned only
+  from answers that name an account already, and never from the account id
+  or the tag. The visibility matrix becomes a matrix of who learns a key.
+- **§4.2, §5:** `rav1e`'s assembly is on: nasm on x86-64 (CI's Linux job
+  and the server's build) and the C compiler on aarch64.
+- **§6.2, §7.1:** the worker also holds the decoders of design B. So the
+  codecs live in a crate of their own, linked only by the worker binary,
+  and never by the service or by anything `central-client` reaches. The
+  service links only the protocol and the answer checks.
+- **§8:** answered as in the table above.
+
+### 0.2 Where the build stopped: AVIF originals cannot be decoded with the accepted package
+
+**Finding (12.11.2026).** `rav1d` 1.1.0, the newest release, has no safe
+Rust API.
+- Its only public decoding functions are the C ABI:
+  - `pub unsafe extern "C" fn dav1d_open`, `dav1d_send_data`,
+    `dav1d_get_picture`, `dav1d_close` and the others, in `src/lib.rs`
+    lines 138 to 931 of the packaged crate;
+  - the Rust functions behind them (`rav1d_open`, `rav1d_send_data`,
+    `rav1d_get_picture`) are `pub(crate)`.
+- Calling it would need `unsafe` blocks in our own code. AGENTS.md forbids
+  that, also in a helper crate.
+- The accepted set also holds no parser for the AVIF container: `rav1d`
+  decodes an AV1 bitstream, and the HEIF items (`iloc`, `pitm`, the alpha
+  auxiliary, `irot`/`imir`, grids) must be read first.
+
+§2.2 counted `rav1d`'s unsafe sites and assembly, but did not foresee that
+its API is unsafe-only. The task's rule is to stop and report rather than
+weaken a decision, so nothing was built: no package was added, and AVIF
+originals were not silently dropped.
+
+**Everything else in the accepted set is usable.** Checked in a copy of
+the tree (lock at `ecaacfc` plus a probe crate under
+`#![forbid(unsafe_code)]` and the workspace lints):
+- **The probe**, built in release on this Mac (aarch64), decoded synthetic
+  files (640 × 480; the ICO 128 × 128) through safe APIs only:
+  - PNG, JPEG (EXIF found), GIF, WebP, BMP and ICO;
+  - an SVG with a `<script>`, an `xlink:href="/etc/passwd"` and a remote
+    `href`, rasterised at 256 × 256 with an `ImageHrefResolver` that
+    resolves nothing (whether anything else in `usvg` touches the
+    filesystem was not traced);
+  - and it encoded a 256² AVIF and PNG with `ravif`. `rav1e`'s assembly
+    was built by `cc` on aarch64 and is linked: its `_neon` symbols are in
+    the binary. A flat grey square took 0.09 s of CPU (0.72 s wall, under
+    a load average of 33) and peaked at 11.4 MB.
+  - nasm is not installed here, so the x86-64 assembly was not built.
+- **The exact manifest lines:**
+  - `png = "=0.18.1"`;
+  - `zune-jpeg = { version = "=0.5.15", default-features = false,
+    features = ["std"] }` and `zune-core = { version = "=0.5.3",
+    default-features = false, features = ["std"] }`;
+  - `gif = { version = "=0.14.2", default-features = false, features =
+    ["std"] }`;
+  - `image-webp = "=0.2.4"`;
+  - `resvg = { version = "=0.50.0", default-features = false }`;
+  - `image = { version = "=0.25.10", default-features = false, features
+    = ["bmp", "ico"] }`;
+  - `ravif = { version = "=0.13.0", default-features = false, features =
+    ["asm"] }`.
+- **The lock** gains 74 packages and changes no existing version. One
+  existing entry's reference to `nom` gains its version (`nom 7.1.3`),
+  since two versions are then in the lock. The packages:
+  - adler2 2.0.1, aligned 0.4.3, aligned-vec 0.6.4, arbitrary 1.5.0,
+    arg_enum_proc_macro 0.3.4, arrayref 0.3.9, as-slice 0.2.1,
+    av-scenechange 0.14.1, av1-grain 0.2.5, avif-serialize 0.8.9,
+    bitstream-io 4.10.0, built 0.8.1, bytemuck 1.25.2, byteorder-lite
+    0.1.0, crc32fast 1.5.5, crossbeam-deque 0.8.8, crossbeam-epoch 0.9.21,
+    data-url 0.3.2, equator 0.4.2, equator-macro 0.4.2, euclid 0.22.14,
+    fdeflate 0.3.7, flate2 1.1.11, float-cmp 0.9.0, gif 0.14.2, image
+    0.25.10, image-webp 0.2.4, imagesize 0.15.0, imgref 1.12.3,
+    interpolate_name 0.2.4, kurbo 0.13.1, libfuzzer-sys 0.4.13, loop9
+    0.1.5, maybe-rayon 0.1.1, miniz_oxide 0.8.9 and 0.9.1, moxcms 0.8.1,
+    nasm-rs 0.3.2, new_debug_unreachable 1.0.6, no_std_io2 0.9.4, nom
+    8.0.0, noop_proc_macro 0.3.0, num-derive 0.4.2, num-rational 0.4.2,
+    pastey 0.1.1, pico-args 0.5.0, png 0.18.1, polycool 0.4.0, profiling
+    1.0.18, profiling-procmacros 1.0.18, pxfm 0.1.30, quick-error 2.0.1,
+    rav1e 0.8.1, ravif 0.13.0, rayon 1.12.0, rayon-core 1.13.0, resvg
+    0.50.0, rgb 0.8.53, roxmltree 0.21.2, simd-adler32 0.3.10,
+    simd_helpers 0.1.0, simplecss 0.2.2, siphasher 1.0.4, strict-num
+    0.1.1, svgtypes 0.16.2, tiny-skia 0.12.0, tiny-skia-path 0.12.0, usvg
+    0.50.0, v_frame 0.3.9, weezl 0.1.12, y4m 0.8.0, zlib-rs 0.6.8,
+    zune-core 0.5.3, zune-jpeg 0.5.15.
+- **Features that matter:**
+  - `zune-jpeg` and `zune-core` resolve with `std` only, so no SIMD;
+  - `rav1e` with `asm`, `cc` and `nasm-rs`;
+  - `resvg` and `usvg` with no features, so no text, fonts, svgz,
+    rasters or writer;
+  - `image` with `bmp`, `ico` and `png` (ICO entries may be PNGs; the same
+    `png` 0.18.1);
+  - SIMD on by default in `tiny-skia` (`simd`), `moxcms` (avx, sse and
+    neon paths, through `image`) and `bytemuck` (`aarch64_simd`).
+- **Approved packages that gain features (8).** These, and the 74 above,
+  come from `cargo metadata` compared with `approved-packages.json`:
+  `cargo xtask policy` stops at the first package it does not find
+  approved (`adler2@2.0.1`), so it was not run to a pass.
+  - `arrayvec` 0.7.8: default;
+  - `crossbeam-utils` 0.8.23: default;
+  - `log` 0.4.35: alloc, std;
+  - `num-traits` 0.2.19: default;
+  - `rand` 0.9.5: default, os_rng, small_rng, std_rng, thread_rng;
+  - `rand_chacha` 0.9.0: default;
+  - `rand_core` 0.9.5: os_rng;
+  - `syn` 2.0.119: fold.
+- **`cargo deny check`:** advisories and sources pass. It fails exactly
+  where the decisions already accept an exception:
+  - licences: BSD-2-Clause for `rav1e`, `av1-grain`, `v_frame` and
+    **`arrayref`** (through `tiny-skia`, for `resvg`); NCSA for
+    `libfuzzer-sys`;
+  - duplicates: `getrandom`, `miniz_oxide`, `nom`, `r-efi`, `rand` and
+    `rand_core`, which are §5.4's six skips.
+
+  The existing `paste` ignore already covers `rav1e`'s use; only its
+  reason changes.
+- **`cargo audit --deny warnings`** with the repository's three ignores
+  exits 0 (549 packages).
+- **New since §5:** `nasm-rs` 0.3.2 (`rav1e`'s build dependency with
+  `asm`, which runs the external nasm on x86-64), and the decoders'
+  packages.
+
+**What the owner can choose (one of):**
+
+- (a) **No AVIF originals at Central.** An AVIF file is decoded by the
+  browser, as design A does for every format the browser shows; Central
+  refuses an original whose magic bytes say AVIF, with a refusal of its
+  own. It needs no further package. Every browser that shows AVIF can
+  convert it; a hardened browser that blanks the canvas cannot send an
+  AVIF original instead.
+- (b) **`avif-decode` 3.0.0** (kornelski, who also maintains `ravif`;
+  BSD-3-Clause). It is a safe API (`Decoder::from_avif(&[u8])`,
+  `to_image()`) over the accepted `rav1d` 1.1.0 and `avif-parse` 2.1.0.
+  - **Checked in the same copy:** our probe called it under
+    `#![forbid(unsafe_code)]` and decoded a 640 × 480 AVIF in 92 ms; a
+    truncated file and a PNG were refused.
+  - **It adds 16 packages:** assert_matches 1.5.0, atomig 0.4.3,
+    atomig-macro 0.4.0, avif-decode 3.0.0, avif-parse 2.1.0, bitreader
+    0.3.11, fallible_collections 0.5.2, leb128 0.2.7, rav1d 1.1.0,
+    raw-cpuid 11.6.0, strum 0.26.3, strum_macros 0.26.4, to_method 1.1.0,
+    yuv 0.8.20, zerocopy 0.7.35, zerocopy-derive 0.7.35.
+  - **Unsafe markers in source:** `avif-decode` 11 (its calls into
+    `rav1d`'s C ABI), `avif-parse` 4, `yuv` 874 (SIMD),
+    `fallible_collections` 129, `zerocopy` 0.7 151, `rav1d` 510 in 36
+    files with 91 assembly files.
+  - **`rav1d`'s assembly is always on:** `avif-decode` asks for `rav1d`'s
+    default features (asm, the arm64 variants, both bit depths), and
+    features only add. So nasm is needed on x86-64 for `rav1d` too.
+  - **Further gate exceptions:**
+    - licences: MPL-2.0 for `avif-parse`, BSD-2-Clause for `rav1d`,
+      CC0-1.0 for `to_method`;
+    - duplicates: `strum` (0.26 and the workspace's) and `zerocopy` (0.7
+      and 0.8);
+    - `cargo audit` still exits 0 (565 packages).
+  - It is a package the decisions did not name, so the owner must accept
+    it.
+- (c) **Wait** for a `rav1d` release with its Rust API. Upstream's main
+  branch has one; `sqzer-rav1d` 0.1.0 republishes that branch under
+  another name. A third party's republication is not recommended.
+
+Not usable:
+- `rav1d-safe` 0.6.0 is `AGPL-3.0-only OR` commercial, and an AGPL crate
+  cannot enter the source-available crates (LICENSE.md §6);
+- `re_rav1d` 0.1.3 and `rusty_av1d` 1.3.0 are forks of the same `rav1d`,
+  and were not examined further.
+
+**Recommended: (a).** It keeps strangers' AVIF bytes away from Central
+altogether: the browser that can show an AVIF converts it. (b) adds a
+second assembly decoder and about 1,700 unsafe markers in source for the
+few people whose browser shows an AVIF but will not let the page read its
+canvas.
+
+## The owner's first answers (12.11.2026, form)
 
 The owner's answers to the first version, verbatim:
 
