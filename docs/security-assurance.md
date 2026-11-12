@@ -6447,3 +6447,67 @@ PostgreSQL and the operator's appointment. `cargo xtask postgres`, `cargo
 xtask smoke`, `cargo audit` and `cargo deny` were not run (no
 dependency changed). This is an engineering review of one page, not an
 audit.
+
+## Profile pictures, 12 November 2026
+
+An account may set a profile picture that everyone sees, signed in or not
+([profile pictures](profile-pictures.md); the owner's decisions and the
+packages he accepted in the [proposal](dependency-proposal/profile-picture.md)
+§0 to §0.8). New: migration 000027, the crates `central-picture` (the
+protocol and the service's checks) and `central-picture-codec` (every
+decoder and encoder, linked only by the worker binary), routes on the
+browser listener, wire variants, moderation, the website's card, and
+ffmpeg as a native runtime dependency of the worker's host.
+
+Design pass. The assets are the service's secrets and database, which a
+stranger's file must not reach; the people shown in pictures; the
+reporters, whom the reported never learn; and the moderators' decisions.
+- **Containment.** Every decoder runs in a fresh process per upload, which
+  holds no secret, has no network and no file but a private `/tmp`, and is
+  bounded in memory, tasks and time by its systemd unit; the service links
+  no codec. The worker's answer is checked by the service as if written by
+  an attacker: a PNG master of exactly three chunks with right CRCs, an
+  AVIF of exactly three boxes, a sequence of exactly four whose sample
+  tables agree; anything else refuses the picture.
+- **ffmpeg** (owner, §0.7 and §0.8) is a child of the worker, inside the
+  same unit, and is fed only frames the worker decoded, bounded and
+  averaged itself, as raw pixels: its parsers never see a stranger's file
+  (ffprobe 8.0.1 crashed on a partial file in the research). No shell, an
+  absolute path from the worker's command line, no environment, the pipe
+  in and one file out in a fresh directory only the worker may enter, a
+  deadline. Its failure keeps the still; it never fails the upload, and
+  the service logs a fixed line so a broken sandbox is seen.
+- **Bounds before work:** upload sizes from `Content-Length`, admission and
+  budgets before the body, header readers of our own before any decoder,
+  an AV1 sequence header bound before `rav1d`, an SVG scan before `usvg`,
+  frame, play, canvas and composited-pixel bounds for animations.
+- **Visibility:** public URLs under a 16-byte random key, new at every
+  upload, never an account's id; keys learned only from answers that name
+  the account already, with the lookup budget and blocks; the same 404 for
+  every refusal; at most an hour in a cache.
+- **Reports** name a picture by the digest of its master and its sequence,
+  so the animation shown is what was reported; administrators see the
+  animation and can open it alone.
+
+Implementation pass. Read for `unsafe` (none: every target root forbids
+it, the policy check passes), panics that cross the process (decoders'
+panics become `malformed`; `rav1d`'s abort ends only the worker), lengths
+and offsets (every box and chunk reader checks its size against what is
+left), logging (no picture, key, address or account in any line; the
+worker prints nothing but its answer), and the ffmpeg runner: the frame
+writer is never waited for beyond the deadline, so a child that holds the
+pipe cannot hold the worker; the directory is removed on every path; the
+probe and every attempt share one deadline inside the service's.
+
+Verification pass. Hostile files on every input path and per format
+(bombs, lying headers, cuts, broken checksums, polyglots, scripts and
+references in SVG, frame bombs and huge canvases), a mutation fuzzer for
+every decoder entry point with no finding (`fuzz/README.md`), stand-in
+encoders for every failure of ffmpeg, the real `libaom-av1` in Ubuntu
+26.04's ffmpeg for durations, tracks and colour, the HTTP routes byte for
+byte, the PostgreSQL fixture with the grants both ways, and the website at
+320 px in both schemes. Not verified: ffmpeg inside the production unit's
+system-call filter and limits (an operator's check after deploy,
+[operations](operations.md#profile-pictures)), anything on x86-64, and
+Firefox and Safari playing the sequences. This is an engineering review,
+not an audit.
