@@ -629,7 +629,7 @@ email-busy = Troppe e-mail per ora. Riprova più tardi.
 email-same = È già il tuo indirizzo.
 email-unsure = Non è arrivata nessuna risposta, quindi non sappiamo se è andata a buon fine. Guarda cosa è mostrato qui e riprova se non è andata.
 # English for now: to be translated.
-email-again = Your sign-in is a few minutes old now. Enter your password once more to send the code.
+email-again = To send the code, enter your password once more.
 
 ## Central's terms
 
