@@ -1162,17 +1162,16 @@ do neither. Nothing on the wire and nothing in Central changed.
   section (`islands/password.rs`): the current password, the new one twice.
   The form gives way to what became of it.
 - **Shared.** `field::labelled` draws a labelled field with its glyph, its
-  hint and, for a password, its eye; `clip::write` copies to the clipboard
-  (the reset's new recovery code has a copy button, the registration's has
-  none yet).
-- **Words.** English and German by hand. French, Italian and Brazilian
-  Portuguese were translated by machine with the change, because
-  `cargo xtask gate` allows a language fewer than 12 in 100 messages
-  that are the English ones, and with the English text standing in those
-  three were over that limit (126, 118 and 114 of 913, where 109 pass).
-  The six others (es, ja, ko, ru, zh-hans, zh-hant) carry the English
-  text of the new messages, and of the changed `faq-password-a`, until
-  they are translated; Spanish is three messages below that limit.
+  hint and, for a password, its eye; `clip::copier` is a recovery code's
+  copy button with the line that says whether the browser took it (the
+  reset's new code and the registration's both have it). A step's card is
+  as wide as what holds it, not as its longest word, and its heading
+  hyphenates: in the registration dialog the German code step had been
+  cut off at a phone's width.
+- **Words.** English and German by hand; the nine other languages by
+  machine (French, Italian and Brazilian Portuguese with the change, the
+  six others the same day), with each language's own vocabulary and a new
+  word for "vault". No speaker has read them.
 - **Tests.** Unit tests of every decision the two forms make, server tests
   of the page and its links, `web/e2e-site/reset.spec.ts` and
   `password.spec.ts` with a stand-in Central and the real Worker, and
@@ -1181,6 +1180,6 @@ do neither. Nothing on the wire and nothing in Central changed.
   redeems a reset code and changes a password").
 
 **Open.** Issuing a reset code in the new site's administration (the old
-build's admin page does it, where that build is still served); the six
-translations, and a reading of the three made by machine; a reset that
-keeps the data through a device still signed in is the client's (M6).
+build's admin page does it, where that build is still served); a reading
+of the nine machine translations by speakers; a reset that keeps the data
+through a device still signed in is the client's (M6).

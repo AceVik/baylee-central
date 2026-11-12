@@ -205,6 +205,8 @@
 .auth-card {
   position: relative;
   display: grid;
+  /* a long word (a German heading) wraps and does not widen the card past the dialog */
+  grid-template-columns: minmax(0, 1fr);
   gap: 0.4rem;
   padding: clamp(1.3rem, 5vw, 2.1rem);
 }
@@ -403,7 +405,20 @@
 
 .step {
   display: grid;
+  /* the column is as wide as the card, not as its longest word */
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-3);
+}
+
+/* A step's heading may be one long word ("Wiederherstellungscode"): where
+   it has to break, it breaks as the language hyphenates. In the dialog,
+   under the dialog's own heading, it is a size smaller. */
+.step > h2 {
+  hyphens: auto;
+}
+
+.auth-card .step > h2 {
+  font-size: var(--text-lg);
 }
 
 /* A secret shown once: monospace, selectable, wrapped anywhere. */

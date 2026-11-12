@@ -5154,17 +5154,39 @@ route.
   said it would. The code goes to `navigator.clipboard.writeText` and
   nowhere else; a browser that refuses is told to the person.
 
-Checks on the merged tree (`2a54baa`; only this record came after it):
-`cargo xtask gate`, `postgres`, `smoke`, `secrets` and `crypto-scope` and
-`cargo deny check` pass. `cargo audit --deny warnings` fails on
-RUSTSEC-2026-0459 alone (`libsqlite3-sys`, in the lockfile through
-`sqlx-sqlite` and in no build; the owner's decision, as before). The
-site's browser suite: 348 passed, 4 skipped, none failed. Against a real
-Central on loopback (PostgreSQL 18, the release binaries, synthetic
+- **The chat after a password change.** The chat opens without a password
+  while the sign-in lasts (owner, 03.11.2026), from an identity this
+  browser keeps sealed and bound to account, epoch and tag. A password
+  change replaces the session twice and uses up the Worker's sign-in key,
+  and no test opened the chat afterwards. The kept record depends on
+  neither, and the master key stays, so it should open; the real suite's
+  password spec now opens the chat after the change and once more after a
+  reload and finds it open, with no password asked for, at both sizes.
+- **Looking at the copy button found a step the dialog cut off.** In the
+  registration dialog the step with the recovery code was wider than the
+  dialog at a phone's width in German: the dialog's card and the step are
+  grids, and a grid's column is as wide as its longest word
+  ("Wiederherstellungscode"). The lead and the card's right edge were cut
+  off; nothing was unreachable (the code wraps anywhere, the buttons sat
+  left), and it was so since the dialogs were built on 11.11. Both columns
+  are `minmax(0, 1fr)` now, the step's heading hyphenates and is a size
+  smaller in the dialog. `dialogs.spec.ts` puts such a heading into the
+  dialog at 320 px, once the German one and once a word nothing
+  hyphenates; without the two columns the second fails. Looked at in
+  German and Russian at 412 and 320 px.
+
+Checks on the merged tree. On `2a54baa`: `cargo xtask gate`, `postgres`,
+`smoke`, `secrets` and `crypto-scope` and `cargo deny check` pass;
+`cargo audit --deny warnings` fails on RUSTSEC-2026-0459 alone
+(`libsqlite3-sys`, in the lockfile through `sqlx-sqlite` and in no build;
+the owner's decision, as before); the site's browser suite, 348 passed, 4
+skipped, none failed. Against a real Central on loopback (PostgreSQL 18,
+Central's release binary, the site from the development server, synthetic
 accounts), each project against a Central started afresh: the chat's
 spec, the reset's and the password's pass at the desktop's and at a
 phone's size; the registration in them copies its recovery code and
-reads it back from the clipboard.
+reads it back from the clipboard. What ran after the two points above is
+in the pull request's text.
 
 Not looked at again: the points the list above names as not checked stay
 as they are.
