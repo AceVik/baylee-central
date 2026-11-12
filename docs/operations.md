@@ -1159,7 +1159,21 @@ syslog and fail2ban. Until that is changed, "14 days" is not true of
 
 *Added 10.11.2026, not deployed* ([proposal](proposals/frontend-rewrite.md)).
 Until the owner switches Caddy over, `baylee.app` keeps serving the static
-build of `web/` as before; nothing here changes production by being merged.
+build of `web/` already on the server; nothing here changes production by
+being merged. Since 12.11.2026 that React build is gone from this
+repository, and the deploy hook builds and installs this site instead
+([below](#deploying-with-the-gateway)).
+
+- **Once, by the owner** (in this order): write `/etc/baylee-app/web.json`
+  (below; root's, `0600`), install `ops/baylee-app-web.service` as
+  `/etc/systemd/system/baylee-app-web.service`, run the hook (or put the
+  first build in place by hand), `systemctl daemon-reload`, `systemctl
+  enable --now baylee-app-web`, check `curl -fsS -H 'Host: baylee.app'
+  http://127.0.0.1:28794/robots.txt`, then switch Caddy (below). The unit
+  runs the binary as a dynamic user with a strict sandbox
+  (`ProtectSystem=strict`, no capabilities, `NoExecPaths=/` but for the
+  binary and the system's libraries, `@system-service` system calls); it was
+  written without a systemd at hand and is checked by that first start.
 
 - **Build** (as the build user, beside `central-service`):
   `cargo build --release --locked -p central-web-server` and, with
@@ -1287,8 +1301,9 @@ The 28 October release (`0.1.1-beta.9a`) was the sunlit Baylee memorial,
 parchment story and photo viewer.
 
 
-`ops/deploy-hook` keeps Central and the website (`web/`) in lockstep with the
-official gateway on the same machine. It is a Baylee deploy hook (Baylee's
+`ops/deploy-hook` keeps Central and the website (the server-rendered
+`central-web`; the React build of `web/` was removed on 12.11.2026) in
+lockstep with the official gateway on the same machine. It is a Baylee deploy hook (Baylee's
 `docs/deploy-hooks.md`): installed root-owned, `0755`, as
 `/etc/baylee/deploy-hooks.d/10-central`, it runs in every gateway deploy,
 including the one the gateway's timer starts for a new release tag.
@@ -1301,9 +1316,13 @@ including the one the gateway's timer starts for a new release tag.
 - **`prepare`.** As the build user it fetches and checks the revision out in
   `/opt/baylee-central/src`. It then takes `ops/grants.sql` out of the
   revision's commit, before anything is built, and only then builds
-  `central-service` and the website (`npm ci`, `npm run content` from the
-  gateway's checkout, `npm run build`). It stages all three in
-  `/opt/baylee-central/staged`. A failed fetch answers "not ready" (75), so
+  `central-service` and `central-web-server` in release and the site
+  (`cargo xtask site` with `BAYLEE_SRC`, for the gateway's screenshots and
+  fallback card status). It stages the two binaries, the grants and the site
+  in `/opt/baylee-central/staged`. The build user needs Rust's
+  `wasm32-unknown-unknown` target and the pinned wasm-bindgen CLI
+  ([xtask](xtask.md#the-sites-assets-site)); `brotli` and `gzip` on the
+  `PATH` make the compressed copies. A failed fetch answers "not ready" (75), so
   the next timer run tries again.
 - **`before-switch`** (no game is running, admission is held): asks first
   whether the grants' login reaches the database and is no superuser, and
@@ -1311,19 +1330,27 @@ including the one the gateway's timer starts for a new release tag.
   binary (the old one kept as `central-service.previous`), migrates
   (`--migrate-stdin` from `/etc/baylee-central/migrate.json` under
   `systemd-run` as `central`), grants as `central_migrator`, starts it and
-  waits up to 30 s for `/health/live`; then swaps the website into
-  `/opt/baylee-app/web`. A failed migration, grant or start puts the
-  previous binary back, starts it and fails the hook, which stops the deploy
-  (migrations are transactional).
+  waits up to 30 s for `/health/live`. Then the website: the site goes to
+  `SITE_ROOT` (`/opt/baylee-app/site`) beside the old one and the binary to
+  `WEB_BIN` (`/opt/baylee-app/bin/central-web`, the old one kept as
+  `central-web.previous`); where `WEB_UNIT` (`baylee-app-web`) is installed
+  it is restarted and has 30 s to answer `robots.txt` on `WEB_LISTEN`, else
+  the previous site and binary are put back and the hook fails (Central
+  stays deployed). Where the unit is not installed yet, the files are put in
+  place and nothing is started. A failed migration, grant or start of
+  Central puts the previous binary back, starts it and fails the hook, which
+  stops the deploy (migrations are transactional).
 - **By hand,** for a Central or website change between gateway releases:
   `sudo /etc/baylee/deploy-hooks.d/10-central manual <central revision>`
   stages and switches that revision at once; nothing holds games for it.
 
 Settings, all optional, in `/etc/baylee-central/deploy-hook.env` (root's,
 not writable by others): `BUILD_USER`, `BAYLEE_SRC`, `CENTRAL_ROOT`,
-`WEB_ROOT`, `UNIT`, `LISTEN`, `DB_CONTAINER`, `DB_GRANTOR`, `DB_NAME`; the
-defaults are this deployment's. The website's site block is the one in
-`web/README.md` §"Serving it", with `root` on `WEB_ROOT`.
+`WEB_BIN`, `SITE_ROOT`, `WEB_UNIT`, `WEB_LISTEN`, `UNIT`, `LISTEN`,
+`DB_CONTAINER`, `DB_GRANTOR`, `DB_NAME`; the defaults are this
+deployment's. The website's Caddy block is the one in §"The server-rendered
+website". The old static `WEB_ROOT` (`/opt/baylee-app/web`) is no longer
+written; remove it once Caddy no longer serves it.
 
 ### The grants' file and login (12.11.2026)
 
