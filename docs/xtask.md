@@ -172,13 +172,21 @@ same container. The resulting WASM SHA-256 is
 The server-rendered website (`crates/central-web`, [the proposal](proposals/frontend-rewrite.md))
 is served by `central-web` from `target/site/`, which this task writes:
 
-- the islands: `central-web-islands` built for `wasm32-unknown-unknown`
-  under the `islands` profile (size-optimised, one codegen unit, LTO,
-  `panic = "abort"`), paths remapped as `wasm` remaps them (a module that
-  still names the repository or Cargo's home fails), then the pinned
-  wasm-bindgen CLI (the same 0.2.130 install as `wasm`); and
+- the islands, as two modules (`site::MODULES`): `central-web-islands`
+  built for `wasm32-unknown-unknown` under the `islands` profile
+  (size-optimised, one codegen unit, LTO, `panic = "abort"`), paths
+  remapped as `wasm` remaps them (a module that still names the repository
+  or Cargo's home fails), then the pinned wasm-bindgen CLI (the same
+  0.2.130 install as `wasm`); once without features, the public module
+  (`islands.wasm`, `islands-glue.js`), and once in a cargo run of its own
+  with `--features admin`, the administration's (`admin-islands.wasm`,
+  `admin-islands-glue.js`), which only `/{lang}/account/admin…` loads
+  ([the proposal](proposals/frontend-rewrite.md) §27). Each gets
   `crates/central-web/js/islands.js`, the bootstrap, with the hashed
-  addresses of the glue and the module written in;
+  addresses of its glue and its module written in (`islands.js`,
+  `admin-islands.js`). A public module that holds one of the
+  administration's marks (`site::ADMIN_ONLY`), or an administration's that
+  lacks one, fails the build;
 - the stylesheet: `crates/central-web/style/` joined in the order of
   `site::STYLES`, every `url("/assets/<name>")` rewritten to the hashed
   file (a missing one fails);
@@ -193,7 +201,8 @@ is served by `central-web` from `target/site/`, which this task writes:
   hashed files the offline page needs written over its two placeholders
   (a changed placeholder fails);
 - `notices.txt`: the fonts' and icons' licences and every crate in the
-  islands' module with its licence files, each text once (read with
+  islands' modules (the same graph for both) with its licence files, each
+  text once (read with
   `cargo metadata --locked --offline`: on a machine that built only this
   site, run `cargo fetch --locked` first, as CI's `site` job does);
 - Brotli and gzip copies of every text file where `brotli` and `gzip` are
