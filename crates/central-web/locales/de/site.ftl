@@ -182,7 +182,7 @@ faq-account-a = Nicht, um allein zu spielen: Deckbuilder und Partien gegen die H
 faq-data-q = Was passiert mit meinen Daten?
 faq-data-a = So wenig wie möglich; was genau, steht in der <privacy>Datenschutzerklärung</privacy>. Dein Passwort verlässt nie deinen Browser; deine privaten Daten und deine Chatnachrichten werden auf deinem Gerät verschlüsselt, bevor sie uns erreichen.
 faq-password-q = Ich habe mein Passwort vergessen. Was nun?
-faq-password-a = Ein neues Passwort setzt du mit einem Reset-Code, den dir ein Administrator gibt, <reset>auf dieser Seite</reset>. Deine verschlüsselten Daten bleiben dabei nur erhalten, wenn du den Wiederherstellungscode hast, den du beim Anlegen deines Accounts bekommen hast. Ohne ihn fängst du mit einem leeren Tresor an, und diese Daten sind verloren.
+faq-password-a = Ein neues Passwort setzt du mit einem Reset-Code, <reset>auf dieser Seite</reset>. Hat dein Account eine bestätigte E-Mail-Adresse, kannst du dir den Code dort an sie schicken lassen; sonst gibt dir ein Administrator einen. Deine verschlüsselten Daten bleiben dabei nur erhalten, wenn du den Wiederherstellungscode hast, den du beim Anlegen deines Accounts bekommen hast. Ohne ihn fängst du mit einem leeren Tresor an, und diese Daten sind verloren.
 faq-gateway-q = Was ist ein Gateway?
 faq-gateway-a = Ein Server, auf dem Online-Tische laufen. Jeder kann eins betreiben; das <gateways>Verzeichnis</gateways> zeigt die, die Central kennt.
 faq-systems-q = Auf welchen Systemen läuft es?
@@ -247,7 +247,7 @@ fc-policy = Die <policy>Richtlinie für Fan-Inhalte</policy> von Wizards of the 
 
 privacy-title = Datenschutzerklärung
 privacy-lead = Was diese Seite und Baylee Central über dich verarbeiten, wozu, auf welcher Rechtsgrundlage und wie lange.
-privacy-updated = Stand: 11. November 2026
+privacy-updated = Stand: 12. November 2026
 privacy-controller-title = Wer verantwortlich ist
 privacy-controller = Verantwortlich im Sinne der DSGVO ist die im <impressum>Impressum</impressum> genannte Privatperson; dort stehen Name, Anschrift und E-Mail-Adresse. Fragen zum Datenschutz kannst du auch über das Kontaktformular stellen. Einen Datenschutzbeauftragten gibt es nicht; er ist nicht vorgeschrieben.
 privacy-short-title = Kurz gesagt
@@ -264,6 +264,8 @@ privacy-directory-title = Das Gateway-Verzeichnis
 privacy-directory = Unser Server liest das Verzeichnis der Gateways von Baylee Central und zeigt es an; über dich ist dabei nichts im Spiel. Ein Gateway kann Central mitteilen, wie viele Spieler gerade verbunden sind, wie viele davon in einer Partie sitzen und wie viele offene Tische und Partien es hat, und Central zählt seine Konten; die Website zeigt diese Zahlen. Es sind reine Anzahlen, nie Namen, und die Zahlen eines Gateways sind die Angabe seines Betreibers.
 privacy-account-title = Dein Account
 privacy-account = Für einen Account speichert Baylee Central: deine Account-ID, deinen Anmeldenamen, deinen Anzeigenamen mit seinem Tag, wann und wie der Account entstanden ist, einen OPAQUE-Passwortdatensatz (mit dem du dein Passwort beweist, ohne dass unser Server es je erfährt), deinen Hauptschlüssel zweimal verschlüsselt (mit deinem Passwort und mit deinem Wiederherstellungscode), dein verschlüsseltes Account-Dokument und deine verschlüsselten Ablagen (für uns unlesbar; wir sehen nur Größe, Stand und Zeit), welche Fassung der Nutzungsbedingungen du wann angenommen hast, den Zeitpunkt deiner letzten Anmeldung, deine Sitzungen, eine Administratorrolle, falls du eine hast, und die Gateways, die du registrierst, mit ihren Tokens. Andere Spieler sehen deinen Anzeigenamen und dein Tag, nie deinen Anmeldenamen. Gibt dir ein Administrator einen Reset-Code, speichern wir nur dessen Hashwert, bis der Code benutzt wird oder abgelaufen ist. Was Administratoren an einem Account oder Gateway tun, steht drei Jahre in einem Protokoll (wer, was, welcher Account oder welches Gateway, wann). Rechtsgrundlage: Art. 6 Abs. 1 lit. b DSGVO (der Account, den du wolltest); für den Zeitpunkt der letzten Anmeldung und das Protokoll Art. 6 Abs. 1 lit. f DSGVO (unser berechtigtes Interesse an einem sicheren, nachvollziehbaren Betrieb). Ohne Anmeldenamen und Passwort gibt es keinen Account; eine E-Mail-Adresse brauchst du nicht. Einen Account darfst du ab 16 Jahren anlegen. Gespeichert, bis du den Account löschst; dann wird er sofort aus dem laufenden System entfernt, aus Sicherungen spätestens nach 12 Monaten. Sitzungen enden nach 30 Minuten ohne Nutzung und spätestens 12 Stunden nach der Anmeldung.
+privacy-email-title = E-Mail-Adresse
+privacy-email = Eine E-Mail-Adresse ist freiwillig; ein Account braucht keine. Gibst du eine an, speichert Baylee Central die Adresse und ob und wann du sie bestätigt hast. Von jedem Code, den wir verschicken, speichern wir nur einen Hashwert, bis der Code benutzt wird oder abgelaufen ist. Wir verwenden die Adresse für drei Dinge: um den Code zu schicken, der sie bestätigt, um dir einen Reset-Code zu schicken, wenn du einen anforderst, und um der alten Adresse Bescheid zu sagen, wenn sie ersetzt oder entfernt wird. Die E-Mails verschickt Baylees eigener Maildienst auf demselben Server über mailbox.org (Heinlein Hosting GmbH, Berlin) als Auftragsverarbeiter. Rechtsgrundlage: Art. 6 Abs. 1 lit. b DSGVO (der Account, den du wolltest). Gespeichert, bis du die Adresse entfernst oder den Account löschst.
 privacy-cookie-title = Das Sitzungscookie
 privacy-cookie = Beim Anmelden wird ein Cookie gesetzt, <code>__Host-central</code>: eine Zufallszahl, die deine Sitzung kennzeichnet. Es wird nur an baylee.app gesendet, ist für Skripte nicht lesbar und endet mit der Sitzung, spätestens nach 12 Stunden. Es ist unbedingt erforderlich, damit du angemeldet bleibst; eine Einwilligung braucht es dafür nicht. Rechtsgrundlage: § 25 Abs. 2 Nr. 2 TDDDG und Art. 6 Abs. 1 lit. b DSGVO.
 privacy-chat-title = Chat und Kontakte
@@ -500,10 +502,10 @@ code-copy-failed = Kopieren hat hier nicht geklappt. Markier den Code und kopier
 ## Mit einem Reset-Code ein neues Passwort setzen
 
 reset-title = Neues Passwort setzen
-reset-lead = Für den Fall, dass du dein Passwort vergessen hast: Ein Administrator gibt dir einen Reset-Code, und mit ihm setzt du hier ein neues.
+reset-lead = Für den Fall, dass du dein Passwort vergessen hast: Mit einem Reset-Code setzt du hier ein neues. Den Code bekommst du per E-Mail an deine bestätigte Adresse oder von einem Administrator.
 reset-noscript = Ein neues Passwort zu setzen braucht JavaScript: Dein Passwort und dein Wiederherstellungscode werden in deinem Browser verarbeitet und nie an uns gesendet.
 reset-code = Reset-Code
-reset-code-hint = Von einem Administrator. Er beginnt mit RESET und gilt einmal, bis 24 Stunden nach dem Ausstellen.
+reset-code-hint = Per E-Mail oder von einem Administrator. Er beginnt mit RESET und gilt einmal: eine Stunde, wenn er per E-Mail kam, 24 Stunden, wenn ihn ein Administrator ausgestellt hat.
 reset-data = Deine verschlüsselten Daten
 reset-keep = Ich habe meinen Wiederherstellungscode. Meine Daten bleiben.
 reset-new = Ich habe ihn nicht. Mit einem leeren Tresor neu anfangen.
@@ -525,6 +527,15 @@ reset-unsure-title = Es kam keine Antwort
 reset-unsure = Die Verbindung brach ab, bevor Baylee Central geantwortet hat. Deshalb wissen wir nicht, ob dein neues Passwort gesetzt wurde. Versuch, dich damit anzumelden. Klappt das nicht, wurde nichts geändert: Dein Reset-Code gilt weiter, gib ihn hier noch einmal ein.
 reset-unsure-code = Wenn dein neues Passwort gilt, ist das dein neuer Wiederherstellungscode, und der alte gilt nicht mehr; er lässt sich nicht noch einmal anzeigen, sichere ihn also jetzt. Wenn dein neues Passwort nicht gilt, ist dieser Code wertlos.
 reset-to-signin = Anmelden
+reset-mail-title = Kein Reset-Code?
+reset-mail-lead = Gib deinen Anmeldenamen ein. Hat dein Account eine bestätigte E-Mail-Adresse, schicken wir einen Reset-Code dorthin.
+reset-mail-name-hint = Der Name, mit dem du dich anmeldest, nicht deine E-Mail-Adresse.
+reset-mail-submit = Code per E-Mail schicken
+reset-mail-error-name = Das ist kein Anmeldename. Gib den Namen ein, mit dem du dich anmeldest, nicht deine E-Mail-Adresse.
+reset-mail-sent = Wenn dieser Account eine bestätigte E-Mail-Adresse hat, ist ein Reset-Code dorthin unterwegs. Er gilt eine Stunde.
+reset-mail-busy = Im Moment zu viele Anfragen. Versuch es später noch einmal.
+reset-mail-none = Dieser Server verschickt keine E-Mails. Bitte einen Administrator um einen Reset-Code.
+reset-mail-early = Das ging zu schnell. Versuch es gleich noch einmal.
 
 ## Das Passwort ändern
 
@@ -536,6 +547,46 @@ password-missing = Gib dein aktuelles Passwort und ein neues ein.
 password-error-current = Das aktuelle Passwort stimmt nicht. Prüf es und versuch es noch einmal.
 password-changed = Dein Passwort ist geändert. Hier bleibst du angemeldet, überall sonst bist du abgemeldet, auch im Baylee-Client; melde dich dort mit dem neuen Passwort an.
 password-unsure = Es kam keine Antwort. Deshalb wissen wir nicht, ob dein Passwort geändert wurde. Versuch beim nächsten Anmelden zuerst das neue Passwort, dann das alte.
+
+## An account's e-mail address
+
+email-title = E-Mail-Adresse
+email-lead = Eine E-Mail-Adresse ist freiwillig. Wir schicken dir damit einen Reset-Code, wenn du einen anforderst, und sagen dir Bescheid, wenn die Adresse ersetzt oder entfernt wird.
+email-warning = Wer dieses Postfach lesen kann, kann deine Anmeldung zurücksetzen. Deine verschlüsselten Daten überstehen einen Reset nur mit deinem Wiederherstellungscode.
+email-no-mail = Dieser Server verschickt keine E-Mails; eine E-Mail-Adresse lässt sich hier deshalb weder eintragen noch bestätigen.
+email-unavailable = Die E-Mail-Adresse lässt sich gerade nicht anzeigen.
+email-password-hint = Dein aktuelles Passwort, damit niemand sonst an diesem Browser bestimmt, wer deine Anmeldung zurücksetzen kann.
+email-submit = Bestätigungscode schicken
+email-missing = Gib eine E-Mail-Adresse und dein Passwort ein.
+email-error-address = An diese Adresse können wir nicht schreiben. Gib eine einfache Adresse ein, etwa name@example.org; Umlaute und Buchstaben mit Akzent gehen nicht.
+email-current = Deine Adresse
+email-confirmed-at = Bestätigt
+email-waiting = Wartet auf ihren Code
+email-change = Ändern
+email-change-lead = Deine bisherige Adresse gilt weiter, bis du die neue bestätigt hast.
+email-change-cancel = Bisherige Adresse behalten
+email-remove = Entfernen
+email-remove-ask = Diese Adresse entfernen? Wir sagen der Adresse Bescheid, dass sie entfernt wurde. Danach kannst du dir keinen Reset-Code mehr per E-Mail schicken lassen.
+email-remove-ask-no-mail = Diese Adresse entfernen? Solange dieser Server keine E-Mails verschickt, kannst du keine neue eintragen.
+email-remove-confirm = Adresse entfernen
+email-remove-keep = Behalten
+email-pending = Wir haben einen Code an <code>{ $address }</code> geschickt. Er gilt 15 Minuten.
+email-pending-keeps = Bis du sie bestätigst, bleibt <code>{ $address }</code> deine Adresse.
+email-code = Bestätigungscode
+email-code-hint = Acht Zeichen, wie in XXXX-XXXX. Groß oder klein, mit oder ohne Bindestrich.
+email-confirm = Bestätigen
+email-resend = Noch einmal schicken
+email-other = Andere Adresse verwenden
+email-withdraw = Zurückziehen
+email-error-code = Das ist kein Bestätigungscode. Er hat acht Zeichen, wie in XXXX-XXXX.
+email-wrong-code = Dieser Code stimmt nicht. Prüf ihn und versuch es noch einmal. Nach mehreren falschen Codes musst du die Adresse neu eingeben.
+email-now-confirmed = Deine E-Mail-Adresse ist bestätigt.
+email-resent = Ein neuer Code ist unterwegs. Der frühere gilt nicht mehr.
+email-withdrawn = Die Adresse ist zurückgezogen. Es wartet kein Code mehr.
+email-removed = Deine E-Mail-Adresse ist entfernt.
+email-busy = Im Moment zu viele E-Mails. Versuch es später noch einmal.
+email-same = Das ist schon deine Adresse.
+email-unsure = Es kam keine Antwort. Deshalb wissen wir nicht, ob das geklappt hat. Sieh nach, was hier steht, und versuch es noch einmal, falls nicht.
 
 ## Die Nutzungsbedingungen von Central
 
@@ -602,6 +653,7 @@ privacy-export-title = Deine Daten exportieren
 privacy-export-lead = Was Baylee Central über deinen Account weiß, als JSON-Datei: Stammdaten, Sitzungen, angenommene Bedingungen, deine Gateways und die Protokolleinträge zu deinem Account. Deine verschlüsselten Inhalte kann nur dein Baylee-Client entschlüsseln und exportieren. Für den Export braucht es eine Anmeldung, die weniger als 30 Minuten her ist.
 privacy-export-make = Export vorbereiten
 privacy-export-save = Export speichern
+privacy-export-no-email = Die E-Mail-Adresse ließ sich nicht lesen; sie steht nicht in dieser Datei.
 privacy-delete-title = Deinen Account löschen
 privacy-delete-lead = Dein Account, seine Daten, seine Sitzungen, deine Kontakte und die Gateways, die dir gehören, werden sofort und endgültig aus dem laufenden System gelöscht; aus Sicherungen verschwinden sie spätestens nach 12 Monaten. Auch deine gesendeten Nachrichten löscht Central; was andere schon auf ihren Geräten gespeichert haben, kann dort bleiben.
 privacy-delete-start = Meinen Account löschen

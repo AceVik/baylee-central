@@ -182,7 +182,8 @@ faq-account-a = 혼자 플레이할 때는 필요 없어요. 덱 빌더와 하�
 faq-data-q = 내 데이터는 어떻게 되나요?
 faq-data-a = 가능한 한 최소한만 처리해요. 자세한 내용은 <privacy>개인정보 처리방침</privacy>에 있어요. 비밀번호는 브라우저를 떠나지 않으며, 개인 데이터와 채팅 메시지는 우리에게 도착하기 전에 기기에서 암호화돼요.
 faq-password-q = 비밀번호를 잊어버렸어요. 어떻게 하나요?
-faq-password-a = 새 비밀번호는 관리자가 주는 재설정 코드로 <reset>이 페이지</reset>에서 설정해요. 암호화된 데이터는 계정을 만들 때 받은 복구 코드가 있어야만 남아 있어요. 복구 코드가 없으면 빈 보관함으로 시작하게 되고, 그 데이터는 사라져요.
+# English for now: to be translated.
+faq-password-a = You set a new password with a reset code, <reset>on this page</reset>. If your account has a confirmed e-mail address, you can have the code sent to it there; otherwise an administrator gives you one. Your encrypted data survives only if you have the recovery code you received when you created your account. Without it you start with an empty vault, and that data is lost.
 faq-gateway-q = Gateway가 무엇인가요?
 faq-gateway-a = 온라인 테이블이 열리는 서버예요. 누구나 운영할 수 있으며, <gateways>목록</gateways>에는 Central이 아는 Gateway가 올라와 있어요.
 faq-systems-q = 어떤 시스템에서 실행되나요?
@@ -247,7 +248,7 @@ fc-policy = Wizards of the Coast의 <policy>팬 콘텐츠 정책</policy>
 
 privacy-title = 개인정보 처리방침
 privacy-lead = 이 사이트와 Baylee Central이 어떤 정보를 왜, 어떤 법적 근거로, 얼마나 오래 처리하는지 안내해요.
-privacy-updated = 2026년 11월 11일 기준
+privacy-updated = 2026년 11월 12일 기준
 privacy-controller-title = 책임자
 privacy-controller = GDPR(EU 일반 개인정보 보호법)에 따른 처리 책임자는 <impressum>법적 고지</impressum>에 이름, 우편 주소, 이메일 주소가 적힌 개인이에요. 개인정보 관련 문의는 문의 양식으로도 보낼 수 있어요. 개인정보 보호책임자는 없으며, 두어야 할 의무도 없어요.
 privacy-short-title = 요약
@@ -264,6 +265,10 @@ privacy-directory-title = Gateway 목록
 privacy-directory = 우리 서버가 Baylee Central에서 Gateway 목록을 읽어 와 보여 줘요. 여러분에 관한 정보는 관여하지 않아요. Gateway는 지금 접속 중인 플레이어가 몇 명인지, 그중 몇 명이 게임 중인지, 열린 테이블과 게임이 몇 개인지 Central에 알릴 수 있고, Central은 계정 수를 세요. 사이트는 이 숫자들을 보여 줘요. 이 숫자들은 개수일 뿐 이름이 아니며, Gateway의 숫자는 그 운영자 본인의 진술이에요.
 privacy-account-title = 내 계정
 privacy-account = 계정을 위해 Baylee Central은 다음을 저장해요. 계정 ID, 로그인 이름, 태그가 붙은 표시 이름, 계정을 만든 시기와 방법, OPAQUE 비밀번호 기록(우리 서버가 비밀번호를 알지 못한 채 여러분이 비밀번호를 증명할 수 있게 해 줌), 비밀번호와 복구 코드로 각각 한 번씩 암호화된 마스터 키, 암호화된 계정 문서와 암호화된 객체(우리는 읽을 수 없고 크기, 리비전, 시각만 볼 수 있음), 동의한 약관의 버전과 시기, 마지막 로그인 시각, 세션, 관리자 역할(있는 경우), 등록한 Gateway와 그 토큰. 다른 플레이어에게는 태그가 붙은 표시 이름이 보이고, 로그인 이름은 절대 보이지 않아요. 관리자가 재설정 코드를 주면, 코드를 사용하거나 만료될 때까지 그 다이제스트만 저장해요. 관리자가 계정이나 Gateway에 한 작업은 누가, 무엇을, 어느 계정이나 Gateway에, 언제 했는지를 3년 동안 기록으로 남겨요. 법적 근거: GDPR 제6조 제1항 (b)호(요청하신 계정). 마지막 로그인 시각과 기록에 대해서는 GDPR 제6조 제1항 (f)호(안전하고 추적 가능한 운영에 대한 우리의 정당한 이익). 로그인 이름과 비밀번호가 없으면 계정이 없으며, 이메일 주소는 필요 없어요. 계정은 만 16세부터 만들 수 있어요. 계정을 삭제할 때까지 보관하며, 삭제하면 운영 중인 시스템에서는 즉시, 백업에서는 늦어도 12개월 안에 제거돼요. 세션은 사용하지 않은 지 30분 후에 끝나고, 늦어도 로그인 후 12시간이 지나면 끝나요.
+# English for now: to be translated.
+privacy-email-title = E-mail address
+# English for now: to be translated.
+privacy-email = An e-mail address is optional; an account needs none. If you give one, Baylee Central stores the address and whether and when you confirmed it. Of every code we mail, we store only a digest, until the code is used or has expired. We use the address for three things: to send the code that confirms it, to send a reset code when you ask for one, and to tell the old address when it is replaced or removed. The mail is sent by Baylee's own mail service on the same server through mailbox.org (Heinlein Hosting GmbH, Berlin), which acts as a processor. Legal basis: Art. 6(1)(b) GDPR (the account you asked for). Kept until you remove the address or delete the account.
 privacy-cookie-title = 세션 쿠키
 privacy-cookie = 로그인하면 쿠키 하나, <code>__Host-central</code>이 설정돼요. 세션을 식별하는 임의 번호예요. baylee.app에만 전송되고, 스크립트가 읽을 수 없으며, 세션과 함께 늦어도 12시간 후에 끝나요. 로그인 상태를 유지하는 데 꼭 필요하므로 동의가 필요하지 않아요. 법적 근거: TDDDG § 25 제2항 제2호 및 GDPR 제6조 제1항 (b)호.
 privacy-chat-title = 채팅과 연락처
@@ -499,10 +504,12 @@ code-copy-failed = 여기서는 복사가 되지 않았어요. 코드를 선택�
 ## Setting a new password with a reset code
 
 reset-title = 새 비밀번호 설정
-reset-lead = 비밀번호를 잊었을 때를 위한 페이지예요. 관리자가 재설정 코드를 주면, 그 코드로 여기서 새 비밀번호를 설정해요.
+# English for now: to be translated.
+reset-lead = For when you forgot your password: with a reset code you set a new one here. The code comes by e-mail to your confirmed address, or from an administrator.
 reset-noscript = 새 비밀번호를 설정하려면 JavaScript가 필요해요. 비밀번호와 복구 코드는 브라우저 안에서 처리되며 우리에게 전송되지 않아요.
 reset-code = 재설정 코드
-reset-code-hint = 관리자에게서 받아요. RESET으로 시작하며, 만들어진 뒤 24시간 안에 한 번만 쓸 수 있어요.
+# English for now: to be translated.
+reset-code-hint = By e-mail or from an administrator. It starts with RESET and works once: for one hour if it came by e-mail, for 24 hours if an administrator made it.
 reset-data = 암호화된 데이터
 reset-keep = 복구 코드가 있어요. 데이터는 그대로 둬요.
 reset-new = 복구 코드가 없어요. 빈 보관함으로 시작해요.
@@ -524,6 +531,24 @@ reset-unsure-title = 응답이 오지 않았어요
 reset-unsure = Baylee Central이 응답하기 전에 연결이 끊어져서, 새 비밀번호가 설정되었는지 알 수 없어요. 새 비밀번호로 로그인해 보세요. 로그인되지 않으면 바뀐 것이 없어요. 재설정 코드는 그대로 쓸 수 있으니 여기에 다시 입력해 주세요.
 reset-unsure-code = 새 비밀번호로 로그인된다면 이것이 새 복구 코드이고 이전 코드는 더 이상 쓸 수 없어요. 다시 보여 줄 수 없으니 지금 저장해 주세요. 새 비밀번호로 로그인되지 않는다면 이 코드는 쓸모가 없어요.
 reset-to-signin = 로그인
+# English for now: to be translated.
+reset-mail-title = No reset code?
+# English for now: to be translated.
+reset-mail-lead = Enter your sign-in name. If your account has a confirmed e-mail address, we send a reset code to it.
+# English for now: to be translated.
+reset-mail-name-hint = The name you sign in with, not your e-mail address.
+# English for now: to be translated.
+reset-mail-submit = Send a code by e-mail
+# English for now: to be translated.
+reset-mail-error-name = That is not a sign-in name. Enter the name you sign in with, not your e-mail address.
+# English for now: to be translated.
+reset-mail-sent = If this account has a confirmed e-mail address, a reset code is on its way to it. It is valid for one hour.
+# English for now: to be translated.
+reset-mail-busy = Too many requests for now. Try again later.
+# English for now: to be translated.
+reset-mail-none = This server sends no mail. Ask an administrator for a reset code.
+# English for now: to be translated.
+reset-mail-early = That was too quick. Try again in a moment.
 
 ## Changing the password
 
@@ -535,6 +560,83 @@ password-missing = 현재 비밀번호와 새 비밀번호를 입력해 주세�
 password-error-current = 현재 비밀번호가 맞지 않아요. 확인한 뒤 다시 시도해 주세요.
 password-changed = 비밀번호를 변경했어요. 여기서는 로그인된 상태로 남고, 그 밖의 모든 곳에서는 Baylee 클라이언트를 포함해 로그아웃돼요. 그쪽에서는 새 비밀번호로 로그인해 주세요.
 password-unsure = 응답이 오지 않아서 비밀번호가 변경되었는지 알 수 없어요. 다음에 로그인할 때는 새 비밀번호를 먼저 시도하고, 그다음에 이전 비밀번호를 시도해 보세요.
+
+## An account's e-mail address
+
+# English for now: to be translated.
+email-title = E-mail address
+# English for now: to be translated.
+email-lead = An e-mail address is optional. We use it to send you a reset code when you ask for one, and to tell you when the address is replaced or removed.
+# English for now: to be translated.
+email-warning = Whoever can read this mailbox can reset your sign-in. Your encrypted data survives a reset only with your recovery code.
+# English for now: to be translated.
+email-no-mail = This server sends no mail, so an e-mail address cannot be set or confirmed here.
+# English for now: to be translated.
+email-unavailable = The e-mail address cannot be shown right now.
+# English for now: to be translated.
+email-password-hint = Your current password, so that nobody else at this browser decides who can reset your sign-in.
+# English for now: to be translated.
+email-submit = Send confirmation code
+# English for now: to be translated.
+email-missing = Enter an e-mail address and your password.
+# English for now: to be translated.
+email-error-address = We cannot write to this address. Enter one plain address such as name@example.org; accented letters and umlauts do not work.
+# English for now: to be translated.
+email-current = Your address
+# English for now: to be translated.
+email-confirmed-at = Confirmed
+# English for now: to be translated.
+email-waiting = Waits for its code
+# English for now: to be translated.
+email-change = Change
+# English for now: to be translated.
+email-change-lead = Your current address stays in use until you have confirmed the new one.
+# English for now: to be translated.
+email-change-cancel = Keep the current address
+# English for now: to be translated.
+email-remove = Remove
+# English for now: to be translated.
+email-remove-ask = Remove this address? We tell the address that it was removed. After that you can no longer get a reset code by e-mail.
+# English for now: to be translated.
+email-remove-ask-no-mail = Remove this address? While this server sends no mail, you cannot set one again.
+# English for now: to be translated.
+email-remove-confirm = Remove address
+# English for now: to be translated.
+email-remove-keep = Keep it
+# English for now: to be translated.
+email-pending = We sent a code to <code>{ $address }</code>. It is valid for 15 minutes.
+# English for now: to be translated.
+email-pending-keeps = Until you confirm it, <code>{ $address }</code> stays your address.
+# English for now: to be translated.
+email-code = Confirmation code
+# English for now: to be translated.
+email-code-hint = Eight characters, as in XXXX-XXXX. Upper or lower case, with or without the hyphen.
+# English for now: to be translated.
+email-confirm = Confirm
+# English for now: to be translated.
+email-resend = Send again
+# English for now: to be translated.
+email-other = Use another address
+# English for now: to be translated.
+email-withdraw = Withdraw
+# English for now: to be translated.
+email-error-code = That is not a confirmation code. It has eight characters, as in XXXX-XXXX.
+# English for now: to be translated.
+email-wrong-code = That code is not right. Check it and try again. After several wrong codes you have to enter the address again.
+# English for now: to be translated.
+email-now-confirmed = Your e-mail address is confirmed.
+# English for now: to be translated.
+email-resent = A new code is on its way. The earlier one no longer works.
+# English for now: to be translated.
+email-withdrawn = The address is withdrawn. No code is waited for any more.
+# English for now: to be translated.
+email-removed = Your e-mail address is removed.
+# English for now: to be translated.
+email-busy = Too many mails for now. Try again later.
+# English for now: to be translated.
+email-same = This is your address already.
+# English for now: to be translated.
+email-unsure = No answer came back, so we cannot tell whether that went through. Look at what is shown here, and try again if it did not.
 
 ## Central's terms
 
@@ -601,6 +703,8 @@ privacy-export-title = 데이터 내보내기
 privacy-export-lead = Baylee Central이 계정에 대해 아는 내용을 JSON 파일로 내보내요. 기본 데이터, 세션, 동의한 약관, 내 Gateways, 계정이 언급된 감사 기록이 들어 있어요. 암호화된 내용은 Baylee 클라이언트에서만 복호화하고 내보낼 수 있어요. 내보내려면 30분 이내에 로그인해야 해요.
 privacy-export-make = 내보내기 준비
 privacy-export-save = 내보낸 파일 저장
+# English for now: to be translated.
+privacy-export-no-email = The e-mail address could not be read; it is not in this file.
 privacy-delete-title = 계정 삭제
 privacy-delete-lead = 계정, 데이터, 세션, 연락처, 소유한 Gateways가 운영 중인 시스템에서 즉시, 영구적으로 삭제돼요. 백업에서는 늦어도 12개월 안에 사라져요. Central은 보낸 메시지도 삭제하지만, 다른 사람이 이미 자기 기기에 저장한 것은 그대로 남을 수 있어요.
 privacy-delete-start = 내 계정 삭제
