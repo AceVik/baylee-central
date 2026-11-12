@@ -92,7 +92,9 @@
     display: flex;
   }
 
-  .conv-back {
+  /* both panes stand: no way back to show (`.icon-button` comes later in
+     the sheet, so the rule names the messenger to outweigh it) */
+  .messenger .conv-back {
     display: none;
   }
 }
