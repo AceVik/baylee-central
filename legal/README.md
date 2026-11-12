@@ -18,6 +18,12 @@ name, profile picture, bug reports in Central) is marked as to follow. The
 owner's full review, and ideally a lawyer's, are still to come; each change is
 a new version.
 
+On 12.11.2026 the owner had e-mail built (an optional address, a reset
+code by mail) and decided that version 2026-11-11, not yet published,
+carries it: the terms' two sentences on e-mail and the privacy policy's
+e-mail lines changed (`updated: 2026-11-12`), the version stayed. Nobody
+outside local tests has accepted 2026-11-11 before the change.
+
 | file | what |
 | --- | --- |
 | `terms.de.md` | Nutzungsbedingungen (binding) |

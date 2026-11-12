@@ -44,6 +44,8 @@ enum Action {
 enum Said {
     /// The code is not the one Central mailed.
     WrongCode,
+    /// The code was wrong once too often: the address waits no more.
+    Dropped,
     /// The address is the account's already.
     Same,
     /// No mail could be handed over, or too many were asked for.
@@ -57,6 +59,7 @@ enum Said {
 fn said_text(lang: Lang, said: Said) -> &'static str {
     match said {
         Said::WrongCode => words::email_wrong_code(lang),
+        Said::Dropped => words::email_code_dropped(lang),
         Said::Same => words::email_same(lang),
         Said::Mails => words::email_busy(lang),
         Said::Unsure => words::email_unsure(lang),
@@ -144,6 +147,10 @@ async fn act(action: Action, request: EmailRequest) -> Outcome {
         return Outcome::Said(said, None);
     }
     match read().await {
+        // the last wrong code gave the address up: say so, not "try again"
+        Ok(state) if said == Said::WrongCode && state.pending.is_none() => {
+            Outcome::Said(Said::Dropped, Some(state))
+        }
         Ok(state) => Outcome::Said(said, Some(state)),
         Err(Unread::SignedOut) => Outcome::SignedOut,
         Err(Unread::Refused | Unread::Problem(_)) => Outcome::Said(said, None),

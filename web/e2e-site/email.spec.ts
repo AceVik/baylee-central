@@ -335,10 +335,13 @@ test("a wrong code is said and the state read again; after several the address i
   // the button is the page's again once the state was read
   await expect(button(page, "Confirm")).not.toHaveAttribute("aria-disabled", "true");
   await expect(code(page)).toBeVisible();
-  // the third: Central gave the address up, and the page shows what it holds
+  // the third: Central gave the address up, the page shows what it holds
+  // and says that the address has to be entered again, not "try again"
   await code(page).press("Enter");
   await expect(address(page)).toBeFocused();
-  await expect(alert(page)).toHaveText(wrong);
+  await expect(alert(page)).toHaveText(
+    "That code was not right either, so the address no longer waits. Enter it again to get a new code.",
+  );
   await expect(code(page)).toHaveCount(0);
   expect(actions(seen, asked)).toEqual(["confirm", "status", "confirm", "status", "confirm", "status"]);
   expect(await page.evaluate(() => localStorage.getItem("baylee-central-session"))).not.toBeNull();
