@@ -19,7 +19,7 @@ async fn group(
         _ => panic!("group response required"),
     }
 }
-async fn change(
+pub(super) async fn change(
     store: &AccountStore,
     token: &Token,
     id: &str,
@@ -41,7 +41,7 @@ async fn list(store: &AccountStore, token: &Token) -> Groups {
         _ => panic!("group snapshot required"),
     }
 }
-async fn create(store: &AccountStore, token: &Token) -> String {
+pub(super) async fn create(store: &AccountStore, token: &Token) -> String {
     match group(
         store,
         token,
@@ -56,7 +56,7 @@ async fn create(store: &AccountStore, token: &Token) -> String {
         _ => panic!("created group required"),
     }
 }
-async fn contact(store: &AccountStore, token: &Token, tag: u32, change: ContactAction) {
+pub(super) async fn contact(store: &AccountStore, token: &Token, tag: u32, change: ContactAction) {
     store
         .social(
             Session::Native(token),
@@ -65,7 +65,7 @@ async fn contact(store: &AccountStore, token: &Token, tag: u32, change: ContactA
         .await
         .unwrap();
 }
-fn message(
+pub(super) fn message(
     conv: &str,
     from: &DeviceSecrets,
     tag: u32,
@@ -119,7 +119,7 @@ fn message(
             .collect(),
     }
 }
-async fn post(
+pub(super) async fn post(
     store: &AccountStore,
     token: &Token,
     conv: &str,
