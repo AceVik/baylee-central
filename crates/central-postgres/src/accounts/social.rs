@@ -8,6 +8,7 @@ pub use chat::CHAT_SENDER_SHARE;
 mod contacts;
 mod groups;
 mod limits;
+pub(super) use limits::charge_lookups;
 
 fn unavailable(_: impl Sized) -> Error {
     Error::Unavailable
@@ -98,6 +99,26 @@ impl AccountStore {
                 SocialResponse::Person {
                     person: found.as_ref().map(person).transpose()?,
                 }
+            }
+            SocialRequest::Pictures { tags } => {
+                lock_accounts(&tx, vec![me]).await?;
+                caller(&tx, session, true).await?;
+                SocialResponse::Pictures {
+                    pictures: super::pictures::pictures(&tx, me, &tags).await?,
+                }
+            }
+            SocialRequest::ReportPicture {
+                tag,
+                key,
+                reason,
+                note,
+            } => {
+                let other = by_tag(&tx, tag).await?.ok_or(Error::Rejected)?;
+                let other: Uuid = other.try_get("", "id").map_err(unavailable)?;
+                lock_accounts(&tx, vec![me]).await?;
+                caller(&tx, session, true).await?;
+                super::pictures::report(&tx, me, other, key, reason, note.as_deref()).await?;
+                SocialResponse::Done
             }
             SocialRequest::Contact { tag, change } => {
                 let other = by_tag(&tx, tag).await?.ok_or(Error::Rejected)?;

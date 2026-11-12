@@ -36,6 +36,9 @@ mod objects;
 mod owner;
 mod pairing;
 mod password;
+mod pictures;
+pub use central_postgres::pictures::Encoding as PictureEncoding;
+pub use pictures::{Admitted, SLOTS as PICTURE_SLOTS, UploadRefusal};
 mod push;
 pub use push::{GatewayDelivery, GatewayOutcome};
 mod reports;
@@ -150,7 +153,8 @@ pub fn browser_operation(request: &Request) -> bool {
         | Request::PairStart
         | Request::PairStatus { .. }
         | Request::PairApprove { .. }
-        | Request::PairCancel { .. } => true,
+        | Request::PairCancel { .. }
+        | Request::Picture { .. } => true,
         Request::AcceptTerms { subject, .. } => matches!(subject, TermsSubject::Central),
         Request::CreateObject
         | Request::ReadObject { .. }
@@ -206,6 +210,7 @@ fn browser_only(request: &Request) -> bool {
             | Request::PairStatus { .. }
             | Request::PairApprove { .. }
             | Request::PairCancel { .. }
+            | Request::Picture { .. }
     )
 }
 
@@ -237,6 +242,7 @@ fn uses_session(request: &Request) -> bool {
             | Request::PairApprove { .. }
             | Request::PairCancel { .. }
             | Request::Email { .. }
+            | Request::Picture { .. }
     )
 }
 
@@ -308,6 +314,8 @@ pub struct IdentityService {
     push_key: Option<String>,
     /// The mailer, what was asked of it and what waits for it (`email.rs`).
     mails: email::Mails,
+    /// The picture worker and the upload slots (`pictures.rs`).
+    pictures: pictures::Pictures,
 }
 
 impl IdentityService {
@@ -357,6 +365,7 @@ impl IdentityService {
             legacy: None,
             push_key: None,
             mails: email::Mails::default(),
+            pictures: pictures::Pictures::default(),
         })
     }
 

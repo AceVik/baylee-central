@@ -139,8 +139,13 @@ impl DevelopmentServer {
                 "browser listener requires its fixed body capacity",
             ));
         }
-        self.run_router(super::browser::router(identity, site), CONNECTION, shutdown)
-            .await
+        // A picture's upload may take its body's and its conversion's time.
+        self.run_router(
+            super::browser::router(identity, site),
+            super::browser::PICTURE_UPLOAD_TIME + CONNECTION,
+            shutdown,
+        )
+        .await
     }
 
     /// Serve `app`, each connection for at most `connection` (one request

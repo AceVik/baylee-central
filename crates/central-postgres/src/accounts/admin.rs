@@ -39,6 +39,15 @@ pub enum Action {
     RegistrationClosed,
     /// An administrator opened registration again.
     RegistrationOpened,
+    /// An administrator kept a reported profile picture.
+    PictureKept,
+    /// An administrator removed a profile picture; the detail holds the
+    /// reason code.
+    PictureRemoved,
+    /// An administrator blocked an account's picture uploads.
+    PictureBlocked,
+    /// An administrator lifted an account's upload block.
+    PictureUnblocked,
 }
 
 impl Action {
@@ -55,6 +64,10 @@ impl Action {
             Self::GatewayTokenRevoked => "gateway.token_revoked",
             Self::RegistrationClosed => "registration.closed",
             Self::RegistrationOpened => "registration.opened",
+            Self::PictureKept => "picture.kept",
+            Self::PictureRemoved => "picture.removed",
+            Self::PictureBlocked => "picture.blocked",
+            Self::PictureUnblocked => "picture.unblocked",
         }
     }
 }
@@ -512,7 +525,7 @@ impl AccountStore {
     /// are checked again in a fresh snapshot, so a removal that committed
     /// meanwhile is seen. Nothing but the transaction itself asks the pool
     /// for a connection from here to its end.
-    async fn acting_administrator(
+    pub(super) async fn acting_administrator(
         &self,
         browser: &Token,
     ) -> Result<(sea_orm::DatabaseTransaction, Uuid), Error> {
@@ -998,6 +1011,9 @@ pub struct Swept {
     /// E-mail addresses that waited for a code past its end
     /// (`docs/email.md`).
     pub addresses: u64,
+    /// Picture reports decided more than a year ago
+    /// (`docs/profile-pictures.md`).
+    pub picture_reports: u64,
 }
 
 /// Delete audit events older than [`AUDIT_YEARS`], the digests of expired
@@ -1039,6 +1055,7 @@ pub async fn sweep(db: &DatabaseConnection) -> Result<Swept, Error> {
     // After the codes: what a confirmed address keeps of a mailed code is
     // tidied against the codes that are left.
     let addresses = super::email::sweep(&tx).await?;
+    let picture_reports = super::pictures::sweep(&tx).await?;
     tx.commit().await.map_err(|_| Error::Unavailable)?;
     Ok(Swept {
         events,
@@ -1046,5 +1063,6 @@ pub async fn sweep(db: &DatabaseConnection) -> Result<Swept, Error> {
         pairings,
         reports,
         addresses,
+        picture_reports,
     })
 }

@@ -573,6 +573,13 @@ pub enum Request {
         /// The verifier whose SHA-256 the claim sent, 32 bytes.
         verifier: Vec<u8>,
     },
+    /// The session's own profile picture (`docs/profile-pictures.md`), on
+    /// the browser listener; Central's terms need not be accepted. The
+    /// picture itself is uploaded on its own route, `PUT /api/v1/picture`.
+    Picture {
+        /// The action.
+        request: crate::picture::PictureRequest,
+    },
 }
 
 /// What a reset does with the account's encrypted data.
@@ -1019,6 +1026,23 @@ pub enum Response {
         sealed: Vec<u8>,
         /// Absolute Unix-seconds expiry of the session.
         expires_at: i64,
+    },
+    /// The session's own profile picture
+    /// ([`crate::picture::PictureRequest::Mine`], and the answer to an
+    /// upload).
+    MyPicture {
+        /// The current picture, if any.
+        picture: Option<crate::picture::Picture>,
+        /// An administrator's last removal, if any: when and why.
+        notice: Option<crate::picture::PictureNotice>,
+        /// An upload block in force, if any.
+        block: Option<crate::picture::UploadBlock>,
+    },
+    /// The picture reports this account filed
+    /// ([`crate::picture::PictureRequest::Reports`]).
+    MyPictureReports {
+        /// Newest first.
+        reports: Vec<crate::picture::FiledReport>,
     },
 }
 

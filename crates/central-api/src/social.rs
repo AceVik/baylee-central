@@ -89,6 +89,30 @@ pub enum SocialRequest {
         /// The requested state transition.
         change: ContactAction,
     },
+    /// The current picture keys of up to
+    /// [`crate::picture::MAX_PICTURE_TAGS`] public tags
+    /// (`docs/profile-pictures.md`). Every tag outside the caller's
+    /// contacts and groups spends one unit of the lookup budget. Unknown
+    /// tags, accounts without a picture and pairs with a block between them
+    /// are absent. Answered with [`SocialResponse::Pictures`].
+    Pictures {
+        /// Exact public tags.
+        tags: Vec<u32>,
+    },
+    /// Report the account's current picture to the administrators, with a
+    /// reason from the list and an optional note. `Done`; one's own
+    /// picture, one the caller cannot see and a key that is not the
+    /// account's current one are `Rejected` alike.
+    ReportPicture {
+        /// The account's public tag.
+        tag: u32,
+        /// The key of the picture the caller saw.
+        key: crate::picture::PictureKey,
+        /// The reason.
+        reason: crate::picture::PictureReason,
+        /// At most [`crate::picture::MAX_REPORT_NOTE`] characters.
+        note: Option<String>,
+    },
 }
 
 /// Closed social reply vocabulary; no request or reply contains a credential.
@@ -114,6 +138,11 @@ pub enum SocialResponse {
     Person {
         /// Never a private username or an unregistered reservation.
         person: Option<Person>,
+    },
+    /// Current picture keys, in the order of the tags asked for.
+    Pictures {
+        /// At most one per tag.
+        pictures: Vec<crate::picture::TaggedPicture>,
     },
     /// The requested change completed, or was already complete.
     Done,

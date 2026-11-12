@@ -4,6 +4,8 @@
 //! identity service is called, and no CORS header is ever sent. The session
 //! token travels only in the `__Host-central` cookie.
 use super::in_flight::{Client, InFlight, Permit, forwarded};
+
+mod pictures;
 use axum::{
     Router,
     body::{Body, Bytes},
@@ -11,14 +13,17 @@ use axum::{
     http::{HeaderMap, HeaderName, HeaderValue, StatusCode, Uri, header, request::Parts},
     middleware,
     response::{IntoResponse, Response},
-    routing::post,
+    routing::{get, post, put},
 };
 use central_api::{
     Error, Token,
     reports::{Part, RecordOrigin},
-    wire::Request,
+    wire::{Request, Response as Answer},
 };
-use central_identity::{BrowserReply, IdentityService, Place, Seen, browser_operation};
+use central_identity::{
+    BrowserReply, IdentityService, PictureEncoding, Place, Seen, UploadRefusal, browser_operation,
+};
+pub(crate) use pictures::UPLOAD_TIME as PICTURE_UPLOAD_TIME;
 use std::{
     collections::BTreeMap,
     future::Future,
@@ -87,6 +92,9 @@ pub const REQUEST_BYTES: usize = 65_536;
 #[derive(Clone, Copy)]
 pub(crate) struct Peer(pub(crate) SocketAddr);
 
+/// A picture's bytes and the digest of its PNG master, when its key names one.
+type StoredPicture = Option<(Vec<u8>, [u8; 32])>;
+
 /// What answers browser requests: the identity service, or a test's stand-in.
 pub(crate) trait Accounts: Send + Sync + 'static {
     /// `place` is the client address the request came from: the service
@@ -109,6 +117,32 @@ pub(crate) trait Accounts: Send + Sync + 'static {
         report: [u8; 16],
         part: Part,
     ) -> impl Future<Output = Result<(Vec<u8>, Option<RecordOrigin>), Error>> + Send;
+
+    /// An admitted picture upload, holding its slot.
+    type Admitted: Send + 'static;
+
+    /// Admit a picture upload by the session `cookie`, before its body is
+    /// read (`docs/profile-pictures.md`).
+    fn admit_picture(
+        &self,
+        cookie: &Token,
+    ) -> impl Future<Output = Result<Self::Admitted, UploadRefusal>> + Send;
+
+    /// Convert and store an admitted upload; the answer is `MyPicture`.
+    fn store_picture(
+        &self,
+        admitted: Self::Admitted,
+        cookie: &Token,
+        format: central_picture::Format,
+        bytes: Vec<u8>,
+    ) -> impl Future<Output = Result<Answer, UploadRefusal>> + Send;
+
+    /// A picture's bytes and digest by its key, for anyone.
+    fn picture_bytes(
+        &self,
+        key: [u8; 16],
+        encoding: PictureEncoding,
+    ) -> impl Future<Output = Result<StoredPicture, Error>> + Send;
 }
 
 impl Accounts for IdentityService {
@@ -130,6 +164,33 @@ impl Accounts for IdentityService {
     ) -> impl Future<Output = Result<(Vec<u8>, Option<RecordOrigin>), Error>> + Send {
         IdentityService::report_part(self, cookie, report, part)
     }
+
+    type Admitted = central_identity::Admitted;
+
+    fn admit_picture(
+        &self,
+        cookie: &Token,
+    ) -> impl Future<Output = Result<Self::Admitted, UploadRefusal>> + Send {
+        IdentityService::admit_picture(self, cookie)
+    }
+
+    fn store_picture(
+        &self,
+        admitted: Self::Admitted,
+        cookie: &Token,
+        format: central_picture::Format,
+        bytes: Vec<u8>,
+    ) -> impl Future<Output = Result<Answer, UploadRefusal>> + Send {
+        IdentityService::store_picture(self, admitted, cookie, format, bytes)
+    }
+
+    fn picture_bytes(
+        &self,
+        key: [u8; 16],
+        encoding: PictureEncoding,
+    ) -> impl Future<Output = Result<StoredPicture, Error>> + Send {
+        IdentityService::picture_bytes(self, key, encoding)
+    }
 }
 
 struct Browser<A> {
@@ -137,6 +198,8 @@ struct Browser<A> {
     site: BrowserOrigin,
     budgets: Mutex<Budgets>,
     in_flight: InFlight,
+    /// Reads of pictures in flight, apart from the calls' places.
+    picture_flight: InFlight,
 }
 
 /// How long a request's body may take to arrive once its headers passed;
@@ -160,6 +223,7 @@ pub(crate) fn router<A: Accounts>(accounts: Arc<A>, site: BrowserOrigin) -> Rout
         site,
         budgets: Mutex::default(),
         in_flight: in_flight(),
+        picture_flight: in_flight(),
     }))
 }
 
@@ -169,20 +233,39 @@ fn in_flight() -> InFlight {
 }
 
 fn routes<A: Accounts>(state: Arc<Browser<A>>) -> Router {
-    Router::new()
+    let calls = Router::new()
         .route("/api/v1", post(call::<A>))
         .route("/api/v1/reports/{report}/{part}", post(report_part::<A>))
-        // Nothing of a request to another path or with another method is read.
-        .fallback(|| async { (StatusCode::NOT_FOUND, "not found\n") })
-        .with_state(state)
         // A backstop only: the body and the answer each have their own
         // deadline, the body's after the checks on the headers alone.
         .layer(TimeoutLayer::with_status_code(
             StatusCode::REQUEST_TIMEOUT,
             BODY_TIME.saturating_add(ANSWER_TIME),
-        ))
+        ));
+    // A picture's upload: its body's own time, then the worker's.
+    let upload = Router::new()
+        .route("/api/v1/picture", put(pictures::upload::<A>))
+        .layer(TimeoutLayer::with_status_code(
+            StatusCode::REQUEST_TIMEOUT,
+            pictures::UPLOAD_TIME,
+        ));
+    let api = calls
+        .merge(upload)
+        // Nothing of a request to another path or with another method is read.
+        .fallback(|| async { (StatusCode::NOT_FOUND, "not found\n") })
+        .with_state(Arc::clone(&state))
         // Outermost: refusals and timeouts also receive the security headers.
-        .layer(middleware::from_fn(super::boundary::headers))
+        .layer(middleware::from_fn(super::boundary::headers));
+    // Pictures, to anyone, with headers of their own (`pictures.rs`).
+    let served = Router::new()
+        .route("/api/v1/pictures/{file}", get(pictures::serve::<A>))
+        .with_state(state)
+        .layer(TimeoutLayer::with_status_code(
+            StatusCode::REQUEST_TIMEOUT,
+            pictures::SERVE_TIME,
+        ))
+        .layer(middleware::from_fn(pictures::headers));
+    api.merge(served)
 }
 
 fn refused() -> Response {
@@ -481,6 +564,8 @@ struct Budgets {
     pair_status: Book,
     /// A report's parts an administrator's page reads.
     parts: Book,
+    /// Pictures read (`pictures.rs`).
+    pictures: Book,
     /// Registration challenges by the block of addresses around the caller
     /// ([`Client::block`]): counted for the challenge's difficulty, and
     /// never a reason to refuse.
@@ -658,6 +743,8 @@ mod tests {
         fail: Option<Error>,
         /// Never answer, as a service that hangs.
         stall: bool,
+        /// How a picture upload is refused, if it is.
+        picture: Option<UploadRefusal>,
     }
 
     const SESSION: [u8; 32] = [0xab; 32];
@@ -722,7 +809,64 @@ mod tests {
                 )),
             })
         }
+
+        type Admitted = ();
+
+        fn admit_picture(
+            &self,
+            cookie: &Token,
+        ) -> impl Future<Output = Result<(), UploadRefusal>> + Send {
+            self.calls
+                .lock()
+                .unwrap()
+                .push(("admit_picture".into(), Some(cookie.digest())));
+            std::future::ready(match self.picture {
+                Some(refusal @ (UploadRefusal::Account(_) | UploadRefusal::Blocked)) => {
+                    Err(refusal)
+                }
+                _ => Ok(()),
+            })
+        }
+
+        fn store_picture(
+            &self,
+            (): (),
+            cookie: &Token,
+            format: central_picture::Format,
+            bytes: Vec<u8>,
+        ) -> impl Future<Output = Result<Answer, UploadRefusal>> + Send {
+            self.calls.lock().unwrap().push((
+                format!("store_picture {format:?} {}", bytes.len()),
+                Some(cookie.digest()),
+            ));
+            std::future::ready(match self.picture {
+                Some(refusal @ UploadRefusal::Picture(_)) => Err(refusal),
+                _ => Ok(Answer::MyPicture {
+                    picture: None,
+                    notice: None,
+                    block: None,
+                }),
+            })
+        }
+
+        fn picture_bytes(
+            &self,
+            key: [u8; 16],
+            encoding: PictureEncoding,
+        ) -> impl Future<Output = Result<StoredPicture, Error>> + Send {
+            self.calls
+                .lock()
+                .unwrap()
+                .push((format!("picture_bytes {encoding:?}"), None));
+            std::future::ready(match self.fail {
+                Some(error) => Err(error),
+                None => Ok((key == PICTURE).then(|| (b"picture bytes".to_vec(), [0xcd; 32]))),
+            })
+        }
     }
+
+    /// The key the stand-in has a picture for.
+    const PICTURE: [u8; 16] = [0x5a; 16];
 
     fn operation(request: &Request) -> String {
         let text = String::from_utf8(central_api::encode(request).unwrap()).unwrap();
@@ -1861,6 +2005,7 @@ mod tests {
             site: BrowserOrigin::live(),
             budgets: Mutex::default(),
             in_flight: in_flight(),
+            picture_flight: in_flight(),
         });
         (state.clone(), routes(state))
     }
@@ -2251,5 +2396,497 @@ mod tests {
                 .origin(),
             "http://[::1]:5173"
         );
+    }
+
+    mod pictures {
+        use super::*;
+        use central_picture::Refusal as PictureRefusal;
+
+        /// Headers, the peer and the expected status of an upload.
+        type UploadCase = (Vec<(&'static str, String)>, &'static str, StatusCode);
+        /// A path, headers and the peer of a read.
+        type ReadCase = (String, Vec<(&'static str, &'static str)>, &'static str);
+
+        /// The headers the profile page sends with a picture.
+        fn upload_headers(kind: &str, length: usize) -> Vec<(&'static str, String)> {
+            let mut headers = with("content-type", &[kind]);
+            headers.push(("content-length", length.to_string()));
+            headers.push(("cookie", format!("__Host-central={}", "ab".repeat(32))));
+            headers
+        }
+
+        /// A body that never comes: a handler that reads it waits for ever.
+        struct Withheld;
+
+        impl hyper::body::Body for Withheld {
+            type Data = Bytes;
+            type Error = std::io::Error;
+
+            fn poll_frame(
+                self: std::pin::Pin<&mut Self>,
+                _: &mut std::task::Context<'_>,
+            ) -> std::task::Poll<Option<Result<hyper::body::Frame<Bytes>, Self::Error>>>
+            {
+                std::task::Poll::Pending
+            }
+        }
+
+        async fn put(
+            app: &Router,
+            headers: &[(&'static str, String)],
+            body: Body,
+            peer: &str,
+        ) -> (StatusCode, HeaderMap, String) {
+            let mut builder = HttpRequest::builder().method("PUT").uri("/api/v1/picture");
+            for (name, value) in headers {
+                builder = builder.header(*name, value);
+            }
+            let response = tokio::time::timeout(
+                Duration::from_secs(3),
+                app.clone().oneshot(
+                    builder
+                        .extension(Peer(peer.parse().unwrap()))
+                        .body(body)
+                        .unwrap(),
+                ),
+            )
+            .await
+            .expect("answered without reading a withheld body")
+            .unwrap();
+            let (status, headers) = (response.status(), response.headers().clone());
+            assert_eq!(headers[header::CACHE_CONTROL], "no-store");
+            let bytes = to_bytes(response.into_body(), 1 << 20).await.unwrap();
+            (status, headers, String::from_utf8(bytes.to_vec()).unwrap())
+        }
+
+        #[tokio::test]
+        async fn every_header_refusal_comes_before_the_body_and_the_service() {
+            let png = upload_headers("image/png", 1_000);
+            let mut cases: Vec<UploadCase> = vec![
+                (
+                    png.iter()
+                        .filter(|(n, _)| *n != "origin")
+                        .cloned()
+                        .collect(),
+                    LOOPBACK,
+                    StatusCode::FORBIDDEN,
+                ),
+                (
+                    png.iter()
+                        .filter(|(n, _)| *n != "x-baylee-central")
+                        .cloned()
+                        .collect(),
+                    LOOPBACK,
+                    StatusCode::FORBIDDEN,
+                ),
+                (
+                    png.iter()
+                        .filter(|(n, _)| *n != "content-length")
+                        .cloned()
+                        .collect(),
+                    LOOPBACK,
+                    StatusCode::LENGTH_REQUIRED,
+                ),
+                (
+                    png.iter()
+                        .filter(|(n, _)| *n != "x-forwarded-for")
+                        .cloned()
+                        .collect(),
+                    LOOPBACK,
+                    StatusCode::BAD_REQUEST,
+                ),
+                (
+                    upload_headers("application/json", 10),
+                    LOOPBACK,
+                    StatusCode::FORBIDDEN,
+                ),
+                (
+                    upload_headers("image/heic", 10),
+                    LOOPBACK,
+                    StatusCode::FORBIDDEN,
+                ),
+                (
+                    upload_headers("image/png; charset=x", 10),
+                    LOOPBACK,
+                    StatusCode::FORBIDDEN,
+                ),
+                (
+                    upload_headers("image/png", 8 * 1024 * 1024 + 1),
+                    LOOPBACK,
+                    StatusCode::PAYLOAD_TOO_LARGE,
+                ),
+                (
+                    upload_headers("image/svg+xml", 1024 * 1024 + 1),
+                    LOOPBACK,
+                    StatusCode::PAYLOAD_TOO_LARGE,
+                ),
+                (png.clone(), "192.0.2.1:50000", StatusCode::FORBIDDEN),
+            ];
+            for (name, value) in [
+                ("host", "evil.example"),
+                ("origin", "https://evil.example"),
+                ("sec-fetch-site", "cross-site"),
+                ("authorization", "Bearer x"),
+            ] {
+                let mut headers: Vec<_> = png.iter().filter(|(n, _)| *n != name).cloned().collect();
+                headers.push((name, value.to_owned()));
+                cases.push((headers, LOOPBACK, StatusCode::FORBIDDEN));
+            }
+            let mut extra_length = png.clone();
+            extra_length.push(("content-length", "1".into()));
+            cases.push((extra_length, LOOPBACK, StatusCode::LENGTH_REQUIRED));
+            for (headers, peer, expected) in cases {
+                let (app, mock) = listener();
+                let (status, ..) = put(&app, &headers, Body::new(Withheld), peer).await;
+                assert_eq!(status, expected, "{headers:?}");
+                assert_eq!(calls(&mock), 0, "{headers:?}");
+            }
+            // without a cookie the service is not asked either
+            let (app, mock) = listener();
+            let no_cookie: Vec<_> = png
+                .iter()
+                .filter(|(n, _)| *n != "cookie")
+                .cloned()
+                .collect();
+            let (status, ..) = put(&app, &no_cookie, Body::new(Withheld), LOOPBACK).await;
+            assert_eq!(status, StatusCode::UNAUTHORIZED);
+            assert_eq!(calls(&mock), 0);
+        }
+
+        #[tokio::test]
+        async fn the_account_is_admitted_before_its_body_is_read() {
+            for (refusal, expected, body) in [
+                (
+                    UploadRefusal::Blocked,
+                    StatusCode::FORBIDDEN,
+                    r#"{"refusal":"blocked"}"#,
+                ),
+                (
+                    UploadRefusal::Account(Error::Busy),
+                    StatusCode::TOO_MANY_REQUESTS,
+                    "account request rejected\n",
+                ),
+                (
+                    UploadRefusal::Account(Error::TermsRequired),
+                    StatusCode::FORBIDDEN,
+                    "account request rejected\n",
+                ),
+                (
+                    UploadRefusal::Account(Error::Rejected),
+                    StatusCode::UNAUTHORIZED,
+                    "account request rejected\n",
+                ),
+            ] {
+                let mock = Arc::new(Mock {
+                    picture: Some(refusal),
+                    ..Mock::default()
+                });
+                let app = router(mock.clone(), BrowserOrigin::live());
+                let (status, _, text) = put(
+                    &app,
+                    &upload_headers("image/png", 1_000),
+                    Body::new(Withheld),
+                    LOOPBACK,
+                )
+                .await;
+                assert_eq!((status, text.as_str()), (expected, body), "{refusal:?}");
+                let names: Vec<String> = mock
+                    .calls
+                    .lock()
+                    .unwrap()
+                    .iter()
+                    .map(|(n, _)| n.clone())
+                    .collect();
+                assert_eq!(names, ["admit_picture"]);
+            }
+        }
+
+        #[tokio::test]
+        async fn a_picture_is_read_to_its_length_and_its_refusals_are_named() {
+            let (app, mock) = listener();
+            let (status, headers, text) = put(
+                &app,
+                &upload_headers("image/png", 12),
+                Body::from(vec![7; 12]),
+                LOOPBACK,
+            )
+            .await;
+            assert_eq!(status, StatusCode::OK, "{text}");
+            assert_eq!(headers[header::CONTENT_TYPE], "application/json");
+            assert_eq!(
+                text,
+                r#"{"result":"my_picture","picture":null,"notice":null,"block":null}"#
+            );
+            let names: Vec<String> = mock
+                .calls
+                .lock()
+                .unwrap()
+                .iter()
+                .map(|(n, _)| n.clone())
+                .collect();
+            assert_eq!(names, ["admit_picture", "store_picture Png 12"]);
+            // fewer bytes than announced, and more
+            let (app, _) = listener();
+            let (status, ..) = put(
+                &app,
+                &upload_headers("image/png", 12),
+                Body::from(vec![7; 5]),
+                LOOPBACK,
+            )
+            .await;
+            assert_eq!(status, StatusCode::BAD_REQUEST);
+            let (status, ..) = put(
+                &app,
+                &upload_headers("image/png", 12),
+                Body::from(vec![7; 13]),
+                LOOPBACK,
+            )
+            .await;
+            assert_eq!(status, StatusCode::PAYLOAD_TOO_LARGE);
+            for refusal in PictureRefusal::ALL {
+                let mock = Arc::new(Mock {
+                    picture: Some(UploadRefusal::Picture(refusal)),
+                    ..Mock::default()
+                });
+                let app = router(mock, BrowserOrigin::live());
+                let (status, headers, text) = put(
+                    &app,
+                    &upload_headers("image/jpeg", 3),
+                    Body::from(vec![1; 3]),
+                    LOOPBACK,
+                )
+                .await;
+                assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+                assert_eq!(headers[header::CONTENT_TYPE], "application/json");
+                assert_eq!(text, format!(r#"{{"refusal":"{}"}}"#, refusal.as_str()));
+            }
+        }
+
+        #[tokio::test]
+        async fn a_body_that_stalls_ends_at_its_pace() {
+            let (app, mock) = listener();
+            let mut builder = HttpRequest::builder().method("PUT").uri("/api/v1/picture");
+            for (name, value) in upload_headers("image/png", 1_000) {
+                builder = builder.header(name, value);
+            }
+            let started = Instant::now();
+            let response = app
+                .oneshot(
+                    builder
+                        .extension(Peer(LOOPBACK.parse().unwrap()))
+                        .body(Body::new(Withheld))
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            assert_eq!(response.status(), StatusCode::REQUEST_TIMEOUT);
+            assert!(started.elapsed() < Duration::from_secs(8));
+            let names: Vec<String> = mock
+                .calls
+                .lock()
+                .unwrap()
+                .iter()
+                .map(|(n, _)| n.clone())
+                .collect();
+            assert_eq!(names, ["admit_picture"]);
+        }
+
+        async fn get_picture(
+            app: &Router,
+            method: &str,
+            uri: &str,
+            headers: &[(&'static str, &str)],
+            peer: &str,
+        ) -> (StatusCode, HeaderMap, Vec<u8>) {
+            let mut builder = HttpRequest::builder().method(method).uri(uri);
+            for (name, value) in headers {
+                builder = builder.header(*name, *value);
+            }
+            let response = app
+                .clone()
+                .oneshot(
+                    builder
+                        .extension(Peer(peer.parse().unwrap()))
+                        .body(Body::empty())
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            let (status, headers) = (response.status(), response.headers().clone());
+            let bytes = to_bytes(response.into_body(), 1 << 20).await.unwrap();
+            (status, headers, bytes.to_vec())
+        }
+
+        const PAGE: [(&str, &str); 3] = [
+            ("host", "baylee.app"),
+            ("sec-fetch-site", "same-origin"),
+            ("x-forwarded-for", "198.51.100.7"),
+        ];
+
+        fn uri(key: [u8; 16], extension: &str) -> String {
+            format!(
+                "/api/v1/pictures/{}.{extension}",
+                central_api::picture::key_hex(&key)
+            )
+        }
+
+        #[tokio::test]
+        async fn a_picture_is_served_to_anyone_with_its_own_headers() {
+            let (app, mock) = listener();
+            for (extension, kind) in [("avif", "image/avif"), ("png", "image/png")] {
+                let (status, headers, body) =
+                    get_picture(&app, "GET", &uri(PICTURE, extension), &PAGE, LOOPBACK).await;
+                assert_eq!(status, StatusCode::OK);
+                assert_eq!(body, b"picture bytes");
+                let expected = [
+                    ("content-type", kind),
+                    ("cache-control", "public, max-age=3600"),
+                    ("content-disposition", "inline"),
+                    ("x-content-type-options", "nosniff"),
+                    ("content-security-policy", "default-src 'none'; sandbox"),
+                    ("cross-origin-resource-policy", "same-origin"),
+                    ("referrer-policy", "no-referrer"),
+                    ("x-frame-options", "DENY"),
+                ];
+                for (name, value) in expected {
+                    assert_eq!(headers[name], value, "{name}");
+                }
+                let etag = format!("\"{}\"", "cd".repeat(32));
+                assert_eq!(headers[header::ETAG], etag.as_str());
+                assert!(!headers.contains_key(header::SET_COOKIE));
+                assert!(
+                    headers
+                        .keys()
+                        .all(|n| !n.as_str().starts_with("access-control-"))
+                );
+                // a direct visit, signed out, and a revalidation
+                let direct = [
+                    ("host", "baylee.app"),
+                    ("sec-fetch-site", "none"),
+                    ("x-forwarded-for", "198.51.100.7"),
+                ];
+                assert_eq!(
+                    get_picture(&app, "GET", &uri(PICTURE, extension), &direct, LOOPBACK)
+                        .await
+                        .0,
+                    StatusCode::OK
+                );
+                let mut again = PAGE.to_vec();
+                again.push(("if-none-match", etag.as_str()));
+                let (status, headers, body) =
+                    get_picture(&app, "GET", &uri(PICTURE, extension), &again, LOOPBACK).await;
+                assert_eq!((status, body.len()), (StatusCode::NOT_MODIFIED, 0));
+                assert_eq!(headers["cache-control"], "public, max-age=3600");
+            }
+            assert!(
+                mock.calls
+                    .lock()
+                    .unwrap()
+                    .iter()
+                    .all(|(_, cookie)| cookie.is_none())
+            );
+        }
+
+        #[tokio::test]
+        async fn every_refused_or_unknown_read_is_the_same_404() {
+            let (app, _) = listener();
+            let good = uri(PICTURE, "png");
+            let unknown = uri([1; 16], "png");
+            let upper = good
+                .to_uppercase()
+                .replace("/API/V1/PICTURES/", "/api/v1/pictures/")
+                .replace(".PNG", ".png");
+            let reference = get_picture(&app, "GET", &unknown, &PAGE, LOOPBACK).await;
+            assert_eq!(reference.0, StatusCode::NOT_FOUND);
+            assert_eq!(reference.1["cache-control"], "no-store");
+            let mut cases: Vec<ReadCase> = vec![
+                (
+                    format!(
+                        "/api/v1/pictures/{}",
+                        central_api::picture::key_hex(&PICTURE)
+                    ),
+                    PAGE.to_vec(),
+                    LOOPBACK,
+                ),
+                (good.replace(".png", ".svg"), PAGE.to_vec(), LOOPBACK),
+                (upper, PAGE.to_vec(), LOOPBACK),
+                (good.clone(), PAGE.to_vec(), "192.0.2.1:50000"),
+                (
+                    good.clone(),
+                    vec![
+                        ("host", "evil.example"),
+                        ("x-forwarded-for", "198.51.100.7"),
+                    ],
+                    LOOPBACK,
+                ),
+            ];
+            for (name, value) in [
+                ("sec-fetch-site", "cross-site"),
+                ("sec-fetch-site", "same-site"),
+                ("authorization", "Bearer x"),
+            ] {
+                let mut headers = PAGE.to_vec();
+                headers.retain(|(n, _)| *n != name);
+                headers.push((name, value));
+                cases.push((good.clone(), headers, LOOPBACK));
+            }
+            for (uri, headers, peer) in cases {
+                let (status, headers_out, body) =
+                    get_picture(&app, "GET", &uri, &headers, peer).await;
+                assert_eq!(
+                    (status, body.as_slice()),
+                    (reference.0, reference.2.as_slice()),
+                    "{uri} {headers:?}"
+                );
+                assert_eq!(headers_out["cache-control"], "no-store");
+                assert_eq!(
+                    headers_out["content-security-policy"],
+                    "default-src 'none'; sandbox"
+                );
+            }
+        }
+
+        #[tokio::test]
+        async fn other_methods_are_refused_and_reads_have_a_budget() {
+            let (app, _) = listener();
+            let good = uri(PICTURE, "avif");
+            for method in ["POST", "PUT", "DELETE", "PATCH"] {
+                assert_eq!(
+                    get_picture(&app, method, &good, &PAGE, LOOPBACK).await.0,
+                    StatusCode::METHOD_NOT_ALLOWED,
+                    "{method}"
+                );
+            }
+            for method in ["GET", "POST", "DELETE"] {
+                assert_eq!(
+                    get_picture(&app, method, "/api/v1/picture", &PAGE, LOOPBACK)
+                        .await
+                        .0,
+                    StatusCode::METHOD_NOT_ALLOWED,
+                    "{method}"
+                );
+            }
+            for _ in 0..super::super::pictures::READS_PER_MINUTE {
+                assert_eq!(
+                    get_picture(&app, "GET", &good, &PAGE, LOOPBACK).await.0,
+                    StatusCode::OK
+                );
+            }
+            assert_eq!(
+                get_picture(&app, "GET", &good, &PAGE, LOOPBACK).await.0,
+                StatusCode::TOO_MANY_REQUESTS
+            );
+            // another address keeps its own budget, and the calls their own
+            let other = [
+                ("host", "baylee.app"),
+                ("sec-fetch-site", "same-origin"),
+                ("x-forwarded-for", "198.51.100.8"),
+            ];
+            assert_eq!(
+                get_picture(&app, "GET", &good, &other, LOOPBACK).await.0,
+                StatusCode::OK
+            );
+            assert_eq!(send(&app, &base(), discover()).await.status, StatusCode::OK);
+        }
     }
 }

@@ -80,7 +80,8 @@ impl IdentityService {
             | Request::SetRecovery { .. }
             | Request::SetDisplayName { .. }
             | Request::Admin { .. }
-            | Request::Owner { .. }) => self.account_request(request, bearer, surface).await,
+            | Request::Owner { .. }
+            | Request::Picture { .. }) => self.account_request(request, bearer, surface).await,
             request @ (Request::LegacyReserve { .. }
             | Request::LegacyInvalidate { .. }
             | Request::LegacyClose { .. }
@@ -130,16 +131,7 @@ impl IdentityService {
             Request::RegisterChallengeFor { signals } => {
                 self.register_challenge(surface, seen, signals).await
             }
-            Request::Register {
-                username,
-                display_name,
-                nonce,
-                counters,
-            } => {
-                let proof = (nonce.as_str(), counters.as_slice());
-                self.register(&username, display_name.as_deref(), proof, surface)
-                    .await
-            }
+            request @ Request::Register { .. } => self.register_request(request, surface).await,
             Request::EnrollmentStart { ticket, message } => {
                 self.enrollment_challenge(&ticket, message).await
             }
@@ -150,12 +142,43 @@ impl IdentityService {
         }
     }
 
+    /// A registration, with its proof of work (`docs/registration-abuse.md`).
+    async fn register_request(
+        &self,
+        request: Request,
+        surface: Surface,
+    ) -> Result<Response, Error> {
+        let Request::Register {
+            username,
+            display_name,
+            nonce,
+            counters,
+        } = request
+        else {
+            return Err(Error::Rejected);
+        };
+        let proof = (nonce.as_str(), counters.as_slice());
+        self.register(&username, display_name.as_deref(), proof, surface)
+            .await
+    }
+
     async fn social(
         &self,
         request: central_api::social::SocialRequest,
         bearer: Option<&Token>,
         surface: Surface,
     ) -> Result<Response, Error> {
+        // Pictures are the website's until the native client has a route
+        // of its own (M6, `docs/profile-pictures.md`).
+        if surface == Surface::Native
+            && matches!(
+                request,
+                central_api::social::SocialRequest::Pictures { .. }
+                    | central_api::social::SocialRequest::ReportPicture { .. }
+            )
+        {
+            return Err(Error::Rejected);
+        }
         Ok(Response::Social {
             response: self.store.social(surface.session(bearer)?, request).await?,
         })
@@ -235,6 +258,8 @@ impl IdentityService {
         match request {
             Request::Admin { request } => self.admin_request(request, bearer, surface).await,
             Request::Owner { request } => self.owner_request(request, cookie).await,
+            // An account's own picture (`docs/profile-pictures.md`).
+            Request::Picture { request } => self.picture_request(request, cookie).await,
             Request::AccountSummary => {
                 let summary = self.store.account_summary(cookie).await?;
                 Ok(Response::AccountSummary {

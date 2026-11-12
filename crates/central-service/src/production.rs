@@ -102,6 +102,34 @@ struct Service {
     /// sends no mail.
     #[serde(default)]
     mail: Option<super::mail::Mail>,
+    /// The picture worker's socket (`docs/profile-pictures.md`,
+    /// `ops/central-picture.socket`); absent means uploads are
+    /// `Unavailable`, while stored pictures are still served.
+    #[serde(default)]
+    pictures: Option<Pictures>,
+}
+
+/// Where systemd accepts for the picture worker: an absolute path.
+#[derive(Deserialize, Zeroize)]
+#[serde(deny_unknown_fields)]
+struct Pictures {
+    socket: String,
+}
+
+impl Pictures {
+    #[cfg(unix)]
+    fn worker(&self) -> Result<central_picture::Worker, ()> {
+        let path = std::path::PathBuf::from(&self.socket);
+        if !path.is_absolute() {
+            return Err(());
+        }
+        Ok(central_picture::Worker::socket(path))
+    }
+
+    #[cfg(not(unix))]
+    fn worker(&self) -> Result<central_picture::Worker, ()> {
+        Err(())
+    }
 }
 
 /// Server-only persistent VAPID key, read with the other private configuration.
@@ -194,14 +222,39 @@ fn listener_configs(settings: &Service) -> Result<(Config, Option<Config>), ()> 
     Ok((config, browser))
 }
 
+/// The services outside this process the configuration names: the mailer
+/// on this host and the picture worker's socket.
+struct Outside {
+    mailer: Option<Arc<central_mail::Client>>,
+    pictures: Option<central_picture::Worker>,
+}
+
+/// A mailer that is not on loopback, a token that is none, or a picture
+/// socket that is no absolute path stops the start here, before a port is
+/// bound or the database is reached.
+fn outside(settings: &mut Service) -> Result<Outside, ()> {
+    let mailer = settings
+        .mail
+        .as_mut()
+        .map(|mail| mail.client(false))
+        .transpose()?;
+    let pictures = settings
+        .pictures
+        .as_ref()
+        .map(Pictures::worker)
+        .transpose()?;
+    Ok(Outside { mailer, pictures })
+}
+
 /// The identity service with what the configuration turned on: the legacy
-/// sign-in, the notifications' public key, the mailer.
+/// sign-in, the notifications' public key, the mailer, the picture worker.
 fn composed(
     mut identity: IdentityService,
     legacy: Option<&LegacyStore>,
     push: Option<&central_push::Sender>,
-    mailer: Option<Arc<central_mail::Client>>,
+    outside: Outside,
 ) -> IdentityService {
+    let Outside { mailer, pictures } = outside;
     if let Some(legacy) = legacy {
         identity = identity.with_legacy(legacy.clone());
     }
@@ -210,6 +263,9 @@ fn composed(
     }
     if let Some(mailer) = mailer {
         identity = identity.with_mailer(mailer);
+    }
+    if let Some(worker) = pictures {
+        identity = identity.with_pictures(worker);
     }
     identity
 }
@@ -255,14 +311,8 @@ async fn serve() -> Result<(), ()> {
         })
         .transpose()
         .map_err(|_| ())?;
-    // A mailer that is not on loopback, or a token that is none, stops the
-    // start here, before a port is bound or the database is reached; so does
-    // a signing key that does not restore.
-    let mailer = settings
-        .mail
-        .as_mut()
-        .map(|mail| mail.client(false))
-        .transpose()?;
+    let outside = outside(&mut settings)?;
+    // A signing key that does not restore stops the start here too.
     let tokens = settings.token_keys.keys()?;
     let endpoint = Endpoint::live();
     let (config, browser) = listener_configs(&settings)?;
@@ -292,7 +342,7 @@ async fn serve() -> Result<(), ()> {
         }
         None => None,
     };
-    let mailing = mailer.is_some();
+    let mailing = outside.mailer.is_some();
     let identity = IdentityService::new(
         store.clone(),
         &endpoint,
@@ -302,7 +352,7 @@ async fn serve() -> Result<(), ()> {
         tokens,
     )
     .map_err(|_| ())
-    .map(|identity| composed(identity, legacy.as_ref(), push.as_deref(), mailer));
+    .map(|identity| composed(identity, legacy.as_ref(), push.as_deref(), outside));
     drop(settings);
     let result = async {
         let identity = Arc::new(identity?);
@@ -350,9 +400,7 @@ fn configured(bytes: &[u8]) -> Result<(), ()> {
         central_push::Sender::new(&push.vapid_key, "https://baylee.app/contact".into())
             .map_err(|_| ())?;
     }
-    if let Some(mail) = settings.mail.as_mut() {
-        mail.client(false)?;
-    }
+    outside(&mut settings)?;
     listener_configs(&settings)?;
     ServerKeys::from_secret_bytes(&settings.opaque_setup).map_err(|_| ())?;
     super::gateway_push::official_pin(settings.official_address.as_deref())?;
@@ -805,6 +853,7 @@ mod tests {
             r#","unknown":1"#,
             &mail("http://192.168.1.2:28795"),
             &mail("https://127.0.0.1:28795"),
+            r#","pictures":{"socket":"run/central-picture.sock"}"#,
         ] {
             assert!(configured(service(extra).as_bytes()).is_err(), "{extra}");
         }

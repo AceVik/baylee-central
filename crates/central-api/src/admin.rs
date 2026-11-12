@@ -237,6 +237,11 @@ pub enum AdminRequest {
         /// Open, or closed.
         open: bool,
     },
+    /// Profile pictures' moderation (`docs/profile-pictures.md`).
+    Picture {
+        /// The action.
+        request: crate::picture::PictureAdmin,
+    },
 }
 
 impl AdminRequest {
@@ -265,6 +270,7 @@ impl AdminRequest {
             | Self::DeleteReportView { .. }
             | Self::SetReportsSeen { .. }
             | Self::SetRegistration { .. } => true,
+            Self::Picture { request } => request.changes(),
             Self::Accounts { .. }
             | Self::Account { .. }
             | Self::Audit { .. }
@@ -618,6 +624,27 @@ pub enum AdminAnswer {
     ReportViews {
         /// Oldest first.
         views: Vec<SavedView>,
+    },
+    /// A page of picture reports.
+    PictureReports {
+        /// At most [`crate::picture::REPORT_PAGE`], newest first.
+        reports: Vec<crate::picture::AdminPictureReport>,
+        /// Another page follows.
+        more: bool,
+    },
+    /// One account's picture case.
+    PictureCase {
+        /// The account as it is called today.
+        account: crate::picture::Named,
+        /// Its current picture, if any.
+        picture: Option<crate::picture::Picture>,
+        /// The reports about its pictures, newest first, at most
+        /// [`crate::picture::REPORT_PAGE`].
+        reports: Vec<crate::picture::AdminPictureReport>,
+        /// The last removal's notice, if any.
+        notice: Option<crate::picture::PictureNotice>,
+        /// An upload block in force, if any.
+        block: Option<crate::picture::UploadBlock>,
     },
 }
 

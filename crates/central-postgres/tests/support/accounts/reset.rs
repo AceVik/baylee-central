@@ -592,6 +592,7 @@ async fn ended(
             pairings: 0,
             reports: 0,
             addresses: 0,
+            picture_reports: 0,
         })
     );
     assert!(!state(operator, moved).await.code);

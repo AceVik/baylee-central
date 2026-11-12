@@ -13,6 +13,7 @@ workspace = true
 [dependencies]
 central-api = { path = "../central-api", version = "=0.1.0" }
 central-identity = { path = "../central-identity", version = "=0.1.0" }
+central-picture = { path = "../central-picture", version = "=0.1.0" }
 central-policy = { path = "../central-policy", version = "=0.1.0" }
 axum = { version = "=0.8.9", default-features = false, features = ["http1", "tokio"] }
 tokio = { version = "=1.54.1", default-features = false, features = ["macros", "rt-multi-thread", "net", "signal", "time", "sync"] }
