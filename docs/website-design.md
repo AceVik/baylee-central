@@ -370,9 +370,16 @@ settings:
   encrypted" (a group's members), the safety number behind a shield that turns
   to a warning when keys changed, a group's settings sliding in from the side;
   the messages as bubbles, the own on the right in `--gold`, by day with a
-  divider, a run of one sender's lines closer together, the sender's name in a
-  group; the composer grows with its text, Enter sends and Shift+Enter starts a
-  line (a phone's keyboard keeps Enter for the line), the send button round.
+  divider, a run of one sender's lines closer together (a new sender, a new
+  day or five quiet minutes start another), the time in each bubble's corner,
+  and in a group the sender's face and name once per run; the composer grows
+  with its text, Enter sends and Shift+Enter starts a line (a phone's keyboard
+  keeps Enter for the line), the send button round.
+- **Empty and waiting.** The list says it is loading until the contacts, the
+  groups and the inbox's first read are in, and says that it failed, with "Try
+  again", rather than look empty. An empty place says so in one line in the
+  site's voice and offers the way on: no conversation, "Add a contact"; no
+  contact, "Copy your handle"; no message yet, "Write the first message".
 - **Locked.** A sign-in unlocks the chat; only after a reload the conversation
   pane asks for the password once, while the contacts and groups stay usable.
 
