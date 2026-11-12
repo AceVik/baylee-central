@@ -269,9 +269,10 @@ The server side of [web accounts](web-accounts.md) lands in three PRs.
   codes spending nothing, two finishes of one code, the other listener and
   the budget. Deploy: the hook migrates; no grant change. The website's
   page is built (12.11.2026: `/{lang}/reset`, with the recovery code or a
-  new vault, [account reset](account-reset.md) §"The website's page");
-  issuing a code in the new site's administration and the client's form
-  (M6) are open.
+  new vault, [account reset](account-reset.md) §"The website's page"), and
+  so is the new site's page that issues a code (12.11.2026:
+  `/{lang}/account/admin`, §"The administration's page"); the client's
+  form (M6) is open.
 - **Deleting and exporting an account** (28.10.2026, roadmap M1 step 3;
   [account deletion](account-deletion.md)). `AccountExport` (both
   listeners, a password sign-in under 30 minutes): everything Central stores
