@@ -154,3 +154,35 @@ read of the figures fail on it; such a database is made anew, not repaired.
   and one of them takes the next number when the two meet. The order that
   counts is the list in `central-migration/src/lib.rs`; this migration
   depends only on the `gateways` table of 000004 and 000009.
+
+## Report levels, a bearer's owner and an inbox's room (12.11.2026)
+
+Three reads were added and no migration: each reads tables the runtime role
+read before, so `ops/grants.sql` and the startup check are unchanged. The
+number 000027 was kept for this work and is not used.
+
+- **Report levels** ([reports](reports.md#what-the-reports-may-take-12112026)).
+  `file_report` weighs before it inserts. In its transaction it first takes
+  `pg_try_advisory_xact_lock(1862384219, 2)`: the migrations' first key with
+  a second key of its own (theirs is 1), so the two never meet. It does not
+  wait: if another filing holds the lock, the answer is `Busy`, and the
+  lock ends with the transaction. Then one aggregate sums what the gateway
+  holds and what all hold: for each row of `reports`, 65,536 bytes and the
+  size it announced for each part that is stored or still awaited
+  (`report_parts`, grouped by report). No index serves it and no counter
+  is kept: it reads every report row there is, so its cost grows with the
+  reports kept (up to three years of them). The parts' bytes are not read.
+  A counter kept by triggers would need a migration and was not built.
+  `ops/report-levels.sql` is the same sum for an operator, by gateway.
+- **A bearer's owner** ([native login](native-login.md#a-bearer-nobody-issued)).
+  `bearer_owner` is one statement of three lookups by a unique digest each
+  (`gateways.credential_digest`, `gateways.heartbeat_digest`,
+  `gateway_tokens.digest`), asked when an answer first vouches for a
+  bearer. It answers nothing for a session and for the official gateway.
+- **An inbox's room** ([chat](central-chat.md#full-inboxes-and-one-senders-share-12112026)).
+  A send counts, for each recipient device, its deliveries and how many of
+  them are the sender's: `chat_deliveries` by `(device, message_id)`,
+  joined to `chat_messages`, of which one sender has at most 5,000
+  (`(sender, correlation)`). Before, it counted the deliveries only. The
+  count still reads every delivery of every recipient device, 5,000 each
+  at the most. The plan was not looked at under load.
