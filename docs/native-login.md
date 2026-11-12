@@ -381,6 +381,18 @@ everyone signs in with; four that keep it up together still can. An IPv6
 address counts by its /64 here and nothing wider: a subscriber whose
 provider hands out a /56 holds 256 of them and is those four alone.
 
+*Added 12.11.2026.* When the 32 are spent, a place that was served fewer
+than 30 such requests in its minute draws on 8 a second kept beside them
+(`limits.rs`, `RESERVE_PER_SECOND`, `LIGHT_PER_MINUTE`): six sign-ins of
+five requests each. So a household still signs in while four addresses
+spend the 32. How little a place asked is counted by the /48 around an
+IPv6 /64, as the guesses are, so one subscriber's many /64s draw these as
+one place. What it draws of the 8 counts toward its 30. A request the
+listener knows no place of never draws on them. Sixteen places that each
+ask thirty a minute spend the 8 as well: many addresses still win. The
+most requests a second without a session is now 40, and the tables that
+are sized by it are sized by 40.
+
 **The native listener's address** is the last `X-Forwarded-For` hop of a
 request that comes from loopback, which the proxy sets, or the peer itself
 if it is not loopback. A loopback request without a well-formed hop has no
@@ -494,7 +506,7 @@ token may do is the store's to decide at every request, as before.
 
 | A request that needs a session, with | draws on |
 | --- | --- |
-| a bearer that is vouched for | its own 128 control and 64 data requests a second, looked at first; then the 512 and 256 all such bearers share |
+| a bearer that is vouched for | its own 128 control and 64 data requests a second, looked at first; then the 256 and 128 that all the bearers of its address draw together (since 12.11.2026); then the 512 and 256 all such bearers share |
 | any other bearer | 64 a second for all of them together, 600 a minute for one place |
 | no bearer | the budget of those who are signing in, as before |
 
@@ -504,16 +516,48 @@ is not vouched for is served like any other; its first answer vouches for
 it. That is every session's first request after Central restarts, and a
 session's first after half an hour without one.
 
-**What stays** (for the owner; the security record of 11.11.2026 has the
-options):
+**One address, and one account's gateways** (*added 12.11.2026*). Four
+vouched-for bearers that each kept up their own budget filled a shared
+window (4 x 128, 4 x 64), from one address: two accounts have four
+sessions between them, and one account alone has up to eight gateways with
+eight tokens each, every one a bearer. Two things changed, and no request
+or response did:
 
-- Bearers that are vouched for can still spend what they share: four that
-  each keep up their own budget fill a window (4 x 128, 4 x 64). Two
-  accounts have four sessions between them, and one account alone has up
-  to eight gateways with eight tokens each, every one a bearer of its own.
-  So two accounts, or one with gateways, from one address can still keep
-  the other sessions at `Busy`. It needs an account now, where it needed
-  nothing.
+- *An address's share.* All the vouched-for bearers of one place draw half
+  of each shared window between them, 256 control and 128 data requests a
+  second (`PLACE_CONTROL`, `PLACE_DATA`), looked at after the bearer's own
+  budget and before the shared window, and nothing is spent when it is
+  used up. Half and not a quarter: two owners' gateways behind one address
+  each keep their whole budget, and a household's clients ask a small part
+  of it. The place is
+  the IPv4 address or the IPv6 /64. A request the listener knows no place
+  of (a process on Central's own host, the official gateway if it is
+  pointed at the listener) has no such share and meets the other two
+  budgets, so a full address never refuses it.
+- *One account's gateways are one bearer.* When an answer first vouches
+  for a bearer, the store says whose gateways it is a credential, a
+  heartbeat token or a link token of (`bearer_owner`, one statement by
+  three unique digests). All such bearers of one account are counted in
+  one budget of 128 and 64 a second. A session is counted by itself, and
+  so is the official gateway's bridge. If the store cannot say, the
+  bearer is not vouched for yet and the next answer asks again.
+
+**What stays** (for the owner; the security records of 11.11.2026 and
+12.11.2026 have the options):
+
+- Two addresses with two bearers each still fill a shared window (2 x 2 x
+  128), and one account has two sessions. So two accounts at two addresses
+  can still keep the other sessions at `Busy`; it took one address before,
+  and nothing at all before 11.11.2026. How much wider a shared window may
+  be is a question of what the store's four connections serve.
+- One account's two sessions at their full budgets use up their address's
+  half. Everyone else behind that address is `Busy` meanwhile: a
+  household, and also a campus or a carrier's shared address.
+- All of one account's gateways share one bearer's budget. An owner of
+  several busy gateways is held to 128 and 64 a second for all of them.
+- The store is asked once more for each bearer an answer first vouches
+  for, and again after it was forgotten (half an hour without an answer,
+  a restart).
 - Seven addresses that each keep up their 600 a minute fill the strangers'
   second all the time; one alone fills it for nine or ten seconds of each
   minute. A session that is not vouched for then waits: after a restart,
@@ -522,7 +566,11 @@ options):
   not counted: no player's bad ticket makes a gateway a stranger).
   Sessions that are vouched for go on, and so does sign-in.
 - A request without a proxy's address has no place and no share: it meets
-  the 64 a second alone, like the other budgets by address.
+  the 64 a second alone, like the other budgets by address. Since
+  12.11.2026 the deployed account listener counts such requests and says
+  so in its log, without anything of the request
+  ([operations](operations.md#sign-in-guesses-and-address-budgets), "The
+  proxy must send the client's address"). They are still served.
 - The list lives in memory; a restart forgets it.
 
 ## Implementation status

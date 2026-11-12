@@ -269,7 +269,11 @@ or the day ends, counted from the first guess of that window.
 - *Everyone is refused for seconds at a time.* The 32 requests a second all
   clients share are spent: a flood from several addresses (one alone is
   held to 600 a minute; an IPv6 subscriber with more than a /64, a /56
-  say, is several). Rate limits at the proxy or the network answer that.
+  say, is several). Since 12.11.2026 not quite everyone: an address that
+  was served fewer than 30 such requests in the minute still draws on 8 a
+  second kept for such addresses, so a person who signs in once is served,
+  and a page or a client that asks often is not. Rate limits at the proxy
+  or the network answer the flood itself.
 - *Signed-in clients are refused for a moment right after a restart, or
   while signing in works.* A session's first request after a restart, or
   after half an hour without one, shares 64 a second with every bearer no
@@ -353,10 +357,13 @@ per IPv6 /48 120 and 400; an own place's 30 days and eight per account; the
 tables' 16,384 entries, which must stay above the number of accounts that
 sign in within 30 days), `central-identity/src/limits.rs` (a place's 600
 requests a minute without a session and 240 pairing requests, beside the
-shared 32 and 64 a second; for bearers no answer has vouched for, 64 a
+shared 32 and 64 a second; the 8 a second kept for places that were served
+fewer than 30 in their minute; for bearers no answer has vouched for, 64 a
 second together and 600 a minute a place; the 30 minutes an answer vouches
 for a bearer, the 16,384 held at once and the four refusals that take it
-back), `central-http/src/addresses.rs` (the native
+back; a vouched-for bearer's own 128 control and 64 data requests a second,
+its address's 256 and 128, of the 512 and 256 all share),
+`central-http/src/addresses.rs` (the native
 listener's `Discover` 30 and `LoginStart` 30 a minute, `LegacyLogin` 10 a
 minute, `ResetStart` 10 an hour, the directory and the public figures 60 a
 minute together) and `central-http/src/browser.rs` (the
@@ -1286,9 +1293,15 @@ startup).
 Since 11.11.2026 both listeners count requests and guesses at passwords by
 client address as well as globally and per account or bearer
 ([above](#sign-in-guesses-and-address-budgets)). What stays: four addresses
-that each keep up their 600 requests a minute spend the login budget all
-clients share (service denial, not account takeover), which the proxy or the
-network must limit. Requests that carry a bearer nobody issued were counted
+that each keep up their 600 requests a minute spend the 32 a second all
+clients without a session share (service denial, not account takeover).
+Since 12.11.2026 a place that was served fewer than 30 requests in its
+minute (an IPv6 place is counted by its /48 for this) then draws on 8 a
+second kept beside the 32, so a household still signs in meanwhile. Sixteen
+places that each ask thirty a minute spend those too, and a flood from many
+addresses is the proxy's or the network's to limit: the firewall's file
+([above](#connection-limits-in-front-of-the-proxy)) bounds connections, not
+requests. Requests that carry a bearer nobody issued were counted
 as a session's until 11.11.2026, and one address sending them kept signed-in
 clients and gateways at `Busy`. They now have a second of their own (64 for
 all of them together, 600 a minute for one address) and spend nothing of
@@ -1297,16 +1310,25 @@ for one bearer, a table of 1,024 bearers a second), nor of the login budget
 ([native login](native-login.md#a-bearer-nobody-issued)). A bearer is a
 session's for these counts once an answer has vouched for it; its own
 budget is looked at before the shared windows are drawn on, so what it asks
-beyond that spends nothing of anyone else's. What stays: four bearers that
-are vouched for and each keep up their own budget still spend a shared
-window, and two accounts hold that many (their four sessions), as one
-alone can (its gateways' tokens); and
+beyond that spends nothing of anyone else's. Until 12.11.2026 four such
+bearers at their own budgets spent a shared window, from one address, with
+two accounts' sessions or one account's gateway tokens. Since then all the
+bearers of one address draw half of each shared window between them (256
+control and 128 data requests a second), and every credential and token of
+one account's gateways is counted as one bearer (the store says whose a
+bearer is when an answer first vouches for it: one statement).
+What stays: two addresses with two sessions each still spend a shared
+window, and one account has two sessions; one account's two sessions spend
+their own address's half, and everyone else behind that address (a campus,
+a carrier's shared address) is `Busy` meanwhile; one account's gateways
+share 128 and 64 a second, however many they are; a request the listener
+knows no address of has no address's share to draw on; and
 seven addresses of made-up bearers fill the strangers' second, which a
 session meets with its first request after a restart or after half an hour
 without one. Each restart, so each deploy, forgets which bearers were
 vouched for.
 The table of unfinished sign-ins is larger than the shared budget
-can fill (4096 against 32 a second for 60 seconds), so it is never the cheaper
+can fill (4096 against 40 a second for 60 seconds), so it is never the cheaper
 target (31.10.2026; before, 128 entries filled at two requests a second).
 Whoever knows an account's identity can still keep its password sign-in at
 `Busy` everywhere but at the account's own places, now with 100 requests a

@@ -424,7 +424,7 @@ room, so a crowd of addresses cannot lock new ones out.
 | `LoginStart` | 30 a minute, apart from `Discover` |
 | `GatewayDirectory` and `PublicFigures` | 60 a minute for the two together, apart from the others |
 | `ResetStart` | 10 an hour |
-| Every request that needs no session | 600 a minute, of the 32 a second all clients share |
+| Every request that needs no session | 600 a minute, of the 32 a second all clients share; when those are spent, an address that was served fewer than 30 in its minute draws on 8 a second kept beside them (12.11.2026, [native login](native-login.md#guessing-a-password-online)) |
 
 The listener also tells the service the address, and the service counts
 guesses at passwords by it (11.11.2026): each sign-in start, each start of a

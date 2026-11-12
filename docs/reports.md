@@ -429,7 +429,9 @@ What the building decided beyond pass 2:
   at once, so one gateway can hold both slots while other gateways' parts
   are answered `429`. Open since 11.11.2026, with the bound on stored
   bytes ([security assurance](security-assurance.md), "The review's other
-  findings").
+  findings"). Since 12.11.2026 there are four slots, two for one gateway,
+  a count of a gateway's unfinished uploads, and bounds on stored bytes
+  ([above](#what-the-reports-may-take-12112026), with what stays open).
 - **Triage asks for no fresh password; a purge does.** Triage is daily
   work, reversible and in the report's history; only the purge cannot be
   undone (`AdminRequest::fresh`).

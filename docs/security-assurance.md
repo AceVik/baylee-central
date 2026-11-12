@@ -4529,7 +4529,15 @@ Central writes no such line, and the sentence now says so.
 **Open, medium or worse.** None of these was built: each needs a number,
 a trade or a server's configuration that is the owner's.
 
-1. *Four vouched-for bearers spend what sessions share* (what stays of
+*12.11.2026: the owner decided for the recommended variant of each, and
+all seven were built that day. The titles are struck and each point names
+what was built; the rest of the list is as it was written. What stays
+possible of each, which is not little, is in
+[the section of 12 November](#the-seven-open-findings-12-november-2026).*
+
+1. ~~*Four vouched-for bearers spend what sessions share*~~ [**Built
+   12.11.2026:** (a) at half a window and (b) by owner, point 1 there. Two
+   addresses with two sessions each still do it.] (what stays of
    the section above). Four bearers at their own budget fill a window
    (4 x 128, 4 x 64). Two accounts have four sessions between them; one
    account alone holds two sessions and up to 64 gateway tokens (eight
@@ -4551,7 +4559,10 @@ a trade or a server's configuration that is the owner's.
      four addresses with an account each: a shared window is four
      bearers' budgets wide, and how much wider it may be is a question of
      what the store's four connections serve.
-2. *The 32 a second of those who have no session* is spent by four
+2. ~~*The 32 a second of those who have no session*~~ [**Built
+   12.11.2026:** (a) as a file for the host's firewall, which the operator
+   loads, and (c), point 2 there. Four addresses still spend the 32; those
+   who ask little are served beside them.] is spent by four
    addresses that each keep up their 600 a minute (known since
    11.11.2026). Sign-in, registration and the public pages' data are
    `Busy` meanwhile.
@@ -4568,8 +4579,11 @@ a trade or a server's configuration that is the owner's.
      minute, so that a household still signs in while a few addresses
      flood. More code; many addresses still win.
    - Recommended: (a) now, (c) when there is time.
-3. *A request that reaches the account listener without the proxy's
-   address* is counted by no address (known). The listener binds
+3. ~~*A request that reaches the account listener without the proxy's
+   address*~~ [**Built 12.11.2026:** the check kept and made exact, and
+   the deployed listener counts such requests and says so in its log,
+   point 3 there. They are still served; the refusal is still the owner's
+   to decide.] is counted by no address (known). The listener binds
    loopback, so this is a process on the host, or a proxy that stopped
    sending the header. The runbook's check after every proxy change (31
    `Discover` in a minute must end in 429) is the control. Refusing such
@@ -4577,10 +4591,16 @@ a trade or a server's configuration that is the owner's.
    local run; an option is to refuse them on the deployed listener unless
    the bearer is the bridge's. Recommended: keep the check, and decide
    the refusal together with point 2.
-4. *The account listener's connections* (128, a quarter of them for late
+4. ~~*The account listener's connections*~~ [**Built 12.11.2026:** the
+   firewall's file bounds the connections one source opens and holds,
+   point 4 there. It does not end this point: eight addresses still hold
+   the places for late and large bodies.] (128, a quarter of them for late
    and large bodies) can be held by many addresses (known). Recommended:
    the firewall's limit of connections per source, with point 2.
-5. *Reports.* It needs an approved gateway. Two things:
+5. ~~*Reports.*~~ [**Built 12.11.2026:** (a) with four slots, (b), (c)
+   without a migration and (d), point 5 there. Two approved gateways can
+   still hold all four slots for a quarter of each hour.] It needs an
+   approved gateway. Two things:
    - *Stored bytes.* A gateway may file 120 reports an hour, each with up
      to 66 MiB of parts (one of 2 MiB and one of 64,
      `central-api/src/reports.rs`): about 7.7 GiB an hour from one.
@@ -4610,7 +4630,10 @@ a trade or a server's configuration that is the owner's.
    - (d) A bound on all stored report bytes.
    - Recommended: (c) and (b) with the owner's numbers; (a) where the
      server's memory allows it.
-6. *Chat.* A device's inbox and a sender's outbox hold 5,000 deliveries
+6. ~~*Chat.*~~ [**Built 12.11.2026:** the share, and a group message
+   that skips a full device, point 6 there. The deletion was not built:
+   the wire has no acknowledgement. Two contacts still fill an inbox for
+   good.] A device's inbox and a sender's outbox hold 5,000 deliveries
    and nothing deletes one that was delivered; a send to a group is
    refused whole while one recipient's device is full, so a contact can
    fill an inbox and keep others from being heard. [Central
@@ -4618,7 +4641,9 @@ a trade or a server's configuration that is the owner's.
    decision; this is what it costs meanwhile. Options: delete on
    acknowledged delivery; a time limit; a share of an inbox for one
    sender. Recommended: the share and the deletion.
-7. *The deploy hook* (`ops/deploy-hook`; not reachable from the internet).
+7. ~~*The deploy hook*~~ [**Built 12.11.2026:** the first two, point 7
+   there. The binary and the website are still what the build made.]
+   (`ops/deploy-hook`; not reachable from the internet).
    Root builds as the build user in the source tree and then takes
    `ops/grants.sql`, the binary and the website from that same tree; the
    grants go to the database's superuser. Whatever ran in the build (a
@@ -5241,5 +5266,483 @@ the pull request's text.
 
 Not looked at again: the points the list above names as not checked stay
 as they are.
+
+Engineering review, not an audit.
+
+## The seven open findings, 12 November 2026
+
+The review of 11.11.2026 left seven findings open, medium or worse (the
+list in "The review's other findings"). On 12.11.2026 the owner decided
+for the recommended variant of each, in one pull request. This section is
+the record of that work: for each point what was thought through, what
+was built, what was tried against it, and what stays possible. The points
+keep the list's numbers. Built is not ended: each point says what it left.
+
+What holds for all seven:
+
+- **Nothing on the wire changed.** No request, answer or type of
+  `central-api` was touched. The released client and the released gateway
+  decode strictly, so every refusal is one that existed before: `Busy`
+  (429 on the routes) and `Rejected`. How the released gateway and client
+  take each was read in their source before a refusal was chosen
+  (`baylee-account/src/http.rs`, `baylee-gateway/src/report/central.rs`,
+  `baylee-client`, `social/central/poll.rs`; read-only).
+- **No migration, no grant, no dependency.** `Cargo.lock` and every
+  `Cargo.toml` are as they were. The migration number 000027 was kept for
+  this work and is not used.
+- **Nothing ran on a server.** No deployed Central, proxy, firewall or
+  database was touched or asked. What follows ran on one developer
+  machine, with synthetic accounts, on loopback or in containers that reach
+  no outside network, and every container and process started for it was
+  removed.
+- **The counts are in one process's memory** unless the point names the
+  store. A restart forgets them.
+
+### 1. One address's bearers, and one account's gateways
+
+Design pass. A vouched-for bearer drew on its own budget (128 control and
+64 data requests a second) and then on the window all such bearers share
+(512 and 256). Four bearers at their own budgets fill a window. Two
+accounts hold four sessions. One account alone holds more: every
+credential, heartbeat token and link token of its gateways was a bearer
+of its own, and an account may register eight gateways with eight tokens
+each. All of it from one address.
+- **What a limit by address must not hurt.** A gateway alone at its
+  address. Two gateways behind one address. A household's clients, each
+  of which asks a few requests a minute. The official gateway if it
+  reaches Central on its own host, where the listener knows no address.
+- **(a) A place's share.** All the bearers of one place draw half of each
+  shared window between them. Half and not a quarter: two bearers at one
+  address then each keep their whole budget. A request without a place
+  has no share and meets the other two budgets, so a full address never
+  refuses the host's own gateway.
+- **(b) By owner.** The count cannot know whose a token is; the store
+  can. It is asked once, when an answer first vouches for a bearer, and
+  outside the count's lock. A gateway's bearers are then one unit with
+  every other gateway of the same account. A session stays a unit of its
+  own, and so does the official gateway's bridge, which has no owner.
+- **Failure modes looked at.** The store cannot say: the bearer is not
+  vouched for yet, and the next answer asks again. A bearer that is
+  already vouched for is marked again without asking, so a failing store
+  takes no bearer's standing away. The table of places is bounded and
+  cannot fill: a place's window is opened by a request that was served
+  and is forgotten a second later, and the table holds more than two
+  seconds of served requests can open (2,048; asserted at compile time).
+
+Implementation pass: `central-identity/src/limits.rs` (`PLACE_CONTROL`
+256, `PLACE_DATA` 128, the map `sharing`, `Unit::{Bearer, Owner}`,
+`Vouched::owner`). A request is refused by the first of three budgets
+without room, in the order own, place, shared, and nothing is spent of
+any of them then. `answered` now says whether the store is to be asked;
+`central-identity/src/lib.rs` asks `bearer_owner` and calls `vouch`.
+`central-postgres/src/accounts/gateways.rs`, `bearer_owner`: one
+statement, three lookups by a unique digest. The lists of which request
+is of which class, and which answer vouches, were not touched.
+
+Adversarial pass (unit tests with a clock of their own, and PostgreSQL 18
+through the service the listeners serve):
+- Four bearers at one address, each asking its whole budget in one
+  instant: half a window is served and a session at another address is
+  served beside them. A gateway alone, and two behind one address, keep
+  their whole budgets. Six clients of a household are served within
+  their address's share. A bearer without a place is served beside a
+  full address. A place's window is forgotten after its second.
+- Seen failing first, on the tree before (a): four bearers at one address
+  (512 served where 256 were expected), the host's own gateway beside a
+  full address (the address was not full: `Ok` where `Busy` was
+  expected), and the forgetting (0 where 64).
+- One account's gateway bearers: four tokens of two gateways, each from
+  an address of its own, each asking 64 data requests in one instant.
+  Sixty-four are served in all, and the account's own session beside
+  them (`central-client/tests/support/strangers.rs`). Seen failing first
+  with the owner ignored: 256 served where 64 were expected; and the unit
+  test `one_account_s_gateway_bearers_are_counted_together`, 512 where
+  128.
+- On PostgreSQL, `bearer_owner` says the owner for a gateway's
+  credential, its heartbeat token and a link token, whatever their
+  state, and nobody for a session, a replaced credential and a token
+  nobody issued (`central-postgres/tests/support/accounts/gateways.rs`).
+- What the released gateway asks was read: a heartbeat and a look at
+  revocations every 30 seconds, the terms every 60, one `RedeemGateway`
+  for each sign-in, four requests in flight at the most, and tokens
+  checked locally. One owner's gateways together stay far below 128
+  control requests a second unless very many players sign in at once.
+
+**What stays possible** (for the owner):
+- Two addresses with two bearers each fill a shared window (2 x 2 x 128).
+  One account has two sessions, so two accounts at two addresses do it.
+  The list said four addresses for a quarter of a window; at the
+  recommended half it is two. Accounts are open to register. This
+  reviewer would still call it medium, narrower than it was: it took one
+  address before. A wider shared window is a question of what the
+  store's four connections serve.
+- One account's two sessions at their full budgets use up their address's
+  half. Everyone else behind that address is `Busy` meanwhile: a
+  household, and also a campus or a carrier's shared address.
+- All of one account's gateways share one bearer's budget.
+- A process on Central's host has no place, so no share holds it.
+- The first answer that vouches for a bearer costs the store one more
+  statement.
+
+### 2. Those without a session: a reserve for who asks little, and the firewall's file
+
+Design pass. Every place may draw 600 requests a minute of the 32 a second
+that all clients without a session share; four places that keep it up are
+40 a second. Sign-in, registration and the public pages' data are `Busy`
+meanwhile, for everyone.
+- **(c) A reserve.** 8 requests a second are kept beside the 32. A place
+  draws on them only when the 32 are spent, and only while it was served
+  fewer than 30 requests in its minute: six sign-ins of five requests.
+  Beside the 32 and not out of them, so nothing that was served before
+  is refused now. What a place draws of the 8 counts toward its 30, so
+  one place takes at most 30 of a minute's 480, and spending them all
+  takes sixteen places.
+- **IPv6.** A place is a /64. A subscriber with a /56 has 256 of them,
+  each of which has "asked little". So how little a place asked is
+  counted by the /48 around it, as the guesses at passwords are.
+- **What it moves.** The most requests a second without a session is 40
+  now. Two tables are sized by it and were checked: unfinished sign-ins
+  (4,096 against 40 x 60 = 2,400) and registration's challenges, which
+  grew from 40,000 to 50,000 (against 40 x 1,201 = 48,040). Both hold by
+  a compile-time assertion that names the sum.
+- **(a) The firewall.** `ops/central-limits.nft` bounds, for one source
+  address (an IPv4 address or an IPv6 /64), new connections to the
+  proxy's ports (300 a minute after a burst of 300) and connections held
+  at once (512). It drops and never opens; it has a table of its own and
+  never flushes another's; loopback is not counted. The reasons for the
+  numbers are in the file's head. Nothing in the repository loads it.
+- **What (a) is not.** The list said it "answers this, the next two
+  points and floods of whole requests at once". That was too much. It
+  counts connections. A client that keeps one connection and sends its
+  requests over it (keep-alive, HTTP/2, HTTP/3) is not slowed, so four
+  addresses still spend the 32. It ends what nothing bounded before: one
+  source opening connections to the proxy without limit.
+
+Implementation pass: `central-identity/src/limits.rs`
+(`RESERVE_PER_SECOND` 8, `LIGHT_PER_MINUTE` 30, `PUBLIC_PER_SECOND` 40,
+`block`, the window `spare` and the places `light`),
+`central-identity/src/challenge.rs` (`HELD` 50,000),
+`ops/central-limits.nft`, and [operations](operations.md) §"Connection
+limits in front of the proxy" with how to load, check and remove it. A
+request the listener knows no place of never draws on the reserve.
+
+Adversarial pass:
+- Four places spend the 32 and a fifth that asked little is served; a
+  place draws the reserve only until its 30; a hundred /64s of one /48 draw 30
+  between them. Seen failing first: the fifth place `Busy`; 0 served
+  where 30 were expected; 80 where 30 (before the /48).
+- The file, with nft 1.1.3 in a container without a network: checked
+  (`nft -c`), loaded, loaded again (the same rules, once), listed,
+  deleted. Between two containers on an internal network, IPv4: 300 of
+  300 connections in a burst, then 12 of 20 in the four seconds after;
+  held connections stop at 512; after ten are closed on both sides, ten
+  of twelve new ones connect. A connection that only the client closed
+  stayed counted until the server closed too.
+- Not tried: the IPv6 rules with traffic (they were loaded and listed);
+  UDP; the file on the server. It assumes that Caddy listens on the
+  host's own addresses. A port published by Docker does not pass the
+  `input` hook, and the server was not looked at for that.
+
+**What stays possible:**
+- Four addresses still spend the 32, and everyone who asks more than a
+  little is `Busy` meanwhile: the website's pages that ask again and
+  again, a client that retries. Sixteen places that each ask thirty a
+  minute spend the 8 too. Many addresses still win; for IPv6 they must
+  be in sixteen /48s.
+- A limit on requests at the proxy is not built. Caddy's own build has
+  none, to this review's knowledge.
+- Still medium for a flood from many addresses. Against four addresses a
+  person who signs in is now served.
+
+### 3. Requests without the proxy's address
+
+Design pass. The account listener binds loopback, and the proxy appends
+the client it saw. A request without that hop is counted by no address.
+On the deployed listener it means a proxy that stopped sending the header,
+or a process on the host that talks to the listener directly. Nothing
+told the operator. Refusing such requests would refuse every local run
+and whatever the operator points at the listener; the list recommended to
+keep the runbook's check and to leave the refusal to the owner. So: count
+them, say so, refuse nothing.
+- **What the line may hold.** The count. There is no address to write,
+  and nothing of a request is written.
+- **How often.** The first one, then at most one line an hour, so a flood
+  of such requests is not a flood of lines.
+
+Implementation pass: `central-http/src/unplaced.rs`; the account
+listener's routes hold the counter only where the endpoint is the live
+one (`native.rs`), so a development listener writes nothing;
+`/health/live` is not counted. [Operations](operations.md) has the line,
+what it means, and the proxy check written out with its expected output
+(30 answers of `200` and one `429`, then a second address).
+
+Adversarial pass: one unit test (the first is reported, then one an hour,
+with the count, and the line is fixed but for the count). The wiring on
+the deployed listener has no test of its own: it needs the service behind
+the routes. The check's command was written from the wire's definition
+and was not run against the deployed name.
+
+**What stays possible:** such requests are served as before, so a process
+on the host is held by no address's budget. A burst between two lines
+shows only in the next line's count. Whether to refuse them on the
+deployed listener is the owner's decision; the bridge would have to be
+let through. Unchanged in what an attacker can do; an operator now sees
+it.
+
+### 4. The account listener's connections
+
+Built as the list recommended: the firewall's file of point 2 bounds the
+connections one source opens and holds. It does not end this point, and
+the record should not read as if it did. The listener's 32 places for
+late and large bodies are taken by requests the proxy passes on, and one
+address has four of them (11.11.2026). Eight addresses still hold all 32.
+The firewall counts a client's connections to the proxy, 512 for one
+source, which is far above four. What it ends is one source holding the
+proxy's own connections without bound. Open as it was: more places, or a
+proxy that reads small bodies itself before it passes a request on
+([operations](operations.md) names Caddy's `request_buffers`, from its
+documentation and not tried), are the owner's to choose.
+
+### 5. Reports
+
+Design pass. An approved gateway is a stranger's server that an
+administrator let in. It could fill the store (about 7.7 GiB an hour) and
+could hold both upload slots with uploads that never finish.
+- **(c), (d) Weighed before stored.** A filing is refused with `Busy`
+  when its gateway would hold more than 2 GiB, the official gateway more
+  than 8 GiB, or all together more than 16 GiB. A report counts as 64 KiB
+  whatever its length, and each part as its announced length while it is
+  stored or may still come (an hour). The level is asked of the reports
+  themselves in the filing's transaction, so it cannot drift and a purge
+  frees room. That needs no migration; the list had expected one.
+- **Two filings and the last room.** One filing is weighed at a time,
+  under a transaction's advisory lock that is tried and never waited
+  for. A filing that finds another being weighed is `Busy`. The released
+  gateway sends a filing again after 250 ms and after a second, and then
+  tells its player the report failed.
+- **The official gateway** has its own, larger bound. Most players play
+  through it, and what the one-time import brought counts in it. The
+  import itself is the operator's and is not weighed.
+- **(a) Slots.** Four uploads at once, two of one gateway, which is what
+  the released gateway sends at once. By reading the code, a part of 64
+  MiB is held up to three times while it is stored: about 768 MiB for
+  four at the same moment, 384 MiB with the two slots before.
+- **(b) Unfinished uploads.** Thirty in an hour for one gateway, counted
+  from the first; past it, its uploads are `Busy` until the hour is over.
+  Unfinished is an upload that took a slot and did not store its part. A
+  part its other upload stored meanwhile (409) and a store that failed
+  (503) are held against nobody. The number comes from the released
+  gateway: a part is sent at most five times, a report has two, so
+  thirty is three reports of which every send failed.
+- **Where the count lives.** Not in `limits.rs`: it is the listener's,
+  beside the slots (`central-http/src/uploads.rs`).
+
+Implementation pass: `central-postgres/src/accounts/reports/level.rs`
+(`admit`, `levels`, `report_levels`; the constants are exported),
+`central-http/src/uploads.rs` and `native.rs` (the semaphore is gone; a
+slot that is dropped counts as unfinished, so a handler that is cancelled
+is counted), `ops/report-levels.sql` for the operator.
+[Reports](reports.md) §"What the reports may take" and
+[operations](operations.md) §"What reports may take, and how to make
+room" have the numbers, how to see each gateway's level and how room
+comes back.
+
+Adversarial pass:
+- On PostgreSQL 18 (`central-postgres/tests/support/accounts/reports/level.rs`):
+  31 largest reports leave a gateway exactly one report's room, and one
+  byte more is refused; an announced part stops counting after its hour
+  and a stored one does not; the official gateway's bound; all together;
+  the operator's query gives the same numbers as the code; with the lock
+  held elsewhere a filing is `Busy`; of four filings at once for the last
+  room, one is stored.
+- Seen failing first, with the weighing not wired: "one byte past a
+  gateway's bound" was accepted (`level.rs:106`).
+- Slots (unit tests, `uploads.rs`): one gateway holds two and another is
+  served; unfinished uploads are counted for an hour; finished ones are
+  not, however many; a dropped slot is free again and counted. Three of
+  the four failed against the old behaviour.
+- Over the real listener and PostgreSQL
+  (`central-client/tests/support/reports.rs`): one gateway holds two
+  uploads within the pace, its third is 429, another approved gateway's
+  part is stored meanwhile, and the first gateway's part goes through
+  once its connections are gone. Seen failing first with two slots in
+  all: the other gateway's part was 429.
+- Not measured: memory. Not tried over a socket: the hour's count of
+  unfinished uploads (unit tests only).
+
+**What stays possible:**
+- Two approved gateways that each hold two slots hold all four, for up
+  to a quarter of each hour with the count. It needs two approvals.
+- The official gateway at its bound leaves room for four registered
+  gateways; more approved gateways than that can fill the 16 GiB between
+  them, and then everyone's reports are refused, the official one's too.
+- 16 GiB counted is more than 16 GiB of disk: the files do not shrink
+  when rows go, and the log, indexes and backups take their own. Reports
+  in the trash still count.
+- An honest gateway whose records never fit its line in a minute reaches
+  thirty with six such records, and loses its small parts for the rest
+  of that hour.
+- A refusal writes no log line. The weighing reads every report row at
+  each filing.
+- This reviewer would call what stays low: it needs approved gateways,
+  and an administrator can disable one.
+
+### 6. Chat
+
+Design pass. Nothing deletes a delivery, so a device's inbox of 5,000
+that is full stays full. One contact could fill it alone. A message to a
+group was refused whole while one member's device was full, so one
+member, or one contact of a member, silenced a group for everyone.
+- **The share.** A device of another account takes a delivery while its
+  inbox holds fewer than 5,000 and fewer than 2,500 of them are this
+  sender's. Half: the two sides of a conversation take the same, and it
+  takes two senders to fill an inbox. The sender's own devices are held
+  to the 5,000 only.
+- **A group.** A device without room is left out and the message goes to
+  the others. It is `Busy` when no device of another account has room,
+  so a direct message is never accepted for nobody.
+- **A block must not show.** Whether anyone else has room is asked of
+  every other device, a blocker's too. Before, a full device was not
+  looked at when its owner had blocked the sender, so a group message
+  that a full device refused went through once that member blocked: the
+  answer told the sender of the block. It is the same answer now.
+- **The deletion was not built.** The list recommended the share and
+  deleting on acknowledged delivery. The wire has no acknowledgement
+  (`Inbox { device, after }` reads by a cursor), both clients read their
+  history again from the start, and the privacy notice says history is
+  not deleted automatically. It needs the owner's retention decision and
+  an addition to the protocol, which this work was not to make.
+- **`Busy`** is an answer both released clients know: the native client
+  keeps the sealed message and sends it again, the website shows it.
+
+Implementation pass: `central-postgres/src/accounts/social/chat/send.rs`
+(`CHAT_SENDER_SHARE`, `room`, `Held::fits`): one query a send counts each
+recipient device's deliveries and how many are the sender's. Everything
+else of a send is as it was: the locks, the exact recipient set, the
+retry that returns the original.
+
+Adversarial pass (PostgreSQL 18,
+`central-postgres/tests/support/accounts/chat/inboxes.rs`, and a unit
+test of the rule):
+- At one below the share a direct message is delivered; the next is
+  `Busy`. Another member is still heard in that inbox. The sender's
+  message to the group reaches the member with room and skips the other.
+- A full device: the group's message still reaches the others, and the
+  full inbox never passes its bound. With a block: sent as far as the
+  sender can tell, nothing delivered to the blocker. With nobody left who
+  has room: `Busy`, and the same answer after the block is lifted. The
+  sender's own device full: `Busy`, as it was.
+- Seen failing first: the message past the share was accepted
+  (`inboxes.rs:145`).
+- Not tried: the query's plan with full inboxes of a large group. It
+  reads every delivery of every recipient device, as the count before it
+  did.
+
+**What stays possible:**
+- Two contacts, or one person with two accounts, fill an inbox for good,
+  2,500 each.
+- A sender at the share is refused in that inbox for good. That is also
+  the busier side of an honest conversation: one person can send another
+  2,500 messages, and then no more, until something is deleted.
+- A member who is left out is not told, and neither is the sender.
+- The privacy notice does not mention a share.
+- Narrower, and this reviewer would still call it medium until retention
+  is decided: the group can no longer be silenced by one device, but an
+  inbox can still be filled for good.
+
+### 7. The deploy hook
+
+Design pass. Root built as the build user and then took `ops/grants.sql`,
+the binary and the website out of the tree the build had run in. The
+grants went to `psql` as the database's superuser. A dependency's build
+script or an install script of `npm ci` runs as the build user and can
+write that tree. A rewritten grants file would have run with every right
+the database has, and `psql` takes what follows a backslash in a file
+for a command of its own, which can start a program.
+- **From the commit.** The file is printed out of the revision's commit
+  by git's plumbing (`cat-file blob`, with `--no-replace-objects`) after
+  the checkout and before anything of the revision is built. The copy is
+  root's from then on.
+- **As the migrator.** `psql` runs as `central_migrator`, the login that
+  owns the tables, with no start-up file and no password prompt. Before
+  the unit is stopped the hook asks whether that login reaches the
+  database and is no superuser; if not, it ends and nothing was changed.
+- **SQL only.** A file that is empty or holds a backslash is refused,
+  when it is staged and again before the switch.
+- **Git as the build user, not as root.** Root running git in a
+  repository another user can write is a hazard of its own (its settings
+  can name programs). So the blob is as good as the build user's git.
+
+Implementation pass: `ops/deploy-hook` (`as_grantor`, `grantor_ready`,
+`plain_sql`; `DB_GRANTOR` in place of `DB_SUPERUSER`), a note in
+`ops/grants.sql`, and [operations](operations.md) §"The grants' file and
+login" with the steps before the first deploy. The store's fixture now
+applies the grants through a helper that asserts the file holds no
+backslash and the login is no superuser.
+
+Adversarial pass:
+- `shellcheck` 0.11.0 and `bash -n` pass.
+- A local dry run with the hook's own three functions, cut out of the
+  file, against a scratch clone and a throwaway PostgreSQL 18.6 container
+  without a network. The commit's file came out byte for byte with the
+  working tree rewritten, with the index rewritten, with a filter set in
+  the repository's settings, and with a replacement object (which is
+  read without `--no-replace-objects`: tried). A revision without the
+  file fails. An empty file, a file with a `psql` command and a
+  backslash in a comment are refused. The migrator reaches the database
+  over the container's socket and is no superuser; a superuser, a login
+  or a database that does not exist, and a container that does not
+  exist are refused. The migrator applies a stand-in grants file to
+  tables it made, twice, and the grant is recorded as its own. Refused
+  to the migrator: making a role a superuser, making a role, `COPY` to a
+  program and from a server file, `ALTER SYSTEM`, reading a server file,
+  an untrusted extension. And `psql` does run a program that a file
+  names, which is why such a file never reaches it.
+- Both PostgreSQL fixtures apply the real `ops/grants.sql` as
+  `central_migrator` after all migrations, and the store's startup check
+  accepts the result.
+- Not tested: the hook as a whole. It needs root, systemd, the build
+  user and the server's container. The server's `pg_hba.conf` was not
+  seen; the old hook reached the database over the same socket as the
+  superuser, which is why the migrator is expected to. No deploy was
+  made with it.
+
+**What stays possible:**
+- The binary and the website are what the build made, and the binary
+  runs the migrations with the migrator's login. A build that was
+  tampered with needs no grants file.
+- The build user's git (its settings, its objects, a `git` earlier in
+  its path) can be written by an earlier build as the tree can.
+- `npm ci` still runs install scripts, and the build user is a person's
+  login with a home and keys. The list's other two options were not
+  among the recommended and were not built.
+- Low: it is not reachable from the internet and needs a dependency
+  that turned hostile.
+
+### What was run, and what was not
+
+On the tree of this record's commit but for this section, on macOS on
+Apple Silicon (rustc 1.99.0), 12.11.2026, each once and in this order:
+
+- `cargo fmt --all --check` and `cargo clippy --workspace --all-targets`
+  pass, the second without a warning.
+- `cargo xtask gate` passes: format, policy, clippy, tests, doc tests and
+  the release build; 605 tests passed, none failed, and the two it
+  ignores are the PostgreSQL fixtures of the next line.
+- `cargo xtask postgres` passes on PostgreSQL 18.6, both fixtures, and
+  removed its container and listener.
+- `cargo xtask smoke`, `cargo xtask secrets` (the tree and the whole
+  history), `cargo xtask crypto-scope` and `cargo deny check` (0.20.2)
+  pass.
+- `cargo audit --deny warnings` (0.22.2) fails on RUSTSEC-2026-0459
+  (`libsqlite3-sys` 0.37.0) and on nothing else, as it did before this
+  work. No manifest and no lock file was changed.
+
+Not run: the other runners of CI (Linux, Windows, macOS on Intel);
+`cargo xtask wasm --check` and the web app's checks, since nothing they
+build was touched; `cargo xtask postgres --exercise-failure` and `smoke
+--exercise-failure`. Nothing was run against a server, and the three
+things an operator loads or installs (the firewall's file, the deploy
+hook, the report levels' query) were tried only as each point says.
 
 Engineering review, not an audit.

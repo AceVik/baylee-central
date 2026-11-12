@@ -49,6 +49,23 @@ Since 11.11.2026 guesses at passwords are also counted per account by the
 hour and day, per client address and per account at an address, and each
 address has a share of the unauthenticated budget
 ([native login](native-login.md) §"Guessing a password online").
+Since 12.11.2026 (the security record of that day has what was built for,
+and what stays open of, seven findings of
+the day before): 8 unauthenticated requests a second are kept beside the
+32 for addresses that asked little in their minute; all the bearers of one
+address draw half of each shared window, and one account's gateway
+credentials and tokens are counted as one bearer
+([native login](native-login.md#a-bearer-nobody-issued)); the deployed
+account listener counts requests that arrive without the proxy's address;
+a gateway's stored report bytes and all of them are bounded, four uploads
+run at once and two of one gateway, and unfinished uploads are counted by
+the hour ([reports](reports.md)); one sender takes at most half of a chat
+inbox and a group message skips a full device
+([central chat](central-chat.md)); the deploy hook takes the grants from
+the commit and applies them as the migrator; and `ops/central-limits.nft`
+bounds connections by source address for the host's firewall
+([operations](operations.md)). No migration, no grant change and no change
+to the wire. None of it is deployed.
 These development limits are not a production capacity benchmark. The native
 wire limit includes worst-case JSON expansion of a maximum ciphertext and its
 enrollment envelope. No first-party unsafe or new external dependency was added.
