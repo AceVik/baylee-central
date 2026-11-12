@@ -649,3 +649,158 @@ test("a wrong password is refused in the real Worker, and nothing about the addr
   await sound(page);
   expect(problems).toEqual([]);
 });
+
+/** The security page's address bar and its history's current entry hold no fragment. */
+async function gone(page: Page) {
+  await expect(page).toHaveURL(/\/en\/account\/security$/);
+  expect(await page.evaluate(() => [location.hash, location.href.includes("#")])).toEqual(["", false]);
+}
+
+// The confirmation mail's button links to `/{lang}/account/security#code=XXXX-XXXX`
+// (docs/email.md, "The code in the button's link"): the area takes the
+// fragment off the address bar at once, and the e-mail section fills the
+// field of an address that waits; nothing is confirmed until the person
+// presses the button.
+test.describe("the code from the confirmation mail's button", () => {
+  const LINKED = `/en/account/security#code=${CODE}`;
+
+  test("fills the field of the address that waits, leaves the address bar at once, and confirms only when pressed", async ({ page }) => {
+    const w = world(waiting());
+    const sent: string[] = [];
+    page.on("request", (request) => {
+      // a navigation's address is reported with the fragment Playwright was given; the browser sends none
+      if (!request.isNavigationRequest()) sent.push(`${request.url()} ${request.headers()["referer"] ?? ""}`);
+    });
+    const { seen, problems } = await open(page, w, { path: LINKED });
+    await expect(code(page)).toHaveValue(CODE);
+    await gone(page);
+    // only the state was read: nothing was confirmed by itself
+    await page.waitForTimeout(500);
+    expect(actions(seen)).toEqual(["status"]);
+    expect(w.held.address).toBeNull();
+    expect(sent.filter((line) => line.includes(CODE) || line.includes("code="))).toEqual([]);
+    await sound(page);
+    // a reload reads the state again and finds no code
+    await page.reload();
+    await expect(page.locator("html")).toHaveAttribute("data-islands", "ready");
+    await expect(code(page)).toBeVisible();
+    await expect(code(page)).toHaveValue("");
+    await gone(page);
+    // The link opened in the tab that shows the page already: a move within
+    // the page, which runs no island. The fragment goes and fills nothing;
+    // the page is left as it was, what was typed included.
+    await code(page).fill("zzzz");
+    const reads = seen.length;
+    await page.goto(LINKED);
+    await gone(page);
+    await expect(code(page)).toHaveValue("zzzz");
+    expect(seen.length).toBe(reads);
+    // opened as a page of its own, it is filled, and the person confirms it
+    await page.goto("/en/account");
+    await page.goto(LINKED);
+    await expect(page.locator("html")).toHaveAttribute("data-islands", "ready");
+    await expect(code(page)).toHaveValue(CODE);
+    await gone(page);
+    const asked = seen.length;
+    await button(page, "Confirm").click();
+    await expect(said(page)).toHaveText("Your e-mail address is confirmed.");
+    expect(actions(seen, asked)).toEqual(["confirm"]);
+    expect(seen.at(-1)).toEqual({ operation: "email", request: { action: "confirm", code: CODE } });
+    expect(problems).toEqual([]);
+  });
+
+  test("lower case and without the hyphen, it is filled in as printed", async ({ page }) => {
+    const { seen } = await open(page, world(waiting()), { path: `/en/account/security#code=${CODE.toLowerCase().replace("-", "")}` });
+    await expect(code(page)).toHaveValue(CODE);
+    await gone(page);
+    expect(actions(seen)).toEqual(["status"]);
+  });
+
+  for (const [what, hash] of [
+    ["a reset code", "#code=RESET-0123-4567-89AB-CDEF-GHJK-MNPQ-RSTV-WXYZ"],
+    ["a code with a letter no code has", "#code=000G-40RU"],
+    ["a code cut short", "#code=000G-40R"],
+    ["an encoded character", "#code=000G%2D40R4"],
+    ["nothing", "#code="],
+  ] as const) {
+    test(`${what} in the fragment fills nothing, and the fragment goes all the same`, async ({ page }) => {
+      const { seen, problems } = await open(page, world(waiting()), { path: `/en/account/security${hash}` });
+      await expect(code(page)).toBeVisible();
+      await expect(code(page)).toHaveValue("");
+      await gone(page);
+      expect(actions(seen)).toEqual(["status"]);
+      expect(problems).toEqual([]);
+    });
+  }
+
+  test("with no address that waits the code is dropped: no field now, and an empty one later", async ({ page }) => {
+    const w = world(confirmed());
+    // naming the address is carried out and its answer lost: the page
+    // reads the state anew and draws the field without clearing it, so
+    // only a code that was dropped leaves it empty
+    w.next.set = "lost";
+    const { seen } = await open(page, w, { path: LINKED });
+    await expect(button(page, "Change")).toBeVisible();
+    await expect(code(page)).toHaveCount(0);
+    await gone(page);
+    await button(page, "Change").click();
+    await send(page, NEW);
+    await expect(code(page)).toBeVisible();
+    await expect(alert(page)).toHaveText(/./);
+    await expect(code(page)).toHaveValue("");
+    expect(actions(seen)).toEqual(["status", "set", "status"]);
+  });
+
+  test("a first read that fails drops the code: after trying again the field is empty", async ({ page }) => {
+    const w = world(waiting());
+    w.next.status = 503;
+    const { seen } = await open(page, w, { path: LINKED });
+    await expect(alert(page)).toHaveText("Baylee Central is not answering right now. Try again in a moment.");
+    await gone(page);
+    await button(page, "Try again").click();
+    await expect(code(page)).toBeVisible();
+    await expect(code(page)).toHaveValue("");
+    expect(actions(seen)).toEqual(["status", "status"]);
+  });
+
+  test("where Central sends no mail the code is dropped", async ({ page }) => {
+    const { seen } = await open(page, world({ mail: false, ...waiting() }), { path: LINKED });
+    await expect(card(page)).toContainText("This server sends no mail, so an e-mail address cannot be set or confirmed here.");
+    await expect(code(page)).toHaveCount(0);
+    await gone(page);
+    expect(actions(seen)).toEqual(["status"]);
+  });
+
+  test("signed out, the code is dropped silently and the fragment goes", async ({ page }) => {
+    // Central no longer knows the session this browser remembers
+    const w = world(waiting());
+    w.gone = true;
+    const { seen } = await open(page, w, { path: LINKED });
+    await expect(page.getByText("You are not signed in.")).toBeVisible();
+    await expect(code(page)).toHaveCount(0);
+    await gone(page);
+    expect(actions(seen)).toEqual([]);
+    expect(JSON.stringify(seen)).not.toContain(CODE);
+  });
+
+  test("with no session remembered, nothing is asked and the fragment goes", async ({ page }) => {
+    const seen: Body[] = [];
+    await page.route("**/api/v1", central(seen, world(waiting())));
+    await page.goto(LINKED);
+    await expect(page.locator("html")).toHaveAttribute("data-islands", "ready");
+    await expect(page.getByText("You are not signed in.")).toBeVisible();
+    await gone(page);
+    expect(seen).toEqual([]);
+  });
+
+  test("on another page of the area the fragment goes too, and leaves no code for later", async ({ page }) => {
+    const { seen } = await open(page, world(waiting()), { path: `/en/account#code=${CODE}` });
+    await expect(page).toHaveURL(/\/en\/account$/);
+    expect(await page.evaluate(() => location.hash)).toBe("");
+    // the security page reached from there has the field empty
+    await page.goto("/en/account/security");
+    await expect(page.locator("html")).toHaveAttribute("data-islands", "ready");
+    await expect(code(page)).toHaveValue("");
+    expect(actions(seen)).toEqual(["status"]);
+  });
+});

@@ -18,7 +18,6 @@ nav-sign-in = Anmelden
 nav-account = Dein Account
 lang-label = Sprache
 theme-label = Farbschema
-theme-system = Farben: wie dein Gerät
 theme-light = Farben: hell
 theme-dark = Farben: dunkel
 
@@ -66,7 +65,7 @@ hero-offline = Solopartien und der Deckbuilder funktionieren offline, ohne Accou
 hero-account = Online spielen? <register>Leg einen Account an</register>, kostenlos und in der offenen Beta für alle offen, oder <signin>melde dich an</signin>.
 hero-memorial = Erinnerung an Baylee: ihr Fotoalbum öffnen
 
-status-label = Stand des Projekts
+status-label = Baylee in Zahlen
 
 cards-eyebrow = Die Karten
 cards-title = Wie viele Karten Baylee kennt
@@ -156,7 +155,6 @@ install-cpu = <b>Prozessor:</b> Die x86-64-Builds brauchen AVX2; für ältere Pr
 ## Gateways
 
 gws-title = Gateways
-gws-official = Offiziell
 gws-online = Online
 gws-offline = Offline
 gws-version = Version
@@ -258,6 +256,7 @@ privacy-views-title = Seitenaufrufe zählen
 privacy-views = Die Website zählt, wie oft ihre Seiten geöffnet werden: eine einzige Zahl für alle Seiten und alle Besucher zusammen, zu sehen auf der Startseite. Öffnet ein Browser eine Seite, steigt sie um eins. Dafür wird nichts über dich gespeichert: keine IP-Adresse, kein Cookie, keine Kennung, nicht einmal, welche Seite es war.
 privacy-device-title = Was dein Browser speichert
 privacy-device = Diese Seite setzt kein Cookie, bis du dich anmeldest. Was dein Browser auf deinem Gerät speichert, und nur mit JavaScript: deine Farbwahl, falls du eine getroffen hast (<code>baylee-site-theme</code>); während du angemeldet bist, wann deine Sitzung endet (<code>baylee-central-session</code>), deinen Chatschlüssel und die vertrauten Schlüssel deiner Kontakte (siehe Chat); wenn du Benachrichtigungen eingeschaltet hast, eine Zufallszahl für dieses Gerät (<code>baylee-push-installation-v1</code>, <code>baylee-push</code>); und erst, wenn du dich angemeldet, die Seite als App installiert oder Benachrichtigungen eingeschaltet hast, eine Kopie der öffentlichen Dateien der Seite (Seitengerüst, Schriften, Skripte), damit sie auch ohne Verbindung startet und Benachrichtigungen ankommen. Trifft keines der drei mehr zu, wird die Kopie beim nächsten Öffnen der Seite entfernt. Nichts davon wird an uns gesendet, außer ein Abschnitt unten sagt es. Die Einträge zu Chat und Sitzung werden beim Abmelden gelöscht; alles andere entfernst du, indem du die Websitedaten in deinem Browser löschst. Rechtsgrundlage: § 25 Abs. 2 Nr. 2 TDDDG (unbedingt erforderlich für die Funktion, die du nutzt); für die Zufallszahl der Benachrichtigungen deine Einwilligung (§ 25 Abs. 1 TDDDG).
+privacy-device-manager = Bewahrst du deinen Wiederherstellungscode auf dem Schritt, der ihn zeigt, im Passwortmanager deines Browsers auf, schickst ihn dir per E-Mail, speicherst ihn als Datei oder druckst ihn aus, dann behalten ihn dein Browser, dein E-Mail-Programm, deine Dateien oder dein Papier, nie diese Website: Der Code entsteht in deinem Browser und wird nie an uns geschickt. Wenn du die Daten der Website löschst, verschwindet er dort nicht.
 privacy-github-title = GitHub
 privacy-github = Die Download-Seite und die Startseite zeigen das neueste Release, den Teststand und die Kartenzahlen. Danach fragt unser Server GitHub, nicht dein Browser; GitHub erfährt dabei nichts über dich. Erst wenn du einen Download- oder GitHub-Link anklickst, verbindet sich dein Browser mit GitHub (GitHub, Inc., USA) und überträgt dorthin deine IP-Adresse und was jede Anfrage enthält; dann gilt GitHubs eigene Datenschutzerklärung.
 privacy-directory-title = Das Gateway-Verzeichnis
@@ -265,7 +264,7 @@ privacy-directory = Unser Server liest das Verzeichnis der Gateways von Baylee C
 privacy-account-title = Dein Account
 privacy-account = Für einen Account speichert Baylee Central: deine Account-ID, deinen Anmeldenamen, deinen Anzeigenamen mit seinem Tag, wann und wie der Account entstanden ist, einen OPAQUE-Passwortdatensatz (mit dem du dein Passwort beweist, ohne dass unser Server es je erfährt), deinen Hauptschlüssel zweimal verschlüsselt (mit deinem Passwort und mit deinem Wiederherstellungscode), dein verschlüsseltes Account-Dokument und deine verschlüsselten Ablagen (für uns unlesbar; wir sehen nur Größe, Stand und Zeit), welche Fassung der Nutzungsbedingungen du wann angenommen hast, den Zeitpunkt deiner letzten Anmeldung, deine Sitzungen, eine Administratorrolle, falls du eine hast, und die Gateways, die du registrierst, mit ihren Tokens. Andere Spieler sehen deinen Anzeigenamen und dein Tag, nie deinen Anmeldenamen. Gibt dir ein Administrator einen Reset-Code, speichern wir nur dessen Hashwert, bis der Code benutzt wird oder abgelaufen ist. Was Administratoren an einem Account oder Gateway tun, steht drei Jahre in einem Protokoll (wer, was, welcher Account oder welches Gateway, wann). Rechtsgrundlage: Art. 6 Abs. 1 lit. b DSGVO (der Account, den du wolltest); für den Zeitpunkt der letzten Anmeldung und das Protokoll Art. 6 Abs. 1 lit. f DSGVO (unser berechtigtes Interesse an einem sicheren, nachvollziehbaren Betrieb). Ohne Anmeldenamen und Passwort gibt es keinen Account; eine E-Mail-Adresse brauchst du nicht. Einen Account darfst du ab 16 Jahren anlegen. Gespeichert, bis du den Account löschst; dann wird er sofort aus dem laufenden System entfernt, aus Sicherungen spätestens nach 12 Monaten. Sitzungen enden nach 30 Minuten ohne Nutzung und spätestens 12 Stunden nach der Anmeldung.
 privacy-email-title = E-Mail-Adresse
-privacy-email = Eine E-Mail-Adresse ist freiwillig; ein Account braucht keine. Gibst du eine an, speichert Baylee Central die Adresse, die Sprache ihrer E-Mails und wann du sie bestätigt hast. Eine Adresse, die du angegeben hast und die noch auf ihren Code wartet, bleibt gespeichert, bis du sie bestätigst oder zurückziehst, und höchstens einen Tag nach Ablauf ihres Codes. Von jedem Code, den wir verschicken, speichern wir nur einen Hashwert, bis der Code benutzt wird oder abgelaufen ist, und 24 Stunden lang die Zeitpunkte, zu denen dir Reset-Codes geschickt wurden, damit höchstens drei am Tag hinausgehen. Wir verwenden die Adresse für drei Dinge: um den Code zu schicken, der sie bestätigt, um einen Reset-Code zu schicken, wenn du oder jemand, der deinen Anmeldenamen kennt, einen anfordert, und um der alten Adresse Bescheid zu sagen, wenn sie ersetzt oder entfernt wird. Die E-Mails verschickt Baylees eigener Maildienst auf demselben Server über mailbox.org (Heinlein Hosting GmbH, Berlin) als Auftragsverarbeiter, der die Adresse und die E-Mail erhält. Rechtsgrundlage: Art. 6 Abs. 1 lit. b DSGVO (der Account, den du wolltest). Gespeichert, bis du die Adresse entfernst oder den Account löschst.
+privacy-email = Eine E-Mail-Adresse ist freiwillig; ein Account braucht keine. Gibst du eine an, speichert Baylee Central die Adresse, die Sprache ihrer E-Mails und wann du sie bestätigt hast. Eine Adresse, die du angegeben hast und die noch auf ihren Code wartet, bleibt gespeichert, bis du sie bestätigst oder zurückziehst, und höchstens einen Tag nach Ablauf ihres Codes. Von jedem Code, den wir verschicken, speichern wir nur einen Hashwert, bis der Code benutzt wird oder abgelaufen ist, und 24 Stunden lang die Zeitpunkte, zu denen dir Reset-Codes geschickt wurden, damit höchstens drei am Tag hinausgehen. Wir verwenden die Adresse für vier Dinge: um den Code zu schicken, der sie bestätigt, um einen Reset-Code zu schicken, wenn du oder jemand, der deinen Anmeldenamen kennt, einen anfordert, um der alten Adresse Bescheid zu sagen, wenn sie ersetzt oder entfernt wird, und um der bestätigten Adresse Bescheid zu sagen, wenn mit einem Reset-Code ein neues Passwort gesetzt, das Passwort geändert oder von einem Administrator ein Reset-Code für den Account ausgestellt wurde. Die E-Mails verschickt Baylees eigener Maildienst auf demselben Server über mailbox.org (Heinlein Hosting GmbH, Berlin) als Auftragsverarbeiter, der die Adresse und die E-Mail erhält. Rechtsgrundlage: Art. 6 Abs. 1 lit. b DSGVO (der Account, den du wolltest). Gespeichert, bis du die Adresse entfernst oder den Account löschst.
 privacy-cookie-title = Das Sitzungscookie
 privacy-cookie = Beim Anmelden wird ein Cookie gesetzt, <code>__Host-central</code>: eine Zufallszahl, die deine Sitzung kennzeichnet. Es wird nur an baylee.app gesendet, ist für Skripte nicht lesbar und endet mit der Sitzung, spätestens nach 12 Stunden. Es ist unbedingt erforderlich, damit du angemeldet bleibst; eine Einwilligung braucht es dafür nicht. Rechtsgrundlage: § 25 Abs. 2 Nr. 2 TDDDG und Art. 6 Abs. 1 lit. b DSGVO.
 privacy-chat-title = Chat und Kontakte
@@ -488,7 +487,7 @@ register-error-taken = Dieser Anmeldename ist vergeben. Wähle einen anderen.
 
 code-title = Dein Wiederherstellungscode
 code-handle = Dein Handle: { $handle }
-code-lead = Nur mit diesem Code bleiben deine verschlüsselten Daten erhalten, wenn du dein Passwort vergisst. Wir kennen ihn nicht und können ihn nicht wiederherstellen. Bewahre ihn sicher auf, nicht auf diesem Gerät.
+code-lead = Nur mit diesem Code bleiben deine verschlüsselten Daten erhalten, wenn du dein Passwort vergisst. Wir kennen ihn nicht und können ihn nicht wiederherstellen. Bewahre ihn sicher auf, so dass du ihn auch ohne dieses Gerät findest.
 code-shown-once = Nur jetzt sichtbar
 code-download = Als Textdatei speichern
 code-kept = Ich habe meinen Wiederherstellungscode gesichert
@@ -498,6 +497,23 @@ code-later = Nicht jetzt
 code-copy = Kopieren
 code-copied = Kopiert.
 code-copy-failed = Kopieren hat hier nicht geklappt. Markier den Code und kopier ihn von Hand.
+code-print = Drucken
+code-manager = Im Passwortmanager speichern
+code-manager-id = Baylee-Wiederherstellungscode ({ $name })
+code-manager-offered = Dein Browser hat den Code angeboten bekommen. Falls er gefragt hat, prüf, ob er ihn gespeichert hat.
+code-manager-failed = Dein Browser hat den Code nicht angenommen. Bewahre ihn auf einem anderen Weg auf.
+code-mail = An mich mailen
+code-mail-warning = Vorsicht: Der Code liegt dann in deinem Postfach. Wer deine Mails lesen kann, kann sich dorthin auch einen Reset-Code schicken lassen und mit beiden deine Anmeldung zurücksetzen und deine verschlüsselten Daten öffnen.
+code-mail-subject = Mein Baylee-Wiederherstellungscode
+code-sheet-title = Baylee-Wiederherstellungscode
+code-sheet-name = Anmeldename: { $name }
+code-sheet-what = Mit diesem Code überstehen deine verschlüsselten Baylee-Daten ein vergessenes Passwort: Du gibst ihn auf der Reset-Seite zusammen mit einem Reset-Code ein.
+code-sheet-keep = Bewahre ihn so auf, dass nur du ihn erreichst. Niemand von Baylee wird dich je danach fragen.
+code-email-label = E-Mail-Adresse (freiwillig)
+code-email-hint = Für einen Reset-Code, falls du dein Passwort vergisst. Nach diesem Schritt schicken wir dir einen Code, um die Adresse zu bestätigen; du kannst auch später in deinem Account eine eintragen.
+code-email-step-title = Bestätige deine E-Mail-Adresse
+code-email-step-lead = Gib den Code aus der Mail hier ein oder später auf der Sicherheitsseite deines Accounts.
+code-email-step-done = Weiter zu deinem Account
 
 ## Mit einem Reset-Code ein neues Passwort setzen
 
@@ -588,6 +604,7 @@ email-removed = Deine E-Mail-Adresse ist entfernt.
 email-busy = Im Moment zu viele E-Mails. Versuch es später noch einmal.
 email-same = Das ist schon deine Adresse.
 email-unsure = Es kam keine Antwort. Deshalb wissen wir nicht, ob das geklappt hat. Sieh nach, was hier steht, und versuch es noch einmal, falls nicht.
+email-again = Gib dein Passwort noch einmal ein, um den Code zu schicken.
 
 ## Die Nutzungsbedingungen von Central
 
@@ -862,18 +879,14 @@ foot-project = Projekt
 foot-source = Quellcode (AGPL-3.0)
 foot-central = Baylee Central (Quellcode einsehbar)
 foot-summary = Freies, quelloffenes Tabletop-Kartenspiel in Rust & Bevy – mit deterministischer Regel-Engine, lokalem Offline-Modus, Haus-KI, LLM-Anbindung und Community-Gateways.
-strip-build = Build
 strip-ci = CI
 strip-commit = Commit
 strip-gateways = Gateways
 strip-online = online
 strip-offline = offline
-strip-releases = siehe Releases
-strip-on-github = auf GitHub ansehen
 strip-directory = das Verzeichnis
 strip-cards = Spielbare Karten
 strip-cards-unit = Karten
-strip-stars = Sterne auf GitHub
 strip-accounts = Konten bei Baylee Central
 strip-live = Gerade auf den Gateways, wie sie es melden
 strip-views = Seitenaufrufe seit { $date }
@@ -996,7 +1009,7 @@ ai-training = Parallel zur Haus-KI und der externen LLM-Anbindung wird eine eige
 ai-hostingLink = Gateway-Hosting & LLM-Setup
 
 # The gateways and the contact page, as the old site wrote them (owner, 11.11.2026)
-gw-lead = Ein Gateway ist ein Server für Online-Tische: Accounts, Decks, Räume und ein Engine-Prozess pro Spiel. Hier stehen die bei Baylee Central registrierten, die dessen Administrator freigegeben hat. Das als offiziell markierte Gateway betreibt Baylee selbst; alle anderen gehören ihren Betreibern, und dort gelten deren Regeln. Ein Eintrag ist kein Versprechen darüber, was ein Gateway tut.
+gw-lead = Ein Gateway ist ein Server für Online-Tische: Accounts, Decks, Räume und ein Engine-Prozess pro Spiel. Hier stehen die bei Baylee Central registrierten, die dessen Administrator freigegeben hat. Jedes gehört seinen Betreibern, und dort gelten deren Regeln. Ein Eintrag ist kein Versprechen darüber, was ein Gateway tut.
 gw-howTo = Um auf einem zu spielen, kopiere seine Adresse in die Eingangstür des Clients. Online heißt, Central hat in den letzten anderthalb Minuten von dem Gateway gehört; ein Versprechen, dass es antwortet, ist das nicht. Namen und Versionen sind die Angaben der Betreiber.
 gw-find = Gateway finden
 gw-findHint = Name oder Adresse
@@ -1013,7 +1026,6 @@ gw-stat-games = Laufende Partien
 gw-show = Anzeigen
 gw-show-every = Alle
 gw-show-online = Online
-gw-show-official = Offiziell
 gw-show-tables = Mit offenen Tischen
 gw-sort = Sortieren nach
 gw-sort-best = Empfohlen

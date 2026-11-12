@@ -38,23 +38,25 @@ notice-check = Если это были не вы, войдите и посмо�
 notice-link = Открыть страницу безопасности
 
 # The notices to the account's confirmed address that its login changed.
-# Not translated yet: English until a translation replaces these lines.
-reset-done-subject = The password of your Baylee account was reset
-reset-done-title = A new password was set
-reset-done-body = A reset code was used to set a new password for the Baylee account of this address.
-reset-done-kept = The account's data was kept.
-reset-done-new = The account starts with an empty vault. Its data from before cannot be opened any more.
-reset-done-sessions = The account is signed out everywhere: every session it had was ended.
-reset-done-not-you = If this was not you, someone else can sign in to your account now. Ask a Baylee administrator for a reset code and set your own password again.
-reset-done-recovery-kept = If the account has a recovery code, it still opens the data. Keep it: with it, a reset keeps the data.
-reset-done-recovery-new = A recovery code from before this reset opens nothing any more.
-password-subject = The password of your Baylee account was changed
-password-title = The password was changed
-password-body = The password of the Baylee account of this address was changed.
-password-sessions = Every other session of the account was signed out.
-password-not-you = If this was not you, someone else knows your password. Set a new one with a reset code: ask for one on the reset page, or ask a Baylee administrator.
-issued-subject = A reset code was made for your Baylee account
-issued-title = An administrator made a reset code
-issued-body = A Baylee administrator made a reset code for the Baylee account of this address. With it, a new password can be set for the account.
-issued-valid = The code works once, for { $hours } hours. Until it is used, your password works as it did.
-issued-not-you = If you did not ask for it, sign in and change your password on the security page: that ends the code. Then tell an administrator.
+reset-done-subject = Пароль вашего аккаунта Baylee сброшен
+reset-done-title = Задан новый пароль
+reset-done-body = Для аккаунта Baylee с этим адресом с помощью кода сброса задан новый пароль.
+reset-done-kept = Данные аккаунта сохранены.
+reset-done-new = Аккаунт начинает с пустого хранилища. Прежние данные аккаунта открыть больше нельзя.
+reset-done-sessions = Аккаунт выведен из системы везде: все его сеансы завершены.
+reset-done-not-you = Если это были не вы, в ваш аккаунт теперь может войти кто-то другой. Попросите у администратора Baylee код сброса и снова задайте свой пароль.
+reset-done-recovery-kept = Если у аккаунта есть код восстановления, он по-прежнему открывает данные. Сохраните его: с ним сброс сохраняет данные.
+reset-done-recovery-new = Код восстановления, созданный до этого сброса, больше ничего не открывает.
+password-subject = Пароль вашего аккаунта Baylee изменён
+password-title = Пароль изменён
+password-body = Пароль аккаунта Baylee с этим адресом изменён.
+password-sessions = Все остальные сеансы аккаунта завершены.
+password-not-you = Если это были не вы, ваш пароль знает кто-то другой. Задайте новый с помощью кода сброса: запросите его на странице сброса или попросите у администратора Baylee.
+issued-subject = Для вашего аккаунта Baylee создан код сброса
+issued-title = Администратор создал код сброса
+issued-body = Администратор Baylee создал код сброса для аккаунта Baylee с этим адресом. С ним для аккаунта можно задать новый пароль.
+issued-valid = Код срабатывает один раз и действует { $hours } ч. Пока он не использован, ваш пароль работает как раньше.
+issued-not-you = Если вы его не просили, войдите и смените пароль на странице безопасности: это отменит код. Затем сообщите администратору.
+
+# The confirmation mail's button, which opens the security page with the code filled in.
+confirm-link = Подтвердить адрес

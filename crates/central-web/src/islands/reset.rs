@@ -9,6 +9,11 @@
 //! asks Central to mail one to the account's confirmed address
 //! (`Request::ResetMail`). Central answers the same whatever the name, and
 //! the block says no more than that.
+//!
+//! The reset mail's button links here with its code in the fragment
+//! (`#code=RESET-…`, `fragment`): the form starts with it in the code's
+//! field, the fragment is gone from the address bar, and nothing is sent
+//! until the person sends the form.
 
 use central_api::Token;
 use central_api::reset_code::ResetCode;
@@ -21,7 +26,7 @@ use super::central::{Failure, call, uuid_v7, valid_username};
 use super::chat::glyph;
 use super::crypto::{Crypto, field_bytes};
 use super::field::{self, Labelled};
-use super::{clip, early, session};
+use super::{early, fragment, keep, session};
 use crate::words::{self, Lang};
 
 /// What the form holds when it is sent.
@@ -172,6 +177,8 @@ struct Outcome {
     sure: bool,
     /// A new vault's recovery code, to show once.
     code: Option<String>,
+    /// The sign-in name the reset was for, for the code's file and sheet.
+    name: String,
 }
 
 /// The account behind `username`.
@@ -258,6 +265,7 @@ async fn reset(worker: &str, f: Fields) -> Result<Outcome, Refusal> {
     }
     let crypto = Crypto::start(worker).ok_or(Refusal::Other(Problem::Failed))?;
     let discovered = discover(&username).await?;
+    let name = username.clone();
     // The Worker reads the recovery code here: one that is none stops the
     // reset before the reset code goes anywhere.
     let start = crypto
@@ -308,7 +316,7 @@ async fn reset(worker: &str, f: Fields) -> Result<Outcome, Refusal> {
             None => false,
         },
     };
-    Ok(Outcome { sure, code })
+    Ok(Outcome { sure, code, name })
 }
 
 /// A reset ends every session of the account. Where this browser remembers
@@ -343,11 +351,19 @@ struct Form {
 impl Form {
     /// The form as it stands when the island starts: what was typed or
     /// chosen before it ran stays (`early`). The data is kept unless the
-    /// person says otherwise.
+    /// person says otherwise. A reset code the mail's link handed in the
+    /// address's fragment fills an empty code field; the fragment leaves
+    /// the address bar either way.
     fn early() -> Self {
+        let handed = fragment::code(&fragment::take(), ResetCode::parse);
+        let typed = early::typed("reset-code");
+        let code = match handed {
+            Some(code) if typed.is_empty() => code.display().to_string(),
+            _ => typed,
+        };
         Self {
             username: RwSignal::new(early::typed("reset-name")),
-            code: RwSignal::new(early::typed("reset-code")),
+            code: RwSignal::new(code),
             keep: RwSignal::new(!early::ticked("reset-new")),
             recovery: RwSignal::new(early::typed("reset-recovery")),
             confirmed: RwSignal::new(early::ticked("reset-confirm")),
@@ -511,13 +527,14 @@ fn form_view(
     }
 }
 
-/// A new vault's recovery code: shown once, to copy or save, and the way
-/// on only after the person says it is saved, as after a registration.
-fn code_view(lang: Lang, code: String, sure: bool, signin: String) -> impl IntoView {
+/// A new vault's recovery code: shown once, with the registration's ways
+/// to keep it (`keep.rs`: copy, file, print, the password manager, a mail
+/// to oneself, which asks its mail program for the address), and the way
+/// on only after the person says it is saved.
+fn code_view(lang: Lang, code: String, name: &str, sure: bool, signin: String) -> impl IntoView {
     let kept = RwSignal::new(false);
     let error = RwSignal::new(None::<&'static str>);
-    let download = format!("data:text/plain;charset=utf-8,Baylee%20recovery%20code%3A%20{code}%0A");
-    let (copy, copied) = clip::copier(lang, code.clone());
+    let ways = keep::ways(lang, &code, name, RwSignal::new(String::new()));
     let go_on = move |_| {
         if kept.get_untracked() {
             session::go(&signin);
@@ -531,11 +548,7 @@ fn code_view(lang: Lang, code: String, sure: bool, signin: String) -> impl IntoV
         {unsure}
         <p class="eyebrow">{words::code_shown_once(lang)}</p>
         <p class="secret" translate="no"><code>{code}</code></p>
-        <p class="actions">
-            {copy}
-            <a class="button" href=download download="baylee-recovery-code.txt">{words::code_download(lang)}</a>
-        </p>
-        {copied}
+        {ways}
         <div class="check">
             <input id="reset-code-kept" type="checkbox" on:change=move |ev| kept.set(event_target_checked(&ev)) />
             <label for="reset-code-kept">{words::code_kept(lang)}</label>
@@ -550,7 +563,7 @@ fn code_view(lang: Lang, code: String, sure: bool, signin: String) -> impl IntoV
 /// The result: what happened to the data and the sessions, a new vault's
 /// code, and the way to the sign-in.
 fn done_view(lang: Lang, outcome: Outcome) -> impl IntoView {
-    let Outcome { sure, code } = outcome;
+    let Outcome { sure, code, name } = outcome;
     let (title, text) = match (sure, code.is_some()) {
         (true, false) => (words::reset_done_title(lang), words::reset_done_kept(lang)),
         (true, true) => (words::reset_done_title(lang), words::reset_done_new(lang)),
@@ -558,7 +571,7 @@ fn done_view(lang: Lang, outcome: Outcome) -> impl IntoView {
     };
     let signin = format!("/{}/signin", lang.code());
     let way_on = match code {
-        Some(code) => code_view(lang, code, sure, signin).into_any(),
+        Some(code) => code_view(lang, code, &name, sure, signin).into_any(),
         None => view! {
             <p class="actions">
                 <a class="button primary" href=signin>{words::reset_to_signin(lang)}</a>
@@ -579,6 +592,8 @@ fn done_view(lang: Lang, outcome: Outcome) -> impl IntoView {
 pub fn Reset(lang: Lang, worker: String) -> impl IntoView {
     let step = RwSignal::new(Step::Form);
     let form = Form::early();
+    // a code the link hands while the page is open: removed, filling nothing
+    fragment::watch();
     let submit = move |event: leptos::ev::SubmitEvent| {
         event.prevent_default();
         let fields = form.fields();

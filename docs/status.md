@@ -347,12 +347,15 @@ The server side of [web accounts](web-accounts.md) lands in three PRs.
   a clock of their own, the mailer's client against a stand-in on loopback,
   rendering and redaction. Not tested: a real mailer and real delivery.
   Deploy: the hook migrates and grants; then add the `mail` block
-  ([operations](operations.md#mail)). **Open:** the website's forms for the
-  address and for asking for a code by mail, the client's (M6), the nine
-  translations, and the privacy notice's lines on the address, which are
-  the owner's review; the nine languages' words for the three notices of a
-  changed login. Three
-  addresses that ask on both listeners spend Central's 30 requests an hour.
+  ([operations](operations.md#mail)). The website's forms for the address
+  and for asking for a code by mail, and the nine languages' words for the
+  mails and the notices, came with the server-rendered site (12.11.2026).
+  **Open:** the client's forms (M6), and the privacy notice's lines on the
+  address, which are the owner's review. Central's 30 reset mails an hour
+  count mails handed to the mailer, not requests: a request for a name
+  without a confirmed address spends none, and one account takes at most
+  one mail in 10 minutes and 3 a day, so spending the hour's mails takes
+  at least ten accounts with confirmed addresses.
 - **Not yet deployed.** Deploy: migrate, grant, add `browser.listen`, pass
   `/api/*` in the `baylee.app` site block (no keys since the open beta, 11.11.2026). Central’s own terms
   are still `draft`, so none are in force.

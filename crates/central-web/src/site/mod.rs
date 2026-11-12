@@ -175,7 +175,8 @@ pub struct Snapshot {
     pub release: Option<Release>,
     /// Its card status.
     pub cards: Option<CardStatus>,
-    /// Central's directory, official first.
+    /// Central's directory, in its order (the origin Central calls official
+    /// first, unmarked).
     pub gateways: Option<Vec<Gateway>>,
     /// The repository's state.
     pub repo: Repo,

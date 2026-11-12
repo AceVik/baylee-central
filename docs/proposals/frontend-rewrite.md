@@ -1045,7 +1045,7 @@ a gateway's card shows its own. A number is drawn only while a source
 reports it, and nothing is kept past the minute it was read in. The
 gateway's half is Baylee's (a brief is with the project's notes); until a
 gateway reports, the strip shows the accounts, the cards, the stars and
-the gateways online.
+the gateways online (the stars left it on 12.11.2026, §19).
 
 **The Impressum** is in §10, point 2.
 
@@ -1106,7 +1106,8 @@ one number for all pages and visitors and nothing about a request
 ([operations](../operations.md), [security
 assurance](../security-assurance.md)); without the setting nothing is
 counted or shown, and the privacy notice has its section only where it is
-counted. On a phone four counts stand two and two.
+counted. On a phone four counts stand two and two (laid out anew on
+12.11.2026, §19).
 
 **Menus.** The download's menu and the language menu lie on a layered
 shade, come in with their rows one after the other and leave as they came
@@ -1315,3 +1316,294 @@ makes a reset code for an account, which until now only the old build's
 **Open.** The rest of the administration (overview, the role, tags,
 gateways, audit, the legacy store, reports) is still the old build's; the
 nine translations; a run of `site-reset.spec.ts` against a real Central.
+
+## 19. As built: the owner's round of 12.11.2026
+
+Three things the owner asked for after using the site. Each point names
+where it is held.
+
+**The colour switch.** It went from the device's scheme to light, to dark
+and back, so on a light device its first press chose light, which was
+already on screen, and nothing changed; a second press was needed. Now one
+press shows the scheme that is not on screen, the one chosen or else the
+device's as the stylesheet reads it (light only where the device asks for
+light), in both directions, from the first visit and with or without a
+choice kept from before. A choice the device would make anyway is not
+kept, so the page follows the device again; the key is
+`baylee-site-theme` as before, applied by `boot.js` in the head before the
+first paint. The switch shows the sun or the moon of the scheme on screen
+and names it ("Colours: light", "Colours: dark"); while nothing is chosen
+it follows the device changing under an open page. Without script the
+switch stays hidden, as before, and the device decides. `theme-system` and
+the half-filled glyph are gone. `web/e2e-site/theme.spec.ts` presses it
+once on a dark and on a light device, with nothing, light or dark kept,
+on both sizes (the phone's switch is in the menu), checks the scheme on
+screen, what is kept, and that the kept one is on the root before the body
+begins; the old test had looked for the switch under a class the bar does
+not have and was skipped everywhere.
+
+**No official gateways.** No card, list, chip or count calls a gateway
+official any more, on the start page or in the directory: the gold pill,
+the card's stronger edge, the "Official" chip with `?show=official` (an
+old address with it shows every gateway) and `data-official` are gone,
+with `gws-official` and `gw-show-official` in all eleven languages. The
+directory's lead no longer says that Baylee runs the one marked official;
+each gateway is run by its operators (English and German by hand; the
+nine others carry the English text until it is translated). Central's API is
+unchanged: its directory still names an official origin, and the site's
+server still lists that one first (`fetch.rs`) without marking it.
+`pages.rs` and `site.spec.ts` hold that the word and the marks are absent.
+
+**The strip under the bar** is Baylee in numbers ("Project status" before):
+nothing of GitHub's is in it any more (the release, the checks, the last
+commit and the stars left; the source section and the download keep
+theirs, so nothing fetched went unused and the privacy notice stays true).
+What stays is ordered for a reader, the most telling first: the players
+the gateways report, of them in a game, the running games and the open
+tables (one term of the list, "as they report it", with four values, the
+three short ones first), the
+gateways online and not, Central's accounts, the playable cards (read from
+the release's `sets.json` on GitHub, but a figure of the game, not of the
+repository) and the page views. Each figure is a cell of its own, its glyph
+running with its words, its label for a screen reader and the tooltip; a
+figure nobody reports is no cell, so it leaves no hole. The server writes
+how many cells there are (`data-count`, 1 to 8), and `header.css` lays out
+that many without script: on a wide screen (1100 px and more) all in one
+line, the room shared out evenly; from 600 px at most four to a line, five
+and six as three and two or three and three, seven and eight as four and
+three or four and four; on a phone two to a line, three in one line as
+wide as their words, and five and seven with a first line of the gateways'
+three short counts (the gateways' cell needs half a line), so that no line
+differs from another by more than one
+cell, the shorter is centred and no cell stands alone. A cell is as wide as
+its share of the line, so two lines' columns stand in line.
+`web/e2e-site/strip.spec.ts` holds the order, the absence of GitHub, axe
+and the 44 px targets, and measures the lines for all sixteen sets of
+silent sources at ten widths from 320 to 2560 px (and a phone's own) in
+all eleven languages: counts per line, centring, equal gaps, nothing
+sticking out of its cell and no sideways scroll. A cell's words may
+break inside it where its share is narrow (the gateways' two parts one
+above the other; in Japanese between phrases, `word-break: auto-phrase`,
+as the site's titles do). `pages.rs` holds a cell for each reported
+figure under all sixteen sets of silent sources.
+
+**Words.** Removed in all eleven languages: `theme-system`,
+`gws-official`, `gw-show-official`, `strip-build`, `strip-releases`,
+`strip-on-github` and `strip-stars` (the build does not refuse a message
+nobody calls, so they went by hand). Changed: `status-label` (the strip's
+name) and `gw-lead` (its sentence on the official gateway), English and
+German by hand; the nine other languages carry the English text of both
+under "# English for now: to be translated.", as with §17's changed
+messages. No new message.
+
+## 20. As built: the album opens as a book, its photographs turn (12.11.2026)
+
+The owner asked for better movement where Baylee's album opens and shuts,
+and for a beautiful change between the photographs in the full view. Both
+are `home.js` and `album.css`; neither has words, so no language changed.
+
+- **The book.** The logo lays the book down shut: a cover of cloth the
+  colour of the site's evening, the spine's hinge pressed into it, a gold
+  rule, and her name as the hero's picture shows it. The cover swings up
+  on the spine towards the reader and over to the left (Web Animations,
+  0.9 s after 0.16 s) while the book comes nearer; the light comes from
+  over the reader's left shoulder, so the cloth catches it as it lifts and
+  darkens as it turns away, the endpaper is dark as it comes round and
+  brightens as it comes down, and the cover's shade on the first page
+  narrows to the spine. The first page lifts a little and settles. The
+  close button and Escape run it back (0.65 s) and take the book away;
+  shut while it opens, the same movement goes back from where it is. The
+  veil over the page fades in with the book and out with it, and goes
+  back with it too (a Web Animation of `::backdrop`, made at the first
+  frame of an opening, as the veil exists only once the dialog is). The
+  light and the shade are keyframes at the cover's angle every 15° under
+  one easing for the whole swing, which a CSS animation cannot give (it
+  eases each keyframe on its own). The cover is made by the script and is
+  there only while the book folds (`data-folding`); without the script the
+  logo opens the plain dialog, as before. An Escape the browser does not
+  let a page hold (pressed again at once) shuts it at once. While the
+  cover swings beyond the book's edge the book does not cut it off, but
+  the pages are still cut where the book cuts them at rest (a window too
+  short for them).
+- **The photographs.** The viewer's frame holds three prints, the one
+  shown and, hidden, the ones before and after (the album's smaller
+  pictures; the one shown takes the full photograph once it has loaded).
+  Each is the size its photograph takes in the frame (container units and
+  the photograph's ratio in `--ratio`), so its place is kept before it
+  loads and its shadow falls from the photograph's edge. Going on, the
+  next print comes in from the right over the one shown, a little turned
+  and lifted, while the one shown sinks back into the dark; going back,
+  the one shown is lifted off to the right. A finger moves the prints as
+  it moves and ends the turn past a third of the way or with a flick;
+  short of it they fall back. Zoomed in, the finger still moves the
+  photograph. A sideways stroke on a touchpad turns once (zoomed in, it
+  moves the photograph sideways; it used to zoom). A key pressed mid-turn
+  ends that turn and starts the next. Only one image is the viewer's
+  (`data-viewer-image`), the one the zoom acts on. The photographs still
+  load only once the book is open.
+- **The rules held.** Only transform and opacity move, the frame and the
+  controls never; no inline style in the markup (the script sets
+  transform, opacity and `--ratio` through the CSSOM); nothing hovers into
+  motion. With less motion asked for, the book is open or shut and the
+  photograph changed at once, and nothing follows a finger.
+- **Tests.** `web/e2e-site/album.spec.ts`: every way in and out of the
+  book with the order of its states, focus back on the logo, every
+  photograph by the buttons, the arrow keys and synthetic touch strokes,
+  the falls back, the zoomed finger, the browser's own input (a mouse's
+  drag, a touch screen's finger through the DevTools protocol, a
+  touchpad's wheel), focus back on the photograph's frame, less motion, no
+  script, and the keyframes of what runs read in the same task as the
+  press that starts it (only `transform` and `opacity`). `site.spec.ts`'s
+  page-turn test reads its leaf the same way.
+
+**Measured** (headless Chromium on the M1 Max's GPU, the machine loaded;
+the gaps between animation frames on the main thread, not the
+compositor's own): at 1440 px the median gap was 16.7 ms while the book
+opened, shut and a photograph turned, in three runs with at most one gap
+of 33 to 50 ms each (a run before them, its browser just started, stalled
+once for 0.55 s). At 375 px with the CPU slowed fourfold the median
+was 16.7 ms as well, with one to four gaps of 50 to 270 ms per run, the
+longest the first open's first frame, which took about 0.2 s before this
+change too (the album's first layout and paint) and comes before anything
+moves. **Open:** a real phone, Safari and Firefox.
+
+## 21. As built: ways to keep the recovery code (12.11.2026)
+
+The owner's decision on the code's step, after the trade-off was explained
+("Wie empfohlen + Mail an mich"). What each way does and keeps is
+[web-accounts](../web-accounts.md), "Keeping the recovery code"; the three
+passes are in [security assurance](../security-assurance.md), "Ways to keep
+a recovery code".
+
+- **The step** (`islands/auth.rs`, `code_view`, with `islands/keep.rs`):
+  under the code, Copy, Save as a text file, Print and, only where the
+  browser has `PasswordCredential`, Save in password manager, in one row
+  that wraps; under them, apart, the warning and "Mail it to myself"; then
+  the e-mail field (a registration only, where Central mails); then the box
+  "I have saved my recovery code" and Continue, as before. The same step
+  after a sign-in that makes a code for a moved account has the ways and
+  no field.
+- **Nothing before the click.** The file's `data:` link, the `mailto:`
+  address and the print's sheet are made when their button is pressed;
+  before that the code is in the page once, as the text of the step. The
+  password manager and the print are reached through `js_sys`
+  (`Reflect`), as the clipboard is: no `web-sys` feature was added. The
+  file and the mail are opened through `web-sys` types Leptos already
+  builds (`session::open`, shared with the Impressum).
+- **Print.** `pages.css` shows the sheet alone while it is in the page,
+  from the page and from the registration's dialog (which a print hides
+  otherwise); on a screen it is never shown.
+- **The address.** Checked by Central's rule on Continue; named after the
+  code is kept and Central's terms are accepted, on a step that is the
+  account area's e-mail section (`email.rs`, `Begin::Name`): `Set` without
+  the password while the registration's sign-in is fresh, the code's field
+  at once, "Continue to your account" to skip or to go on. Where Central
+  refuses `Set`, the section's own form asks for the password.
+- **Words.** 18 new messages (`code-print`, `code-manager`,
+  `code-manager-id`, `code-manager-offered`, `code-manager-failed`,
+  `code-mail`, `code-mail-warning`, `code-mail-subject`,
+  `code-sheet-title`, `code-sheet-name`, `code-sheet-what`,
+  `code-sheet-keep`, `code-email-label`, `code-email-hint`,
+  `code-email-step-title`, `code-email-step-lead`, `code-email-step-done`,
+  `email-again`) and `privacy-device-manager`, a second paragraph of the
+  privacy notice's "What your browser keeps"; `code-lead` changed in
+  English and German ("somewhere safe where you will find it even without
+  this device" for "away from this device", which the file and the
+  password manager contradicted). The nine other languages carry the
+  English text of the new ones under `# English for now: to be
+  translated.` and their old `code-lead`.
+- **Reduced motion** now stops the dialogs' backdrop too (`*::backdrop` in
+  `base.css`): its colour faded under reduced motion, which `schemes`
+  found once the registration's dialog was measured in both schemes.
+- **Tests.** `web/e2e-site/recovery.spec.ts`: the whole registration in
+  the real island against a stand-in Central and a canned crypto Worker;
+  every way, the code once in the page before any click, the `mailto:`
+  address (to the typed address and to nobody), the file's content, the
+  password manager's offer and its absence, the print in print media from
+  the page and from the dialog, the address named with and without terms
+  in force, a stale sign-in, a refused address, skipping; axe in both
+  schemes, the targets, 320 px and the keyboard's order, and both steps in
+  German at 320 px on the page and in the dialog. `e2e-real`'s
+  `register()` and `site-email.spec.ts` were adapted (the address named at
+  registration, another in the account area) and type-check; they were not
+  run here.
+
+## 22. As built: the nine languages translated (12.11.2026)
+
+- **What.** Every message that §17 to §21, the strip and the mails' notices
+  had left in English under `# English for now: to be translated.` now
+  has its own text in Spanish, French, Italian, Japanese, Korean,
+  Brazilian Portuguese, Russian and both Chinese scripts: the
+  administrator's page, the recovery code's ways and its e-mail step,
+  `status-label`, `gw-lead`, `privacy-device-manager`, and in the mails
+  `confirm-link` and the nineteen notice ids. The comments are gone.
+- **Who.** Translated by a cheaper model, as the owner asked for words
+  (Claude Sonnet), then checked here: every language has every id of the
+  English file, the same placeables and the same tags in each message;
+  the Italian file's messages were read against their English ids one by
+  one; the page named in `admin-refused-own` is the account area's own
+  name for its security page in each language.
+- **What stays English.** Names and technical words (Baylee, GitHub, the
+  platforms, SHA-256, Argon2id, OPAQUE, Central, the README anchors), and
+  short words a language's UI keeps as they are (Online, Gateway, Beta in
+  some). The gate's share of English messages is now 25 to 58 in about
+  1,020 per language (French the most, many of them French words that
+  are spelt as in English), under its limit of 12 in 100.
+- **Not done.** No native speaker has read them. Wording the translator
+  marked as unsure (for example the Italian `code-sheet-keep` and
+  `admin-lost`, the French `admin-warning-takeover`) is listed in the
+  pull request for a reader of that language.
+
+## 23. As built: the BIMI mark (12.11.2026)
+
+- **What.** Baylee's mark for BIMI (SVG Tiny PS, Baylee on the moon,
+  31,288 bytes, SHA-256 `0a52483c…1f17b`), approved by the owner, is
+  served at `/bimi/baylee.svg` for mail providers and shown in every
+  page's footer beside the sunlight wordmark, 72 px, the same file by the
+  same address (the owner, through the session that asked: "Wenn es
+  wichtig ist, dann ja"; a mark certificate wants the mark public on the
+  domain for a year, and the clock starts when it shows).
+- **How.** The file lives in `crates/central-web/assets/bimi/` and is
+  marked `-text` in `.gitattributes`; `cargo xtask site` copies it byte
+  for byte to `target/site/bimi/baylee.svg` (and makes its `.br` and
+  `.gz` beside it, as for every text file); `central-web-server` lists it
+  with the fixed-name files (`files::ROOT`), so it is read once at start
+  and answered before any language redirect, `image/svg+xml`,
+  `no-cache` with an entity tag, the site's security headers. It is never
+  optimised: a tool such as svgo would break the profile.
+- **Tests.** `xtask`: the file's SHA-256 is the approved one, it begins
+  with the Tiny PS root, and it holds no script, handler, external link,
+  image or import (its `url(#…)` name its own gradients). Server: 200,
+  the type, the exact bytes, no redirect, no cookie, revalidated, in both
+  modes; `/en/bimi/…`, `/bimi/`, a trailing slash and another name are
+  not it. `web/e2e-site/bimi.spec.ts`: the same over HTTP with and
+  without `br` and `gzip`, and the footer's mark visible, loaded and at
+  least 64 px on five pages in four languages at both sizes.
+- **Not done here.** The DNS record (`docs/operations.md`, "The BIMI
+  mark") waits for this site's deploy; the deploy is the owner's.
+
+## 24. As built: the overlays' scrollbars and a wider registration (12.11.2026)
+
+- **The owner:** with a scrollbar, the overlays (the sign-in and
+  registration dialogs, the download's other systems) looked broken at
+  their right edge; the registration may be wider where there is room.
+- **Scrollbars.** What floats and scrolls on its own (`.auth-dialog`,
+  `.menu`, the phone's `.nav[popover]`, `.terms-text`) has a thin bar in
+  the page's ink on no track (`scrollbar-width: thin`, `scrollbar-color`;
+  for a Safari without them, the same by `::-webkit-scrollbar`). A
+  dialog's bar ran through its rounded corners: the dialog now has a
+  transparent border as tall as its corner radius, so the bar runs between
+  the corners, and its edge is drawn by an outline at the border's outer
+  line (`outline-offset: -1px`); in Windows' high contrast the border is
+  the ground and the outline the edge. Scrolling the card instead of the
+  dialog was tried and dropped: Chrome makes a scrolling element
+  focusable, and the dialog then gave the keyboard to the card instead of
+  its first field.
+- **Width.** The registration dialog is up to 42rem wide (signing in stays
+  31rem); on a phone both take the screen's width less the gutters.
+- **Tests.** `dialogs.spec.ts`: at 1300 × 560 and on a phone, the
+  registration dialog scrolls, its bar is thin on no track, its border is
+  transparent and at least the corner's radius, its edge a 1 px outline,
+  the keyboard is in its first field, it is wider than signing in where
+  there is room, its last control and the close button are reachable, and
+  every target is 44 px.

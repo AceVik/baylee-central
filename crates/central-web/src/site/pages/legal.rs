@@ -202,7 +202,12 @@ pub fn privacy(cx: &Context<'_>) -> Built {
             {section("short", words::privacy_short_title(lang), words::privacy_short(lang).into_any())}
             {hosting}
             {views}
-            {section("device", words::privacy_device_title(lang), plain(words::privacy_device(lang)))}
+            <section class="legal-part" aria-labelledby="device">
+                <h2 id="device">{words::privacy_device_title(lang)}</h2>
+                <p>{plain(words::privacy_device(lang))}</p>
+                // the recovery code, where its step put it at the person's word
+                <p>{words::privacy_device_manager(lang)}</p>
+            </section>
             {github}
             {section("links", words::privacy_links_title(lang), words::privacy_links(lang).into_any())}
             {directory}

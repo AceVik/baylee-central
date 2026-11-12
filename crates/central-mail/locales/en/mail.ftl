@@ -14,12 +14,13 @@ confirm-subject = Confirm your e-mail address for Baylee
 confirm-title = Confirm your e-mail address
 confirm-intro = This address was named for a Baylee account. To confirm it, enter this code where you named the address.
 confirm-valid = The code works for { $minutes } minutes.
+confirm-link = Confirm address
 confirm-ignore = If this was not you, ignore this mail. The address is not used without the code.
 
 # The reset code. `name` is the account's sign-in name.
 reset-subject = Your reset code for Baylee
 reset-title = Set a new password
-reset-intro = A reset code was asked for the Baylee account { $name }.
+reset-intro = A reset code was requested for the Baylee account { $name }.
 reset-how = Enter the code on the reset page to set a new password.
 reset-valid = The code works once, for { $minutes } minutes.
 reset-link = Open the reset page

@@ -1006,7 +1006,8 @@ administrator work as before.
 "mail": {
   "endpoint": "http://127.0.0.1:<the mailer's port>",
   "site": "https://baylee.app",
-  "token": "…"
+  "token": "…",
+  "logo": false
 }
 ```
 
@@ -1015,9 +1016,10 @@ administrator work as before.
   mailer's default port must not be assumed**: read the port from the
   mailer's own configuration on this host. A name (also `localhost`),
   another host, `https://` or a path is refused.
-- `site`: the origin the mails' links start with (`{site}/{lang}/reset` and
-  `{site}/{lang}/account/security`). The website's canonical HTTPS origin,
-  without a path or a trailing slash.
+- `site`: the origin the mails' links start with (`{site}/{lang}/reset`,
+  `{site}/{lang}/account/security`, and the start page `{site}/{lang}/` in
+  every mail's footer, shown as the origin's host). The website's
+  canonical HTTPS origin, without a path or a trailing slash.
 - `token`: the bearer token the mailer holds for Central, 32 to 256
   characters. It is a secret like the bridge: it lives in the root-owned
   configuration file and in the mailer's own configuration, never in an
@@ -1025,6 +1027,19 @@ administrator work as before.
   it can send mail through the mailer in Central's name, within the
   mailer's limits. To rotate it, change it in both places and restart
   Central.
+- `logo` (optional, `true` or `false`; absent is `false`): whether the
+  mailer attaches Baylee's logo. With `true` every mail asks the mailer
+  for it (`"inline": ["baylee-logo"]` in the request) and shows it in its
+  band beside the wordmark (`cid:baylee-logo`, a part of the mail, nothing
+  loaded from elsewhere); with `false` the band shows the letter's tile and
+  the request has no such field. **Deploy the mailer that has the picture
+  first** (its own configuration names the image and attaches it as
+  `Content-ID: <baylee-logo>`), **then set `logo` to `true` and restart
+  Central.** An older mailer refuses the unknown field with `400`: with
+  the flag set too early, every mail is refused and Central logs `central:
+  a mail was not handed to the mailer` for the notices and reset codes;
+  set it back to `false` and restart. To turn it off later, the other way
+  round: first the flag, then the mailer.
 
 A service whose block is malformed prints `central: invalid configuration`
 and does not start; the line names no value. The development launcher takes
@@ -1222,6 +1237,15 @@ build of `web/` as before; nothing here changes production by being merged.
   `central-web` itself, on every answer it gives; Caddy adds none to those.
   HSTS is sent without `includeSubDomains`: whether every name under
   `baylee.app` is served over HTTPS for good is the owner's to say.
+- **The BIMI mark**: `central-web` answers `/bimi/baylee.svg` itself (the
+  catch-all handle above passes it), `image/svg+xml`, 200, the approved
+  bytes, revalidated by its entity tag; every page's footer shows the same
+  file. The DNS record `default._bimi.baylee.app` (`v=BIMI1;
+  l=https://baylee.app/bimi/baylee.svg;`) belongs only after this site
+  is live: the old `web/` build has no such file, and its `file_server`
+  answers an unknown path with the app's HTML. DMARC must stay at
+  `quarantine` or `reject`. A mark certificate (Gmail's CMC) asks that the
+  mark was public on the domain for a year, from the day it first shows.
 - **Until the administration is rebuilt** (phase 5 of the proposal),
   `/admin*` can keep being served from the old build: a `handle /admin*`
   with the old `file_server` block in front of the `central-web` handle.

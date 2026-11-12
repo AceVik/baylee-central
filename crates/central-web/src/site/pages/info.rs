@@ -85,7 +85,6 @@ fn directory_stats(lang: Lang, all: &[Gateway]) -> impl IntoView + use<> {
 fn directory_tools(lang: Lang, all: &[Gateway]) -> impl IntoView + use<> {
     let count = |n: usize| words::number(lang, u64::try_from(n).unwrap_or(u64::MAX));
     let online = all.iter().filter(|gateway| gateway.online).count();
-    let official = all.iter().filter(|gateway| gateway.official).count();
     let tables = all
         .iter()
         .filter(|gateway| gateway.online && gateway.activity.is_some_and(|now| now.tables > 0))
@@ -136,17 +135,17 @@ fn directory_tools(lang: Lang, all: &[Gateway]) -> impl IntoView + use<> {
             <div class="dir-chips" role="group" aria-label=words::gw_show(lang)>
                 {chip("", words::gw_show_every(lang), all.len(), false)}
                 {chip("online", words::gw_show_online(lang), online, true)}
-                {chip("official", words::gw_show_official(lang), official, false)}
                 {chip("tables", words::gw_show_tables(lang), tables, false)}
             </div>
         </div>
     }
 }
 
-/// Every gateway Central lists, the official one first: the directory in
+/// Every gateway Central lists, in the server's order: the directory in
 /// numbers, then the cards. Finding one by name or address, narrowing to
-/// those online, official or with open tables, sorting and the list view
-/// are `directory.js`'s (without it every card shows, in this order).
+/// those online or with open tables, sorting and the list view are
+/// `directory.js`'s (without it every card shows, in this order). No
+/// gateway is marked or offered as official (owner, 12.11.2026).
 fn directory(lang: Lang, all: Option<&[Gateway]>) -> impl IntoView + use<> {
     let Some(all) = all else {
         return view! { <p class="notice dir-failure glass">{words::gws_failed(lang)}</p> }

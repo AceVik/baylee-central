@@ -173,6 +173,15 @@ at one account from one address; `docs/native-login.md` §"Guessing a
 password online"), and every local run comes from one address: a Central
 started afresh has counted none.
 
+`site-email.spec.ts` needs Central's `mail` block pointed at the stand-in
+mailer `mailer.ts` (`node e2e-real/mailer.ts --token-file <file> [--port
+47925] [--keep <dir>]`, loopback only), whose token file holds the block's
+token. It takes a mail as the real `baylee-mailer` does, the `inline` field
+of `"logo": true` included, keeps it in memory for `GET /mails?to=` and,
+with `--keep`, writes each as `.txt` and `.html` (mode 0600) to look at.
+The spec accepts a mail with no image, or, where the request names
+`inline: ["baylee-logo"]`, exactly that one image by `cid:`.
+
 ## Tearing down
 
 Stop `front.ts` and Central (SIGTERM; their ports must refuse), remove the

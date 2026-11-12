@@ -45,10 +45,12 @@ first. Every piece goes through the three passes of
    master key under it (below), and seals the initial account document (below)
    as object 1. `EnrollmentFinish { ticket, record, wrapped_master, document,
    recovery }` → `Done`. The commit is atomic and consumes the key's use.
-4. The page shows the recovery code once (copy, download as a text file, and a
-   confirmation that it was kept) and signs in (below) to accept Central's
-   terms; the sign-in's `AccountSummary` gives it the tag, and the code's step
-   then shows the whole handle, `Name#3fa2`.
+4. The page shows the recovery code once (the ways to keep it below, §"Keeping
+   the recovery code", and a confirmation that it was kept) and signs in
+   (below) to accept Central's terms; the sign-in's `AccountSummary` gives it
+   the tag, and the code's step then shows the whole handle, `Name#3fa2`.
+   Where Central mails, the step also takes an e-mail address for the
+   account; it is named after the code is kept and the terms are accepted.
 
 **Sign-in** (website): `Discover` → `LoginStart` → `LoginFinish`, as native.
 On the browser surface `LoginFinish` answers `BrowserSession { identity,
@@ -92,6 +94,57 @@ same 73-byte XChaCha20-Poly1305 format as `wrapped_master` with the AAD domain
 bits. `central-crypto` gains `RecoveryCode` (generate, parse, wrap, unwrap) with
 known-answer tests. Central stores the 73 bytes as `recovery_wrapped_master`;
 reset, which uses it, comes with M1.
+
+### Keeping the recovery code
+
+*12.11.2026, by the owner's decision after the trade-off was explained
+("Wie empfohlen + Mail an mich"). The record of its three passes is in
+[security assurance](security-assurance.md), "Ways to keep a recovery
+code".* `crates/central-web/src/islands/keep.rs`, used by the code's step
+of a registration and of a sign-in that makes a code for a moved account
+(`auth.rs`, `code_view`), and since the same day by the reset page's step
+that shows a new vault's code (`reset.rs`, `code_view`; it knows no
+address, so its mail leaves the recipient to the mail program). Each way is made in the page when its button is
+pressed and not before; none of them sends anything to Central, logs the
+code, keeps it in the page's storage or puts it into the page's address.
+
+- **Copy** to the clipboard (`clip.rs`), as before.
+- **Save as a text file**, `baylee-recovery-code.txt`: the title, the
+  sign-in name, the code on a line of its own, and two lines on what it
+  does and how to keep it. A `data:` link is made for the click and taken
+  away again; until then no attribute of the page holds the code.
+- **Print**: the button draws a sheet with the same words into the step
+  and asks the browser to print. While the sheet is in the page, a print
+  shows it alone, also from the registration's dialog (`pages.css`); on a
+  screen it is never shown.
+- **Save in password manager**, only where the browser has
+  `PasswordCredential` (Chrome, Edge and the other Chromium browsers): the
+  code is offered as a password under the id "Baylee recovery code
+  (<sign-in name>)". The browser asks the person; the page learns only
+  whether the browser took the offer, not whether it was saved. Firefox
+  and Safari have no `PasswordCredential` and no other way for a page to
+  offer a password: there the button is not shown.
+- **Mail it to myself** opens the person's own mail program with the code
+  in the body (`mailto:`): to the address typed into the step's e-mail
+  field where it is one Central would mail to, else to nobody yet. The
+  subject and body are made in the page on the click; Central never sees
+  them. A warning stands before the button and describes it: the code
+  then lies in the mailbox, and whoever reads the mailbox can have a reset
+  code sent there too, and with both reset the sign-in and open the data.
+
+The e-mail field (a registration only, and only where `EmailRequest::Status`
+says this Central mails and the account has no address): an address typed
+there is checked by Central's rule when the person goes on, and named once
+the code is kept and Central's terms are accepted, which naming one needs
+([e-mail](email.md)). The step after it is the account area's e-mail
+section (`email.rs`, `Begin::Name`) as a step of its own: it sends `Set`
+without asking for the password, since the registration's sign-in is less
+than five minutes old, and shows the code's field; the person confirms the
+code there or later on the security page. Where Central refuses `Set`
+(most likely because the sign-in became older than five minutes; the
+mailer refusing the address is answered the same), the section's form asks
+for the password and signs in once more, as in the account area. Leaving
+the field empty skips all of it.
 
 ### A recovery code after a sign-in
 

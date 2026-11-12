@@ -21,8 +21,6 @@ pub const WHATSAPP: &str = "M12 2a10 10 0 0 0-8.6 15l-1.3 4.8 4.9-1.3A10 10 0 1 
 pub const SUN: &str = "M12 7.5a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9zM11 1h2v4h-2zm0 18h2v4h-2zM1 11h4v2H1zm18 0h4v2h-4zM4.2 5.6l1.4-1.4 2.9 2.9-1.4 1.4zm11.3 1.5 2.9-2.9 1.4 1.4-2.9 2.9zM4.2 18.4l2.9-2.9 1.4 1.4-2.9 2.9zm11.3-1.5 1.4-1.4 2.9 2.9-1.4 1.4z";
 /// The moon: dark colours.
 pub const MOON: &str = "M12 3a9 9 0 1 0 9 9 7 7 0 0 1-9-9z";
-/// A half-filled circle: the device's colours.
-pub const HALF: &str = "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 2v16a8 8 0 0 1 0-16z";
 
 /// An eye, struck through: what stays hidden.
 pub const EYE_OFF: &str = "M12 5c-5 0-9 4.5-10 7 .5 1.3 1.7 3 3.4 4.4L3.3 18.5l1.4 1.4 16-16-1.4-1.4-2.6 2.6A10.6 10.6 0 0 0 12 5zm-3.9 9.3A4 4 0 0 1 13.3 8.1L8.1 13.3zM12 19c5 0 9-4.5 10-7-.4-1-1.2-2.3-2.4-3.5l-3.7 3.7A4 4 0 0 1 12.2 16l-2.7 2.7c.8.2 1.6.3 2.5.3z";
@@ -60,10 +58,6 @@ pub const SHIELD: &str =
 
 /// Two sheets: copy.
 pub const COPY: &str = "M16 1H4a2 2 0 0 0-2 2v14h2V3h12zm3 4H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2zm0 16H8V7h11z";
-
-/// A five-pointed star.
-pub const STAR: &str =
-    "M12 2.3l2.95 6.2 6.75.9-4.95 4.7 1.25 6.75L12 17.55 5.99 20.85l1.26-6.75L2.3 9.4l6.75-.9z";
 
 /// A glyph, `class="icon"`, hidden from assistive technology.
 pub fn icon(path: &'static str) -> impl IntoView + use<> {

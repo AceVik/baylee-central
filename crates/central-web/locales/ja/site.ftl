@@ -18,7 +18,6 @@ nav-sign-in = ログイン
 nav-account = アカウント
 lang-label = 言語
 theme-label = 配色
-theme-system = 配色：端末に合わせる
 theme-light = 配色：ライト
 theme-dark = 配色：ダーク
 
@@ -66,7 +65,7 @@ hero-offline = 一人用の対戦とデッキビルダーは、アカウント�
 hero-account = オンラインで遊びますか？ オープンベータ中は誰でも無料で作れます。<register>アカウントを作成</register>するか、<signin>ログイン</signin>してください。
 hero-memorial = Baylee を偲んで：写真アルバムを開く
 
-status-label = プロジェクトの状況
+status-label = 数字で見る Baylee
 
 cards-eyebrow = カード
 cards-title = Baylee が知っているカードの数
@@ -109,7 +108,7 @@ open-central = GitHub の Baylee Central
 
 ## Download
 
-dl-prerelease = Beta
+dl-prerelease = ベータ
 dl-for = { $system } 版をダウンロード
 dl-size = { $size } MB
 dl-checksum = SHA-256
@@ -156,7 +155,6 @@ install-cpu = <b>プロセッサー：</b>x86-64 向けビルドには AVX2 が�
 ## Gateways
 
 gws-title = Gateway
-gws-official = 公式
 gws-online = オンライン
 gws-offline = オフライン
 gws-version = バージョン
@@ -258,6 +256,7 @@ privacy-views-title = ページビューの集計
 privacy-views = このサイトは、ページが開かれた回数を数えています。すべてのページとすべての訪問者をまとめた1つの数だけで、トップページに表示されます。ブラウザでページが開かれると、この数が1増えます。このために、あなたに関することは何も保存しません。IPアドレスも、クッキーも、識別子も、どのページだったかさえ保存しません。
 privacy-device-title = ブラウザーが保持するもの
 privacy-device = ログインするまで、このサイトはクッキーを設定しません。ブラウザーがお使いの端末に保持するものは次のとおりで、JavaScript を使う場合に限ります。配色を選んだ場合はその選択（<code>baylee-site-theme</code>）。ログイン中は、セッションの終了時刻（<code>baylee-central-session</code>）、チャットの鍵、連絡先の信頼済みの鍵（チャットの項を参照）。通知をオンにした場合は、この端末の乱数（<code>baylee-push-installation-v1</code>、<code>baylee-push</code>）。そして、ログインした、サイトをアプリとしてインストールした、通知をオンにした、のいずれかの場合に限り、サイトの公開ファイル（ページの枠、フォント、スクリプト）の控え。これにより、接続がなくても起動でき、通知を受け取れます。この三つのいずれにも当てはまらなくなった場合、控えは次にサイトを開いたときに削除されます。以下の項に記載がない限り、これらが私たちに送られることはありません。チャットとセッションの項目はログアウト時に削除されます。それ以外は、ブラウザーでサイトのデータを消去すれば削除できます。法的根拠：TDDDG第25条第2項第2号（利用する機能に厳密に必要なもの）。通知の乱数については、同意（TDDDG第25条第1項）。
+privacy-device-manager = 回復コードをブラウザーのパスワードマネージャーに保存したり、自分宛てにメールで送ったり、ファイルとして保存したり、表示される手順で印刷したりした場合、コードを保持するのは、ブラウザー、メールソフト、ファイル、紙であり、このサイトではありません。コードはお使いのブラウザー内で作られ、私たちには送られません。サイトのデータを消去しても、それらの場所からは消えません。
 privacy-github-title = GitHub
 privacy-github = ダウンロードページとトップページには、最新のリリース、テストの状況、カードの数が表示されます。これらはブラウザーではなく私たちのサーバーが GitHub に問い合わせて取得するため、GitHub があなたについて知ることはありません。ダウンロードや GitHub へのリンクを押したときに限り、ブラウザーが GitHub（GitHub, Inc.、米国）に接続し、IPアドレスとすべてのリクエストに付くものを送ります。その後は GitHub 自身のプライバシー通知が適用されます。
 privacy-directory-title = Gateway 一覧
@@ -265,7 +264,7 @@ privacy-directory = 私たちのサーバーは Baylee Central から Gateway �
 privacy-account-title = アカウント
 privacy-account = アカウントについて、Baylee Central は次を保存します。アカウントID、ログイン名、タグ付きの表示名、アカウントがいつどのように作られたか、OPAQUE のパスワード記録（私たちのサーバーがパスワードを知ることなく、パスワードを証明できる仕組み）、パスワードと回復コードで二重に暗号化されたマスターキー、暗号化されたアカウント文書と暗号化されたオブジェクト（私たちには読めず、サイズ、リビジョン、時刻だけが見えます）、同意した利用規約のバージョンと時期、最後にログインした時刻、セッション、管理者の役割（ある場合）、登録した Gateway とそのトークン。ほかのプレイヤーに見えるのは表示名とタグで、ログイン名は見えません。管理者がリセットコードを渡した場合、私たちが保存するのは、コードが使われるか期限が切れるまで、そのダイジェストだけです。管理者がアカウントや Gateway に対して行った操作は、3年間、記録（誰が、何を、どのアカウントまたは Gateway に、いつ）として保管されます。法的根拠：GDPR第6条第1項(b)（ご希望のアカウント）。最後のログイン時刻と記録については、GDPR第6条第1項(f)（安全で追跡可能な運用という私たちの正当な利益）。ログイン名とパスワードがなければアカウントはありません。メールアドレスは不要です。アカウントを作成できるのは16歳からです。アカウントを削除するまで保管します。削除すると、稼働中のシステムからは直ちに、バックアップからは遅くとも12か月以内に削除されます。セッションは、使われないまま30分で、遅くともログインから12時間で終了します。
 privacy-email-title = メールアドレス
-privacy-email = メールアドレスは任意です。アカウントには必要ありません。メールアドレスを登録した場合、Baylee Central は、そのアドレス、メールを書く言語、確認した日時を保存します。指定されたアドレスのうち、コードの入力を待っているものは、確認または取り下げるまで、ただし遅くともコードの期限が切れてから1日後まで保管されます。送信した各コードについては、コードが使われるか期限が切れるまでダイジェストだけを保存し、24時間は、リセットコードが送信された時刻を保存します。1日に送るリセットコードを3通以内にするためです。アドレスは3つの目的に使います。アドレスを確認するコードの送信、あなたまたはあなたのログイン名を知っている誰かが求めたときのリセットコードの送信、古いアドレスへの置き換えまたは削除の通知です。メールは、同じサーバー上の Baylee 独自のメールサービスから、mailbox.org（Heinlein Hosting GmbH、Berlin）経由で送られます。mailbox.org は処理者として、アドレスとメールを受け取ります。法的根拠：GDPR第6条第1項(b)（ご希望のアカウント）。アドレスを削除するかアカウントを削除するまで保管します。
+privacy-email = メールアドレスは任意です。アカウントには必要ありません。メールアドレスを登録した場合、Baylee Central は、そのアドレス、メールを書く言語、確認した日時を保存します。指定されたアドレスのうち、コードの入力を待っているものは、確認または取り下げるまで、ただし遅くともコードの期限が切れてから1日後まで保管されます。送信した各コードについては、コードが使われるか期限が切れるまでダイジェストだけを保存し、24時間は、リセットコードが送信された時刻を保存します。1日に送るリセットコードを3通以内にするためです。アドレスは4つの目的に使います。アドレスを確認するコードの送信、あなたまたはあなたのログイン名を知っている誰かが求めたときのリセットコードの送信、古いアドレスへの置き換えまたは削除の通知、リセットコードで新しいパスワードが設定されたとき、パスワードが変更されたとき、または管理者がアカウントのリセットコードを作ったときの、確認済みのアドレスへの通知です。メールは、同じサーバー上の Baylee 独自のメールサービスから、mailbox.org（Heinlein Hosting GmbH、Berlin）経由で送られます。mailbox.org は処理者として、アドレスとメールを受け取ります。法的根拠：GDPR第6条第1項(b)（ご希望のアカウント）。アドレスを削除するかアカウントを削除するまで保管します。
 privacy-cookie-title = セッションのクッキー
 privacy-cookie = ログインすると、クッキーを一つ設定します。<code>__Host-central</code> で、セッションを識別する乱数です。baylee.app にだけ送られ、スクリプトからは読めず、セッションとともに、遅くとも12時間後に終了します。ログイン状態を保つために厳密に必要なものであり、同意は要りません。法的根拠：TDDDG第25条第2項第2号およびGDPR第6条第1項(b)。
 privacy-chat-title = チャットと連絡先
@@ -497,6 +496,23 @@ code-later = 今はしない
 code-copy = コピー
 code-copied = コピーしました。
 code-copy-failed = ここではコピーできませんでした。コードを選択して、手でコピーしてください。
+code-print = 印刷
+code-manager = パスワードマネージャーに保存
+code-manager-id = Baylee 回復コード（{ $name }）
+code-manager-offered = ブラウザーにコードを渡しました。確認を求められた場合は、保存されたかどうか確かめてください。
+code-manager-failed = ブラウザーはコードを受け取りませんでした。ほかの方法で保管してください。
+code-mail = 自分宛てにメールで送る
+code-mail-warning = ご注意：コードがメールボックスに残ります。そのメールを読める人は、そこにリセットコードも送らせることができ、両方があればログインをリセットして、暗号化されたデータを開けます。
+code-mail-subject = Baylee 回復コード
+code-sheet-title = Baylee 回復コード
+code-sheet-name = ログイン名：{ $name }
+code-sheet-what = このコードがあれば、パスワードを忘れても、暗号化された Baylee のデータが残ります。リセットページで、リセットコードと一緒に入力します。
+code-sheet-keep = あなただけが手に取れる場所に保管してください。Baylee の誰もこのコードを尋ねることはありません。
+code-email-label = メールアドレス（任意）
+code-email-hint = パスワードを忘れたときのリセットコード用です。この手順のあと、アドレスを確認するコードをメールでお送りします。アドレスはあとからアカウントで追加することもできます。
+code-email-step-title = メールアドレスの確認
+code-email-step-lead = メールに届いたコードをここに入力するか、あとでアカウントのセキュリティページで入力してください。
+code-email-step-done = アカウントへ進む
 
 ## Setting a new password with a reset code
 
@@ -587,6 +603,7 @@ email-removed = メールアドレスを削除しました。
 email-busy = 現在メールが多すぎます。しばらくしてからもう一度お試しください。
 email-same = すでにこのアドレスです。
 email-unsure = 応答がなかったため、処理が完了したかどうか分かりません。ここに表示されている内容を確認し、完了していなければもう一度お試しください。
+email-again = コードを送るには、もう一度パスワードを入力してください。
 
 ## Central's terms
 
@@ -859,18 +876,14 @@ foot-project = プロジェクト
 foot-source = ソースコード (AGPL-3.0)
 foot-central = Baylee Central（ソース公開）
 foot-summary = Rust と Bevy で作られた、無料でオープンソースのテーブルトップ・カードゲーム。決定論的なルールエンジン、完全なオフラインモード、ハウスAI、LLMブリッジ、コミュニティ Gateway を備えています。
-strip-build = ビルド
 strip-ci = CI
 strip-commit = コミット
 strip-gateways = Gateway
 strip-online = オンライン
 strip-offline = オフライン
-strip-releases = リリースを見る
-strip-on-github = GitHub で見る
 strip-directory = 一覧
 strip-cards = プレイ可能なカード
 strip-cards-unit = 枚
-strip-stars = GitHub のスター
 strip-accounts = Baylee Central のアカウント
 strip-live = Gateway が報告する、今の数
 strip-views = { $date } からのページビュー
@@ -990,7 +1003,7 @@ ai-training = ハウスAIと外部の LLM ブリッジのほかに、決定論�
 ai-hostingLink = Gateway のホスティングと LLM の設定
 
 # The gateways and the contact page, as the old site wrote them (owner, 11.11.2026)
-gw-lead = Gateway は、オンラインのテーブルがあるサーバーです。アカウント、デッキ、ルーム、そしてゲームごとに一つのエンジンプロセスがあります。ここに載っているのは、Baylee Central に登録され、その管理者が承認したものです。公式と記されたものは Baylee が運営し、そのほかは他の人が自分たちのグループのために運営しており、そこでは各自のルールが適用されます。一覧に載っていることは、その Gateway が何をするかの約束ではありません。
+gw-lead = Gateway は、オンラインのテーブルがあるサーバーです。アカウント、デッキ、ルーム、ゲームごとに1つのエンジンプロセスがあります。ここに載っているのは、Baylee Central に登録され、その管理者が承認したものです。それぞれ運営者が自分たちのグループのために運営しており、そこでは運営者自身のルールが適用されます。一覧に載っていることは、Gateway の動作についての約束ではありません。
 gw-howTo = Gateway で遊ぶには、そのアドレスをクライアントの入口にコピーします。オンラインとは、Central が直近1分半以内にその Gateway から連絡を受けたという意味で、応答する約束ではありません。名前とバージョンは、各運営者が報告したものです。
 gw-find = Gateway を探す
 gw-findHint = 名前またはアドレス
@@ -1007,7 +1020,6 @@ gw-stat-games = 進行中のゲーム
 gw-show = 表示
 gw-show-every = すべて
 gw-show-online = オンライン
-gw-show-official = 公式
 gw-show-tables = 開いているテーブルあり
 gw-sort = 並べ替え
 gw-sort-best = おすすめ
@@ -1199,55 +1211,54 @@ sec-teaser-more = 各手順を図で見る
 register-solving = ブラウザーがロボットを寄せつけないパズルを解いています。多くのアカウントが作成されているときは、数分かかることがあります … { $percent } %
 
 ## An administrator makes a reset code (/account/admin)
-# English for now: to be translated.
-admin-reset-title = Reset a login
-admin-reset-lead = Find the account of the person who asked you, and make a reset code for it. With the code they set a new password on the reset page.
-admin-find = Find the account
-admin-only = This page is only for administrators.
-admin-search = Search accounts
-admin-search-hint = Part of a sign-in name or a display name, or # and a tag. Leave it empty to list every account, newest first.
-admin-search-submit = Search
-admin-search-error = A search is 1 to 64 plain characters without accents, or # and a tag such as #1a2b.
-admin-count = Accounts shown: { $count }
-admin-none = No account matches this search.
-admin-more = Show more
-admin-open = Open
-admin-back = Back
-admin-pill = Administrator
-admin-state = State
-admin-state-pending = Reserved, never set up
-admin-state-enrolled = Set up
-admin-state-restored = In use
-admin-created = Created
-admin-last-sign-in = Last sign-in
-admin-recovery = Recovery code
-admin-yes = Yes
-admin-no = No
-admin-reset-outstanding = An unused reset code is valid until { $time }. Whether an administrator made it or it went by e-mail, Central does not say. A new code replaces it.
-admin-reset = Reset login
-admin-refused-admin = This account holds the administrator role, and Central makes no reset code for an administrator's account. Remove the role first.
-admin-refused-own = This is your own account, and nobody makes a reset code for their own. Change your password under Security instead.
-admin-refused-pending = This account was reserved and never set up, so it has no sign-in to reset.
-admin-refused-moving = This account's move from the official gateway is not finished. Until it is, its sign-in is reset there, not here.
-admin-refused-stale = Baylee Central counts your sign-in as older than 30 minutes. Try again; you enter your password once more.
-admin-refused-role = Your account no longer holds the administrator role.
-admin-refused-gone = This account no longer exists.
-admin-switched = This browser is signed in as another account now, so no code was asked for. Load the page again.
-admin-lost = No answer came back, so we cannot tell whether a code was made. If one was, nobody can show it again, and it already replaced any earlier code. Make a new one: it replaces that one in turn.
-admin-warning-title = Before you make a code
-admin-warning-who = Check outside this site that the person asking really holds this account, for example by a call or on a channel you already know them by. Whoever has the code can set a new password.
-admin-warning-ends = Making a code ends nothing: the old password keeps working until the code is used, and every device stays signed in.
-admin-warning-data = The person's encrypted data survives the reset only with their recovery code or on a device that is still signed in. Without either, they start with an empty vault.
-admin-warning-replaces = A new code replaces any earlier one, one sent by e-mail included. It is valid for 24 hours and works once.
-admin-warning-takeover = A reset code answers a forgotten password, not a taken-over account: an intruder's sessions and the old password stay until the code is used, and for good if it never is.
-admin-warning-continue = I have checked who is asking
-admin-password-hint = Making a code needs a sign-in less than 30 minutes old, so you enter your password once more. It stays in this browser.
-admin-password-missing = Enter your password.
-admin-make = Make the reset code
-admin-code-title = The reset code
-admin-code-until = Valid until { $time }, and only once.
-admin-code-lead = Hand it to the person who asked, on a channel you trust. It is shown only now: neither Baylee Central nor this page can show it again. If it gets lost, make a new one.
-admin-code-done = Done
+admin-reset-title = ログインのリセット
+admin-reset-lead = 依頼した人のアカウントを探し、そのリセットコードを作ります。そのコードで、本人がリセットページで新しいパスワードを設定します。
+admin-find = アカウントを探す
+admin-only = このページは管理者専用です。
+admin-search = アカウントを検索
+admin-search-hint = ログイン名または表示名の一部、または # とタグを入力します。空のままにすると、新しい順にすべてのアカウントを表示します。
+admin-search-submit = 検索
+admin-search-error = 検索語は、アクセント記号のない通常の文字1～64文字、または # と #1a2b のようなタグです。
+admin-count = 表示中のアカウント：{ $count }
+admin-none = この検索に一致するアカウントはありません。
+admin-more = さらに表示
+admin-open = 開く
+admin-back = 戻る
+admin-pill = 管理者
+admin-state = 状態
+admin-state-pending = 予約済み・未設定
+admin-state-enrolled = 設定済み
+admin-state-restored = 使用中
+admin-created = 作成日時
+admin-last-sign-in = 最後のログイン
+admin-recovery = 回復コード
+admin-yes = はい
+admin-no = いいえ
+admin-reset-outstanding = 未使用のリセットコードが{ $time }まで有効です。管理者が作ったものか、メールで送られたものかは、Central には分かりません。新しいコードを作ると、置き換わります。
+admin-reset = ログインをリセット
+admin-refused-admin = このアカウントは管理者のロールを持っており、Central は管理者のアカウントのリセットコードを作りません。先にロールを外してください。
+admin-refused-own = これはご自分のアカウントです。自分のリセットコードは、誰も作れません。代わりに、セキュリティでパスワードを変更してください。
+admin-refused-pending = このアカウントは予約されただけで設定されていないため、リセットするログインがありません。
+admin-refused-moving = このアカウントの公式 Gateway からの移動は終わっていません。終わるまでは、ログインのリセットはここではなく、そちらで行います。
+admin-refused-stale = Baylee Central は、あなたのログインが30分より前のものと見なしています。もう一度お試しください。パスワードをもう一度入力します。
+admin-refused-role = あなたのアカウントは、もう管理者のロールを持っていません。
+admin-refused-gone = このアカウントは、もう存在しません。
+admin-switched = このブラウザーは、いま別のアカウントでログインしているため、コードは求められませんでした。ページを読み込み直してください。
+admin-lost = 応答がなかったため、コードが作られたかどうか分かりません。作られていた場合、それをもう一度表示できる人はおらず、以前のコードはすでに置き換わっています。新しいコードを作ってください。それが、そのコードを置き換えます。
+admin-warning-title = コードを作る前に
+admin-warning-who = 依頼した人が本当にこのアカウントの持ち主であることを、このサイトの外で確認してください。たとえば、電話や、すでにその人と知り合っている連絡手段を使います。コードを持つ人は、新しいパスワードを設定できます。
+admin-warning-ends = コードを作っても、何も終わりません。コードが使われるまで古いパスワードは使え続け、すべての端末はログインしたままです。
+admin-warning-data = 本人の暗号化されたデータがリセット後も残るのは、回復コードがあるか、まだログインしている端末がある場合だけです。どちらもなければ、空の保管庫から始まります。
+admin-warning-replaces = 新しいコードは、メールで送られたものを含め、以前のコードを置き換えます。有効期間は24時間で、1回だけ使えます。
+admin-warning-takeover = リセットコードは、パスワードを忘れた場合のためのもので、乗っ取られたアカウントへの対処ではありません。侵入者のセッションと古いパスワードは、コードが使われるまで残り、使われなければそのまま残り続けます。
+admin-warning-continue = 依頼した人を確認しました
+admin-password-hint = コードを作るには、30分以内のログインが必要なため、パスワードをもう一度入力します。パスワードはこのブラウザーの中にとどまります。
+admin-password-missing = パスワードを入力してください。
+admin-make = リセットコードを作る
+admin-code-title = リセットコード
+admin-code-until = { $time }まで有効で、1回だけ使えます。
+admin-code-lead = 依頼した人に、信頼できる連絡手段で渡してください。表示されるのは今だけです。Baylee Central もこのページも、もう一度表示することはできません。なくした場合は、新しいコードを作ってください。
+admin-code-done = 完了
 
 ## Profile pictures (/account/profile, the chat, the administration, the privacy notice)
 # English for now: to be translated.

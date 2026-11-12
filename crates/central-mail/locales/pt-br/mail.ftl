@@ -38,23 +38,25 @@ notice-check = Se não foi você, entre e confira a página de segurança da sua
 notice-link = Abrir a página de segurança
 
 # The notices to the account's confirmed address that its login changed.
-# Not translated yet: English until a translation replaces these lines.
-reset-done-subject = The password of your Baylee account was reset
-reset-done-title = A new password was set
-reset-done-body = A reset code was used to set a new password for the Baylee account of this address.
-reset-done-kept = The account's data was kept.
-reset-done-new = The account starts with an empty vault. Its data from before cannot be opened any more.
-reset-done-sessions = The account is signed out everywhere: every session it had was ended.
-reset-done-not-you = If this was not you, someone else can sign in to your account now. Ask a Baylee administrator for a reset code and set your own password again.
-reset-done-recovery-kept = If the account has a recovery code, it still opens the data. Keep it: with it, a reset keeps the data.
-reset-done-recovery-new = A recovery code from before this reset opens nothing any more.
-password-subject = The password of your Baylee account was changed
-password-title = The password was changed
-password-body = The password of the Baylee account of this address was changed.
-password-sessions = Every other session of the account was signed out.
-password-not-you = If this was not you, someone else knows your password. Set a new one with a reset code: ask for one on the reset page, or ask a Baylee administrator.
-issued-subject = A reset code was made for your Baylee account
-issued-title = An administrator made a reset code
-issued-body = A Baylee administrator made a reset code for the Baylee account of this address. With it, a new password can be set for the account.
-issued-valid = The code works once, for { $hours } hours. Until it is used, your password works as it did.
-issued-not-you = If you did not ask for it, sign in and change your password on the security page: that ends the code. Then tell an administrator.
+reset-done-subject = A senha da sua conta do Baylee foi redefinida
+reset-done-title = Uma nova senha foi definida
+reset-done-body = Um código de redefinição foi usado para definir uma nova senha para a conta do Baylee deste endereço.
+reset-done-kept = Os dados da conta foram mantidos.
+reset-done-new = A conta recomeça com um cofre vazio. Os dados que ela tinha antes não podem mais ser abertos.
+reset-done-sessions = A conta foi desconectada em todos os lugares: todas as sessões dela foram encerradas.
+reset-done-not-you = Se não foi você, outra pessoa pode entrar na sua conta agora. Peça um código de redefinição a um administrador do Baylee e defina de novo a sua própria senha.
+reset-done-recovery-kept = Se a conta tem um código de recuperação, ele ainda abre os dados. Guarde-o: com ele, uma redefinição mantém os dados.
+reset-done-recovery-new = Um código de recuperação de antes desta redefinição não abre mais nada.
+password-subject = A senha da sua conta do Baylee foi alterada
+password-title = A senha foi alterada
+password-body = A senha da conta do Baylee deste endereço foi alterada.
+password-sessions = Todas as outras sessões da conta foram desconectadas.
+password-not-you = Se não foi você, outra pessoa sabe a sua senha. Defina uma nova com um código de redefinição: peça um na página de redefinição ou a um administrador do Baylee.
+issued-subject = Um código de redefinição foi gerado para a sua conta do Baylee
+issued-title = Um administrador gerou um código de redefinição
+issued-body = Um administrador do Baylee gerou um código de redefinição para a conta do Baylee deste endereço. Com ele, é possível definir uma nova senha para a conta.
+issued-valid = O código vale uma única vez, por { $hours } horas. Até ele ser usado, a sua senha continua valendo como antes.
+issued-not-you = Se você não pediu, entre e altere a sua senha na página de segurança: isso encerra o código. Depois avise um administrador.
+
+# The confirmation mail's button, which opens the security page with the code filled in.
+confirm-link = Confirmar endereço

@@ -651,7 +651,22 @@ mod tests {
             parse::<Service>(service(&mail).as_bytes()).unwrap()
         };
         let mut settings = with("http://127.0.0.1:28795", "https://baylee.app");
-        assert!(settings.mail.as_mut().unwrap().client(false).is_ok());
+        let client = settings.mail.as_mut().unwrap().client(false).unwrap();
+        assert!(!client.logo(), "no logo unless the block says so");
+        // The logo, once the mailer that attaches it is deployed.
+        let mail = format!(
+            r#","mail":{{"endpoint":"http://127.0.0.1:28795","site":"https://baylee.app","token":"{token}","logo":true}}"#
+        );
+        let mut settings = parse::<Service>(service(&mail).as_bytes()).unwrap();
+        assert!(
+            settings
+                .mail
+                .as_mut()
+                .unwrap()
+                .client(false)
+                .unwrap()
+                .logo()
+        );
         // Refused when the service starts: a mailer anywhere else, a site
         // that is no HTTPS origin.
         for (endpoint, site) in [
@@ -673,6 +688,7 @@ mod tests {
             r#","mail":"http://127.0.0.1:28795""#,
             r#","mail":{"endpoint":"http://127.0.0.1:28795","site":"https://baylee.app"}"#,
             r#","mail":{"endpoint":"http://127.0.0.1:28795","site":"https://baylee.app","token":"x","smtp":"mail.example.org"}"#,
+            r#","mail":{"endpoint":"http://127.0.0.1:28795","site":"https://baylee.app","token":"x","logo":"true"}"#,
         ] {
             assert!(
                 parse::<Service>(service(extra).as_bytes()).is_err(),

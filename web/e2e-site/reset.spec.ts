@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { expect, type Page, type Route, test } from "@playwright/test";
 
 import { axe, narrow, schemes, targets, watch } from "./check.ts";
@@ -314,16 +315,41 @@ test("a new vault: its recovery code is shown once, copied or saved, and kept be
   // the form's fields are gone, and with them what they held
   await expect(page.locator("#reset-steps input[type=password], #reset-steps input[type=text]")).toHaveCount(0);
 
-  await page.getByRole("button", { name: "Copy" }).click();
-  await expect(page.locator("#reset-steps [role=status]")).toHaveText("Copied.");
+  // the registration's ways to keep it (keep.rs), each made only when it is asked for
+  const steps = page.locator("#reset-steps");
+  const way = (name: string) => steps.getByRole("button", { name, exact: true });
+  for (const name of ["Copy", "Save as a text file", "Print", "Mail it to myself"]) await expect(way(name)).toBeVisible();
+  const before = await page.content();
+  expect(before.split(shown)).toHaveLength(2);
+  expect(before).not.toContain("data:text");
+  expect(before).not.toContain("mailto:");
+  await expect(page.locator("a[download], a[href^='mailto:'], .code-sheet")).toHaveCount(0);
+
+  await way("Copy").click();
+  await expect(steps.locator("[role=status]").filter({ hasText: "Copied." })).toHaveCount(1);
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(shown);
-  await expect(page.getByRole("link", { name: "Save as a text file" })).toHaveAttribute(
-    "href",
-    `data:text/plain;charset=utf-8,Baylee%20recovery%20code%3A%20${shown}%0A`,
-  );
+  // the file names the account the reset was for, and its link is gone again
+  const [download] = await Promise.all([page.waitForEvent("download"), way("Save as a text file").click()]);
+  expect(download.suggestedFilename()).toBe("baylee-recovery-code.txt");
+  const file = await readFile(await download.path(), "utf8");
+  expect(file.split("\n").slice(0, 4)).toEqual(["Baylee recovery code", "Sign-in name: erika", "", shown]);
+  await expect(page.locator("a[download]")).toHaveCount(0);
+  // the mail knows no address here: its mail program asks for one
+  const asked: string[] = [];
+  const protocol = await page.context().newCDPSession(page);
+  await protocol.send("Page.enable");
+  protocol.on("Page.frameRequestedNavigation", (event) => asked.push(event.url));
+  await way("Mail it to myself").click();
+  await expect.poll(() => asked.length).toBe(1);
+  const mailto = new URL(asked[0] ?? "");
+  expect(mailto.protocol).toBe("mailto:");
+  expect(mailto.pathname).toBe("");
+  expect(mailto.searchParams.get("body")).toBe(file.replaceAll("\n", "\r\n"));
+  expect(await page.content()).not.toContain("mailto:");
+  await expect(page).toHaveURL(/\/en\/reset$/);
   expect(await axe(page)).toEqual([]);
   expect(await targets(page)).toEqual([]);
-  // the code's one line and its two ways to keep it hold on the narrowest phone
+  // the code's one line and its ways to keep it hold on the narrowest phone
   expect(await narrow(page)).toBe(0);
 
   // no way on before the person says the code is saved
@@ -334,6 +360,65 @@ test("a new vault: its recovery code is shown once, copied or saved, and kept be
   await page.getByLabel("I have saved my recovery code").check();
   await on.click();
   await expect(page).toHaveURL(/\/en\/signin$/);
+  expect(problems).toEqual([]);
+});
+
+// German has the longest words: the new vault's code step, with the
+// registration's ways to keep the code (keep.rs), at 320 px in both
+// schemes, and its print is the sheet alone.
+test("a new vault's code step holds in German at 320 px in both schemes, and its print is the sheet alone", async ({ page }) => {
+  const problems = errors(page);
+  const seen: Body[] = [];
+  await page.route("**/api/v1", central(seen));
+  // the print dialog, counted instead of shown
+  await page.addInitScript(() => {
+    let printed = 0;
+    Object.defineProperty(window, "print", { configurable: true, value: () => (printed += 1) });
+    Object.defineProperty(window, "printed", { get: () => printed });
+  });
+  await page.setViewportSize({ width: 320, height: 760 });
+  await open(page, "de");
+  await page.locator("#reset-name").fill("Erika");
+  await page.locator("#reset-code").fill(CODE);
+  await page.locator("#reset-new").check();
+  await page.locator("#reset-confirm").check();
+  await page.locator("#reset-password").fill(PASSWORD);
+  await page.locator("#reset-repeat").fill(PASSWORD);
+  await form(page).locator("button[type=submit]").click();
+  await expect(page.locator("#reset-done-title")).toBeFocused({ timeout: 60_000 });
+  const shown = (await form(page).locator(".secret code").textContent()) ?? "";
+  expect(shown).toMatch(/^([0-9A-HJKMNP-TV-Z]{4}-){7}[0-9A-HJKMNP-TV-Z]{4}$/);
+  for (const name of ["Als Textdatei speichern", "Drucken", "Im Passwortmanager speichern"]) {
+    await expect(form(page).getByRole("button", { name, exact: true })).toBeVisible();
+  }
+  // nothing of the step reaches past its card, and the page needs no sideways scrolling
+  const card = form(page).locator("section.card");
+  expect(
+    await card.evaluate((el) => {
+      const edge = el.getBoundingClientRect().right + 0.5;
+      const beyond = [...el.querySelectorAll("*")]
+        .filter((node) => {
+          const box = node.getBoundingClientRect();
+          return box.width > 0 && box.right > edge;
+        })
+        .map((node) => `${node.tagName.toLowerCase()}.${node.className}#${node.id}:${Math.round(node.getBoundingClientRect().right - edge)}`);
+      return { beyond, scroll: el.scrollWidth - el.clientWidth };
+    }),
+  ).toEqual({ beyond: [], scroll: 0 });
+  expect(await narrow(page)).toBe(0);
+  expect(await targets(page)).toEqual([]);
+  expect(await schemes(page)).toEqual([]);
+
+  await form(page).getByRole("button", { name: "Drucken", exact: true }).click();
+  await expect.poll(() => page.evaluate(() => Reflect.get(window, "printed"))).toBe(1);
+  await page.emulateMedia({ media: "print" });
+  await expect(page.locator(".code-sheet")).toBeVisible();
+  const printed = (await page.evaluate(() => document.body.innerText.trim())).split("\n").filter((line) => line.trim() !== "");
+  expect(printed.slice(0, 4)).toEqual(["Baylee", "Baylee-Wiederherstellungscode", "Anmeldename: erika", shown]);
+  expect(printed).toHaveLength(6);
+  await page.emulateMedia({ media: "screen" });
+  await expect(page.locator(".code-sheet")).toBeHidden();
+  expect(JSON.stringify(seen)).not.toContain(shown);
   expect(problems).toEqual([]);
 });
 
@@ -578,5 +663,150 @@ test.describe("before the islands run", () => {
     await page.waitForTimeout(500);
     await expect(page).toHaveURL(/\/en\/reset$/);
     expect(posted).toEqual([]);
+  });
+});
+
+/**
+ * Every request but the page's own navigations, with the Referer it
+ * carries. A browser sends no fragment; Playwright reports a navigation's
+ * address with the fragment it was given, so the navigations are left out.
+ */
+function requests(page: Page): string[] {
+  const sent: string[] = [];
+  page.on("request", (request) => {
+    if (request.isNavigationRequest()) return;
+    sent.push(`${request.method()} ${request.url()} ${request.headers()["referer"] ?? ""} ${request.postData() ?? ""}`);
+  });
+  return sent;
+}
+
+// The reset mail's button links to `/{lang}/reset#code=RESET-…` (docs/email.md,
+// "The code in the button's link"): the island fills the field from the
+// fragment, removes it from the address bar at once and sends nothing until
+// the person sends the form.
+test.describe("the code from the mail's button", () => {
+  // the service worker would fetch the WebAssembly past the page's routes
+  test.use({ serviceWorkers: "block" });
+
+  test("fills the code's field, leaves the address bar and the history at once, and sends nothing until the form is sent", async ({ page, baseURL }) => {
+    const problems = watch(page, baseURL ?? "");
+    const seen: Body[] = [];
+    await page.route("**/api/v1", central(seen));
+    const sent = requests(page);
+    await page.goto("/en/");
+    const before = await page.evaluate(() => history.length);
+    await page.goto(`/en/reset#code=${CODE}`);
+    await expect(page.locator("html")).toHaveAttribute("data-islands", "ready");
+    await expect(form(page).getByLabel("Reset code")).toHaveValue(CODE);
+    // the address bar and the history's current entry hold no code, and
+    // the entry was replaced, not added
+    await expect(page).toHaveURL(/\/en\/reset$/);
+    expect(await page.evaluate(() => ({ hash: location.hash, href: location.href, length: history.length }))).toEqual({
+      hash: "",
+      href: `${baseURL}/en/reset`,
+      length: before + 1,
+    });
+    // nothing was asked of Central, and no request held the code
+    await page.waitForTimeout(500);
+    expect(seen).toEqual([]);
+    expect(sent.filter((line) => line.includes(CODE) || line.includes("code="))).toEqual([]);
+    // back and forth: the entry is the page without the code
+    await page.goBack();
+    await expect(page).toHaveURL(/\/en\/$/);
+    await page.goForward();
+    await expect(page).toHaveURL(/\/en\/reset$/);
+    expect(await page.evaluate(() => location.hash)).toBe("");
+    await page.reload();
+    await expect(page.locator("html")).toHaveAttribute("data-islands", "ready");
+    await expect(form(page).getByLabel("Reset code")).toHaveValue("");
+
+    // the form sends the code only once the person sends it
+    await page.goto("/en/");
+    await page.goto(`/en/reset#code=${CODE}`);
+    await expect(page.locator("html")).toHaveAttribute("data-islands", "ready");
+    await expect(form(page).getByLabel("Reset code")).toHaveValue(CODE);
+    await form(page).getByLabel("Sign-in name").fill("Erika");
+    await page.getByRole("radio", { name: FRESH }).check();
+    await page.getByRole("checkbox", { name: "I understand that this data is lost for good." }).check();
+    await page.getByLabel("New password", { exact: true }).fill(PASSWORD);
+    await page.getByLabel("Repeat new password").fill(PASSWORD);
+    expect(seen).toEqual([]);
+    await submit(page).click();
+    await expect.poll(() => operations(seen), { timeout: 60_000 }).toContain("reset_start");
+    expect(seen[0]).toEqual({ operation: "discover", username: "erika" });
+    expect((seen[1] as { code: string }).code).toBe(CODE);
+    await expect(page.getByRole("heading", { name: "Your new password is set" })).toBeVisible({ timeout: 60_000 });
+    const shown = (await page.locator("#reset-steps .secret code").textContent()) ?? "";
+    expect(shown).not.toBe("");
+
+    // The link opened in the tab that shows the page already: a move within
+    // the page, which runs no island. The fragment goes; the page stays as
+    // it was, the new vault's recovery code still shown once.
+    const asked = seen.length;
+    await page.goto(`/en/reset#code=${CODE}`);
+    await expect(page).toHaveURL(/\/en\/reset$/);
+    expect(await page.evaluate(() => location.hash)).toBe("");
+    await expect(page.locator("#reset-steps .secret code")).toHaveText(shown);
+    await expect(page.getByRole("heading", { name: "Your new password is set" })).toBeVisible();
+    expect(seen.length).toBe(asked);
+    expect(problems).toEqual([]);
+  });
+
+  test("lower case and without hyphens, as a person might type it, it is filled in as printed", async ({ page }) => {
+    const seen: Body[] = [];
+    await page.route("**/api/v1", central(seen));
+    await page.goto(`/en/reset#code=${CODE.toLowerCase().replaceAll("-", "")}`);
+    await expect(page.locator("html")).toHaveAttribute("data-islands", "ready");
+    await expect(form(page).getByLabel("Reset code")).toHaveValue(CODE);
+    await expect(page).toHaveURL(/\/en\/reset$/);
+    expect(seen).toEqual([]);
+  });
+
+  for (const [what, hash] of [
+    ["a confirmation code", "#code=000G-40R4"],
+    ["a recovery code", `#code=${RECOVERY}`],
+    ["a code cut short", `#code=${CODE.slice(0, 30)}`],
+    ["an encoded character", `#code=${CODE.slice(0, 20)}%2D${CODE.slice(21)}`],
+    ["a second field", `#code=${CODE}&code=${CODE}`],
+    ["nothing", "#code="],
+  ] as const) {
+    test(`${what} in the fragment fills nothing, and the fragment goes all the same`, async ({ page, baseURL }) => {
+      const problems = watch(page, baseURL ?? "");
+      const seen: Body[] = [];
+      await page.route("**/api/v1", central(seen));
+      await page.goto(`/en/reset${hash}`);
+      await expect(page.locator("html")).toHaveAttribute("data-islands", "ready");
+      await expect(page).toHaveURL(/\/en\/reset$/);
+      expect(await page.evaluate(() => location.hash)).toBe("");
+      await expect(form(page).getByLabel("Reset code")).toHaveValue("");
+      await page.waitForTimeout(300);
+      expect(seen).toEqual([]);
+      expect(problems).toEqual([]);
+    });
+  }
+
+  test("another fragment, a place on the page, stays", async ({ page }) => {
+    await page.goto("/en/reset#reset-mail-title");
+    await expect(page.locator("html")).toHaveAttribute("data-islands", "ready");
+    await expect(page).toHaveURL(/\/en\/reset#reset-mail-title$/);
+    await expect(form(page).getByLabel("Reset code")).toHaveValue("");
+  });
+
+  test("a code typed before the islands ran stays, and the fragment goes", async ({ page }) => {
+    let release: (() => void) | undefined;
+    const typed = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await page.route("**/assets/islands.*.wasm", async (route) => {
+      await typed;
+      await route.continue();
+    });
+    await page.goto(`/en/reset#code=${CODE}`);
+    const other = "RESET-ZYXW-VTSR-QPNM-KJHG-FEDC-BA98-7654-3210";
+    await page.locator("#reset-code").fill(other);
+    release?.();
+    await expect(page.locator("html")).toHaveAttribute("data-islands", "ready");
+    await expect(form(page).getByLabel("Reset code")).toHaveValue(other);
+    await expect(page).toHaveURL(/\/en\/reset$/);
   });
 });

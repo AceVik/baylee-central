@@ -22,7 +22,10 @@ On 12.11.2026 the owner had e-mail built (an optional address, a reset
 code by mail) and decided that version 2026-11-11, not yet published,
 carries it: the terms' two sentences on e-mail and the privacy policy's
 e-mail lines changed (`updated: 2026-11-12`), the version stayed. Nobody
-outside local tests has accepted 2026-11-11 before the change.
+outside local tests has accepted 2026-11-11 before the change. The same
+day the privacy policy's e-mail line gained the notices to a confirmed
+address (a reset finished, the password changed, an administrator's
+reset code), which Central sends since then; the version stayed.
 
 | file | what |
 | --- | --- |

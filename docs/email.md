@@ -164,8 +164,9 @@ a request, so a mailer that does not answer is answered as `Busy`.
 `central_api::email::MailCode`: 40 bits of operating-system randomness,
 written `XXXX-XXXX` in Crockford's base32 and read back as the reset code
 is. Central stores SHA-256 over a label, the account's id and the code, so
-one account's digest says nothing of another's. The code is never in a
-link, a log or a Debug output.
+one account's digest says nothing of another's. The code is never in a log
+or a Debug output, and in a link only in the fragment of the mail's button
+([below](#the-code-in-the-buttons-link)).
 
 It is short because little depends on it and few guesses are taken. It
 authorizes one thing: making the address it was mailed to the account's
@@ -184,19 +185,159 @@ Crate `central-mail`. Each mail has a plain text part and an HTML part:
 - a notice to it that the password was changed;
 - a notice to it that an administrator made a reset code.
 
-The HTML is a table layout with inline styles in the site's light colours.
-It has no image, no script and nothing loaded from elsewhere. A code is
-printed and never part of a link; no notice carries one. The only links go
-to the site's reset page (the reset mail, and the notices of a reset and of
-a changed password) and to the account's security page (the notices of a
-replaced or removed address and of an administrator's code); the
-confirmation mail has none. Every value is escaped.
+The HTML is a table layout with inline styles. It has no image except,
+where the operator turned it on, Baylee's logo, which the mailer attaches
+to the mail itself (`cid:baylee-logo`, [below](#configuration)); no style
+sheet, no script and nothing loaded from elsewhere. The links go to the
+configured site and nowhere else: a button to the site's reset page (the
+reset mail, and the notices of a reset and of a changed password) or to the
+account's security page (the confirmation mail, and the notices of a
+replaced or removed address and of an administrator's code), and in every
+mail's footer the site's start page (`{site}/{lang}/`). A code is printed,
+and the two code mails' buttons carry it in their link's fragment, and only
+there: never in a path or a query, never in any other link; no notice
+carries one ([below](#the-code-in-the-buttons-link)). Every value is
+escaped.
 
-A code is set in a monospace font in a box of its own. The confirmation
-code (9 characters) at 30 px; the reset code (45 characters) at 15 px with
-no space added between its characters, about 406 px, so that it fits on one
-line of the 520 px card in the mail clients (Gmail and mailbox.org broke it
-in two at 17 px). On a narrow screen it breaks at its hyphens.
+### The code in the button's link
+
+*12.11.2026, by the owner's word: whoever comes to the page through the
+mail's button finds the code filled in, "a good, safe way".*
+
+- **Where.** The reset mail's button links to `{site}/{lang}/reset#code=`
+  and the reset code as printed (`RESET-…`); the confirmation mail's button
+  ("Confirm address") to `{site}/{lang}/account/security#code=` and the
+  confirmation code (`XXXX-XXXX`). The plain text has the same addresses
+  under the button's words. The code is in the fragment and nowhere else in
+  the address: a browser sends no fragment to the site, so it is in no
+  request, no server's or proxy's log, and in no `Referer` (the site sends
+  `Referrer-Policy: no-referrer` besides).
+- **The page.** The island reads `location.hash` once, when it starts
+  (`islands/fragment.rs`). It takes `#code=` and up to 64 letters, digits
+  and hyphens, and keeps them only if they parse as its own kind of code
+  (`ResetCode::parse` on the reset page, `MailCode::parse` on the security
+  page); it fills the field with the code as printed, unless the person
+  typed into it already. Whatever followed `#code=`, it removes the
+  fragment at once with `history.replaceState`, the rest of the address
+  and the entry's state kept: the address bar, the current entry of the
+  history and a reload no longer hold it. Another fragment (a place on the
+  page) stays. The link opened in a tab that shows the same page already
+  is, to the browser, a move within the page, which runs no island: on
+  such a `hashchange` to `#code=` the fragment is removed the same way and
+  fills nothing, and the page is left as it is (a reload would lose a step
+  shown once, such as a new vault's recovery code); the person types the
+  code. Until the island runs (after the page's largest paint), the
+  fragment stands in the address bar; without script it stays there.
+- **Never by itself.** The island sends nothing because of the fragment:
+  the person still presses the form's button. A link scanner that opens
+  the link (some mail providers open every link they deliver) spends no
+  code and learns nothing it did not read in the mail. Nothing logs or
+  stores the code; it lives in the field as a typed one does.
+- **The security page** has the code's field only while an address waits
+  for its code. The account area takes the fragment on every one of its
+  pages and keeps the code only on the security page, until the e-mail
+  section's first read of Central's state: where an address waits, the
+  code goes into its empty field; signed out, with no address that waits,
+  without mail, or when the state could not be read, it is dropped
+  silently. A later read never finds it.
+- **The old way stays.** The code is printed in the mail, and typing it is
+  as before.
+
+What remains, and why it is acceptable, is in the record in [security
+assurance](security-assurance.md), "The code in the mail button's
+fragment".
+
+### How a mail looks
+
+*Since 12.11.2026, by the owner's word ("Mache bitte die E-Mails
+schöner"). Both bodies say the same in the same order. The second round
+(12.11.2026), after the owner read the first in Gmail and mailbox.org:
+the plain text begins with its title and first sentence, the reset mail
+sets the account's name in bold, a finished reset lists its facts, and
+the footer links to the site.*
+
+- **The card.** A card of at most 560 px on the site's sunlit ground
+  (`#f2efe4`), with a thin edge and round corners; where the reader is
+  narrower, the card is too. Outlook, which knows no maximum width, gets a
+  560 px table in a conditional comment.
+- **The band.** The card's top is a band in the blue hour's colour
+  (`#0f1b2d`) with a gold edge (`#e3c07e`) under it. On it, the wordmark in
+  letters: the name's first letter on a gold tile, as the site's header has
+  its picture there (hidden from screen readers), and "Baylee" in the
+  site's serif (Literata where a device has it, else Georgia). With the
+  `logo` flag ([configuration](#configuration)) the logo stands in the
+  tile's place: the picture the mailer attaches (`src="cid:baylee-logo"`),
+  48 × 48 CSS px with `width` and `height` set, rounded, `alt=""` since
+  the name stands beside it, and the name as high as the picture. Picture
+  and name are two cells of one table row, both set to the middle
+  (`valign` and `vertical-align`): mailbox.org showed a bare picture in the
+  tile's place above the name, and no reader stacks two cells of a row.
+  Without the flag the band is exactly as before.
+- **The title** is the mail's one heading (`h1`), in the serif at 26 px,
+  with a short line in the accent (`#235b66`) under it. Then what happened,
+  in paragraphs of 16 px. The reset mail sets the account's sign-in name
+  in bold, in the title's colour, so the reader sees at once which account
+  it is (only in the HTML: the plain text and the list's preview say it
+  plainly).
+- **The facts.** Where a notice says several things that came of what
+  happened, they stand as a short list under its first paragraph: a line
+  each behind a small dot in the accent (a character, not a picture; a
+  table, as every reader draws one; the dots are not read aloud). The
+  notices of a finished reset do this with their three facts (the data
+  kept or a new vault, the sessions ended, what the recovery code does
+  now). The other mails say one or two things and keep their paragraphs.
+  No words changed.
+- **The code** in a monospace font in a box of its own: a light tint with a
+  dashed frame in the accent, its label above it in small capitals, and
+  under it how long it lasts and that nobody at Baylee asks for it. A click
+  selects the whole code where the reader allows it. The confirmation code
+  (9 characters) at 30 px; the reset code (45 characters) at 15 px with no
+  space added between its characters, about 406 px, so that it fits on one
+  line of the 470 px inside the box (Gmail and mailbox.org broke it in two
+  at 17 px on the old 520 px card). On a narrow screen it breaks at its
+  hyphens.
+- **The warning.** What to do if this was not you stands apart on the
+  site's warning tint with an edge in its colour: in the notices, where it
+  matters. The code mails end with the calmer "if this was not you, ignore
+  this mail" in a quieter hand.
+- **The button.** The link to the page that helps is a button made of a
+  table cell in the accent with the words in the light ink (7.4:1). The
+  cell carries the colour and Outlook's padding (`mso-padding-alt`), the
+  link a padding of its own for every other reader: 48 px high, the whole
+  of it a target. Every mail has one; the confirmation mail's
+  ("Confirm address") came with the code in the link's fragment.
+- **The footer** under a thin rule, at 13 px, and under it a quiet line:
+  the site's host name (`baylee.app`), underlined in the accent, which
+  links to the site's start page in the mail's language.
+- **Dark readers.** Without a style sheet there is no dark variant, so the
+  mail says it is light only (`color-scheme` and `supported-color-schemes`
+  metadata, and on the root element). Readers that darken mails anyway do
+  it in two ways: they invert everything, or they darken light grounds and
+  lighten dark text. Every text stands on a ground the mail sets (band,
+  card, box, warning, button), and the band and the button are dark under
+  light words, which such readers leave alone. A test measures every pair
+  of ink and ground at 4.5:1 or more as drawn and as inverted, and the
+  frames at 3:1.
+- **The list of mails** shows the first paragraph beside the subject: it
+  stands first in the body, hidden. It is never a code.
+
+The plain text is complete on its own: the title, an empty line, then the
+paragraphs with an empty line between them, the facts a line each after
+`- `, the code alone on a line under its label, the link's address alone on
+a line under its words, and the footer and the start page's address under
+the signature's mark (`-- `), which mail readers set apart. A list of mails
+that shows the text's beginning (mailbox.org does) shows the title and the
+first sentence; until the second round a line of `=` under the title stood
+there.
+
+To look at them: `BAYLEE_MAIL_SHOTS=<folder> cargo test -p central-mail --
+--ignored` writes every mail in English and German as HTML and text into
+the folder, with fresh random codes, for a browser, and each again with
+the logo (`…-logo.html`; a browser cannot resolve `cid:`, so to look at it
+the `src` is pointed at a local copy of the picture). They were looked at
+in Chromium at 360 and 640 px, as drawn and inverted, on 12.11.2026; the
+first round also by the owner in Gmail and mailbox.org, the second round
+and the logo not yet in a real mail program.
 
 The words are `id = text` lines in `crates/central-mail/locales/<lang>/mail.ftl`,
 one file for each of the site's eleven languages, read by a small parser of
@@ -204,10 +345,11 @@ the crate's own. English and German are written by hand; the other nine
 were translated by machine (12.11.2026, by the owner's instruction) and
 have not been read by a speaker. A test holds that every language has its
 own words, by id. The nineteen messages of the three notices that a login
-changed (`reset-done-*`, `password-*`, `issued-*`) are English in those
-nine until they are translated; the test allows exactly those ids to be
-English there, and German has its own for every id. A tag Central has no
-file for is written in English.
+changed (`reset-done-*`, `password-*`, `issued-*`) and the confirmation
+mail's button (`confirm-link`) are English in those nine until they are
+translated; the test allows exactly those twenty ids to be English there,
+and German has its own for every id. A tag Central has no file for is
+written in English.
 
 A code mail is in the language the request asked in. A notice is in the
 language the address was confirmed in.
@@ -269,7 +411,11 @@ if it has one and this Central has a mailer:
   and never again, so the key only keeps one request from becoming two
   mails on the way;
 - with `to`, `subject`, `text`, `html`, `limit_key`, and `ttl_secs` for a
-  mail with a code. A notice has no `ttl_secs` and waits its turn.
+  mail with a code. A notice has no `ttl_secs` and waits its turn;
+- with `"inline": ["baylee-logo"]` as well, and only, where the `logo` flag
+  is set ([below](#configuration)): the mailer attaches the picture its own
+  configuration names, as `Content-ID: <baylee-logo>`. A mailer from before
+  that field refuses it, as it refuses every field it does not know.
 
 What the mailer answers becomes one of four outcomes: `202` and `200` are
 sent, `429` and `503` are busy, `400` with `invalid_address` is a refused
@@ -289,18 +435,26 @@ An optional `mail` block in the service's document, live
 "mail": {
   "endpoint": "http://127.0.0.1:<the mailer's port>",
   "site": "https://baylee.app",
-  "token": "…"
+  "token": "…",
+  "logo": false
 }
 ```
 
 - `endpoint`: `http://`, a numeric loopback address and a port, nothing
   after it. There is no default.
-- `site`: the origin the mails' two links start with. A canonical HTTPS
+- `site`: the origin every link of the mails starts with. A canonical HTTPS
   origin on the live service, a numeric loopback HTTP origin in
   development.
 - `token`: Central's bearer token for the mailer, 32 to 256 characters of a
   bearer token's alphabet. It arrives with the other secrets on standard
   input, never in an argument or the environment, and is wiped after use.
+- `logo`: optional, `false` when absent. `true` says that the mailer
+  attaches Baylee's logo when asked: every mail then asks for it
+  (`inline`, above) and shows it in the band
+  ([how a mail looks](#how-a-mail-looks)). Set it only once a mailer with
+  the picture runs: an older one refuses the field, and with it every
+  mail. Deploy the mailer first, then the flag
+  ([operations](operations.md#mail)).
 
 A service whose block names anything else does not start.
 
@@ -451,7 +605,8 @@ mail. Both refuse a malformed address or tag before anything is sent.
 - **An administrator can mail an account's address** with each code they
   make. Each code is in the audit, and the mailer's limit for the account
   bounds the mails.
-- **Nine languages** say the notices of a changed login in English until
+- **Nine languages** say the notices of a changed login and the
+  confirmation mail's button in English until
   they are translated.
 
 ## What the clients need

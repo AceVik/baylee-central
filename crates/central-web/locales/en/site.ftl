@@ -18,7 +18,6 @@ nav-sign-in = Sign in
 nav-account = Your account
 lang-label = Language
 theme-label = Colour scheme
-theme-system = Colours: same as your device
 theme-light = Colours: light
 theme-dark = Colours: dark
 
@@ -66,7 +65,7 @@ hero-offline = Solo matches and the deck builder work offline, without an accoun
 hero-account = Playing online? <register>Create an account</register>, free and open to everyone in the open beta, or <signin>sign in</signin>.
 hero-memorial = Remember Baylee: open her photo album
 
-status-label = Project status
+status-label = Baylee in numbers
 
 cards-eyebrow = The cards
 cards-title = How many cards Baylee knows
@@ -156,7 +155,6 @@ install-cpu = <b>Processor:</b> x86-64 builds need AVX2; for older processors th
 ## Gateways
 
 gws-title = Gateways
-gws-official = Official
 gws-online = Online
 gws-offline = Offline
 gws-version = Version
@@ -258,6 +256,7 @@ privacy-views-title = Counting page views
 privacy-views = The website counts how often its pages are opened: one single number for all pages and all visitors together, shown on the start page. A page opened in a browser adds one to it. Nothing about you is stored for this: no IP address, no cookie, no identifier, not even which page it was.
 privacy-device-title = What your browser keeps
 privacy-device = This site sets no cookie until you sign in. What your browser keeps on your device, and only with JavaScript: your colour choice if you made one (<code>baylee-site-theme</code>); while you are signed in, when your session ends (<code>baylee-central-session</code>), your chat key and your contacts' trusted keys (see Chat); if you turned on notifications, a random number for this device (<code>baylee-push-installation-v1</code>, <code>baylee-push</code>); and, only once you have signed in, installed the site as an app or turned on notifications, a copy of the site's public files (page shell, fonts, scripts), so that it starts without a connection and notifications can arrive. If none of the three applies any more, the copy is removed the next time you open the site. None of this is sent to us unless a section below says so. The chat and session entries are deleted when you sign out; you remove everything else by clearing the site's data in your browser. Legal basis: § 25(2) no. 2 TDDDG (strictly necessary for the function you use); for the notifications' random number, your consent (§ 25(1) TDDDG).
+privacy-device-manager = If you keep your recovery code in your browser's password manager, mail it to yourself, save it as a file or print it on the step that shows it, your browser, your mail program, your files or your paper keep it, never this site: the code is made in your browser and never sent to us. Clearing the site's data does not remove it from there.
 privacy-github-title = GitHub
 privacy-github = The download page and the start page show the newest release, the test status and the card numbers. Our server asks GitHub for them, not your browser; GitHub learns nothing about you from that. Only when you click a download or GitHub link does your browser connect to GitHub (GitHub, Inc., USA) and send it your IP address and what every request carries; GitHub's own privacy notice then applies.
 privacy-directory-title = The gateway directory
@@ -265,7 +264,7 @@ privacy-directory = Our server reads the directory of gateways from Baylee Centr
 privacy-account-title = Your account
 privacy-account = For an account, Baylee Central stores: your account id, your sign-in name, your display name with its tag, when and how the account was created, an OPAQUE password record (which lets you prove your password without our server ever learning it), your master key twice encrypted (by your password and by your recovery code), your encrypted account document and your encrypted objects (unreadable to us; we see only size, revision and time), which version of the terms you accepted and when, the time of your last sign-in, your sessions, an administrator role if you have one, and the gateways you register with their tokens. Other players see your display name and tag, never your sign-in name. If an administrator gives you a reset code, we store only its digest until the code is used or has expired. What administrators do to an account or gateway is kept in a record for three years (who, what, which account or gateway, when). Legal basis: Art. 6(1)(b) GDPR (the account you asked for); for the time of the last sign-in and the record, Art. 6(1)(f) GDPR (our legitimate interest in secure, traceable operation). Without a sign-in name and a password there is no account; you need no e-mail address. You may create an account from the age of 16. Kept until you delete the account; it is then removed from the running system at once, and from backups within 12 months at the latest. Sessions end after 30 minutes without use and at the latest 12 hours after signing in.
 privacy-email-title = E-mail address
-privacy-email = An e-mail address is optional; an account needs none. If you give one, Baylee Central stores the address, the language its mails are written in and when you confirmed it. An address you named that waits for its code is kept until you confirm or withdraw it, and at most a day after its code has expired. Of every code we mail, we store only a digest, until the code is used or has expired, and for 24 hours the times reset codes were mailed to you, so that no more than three a day go out. We use the address for three things: to send the code that confirms it, to send a reset code when you or anyone who knows your sign-in name asks for one, and to tell the old address when it is replaced or removed. The mail is sent by Baylee's own mail service on the same server through mailbox.org (Heinlein Hosting GmbH, Berlin), which acts as a processor and receives the address and the mail. Legal basis: Art. 6(1)(b) GDPR (the account you asked for). Kept until you remove the address or delete the account.
+privacy-email = An e-mail address is optional; an account needs none. If you give one, Baylee Central stores the address, the language its mails are written in and when you confirmed it. An address you named that waits for its code is kept until you confirm or withdraw it, and at most a day after its code has expired. Of every code we mail, we store only a digest, until the code is used or has expired, and for 24 hours the times reset codes were mailed to you, so that no more than three a day go out. We use the address for four things: to send the code that confirms it, to send a reset code when you or anyone who knows your sign-in name asks for one, to tell the old address when it is replaced or removed, and to tell the confirmed address when a reset code set a new password, when the password was changed or when an administrator made a reset code for the account. The mail is sent by Baylee's own mail service on the same server through mailbox.org (Heinlein Hosting GmbH, Berlin), which acts as a processor and receives the address and the mail. Legal basis: Art. 6(1)(b) GDPR (the account you asked for). Kept until you remove the address or delete the account.
 privacy-cookie-title = The session cookie
 privacy-cookie = Signing in sets one cookie, <code>__Host-central</code>: a random number that identifies your session. It is sent only to baylee.app, cannot be read by scripts and ends with the session, after 12 hours at the latest. It is strictly necessary to keep you signed in; it needs no consent. Legal basis: § 25(2) no. 2 TDDDG and Art. 6(1)(b) GDPR.
 privacy-chat-title = Chat and contacts
@@ -487,7 +486,7 @@ register-error-taken = This sign-in name is taken. Choose another.
 
 code-title = Your recovery code
 code-handle = Your handle: { $handle }
-code-lead = Only with this code does your encrypted data survive if you forget your password. We do not know it and cannot restore it. Keep it somewhere safe, away from this device.
+code-lead = Only with this code does your encrypted data survive if you forget your password. We do not know it and cannot restore it. Keep it somewhere safe where you will find it even without this device.
 code-shown-once = Shown only now
 code-download = Save as a text file
 code-kept = I have saved my recovery code
@@ -497,6 +496,23 @@ code-later = Not now
 code-copy = Copy
 code-copied = Copied.
 code-copy-failed = Copying did not work here. Select the code and copy it by hand.
+code-print = Print
+code-manager = Save in password manager
+code-manager-id = Baylee recovery code ({ $name })
+code-manager-offered = Your browser was offered the code. If it asked you, check that it saved it.
+code-manager-failed = Your browser did not take the code. Keep it another way.
+code-mail = Mail it to myself
+code-mail-warning = Careful: the code then lies in your mailbox. Whoever can read your mail can also have a reset code sent there, and with both reset your sign-in and open your encrypted data.
+code-mail-subject = My Baylee recovery code
+code-sheet-title = Baylee recovery code
+code-sheet-name = Sign-in name: { $name }
+code-sheet-what = With this code your encrypted Baylee data survives a forgotten password: you enter it on the reset page, together with a reset code.
+code-sheet-keep = Keep it where only you can reach it. Nobody at Baylee will ever ask you for it.
+code-email-label = E-mail address (optional)
+code-email-hint = For a reset code if you forget your password. After this step we mail a code to confirm the address; you can also add one later in your account.
+code-email-step-title = Confirm your e-mail address
+code-email-step-lead = Enter the code from the mail here, or later on your account's security page.
+code-email-step-done = Continue to your account
 
 ## Setting a new password with a reset code
 
@@ -587,6 +603,7 @@ email-removed = Your e-mail address is removed.
 email-busy = Too many mails for now. Try again later.
 email-same = This is your address already.
 email-unsure = No answer came back, so we cannot tell whether that went through. Look at what is shown here, and try again if it did not.
+email-again = To send the code, enter your password once more.
 
 ## Central's terms
 
@@ -861,18 +878,14 @@ foot-project = Project
 foot-source = Source code (AGPL-3.0)
 foot-central = Baylee Central (source-available)
 foot-summary = Free, open-source tabletop card game built in Rust & Bevy — with a deterministic rules engine, full offline mode, House AI, LLM bridge, and community gateways.
-strip-build = Build
 strip-ci = CI
 strip-commit = Commit
 strip-gateways = Gateways
 strip-online = online
 strip-offline = offline
-strip-releases = see releases
-strip-on-github = see on GitHub
 strip-directory = the directory
 strip-cards = Playable cards
 strip-cards-unit = cards
-strip-stars = Stars on GitHub
 strip-accounts = Accounts at Baylee Central
 strip-live = Right now on the gateways, as they report it
 strip-views = Page views since { $date }
@@ -995,7 +1008,7 @@ ai-training = Alongside the House AI and external LLM bridge, a dedicated native
 ai-hostingLink = Gateway hosting & LLM setup
 
 # The gateways and the contact page, as the old site wrote them (owner, 11.11.2026)
-gw-lead = A gateway is a server where online tables live: accounts, decks, rooms and one engine process per game. These are the ones registered with Baylee Central and approved by its administrator. Baylee runs the one marked official; the others are run by other people for their groups, and their own rules apply there. A listing is not a promise about what a gateway does.
+gw-lead = A gateway is a server where online tables live: accounts, decks, rooms and one engine process per game. These are the ones registered with Baylee Central and approved by its administrator. Each is run by its operators for their groups, and their own rules apply there. A listing is not a promise about what a gateway does.
 gw-howTo = To play on one, copy its address into the client's front door. Online means Central heard from the gateway within the last minute and a half; it is no promise that it answers. Names and versions are what each operator reports.
 gw-find = Find a gateway
 gw-findHint = Name or address
@@ -1012,7 +1025,6 @@ gw-stat-games = Games running
 gw-show = Show
 gw-show-every = All
 gw-show-online = Online
-gw-show-official = Official
 gw-show-tables = With open tables
 gw-sort = Sort by
 gw-sort-best = Recommended

@@ -11,14 +11,13 @@ skip = 본문으로 건너뛰기
 new-tab = 새 탭에서 열려요
 nav-label = 주 메뉴
 nav-download = 다운로드
-nav-gateways = Gateways
+nav-gateways = Gateway
 nav-faq = 질문
 nav-contact = 문의
 nav-sign-in = 로그인
 nav-account = 내 계정
 lang-label = 언어
 theme-label = 색상 모드
-theme-system = 색상: 기기 설정과 같게
 theme-light = 색상: 밝게
 theme-dark = 색상: 어둡게
 
@@ -66,7 +65,7 @@ hero-offline = 솔로 대전과 덱 빌더는 계정 없이 오프라인에서 �
 hero-account = 온라인으로 플레이하나요? <register>계정을 만드세요</register>. 오픈 베타 동안 누구나 무료로 만들 수 있어요. 이미 계정이 있다면 <signin>로그인하세요</signin>.
 hero-memorial = Baylee를 기억해요: 사진 앨범 열기
 
-status-label = 프로젝트 현황
+status-label = 숫자로 보는 Baylee
 
 cards-eyebrow = 카드
 cards-title = Baylee가 아는 카드의 수
@@ -103,13 +102,13 @@ about-engine = 우선권, 스택, 계층, 대체 효과, 유발 능력, 상태 �
 about-table = 전장, 손, 스택, 추방 영역, 묘지가 깔끔한 3D 테이블 위에 명확한 전투선과 즉시 뜨는 카드 미리보기와 함께 표시돼요. 카드 일러스트는 플레이하는 동안 Scryfall에서 불러오며, 언제든 선명한 오라클 텍스트 보기로 바꿀 수 있어요.
 
 gw-eyebrow = 온라인
-gw-title = Gateways
+gw-title = Gateway
 
 open-central = GitHub의 Baylee Central
 
 ## Download
 
-dl-prerelease = Beta
+dl-prerelease = 베타
 dl-for = { $system }용 다운로드
 dl-size = { $size } MB
 dl-checksum = SHA-256
@@ -155,8 +154,7 @@ install-cpu = <b>프로세서:</b> x86-64 빌드에는 AVX2가 필요해요. 더
 
 ## Gateways
 
-gws-title = Gateways
-gws-official = 공식
+gws-title = Gateway
 gws-online = 온라인
 gws-offline = 오프라인
 gws-version = 버전
@@ -258,6 +256,7 @@ privacy-views-title = 페이지 조회수 세기
 privacy-views = 이 사이트는 페이지가 열린 횟수를 세요. 모든 페이지와 모든 방문자를 합친 숫자 하나뿐이고, 시작 페이지에 표시돼요. 브라우저에서 페이지가 열리면 이 숫자에 1이 더해져요. 이를 위해 여러분에 관한 정보는 저장하지 않아요. IP 주소도, 쿠키도, 식별자도, 어느 페이지였는지조차 저장하지 않아요.
 privacy-device-title = 브라우저에 저장되는 것
 privacy-device = 이 사이트는 로그인하기 전에는 쿠키를 설정하지 않아요. 브라우저가 기기에 저장하는 것은 다음과 같고, JavaScript를 쓸 때만 해당돼요. 색상을 선택했다면 그 선택(<code>baylee-site-theme</code>), 로그인한 동안에는 세션이 끝나는 시각(<code>baylee-central-session</code>), 채팅 키, 연락처의 신뢰한 키(채팅 항목 참고), 알림을 켰다면 이 기기의 임의 번호(<code>baylee-push-installation-v1</code>, <code>baylee-push</code>), 그리고 로그인했거나 사이트를 앱으로 설치했거나 알림을 켠 경우에 한해 사이트의 공개 파일(페이지 틀, 글꼴, 스크립트)의 사본이에요. 이 사본이 있으면 연결 없이도 시작되고 알림을 받을 수 있어요. 세 가지가 모두 더는 해당하지 않으면 다음에 사이트를 열 때 사본이 제거돼요. 아래 항목에서 달리 말하지 않는 한, 이 중 어떤 것도 우리에게 전송되지 않아요. 채팅과 세션 항목은 로그아웃하면 삭제되며, 나머지는 브라우저에서 사이트 데이터를 지우면 제거할 수 있어요. 법적 근거: TDDDG § 25 제2항 제2호(사용하는 기능에 꼭 필요한 경우). 알림의 임의 번호에 대해서는 동의(TDDDG § 25 제1항).
+privacy-device-manager = 복구 코드를 브라우저의 비밀번호 관리자에 보관하거나, 자신에게 메일로 보내거나, 파일로 저장하거나, 코드가 나오는 단계에서 인쇄하면, 코드는 브라우저, 메일 프로그램, 파일, 종이에 남을 뿐 이 사이트에는 남지 않아요. 코드는 브라우저 안에서 만들어지고 우리에게 전송되지 않아요. 사이트 데이터를 지워도 그곳에서는 지워지지 않아요.
 privacy-github-title = GitHub
 privacy-github = 다운로드 페이지와 시작 페이지는 최신 릴리스, 테스트 상태, 카드 수치를 보여 줘요. 이 정보는 브라우저가 아니라 우리 서버가 GitHub에 요청하므로, GitHub는 이를 통해 여러분에 대해 아무것도 알 수 없어요. 다운로드나 GitHub 링크를 누를 때만 브라우저가 GitHub(GitHub, Inc., 미국)에 연결해 IP 주소와 모든 요청에 담기는 정보를 보내며, 그 뒤에는 GitHub의 개인정보 처리방침이 적용돼요.
 privacy-directory-title = Gateway 목록
@@ -265,7 +264,7 @@ privacy-directory = 우리 서버가 Baylee Central에서 Gateway 목록을 읽�
 privacy-account-title = 내 계정
 privacy-account = 계정을 위해 Baylee Central은 다음을 저장해요. 계정 ID, 로그인 이름, 태그가 붙은 표시 이름, 계정을 만든 시기와 방법, OPAQUE 비밀번호 기록(우리 서버가 비밀번호를 알지 못한 채 여러분이 비밀번호를 증명할 수 있게 해 줌), 비밀번호와 복구 코드로 각각 한 번씩 암호화된 마스터 키, 암호화된 계정 문서와 암호화된 객체(우리는 읽을 수 없고 크기, 리비전, 시각만 볼 수 있음), 동의한 약관의 버전과 시기, 마지막 로그인 시각, 세션, 관리자 역할(있는 경우), 등록한 Gateway와 그 토큰. 다른 플레이어에게는 태그가 붙은 표시 이름이 보이고, 로그인 이름은 절대 보이지 않아요. 관리자가 재설정 코드를 주면, 코드를 사용하거나 만료될 때까지 그 다이제스트만 저장해요. 관리자가 계정이나 Gateway에 한 작업은 누가, 무엇을, 어느 계정이나 Gateway에, 언제 했는지를 3년 동안 기록으로 남겨요. 법적 근거: GDPR 제6조 제1항 (b)호(요청하신 계정). 마지막 로그인 시각과 기록에 대해서는 GDPR 제6조 제1항 (f)호(안전하고 추적 가능한 운영에 대한 우리의 정당한 이익). 로그인 이름과 비밀번호가 없으면 계정이 없으며, 이메일 주소는 필요 없어요. 계정은 만 16세부터 만들 수 있어요. 계정을 삭제할 때까지 보관하며, 삭제하면 운영 중인 시스템에서는 즉시, 백업에서는 늦어도 12개월 안에 제거돼요. 세션은 사용하지 않은 지 30분 후에 끝나고, 늦어도 로그인 후 12시간이 지나면 끝나요.
 privacy-email-title = 이메일 주소
-privacy-email = 이메일 주소는 선택 사항이며, 계정에 꼭 필요하지 않아요. 주소를 입력하면 Baylee Central은 그 주소, 메일을 쓰는 언어, 주소를 확인한 시각을 저장해요. 코드를 기다리는 중인 주소는 여러분이 확인하거나 철회할 때까지, 늦어도 코드가 만료된 지 하루 뒤까지 보관해요. 우리가 메일로 보내는 모든 코드는 코드를 사용하거나 만료될 때까지 해시값만 저장하고, 하루에 세 통을 넘지 않게 하려고 재설정 코드를 보낸 시각을 24시간 동안 저장해요. 이 주소는 세 가지에 써요. 주소를 확인하는 코드를 보낼 때, 여러분이나 로그인 이름을 아는 누군가가 요청했을 때 재설정 코드를 보낼 때, 주소가 바뀌거나 삭제될 때 이전 주소에 알릴 때예요. 메일은 같은 서버에 있는 Baylee 자체 메일 서비스가 mailbox.org(Heinlein Hosting GmbH, 베를린)를 통해 보내며, mailbox.org는 수탁자로서 주소와 메일을 받아요. 법적 근거: GDPR 제6조 제1항 (b)호(요청하신 계정). 주소를 삭제하거나 계정을 삭제할 때까지 보관해요.
+privacy-email = 이메일 주소는 선택 사항이며, 계정에 꼭 필요하지 않아요. 주소를 입력하면 Baylee Central은 그 주소, 메일을 쓰는 언어, 주소를 확인한 시각을 저장해요. 코드를 기다리는 중인 주소는 여러분이 확인하거나 철회할 때까지, 늦어도 코드가 만료된 지 하루 뒤까지 보관해요. 우리가 메일로 보내는 모든 코드는 코드를 사용하거나 만료될 때까지 해시값만 저장하고, 하루에 세 통을 넘지 않게 하려고 재설정 코드를 보낸 시각을 24시간 동안 저장해요. 이 주소는 네 가지에 써요. 주소를 확인하는 코드를 보낼 때, 여러분이나 로그인 이름을 아는 누군가가 요청했을 때 재설정 코드를 보낼 때, 주소가 바뀌거나 삭제될 때 이전 주소에 알릴 때, 재설정 코드로 새 비밀번호가 설정되었거나 비밀번호가 변경되었거나 관리자가 계정의 재설정 코드를 만들었을 때 확인된 주소에 알릴 때예요. 메일은 같은 서버에 있는 Baylee 자체 메일 서비스가 mailbox.org(Heinlein Hosting GmbH, 베를린)를 통해 보내며, mailbox.org는 수탁자로서 주소와 메일을 받아요. 법적 근거: GDPR 제6조 제1항 (b)호(요청하신 계정). 주소를 삭제하거나 계정을 삭제할 때까지 보관해요.
 privacy-cookie-title = 세션 쿠키
 privacy-cookie = 로그인하면 쿠키 하나, <code>__Host-central</code>이 설정돼요. 세션을 식별하는 임의 번호예요. baylee.app에만 전송되고, 스크립트가 읽을 수 없으며, 세션과 함께 늦어도 12시간 후에 끝나요. 로그인 상태를 유지하는 데 꼭 필요하므로 동의가 필요하지 않아요. 법적 근거: TDDDG § 25 제2항 제2호 및 GDPR 제6조 제1항 (b)호.
 privacy-chat-title = 채팅과 연락처
@@ -497,6 +496,23 @@ code-later = 나중에
 code-copy = 복사
 code-copied = 복사했어요.
 code-copy-failed = 여기서는 복사가 되지 않았어요. 코드를 선택해서 직접 복사해 주세요.
+code-print = 인쇄
+code-manager = 비밀번호 관리자에 저장
+code-manager-id = Baylee 복구 코드 ({ $name })
+code-manager-offered = 브라우저에 코드를 넘겼어요. 브라우저가 물어봤다면 저장되었는지 확인하세요.
+code-manager-failed = 브라우저가 코드를 받지 않았어요. 다른 방법으로 보관하세요.
+code-mail = 나에게 메일로 보내기
+code-mail-warning = 주의: 그러면 코드가 메일함에 남아요. 메일을 읽을 수 있는 사람은 그 주소로 재설정 코드도 보내게 할 수 있고, 둘이 있으면 로그인을 재설정하고 암호화된 데이터를 열 수 있어요.
+code-mail-subject = 내 Baylee 복구 코드
+code-sheet-title = Baylee 복구 코드
+code-sheet-name = 로그인 이름: { $name }
+code-sheet-what = 이 코드가 있으면 비밀번호를 잊어버려도 암호화된 Baylee 데이터가 남아요. 재설정 페이지에서 재설정 코드와 함께 입력하세요.
+code-sheet-keep = 본인만 접근할 수 있는 곳에 보관하세요. Baylee의 누구도 이 코드를 묻지 않아요.
+code-email-label = 이메일 주소 (선택)
+code-email-hint = 비밀번호를 잊었을 때 재설정 코드를 받기 위한 주소예요. 이 단계 뒤에 주소를 확인하는 코드를 메일로 보내요. 나중에 계정에서 추가할 수도 있어요.
+code-email-step-title = 이메일 주소 확인
+code-email-step-lead = 메일로 받은 코드를 여기에 입력하세요. 나중에 계정의 보안 페이지에서 입력해도 돼요.
+code-email-step-done = 계정으로 계속
 
 ## Setting a new password with a reset code
 
@@ -587,6 +603,7 @@ email-removed = 이메일 주소를 삭제했어요.
 email-busy = 지금은 메일이 너무 많아요. 나중에 다시 시도하세요.
 email-same = 이미 내 주소예요.
 email-unsure = 응답이 오지 않아서 처리되었는지 알 수 없어요. 여기에 표시된 내용을 확인하고, 처리되지 않았다면 다시 시도하세요.
+email-again = 코드를 보내려면 비밀번호를 한 번 더 입력하세요.
 
 ## Central's terms
 
@@ -859,18 +876,14 @@ foot-project = 프로젝트
 foot-source = 소스 코드 (AGPL-3.0)
 foot-central = Baylee Central (소스 공개)
 foot-summary = Rust와 Bevy로 만든 무료 오픈 소스 테이블탑 카드 게임. 결정론적 룰 엔진, 완전한 오프라인 모드, 하우스 AI, LLM 브리지, 커뮤니티 Gateways를 갖췄어요.
-strip-build = 빌드
 strip-ci = CI
 strip-commit = 커밋
-strip-gateways = Gateways
+strip-gateways = Gateway
 strip-online = 온라인
 strip-offline = 오프라인
-strip-releases = 릴리스 보기
-strip-on-github = GitHub에서 보기
 strip-directory = 목록
 strip-cards = 플레이 가능한 카드
 strip-cards-unit = 장
-strip-stars = GitHub 스타
 strip-accounts = Baylee Central의 계정
 strip-live = 지금 Gateways가 보고한 수치
 strip-views = { $date }부터의 페이지 조회수
@@ -884,7 +897,7 @@ live-players = { $n ->
    *[other] 플레이어 { $n }명
 }
 live-playing = { $n ->
-   *[other] { $n }명 게임 중
+   *[other] 게임 중 { $n }명
 }
 live-tables = { $n ->
    *[other] 열린 테이블 { $n }개
@@ -986,7 +999,7 @@ ai-training = 하우스 AI와 외부 LLM 브리지 외에도, 결정론적 룰 �
 ai-hostingLink = Gateway 호스팅과 LLM 설정
 
 # The gateways and the contact page, as the old site wrote them (owner, 11.11.2026)
-gw-lead = Gateway는 온라인 테이블이 열리는 서버예요. 계정, 덱, 방, 게임당 엔진 프로세스 하나가 있어요. 여기 나온 것은 Baylee Central에 등록되고 관리자가 승인한 Gateway예요. 공식 표시가 있는 것은 Baylee가 운영하고, 나머지는 다른 사람들이 자기 그룹을 위해 운영하며 그곳에서는 그들의 규칙이 적용돼요. 목록에 있다고 해서 Gateway가 무엇을 하는지 보증하는 것은 아니에요.
+gw-lead = Gateway는 온라인 테이블이 있는 서버예요. 계정, 덱, 방, 그리고 게임마다 엔진 프로세스 하나가 거기 있어요. 여기에 나오는 것은 Baylee Central에 등록되고 관리자가 승인한 Gateway예요. 각 Gateway는 운영자가 자기 그룹을 위해 운영하며, 거기서는 운영자의 규칙이 적용돼요. 목록에 있다고 해서 그 Gateway가 하는 일을 보증하는 것은 아니에요.
 gw-howTo = Gateway에서 플레이하려면 주소를 복사해 클라이언트의 첫 화면에 붙여 넣으세요. 온라인은 Central이 최근 1분 30초 안에 그 Gateway에서 소식을 받았다는 뜻이며, 응답한다는 보장은 아니에요. 이름과 버전은 각 운영자가 알려 준 그대로예요.
 gw-find = Gateway 찾기
 gw-findHint = 이름 또는 주소
@@ -1003,7 +1016,6 @@ gw-stat-games = 진행 중인 게임
 gw-show = 표시
 gw-show-every = 전체
 gw-show-online = 온라인
-gw-show-official = 공식
 gw-show-tables = 열린 테이블 있음
 gw-sort = 정렬
 gw-sort-best = 추천순
@@ -1195,55 +1207,54 @@ sec-teaser-more = 각 단계를 도표로 보기
 register-solving = 브라우저가 로봇을 막는 퍼즐을 풀고 있어요. 많은 계정이 만들어지고 있을 때는 몇 분 걸릴 수 있어요 … { $percent } %
 
 ## An administrator makes a reset code (/account/admin)
-# English for now: to be translated.
-admin-reset-title = Reset a login
-admin-reset-lead = Find the account of the person who asked you, and make a reset code for it. With the code they set a new password on the reset page.
-admin-find = Find the account
-admin-only = This page is only for administrators.
-admin-search = Search accounts
-admin-search-hint = Part of a sign-in name or a display name, or # and a tag. Leave it empty to list every account, newest first.
-admin-search-submit = Search
-admin-search-error = A search is 1 to 64 plain characters without accents, or # and a tag such as #1a2b.
-admin-count = Accounts shown: { $count }
-admin-none = No account matches this search.
-admin-more = Show more
-admin-open = Open
-admin-back = Back
-admin-pill = Administrator
-admin-state = State
-admin-state-pending = Reserved, never set up
-admin-state-enrolled = Set up
-admin-state-restored = In use
-admin-created = Created
-admin-last-sign-in = Last sign-in
-admin-recovery = Recovery code
-admin-yes = Yes
-admin-no = No
-admin-reset-outstanding = An unused reset code is valid until { $time }. Whether an administrator made it or it went by e-mail, Central does not say. A new code replaces it.
-admin-reset = Reset login
-admin-refused-admin = This account holds the administrator role, and Central makes no reset code for an administrator's account. Remove the role first.
-admin-refused-own = This is your own account, and nobody makes a reset code for their own. Change your password under Security instead.
-admin-refused-pending = This account was reserved and never set up, so it has no sign-in to reset.
-admin-refused-moving = This account's move from the official gateway is not finished. Until it is, its sign-in is reset there, not here.
-admin-refused-stale = Baylee Central counts your sign-in as older than 30 minutes. Try again; you enter your password once more.
-admin-refused-role = Your account no longer holds the administrator role.
-admin-refused-gone = This account no longer exists.
-admin-switched = This browser is signed in as another account now, so no code was asked for. Load the page again.
-admin-lost = No answer came back, so we cannot tell whether a code was made. If one was, nobody can show it again, and it already replaced any earlier code. Make a new one: it replaces that one in turn.
-admin-warning-title = Before you make a code
-admin-warning-who = Check outside this site that the person asking really holds this account, for example by a call or on a channel you already know them by. Whoever has the code can set a new password.
-admin-warning-ends = Making a code ends nothing: the old password keeps working until the code is used, and every device stays signed in.
-admin-warning-data = The person's encrypted data survives the reset only with their recovery code or on a device that is still signed in. Without either, they start with an empty vault.
-admin-warning-replaces = A new code replaces any earlier one, one sent by e-mail included. It is valid for 24 hours and works once.
-admin-warning-takeover = A reset code answers a forgotten password, not a taken-over account: an intruder's sessions and the old password stay until the code is used, and for good if it never is.
-admin-warning-continue = I have checked who is asking
-admin-password-hint = Making a code needs a sign-in less than 30 minutes old, so you enter your password once more. It stays in this browser.
-admin-password-missing = Enter your password.
-admin-make = Make the reset code
-admin-code-title = The reset code
-admin-code-until = Valid until { $time }, and only once.
-admin-code-lead = Hand it to the person who asked, on a channel you trust. It is shown only now: neither Baylee Central nor this page can show it again. If it gets lost, make a new one.
-admin-code-done = Done
+admin-reset-title = 로그인 재설정
+admin-reset-lead = 요청한 사람의 계정을 찾아서 재설정 코드를 만드세요. 그 코드로 요청한 사람이 재설정 페이지에서 새 비밀번호를 설정해요.
+admin-find = 계정 찾기
+admin-only = 이 페이지는 관리자 전용이에요.
+admin-search = 계정 검색
+admin-search-hint = 로그인 이름이나 표시 이름의 일부, 또는 #과 태그를 입력하세요. 비워 두면 모든 계정이 최신순으로 나와요.
+admin-search-submit = 검색
+admin-search-error = 검색어는 악센트 없는 일반 문자 1~64자, 또는 #1a2b 같은 #과 태그여야 해요.
+admin-count = 표시된 계정: { $count }
+admin-none = 이 검색에 맞는 계정이 없어요.
+admin-more = 더 보기
+admin-open = 열기
+admin-back = 뒤로
+admin-pill = 관리자
+admin-state = 상태
+admin-state-pending = 예약됨, 설정한 적 없음
+admin-state-enrolled = 설정됨
+admin-state-restored = 사용 중
+admin-created = 생성일
+admin-last-sign-in = 마지막 로그인
+admin-recovery = 복구 코드
+admin-yes = 예
+admin-no = 아니요
+admin-reset-outstanding = 사용하지 않은 재설정 코드가 { $time }까지 유효해요. 관리자가 만들었는지 이메일로 갔는지는 Central이 알려 주지 않아요. 새 코드를 만들면 이 코드는 대체돼요.
+admin-reset = 로그인 재설정
+admin-refused-admin = 이 계정은 관리자 역할이 있고, Central은 관리자 계정의 재설정 코드를 만들지 않아요. 먼저 역할을 제거하세요.
+admin-refused-own = 본인 계정이에요. 자기 계정의 재설정 코드는 누구도 만들 수 없어요. 대신 보안에서 비밀번호를 바꾸세요.
+admin-refused-pending = 이 계정은 예약만 되었고 설정된 적이 없어서 재설정할 로그인이 없어요.
+admin-refused-moving = 이 계정의 공식 Gateway에서의 이전이 끝나지 않았어요. 끝나기 전에는 로그인을 여기가 아니라 그곳에서 재설정해요.
+admin-refused-stale = Baylee Central은 여러분의 로그인이 30분보다 오래되었다고 봐요. 다시 시도하세요. 비밀번호를 한 번 더 입력하게 돼요.
+admin-refused-role = 여러분의 계정은 더 이상 관리자 역할이 없어요.
+admin-refused-gone = 이 계정은 더 이상 없어요.
+admin-switched = 이 브라우저는 이제 다른 계정으로 로그인되어 있어서 코드를 요청하지 않았어요. 페이지를 다시 불러오세요.
+admin-lost = 응답이 오지 않아서 코드가 만들어졌는지 알 수 없어요. 만들어졌다면 아무도 다시 보여 줄 수 없고, 이전 코드는 이미 대체되었어요. 새 코드를 만드세요. 그러면 그 코드가 대체돼요.
+admin-warning-title = 코드를 만들기 전에
+admin-warning-who = 요청한 사람이 정말 이 계정의 주인인지 이 사이트 밖에서 확인하세요. 예를 들어 전화나 이미 아는 채널로요. 코드를 가진 사람은 새 비밀번호를 설정할 수 있어요.
+admin-warning-ends = 코드를 만든다고 아무것도 끝나지 않아요. 코드를 사용할 때까지 이전 비밀번호는 계속 쓸 수 있고, 모든 기기는 로그인된 채로 있어요.
+admin-warning-data = 그 사람의 암호화된 데이터는 복구 코드가 있거나 아직 로그인된 기기가 있을 때만 재설정 후에도 남아요. 둘 다 없으면 빈 보관함으로 시작해요.
+admin-warning-replaces = 새 코드는 이메일로 보낸 코드를 포함해 이전 코드를 대체해요. 24시간 동안 유효하고 한 번만 쓸 수 있어요.
+admin-warning-takeover = 재설정 코드는 잊어버린 비밀번호를 위한 것이고 탈취된 계정을 위한 것이 아니에요. 코드를 사용할 때까지 침입자의 세션과 이전 비밀번호는 그대로 남고, 코드를 쓰지 않으면 계속 남아요.
+admin-warning-continue = 요청한 사람을 확인했어요
+admin-password-hint = 코드를 만들려면 30분 이내의 로그인이 필요해서 비밀번호를 한 번 더 입력해요. 비밀번호는 이 브라우저 안에만 있어요.
+admin-password-missing = 비밀번호를 입력하세요.
+admin-make = 재설정 코드 만들기
+admin-code-title = 재설정 코드
+admin-code-until = { $time }까지 유효하며 한 번만 쓸 수 있어요.
+admin-code-lead = 요청한 사람에게 신뢰할 수 있는 채널로 전달하세요. 지금만 표시돼요. Baylee Central도 이 페이지도 다시 보여 줄 수 없어요. 잃어버리면 새 코드를 만드세요.
+admin-code-done = 완료
 
 ## Profile pictures (/account/profile, the chat, the administration, the privacy notice)
 # English for now: to be translated.
