@@ -2,6 +2,7 @@
 //! bounds for entities, nesting, element counts and filters.
 use crate::support::{assemble, at, chunk, ihdr, timed, valid, zlib_stored};
 use central_picture::{Format, Refusal};
+use std::fmt::Write as _;
 
 const GREEN: [u8; 4] = [0, 128, 0, 255];
 
@@ -151,7 +152,7 @@ fn entity_expansion_is_refused_before_any_parser_runs() {
     let mut laughs = String::from("<!DOCTYPE svg [<!ENTITY a0 'lol'>");
     for n in 1..10 {
         let previous = format!("&a{};", n - 1).repeat(10);
-        laughs.push_str(&format!("<!ENTITY a{n} '{previous}'>"));
+        let _ = write!(laughs, "<!ENTITY a{n} '{previous}'>");
     }
     laughs.push_str("]><svg xmlns=\"http://www.w3.org/2000/svg\"><text>&a9;</text></svg>");
     // a declaration where no document type stands
