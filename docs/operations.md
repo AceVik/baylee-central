@@ -1261,27 +1261,47 @@ Since then:
    for `BUILD_USER`:
 
    ```sh
+   rev=$(cat /opt/baylee-central/state/deployed); echo "revision: $rev"
    f=$(mktemp)
    runuser -u BUILD_USER -- git --no-replace-objects -C /opt/baylee-central/src \
-     cat-file blob "$(cat /opt/baylee-central/state/deployed):ops/grants.sql" > "$f"
-   grep -c '\\' "$f"
+     cat-file blob "$rev^{commit}:ops/grants.sql" > "$f"; echo "git: $?"
+   grep -c '' "$f"; grep -c '\\' "$f"
    docker exec -i baylee-postgres-1 psql -X -w -q -v ON_ERROR_STOP=1 \
-     -U central_migrator -d baylee_central < "$f"; echo "exit $?"
+     -U central_migrator -d baylee_central < "$f"; echo "psql: $?"
    rm -f "$f"
    ```
 
-   `grep` must print `0` (no backslash; if it prints more, do not go on to
-   `psql`, which would take such a line for a command of its own). The
-   last line must be `exit 0`. If `state/deployed` is missing (a Central
-   deployed by hand), name the revision the running service was built
-   from. The file only grants (read it first, it is short), and the
-   deployed service has these grants already, so applying it again
-   changes nothing.
-   If `psql` ends with `permission denied` or `must be owner`, a table or
-   the schema on the server is not the migrator's: deploy nothing with
-   this hook until its owner is `central_migrator` (the migrations make
-   them as that login, so this is not expected). This step was not run on
-   the server.
+   Go on from one line to the next only if it says what follows.
+   - `revision:` names a commit, forty characters. If `state/deployed` is
+     missing (a Central deployed by hand), set `rev` to the revision the
+     running service was built from. With an empty `rev` git ends with an
+     error; without the `^{commit}` it would print the file of the index
+     instead, which a build can write (tried).
+   - `git: 0`, then the file's lines (more than none) and `0` for the
+     lines with a backslash. If the second number is more, do not go on
+     to `psql`, which would take such a line for a command of its own.
+   - `psql` prints nothing at all, and then `psql: 0`. **Any line from
+     `psql` is a failure, a warning too.** A grant on a table that is not
+     the login's ends with an error (`permission denied`, status 3) when
+     the login holds nothing on it. When the login holds the privilege
+     but may not pass it on, `psql` only warns (`no privileges were
+     granted`), grants nothing and still ends with 0 (both tried on
+     PostgreSQL 18.6 with the hook's own call). The messages come in the
+     server's language, so go by whether anything is printed.
+
+   The file only grants (read it first, it is short), and the deployed
+   service has these grants already, so applying it again changes
+   nothing. If `psql` printed anything, a table or the schema on the
+   server is not the migrator's: deploy nothing with this hook until its
+   owner is `central_migrator` (the migrations make them as that login, so
+   this is not expected). This step was not run on the server.
+
+   The hook itself goes by `psql`'s status, so it does not see a grant
+   that only warned. It would start the unit; the store checks at start
+   that the runtime login holds each privilege it needs and refuses to
+   run otherwise (the fixture tests that); the hook's probe would then
+   fail after its thirty seconds and the previous binary would be started
+   again, with the migration already applied.
 
 **What stays possible.** The binary and the website are still what the
 build made, and the binary runs the migrations with the migrator's login:
