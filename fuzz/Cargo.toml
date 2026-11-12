@@ -1,0 +1,32 @@
+# A mutation fuzzer for the picture worker's decoders (fuzz/README.md).
+# Outside the workspace on purpose: its own lock, nothing added to the
+# workspace's graph, and only path dependencies on the workspace's crates.
+[workspace]
+
+[package]
+name = "central-picture-fuzz"
+version = "0.0.0"
+edition = "2024"
+publish = false
+license = "LicenseRef-Baylee-Central-Source-Available-1.0"
+description = "Seeded mutation fuzzing of every picture decoder entry point, with no foreign function interface"
+
+[[bin]]
+name = "picture-fuzz"
+path = "src/main.rs"
+
+[dependencies]
+central-picture = { path = "../crates/central-picture" }
+central-picture-codec = { path = "../crates/central-picture-codec" }
+png = "=0.18.1"
+gif = { version = "=0.14.2", default-features = false, features = ["std"] }
+image-webp = "=0.2.4"
+image = { version = "=0.25.10", default-features = false, features = ["bmp", "ico"] }
+ravif = { version = "=0.13.0", default-features = false, features = ["asm"] }
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[profile.release]
+overflow-checks = true
+debug-assertions = true

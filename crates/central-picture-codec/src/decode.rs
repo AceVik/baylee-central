@@ -43,10 +43,11 @@ fn upright(width: u32, height: u32, rgba: Vec<u8>) -> Result<Raster, Refusal> {
     })
 }
 
-/// `pixels` of `channels` (1 grey, 2 grey and alpha, 3 RGB, 4 RGBA) as RGBA.
-fn to_rgba(pixels: &[u8], channels: usize) -> Result<Vec<u8>, Refusal> {
+/// `pixels` of `channels` (1 grey, 2 grey and alpha, 3 RGB, 4 RGBA) as
+/// RGBA; RGBA is handed on without a copy.
+fn to_rgba(pixels: Vec<u8>, channels: usize) -> Result<Vec<u8>, Refusal> {
     if channels == 4 {
-        return Ok(pixels.to_vec());
+        return Ok(pixels);
     }
     let mut out = Vec::new();
     out.try_reserve_exact(pixels.len() / channels * 4)
@@ -103,17 +104,22 @@ fn png(bytes: &[u8]) -> Result<Raster, Refusal> {
         png::ColorType::Rgba => 4,
         png::ColorType::Indexed => return Err(Refusal::Malformed),
     };
-    // A row may be padded; take each row's pixels only.
+    // A row may be padded; then take each row's pixels only. Unpadded, the
+    // buffer is the picture, without a copy (a 4096² RGBA is 64 MiB).
     let row = usize::try_from(width).map_err(|_| Refusal::Malformed)? * channels;
+    let rows = usize::try_from(height).map_err(|_| Refusal::Malformed)?;
     let stride = frame.line_size;
-    let mut pixels = Vec::with_capacity(row * usize::try_from(height).unwrap_or(0));
-    for line in buffer
-        .chunks(stride.max(1))
-        .take(usize::try_from(height).unwrap_or(0))
-    {
-        pixels.extend_from_slice(line.get(..row).ok_or(Refusal::Malformed)?);
-    }
-    upright(width, height, to_rgba(&pixels, channels)?)
+    let pixels = if stride == row {
+        buffer.truncate(row * rows);
+        buffer
+    } else {
+        let mut pixels = Vec::with_capacity(row * rows);
+        for line in buffer.chunks(stride.max(1)).take(rows) {
+            pixels.extend_from_slice(line.get(..row).ok_or(Refusal::Malformed)?);
+        }
+        pixels
+    };
+    upright(width, height, to_rgba(pixels, channels)?)
 }
 
 /// JPEG with `zune-jpeg` (scalar, no SIMD), baseline or progressive, grey,
@@ -193,7 +199,7 @@ fn webp(bytes: &[u8]) -> Result<Raster, Refusal> {
         .read_image(&mut buffer)
         .map_err(|_| Refusal::Malformed)?;
     let channels = if decoder.has_alpha() { 4 } else { 3 };
-    upright(width, height, to_rgba(&buffer, channels)?)
+    upright(width, height, to_rgba(buffer, channels)?)
 }
 
 /// AVIF with `avif-decode` (`avif-parse` and `rav1d`): the primary item and
@@ -409,9 +415,10 @@ mod tests {
 
     #[test]
     fn channels_become_rgba() {
-        assert_eq!(to_rgba(&[7], 1).unwrap(), [7, 7, 7, 255]);
-        assert_eq!(to_rgba(&[7, 9], 2).unwrap(), [7, 7, 7, 9]);
-        assert_eq!(to_rgba(&[1, 2, 3], 3).unwrap(), [1, 2, 3, 255]);
+        assert_eq!(to_rgba(vec![7], 1).unwrap(), [7, 7, 7, 255]);
+        assert_eq!(to_rgba(vec![7, 9], 2).unwrap(), [7, 7, 7, 9]);
+        assert_eq!(to_rgba(vec![1, 2, 3], 3).unwrap(), [1, 2, 3, 255]);
+        assert_eq!(to_rgba(vec![1, 2, 3, 4], 4).unwrap(), [1, 2, 3, 4]);
         assert_eq!(high(0xabcd), 0xab);
     }
 }

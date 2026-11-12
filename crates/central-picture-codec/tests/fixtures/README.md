@@ -14,3 +14,4 @@ by the tests themselves with the encoders in the build.
 | `animated.webp` | `img2webp -lossless`, a red frame then a blue one |
 | `imageio.avif` | macOS `sips -s format avif`, 48 × 32 quadrant |
 | `ten-bit.avif` | `ffmpeg` with SVT-AV1, 48 × 32 of `#336699`, 10-bit 4:2:0 |
+| `animated.avif` | `ffmpeg` 9.0.2 with SVT-AV1, three 64 × 64 frames of its `testsrc2` pattern, major brand `avis` |

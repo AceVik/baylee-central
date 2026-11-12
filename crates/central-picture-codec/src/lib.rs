@@ -11,6 +11,7 @@
 //! pixels alone. Nothing of the file but its pixels reaches either.
 #![forbid(unsafe_code)]
 
+mod animation;
 mod av1;
 mod decode;
 mod encode;
@@ -18,6 +19,10 @@ mod exif;
 mod header;
 mod scale;
 
+pub use animation::{
+    Animation, Frame, MAX_CANVAS, MAX_COMPOSITED, MAX_FRAMES, MAX_PLAY_MS, MIN_DELAY_MS, SLOW_MS,
+    frames,
+};
 pub use central_picture::{Format, Output, Refusal};
 
 /// Longest side of any picture or frame, in pixels.
@@ -71,11 +76,29 @@ fn checked(format: Format, bytes: &[u8]) -> Result<Output, Refusal> {
         Some(_) => return Err(Refusal::WrongType),
         None => return Err(Refusal::Unsupported),
     }
+    // An AVIF image sequence: `avif-parse` 2.1.0 refuses a file whose
+    // major brand is `avis`, and no accepted package decodes AV1 sequences
+    // through a safe interface (proposal §0.4). A file that only lists
+    // `avis` among its compatible brands gives its still item.
+    if format == Format::Avif && bytes.get(8..12) == Some(b"avis".as_slice()) {
+        return Err(Refusal::Unsupported);
+    }
+    if format != Format::Svg {
+        let (width, height) = header::dimensions(format, bytes)?;
+        within(width, height)?;
+        // An animation's still is its first composited frame, so the two
+        // cannot disagree (proposal §0.4).
+        if let Some(moving) = animation::frames(format, bytes)? {
+            let first = scale::Square(moving.frames[0].rgba.clone());
+            let output = encode::both(&first)?;
+            // Nothing is kept of the animation until its format is chosen.
+            let _ = encode::animation(&moving);
+            return Ok(output);
+        }
+    }
     let raster = if format == Format::Svg {
         decode::svg(bytes)?
     } else {
-        let (width, height) = header::dimensions(format, bytes)?;
-        within(width, height)?;
         decode::raster(format, bytes)?
     };
     within(raster.width, raster.height)?;

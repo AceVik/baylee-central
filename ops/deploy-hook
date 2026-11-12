@@ -126,15 +126,19 @@ stage() {
         > "$STATE/grants.sql" || die "no ops/grants.sql in $rev"
     plain_sql "$STATE/grants.sql" || die "ops/grants.sql of $rev is empty or holds a backslash"
     say "building $rev"
-    # Central and the website, each binary named: `--bin` limits the build to
-    # the binaries it names in every package given.
+    # Central, the website, and the picture worker beside the service
+    # (docs/profile-pictures.md), each binary named: `--bin` limits the build
+    # to the binaries it names in every package given. The codecs' x86-64
+    # assembly needs nasm on the build host.
     as_builder bash -c "cd '$SRC' && cargo build -q --release --locked -p central-service \
-        -p central-web-server --bin central-service --bin central-web"
+        -p central-web-server -p central-picture-codec \
+        --bin central-service --bin central-web --bin central-picture-worker"
     # the site, with the gateway's screenshots and fallback card status
     as_builder bash -c "cd '$SRC' && BAYLEE_SRC='$BAYLEE_SRC' cargo xtask site"
     rm -rf "$STAGED"
     install -d -m755 -o root -g root "$STAGED"
     install -m755 -o root -g root "$SRC/target/release/central-service" "$STAGED/central-service"
+    install -m755 -o root -g root "$SRC/target/release/central-picture-worker" "$STAGED/central-picture-worker"
     install -m755 -o root -g root "$SRC/target/release/central-web" "$STAGED/central-web"
     install -m644 -o root -g root "$STATE/grants.sql" "$STAGED/grants.sql"
     rm -f "$STATE/grants.sql"
@@ -167,6 +171,9 @@ switch() {
     [[ -x $BIN/central-service ]] && install -m755 -o root -g root "$BIN/central-service" "$BIN/central-service.previous"
     install -m755 -o root -g root "$STAGED/central-service" "$BIN/central-service.new"
     mv -f "$BIN/central-service.new" "$BIN/central-service"
+    # systemd starts a fresh worker for each picture: the next one is the new.
+    install -m755 -o root -g root "$STAGED/central-picture-worker" "$BIN/central-picture-worker.new"
+    mv -f "$BIN/central-picture-worker.new" "$BIN/central-picture-worker"
     if ! systemd-run --wait --collect --quiet -p User=central -p Group=central \
         -p StandardInput=file:/etc/baylee-central/migrate.json \
         "$BIN/central-service" --migrate-stdin; then

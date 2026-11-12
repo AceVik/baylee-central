@@ -3,6 +3,7 @@
 //! behind the service's own client. Every file is synthetic.
 #![forbid(unsafe_code)]
 
+mod animations;
 mod avif;
 mod formats;
 mod mutations;
