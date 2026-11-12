@@ -1396,7 +1396,7 @@ German by hand; the nine other languages carry the English text of both
 under "# English for now: to be translated.", as with §17's changed
 messages. No new message.
 
-## 18. As built: the album opens as a book, its photographs turn (12.11.2026)
+## 20. As built: the album opens as a book, its photographs turn (12.11.2026)
 
 The owner asked for better movement where Baylee's album opens and shuts,
 and for a beautiful change between the photographs in the full view. Both
