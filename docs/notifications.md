@@ -116,7 +116,7 @@ release migration, legal and independent security-review gates still apply.
   caching and retaining a previous build. Settings tests cover opt-in, all category
   switches, denied/offline changes, failed consent storage, delayed registration,
   reauthentication cleanup and unmounted-account races.
-- `web/e2e-real/pwa.spec.ts` uses an isolated HTTPS fixture and browser notifications;
+- `web/e2e-real/pwa.spec.ts` (removed 12.11.2026) uses an isolated HTTPS fixture and browser notifications;
   CDP injects delivery instead of contacting a real push provider. Full Chromium
   is used headlessly: the headless-shell binary denies notification permission
   ([Playwright issue 23954](https://github.com/microsoft/playwright/issues/23954)). The fixture
