@@ -592,7 +592,7 @@ fn done_view(lang: Lang, outcome: Outcome) -> impl IntoView {
 pub fn Reset(lang: Lang, worker: String) -> impl IntoView {
     let step = RwSignal::new(Step::Form);
     let form = Form::early();
-    // a code the link hands while the page is open: taken as at the start
+    // a code the link hands while the page is open: removed, filling nothing
     fragment::watch();
     let submit = move |event: leptos::ev::SubmitEvent| {
         event.prevent_default();

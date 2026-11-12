@@ -684,14 +684,20 @@ test.describe("the code from the confirmation mail's button", () => {
     await expect(code(page)).toHaveValue("");
     await gone(page);
     // The link opened in the tab that shows the page already: a move within
-    // the page, which runs no island; the page loads anew and takes it.
-    const reads = actions(seen).length;
+    // the page, which runs no island. The fragment goes and fills nothing;
+    // the page is left as it was, what was typed included.
+    await code(page).fill("zzzz");
+    const reads = seen.length;
     await page.goto(LINKED);
-    await expect(code(page)).toHaveValue(CODE);
-    await expect(page.locator("html")).toHaveAttribute("data-islands", "ready");
     await gone(page);
-    expect(actions(seen, 0).slice(reads)).toEqual(["status"]);
-    // the person confirms it
+    await expect(code(page)).toHaveValue("zzzz");
+    expect(seen.length).toBe(reads);
+    // opened as a page of its own, it is filled, and the person confirms it
+    await page.goto("/en/account");
+    await page.goto(LINKED);
+    await expect(page.locator("html")).toHaveAttribute("data-islands", "ready");
+    await expect(code(page)).toHaveValue(CODE);
+    await gone(page);
     const asked = seen.length;
     await button(page, "Confirm").click();
     await expect(said(page)).toHaveText("Your e-mail address is confirmed.");
@@ -726,16 +732,32 @@ test.describe("the code from the confirmation mail's button", () => {
 
   test("with no address that waits the code is dropped: no field now, and an empty one later", async ({ page }) => {
     const w = world(confirmed());
+    // naming the address is carried out and its answer lost: the page
+    // reads the state anew and draws the field without clearing it, so
+    // only a code that was dropped leaves it empty
+    w.next.set = "lost";
     const { seen } = await open(page, w, { path: LINKED });
     await expect(button(page, "Change")).toBeVisible();
     await expect(code(page)).toHaveCount(0);
     await gone(page);
-    // another address is named: its field starts empty, the link's code is gone
     await button(page, "Change").click();
     await send(page, NEW);
-    await expect(code(page)).toBeFocused();
+    await expect(code(page)).toBeVisible();
+    await expect(alert(page)).toHaveText(/./);
     await expect(code(page)).toHaveValue("");
-    expect(actions(seen)).not.toContain("confirm");
+    expect(actions(seen)).toEqual(["status", "set", "status"]);
+  });
+
+  test("a first read that fails drops the code: after trying again the field is empty", async ({ page }) => {
+    const w = world(waiting());
+    w.next.status = 503;
+    const { seen } = await open(page, w, { path: LINKED });
+    await expect(alert(page)).toHaveText("Baylee Central is not answering right now. Try again in a moment.");
+    await gone(page);
+    await button(page, "Try again").click();
+    await expect(code(page)).toBeVisible();
+    await expect(code(page)).toHaveValue("");
+    expect(actions(seen)).toEqual(["status", "status"]);
   });
 
   test("where Central sends no mail the code is dropped", async ({ page }) => {

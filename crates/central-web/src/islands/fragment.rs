@@ -7,11 +7,11 @@
 //! it only if it is a code of its own kind, and removes it from the address
 //! bar at once (`history.replaceState`, the rest of the address kept),
 //! whatever followed `#code=`. A code that arrives while the page is open
-//! (`watch`) loads the page anew, which takes it the same way. Nothing here
-//! sends, logs or stores it, and no island submits a form by itself: the
-//! person still presses the button, so a link scanner that opens the link
-//! spends nothing. Read through `js_sys` alone, as `early` reads the
-//! fields, so no further `web-sys` feature is needed.
+//! (`watch`) is removed the same way and fills nothing. Nothing here sends,
+//! logs or stores it, and no island submits a form by itself: the person
+//! still presses the button, so a link scanner that opens the link spends
+//! nothing. Read through `js_sys` alone, as `early` reads the fields, so no
+//! further `web-sys` feature is needed.
 
 /// What a fragment that hands a code begins with.
 const PREFIX: &str = "#code=";
@@ -105,20 +105,16 @@ pub fn take() -> String {
 
 /// Watches for a fragment that hands a code after the page started: the
 /// link opened in a tab that shows this page already, which a browser
-/// takes as a move within the page and runs no island for. The page is
-/// then loaded anew, its fragment with it, and its island takes the code
-/// as it takes one at its start (`take`), removing it at once. Another
+/// takes as a move within the page and runs no island for. The fragment
+/// is removed as at the start (`take`), and the code fills nothing: the
+/// page is left as it is, a step it shows once (a new vault's recovery
+/// code) included, and the person types the code from the mail. Another
 /// fragment is left alone.
 #[cfg(target_arch = "wasm32")]
 pub fn watch() {
     use wasm_bindgen::{JsValue, closure::Closure};
     let changed = Closure::<dyn Fn()>::new(|| {
-        if let Some((location, hash)) = location("hash")
-            && hands(&hash)
-            && let Some(reload) = method(&location, "reload")
-        {
-            let _ = reload.call0(&location);
-        }
+        let _ = take();
     });
     let global: JsValue = js_sys::global().into();
     if let Some(add) = method(&global, "addEventListener") {

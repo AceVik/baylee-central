@@ -314,13 +314,16 @@ fn every_mail_has_the_band_the_heading_one_button_and_the_footer() {
                 ),
                 "</td></tr>\n",
             );
-            assert!(band.contains(&format!("bgcolor=\"{GOLD}\" aria-hidden=\"true\"")));
-            assert!(band.contains(&format!(
-                "color:{NIGHT};mso-line-height-rule:exactly;\">B</td>"
-            )));
-            assert!(band.contains(&format!(
-                "color:{DAWN};mso-line-height-rule:exactly;\">Baylee</td>"
-            )));
+            // without the logo, the band of the first round, byte for byte
+            assert_eq!(
+                band,
+                format!(
+                    "border-radius:13px 13px 0 0;\"><{TABLE}><tr>\
+                     <td width=\"34\" height=\"34\" align=\"center\" valign=\"middle\" bgcolor=\"{GOLD}\" aria-hidden=\"true\" style=\"width:34px;height:34px;background:{GOLD};border-radius:9px;font-family:{SERIF};font-size:20px;line-height:34px;font-weight:700;color:{NIGHT};mso-line-height-rule:exactly;\">B</td>\
+                     <td bgcolor=\"{NIGHT}\" style=\"padding-left:12px;background:{NIGHT};font-family:{SERIF};font-size:24px;line-height:34px;font-weight:700;letter-spacing:0.01em;color:{DAWN};mso-line-height-rule:exactly;\">Baylee</td>\
+                     </tr></table>"
+                )
+            );
             // one heading, the title
             assert_eq!(html.matches("<h1 ").count(), 1);
             let title = between(html, "<h1 ", "</h1>");

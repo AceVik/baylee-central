@@ -236,8 +236,9 @@ functions; no message changed.
   fragment once when it starts, fills the code's field with a reset code
   it parses (an empty field only: what was typed before the island ran
   stays), and removes the fragment from the address bar at once, whatever
-  it held; a code that arrives while the page is open loads the page anew,
-  which takes it the same way. Nothing is sent until the person sends the
+  it held; a code that arrives while the page is open is removed the same
+  way and fills nothing, so that a step shown once (a new vault's recovery
+  code) is not lost. Nothing is sent until the person sends the
   form: a link scanner that opens the link spends nothing. The sign-in name
   is still typed; the link carries none.
 
