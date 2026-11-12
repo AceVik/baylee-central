@@ -6451,7 +6451,7 @@ audit.
 ## The site's strip, the official mark and the colour switch, 12 November 2026
 
 The owner asked for three things on the website
-([frontend rewrite](proposals/frontend-rewrite.md), §18).
+([frontend rewrite](proposals/frontend-rewrite.md), §19).
 
 **Pass 1, what changed.** The strip under the bar lost the release, the
 checks, the last commit and the stars, and lays out what stays from a count

@@ -1045,7 +1045,7 @@ a gateway's card shows its own. A number is drawn only while a source
 reports it, and nothing is kept past the minute it was read in. The
 gateway's half is Baylee's (a brief is with the project's notes); until a
 gateway reports, the strip shows the accounts, the cards, the stars and
-the gateways online (the stars left it on 12.11.2026, §18).
+the gateways online (the stars left it on 12.11.2026, §19).
 
 **The Impressum** is in §10, point 2.
 
@@ -1107,7 +1107,7 @@ one number for all pages and visitors and nothing about a request
 assurance](../security-assurance.md)); without the setting nothing is
 counted or shown, and the privacy notice has its section only where it is
 counted. On a phone four counts stand two and two (laid out anew on
-12.11.2026, §18).
+12.11.2026, §19).
 
 **Menus.** The download's menu and the language menu lie on a layered
 shade, come in with their rows one after the other and leave as they came
