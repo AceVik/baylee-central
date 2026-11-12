@@ -990,9 +990,11 @@ password guessing. Treat any backup that holds both as credential material.
 *Since migration 000026; the protocol and every number are in
 [an account's e-mail address](email.md).*
 
-Central sends three mails: the code that confirms an account's address, a
-reset code, and a notice to an address that was replaced or removed. It
-speaks no SMTP. It hands each mail to `baylee-mailer` on the same host, one
+Central sends the code that confirms an account's address, a reset code,
+a notice to an address that was replaced or removed, and notices to the
+account's confirmed address that a reset was finished, that the password
+was changed and that an administrator made a reset code. It speaks no
+SMTP. It hands each mail to `baylee-mailer` on the same host, one
 `POST /v1/send` over loopback HTTP. The mailer's `API.md` is the contract.
 
 Without the `mail` block Central sends no mail. An address that is stored

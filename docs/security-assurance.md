@@ -6104,3 +6104,180 @@ one of the eleven or English, and links go to the configured site.
 Tested: the unit tests of the hour's mails and the queue, the terms rule
 for each action, and the fixtures of both PostgreSQL suites with the
 five minutes. What ran on the merged tree is in the pull request's text.
+
+## Notices of a changed login to the account's address, 12 November 2026
+
+Until this change Central told an account's e-mail address only that it
+was replaced or removed. Three notices now go to the account's confirmed
+address ([e-mail](email.md#notices-that-the-login-changed)): a reset code
+set a new password (with `keep` or `new`), the password was changed, and
+an administrator made a reset code. No change to `central-api`, no
+migration, no new dependency and no change to `Cargo.lock`.
+`central-postgres`'s `finish_reset`, `change_password` and `issue_reset`
+return the confirmed address with their answers, and
+`ISSUED_RESET_HOURS` is public, so the notice says the number the store
+uses. The same work set the reset code in its mail at 15 px without added
+space between its characters, so that it fits on one line of the card in
+Gmail and mailbox.org, where it had broken in two.
+
+Design pass. The assets are the confirmed address (personal data Central
+holds already), the fact that the login changed, and the reset code, which
+no notice may carry. The account's mailbox is trusted with what the
+account's owner is told and nobody else is told anything.
+- **What a notice is for.** It tells the owner of a change they did not
+  make, in time to act: an administrator's code is ended by a password
+  change, which the notice says; after a reset the owner asks an
+  administrator for a code, and learns whether the recovery code still
+  opens the data; after a password change the owner sets a new one with a
+  reset code.
+- **Who is told.** The confirmed address only. An address that waits for
+  its code is nobody's yet: a session named it, and nothing proves the
+  mailbox is the owner's until the code comes back.
+- **When, and which address.** Only once the store committed the change,
+  and to the address the account had at that moment. The store reads it in
+  the change's own transaction, after the account's row is locked, which
+  every write of the address locks first; `email_confirm` and
+  `email_remove` read the address they tell the same way. Decided against:
+  reading after the commit (one more `await` between the commit and the
+  queue, where a request that is cut off loses the notice, and an address
+  replaced meanwhile receives it), and reading in the worker (whoever took
+  the login could remove or replace the address before the worker came to
+  it; a password change gives its new session five minutes in which it
+  may name one).
+- **What it says.** No code; links only to the site's reset and security
+  pages; no administrator's name. **No account named**: the sign-in name
+  is half of what a reset by mail needs, these mails go out unasked, and
+  the confirmation mail and the older notices name none. The cost, in the
+  accepted limits: a mailbox that two accounts confirmed is not told which
+  account changed.
+- **Not for a mailed code.** That code is made by the worker
+  (`issue_mailed_reset`), not by `ResetLogin`; the reset mail is what the
+  address learns.
+- **Never a reason to fail or wait.** The notice is queued with the others
+  and tried once, off the request. A full queue drops it, a mailer that
+  does not take it leaves the change done.
+- **The shared queue.** One account changing its password again and again
+  could take the 64 places. The same notice to the same address of an
+  account is now queued once while it waits, so one account holds at most
+  one place for each kind; filling the queue needs many accounts with
+  confirmed addresses and a slow mailer, which is in the accepted limits.
+- **Audit.** No new event. An administrator's code has its event already;
+  a reset and a password change are the account's own and have none, as
+  before.
+- Decided against: a notice for every sign-in; a second try for a notice;
+  naming the administrator; a notice for a mailed code beside its mail.
+
+Implementation pass: looked at each boundary in turn.
+- **After the commit only.** `Mails::committed` takes the store's answer
+  with the address: a refusal returns before anything else, a commit
+  queues the notice and returns the store's answer. It is synchronous, so
+  nothing is awaited between the store's return and the queue. The three
+  callers pass the answer straight to it; `changed` (the guesses' places)
+  still runs after a commit only.
+- **The cut-off request.** The listeners wrap each request in a timeout
+  and serve it on the connection's task (`central-http`'s `boundary.rs`,
+  `server.rs`): a request cut off is dropped at its next `await`. After the
+  commit returns there is none before the queue, so a cut there loses
+  nothing; a cut during the commit can lose the notice of a change that
+  committed, as it can for the two older notices. In the accepted limits.
+- **The store.** One `SELECT` of `account_emails` by the account's id, in
+  the transaction that changes the login, after its lock. Nothing else in
+  those statements changed. A storage failure of that `SELECT` fails the
+  change, as any statement of the transaction would; it then commits
+  nothing.
+- **Without a mailer** nothing is queued, and an address read is dropped.
+- **Secrets and diagnostics.** `Told` prints nothing of what it holds, as
+  before; `What` says which mail and, for a reset, whether a new vault
+  began. No new log line. The notices carry no code: they are made without
+  one, and `Mail::code` is `None` for them.
+- **Words.** English and German by hand. The test that every language has
+  its own words goes by id now (it went by position), allows exactly the
+  nineteen new ids to be English in the nine other languages, and still
+  holds German and the nine to their own words for every other id. The
+  placeables test allows `hours`.
+- **Lints.** No exemption; clippy with `-D warnings` over the workspace.
+- **The worker** in `central-service` is unchanged: it reads `Delivery`
+  only, and a notice is a `Notice` as before.
+
+Adversarial pass, with what was tested.
+- **A refusal tells nobody.** Unit: every refusal the store gives is
+  answered as it is, with nothing queued and the worker not told; the
+  closure that writes the mail is never called. Real PostgreSQL: a wrong
+  current password, a spent code, a code asked for by no administrator and
+  one for the administrator's own account each leave nothing waiting.
+- **Nobody without an address or a mailer.** Unit: no address and no
+  mailer queue nothing. Real PostgreSQL: an account whose address only
+  waits changes its password and gets an administrator's code, and nothing
+  waits; a Central without a mailer changes a password, makes a code and
+  resets with it for an account with a confirmed address, and nothing
+  waits and nothing is handed over.
+- **Never on the request.** Unit: with a mailer that panics when asked,
+  the change is answered and the notice waits; a full queue drops it and
+  the answer stands. Real PostgreSQL: after each change's answer the
+  mailer has been handed nothing; the notice goes out when the worker's
+  step runs.
+- **Each notice end to end.** Over the real listeners: a reset that keeps
+  the data, an administrator's code and a reset with a new vault, told in
+  that order to the address the account confirmed, in its language; a
+  password change, told before the address's removal. Directly on a second
+  service: a password change in German, an administrator's code, a reset
+  that keeps and one that begins a new vault in Italian, each to the
+  confirmed address with no code and no time to live.
+- **A notice not taken.** The mailer refuses the notice of a new vault:
+  `Failed`, nothing waits after it, and the account signs in with the new
+  password at the new epoch.
+- **A mailed code** gets its reset mail and no notice of a code beside it.
+- **Once while it waits.** Unit: 128 password changes of one account hold
+  one place; another kind, another address and another account each have
+  their own; once taken, the same notice waits again.
+- **The mails.** Every language renders the three notices; no image, no
+  script, no address outside the site, no code, no name; the reset and the
+  password notice link to the reset page, the administrator's to the
+  security page; the German words say what each change was, and the keep
+  and new resets differ. The reset code's box is at 15 px with no added
+  space, the confirmation code's unchanged.
+- **Mutants.** Seven changes were each caught by the unit tests: a notice
+  queued twice while it waits, a notice queued for a refusal or for an
+  account without an address, a committed change never told, a notice
+  queued without a mailer, the reset code's box back at 17 px, a new
+  message left in English in German, and an old message left in English
+  in French. Two more were tried against the real store, one fixture run
+  each: a password change whose transaction reads no address (caught
+  where the password notice must arrive) and a reset that reports the
+  other vault (caught over the real listeners, where the reset that kept
+  the data must say so). None survived; each run's container was gone
+  afterwards.
+
+Not tested.
+- A `ResetFinish` the store refuses after a start that succeeded (two
+  finishes racing for one code). The fixture's refused resets are refused
+  at `ResetStart`; the unit test covers that a refusal from the store
+  tells nobody.
+- A request cut off between the store's commit and its return.
+- A real mailer, real delivery, and how the notices look in real mail
+  clients. The 15 px for the reset code follow the coordinator's
+  measurement in Gmail and mailbox.org; no client was looked at here.
+- The nine languages: they hold the English text.
+
+For the owner.
+- The nineteen messages of the three notices are English in fr, it, es,
+  pt-br, ru, ja, ko, zh-hans and zh-hant until they are translated.
+- The notices name no account (above). If a mailbox is shared by two
+  accounts, it is not told which one changed.
+- The privacy notice (`legal/privacy.*.md` § 3) gives the address's
+  purposes as confirming it, sending reset codes and telling the old
+  address when it is replaced or removed. Telling the address of a reset,
+  a password change and an administrator's code is a further use of the
+  same address. The texts were not changed here.
+
+Checks. On the code of `2d614e4` (the documents after it change no code):
+`cargo fmt --all --check` and `cargo clippy --locked --workspace
+--all-targets -- -D warnings` pass; `cargo xtask gate` passes (format,
+policy, clippy, 673 tests with the doc tests, the release build); `cargo
+xtask postgres` passes, both suites, and its container was gone afterwards;
+`cargo xtask secrets` passes on the tree and the full history; `cargo xtask
+crypto-scope` and `cargo xtask sqlite-scope` pass; `cargo deny check`
+(0.20.2) and `cargo audit --deny warnings` (0.22.2, with the ignores in
+`.cargo/audit.toml`) pass.
+
+Engineering review, not an audit.
