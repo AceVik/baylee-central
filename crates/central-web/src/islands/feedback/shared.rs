@@ -602,3 +602,33 @@ impl Purge {
 fn now() -> i64 {
     i64::try_from(super::super::pow::now_ms() / 1000).unwrap_or(i64::MAX)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// An answer that did not arrive is never a refusal: a change may have
+    /// been made, so the page reads again instead of saying "refused".
+    #[test]
+    fn a_lost_answer_is_no_refusal() {
+        for failure in [Failure::Unavailable, Failure::Malformed, Failure::Network] {
+            assert!(lost(failure), "{failure:?}");
+        }
+        for failure in [
+            Failure::Rejected,
+            Failure::Forbidden,
+            Failure::Conflict,
+            Failure::Busy,
+        ] {
+            assert!(!lost(failure), "{failure:?}");
+        }
+    }
+
+    /// Deleting for good asks for the password a minute before Central
+    /// would refuse, so the two clocks never disagree on the edge.
+    #[test]
+    fn a_purge_wants_a_sign_in_younger_than_central_s_limit() {
+        const { assert!(FRESH < 30 * 60) };
+        const { assert!(FRESH > 25 * 60) };
+    }
+}

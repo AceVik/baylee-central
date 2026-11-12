@@ -403,6 +403,14 @@ announces new reports, and `?` for the keys. Beyond it: the Overview's
 tile for open reports and new crashes, and the navigation's count of
 unread ones.
 
+The new site (`docs/proposals/frontend-rewrite.md` §26) has the section
+at `/{lang}/account/admin/feedback` and a report at
+`/{lang}/account/admin/feedback/<id in hex>`, on the same requests and the
+same query string, so saved views carry over. It leaves out the drawer,
+the single-key shortcuts, the quiet refresh, and Scryfall's pictures (its
+`img-src 'self'` admits no other origin); the screenshot is drawn from its
+checked bytes into a canvas, never through an address.
+
 ### For the owner and the PM
 
 - **Who files:** the bridge and approved gateways' `sso` tokens. A pending
