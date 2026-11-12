@@ -1,6 +1,6 @@
 import { expect, type Page, type Route, test } from "@playwright/test";
 
-import { axe, narrow, targets, watch } from "./check.ts";
+import { axe, narrow, schemes, targets, watch } from "./check.ts";
 
 // The reset page (docs/account-reset.md) in a real browser, against a
 // stand-in for Central's browser surface. The crypto is real: the committed
@@ -397,7 +397,8 @@ test("someone without a code asks for one by mail: only a name is sent, not at a
   await expect(form(page).getByLabel("Reset code")).toHaveAccessibleDescription(
     "By e-mail or from an administrator. It starts with RESET and works once: for one hour if it came by e-mail, for 24 hours if an administrator made it.",
   );
-  expect(await axe(page)).toEqual([]);
+  // with the block's refusal showing, in the dark scheme and in the light one
+  expect(await schemes(page)).toEqual([]);
   expect(await targets(page)).toEqual([]);
   expect(await narrow(page)).toBe(0);
   // by keyboard: the name, its button, then the form below
@@ -427,7 +428,8 @@ test("someone without a code asks for one by mail: only a name is sent, not at a
   // the code that arrives is redeemed below, for this name
   await expect(form(page).getByLabel("Sign-in name")).toHaveValue("erika");
   await expect(mailName(page)).toBeFocused();
-  expect(await axe(page)).toEqual([]);
+  // with what the block says of the mail showing
+  expect(await schemes(page)).toEqual([]);
   expect(await narrow(page)).toBe(0);
 });
 
@@ -522,7 +524,7 @@ test("the page speaks German by hand", async ({ page }) => {
     "Wenn dieser Account eine bestätigte E-Mail-Adresse hat, ist ein Reset-Code dorthin unterwegs. Er gilt eine Stunde.",
   );
   expect(seen).toEqual([{ operation: "reset_mail", username: "erika", lang: "de" }]);
-  expect(await axe(page)).toEqual([]);
+  expect(await schemes(page)).toEqual([]);
   expect(await targets(page)).toEqual([]);
   expect(await narrow(page)).toBe(0);
 });

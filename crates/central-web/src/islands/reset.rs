@@ -434,7 +434,7 @@ fn mail_view(
         <form class="form" method="post" novalidate=true on:submit=submit>
             {field::labelled(lang, name, move || mail.name.get(), move |value| mail.name.set(value))}
             <p class="error" role="alert">{move || mail.error.get()}</p>
-            <button type="submit" class="button" aria-disabled=move || mail.busy.get().then_some("true")>
+            <button type="submit" class="button quiet" aria-disabled=move || mail.busy.get().then_some("true")>
                 {glyph::glyph(glyph::MAIL)}
                 <span>{words::reset_mail_submit(lang)}</span>
             </button>

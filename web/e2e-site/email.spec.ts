@@ -1,6 +1,6 @@
 import { expect, type Locator, type Page, type Route, test } from "@playwright/test";
 
-import { axe, narrow, targets } from "./check.ts";
+import { narrow, schemes, targets } from "./check.ts";
 
 // An account's optional e-mail address in the account area
 // (crates/central-web/src/islands/email.rs) in a real browser, against a
@@ -191,9 +191,9 @@ const button = (page: Page, name: string) => card(page).getByRole("button", { na
 const actions = (seen: Body[], from = 0) => seen.slice(from).filter((body) => body.operation === "email").map((body) => body.request?.action);
 const operations = (seen: Body[], from: number) => seen.slice(from).map((body) => body.operation);
 
-/** The page as it stands passes the checks every page passes, at 320 px too. */
+/** The page as it stands passes the checks every page passes: axe in both schemes, the targets, 320 px. */
 async function sound(page: Page) {
-  expect(await axe(page)).toEqual([]);
+  expect(await schemes(page)).toEqual([]);
   expect(await targets(page)).toEqual([]);
   expect(await narrow(page)).toBe(0);
 }
@@ -560,8 +560,7 @@ test("Central not answering at all is said in the section, with a way to try aga
   await expect(address(page)).toBeVisible();
 });
 
-test("German, a long address and the light scheme hold at 320 px", async ({ page }) => {
-  await page.emulateMedia({ colorScheme: "light" });
+test("German and an address as long as one gets hold at 320 px", async ({ page }) => {
   const w = world({ ...confirmed(LONG), ...waiting(LONG.replace("a", "e")) });
   const { seen } = await open(page, w, { path: "/de/account/security" });
   const section = card(page);
