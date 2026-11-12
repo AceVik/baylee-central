@@ -579,8 +579,9 @@ async fn the_privacy_notice_has_a_part_for_the_e_mail_address() {
             at("account") < at("email") && at("email") < at("cookie"),
             "{lang:?}"
         );
+        // the processor by its names, in every language
         assert!(
-            html.contains("mailbox.org (Heinlein Hosting GmbH, Berlin)"),
+            html.contains("mailbox.org") && html.contains("Heinlein Hosting GmbH"),
             "{lang:?}"
         );
     }

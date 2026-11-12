@@ -863,9 +863,10 @@ fn without_a_mailer(fixture: &Fixture<'_>, mailing: &Asked<'_>, account: &Accoun
     assert_eq!(mailer.count(), before);
 }
 
-/// Central takes thirty requests for a reset code by mail an hour,
-/// whoever asks and whatever the name; the queue is told of them and
-/// worked off one piece at a time.
+/// Requests for a reset code by mail are taken whatever the name; those
+/// for names that get no mail spend nothing of the hour's thirty mails, so
+/// more than thirty are taken. The queue is told of them and worked off
+/// one piece at a time.
 fn whole(fixture: &Fixture<'_>) {
     let central = fixture.central(true);
     let asked = Asked {
@@ -873,7 +874,8 @@ fn whole(fixture: &Fixture<'_>) {
         runtime: fixture.runtime,
     };
     let before = fixture.mailer.count();
-    for turn in 0..30 {
+    // Forty: more than the hour's thirty mails, which these spend none of.
+    for turn in 0..40 {
         let name = ["mail-nobody", "mail-c", "mail-b"][turn % 3];
         let answered = if turn % 2 == 0 {
             asked.reset(name)
@@ -882,11 +884,7 @@ fn whole(fixture: &Fixture<'_>) {
         };
         assert!(answered.is_ok(), "request {turn}");
     }
-    for name in ["mail-nobody", "mail-c", "mail-b"] {
-        assert_eq!(asked.reset(name).err(), Some(Error::Busy));
-        assert_eq!(asked.reset_on_the_site(name, None).err(), Some(Error::Busy));
-    }
-    // Told once for all thirty, and all thirty are there to be worked on.
+    // Told once for all forty, and all forty are there to be worked on.
     let told = |within: u64| {
         fixture.runtime.block_on(async {
             tokio::time::timeout(Duration::from_millis(within), central.mail_queued())
@@ -902,7 +900,7 @@ fn whole(fixture: &Fixture<'_>) {
         assert_eq!(delivery, Delivery::Nothing);
         done += 1;
     }
-    assert_eq!(done, 30);
+    assert_eq!(done, 40);
     assert_eq!(fixture.mailer.count(), before);
     assert!(!told(50));
 }
