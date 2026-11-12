@@ -695,6 +695,26 @@ async fn blocks(
             .any(|r| r.state == PictureReportState::Open),
         "reopened"
     );
+    // a current picture no report names can be removed all the same, by
+    // its digest, from the account's case; keeping it needs a report
+    set(store, owner, *owner_id, 12, 120).await.unwrap();
+    assert_eq!(
+        store
+            .decide_picture(moderator, owner_id.account, [120; 32], &PictureDecision::Keep)
+            .await,
+        Err(Error::Conflict)
+    );
+    let unreported = PictureDecision::Remove {
+        reason: PictureReason::Private,
+        note: None,
+        block: BlockChoice::None,
+    };
+    store
+        .decide_picture(moderator, owner_id.account, [120; 32], &unreported)
+        .await
+        .unwrap();
+    assert!(store.my_picture(owner).await.unwrap().picture.is_none());
+    assert_eq!(count(operator, &audit("picture.removed")).await, 3);
 }
 
 /// The runtime cannot delete a report, rewrite its words or move a picture

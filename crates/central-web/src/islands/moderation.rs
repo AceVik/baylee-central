@@ -8,8 +8,8 @@
 
 use central_api::admin::{AdminAnswer, AdminRequest};
 use central_api::picture::{
-    AdminPictureReport, BlockChoice, MAX_NOTICE_NOTE, PictureAdmin, PictureDecision, PictureReason,
-    PictureReportState, valid_note,
+    AdminPictureReport, BlockChoice, MAX_NOTICE_NOTE, Named, Picture, PictureAdmin,
+    PictureDecision, PictureDigest, PictureReason, PictureReportState, valid_note,
 };
 use central_api::wire::{Request, Response};
 use leptos::prelude::*;
@@ -32,9 +32,36 @@ struct Section {
     password: RwSignal<String>,
     said: RwSignal<Option<&'static str>>,
     busy: RwSignal<bool>,
+    /// The account whose case is open: its name and current picture.
+    case: RwSignal<Option<Result<Case, Problem>>>,
 }
 
+/// An open case: the account as it is called and its current picture.
+type Case = (Named, Option<Picture>);
+
 impl Section {
+    /// Opens `account`'s case: its current picture, whether reported or not.
+    fn open_case(self, account: [u8; 16]) {
+        leptos::task::spawn_local(async move {
+            let asked = Request::Admin {
+                request: AdminRequest::Picture {
+                    request: PictureAdmin::Case { account },
+                },
+            };
+            let read = match call(&asked).await {
+                Ok(Response::Admin {
+                    answer:
+                        AdminAnswer::PictureCase {
+                            account, picture, ..
+                        },
+                }) => Ok((account, picture)),
+                Ok(_) => Err(Problem::Failed),
+                Err(failure) => Err(failure.into()),
+            };
+            self.case.set(Some(read));
+        });
+    }
+
     fn read(self) {
         let state = self.state.get_untracked();
         leptos::task::spawn_local(async move {
@@ -99,6 +126,10 @@ impl Section {
             self.busy.set(false);
             self.said.set(Some(said));
             self.read();
+            // a decision changes the case too: it is read again
+            if let Some(Ok((named, _))) = self.case.get_untracked() {
+                self.open_case(named.id);
+            }
         });
     }
 }
@@ -111,13 +142,20 @@ fn named(lang: Lang, name: Option<&str>, tag: Option<u32>) -> String {
     }
 }
 
-fn decide_form(s: Section, report: &AdminPictureReport) -> impl IntoView + use<> {
+/// The decision on `sha256`, `account`'s picture: keep (only where a
+/// report is open) or remove with a reason, a note and a block.
+fn decide_form(
+    s: Section,
+    (account, sha256): ([u8; 16], PictureDigest),
+    first: PictureReason,
+    id: &str,
+    keeping: bool,
+) -> impl IntoView + use<> {
+    let id = id.to_owned();
     let lang = s.lang;
-    let (account, sha256) = (report.account.id, report.sha256);
-    let reason = RwSignal::new(report.reason);
+    let reason = RwSignal::new(first);
     let note = RwSignal::new(String::new());
     let block = RwSignal::new(BlockChoice::None);
-    let id = central_api::picture::hex(&report.id);
     let keep = move |_| {
         s.decide(
             PictureAdmin::Decide {
@@ -182,7 +220,7 @@ fn decide_form(s: Section, report: &AdminPictureReport) -> impl IntoView + use<>
         .map(|(value, _, text)| view! { <option value=*value>{*text}</option> })
         .collect_view();
     view! {
-        <div class="actions">
+        <div class="actions" hidden=!keeping>
             <button type="button" class="button" on:click=keep>{words::admin_pictures_keep(lang)}</button>
         </div>
         <div class="field">
@@ -208,6 +246,48 @@ fn decide_form(s: Section, report: &AdminPictureReport) -> impl IntoView + use<>
     }
 }
 
+/// An account's case: its current picture, which an administrator may
+/// remove whether or not a report about it is open.
+fn case_view(s: Section) -> AnyView {
+    let lang = s.lang;
+    match s.case.get() {
+        None => ().into_any(),
+        Some(Err(problem)) => {
+            view! { <p class="error" role="alert">{problem_text(lang, problem)}</p> }.into_any()
+        }
+        Some(Ok((account, picture))) => {
+            let who = named(lang, account.display_name.as_deref(), account.tag);
+            let shown = picture.map_or_else(
+                || view! { <p class="meta" id="picture-case-none">{words::admin_pictures_case_none(lang)}</p> }.into_any(),
+                |p| {
+                    let form = decide_form(
+                        s,
+                        (account.id, p.sha256),
+                        PictureReason::Other,
+                        &format!("case-{}", central_api::picture::hex(&account.id)),
+                        false,
+                    );
+                    view! {
+                        <div class="picture-current">{face(&p.key, p.sequence_bytes.is_some(), String::new())}</div>
+                        {p.sequence_bytes.is_some().then(|| view! {
+                            <a class="picture-open-moving" href=sequence_url(&p.key) target="_blank" rel="noopener noreferrer">{words::picture_open_moving(lang)}</a>
+                        })}
+                        {form}
+                    }
+                    .into_any()
+                },
+            );
+            view! {
+                <section class="card picture-case" aria-labelledby="picture-case-title">
+                    <h3 id="picture-case-title" translate="no">{who}</h3>
+                    {shown}
+                </section>
+            }
+            .into_any()
+        }
+    }
+}
+
 fn report_view(s: Section, report: &AdminPictureReport) -> impl IntoView + use<> {
     let lang = s.lang;
     let account = report.account.id;
@@ -224,7 +304,14 @@ fn report_view(s: Section, report: &AdminPictureReport) -> impl IntoView + use<>
         },
     );
     let actions = match (report.state, report.current.is_some()) {
-        (PictureReportState::Open, true) => decide_form(s, report).into_any(),
+        (PictureReportState::Open, true) => decide_form(
+            s,
+            (account, report.sha256),
+            report.reason,
+            &central_api::picture::hex(&report.id),
+            true,
+        )
+        .into_any(),
         (PictureReportState::Removed, _) => view! {
             <div class="actions">
                 <button type="button" class="button" on:click=move |_| {
@@ -253,6 +340,10 @@ fn report_view(s: Section, report: &AdminPictureReport) -> impl IntoView + use<>
             </dl>
             {report.note.clone().map(|note| view! { <blockquote translate="no">{note}</blockquote> })}
             {actions}
+            <div class="actions">
+                <button type="button" class="button picture-case-open" on:click=move |_| s.open_case(account)>
+                    {words::admin_pictures_case(lang)}</button>
+            </div>
         </li>
     }
 }
@@ -264,6 +355,7 @@ pub fn section(lang: Lang, worker: String) -> impl IntoView {
         worker: StoredValue::new(worker),
         state: RwSignal::new(PictureReportState::Open),
         reports: RwSignal::new(None),
+        case: RwSignal::new(None),
         password: RwSignal::new(String::new()),
         said: RwSignal::new(None),
         busy: RwSignal::new(false),
@@ -307,6 +399,7 @@ pub fn section(lang: Lang, worker: String) -> impl IntoView {
                 <p class="hint" id="admin-pictures-password-hint">{words::admin_pictures_password_hint(lang)}</p>
             </div>
             <p class="meta" role="status">{move || s.said.get()}</p>
+            {move || case_view(s)}
             {list}
         </section>
     }
