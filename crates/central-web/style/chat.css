@@ -1,7 +1,12 @@
 /* The messenger (docs/proposals/frontend-rewrite.md §6.3): one pane at a
    time when narrow, the list beside the conversation from 48rem of its own
    width, the details as a sheet over the conversation and docked beside it
-   from 70rem. It decides by its own width (a container), not the window's. */
+   from 70rem. It decides by its own width (a container), not the window's.
+
+   It is drawn as the old site's messenger was (web/src/styles/chat.css):
+   one calm window, the interface in Inter, a person's words in bubbles,
+   one's own in the gold. Nothing moves or grows under the pointer; only
+   colours and shades change (owner, 11.11.2026; tests/hover.rs). */
 
 .frame-messenger {
   max-inline-size: 100rem;
@@ -28,13 +33,20 @@
 }
 
 .messenger {
+  /* a bubble's corners: round, and tighter where a run's lines meet */
+  --bubble-r: 1.125rem;
+  --bubble-joint: 0.375rem;
+
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   block-size: max(28rem, calc(100dvh - var(--bar-height) - var(--space-8)));
   border: var(--hairline) solid var(--edge-soft);
-  border-radius: var(--radius-md);
-  background: var(--surface);
+  border-radius: var(--radius);
+  background: var(--panel-solid);
+  box-shadow: var(--shadow);
   overflow: hidden;
+  font-family: var(--sans);
+  line-height: var(--leading);
 }
 
 @media (max-width: 39.99rem) {
@@ -44,6 +56,7 @@
 
   .messenger {
     block-size: max(26rem, calc(100dvh - var(--bar-height) - var(--dock-height) - var(--space-9)));
+    border-radius: var(--radius-md);
   }
 
   .frame-messenger .frame-main {
@@ -61,7 +74,7 @@
 
 .msgr-side {
   border-inline-end: var(--hairline) solid var(--edge-soft);
-  background: var(--ground);
+  background: var(--bg);
 }
 
 .messenger[data-pane="list"] .msgr-main,
@@ -71,7 +84,7 @@
 
 @container messenger (min-width: 48rem) {
   .messenger {
-    grid-template-columns: minmax(16rem, 22rem) minmax(0, 1fr);
+    grid-template-columns: minmax(17rem, 22rem) minmax(0, 1fr);
   }
 
   .messenger[data-pane] .msgr-main,
@@ -79,9 +92,18 @@
     display: flex;
   }
 
-  .conv-back {
+  /* both panes are in view: there is nothing to go back to */
+  .messenger .conv-back {
     display: none;
   }
+}
+
+/* What scrolls on its own: a thin bar in the page's ink on no track. */
+.msgr-panel,
+.conv-scroll,
+.conv-details {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--ink-soft) 45%, transparent) transparent;
 }
 
 /* ---- The side: who, the two halves, the list ------------------------------ */
@@ -90,7 +112,7 @@
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
+  padding: var(--space-4) var(--space-4) var(--space-3);
 }
 
 .msgr-me-name {
@@ -103,19 +125,29 @@
   font-weight: 700;
 }
 
-.tag {
+/* a handle's tag: lowercase, as it is typed (`Name#1a2b`), in a quieter ink */
+.messenger .tag {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
   color: var(--ink-faint);
+  font-family: var(--sans);
   font-size: var(--text-sm);
-  font-weight: 400;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
   font-variant-numeric: tabular-nums;
 }
 
+/* the two halves: a segmented control, as the old site's */
 .msgr-tabs {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: var(--space-1);
-  padding: 0 var(--space-3) var(--space-2);
-  border-block-end: var(--hairline) solid var(--edge-soft);
+  margin: 0 var(--space-4) var(--space-3);
+  padding: var(--space-1);
+  border-radius: var(--radius-full);
+  background: var(--panel-2);
 }
 
 .msgr-tabs a {
@@ -124,24 +156,31 @@
   justify-content: center;
   gap: 0.45em;
   min-block-size: var(--target);
-  border-radius: var(--radius-sm);
+  padding-inline: var(--space-2);
+  border-radius: var(--radius-full);
   color: var(--ink-soft);
+  font-size: var(--text-sm);
   font-weight: 700;
   text-decoration: none;
+  transition:
+    background-color var(--dur-fast) ease,
+    color var(--dur-fast) ease,
+    box-shadow var(--dur-fast) ease;
 }
 
 .msgr-tabs a:hover {
-  background: var(--surface-raised);
+  color: var(--title);
 }
 
 .msgr-tabs a[aria-current="page"] {
-  background: var(--surface);
+  background: var(--panel-solid);
   color: var(--title);
-  box-shadow: inset 0 -0.1875rem 0 var(--action);
+  box-shadow: var(--elevation-1);
 }
 
 .badge {
   display: inline-grid;
+  flex: none;
   place-items: center;
   min-inline-size: 1.5em;
   padding: 0 0.4em;
@@ -156,52 +195,96 @@
 
 .msgr-panel {
   display: grid;
+  flex: 1;
   align-content: start;
   gap: var(--space-3);
+  min-block-size: 0;
   padding: var(--space-3);
+  border-block-start: var(--hairline) solid var(--edge-soft);
   overflow-y: auto;
   overscroll-behavior: contain;
+}
+
+/* finding a conversation, and a new group beside it */
+.msgr-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
 }
 
 .msgr-find {
   position: relative;
   display: flex;
+  flex: 1 1 9rem;
   align-items: center;
+  min-inline-size: 0;
 }
 
 .msgr-find .icon {
   position: absolute;
-  inset-inline-start: 0.75em;
+  inset-inline-start: 0.9rem;
+  inline-size: 1.05rem;
+  block-size: 1.05rem;
   color: var(--ink-faint);
   pointer-events: none;
 }
 
+.msgr-new {
+  flex: none;
+}
+
+/* the messenger's fields: the site's fields (components.css), a little
+   tighter; the search and the composer as pills */
 .msgr-find input,
 .msgr-add input,
 .msgr-add select,
 .composer textarea {
   inline-size: 100%;
   min-block-size: var(--target);
-  padding: 0.5em 0.75em;
-  border: var(--hairline) solid var(--edge);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
+  padding: 0.5em 0.85em;
+  border: var(--hairline) solid var(--field-edge);
+  border-radius: var(--radius-md);
+  background: var(--field-bg);
   color: var(--ink);
-  font: inherit;
+  font: 1rem var(--sans);
+  transition:
+    border-color var(--dur-fast) ease,
+    box-shadow var(--dur-fast) ease;
+}
+
+.msgr-find input::placeholder,
+.msgr-add input::placeholder,
+.composer textarea::placeholder {
+  color: var(--ink-faint);
+  opacity: 1;
+}
+
+.msgr-find input:hover,
+.msgr-add input:hover,
+.msgr-add select:hover,
+.composer textarea:hover {
+  border-color: var(--edge);
+}
+
+.msgr-find input:focus-visible,
+.msgr-add input:focus-visible,
+.msgr-add select:focus-visible,
+.composer textarea:focus-visible {
+  outline: 2px solid transparent;
+  outline-offset: 0;
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold) 35%, transparent);
 }
 
 .msgr-find input {
-  padding-inline-start: 2.5em;
-}
-
-.msgr-tools {
-  display: flex;
-  justify-content: flex-end;
+  padding-inline-start: 2.6rem;
+  border-radius: var(--radius-full);
 }
 
 .button.small {
   min-block-size: var(--target);
-  padding: 0.35em 0.8em;
+  padding: 0.35em 0.95em;
   font-size: var(--text-sm);
 }
 
@@ -211,25 +294,140 @@
 }
 
 .msgr-add label {
+  color: var(--ink);
+  font-size: var(--text-sm);
   font-weight: 700;
+}
+
+.msgr-add .hint {
+  margin: 0;
+  font-size: var(--text-xs);
+}
+
+.msgr-add .with-tool {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.with-tool > input,
+.with-tool > select {
+  flex: 1 1 8rem;
+  min-inline-size: 0;
+}
+
+.with-tool > .button {
+  flex: none;
+}
+
+/* the new group's form: a small panel of its own under its button */
+#new-group {
+  padding: var(--space-3);
+  border: var(--hairline) solid var(--edge-soft);
+  border-radius: var(--radius-md);
+  background: var(--panel-solid);
 }
 
 .msgr-own {
   margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--violet-soft);
   color: var(--ink-soft);
+  font-size: var(--text-sm);
+}
+
+.msgr-own strong {
+  color: var(--title);
 }
 
 .selectable {
   user-select: all;
 }
 
-.msgr-empty,
+/* what a list says while it loads, or that nothing matched */
 .msgr-note {
   margin: 0;
   padding: var(--space-4) var(--space-2);
   color: var(--ink-soft);
+  font-size: var(--text-sm);
   text-align: center;
 }
+
+/* ---- Empty: a sign, a short line in the site's voice, the way on ---------- */
+
+.msgr-empty,
+.conv-start {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-2);
+  padding: var(--space-6) var(--space-3);
+  color: var(--ink-soft);
+  font-size: var(--text-sm);
+  text-align: center;
+}
+
+.msgr-empty p,
+.conv-start p {
+  max-inline-size: 22rem;
+  margin: 0;
+}
+
+.msgr-empty-icon,
+.msgr-welcome-icon,
+.chat-missing-icon {
+  display: inline-grid;
+  place-items: center;
+  inline-size: 3.5rem;
+  block-size: 3.5rem;
+  margin-block-end: var(--space-1);
+  border-radius: var(--radius-full);
+  background: var(--violet-soft);
+  color: var(--violet);
+}
+
+.msgr-empty-icon .icon,
+.msgr-welcome-icon .icon,
+.chat-missing-icon .icon {
+  inline-size: 1.6rem;
+  block-size: 1.6rem;
+}
+
+.msgr-empty .msgr-empty-title,
+.conv-start .conv-start-title {
+  color: var(--title);
+  font-family: var(--serif);
+  font-size: var(--text-lg);
+  font-weight: 600;
+  line-height: var(--leading-tight);
+  text-wrap: balance;
+}
+
+.msgr-empty .button,
+.conv-start .button {
+  margin-block-start: var(--space-2);
+}
+
+.msgr-empty .meta:empty {
+  display: none;
+}
+
+/* a conversation without a message stands in the middle of its pane */
+.conv-start {
+  align-content: center;
+  min-block-size: 100%;
+}
+
+.conv-start .avatar {
+  inline-size: 4.5rem;
+  block-size: 4.5rem;
+  margin-block-end: var(--space-1);
+  font-size: 1.5rem;
+  box-shadow: var(--elevation-1);
+}
+
+/* ---- The list of conversations -------------------------------------------- */
 
 .conv-list,
 .people ul,
@@ -246,20 +444,32 @@
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   gap: var(--space-3);
-  min-block-size: var(--target);
+  min-block-size: 3.75rem;
   padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   color: var(--ink);
   text-decoration: none;
+  transition:
+    background-color var(--dur-fast) ease,
+    box-shadow var(--dur-fast) ease;
+}
+
+.conv-row .avatar {
+  inline-size: 2.75rem;
+  block-size: 2.75rem;
 }
 
 .conv-row:hover {
-  background: var(--surface-raised);
+  background: var(--panel-2);
+  color: var(--ink);
 }
 
+/* the open one: lifted onto the panel, the gold rule at its edge */
 .conv-row[aria-current="true"] {
-  background: var(--surface);
-  box-shadow: inset 0.1875rem 0 0 var(--action);
+  background: var(--panel-solid);
+  box-shadow:
+    inset 0.1875rem 0 0 var(--gold),
+    var(--elevation-1);
 }
 
 .conv-main,
@@ -280,6 +490,10 @@
   gap: 0.35em;
 }
 
+.conv-bottom {
+  align-items: center;
+}
+
 .conv-name,
 .conv-preview {
   overflow: hidden;
@@ -289,13 +503,20 @@
 
 .conv-name {
   color: var(--title);
-  font-weight: 700;
+  font-weight: 600;
+}
+
+.conv-row .tag {
+  flex: none;
 }
 
 .conv-top time {
+  flex: none;
   margin-inline-start: auto;
+  padding-inline-start: var(--space-2);
   color: var(--ink-faint);
   font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
@@ -305,8 +526,23 @@
   font-size: var(--text-sm);
 }
 
+.conv-who {
+  color: var(--ink-faint);
+}
+
+/* something new: the name heavier, the line in the body's ink, the time
+   in the information colour, and the count in words beside it */
+.conv-row[data-unread] .conv-name {
+  font-weight: 800;
+}
+
 .conv-row[data-unread] .conv-preview {
   color: var(--ink);
+  font-weight: 600;
+}
+
+.conv-row[data-unread] .conv-top time {
+  color: var(--violet);
   font-weight: 700;
 }
 
@@ -321,8 +557,16 @@
   border-radius: var(--radius-full);
   background: var(--avatar-0);
   color: var(--on-avatar);
+  font-size: 0.95rem;
   font-weight: 700;
   letter-spacing: 0.02em;
+  line-height: 1;
+  user-select: none;
+}
+
+.avatar > .icon {
+  inline-size: 55%;
+  block-size: 55%;
 }
 
 .avatar[data-hue="1"] {
@@ -347,22 +591,27 @@
 
 /* ---- People --------------------------------------------------------------- */
 
-.people h2,
-.group-panel h4 {
-  margin: var(--space-2) 0 var(--space-1);
-  color: var(--ink-soft);
-  font-size: var(--text-sm);
-  letter-spacing: 0.04em;
+.people {
+  display: grid;
+  gap: var(--space-1);
+}
+
+/* a section's name as an eyebrow, as the old site's side headings were */
+.messenger .people > h2 {
+  margin: var(--space-2) var(--space-1) var(--space-1);
+  color: var(--violet);
+  font-family: var(--sans);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  line-height: 1.4;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
 }
 
 .person {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
+  display: grid;
   gap: var(--space-2);
-  padding-block: var(--space-2);
+  padding: var(--space-2);
 }
 
 .person + .person {
@@ -372,17 +621,41 @@
 .person-line {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-3);
   min-inline-size: 0;
 }
 
-.person-line small {
-  display: block;
-  color: var(--ink-faint);
+.person-handle {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 0.1em;
+  min-inline-size: 0;
 }
 
 .person-name {
+  color: var(--title);
+  font-weight: 600;
   overflow-wrap: anywhere;
+}
+
+.person-handle small {
+  flex-basis: 100%;
+  color: var(--ink-faint);
+  font-size: var(--text-xs);
+}
+
+.person .avatar {
+  inline-size: 2.25rem;
+  block-size: 2.25rem;
+  font-size: 0.85rem;
+}
+
+/* a row's actions start under its name */
+.person-actions,
+.person > .button {
+  padding-inline-start: 0;
+  margin-inline-start: calc(2.25rem + var(--space-3));
 }
 
 .person-actions {
@@ -391,10 +664,36 @@
   gap: var(--space-2);
 }
 
-.person .avatar {
-  inline-size: 2rem;
-  block-size: 2rem;
-  font-size: var(--text-sm);
+.person > .button {
+  justify-self: start;
+}
+
+/* what waits for an answer (a request, an invitation) and what was found
+   stands on the panel, as a card */
+.people[data-relation="incoming"] ul,
+.people[data-relation="invited"] ul {
+  gap: var(--space-2);
+}
+
+.people[data-relation="incoming"] .person,
+.people[data-relation="invited"] .person,
+.person.found {
+  padding: var(--space-3);
+  border: var(--hairline) solid var(--edge);
+  border-radius: var(--radius-md);
+  background: var(--panel-solid);
+  box-shadow: var(--elevation-1);
+}
+
+.person.found {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.people[data-relation="blocked"] .person-name {
+  color: var(--ink-soft);
 }
 
 .ask {
@@ -402,10 +701,10 @@
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2);
-  inline-size: 100%;
   padding: var(--space-3);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   background: var(--bad-tint);
+  color: var(--ink);
 }
 
 .ask p {
@@ -431,22 +730,36 @@
   text-align: center;
 }
 
+.msgr-welcome h2,
+.chat-missing h2 {
+  margin: 0;
+  font-size: var(--text-lg);
+}
+
+.msgr-welcome p,
+.chat-missing > p {
+  max-inline-size: 30rem;
+  margin: 0;
+  color: var(--ink-soft);
+}
+
 .chat-missing .form {
   inline-size: min(100%, 24rem);
   text-align: start;
-}
-
-.msgr-welcome-icon .icon,
-.chat-missing-icon .icon {
-  inline-size: 3rem;
-  block-size: 3rem;
-  color: var(--accent);
 }
 
 .msgr-welcome .meta {
   display: inline-flex;
   align-items: center;
   gap: 0.4em;
+  margin-block-start: var(--space-2);
+  color: var(--ink-faint);
+  font-size: var(--text-xs);
+}
+
+.msgr-welcome .meta .icon {
+  inline-size: 1em;
+  block-size: 1em;
 }
 
 .conv {
@@ -455,43 +768,69 @@
   flex-direction: column;
   block-size: 100%;
   min-block-size: 0;
+  background: var(--bg-alt);
 }
 
 .conv-head {
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  padding: var(--space-2) var(--space-3);
+  min-block-size: 4.25rem;
+  padding: var(--space-2) var(--space-3) var(--space-2) var(--space-4);
   border-block-end: var(--hairline) solid var(--edge-soft);
+  background: var(--panel-solid);
+}
+
+.conv-head .avatar {
+  inline-size: 2.75rem;
+  block-size: 2.75rem;
 }
 
 .conv-head-text {
+  display: grid;
   flex: 1;
+  gap: 0.1rem;
   min-inline-size: 0;
 }
 
 .conv-head h2 {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4em;
+  min-inline-size: 0;
   margin: 0;
   font-size: var(--text-lg);
-  overflow-wrap: anywhere;
+}
+
+/* a long name is cut, never wrapped, in the head */
+.conv-head-name {
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.conv-head .tag {
+  flex: none;
 }
 
 .conv-head h2:focus {
   outline: none;
 }
 
-.conv-head p {
+.conv-head-state {
   display: flex;
   align-items: center;
   gap: 0.35em;
   margin: 0;
   color: var(--ink-faint);
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
 }
 
-.conv-head p .icon {
-  inline-size: 1em;
-  block-size: 1em;
+.conv-head-state .icon {
+  inline-size: 0.95rem;
+  block-size: 0.95rem;
+  color: var(--ok);
 }
 
 .icon-button {
@@ -500,49 +839,77 @@
   place-items: center;
   inline-size: var(--target);
   block-size: var(--target);
+  padding: 0;
   border: 0;
   border-radius: var(--radius-full);
   background: transparent;
   color: var(--ink-soft);
   cursor: pointer;
+  transition:
+    background-color var(--dur-fast) ease,
+    color var(--dur-fast) ease;
 }
 
-.icon-button:hover {
-  background: var(--surface-raised);
-  color: var(--ink);
+.icon-button:hover,
+.icon-button[aria-expanded="true"] {
+  background: var(--panel-2);
+  color: var(--title);
 }
 
 .icon-button[data-warn] {
   color: var(--bad);
 }
 
+/* ---- System lines: what the chat itself says ------------------------------ */
+
 .banner {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-2) var(--space-3);
   margin: 0;
-  padding: var(--space-2) var(--space-4);
-  border-block-end: var(--hairline) solid var(--edge-soft);
+  padding: var(--space-2) var(--space-3);
+  border: var(--hairline) solid color-mix(in srgb, var(--warn) 35%, transparent);
+  border-radius: var(--radius-md);
   background: var(--warn-tint);
+  color: var(--ink);
+  font-size: var(--text-sm);
+}
+
+.conv > .banner {
+  margin: var(--space-3) var(--space-4) 0;
+}
+
+.banner > span {
+  flex: 1 1 12rem;
+}
+
+.banner > .icon {
+  color: var(--warn);
 }
 
 .banner.bad {
+  border-color: color-mix(in srgb, var(--bad) 40%, transparent);
   background: var(--bad-tint);
 }
+
+.banner.bad > .icon {
+  color: var(--bad);
+}
+
+/* ---- The messages ---------------------------------------------------------- */
 
 .conv-scroll {
   flex: 1;
   min-block-size: 0;
-  padding: var(--space-3) var(--space-4);
+  padding: var(--space-2) var(--space-5) var(--space-4);
   overflow-y: auto;
   overscroll-behavior: contain;
-  background: var(--ground-alt);
 }
 
 .conv-older {
   display: flex;
-  margin: 0 auto var(--space-3);
+  margin: var(--space-2) auto var(--space-3);
 }
 
 .conv-day-head {
@@ -551,91 +918,192 @@
   z-index: 1;
   display: flex;
   justify-content: center;
-  margin: var(--space-3) 0;
+  margin: var(--space-2) 0 var(--space-3);
+  padding-block-start: var(--space-1);
+  font-family: var(--sans);
   font-size: var(--text-xs);
-  font-weight: 700;
+  font-weight: 600;
+  letter-spacing: 0.04em;
 }
 
 .conv-day-head span {
-  padding: 0.2em 0.8em;
+  padding: 0.2em 0.9em;
+  border: var(--hairline) solid var(--edge-soft);
   border-radius: var(--radius-full);
-  background: var(--surface);
+  background: var(--panel-solid);
   color: var(--ink-soft);
   box-shadow: var(--elevation-1);
 }
 
 .conv-msgs {
   display: grid;
-  gap: var(--space-1);
+  gap: 0.125rem;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
+/* a line: on the start side, or on the end side for one's own; in a group
+   others' lines stand beside a column for their face */
 .msg {
   display: grid;
-  justify-self: start;
-  max-inline-size: min(36rem, 85%);
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-md);
-  background: var(--surface);
-  box-shadow: var(--elevation-1);
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: start;
 }
 
 .msg[data-first] {
-  margin-block-start: var(--space-2);
+  margin-block-start: var(--space-3);
+}
+
+.conv-msgs > .msg:first-child {
+  margin-block-start: 0;
 }
 
 .msg[data-own] {
-  justify-self: end;
-  background: var(--bubble-own);
+  justify-items: end;
 }
 
-.pending {
-  display: grid;
-  margin-inline-start: auto;
-  opacity: 0.85;
+.msg[data-beside] {
+  grid-template-columns: 2rem minmax(0, 1fr);
+  column-gap: var(--space-2);
+}
+
+.msg[data-beside] > .msg-bubble {
+  grid-column: 2;
+}
+
+.msg-face {
+  grid-column: 1;
+  align-self: start;
+}
+
+.msg-face .avatar,
+.safety-who .avatar {
+  inline-size: 2rem;
+  block-size: 2rem;
+  font-size: 0.75rem;
+}
+
+.msg-bubble {
+  position: relative;
+  max-inline-size: min(36rem, 85%);
+  padding: 0.45rem 0.85rem 0.4rem;
+  border: var(--hairline) solid var(--edge-soft);
+  border-radius: var(--bubble-r);
+  border-start-start-radius: var(--bubble-joint);
+  background: var(--panel-solid);
+  color: var(--ink);
+  box-shadow: 0 1px 2px var(--shade);
+}
+
+.msg:not([data-last]) > .msg-bubble {
+  border-end-start-radius: var(--bubble-joint);
+}
+
+/* one's own: the gold, its corners on the end side */
+.msg[data-own] > .msg-bubble {
+  border-color: transparent;
+  border-start-start-radius: var(--bubble-r);
+  border-start-end-radius: var(--bubble-joint);
+  background: var(--gold);
+  color: var(--gold-ink);
+}
+
+.msg[data-own]:not([data-last]) > .msg-bubble {
+  border-end-start-radius: var(--bubble-r);
+  border-end-end-radius: var(--bubble-joint);
+}
+
+.msg[data-own] > .msg-bubble ::selection {
+  background: var(--gold-ink);
+  color: var(--gold);
 }
 
 .msg-sender {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  color: var(--accent);
+  display: block;
+  margin-block-end: 0.1rem;
+  overflow: hidden;
+  color: var(--violet);
   font-size: var(--text-sm);
   font-weight: 700;
-}
-
-/* A message author's picture: one small fixed size beside the name. */
-.msg-sender .avatar,
-.safety-who .avatar {
-  inline-size: 1.75rem;
-  block-size: 1.75rem;
-  font-size: 0.7rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .msg-text {
   margin: 0;
+  font-size: var(--text-md);
+  line-height: 1.45;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
 
+/* room at the end of the last line for the time, which stands in the
+   bubble's corner: on the same line where it fits, under it where not */
+.msg-text::after {
+  content: "";
+  display: inline-block;
+  inline-size: 3rem;
+}
+
+/* a line sent as /me in the game: the serif's italic */
 .msg-text.emote {
+  font-family: var(--serif);
   font-style: italic;
 }
 
-.msg time,
-.msg-state {
-  justify-self: end;
+.msg-bubble time {
+  position: absolute;
+  inset-inline-end: 0.85rem;
+  inset-block-end: 0.4rem;
   color: var(--ink-faint);
   font-size: var(--text-xs);
+  line-height: 1.85;
+  font-variant-numeric: tabular-nums;
+}
+
+.msg[data-own] .msg-bubble time {
+  color: var(--gold-ink);
+}
+
+/* the line on its way: quieter until Central took it, its state under it */
+.msg.pending {
+  justify-items: end;
+  gap: var(--space-1);
+  margin-block-start: var(--space-3);
+}
+
+.msg.pending > .msg-bubble {
+  border: var(--hairline) dashed var(--field-edge);
+  border-start-end-radius: var(--bubble-joint);
+  background: var(--bubble-own);
+  color: var(--ink);
+}
+
+.msg.pending .msg-text::after {
+  content: none;
+}
+
+.msg-state {
+  color: var(--ink-soft);
+  font-size: var(--text-xs);
+}
+
+.msg.pending[data-failed] > .msg-bubble {
+  border-style: solid;
+  border-color: var(--bad);
+}
+
+.msg.pending[data-failed] .msg-state {
+  color: var(--bad);
+  font-weight: 600;
 }
 
 .msg-actions {
   display: flex;
   flex-wrap: wrap;
+  justify-content: flex-end;
   gap: var(--space-2);
-  margin-block-start: var(--space-2);
 }
 
 /* ---- Composing ------------------------------------------------------------- */
@@ -645,31 +1113,60 @@
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: end;
   gap: var(--space-1) var(--space-2);
-  padding: var(--space-2) var(--space-3);
+  padding: var(--space-3) var(--space-4) var(--space-2);
   border-block-start: var(--hairline) solid var(--edge-soft);
+  background: var(--panel-solid);
 }
 
 .composer textarea {
+  max-block-size: calc(6lh + 1.2rem);
+  padding: 0.55rem 1.1rem;
+  border-radius: 1.375rem;
+  line-height: var(--leading);
   resize: none;
   field-sizing: content;
-  max-block-size: calc(6lh + 1em);
-  line-height: var(--leading);
 }
 
+/* the send button: round and gold, the one thing to do here */
 .send {
   display: inline-grid;
   place-items: center;
   inline-size: var(--target);
   block-size: var(--target);
-  border: var(--hairline) solid var(--action-edge);
+  padding: 0;
+  border: 0;
   border-radius: var(--radius-full);
-  background: var(--action);
-  color: var(--on-action);
+  background: var(--gold);
+  color: var(--gold-ink);
+  box-shadow: 0 0.6rem 1.5rem -0.9rem color-mix(in srgb, var(--gold) 70%, transparent);
   cursor: pointer;
+  transition:
+    background-color var(--dur-fast) ease,
+    color var(--dur-fast) ease,
+    box-shadow var(--dur-fast) ease;
 }
 
-.send[aria-disabled="true"] {
-  opacity: 0.6;
+.send .icon {
+  inline-size: 1.2rem;
+  block-size: 1.2rem;
+  margin-inline-start: -0.1rem;
+}
+
+.send:hover {
+  background: var(--gold-2);
+}
+
+.send:active {
+  box-shadow: inset 0 2px 6px var(--shade-strong);
+}
+
+/* nothing to send yet, or a line still on its way */
+.send[aria-disabled="true"],
+.send[aria-disabled="true"]:hover {
+  background: var(--panel-2);
+  color: var(--ink-faint);
+  box-shadow: none;
+  cursor: default;
 }
 
 .composer-hint {
@@ -678,6 +1175,7 @@
   justify-content: space-between;
   gap: var(--space-2);
   margin: 0;
+  padding-inline: 1.1rem;
   color: var(--ink-faint);
   font-size: var(--text-xs);
 }
@@ -693,15 +1191,56 @@
   margin: 0;
   padding: var(--space-3) var(--space-4);
   border-block-start: var(--hairline) solid var(--edge-soft);
+  background: var(--panel-solid);
   color: var(--ink-soft);
+  font-size: var(--text-sm);
+  text-align: center;
+}
+
+.composer-closed {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+}
+
+.composer-closed .icon {
+  color: var(--ink-faint);
 }
 
 .composer-blocked {
   display: grid;
+  justify-items: center;
   gap: var(--space-2);
-  justify-items: start;
   background: var(--bad-tint);
   color: var(--ink);
+}
+
+.composer-blocked p {
+  margin: 0;
+}
+
+@media (max-width: 39.99rem) {
+  .conv-head {
+    gap: var(--space-2);
+    padding-inline: var(--space-2) var(--space-3);
+  }
+
+  .conv-scroll {
+    padding-inline: var(--space-3);
+  }
+
+  .msg-bubble {
+    max-inline-size: 88%;
+  }
+
+  .composer {
+    padding: var(--space-2) var(--space-3);
+  }
+
+  .conv > .banner {
+    margin-inline: var(--space-3);
+  }
 }
 
 /* ---- The details: a sheet over the conversation, docked when wide --------- */
@@ -832,6 +1371,21 @@
     grid-row: 1 / -1;
     inline-size: auto;
     box-shadow: none;
+  }
+}
+
+/* Windows' high contrast drops fills and shades: a bubble, the open row and
+   a count keep an outline in the system's colours. */
+@media (forced-colors: active) {
+  .msg-bubble,
+  .badge,
+  .msgr-tabs {
+    border: 1px solid CanvasText;
+  }
+
+  .conv-row[aria-current="true"] {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
   }
 }
 
