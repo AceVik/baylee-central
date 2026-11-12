@@ -102,7 +102,9 @@ reset, which uses it, comes with M1.
 [security assurance](security-assurance.md), "Ways to keep a recovery
 code".* `crates/central-web/src/islands/keep.rs`, used by the code's step
 of a registration and of a sign-in that makes a code for a moved account
-(`auth.rs`, `code_view`). Each way is made in the page when its button is
+(`auth.rs`, `code_view`), and since the same day by the reset page's step
+that shows a new vault's code (`reset.rs`, `code_view`; it knows no
+address, so its mail leaves the recipient to the mail program). Each way is made in the page when its button is
 pressed and not before; none of them sends anything to Central, logs the
 code, keeps it in the page's storage or puts it into the page's address.
 
