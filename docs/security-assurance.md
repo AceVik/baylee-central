@@ -6447,3 +6447,35 @@ PostgreSQL and the operator's appointment. `cargo xtask postgres`, `cargo
 xtask smoke`, `cargo audit` and `cargo deny` were not run (no
 dependency changed). This is an engineering review of one page, not an
 audit.
+
+## The site's strip, the official mark and the colour switch, 12 November 2026
+
+The owner asked for three things on the website
+([frontend rewrite](proposals/frontend-rewrite.md), §18).
+
+**Pass 1, what changed.** The strip under the bar lost the release, the
+checks, the last commit and the stars, and lays out what stays from a count
+the server writes (`data-count`) in the stylesheet alone. No card, list or
+chip calls a gateway official; Central's directory and API are unchanged.
+The colour switch turns the scheme on screen into the other one and keeps a
+choice only where it differs from the device's.
+
+**Pass 2, the attacker's view.** `boot.js` still sets `data-theme` only from
+the two values `light` and `dark` and writes only those or removes the key;
+it adds a listener on a media query and no sink, origin, inline script or
+style (the CSP is unchanged; the switch's position is set through the CSSOM
+as before). `data-count` is a number the server counts from the snapshot,
+not input. The strip links to nothing off the site any more. `directory.js`
+offers only the chips the server wrote, so an old `?show=official` falls back
+to every gateway; nothing in the snapshot or the wire changed.
+
+**Pass 3, what was tested.** `pages.rs`: a cell for each figure a source
+reports, under all sixteen sets of silent sources, none of GitHub's, and no
+official mark in either language. `e2e-site`: the strip's lines measured for
+every count at ten widths and four languages, axe and the 44 px targets; one
+press of the switch on a dark and a light device, with nothing, light or
+dark kept, on both sizes, and the kept scheme on the root before the body
+begins; no "official" on the start page or in the directory. `tests/hover.rs`
+and `tests/contrast.rs` still hold.
+
+Engineering review, not an audit.

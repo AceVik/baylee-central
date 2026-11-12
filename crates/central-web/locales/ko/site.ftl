@@ -65,7 +65,7 @@ hero-offline = 솔로 대전과 덱 빌더는 계정 없이 오프라인에서 �
 hero-account = 온라인으로 플레이하나요? <register>계정을 만드세요</register>. 오픈 베타 동안 누구나 무료로 만들 수 있어요. 이미 계정이 있다면 <signin>로그인하세요</signin>.
 hero-memorial = Baylee를 기억해요: 사진 앨범 열기
 
-status-label = 프로젝트 현황
+status-label = 숫자로 보는 Baylee
 
 cards-eyebrow = 카드
 cards-title = Baylee가 아는 카드의 수
@@ -857,18 +857,14 @@ foot-project = 프로젝트
 foot-source = 소스 코드 (AGPL-3.0)
 foot-central = Baylee Central (소스 공개)
 foot-summary = Rust와 Bevy로 만든 무료 오픈 소스 테이블탑 카드 게임. 결정론적 룰 엔진, 완전한 오프라인 모드, 하우스 AI, LLM 브리지, 커뮤니티 Gateways를 갖췄어요.
-strip-build = 빌드
 strip-ci = CI
 strip-commit = 커밋
 strip-gateways = Gateways
 strip-online = 온라인
 strip-offline = 오프라인
-strip-releases = 릴리스 보기
-strip-on-github = GitHub에서 보기
 strip-directory = 목록
 strip-cards = 플레이 가능한 카드
 strip-cards-unit = 장
-strip-stars = GitHub 스타
 strip-accounts = Baylee Central의 계정
 strip-live = 지금 Gateways가 보고한 수치
 strip-views = { $date }부터의 페이지 조회수

@@ -65,7 +65,7 @@ hero-offline = Solo matches and the deck builder work offline, without an accoun
 hero-account = Playing online? <register>Create an account</register>, free and open to everyone in the open beta, or <signin>sign in</signin>.
 hero-memorial = Remember Baylee: open her photo album
 
-status-label = Project status
+status-label = Baylee in numbers
 
 cards-eyebrow = The cards
 cards-title = How many cards Baylee knows
@@ -859,18 +859,14 @@ foot-project = Project
 foot-source = Source code (AGPL-3.0)
 foot-central = Baylee Central (source-available)
 foot-summary = Free, open-source tabletop card game built in Rust & Bevy — with a deterministic rules engine, full offline mode, House AI, LLM bridge, and community gateways.
-strip-build = Build
 strip-ci = CI
 strip-commit = Commit
 strip-gateways = Gateways
 strip-online = online
 strip-offline = offline
-strip-releases = see releases
-strip-on-github = see on GitHub
 strip-directory = the directory
 strip-cards = Playable cards
 strip-cards-unit = cards
-strip-stars = Stars on GitHub
 strip-accounts = Accounts at Baylee Central
 strip-live = Right now on the gateways, as they report it
 strip-views = Page views since { $date }

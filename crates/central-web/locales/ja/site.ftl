@@ -65,7 +65,7 @@ hero-offline = 一人用の対戦とデッキビルダーは、アカウント�
 hero-account = オンラインで遊びますか？ オープンベータ中は誰でも無料で作れます。<register>アカウントを作成</register>するか、<signin>ログイン</signin>してください。
 hero-memorial = Baylee を偲んで：写真アルバムを開く
 
-status-label = プロジェクトの状況
+status-label = 数字で見る Baylee
 
 cards-eyebrow = カード
 cards-title = Baylee が知っているカードの数
@@ -857,18 +857,14 @@ foot-project = プロジェクト
 foot-source = ソースコード (AGPL-3.0)
 foot-central = Baylee Central（ソース公開）
 foot-summary = Rust と Bevy で作られた、無料でオープンソースのテーブルトップ・カードゲーム。決定論的なルールエンジン、完全なオフラインモード、ハウスAI、LLMブリッジ、コミュニティ Gateway を備えています。
-strip-build = ビルド
 strip-ci = CI
 strip-commit = コミット
 strip-gateways = Gateway
 strip-online = オンライン
 strip-offline = オフライン
-strip-releases = リリースを見る
-strip-on-github = GitHub で見る
 strip-directory = 一覧
 strip-cards = プレイ可能なカード
 strip-cards-unit = 枚
-strip-stars = GitHub のスター
 strip-accounts = Baylee Central のアカウント
 strip-live = Gateway が報告する、今の数
 strip-views = { $date } からのページビュー

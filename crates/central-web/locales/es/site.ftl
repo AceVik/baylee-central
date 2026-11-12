@@ -65,7 +65,7 @@ hero-offline = Las partidas en solitario y el constructor de mazos funcionan sin
 hero-account = ¿Vas a jugar online? <register>Crea una cuenta</register>, gratis y abierta a todos durante la beta abierta, o <signin>inicia sesión</signin>.
 hero-memorial = Recuerda a Baylee: abre su álbum de fotos
 
-status-label = Estado del proyecto
+status-label = Baylee en cifras
 
 cards-eyebrow = Las cartas
 cards-title = Cuántas cartas conoce Baylee
@@ -859,18 +859,14 @@ foot-project = Proyecto
 foot-source = Código fuente (AGPL-3.0)
 foot-central = Baylee Central (código disponible)
 foot-summary = Juego de cartas de mesa gratuito y de código abierto, creado en Rust y Bevy, con un motor de reglas determinista, modo sin conexión completo, IA de la casa, puente con LLM y gateways de la comunidad.
-strip-build = Compilación
 strip-ci = CI
 strip-commit = Commit
 strip-gateways = Gateways
 strip-online = online
 strip-offline = sin conexión
-strip-releases = ver versiones
-strip-on-github = ver en GitHub
 strip-directory = el directorio
 strip-cards = Cartas jugables
 strip-cards-unit = cartas
-strip-stars = Estrellas en GitHub
 strip-accounts = Cuentas en Baylee Central
 strip-live = Ahora mismo en los gateways, según informan
 strip-views = Páginas vistas desde { $date }

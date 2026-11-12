@@ -1045,7 +1045,7 @@ a gateway's card shows its own. A number is drawn only while a source
 reports it, and nothing is kept past the minute it was read in. The
 gateway's half is Baylee's (a brief is with the project's notes); until a
 gateway reports, the strip shows the accounts, the cards, the stars and
-the gateways online.
+the gateways online (the stars left it on 12.11.2026, §18).
 
 **The Impressum** is in §10, point 2.
 
@@ -1106,7 +1106,8 @@ one number for all pages and visitors and nothing about a request
 ([operations](../operations.md), [security
 assurance](../security-assurance.md)); without the setting nothing is
 counted or shown, and the privacy notice has its section only where it is
-counted. On a phone four counts stand two and two.
+counted. On a phone four counts stand two and two (laid out anew on
+12.11.2026, §18).
 
 **Menus.** The download's menu and the language menu lie on a layered
 shade, come in with their rows one after the other and leave as they came
@@ -1352,3 +1353,39 @@ nine others edited by machine to drop that clause). Central's API is
 unchanged: its directory still names an official origin, and the site's
 server still lists that one first (`fetch.rs`) without marking it.
 `pages.rs` and `site.spec.ts` hold that the word and the marks are absent.
+
+**The strip under the bar** is Baylee in numbers ("Project status" before):
+nothing of GitHub's is in it any more (the release, the checks, the last
+commit and the stars left; the source section and the download keep
+theirs, so nothing fetched went unused and the privacy notice stays true).
+What stays is ordered for a reader, the most telling first: the players
+the gateways report, of them in a game, the open tables and the running
+games (one term of the list, "as they report it", with four values), the
+gateways online and not, Central's accounts, the playable cards (read from
+the release's `sets.json` on GitHub, but a figure of the game, not of the
+repository) and the page views. Each figure is a cell of its own, its glyph
+running with its words, its label for a screen reader and the tooltip; a
+figure nobody reports is no cell, so it leaves no hole. The server writes
+how many cells there are (`data-count`, 1 to 8), and `header.css` lays out
+that many without script: on a wide screen (1100 px and more) all in one
+line, the room shared out evenly; from 600 px at most four to a line, five
+and six as three and two or three and three, seven and eight as four and
+three or four and four; on a phone two to a line, three in one line as
+wide as their words, and five and seven with a first line of the gateways'
+three short counts, so that no line differs from another by more than one
+cell, the shorter is centred and no cell stands alone. A cell is as wide as
+its share of the line, so two lines' columns stand in line.
+`web/e2e-site/strip.spec.ts` holds the order, the absence of GitHub, axe
+and the 44 px targets, and measures the lines for every count the server
+can write at ten widths from 320 to 2560 px (and a phone's own) in
+English, German, French and Russian: counts per line, centring, equal
+gaps, nothing sticking out of its cell and no sideways scroll. `pages.rs` holds a cell for each
+reported figure under all sixteen sets of silent sources.
+
+**Words.** Removed in all eleven languages: `theme-system`,
+`gws-official`, `gw-show-official`, `strip-build`, `strip-releases`,
+`strip-on-github` and `strip-stars` (the build does not refuse a message
+nobody calls, so they went by hand). Changed: `status-label` (the strip's
+name) and `gw-lead` (its sentence on the official gateway), English and
+German by hand, the nine others by machine, unread by a speaker. No new
+message.

@@ -710,6 +710,86 @@ async fn the_figures_are_shown_only_while_a_source_reports_them() {
     }
 }
 
+/// The strip under the bar, for every set of silent sources: nothing of
+/// GitHub's, the figures the most telling first, one cell for each figure a
+/// source reports and none for one it does not, and the number of cells
+/// written where the stylesheet reads it (`data-count`, by which it lays
+/// them out in even lines).
+#[tokio::test]
+async fn the_strip_has_a_cell_for_each_reported_figure_and_nothing_of_github() {
+    for silent in 0_u8..16 {
+        let mut config = Config::development(site(), Some(data()));
+        config.origin = "https://baylee.app".into();
+        let state = central_web_server::app(config).expect("app");
+        let app = router(Arc::clone(&state));
+        let live = silent & 1 == 0;
+        let accounts = silent & 2 == 0;
+        let cards = silent & 4 == 0;
+        let views = silent & 8 == 0;
+        install(&state.data, |snapshot| {
+            if !live {
+                for gateway in snapshot.gateways.iter_mut().flatten() {
+                    gateway.activity = None;
+                }
+            }
+            if !accounts {
+                snapshot.accounts = None;
+            }
+            if !cards {
+                snapshot.cards = None;
+            }
+            if !views {
+                snapshot.views = None;
+            }
+        });
+        let (_, _, home) = get(&app, "/en/", &[]).await;
+        let mark = home.find("class=\"strip\"").expect("the strip");
+        let start = home[..mark].rfind("<section").expect("its section");
+        let strip = &home[start..start + home[start..].find("</section>").expect("its end")];
+        let cells = 1
+            + 4 * usize::from(live)
+            + usize::from(accounts)
+            + usize::from(cards)
+            + usize::from(views);
+        assert_eq!(count(strip, "class=\"strip-cell\""), cells, "{silent:04b}");
+        assert!(
+            strip.contains(&format!("data-count=\"{cells}\"")),
+            "{silent:04b}"
+        );
+        assert!(strip.contains("aria-label=\"Baylee in numbers\""));
+        // the most telling first: what is played, the gateways, the
+        // accounts, the cards, the views
+        let order: Vec<usize> = [
+            (live, "12 players"),
+            (live, "4 games"),
+            (true, "1 online"),
+            (accounts, "1,234 accounts"),
+            (cards, "8,348"),
+            (views, "48,213 views"),
+        ]
+        .iter()
+        .map(|(shown, words)| {
+            assert_eq!(strip.contains(words), *shown, "{silent:04b}: {words}");
+            strip.find(words).unwrap_or(0)
+        })
+        .filter(|at| *at > 0)
+        .collect();
+        assert!(order.is_sorted(), "{silent:04b}: {order:?}");
+        for never in [
+            "github.com",
+            "<code",
+            "v0.2.0",
+            "passing",
+            "Build",
+            "Commit",
+            "Stars",
+            "GitHub",
+        ] {
+            assert!(!strip.contains(never), "{silent:04b}: {never}");
+        }
+    }
+}
+
 /// The count of page views: shown in the strip and told in the privacy
 /// notice only where a deployment counts (here the fixture stands in for
 /// one), and nowhere else.
