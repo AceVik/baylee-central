@@ -21,6 +21,8 @@ use crate::words::{self, Lang};
 /// What `AccountSummary` says, as the pages use it.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Summary {
+    /// The account this browser is signed in as.
+    account: [u8; 16],
     username: String,
     display_name: Option<String>,
     tag: Option<u32>,
@@ -53,6 +55,7 @@ async fn summary() -> Load {
     }
     match call(&Request::AccountSummary).await {
         Ok(Response::AccountSummary {
+            identity,
             username,
             display_name,
             tag,
@@ -62,6 +65,7 @@ async fn summary() -> Load {
             expires_at,
             ..
         }) => Load::Ready(Summary {
+            account: identity.account,
             username,
             display_name,
             tag,
@@ -283,10 +287,15 @@ fn home(lang: Lang, summary: &Summary, worker: &str) -> AnyView {
             </li>
         }
     });
+    // only an administrator is led to the page that makes reset codes; the
+    // rest of the administration is still the old build's, under `/admin`
     let admin = summary.admin.then(|| {
         view! {
             {registration_switch(lang, worker.to_owned())}
-            <p><a class="button" href="/admin">{words::account_admin(lang)}</a></p>
+            <p class="actions">
+                <a class="button" href=format!("/{code}/account/admin")>{words::admin_reset_title(lang)}</a>
+                <a class="button" href="/admin">{words::account_admin(lang)}</a>
+            </p>
         }
     });
     view! {
@@ -1167,6 +1176,16 @@ pub fn Account(lang: Lang, section: Section, worker: String) -> impl IntoView {
             Section::Privacy => privacy(lang, worker.clone()),
             Section::Gateways => gateways(lang, worker.clone()),
             Section::Notifications => notifications(lang, summary.admin),
+            // the role is Central's to grant: without it, nothing is asked
+            Section::Admin if summary.admin => super::admin::page(
+                lang,
+                worker.clone(),
+                summary.username.clone(),
+                summary.account,
+                reload,
+            )
+            .into_any(),
+            Section::Admin => super::admin::refused(lang).into_any(),
             // the messenger is its own island
             Section::Chat | Section::Contacts => ().into_any(),
             }
