@@ -503,8 +503,14 @@ async fn forms_and_the_account_area_are_islands_and_not_indexed() {
         assert_eq!(status, StatusCode::OK, "{path}");
         assert_eq!(count(&html, "<h1"), 1, "{path}: one h1");
         assert!(html.contains("<leptos-island"), "{path}: an island");
+        // the administration's page loads its own module (below)
+        let script = if path.contains("/account/admin") {
+            "admin-islands.js"
+        } else {
+            "islands.js"
+        };
         assert!(
-            html.contains("<script type=\"module\" src=\"/assets/islands.js\""),
+            html.contains(&format!("<script type=\"module\" src=\"/assets/{script}\"")),
             "{path}: the islands' script"
         );
         assert!(
@@ -516,6 +522,82 @@ async fn forms_and_the_account_area_are_islands_and_not_indexed() {
         assert!(
             html.contains("/assets/crypto-worker.js"),
             "{path}: the crypto Worker's address"
+        );
+    }
+}
+
+/// The administration's islands are a module of their own
+/// (`docs/proposals/frontend-rewrite.md` §27): every page under
+/// `/{lang}/account/admin` (the feedback's among them) has the
+/// administration's island and loads the administration's module and no
+/// other; every other page with islands (the forms, the account area, the
+/// messenger, a page that opens the sign-in over itself) loads the public
+/// module, which has no administration's island to draw, and names neither.
+#[tokio::test]
+async fn only_the_administration_s_pages_load_its_module() {
+    const ID: &str = "019a2b3c4d5e708090a0b0c0d0e0f0ff";
+    const PUBLIC: &str = "<script type=\"module\" src=\"/assets/islands.js\"";
+    const ADMIN: &str = "<script type=\"module\" src=\"/assets/admin-islands.js\"";
+    let app = app(true);
+    for lang in Lang::ALL {
+        let code = lang.code();
+        let mut admin: Vec<String> = Section::ROUTED
+            .into_iter()
+            .filter(|section| section.administration())
+            .map(|section| Page::Account(section).path(lang))
+            .collect();
+        admin.push(format!("/{code}/account/admin/users/{ID}"));
+        admin.push(format!("/{code}/account/admin/feedback/{ID}"));
+        for path in &admin {
+            let (status, _, html) = get(&app, path, &[]).await;
+            assert_eq!(status, StatusCode::OK, "{path}");
+            assert_eq!(
+                count(&html, ADMIN),
+                1,
+                "{path}: the administration's module"
+            );
+            assert!(!html.contains(PUBLIC), "{path}: the public module");
+            assert_eq!(count(&html, "<leptos-island"), 1, "{path}: one island");
+            assert!(
+                html.contains("data-component=\"Administration_"),
+                "{path}: the administration's island"
+            );
+        }
+        let public = [
+            Page::Home.path(lang),
+            Page::Contact.path(lang),
+            Page::Download.path(lang),
+            Page::SignIn.path(lang),
+            Page::Register.path(lang),
+            Page::Reset.path(lang),
+        ]
+        .into_iter()
+        .chain(
+            Section::ROUTED
+                .into_iter()
+                .filter(|section| !section.administration())
+                .map(|section| Page::Account(section).path(lang)),
+        );
+        for path in public {
+            let (status, _, html) = get(&app, &path, &[]).await;
+            assert_eq!(status, StatusCode::OK, "{path}");
+            assert_eq!(count(&html, PUBLIC), 1, "{path}: the public module");
+            assert!(
+                !html.contains("admin-islands"),
+                "{path}: the administration's module"
+            );
+            assert!(
+                !html.contains("data-component=\"Administration_"),
+                "{path}: the administration's island"
+            );
+        }
+    }
+    // a page of the administration is one exactly when it is under its address
+    for section in Section::ROUTED {
+        assert_eq!(
+            section.administration(),
+            section.slug().starts_with("account/admin"),
+            "{section:?}"
         );
     }
 }

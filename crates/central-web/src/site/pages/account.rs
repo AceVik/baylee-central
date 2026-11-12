@@ -6,7 +6,7 @@ use leptos::prelude::*;
 
 use super::Built;
 use crate::data::Section;
-use crate::islands::{Account, Messenger, Register, Reset, SignIn};
+use crate::islands::{Account, Administration, Messenger, Register, Reset, SignIn};
 use crate::rich::{icon, rich};
 use crate::site::icons;
 use crate::site::shell::Meta;
@@ -160,8 +160,12 @@ pub fn area(cx: &Context<'_>, section: Section) -> Built {
         .collect_view();
     let worker = cx.assets.url("crypto-worker.js");
     let messenger = matches!(section, Section::Chat | Section::Contacts);
+    // the administration's pages have an island of their own, in a module
+    // of their own (`shell::islands_script`)
     let island = if messenger {
         view! { <Messenger lang=lang section=section worker=worker /> }.into_any()
+    } else if section.administration() {
+        view! { <Administration lang=lang section=section worker=worker /> }.into_any()
     } else {
         view! { <Account lang=lang section=section worker=worker /> }.into_any()
     };
