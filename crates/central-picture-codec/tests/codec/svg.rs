@@ -135,3 +135,36 @@ fn entity_bombs_deep_nesting_and_crowds_are_bounded() {
     );
     let _ = timed(Format::Svg, hidden.as_bytes());
 }
+
+#[test]
+fn entity_expansion_is_refused_before_any_parser_runs() {
+    // The review's probes (12.11.2026): an entity of deep nesting used
+    // many times, and the classic laughs. Before this, a 25 KB file took
+    // 548 MiB and 9.3 s.
+    let deep = format!(
+        "<!DOCTYPE svg [<!ENTITY g '{}<rect width=\"1\" height=\"1\"/>{}'>]>\
+         <svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\">{}</svg>",
+        "<g>".repeat(120),
+        "</g>".repeat(120),
+        "&g;".repeat(2_000)
+    );
+    let mut laughs = String::from("<!DOCTYPE svg [<!ENTITY a0 'lol'>");
+    for n in 1..10 {
+        let previous = format!("&a{};", n - 1).repeat(10);
+        laughs.push_str(&format!("<!ENTITY a{n} '{previous}'>"));
+    }
+    laughs.push_str("]><svg xmlns=\"http://www.w3.org/2000/svg\"><text>&a9;</text></svg>");
+    // a declaration where no document type stands
+    let late = "<svg xmlns=\"http://www.w3.org/2000/svg\"/><!ENTITY x 'y'>";
+    // an internal subset that declares nothing is refused all the same
+    let empty = "<!DOCTYPE svg [ ]><svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 8 8\"/>";
+    for file in [deep.as_str(), laughs.as_str(), late, empty] {
+        assert_eq!(
+            timed(Format::Svg, file.as_bytes()),
+            Err(Refusal::Unsupported)
+        );
+    }
+    // a document type without a subset is still taken
+    let plain = "<!DOCTYPE svg><svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 8 8\"><rect width=\"8\" height=\"8\"/></svg>";
+    valid(&timed(Format::Svg, plain.as_bytes()).unwrap());
+}
