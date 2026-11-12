@@ -334,7 +334,9 @@
 
 .check {
   display: grid;
-  grid-template-columns: auto 1fr;
+  /* the label's column may be narrower than its longest word, which then
+     breaks (German's "Wiederherstellungscode" at 320 px) */
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: start;
   gap: var(--space-3);
 }
@@ -348,6 +350,8 @@
 
 .check label {
   min-block-size: var(--target);
+  overflow-wrap: break-word;
+  hyphens: auto;
 }
 
 /* A choice among a few: its question in the legend, one line per answer. */
