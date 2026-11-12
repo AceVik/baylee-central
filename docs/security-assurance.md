@@ -5767,8 +5767,11 @@ Adversarial pass:
 
 ### What was run, and what was not
 
-On the tree of this record's commit but for this section, on macOS on
-Apple Silicon (rustc 1.99.0), 12.11.2026, each once and in this order:
+On commit `0dcedc3` with nothing uncommitted, on macOS on Apple Silicon
+(rustc 1.99.0), 12.11.2026, each once and in this order. That commit is
+this branch but for the words of this section, which were written after
+the run; `cargo fmt --all --check` and `cargo xtask secrets` were run
+again on the commit that holds them and pass.
 
 - `cargo fmt --all --check` and `cargo clippy --workspace --all-targets`
   pass, the second without a warning.
@@ -5781,8 +5784,11 @@ Apple Silicon (rustc 1.99.0), 12.11.2026, each once and in this order:
   history), `cargo xtask crypto-scope` and `cargo deny check` (0.20.2)
   pass.
 - `cargo audit --deny warnings` (0.22.2) fails on RUSTSEC-2026-0459
-  (`libsqlite3-sys` 0.37.0) and on nothing else, as it did before this
-  work. No manifest and no lock file was changed.
+  (`libsqlite3-sys` 0.37.0, an advisory of 30.10.2026) and on nothing
+  else. This work did not bring it: `cargo audit` reads the lock file,
+  and no manifest and no lock file was changed. It is not in the ignore
+  lists and was not added to them; it is the owner's to decide, and the
+  dependency job of CI runs the same command.
 
 Not run: the other runners of CI (Linux, Windows, macOS on Intel);
 `cargo xtask wasm --check` and the web app's checks, since nothing they
