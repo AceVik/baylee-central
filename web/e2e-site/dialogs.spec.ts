@@ -135,3 +135,48 @@ test("without script the link leads to the page", async ({ browser }) => {
   await expect(page).toHaveURL(/\/en\/signin$/);
   await context.close();
 });
+
+// The step after a registration is a card with a heading, and in German
+// that heading is one long word. The dialog's card is a grid: its column
+// took the word's width and the dialog cut the step off at its edge
+// (12.11.2026). The stand-in Central of this suite registers nobody, so
+// the step's heading is put where the island puts it and measured there:
+// once with the German word, which hyphenation breaks, and once with a word
+// no language hyphenates, which only the card's own width can hold.
+for (const [what, word] of [
+  ["the German heading", "Dein Wiederherstellungscode"],
+  ["a word nothing hyphenates", "MMMMMMMMMMMMMMMMMMMMMMMMMMMMMM"],
+] as const) {
+  test(`a step with a long word in its heading stays inside the registration dialog at 320 px: ${what}`, async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 760 });
+    await page.goto("/de/");
+    await ask(page);
+    await page.locator("#auth-signin a[href$='/register']").click();
+    const dialog = page.locator("#auth-register");
+    await expect(dialog).toBeVisible();
+    await expect(dialog.locator("leptos-island")).toHaveAttribute("data-hydrated", "", { timeout: 15_000 });
+    const measured = await dialog.evaluate((el, text) => {
+      const steps = el.querySelector("#register-steps");
+      if (steps === null) return null;
+      const step = document.createElement("section");
+      step.className = "card step";
+      const heading = document.createElement("h2");
+      heading.textContent = text;
+      step.append(heading);
+      steps.replaceChildren(step);
+      const edge = el.getBoundingClientRect().right + 0.5;
+      const beyond = [...el.querySelectorAll("*")]
+        .filter((node) => {
+          const box = node.getBoundingClientRect();
+          return box.width > 0 && box.right > edge;
+        })
+        .map((node) => `${node.tagName.toLowerCase()}.${node.className}`);
+      return { beyond, scroll: el.scrollWidth - el.clientWidth, lines: Math.round(heading.getBoundingClientRect().height / parseFloat(getComputedStyle(heading).lineHeight)) };
+    }, word);
+    expect(measured).not.toBeNull();
+    expect(measured?.beyond).toEqual([]);
+    expect(measured?.scroll).toBe(0);
+    // the word broke and did not run out of the card
+    expect(measured?.lines).toBeGreaterThanOrEqual(2);
+  });
+}

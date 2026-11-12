@@ -71,6 +71,21 @@ test("the account area changes the password: this browser stays, the client is s
   await expect(page.getByRole("heading", { name: "Where you are signed in" })).toBeVisible({ timeout: 30_000 });
   await expect(page.locator("ul.sessions > li")).toHaveCount(1, { timeout: 30_000 });
 
+  // The chat opens from what this browser kept, as before the change, and
+  // across a reload: no password is asked for (owner, 03.11.2026). The
+  // master key is the same, so the kept identity still is this account's.
+  await open(page, "/en/account/chat");
+  for (const reloaded of [false, true]) {
+    if (reloaded) await page.reload();
+    // the opened chat's own greeting (a phone shows the list in its place, so it is asked for in the page, not on the screen)
+    await expect(page.locator(".msgr-main .msgr-welcome-icon")).toBeAttached({ timeout: 60_000 });
+    await expect(page.locator(".msgr-side")).toBeVisible();
+    await expect(page.locator("#chat-missing-title")).toHaveCount(0);
+    await expect(page.locator(".msgr-main").getByLabel("Password")).toHaveCount(0);
+    await expect(page.locator(".msgr-main [role=alert]")).toHaveCount(0);
+  }
+  await open(page, "/en/account/security");
+
   // The old password opens nothing any more; the new one opens the same vault.
   expect(await client(name, OLD, before.tag)).toBeNull();
   const second = await client(name, NEW, before.tag);
