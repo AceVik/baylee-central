@@ -743,10 +743,10 @@ test("the keyboard meets the same stops in the same order", async ({ page }, inf
     await page.keyboard.press("Shift+Tab");
     await expect(page.getByRole("button", { name: "Back to the conversations" })).toBeFocused();
   } else {
-    // both panes; the way back stands here too, as it did (a container
-    // rule meant to hide it is outweighed by .icon-button's display)
+    // both panes: the list, then the conversation; no way back to show
     await page.locator(".msgr-tabs a").first().focus();
-    expect(await stops(page)).toEqual([...LIST, 'button "Back to the conversations"', ...OPEN]);
+    expect(await stops(page)).toEqual([...LIST, ...OPEN]);
+    await expect(page.getByRole("button", { name: "Back to the conversations" })).toBeHidden();
   }
   await page.goto("/en/account/contacts");
   await expect(page.locator(".person").first()).toBeVisible({ timeout: 15_000 });
