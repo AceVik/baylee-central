@@ -4856,4 +4856,265 @@ change; three of this section's own claims said more than the code did).
 - The nine translated privacy notices carry the new sentence by machine
   translation, unread by a speaker, like the rest of them.
 
+## The website redeems a reset code and changes a password, 12 November 2026
+
+Central and `central-client` could reset a login with an administrator's
+code and change a signed-in account's password since 28.10.2026
+([account reset](account-reset.md), [native login](native-login.md)
+§"Password change"). The website could do neither, and its FAQ said so.
+This change builds both on the website: five exports in
+`central-web-crypto`, a page `/{lang}/reset`, and a form in the account
+area's security section. Central is as it was: no request, no wire type, no
+server crate, no migration and no dependency changed (`Cargo.lock` is
+untouched).
+
+Design pass. The two flows exist and were reviewed when they were built;
+the questions were what a browser adds to them:
+- **No new cryptography.** `reset_start`, `reset_keep` and `reset_new` do
+  what `central-client`'s `reset` does, and `password_start` and
+  `password_finish` what `Session::change_password` does, with the same
+  `central-crypto` calls in the same order; every message is the wire
+  type's. The epoch rule (a kept vault at the account's epoch, a new one at
+  the next) and the minimum of eight characters are applied in the module,
+  as the SDK applies them, so a page cannot ask for another. A reset's two
+  finishes are two exports that consume one state: a reset started to keep
+  cannot finish as a new vault, nor the other way round.
+- **The browser has no master key.** After a sign-in the page keeps none,
+  so it cannot wrap "the key it holds" as the client does. Two things
+  follow. The reset page has two of the three ways: the recovery code, or a
+  new vault; "still signed in" is the client's. And the password's form
+  signs in once more with the current password and changes in the same
+  Worker, which holds the sign-in's key for exactly that long. The price is
+  one more sign-in start per change (three guesses where the client's is
+  two; the right password gives them back) and a browser session replaced
+  once more.
+- **Where the secrets are.** The passwords and the recovery code go from
+  the form's fields to the Worker and nowhere else; the fields carry no
+  `name`, and the page's script stops a submit before the islands run, so
+  no browser sends them as a form. The Worker ends when the flow drops it,
+  on every way out. A new vault's recovery code comes back to the page, as
+  a registration's does, to be shown once. The reset code is the one
+  secret that is sent, in `ResetStart`, as the protocol has it.
+- **What the page may say.** Central answers a name nobody has as an
+  account that has not moved, and a wrong, expired, used or replaced code
+  with `Rejected`. The page has one sentence for all of them and for a name
+  that cannot be one. It stops at discovery for a name that is nobody's,
+  which is what `Discover` tells anyone already.
+- **A wrong recovery code must not cost the reset code.** The Worker reads
+  the recovery code before `ResetStart` and opens the wrapper with it
+  before `ResetFinish`. A code that does not open the wrapper, and an
+  account that has no wrapper, stop after `ResetStart` and before the
+  finish: Central has checked the reset code and has not spent it. A
+  recovery code that is none at all stops before anything is sent: the
+  reset code was neither checked nor used. The page has one sentence for
+  the three, "Nothing was changed, and your reset code still works"; in the
+  last case "still works" says more than the page knows (below, for the
+  owner).
+- **The warning before a new vault.** Without the recovery code the data
+  is lost for good. The page says what that is (the account's settings,
+  the deck backups, the chat history) and what stays, beside the choice,
+  and takes the form only with the warning's box checked; nothing is sent
+  before.
+- **A lost answer.** A finish whose answer does not arrive may have
+  happened. The page says so in both flows and calls it neither done nor
+  refused. For a new vault it still shows the recovery code the Worker
+  made, with what it is worth in either case: if the reset happened, that
+  code is the only one, and it cannot be made again.
+- **What the page says after a change** is what Central does
+  (`central-identity`'s `password.rs` and its tests): every session of the
+  account is deleted and one of the caller's kind inserted. So: signed in
+  here, signed out everywhere else, the client included.
+- **The link.** "Forgot your password?" under the sign-in form is a plain
+  link; the site's script opens dialogs for the sign-in's and the
+  registration's links only, and the reset page has no dialog of its own.
+- Decided against: a code read from the page's address (it would stay in
+  the browser's history); telling a wrong code from an unknown name; a
+  "keep my data" without the recovery code on a signed-in browser (it has
+  no key); a Worker kept alive between page loads to hold one; showing a
+  new vault's code only after Central's yes when the answer is lost (the
+  person would be left without any).
+
+Implementation pass:
+- `central-web-crypto` (`flow.rs`, `password_exports.rs`): the five
+  exports and their handles (`Reset`, `ResetKept`, `PasswordChange`,
+  `PasswordChanged`; a new vault answers the registration's `Enrolled`).
+  States are consumed by the step that takes them, also on failure, and
+  wiped when dropped. The crypto Worker's script has the five steps. The
+  committed module was rebuilt in the pinned container
+  ([xtask](xtask.md)).
+- `islands/reset.rs`: the form's rules (`form_problem`), the refusals'
+  mapping (`by_central`, `by_worker`, `at_finish`), the flow (a valid name
+  and a parsed code, discovery, the Worker's start, `ResetStart`, the
+  challenge's identity equal to the discovered one, the Worker's finish,
+  `ResetFinish`), and the views. After a reset Central confirmed, a
+  session this browser remembers is forgotten if Central refuses it, with
+  the chat identity kept for it.
+- `islands/password.rs`: the sign-in (`AccountSummary` for the session's
+  own identity, `LoginStart`, the Worker's check, `LoginFinish`), the
+  change, and the form. A wrong current password is said only where the
+  Worker's KE2 check refused it. The change counts as done only when the
+  wrapper Central answers is the one the Worker made.
+- `islands/field.rs` (`labelled`: label, glyph, hint, eye), `clip.rs` (the
+  clipboard), two glyphs. `Page::Reset`: not indexed, not listed, without
+  the dialogs; `/reset` redirects under a language. The sign-in form's
+  link; the FAQ's answer with its link.
+- Words: 39 new messages and the changed `faq-password-a`;
+  `security-password-later` is gone. English and German by hand. French,
+  Italian and Brazilian Portuguese by machine, with this change: the
+  gate's `no_language_is_english_under_another_name` allows a language
+  fewer than 12 in 100 messages that are the English ones, and with the
+  English text standing in, those three had 126, 118 and 114 of 913 where
+  109 pass. The limit was left as it is. The six other languages carry the
+  English text of these messages.
+- The lines `docs/security-page.md` cites in files this change lengthened
+  were moved by as much as the lines moved. Some were a few lines off
+  before; they are as far off now.
+- Nothing is logged, in the page or in the module. No lint was switched
+  off; no `unsafe`.
+
+Adversarial pass, each question with what answers it:
+- *Does the page tell a guesser more than Central?* No. One sentence for
+  an unknown name, a name that is none, an account that has not moved and
+  every refusal of a code (unit test over every failure; in the browser
+  with a stand-in for three of them; against a real Central for a used
+  code).
+- *Can a recovery code that is wrong burn the reset code?* No. Against a
+  real Central the same code was refused with a foreign recovery code, no
+  `reset_finish` was sent, the client's session stayed, and the code then
+  worked with the right one. After a new vault the old recovery code is
+  refused the same way and the new one works.
+- *Can a new vault be asked for without the warning?* Not through the
+  form: the rule is one function, tested, and the browser test sees no
+  request before the box is checked.
+- *Is "the vault stays" true?* Read from outside the page, by a sign-in
+  over the native listener with the committed module: after a kept reset
+  and after a password change the chat identity's fingerprint (derived
+  from the master key) and the stored document with its revision are the
+  same; after a new vault the epoch is one higher, the fingerprint is
+  another and the document is a first one. That the fingerprint tells keys
+  apart is seen in the same run.
+- *Is "signed out everywhere" true?* A client's session, signed in over
+  the native listener before, is live after the attempt with the foreign
+  recovery code, and refused after the kept reset, after the new vault and
+  after the password's change. (The run's third reset, kept with the new
+  recovery code, was not followed by that question.) The page's own
+  session is forgotten after a reset and kept after a change, where the
+  list shows one session and a reload stays signed in.
+- *Do the old password and the old code still work?* The old password is
+  refused on the page and over the native listener after the kept reset
+  and after the change, and on the page after the new vault; the used
+  reset code is refused; the old recovery code opens nothing after a new
+  vault.
+- *Does a secret leave the Worker or stay in the browser?* Against a real
+  Central, no request body the page sent to `/api/` after the
+  registrations holds a password or a recovery code as text, with or
+  without its dashes, and at the end neither storage holds one or a reset
+  code. With a stand-in: the fields have no name, and a submit without
+  script sends nothing and leaves the address without a query.
+- *Can a stolen cookie change the password through the page?* No more
+  than through Central: the page's sign-in fails in the Worker without the
+  password, and `ChangePasswordFinish` needs the proof whatever a page
+  does.
+- *Someone signed in as one account resets another.* By reading, not by a
+  test: the session is forgotten only when Central refuses it, so the
+  first account stays signed in.
+- *A lost answer.* With a stand-in that drops the reset's finish, the
+  page says "No answer came back", not "done", and still shows the code. A
+  refused finish shows no code.
+- *Script in the origin* reads what is typed, here as on the sign-in page
+  ([threat model](threat-model.md), "Website compromise"); the Worker does
+  not help against that, and nothing here claims it.
+- **The checks have teeth** (one change at a time, each undone). Caught by
+  the unit tests: a code's refusal mapped to the sign-in's "wrong
+  password"; the confirmation no longer required; a lost finish called a
+  refusal (reset, and again for the password); any Worker refusal blamed
+  on the recovery code; any Worker refusal blamed on the current password.
+  Caught by the server's tests: the page indexed; the page given the
+  sign-in dialogs. Caught in the browser with a stand-in, on a site built
+  with the change and rebuilt without it afterwards: the shared field
+  given a `name` (both specs), and a dead session left remembered after a
+  reset. These are the mutants that were tried, not every decision.
+
+Run on this change: `cargo xtask gate` passes (format, policy, clippy, the
+workspace's tests, the doc tests, the release build), as do `cargo test -p
+central-web -p central-web-server -p central-web-crypto` (117 tests),
+`cargo xtask site`, `cargo xtask secrets` and, in the pinned container
+under Rosetta, `cargo xtask wasm --check` (the committed module and glue
+match a fresh build). In `web/`, `npm run lint` and `npm run typecheck`
+pass. The gate, the tests, the site's build and the module's check ran on
+the commit before this section's, with the documents of this section's
+commit in the tree; the gate and the secret scan ran again on the last
+commit.
+
+The site suite (`web/e2e-site`, every spec, both projects) ran on a
+loopback port of its own, 28797, because another session's server held the
+suite's 28792; the configuration for that was not committed. 338 passed, 6
+were skipped, 2 failed. The two are one test in both projects,
+`site.spec.ts`'s "the gateway directory finds by name or address …": it
+expects five tiles of the directory's numbers, and the page draws six
+since the commit this change stands on (the players in a game). That test
+and the directory are not part of this change and were left. In an
+earlier run of the whole suite `account.spec.ts`'s three-second check of
+a registration's haste failed once on the desktop while the machine was
+busy, and passed alone and in the last run.
+
+The real suite's two specs (`web/e2e-real/site-reset.spec.ts`,
+`site-password.spec.ts`) ran against a throwaway Central with the suite's
+PostgreSQL image in a container, a stand-in for the site's Caddy and
+loopback ports of their own, with synthetic accounts: both passed on the
+desktop and at the phone's size, each project against a Central started
+afresh. Run together against one Central, the phone's reset met Central's
+429 at its registration, as the registration budget has it. They ran on
+the site as the commit that built the two pages left it. After them the
+words of three languages, the site suite's 320 px checks, comments and
+documents changed, nothing the two specs run. Every process and container
+started for these runs was stopped, and the ports were seen closed.
+
+Not tested, and recorded for the owner:
+- **No page of the new site issues a reset code.** The run against a real
+  Central sends the administrator's request with the administrator's
+  session, as a page would. Until the new site's administration has
+  "Reset login", a person gets a code only where the old build's admin
+  page is still served.
+- **"Your reset code still works"** is also said for a recovery code that
+  is none at all, where the reset code was never sent. If the reset code
+  is wrong too, the person learns that at the next attempt. The words were
+  left; a second sentence for that case is the owner's to want.
+- **The FAQ's answer** no longer says "or are still signed in to the
+  Baylee client": the client has no reset form yet (M6), and the page
+  cannot do that.
+- **The password's lost answer**: that a lost finish is called "cannot
+  tell" is a unit test of the mapping. No browser test drops
+  `ChangePasswordFinish`'s answer, and the comparison of the wrapper
+  Central answers with the one the Worker made has no test of its own.
+- **A secret sent as bytes.** The run's search of the request bodies looks
+  for the secrets as text. A password sent as an array of numbers would
+  pass it; that no wire type has such a field is by reading.
+- **The third reset's sessions** and the old password over the native
+  listener after the new vault: not asked (above).
+- **Someone signed in as one account who resets another**: by reading.
+- **Browsers and aids.** Chromium only, desktop and a phone's size. No
+  screen reader was run: the labels, the alert and status regions and the
+  focus after each step are asserted in the page's tree, not heard. The
+  clipboard was tried with its permission granted; the refusal's sentence
+  is not reached by a test. The file to save is checked by its address,
+  not downloaded.
+- **Six languages** (es, ja, ko, ru, zh-hans, zh-hant) show these
+  messages in English, the FAQ's changed answer among them. Spanish is
+  three messages below the gate's limit: four more English ones fail it.
+  The three languages translated by machine were not read by a speaker.
+- **A failed run's trace** of the real suite holds what was typed and the
+  reset code as sent (`web/test-results-real`). Everything in it is
+  synthetic; the folder of these runs was deleted.
+- **Not run**: `cargo xtask postgres` (no database crate, migration or
+  query was touched), `cargo xtask smoke`, `cargo audit` and `cargo deny
+  check` (`Cargo.lock` and every `Cargo.toml` are untouched).
+- **The registration's code step** has no copy button; the reset's has
+  one (`clip.rs` is there for it). The account area's older requests
+  word Central's `Rejected` as the sign-in's wrong name or password
+  (`failure.into()`); the two new forms do not
+  (`Problem::outside_sign_in`). `Debug` on the reset's outcome holds a
+  new vault's recovery code, as the registration's `NewCode` does;
+  nothing prints either.
+
 Engineering review, not an audit.

@@ -214,7 +214,10 @@ The server side of [web accounts](web-accounts.md) lands in three PRs.
   change's start counts as two sign-ins) and the website's change
   on a registered account (cookie, native session and gateway lease ended,
   recovery code still opening the document). No migration or grant change.
-  The website's form (M4) and the client's (M6) are separate.
+  The website's form is built (12.11.2026: the account area's security
+  section, `central-web-crypto`'s `password_start` and `password_finish`;
+  it signs in once more inside one Worker, since a browser keeps no master
+  key); the client's (M6) is separate.
 - **Administration** (28.10.2026, roadmap M1 step 2a; [administration](administration.md)).
   Migration 000012: administrator roles, an append-only audit (the runtime
   may only read and insert it) and the last password sign-in time.
@@ -247,8 +250,11 @@ The server side of [web accounts](web-accounts.md) lands in three PRs.
   or cleared code, the gateway ticket after a new vault, and over the real
   listeners all three ways to keep or renew, a wrong recovery code, wrong
   codes spending nothing, two finishes of one code, the other listener and
-  the budget. Deploy: the hook migrates; no grant change. The website's and
-  the client's forms are M4 and M6.
+  the budget. Deploy: the hook migrates; no grant change. The website's
+  page is built (12.11.2026: `/{lang}/reset`, with the recovery code or a
+  new vault, [account reset](account-reset.md) §"The website's page");
+  issuing a code in the new site's administration and the client's form
+  (M6) are open.
 - **Deleting and exporting an account** (28.10.2026, roadmap M1 step 3;
   [account deletion](account-deletion.md)). `AccountExport` (both
   listeners, a password sign-in under 30 minutes): everything Central stores
@@ -356,8 +362,9 @@ evidence of production capacity.
 Native OPAQUE login, account persistence, gateway registration/admin APIs,
 exclusive sessions, guarded legacy migration and encrypted private-object/chat
 storage are implemented and tested with synthetic data. They have not been
-deployed for real users. Browser SSO, password reset/recovery service, the
-password change's UI flows (its service exists since 28.10.2026) and MFA
+deployed for real users. Browser SSO, a reset by e-mail, the client's forms
+for a reset and for a password change (both are served since 28.10.2026 and
+the website has its pages since 12.11.2026) and MFA
 remain unfinished (sessions renew, up to 12 hours); registration and
 browser sign-in are in progress (above). Live discovery exposes enrollment state
 and requires its documented review before public use.

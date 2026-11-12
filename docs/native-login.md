@@ -262,10 +262,31 @@ stay.
 a modified client can wrap another key and lose its own data, nothing of
 anyone else's. A device signed in elsewhere learns of the change when its
 session is refused; there is no notice by e-mail yet (M1 step 4). The
-browser page has no change form yet (M4): it keeps no master key after a
-sign-in, so its form will sign in and change inside one Worker, with a
-`central-web-crypto` export like `recovery_create`. The native client's form
-is M6.
+native client's form is M6.
+
+**The website's form** (12.11.2026; `crates/central-web`,
+`islands/password.rs`, in the account area's security section). A browser
+keeps no master key after a sign-in, so the form signs in once more with the
+current password inside one Worker (`LoginStart`, `LoginFinish`, which
+replaces the browser session as every sign-in does) and changes in the same
+Worker with `central-web-crypto`'s `password_start` and `password_finish`,
+which do what `Session::change_password` does: the wrapper the sign-in
+answered is opened and the same master key wrapped under the new password.
+Nothing on the wire changed. What follows from the two steps:
+
+- A change through the page is three guesses where the client's is two (a
+  sign-in's start and the change's); the right password gives them back.
+  A wrong current password fails at the sign-in's KE2, in the Worker,
+  before `ChangePasswordStart` is sent, and counts one.
+- The page cannot read its cookie, so it has no `SessionStatus` with the old
+  token. When the finish's answer is lost it asks `AccountSummary`: refused
+  means the session ended, and the page forgets it; answered means either
+  that nothing changed or that the new cookie arrived without its answer.
+  The page says in both cases that it cannot tell, and to try the new
+  password first at the next sign-in.
+- After a change the page says what Central did: this browser stays signed
+  in and every other session of the account, the client's included, is
+  ended.
 
 ## Guessing a password online
 

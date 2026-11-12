@@ -12,9 +12,9 @@ pass is no evidence of compliance: no lawyer has read the texts.
 
 ## Open questions
 
-The reviewer's notes, in German as written. Also open: a reset code cannot be
-redeemed on the new site yet (`ResetStart`/`ResetFinish` exist in
-`central-client` only); the FAQ says so.
+The reviewer's notes, in German as written. (Closed on 12.11.2026: a reset
+code is redeemed on the new site at `/{lang}/reset`, and the FAQ's answer
+links to it; `../account-reset.md`, "The website's page".)
 
 - Zwei Datenschutzerklärungen: Die Website zeigt die privacy-*-Texte aus site.ftl (legal.rs), daneben gibt es legal/privacy.de.md/.en.md (Version 2026-11-02, laut legal/README.md 'binding'). Sie widersprechen sich (Serverprotokolle: 'kein Zugriffsprotokoll' gegen '14 Tage Protokolle'; Drittländer; Sprachwahl im Browser gespeichert; Umfang). Welche gilt? Empfehlung: ein einziger Text, aus dem beide Stellen gespeist werden. legal/README.md nennt außerdem Version 2026-10-28, die Datei 2026-11-02.
 

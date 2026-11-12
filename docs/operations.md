@@ -2,9 +2,10 @@
 
 This runbook covers the deployed launcher and its database connector. It is an
 operator procedure, not a release approval: the gates in [status](status.md)
-still apply. Registration and sign-in on `baylee.app` are served by the browser
+still apply. Registration, sign-in, a password change and a reset with an
+administrator's code on `baylee.app` are served by the browser
 listener ([below](#the-browser-listener)) once it is configured; nothing here
-enables password reset or browser SSO for gateways. Sessions renew
+enables a reset by e-mail or browser SSO for gateways. Sessions renew
 ([below](#sessions)).
 
 ## Launcher modes
@@ -1006,6 +1007,11 @@ where. The guessing brake's numbers are the owner's to decide (the security
 records of 31.10.2026 and 11.11.2026).
 Central sessions last 30 minutes unless renewed, and at most 12 hours. Password change
 is served on both listeners since 28.10.2026 ([native login](native-login.md)
-§"Password change"; no migration or grant), with no form on the website or in
-the client yet; reset and recovery are not served. Discovery reveals enrollment state for a supplied
+§"Password change"; no migration or grant), with a form on the website since
+12.11.2026 (the account area's security section) and none in the client yet.
+A reset with an administrator's code is served on both listeners since
+28.10.2026 ([account reset](account-reset.md)) and has its page on the
+website since 12.11.2026 (`/{lang}/reset`). The new site has no page that
+issues the code yet: the old build's admin page does, where it is still
+served (`handle /admin*`, above). A reset by e-mail is not served. Discovery reveals enrollment state for a supplied
 username (see [native login](native-login.md)), on both listeners.

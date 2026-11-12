@@ -82,7 +82,8 @@ but without any UI or browser crypto:** `change_password_start/finish`,
 `key_check_status`, `set_key_check`, `pair_start/status/approve/cancel`,
 `session_status` (client exists, no caller). Their native implementations
 are in `central-client` (`password.rs`, `reset.rs`, `export.rs`,
-`deletion.rs`, `pairing.rs`).
+`deletion.rs`, `pairing.rs`). (This was the state before the rewrite; the
+new site has the password change and the reset since 12.11.2026, §15.)
 
 ### 1.4 Browser crypto and the chat
 
@@ -766,10 +767,9 @@ address (staging).
   made after a fresh sign-in and shown once, revoked).
 - **Not yet** (each needs new exports in `central-web-crypto`, i.e. a
   change to the committed, byte-checked module with its own review and the
-  canonical rebuild): password change on the website, reset with a recovery
-  or reset code, and approving a pairing. The security page says that
-  password changes stay in the client for now. Notification settings come
-  with the PWA (phase 4).
+  canonical rebuild): approving a pairing. The password change and the
+  reset with a reset code came on 12.11.2026 (§15). Notification settings
+  come with the PWA (phase 4).
 - **Tests**: unit tests of the form rules and term selection; server tests
   that every form and account page is an island page, `noindex`, one `h1`;
   `web/e2e-site/account.spec.ts` drives a sign-in through the real
@@ -980,7 +980,8 @@ AVIF, behind the HTML, the stylesheet and three faces on simulated slow
   committed `central-web-crypto` module (the key check, the HPKE seal to the
   client's key, the approval proof), hence that module's own three-pass
   review and the canonical Linux rebuild.
-- Password change and reset on the website (new exports too).
+- Password change and reset on the website (new exports too): built on
+  12.11.2026, §15.
 - The administration still comes from the old build (§11, Caddy `/admin*`).
 
 ## 14. As built: the owner's round of 11.11.2026
@@ -1138,3 +1139,48 @@ less motion, and no hover moves or resizes an element as a whole.
 **Something for those who look.** Typing "baylee" outside a field lets a
 cat walk across the foot of the window (`hint.js`): paw prints, hidden
 from a screen reader, in nobody's way, gone after a few seconds.
+
+## 16. As built: a reset code and a password change (12.11.2026)
+
+Central and `central-client` could do both since 28.10.2026; the site could
+do neither. Nothing on the wire and nothing in Central changed.
+
+- **The module.** `central-web-crypto` has five more exports, each a
+  wrapper around what `central-client` does with `central-crypto`:
+  `reset_start`, `reset_keep` and `reset_new` for a reset
+  ([account reset](../account-reset.md)), `password_start` and
+  `password_finish` for a change ([native login](../native-login.md),
+  "Password change"). The committed module was rebuilt in the pinned
+  container ([xtask](../xtask.md), "The website's WebAssembly").
+- **The reset page**, `/{lang}/reset` (`Page::Reset`, `islands/reset.rs`):
+  not indexed, in no menu and not in the sitemap, without the sign-in
+  dialogs, and `/reset` leads to it. The sign-in form, on its page and in
+  its dialog, links to it with a plain link, and the FAQ's answer about a
+  forgotten password does. What it does and does not tell is in
+  [account reset](../account-reset.md), "The website's page".
+- **The password's change** is a card in the account area's security
+  section (`islands/password.rs`): the current password, the new one twice.
+  The form gives way to what became of it.
+- **Shared.** `field::labelled` draws a labelled field with its glyph, its
+  hint and, for a password, its eye; `clip::write` copies to the clipboard
+  (the reset's new recovery code has a copy button, the registration's has
+  none yet).
+- **Words.** English and German by hand. French, Italian and Brazilian
+  Portuguese were translated by machine with the change, because
+  `cargo xtask gate` allows a language fewer than 12 in 100 messages
+  that are the English ones, and with the English text standing in those
+  three were over that limit (126, 118 and 114 of 913, where 109 pass).
+  The six others (es, ja, ko, ru, zh-hans, zh-hant) carry the English
+  text of the new messages, and of the changed `faq-password-a`, until
+  they are translated; Spanish is three messages below that limit.
+- **Tests.** Unit tests of every decision the two forms make, server tests
+  of the page and its links, `web/e2e-site/reset.spec.ts` and
+  `password.spec.ts` with a stand-in Central and the real Worker, and
+  `web/e2e-real/site-reset.spec.ts` and `site-password.spec.ts` against a
+  real Central ([security assurance](../security-assurance.md), "The website
+  redeems a reset code and changes a password").
+
+**Open.** Issuing a reset code in the new site's administration (the old
+build's admin page does it, where that build is still served); the six
+translations, and a reading of the three made by machine; a reset that
+keeps the data through a device still signed in is the client's (M6).

@@ -155,6 +155,14 @@ emulation of x86-64 (QEMU emulation crashed `rustc`), and `cargo xtask wasm
 `7983d3ec71c4702ab124660038d92a0a0b3f76c40bfa644e440fcc8574f46025`; CI's
 `wasm` job checks it again on its own runner.
 
+The 2026-11-12 bundle (`reset_start`, `reset_keep`, `reset_new`,
+`password_start`, `password_finish`) was built the same way, with the
+command above under Rosetta, and `cargo xtask wasm --check` passed in the
+same container. The resulting WASM SHA-256 is
+`abeaad928229eb30338a15db4bdc9d5864ed85ffa07c882521675d5cceebbc39`.
+`cargo xtask site` takes the committed module (checked against its
+`SHA256SUMS`) and builds none of its own.
+
 ## The site's assets (`site`)
 
 The server-rendered website (`crates/central-web`, [the proposal](proposals/frontend-rewrite.md))
