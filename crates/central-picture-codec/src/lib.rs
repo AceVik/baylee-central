@@ -87,6 +87,15 @@ pub fn convert_with(
     std::panic::catch_unwind(|| checked(format, bytes, ffmpeg)).unwrap_or(Err(Refusal::Malformed))
 }
 
+/// [`convert`] without catching a decoder's panic, for the fuzzer
+/// (`fuzz/`), which must see every panic as a finding; never for a worker.
+///
+/// # Errors
+/// As [`convert`].
+pub fn convert_uncaught(format: Format, bytes: &[u8]) -> Result<Output, Refusal> {
+    checked(format, bytes, None)
+}
+
 fn checked(format: Format, bytes: &[u8], ffmpeg: Option<&Ffmpeg>) -> Result<Output, Refusal> {
     if bytes.len() > format.max_bytes() {
         return Err(Refusal::TooLarge);
