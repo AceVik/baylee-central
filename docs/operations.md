@@ -414,7 +414,7 @@ listener does). A request without a well-formed last hop is refused (400). Do no
 Caddy's `trusted_proxies` for this site unless a CDN in front of it appends its
 own hop: without it Caddy ignores a client's own `X-Forwarded-For`.
 
-The `baylee.app` site block (`web/README.md` §"Serving it") passes `/api/*`
+The `baylee.app` site block ([the server-rendered website](#the-server-rendered-website-central-web)) passes `/api/*`
 to it instead of answering 404, with the `Host` unchanged (Caddy's default for
 a plain-HTTP upstream):
 
@@ -631,7 +631,8 @@ no grant. What stays the operator's:
 ## Gateways and their tokens
 
 Since 30.10.2026 Central's administrators approve, disable and enable
-gateways on the website (`/admin/gateways`), and owners mint and revoke their
+gateways on the website (`/{lang}/account/admin/gateways` since 12.11.2026; the
+old build's `/admin/gateways` before), and owners mint and revoke their
 gateways' tokens there ([gateway registry](gateway-registry.md) §"Gateway
 tokens"). The deploy hook applies `ops/grants.sql` after the migration,
 which gives the runtime `INSERT` and `UPDATE (enabled)` on
@@ -693,7 +694,7 @@ operator:
   gateway sends pulses, `PublicFigures` lists no gateway and still answers
   the number of accounts.
 - **Taking a gateway's numbers away.** Disabling the gateway
-  (`/admin/gateways`) hides them at once. To withdraw the numbers alone
+  (`/{lang}/account/admin/gateways`) hides them at once. To withdraw the numbers alone
   while the gateway stays listed, clear them; they come back with the
   gateway's next pulse, so its operator has to stop reporting as well:
 
@@ -855,7 +856,7 @@ of that day in Europe/Berlin; `null` clears it (the store then stays until a
 date is set again). From then no legacy sign-in is taken, and the daily sweep (`--sweep-stdin`, [administration](#administration))
 deletes every row left and every legacy reservation that never enrolled; it
 deletes the row of a closed move at any time. Administrators see what is left
-on the website, at `/admin/legacy` (`AdminRequest::LegacyAccounts`). After the deadline's sweep,
+on the website, at `/{lang}/account/admin/legacy` (`AdminRequest::LegacyAccounts`). After the deadline's sweep,
 remove the `legacy` block, revoke the role's grants and drop the role; a later
 release removes the schema.
 
@@ -932,7 +933,7 @@ line for a report, and none for a refusal.
 (*Feedback*: move to the trash, then purge; the trash alone frees nothing
 for its 30 days). The sweep frees what is done for 90 days, in the trash
 for 30 or older than 1,095. A gateway that is filling its bound with
-reports nobody asked for is disabled like any other (`/admin/gateways`);
+reports nobody asked for is disabled like any other (`/{lang}/account/admin/gateways`);
 its reports stay until they are purged.
 
 **Memory.** With four uploads at once, parts of the largest size (64 MiB)
@@ -1166,7 +1167,21 @@ syslog and fail2ban. Until that is changed, "14 days" is not true of
 
 *Added 10.11.2026, not deployed* ([proposal](proposals/frontend-rewrite.md)).
 Until the owner switches Caddy over, `baylee.app` keeps serving the static
-build of `web/` as before; nothing here changes production by being merged.
+build of `web/` already on the server; nothing here changes production by
+being merged. Since 12.11.2026 that React build is gone from this
+repository, and the deploy hook builds and installs this site instead
+([below](#deploying-with-the-gateway)).
+
+- **Once, by the owner** (in this order): write `/etc/baylee-app/web.json`
+  (below; root's, `0600`), install `ops/baylee-app-web.service` as
+  `/etc/systemd/system/baylee-app-web.service`, run the hook (or put the
+  first build in place by hand), `systemctl daemon-reload`, `systemctl
+  enable --now baylee-app-web`, check `curl -fsS -H 'Host: baylee.app'
+  http://127.0.0.1:28794/robots.txt`, then switch Caddy (below). The unit
+  runs the binary as a dynamic user with a strict sandbox
+  (`ProtectSystem=strict`, no capabilities, `NoExecPaths=/` but for the
+  binary and the system's libraries, `@system-service` system calls); it was
+  written without a systemd at hand and is checked by that first start.
 
 - **Build** (as the build user, beside `central-service`):
   `cargo build --release --locked -p central-web-server` and, with
@@ -1260,14 +1275,22 @@ build of `web/` as before; nothing here changes production by being merged.
   answers an unknown path with the app's HTML. DMARC must stay at
   `quarantine` or `reject`. A mark certificate (Gmail's CMC) asks that the
   mark was public on the domain for a year, from the day it first shows.
-- **Until the administration is rebuilt** (phase 5 of the proposal),
-  `/admin*` can keep being served from the old build: a `handle /admin*`
-  with the old `file_server` block in front of the `central-web` handle.
-  What `central-web` does not answer carries none of its headers: that
-  handle needs the old site block's own `header` directives inside it
-  (`web/README.md` §"Serving it": the old build's Content-Security-Policy,
-  Permissions-Policy, COOP, `nosniff`, `no-referrer`), or the
-  administration is served without a content policy.
+- **The administration is `central-web`'s** since 12.11.2026, under the
+  account area: `/{lang}/account/admin/overview`, `/users` (and one
+  account's `/users/<id in hex>`), `/gateways`, `/audit`, `/legacy` and
+  the reset code's `/{lang}/account/admin` ([frontend
+  rewrite](proposals/frontend-rewrite.md) §25). It needs no Caddy handle
+  of its own: the catch-all passes it, with `central-web`'s headers. The
+  old build's `/admin*` is needed only for what is not rebuilt yet, the
+  feedback's triage (`/admin/feedback`, rebuilt separately as
+  `/{lang}/account/admin/feedback`). Until that is merged, a
+  `handle /admin*` with the old `file_server` block in front of the
+  `central-web` handle keeps it reachable; what `central-web` does not
+  answer carries none of its headers, so that handle needs the old site
+  block's own `header` directives inside it (`web/README.md` §"Serving
+  it": the old build's Content-Security-Policy, Permissions-Policy, COOP,
+  `nosniff`, `no-referrer`), or it is served without a content policy.
+  Once nothing is left there, the handle goes with the old build.
 
 ## Profile pictures
 
@@ -1342,8 +1365,9 @@ The 28 October release (`0.1.1-beta.9a`) was the sunlit Baylee memorial,
 parchment story and photo viewer.
 
 
-`ops/deploy-hook` keeps Central and the website (`web/`) in lockstep with the
-official gateway on the same machine. It is a Baylee deploy hook (Baylee's
+`ops/deploy-hook` keeps Central and the website (the server-rendered
+`central-web`; the React build of `web/` was removed on 12.11.2026) in
+lockstep with the official gateway on the same machine. It is a Baylee deploy hook (Baylee's
 `docs/deploy-hooks.md`): installed root-owned, `0755`, as
 `/etc/baylee/deploy-hooks.d/10-central`, it runs in every gateway deploy,
 including the one the gateway's timer starts for a new release tag.
@@ -1356,9 +1380,13 @@ including the one the gateway's timer starts for a new release tag.
 - **`prepare`.** As the build user it fetches and checks the revision out in
   `/opt/baylee-central/src`. It then takes `ops/grants.sql` out of the
   revision's commit, before anything is built, and only then builds
-  `central-service` and the website (`npm ci`, `npm run content` from the
-  gateway's checkout, `npm run build`). It stages all three in
-  `/opt/baylee-central/staged`. A failed fetch answers "not ready" (75), so
+  `central-service` and `central-web-server` in release and the site
+  (`cargo xtask site` with `BAYLEE_SRC`, for the gateway's screenshots and
+  fallback card status). It stages the two binaries, the grants and the site
+  in `/opt/baylee-central/staged`. The build user needs Rust's
+  `wasm32-unknown-unknown` target and the pinned wasm-bindgen CLI
+  ([xtask](xtask.md#the-sites-assets-site)); `brotli` and `gzip` on the
+  `PATH` make the compressed copies. A failed fetch answers "not ready" (75), so
   the next timer run tries again.
 - **`before-switch`** (no game is running, admission is held): asks first
   whether the grants' login reaches the database and is no superuser, and
@@ -1366,19 +1394,27 @@ including the one the gateway's timer starts for a new release tag.
   binary (the old one kept as `central-service.previous`), migrates
   (`--migrate-stdin` from `/etc/baylee-central/migrate.json` under
   `systemd-run` as `central`), grants as `central_migrator`, starts it and
-  waits up to 30 s for `/health/live`; then swaps the website into
-  `/opt/baylee-app/web`. A failed migration, grant or start puts the
-  previous binary back, starts it and fails the hook, which stops the deploy
-  (migrations are transactional).
+  waits up to 30 s for `/health/live`. Then the website: the site goes to
+  `SITE_ROOT` (`/opt/baylee-app/site`) beside the old one and the binary to
+  `WEB_BIN` (`/opt/baylee-app/bin/central-web`, the old one kept as
+  `central-web.previous`); where `WEB_UNIT` (`baylee-app-web`) is installed
+  it is restarted and has 30 s to answer `robots.txt` on `WEB_LISTEN`, else
+  the previous site and binary are put back and the hook fails (Central
+  stays deployed). Where the unit is not installed yet, the files are put in
+  place and nothing is started. A failed migration, grant or start of
+  Central puts the previous binary back, starts it and fails the hook, which
+  stops the deploy (migrations are transactional).
 - **By hand,** for a Central or website change between gateway releases:
   `sudo /etc/baylee/deploy-hooks.d/10-central manual <central revision>`
   stages and switches that revision at once; nothing holds games for it.
 
 Settings, all optional, in `/etc/baylee-central/deploy-hook.env` (root's,
 not writable by others): `BUILD_USER`, `BAYLEE_SRC`, `CENTRAL_ROOT`,
-`WEB_ROOT`, `UNIT`, `LISTEN`, `DB_CONTAINER`, `DB_GRANTOR`, `DB_NAME`; the
-defaults are this deployment's. The website's site block is the one in
-`web/README.md` §"Serving it", with `root` on `WEB_ROOT`.
+`WEB_BIN`, `SITE_ROOT`, `WEB_UNIT`, `WEB_LISTEN`, `UNIT`, `LISTEN`,
+`DB_CONTAINER`, `DB_GRANTOR`, `DB_NAME`; the defaults are this
+deployment's. The website's Caddy block is the one in §"The server-rendered
+website". The old static `WEB_ROOT` (`/opt/baylee-app/web`) is no longer
+written; remove it once Caddy no longer serves it.
 
 ### The grants' file and login (12.11.2026)
 
@@ -1582,9 +1618,9 @@ is served on both listeners since 28.10.2026 ([native login](native-login.md)
 A reset with an administrator's code is served on both listeners since
 28.10.2026 ([account reset](account-reset.md)) and has its page on the
 website since 12.11.2026 (`/{lang}/reset`). An administrator makes the
-code on the new site's `/{lang}/account/admin` since 12.11.2026, or on the
-old build's admin page where that is still served (`handle /admin*`,
-above). A reset code by mail is served on both
+code on the new site's `/{lang}/account/admin` since 12.11.2026 (an
+account's page in the administration leads there, opened at that
+account). A reset code by mail is served on both
 listeners since migration 000026, where the `mail` block is configured
 ([mail](#mail)), and the website's reset page asks for it. Central mails
 30 reset codes an hour for all accounts together, counted in memory when a

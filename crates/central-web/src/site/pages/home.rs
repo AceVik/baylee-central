@@ -38,7 +38,7 @@ const SHOTS: [Shot; 6] = [
 ];
 
 /// The album's photographs: file number, caption, width, height (fixed
-/// files, family-approved; `web/assets-sunlight.md`).
+/// files, family-approved; `docs/assets-sunlight.md`).
 /// A photograph: its number, its caption, its width and height.
 type Photo = (u8, fn(Lang) -> &'static str, u32, u32);
 

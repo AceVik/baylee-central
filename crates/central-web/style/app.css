@@ -730,53 +730,6 @@
   font-size: var(--text-lg);
 }
 
-/* ---- The administration: a reset code (`islands/admin.rs`) ------------------ */
-
-/* the accounts a search found: a card each, as the sessions are; the facts
-   of a card fall into one column where the card is narrow */
-.admin-accounts {
-  display: grid;
-  gap: var(--space-3);
-  margin-block-start: var(--space-3);
-  padding: 0;
-  list-style: none;
-}
-
-.admin-account,
-#admin-steps > .card {
-  container-type: inline-size;
-}
-
-/* an account's name and its role's pill, the name wrapped anywhere: a
-   sign-in name is one word of up to 24 characters */
-.admin-title {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.admin-title bdi {
-  min-inline-size: 0;
-  overflow-wrap: anywhere;
-}
-
-.admin-list {
-  display: grid;
-  gap: var(--space-5);
-}
-
-.admin-search .with-tool .button {
-  flex: none;
-}
-
-.admin-warning {
-  display: grid;
-  gap: var(--space-2);
-  margin: 0;
-  padding-inline-start: 1.25em;
-}
-
 /* ---- The profile picture card and the moderation list -------------------- */
 
 .picture-current {

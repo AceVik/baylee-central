@@ -305,7 +305,14 @@ fn page(app: &App, headers: &HeaderMap, page: Page, lang: Lang) -> Response {
     };
     let data = snapshot(app);
     let key = (page, lang, machine);
-    let rendered = app.pages.find(key, &data).unwrap_or_else(|| {
+    // one account's page in the administration has an address per id: it
+    // is rendered for its request and never kept
+    let found = if page.kept() {
+        app.pages.find(key, &data)
+    } else {
+        None
+    };
+    let rendered = found.unwrap_or_else(|| {
         let cx = Context {
             lang,
             origin: &app.config.origin,
@@ -319,7 +326,9 @@ fn page(app: &App, headers: &HeaderMap, page: Page, lang: Lang) -> Response {
             etag: etag(&body),
             body,
         });
-        app.pages.keep(key, &data, &rendered);
+        if page.kept() {
+            app.pages.keep(key, &data, &rendered);
+        }
         rendered
     });
     let status = match page {
@@ -521,10 +530,52 @@ async fn any(
     conditional(&headers, answer(&app, &headers, &uri))
 }
 
+/// Where an address of the old React build's administration (`/admin…`,
+/// removed on 12.11.2026) lives now, after `/{lang}/`: its overview, the
+/// accounts' list and one account, the gateways, the audit, the legacy
+/// accounts, and the feedback's list (with its query, whose form the new
+/// list kept) and one report. An id is 32 lowercase hex digits, as the old
+/// build wrote it; any other address under `/admin` is no page.
+fn old_admin(path: &str, query: Option<&str>) -> Option<String> {
+    let rest = path.strip_prefix("/admin")?;
+    let rest = rest.strip_suffix('/').unwrap_or(rest);
+    let hex =
+        |id: &str| id.len() == 32 && id.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'));
+    let with_query = |to: String| match query {
+        Some(query) if !query.is_empty() => format!("{to}?{query}"),
+        _ => to,
+    };
+    let mut parts = rest.split('/');
+    // the path began with "/admin": what follows must be empty or "/…"
+    if parts.next() != Some("") {
+        return None;
+    }
+    match (parts.next(), parts.next(), parts.next()) {
+        (None, None, None) => Some("account/admin/overview".to_owned()),
+        (Some(page @ ("users" | "gateways" | "audit" | "legacy")), None, None) => {
+            Some(format!("account/admin/{page}"))
+        }
+        (Some("users"), Some(id), None) if hex(id) => Some(format!("account/admin/users/{id}")),
+        (Some("feedback" | "reports"), None, None) => {
+            Some(with_query("account/admin/feedback".to_owned()))
+        }
+        (Some("feedback" | "reports"), Some(id), None) if hex(id) => {
+            Some(with_query(format!("account/admin/feedback/{id}")))
+        }
+        _ => None,
+    }
+}
+
 fn answer(app: &App, headers: &HeaderMap, uri: &Uri) -> Response {
     let path = uri.path();
     if let Some(response) = file(app, path, headers) {
         return response;
+    }
+    // the old React build's administration, bookmarked: its pages live in
+    // the account area now
+    if let Some(rest) = old_admin(path, uri.query()) {
+        let to = format!("/{}/{rest}", negotiated(headers, uri).code());
+        return redirect(StatusCode::FOUND, &to, true);
     }
     match path {
         "/robots.txt" => {

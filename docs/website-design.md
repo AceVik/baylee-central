@@ -1,8 +1,10 @@
 # Website design guidelines
 
+*Status, 12.11.2026: the React app these rules were written for was removed from `web/`. The paths marked as removed below are gone.*
+
 *30.10.2026.* How baylee.app looks, moves and is put together: the public
 pages, the account area and the administration. It binds every change under
-`web/`. The words are in `web/README.md` §"The words"; the security rules of
+`web/`. The words were in the old `web/README.md` §"The words" (removed 12.11.2026); the security rules of
 the pages are in [web accounts](web-accounts.md). Where this document and a
 stylesheet disagree, the stylesheet is wrong.
 
@@ -38,11 +40,11 @@ Baylee in sunlight by day, the blue hour by night.
    failed and offers to try again; it never shows an empty list instead. A
    secret is shown once, in its own box, with what to do with it.
 5. **Nothing from elsewhere.** No font, script, tracker or picture from
-   another host, except the ones the CSP names (`web/scripts/csp.ts`).
+   another host, except the ones the CSP names (`web/scripts/csp.ts`, removed 12.11.2026).
 
 ## Colour
 
-Every colour is a custom property in `web/src/styles/tokens.css`, defined
+Every colour is a custom property in `web/src/styles/tokens.css` (removed 12.11.2026), defined
 for the dark scheme in `:root`, for the light scheme under
 `prefers-color-scheme: light` and again under `[data-theme="light"]`. The
 header's colour switch went from the device's scheme to light, dark and back
@@ -83,7 +85,7 @@ Rules:
 
 - **Contrast**, WCAG 2.1 AA: text 4.5:1 on every surface it is drawn on,
   large text (≥ 1.2rem bold, ≥ 1.5rem) 3:1, borders that carry meaning and
-  the focus ring 3:1. `web/test/styles/contrast.test.ts` measures the token
+  the focus ring 3:1. `web/test/styles/contrast.test.ts` (removed 12.11.2026) measures the token
   file in both schemes and fails a pair that drops below.
 - **State colours are not the accent.** `--ok`, `--warn` and `--bad` never
   stand in for the gold, and the gold never says "fine".
@@ -170,7 +172,7 @@ The scale (`--text-*`, rem at a root of 16–20 px by viewport):
 ## Components
 
 Each lives in one stylesheet named after it and one component under
-`web/src/components/` when it has behaviour.
+`web/src/components/` (removed 12.11.2026) when it has behaviour.
 
 - **Buttons** (`buttons.css`): `.button` gold, primary, one per view (one
   exception: a queue whose rows each wait for the same decision, the
@@ -435,7 +437,7 @@ above, with these of their own:
   `e2e/area.ts`) (`expectNoSideScroll`; the memorial
   at 320 px too), a gateway card's controls 44 px high with copying its
   address as the first action while gateway links are off
-  (`VITE_DEEP_LINKS`, `web/README.md` §"Settings"), and the reduced-motion
+  (`VITE_DEEP_LINKS`, the old `web/README.md` §"Settings", removed 12.11.2026), and the reduced-motion
   preference hiding nothing.
 - `npm run screens`: every page at phone and desktop width in both schemes,
   the account area and the administration signed in as well, for a person

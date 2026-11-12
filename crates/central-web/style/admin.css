@@ -1,0 +1,386 @@
+/* The administration (`islands/admin.rs`, `islands/admin/`): the old
+   build's look rewritten for this site, its palette, panels and pills.
+   Nothing moves or grows under the pointer; a colour may change. */
+
+/* ---- Its own navigation, under the page's title ------------------------- */
+
+.admin-nav ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-nav a {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: var(--target);
+  padding-inline: 1em;
+  border: 1px solid var(--edge-soft);
+  border-radius: var(--pill);
+  color: var(--ink-soft);
+  font: 500 0.92rem var(--sans);
+  text-decoration: none;
+  transition:
+    background-color var(--dur-fast) ease,
+    color var(--dur-fast) ease,
+    border-color var(--dur-fast) ease;
+}
+
+.admin-nav a:hover {
+  border-color: var(--edge);
+  color: var(--title);
+}
+
+/* where the page is: the gold edge of the area's own navigation */
+.admin-nav a[aria-current] {
+  border-color: var(--gold);
+  color: var(--title);
+}
+
+.admin-nav a[aria-current="page"] {
+  background: var(--panel-solid);
+  box-shadow: inset 0 -3px 0 var(--gold);
+}
+
+.admin-lead {
+  max-inline-size: var(--measure);
+  margin: 0;
+  color: var(--ink-soft);
+}
+
+/* ---- The reset code's page ------------------------------------------------ */
+
+/* the accounts a search found: a card each, as the sessions are; the facts
+   of a card fall into one column where the card is narrow */
+.admin-accounts {
+  display: grid;
+  gap: var(--space-3);
+  margin-block-start: var(--space-3);
+  padding: 0;
+  list-style: none;
+}
+
+.admin-account,
+#admin-steps > .card {
+  container-type: inline-size;
+}
+
+/* an account's name and its role's pill, the name wrapped anywhere: a
+   sign-in name is one word of up to 24 characters */
+.admin-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.admin-title bdi {
+  min-inline-size: 0;
+  overflow-wrap: anywhere;
+}
+
+.admin-list {
+  display: grid;
+  gap: var(--space-5);
+}
+
+.admin-search .with-tool .button {
+  flex: none;
+}
+
+.admin-warning {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding-inline-start: 1.25em;
+}
+
+/* ---- The overview's tiles ------------------------------------------------- */
+
+.admin-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr));
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-stat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.admin-stat p {
+  margin: 0;
+}
+
+.admin-stat-label {
+  margin: 0;
+  color: var(--violet);
+  font: 700 var(--text-xs) var(--sans);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.admin-stat-n {
+  color: var(--title);
+  font: 600 var(--text-xl) / 1.05 var(--serif);
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.admin-stat-sub {
+  flex: 1;
+  color: var(--ink-soft);
+}
+
+.admin-stat-go {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: var(--target);
+  font-family: var(--sans);
+  font-weight: 700;
+}
+
+/* the tile that asks for attention says so in words and in its colour */
+.admin-stat-warn {
+  border-color: var(--warn);
+}
+
+.admin-stat-warn .admin-stat-n {
+  color: var(--warn);
+}
+
+/* ---- Tables: the interface's face, tabular figures; a wide one scrolls in
+   its own box, and on a phone a row stays one line --------------------- */
+
+/* the box takes the width it is given and asks for none (inline-size
+   containment): a table wider than the page scrolls in it, and never
+   widens the column around it */
+.admin-table {
+  contain: inline-size;
+  overflow-x: auto;
+  margin-block-start: var(--space-3);
+  border: var(--hairline) solid var(--edge-soft);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+.admin-table table {
+  inline-size: 100%;
+  border-collapse: collapse;
+  font: var(--text-sm) var(--sans);
+}
+
+.admin-table :is(th, td) {
+  padding: var(--space-2) var(--space-3);
+  border-block-end: var(--hairline) solid var(--edge-soft);
+  text-align: start;
+  vertical-align: middle;
+}
+
+.admin-table thead th {
+  background: var(--panel-solid);
+  color: var(--ink-faint);
+  font-size: var(--text-xs);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.admin-table tbody th {
+  color: var(--title);
+  font-weight: 700;
+}
+
+.admin-table tbody tr {
+  transition: background-color var(--dur-fast) ease;
+}
+
+.admin-table tbody tr:hover {
+  background: var(--panel-2);
+}
+
+.admin-table tbody tr:last-child > * {
+  border-block-end: 0;
+}
+
+.admin-table .num,
+.admin-table code {
+  font-variant-numeric: tabular-nums lining-nums;
+  white-space: nowrap;
+}
+
+/* a name in a cell is a link with a whole target */
+.admin-table a {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: var(--target);
+}
+
+.admin-table tbody th a {
+  color: var(--title);
+  text-decoration: underline transparent;
+  text-underline-offset: 0.2em;
+  transition:
+    color var(--dur-fast) ease,
+    text-decoration-color var(--dur-fast) ease;
+}
+
+.admin-table tbody th a:hover {
+  color: var(--link-hover);
+  text-decoration-color: currentcolor;
+}
+
+.admin-table .pill + .pill {
+  margin-inline-start: var(--space-1);
+}
+
+@media (max-width: 37.5rem) {
+  .admin-table :is(th, td) {
+    white-space: nowrap;
+  }
+}
+
+/* ---- One account ---------------------------------------------------------- */
+
+/* a code and its copy button side by side, the line saying it worked under */
+.admin-copyable {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+}
+
+.admin-copyable code {
+  min-inline-size: 0;
+  overflow-wrap: anywhere;
+}
+
+.admin-copyable .meta {
+  margin: 0;
+}
+
+.admin-copyable .meta:empty {
+  display: none;
+}
+
+.admin-owned {
+  display: grid;
+  gap: var(--space-1);
+  margin-block: var(--space-3) 0;
+  padding-inline-start: 1.25em;
+}
+
+.admin-owned code {
+  overflow-wrap: anywhere;
+}
+
+/* ---- Gateways ------------------------------------------------------------- */
+
+.admin-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  min-inline-size: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.admin-gws {
+  display: grid;
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-gw {
+  container-type: inline-size;
+}
+
+.admin-gw-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.admin-gw-who {
+  min-inline-size: 0;
+}
+
+.card .admin-gw-name {
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-lg);
+  overflow-wrap: anywhere;
+}
+
+.admin-gw .pills {
+  margin: 0;
+}
+
+/* the state's green on its own tint: the shared pill's mix of 12 % comes
+   to just under 4.5 : 1 on a light panel */
+.admin-gw .pill.ok {
+  background: var(--ok-tint);
+}
+
+.admin-gw .actions {
+  margin-block-start: var(--space-4);
+}
+
+.admin-tokens {
+  margin-block-start: var(--space-3);
+}
+
+/* ---- A change: its confirmation in the card of what it changes ------------ */
+
+.admin-confirm {
+  margin-block-start: var(--space-4);
+  padding: var(--space-4);
+  border: var(--hairline) solid var(--edge);
+  border-inline-start: 0.25rem solid var(--action);
+  border-radius: var(--radius-md);
+  background: var(--panel-2);
+}
+
+.card .admin-confirm h3 {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-md);
+  overflow-wrap: anywhere;
+}
+
+.admin-confirm .actions {
+  margin-block-start: var(--space-3);
+}
+
+.admin-working {
+  margin-block-start: var(--space-4);
+}
+
+/* what the last change came to; empty, it takes no room and stays a live
+   region for the next */
+.admin-done {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border-inline-start: 0.25rem solid var(--ok);
+  border-radius: var(--radius-sm);
+  background: var(--ok-tint);
+  color: var(--ink);
+}
+
+.admin-done:empty {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+}

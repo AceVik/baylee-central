@@ -86,8 +86,14 @@ async fn summary() -> Load {
 
 /// A Unix time as the page's language writes a date and time, in UTC.
 pub fn when(lang: Lang, seconds: i64) -> String {
-    let days = seconds.div_euclid(86_400);
     let rest = seconds.rem_euclid(86_400);
+    let time = format!("{:02}:{:02}", rest / 3600, rest % 3600 / 60);
+    format!("{}, {time} UTC", day(lang, seconds))
+}
+
+/// The day of a Unix time as the page's language writes a date, in UTC.
+pub fn day(lang: Lang, seconds: i64) -> String {
+    let days = seconds.div_euclid(86_400);
     // Civil date from days since 1970-01-01 (Howard Hinnant's algorithm).
     let z = days + 719_468;
     let era = z.div_euclid(146_097);
@@ -99,8 +105,7 @@ pub fn when(lang: Lang, seconds: i64) -> String {
     let month = if mp < 10 { mp + 3 } else { mp - 9 };
     let year = yoe + era * 400 + i64::from(month <= 2);
     let date = format!("{year:04}-{month:02}-{day:02}");
-    let time = format!("{:02}:{:02}", rest / 3600, rest % 3600 / 60);
-    format!("{}, {time} UTC", crate::format::date(lang, &date))
+    crate::format::date(lang, &date)
 }
 
 /// Signs out here: Central ends the session and clears the cookie, the
@@ -288,14 +293,14 @@ fn home(lang: Lang, summary: &Summary, worker: &str) -> AnyView {
             </li>
         }
     });
-    // only an administrator is led to the page that makes reset codes; the
-    // rest of the administration is still the old build's, under `/admin`
+    // only an administrator is led to the administration: its overview,
+    // and the page that makes reset codes
     let admin = summary.admin.then(|| {
         view! {
             {registration_switch(lang, worker.to_owned())}
             <p class="actions">
                 <a class="button" href=format!("/{code}/account/admin")>{words::admin_reset_title(lang)}</a>
-                <a class="button" href="/admin">{words::account_admin(lang)}</a>
+                <a class="button" href=format!("/{code}/account/admin/overview")>{words::account_admin(lang)}</a>
             </p>
         }
     });
@@ -1218,17 +1223,34 @@ pub fn Account(lang: Lang, section: Section, worker: String) -> impl IntoView {
             Section::Gateways => gateways(lang, worker.clone()),
             Section::Notifications => notifications(lang, summary.admin),
             // the role is Central's to grant: without it, nothing is asked
-            Section::Admin if summary.admin => super::admin::page(
+            section if section.admin() && summary.admin => super::admin::area(
                 lang,
+                section,
                 worker.clone(),
                 summary.username.clone(),
                 summary.account,
                 reload,
-            )
-            .into_any(),
-            Section::Admin => super::admin::refused(lang).into_any(),
+            ),
+            Section::Feedback | Section::Report if summary.admin => super::feedback::page(
+                lang,
+                section,
+                worker.clone(),
+                summary.username.clone(),
+                summary.account,
+                reload,
+            ),
             // the messenger is its own island
             Section::Chat | Section::Contacts => ().into_any(),
+            // what is left is the administration, for someone without the role
+            Section::Admin
+            | Section::AdminOverview
+            | Section::AdminUsers
+            | Section::AdminUser(_)
+            | Section::AdminGateways
+            | Section::AdminAudit
+            | Section::AdminLegacy
+            | Section::Feedback
+            | Section::Report => super::admin::refused(lang).into_any(),
             }
         }
     }

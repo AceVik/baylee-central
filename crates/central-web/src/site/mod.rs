@@ -94,11 +94,21 @@ impl Page {
     /// The page at a slug.
     #[must_use]
     pub fn from_slug(slug: &str) -> Option<Page> {
+        // one report of the moderation: its id is the island's to read
+        if slug
+            .strip_prefix("account/admin/feedback/")
+            .is_some_and(|id| {
+                id.len() == 32 && id.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'))
+            })
+        {
+            return Some(Page::Account(Section::Report));
+        }
         Page::LISTED
             .into_iter()
             .chain([Page::SignIn, Page::Register, Page::Reset, Page::Offline])
             .chain(Section::ROUTED.map(Page::Account))
             .find(|page| page.slug() == slug)
+            .or_else(|| Section::account_page(slug).map(Page::Account))
     }
 
     /// Whether search engines may index it: not the Impressum (as before),
@@ -118,10 +128,27 @@ impl Page {
         )
     }
 
-    /// The page's absolute path in `lang`, `/de/download`.
+    /// The page's absolute path in `lang`, `/de/download`; one account's
+    /// page in the administration with the account's id.
     #[must_use]
     pub fn path(self, lang: Lang) -> String {
-        format!("/{}/{}", lang.code(), self.slug())
+        match self {
+            Page::Account(Section::AdminUser(id)) => format!(
+                "/{}/{}/{}",
+                lang.code(),
+                self.slug(),
+                crate::data::id_hex(&id)
+            ),
+            _ => format!("/{}/{}", lang.code(), self.slug()),
+        }
+    }
+
+    /// Whether the server keeps the page once rendered: every page but one
+    /// account's in the administration, whose address the visitor chooses
+    /// (a kept page per id would let requests fill the table).
+    #[must_use]
+    pub const fn kept(self) -> bool {
+        !matches!(self, Page::Account(Section::AdminUser(_)))
     }
 }
 

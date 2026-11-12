@@ -103,6 +103,69 @@ pub fn take() -> String {
     String::new()
 }
 
+/// What the account page's link to the reset page puts in its fragment:
+/// `/{lang}/account/admin#account=<the account's id in hex>`. An id is no
+/// secret; in the fragment it stays out of the site's logs all the same.
+#[cfg(any(target_arch = "wasm32", test))]
+const ACCOUNT: &str = "#account=";
+
+/// The account that the fragment `hash` names: `#account=` and the id as
+/// 32 lowercase hex digits, and nothing else.
+#[cfg(any(target_arch = "wasm32", test))]
+fn account_in(hash: &str) -> Option<[u8; 16]> {
+    crate::data::id_from_hex(hash.strip_prefix(ACCOUNT)?)
+}
+
+/// The account the page's fragment names, read once; a fragment that
+/// begins `#account=` is removed from the address as a code's is, so the
+/// page loaded again starts at its list.
+#[cfg(target_arch = "wasm32")]
+pub fn take_account() -> Option<[u8; 16]> {
+    let (_, hash) = location("hash")?;
+    if !hash.starts_with(ACCOUNT) {
+        return None;
+    }
+    replace("");
+    account_in(&hash)
+}
+
+/// On the server there is no address to read.
+#[cfg(not(target_arch = "wasm32"))]
+pub fn take_account() -> Option<[u8; 16]> {
+    None
+}
+
+/// Puts `fragment` (`#state=approved`, or nothing) in place of the page's
+/// own, in the same entry of the history: a filter the page shows stays
+/// when it is loaded again, and never reaches the site.
+#[cfg(target_arch = "wasm32")]
+pub fn replace(fragment: &str) {
+    use wasm_bindgen::JsValue;
+    let Some((location, _)) = location("hash") else {
+        return;
+    };
+    let href = get(&location, "href")
+        .and_then(|value| value.as_string())
+        .unwrap_or_default();
+    let global: JsValue = js_sys::global().into();
+    if let Some(history) = get(&global, "history")
+        && let Some(replace) = method(&history, "replaceState")
+    {
+        let state = get(&history, "state").unwrap_or(JsValue::NULL);
+        let address = format!("{}{fragment}", without_fragment(&href));
+        let _ = replace.call3(
+            &history,
+            &state,
+            &JsValue::from_str(""),
+            &JsValue::from_str(&address),
+        );
+    }
+}
+
+/// On the server there is no address.
+#[cfg(not(target_arch = "wasm32"))]
+pub fn replace(_fragment: &str) {}
+
 /// Watches for a fragment that hands a code after the page started: the
 /// link opened in a tab that shows this page already, which a browser
 /// takes as a move within the page and runs no island for. The fragment
@@ -191,6 +254,27 @@ mod tests {
             assert_eq!(reset(hash), None, "{hash}");
         }
         assert!(long.len() > PREFIX.len() + LONGEST);
+    }
+
+    /// The reset page opens the account its fragment names by its id in
+    /// lowercase hex, and nothing else; the account is never a code.
+    #[test]
+    fn the_reset_page_opens_the_account_its_fragment_names() {
+        let hex = "019a2b3c4d5e708090a0b0c0d0e0f0ff";
+        let id = crate::data::id_from_hex(hex).expect("an id");
+        assert_eq!(account_in(&format!("#account={hex}")), Some(id));
+        for hash in [
+            String::new(),
+            "#account=".to_owned(),
+            format!("#account={}", hex.to_uppercase()),
+            format!("#account={hex}&x"),
+            format!("#account= {hex}"),
+            format!("#code={hex}"),
+            format!("account={hex}"),
+        ] {
+            assert_eq!(account_in(&hash), None, "{hash}");
+        }
+        assert!(!hands(&format!("#account={hex}")));
     }
 
     /// A fragment that hands a code goes from the address bar, a good one

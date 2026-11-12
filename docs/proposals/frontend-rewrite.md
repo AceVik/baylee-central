@@ -21,7 +21,7 @@ German), built at deploy time by `ops/deploy-hook` (`npm ci && npm run content
 && npm run build`) and served by Caddy as static files from
 `/opt/baylee-app/web`, with `/api/*` passed to Central's browser listener
 (`127.0.0.1:28791`) and `/site/impressum*` to Baylee's feedback service. The
-Caddy site block exists only as documentation (`web/README.md` §"Serving it").
+Caddy site block exists only as documentation (the old `web/README.md` §"Serving it", removed 12.11.2026).
 
 ### 1.1 Pages
 
@@ -88,7 +88,7 @@ new site has the password change and the reset since 12.11.2026, §16.)
 ### 1.4 Browser crypto and the chat
 
 - `central-web-crypto` (Rust, `#![forbid(unsafe_code)]`) is committed as
-  WebAssembly with its wasm-bindgen glue in `web/src/central-wasm/`, checked
+  WebAssembly with its wasm-bindgen glue in `crates/central-web/crypto/`, checked
   byte for byte by CI (`cargo xtask wasm --check`, canonical x86-64 Linux
   build). Exports: `enrollment_start/finish`, `login_start/finish`,
   `login_confirm`, `recovery_create`, `chat_unlock`, `chat_resume`, and the
@@ -1607,3 +1607,248 @@ a recovery code".
   the keyboard is in its first field, it is wider than signing in where
   there is room, its last control and the close button are reachable, and
   every target is 44 px.
+
+## 25. As built: the administration's other pages (12.11.2026)
+
+The owner: "Erst Admin neu, dann löschen" (the administration rebuilt
+first, then the old React site deleted). Everything the old build's
+`/admin`, `/admin/users`, `/admin/users/<id>`, `/admin/gateways`,
+`/admin/audit` and `/admin/legacy` offered is now on this site; the
+feedback's triage (`/admin/feedback`) is rebuilt separately. Nothing on
+the wire changed (`central-api`, `central-client`, `central-crypto`,
+migrations and `Cargo.lock` are untouched); no dependency.
+
+- **The pages.** Under the account area, each an island page that is not
+  indexed and in no sitemap: `/{lang}/account/admin/overview` (the
+  counts: accounts, gateways awaiting approval, open reports and new
+  crashes, gateways in the list, administrators, what is left to move;
+  each tile leads to its work, a tile whose read gives nothing is left
+  out), `/users` (newest first, 50 a page, a search checked by
+  `AccountQuery`'s rule that follows the field once typing pauses, Escape
+  empties it, Ctrl+K or ⌘K reaches it), `/users/<id in hex>` (the facts
+  with copy buttons for the sign-in name and the id, the tag, the role,
+  the way to a reset code, the gateways it registered, its latest twenty
+  audit events), `/gateways` (by state, the queue first, counts on the
+  filters, owners, tokens on request; approve, disable, enable again,
+  revoke a token), `/audit` (today's names beside the ids, the end of an
+  id where a name is gone, an action the page does not know as Central
+  names it) and `/legacy` (deadline, progress, what holds a move back; a
+  Central without a store says so). `/{lang}/account/admin` stays the
+  reset code's page, and opens at the account an account page's link
+  names (`#account=<id>`, removed from the address once read).
+- **Who sees them.** The server cannot know the role, so every address
+  answers everyone with the same frame and the island shows the page only
+  to a session whose `AccountSummary` says `admin`; anyone else gets one
+  sentence and no administration's request is sent. The administration's
+  own navigation (Overview, Accounts, Gateways, Audit log, Legacy accounts,
+  Feedback, Reset a login) is drawn by the island for an administrator,
+  on every page of it, the reset code's included: no page the server
+  renders links there. The account overview's "Administration" leads to
+  the overview here.
+- **One account's address** is the only one with a part the visitor
+  chooses (`Section::AdminUser([u8; 16])`): the id as 32 lowercase hex
+  digits and nothing else (`data::id_from_hex`); `Page::path` writes it
+  back, so the language menu keeps the account. The server renders that
+  page for its request and never keeps it (`Page::kept`): ids cannot fill
+  the table of rendered pages, whose bounds hold every other page there
+  is.
+- **A change** (`common::Flow`: the role, a tag, a gateway's approval, a
+  token) opens its confirmation in the card of what it changes, with what
+  follows (the tag's warning about whispers, the approval's check of who
+  runs the address); only the confirmation's button sends, and the
+  confirmation gives way to "Asking Baylee Central …" before anything
+  leaves, so a second press finds nothing. `AccountSummary` first: another
+  account in this browser sends nothing, no role sends nothing, a sign-in
+  older than 29 minutes by the browser's clock asks for the password once
+  more (in a Worker ended at once, with the session's account checked),
+  as the old pages' "password again" did. Central refuses every one of
+  these changes with the same `Rejected`; the page explains it by what
+  stands afterwards (the role, then whether the account or gateway still
+  exists, then the sign-in, asked for once and never in a loop); a tag's
+  `Conflict` is "taken, or kept by Central chat". An answer that does not
+  arrive (no network, a 5xx, an answer of another kind) is never a
+  refusal: the page reads what it shows again and says that it cannot
+  tell; where that reading fails too, it says to load the page. After a
+  gateway's change the keyboard goes on at the gateway now in its place.
+- **Reads** go through `common::read`: a `Rejected` is a lost session only
+  where `AccountSummary` is refused too, the role gone where it says so,
+  and for an administrator "what was asked for is not there" (an account
+  or gateway gone, no legacy store).
+- **Not rebuilt, and why.** The navigation's counts (gateways awaiting
+  approval, unread reports): they would make every page ask Central, the
+  reset code's page included; the overview and the gateways' filters show
+  the counts. The search in the address (`?q=`): decided against for the
+  reset code's page (§18, `docs/security-assurance.md`); the gateways'
+  filter stands in the fragment instead (`#state=approved`), which never
+  reaches the site. The reports tile's link with its filters
+  (`?status=new&kind=crash`): the feedback's page and its addresses are
+  another change's, so the tile leads to its page. The tiles' counting-up
+  animation and the skeletons: "Loading …" instead. The modal
+  confirmations: inline in the card, as the reset code's page does it.
+- **Wire limits found** (none worked around): `OwnedGateway` says only
+  `approved`, so a disabled gateway an account registered reads "Awaiting
+  approval" on its page, as on the old one; `Rejected` for a change says
+  nothing of why (explained as above; a token gone while its gateway
+  stays would be taken for the sign-in's age, which no store path produces
+  today).
+- **Words.** 106 messages (`admin-*`, sections `admin-ov-`, `admin-gw-`,
+  `admin-audit-`, `admin-legacy-`, `admin-tag-`, `admin-role-`,
+  `admin-change-`), English and German by hand. The nine other languages
+  were to carry the English text for a later pass, but that broke the
+  gate's 12 in 100 (French 14.5 %); they are translated (Claude Sonnet,
+  each language's own terms from its file, the French read against the
+  English), in a commit of their own that a revert turns back into the
+  English. No native speaker has read them. Reused: `gateways-*`,
+  `tokens-*`, `gws-online`, `profile-*`, `admin-state-*`, `admin-pill`,
+  `admin-refused-*`, `admin-search*`, `admin-count`, `admin-more`,
+  `error-*`, `account-*`, `code-copy*`.
+- **Look.** `style/admin.css`, last in `STYLES` (the reset code's block
+  moved there from `app.css`): the old build's tiles, tables in a box that
+  scrolls on its own (inline-size containment, so a table never widens the
+  column), filter chips, pills; nothing moves or grows under the pointer.
+- **Tests.** Unit tests: the id's address, the fragment, every change's
+  request, what stands before a change, a lost answer never a refusal,
+  the explanation of a refusal, every outcome's own sentence in every
+  language, every audited action's words, the filters, a tag as Central
+  takes it, what holds a legacy move back, the reports at a glance. Server:
+  every page in every language, not indexed, an island, linked from no
+  page the server renders, one account's address and its 404s, never
+  kept. Browser (`web/e2e-site/admin-*.spec.ts` with the stand-in
+  `admin-central.ts`, 54 tests, both sizes): every page with and without
+  the role, axe in both schemes, 44 px targets, 320 px in German, the
+  keyboard's order, each change's exact request after its confirmation
+  and nothing before, a double press sending once, the password's step,
+  refusals and lost answers; `admin.spec.ts` (20) unchanged but for the
+  overview's link.
+- **Open.** The feedback's page (another change); a native reader for the
+  nine languages (unsure wording is listed in the pull request); a run
+  against a real Central and PostgreSQL; deleting the old build once the
+  feedback is here.
+
+
+## 26. As built: the feedback moderation (12.11.2026)
+
+The old build's report moderation (`web/src/admin/feedback/`, removed 12.11.2026, its routes
+`/admin/feedback`, `/admin/feedback/<hex>` and the `/admin/reports`
+alias) rebuilt on the new site, so the old React site can go (owner,
+12.11.2026: "Erst Admin neu, dann löschen"). Nothing on the wire changed:
+`AdminRequest`'s report actions and `POST /api/v1/reports/<hex>/<part>`
+as they were; no dependency, no `web-sys` feature (the browser's
+`DecompressionStream`, `Blob`, `URL` and `createImageBitmap` are reached
+through `js_sys`, as `clip` does).
+
+- **The pages.** `/{lang}/account/admin/feedback` (`Section::Feedback`)
+  and `/{lang}/account/admin/feedback/<32 lowercase hex>`
+  (`Section::Report`), islands of the account area as §18's page is: for
+  an administrator only (anyone else gets §18's one sentence and Central
+  is asked nothing but `AccountSummary`), not indexed, in no sitemap, in
+  no navigation, linked from no page the server renders. Every report's
+  address is one id-less page (`Page::from_slug` matches the hex; the
+  island reads the id from `location`), so the render cache never holds
+  an id; anything but 32 lowercase hex digits is a 404. Each page links
+  back to `/{lang}/account/admin/overview`; the shared administration
+  navigation is wired in when the two branches meet.
+- **The list** (`islands/feedback/list.rs`): the seven views with their
+  counts (the open reports' facets and the trash's total), the search
+  (it follows the typing after a pause, Enter at once, Escape empties
+  it), every filter of `ReportFilter` with its facet count (status, kind,
+  priority as chips; assignee, label, gateway, channel, record, reporter,
+  days, order as fields; only unread), the active filters as pills that
+  take themselves out, sortable column heads, pages and their size, saved
+  lists (read when the menu opens, saved, removed), the chart of the last
+  30 days (inline SVG and a table, read when unfolded), crash groups with
+  "show its reports", the CSV of a selection or of everything the filter
+  matches (up to 5,000), and a selection's actions in one request each
+  (status, priority, assignee, add or take off a label, merge into one,
+  the trash with Undo, restore, delete for good, opened or not, copy the
+  ids). The query string is the old one byte for byte (keys, order,
+  `URLSearchParams` encoding), so lists saved in the old build still open
+  and match; a part out of Central's bounds is dropped, never sent.
+- **One report** (`report.rs`): the way back to its list and that list's
+  previous and next report with its place (`ReportNeighbours`); its
+  pills, first line, short id and a copied link; what was written (the
+  client's `[Card]` and `[@Player]` references as chips in their place),
+  the crash; what the client sent (inflated in the browser, at most 16
+  MiB; the window's picture drawn into a canvas from its checked PNG
+  bytes; build, game, backtrace, log, system, settings, and the whole
+  object as a tree that draws a fold's children only when it opens);
+  the facts (the gateway's address as text, never a link); the record
+  handed over as Central keeps it (`.jsonl.gz`); the history in words;
+  the triage (status, priority, assignee, labels with the labels in use
+  offered, duplicate of, the GitHub issue and GitHub's own "new issue"
+  form filled with the administrator's neutral words only); notes, added
+  and removed by their author; the related lists; the trash with Undo,
+  restore and delete for good. Opening a report marks it opened. Every
+  change names the revision it was read at; a conflict reads it again and
+  says so.
+- **Untrusted words.** A report is a game client's: every field is drawn
+  as text (Leptos text nodes; no `inner_html` anywhere, and Trusted Types
+  would refuse one). Nothing of a report goes into an address but its id
+  and the list's own filter; nothing is logged or written to the console.
+  The only addresses built from report data are the old ones: Baylee's
+  issue by its number (1 to 10,000,000) and GitHub's new-issue form from
+  the administrator's summary, a category and a build that reads as a
+  version.
+- **Deleting for good** is asked first (nothing is sent before the
+  confirmation), wants a password sign-in younger than Central's 30
+  minutes (asked once more in a Worker where `AccountSummary` says it is
+  older, the session's account checked as §18 does), and is sent once
+  however often it is pressed. Central refuses a stale sign-in and a
+  report out of the trash with the same 401: the page tells them apart by
+  what `AccountSummary` says afterwards.
+- **Refusals and lost answers.** A refused read is explained by
+  `AccountSummary` (no session: the area says so; no role: one sentence;
+  else "does not exist"); an answer that never came is never a refusal: a
+  change is read again and said as possibly made, a note's draft stays.
+- **Look.** `style/feedback.css`, last of `STYLES`: the old look on the
+  site's tokens; 44 px for every control; a table scrolls in its own box
+  (`contain: inline-size`, and it is the containing block of its hidden
+  words, which would otherwise widen the page); the pill tones mixed a
+  little toward the ink so a small bold word keeps 4.5:1 on its tint.
+- **Words.** 297 messages (`fb-*`), English and German by hand; the nine
+  other languages carry the English text under
+  `# English for now: to be translated.` That puts every one of them past
+  the gate's English share (`xtask` `no_language_is_english_under_another_name`:
+  24 to 27 in 100, the limit is 12): the translations are owed before
+  this merges.
+- **Tests.** Unit tests of the query string (the old encoding, saved
+  views of the old build round-tripping byte for byte, every bound),
+  the filter, the CSV (formula injection `=+-@`, tab and CR, quoting),
+  the alias, sizes and times, the chart's days, history words, ids as
+  pasted, the GitHub addresses, the client part's readers and the
+  reference pieces, and that a lost answer is no refusal; a server test
+  that both pages exist in every language, are not indexed, not in the
+  sitemap, linked from nowhere, and that a malformed id is a 404;
+  `web/e2e-site/feedback.spec.ts` and `feedback-report.spec.ts` against a
+  stand-in Central (`feedback-stand-in.ts`) with markup and script in
+  every text field: each action's exact request, nothing before a
+  confirmation, a purge sent once on a double press and only after the
+  password where the sign-in is stale, refusals and lost answers, the
+  CSV's defused formula, the canvas drawn, axe in both schemes, 44 px,
+  320 px in German, the keyboard order, at both sizes.
+- **Not rebuilt**, being second presentations or conveniences of what is
+  here: the drawer beside the list (a report opens on its own page, which
+  steps through the list); the single-key shortcuts and their dialog
+  (every action is a control in the tab order); the quiet 30-second
+  re-read with its "new reports arrived" line (the Refresh button);
+  relative times ("5 minutes ago": absolute UTC as the rest of the
+  site); Scryfall's card pictures and links on the chips (the site's
+  `img-src 'self'` admits no other origin, and the chips stay text); the
+  "clear the filters" button repeated on an empty result (the pills'
+  own is there); a record written by the client has no button label and
+  notice of its own (the facts say who wrote it). The `/admin/reports`
+  alias and the old `/admin/feedback…` addresses get no page here: when
+  the old build goes, a redirect to `/{lang}/account/admin/feedback…`
+  keeps their query strings, which are the same. As in the old build,
+  only deleting for good is confirmed; moving to the trash has Undo, and a
+  selection's changes apply at once. The navigation's unread count and
+  the overview's report figures belong to the shared administration
+  navigation and overview.
+- **Wire, as it is.** A purge's 401 does not say whether the sign-in was
+  stale or a report had left the trash (the page reads the reports again
+  to tell); `AddReportNote` has no idempotency key, so a retry after a
+  lost answer could add the note twice (the page reads the report first
+  and keeps the draft, and the administrator decides).
+- **Open.** The nine translations (the gate fails until then); the
+  language menu of a report's page leads to the list in that language
+  (the page has no id of its own); a run against a real Central.

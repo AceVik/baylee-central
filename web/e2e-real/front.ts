@@ -1,23 +1,19 @@
-// A stand-in for baylee.app's Caddy site block (README.md §"Serving it",
-// ../docs/operations.md §"The browser listener"), for a local run against a
-// real Central only (e2e-real/README.md): TLS for baylee.app with a
-// throwaway certificate, dist/ with the production CSP, and /api/* passed to
-// Central's browser listener with the Host unchanged and X-Forwarded-For set
-// to the client, as Caddy does without trusted_proxies (it replaces whatever
-// the client sent). Loopback only; nothing here is for production.
+// A stand-in for baylee.app's Caddy site block (../docs/operations.md
+// §"The browser listener"), for a local run against a real Central only
+// (e2e-real/README.md): TLS for baylee.app with a throwaway certificate,
+// /api/* passed to Central's browser listener with the Host unchanged and
+// X-Forwarded-For set to the client, as Caddy does without trusted_proxies (it
+// replaces whatever the client sent), and every other request passed to the
+// server-rendered site (crates/central-web) on 127.0.0.1:<port> without the
+// cookie, as the same Caddy block does. Loopback only; nothing here is for
+// production.
 //
-//   node e2e-real/front.ts --tls <dir with cert.pem, key.pem> [--port 8443] [--listener 47921] [--dir dist] [--site <port>]
-//
-// With --site, every other request goes to the server-rendered site
-// (crates/central-web) on 127.0.0.1:<port> instead of dist/, without the
-// cookie, as the Caddy block in ../docs/operations.md does.
+//   node e2e-real/front.ts --tls <dir with cert.pem, key.pem> --site <port> [--port 8443] [--listener 47921]
 
-import { createReadStream, existsSync, readFileSync, statSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { request } from "node:http";
 import { createServer } from "node:https";
-import { extname, join, resolve, sep } from "node:path";
-
-import { csp } from "../scripts/csp.ts";
+import { join } from "node:path";
 
 function arg(name: string, fallback: string): string {
   const at = process.argv.indexOf(`--${name}`);
@@ -26,27 +22,14 @@ function arg(name: string, fallback: string): string {
 
 const port = Number(arg("port", "8443"));
 const listener = Number(arg("listener", "47921"));
-const root = resolve(arg("dir", "dist"));
 const tls = arg("tls", "");
 const site = Number(arg("site", "0"));
-const policy = csp();
 const LIMIT = 65_536;
 
-const TYPES: Record<string, string> = {
-  ".html": "text/html; charset=utf-8",
-  ".js": "text/javascript; charset=utf-8",
-  ".css": "text/css; charset=utf-8",
-  ".json": "application/json",
-  ".webmanifest": "application/manifest+json",
-  ".woff2": "font/woff2",
-  ".png": "image/png",
-  ".webp": "image/webp",
-  ".avif": "image/avif",
-  ".ico": "image/x-icon",
-  ".svg": "image/svg+xml",
-  ".wasm": "application/wasm",
-  ".txt": "text/plain; charset=utf-8",
-};
+if (!(site > 0)) {
+  process.stderr.write("front.ts needs --site <port>: the server-rendered site on 127.0.0.1\n");
+  process.exit(2);
+}
 
 const server = createServer({ key: readFileSync(join(tls, "key.pem")), cert: readFileSync(join(tls, "cert.pem")) }, (req, res) => {
   const url = new URL(req.url ?? "/", "https://baylee.app");
@@ -88,39 +71,18 @@ const server = createServer({ key: readFileSync(join(tls, "key.pem")), cert: rea
     });
     return;
   }
-  if (site > 0) {
-    // header_up -Cookie: the site never sees the session
-    const headers = { ...req.headers, "x-forwarded-for": req.socket.remoteAddress ?? "" };
-    delete headers.cookie;
-    const upstream = request({ host: "127.0.0.1", port: site, method: req.method, path: req.url, headers }, (answer) => {
-      res.writeHead(answer.statusCode ?? 502, answer.headers);
-      answer.pipe(res);
-    });
-    upstream.on("error", () => {
-      if (!res.headersSent) res.writeHead(502);
-      res.end();
-    });
-    req.pipe(upstream);
-    return;
-  }
-  if (req.method !== "GET" && req.method !== "HEAD") {
-    res.writeHead(405).end();
-    return;
-  }
-  let file = resolve(join(root, decodeURIComponent(url.pathname)));
-  if (file !== root && !file.startsWith(root + sep)) {
-    res.writeHead(403).end();
-    return;
-  }
-  if (!(existsSync(file) && statSync(file).isFile())) file = join(root, "index.html");
-  res.writeHead(200, {
-    "Content-Security-Policy": policy,
-    "X-Content-Type-Options": "nosniff",
-    "Referrer-Policy": "no-referrer",
-    "Content-Type": TYPES[extname(file)] ?? "application/octet-stream",
-    "Cache-Control": "no-cache",
+  // header_up -Cookie: the site never sees the session
+  const headers = { ...req.headers, "x-forwarded-for": req.socket.remoteAddress ?? "" };
+  delete headers.cookie;
+  const upstream = request({ host: "127.0.0.1", port: site, method: req.method, path: req.url, headers }, (answer) => {
+    res.writeHead(answer.statusCode ?? 502, answer.headers);
+    answer.pipe(res);
   });
-  createReadStream(file).pipe(res);
+  upstream.on("error", () => {
+    if (!res.headersSent) res.writeHead(502);
+    res.end();
+  });
+  req.pipe(upstream);
 });
 
 server.listen(port, "127.0.0.1", () => {
