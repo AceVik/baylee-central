@@ -866,11 +866,17 @@ the inbox.
   else it removes a worker left from earlier and its caches, so a reader
   gets nothing stored (owner's decision, 11 November 2026). The removed
   worker goes on answering for the page that removed it, so the page
-  retires it first (a `RETIRE` message): the worker leaves every request
-  to the network from then on, waits for what it was writing and takes
-  its caches away itself; the page waits three seconds at most for its
-  word and removes the caches too (12 November 2026: a fetch under way
-  while the cache went had made it again until the next page).
+  tells it to retire (a `RETIRE` message): the worker leaves every
+  request to the network from then on, waits for what it was writing and
+  takes its caches away itself; the page removes the caches too, after
+  the worker's word or three seconds (12 November 2026: a fetch under way
+  while the cache went had made it again until the next page). The
+  removal itself waits for nothing: the previous site's worker never
+  answers. While such a page stays open, a browser hands the same worker
+  to a page that registers it again (signed in in another tab), retired
+  and with no cache, and nothing would install it anew before the next
+  build; so a page that wants the worker says so (`KEEP`), and the worker
+  caches again and fills its cache if it has none.
 - `/{lang}/offline` (200, not indexed) and
   `/{lang}/account/notifications`: Web Push on this device and the
   account's categories, the protocol, bits, nonce and storage names

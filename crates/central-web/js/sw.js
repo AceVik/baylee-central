@@ -84,8 +84,12 @@ const OFFLINE = LANGS.map((lang) => `/${lang}/offline`);
 const ASSETS = /* the offline page's files */ [];
 const HASHED = /^\/assets\/(?:[\w-]+\/)*[\w.-]+\.[0-9a-f]{12}\.[a-z0-9]+$/;
 
+function fill() {
+  return caches.open(CACHE).then((cache) => cache.addAll([...OFFLINE, ...ASSETS]));
+}
+
 self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll([...OFFLINE, ...ASSETS])));
+  event.waitUntil(fill());
 });
 
 self.addEventListener("activate", (event) => {
@@ -99,12 +103,20 @@ self.addEventListener("activate", (event) => {
   );
 });
 
-// A page that found its visitor signed out retires this worker before it
-// removes it ("RETIRE", below). The worker goes on answering for that page
-// until the page goes, so from then on it leaves every request to the
-// network, and what it was writing just then is waited for before the
-// cache is taken away: nothing makes the cache again behind the page.
+// A page that found its visitor signed out retires this worker and removes
+// it ("RETIRE", below). The worker goes on answering for that page until
+// the page goes, so from then on it leaves every request to the network,
+// and what it was writing just then is waited for before the cache is
+// taken away: nothing makes the cache again behind the page.
+//
+// While such a page is still open, a browser hands the same worker to a
+// page that registers it again (someone signed in in another tab): retired,
+// with no cache, and nothing installs it anew before the next build. So a
+// page that wants the worker says so ("KEEP"), and the worker caches again
+// and fills its cache if it has none. The two are taken one after the
+// other, in the order they came.
 let retired = false;
+let turn = Promise.resolve();
 const answering = new Set();
 
 function mine(key) {
@@ -149,16 +161,29 @@ self.addEventListener("message", (event) => {
   }
   if (event.data?.type === "RETIRE") {
     retired = true;
-    event.waitUntil(
-      (async () => {
+    turn = turn
+      .then(async () => {
+        retired = true;
         await Promise.allSettled([...answering]);
         const keys = await caches.keys();
         await Promise.all(keys.filter(mine).map((key) => caches.delete(key)));
         event.ports[0]?.postMessage({ ok: true });
-      })().catch(() => {
+      })
+      .catch(() => {
         event.ports[0]?.postMessage({ ok: false });
-      }),
-    );
+      });
+    event.waitUntil(turn);
+    return;
+  }
+  if (event.data?.type === "KEEP") {
+    turn = turn
+      .then(async () => {
+        retired = false;
+        // not `caches.has`: a fill that failed (no network) leaves the cache there, empty
+        if (!(await caches.match(OFFLINE[0], { cacheName: CACHE }))) await fill();
+      })
+      .catch(() => {});
+    event.waitUntil(turn);
     return;
   }
   if (event.data?.type !== "PUSH_STATE") return;

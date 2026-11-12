@@ -99,6 +99,46 @@ test("a reader gets no worker, and after signing out it goes with its cache", as
     .toBe(true);
 });
 
+test("signing in beside a signed-out page that stays open brings the worker's cache back", async ({ page, context }) => {
+  const stored = (of: typeof page) =>
+    of.evaluate(async () => {
+      const name = (await caches.keys()).find((key) => key.startsWith("baylee-site-"));
+      if (name === undefined) return [];
+      return (await (await caches.open(name)).keys()).map((request) => new URL(request.url).pathname);
+    });
+
+  // the first page: signed in, then signed out, and left open with the worker it retired
+  await page.goto("/en/");
+  await page.evaluate(SIGNED_IN);
+  await page.reload();
+  await page.evaluate(async () => {
+    await navigator.serviceWorker.ready;
+  });
+  await page.evaluate(() => localStorage.removeItem("baylee-central-session"));
+  await expect.poll(async () => (await stored(page)).length).toBeGreaterThan(0);
+  await page.reload();
+  await expect.poll(() => page.evaluate(async () => (await navigator.serviceWorker.getRegistrations()).length)).toBe(0);
+  await expect.poll(() => page.evaluate(async () => (await caches.keys()).length)).toBe(0);
+
+  // A second page signs in. The browser hands it the worker the first page
+  // still holds, retired and with no cache: the page keeps it, and the
+  // worker fills its cache and caches again.
+  await page.evaluate(SIGNED_IN);
+  const second = await context.newPage();
+  await second.goto("/en/download");
+  await second.evaluate(async () => {
+    await navigator.serviceWorker.ready;
+  });
+  await expect.poll(async () => (await stored(second)).includes("/de/offline")).toBe(true);
+  const filled = (await stored(second)).length;
+  await second.reload();
+  await expect.poll(async () => (await stored(second)).length).toBeGreaterThan(filled);
+  await context.setOffline(true);
+  await second.goto("/de/download");
+  await expect(second.getByRole("heading", { level: 1 })).toHaveText("Du bist offline");
+  await context.setOffline(false);
+});
+
 test("a device with notifications on keeps its worker past the sign-in", async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem("baylee-push-installation-v1", "0123456789abcdef0123456789abcdef"));
   await page.goto("/en/");

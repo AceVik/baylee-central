@@ -49,18 +49,26 @@ if (root && window.isSecureContext) {
         scope: "/",
         updateViaCache: "none",
       })
-      .then(watch)
+      .then((registration) => {
+        // While a page that retired the worker is still open, the browser
+        // hands the same worker back, with no cache: this page keeps it.
+        registration.active?.postMessage({ type: "KEEP" });
+        watch(registration);
+      })
       .catch(() => {});
   } else {
     // The worker goes on answering for this page after it is removed, so it
-    // is retired first: it stops reading and writing its cache and takes
-    // the cache away once what it was writing is written. The cache goes
-    // here too, even where no worker is left or the worker did not answer.
+    // is told to retire: it stops reading and writing its cache and takes
+    // the cache away once what it was writing is written. Its removal does
+    // not wait for that (the previous site's worker never answers). The
+    // cache goes here too, after the worker's word, or where no worker is
+    // left or none answered.
     root
       .getRegistration("/")
       .then(async (registration) => {
-        await retire(registration?.active);
+        const retired = retire(registration?.active);
         await registration?.unregister();
+        await retired;
         const names = await caches.keys();
         await Promise.all(
           names.filter((name) => name.startsWith("baylee-site-") || name.startsWith("baylee-public-")).map((name) => caches.delete(name)),
