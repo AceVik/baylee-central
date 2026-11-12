@@ -158,8 +158,30 @@ impl Pages {
 /// compiled by our own scripts only, Trusted Types for every script URL.
 #[must_use]
 pub fn csp(https: bool) -> String {
-    let mut policy = String::from(
-        "default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self'; \
+    policy(https, "'self'")
+}
+
+/// The profile page's policy (`docs/profile-pictures.md`): the same, and
+/// `blob:` pictures, so the page can draw a picture the person chose from
+/// their own device (an SVG through `<img>`). Only this page sends it.
+#[must_use]
+pub fn csp_profile(https: bool) -> String {
+    policy(https, "'self' blob:")
+}
+
+/// Whether `path` is an account's profile page, `/{lang}/account/profile`.
+fn profile_page(path: &str) -> bool {
+    path.strip_prefix('/')
+        .and_then(|rest| rest.split_once('/'))
+        .is_some_and(|(lang, rest)| {
+            Lang::from_code(lang).is_some()
+                && matches!(rest, "account/profile" | "account/profile/")
+        })
+}
+
+fn policy(https: bool, images: &str) -> String {
+    let mut policy = format!(
+        "default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src {images}; \
          font-src 'self'; connect-src 'self'; worker-src 'self'; manifest-src 'self'; form-action 'none'; \
          base-uri 'none'; frame-ancestors 'none'; object-src 'none'; \
          require-trusted-types-for 'script'; trusted-types baylee baylee-sw",
@@ -176,6 +198,7 @@ pub const PERMISSIONS: &str = "camera=(), microphone=(), geolocation=(), payment
 
 async fn security(State(app): State<Arc<App>>, request: Request, next: Next) -> Response {
     let https = app.config.origin.starts_with("https://");
+    let profile = profile_page(request.uri().path());
     let mut response = next.run(request).await;
     let headers = response.headers_mut();
     let mut set = |name: &'static str, value: &str| {
@@ -183,7 +206,14 @@ async fn security(State(app): State<Arc<App>>, request: Request, next: Next) -> 
             headers.insert(name, value);
         }
     };
-    set("content-security-policy", &csp(https));
+    set(
+        "content-security-policy",
+        &if profile {
+            csp_profile(https)
+        } else {
+            csp(https)
+        },
+    );
     set("permissions-policy", PERMISSIONS);
     set("cross-origin-opener-policy", "same-origin");
     set("cross-origin-resource-policy", "same-origin");
@@ -601,6 +631,27 @@ pub fn router(app: Arc<App>) -> Router {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn only_the_profile_page_allows_blob_pictures() {
+        assert!(profile_page("/en/account/profile"));
+        assert!(profile_page("/pt-br/account/profile/"));
+        for other in [
+            "/en/account",
+            "/en/account/profile/x",
+            "/xx/account/profile",
+            "/account/profile",
+            "/en/account/privacy",
+            "/en/chat",
+        ] {
+            assert!(!profile_page(other), "{other}");
+        }
+        assert!(csp_profile(true).contains("img-src 'self' blob:;"));
+        assert!(csp(true).contains("img-src 'self';"));
+        assert!(!csp(false).contains("blob:"));
+        // the rest of the policy is the same
+        assert_eq!(csp_profile(false).replace(" blob:", ""), csp(false));
+    }
 
     fn accepts(values: &[&str]) -> HeaderMap {
         let mut headers = HeaderMap::new();

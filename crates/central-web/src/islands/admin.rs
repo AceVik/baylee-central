@@ -1049,6 +1049,7 @@ pub fn page(
     own: [u8; 16],
     signed_out: Callback<()>,
 ) -> impl IntoView {
+    let moderation = super::moderation::section(lang, worker.clone());
     let a = Admin {
         lang,
         worker: StoredValue::new(worker),
@@ -1080,6 +1081,7 @@ pub fn page(
     view! {
         {list_view(a)}
         <div id="admin-steps" class="steps">{move || step_view(a)}</div>
+        {moderation}
     }
 }
 

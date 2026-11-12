@@ -19,7 +19,7 @@ type Asking = RwSignal<Option<(u32, &'static str)>>;
 fn person_line(p: &Person) -> impl IntoView + use<> {
     let tag = p.tag.to_string();
     view! {
-        {avatar(&p.display_name, &tag, false)}
+        {avatar(&p.display_name, &tag, false, Some(p.tag))}
         <bdi class="person-name" translate="no">{handle(p)}</bdi>
     }
 }
@@ -313,7 +313,7 @@ pub fn invites(lang: Lang, own: u32, ctl: Ctl, choose: Callback<String>) -> impl
                     view! {
                         <li class="person">
                             <span class="person-line">
-                                {avatar(&invite.name, &format!("grp:{}", invite.group), true)}
+                                {avatar(&invite.name, &format!("grp:{}", invite.group), true, None)}
                                 <span><bdi class="person-name">{invite.name.clone()}</bdi>
                                     <small>{words::chat_invited_by(lang, &handle(&invite.inviter))}</small></span>
                             </span>

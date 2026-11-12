@@ -389,6 +389,7 @@ fn profile(
             <h2 id="profile-code">{words::profile_code_title(lang)}</h2>
             {code}
         </section>
+        {summary.display_name.is_some().then(|| super::picture::card(lang, summary.handle().unwrap_or_default()))}
     }
     .into_any()
 }
@@ -528,6 +529,7 @@ enum Deletion {
 fn export_view(lang: Lang, worker: String) -> impl IntoView {
     let export = RwSignal::new(None::<Result<String, Problem>>);
     let without_email = RwSignal::new(false);
+    let picture = RwSignal::new(None::<central_api::picture::PictureKey>);
     let needs_reauth = RwSignal::new(false);
     let run_export = move || {
         leptos::task::spawn_local(async move {
@@ -535,10 +537,13 @@ fn export_view(lang: Lang, worker: String) -> impl IntoView {
                 Ok(Response::AccountExport { export: data }) => {
                     // asked once the export answered: a refusal here is not the export's
                     let email = super::email::for_export().await;
+                    let (held, filed) = super::picture::for_export().await;
                     without_email.set(email.is_none());
-                    export.set(Some(
-                        super::email::export_file(&data, email.as_ref()).ok_or(Problem::Failed),
-                    ));
+                    picture.set(held.as_ref().map(|p| p.key));
+                    let file = super::email::export_file(&data, email.as_ref()).and_then(|file| {
+                        super::picture::merged(&file, held.as_ref(), filed.as_deref())
+                    });
+                    export.set(Some(file.ok_or(Problem::Failed)));
                 }
                 Ok(_) => export.set(Some(Err(Problem::Failed))),
                 Err(Failure::Rejected) => needs_reauth.set(true),
@@ -556,7 +561,11 @@ fn export_view(lang: Lang, worker: String) -> impl IntoView {
                     let lacks = without_email.get().then(|| {
                         view! { <p class="meta" id="export-no-email">{words::privacy_export_no_email(lang)}</p> }
                     });
-                    view! { {download_link(lang, &json)}{lacks} }.into_any()
+                    let png = picture.get().map(|key| view! {
+                        <a class="button" id="export-picture" href=super::picture::url(&key, false)
+                            download="baylee-profile-picture.png">{words::privacy_export_picture(lang)}</a>
+                    });
+                    view! { {download_link(lang, &json)}{png}{lacks} }.into_any()
                 }
                 Some(Err(problem)) => {
                     super::focus::when_shown("#export-error");

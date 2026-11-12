@@ -23,8 +23,19 @@ wasm-bindgen = { version = "=0.2.130", default-features = false, features = ["st
 wasm-bindgen-futures = "=0.4.80"
 js-sys = "=0.3.107"
 web-sys = { version = "=0.3.107", features = [
+    "Blob",
+    "CanvasRenderingContext2d",
+    "Document",
     "Event",
+    "File",
+    "FileList",
     "Headers",
+    "HtmlCanvasElement",
+    "HtmlImageElement",
+    "HtmlInputElement",
+    "ImageBitmap",
+    "ImageBitmapOptions",
+    "ImageOrientation",
     "MessageEvent",
     "Navigator",
     "ReferrerPolicy",
@@ -35,6 +46,7 @@ web-sys = { version = "=0.3.107", features = [
     "RequestRedirect",
     "Response",
     "Storage",
+    "Url",
     "Window",
     "Worker",
 ] }

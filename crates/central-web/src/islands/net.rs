@@ -68,6 +68,46 @@ pub async fn request(
     Ok((response.status(), text.as_string().unwrap_or_default()))
 }
 
+/// Sends a picture (`docs/profile-pictures.md`): `PUT` of `blob` with its
+/// media type, on this origin, with the session cookie and
+/// `X-Baylee-Central: 1`. `Err` when the browser could not send it or read
+/// the answer.
+#[cfg(target_arch = "wasm32")]
+pub async fn put_blob(url: &str, blob: &web_sys::Blob, kind: &str) -> Result<Answer, Unsent> {
+    use wasm_bindgen::JsCast;
+    use wasm_bindgen_futures::JsFuture;
+    use web_sys::{
+        ReferrerPolicy, RequestCache, RequestCredentials, RequestInit, RequestRedirect, Response,
+    };
+
+    let init = RequestInit::new();
+    init.set_method("PUT");
+    init.set_credentials(RequestCredentials::SameOrigin);
+    init.set_redirect(RequestRedirect::Error);
+    init.set_referrer_policy(ReferrerPolicy::NoReferrer);
+    init.set_cache(RequestCache::NoStore);
+    init.set_body(blob);
+    let request = web_sys::Request::new_with_str_and_init(url, &init).map_err(|_| Unsent)?;
+    request
+        .headers()
+        .set("Content-Type", kind)
+        .map_err(|_| Unsent)?;
+    request
+        .headers()
+        .set("X-Baylee-Central", "1")
+        .map_err(|_| Unsent)?;
+    let window = web_sys::window().ok_or(Unsent)?;
+    let response: Response = JsFuture::from(window.fetch_with_request(&request))
+        .await
+        .map_err(|_| Unsent)?
+        .dyn_into()
+        .map_err(|_| Unsent)?;
+    let text = JsFuture::from(response.text().map_err(|_| Unsent)?)
+        .await
+        .map_err(|_| Unsent)?;
+    Ok((response.status(), text.as_string().unwrap_or_default()))
+}
+
 /// On the server nothing is ever sent: islands only send from the browser.
 #[cfg(not(target_arch = "wasm32"))]
 pub fn request(

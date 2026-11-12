@@ -858,3 +858,24 @@
 .install {
   margin: var(--space-3) 0 0;
 }
+
+/* ---- Profile pictures (docs/profile-pictures.md) ------------------------- */
+
+/* A picture fills its circle; the initials' tint stays behind it while it
+   loads. Nothing moves or grows on hover (owner, 11.11.2026). */
+.face,
+.face img {
+  display: block;
+  inline-size: 100%;
+  block-size: 100%;
+}
+
+.face img {
+  border-radius: var(--radius-full);
+  object-fit: cover;
+}
+
+.avatar .face {
+  overflow: hidden;
+  border-radius: var(--radius-full);
+}

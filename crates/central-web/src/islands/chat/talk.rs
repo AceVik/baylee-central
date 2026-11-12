@@ -31,12 +31,23 @@ fn focus(id: &str) {
     }
 }
 
-/// An avatar: initials or the group sign, in one of six tints.
-pub fn avatar(name: &str, seed: &str, group: bool) -> AnyView {
+/// An avatar: the person's picture where `tag` has one
+/// (`docs/profile-pictures.md`), else initials or the group sign, in one of
+/// six tints.
+pub fn avatar(name: &str, seed: &str, group: bool, tag: Option<u32>) -> AnyView {
+    let initials = initials(name).into_any();
     let face = if group {
         glyph(glyph::USERS)
     } else {
-        initials(name).into_any()
+        let shown = StoredValue::new_local(Some(initials));
+        (move || match tag.and_then(crate::islands::picture::key_of) {
+            Some(key) => crate::islands::picture::face(&key, String::new()).into_any(),
+            None => shown
+                .try_update_value(Option::take)
+                .flatten()
+                .unwrap_or_else(|| ().into_any()),
+        })
+        .into_any()
     };
     view! { <span class="avatar" data-hue=model::hue(seed).to_string() aria-hidden="true">{face}</span> }.into_any()
 }
@@ -216,7 +227,7 @@ pub fn messenger(
         <div class="messenger" data-pane=pane>
             <section class="msgr-side" aria-label=words::chat_side(lang)>
                 <header class="msgr-me">
-                    {avatar(&me.name, &own.to_string(), false)}
+                    {avatar(&me.name, &own.to_string(), false, Some(own))}
                     <span class="msgr-me-name">
                         <bdi translate="no">{me.name.clone()}</bdi>
                         <span class="tag" translate="no">{format!("#{}", tag_text(own))}</span>
@@ -428,7 +439,10 @@ fn row(
                         choose.run(to.clone());
                     }
                 }>
-                {avatar(&name, &id, !matches!(c.kind, Kind::Direct(_)))}
+                {avatar(&name, &id, !matches!(c.kind, Kind::Direct(_)), match &c.kind {
+                    Kind::Direct(p) => Some(p.tag),
+                    _ => None,
+                })}
                 <span class="conv-main">
                     <span class="conv-top">
                         <bdi class="conv-name" translate="no">{name.clone()}</bdi>{tag}{when}
@@ -660,6 +674,15 @@ impl Open {
             .unwrap_or_default()
     }
 
+    /// The other person's tag in a direct conversation.
+    fn direct_tag(self) -> Option<u32> {
+        self.conv
+            .with_untracked(|c| match c.as_ref().map(|c| &c.kind) {
+                Some(Kind::Direct(p)) => Some(p.tag),
+                _ => None,
+            })
+    }
+
     fn group(self) -> bool {
         self.conv.with_untracked(|c| {
             c.as_ref()
@@ -699,7 +722,7 @@ impl Open {
                 <button type="button" class="icon-button conv-back" aria-label=words::chat_back(lang) on:click=back>
                     {glyph(glyph::BACK)}
                 </button>
-                {avatar(&name, &id, self.group())}
+                {avatar(&name, &id, self.group(), self.direct_tag())}
                 <div class="conv-head-text">
                     <h2 id="conv-title" tabindex="-1"><bdi translate="no">{name.clone()}</bdi>
                         {tag.map(|t| view! { <span class="tag" translate="no">{t}</span> })}</h2>
@@ -739,6 +762,9 @@ impl Open {
                         </button>
                     </header>
                     {group}
+                    {move || self.direct_tag().and_then(|tag| {
+                        crate::islands::picture::key_of(tag).map(|key| crate::islands::picture::report(lang, tag, key))
+                    })}
                     {safety(lang, self.reviews, self.ctl)}
                     <p class="conv-fan">
                         {glyph(glyph::INFO)}
