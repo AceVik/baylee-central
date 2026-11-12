@@ -52,20 +52,9 @@ fn real_native_login_restore_migration_and_adversarial_paths() {
     let endpoint = Endpoint::development(&format!("http://{address}")).unwrap();
     let bridge = Token::generate().unwrap();
     let keys = ServerKeys::generate();
-    let restored = ServerKeys::from_secret_bytes(&keys.to_secret_bytes()).unwrap();
-    let identity = Arc::new(
-        IdentityService::new(
-            store.clone(),
-            &endpoint,
-            restored,
-            &bridge,
-            "http://127.0.0.1:28766",
-        )
-        .unwrap()
-        .with_terms(Some(support::terms::central_document()))
-        // many registrations: the proof of work's check, not its cost
-        .with_registration_challenge(1, 64, std::time::Duration::ZERO),
-    );
+    // The mailer's place: no mail leaves the process (`support/email.rs`).
+    let mailer = Arc::new(support::email::Recorder::default());
+    let identity = serving(&store, &endpoint, &keys, &bridge, mailer.clone());
     let (stop_browser, browser_stopped) = oneshot::channel();
     let browser_task =
         runtime.spawn(
@@ -106,6 +95,17 @@ fn real_native_login_restore_migration_and_adversarial_paths() {
         support::pairing::run(&http, &browser, &runtime, &operator);
         support::legacy::run(&http, &browser, &bridge, &store, &runtime, &operator);
         support::notifications::run(&http, &browser, &bridge, &store, &runtime);
+        support::email::run(&support::email::Fixture {
+            http: &http,
+            browser: &browser,
+            service: &service,
+            mailer: &mailer,
+            store: &store,
+            keys: &keys,
+            bridge: &bridge,
+            runtime: &runtime,
+            operator: &operator,
+        });
         support::guessing::run(&http, &browser);
         support::strangers::run(&service, &store, &keys, &bridge, &http, &browser, &runtime);
     }));
@@ -131,6 +131,32 @@ fn real_native_login_restore_migration_and_adversarial_paths() {
     if let Err(panic) = tested {
         std::panic::resume_unwind(panic);
     }
+}
+
+/// The service behind the fixture's two listeners, with the keys as a
+/// restart restores them.
+fn serving(
+    store: &AccountStore,
+    endpoint: &Endpoint,
+    keys: &ServerKeys,
+    bridge: &Token,
+    mailer: Arc<support::email::Recorder>,
+) -> Arc<IdentityService> {
+    let restored = ServerKeys::from_secret_bytes(&keys.to_secret_bytes()).unwrap();
+    Arc::new(
+        IdentityService::new(
+            store.clone(),
+            endpoint,
+            restored,
+            bridge,
+            "http://127.0.0.1:28766",
+        )
+        .unwrap()
+        .with_terms(Some(support::terms::central_document()))
+        .with_mailer(mailer)
+        // many registrations: the proof of work's check, not its cost
+        .with_registration_challenge(1, 64, std::time::Duration::ZERO),
+    )
 }
 
 fn central_policy_config() -> central_policy::config::Config {

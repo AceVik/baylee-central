@@ -75,8 +75,8 @@ impl IdentityService {
             request @ (Request::SessionStatus | Request::RenewSession | Request::Logout) => {
                 self.session_request(&request, bearer, surface).await
             }
-            // the wire is set (`central_api::email`); the service is not built yet
-            Request::Email { .. } | Request::ResetMail { .. } => Err(Error::Rejected),
+            Request::Email { request } => self.email_request(request, bearer, surface).await,
+            Request::ResetMail { username, lang } => self.reset_mail(username, lang),
             request @ (Request::AccountSummary
             | Request::SetRecovery { .. }
             | Request::SetDisplayName { .. }

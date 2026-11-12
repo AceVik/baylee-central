@@ -474,6 +474,8 @@ struct Budgets {
     login: Book,
     directory: Book,
     reset: Book,
+    /// Requests for a reset code by mail.
+    reset_mail: Book,
     pair_start: Book,
     pair_status: Book,
     /// A report's parts an administrator's page reads.
@@ -522,6 +524,12 @@ impl Budgets {
             }
             // A reset needs a code; a few tries an hour leave room for typing it.
             Request::ResetStart { .. } => self.reset.charge(client, now, 10, HOUR),
+            // A reset code by mail (`docs/email.md`): the same few an hour
+            // as on the account listener, whatever the name.
+            Request::ResetMail { .. } => {
+                self.reset_mail
+                    .charge(client, now, super::addresses::RESET_MAIL, HOUR)
+            }
             // A pairing is a click on "Play in Baylee"; its page asks for the
             // claim about once a second for at most five minutes.
             Request::PairStart => self.pair_start.charge(client, now, 10, HOUR),
@@ -1763,6 +1771,37 @@ mod tests {
             now
         ));
         assert!(budgets.charge(&request, client, now + HOUR));
+    }
+
+    #[test]
+    fn a_reset_by_mail_has_five_requests_an_hour_per_address_whatever_the_name() {
+        let mut budgets = Budgets::default();
+        let client = Client::from("198.51.100.44".parse::<IpAddr>().unwrap());
+        let asked = |name: &str| Request::ResetMail {
+            username: name.into(),
+            lang: "en".into(),
+        };
+        let now = Instant::now();
+        // Five, counted by the address and not by the name asked about.
+        for name in ["one", "two", "three", "four", "five"] {
+            assert!(budgets.charge(&asked(name), client, now));
+        }
+        for name in ["one", "six"] {
+            assert!(!budgets.charge(&asked(name), client, now + Duration::from_secs(3_599)));
+        }
+        // Another address is served, and so is a reset's start from this one.
+        let other = Client::from("198.51.100.45".parse::<IpAddr>().unwrap());
+        assert!(budgets.charge(&asked("one"), other, now));
+        assert!(budgets.charge(
+            &Request::ResetStart {
+                username: "synthetic".into(),
+                code: central_api::reset_code::ResetCode::generate().unwrap(),
+                registration: vec![],
+            },
+            client,
+            now
+        ));
+        assert!(budgets.charge(&asked("one"), client, now + HOUR));
     }
 
     #[test]

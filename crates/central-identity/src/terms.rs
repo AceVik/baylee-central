@@ -95,6 +95,8 @@ pub(super) fn needs_acceptance(request: &Request) -> bool {
             | Request::SetRecovery { .. }
             | Request::SetDisplayName { .. }
             | Request::ChangePasswordStart { .. }
+            // An account's address, read or changed (`docs/email.md`).
+            | Request::Email { .. }
             | Request::Admin { .. }
             // A move's export and close wait for the terms, as the gateway
             // tickets before them did (`docs/native-login.md` §"Legacy login").

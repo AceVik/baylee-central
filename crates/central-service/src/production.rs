@@ -89,6 +89,10 @@ struct Service {
     legacy: Option<Legacy>,
     #[serde(default)]
     push: Option<Push>,
+    /// The mailer on this host (`docs/email.md`); absent means Central
+    /// sends no mail.
+    #[serde(default)]
+    mail: Option<super::mail::Mail>,
 }
 
 /// Server-only persistent VAPID key, read with the other private configuration.
@@ -181,6 +185,31 @@ fn listener_configs(settings: &Service) -> Result<(Config, Option<Config>), ()> 
     Ok((config, browser))
 }
 
+/// The identity service over `store`, with what the configuration turned
+/// on: the legacy sign-in, the notifications' public key, the mailer.
+fn composed(
+    store: &AccountStore,
+    endpoint: &Endpoint,
+    keys: ServerKeys,
+    bridge: &Token,
+    legacy: Option<&LegacyStore>,
+    push: Option<&central_push::Sender>,
+    mailer: Option<Arc<central_mail::Client>>,
+) -> Result<IdentityService, ()> {
+    let mut identity = IdentityService::new(store.clone(), endpoint, keys, bridge, OFFICIAL_ORIGIN)
+        .map_err(|_| ())?;
+    if let Some(legacy) = legacy {
+        identity = identity.with_legacy(legacy.clone());
+    }
+    if let Some(push) = push {
+        identity = identity.with_push_key(push.public_key().into());
+    }
+    if let Some(mailer) = mailer {
+        identity = identity.with_mailer(mailer);
+    }
+    Ok(identity)
+}
+
 async fn serve() -> Result<(), ()> {
     let bytes = read_settings()?;
     let mut settings: Service = parse(&bytes)?;
@@ -194,6 +223,13 @@ async fn serve() -> Result<(), ()> {
         })
         .transpose()
         .map_err(|_| ())?;
+    // A mailer that is not on loopback, or a token that is none, stops the
+    // start here, before a port is bound or the database is reached.
+    let mailer = settings
+        .mail
+        .as_mut()
+        .map(|mail| mail.client(false))
+        .transpose()?;
     let endpoint = Endpoint::live();
     let (config, browser) = listener_configs(&settings)?;
     let keys = ServerKeys::from_secret_bytes(&settings.opaque_setup).map_err(|_| ())?;
@@ -221,24 +257,19 @@ async fn serve() -> Result<(), ()> {
         }
         None => None,
     };
-    let identity = IdentityService::new(
-        store.clone(),
+    let mailing = mailer.is_some();
+    let identity = composed(
+        &store,
         &endpoint,
         keys,
         &settings.bridge,
-        OFFICIAL_ORIGIN,
-    )
-    .map(|identity| match &legacy {
-        Some(legacy) => identity.with_legacy(legacy.clone()),
-        None => identity,
-    });
-    let identity = identity.map(|identity| match &push {
-        Some(push) => identity.with_push_key(push.public_key().into()),
-        None => identity,
-    });
+        legacy.as_ref(),
+        push.as_deref(),
+        mailer,
+    );
     drop(settings);
     let result = async {
-        let identity = Arc::new(identity.map_err(|_| ())?);
+        let identity = Arc::new(identity?);
         println!(
             "central: account listener at http://{} for {}",
             server.local_addr(),
@@ -253,7 +284,11 @@ async fn serve() -> Result<(), ()> {
         if legacy.is_some() {
             println!("central: legacy sign-in from the legacy store");
         }
+        if mailing {
+            println!("central: mail through the mailer on this host");
+        }
         let (stop, _) = watch::channel(false);
+        let mail = super::mail::run(identity.clone(), stop.subscribe());
         let native = server.run_with_identity(&endpoint, identity.clone(), stopped(&stop));
         let browser = browser
             .map(|browser| browser.run_browser(identity, BrowserOrigin::live(), stopped(&stop)));
@@ -263,9 +298,10 @@ async fn serve() -> Result<(), ()> {
                 .await
                 .map_err(|_| ())?;
         }
-        let (result, ()) = tokio::join!(
+        let (result, (), ()) = tokio::join!(
             together(&stop, native, browser, shutdown()),
-            super::push::run(store.clone(), push, stop.subscribe())
+            super::push::run(store.clone(), push, stop.subscribe()),
+            mail
         );
         result.map_err(|_| ())
     }
@@ -545,6 +581,47 @@ mod tests {
             r#","browser":{"listen":"127.0.0.1:28791","origin":"https://evil.example"}"#,
             r#","browser":{}"#,
             r#","browser":"127.0.0.1:28791""#,
+        ] {
+            assert!(
+                parse::<Service>(service(extra).as_bytes()).is_err(),
+                "{extra}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_mailer_is_optional_and_on_loopback_only() {
+        let settings: Service = parse(service("").as_bytes()).unwrap();
+        assert!(settings.mail.is_none(), "absent means no mail");
+        let token = "01234567".repeat(8);
+        let with = |endpoint: &str, site: &str| {
+            let mail =
+                format!(r#","mail":{{"endpoint":"{endpoint}","site":"{site}","token":"{token}"}}"#);
+            parse::<Service>(service(&mail).as_bytes()).unwrap()
+        };
+        let mut settings = with("http://127.0.0.1:28795", "https://baylee.app");
+        assert!(settings.mail.as_mut().unwrap().client(false).is_ok());
+        // Refused when the service starts: a mailer anywhere else, a site
+        // that is no HTTPS origin.
+        for (endpoint, site) in [
+            ("https://127.0.0.1:28795", "https://baylee.app"),
+            ("http://192.168.1.2:28795", "https://baylee.app"),
+            ("http://mailer.example.org:28795", "https://baylee.app"),
+            ("http://localhost:28795", "https://baylee.app"),
+            ("http://127.0.0.1:28795", "http://127.0.0.1:5173"),
+            ("http://127.0.0.1:28795", "https://baylee.app/en"),
+        ] {
+            let mut settings = with(endpoint, site);
+            assert!(
+                settings.mail.as_mut().unwrap().client(false).is_err(),
+                "{endpoint} {site}"
+            );
+        }
+        for extra in [
+            r#","mail":{}"#,
+            r#","mail":"http://127.0.0.1:28795""#,
+            r#","mail":{"endpoint":"http://127.0.0.1:28795","site":"https://baylee.app"}"#,
+            r#","mail":{"endpoint":"http://127.0.0.1:28795","site":"https://baylee.app","token":"x","smtp":"mail.example.org"}"#,
         ] {
             assert!(
                 parse::<Service>(service(extra).as_bytes()).is_err(),

@@ -19,10 +19,12 @@ use zeroize::Zeroizing;
 
 /// Time to connect: the mailer is on this host, and an absent one should
 /// cost a request little.
-const CONNECT: Duration = Duration::from_secs(2);
+const CONNECT: Duration = Duration::from_secs(1);
 /// Time for a whole request. The mailer queues a mail and answers; it does
-/// not deliver first.
-const OVERALL: Duration = Duration::from_secs(5);
+/// not deliver first. Shorter than the five seconds the listeners give a
+/// request, so that a mailer that does not answer is answered as busy and
+/// the request is not cut off between the mail and what the store keeps.
+const OVERALL: Duration = Duration::from_secs(3);
 /// Most bytes of the answer's head: the mailer's is a few lines.
 const HEAD_BYTES: usize = 8192;
 /// Most bytes read of a refusal: the mailer's are a few dozen.

@@ -689,6 +689,7 @@ version = "0.1.0"
 dependencies = [
  "central-api",
  "central-crypto",
+ "central-mail",
  "central-postgres",
  "subtle",
  "tokio",
@@ -756,6 +757,7 @@ dependencies = [
  "central-crypto",
  "central-http",
  "central-identity",
+ "central-mail",
  "central-migration",
  "central-policy",
  "central-postgres",

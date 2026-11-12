@@ -164,6 +164,7 @@ fn class(request: &Request) -> Class {
             | Request::GatewayTerms { .. }
             | Request::ResetStart { .. }
             | Request::ResetFinish { .. }
+            | Request::ResetMail { .. }
             | Request::LegacyLogin { .. }
     ) {
         return Class::Public;

@@ -34,6 +34,10 @@ struct Settings {
     /// sign-in.
     #[serde(default)]
     legacy: Option<Legacy>,
+    /// A mailer on this host (`docs/email.md`), its site a numeric loopback
+    /// origin; absent means no mail.
+    #[serde(default)]
+    mail: Option<super::mail::Mail>,
 }
 
 /// The development legacy store's role and password.
@@ -142,6 +146,11 @@ async fn serve() -> Result<(), ()> {
     )
     .map_err(|_| ())?;
     let browser = settings.browser.as_ref().map(Browser::config).transpose()?;
+    let mailer = settings
+        .mail
+        .as_mut()
+        .map(|mail| mail.client(true))
+        .transpose()?;
     let legacy = legacy_config(&mut settings)?;
     let store = AccountStore::connect_dev(database).await.map_err(|_| ())?;
     let legacy = legacy_store(&store, legacy).await?;
@@ -155,6 +164,10 @@ async fn serve() -> Result<(), ()> {
     .and_then(|identity| identity.with_aliases(settings.gateway_aliases.clone()))
     .map(|identity| match &legacy {
         Some(legacy) => identity.with_legacy(legacy.clone()),
+        None => identity,
+    })
+    .map(|identity| match mailer {
+        Some(mailer) => identity.with_mailer(mailer),
         None => identity,
     });
     drop(settings);
@@ -179,15 +192,15 @@ async fn serve() -> Result<(), ()> {
             );
         }
         let (stop, _) = watch::channel(false);
+        let mail = super::mail::run(identity.clone(), stop.subscribe());
         let native = server.run_with_identity(&endpoint, identity.clone(), stopped(&stop));
         let browser =
             browser.map(|(browser, site)| browser.run_browser(identity, site, stopped(&stop)));
         let interrupted = async {
             let _ = tokio::signal::ctrl_c().await;
         };
-        together(&stop, native, browser, interrupted)
-            .await
-            .map_err(|_| ())
+        let (result, ()) = tokio::join!(together(&stop, native, browser, interrupted), mail);
+        result.map_err(|_| ())
     }
     .await;
     let closed = store.close().await.map_err(|_| ());
@@ -255,6 +268,41 @@ mod tests {
         for extra in [
             r#","browser":{"listen":"127.0.0.1:28791"}"#,
             r#","browser":{"listen":"127.0.0.1:28791","origin":"http://127.0.0.1:5173","host":"baylee.app"}"#,
+        ] {
+            assert!(parse(&settings(extra)).is_err(), "{extra}");
+        }
+    }
+
+    #[test]
+    fn the_development_mailer_is_optional_and_on_loopback_only() {
+        assert!(
+            parse(&settings("")).unwrap().mail.is_none(),
+            "absent means no mail"
+        );
+        let token = "01234567".repeat(8);
+        let with = |endpoint: &str, site: &str| {
+            parse(&settings(&format!(
+                r#","mail":{{"endpoint":"{endpoint}","site":"{site}","token":"{token}"}}"#
+            )))
+            .unwrap()
+        };
+        let mut parsed = with("http://127.0.0.1:28795", "http://127.0.0.1:5173");
+        assert!(parsed.mail.as_mut().unwrap().client(true).is_ok());
+        for (endpoint, site) in [
+            ("http://192.168.1.2:28795", "http://127.0.0.1:5173"),
+            ("https://127.0.0.1:28795", "http://127.0.0.1:5173"),
+            ("http://127.0.0.1:28795", "https://baylee.app"),
+            ("http://127.0.0.1:28795", "http://localhost:5173"),
+        ] {
+            let mut parsed = with(endpoint, site);
+            assert!(
+                parsed.mail.as_mut().unwrap().client(true).is_err(),
+                "{endpoint} {site}"
+            );
+        }
+        for extra in [
+            r#","mail":{"endpoint":"http://127.0.0.1:28795"}"#,
+            r#","mail":{"endpoint":"http://127.0.0.1:28795","site":"http://127.0.0.1:5173","token":"x","from":"central@example.org"}"#,
         ] {
             assert!(parse(&settings(extra)).is_err(), "{extra}");
         }
