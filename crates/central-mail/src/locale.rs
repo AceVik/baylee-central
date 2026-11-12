@@ -97,15 +97,30 @@ impl Lang {
     /// language to every message, so the fallback is for a file edited
     /// wrongly later, and a mail then still says what it has to.
     pub(crate) fn text(self, id: &str, values: &[(&str, &str)]) -> String {
+        fill(self.message(id), values)
+            .into_iter()
+            .map(|(text, _)| text)
+            .collect()
+    }
+
+    /// [`Lang::text`] in pieces, each with whether it is one of `values`
+    /// (`true`) or the message's own words: for a writer that sets a value
+    /// apart, as the reset mail sets the sign-in name in bold.
+    pub(crate) fn pieces(self, id: &str, values: &[(&str, &str)]) -> Vec<(String, bool)> {
+        fill(self.message(id), values)
+    }
+
+    /// The text of the message `id`, in English where this language lacks
+    /// it, and empty where English lacks it too.
+    fn message(self, id: &str) -> &'static str {
         let find = |source| {
             messages(source)
                 .flatten()
                 .find_map(|(name, text)| (name == id).then_some(text))
         };
-        let text = find(self.source())
+        find(self.source())
             .or_else(|| find(Self::En.source()))
-            .unwrap_or_default();
-        fill(text, values)
+            .unwrap_or_default()
     }
 }
 
@@ -192,17 +207,19 @@ impl<'a> Iterator for Parts<'a> {
     }
 }
 
-/// Write `text` with `values` in its placeables. A placeable without a
-/// value writes nothing. The result is plain text: whoever puts it into
-/// HTML escapes all of it, the values with the words.
-fn fill(text: &str, values: &[(&str, &str)]) -> String {
-    let mut out = String::with_capacity(text.len());
+/// Write `text` with `values` in its placeables, in pieces: the words as
+/// they are written (`false`) and each value where it goes (`true`). A
+/// placeable without a value writes nothing. The pieces are plain text:
+/// whoever puts them into HTML escapes all of them, the values with the
+/// words.
+fn fill(text: &str, values: &[(&str, &str)]) -> Vec<(String, bool)> {
+    let mut out = Vec::new();
     for part in parts(text).flatten() {
         match part {
-            Part::Words(words) => out.push_str(words),
+            Part::Words(words) => out.push((words.to_owned(), false)),
             Part::Value(name) => {
                 if let Some((_, value)) = values.iter().find(|(given, _)| *given == name) {
-                    out.push_str(value);
+                    out.push(((*value).to_owned(), true));
                 }
             }
         }
@@ -348,10 +365,18 @@ mod tests {
         }
     }
 
+    /// [`fill`]'s pieces joined, as [`Lang::text`] joins them.
+    fn filled(text: &str, values: &[(&str, &str)]) -> String {
+        fill(text, values)
+            .into_iter()
+            .map(|(text, _)| text)
+            .collect()
+    }
+
     #[test]
     fn values_go_where_they_are_named_and_only_there() {
         assert_eq!(
-            fill(
+            filled(
                 "For { $name }: {$minutes} minutes, { $name }.",
                 &[("name", "player"), ("minutes", "15")]
             ),
@@ -359,11 +384,24 @@ mod tests {
         );
         // a value is written as it is and never read as a placeable
         assert_eq!(
-            fill("{ $name }", &[("name", "{ $minutes }")]),
+            filled("{ $name }", &[("name", "{ $minutes }")]),
             "{ $minutes }"
         );
         // a placeable nobody fills writes nothing
-        assert_eq!(fill("a{ $other }b", &[("name", "x")]), "ab");
+        assert_eq!(filled("a{ $other }b", &[("name", "x")]), "ab");
+        // in pieces, each value is told from the words around it
+        assert_eq!(
+            fill("For { $name }.", &[("name", "player")]),
+            vec![
+                ("For ".to_owned(), false),
+                ("player".to_owned(), true),
+                (".".to_owned(), false)
+            ]
+        );
+        assert_eq!(
+            Lang::De.pieces("reset-intro", &[("name", "player.one")])[1],
+            ("player.one".to_owned(), true)
+        );
         // English words for a message that is in every file
         assert_eq!(Lang::De.text("brand", &[]), "Baylee");
         assert_eq!(Lang::En.text("no-such-message", &[]), "");

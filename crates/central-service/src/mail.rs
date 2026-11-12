@@ -17,7 +17,7 @@ use zeroize::{Zeroize, ZeroizeOnDrop};
 pub(super) struct Mail {
     /// `http://`, a numeric loopback address and a port, nothing after it.
     endpoint: String,
-    /// The site's origin, which the mails' two links start with.
+    /// The site's origin, which every link of the mails starts with.
     site: String,
     /// Central's bearer token for the mailer.
     token: String,
