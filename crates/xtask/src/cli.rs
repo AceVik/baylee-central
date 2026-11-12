@@ -59,7 +59,7 @@ tasks:
   postgres [--exercise-failure] the PostgreSQL integration fixture (needs Docker and OpenSSL)
   smoke [--exercise-failure]    the development listener smoke test (build --release first)
   secrets                       the secret scan of the tree and the full history (pinned gitleaks)
-  wasm [--check]                the website's WebAssembly crypto and glue (web/src/central-wasm)
+  wasm [--check]                the website's WebAssembly crypto and glue (crates/central-web/crypto)
   site                          the website's assets into target/site (BAYLEE_SRC: screenshots)";
 
 /// The task `args` name.
