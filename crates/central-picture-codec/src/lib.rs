@@ -14,7 +14,6 @@
 #![forbid(unsafe_code)]
 
 mod animation;
-mod av1;
 mod decode;
 mod encode;
 mod exif;

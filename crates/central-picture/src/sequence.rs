@@ -22,6 +22,10 @@ pub fn sequence_tracks(bytes: &[u8]) -> Option<Vec<Vec<u32>>> {
     if kinds != [b"ftyp", b"meta", b"moov", b"mdat"] || top[0].1.get(..4)? != b"avis" {
         return None;
     }
+    // the still in its meta, and every frame, as the worker writes them
+    if !crate::answer::items(top[1].1) || !crate::answer::bitstream(top[3].1) {
+        return None;
+    }
     let moov = boxes(top[2].1)?;
     if moov.iter().filter(|(kind, _)| *kind == b"mvhd").count() != 1 {
         return None;
@@ -78,7 +82,7 @@ fn track(trak: &[u8]) -> Option<Vec<u32>> {
 
 /// The boxes that fill `bytes`: 32-bit sizes only, each at least its
 /// header and within what is left.
-fn boxes(mut bytes: &[u8]) -> Option<Vec<(&[u8; 4], &[u8])>> {
+pub(crate) fn boxes(mut bytes: &[u8]) -> Option<Vec<(&[u8; 4], &[u8])>> {
     let mut out = Vec::new();
     while !bytes.is_empty() {
         let size = usize::try_from(be32(bytes, 0)?).ok()?;
@@ -152,9 +156,16 @@ mod tests {
         let moov = boxed(b"moov", &[full(b"mvhd", &[0; 24]), traks.concat()].concat());
         [
             boxed(b"ftyp", b"avis\0\0\0\0avisavif"),
-            boxed(b"meta", &[0; 8]),
+            boxed(
+                b"meta",
+                &crate::answer::tests::meta_body(
+                    &crate::answer::tests::still_items(false),
+                    &crate::answer::tests::properties_of(256, b"nclx", false),
+                    false,
+                ),
+            ),
             moov,
-            boxed(b"mdat", &[1, 2, 3]),
+            boxed(b"mdat", &crate::av1::tests::sequence(8, 8)),
         ]
         .concat()
     }

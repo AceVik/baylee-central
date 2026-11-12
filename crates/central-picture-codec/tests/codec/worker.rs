@@ -136,3 +136,54 @@ fn heavy_svgs_end_within_the_worker_s_time_and_the_next_picture_converts() {
     }
     assert!(worker().convert(Format::Gif, &gif_of(32, 32, 1)).is_ok());
 }
+
+/// A stand-in worker that answers `answer` to anything.
+#[cfg(unix)]
+fn answering(name: &str, answer: &[u8]) -> Worker {
+    let path = std::env::temp_dir().join(format!(
+        "central-picture-answer-{}-{name}",
+        std::process::id()
+    ));
+    std::fs::write(&path, answer).unwrap();
+    let script = format!("cat > /dev/null; cat '{}'", path.display());
+    Worker::program_with("/bin/sh", vec!["-c".into(), script.into()])
+}
+
+#[cfg(unix)]
+#[test]
+fn a_worker_s_answer_with_other_sizes_profiles_or_items_is_refused() {
+    let gif = gif_of(64, 64, 1);
+    let real = worker().convert(Format::Gif, &gif).unwrap();
+    let frame = |avif: Vec<u8>| {
+        central_picture::answer(&Ok(central_picture::Output {
+            avif,
+            png: real.png.clone(),
+            motion: central_picture::Motion::Still,
+        }))
+    };
+    // the real answer passes through a stand-in as it is
+    assert!(
+        answering("real", &frame(real.avif.clone()))
+            .convert(Format::Gif, &gif)
+            .is_ok()
+    );
+    let at = |kind: &[u8]| real.avif.windows(4).position(|w| w == kind).unwrap() + 4;
+    let mut wide = real.avif.clone();
+    let ispe = at(b"ispe");
+    wide[ispe + 4..ispe + 8].copy_from_slice(&512_u32.to_be_bytes());
+    // a colour that is not nclx, as an ICC profile's would be: the
+    // still's pixi box renamed, its body no nclx
+    let mut icc = real.avif.clone();
+    let pixi = at(b"pixi");
+    icc[pixi - 4..pixi].copy_from_slice(b"colr");
+    let mut exif = real.avif.clone();
+    let infe = at(b"av01");
+    exif[infe - 4..infe].copy_from_slice(b"Exif");
+    for (name, avif) in [("wide", wide), ("icc", icc), ("exif", exif)] {
+        assert_eq!(
+            answering(name, &frame(avif)).convert(Format::Gif, &gif),
+            Err(Refusal::Failed),
+            "{name}"
+        );
+    }
+}
