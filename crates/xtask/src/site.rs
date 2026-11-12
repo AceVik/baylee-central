@@ -106,8 +106,14 @@ pub(crate) fn run(root: &Path) -> Result<()> {
     }
     // The BIMI mark at its fixed address, byte for byte (`BIMI_SHA256`):
     // mail providers fetch it by that name and its profile is strict.
+    let mark = fs::read(web.join("assets").join(BIMI)).or_fail("the BIMI mark is missing")?;
+    if random::to_hex(&Sha256::digest(&mark)) != BIMI_SHA256 {
+        return Err(Fail::new(
+            "the BIMI mark is not the approved file: its bytes must not change",
+        ));
+    }
     fs::create_dir_all(out.join("bimi")).or_fail("target/site/bimi could not be made")?;
-    fs::copy(web.join("assets").join(BIMI), out.join(BIMI)).or_fail("the BIMI mark is missing")?;
+    fs::write(out.join(BIMI), &mark).or_fail("the BIMI mark could not be written")?;
     let worker = service_worker(&web.join("js/sw.js"), &site.files, &languages)?;
     fs::write(out.join("sw.js"), worker).or_fail("sw.js could not be written")?;
     fs::write(out.join("notices.txt"), notices(root)?)
