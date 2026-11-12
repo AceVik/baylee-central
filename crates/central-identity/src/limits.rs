@@ -9,18 +9,32 @@ use subtle::ConstantTimeEq;
 /// Requests a second without a session, all clients together: discovery,
 /// sign-in, registration and the other public operations.
 pub(super) const GLOBAL_PER_SECOND: u32 = 32;
+/// Such requests a second beside those, for places that asked little in
+/// their minute ([`LIGHT_PER_MINUTE`]), all of them together. Drawn on only
+/// when the second everyone shares is spent, so a household still signs in
+/// while a few addresses keep up their share. Beside the 32 and not out of
+/// them: whatever was served without these is served with them.
+pub(super) const RESERVE_PER_SECOND: u32 = 8;
+/// Requests in its minute below which a place has asked little: six
+/// sign-ins of five requests each. So it is also the most one place draws
+/// of the spare requests in a minute, and spending them all takes sixteen
+/// places that each ask this much and no more.
+pub(super) const LIGHT_PER_MINUTE: u32 = 30;
+/// The most requests a second without a session, both together. Every
+/// table sized by what such requests can start is sized by this.
+pub(super) const PUBLIC_PER_SECOND: u32 = GLOBAL_PER_SECOND + RESERVE_PER_SECOND;
 /// How long an unfinished OPAQUE sign-in, password change or deletion waits
 /// for its second message.
 pub(super) const PENDING_SECONDS: u64 = 60;
-/// Unfinished OPAQUE exchanges held at once. More than the global budget can
-/// start within their lifetime ([`GLOBAL_PER_SECOND`] × [`PENDING_SECONDS`] =
-/// 1920), so no sequence of public requests fills the table before it spends
+/// Unfinished OPAQUE exchanges held at once. More than the public budget can
+/// start within their lifetime ([`PUBLIC_PER_SECOND`] × [`PENDING_SECONDS`] =
+/// 2,400), so no sequence of public requests fills the table before it spends
 /// the budget everyone shares; a password change or deletion besides needs a
 /// signed-in account and its eight units a minute. Each entry is an OPAQUE
 /// server state and a credential record, about a kilobyte: a few megabytes
 /// at most.
 pub(super) const PENDING: usize = 4096;
-const _: () = assert!(PENDING as u64 > GLOBAL_PER_SECOND as u64 * PENDING_SECONDS);
+const _: () = assert!(PENDING as u64 > PUBLIC_PER_SECOND as u64 * PENDING_SECONDS);
 
 /// Legacy sign-ins a minute, all names together: the store holds a handful
 /// of accounts, and each sign-in is one Argon2 derivation.
@@ -41,7 +55,7 @@ pub(super) const PLACE_PAIRING_PER_MINUTE: u32 = 240;
 /// requests pass the shared windows between two sweeps and the minute
 /// before them (at most 64 a second) than it holds.
 pub(super) const PLACES: usize = 8_192;
-const _: () = assert!(PLACES > 2 * 60 * 64);
+const _: () = assert!(PLACES > 2 * 60 * 64 && PUBLIC_PER_SECOND <= 64);
 const MINUTE: Duration = Duration::from_secs(60);
 
 /// Requests a second that come with a bearer no answer has vouched for
@@ -357,6 +371,8 @@ impl Places {
 #[derive(Default)]
 pub(super) struct Limits {
     global: Option<(Instant, u32)>,
+    /// What places that asked little drew beside it ([`RESERVE_PER_SECOND`]).
+    spare: Window,
     /// Each place's share of [`GLOBAL_PER_SECOND`] ([`PLACE_PER_MINUTE`]).
     public: Places,
     /// Each place's share of the pairing window ([`PLACE_PAIRING_PER_MINUTE`]).
@@ -540,12 +556,22 @@ impl Limits {
 
     /// Spend one of the [`GLOBAL_PER_SECOND`] requests everyone shares,
     /// and one of the [`PLACE_PER_MINUTE`] its place may draw of them.
-    /// Nothing is spent when either is used up.
+    /// When everyone's second is spent, a place that asked little in its
+    /// minute ([`LIGHT_PER_MINUTE`]) draws on the few kept for such places
+    /// ([`RESERVE_PER_SECOND`]); a request the listener knows no place of
+    /// never does. Nothing is spent when a budget is used up.
     pub(super) fn global(&mut self, place: Option<Place>, now: Instant) -> Result<(), Error> {
         if !self.public.fits(place, now, PLACE_PER_MINUTE) {
             return Err(Error::Busy);
         }
-        self.everyone(now)?;
+        if self.everyone(now).is_err() {
+            // Counted in the same minute as everything else the place
+            // was served, so what it draws here ends its drawing here.
+            if place.is_none() || !self.public.fits(place, now, LIGHT_PER_MINUTE) {
+                return Err(Error::Busy);
+            }
+            self.spare.charge(now, RESERVE_PER_SECOND)?;
+        }
         self.public.spend(place, now);
         Ok(())
     }
@@ -1398,6 +1424,75 @@ mod tests {
             Err(Error::Busy)
         );
         limits.global(Some(place(2)), later).unwrap();
+    }
+
+    /// Four addresses that keep up their share spend the second everyone
+    /// signs in with. A place that asked little in its minute still has a
+    /// few requests a second beside them: a household signs in meanwhile.
+    /// The four get nothing of it, nor does a request without a place.
+    #[test]
+    fn a_place_that_asked_little_still_signs_in_while_four_spend_the_second() {
+        let start = Instant::now();
+        let mut limits = Limits::default();
+        let discover = Request::Discover {
+            username: "synthetic".into(),
+        };
+        // Six seconds of eight a second each: 32 a second between them,
+        // and each of them past what counts as little.
+        for second in 0..=5 {
+            let now = start + Duration::from_secs(second);
+            for flooding in 1..=4 {
+                assert_eq!(
+                    served(&mut limits, &discover, Some(place(flooding)), now, 8, 0),
+                    8
+                );
+            }
+        }
+        let now = start + Duration::from_secs(5);
+        // The second is spent: nothing for the four, nothing without a place.
+        assert_eq!(
+            limits.request(&discover, None, Some(place(1)), now),
+            Err(Error::Busy)
+        );
+        assert_eq!(limits.request(&discover, None, None, now), Err(Error::Busy));
+        // A sign-in from somewhere else is three to five such requests.
+        for _ in 0..5 {
+            limits
+                .request(&discover, None, Some(place(20)), now)
+                .expect("a place that asked little is served");
+        }
+        // The spare requests are a few a second, for all such places.
+        assert_eq!(
+            served(&mut limits, &discover, Some(place(21)), now, 9, 0),
+            RESERVE_PER_SECOND - 5
+        );
+        assert_eq!(
+            limits.request(&discover, None, Some(place(22)), now),
+            Err(Error::Busy)
+        );
+    }
+
+    /// The spare requests are for a place only while it has asked little:
+    /// past [`LIGHT_PER_MINUTE`] in its minute it shares the second with
+    /// everyone again, so no address draws more of them than that.
+    #[test]
+    fn a_place_draws_the_spare_requests_only_while_it_asked_little() {
+        let start = Instant::now();
+        let mut limits = Limits::default();
+        let mut through = 0;
+        for tenth in 0..100_u64 {
+            let now = start + Duration::from_millis(tenth * 100);
+            // Everyone's second is spent at once, by requests without a place.
+            while limits.global(None, now).is_ok() {}
+            if limits.global(Some(place(5)), now).is_ok() {
+                through += 1;
+            }
+        }
+        assert_eq!(through, LIGHT_PER_MINUTE);
+        // Its minute over, it counts as a place that asked little again.
+        let next = start + MINUTE;
+        while limits.global(None, next).is_ok() {}
+        limits.global(Some(place(5)), next).unwrap();
     }
 
     #[test]

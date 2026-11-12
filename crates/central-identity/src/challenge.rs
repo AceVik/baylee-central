@@ -32,7 +32,7 @@ use central_api::{Error, Token};
 use central_crypto::proof::{self, Work};
 use tokio::sync::Semaphore;
 
-use super::limits::GLOBAL_PER_SECOND;
+use super::limits::PUBLIC_PER_SECOND;
 
 /// How long a challenge of up to [`PATIENT`] bits over the base waits for
 /// its solution; a harder one waits longer ([`lifetime`]).
@@ -40,11 +40,12 @@ pub(crate) const LIFETIME: Duration = Duration::from_secs(300);
 /// The least time between a challenge and its solution: a form filled in
 /// faster than this was not filled in by a person.
 pub(crate) const MINIMUM: Duration = Duration::from_secs(3);
-/// Challenges held at once: more than the global budget lets all callers
-/// together ask for within the longest lifetime (asserted below), so
-/// however many ask, no challenge makes room for another before its own
-/// time is over.
-pub(crate) const HELD: usize = 40_000;
+/// Challenges held at once: more than the public budget lets all callers
+/// together ask for within the longest lifetime (asserted below; the
+/// budget counts the spare requests of places that asked little, 40 a
+/// second with them), so however many ask, no challenge makes room for
+/// another before its own time is over.
+pub(crate) const HELD: usize = 50_000;
 /// Memory of one evaluation, in KiB: 16 MiB, a quarter of what the
 /// password stretch takes in the page's Worker, and less than the legacy
 /// store's check takes through the same workers here.
@@ -92,8 +93,8 @@ const _: () = assert!(
         && register::NONCE_LEN == proof::NONCE_LEN
 );
 const _: () = assert!(RISE <= MOST && SUSPICION <= MOST && PATIENT <= MOST);
-// One more second for the window the global budget counts in.
-const _: () = assert!(HELD as u64 > GLOBAL_PER_SECOND as u64 * (lifetime(MOST).as_secs() + 1));
+// One more second for the window the public budget counts in.
+const _: () = assert!(HELD as u64 > PUBLIC_PER_SECOND as u64 * (lifetime(MOST).as_secs() + 1));
 
 /// How long a challenge of `extra` bits over the base lives: [`LIFETIME`],
 /// doubled for each bit past [`PATIENT`], as the work doubles
@@ -266,7 +267,7 @@ impl Challenges {
         if self.held.len() >= HELD {
             self.sweep(now);
         }
-        // Not reached while the global budget holds (asserted above): the
+        // Not reached while the public budget holds (asserted above): the
         // oldest makes room, so a crowd cannot lock others out.
         if self.held.len() >= HELD {
             let oldest = self
@@ -332,7 +333,7 @@ impl Challenges {
 /// workers' number times [`MEMORY`]; an address can make Central check as
 /// often as the browser listener lets it send `Register`, and all callers
 /// together as often as the shared budget lets them
-/// ([`GLOBAL_PER_SECOND`]).
+/// ([`PUBLIC_PER_SECOND`]).
 ///
 /// # Errors
 /// `Busy` without a worker, `Rejected` as above, `Unavailable` when the
@@ -730,7 +731,7 @@ mod tests {
         );
     }
 
-    /// As many challenges as the global budget lets all callers together
+    /// As many challenges as the public budget lets all callers together
     /// ask for, for as long as the hardest challenge lives: the first one
     /// is still there for its solution a second before its end, and the
     /// table never reached its bound.
@@ -748,7 +749,7 @@ mod tests {
         let mut most = 0;
         for second in 0..seconds {
             let now = start + Duration::from_secs(second);
-            for _ in 0..GLOBAL_PER_SECOND {
+            for _ in 0..PUBLIC_PER_SECOND {
                 challenges.issue(now, SUSPICION).expect("issued");
             }
             most = most.max(challenges.held.len());
