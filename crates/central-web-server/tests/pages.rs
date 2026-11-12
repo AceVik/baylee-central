@@ -1264,6 +1264,60 @@ async fn the_documents_the_server_writes_are_revalidated_too() {
     }
 }
 
+/// The old React build's administration is gone (12.11.2026): its
+/// bookmarks lead to the account area's pages in the visitor's language,
+/// by a redirect that is not kept, the feedback's list with its query.
+#[tokio::test]
+async fn the_old_administrations_addresses_lead_to_its_new_pages() {
+    let app = app(true);
+    let id = "0123456789abcdef0123456789abcdef";
+    for (old, new) in [
+        ("/admin", "/de/account/admin/overview".to_owned()),
+        ("/admin/", "/de/account/admin/overview".to_owned()),
+        ("/admin/users", "/de/account/admin/users".to_owned()),
+        (
+            &format!("/admin/users/{id}") as &str,
+            format!("/de/account/admin/users/{id}"),
+        ),
+        ("/admin/gateways", "/de/account/admin/gateways".to_owned()),
+        ("/admin/audit/", "/de/account/admin/audit".to_owned()),
+        ("/admin/legacy", "/de/account/admin/legacy".to_owned()),
+        (
+            "/admin/feedback?status=new&kind=crash",
+            "/de/account/admin/feedback?status=new&kind=crash".to_owned(),
+        ),
+        ("/admin/reports", "/de/account/admin/feedback".to_owned()),
+        (
+            &format!("/admin/feedback/{id}") as &str,
+            format!("/de/account/admin/feedback/{id}"),
+        ),
+    ] {
+        let (status, headers, _) = get(&app, old, &[("accept-language", "de-DE,de;q=0.9")]).await;
+        assert_eq!(status, StatusCode::FOUND, "{old}");
+        assert_eq!(headers["location"], new.as_str(), "{old}");
+        assert_eq!(headers["cache-control"], "no-cache", "{old}");
+        assert_eq!(headers["vary"], "Accept-Language", "{old}");
+    }
+    // nothing else under it leads into the account area, and nothing that
+    // only begins alike (the site's rule for an address without a language
+    // may still send it to `/{lang}/…`, where it is no page)
+    for path in [
+        "/administration",
+        "/admin/users/XYZ",
+        "/admin/users/0123",
+        "/admin/feedback/0123456789ABCDEF0123456789ABCDEF",
+        "/admin/settings",
+        "/admin/users/0123456789abcdef0123456789abcdef/more",
+    ] {
+        let (_, headers, _) = get(&app, path, &[]).await;
+        let location = headers
+            .get("location")
+            .and_then(|l| l.to_str().ok())
+            .unwrap_or("");
+        assert!(!location.contains("/account/admin"), "{path} -> {location}");
+    }
+}
+
 /// Mail providers fetch the BIMI mark at its fixed address: a 200, as an
 /// SVG, its bytes exactly, no redirect to a language, revalidated, without
 /// a session and in either mode.
