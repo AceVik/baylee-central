@@ -5,7 +5,7 @@ edition.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 license.workspace = true
-description = "Central's three mails and the bounded loopback client that hands them to the mailer"
+description = "Central's mails and the bounded loopback client that hands them to the mailer"
 [lints]
 workspace = true
 [dependencies]

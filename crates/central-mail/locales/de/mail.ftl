@@ -39,3 +39,33 @@ removed-body = Diese Adresse ist nicht mehr die E-Mail-Adresse eines Baylee-Acco
 # Beide Hinweise.
 notice-check = Wenn du das nicht warst, melde dich an und sieh auf der Sicherheitsseite deines Accounts nach.
 notice-link = Sicherheitsseite öffnen
+
+# Die Hinweise an die bestätigte Adresse des Accounts, dass sich seine
+# Anmeldung geändert hat. Sie nennen keinen Account: Der Anmeldename ist die
+# Hälfte dessen, was ein Reset per E-Mail braucht, und diese Mails gehen
+# hinaus, ohne dass jemand nach ihnen gefragt hat.
+
+# Ein Reset-Code hat ein neues Passwort gesetzt.
+reset-done-subject = Das Passwort deines Baylee-Accounts wurde zurückgesetzt
+reset-done-title = Ein neues Passwort wurde gesetzt
+reset-done-body = Mit einem Reset-Code wurde ein neues Passwort für den Baylee-Account dieser Adresse gesetzt.
+reset-done-kept = Die Daten des Accounts sind geblieben.
+reset-done-new = Der Account fängt mit einem leeren Tresor an. Seine bisherigen Daten lassen sich nicht mehr öffnen.
+reset-done-sessions = Der Account ist überall abgemeldet: Jede seiner Sitzungen wurde beendet.
+reset-done-not-you = Wenn du das nicht warst, kann sich jetzt jemand anderes bei deinem Account anmelden. Bitte einen Administrator von Baylee um einen Reset-Code und setze wieder dein eigenes Passwort.
+reset-done-recovery-kept = Dein Wiederherstellungscode öffnet deine Daten weiterhin. Bewahre ihn auf: Mit ihm bleiben die Daten bei einem Reset erhalten.
+reset-done-recovery-new = Ein Wiederherstellungscode von vor diesem Reset öffnet nichts mehr.
+
+# Das Passwort wurde geändert.
+password-subject = Das Passwort deines Baylee-Accounts wurde geändert
+password-title = Das Passwort wurde geändert
+password-body = Das Passwort des Baylee-Accounts dieser Adresse wurde geändert.
+password-sessions = Alle anderen Sitzungen des Accounts wurden abgemeldet.
+password-not-you = Wenn du das nicht warst, kennt jemand anderes dein Passwort. Setze mit einem Reset-Code ein neues: Fordere einen auf der Reset-Seite an oder bitte einen Administrator von Baylee darum.
+
+# Ein Administrator hat einen Reset-Code ausgestellt. `hours` ist, wie lange er gilt.
+issued-subject = Für deinen Baylee-Account wurde ein Reset-Code ausgestellt
+issued-title = Ein Administrator hat einen Reset-Code ausgestellt
+issued-body = Ein Administrator von Baylee hat für den Baylee-Account dieser Adresse einen Reset-Code ausgestellt. Mit ihm lässt sich ein neues Passwort für den Account setzen.
+issued-valid = Der Code gilt einmal, { $hours } Stunden lang. Bis er benutzt wird, gilt dein Passwort wie bisher.
+issued-not-you = Wenn du ihn nicht angefordert hast, melde dich an und ändere dein Passwort auf der Sicherheitsseite: Damit endet der Code. Sag danach einem Administrator Bescheid.

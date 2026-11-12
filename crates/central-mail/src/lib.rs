@@ -1,6 +1,9 @@
 //! The mails Central sends and the client that hands them to the mailer
-//! (`docs/email.md`): a code that confirms an address, a reset code, and a
-//! notice to an address that was replaced or removed. Central speaks no
+//! (`docs/email.md`): a code that confirms an address, a reset code, a
+//! notice to an address that was replaced or removed, and the notices to
+//! the account's confirmed address that a reset was finished, that the
+//! password was changed and that an administrator made a reset code.
+//! Central speaks no
 //! SMTP. A separate service on the same host, `baylee-mailer`, takes one
 //! mail a request on loopback and delivers it; this crate reaches nothing
 //! but that address.
@@ -49,6 +52,17 @@ pub enum What {
     Replaced,
     /// The notice to an address that was removed.
     Removed,
+    /// The notice to the account's address that a reset code set a new
+    /// password; `new_vault` when a new vault began with it.
+    ResetDone {
+        /// The data from before cannot be opened any more.
+        new_vault: bool,
+    },
+    /// The notice to the account's address that its password was changed.
+    PasswordChanged,
+    /// The notice to the account's address that an administrator made a
+    /// reset code for it. It carries no code.
+    ResetIssued,
 }
 
 /// What a mail carries besides its words.
@@ -64,6 +78,13 @@ enum Kind {
     },
     Replaced,
     Removed,
+    ResetDone {
+        new_vault: bool,
+    },
+    PasswordChanged,
+    ResetIssued {
+        hours: u32,
+    },
 }
 
 /// One mail to one address. Its words come from this crate; of what a
@@ -143,6 +164,30 @@ impl Mail {
         Self::new(to, account, lang, Kind::Removed)
     }
 
+    /// The notice to `to`, the confirmed address of `account`, that a
+    /// reset code set a new password for it; `new_vault` when a new vault
+    /// began and the data from before cannot be opened any more. It names
+    /// no account.
+    #[must_use]
+    pub fn reset_done(to: &str, account: [u8; 16], lang: &str, new_vault: bool) -> Self {
+        Self::new(to, account, lang, Kind::ResetDone { new_vault })
+    }
+
+    /// The notice to `to`, the confirmed address of `account`, that the
+    /// account's password was changed. It names no account.
+    #[must_use]
+    pub fn password_changed(to: &str, account: [u8; 16], lang: &str) -> Self {
+        Self::new(to, account, lang, Kind::PasswordChanged)
+    }
+
+    /// The notice to `to`, the confirmed address of `account`, that an
+    /// administrator made a reset code for it, which lasts `hours`. It
+    /// carries no code and names no account.
+    #[must_use]
+    pub fn reset_issued(to: &str, account: [u8; 16], lang: &str, hours: u32) -> Self {
+        Self::new(to, account, lang, Kind::ResetIssued { hours })
+    }
+
     fn new(to: &str, account: [u8; 16], lang: &str, kind: Kind) -> Self {
         Self {
             to: to.to_owned(),
@@ -179,6 +224,9 @@ impl Mail {
             Kind::Reset { .. } => What::Reset,
             Kind::Replaced => What::Replaced,
             Kind::Removed => What::Removed,
+            Kind::ResetDone { new_vault } => What::ResetDone { new_vault },
+            Kind::PasswordChanged => What::PasswordChanged,
+            Kind::ResetIssued { .. } => What::ResetIssued,
         }
     }
 
@@ -187,19 +235,28 @@ impl Mail {
     pub fn code(&self) -> Option<&str> {
         match &self.kind {
             Kind::Confirm { code, .. } | Kind::Reset { code, .. } => Some(code.as_str()),
-            Kind::Replaced | Kind::Removed => None,
+            Kind::Replaced
+            | Kind::Removed
+            | Kind::ResetDone { .. }
+            | Kind::PasswordChanged
+            | Kind::ResetIssued { .. } => None,
         }
     }
 
     /// The seconds after which the mailer no longer sends the mail: the
-    /// life of its code. A notice has none and waits its turn.
+    /// life of its code. A notice has none and waits its turn, the one of
+    /// an administrator's code too: it tells of the code and carries none.
     #[must_use]
     pub const fn ttl_secs(&self) -> Option<u32> {
         match self.kind {
             Kind::Confirm { minutes, .. } | Kind::Reset { minutes, .. } => {
                 Some(minutes.saturating_mul(60))
             }
-            Kind::Replaced | Kind::Removed => None,
+            Kind::Replaced
+            | Kind::Removed
+            | Kind::ResetDone { .. }
+            | Kind::PasswordChanged
+            | Kind::ResetIssued { .. } => None,
         }
     }
 }
@@ -234,10 +291,32 @@ mod tests {
             ),
             Mail::replaced("player@example.org", account, "pt-br"),
             Mail::removed("player@example.org", account, "klingon"),
+            Mail::reset_done("player@example.org", account, "ja", false),
+            Mail::reset_done("player@example.org", account, "de", true),
+            Mail::password_changed("player@example.org", account, "ko"),
+            Mail::reset_issued("player@example.org", account, "zh-hant", 24),
         ];
-        let what = [What::Confirm, What::Reset, What::Replaced, What::Removed];
-        let ttl = [Some(900), Some(3600), None, None];
-        let lang = [Lang::De, Lang::Fr, Lang::PtBr, Lang::En];
+        let what = [
+            What::Confirm,
+            What::Reset,
+            What::Replaced,
+            What::Removed,
+            What::ResetDone { new_vault: false },
+            What::ResetDone { new_vault: true },
+            What::PasswordChanged,
+            What::ResetIssued,
+        ];
+        let ttl = [Some(900), Some(3600), None, None, None, None, None, None];
+        let lang = [
+            Lang::De,
+            Lang::Fr,
+            Lang::PtBr,
+            Lang::En,
+            Lang::Ja,
+            Lang::De,
+            Lang::Ko,
+            Lang::ZhHant,
+        ];
         for (index, mail) in mails.iter().enumerate() {
             assert_eq!(mail.what(), what[index]);
             assert_eq!(mail.ttl_secs(), ttl[index]);
@@ -256,7 +335,8 @@ mod tests {
         }
         assert_eq!(mails[0].code(), Some(code.display().as_str()));
         assert_eq!(mails[1].code(), Some(reset.display().as_str()));
-        assert!(mails[2].code().is_none() && mails[3].code().is_none());
+        // A notice carries no code, the one of an administrator's code too.
+        assert!(mails[2..].iter().all(|mail| mail.code().is_none()));
     }
 
     #[test]

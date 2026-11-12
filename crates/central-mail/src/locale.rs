@@ -245,28 +245,63 @@ mod tests {
         }
         // The placeables are the ones the mails fill.
         let used: Vec<&str> = english.values().flatten().copied().collect();
-        assert!(used.iter().all(|name| ["minutes", "name"].contains(name)));
+        assert!(
+            used.iter()
+                .all(|name| ["hours", "minutes", "name"].contains(name))
+        );
     }
+
+    /// The messages of the notices that a login changed (12.11.2026),
+    /// written in English and German. The other nine languages hold the
+    /// English text until they are translated.
+    const UNTRANSLATED: [&str; 19] = [
+        "reset-done-subject",
+        "reset-done-title",
+        "reset-done-body",
+        "reset-done-kept",
+        "reset-done-new",
+        "reset-done-sessions",
+        "reset-done-not-you",
+        "reset-done-recovery-kept",
+        "reset-done-recovery-new",
+        "password-subject",
+        "password-title",
+        "password-body",
+        "password-sessions",
+        "password-not-you",
+        "issued-subject",
+        "issued-title",
+        "issued-body",
+        "issued-valid",
+        "issued-not-you",
+    ];
 
     #[test]
     fn every_language_has_words_of_its_own() {
-        let words = |lang: Lang| -> Vec<&str> {
-            messages(lang.source())
-                .map(|line| line.unwrap().1)
-                .collect()
+        let words = |lang: Lang| -> BTreeMap<&str, &str> {
+            messages(lang.source()).map(Result::unwrap).collect()
         };
         let english = words(Lang::En);
+        assert!(UNTRANSLATED.iter().all(|id| english.contains_key(id)));
         for lang in Lang::ALL {
             if lang == Lang::En {
                 continue;
             }
-            // only the brand's name is the same in every language
-            let same = words(lang)
-                .iter()
-                .zip(&english)
-                .filter(|(theirs, ours)| theirs == ours)
-                .count();
-            assert_eq!(same, 1, "{}", lang.code());
+            let theirs = words(lang);
+            assert_eq!(theirs.len(), english.len(), "{}", lang.code());
+            for (id, ours) in &english {
+                let same = theirs[id] == *ours;
+                // Only the brand's name is the same in every language.
+                // German has words of its own for every message; the
+                // other nine may hold the English text of the newest ones
+                // for now, and of no other.
+                let may_be_english = lang != Lang::De && UNTRANSLATED.contains(id);
+                if *id == "brand" {
+                    assert!(same, "{}: {id}", lang.code());
+                } else if !may_be_english {
+                    assert!(!same, "{}: {id}", lang.code());
+                }
+            }
         }
     }
 
