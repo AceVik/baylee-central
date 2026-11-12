@@ -18,6 +18,31 @@ export async function axe(page: Page): Promise<string[]> {
   return result.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(" ")).join(", ")}`);
 }
 
+/**
+ * `axe` in the dark and in the light scheme, for a page in a state no
+ * address leads to (a form an answer changed, a message that came back):
+ * the scheme is switched under the page as it stands. Playwright's own
+ * scheme is light, so a check that sets none never sees the dark one. The
+ * colours cross-fade when the scheme changes, so they are measured with
+ * motion reduced, where nothing fades (`base.css`); the page is left light
+ * and moving, as a test found it.
+ */
+export async function schemes(page: Page): Promise<string[]> {
+  const found: string[] = [];
+  const inks: string[] = [];
+  for (const scheme of ["dark", "light"] as const) {
+    await page.emulateMedia({ colorScheme: scheme, reducedMotion: "reduce" });
+    // a colour still fading would be measured in between: with reduced motion nothing fades
+    const fading = await page.evaluate(() => document.getAnimations().length);
+    if (fading > 0) found.push(`${scheme}: ${fading} animations run with reduced motion asked for`);
+    inks.push(await page.evaluate(() => getComputedStyle(document.body).color));
+    found.push(...(await axe(page)).map((violation) => `${scheme}: ${violation}`));
+  }
+  await page.emulateMedia({ colorScheme: "light", reducedMotion: null });
+  if (inks[0] === inks[1]) found.push(`the page's ink is ${inks[0]} in both schemes: it did not follow them`);
+  return found;
+}
+
 /** Every visible control smaller than 44 × 44 CSS px, except links inside running text. */
 export async function targets(page: Page): Promise<string[]> {
   return page.evaluate(() => {

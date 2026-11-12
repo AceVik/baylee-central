@@ -365,7 +365,8 @@
 
 /* The reset page, for someone who has no code yet (`islands/reset.rs`):
    a block of its own before the form that redeems one, set apart by a
-   line. Its one button is as wide as its field. */
+   line. Its one button is as wide as its field and the quiet kind: the
+   page's own thing to do is the form's. */
 .reset-mail {
   display: grid;
   /* the column is as wide as the block, not as its longest word */

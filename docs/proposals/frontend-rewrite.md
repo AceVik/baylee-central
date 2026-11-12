@@ -1249,8 +1249,12 @@ when this was written, the service refused both new requests.
   transition against a stand-in that keeps an address as the contract
   describes it; the sign-in once more in a canned Worker, a wrong password
   in the real one) and the block's tests in `reset.spec.ts`: at both sizes,
-  at 320 px, in German, in the light scheme, with axe and the 44 px
-  targets.
+  at 320 px, in German, with the 44 px targets, and with axe in the dark
+  and in the light scheme. `check.ts`'s `schemes` switches the scheme under
+  the page as it stands, since these states have no address of their own;
+  it asks for reduced motion while it measures, so that no colour is read
+  in the middle of its fade, and says so if anything still moves or if
+  the page did not follow the scheme.
 
 **Open.** A run against a Central that keeps addresses (`e2e-real`), which
 needs the server's half; the nine translations; `privacy-recipients` does
