@@ -219,7 +219,7 @@ if it has one and this Central has a mailer:
 
 | Change | When | The notice says |
 | --- | --- | --- |
-| A reset was finished | `ResetFinish` succeeded, for `keep` and for `new` | a reset code set a new password; the data was kept, or the account starts with an empty vault and the data from before cannot be opened; every session was ended. If this was not you: ask an administrator for a reset code; with `keep`, the recovery code still opens the data, with `new`, an earlier recovery code opens nothing |
+| A reset was finished | `ResetFinish` succeeded, for `keep` and for `new` | a reset code set a new password; the data was kept, or the account starts with an empty vault and the data from before cannot be opened; every session was ended. If this was not you: ask an administrator for a reset code; with `keep`, a recovery code the account has still opens the data, with `new`, an earlier recovery code opens nothing |
 | The password was changed | `ChangePasswordFinish` succeeded | every other session was signed out. If this was not you: someone knows the password; set a new one with a reset code from the reset page or from an administrator |
 | An administrator made a reset code | `AdminRequest::ResetLogin` succeeded | a code exists and works once for 24 hours, and the password works until it is used. If you did not ask for it: sign in and change the password on the security page, which ends the code (`account-reset.md`, "As built"), then tell an administrator |
 
@@ -442,6 +442,12 @@ mail. Both refuse a malformed address or tag before anything is sent.
   someone who holds many accounts with confirmed addresses and changes
   their passwords (up to four changes a minute each, by the login budget) while
   the mailer is slow can keep it full, and others' notices are dropped.
+- **An administrator's own account.** The notice of a changed password
+  says to set a new one with a reset code, but no code is made for an
+  administrator's account: an administrator who did not change their
+  password removes the role first, as for any reset
+  ([account reset](account-reset.md)). The words are the same for every
+  account.
 - **An administrator can mail an account's address** with each code they
   make. Each code is in the audit, and the mailer's limit for the account
   bounds the mails.

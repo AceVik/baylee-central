@@ -464,7 +464,7 @@ mod tests {
         assert!(kept.text.contains("Die Daten des Accounts sind geblieben."));
         assert!(
             kept.text
-                .contains("Wiederherstellungscode öffnet deine Daten weiterhin")
+                .contains("Wiederherstellungscode, öffnet er die Daten weiterhin")
         );
         assert!(new.text.contains("leeren Tresor"));
         assert!(new.text.contains("öffnet nichts mehr"));
