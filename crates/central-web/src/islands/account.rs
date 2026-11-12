@@ -1,6 +1,9 @@
 //! The signed-in area (`docs/proposals/frontend-rewrite.md` §6.2): one island
 //! per section page, reading the account from Central in the browser. The
 //! server renders the frame and the headings; it never sees the session.
+//! The administration's pages are drawn by its own island in its own
+//! module (`admin::Administration`, §27), inside the same [`frame`]: this
+//! island never reaches into it.
 
 use std::fmt::Write as _;
 
@@ -22,14 +25,18 @@ use crate::words::{self, Lang};
 /// What `AccountSummary` says, as the pages use it.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Summary {
-    /// The account this browser is signed in as.
-    account: [u8; 16],
-    username: String,
+    /// The account this browser is signed in as (the administration's
+    /// pages know their own row by it).
+    #[cfg(any(not(target_arch = "wasm32"), feature = "admin"))]
+    pub(super) account: [u8; 16],
+    /// The sign-in name, for a password manager.
+    pub(super) username: String,
     display_name: Option<String>,
     tag: Option<u32>,
     moved: bool,
     recovery: bool,
-    admin: bool,
+    /// Whether Central grants this account the administration.
+    pub(super) admin: bool,
     expires_at: i64,
 }
 
@@ -56,6 +63,7 @@ async fn summary() -> Load {
     }
     match call(&Request::AccountSummary).await {
         Ok(Response::AccountSummary {
+            #[cfg(any(not(target_arch = "wasm32"), feature = "admin"))]
             identity,
             username,
             display_name,
@@ -66,6 +74,7 @@ async fn summary() -> Load {
             expires_at,
             ..
         }) => Load::Ready(Summary {
+            #[cfg(any(not(target_arch = "wasm32"), feature = "admin"))]
             account: identity.account,
             username,
             display_name,
@@ -1158,8 +1167,28 @@ fn notifications(lang: Lang, admin: bool) -> AnyView {
     .into_any()
 }
 
-#[island]
-pub fn Account(lang: Lang, section: Section, worker: String) -> impl IntoView {
+/// What a page of the area is drawn with once the account is read.
+#[derive(Clone, Copy)]
+pub struct Area {
+    /// Reads the account again and draws the page anew; also what a page
+    /// runs when this browser turns out not to be signed in.
+    pub reload: Callback<()>,
+    /// Where the focus goes once a reload an action asked for is drawn.
+    focus_next: StoredValue<Option<&'static str>>,
+    /// The confirmation code a mail's link handed the security page.
+    handed: StoredValue<Option<MailCode>>,
+}
+
+/// The frame of every page of the area but the messenger's: the account
+/// read from Central in the browser (on the server, "loading"), a way to
+/// sign in where there is none, a failure with "again", and, once the
+/// account is read, the page `draw` makes of it. Both islands drawn in it
+/// call it: [`Account`] and the administration's (`admin::Administration`),
+/// which only the administration's module has.
+pub fn frame<F>(lang: Lang, section: Section, draw: F) -> impl IntoView
+where
+    F: Fn(Summary, Area) -> AnyView + Send + Sync + 'static,
+{
     let state = RwSignal::new(Load::Loading);
     // where the focus goes once a reload an action asked for is drawn
     let focus_next = StoredValue::new(None::<&'static str>);
@@ -1184,6 +1213,11 @@ pub fn Account(lang: Lang, section: Section, worker: String) -> impl IntoView {
     });
     // Effects run in the browser only: the server renders "loading".
     Effect::new(move |_| reload.run(()));
+    let area = Area {
+        reload,
+        focus_next,
+        handed,
+    };
     let code = lang.code();
     move || {
         match state.get() {
@@ -1204,46 +1238,41 @@ pub fn Account(lang: Lang, section: Section, worker: String) -> impl IntoView {
             if let Some(target) = focus_next.try_update_value(Option::take).flatten() {
                 super::focus::after_render(target);
             }
-            match section {
-            Section::Home => home(lang, &summary, &worker),
-            Section::Profile => profile(lang, &worker, &summary, reload, focus_next),
-            Section::Security => {
-                security(lang, worker.clone(), summary.username.clone(), reload, handed)
-            }
-            Section::Privacy => privacy(lang, worker.clone()),
-            Section::Gateways => gateways(lang, worker.clone()),
-            Section::Notifications => notifications(lang, summary.admin),
-            // the role is Central's to grant: without it, nothing is asked
-            section if section.admin() && summary.admin => super::admin::area(
-                lang,
-                section,
-                worker.clone(),
-                summary.username.clone(),
-                summary.account,
-                reload,
-            ),
-            Section::Feedback | Section::Report if summary.admin => super::feedback::page(
-                lang,
-                section,
-                worker.clone(),
-                summary.username.clone(),
-                summary.account,
-                reload,
-            ),
-            // the messenger is its own island
-            Section::Chat | Section::Contacts => ().into_any(),
-            // what is left is the administration, for someone without the role
-            Section::Admin
-            | Section::AdminOverview
-            | Section::AdminUsers
-            | Section::AdminUser(_)
-            | Section::AdminGateways
-            | Section::AdminAudit
-            | Section::AdminLegacy
-            | Section::Feedback
-            | Section::Report => super::admin::refused(lang).into_any(),
-            }
+            draw(summary, area)
         }
     }
     }
+}
+
+#[island]
+pub fn Account(lang: Lang, section: Section, worker: String) -> impl IntoView {
+    frame(lang, section, move |summary, area| match section {
+        Section::Home => home(lang, &summary, &worker),
+        Section::Profile => profile(lang, &worker, &summary, area.reload, area.focus_next),
+        Section::Security => security(
+            lang,
+            worker.clone(),
+            summary.username.clone(),
+            area.reload,
+            area.handed,
+        ),
+        Section::Privacy => privacy(lang, worker.clone()),
+        Section::Gateways => gateways(lang, worker.clone()),
+        Section::Notifications => notifications(lang, summary.admin),
+        // The messenger and the administration are islands of their own
+        // (`chat::Messenger`, `admin::Administration`, the latter in the
+        // administration's module only): the server never draws their
+        // pages with this one, and this one never reaches into theirs.
+        Section::Chat
+        | Section::Contacts
+        | Section::Admin
+        | Section::AdminOverview
+        | Section::AdminUsers
+        | Section::AdminUser(_)
+        | Section::AdminGateways
+        | Section::AdminAudit
+        | Section::AdminLegacy
+        | Section::Feedback
+        | Section::Report => ().into_any(),
+    })
 }

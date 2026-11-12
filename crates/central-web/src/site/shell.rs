@@ -218,7 +218,8 @@ fn head(page: Page, cx: &Context<'_>, meta: &Meta) -> impl IntoView + use<> {
     });
     // every page that can open the sign-in over itself has its islands
     let islands = (meta.islands || has_auth_dialogs(page)).then(|| {
-        view! { <script type="module" src=assets.url("islands.js") integrity=assets.integrity("islands.js") fetchpriority="low"></script> }
+        let name = islands_script(page);
+        view! { <script type="module" src=assets.url(name) integrity=assets.integrity(name) fetchpriority="low"></script> }
     });
     let others = Lang::ALL
         .into_iter()
@@ -296,6 +297,18 @@ pub fn document(page: Page, cx: &Context<'_>, meta: &Meta, body: AnyView) -> imp
                 {auth_dialogs(page, cx)}
             </body>
         </html>
+    }
+}
+
+/// The bootstrap of the islands' module a page loads (`cargo xtask site`
+/// writes both from `js/islands.js`): the administration's pages
+/// (`/{lang}/account/admin…`) load the administration's own module, every
+/// other page with islands the public one, which carries none of the
+/// administration. A page loads one module, never both.
+pub fn islands_script(page: Page) -> &'static str {
+    match page {
+        Page::Account(section) if section.administration() => "admin-islands.js",
+        _ => "islands.js",
     }
 }
 
