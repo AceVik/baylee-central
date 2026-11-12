@@ -41,22 +41,45 @@ fn attributes<'a>(html: &'a str, name: &str) -> Vec<&'a str> {
 }
 
 /// The addresses a mail in `lang` links to, in their order: its button's
-/// page, if it has one, and the site's start page in the footer.
+/// page, with the mail's code as printed in the fragment where it carries
+/// one, and the site's start page in the footer.
 fn expected_links(mail: &Mail, lang: Lang) -> Vec<String> {
     let button = match mail.what() {
-        crate::What::Confirm => None,
         crate::What::Reset | crate::What::ResetDone { .. } | crate::What::PasswordChanged => {
-            Some("reset")
+            "reset"
         }
-        crate::What::Replaced | crate::What::Removed | crate::What::ResetIssued => {
-            Some("account/security")
-        }
+        crate::What::Confirm
+        | crate::What::Replaced
+        | crate::What::Removed
+        | crate::What::ResetIssued => "account/security",
     };
-    button
-        .into_iter()
-        .chain([""])
-        .map(|path| format!("{SITE}/{}/{path}", lang.code()))
-        .collect()
+    let fragment = mail
+        .code()
+        .map(|code| format!("#code={code}"))
+        .unwrap_or_default();
+    vec![
+        format!("{SITE}/{}/{button}{fragment}", lang.code()),
+        format!("{SITE}/{}/", lang.code()),
+    ]
+}
+
+/// A link of a mail holds a code only in its fragment, as `code=` and the
+/// mail's own code, and never in its path or a query.
+fn holds_a_code_only_after_the_hash(link: &str, mail: &Mail, codes: &[&str]) {
+    let (before, fragment) = link
+        .split_once('#')
+        .map_or((link, None), |(before, fragment)| (before, Some(fragment)));
+    assert!(!before.contains('?'), "{link}");
+    for code in codes {
+        assert!(
+            !before.to_lowercase().contains(&code.to_lowercase()),
+            "{link}"
+        );
+    }
+    if let Some(fragment) = fragment {
+        let theirs = mail.code().map(|code| format!("code={code}"));
+        assert_eq!(Some(fragment), theirs.as_deref(), "{link}");
+    }
 }
 
 #[test]
@@ -135,34 +158,43 @@ fn loads_nothing(html: &str) {
 /// `Content-ID`, 48 px, rounded, without words of its own.
 const LOGO_IMG: &str = "<img src=\"cid:baylee-logo\" width=\"48\" height=\"48\" alt=\"\" style=\"display:block;width:48px;height:48px;border:0;border-radius:12px;\">";
 
+/// The mail loads nothing, its links go to the configured site only (the
+/// button's page and the start page), and a code is in a link only in
+/// the fragment of a code mail's button: never in a path or a query, never
+/// in the footer's link or a notice's, in either body.
 #[test]
-fn the_html_loads_nothing_and_links_only_to_the_site() {
+fn the_html_loads_nothing_and_a_code_is_only_in_the_button_s_fragment() {
     for lang in Lang::ALL {
         let (mails, code, reset) = mails(lang);
         for mail in &mails {
-            let html = render(mail, SITE, false).html.to_lowercase();
-            loads_nothing(&html);
-            // The only addresses in the whole mail are the site's: the
-            // button's page and the start page.
-            let links = attributes(&html, "href");
+            let rendered = render(mail, SITE, false);
+            let html = rendered.html.as_str();
+            loads_nothing(html);
+            let links = attributes(html, "href");
             let expected = expected_links(mail, lang);
             assert_eq!(links, expected);
+            let lower = html.to_lowercase();
             assert_eq!(
-                html.matches("http://").count() + html.matches("https://").count(),
+                lower.matches("http://").count() + lower.matches("https://").count(),
                 expected.len()
             );
             assert_eq!(html.matches("//").count(), expected.len());
-            // No code in any link, in either body.
-            let text = render(mail, SITE, false).text.to_lowercase();
-            for secret in [code.to_lowercase(), reset.to_lowercase()] {
-                assert!(links.iter().all(|link| !link.contains(&secret)));
-                assert!(
-                    text.lines()
-                        .filter(|line| line.contains("://"))
-                        .all(|line| !line.contains(&secret))
-                );
+            for link in &links {
+                holds_a_code_only_after_the_hash(link, mail, &[&code, &reset]);
             }
+            assert!(!links[1].contains('#'), "the start page takes no code");
+            assert_eq!(
+                links[0].contains('#'),
+                mail.code().is_some(),
+                "only a code mail's button carries one"
+            );
+            // the plain text: the same addresses, each alone on its line
+            let text = rendered.text.as_str();
             assert_eq!(text.matches("://").count(), expected.len());
+            for line in text.lines().filter(|line| line.contains("://")) {
+                assert!(expected.iter().any(|url| url == line), "{line}");
+                holds_a_code_only_after_the_hash(line, mail, &[&code, &reset]);
+            }
             for url in &expected {
                 assert!(text.lines().any(|line| line == url), "{url}");
             }
@@ -170,26 +202,50 @@ fn the_html_loads_nothing_and_links_only_to_the_site() {
     }
 }
 
+/// A code mail shows its code once to be read or copied, and once more in
+/// its button's link, in the fragment, for the page to fill in; a notice
+/// carries none.
 #[test]
-fn a_mail_carries_its_code_once_in_each_body_and_a_notice_none() {
+fn a_code_mail_shows_its_code_once_and_hands_it_to_its_page_once() {
     let (mails, code, reset) = mails(Lang::De);
     let confirm = render(&mails[0], SITE, false);
-    assert_eq!(confirm.text.matches(&code).count(), 1);
-    assert_eq!(confirm.html.matches(&code).count(), 1);
+    let link = format!("https://baylee.example/de/account/security#code={code}");
+    for body in [&confirm.text, &confirm.html] {
+        assert_eq!(body.matches(&code).count(), 2);
+        assert_eq!(body.matches(&link).count(), 1);
+    }
     assert!(confirm.html.contains(&format!("font-family:{MONO};font-size:30px;line-height:1.4;font-weight:700;letter-spacing:0.04em;color:{TITLE};\">{code}</td>")));
+    assert!(confirm.html.contains(&format!("<a href=\"{link}\" ")));
+    assert!(confirm.html.contains(">Adresse bestätigen</a>"));
+    assert!(
+        confirm
+            .text
+            .contains(&format!("Adresse bestätigen:\n{link}\n"))
+    );
+    assert!(confirm.text.contains(&format!("\n{code}\n")));
     assert!(confirm.text.contains("Der Code gilt 15 Minuten."));
     assert!(!confirm.subject.contains(&code));
     let mailed = render(&mails[1], SITE, false);
-    assert_eq!(mailed.text.matches(&reset).count(), 1);
-    assert_eq!(mailed.html.matches(&reset).count(), 1);
+    let link = format!("https://baylee.example/de/reset#code={reset}");
+    for body in [&mailed.text, &mailed.html] {
+        assert_eq!(body.matches(&reset).count(), 2);
+        assert_eq!(body.matches(&link).count(), 1);
+    }
+    assert!(
+        mailed
+            .text
+            .contains(&format!("Reset-Seite öffnen:\n{link}\n"))
+    );
+    assert!(mailed.text.contains(&format!("\n{reset}\n")));
     // 45 characters on one line of the 560 px card: 15 px and no
     // space between them.
     assert_eq!(reset.len(), 45);
     assert!(mailed.html.contains(&format!("font-family:{MONO};font-size:15px;line-height:1.4;font-weight:700;letter-spacing:0;color:{TITLE};\">{reset}</td>")));
     assert!(mailed.text.contains("player.one"));
     assert!(mailed.text.contains("60 Minuten"));
-    assert!(mailed.text.contains("https://baylee.example/de/reset"));
     assert!(!mailed.subject.contains(&reset) && !mailed.subject.contains("player"));
+    // the confirmation code is no reset code, and the other way round
+    assert!(!confirm.html.contains("/reset") && !mailed.html.contains("/account/security"));
     for (notice, page) in mails[2..].iter().zip([
         "account/security",
         "account/security",
@@ -434,7 +490,7 @@ fn the_plain_text_stands_on_its_own() {
             if let Some((words, url)) = &content.link {
                 let at = lines
                     .iter()
-                    .position(|line| line == url)
+                    .position(|line| *line == url.as_str())
                     .expect("the address alone on its line");
                 assert_eq!(lines[at - 1], format!("{words}:"));
             }

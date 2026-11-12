@@ -14,6 +14,7 @@ confirm-subject = Confirm your e-mail address for Baylee
 confirm-title = Confirm your e-mail address
 confirm-intro = This address was named for a Baylee account. To confirm it, enter this code where you named the address.
 confirm-valid = The code works for { $minutes } minutes.
+confirm-link = Confirm address
 confirm-ignore = If this was not you, ignore this mail. The address is not used without the code.
 
 # The reset code. `name` is the account's sign-in name.

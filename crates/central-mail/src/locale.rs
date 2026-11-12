@@ -268,10 +268,12 @@ mod tests {
         );
     }
 
-    /// The messages of the notices that a login changed (12.11.2026),
-    /// written in English and German. The other nine languages hold the
-    /// English text until they are translated.
-    const UNTRANSLATED: [&str; 19] = [
+    /// The messages of the notices that a login changed and the
+    /// confirmation mail's button (12.11.2026), written in English and
+    /// German. The other nine languages hold the English text until they
+    /// are translated.
+    const UNTRANSLATED: [&str; 20] = [
+        "confirm-link",
         "reset-done-subject",
         "reset-done-title",
         "reset-done-body",

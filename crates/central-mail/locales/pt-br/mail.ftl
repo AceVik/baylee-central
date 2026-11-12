@@ -58,3 +58,7 @@ issued-title = An administrator made a reset code
 issued-body = A Baylee administrator made a reset code for the Baylee account of this address. With it, a new password can be set for the account.
 issued-valid = The code works once, for { $hours } hours. Until it is used, your password works as it did.
 issued-not-you = If you did not ask for it, sign in and change your password on the security page: that ends the code. Then tell an administrator.
+
+# English for now: to be translated.
+# The confirmation mail's button, which opens the security page with the code filled in.
+confirm-link = Confirm address
