@@ -475,7 +475,49 @@ async fn registration(
             .is_err()
     );
     directory(store, gateway, origin, &heartbeat).await;
+    let nobody = Token::generate().unwrap();
+    let others = [&stale, owner_session, &nobody];
+    counted(
+        store,
+        operator,
+        gateway,
+        &[&credential, &heartbeat],
+        &others,
+    )
+    .await;
     gateway
+}
+
+/// What the budgets ask the store (`bearer_owner`): a gateway's credentials
+/// and tokens are its owner's, whatever their state, and no other token is
+/// anybody's, a session's and a replaced credential included.
+async fn counted(
+    store: &AccountStore,
+    operator: &DatabaseConnection,
+    gateway: [u8; 16],
+    theirs: &[&Token],
+    others: &[&Token],
+) {
+    let owner: Uuid = operator
+        .query_one_raw(Statement::from_sql_and_values(
+            DbBackend::Postgres,
+            "SELECT owner_id FROM central_identity.gateways WHERE id = $1",
+            vec![Uuid::from_bytes(gateway).into()],
+        ))
+        .await
+        .unwrap()
+        .unwrap()
+        .try_get("", "owner_id")
+        .unwrap();
+    for bearer in theirs {
+        assert_eq!(
+            store.bearer_owner(bearer).await.unwrap(),
+            Some(*owner.as_bytes())
+        );
+    }
+    for bearer in others {
+        assert_eq!(store.bearer_owner(bearer).await.unwrap(), None);
+    }
 }
 
 async fn directory(store: &AccountStore, gateway: [u8; 16], origin: &str, heartbeat: &Token) {

@@ -250,6 +250,45 @@ impl AccountStore {
         ))
     }
 
+    /// The account whose gateway `bearer` is a redemption credential, a
+    /// heartbeat credential or a token of, whatever the gateway's approval
+    /// and whether the token is live; none for any other token. For
+    /// counting a gateway's bearers together (`central-identity`,
+    /// `limits.rs`), never for authorization: nothing is granted by an
+    /// answer, and the caller asks only about a bearer another request
+    /// was just answered for.
+    ///
+    /// # Errors
+    /// Storage failure.
+    pub async fn bearer_owner(&self, bearer: &Token) -> Result<Option<[u8; 16]>, Error> {
+        // Three lookups by a unique digest each. A registered gateway has
+        // an owner (`gateway_official`); the official one holds none of
+        // the three.
+        let row = self
+            .db
+            .query_one_raw(statement(
+                "SELECT g.owner_id FROM central_identity.gateways g
+                 WHERE g.credential_digest = $1 AND NOT g.official
+                 UNION ALL
+                 SELECT g.owner_id FROM central_identity.gateways g
+                 WHERE g.heartbeat_digest = $1 AND NOT g.official
+                 UNION ALL
+                 SELECT g.owner_id FROM central_identity.gateway_tokens t
+                 JOIN central_identity.gateways g ON g.id = t.gateway_id
+                 WHERE t.digest = $1 AND NOT g.official LIMIT 1",
+                vec![bearer.digest().to_vec().into()],
+            ))
+            .await
+            .map_err(|_| Error::Unavailable)?;
+        let Some(row) = row else {
+            return Ok(None);
+        };
+        let owner: Uuid = row
+            .try_get("", "owner_id")
+            .map_err(|_| Error::Unavailable)?;
+        Ok(Some(*owner.as_bytes()))
+    }
+
     /// Update public metadata and central-clock liveness only, at most once per five seconds.
     /// The credential is a registered gateway's heartbeat token or a live
     /// gateway token with the `listing` scope (migration 000014), which this

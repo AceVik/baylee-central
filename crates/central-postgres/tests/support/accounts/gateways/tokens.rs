@@ -96,6 +96,8 @@ pub(super) async fn run(store: &AccountStore, operator: &DatabaseConnection, key
             .is_ok()
     );
     authentication(store, operator, &browser, gateway, &token).await;
+    // a token is its gateway's owner's for the budgets; a session is nobody's
+    super::counted(store, operator, gateway, &[&token], &[&browser, &native]).await;
     let admin = administration(store, operator, keys, gateway, &native, &browser).await;
     tags(store, operator, admin, owner.account, other.account).await;
     sessions(store, &browser, &native).await;
