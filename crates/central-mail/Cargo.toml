@@ -1,0 +1,17 @@
+[package]
+name = "central-mail"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+license.workspace = true
+description = "Central's three mails and the bounded loopback client that hands them to the mailer"
+[lints]
+workspace = true
+[dependencies]
+central-api = { path = "../central-api", version = "=0.1.0" }
+ureq = { version = "=3.5.1", default-features = false, features = ["rustls"] }
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = "=1.0.154"
+zeroize = { version = "=1.9.1", features = ["alloc"] }
+getrandom = "=0.4.3"

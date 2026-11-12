@@ -695,6 +695,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "central-mail"
+version = "0.1.0"
+dependencies = [
+ "central-api",
+ "getrandom 0.4.3",
+ "serde",
+ "serde_json",
+ "ureq",
+ "zeroize",
+]
+
+[[package]]
 name = "central-migration"
 version = "0.1.0"
 dependencies = [
