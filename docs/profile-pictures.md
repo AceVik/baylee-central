@@ -399,6 +399,40 @@ Reports about one's own picture are not exported with their reporters.
   fuzzer for every decoder entry point, not coverage-guided;
   [its README](../fuzz/README.md) says why and what ran.
 
+## The whole path against a real Central (12.11.2026)
+
+`web/e2e-real/site-picture.spec.ts` runs a picture's whole path against a
+throwaway Central built from this branch:
+1. The browser prepares a still and sends it, and sends an animated GIF
+   whole, through `front.ts`, which lets the upload through to 9 MiB as the
+   Caddy handle does.
+2. Central hands each one to the worker through a Unix socket.
+   `picture-socket.ts` stands in for systemd's activation: one worker per
+   connection, two at a time. The worker was the Linux build, in an
+   Ubuntu 26.04 container whose ffmpeg has libaom, without network, with a
+   read-only root, a 64 MiB `/tmp`, 512 MiB of memory and 32 tasks.
+3. Central stores what comes back and serves it.
+
+What it checks:
+- **The still:** a noisy PNG over 64 KiB comes back as a 256 × 256 PNG and an
+  AVIF (`ftypavif`), with the served headers (CSP sandbox, `nosniff`,
+  CORP, `private, max-age=3600`) and no sequence.
+- **The animation:** it comes back as an AVIF sequence (`ftypavis`), shown
+  only where motion is welcome. The replaced still answers 404 at once.
+- **Elsewhere on the site:** the header's face, and the contact's
+  conversation list, show the picture.
+- **The report:** the contact reports it from the chat's details, with a
+  reason and a note that stays text.
+- **The removal:** an administrator the operator appointed removes it
+  with a reason and a sentence, after the password once more.
+- **Afterwards:** the person sees the notice with the reason, and every file
+  answers 404, `no-store`.
+
+Result: it passed at a desktop's and a phone's size, each against a
+Central started afresh. It is a local run, not part of CI. Not covered
+here: systemd's own sandbox (the post-deploy check), x86-64, and any
+browser but Chromium.
+
 ## Not done here
 
 - The native client's own route and conversion (M6): the native listener
