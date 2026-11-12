@@ -440,5 +440,5 @@ export async function tabs(page: Page, from: Locator, stops: Locator[]) {
 }
 
 /** The administration's navigation, in its order. */
-export const NAV = ["Overview", "Accounts", "Gateways", "Audit log", "Legacy accounts", "Feedback", "Reset a login"];
+export const NAV = ["Overview", "Accounts", "Gateways", "Audit log", "Legacy accounts", "Reported profile pictures", "Feedback", "Reset a login"];
 export const nav = (page: Page) => page.getByRole("navigation", { name: "Administration" });

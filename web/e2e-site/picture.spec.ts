@@ -483,7 +483,7 @@ test("only the profile page allows blob: pictures", async ({ page }) => {
 
 test("an administrator opens an account's case and may remove its current picture without a report", async ({ page }) => {
   const w = world();
-  const problems = await open(page, w, { admin: true, path: "/en/account/admin" });
+  const problems = await open(page, w, { admin: true, path: "/en/account/admin/pictures" });
   const section = page.locator("section", { has: page.getByRole("heading", { name: "Reported profile pictures" }) });
   await section.getByRole("button", { name: "Open the account's case" }).click();
   const opened = page.locator(".picture-case");
@@ -501,7 +501,7 @@ test("an administrator opens an account's case and may remove its current pictur
 
 test("the administrators see reported pictures with their reasons and notes as text", async ({ page }) => {
   const w = world();
-  const problems = await open(page, w, { admin: true, path: "/en/account/admin" });
+  const problems = await open(page, w, { admin: true, path: "/en/account/admin/pictures" });
   const section = page.locator("section", { has: page.getByRole("heading", { name: "Reported profile pictures" }) });
   await expect(section.getByText("Mallory#0f0f")).toBeVisible();
   await expect(section.getByText("Synthetic note <b>not bold</b>")).toBeVisible();
