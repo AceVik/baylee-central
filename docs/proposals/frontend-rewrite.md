@@ -864,7 +864,13 @@ the inbox.
   for someone signed in, for the installed app (`display-mode`) and for a
   device whose notifications are on (the nonce in localStorage); for anyone
   else it removes a worker left from earlier and its caches, so a reader
-  gets nothing stored (owner's decision, 11 November 2026).
+  gets nothing stored (owner's decision, 11 November 2026). The removed
+  worker goes on answering for the page that removed it, so the page
+  retires it first (a `RETIRE` message): the worker leaves every request
+  to the network from then on, waits for what it was writing and takes
+  its caches away itself; the page waits three seconds at most for its
+  word and removes the caches too (12 November 2026: a fetch under way
+  while the cache went had made it again until the next page).
 - `/{lang}/offline` (200, not indexed) and
   `/{lang}/account/notifications`: Web Push on this device and the
   account's categories, the protocol, bits, nonce and storage names

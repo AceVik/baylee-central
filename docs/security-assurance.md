@@ -5175,6 +5175,30 @@ route.
   hyphenates; without the two columns the second fails. Looked at in
   German and Russian at 412 and 320 px.
 
+- **A cache made again behind the page that removed it.** The site's
+  browser suite failed once in `pwa.spec.ts` on the last full run, and
+  the test repeated in parallel failed in 3 to 6 of 16 runs, alone in
+  none: after a sign-out the next page removes the service worker and its
+  cache (a reader gets nothing stored), but the removed worker still
+  answers for that page, and a fetch that had found the cache present
+  opened it again after the page deleted it. The copy held the site's
+  public files only and went with the next page load; the sentence "a
+  reader gets nothing stored" was not true for that while. It was so
+  since 11.11. and is no part of the reset's change. Now the page retires
+  the worker before it removes it: on `RETIRE` (taken from a window of
+  this origin only, like the worker's other messages) the worker answers
+  no request any more, waits for the answers under way and deletes its
+  caches, and the page deletes them as before, after the worker's word or
+  three seconds. A script of this origin could always unregister the
+  worker and delete the caches; the message lets it do nothing more. A
+  worker started again forgets that it was retired and finds no cache,
+  which it does not make (the check that was there). After the change the
+  test passed 48 times of 48 in parallel, and a probe of the same steps,
+  six at a time, found no cache in 24 runs of 24 (4 of 20 before). The
+  test also fetches a file through the removed worker and finds no cache
+  made, and signs in again on that page: a new worker comes with its
+  cache and the offline page (the retired one goes with its page).
+
 Checks on the merged tree. On `2a54baa`: `cargo xtask gate`, `postgres`,
 `smoke`, `secrets` and `crypto-scope` and `cargo deny check` pass;
 `cargo audit --deny warnings` fails on RUSTSEC-2026-0459 alone
@@ -5185,8 +5209,8 @@ Central's release binary, the site from the development server, synthetic
 accounts), each project against a Central started afresh: the chat's
 spec, the reset's and the password's pass at the desktop's and at a
 phone's size; the registration in them copies its recovery code and
-reads it back from the clipboard. What ran after the two points above is
-in the pull request's text.
+reads it back from the clipboard. What ran after the three points above
+is in the pull request's text.
 
 Not looked at again: the points the list above names as not checked stay
 as they are.

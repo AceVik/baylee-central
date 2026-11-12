@@ -92,14 +92,27 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(
     (async () => {
       const keys = await caches.keys();
-      const old = keys.filter((key) => key.startsWith("baylee-public-") || (key.startsWith("baylee-site-") && key !== CACHE));
+      const old = keys.filter((key) => mine(key) && key !== CACHE);
       await Promise.all(old.map((key) => caches.delete(key)));
       await self.clients.claim();
     })(),
   );
 });
 
+// A page that found its visitor signed out retires this worker before it
+// removes it ("RETIRE", below). The worker goes on answering for that page
+// until the page goes, so from then on it leaves every request to the
+// network, and what it was writing just then is waited for before the
+// cache is taken away: nothing makes the cache again behind the page.
+let retired = false;
+const answering = new Set();
+
+function mine(key) {
+  return key.startsWith("baylee-site-") || key.startsWith("baylee-public-");
+}
+
 self.addEventListener("fetch", (event) => {
+  if (retired) return;
   const request = event.request;
   if (request.method !== "GET") return;
   const url = new URL(request.url);
@@ -111,25 +124,41 @@ self.addEventListener("fetch", (event) => {
     return;
   }
   if (!HASHED.test(url.pathname)) return;
-  event.respondWith(
-    (async () => {
-      // A page that found its visitor signed out takes the cache away while
-      // this worker still answers for it: what is gone is not made again.
-      if (!(await caches.has(CACHE))) return fetch(request);
-      const cache = await caches.open(CACHE);
-      const kept = await cache.match(request);
-      if (kept) return kept;
-      const answer = await fetch(request);
-      if (answer.ok && answer.type === "basic") await cache.put(request, answer.clone());
-      return answer;
-    })(),
-  );
+  const answer = (async () => {
+    // A worker started again after its cache was taken away (it forgot that
+    // it was retired) finds no cache, and does not make one.
+    if (!(await caches.has(CACHE))) return fetch(request);
+    const cache = await caches.open(CACHE);
+    const kept = await cache.match(request);
+    if (kept) return kept;
+    const fresh = await fetch(request);
+    if (fresh.ok && fresh.type === "basic") await cache.put(request, fresh.clone());
+    return fresh;
+  })();
+  answering.add(answer);
+  const done = () => answering.delete(answer);
+  answer.then(done, done);
+  event.respondWith(answer);
 });
 
 self.addEventListener("message", (event) => {
   if (!event.source || new URL(event.source.url).origin !== self.location.origin) return;
   if (event.data?.type === "SKIP_WAITING") {
     event.waitUntil(self.skipWaiting());
+    return;
+  }
+  if (event.data?.type === "RETIRE") {
+    retired = true;
+    event.waitUntil(
+      (async () => {
+        await Promise.allSettled([...answering]);
+        const keys = await caches.keys();
+        await Promise.all(keys.filter(mine).map((key) => caches.delete(key)));
+        event.ports[0]?.postMessage({ ok: true });
+      })().catch(() => {
+        event.ports[0]?.postMessage({ ok: false });
+      }),
+    );
     return;
   }
   if (event.data?.type !== "PUSH_STATE") return;
