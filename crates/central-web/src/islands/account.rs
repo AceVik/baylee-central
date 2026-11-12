@@ -4,6 +4,7 @@
 
 use std::fmt::Write as _;
 
+use central_api::email::MailCode;
 use central_api::owner::{
     GatewayScopes, MyGateway, OwnerAnswer, OwnerRequest, SessionInfo, SessionKind, token_text,
 };
@@ -14,7 +15,7 @@ use serde_json::json;
 use super::auth::{Problem, problem_text, sign_in};
 use super::central::{Failure, call};
 use super::crypto::{Crypto, field_bytes};
-use super::session;
+use super::{fragment, session};
 use crate::data::Section;
 use crate::words::{self, Lang};
 
@@ -424,9 +425,16 @@ fn session_row(lang: Lang, info: &SessionInfo) -> impl IntoView + use<> {
 }
 
 /// The sessions, the password's change (`password::change_form`) and the
-/// account's e-mail address (`email::section`). `signed_out` reloads the
+/// account's e-mail address (`email::section`), which takes the code the
+/// confirmation mail's link `handed` over, once. `signed_out` reloads the
 /// area when one of them finds no session.
-fn security(lang: Lang, worker: String, username: String, signed_out: Callback<()>) -> AnyView {
+fn security(
+    lang: Lang,
+    worker: String,
+    username: String,
+    signed_out: Callback<()>,
+    handed: StoredValue<Option<MailCode>>,
+) -> AnyView {
     let sessions = RwSignal::new(None::<Result<Vec<SessionInfo>, Problem>>);
     let notice = RwSignal::new(None::<&'static str>);
     let load = move || {
@@ -478,6 +486,7 @@ fn security(lang: Lang, worker: String, username: String, signed_out: Callback<(
         super::email::Begin::Read,
         changed,
         signed_out,
+        handed,
     );
     view! {
         <section aria-labelledby="sessions-title">
@@ -1149,8 +1158,24 @@ pub fn Account(lang: Lang, section: Section, worker: String) -> impl IntoView {
     let state = RwSignal::new(Load::Loading);
     // where the focus goes once a reload an action asked for is drawn
     let focus_next = StoredValue::new(None::<&'static str>);
+    // A confirmation code the mail's link handed in the address's
+    // fragment (`fragment`): gone from the address bar at once, on every
+    // page of the area, and kept on the security page only, until the
+    // e-mail section learns whether an address waits for it. Signed out,
+    // or with the area not read, it is dropped unseen. One that arrives
+    // while the page is open loads it anew (`fragment::watch`).
+    fragment::watch();
+    let handed = StoredValue::new(
+        fragment::code(&fragment::take(), MailCode::parse).filter(|_| section == Section::Security),
+    );
     let reload = Callback::new(move |()| {
-        leptos::task::spawn_local(async move { state.set(summary().await) });
+        leptos::task::spawn_local(async move {
+            let load = summary().await;
+            if !matches!(load, Load::Ready(_)) {
+                handed.set_value(None);
+            }
+            state.set(load);
+        });
     });
     // Effects run in the browser only: the server renders "loading".
     Effect::new(move |_| reload.run(()));
@@ -1178,7 +1203,7 @@ pub fn Account(lang: Lang, section: Section, worker: String) -> impl IntoView {
             Section::Home => home(lang, &summary, &worker),
             Section::Profile => profile(lang, &worker, &summary, reload, focus_next),
             Section::Security => {
-                security(lang, worker.clone(), summary.username.clone(), reload)
+                security(lang, worker.clone(), summary.username.clone(), reload, handed)
             }
             Section::Privacy => privacy(lang, worker.clone()),
             Section::Gateways => gateways(lang, worker.clone()),
