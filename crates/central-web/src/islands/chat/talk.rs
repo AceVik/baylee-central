@@ -291,13 +291,18 @@ enum Known {
 impl Known {
     /// An empty list is said to be empty only once everything it is made
     /// of arrived; a failure says so, never an empty list in its place.
+    /// The inbox is waited for only while the chat opens or is open: one
+    /// that could not be opened, or whose session ended, reads nothing.
     fn watch(ctl: Ctl) -> Memo<Known> {
         Memo::new(move |_| {
             let contacts = ctl.contacts.with(|c| c.as_ref().map(Result::is_ok));
             let groups = ctl.groups.with(|g| g.as_ref().map(Result::is_ok));
+            let reading = ctl
+                .shown
+                .with(|s| s.loading && matches!(s.phase, Phase::Opening | Phase::Ready));
             match (contacts, groups) {
                 (Some(false), _) | (_, Some(false)) => Known::Failed,
-                (Some(true), Some(true)) if !ctl.shown.with(|s| s.loading) => Known::Loaded,
+                (Some(true), Some(true)) if !reading => Known::Loaded,
                 _ => Known::Waiting,
             }
         })

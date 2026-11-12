@@ -92,8 +92,7 @@
     display: flex;
   }
 
-  /* both panes are in view: there is nothing to go back to */
-  .messenger .conv-back {
+  .conv-back {
     display: none;
   }
 }
@@ -651,10 +650,10 @@
   font-size: 0.85rem;
 }
 
-/* a row's actions start under its name */
+/* a row's actions, or its state, start under its name */
 .person-actions,
-.person > .button {
-  padding-inline-start: 0;
+.person > .button,
+.person > .pill {
   margin-inline-start: calc(2.25rem + var(--space-3));
 }
 
@@ -664,7 +663,8 @@
   gap: var(--space-2);
 }
 
-.person > .button {
+.person > .button,
+.person > .pill {
   justify-self: start;
 }
 
@@ -683,13 +683,6 @@
   border-radius: var(--radius-md);
   background: var(--panel-solid);
   box-shadow: var(--elevation-1);
-}
-
-.person.found {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
 }
 
 .people[data-relation="blocked"] .person-name {
