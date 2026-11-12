@@ -156,7 +156,7 @@ fn loads_nothing(html: &str) {
 
 /// The logo as the band shows it: the mailer's attachment, by its
 /// `Content-ID`, 48 px, rounded, without words of its own.
-const LOGO_IMG: &str = "<img src=\"cid:baylee-logo\" width=\"48\" height=\"48\" alt=\"\" style=\"display:block;width:48px;height:48px;border:0;border-radius:12px;\">";
+const LOGO_IMG: &str = "<img src=\"cid:baylee-logo\" width=\"48\" height=\"48\" alt=\"\" style=\"display:block;width:48px;height:48px;border:0;border-radius:10px;\">";
 
 /// The mail loads nothing, its links go to the configured site only (the
 /// button's page and the start page), and a code is in a link only in
@@ -435,13 +435,13 @@ fn with_the_logo_the_band_shows_it_and_nothing_else_changes() {
             assert_eq!(on.html.matches(LOGO_IMG).count(), 1);
             loads_nothing(&on.html.replace(LOGO_IMG, ""));
             let band = between(&on.html, &start, "</td></tr>\n");
-            assert!(band.contains(&format!(
-                "<td width=\"48\" height=\"48\" valign=\"middle\" style=\"width:48px;height:48px;\">{LOGO_IMG}</td>"
-            )));
-            // the name beside it, as high as the logo; no letter's tile
+            // the logo and the name in two cells of one row, each in the
+            // middle, so that no reader stacks them; no letter's tile
             assert!(band.ends_with(&format!(
-                "line-height:48px;font-weight:700;letter-spacing:0.01em;color:{DAWN};mso-line-height-rule:exactly;\">Baylee</td></tr></table>"
+                "<tr><td width=\"48\" height=\"48\" valign=\"middle\" style=\"width:48px;height:48px;vertical-align:middle;\">{LOGO_IMG}</td>\
+                 <td valign=\"middle\" bgcolor=\"{NIGHT}\" style=\"vertical-align:middle;padding-left:12px;background:{NIGHT};font-family:{SERIF};font-size:24px;line-height:48px;font-weight:700;letter-spacing:0.01em;color:{DAWN};mso-line-height-rule:exactly;\">Baylee</td></tr></table>"
             )));
+            assert_eq!(band.matches("<tr>").count(), 1);
             assert!(band.find(LOGO_IMG) < band.find(">Baylee<"));
             assert!(!band.contains(&format!("bgcolor=\"{GOLD}\"")));
             assert!(!band.contains("aria-hidden"));

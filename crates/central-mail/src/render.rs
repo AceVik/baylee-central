@@ -409,16 +409,21 @@ fn paragraph(inner: &str, size: u8, colour: &str) -> String {
 /// and the wordmark in letters beside a picture, as the site's header has
 /// it. With `logo`, the picture is the logo the mailer attaches, rounded,
 /// with no text of its own since the name stands beside it; without, the
-/// name's first letter on a gold tile, not read aloud.
+/// name's first letter on a gold tile, not read aloud. Picture and name
+/// are two cells of one row, each set to the middle, so that no reader
+/// stacks them (mailbox.org put a bare picture above the name).
 fn band(out: &mut String, lang: Lang, logo: bool) {
     let brand = lang.text("brand", &[]);
-    let (mark, high) = if logo {
+    let (mark, name) = if logo {
         (
             format!(
-                "<td width=\"{LOGO_SIDE}\" height=\"{LOGO_SIDE}\" valign=\"middle\" style=\"width:{LOGO_SIDE}px;height:{LOGO_SIDE}px;\">\
-                 <img src=\"cid:{LOGO}\" width=\"{LOGO_SIDE}\" height=\"{LOGO_SIDE}\" alt=\"\" style=\"display:block;width:{LOGO_SIDE}px;height:{LOGO_SIDE}px;border:0;border-radius:12px;\"></td>"
+                "<td width=\"{LOGO_SIDE}\" height=\"{LOGO_SIDE}\" valign=\"middle\" style=\"width:{LOGO_SIDE}px;height:{LOGO_SIDE}px;vertical-align:middle;\">\
+                 <img src=\"cid:{LOGO}\" width=\"{LOGO_SIDE}\" height=\"{LOGO_SIDE}\" alt=\"\" style=\"display:block;width:{LOGO_SIDE}px;height:{LOGO_SIDE}px;border:0;border-radius:10px;\"></td>"
             ),
-            LOGO_SIDE,
+            format!(
+                "<td valign=\"middle\" bgcolor=\"{NIGHT}\" style=\"vertical-align:middle;padding-left:12px;background:{NIGHT};font-family:{SERIF};font-size:24px;line-height:{LOGO_SIDE}px;font-weight:700;letter-spacing:0.01em;color:{DAWN};mso-line-height-rule:exactly;\">{}</td>",
+                escape(&brand)
+            ),
         )
     } else {
         let letter: String = brand.chars().take(1).collect();
@@ -427,16 +432,16 @@ fn band(out: &mut String, lang: Lang, logo: bool) {
                 "<td width=\"34\" height=\"34\" align=\"center\" valign=\"middle\" bgcolor=\"{GOLD}\" aria-hidden=\"true\" style=\"width:34px;height:34px;background:{GOLD};border-radius:9px;font-family:{SERIF};font-size:20px;line-height:34px;font-weight:700;color:{NIGHT};mso-line-height-rule:exactly;\">{}</td>",
                 escape(&letter)
             ),
-            34,
+            format!(
+                "<td bgcolor=\"{NIGHT}\" style=\"padding-left:12px;background:{NIGHT};font-family:{SERIF};font-size:24px;line-height:34px;font-weight:700;letter-spacing:0.01em;color:{DAWN};mso-line-height-rule:exactly;\">{}</td>",
+                escape(&brand)
+            ),
         )
     };
     let _ = writeln!(
         out,
         "<tr><td bgcolor=\"{NIGHT}\" style=\"padding:20px {SIDE}px;background:{NIGHT};border-bottom:3px solid {GOLD};border-radius:13px 13px 0 0;\">\
-         <{TABLE}><tr>{mark}\
-         <td bgcolor=\"{NIGHT}\" style=\"padding-left:12px;background:{NIGHT};font-family:{SERIF};font-size:24px;line-height:{high}px;font-weight:700;letter-spacing:0.01em;color:{DAWN};mso-line-height-rule:exactly;\">{}</td>\
-         </tr></table></td></tr>",
-        escape(&brand),
+         <{TABLE}><tr>{mark}{name}</tr></table></td></tr>",
     );
 }
 
