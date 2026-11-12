@@ -13,6 +13,7 @@ mod clip;
 mod contact;
 mod crypto;
 mod early;
+mod email;
 mod field;
 mod focus;
 mod impressum;

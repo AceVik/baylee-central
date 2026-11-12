@@ -118,6 +118,11 @@ pub const KEY: &[Shape] = &[
     ),
     Circle("16.5", "7.5", ".5"),
 ];
+/// `mail`.
+pub const MAIL: &[Shape] = &[
+    Path("m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7"),
+    Rect("20", "16", "2", "4", "2"),
+];
 /// `copy`.
 pub const COPY: &[Shape] = &[
     Rect("14", "14", "8", "8", "2"),

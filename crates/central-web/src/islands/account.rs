@@ -80,7 +80,7 @@ async fn summary() -> Load {
 }
 
 /// A Unix time as the page's language writes a date and time, in UTC.
-fn when(lang: Lang, seconds: i64) -> String {
+pub fn when(lang: Lang, seconds: i64) -> String {
     let days = seconds.div_euclid(86_400);
     let rest = seconds.rem_euclid(86_400);
     // Civil date from days since 1970-01-01 (Howard Hinnant's algorithm).
@@ -414,8 +414,9 @@ fn session_row(lang: Lang, info: &SessionInfo) -> impl IntoView + use<> {
     }
 }
 
-/// The sessions, and the password's change (`password::change_form`).
-/// `signed_out` reloads the area when the change finds no session.
+/// The sessions, the password's change (`password::change_form`) and the
+/// account's e-mail address (`email::section`). `signed_out` reloads the
+/// area when one of them finds no session.
 fn security(lang: Lang, worker: String, username: String, signed_out: Callback<()>) -> AnyView {
     let sessions = RwSignal::new(None::<Result<Vec<SessionInfo>, Problem>>);
     let notice = RwSignal::new(None::<&'static str>);
@@ -460,6 +461,8 @@ fn security(lang: Lang, worker: String, username: String, signed_out: Callback<(
     };
     // a change ends every other session: the list above is another then
     let changed = Callback::new(move |()| load());
+    // naming an address signs in once more: this session is a newer one then
+    let email = super::email::section(lang, worker.clone(), username.clone(), changed, signed_out);
     view! {
         <section aria-labelledby="sessions-title">
             <h2 id="sessions-title">{words::security_sessions(lang)}</h2>
@@ -483,6 +486,7 @@ fn security(lang: Lang, worker: String, username: String, signed_out: Callback<(
             <p>{words::security_password_lead(lang)}</p>
             {super::password::change_form(lang, worker, username, changed, signed_out)}
         </section>
+        {email}
     }
     .into_any()
 }
@@ -508,15 +512,23 @@ enum Deletion {
     Deleted,
 }
 
+/// The export, and beside it in the same file what Central holds of the
+/// account's e-mail address (`email::export_file`): the export's own
+/// answer does not carry it. Where the address cannot be read the file is
+/// the export alone, and the page says that the address is not in it.
 fn export_view(lang: Lang, worker: String) -> impl IntoView {
     let export = RwSignal::new(None::<Result<String, Problem>>);
+    let without_email = RwSignal::new(false);
     let needs_reauth = RwSignal::new(false);
     let run_export = move || {
         leptos::task::spawn_local(async move {
             match call(&Request::AccountExport).await {
                 Ok(Response::AccountExport { export: data }) => {
+                    // asked once the export answered: a refusal here is not the export's
+                    let email = super::email::for_export().await;
+                    without_email.set(email.is_none());
                     export.set(Some(
-                        serde_json::to_string_pretty(&data).map_err(|_| Problem::Failed),
+                        super::email::export_file(&data, email.as_ref()).ok_or(Problem::Failed),
                     ));
                 }
                 Ok(_) => export.set(Some(Err(Problem::Failed))),
@@ -532,7 +544,10 @@ fn export_view(lang: Lang, worker: String) -> impl IntoView {
             {move || match export.get() {
                 Some(Ok(json)) => {
                     super::focus::when_shown("#export-save");
-                    download_link(lang, &json).into_any()
+                    let lacks = without_email.get().then(|| {
+                        view! { <p class="meta" id="export-no-email">{words::privacy_export_no_email(lang)}</p> }
+                    });
+                    view! { {download_link(lang, &json)}{lacks} }.into_any()
                 }
                 Some(Err(problem)) => {
                     super::focus::when_shown("#export-error");

@@ -363,6 +363,36 @@
   font: 700 1rem var(--sans);
 }
 
+/* The reset page, for someone who has no code yet (`islands/reset.rs`):
+   a block of its own before the form that redeems one, set apart by a
+   line. Its one button is as wide as its field. */
+.reset-mail {
+  display: grid;
+  /* the column is as wide as the block, not as its longest word */
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-3);
+  margin-block-end: var(--space-5);
+  padding-block-end: var(--space-5);
+  border-block-end: var(--hairline) solid var(--edge);
+}
+
+.reset-mail > h2 {
+  font-size: var(--text-lg);
+  hyphens: auto;
+}
+
+.reset-mail .form > .button {
+  inline-size: 100%;
+}
+
+/* A code typed from a mail (`islands/email.rs`): read in either case,
+   shown in the one it was mailed in. */
+.field .code-entry {
+  font-family: var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 /* A part of a form that only one of the answers shows. */
 .form-part {
   display: grid;
