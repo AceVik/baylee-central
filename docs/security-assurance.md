@@ -6936,3 +6936,107 @@ animations before the rule and none after. The site's browser suite and
 ran on this work as reported in the pull request.
 
 Engineering review, not an audit.
+
+## The administration's other pages on the new site, 12 November 2026
+
+The old build's administration (`/admin`, the accounts, one account, the
+gateways, the audit log, the legacy store) is rebuilt on the new site
+under `/{lang}/account/admin/…` ([frontend
+rewrite](proposals/frontend-rewrite.md) §25), so that the old build can go
+(the owner, 12.11.2026). Central is as it was: no request, answer, server
+crate, migration or dependency changed; `Cargo.lock` is untouched.
+
+Design pass. The assets are what an administrator reads (every account's
+sign-in name, ids, the audit log, the legacy store's names) and the four
+changes the pages make: the administrator role (whoever holds it sees
+and changes everything), a tag (it moves a handle, and loses an account
+its gateway-bound whisper history), a gateway's approval (the public
+list, and disabling ends its players' sign-ins), and a token's
+revocation. Central decides who may read and change, and refuses a
+change without a password sign-in under 30 minutes old; the pages decide
+nothing Central does not decide again.
+- **Who sees the pages.** As for the reset code's page: the server cannot
+  know the role, every address answers everyone with the same frame, and
+  the island draws a page, and the administration's own navigation, only
+  for a session whose `AccountSummary` says `admin`. Anyone else gets one
+  sentence and no administration request. No page the server renders
+  links to the administration.
+- **One account's address** carries an id the visitor chooses. It is read
+  strictly (32 lowercase hex digits) and the page is rendered for each
+  request and never kept: the table of rendered pages stays bounded by
+  the pages there are. An id is no secret (`AGENTS.md`); the reset code's
+  page takes an account by the fragment (`#account=`), which never
+  reaches the site, and removes it once read.
+- **The order of a change.** Nothing that changes is sent from a button:
+  it opens a confirmation that says what follows; only the confirmation's
+  own button sends, after `AccountSummary` (another account in this
+  browser sends nothing; no role sends nothing), and where the sign-in is
+  older than 29 minutes by the browser's clock, after the password proven
+  once more in a Worker ended at once, for the session's own account.
+  The confirmation gives way to the work before the request leaves, and a
+  page that is working takes no other change: a double press sends one.
+- **What a refusal may say.** Central answers each refusal with one
+  `Rejected` (a tag also with `Conflict`). The page says what stands
+  afterwards, in this order: the role, whether what was changed still
+  exists, then the sign-in's age, for which it asks the password once and
+  never again for the same attempt. An answer that did not arrive may have
+  made the change: the page never calls it a refusal, reads what it shows
+  again and says that it cannot tell; where that read fails too, it says
+  to load the page.
+- Decided against: the search in the address (as for the reset code's
+  page); the navigation's counts (every page, the reset code's included,
+  would ask Central for them).
+
+Implementation pass:
+- `islands/admin/common.rs`: the decisions are plain functions with unit
+  tests (`before`, `at_change`, `explain`, `came_text`, `unread`,
+  `action_text`); the flow (`send`, `send_after`, `Flow`). Reads go
+  through `read`, whose `Rejected` is a lost session only where
+  `AccountSummary` is refused too. Only the newest list request is drawn.
+- `data.rs`: `Section`'s administration variants, `id_hex`/`id_from_hex`;
+  `site/mod.rs`: `Page::path`, `Page::kept`; `central-web-server`'s
+  `routes.rs` skips the table for a page not kept.
+- No new dependency. Nothing is logged; the password is a signal's
+  string, emptied when it is sent and dropped after the Worker's sign-in.
+  No lint was switched off; no `unsafe`.
+
+Adversarial pass, each question with what answers it:
+- *Does anyone without the role get a page, the navigation or a request?*
+  No: the browser test opens all seven pages without the role and sees
+  one sentence each, no navigation, no link into the administration in
+  the frame, and no administration request; the server's test finds no
+  link to it in any page it renders.
+- *Is anything sent before the confirmation?* No: the tests count the
+  requests from each button through its confirmation and its way back
+  (none), and after it exactly one change, also for a double press.
+- *Is the password proven before a change on a stale sign-in, for the
+  session's own account?* The tests see `account_summary` only, then
+  after the password `account_summary`, `login_start`, `login_finish`,
+  `account_summary` and the one change; with Central counting the
+  sign-in old where the browser does not, the refusal is explained and
+  the password asked for, with no second change. A browser signed in as
+  another account meanwhile sends no change.
+- *Can a refusal or a lost answer read as something it is not?* Unit
+  tests: a lost answer never a refusal, a refusal never asking for the
+  password twice, every outcome its own sentence in every language. In
+  the browser: an account and a gateway gone meanwhile, the role gone,
+  `Busy`, a taken tag, and the three kinds of lost answer (none; another
+  kind; 503), with the read afterwards showing what Central holds.
+- *Can ids fill the server's table?* The server's test asks for twenty
+  ids and finds the table unchanged.
+- **The checks have teeth** (one change at a time, each undone, the site
+  and the server rebuilt): every page kept (caught by the server's test);
+  the pages drawn without the role; a change sent from its button
+  without the confirmation (both caught in the browser).
+
+Run on this change: `cargo fmt --all --check`, `cargo clippy` for the web
+crates on the host and on `wasm32-unknown-unknown` (no warning), `cargo
+test -p central-web -p central-web-server`, `cargo test -p xtask` (with
+the English share), `cargo xtask site`, and the administration's browser
+specs (`admin*.spec.ts`, 74 on both projects). `cargo clippy --workspace
+--all-targets` reports one finding, in code this change did not touch:
+`site/shell.rs`'s `footer` is 104 lines since the BIMI mark (d41fce5).
+Not run: `e2e-real` (no real Central here), `cargo xtask postgres`,
+`smoke`, `cargo audit`, `cargo deny` (no dependency changed).
+
+Engineering review, not an audit.
