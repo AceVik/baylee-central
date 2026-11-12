@@ -276,8 +276,8 @@ test("an administrator is led there and finds accounts, page by page; a search C
   const { seen, problems } = await open(page, w, { path: "/en/account" });
   const link = page.getByRole("link", { name: "Reset a login" });
   await expect(link).toHaveAttribute("href", "/en/account/admin");
-  // the rest of the administration is still the old build's
-  await expect(page.getByRole("link", { name: "Administration", exact: true })).toHaveAttribute("href", "/admin");
+  // and to the rest of the administration, on this site
+  await expect(page.getByRole("link", { name: "Administration", exact: true })).toHaveAttribute("href", "/en/account/admin/overview");
   const start = seen.length;
   await link.click();
   await expect(page).toHaveURL(/\/en\/account\/admin$/);

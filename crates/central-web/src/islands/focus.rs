@@ -29,6 +29,24 @@ pub(crate) fn after_render(selector: impl Into<String>) {
     let _ = window().request_animation_frame(callback.unchecked_ref());
 }
 
+/// As [`after_render`], for the first of `selectors` that finds an element,
+/// in their order (a selector list would pick the first in the page's).
+pub(crate) fn after_render_first(selectors: Vec<String>) {
+    let callback = Closure::once_into_js(move || {
+        let target = selectors.iter().find_map(|selector| {
+            document()
+                .query_selector(selector)
+                .ok()
+                .flatten()
+                .and_then(|element| element.dyn_into::<web_sys::HtmlElement>().ok())
+        });
+        if let Some(element) = target {
+            let _ = element.focus();
+        }
+    });
+    let _ = window().request_animation_frame(callback.unchecked_ref());
+}
+
 /// For a part that only an action shows (never the page's first render):
 /// once it is drawn, `selector` in it takes the focus. Effects run in the
 /// browser only.
