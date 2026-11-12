@@ -1456,8 +1456,9 @@ are `home.js` and `album.css`; neither has words, so no language changed.
 **Measured** (headless Chromium on the M1 Max's GPU, the machine loaded;
 the gaps between animation frames on the main thread, not the
 compositor's own): at 1440 px the median gap was 16.7 ms while the book
-opened, shut and a photograph turned, with at most one gap of 33 to 50 ms,
-the first open's first. At 375 px with the CPU slowed fourfold the median
+opened, shut and a photograph turned, in three runs with at most one gap
+of 33 to 50 ms each (a run before them, its browser just started, stalled
+once for 0.55 s). At 375 px with the CPU slowed fourfold the median
 was 16.7 ms as well, with one to four gaps of 50 to 270 ms per run, the
 longest the first open's first frame, which took about 0.2 s before this
 change too (the album's first layout and paint) and comes before anything

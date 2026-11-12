@@ -1,7 +1,8 @@
 // The start page's script. Baylee's album (#album and #photo-viewer): the
-// server writes the whole book; this turns it into one chapter and one
-// photograph at a time, turns the page between chapters, and opens a
-// photograph full size to zoom into and move about. The screenshots: each
+// server writes the whole book; this opens and shuts it as a book, turns
+// it into one chapter and one photograph at a time, turns the page between
+// chapters, and opens a photograph full size to zoom into and move about,
+// laying each print on the one before. The screenshots: each
 // is drawn, and starts moving, once it comes near, and opens large
 // (#shot-viewer), where the arrow keys step. Plain DOM, no
 // markup strings: nothing here needs a Trusted Types policy. Without it
