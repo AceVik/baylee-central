@@ -249,18 +249,24 @@ mod tests {
     }
 
     #[test]
-    fn german_is_written_by_hand_and_the_others_are_english_for_now() {
+    fn every_language_has_words_of_its_own() {
         let words = |lang: Lang| -> Vec<&str> {
             messages(lang.source())
                 .map(|line| line.unwrap().1)
                 .collect()
         };
         let english = words(Lang::En);
-        assert_ne!(words(Lang::De), english);
         for lang in Lang::ALL {
-            if !matches!(lang, Lang::En | Lang::De) {
-                assert_eq!(words(lang), english, "{}", lang.code());
+            if lang == Lang::En {
+                continue;
             }
+            // only the brand's name is the same in every language
+            let same = words(lang)
+                .iter()
+                .zip(&english)
+                .filter(|(theirs, ours)| theirs == ours)
+                .count();
+            assert_eq!(same, 1, "{}", lang.code());
         }
     }
 

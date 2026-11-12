@@ -1,43 +1,38 @@
-# Not translated yet: these are the English words, line for line
-# (locales/en/mail.ftl), until this language has its own.
+# The words of the mails Baylee Central sends (docs/email.md), in Russian.
 #
-# The words of the mails Baylee Central sends (docs/email.md).
-#
-# One message a line: `id = text`. `{ $name }` is replaced when a mail is
-# written. A line that starts with `#` is a comment. No markup: the words go
-# into the plain text as they are and into the HTML escaped.
+# One message a line: `id = text`. `{ $name }` is replaced when a mail is written.
 
 brand = Baylee
-code-label = Your code
-code-secret = Do not pass this code on. Nobody at Baylee asks for it.
-footer = Baylee never asks for your password by e-mail. You get this mail because this address was named for a Baylee account.
+code-label = Ваш код
+code-secret = Никому не передавайте этот код. В Baylee его никто не спрашивает.
+footer = Baylee никогда не спрашивает ваш пароль по почте. Вы получили это письмо, потому что этот адрес был указан для аккаунта Baylee.
 
-# The code that confirms an address.
-confirm-subject = Confirm your e-mail address for Baylee
-confirm-title = Confirm your e-mail address
-confirm-intro = This address was named for a Baylee account. To confirm it, enter this code where you named the address.
-confirm-valid = The code works for { $minutes } minutes.
-confirm-ignore = If this was not you, ignore this mail. The address is not used without the code.
+# Код, который подтверждает адрес.
+confirm-subject = Подтвердите адрес электронной почты для Baylee
+confirm-title = Подтвердите адрес электронной почты
+confirm-intro = Этот адрес был указан для аккаунта Baylee. Чтобы подтвердить его, введите этот код там, где вы указывали адрес.
+confirm-valid = Срок действия кода: { $minutes } мин.
+confirm-ignore = Если это были не вы, проигнорируйте это письмо. Без кода адрес не используется.
 
-# The reset code. `name` is the account's sign-in name.
-reset-subject = Your reset code for Baylee
-reset-title = Set a new password
-reset-intro = A reset code was asked for the Baylee account { $name }.
-reset-how = Enter the code on the reset page to set a new password.
-reset-valid = The code works once, for { $minutes } minutes.
-reset-link = Open the reset page
-reset-ignore = If this was not you, ignore this mail. Your password stays as it is.
+# Код сброса. `name` — имя для входа в аккаунт.
+reset-subject = Ваш код сброса для Baylee
+reset-title = Задайте новый пароль
+reset-intro = Для аккаунта Baylee { $name } запрошен код сброса.
+reset-how = Введите код на странице сброса, чтобы задать новый пароль.
+reset-valid = Код действует один раз. Срок действия: { $minutes } мин.
+reset-link = Открыть страницу сброса
+reset-ignore = Если это были не вы, проигнорируйте это письмо. Ваш пароль останется прежним.
 
-# The notice to an address that another one replaced.
-replaced-subject = Your e-mail address on Baylee was replaced
-replaced-title = This address was replaced
-replaced-body = This address is no longer the e-mail address of a Baylee account. Another address was confirmed in its place.
+# Уведомление адресу, который заменили другим.
+replaced-subject = Адрес электронной почты в Baylee заменён
+replaced-title = Этот адрес заменён
+replaced-body = Этот адрес больше не является адресом электронной почты аккаунта Baylee. Вместо него подтверждён другой адрес.
 
-# The notice to an address that was removed.
-removed-subject = Your e-mail address on Baylee was removed
-removed-title = This address was removed
-removed-body = This address is no longer the e-mail address of a Baylee account. It was removed from the account.
+# Уведомление адресу, который удалили.
+removed-subject = Адрес электронной почты в Baylee удалён
+removed-title = Этот адрес удалён
+removed-body = Этот адрес больше не является адресом электронной почты аккаунта Baylee. Он удалён из аккаунта.
 
-# Both notices.
-notice-check = If this was not you, sign in and look at the security page of your account.
-notice-link = Open the security page
+# Оба уведомления.
+notice-check = Если это были не вы, войдите и посмотрите страницу безопасности вашего аккаунта.
+notice-link = Открыть страницу безопасности

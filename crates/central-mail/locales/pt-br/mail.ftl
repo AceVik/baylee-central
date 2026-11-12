@@ -1,43 +1,38 @@
-# Not translated yet: these are the English words, line for line
-# (locales/en/mail.ftl), until this language has its own.
+# The words of the mails Baylee Central sends (docs/email.md), in Brazilian Portuguese.
 #
-# The words of the mails Baylee Central sends (docs/email.md).
-#
-# One message a line: `id = text`. `{ $name }` is replaced when a mail is
-# written. A line that starts with `#` is a comment. No markup: the words go
-# into the plain text as they are and into the HTML escaped.
+# One message a line: `id = text`. `{ $name }` is replaced when a mail is written.
 
 brand = Baylee
-code-label = Your code
-code-secret = Do not pass this code on. Nobody at Baylee asks for it.
-footer = Baylee never asks for your password by e-mail. You get this mail because this address was named for a Baylee account.
+code-label = Seu código
+code-secret = Não repasse este código. Ninguém do Baylee pede por ele.
+footer = O Baylee nunca pede a sua senha por e-mail. Você recebe este e-mail porque este endereço foi indicado para uma conta do Baylee.
 
-# The code that confirms an address.
-confirm-subject = Confirm your e-mail address for Baylee
-confirm-title = Confirm your e-mail address
-confirm-intro = This address was named for a Baylee account. To confirm it, enter this code where you named the address.
-confirm-valid = The code works for { $minutes } minutes.
-confirm-ignore = If this was not you, ignore this mail. The address is not used without the code.
+# O código que confirma um endereço.
+confirm-subject = Confirme seu e-mail no Baylee
+confirm-title = Confirme seu endereço de e-mail
+confirm-intro = Este endereço foi indicado para uma conta do Baylee. Para confirmá-lo, digite este código onde você indicou o endereço.
+confirm-valid = O código vale por { $minutes } minutos.
+confirm-ignore = Se não foi você, ignore este e-mail. O endereço não é usado sem o código.
 
-# The reset code. `name` is the account's sign-in name.
-reset-subject = Your reset code for Baylee
-reset-title = Set a new password
-reset-intro = A reset code was asked for the Baylee account { $name }.
-reset-how = Enter the code on the reset page to set a new password.
-reset-valid = The code works once, for { $minutes } minutes.
-reset-link = Open the reset page
-reset-ignore = If this was not you, ignore this mail. Your password stays as it is.
+# O código de redefinição. `name` é o nome de entrada da conta.
+reset-subject = Seu código de redefinição do Baylee
+reset-title = Definir uma nova senha
+reset-intro = Um código de redefinição foi pedido para a conta do Baylee { $name }.
+reset-how = Digite o código na página de redefinição para definir uma nova senha.
+reset-valid = O código vale uma única vez, por { $minutes } minutos.
+reset-link = Abrir a página de redefinição
+reset-ignore = Se não foi você, ignore este e-mail. Sua senha continua como está.
 
-# The notice to an address that another one replaced.
-replaced-subject = Your e-mail address on Baylee was replaced
-replaced-title = This address was replaced
-replaced-body = This address is no longer the e-mail address of a Baylee account. Another address was confirmed in its place.
+# O aviso a um endereço que foi substituído por outro.
+replaced-subject = Seu e-mail no Baylee foi substituído
+replaced-title = Este endereço foi substituído
+replaced-body = Este endereço não é mais o endereço de e-mail de uma conta do Baylee. Outro endereço foi confirmado no lugar dele.
 
-# The notice to an address that was removed.
-removed-subject = Your e-mail address on Baylee was removed
-removed-title = This address was removed
-removed-body = This address is no longer the e-mail address of a Baylee account. It was removed from the account.
+# O aviso a um endereço que foi removido.
+removed-subject = Seu e-mail no Baylee foi removido
+removed-title = Este endereço foi removido
+removed-body = Este endereço não é mais o endereço de e-mail de uma conta do Baylee. Ele foi removido da conta.
 
-# Both notices.
-notice-check = If this was not you, sign in and look at the security page of your account.
-notice-link = Open the security page
+# Os dois avisos.
+notice-check = Se não foi você, entre e confira a página de segurança da sua conta.
+notice-link = Abrir a página de segurança

@@ -1240,8 +1240,10 @@ when this was written, the service refused both new requests.
   is not in it.
 - **Words.** 49 new messages and three changed ones (`faq-password-a`,
   `reset-lead`, `reset-code-hint`), English and German by hand. The nine
-  other languages carry the English text for these 52, each under the
-  comment `# English for now: to be translated.` The privacy notice has a
+  other languages carried the English text for these 52; the same day
+  they, the new `email-code-dropped` and the changed privacy paragraphs
+  were translated by machine (Sonnet 5.5, by the owner's instruction),
+  unread by a speaker, as were the mails' words. The privacy notice has a
   paragraph "E-mail address" after "Your account", and its date is the
   12th.
 - **Tests.** Unit tests of every decision the section and the block make

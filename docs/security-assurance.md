@@ -6037,7 +6037,9 @@ For the owner.
 - Every `Email` action needs accepted terms, `remove` included. (Changed
   the same day: "A second look" below.)
 - No mail says that a reset was finished or a password changed.
-- Nine of the eleven languages hold the English text.
+- Nine of the eleven languages held the English text; the same day they
+  were translated by machine (Sonnet 5.5, by the owner's instruction),
+  unread by a speaker.
 - A refused `Email` request counts against the session's bearer in the
   request budgets, like other refusals; the line of work on those budgets
   may want it otherwise.

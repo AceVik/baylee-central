@@ -182,8 +182,7 @@ faq-account-a = 一人で遊ぶ分には不要です。デッキビルダーと�
 faq-data-q = 私のデータはどうなりますか？
 faq-data-a = できるだけ少なくしています。詳しくは<privacy>プライバシー通知</privacy>をご覧ください。パスワードがブラウザーの外に出ることはなく、非公開のデータとチャットのメッセージは、私たちに届く前にお使いの端末で暗号化されます。
 faq-password-q = パスワードを忘れました。どうすればよいですか？
-# English for now: to be translated.
-faq-password-a = You set a new password with a reset code, <reset>on this page</reset>. If your account has a confirmed e-mail address, you can have the code sent to it there; otherwise an administrator gives you one. Your encrypted data survives only if you have the recovery code you received when you created your account. Without it you start with an empty vault, and that data is lost.
+faq-password-a = 新しいパスワードは、リセットコードを使って<reset>このページ</reset>で設定します。アカウントに確認済みのメールアドレスがあれば、そこでコードをそのアドレスに送ってもらえます。ない場合は、管理者から受け取ります。暗号化されたデータが残るのは、アカウント作成時に受け取った回復コードがある場合だけです。ない場合は空の保管庫から始まり、そのデータは失われます。
 faq-gateway-q = Gateway とは何ですか？
 faq-gateway-a = オンラインのテーブルがあるサーバーです。誰でも運営できます。<gateways>一覧</gateways>には、Central が把握しているものが載っています。
 faq-systems-q = どのシステムで動きますか？
@@ -265,10 +264,8 @@ privacy-directory-title = Gateway 一覧
 privacy-directory = 私たちのサーバーは Baylee Central から Gateway の一覧を読み、表示します。あなたに関することは含まれません。Gateway は、その時点で接続しているプレイヤーの数、そのうちゲーム中の数、開いているテーブルの数、ゲームの数を Central に伝えることがあり、Central はアカウント数を数えます。サイトはこれらの数を表示します。表示されるのは数だけで、名前は含まれません。Gateway の数は、その運営者自身の申告です。
 privacy-account-title = アカウント
 privacy-account = アカウントについて、Baylee Central は次を保存します。アカウントID、ログイン名、タグ付きの表示名、アカウントがいつどのように作られたか、OPAQUE のパスワード記録（私たちのサーバーがパスワードを知ることなく、パスワードを証明できる仕組み）、パスワードと回復コードで二重に暗号化されたマスターキー、暗号化されたアカウント文書と暗号化されたオブジェクト（私たちには読めず、サイズ、リビジョン、時刻だけが見えます）、同意した利用規約のバージョンと時期、最後にログインした時刻、セッション、管理者の役割（ある場合）、登録した Gateway とそのトークン。ほかのプレイヤーに見えるのは表示名とタグで、ログイン名は見えません。管理者がリセットコードを渡した場合、私たちが保存するのは、コードが使われるか期限が切れるまで、そのダイジェストだけです。管理者がアカウントや Gateway に対して行った操作は、3年間、記録（誰が、何を、どのアカウントまたは Gateway に、いつ）として保管されます。法的根拠：GDPR第6条第1項(b)（ご希望のアカウント）。最後のログイン時刻と記録については、GDPR第6条第1項(f)（安全で追跡可能な運用という私たちの正当な利益）。ログイン名とパスワードがなければアカウントはありません。メールアドレスは不要です。アカウントを作成できるのは16歳からです。アカウントを削除するまで保管します。削除すると、稼働中のシステムからは直ちに、バックアップからは遅くとも12か月以内に削除されます。セッションは、使われないまま30分で、遅くともログインから12時間で終了します。
-# English for now: to be translated.
-privacy-email-title = E-mail address
-# English for now: to be translated.
-privacy-email = An e-mail address is optional; an account needs none. If you give one, Baylee Central stores the address and whether and when you confirmed it. Of every code we mail, we store only a digest, until the code is used or has expired. We use the address for three things: to send the code that confirms it, to send a reset code when you ask for one, and to tell the old address when it is replaced or removed. The mail is sent by Baylee's own mail service on the same server through mailbox.org (Heinlein Hosting GmbH, Berlin), which acts as a processor. Legal basis: Art. 6(1)(b) GDPR (the account you asked for). Kept until you remove the address or delete the account.
+privacy-email-title = メールアドレス
+privacy-email = メールアドレスは任意です。アカウントには必要ありません。メールアドレスを登録した場合、Baylee Central は、そのアドレス、メールを書く言語、確認した日時を保存します。指定されたアドレスのうち、コードの入力を待っているものは、確認または取り下げるまで、ただし遅くともコードの期限が切れてから1日後まで保管されます。送信した各コードについては、コードが使われるか期限が切れるまでダイジェストだけを保存し、24時間は、リセットコードが送信された時刻を保存します。1日に送るリセットコードを3通以内にするためです。アドレスは3つの目的に使います。アドレスを確認するコードの送信、あなたまたはあなたのログイン名を知っている誰かが求めたときのリセットコードの送信、古いアドレスへの置き換えまたは削除の通知です。メールは、同じサーバー上の Baylee 独自のメールサービスから、mailbox.org（Heinlein Hosting GmbH、Berlin）経由で送られます。mailbox.org は処理者として、アドレスとメールを受け取ります。法的根拠：GDPR第6条第1項(b)（ご希望のアカウント）。アドレスを削除するかアカウントを削除するまで保管します。
 privacy-cookie-title = セッションのクッキー
 privacy-cookie = ログインすると、クッキーを一つ設定します。<code>__Host-central</code> で、セッションを識別する乱数です。baylee.app にだけ送られ、スクリプトからは読めず、セッションとともに、遅くとも12時間後に終了します。ログイン状態を保つために厳密に必要なものであり、同意は要りません。法的根拠：TDDDG第25条第2項第2号およびGDPR第6条第1項(b)。
 privacy-chat-title = チャットと連絡先
@@ -282,7 +279,7 @@ privacy-contact = フォームは、メッセージ、ページの言語、時�
 privacy-impressum-title = 法的表示のパズル
 privacy-impressum = 法的表示は、ブラウザーがパズルを解いた後にのみ表示されます。これは、住所を収集するプログラムから住所を守るためです。パズルは乱数でできており、あなたに関する情報は含みません。このためフィードバックサービスは、メモリ内にのみ、ディスクにも記録にも残さずに、次のものを保持します。あなたのIPアドレスが要求したパズルの数（1時間。IPv6アドレスは前半部分で）、人には見えないリンクをたどったかどうか（24時間）、解かれたパズル（5分、アドレスなし）。ブラウザーについての三つのはい・いいえの答えがパズルの難しさを決めますが、保持されません。プログラムが操作しているか、言語を一つも示していないか、グラフィックスカードなしで描画しているか、の三つです。拒否される人はいません。プログラムに見えるブラウザーには、より長いパズルが出ます。法的根拠：GDPR第6条第1項(f)（個人の住所を守るという私たちの正当な利益）。
 privacy-recipients-title = 受領者と国
-privacy-recipients = データを販売することも、広告のために渡すこともありません。受領者は次のとおりです。netcup GmbH（ドイツでのホスティング、GDPR第28条にいう処理者）。Baylee Central の管理者（管理のため、ログイン名、タグ付きの表示名、アカウントの由来・作成・最後のログイン、Gateway が見えますが、暗号化されたデータは見えません）。アカウントでログインする Gateway（アカウントID、表示名、タグを受け取り、パスワードは受け取りません）。連絡先とグループのメンバー（表示名、タグ、あなたのメッセージ）。法律で義務付けられている場合に限り、当局。欧州経済領域外の国：通知をオンにした場合に限り、ブラウザーのプッシュサービス（Google、Mozilla、Apple、米国）がこれらを運びます。他者が運営する Gateway はどの国にもありえます。そこでログインするかどうかは、あなたが決めます。それ以外に、欧州経済領域外の国へデータを移転することはありません。
+privacy-recipients = データを販売することも、広告のために渡すこともありません。受領者は次のとおりです。netcup GmbH（ドイツでのホスティング、GDPR第28条にいう処理者）。mailbox.org（Heinlein Hosting GmbH、Berlin。あなたが登録したメールアドレスへメールを届ける処理者）。Baylee Central の管理者（管理のため、ログイン名、タグ付きの表示名、アカウントの由来・作成・最後のログイン、Gateway が見えますが、暗号化されたデータは見えません）。アカウントでログインする Gateway（アカウントID、表示名、タグを受け取り、パスワードは受け取りません）。連絡先とグループのメンバー（表示名、タグ、あなたのメッセージ）。法律で義務付けられている場合に限り、当局。欧州経済領域外の国：通知をオンにした場合に限り、ブラウザーのプッシュサービス（Google、Mozilla、Apple、米国）がこれらを運びます。他者が運営する Gateway はどの国にもありえます。そこでログインするかどうかは、あなたが決めます。それ以外に、欧州経済領域外の国へデータを移転することはありません。
 privacy-rights-title = あなたの権利
 privacy-rights = あなたには、アクセス権（GDPR第15条）、訂正権（第16条）、消去権（第17条）、処理の制限の権利（第18条）、データポータビリティの権利（第20条）があります。ご自身の特別な状況を理由として、私たちの正当な利益に基づく第6条第1項(f)の処理に、いつでも異議を述べることができます（第21条）。同意は、将来に向けていつでも撤回できます（第7条第3項）。アカウントのデータの書き出しとアカウントの削除は、アカウントの設定で行えます。それ以外は、お問い合わせフォームか、法的表示に記載のアドレスへのメッセージで足ります。データ保護監督機関に苦情を申し立てることもできます（第77条）。たとえばお住まいの地域の機関や、ノルトライン＝ヴェストファーレン州のデータ保護・情報自由州コミッショナーです。法律や契約によってデータの提供を義務付けられることはありません。ただし、ログイン名とパスワードがなければアカウントはありません。自動化された意思決定もプロファイリングもありません（第22条）。
 privacy-objection-title = 異議を述べる権利
@@ -504,12 +501,10 @@ code-copy-failed = ここではコピーできませんでした。コードを�
 ## Setting a new password with a reset code
 
 reset-title = 新しいパスワードの設定
-# English for now: to be translated.
-reset-lead = For when you forgot your password: with a reset code you set a new one here. The code comes by e-mail to your confirmed address, or from an administrator.
+reset-lead = パスワードを忘れたときのために。リセットコードがあれば、ここで新しいパスワードを設定できます。コードは、確認済みのメールアドレスに届くか、管理者から渡されます。
 reset-noscript = 新しいパスワードの設定には JavaScript が必要です。パスワードと回復コードはお使いのブラウザー内で処理され、当方には送信されません。
 reset-code = リセットコード
-# English for now: to be translated.
-reset-code-hint = By e-mail or from an administrator. It starts with RESET and works once: for one hour if it came by e-mail, for 24 hours if an administrator made it.
+reset-code-hint = メールまたは管理者から届きます。RESET で始まり、1回だけ使えます。メールで届いたものは1時間、管理者が作ったものは24時間有効です。
 reset-data = 暗号化されたデータ
 reset-keep = 回復コードがあります。データは残します。
 reset-new = 回復コードがありません。空の保管庫から始めます。
@@ -531,24 +526,15 @@ reset-unsure-title = 応答がありませんでした
 reset-unsure = Baylee Central が応答する前に接続が切れたため、新しいパスワードが設定されたかどうか分かりません。新しいパスワードでログインしてみてください。ログインできなければ、何も変更されていません。リセットコードはそのまま使えるので、ここでもう一度入力してください。
 reset-unsure-code = 新しいパスワードでログインできた場合は、これが新しい回復コードで、古い回復コードはもう使えません。再表示はできないので、今すぐ保存してください。新しいパスワードでログインできない場合、このコードは無効です。
 reset-to-signin = ログイン
-# English for now: to be translated.
-reset-mail-title = No reset code?
-# English for now: to be translated.
-reset-mail-lead = Enter your sign-in name. If your account has a confirmed e-mail address, we send a reset code to it.
-# English for now: to be translated.
-reset-mail-name-hint = The name you sign in with, not your e-mail address.
-# English for now: to be translated.
-reset-mail-submit = Send a code by e-mail
-# English for now: to be translated.
-reset-mail-error-name = That is not a sign-in name. Enter the name you sign in with, not your e-mail address.
-# English for now: to be translated.
-reset-mail-sent = If this account has a confirmed e-mail address, a reset code is on its way to it. It is valid for one hour.
-# English for now: to be translated.
-reset-mail-busy = Too many requests for now. Try again later.
-# English for now: to be translated.
-reset-mail-none = This server sends no mail. Ask an administrator for a reset code.
-# English for now: to be translated.
-reset-mail-early = That was too quick. Try again in a moment.
+reset-mail-title = リセットコードが届きませんか？
+reset-mail-lead = ログイン名を入力してください。アカウントに確認済みのメールアドレスがあれば、そこにリセットコードを送ります。
+reset-mail-name-hint = ログインに使う名前です。メールアドレスではありません。
+reset-mail-submit = コードをメールで送る
+reset-mail-error-name = これはログイン名ではありません。メールアドレスではなく、ログインに使う名前を入力してください。
+reset-mail-sent = このアカウントに確認済みのメールアドレスがあれば、リセットコードがそこへ送られます。有効期間は1時間です。
+reset-mail-busy = ただいまリクエストが多すぎます。しばらくしてからもう一度お試しください。
+reset-mail-none = このサーバーはメールを送信しません。リセットコードは管理者にお問い合わせください。
+reset-mail-early = 操作が早すぎます。少し待ってからもう一度お試しください。
 
 ## Changing the password
 
@@ -563,81 +549,44 @@ password-unsure = 応答がなかったため、パスワードが変更され�
 
 ## An account's e-mail address
 
-# English for now: to be translated.
-email-title = E-mail address
-# English for now: to be translated.
-email-lead = An e-mail address is optional. We use it to send you a reset code when you ask for one, and to tell you when the address is replaced or removed.
-# English for now: to be translated.
-email-warning = Whoever can read this mailbox can reset your sign-in. Your encrypted data survives a reset only with your recovery code.
-# English for now: to be translated.
-email-no-mail = This server sends no mail, so an e-mail address cannot be set or confirmed here.
-# English for now: to be translated.
-email-unavailable = The e-mail address cannot be shown right now.
-# English for now: to be translated.
-email-password-hint = Your current password, so that nobody else at this browser decides who can reset your sign-in.
-# English for now: to be translated.
-email-submit = Send confirmation code
-# English for now: to be translated.
-email-missing = Enter an e-mail address and your password.
-# English for now: to be translated.
-email-error-address = We cannot write to this address. Enter one plain address such as name@example.org; accented letters and umlauts do not work.
-# English for now: to be translated.
-email-current = Your address
-# English for now: to be translated.
-email-confirmed-at = Confirmed
-# English for now: to be translated.
-email-waiting = Waits for its code
-# English for now: to be translated.
-email-change = Change
-# English for now: to be translated.
-email-change-lead = Your current address stays in use until you have confirmed the new one.
-# English for now: to be translated.
-email-change-cancel = Keep the current address
-# English for now: to be translated.
-email-remove = Remove
-# English for now: to be translated.
-email-remove-ask = Remove this address? We tell the address that it was removed. After that you can no longer get a reset code by e-mail.
-# English for now: to be translated.
-email-remove-ask-no-mail = Remove this address? While this server sends no mail, you cannot set one again.
-# English for now: to be translated.
-email-remove-confirm = Remove address
-# English for now: to be translated.
-email-remove-keep = Keep it
-# English for now: to be translated.
-email-pending = We sent a code to <code>{ $address }</code>. It is valid for 15 minutes.
-# English for now: to be translated.
-email-pending-keeps = Until you confirm it, <code>{ $address }</code> stays your address.
-# English for now: to be translated.
-email-code = Confirmation code
-# English for now: to be translated.
-email-code-hint = Eight characters, as in XXXX-XXXX. Upper or lower case, with or without the hyphen.
-# English for now: to be translated.
-email-confirm = Confirm
-# English for now: to be translated.
-email-resend = Send again
-# English for now: to be translated.
-email-other = Use another address
-# English for now: to be translated.
-email-withdraw = Withdraw
-# English for now: to be translated.
-email-error-code = That is not a confirmation code. It has eight characters, as in XXXX-XXXX.
-# English for now: to be translated.
-email-wrong-code = That code is not right. Check it and try again. After several wrong codes you have to enter the address again.
-email-code-dropped = That code was not right either, so the address no longer waits. Enter it again to get a new code.
-# English for now: to be translated.
-email-now-confirmed = Your e-mail address is confirmed.
-# English for now: to be translated.
-email-resent = A new code is on its way. The earlier one no longer works.
-# English for now: to be translated.
-email-withdrawn = The address is withdrawn. No code is waited for any more.
-# English for now: to be translated.
-email-removed = Your e-mail address is removed.
-# English for now: to be translated.
-email-busy = Too many mails for now. Try again later.
-# English for now: to be translated.
-email-same = This is your address already.
-# English for now: to be translated.
-email-unsure = No answer came back, so we cannot tell whether that went through. Look at what is shown here, and try again if it did not.
+email-title = メールアドレス
+email-lead = メールアドレスは任意です。リセットコードを求められたときの送信と、アドレスが置き換えられたり削除されたりしたときの通知に使います。
+email-warning = このメールボックスを読める人は、あなたのログインをリセットできます。暗号化されたデータがリセット後も残るのは、回復コードがある場合だけです。
+email-no-mail = このサーバーはメールを送信しないため、ここではメールアドレスを設定も確認もできません。
+email-unavailable = 現在、メールアドレスを表示できません。
+email-password-hint = 現在のパスワードです。このブラウザーを使っている他の人が、誰がログインをリセットできるかを決められないようにするためです。
+email-submit = 確認コードを送る
+email-missing = メールアドレスとパスワードを入力してください。
+email-error-address = このアドレスにはメールを送れません。name@example.org のような、1つの通常のアドレスを入力してください。アクセント付きの文字やウムラウトは使えません。
+email-current = あなたのアドレス
+email-confirmed-at = 確認済み
+email-waiting = コード待ち
+email-change = 変更
+email-change-lead = 新しいアドレスを確認するまで、現在のアドレスが使われます。
+email-change-cancel = 現在のアドレスを使い続ける
+email-remove = 削除
+email-remove-ask = このアドレスを削除しますか？削除したことを、そのアドレスに通知します。その後は、リセットコードをメールで受け取れなくなります。
+email-remove-ask-no-mail = このアドレスを削除しますか？このサーバーがメールを送信しない間は、アドレスを再び設定できません。
+email-remove-confirm = アドレスを削除
+email-remove-keep = 削除しない
+email-pending = <code>{ $address }</code> にコードを送りました。有効期間は15分です。
+email-pending-keeps = 確認するまでは、<code>{ $address }</code> があなたのアドレスのままです。
+email-code = 確認コード
+email-code-hint = XXXX-XXXX のように8文字です。大文字と小文字のどちらでも、ハイフンの有無も問いません。
+email-confirm = 確認
+email-resend = 再送
+email-other = 別のアドレスを使う
+email-withdraw = 取り下げ
+email-error-code = これは確認コードではありません。XXXX-XXXX のように8文字です。
+email-wrong-code = コードが違います。確認して、もう一度お試しください。何度か間違えると、アドレスを入力し直す必要があります。
+email-code-dropped = このコードも違っていたため、アドレスはコード待ちではなくなりました。もう一度入力すると、新しいコードが届きます。
+email-now-confirmed = メールアドレスを確認しました。
+email-resent = 新しいコードを送信しています。前のコードはもう使えません。
+email-withdrawn = アドレスを取り下げました。コードはもう待っていません。
+email-removed = メールアドレスを削除しました。
+email-busy = 現在メールが多すぎます。しばらくしてからもう一度お試しください。
+email-same = すでにこのアドレスです。
+email-unsure = 応答がなかったため、処理が完了したかどうか分かりません。ここに表示されている内容を確認し、完了していなければもう一度お試しください。
 
 ## Central's terms
 
@@ -704,8 +653,7 @@ privacy-export-title = データのエクスポート
 privacy-export-lead = Baylee Central があなたのアカウントについて把握していることを、JSON ファイルにまとめます。基本データ、セッション、同意した規約、Gateway、あなたのアカウントに関する監査記録です。暗号化された内容を復号してエクスポートできるのは、Baylee クライアントだけです。エクスポートには、30分以内のログインが必要です。
 privacy-export-make = エクスポートを準備
 privacy-export-save = エクスポートを保存
-# English for now: to be translated.
-privacy-export-no-email = The e-mail address could not be read; it is not in this file.
+privacy-export-no-email = メールアドレスを読み取れませんでした。このファイルには含まれていません。
 privacy-delete-title = アカウントを削除
 privacy-delete-lead = アカウント、そのデータ、セッション、連絡先、あなたが所有する Gateway は、稼働中のシステムから直ちに完全に削除されます。バックアップからは、遅くとも12か月以内に消えます。Central は、あなたが送ったメッセージも削除します。ほかの人がすでに端末に保存したものは、そこに残ることがあります。
 privacy-delete-start = アカウントを削除する

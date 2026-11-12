@@ -182,8 +182,7 @@ faq-account-a = Чтобы играть в одиночку — нет: ред�
 faq-data-q = Что происходит с моими данными?
 faq-data-a = Как можно меньше; что именно, сказано в <privacy>политике конфиденциальности</privacy>. Ваш пароль никогда не покидает ваш браузер; ваши личные данные и сообщения чата шифруются на вашем устройстве, прежде чем попасть к нам.
 faq-password-q = Я забыл пароль. Что делать?
-# English for now: to be translated.
-faq-password-a = You set a new password with a reset code, <reset>on this page</reset>. If your account has a confirmed e-mail address, you can have the code sent to it there; otherwise an administrator gives you one. Your encrypted data survives only if you have the recovery code you received when you created your account. Without it you start with an empty vault, and that data is lost.
+faq-password-a = Новый пароль вы задаёте с помощью кода сброса, <reset>на этой странице</reset>. Если у вашего аккаунта есть подтверждённый адрес электронной почты, код можно отправить на него прямо там; иначе его выдаёт администратор. Ваши зашифрованные данные сохранятся, только если у вас есть код восстановления, полученный при создании аккаунта. Без него вы начинаете с пустым хранилищем, и эти данные потеряны.
 faq-gateway-q = Что такое Gateway?
 faq-gateway-a = Сервер, на котором живут онлайн-столы. Запустить его может любой; в <gateways>каталоге</gateways> перечислены те, о которых знает Central.
 faq-systems-q = На каких системах это работает?
@@ -265,10 +264,8 @@ privacy-directory-title = Каталог Gateway
 privacy-directory = Наш сервер читает каталог Gateway из Baylee Central и показывает его; о вас при этом ничего не используется. Gateway может сообщать Central, сколько игроков подключено в данный момент, сколько из них в партии, сколько у него открытых столов и партий, а Central считает свои аккаунты; сайт показывает эти числа. Это только количества, никогда не имена, и числа Gateway — собственное заявление его оператора.
 privacy-account-title = Ваш аккаунт
 privacy-account = Для аккаунта Baylee Central хранит: идентификатор вашего аккаунта, ваше имя для входа, ваше отображаемое имя с тегом, когда и как был создан аккаунт, запись пароля OPAQUE (позволяющую доказать знание пароля, так что наш сервер его не узнаёт), ваш мастер-ключ в двойном шифровании (вашим паролем и вашим кодом восстановления), ваш зашифрованный документ аккаунта и ваши зашифрованные объекты (для нас нечитаемые; мы видим только размер, ревизию и время), какую версию условий вы приняли и когда, время вашего последнего входа, ваши сеансы, роль администратора, если она у вас есть, и Gateway, которые вы регистрируете, с их токенами. Другие игроки видят ваше отображаемое имя и тег, но не имя для входа. Если администратор выдаёт вам код сброса, мы храним только его дайджест, пока код не использован или не истёк. Действия администраторов с аккаунтом или Gateway записываются в журнал на три года (кто, что, какой аккаунт или Gateway, когда). Правовое основание: ст. 6(1)(b) GDPR (аккаунт, о котором вы просили); для времени последнего входа и журнала — ст. 6(1)(f) GDPR (наш законный интерес в безопасной и отслеживаемой работе). Без имени для входа и пароля аккаунта нет; адрес электронной почты не нужен. Создать аккаунт можно с 16 лет. Хранится, пока вы не удалите аккаунт; затем он сразу удаляется из работающей системы, а из резервных копий — не позднее чем через 12 месяцев. Сеансы заканчиваются через 30 минут без использования и не позднее чем через 12 часов после входа.
-# English for now: to be translated.
-privacy-email-title = E-mail address
-# English for now: to be translated.
-privacy-email = An e-mail address is optional; an account needs none. If you give one, Baylee Central stores the address and whether and when you confirmed it. Of every code we mail, we store only a digest, until the code is used or has expired. We use the address for three things: to send the code that confirms it, to send a reset code when you ask for one, and to tell the old address when it is replaced or removed. The mail is sent by Baylee's own mail service on the same server through mailbox.org (Heinlein Hosting GmbH, Berlin), which acts as a processor. Legal basis: Art. 6(1)(b) GDPR (the account you asked for). Kept until you remove the address or delete the account.
+privacy-email-title = Адрес электронной почты
+privacy-email = Адрес электронной почты необязателен; аккаунту он не нужен. Если вы его указываете, Baylee Central хранит адрес, язык, на котором пишутся его письма, и время, когда вы его подтвердили. Названный вами адрес, который ждёт своего кода, хранится, пока вы не подтвердите или не отзовёте его, и не дольше суток после истечения срока его кода. От каждого отправленного кода мы храним только дайджест, пока код не использован или не истёк, а в течение 24 часов — время, когда вам отправлялись коды сброса, чтобы в сутки уходило не больше трёх. Адрес мы используем для трёх целей: чтобы отправить код, который его подтверждает; чтобы отправить код сброса, когда вы или любой, кто знает ваше имя для входа, его запросит; и чтобы сообщить старому адресу, что он заменён или удалён. Письмо отправляет собственная почтовая служба Baylee на том же сервере через mailbox.org (Heinlein Hosting GmbH, Berlin), которая действует как обработчик и получает адрес и письмо. Правовое основание: ст. 6(1)(b) GDPR (аккаунт, о котором вы просили). Хранится, пока вы не удалите адрес или аккаунт.
 privacy-cookie-title = Cookie сеанса
 privacy-cookie = Вход устанавливает одну cookie, <code>__Host-central</code>: случайное число, которое идентифицирует ваш сеанс. Она отправляется только на baylee.app, не читается скриптами и заканчивается вместе с сеансом, не позднее чем через 12 часов. Она строго необходима, чтобы вы оставались в системе; согласия не требует. Правовое основание: § 25(2) № 2 TDDDG и ст. 6(1)(b) GDPR.
 privacy-chat-title = Чат и контакты
@@ -282,7 +279,7 @@ privacy-contact = Форма отправляет ваше сообщение, �
 privacy-impressum-title = Головоломка правовой информации
 privacy-impressum = Правовая информация показывается только после того, как ваш браузер решит головоломку; это защищает адрес от программ, собирающих адреса. Головоломка состоит из случайных чисел и ничего о вас не содержит. Для этого сервис обратной связи хранит только в памяти, никогда не на диске и никогда в журнале: сколько головоломок запросил ваш IP-адрес (в течение одного часа; адрес IPv6 — по его первой половине), переходил ли он по ссылке, скрытой от людей (в течение 24 часов), и какие головоломки решены (в течение пяти минут, без адреса). Три ответа «да» или «нет» о вашем браузере задают сложность головоломки и не сохраняются: управляет ли им программа, не называет ли он ни одного языка и рисует ли он без видеокарты. Никому не отказывают; браузер, похожий на программу, получает более долгую головоломку. Правовое основание: ст. 6(1)(f) GDPR (наш законный интерес в защите адреса частного лица).
 privacy-recipients-title = Получатели и страны
-privacy-recipients = Мы не продаём данные и не передаём их для рекламы. Получатели: netcup GmbH (хостинг в Германии, как обработчик по ст. 28 GDPR); администраторы Baylee Central, которые для администрирования видят ваше имя для входа, ваше отображаемое имя с тегом, происхождение, создание и последний вход вашего аккаунта и ваши Gateway, но никогда — ваши зашифрованные данные; Gateway, на который вы входите со своим аккаунтом (он получает идентификатор вашего аккаунта, отображаемое имя и тег, но не пароль); ваши контакты и участники ваших групп (отображаемое имя, тег и ваши сообщения); органы власти — только там, где нас обязывает закон. Страны за пределами Европейского экономического пространства: только при включении уведомлений через push-сервис вашего браузера (Google, Mozilla или Apple, США). Gateway, которые ведут другие, могут находиться в любой стране; входить ли туда, решаете вы. В остальном мы не передаём данные в страны за пределами Европейского экономического пространства.
+privacy-recipients = Мы не продаём данные и не передаём их для рекламы. Получатели: netcup GmbH (хостинг в Германии, как обработчик по ст. 28 GDPR); mailbox.org (Heinlein Hosting GmbH, Berlin), доставляющая письма на указанный вами адрес электронной почты, как обработчик; администраторы Baylee Central, которые для администрирования видят ваше имя для входа, ваше отображаемое имя с тегом, происхождение, создание и последний вход вашего аккаунта и ваши Gateway, но никогда — ваши зашифрованные данные; Gateway, на который вы входите со своим аккаунтом (он получает идентификатор вашего аккаунта, отображаемое имя и тег, но не пароль); ваши контакты и участники ваших групп (отображаемое имя, тег и ваши сообщения); органы власти — только там, где нас обязывает закон. Страны за пределами Европейского экономического пространства: только при включении уведомлений через push-сервис вашего браузера (Google, Mozilla или Apple, США). Gateway, которые ведут другие, могут находиться в любой стране; входить ли туда, решаете вы. В остальном мы не передаём данные в страны за пределами Европейского экономического пространства.
 privacy-rights-title = Ваши права
 privacy-rights = Вы имеете право на доступ (ст. 15 GDPR), исправление (ст. 16), удаление (ст. 17), ограничение обработки (ст. 18) и переносимость данных (ст. 20). Вы можете в любое время возразить, по причинам, связанным с вашей конкретной ситуацией, против обработки, основанной на наших законных интересах по ст. 6(1)(f) (ст. 21). Вы можете в любое время отозвать согласие на будущее (ст. 7(3)). Данные вашего аккаунта можно экспортировать, а аккаунт удалить в настройках аккаунта; во всех остальных случаях достаточно сообщения через форму связи или на адрес из правовой информации. Вы вправе подать жалобу в надзорный орган по защите данных (ст. 77), например в тот, что находится по месту вашего жительства, или земельному уполномоченному по защите данных и свободе информации Северного Рейна — Вестфалии. Никакой закон и никакой договор не обязывают вас передавать нам данные; однако без имени для входа и пароля аккаунта нет. Автоматизированного принятия решений и профилирования нет (ст. 22).
 privacy-objection-title = Ваше право на возражение
@@ -504,12 +501,10 @@ code-copy-failed = Здесь скопировать не получилось. 
 ## Setting a new password with a reset code
 
 reset-title = Задать новый пароль
-# English for now: to be translated.
-reset-lead = For when you forgot your password: with a reset code you set a new one here. The code comes by e-mail to your confirmed address, or from an administrator.
+reset-lead = На случай, если вы забыли пароль: с кодом сброса вы задаёте здесь новый. Код приходит по электронной почте на ваш подтверждённый адрес или от администратора.
 reset-noscript = Чтобы задать новый пароль, нужен JavaScript: ваш пароль и ваш код восстановления обрабатываются в вашем браузере и никогда не отправляются нам.
 reset-code = Код сброса
-# English for now: to be translated.
-reset-code-hint = By e-mail or from an administrator. It starts with RESET and works once: for one hour if it came by e-mail, for 24 hours if an administrator made it.
+reset-code-hint = По электронной почте или от администратора. Начинается с RESET и действует один раз: один час, если пришёл по почте, и 24 часа, если его создал администратор.
 reset-data = Ваши зашифрованные данные
 reset-keep = У меня есть код восстановления. Мои данные сохранятся.
 reset-new = У меня его нет. Начать с пустым хранилищем.
@@ -531,24 +526,15 @@ reset-unsure-title = Ответ не пришёл
 reset-unsure = Соединение оборвалось раньше, чем ответил Baylee Central, поэтому мы не можем сказать, был ли задан ваш новый пароль. Попробуйте войти с ним. Если не получится, ничего не изменилось: ваш код сброса по-прежнему действует, введите его здесь снова.
 reset-unsure-code = Если ваш новый пароль работает, это ваш новый код восстановления, а старый больше не действует; его нельзя показать повторно, поэтому сохраните его сейчас. Если ваш новый пароль не работает, этот код ничего не стоит.
 reset-to-signin = Войти
-# English for now: to be translated.
-reset-mail-title = No reset code?
-# English for now: to be translated.
-reset-mail-lead = Enter your sign-in name. If your account has a confirmed e-mail address, we send a reset code to it.
-# English for now: to be translated.
-reset-mail-name-hint = The name you sign in with, not your e-mail address.
-# English for now: to be translated.
-reset-mail-submit = Send a code by e-mail
-# English for now: to be translated.
-reset-mail-error-name = That is not a sign-in name. Enter the name you sign in with, not your e-mail address.
-# English for now: to be translated.
-reset-mail-sent = If this account has a confirmed e-mail address, a reset code is on its way to it. It is valid for one hour.
-# English for now: to be translated.
-reset-mail-busy = Too many requests for now. Try again later.
-# English for now: to be translated.
-reset-mail-none = This server sends no mail. Ask an administrator for a reset code.
-# English for now: to be translated.
-reset-mail-early = That was too quick. Try again in a moment.
+reset-mail-title = Нет кода сброса?
+reset-mail-lead = Введите имя для входа. Если у вашего аккаунта есть подтверждённый адрес электронной почты, мы отправим на него код сброса.
+reset-mail-name-hint = Имя, с которым вы входите, а не адрес электронной почты.
+reset-mail-submit = Отправить код по почте
+reset-mail-error-name = Это не имя для входа. Введите имя, с которым вы входите, а не адрес электронной почты.
+reset-mail-sent = Если у этого аккаунта есть подтверждённый адрес электронной почты, код сброса уже отправлен на него. Он действует один час.
+reset-mail-busy = Пока слишком много запросов. Повторите позже.
+reset-mail-none = Этот сервер не отправляет почту. Попросите код сброса у администратора.
+reset-mail-early = Слишком быстро. Повторите чуть позже.
 
 ## Changing the password
 
@@ -563,81 +549,44 @@ password-unsure = Ответ не пришёл, поэтому мы не мож�
 
 ## An account's e-mail address
 
-# English for now: to be translated.
-email-title = E-mail address
-# English for now: to be translated.
-email-lead = An e-mail address is optional. We use it to send you a reset code when you ask for one, and to tell you when the address is replaced or removed.
-# English for now: to be translated.
-email-warning = Whoever can read this mailbox can reset your sign-in. Your encrypted data survives a reset only with your recovery code.
-# English for now: to be translated.
-email-no-mail = This server sends no mail, so an e-mail address cannot be set or confirmed here.
-# English for now: to be translated.
-email-unavailable = The e-mail address cannot be shown right now.
-# English for now: to be translated.
-email-password-hint = Your current password, so that nobody else at this browser decides who can reset your sign-in.
-# English for now: to be translated.
-email-submit = Send confirmation code
-# English for now: to be translated.
-email-missing = Enter an e-mail address and your password.
-# English for now: to be translated.
-email-error-address = We cannot write to this address. Enter one plain address such as name@example.org; accented letters and umlauts do not work.
-# English for now: to be translated.
-email-current = Your address
-# English for now: to be translated.
-email-confirmed-at = Confirmed
-# English for now: to be translated.
-email-waiting = Waits for its code
-# English for now: to be translated.
-email-change = Change
-# English for now: to be translated.
-email-change-lead = Your current address stays in use until you have confirmed the new one.
-# English for now: to be translated.
-email-change-cancel = Keep the current address
-# English for now: to be translated.
-email-remove = Remove
-# English for now: to be translated.
-email-remove-ask = Remove this address? We tell the address that it was removed. After that you can no longer get a reset code by e-mail.
-# English for now: to be translated.
-email-remove-ask-no-mail = Remove this address? While this server sends no mail, you cannot set one again.
-# English for now: to be translated.
-email-remove-confirm = Remove address
-# English for now: to be translated.
-email-remove-keep = Keep it
-# English for now: to be translated.
-email-pending = We sent a code to <code>{ $address }</code>. It is valid for 15 minutes.
-# English for now: to be translated.
-email-pending-keeps = Until you confirm it, <code>{ $address }</code> stays your address.
-# English for now: to be translated.
-email-code = Confirmation code
-# English for now: to be translated.
-email-code-hint = Eight characters, as in XXXX-XXXX. Upper or lower case, with or without the hyphen.
-# English for now: to be translated.
-email-confirm = Confirm
-# English for now: to be translated.
-email-resend = Send again
-# English for now: to be translated.
-email-other = Use another address
-# English for now: to be translated.
-email-withdraw = Withdraw
-# English for now: to be translated.
-email-error-code = That is not a confirmation code. It has eight characters, as in XXXX-XXXX.
-# English for now: to be translated.
-email-wrong-code = That code is not right. Check it and try again. After several wrong codes you have to enter the address again.
-email-code-dropped = That code was not right either, so the address no longer waits. Enter it again to get a new code.
-# English for now: to be translated.
-email-now-confirmed = Your e-mail address is confirmed.
-# English for now: to be translated.
-email-resent = A new code is on its way. The earlier one no longer works.
-# English for now: to be translated.
-email-withdrawn = The address is withdrawn. No code is waited for any more.
-# English for now: to be translated.
-email-removed = Your e-mail address is removed.
-# English for now: to be translated.
-email-busy = Too many mails for now. Try again later.
-# English for now: to be translated.
-email-same = This is your address already.
-# English for now: to be translated.
-email-unsure = No answer came back, so we cannot tell whether that went through. Look at what is shown here, and try again if it did not.
+email-title = Адрес электронной почты
+email-lead = Адрес электронной почты необязателен. Мы используем его, чтобы отправить вам код сброса по вашему запросу и сообщить, когда адрес заменён или удалён.
+email-warning = Любой, кто может читать этот почтовый ящик, может сбросить вход в ваш аккаунт. Ваши зашифрованные данные переживут сброс только при наличии кода восстановления.
+email-no-mail = Этот сервер не отправляет почту, поэтому адрес электронной почты здесь нельзя ни задать, ни подтвердить.
+email-unavailable = Адрес электронной почты сейчас нельзя показать.
+email-password-hint = Ваш текущий пароль — чтобы никто другой за этим браузером не решал, кто может сбросить вход в ваш аккаунт.
+email-submit = Отправить код подтверждения
+email-missing = Введите адрес электронной почты и пароль.
+email-error-address = Мы не можем писать на этот адрес. Введите один обычный адрес, например name@example.org; буквы с диакритическими знаками и умляуты не подходят.
+email-current = Ваш адрес
+email-confirmed-at = Подтверждён
+email-waiting = Ждёт кода
+email-change = Изменить
+email-change-lead = Текущий адрес остаётся в силе, пока вы не подтвердите новый.
+email-change-cancel = Оставить текущий адрес
+email-remove = Удалить
+email-remove-ask = Удалить этот адрес? Мы сообщим на этот адрес, что он удалён. После этого вы больше не сможете получать код сброса по почте.
+email-remove-ask-no-mail = Удалить этот адрес? Пока этот сервер не отправляет почту, задать адрес снова вы не сможете.
+email-remove-confirm = Удалить адрес
+email-remove-keep = Оставить
+email-pending = Мы отправили код на <code>{ $address }</code>. Он действует 15 минут.
+email-pending-keeps = Пока вы его не подтвердите, вашим адресом остаётся <code>{ $address }</code>.
+email-code = Код подтверждения
+email-code-hint = Восемь символов, как в XXXX-XXXX. В верхнем или нижнем регистре, с дефисом или без.
+email-confirm = Подтвердить
+email-resend = Отправить снова
+email-other = Другой адрес
+email-withdraw = Отозвать
+email-error-code = Это не код подтверждения. В нём восемь символов, как в XXXX-XXXX.
+email-wrong-code = Код неверный. Проверьте его и попробуйте ещё раз. После нескольких неверных кодов адрес придётся ввести заново.
+email-code-dropped = И этот код был неверным, поэтому адрес больше не ждёт кода. Введите его снова, чтобы получить новый код.
+email-now-confirmed = Ваш адрес электронной почты подтверждён.
+email-resent = Новый код уже отправлен. Прежний больше не действует.
+email-withdrawn = Адрес отозван. Никакой код больше не ожидается.
+email-removed = Ваш адрес электронной почты удалён.
+email-busy = Пока слишком много писем. Повторите позже.
+email-same = Это уже ваш адрес.
+email-unsure = Ответ не пришёл, поэтому мы не можем сказать, удалось ли это. Посмотрите на то, что показано здесь, и попробуйте ещё раз, если не удалось.
 
 ## Central's terms
 
@@ -704,8 +653,7 @@ privacy-export-title = Экспорт ваших данных
 privacy-export-lead = Что Baylee Central знает о вашем аккаунте, в виде файла JSON: его основные данные, сеансы, принятые условия, ваши Gateway и записи журнала аудита, называющие ваш аккаунт. Ваше зашифрованное содержимое может расшифровать и экспортировать только ваш клиент Baylee. Для экспорта нужен вход не старше 30 минут.
 privacy-export-make = Подготовить экспорт
 privacy-export-save = Сохранить экспорт
-# English for now: to be translated.
-privacy-export-no-email = The e-mail address could not be read; it is not in this file.
+privacy-export-no-email = Адрес электронной почты не удалось прочитать; его нет в этом файле.
 privacy-delete-title = Удаление аккаунта
 privacy-delete-lead = Ваш аккаунт, его данные, его сеансы, ваши контакты и принадлежащие вам Gateway сразу и навсегда удаляются из работающей системы; из резервных копий они исчезают не позднее чем через 12 месяцев. Central удаляет и отправленные вами сообщения; то, что другие уже сохранили на своих устройствах, может там остаться.
 privacy-delete-start = Удалить мой аккаунт

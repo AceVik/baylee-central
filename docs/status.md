@@ -329,8 +329,8 @@ The server side of [web accounts](web-accounts.md) lands in three PRs.
   valid one hour, never over an administrator's code that lasts, once in
   ten minutes and three times a day for an account, and mails it. It is
   redeemed with `ResetStart` and `ResetFinish`, unchanged. A new crate,
-  `central-mail`, writes the three mails (English and German; the other
-  nine languages hold the English text for now) and hands them to
+  `central-mail`, writes the three mails (English and German by hand; the
+  other nine languages by machine, unread by a speaker) and hands them to
   `baylee-mailer` over loopback HTTP. An optional `mail` block in the
   service's document; without it Central sends no mail and refuses what
   needs one. `central-client`: `Session::email` and `reset_mail`. No

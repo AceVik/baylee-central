@@ -182,9 +182,10 @@ the confirmation mail has none. Every value is escaped.
 
 The words are `id = text` lines in `crates/central-mail/locales/<lang>/mail.ftl`,
 one file for each of the site's eleven languages, read by a small parser of
-the crate's own. **English and German are written. The other nine files
-hold the English text for now** and say so in their first lines. A tag
-Central has no file for is written in English.
+the crate's own. English and German are written by hand; the other nine
+were translated by machine (12.11.2026, by the owner's instruction) and
+have not been read by a speaker. A test holds that every language has its
+own words. A tag Central has no file for is written in English.
 
 A code mail is in the language the request asked in. A notice is in the
 language the address was confirmed in.
