@@ -305,6 +305,10 @@ const SVG_ELEMENTS: usize = 20_000;
 /// centred square of its own size, rasterised straight at 256 × 256. No
 /// reference is resolved: images, fonts and files stay unloaded.
 pub(crate) fn svg(bytes: &[u8]) -> Result<Raster, Refusal> {
+    // An entity declared anywhere, even where the scan would not look.
+    if bytes.windows(8).any(|w| w == b"<!ENTITY") {
+        return Err(Refusal::Unsupported);
+    }
     use resvg::{tiny_skia, usvg};
     shallow(bytes)?;
     let options = usvg::Options {
@@ -364,9 +368,12 @@ fn shallow(bytes: &[u8]) -> Result<(), Refusal> {
         } else if rest.starts_with("<?") {
             skip_to(rest, "?>")
         } else if rest.starts_with("<!") {
-            // A declaration; an internal subset is skipped whole.
+            // A document type: an internal subset could declare entities,
+            // whose expansion no element or depth count here would see (a
+            // 25 KB file took 548 MiB in the review). None is needed for
+            // a picture, so any subset is refused.
             match (rest.find('['), rest.find('>')) {
-                (Some(open), Some(close)) if open < close => skip_to(rest, "]>"),
+                (Some(open), Some(close)) if open < close => return Err(Refusal::Unsupported),
                 _ => skip_to(rest, ">"),
             }
         } else if rest.starts_with("</") {

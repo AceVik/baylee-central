@@ -92,14 +92,13 @@ impl Ffmpeg {
         if !self.program.is_absolute() {
             return false;
         }
-        let Ok(mut child) = self
-            .command(Path::new("/"))
+        let mut command = self.command(Path::new("/"));
+        command
             .args(["-h", "encoder=libaom-av1"])
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
-            .stderr(Stdio::null())
-            .spawn()
-        else {
+            .stderr(Stdio::null());
+        let Some(mut child) = spawn(&mut command, deadline) else {
             return false;
         };
         let stdout = child.stdout.take();
@@ -141,14 +140,13 @@ impl Ffmpeg {
         let Some(scratch) = Scratch::new() else {
             return Attempt::Failed;
         };
-        let Ok(mut child) = self
-            .command(&scratch.0)
+        let mut command = self.command(&scratch.0);
+        command
             .args(arguments(moving, opaque, crf))
             .stdin(Stdio::piped())
             .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .spawn()
-        else {
+            .stderr(Stdio::null());
+        let Some(mut child) = spawn(&mut command, deadline) else {
             return Attempt::Failed;
         };
         let Some(mut stdin) = child.stdin.take() else {
@@ -303,6 +301,24 @@ fn checked(bytes: Vec<u8>, moving: &Animation, opaque: bool) -> Motion {
             Motion::Sequence(bytes)
         }
         _ => Motion::Failed,
+    }
+}
+
+/// Starts `command`, again while the program is busy being written
+/// ("text file busy": another thread's fork still held it open for
+/// writing, as a just-written script can be), until `deadline`.
+fn spawn(command: &mut Command, deadline: Instant) -> Option<Child> {
+    loop {
+        match command.spawn() {
+            Ok(child) => return Some(child),
+            Err(error)
+                if error.kind() == std::io::ErrorKind::ExecutableFileBusy
+                    && Instant::now() < deadline =>
+            {
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            Err(_) => return None,
+        }
     }
 }
 
