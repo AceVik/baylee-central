@@ -262,8 +262,11 @@ the footer links to the site.*
   `logo` flag ([configuration](#configuration)) the logo stands in the
   tile's place: the picture the mailer attaches (`src="cid:baylee-logo"`),
   48 × 48 CSS px with `width` and `height` set, rounded, `alt=""` since
-  the name stands beside it, and the name as high as the picture. Without
-  the flag the band is exactly as before.
+  the name stands beside it, and the name as high as the picture. Picture
+  and name are two cells of one table row, both set to the middle
+  (`valign` and `vertical-align`): mailbox.org showed a bare picture in the
+  tile's place above the name, and no reader stacks two cells of a row.
+  Without the flag the band is exactly as before.
 - **The title** is the mail's one heading (`h1`), in the serif at 26 px,
   with a short line in the accent (`#235b66`) under it. Then what happened,
   in paragraphs of 16 px. The reset mail sets the account's sign-in name
