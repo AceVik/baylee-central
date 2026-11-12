@@ -13,7 +13,8 @@ passes of [security assurance](security-assurance.md).
 
 An administrator, on the website (`AdminRequest::ResetLogin { account }`, a
 change: a password sign-in under 30 minutes, the audit event
-`account.reset_issued`), makes a **reset code** for an enrolled account
+`account.reset_issued`; on the new site the page below, "The
+administration's page"), makes a **reset code** for an enrolled account
 whose move is finished, after checking out of band that the person asking
 holds it. The answer `AdminAnswer::ResetCode { code, expires_at }` shows the
 code once; the administrator hands it over. Central keeps only its SHA-256
@@ -230,12 +231,74 @@ functions; no message changed.
   the code's hint name both origins and both lifetimes (one hour by mail,
   24 hours from an administrator).
 
+## The administration's page
+
+*Built 12.11.2026 (`crates/central-web`, `islands/admin.rs`; the record is
+in [security assurance](security-assurance.md), "The new site makes a reset
+code"). No request and no answer changed.* `/{lang}/account/admin`, a page
+of the account area under a language, so never Caddy's `/admin*` of the old
+build: not indexed, in no sitemap and in no navigation. The server renders
+the same frame for everyone; the page's island asks `AccountSummary`, and
+only for an account with the role does it show anything or ask Central
+anything more. Anyone else gets one sentence and the way back, and nothing
+is asked. The overview links to it for an administrator only, beside the
+link to the old build's administration.
+
+- **Find, open, warn, prove, make.** The search is `Accounts { query,
+  before }`, checked first with `AccountQuery::parse` (a search Central
+  would refuse is said and not sent; nothing typed lists every account), 50
+  a page with "Show more" after the last one shown. Each account shows what
+  the list gives: sign-in name, handle, state, where it came from, created,
+  last sign-in, and the expiry of an outstanding code. "Open" reads
+  `Account { account }` afresh, which alone says whether it has a recovery
+  code. "Reset login" shows the warning; "I have checked who is asking"
+  shows the password's field; its submit signs in once more in a Worker
+  that is ended at once (`password::sign_in_again`, as the e-mail
+  address's form does), checks that the session is still the account the
+  page was opened as, and only then sends `ResetLogin`. Nothing is sent
+  between "Open" and the password's submit.
+- **The warning** says: check outside the site that the person asking holds
+  the account, since whoever has the code can set a new password; issuing
+  ends nothing (the old password works until the code is used, every
+  device stays signed in); the data survives only with the recovery code or
+  on a device still signed in; a new code replaces any earlier one, a
+  mailed one included, and lasts 24 hours, once; a code answers a forgotten
+  password, not a taken-over account.
+- **The code** is shown once, with "Shown only now", its expiry, a copy
+  button, and the sentence that neither Central nor the page can show it
+  again. It is held by that step alone as a `ResetCode` (which wipes its
+  bytes when dropped) and goes when the step is left: by "Done", by leaving
+  the page, or by `pagehide` (another page, the back-forward cache). It is
+  in no address, no storage, no log, no field and no request.
+- **What a refusal says.** Central refuses every code it does not make with
+  the same `Rejected`. What the row already says is said instead of the
+  button, before anything is asked: an administrator's account (the role
+  goes first), one's own, a pending account, a moved account not in use
+  (its move cannot be closed: migration 000005 requires a closed move to be
+  restored). After a refusal the page asks what stands now:
+  `AccountSummary` (no session: the area says so; no role: "no longer an
+  administrator") and the account read again (gone; became an
+  administrator's; or, for a moved account in use whose move Central has
+  not closed, which no answer shows, the unfinished move while the sign-in
+  is fresh by the browser's clock). What is left is a sign-in Central
+  counts as older than 30 minutes. `Busy`, `Forbidden` and `Conflict` are
+  said in the forms' shared words.
+- **A lost answer is neither.** When the answer to `ResetLogin` does not
+  arrive (no network, a 5xx, an answer of another shape), the page says
+  that it cannot tell whether a code was made, that such a code cannot be
+  shown again and already replaced any earlier one, and that a new one
+  replaces it in turn; it reads the account again, which shows an
+  outstanding code's expiry if one stands.
+- *Departure, on purpose:* the list does not say whether an account has a
+  recovery code. `AdminAccount` does not carry it; one `Account` read per
+  row would be 50 requests a page. The page reads it when an account is
+  opened, before the warning, so that the warning and the password's step
+  send nothing.
+
 ## What the clients need
 
-- Website: the page above. Open: a way to ask for a code by mail on that
-  page, and the new site's administration with "Reset
-  login" and its warning text. Until then the new site has no page that
-  issues a code; the old build's admin page (`web/`) does, where that
-  build is still served under `/admin`.
+- Website: the reset page and the administration's page above. The rest of
+  the administration is still the old build's (`web/`), where that build is
+  served under `/admin`.
 - M6 (Baylee client): the same choice; a signed-in client offers "keep my
   data" through `Session::redeem_reset`.
