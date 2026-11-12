@@ -611,6 +611,36 @@ fn bar(page: Page, cx: &Context<'_>) -> impl IntoView + use<> {
     }
 }
 
+/// The footer's way home: Baylee's BIMI mark and the sunlight wordmark.
+fn foot_logo(lang: Lang, assets: &Assets) -> impl IntoView + use<> {
+    let wordmark = assets.url("img/logo-480.webp");
+    view! {
+        <a class="foot-logo-link" href=Page::Home.path(lang) aria-label=words::site_name(lang)>
+            // The BIMI mark, the very file mail providers fetch
+            // (`/bimi/baylee.svg`), shown on every page: a mark
+            // certificate asks that it was public on the domain
+            // for a year. Not lazy, so that archives take it.
+            <img
+                class="foot-mark"
+                src="/bimi/baylee.svg"
+                width="72"
+                height="72"
+                alt="Baylee"
+                decoding="async"
+            />
+            <img
+                class="foot-logo"
+                src=wordmark
+                width="480"
+                height="200"
+                alt=""
+                loading="lazy"
+                decoding="async"
+            />
+        </a>
+    }
+}
+
 fn footer(page: Page, cx: &Context<'_>) -> impl IntoView + use<> {
     let lang = cx.lang;
     let assets = cx.assets;
@@ -640,29 +670,7 @@ fn footer(page: Page, cx: &Context<'_>) -> impl IntoView + use<> {
             <div class="foot-inner">
                 <div class="foot-top">
                     <div class="foot-brand">
-                        <a class="foot-logo-link" href=Page::Home.path(lang) aria-label=words::site_name(lang)>
-                            // The BIMI mark, the very file mail providers fetch
-                            // (`/bimi/baylee.svg`), shown on every page: a mark
-                            // certificate asks that it was public on the domain
-                            // for a year. Not lazy, so that archives take it.
-                            <img
-                                class="foot-mark"
-                                src="/bimi/baylee.svg"
-                                width="72"
-                                height="72"
-                                alt="Baylee"
-                                decoding="async"
-                            />
-                            <img
-                                class="foot-logo"
-                                src=assets.url("img/logo-480.webp")
-                                width="480"
-                                height="200"
-                                alt=""
-                                loading="lazy"
-                                decoding="async"
-                            />
-                        </a>
+                        {foot_logo(lang, assets)}
                         <p class="dedication">{words::foot_dedication(lang)}</p>
                         <p class="foot-summary">{words::foot_summary(lang)}</p>
                         <div class="foot-social">
