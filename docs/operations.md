@@ -1493,9 +1493,10 @@ is served on both listeners since 28.10.2026 ([native login](native-login.md)
 12.11.2026 (the account area's security section) and none in the client yet.
 A reset with an administrator's code is served on both listeners since
 28.10.2026 ([account reset](account-reset.md)) and has its page on the
-website since 12.11.2026 (`/{lang}/reset`). The new site has no page that
-issues the code yet: the old build's admin page does, where it is still
-served (`handle /admin*`, above). A reset code by mail is served on both
+website since 12.11.2026 (`/{lang}/reset`). An administrator makes the
+code on the new site's `/{lang}/account/admin` since 12.11.2026, or on the
+old build's admin page where that is still served (`handle /admin*`,
+above). A reset code by mail is served on both
 listeners since migration 000026, where the `mail` block is configured
 ([mail](#mail)), and the website's reset page asks for it. Central mails
 30 reset codes an hour for all accounts together, counted in memory when a
