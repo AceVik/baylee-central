@@ -684,6 +684,17 @@ async fn blocks(
             .iter()
             .any(|r| r.state == PictureReportState::Gone)
     );
+    // the same picture back (same digest): its gone report is open again
+    set(store, owner, *owner_id, 10, 80).await.unwrap();
+    assert!(
+        store
+            .my_picture_reports(viewer)
+            .await
+            .unwrap()
+            .iter()
+            .any(|r| r.state == PictureReportState::Open),
+        "reopened"
+    );
 }
 
 /// The runtime cannot delete a report, rewrite its words or move a picture
