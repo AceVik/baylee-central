@@ -65,8 +65,7 @@ hero-offline = 单人对局和套牌构筑器无需账号，离线也能用。�
 hero-account = 想在线游玩？<register>创建账号</register>，公开测试期间免费，人人都可以注册；或者<signin>登录</signin>。
 hero-memorial = 缅怀 Baylee：打开她的相册
 
-# English for now: to be translated.
-status-label = Baylee in numbers
+status-label = Baylee 数据一览
 
 cards-eyebrow = 牌张
 cards-title = Baylee 认识多少张牌
@@ -109,7 +108,7 @@ open-central = GitHub 上的 Baylee Central
 
 ## Download
 
-dl-prerelease = Beta
+dl-prerelease = 测试版
 dl-for = 下载{ $system }版
 dl-size = { $size } MB
 dl-checksum = SHA-256
@@ -257,8 +256,7 @@ privacy-views-title = 统计页面浏览量
 privacy-views = 本站会统计其页面被打开的次数：所有页面、所有访客合在一起只有一个数字，显示在起始页面上。在浏览器中打开一个页面，就会使它加一。为此不会存储任何关于你的信息：没有 IP 地址，没有 Cookie，没有标识符，也不存储是哪个页面。
 privacy-device-title = 你的浏览器保存什么
 privacy-device = 在你登录之前，本站不设置任何 Cookie。你的浏览器会在你的设备上保存以下内容，并且仅在启用 JavaScript 时：如果你做过选择，则保存你的配色选择（<code>baylee-site-theme</code>）；在你登录期间，保存会话何时结束（<code>baylee-central-session</code>）、你的聊天密钥以及联系人的受信任密钥（见“聊天”）；如果你开启了通知，则保存本设备的一个随机数（<code>baylee-push-installation-v1</code>、<code>baylee-push</code>）；并且，仅当你已登录、将本站安装为应用或开启了通知时，保存本站公开文件（页面外壳、字体、脚本）的一份副本，使本站无需网络连接即可启动，也使通知能够送达。如果这三种情况都不再适用，该副本会在你下次打开本站时被移除。除非下文某一节另有说明，这些内容都不会发送给我们。聊天和会话相关的条目会在你退出登录时删除；其余所有内容，你可以通过清除浏览器中本站的数据来移除。法律依据：TDDDG 第 25 条第 2 款第 2 项（对你所使用的功能而言是严格必需的）；对于通知所用的随机数，则是你的同意（TDDDG 第 25 条第 1 款）。
-# English for now: to be translated.
-privacy-device-manager = If you keep your recovery code in your browser's password manager, mail it to yourself, save it as a file or print it on the step that shows it, your browser, your mail program, your files or your paper keep it, never this site: the code is made in your browser and never sent to us. Clearing the site's data does not remove it from there.
+privacy-device-manager = 如果你在显示恢复码的那一步，把恢复码保存在浏览器的密码管理器中、用邮件发给自己、存成文件或打印出来，那么保管它的是你的浏览器、你的邮件程序、你的文件或你的纸张，而不是本站：这个码在你的浏览器中生成，绝不会发送给我们。清除本站的数据并不会把它从那些地方移除。
 privacy-github-title = GitHub
 privacy-github = 下载页面和起始页面会显示最新版本、测试状态和牌张数字。是我们的服务器向 GitHub 请求这些信息，而不是你的浏览器；GitHub 不会因此得知任何关于你的信息。只有当你点击下载链接或 GitHub 链接时，你的浏览器才会连接到 GitHub（GitHub, Inc.，美国），并向它发送你的 IP 地址以及每个请求都带有的信息；此后适用 GitHub 自己的隐私声明。
 privacy-directory-title = Gateway 目录
@@ -498,24 +496,23 @@ code-later = 暂不
 code-copy = 复制
 code-copied = 已复制。
 code-copy-failed = 这里无法复制。请选中代码，手动复制。
-# English for now: to be translated.
-code-print = Print
-code-manager = Save in password manager
-code-manager-id = Baylee recovery code ({ $name })
-code-manager-offered = Your browser was offered the code. If it asked you, check that it saved it.
-code-manager-failed = Your browser did not take the code. Keep it another way.
-code-mail = Mail it to myself
-code-mail-warning = Careful: the code then lies in your mailbox. Whoever can read your mail can also have a reset code sent there, and with both reset your sign-in and open your encrypted data.
-code-mail-subject = My Baylee recovery code
-code-sheet-title = Baylee recovery code
-code-sheet-name = Sign-in name: { $name }
-code-sheet-what = With this code your encrypted Baylee data survives a forgotten password: you enter it on the reset page, together with a reset code.
-code-sheet-keep = Keep it where only you can reach it. Nobody at Baylee will ever ask you for it.
-code-email-label = E-mail address (optional)
-code-email-hint = For a reset code if you forget your password. After this step we mail a code to confirm the address; you can also add one later in your account.
-code-email-step-title = Confirm your e-mail address
-code-email-step-lead = Enter the code from the mail here, or later on your account's security page.
-code-email-step-done = Continue to your account
+code-print = 打印
+code-manager = 保存到密码管理器
+code-manager-id = Baylee 恢复码（{ $name }）
+code-manager-offered = 已向你的浏览器提供这个码。如果它询问过你，请检查它是否已保存。
+code-manager-failed = 你的浏览器没有接收这个码。请用其他方式保存。
+code-mail = 发邮件给自己
+code-mail-warning = 注意：这样这个码就会留在你的邮箱里。能读你邮件的人，也能让人把重置码发到那里，凭这两样就能重置你的登录并打开你的加密数据。
+code-mail-subject = 我的 Baylee 恢复码
+code-sheet-title = Baylee 恢复码
+code-sheet-name = 登录名：{ $name }
+code-sheet-what = 有了这个码，即使忘记密码，你的 Baylee 加密数据也能保留：你在重置页面把它和重置码一起输入。
+code-sheet-keep = 请保存在只有你能拿到的地方。Baylee 的任何人都不会向你索要它。
+code-email-label = 电子邮件地址（选填）
+code-email-hint = 用于在你忘记密码时获得重置码。这一步之后，我们会发一个码来确认该地址；你也可以稍后在账号中添加。
+code-email-step-title = 确认你的电子邮件地址
+code-email-step-lead = 在这里输入邮件中的码，或稍后在你账号的安全页面输入。
+code-email-step-done = 继续前往你的账号
 
 ## Setting a new password with a reset code
 
@@ -606,8 +603,7 @@ email-removed = 你的电子邮件地址已移除。
 email-busy = 目前邮件过多。请稍后再试。
 email-same = 这已经是你的地址了。
 email-unsure = 没有收到回应，所以我们无法确定刚才的操作是否成功。请看一下这里显示的内容；如果没有成功，请再试一次。
-# English for now: to be translated.
-email-again = To send the code, enter your password once more.
+email-again = 要发送这个码，请再输入一次你的密码。
 
 ## Central's terms
 
@@ -1003,8 +999,7 @@ ai-training = 除了内置 AI 和外部 LLM 桥接之外，一个专门的 Bayle
 ai-hostingLink = Gateway 托管与 LLM 设置
 
 # The gateways and the contact page, as the old site wrote them (owner, 11.11.2026)
-# English for now: to be translated.
-gw-lead = A gateway is a server where online tables live: accounts, decks, rooms and one engine process per game. These are the ones registered with Baylee Central and approved by its administrator. Each is run by its operators for their groups, and their own rules apply there. A listing is not a promise about what a gateway does.
+gw-lead = Gateway 是在线牌桌所在的服务器：账号、套牌、房间，以及每局对局一个引擎进程。这里列出的是已在 Baylee Central 注册并经其管理员批准的 Gateway。每个 Gateway 由其运营者为他们的群组运行，适用他们自己的规则。列入目录不代表对该 Gateway 的做法作出任何承诺。
 gw-howTo = 要在某个 Gateway 上游玩，请把它的地址复制到客户端的入口处。在线是指 Central 在最近一分半钟内收到过该 Gateway 的消息；这并不保证它会响应。名称和版本由各运营者自行报告。
 gw-find = 查找 Gateway
 gw-findHint = 名称或地址
@@ -1212,52 +1207,51 @@ sec-teaser-more = 在图示中查看每一步
 register-solving = 你的浏览器正在解一道把机器人挡在外面的谜题。创建账号的人很多时，这可能需要几分钟 … { $percent } %
 
 ## An administrator makes a reset code (/account/admin)
-# English for now: to be translated.
-admin-reset-title = Reset a login
-admin-reset-lead = Find the account of the person who asked you, and make a reset code for it. With the code they set a new password on the reset page.
-admin-find = Find the account
-admin-only = This page is only for administrators.
-admin-search = Search accounts
-admin-search-hint = Part of a sign-in name or a display name, or # and a tag. Leave it empty to list every account, newest first.
-admin-search-submit = Search
-admin-search-error = A search is 1 to 64 plain characters without accents, or # and a tag such as #1a2b.
-admin-count = Accounts shown: { $count }
-admin-none = No account matches this search.
-admin-more = Show more
-admin-open = Open
-admin-back = Back
-admin-pill = Administrator
-admin-state = State
-admin-state-pending = Reserved, never set up
-admin-state-enrolled = Set up
-admin-state-restored = In use
-admin-created = Created
-admin-last-sign-in = Last sign-in
-admin-recovery = Recovery code
-admin-yes = Yes
-admin-no = No
-admin-reset-outstanding = An unused reset code is valid until { $time }. Whether an administrator made it or it went by e-mail, Central does not say. A new code replaces it.
-admin-reset = Reset login
-admin-refused-admin = This account holds the administrator role, and Central makes no reset code for an administrator's account. Remove the role first.
-admin-refused-own = This is your own account, and nobody makes a reset code for their own. Change your password under Security instead.
-admin-refused-pending = This account was reserved and never set up, so it has no sign-in to reset.
-admin-refused-moving = This account's move from the official gateway is not finished. Until it is, its sign-in is reset there, not here.
-admin-refused-stale = Baylee Central counts your sign-in as older than 30 minutes. Try again; you enter your password once more.
-admin-refused-role = Your account no longer holds the administrator role.
-admin-refused-gone = This account no longer exists.
-admin-switched = This browser is signed in as another account now, so no code was asked for. Load the page again.
-admin-lost = No answer came back, so we cannot tell whether a code was made. If one was, nobody can show it again, and it already replaced any earlier code. Make a new one: it replaces that one in turn.
-admin-warning-title = Before you make a code
-admin-warning-who = Check outside this site that the person asking really holds this account, for example by a call or on a channel you already know them by. Whoever has the code can set a new password.
-admin-warning-ends = Making a code ends nothing: the old password keeps working until the code is used, and every device stays signed in.
-admin-warning-data = The person's encrypted data survives the reset only with their recovery code or on a device that is still signed in. Without either, they start with an empty vault.
-admin-warning-replaces = A new code replaces any earlier one, one sent by e-mail included. It is valid for 24 hours and works once.
-admin-warning-takeover = A reset code answers a forgotten password, not a taken-over account: an intruder's sessions and the old password stay until the code is used, and for good if it never is.
-admin-warning-continue = I have checked who is asking
-admin-password-hint = Making a code needs a sign-in less than 30 minutes old, so you enter your password once more. It stays in this browser.
-admin-password-missing = Enter your password.
-admin-make = Make the reset code
-admin-code-title = The reset code
-admin-code-until = Valid until { $time }, and only once.
-admin-code-lead = Hand it to the person who asked, on a channel you trust. It is shown only now: neither Baylee Central nor this page can show it again. If it gets lost, make a new one.
-admin-code-done = Done
+admin-reset-title = 重置登录
+admin-reset-lead = 找到向你求助的人的账号，为它生成一个重置码。凭这个码，对方可以在重置页面设置新密码。
+admin-find = 查找账号
+admin-only = 此页面仅限管理员使用。
+admin-search = 搜索账号
+admin-search-hint = 登录名或显示名的一部分，或 # 加标签。留空则列出所有账号，最新的在前。
+admin-search-submit = 搜索
+admin-search-error = 搜索词为 1 到 64 个不带重音的普通字符，或 # 加标签，例如 #1a2b。
+admin-count = 显示的账号：{ $count }
+admin-none = 没有账号符合此搜索。
+admin-more = 显示更多
+admin-open = 打开
+admin-back = 返回
+admin-pill = 管理员
+admin-state = 状态
+admin-state-pending = 已保留，从未设置
+admin-state-enrolled = 已设置
+admin-state-restored = 使用中
+admin-created = 创建时间
+admin-last-sign-in = 上次登录
+admin-recovery = 恢复码
+admin-yes = 是
+admin-no = 否
+admin-reset-outstanding = 有一个未使用的重置码，有效期至 { $time }。它是管理员生成的，还是通过电子邮件发出的，Central 不会说明。新的码会取代它。
+admin-reset = 重置登录
+admin-refused-admin = 此账号拥有管理员角色，Central 不会为管理员的账号生成重置码。请先移除该角色。
+admin-refused-own = 这是你自己的账号，任何人都不能为自己生成重置码。请改在“安全”页面更改你的密码。
+admin-refused-pending = 此账号已被保留但从未设置，因此没有可重置的登录。
+admin-refused-moving = 此账号从官方 Gateway 的迁移尚未完成。在完成之前，它的登录要在那边重置，而不是在这里。
+admin-refused-stale = Baylee Central 认为你的登录已超过 30 分钟。请再试一次；你需要再输入一次密码。
+admin-refused-role = 你的账号不再拥有管理员角色。
+admin-refused-gone = 此账号已不存在。
+admin-switched = 此浏览器现在登录的是另一个账号，因此没有请求重置码。请重新加载页面。
+admin-lost = 没有收到回应，所以我们无法确定是否已生成重置码。如果已生成，任何人都无法再次显示它，而且它已经取代了之前的码。请再生成一个新的：它会取代那一个。
+admin-warning-title = 生成重置码之前
+admin-warning-who = 请在本站之外确认，来求助的人确实拥有这个账号，例如通过电话，或通过你已经认识对方的渠道。谁拿到这个码，谁就能设置新密码。
+admin-warning-ends = 生成重置码不会结束任何东西：在码被使用之前，旧密码仍然有效，所有设备也都保持登录。
+admin-warning-data = 此人的加密数据只有凭恢复码，或在仍保持登录的设备上，才能在重置后保留。两者都没有，对方就会从空保险库开始。
+admin-warning-replaces = 新的码会取代之前的任何码，包括通过电子邮件发出的。它的有效期为 24 小时，且只能使用一次。
+admin-warning-takeover = 重置码是为忘记密码而设的，不是为被接管的账号：入侵者的会话和旧密码会一直保留到码被使用；如果一直没有被使用，就永远保留。
+admin-warning-continue = 我已确认是谁在求助
+admin-password-hint = 生成重置码需要 30 分钟内的登录，所以你要再输入一次密码。它只留在此浏览器中。
+admin-password-missing = 请输入你的密码。
+admin-make = 生成重置码
+admin-code-title = 重置码
+admin-code-until = 有效期至 { $time }，且只能使用一次。
+admin-code-lead = 请通过你信任的渠道把它交给求助的人。它只在此刻显示：Baylee Central 和本页面都无法再次显示它。如果丢失了，请生成一个新的。
+admin-code-done = 完成

@@ -38,27 +38,25 @@ notice-check = 如果不是你本人操作的，请登录并查看你账号的�
 notice-link = 打开安全页面
 
 # The notices to the account's confirmed address that its login changed.
-# Not translated yet: English until a translation replaces these lines.
-reset-done-subject = The password of your Baylee account was reset
-reset-done-title = A new password was set
-reset-done-body = A reset code was used to set a new password for the Baylee account of this address.
-reset-done-kept = The account's data was kept.
-reset-done-new = The account starts with an empty vault. Its data from before cannot be opened any more.
-reset-done-sessions = The account is signed out everywhere: every session it had was ended.
-reset-done-not-you = If this was not you, someone else can sign in to your account now. Ask a Baylee administrator for a reset code and set your own password again.
-reset-done-recovery-kept = If the account has a recovery code, it still opens the data. Keep it: with it, a reset keeps the data.
-reset-done-recovery-new = A recovery code from before this reset opens nothing any more.
-password-subject = The password of your Baylee account was changed
-password-title = The password was changed
-password-body = The password of the Baylee account of this address was changed.
-password-sessions = Every other session of the account was signed out.
-password-not-you = If this was not you, someone else knows your password. Set a new one with a reset code: ask for one on the reset page, or ask a Baylee administrator.
-issued-subject = A reset code was made for your Baylee account
-issued-title = An administrator made a reset code
-issued-body = A Baylee administrator made a reset code for the Baylee account of this address. With it, a new password can be set for the account.
-issued-valid = The code works once, for { $hours } hours. Until it is used, your password works as it did.
-issued-not-you = If you did not ask for it, sign in and change your password on the security page: that ends the code. Then tell an administrator.
+reset-done-subject = 你的 Baylee 账号的密码已被重置
+reset-done-title = 已设置新密码
+reset-done-body = 有人用重置码为这个地址对应的 Baylee 账号设置了新密码。
+reset-done-kept = 账号的数据已保留。
+reset-done-new = 账号从空保险库开始。之前的数据已无法再打开。
+reset-done-sessions = 账号已在所有地方退出登录：它的每个会话都已结束。
+reset-done-not-you = 如果不是你本人操作的，现在别人可以登录你的账号。请向 Baylee 管理员索取重置码，再次设置你自己的密码。
+reset-done-recovery-kept = 如果账号有恢复码，它仍能打开数据。请保管好它：有了它，重置后数据会保留。
+reset-done-recovery-new = 这次重置之前的恢复码已无法打开任何东西。
+password-subject = 你的 Baylee 账号的密码已更改
+password-title = 密码已更改
+password-body = 这个地址对应的 Baylee 账号的密码已被更改。
+password-sessions = 账号的其他所有会话都已退出登录。
+password-not-you = 如果不是你本人操作的，说明别人知道你的密码。请用重置码设置新密码：在重置页面索取一个，或向 Baylee 管理员索取。
+issued-subject = 已为你的 Baylee 账号生成重置码
+issued-title = 管理员生成了重置码
+issued-body = Baylee 管理员为这个地址对应的 Baylee 账号生成了一个重置码。凭它可以为该账号设置新密码。
+issued-valid = 这个码只能使用一次，有效期为 { $hours } 小时。在它被使用之前，你的密码照常有效。
+issued-not-you = 如果不是你要求的，请登录并在安全页面更改你的密码：这会使该码失效。然后告诉管理员。
 
-# English for now: to be translated.
 # The confirmation mail's button, which opens the security page with the code filled in.
-confirm-link = Confirm address
+confirm-link = 确认地址
