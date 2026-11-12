@@ -25,6 +25,8 @@ const listener = Number(arg("listener", "47921"));
 const tls = arg("tls", "");
 const site = Number(arg("site", "0"));
 const LIMIT = 65_536;
+/** A profile picture's upload, as the Caddy block's own handle lets it through (docs/operations.md). */
+const PICTURE_LIMIT = 9 * 1024 * 1024;
 
 if (!(site > 0)) {
   process.stderr.write("front.ts needs --site <port>: the server-rendered site on 127.0.0.1\n");
@@ -34,15 +36,17 @@ if (!(site > 0)) {
 const server = createServer({ key: readFileSync(join(tls, "key.pem")), cert: readFileSync(join(tls, "cert.pem")) }, (req, res) => {
   const url = new URL(req.url ?? "/", "https://baylee.app");
   if (url.pathname.startsWith("/api/")) {
-    // request_body max_size 64KiB, then reverse_proxy 127.0.0.1:<listener>
+    // request_body max_size 64KiB (9MiB for a picture's upload), then
+    // reverse_proxy 127.0.0.1:<listener>
+    const limit = req.method === "PUT" && url.pathname === "/api/v1/picture" ? PICTURE_LIMIT : LIMIT;
     const chunks: Buffer[] = [];
     let size = 0;
     req.on("data", (chunk: Buffer) => {
       size += chunk.length;
-      if (size <= LIMIT) chunks.push(chunk);
+      if (size <= limit) chunks.push(chunk);
     });
     req.on("end", () => {
-      if (size > LIMIT) {
+      if (size > limit) {
         res.writeHead(413).end();
         return;
       }

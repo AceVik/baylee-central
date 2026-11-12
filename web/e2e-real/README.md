@@ -110,6 +110,40 @@ with `--keep`, writes each as `.txt` and `.html` (mode 0600) to look at.
 The spec accepts a mail with no image, or, where the request names
 `inline: ["baylee-logo"]`, exactly that one image by `cid:`.
 
+### Profile pictures (`site-picture.spec.ts`)
+
+The whole path of a picture: the browser prepares and sends it through
+`front.ts`, which lets `PUT /api/v1/picture` through up to 9 MiB as the
+Caddy block's own handle does (every other `/api/*` body stops at 64 KiB).
+Central hands it to the worker behind its socket and serves what it
+stores. A contact reports it from the chat, an administrator whom the
+operator appointed removes it with a reason, the person is told, and every
+file of the picture answers 404.
+
+Central's configuration names the socket
+(`"pictures": {"socket": "<absolute path>"}`; macOS allows about 104
+characters for it). `picture-socket.ts` stands in for systemd's socket
+activation: a worker for each connection, the connection as its input and
+output, two at a time.
+
+```bash
+node e2e-real/picture-socket.ts --socket /private/tmp/claude-501/bp/picture.sock -- \
+  docker run -i --rm --network none --read-only --tmpfs /tmp:rw,size=64m --memory 512m --pids-limit 32 \
+  -v <a Linux central-picture-worker>:/usr/local/bin/central-picture-worker:ro <an Ubuntu 26.04 image with ffmpeg> \
+  /usr/local/bin/central-picture-worker --ffmpeg /usr/bin/ffmpeg
+```
+
+The worker runs in a container because an animation needs ffmpeg with
+libaom, which Homebrew's ffmpeg lacks. The Linux worker is built in the
+pinned Rust image for the container's architecture. Without libaom, run
+the worker itself (`-- target/release/central-picture-worker --ffmpeg
+<ffmpeg>`) and set `REAL_PICTURE_SEQUENCE=0`: the animated GIF is then
+expected to be kept as its still.
+
+The spec registers three accounts per run: the person, a contact and the
+administrator, whom it appoints with `REAL_SERVICE` and `REAL_MIGRATE` as
+`site-reset.spec.ts` does. Start Central afresh before each project.
+
 ## Tearing down
 
 Stop `front.ts` and Central (SIGTERM; their ports must refuse), remove the
