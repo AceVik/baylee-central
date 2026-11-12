@@ -83,7 +83,7 @@ but without any UI or browser crypto:** `change_password_start/finish`,
 `session_status` (client exists, no caller). Their native implementations
 are in `central-client` (`password.rs`, `reset.rs`, `export.rs`,
 `deletion.rs`, `pairing.rs`). (This was the state before the rewrite; the
-new site has the password change and the reset since 12.11.2026, §15.)
+new site has the password change and the reset since 12.11.2026, §16.)
 
 ### 1.4 Browser crypto and the chat
 
@@ -768,7 +768,7 @@ address (staging).
 - **Not yet** (each needs new exports in `central-web-crypto`, i.e. a
   change to the committed, byte-checked module with its own review and the
   canonical rebuild): approving a pairing. The password change and the
-  reset with a reset code came on 12.11.2026 (§15). Notification settings
+  reset with a reset code came on 12.11.2026 (§16). Notification settings
   come with the PWA (phase 4).
 - **Tests**: unit tests of the form rules and term selection; server tests
   that every form and account page is an island page, `noindex`, one `h1`;
@@ -981,7 +981,7 @@ AVIF, behind the HTML, the stylesheet and three faces on simulated slow
   client's key, the approval proof), hence that module's own three-pass
   review and the canonical Linux rebuild.
 - Password change and reset on the website (new exports too): built on
-  12.11.2026, §15.
+  12.11.2026, §16.
 - The administration still comes from the old build (§11, Caddy `/admin*`).
 
 ## 14. As built: the owner's round of 11.11.2026
