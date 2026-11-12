@@ -45,6 +45,7 @@ type Mail = {
   html: string;
   ttl_secs?: number;
   limit_key?: string;
+  inline?: string[];
 };
 
 /** The mails the stand-in took for `to`, oldest first. */
@@ -76,14 +77,25 @@ async function newest(to: string, count: number): Promise<Mail> {
 }
 
 /**
- * What a mail may hold: no image (the logo is off here), no script, nothing
- * from elsewhere, links to the site Central names (its `mail` block's
- * `site`, here baylee.app as the browser sees it): the button's page and
- * the start page. A code only in the fragment of a code mail's button
- * (`#code=` and that mail's code), never before it.
+ * What a mail may hold: no image but the logo the mailer attaches, and that
+ * only where Central's `mail` block has `"logo": true` (then the request
+ * names it in `inline` and the HTML once as `cid:baylee-logo`); no script,
+ * nothing from elsewhere, links to the site Central names (its `mail`
+ * block's `site`, here baylee.app as the browser sees it): the button's
+ * page and the start page. A code only in the fragment of a code mail's
+ * button (`#code=` and that mail's code), never before it.
  */
 function sound(mail: Mail, code: string) {
-  expect(mail.html).not.toMatch(/<img|<script|<iframe|<link|@import|url\(/i);
+  const images = mail.html.match(/<img\b[^>]*>/gi) ?? [];
+  if (mail.inline === undefined) {
+    expect(images).toEqual([]);
+  } else {
+    expect(mail.inline).toEqual(["baylee-logo"]);
+    expect(images).toHaveLength(1);
+    expect(images[0]).toMatch(/^<img src="cid:baylee-logo" /);
+  }
+  const rest = mail.html.replace(/<img\b[^>]*>/gi, "");
+  expect(rest).not.toMatch(/<img|<script|<iframe|<link|@import|url\(/i);
   const links = [...mail.html.matchAll(/href="([^"]*)"/g)].map(
     ([, href]) => href ?? "",
   );
@@ -237,9 +249,10 @@ test("an address is named, confirmed by the mailed code, and a mailed reset code
   expect(replaced.ttl_secs).toBeUndefined();
   expect(replaced.text).not.toContain(code);
   expect(replaced.text).not.toContain(firstCode);
-  for (const [, href] of replaced.html.matchAll(/href="([^"]*)"/g)) {
-    expect(href).toBe("https://baylee.app/en/account/security");
-  }
+  // the notice links to the security page and, in its footer, the site
+  expect(
+    [...replaced.html.matchAll(/href="([^"]*)"/g)].map(([, href]) => href),
+  ).toEqual(["https://baylee.app/en/account/security", "https://baylee.app/en/"]);
 
   // Signed out, someone asks the reset page for a code by mail. A name that
   // is nobody's is answered alike and gets no mail.
