@@ -21,6 +21,12 @@ pub(super) struct Mail {
     site: String,
     /// Central's bearer token for the mailer.
     token: String,
+    /// The mailer has the logo and attaches it when asked: the mails show
+    /// it beside the wordmark and ask for it. Absent means false, the
+    /// letter's tile and no request field a mailer without the picture
+    /// would refuse. Set only after that mailer is deployed.
+    #[serde(default)]
+    logo: bool,
 }
 
 impl Mail {
@@ -34,7 +40,7 @@ impl Mail {
     pub(super) fn client(&mut self, development: bool) -> Result<Arc<Client>, ()> {
         let token = Token::new(std::mem::take(&mut self.token)).map_err(|_| ())?;
         Client::new(&self.endpoint, &self.site, token, development)
-            .map(Arc::new)
+            .map(|client| Arc::new(client.with_logo(self.logo)))
             .map_err(|_| ())
     }
 }
@@ -187,17 +193,42 @@ mod tests {
     }
 
     #[test]
-    fn a_mail_block_takes_its_three_fields_and_no_other() {
+    fn a_mail_block_takes_its_three_fields_the_logo_and_no_other() {
         let parse = |text: &str| serde_json::from_str::<Mail>(text);
         for text in [
             r#"{"endpoint":"http://127.0.0.1:28795","site":"https://baylee.app"}"#,
             r#"{"endpoint":"http://127.0.0.1:28795","token":"x"}"#,
             r#"{"site":"https://baylee.app","token":"x"}"#,
             r#"{"endpoint":"http://127.0.0.1:28795","site":"https://baylee.app","token":"x","from":"central@example.org"}"#,
+            r#"{"endpoint":"http://127.0.0.1:28795","site":"https://baylee.app","token":"x","logo":"yes"}"#,
+            r#"{"endpoint":"http://127.0.0.1:28795","site":"https://baylee.app","token":"x","logo":1}"#,
+            r#"{"endpoint":"http://127.0.0.1:28795","site":"https://baylee.app","token":"x","logo":null}"#,
+            r#"{"endpoint":"http://127.0.0.1:28795","site":"https://baylee.app","token":"x","inline":["baylee-logo"]}"#,
             r#""http://127.0.0.1:28795""#,
             "{}",
         ] {
             assert!(parse(text).is_err(), "{text}");
+        }
+    }
+
+    /// The logo is shown and asked for only where the block says the
+    /// mailer has it; absent, it is not.
+    #[test]
+    fn the_logo_is_off_unless_the_block_turns_it_on() {
+        let block = |logo: &str| {
+            serde_json::from_str::<Mail>(&format!(
+                r#"{{"endpoint":"http://127.0.0.1:28795","site":"https://baylee.app","token":"{TOKEN}"{logo}}}"#
+            ))
+            .unwrap()
+        };
+        for (logo, on) in [
+            ("", false),
+            (r#","logo":false"#, false),
+            (r#","logo":true"#, true),
+        ] {
+            let mut parsed = block(logo);
+            assert_eq!(parsed.logo, on, "{logo}");
+            assert_eq!(parsed.client(false).unwrap().logo(), on, "{logo}");
         }
     }
 

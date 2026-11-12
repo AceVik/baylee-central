@@ -64,7 +64,7 @@ fn every_language_renders_every_mail_within_the_mailers_rules() {
     for lang in Lang::ALL {
         let (mails, ..) = mails(lang);
         for mail in &mails {
-            let rendered = render(mail, SITE);
+            let rendered = render(mail, SITE, false);
             let subject = &rendered.subject;
             assert!((1..=200).contains(&subject.chars().count()), "{subject}");
             assert!(!subject.chars().any(char::is_control), "{subject}");
@@ -95,41 +95,53 @@ fn every_language_renders_every_mail_within_the_mailers_rules() {
     }
 }
 
+/// `html` has no image, no script, no style sheet and nothing else that
+/// loads or runs.
+fn loads_nothing(html: &str) {
+    let html = html.to_lowercase();
+    for forbidden in [
+        "<img",
+        "<script",
+        "<style",
+        "<link",
+        "<iframe",
+        "<object",
+        "<embed",
+        "<form",
+        "<video",
+        "<audio",
+        "<svg",
+        "<base",
+        "<v:",
+        "src=",
+        "srcset=",
+        "background=",
+        "url(",
+        "@import",
+        "@font-face",
+        "javascript:",
+        "data:",
+        "cid:",
+        "onload",
+        "onclick",
+        "onerror",
+        "http-equiv",
+    ] {
+        assert!(!html.contains(forbidden), "{forbidden}");
+    }
+}
+
+/// The logo as the band shows it: the mailer's attachment, by its
+/// `Content-ID`, 48 px, rounded, without words of its own.
+const LOGO_IMG: &str = "<img src=\"cid:baylee-logo\" width=\"48\" height=\"48\" alt=\"\" style=\"display:block;width:48px;height:48px;border:0;border-radius:12px;\">";
+
 #[test]
 fn the_html_loads_nothing_and_links_only_to_the_site() {
     for lang in Lang::ALL {
         let (mails, code, reset) = mails(lang);
         for mail in &mails {
-            let html = render(mail, SITE).html.to_lowercase();
-            for forbidden in [
-                "<img",
-                "<script",
-                "<style",
-                "<link",
-                "<iframe",
-                "<object",
-                "<embed",
-                "<form",
-                "<video",
-                "<audio",
-                "<svg",
-                "<base",
-                "<v:",
-                "src=",
-                "srcset=",
-                "background=",
-                "url(",
-                "@import",
-                "@font-face",
-                "javascript:",
-                "data:",
-                "onload",
-                "onclick",
-                "onerror",
-                "http-equiv",
-            ] {
-                assert!(!html.contains(forbidden), "{forbidden}");
-            }
+            let html = render(mail, SITE, false).html.to_lowercase();
+            loads_nothing(&html);
             // The only addresses in the whole mail are the site's: the
             // button's page and the start page.
             let links = attributes(&html, "href");
@@ -141,7 +153,7 @@ fn the_html_loads_nothing_and_links_only_to_the_site() {
             );
             assert_eq!(html.matches("//").count(), expected.len());
             // No code in any link, in either body.
-            let text = render(mail, SITE).text.to_lowercase();
+            let text = render(mail, SITE, false).text.to_lowercase();
             for secret in [code.to_lowercase(), reset.to_lowercase()] {
                 assert!(links.iter().all(|link| !link.contains(&secret)));
                 assert!(
@@ -161,13 +173,13 @@ fn the_html_loads_nothing_and_links_only_to_the_site() {
 #[test]
 fn a_mail_carries_its_code_once_in_each_body_and_a_notice_none() {
     let (mails, code, reset) = mails(Lang::De);
-    let confirm = render(&mails[0], SITE);
+    let confirm = render(&mails[0], SITE, false);
     assert_eq!(confirm.text.matches(&code).count(), 1);
     assert_eq!(confirm.html.matches(&code).count(), 1);
     assert!(confirm.html.contains(&format!("font-family:{MONO};font-size:30px;line-height:1.4;font-weight:700;letter-spacing:0.04em;color:{TITLE};\">{code}</td>")));
     assert!(confirm.text.contains("Der Code gilt 15 Minuten."));
     assert!(!confirm.subject.contains(&code));
-    let mailed = render(&mails[1], SITE);
+    let mailed = render(&mails[1], SITE, false);
     assert_eq!(mailed.text.matches(&reset).count(), 1);
     assert_eq!(mailed.html.matches(&reset).count(), 1);
     // 45 characters on one line of the 560 px card: 15 px and no
@@ -186,7 +198,7 @@ fn a_mail_carries_its_code_once_in_each_body_and_a_notice_none() {
         "reset",
         "account/security",
     ]) {
-        let notice = render(notice, SITE);
+        let notice = render(notice, SITE, false);
         assert!(!notice.subject.contains("player"));
         for body in [&notice.text, &notice.html] {
             assert!(!body.contains(&code) && !body.contains(&reset));
@@ -197,7 +209,7 @@ fn a_mail_carries_its_code_once_in_each_body_and_a_notice_none() {
     }
     // No mail says the address it goes to.
     for mail in &mails {
-        let rendered = render(mail, SITE);
+        let rendered = render(mail, SITE, false);
         assert!(!rendered.text.contains("example.org"));
         assert!(!rendered.html.contains("example.org"));
     }
@@ -221,7 +233,7 @@ fn every_mail_has_the_band_the_heading_one_button_and_the_footer() {
         for mail in &mails {
             let content = content(mail, SITE);
             let start = Start::of(SITE, lang);
-            let html = render(mail, SITE).html;
+            let html = render(mail, SITE, false).html;
             let html = html.as_str();
             for light in [
                 "<meta name=\"color-scheme\" content=\"light only\">",
@@ -349,6 +361,43 @@ fn in_order(html: &str, content: &Content<'_>, footer: String, home: String) {
     }
 }
 
+/// With the logo, the band shows the mailer's attachment beside the
+/// wordmark instead of the letter's tile: the one image of the mail,
+/// named by its `Content-ID` and loaded from nowhere. Everything else is
+/// the mail without it, and the plain text is the same.
+#[test]
+fn with_the_logo_the_band_shows_it_and_nothing_else_changes() {
+    let start = format!(
+        "<td bgcolor=\"{NIGHT}\" style=\"padding:20px {SIDE}px;background:{NIGHT};border-bottom:3px solid {GOLD};"
+    );
+    for lang in Lang::ALL {
+        let (mails, ..) = mails(lang);
+        for mail in &mails {
+            let (off, on) = (render(mail, SITE, false), render(mail, SITE, true));
+            assert_eq!(on.html.matches("<img").count(), 1);
+            assert_eq!(on.html.matches("src=").count(), 1);
+            assert_eq!(on.html.matches(LOGO_IMG).count(), 1);
+            loads_nothing(&on.html.replace(LOGO_IMG, ""));
+            let band = between(&on.html, &start, "</td></tr>\n");
+            assert!(band.contains(&format!(
+                "<td width=\"48\" height=\"48\" valign=\"middle\" style=\"width:48px;height:48px;\">{LOGO_IMG}</td>"
+            )));
+            // the name beside it, as high as the logo; no letter's tile
+            assert!(band.ends_with(&format!(
+                "line-height:48px;font-weight:700;letter-spacing:0.01em;color:{DAWN};mso-line-height-rule:exactly;\">Baylee</td></tr></table>"
+            )));
+            assert!(band.find(LOGO_IMG) < band.find(">Baylee<"));
+            assert!(!band.contains(&format!("bgcolor=\"{GOLD}\"")));
+            assert!(!band.contains("aria-hidden"));
+            // the rest is the mail without the logo
+            let plain = between(&off.html, &start, "</td></tr>\n");
+            assert_eq!(on.html.replace(band, ""), off.html.replace(plain, ""));
+            assert_eq!(on.text, off.text);
+            assert_eq!(on.subject, off.subject);
+        }
+    }
+}
+
 /// The plain text is the whole mail on its own: the title, an empty line
 /// and the first paragraph, so that a list of mails that shows the text's
 /// beginning shows the title and the first sentence; every paragraph, the
@@ -361,7 +410,7 @@ fn the_plain_text_stands_on_its_own() {
         let (mails, ..) = mails(lang);
         for mail in &mails {
             let content = content(mail, SITE);
-            let text = render(mail, SITE).text;
+            let text = render(mail, SITE, false).text;
             let lines: Vec<&str> = text.lines().collect();
             assert_eq!(lines[0], content.title);
             assert_eq!(lines[1], "");
@@ -435,7 +484,7 @@ fn the_plain_text_stands_on_its_own() {
 fn the_reset_mail_sets_the_account_s_name_in_bold() {
     for lang in Lang::ALL {
         let (mails, ..) = mails(lang);
-        let rendered = render(&mails[1], SITE);
+        let rendered = render(&mails[1], SITE, false);
         let strong =
             format!("<strong style=\"font-weight:700;color:{TITLE};\">player.one</strong>");
         assert_eq!(rendered.html.matches(&strong).count(), 1, "{}", lang.code());
@@ -446,7 +495,7 @@ fn the_reset_mail_sets_the_account_s_name_in_bold() {
         assert!(!rendered.text.contains('*') && !rendered.text.contains('<'));
         for (at, mail) in mails.iter().enumerate() {
             if at != 1 {
-                assert!(!render(mail, SITE).html.contains("<strong"));
+                assert!(!render(mail, SITE, false).html.contains("<strong"));
             }
         }
     }
@@ -470,7 +519,7 @@ fn a_finished_reset_lists_what_came_of_it() {
                 content.facts,
                 [vault, "reset-done-sessions", recovery].map(|id| lang.text(id, &[]))
             );
-            let html = render(&mails[at], SITE).html;
+            let html = render(&mails[at], SITE, false).html;
             for fact in &content.facts {
                 assert!(html.contains(&format!(
                     "font-size:16px;line-height:26px;color:{INK};mso-line-height-rule:exactly;\">{}</td></tr>",
@@ -563,7 +612,7 @@ fn every_pair_the_mail_draws_is_readable_as_drawn_and_inverted() {
 #[test]
 fn the_notices_of_a_changed_login_say_what_changed() {
     let (mails, ..) = mails(Lang::De);
-    let [kept, new, password, issued] = [4, 5, 6, 7].map(|at| render(&mails[at], SITE));
+    let [kept, new, password, issued] = [4, 5, 6, 7].map(|at| render(&mails[at], SITE, false));
     // A reset says whether the data stayed and what the recovery code
     // still does; the two say it differently.
     assert!(kept.text.contains("Die Daten des Accounts sind geblieben."));
@@ -589,6 +638,7 @@ fn the_notices_of_a_changed_login_say_what_changed() {
     let english = render(
         &Mail::reset_issued("player@example.org", [7; 16], "en", 24),
         SITE,
+        false,
     );
     assert!(english.text.contains("for 24 hours"));
     // Each says so in its own subject.
@@ -611,7 +661,7 @@ fn what_is_written_into_the_html_is_escaped() {
         panic!("a reset mail");
     };
     *name = "<img src=x onerror=alert(1)>&\"'".into();
-    let html = render(&mail, SITE).html;
+    let html = render(&mail, SITE, false).html;
     assert!(!html.contains("<img"));
     assert_eq!(
         html.matches("&lt;img src=x onerror=alert(1)&gt;&amp;&quot;&#39;")
@@ -621,15 +671,17 @@ fn what_is_written_into_the_html_is_escaped() {
     // The German words hold an apostrophe-free text, the English ones
     // none either; an origin with a quote would be escaped too, in the
     // links and in the host the footer shows.
-    let odd = render(&mail, "https://baylee.example\"><b>");
+    let odd = render(&mail, "https://baylee.example\"><b>", false);
     assert!(!odd.html.contains("\"><b>"));
     assert!(odd.html.contains(">baylee.example&quot;&gt;&lt;b&gt;</a>"));
 }
 
 /// Writes every mail in English and German, as HTML and as text, into
 /// the folder `BAYLEE_MAIL_SHOTS` names, to be looked at in a browser
-/// (`docs/email.md`, "The mails"). Its codes are fresh random ones and
-/// its address and site are reserved names.
+/// (`docs/email.md`, "The mails"); with the logo too, as `…-logo.html`,
+/// whose `cid:` a browser cannot resolve (point it at a local picture to
+/// look). Its codes are fresh random ones and its address and site are
+/// reserved names.
 #[test]
 #[ignore = "writes files: BAYLEE_MAIL_SHOTS=<folder> cargo test -p central-mail -- --ignored"]
 fn every_mail_written_out_for_a_look() {
@@ -650,10 +702,13 @@ fn every_mail_written_out_for_a_look() {
     for lang in [Lang::En, Lang::De] {
         let (mails, ..) = mails(lang);
         for (mail, name) in mails.iter().zip(names) {
-            let rendered = render(mail, SITE);
+            let rendered = render(mail, SITE, false);
             let stem = folder.join(format!("{}-{name}", lang.code()));
             std::fs::write(stem.with_extension("html"), rendered.html.as_bytes()).unwrap();
             std::fs::write(stem.with_extension("txt"), rendered.text.as_bytes()).unwrap();
+            let logo = render(mail, SITE, true);
+            let stem = folder.join(format!("{}-{name}-logo.html", lang.code()));
+            std::fs::write(stem, logo.html.as_bytes()).unwrap();
         }
     }
 }

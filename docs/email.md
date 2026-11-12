@@ -184,7 +184,9 @@ Crate `central-mail`. Each mail has a plain text part and an HTML part:
 - a notice to it that the password was changed;
 - a notice to it that an administrator made a reset code.
 
-The HTML is a table layout with inline styles. It has no image, no style
+The HTML is a table layout with inline styles. It has no image except,
+where the operator turned it on, Baylee's logo, which the mailer attaches
+to the mail itself (`cid:baylee-logo`, [below](#configuration)); no style
 sheet, no script and nothing loaded from elsewhere. A code is printed and
 never part of a link; no notice carries one. The links go to the configured
 site and nowhere else: a button to the site's reset page (the reset mail,
@@ -211,7 +213,12 @@ the footer links to the site.*
   (`#0f1b2d`) with a gold edge (`#e3c07e`) under it. On it, the wordmark in
   letters: the name's first letter on a gold tile, as the site's header has
   its picture there (hidden from screen readers), and "Baylee" in the
-  site's serif (Literata where a device has it, else Georgia).
+  site's serif (Literata where a device has it, else Georgia). With the
+  `logo` flag ([configuration](#configuration)) the logo stands in the
+  tile's place: the picture the mailer attaches (`src="cid:baylee-logo"`),
+  48 × 48 CSS px with `width` and `height` set, rounded, `alt=""` since
+  the name stands beside it, and the name as high as the picture. Without
+  the flag the band is exactly as before.
 - **The title** is the mail's one heading (`h1`), in the serif at 26 px,
   with a short line in the accent (`#235b66`) under it. Then what happened,
   in paragraphs of 16 px. The reset mail sets the account's sign-in name
@@ -270,9 +277,12 @@ there.
 
 To look at them: `BAYLEE_MAIL_SHOTS=<folder> cargo test -p central-mail --
 --ignored` writes every mail in English and German as HTML and text into
-the folder, with fresh random codes, for a browser. They were looked at in
-Chromium at 360 and 640 px, as drawn and inverted, on 12.11.2026; not yet
-in Gmail, mailbox.org or Outlook in this look.
+the folder, with fresh random codes, for a browser, and each again with
+the logo (`…-logo.html`; a browser cannot resolve `cid:`, so to look at it
+the `src` is pointed at a local copy of the picture). They were looked at
+in Chromium at 360 and 640 px, as drawn and inverted, on 12.11.2026; the
+first round also by the owner in Gmail and mailbox.org, the second round
+and the logo not yet in a real mail program.
 
 The words are `id = text` lines in `crates/central-mail/locales/<lang>/mail.ftl`,
 one file for each of the site's eleven languages, read by a small parser of
@@ -345,7 +355,11 @@ if it has one and this Central has a mailer:
   and never again, so the key only keeps one request from becoming two
   mails on the way;
 - with `to`, `subject`, `text`, `html`, `limit_key`, and `ttl_secs` for a
-  mail with a code. A notice has no `ttl_secs` and waits its turn.
+  mail with a code. A notice has no `ttl_secs` and waits its turn;
+- with `"inline": ["baylee-logo"]` as well, and only, where the `logo` flag
+  is set ([below](#configuration)): the mailer attaches the picture its own
+  configuration names, as `Content-ID: <baylee-logo>`. A mailer from before
+  that field refuses it, as it refuses every field it does not know.
 
 What the mailer answers becomes one of four outcomes: `202` and `200` are
 sent, `429` and `503` are busy, `400` with `invalid_address` is a refused
@@ -365,7 +379,8 @@ An optional `mail` block in the service's document, live
 "mail": {
   "endpoint": "http://127.0.0.1:<the mailer's port>",
   "site": "https://baylee.app",
-  "token": "…"
+  "token": "…",
+  "logo": false
 }
 ```
 
@@ -377,6 +392,13 @@ An optional `mail` block in the service's document, live
 - `token`: Central's bearer token for the mailer, 32 to 256 characters of a
   bearer token's alphabet. It arrives with the other secrets on standard
   input, never in an argument or the environment, and is wiped after use.
+- `logo`: optional, `false` when absent. `true` says that the mailer
+  attaches Baylee's logo when asked: every mail then asks for it
+  (`inline`, above) and shows it in the band
+  ([how a mail looks](#how-a-mail-looks)). Set it only once a mailer with
+  the picture runs: an older one refuses the field, and with it every
+  mail. Deploy the mailer first, then the flag
+  ([operations](operations.md#mail)).
 
 A service whose block names anything else does not start.
 

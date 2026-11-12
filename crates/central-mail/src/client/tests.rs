@@ -523,3 +523,53 @@ fn a_token_is_a_header_value_and_never_printed() {
         assert_eq!(Token::new(bad).err(), Some(Error::Rejected));
     }
 }
+
+#[test]
+fn with_the_logo_every_mail_asks_the_mailer_to_attach_it() {
+    let queued = r#"{"id":"1","status":"queued"}"#;
+    let mailer = Standin::start(vec![
+        Script::Answer(answer("202 Accepted", queued)),
+        Script::Answer(answer("202 Accepted", queued)),
+        Script::Answer(answer("202 Accepted", queued)),
+    ]);
+    let plain = mailer.client();
+    assert!(!plain.logo());
+    let client = mailer.client().with_logo(true);
+    assert!(client.logo());
+    let code = MailCode::generate().unwrap();
+    assert_eq!(client.send(&confirm(&code)), Outcome::Sent);
+    assert_eq!(
+        client.send(&Mail::password_changed(
+            "player@example.org",
+            [0xab; 16],
+            "en"
+        )),
+        Outcome::Sent
+    );
+    assert_eq!(plain.send(&confirm(&code)), Outcome::Sent);
+    let seen = mailer.stop();
+    assert_eq!(seen.len(), 3);
+    let img = "<img src=\"cid:baylee-logo\"";
+    for request in &seen[..2] {
+        let body = request.json();
+        assert_eq!(body["inline"], serde_json::json!(["baylee-logo"]));
+        let html = body["html"].as_str().unwrap();
+        assert_eq!(html.matches("<img").count(), 1);
+        assert_eq!(html.matches(img).count(), 1);
+        assert!(!body["text"].as_str().unwrap().contains("cid:"));
+    }
+    // without it: the fields of before, and no picture
+    let body = seen[2].json();
+    assert!(body.get("inline").is_none());
+    assert!(!body["html"].as_str().unwrap().contains("<img"));
+    assert_eq!(
+        body.as_object()
+            .unwrap()
+            .keys()
+            .cloned()
+            .collect::<Vec<_>>(),
+        ["html", "limit_key", "subject", "text", "to", "ttl_secs"]
+    );
+    // Debug says nothing of it either
+    assert_eq!(format!("{client:?}"), "Client([REDACTED])");
+}
