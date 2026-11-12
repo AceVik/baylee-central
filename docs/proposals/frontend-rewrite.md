@@ -1413,6 +1413,9 @@ are `home.js` and `album.css`; neither has words, so no language changed.
   narrows to the spine. The first page lifts a little and settles. The
   close button and Escape run it back (0.65 s) and take the book away;
   shut while it opens, the same movement goes back from where it is. The
+  veil over the page fades in with the book and out with it, and goes
+  back with it too (a Web Animation of `::backdrop`, made at the first
+  frame of an opening, as the veil exists only once the dialog is). The
   light and the shade are keyframes at the cover's angle every 15° under
   one easing for the whole swing, which a CSS animation cannot give (it
   eases each keyframe on its own). The cover is made by the script and is

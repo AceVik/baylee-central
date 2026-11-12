@@ -688,6 +688,21 @@ if (album instanceof HTMLDialogElement && viewer instanceof HTMLDialogElement) {
     () => true,
     () => false,
   );
+  // The veil over the page comes with the book and goes with it once the
+  // cover is down. It is one of the book's own runs, so that a book shut
+  // while it opens takes its veil back with it; it exists only while the
+  // dialog is open, so an opening's veil joins at the first frame. A
+  // browser that cannot move it shows it, and takes it away, at once.
+  const fade = (opening) => {
+    try {
+      return album.animate(
+        { opacity: opening ? [0, 1] : [1, 0] },
+        opening ? { duration: 420, easing: "ease-out", fill: "both", pseudoElement: "::backdrop" } : { duration: 220, delay: 640, easing: "ease-in", fill: "both", pseudoElement: "::backdrop" },
+      );
+    } catch {
+      return null;
+    }
+  };
   const fold = (opening) => {
     album.dataset.folding = opening ? "open" : "shut";
     const timing = { duration: opening ? 900 : 650, delay: opening ? 160 : 0, easing: opening ? SWING : SWING_BACK, fill: "both" };
@@ -695,10 +710,12 @@ if (album instanceof HTMLDialogElement && viewer instanceof HTMLDialogElement) {
       const all = ANGLES.map((angle) => ({ offset: angle / 180, ...pose(angle) }));
       return opening ? all : all.reverse().map((frame) => ({ ...frame, offset: round(1 - frame.offset) }));
     };
+    const veil = opening ? null : fade(false);
     const runs = [
       album.animate(opening ? BOOK_OPEN : BOOK_SHUT, { duration: opening ? 1060 : 860, fill: "both" }),
       ...swing.map(([node, pose]) => node.animate(frames(pose), timing)),
       ...(opening ? pages.map((page) => page.animate(SETTLE, { duration: 560, delay: 560, fill: "both" })) : []),
+      ...(veil ? [veil] : []),
     ];
     folding = { opening, runs };
     return ended(runs);
@@ -713,6 +730,10 @@ if (album instanceof HTMLDialogElement && viewer instanceof HTMLDialogElement) {
     cloth();
     const run = fold(true);
     const mine = folding;
+    requestAnimationFrame(() => {
+      const veil = folding === mine && mine.opening && album.open ? fade(true) : null;
+      if (veil) mine.runs.push(veil);
+    });
     run.then((done) => {
       // a book shut while it opened is closed by `shut`, not laid open here
       if (done && folding === mine && mine.opening) unfold();
