@@ -514,13 +514,8 @@ fn system_word(lang: Lang, row: SystemRow) -> &'static str {
     }
 }
 
-fn client_details(r: &Rep, c: &Map<String, Value>) -> AnyView {
-    let r = *r;
-    let lang = r.c.lang;
-    let shot = client::screenshot(c).map_or_else(
-        || view! { <p class="meta">{words::fb_no_shot(lang)}</p> }.into_any(),
-        |shot| shot_view(&r, shot).into_any(),
-    );
+/// The facts of the client's build and of the game it was in.
+fn client_facts(lang: Lang, c: &Map<String, Value>) -> Vec<AnyView> {
     let mut facts: Vec<AnyView> = Vec::new();
     if let Some(build) = client::build(c) {
         let commit = build.commit.map(|c| c.chars().take(12).collect::<String>());
@@ -562,13 +557,12 @@ fn client_details(r: &Rep, c: &Map<String, Value>) -> AnyView {
         );
         facts.push(view! { <dt>{words::fb_game_pending(lang)}</dt><dd>{pending}</dd> }.into_any());
     }
-    let backtrace = client::crash(c).and_then(|c| c.backtrace).map(|trace| {
-        fold(
-            words::fb_backtrace(lang).to_owned(),
-            view! { <pre class="fb-pre">{trace}</pre> },
-        )
-    });
-    let log = client::log(c).map(|log| {
+    facts
+}
+
+/// The game's log, folded: who sat where and its latest lines.
+fn log_fold(lang: Lang, c: &Map<String, Value>) -> Option<impl IntoView + use<>> {
+    client::log(c).map(|log| {
         let roster = (!log.roster.is_empty()).then(|| {
             let text = log
                 .roster
@@ -597,7 +591,24 @@ fn client_details(r: &Rep, c: &Map<String, Value>) -> AnyView {
             .collect_view();
         let title = words::fb_log(lang, &log.lines.len().to_string());
         fold(title, view! { {roster}<ol class="fb-log">{lines}</ol> })
+    })
+}
+
+fn client_details(r: &Rep, c: &Map<String, Value>) -> AnyView {
+    let r = *r;
+    let lang = r.c.lang;
+    let shot = client::screenshot(c).map_or_else(
+        || view! { <p class="meta">{words::fb_no_shot(lang)}</p> }.into_any(),
+        |shot| shot_view(&r, shot).into_any(),
+    );
+    let facts = client_facts(lang, c);
+    let backtrace = client::crash(c).and_then(|c| c.backtrace).map(|trace| {
+        fold(
+            words::fb_backtrace(lang).to_owned(),
+            view! { <pre class="fb-pre">{trace}</pre> },
+        )
     });
+    let log = log_fold(lang, c);
     let system = client::system(c)
         .filter(|rows| !rows.is_empty())
         .map(|rows| {
@@ -1044,6 +1055,65 @@ fn duplicate_view(r: &Rep) -> impl IntoView + use<> {
     }
 }
 
+/// GitHub's form for a new issue, filled with the administrator's own
+/// neutral words, while no issue is linked.
+fn new_issue_view(r: &Rep) -> impl IntoView + use<> {
+    let r = *r;
+    let lang = r.c.lang;
+    let linked = move || r.with(|d| d.summary.issue).flatten();
+    let kind = move || r.with(|d| d.summary.kind).unwrap_or(ReportKind::Other);
+    let build = move || {
+        r.with(|d| {
+            d.summary
+                .build
+                .clone()
+                .or_else(|| d.summary.gateway_version.clone())
+        })
+        .flatten()
+    };
+    let chosen = move || r.category.get().unwrap_or_else(kind);
+    let url = move || new_issue_url(&r.summary.get(), chosen(), build().as_deref());
+    let categories = ReportKind::ALL
+        .iter()
+        .map(|k| {
+            let k = *k;
+            view! { <option value=k.as_str() prop:selected=move || chosen() == k>{category(k)}</option> }
+        })
+        .collect_view();
+    move || {
+        linked().is_none().then(|| {
+            view! {
+                <details class="fb-more">
+                    <summary>{words::fb_new_issue(lang)}</summary>
+                    <div class="field">
+                        <label for="fb-issue-summary">{words::fb_summary_label(lang)}</label>
+                        <textarea id="fb-issue-summary" rows="3" aria-describedby="fb-issue-summary-hint"
+                            prop:value=move || r.summary.get() on:input=move |ev| r.summary.set(event_target_value(&ev))></textarea>
+                        <p class="hint" id="fb-issue-summary-hint">{words::fb_summary_hint(lang)}</p>
+                    </div>
+                    <div class="field fb-field">
+                        <label for="fb-issue-category">{words::fb_category(lang)}</label>
+                        <select id="fb-issue-category" on:change=move |ev| {
+                            let v = event_target_value(&ev);
+                            r.category.set(ReportKind::ALL.iter().copied().find(|k| k.as_str() == v));
+                        }>{categories.clone()}</select>
+                    </div>
+                    {move || match url() {
+                        None => view! { <p class="meta">{words::fb_summary_first(lang)}</p> }.into_any(),
+                        Some(href) => view! {
+                            <a class="button button-ghost" href=href target="_blank" rel="noopener noreferrer">
+                                <span>{words::fb_open_issue(lang)}</span>{glyph::glyph(EXTERNAL)}
+                                <span class="visually-hidden">{" "}{words::fb_new_tab(lang)}</span>
+                            </a>
+                        }
+                        .into_any(),
+                    }}
+                </details>
+            }
+        })
+    }
+}
+
 fn issue_view(r: &Rep) -> impl IntoView + use<> {
     let r = *r;
     let lang = r.c.lang;
@@ -1097,58 +1167,7 @@ fn issue_view(r: &Rep) -> impl IntoView + use<> {
         .into_any(),
     }
     };
-    // GitHub's form for a new issue, filled with the administrator's own neutral words
-    let kind = move || r.with(|d| d.summary.kind).unwrap_or(ReportKind::Other);
-    let build = move || {
-        r.with(|d| {
-            d.summary
-                .build
-                .clone()
-                .or_else(|| d.summary.gateway_version.clone())
-        })
-        .flatten()
-    };
-    let chosen = move || r.category.get().unwrap_or_else(kind);
-    let url = move || new_issue_url(&r.summary.get(), chosen(), build().as_deref());
-    let categories = ReportKind::ALL
-        .iter()
-        .map(|k| {
-            let k = *k;
-            view! { <option value=k.as_str() prop:selected=move || chosen() == k>{category(k)}</option> }
-        })
-        .collect_view();
-    let new_issue = move || {
-        linked().is_none().then(|| {
-            view! {
-                <details class="fb-more">
-                    <summary>{words::fb_new_issue(lang)}</summary>
-                    <div class="field">
-                        <label for="fb-issue-summary">{words::fb_summary_label(lang)}</label>
-                        <textarea id="fb-issue-summary" rows="3" aria-describedby="fb-issue-summary-hint"
-                            prop:value=move || r.summary.get() on:input=move |ev| r.summary.set(event_target_value(&ev))></textarea>
-                        <p class="hint" id="fb-issue-summary-hint">{words::fb_summary_hint(lang)}</p>
-                    </div>
-                    <div class="field fb-field">
-                        <label for="fb-issue-category">{words::fb_category(lang)}</label>
-                        <select id="fb-issue-category" on:change=move |ev| {
-                            let v = event_target_value(&ev);
-                            r.category.set(ReportKind::ALL.iter().copied().find(|k| k.as_str() == v));
-                        }>{categories.clone()}</select>
-                    </div>
-                    {move || match url() {
-                        None => view! { <p class="meta">{words::fb_summary_first(lang)}</p> }.into_any(),
-                        Some(href) => view! {
-                            <a class="button button-ghost" href=href target="_blank" rel="noopener noreferrer">
-                                <span>{words::fb_open_issue(lang)}</span>{glyph::glyph(EXTERNAL)}
-                                <span class="visually-hidden">{" "}{words::fb_new_tab(lang)}</span>
-                            </a>
-                        }
-                        .into_any(),
-                    }}
-                </details>
-            }
-        })
-    };
+    let new_issue = new_issue_view(&r);
     view! {
         <div class="fb-field">
             <p class="fb-legend">{words::fb_issue(lang)}</p>
