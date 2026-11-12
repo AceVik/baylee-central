@@ -14,6 +14,7 @@ use central_api::{
     Error, Token,
     gateway::GatewayMetadata,
     notifications::NotificationRequest,
+    owner::GatewayScopes,
     social::SocialRequest,
     wire::{Request, Response, TicketPurpose},
 };
@@ -273,8 +274,66 @@ pub(crate) fn run(
         assert_eq!(answer.err(), Some(Error::Rejected), "request {index}");
     }
 
+    one_owner_s_tokens(service, store, &cookie, &bearer, runtime);
     after_a_restart(&restarted, &cookie, &bearer, runtime);
     replaced(service, http, &account, bearer, runtime);
+}
+
+/// One account's gateway tokens are counted together. Four tokens of two
+/// gateways, each asking a bearer's whole data budget in one instant and
+/// each from an address of its own, were the whole of what sessions share
+/// (4 x 64). They have one budget between them now, whichever gateway
+/// they are of, and the account's own session is served beside them.
+fn one_owner_s_tokens(
+    service: &IdentityService,
+    store: &AccountStore,
+    cookie: &Token,
+    bearer: &Token,
+    runtime: &Runtime,
+) {
+    let scopes = GatewayScopes {
+        sso: true,
+        listing: true,
+    };
+    let mut tokens = Vec::new();
+    for origin in ["http://127.0.0.1:28771", "http://127.0.0.1:28772"] {
+        let gateway = runtime
+            .block_on(store.add_gateway(cookie, origin, "Counted together", true))
+            .unwrap();
+        for name in ["First", "Second"] {
+            let token = Token::generate().unwrap();
+            runtime
+                .block_on(store.create_gateway_token(cookie, gateway, name, scopes, 1, &token))
+                .unwrap();
+            tokens.push(token);
+        }
+    }
+    // Heard once each: the answer vouches for the token, and the store
+    // says whose gateway it is of.
+    for token in &tokens {
+        let heard = runtime.block_on(native(service, Request::GatewayStatus, token, place(170)));
+        assert!(heard.is_ok(), "a token's status: {:?}", heard.err());
+    }
+    second();
+    let mut asked = Vec::new();
+    for (token, last) in tokens.iter().zip(171..) {
+        for _ in 0..64 {
+            asked.push(native(service, Request::GatewayStatus, token, place(last)));
+        }
+    }
+    asked.push(native(service, Request::ReadDocument, bearer, place(161)));
+    let mut answers = runtime.block_on(in_order(asked));
+    let held = answers.pop().unwrap();
+    let served = answers.iter().filter(|answer| answer.is_ok()).count();
+    assert_eq!(served, 64, "one owner's tokens, one bearer's budget");
+    for answer in answers {
+        assert!(matches!(answer, Ok(_) | Err(Error::Busy)));
+    }
+    assert!(
+        held.is_ok(),
+        "the account's session beside its gateways' tokens: {:?}",
+        held.err()
+    );
 }
 
 /// A Central that has just started knows no session: `restarted` is a

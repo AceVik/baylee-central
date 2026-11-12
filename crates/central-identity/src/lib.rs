@@ -604,7 +604,7 @@ impl IdentityService {
         let reply = self
             .dispatch(request, bearer, Surface::Native, Seen::default(), place)
             .await;
-        self.answered(told.as_ref(), &reply);
+        self.answered(told.as_ref(), bearer, &reply).await;
         Ok(reply?.response)
     }
 
@@ -612,21 +612,49 @@ impl IdentityService {
     /// (`limits.rs`): whether the one its request was counted by is a
     /// session's or a credential's, and the session it issues, if any.
     /// It grants nothing and is never a refusal: the answer stands.
-    fn answered(&self, told: Option<&limits::Told>, reply: &Result<BrowserReply, Error>) {
-        let session = reply.as_ref().ok().and_then(issued);
-        if told.is_none() && session.is_none() {
+    ///
+    /// An answer that vouches for a bearer not vouched for before asks
+    /// the store once whose gateways the bearer belongs to, so that one
+    /// account's gateway credentials and tokens are counted together.
+    /// When the store cannot say, the bearer is not vouched for by this
+    /// answer and waits with the strangers until one can be asked about.
+    async fn answered(
+        &self,
+        told: Option<&limits::Told>,
+        bearer: Option<&Token>,
+        reply: &Result<BrowserReply, Error>,
+    ) {
+        if !self.heard(told, reply) {
             return;
         }
-        let Ok(mut limits) = self.limits.lock() else {
+        let (Some(told), Some(bearer)) = (told, bearer) else {
             return;
         };
-        let now = Instant::now();
-        if let Some(told) = told {
-            limits.answered(told, reply.as_ref().err(), now);
+        // The lock is not held across the question.
+        let Ok(owner) = self.store.bearer_owner(bearer).await else {
+            return;
+        };
+        if let Ok(mut limits) = self.limits.lock() {
+            limits.vouch(told, owner, Instant::now());
         }
+    }
+
+    /// The part of [`Self::answered`] that asks nobody; `true` when the
+    /// store is to say whose the bearer is.
+    fn heard(&self, told: Option<&limits::Told>, reply: &Result<BrowserReply, Error>) -> bool {
+        let session = reply.as_ref().ok().and_then(issued);
+        if told.is_none() && session.is_none() {
+            return false;
+        }
+        let Ok(mut limits) = self.limits.lock() else {
+            return false;
+        };
+        let now = Instant::now();
+        let asks = told.is_some_and(|told| limits.answered(told, reply.as_ref().err(), now));
         if let Some(session) = session {
             limits.issued(session, now);
         }
+        asks
     }
 
     /// A start's password was proven: its guess comes back (`guesses.rs`).
@@ -709,7 +737,7 @@ impl IdentityService {
         let reply = self
             .dispatch(request, context, Surface::Browser, seen, place)
             .await;
-        self.answered(told.as_ref(), &reply);
+        self.answered(told.as_ref(), session, &reply).await;
         reply
     }
 }

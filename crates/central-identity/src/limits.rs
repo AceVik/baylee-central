@@ -269,50 +269,96 @@ pub(super) fn told(request: &Request, bearer: Option<&Token>) -> Option<Told> {
 /// either way.
 #[derive(Default)]
 struct Proven {
-    /// When each was last vouched for, and the refusals in a row since.
-    known: BTreeMap<[u8; 32], (Instant, u8)>,
+    known: BTreeMap<[u8; 32], Vouched>,
     swept: Option<Instant>,
     /// The official gateway's bridge: configured, so never forgotten.
     kept: Option<[u8; 32]>,
 }
 
+/// A bearer an answer vouched for.
+struct Vouched {
+    /// When it was last vouched for.
+    at: Instant,
+    /// The refusals in a row since.
+    refusals: u8,
+    /// The account whose gateways it is a credential or a token of, as
+    /// the store said when it was first vouched for; none for a session.
+    owner: Option<[u8; 16]>,
+}
+
+impl Vouched {
+    fn live(&self, now: Instant) -> bool {
+        now.saturating_duration_since(self.at) < Duration::from_secs(PROVEN_SECONDS)
+    }
+}
+
+/// Whose budget a vouched-for bearer's requests are counted in
+/// ([`BEARER_CONTROL`], [`BEARER_DATA`]).
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum Unit {
+    /// Its own: a session's, or the bridge's.
+    Bearer([u8; 32]),
+    /// One account's gateways': every credential and token of every
+    /// gateway the account owns, together. An account holds up to eight
+    /// gateways and eight tokens for each; counted one by one, they
+    /// alone would spend what all sessions share.
+    Owner([u8; 16]),
+}
+
 impl Proven {
-    fn holds(&self, bearer: &[u8; 32], now: Instant) -> bool {
+    fn kept(&self, bearer: &[u8; 32]) -> bool {
         self.kept.is_some_and(|kept| bool::from(kept.ct_eq(bearer)))
-            || self.known.get(bearer).is_some_and(|(at, _)| {
-                now.saturating_duration_since(*at) < Duration::from_secs(PROVEN_SECONDS)
-            })
     }
 
-    fn mark(&mut self, bearer: [u8; 32], now: Instant) {
+    fn holds(&self, bearer: &[u8; 32], now: Instant) -> bool {
+        self.unit(bearer, now).is_some()
+    }
+
+    /// Whose budget `bearer` is counted in; none for one that is not
+    /// vouched for.
+    fn unit(&self, bearer: &[u8; 32], now: Instant) -> Option<Unit> {
+        if self.kept(bearer) {
+            return Some(Unit::Bearer(*bearer));
+        }
+        let known = self.known.get(bearer).filter(|known| known.live(now))?;
+        Some(known.owner.map_or(Unit::Bearer(*bearer), Unit::Owner))
+    }
+
+    /// Vouch for `bearer` from `now` on. `owner` is whose gateways it
+    /// belongs to; a bearer vouched for again stays whose it was.
+    fn mark(&mut self, bearer: [u8; 32], owner: Option<[u8; 16]>, now: Instant) {
         let due = self
             .swept
             .is_none_or(|swept| now.saturating_duration_since(swept) >= MINUTE);
         if due {
-            self.known.retain(|_, (at, _)| {
-                now.saturating_duration_since(*at) < Duration::from_secs(PROVEN_SECONDS)
-            });
+            self.known.retain(|_, known| known.live(now));
             self.swept = Some(now);
         }
         if self.known.len() >= PROVEN && !self.known.contains_key(&bearer) {
             let oldest = self
                 .known
                 .iter()
-                .min_by_key(|(_, (at, _))| *at)
+                .min_by_key(|(_, known)| known.at)
                 .map(|(bearer, _)| *bearer);
             if let Some(oldest) = oldest {
                 self.known.remove(&oldest);
             }
         }
-        self.known.insert(bearer, (now, 0));
+        let owner = owner.or_else(|| self.known.get(&bearer).and_then(|known| known.owner));
+        let vouched = Vouched {
+            at: now,
+            refusals: 0,
+            owner,
+        };
+        self.known.insert(bearer, vouched);
     }
 
     fn refused(&mut self, bearer: &[u8; 32]) {
-        let Some((_, refusals)) = self.known.get_mut(bearer) else {
+        let Some(known) = self.known.get_mut(bearer) else {
             return;
         };
-        *refusals = refusals.saturating_add(1);
-        if *refusals >= REFUSALS {
+        known.refusals = known.refusals.saturating_add(1);
+        if known.refusals >= REFUSALS {
             self.known.remove(bearer);
         }
     }
@@ -385,7 +431,8 @@ pub(super) struct Limits {
     data: Window,
     control: Window,
     pairing: Window,
-    peers: BTreeMap<([u8; 32], bool), Window>,
+    /// What each unit drew of its own budget in the current second.
+    peers: BTreeMap<(Unit, bool), Window>,
     /// What each place's bearers drew together of `control` (`true`) and
     /// of `data` in the current second ([`PLACE_CONTROL`], [`PLACE_DATA`]).
     sharing: BTreeMap<(Place, bool), Window>,
@@ -471,17 +518,19 @@ impl Limits {
         // window of its own and its place's share of that: it spends
         // nothing of what sessions share, takes no room among their
         // bearers, and nothing of the sign-ins' budget either.
-        if !self.proven.holds(&digest, now) {
+        let Some(unit) = self.proven.unit(&digest, now) else {
             if !self.strangers.fits(place, now, PLACE_UNPROVEN_PER_MINUTE) {
                 return Err(Error::Busy);
             }
             self.unproven.charge(now, UNPROVEN_PER_SECOND)?;
             self.strangers.spend(place, now);
             return Ok(());
-        }
+        };
         self.peers.retain(|_, window| window.live(now));
         self.sharing.retain(|_, window| window.live(now));
-        let key = (digest, control);
+        // A gateway's bearer is counted with every other credential and
+        // token of its owner's gateways ([`Unit`]).
+        let key = (unit, control);
         let (own, share, shared) = if control {
             (BEARER_CONTROL, PLACE_CONTROL, SHARED_CONTROL)
         } else {
@@ -535,9 +584,21 @@ impl Limits {
     /// row, or the session's end, take that back. A rejection of a request
     /// that carries someone else's secret is not counted
     /// ([`refusal_is_the_bearer_s`]).
-    pub(super) fn answered(&mut self, told: &Told, refused: Option<&Error>, now: Instant) {
+    ///
+    /// `true` when the answer vouches for a bearer that was not vouched
+    /// for before: it is not yet, and the caller asks the store whose it
+    /// is and says so ([`Self::vouch`]). Which request was answered does
+    /// not decide that: the store does, for every such bearer alike, so
+    /// no list of a gateway's requests can fall behind the wire.
+    #[must_use]
+    pub(super) fn answered(&mut self, told: &Told, refused: Option<&Error>, now: Instant) -> bool {
         match (refused, told.tells) {
-            (None, Tells::Proves) => self.proven.mark(told.bearer, now),
+            // The bridge is configured and counted by itself.
+            (None, Tells::Proves) if self.proven.kept(&told.bearer) => {}
+            (None, Tells::Proves) if self.proven.holds(&told.bearer, now) => {
+                self.proven.mark(told.bearer, None, now);
+            }
+            (None, Tells::Proves) => return true,
             (None, Tells::Ends) => {
                 self.proven.known.remove(&told.bearer);
             }
@@ -546,12 +607,22 @@ impl Limits {
             }
             _ => {}
         }
+        false
+    }
+
+    /// Vouch for the bearer [`Self::answered`] asked about. `owner` is
+    /// the account whose gateways it is a credential or a token of, as the
+    /// store has it: its requests are then counted with all of that
+    /// account's gateways' ([`Unit::Owner`]). None for a session, which is
+    /// counted by itself.
+    pub(super) fn vouch(&mut self, told: &Told, owner: Option<[u8; 16]>, now: Instant) {
+        self.proven.mark(told.bearer, owner, now);
     }
 
     /// A sign-in, a password change or a pairing just issued `session`: it
     /// is vouched for before its first request.
     pub(super) fn issued(&mut self, session: &Token, now: Instant) {
-        self.proven.mark(session.digest(), now);
+        self.proven.mark(session.digest(), None, now);
     }
 
     /// Spend one of the [`GLOBAL_PER_SECOND`] requests everyone shares,
@@ -1096,9 +1167,163 @@ mod tests {
         limits.proven.holds(&token.digest(), now)
     }
 
+    /// An answer, and the store saying the bearer is nobody's gateway's.
     fn answer(limits: &mut Limits, request: &Request, token: &Token, refused: Option<Error>) {
+        answer_of(limits, request, token, refused, None);
+    }
+
+    /// An answer, and the store saying whose gateways the bearer is of.
+    fn answer_of(
+        limits: &mut Limits,
+        request: &Request,
+        token: &Token,
+        refused: Option<Error>,
+        owner: Option<[u8; 16]>,
+    ) {
         let told = told(request, Some(token)).expect("counted by its bearer");
-        limits.answered(&told, refused.as_ref(), Instant::now());
+        let now = Instant::now();
+        if limits.answered(&told, refused.as_ref(), now) {
+            limits.vouch(&told, owner, now);
+        }
+    }
+
+    /// One account holds eight gateways and eight tokens for each, and its
+    /// own two sessions. Counted one by one, four of the tokens filled
+    /// what all sessions share. Counted together they have one bearer's
+    /// budget, from however many addresses, and with the account's two
+    /// sessions that is three budgets of the four a window holds.
+    #[test]
+    fn one_account_s_gateway_bearers_are_counted_together() {
+        let now = Instant::now();
+        for (request, own, shared) in [
+            (check(), BEARER_CONTROL, SHARED_CONTROL),
+            (Request::GatewayStatus, BEARER_DATA, SHARED_DATA),
+        ] {
+            let mut limits = Limits::default();
+            let owner = [7; 16];
+            let mut served = 0;
+            for gateway in 0..8 {
+                let token = Token::generate().unwrap();
+                answer_of(
+                    &mut limits,
+                    &Request::GatewayStatus,
+                    &token,
+                    None,
+                    Some(owner),
+                );
+                assert!(vouched(&limits, &token, now));
+                for _ in 0..own {
+                    if limits
+                        .request(&request, Some(&token), Some(place(gateway)), now)
+                        .is_ok()
+                    {
+                        served += 1;
+                    }
+                }
+            }
+            assert_eq!(served, own);
+            // The owner's two sessions beside them, at two more addresses.
+            for session in 0..2 {
+                let token = Token::generate().unwrap();
+                limits.issued(&token, now);
+                assert_eq!(
+                    served_with(&mut limits, &request, &token, place(20 + session), now, own),
+                    own
+                );
+            }
+            // A quarter of the window is left for someone else's session.
+            let other = Token::generate().unwrap();
+            limits.issued(&other, now);
+            assert_eq!(
+                served_with(&mut limits, &request, &other, place(30), now, shared),
+                own
+            );
+            // Another account's gateway has a budget of its own.
+            let later = now + Duration::from_secs(1);
+            let theirs = Token::generate().unwrap();
+            answer_of(
+                &mut limits,
+                &Request::GatewayStatus,
+                &theirs,
+                None,
+                Some([8; 16]),
+            );
+            let mine = Token::generate().unwrap();
+            answer_of(
+                &mut limits,
+                &Request::GatewayStatus,
+                &mine,
+                None,
+                Some(owner),
+            );
+            assert_eq!(
+                served_with(&mut limits, &request, &mine, place(1), later, own),
+                own
+            );
+            assert_eq!(
+                served_with(&mut limits, &request, &theirs, place(2), later, own),
+                own
+            );
+        }
+    }
+
+    /// `count` requests with `bearer` at one instant; how many were served.
+    fn served_with(
+        limits: &mut Limits,
+        request: &Request,
+        bearer: &Token,
+        from: Place,
+        now: Instant,
+        count: u32,
+    ) -> u32 {
+        let mut served = 0;
+        for _ in 0..count {
+            if limits
+                .request(request, Some(bearer), Some(from), now)
+                .is_ok()
+            {
+                served += 1;
+            }
+        }
+        served
+    }
+
+    /// An answer vouches for a bearer only once the store has said whose
+    /// it is. Until then, and when the store could not be asked, the
+    /// bearer waits with the strangers; one that is vouched for is never
+    /// asked about again, and keeps its owner when it is vouched for anew.
+    #[test]
+    fn a_bearer_is_vouched_for_once_the_store_said_whose_it_is() {
+        let now = Instant::now();
+        let bridge = Token::generate().unwrap();
+        let mut limits = Limits::keeping(bridge.digest());
+        let token = Token::generate().unwrap();
+        let status = told(&Request::GatewayStatus, Some(&token)).unwrap();
+        assert!(limits.answered(&status, None, now), "nobody knows whose");
+        assert!(!vouched(&limits, &token, now), "and nobody was asked yet");
+        // The store did not answer: asked again with the next answer.
+        assert!(limits.answered(&status, None, now));
+        limits.vouch(&status, Some([7; 16]), now);
+        assert!(vouched(&limits, &token, now));
+        assert!(!limits.answered(&status, None, now), "known from here on");
+        assert!(limits.proven.unit(&token.digest(), now) == Some(Unit::Owner([7; 16])));
+        // A refusal, or an answer that tells nothing, asks nobody.
+        let stranger = Token::generate().unwrap();
+        let refused = told(&Request::GatewayStatus, Some(&stranger)).unwrap();
+        assert!(!limits.answered(&refused, Some(&Error::Rejected), now));
+        let silent = told(&Request::KeyCheckStatus, Some(&stranger));
+        assert!(silent.is_none_or(|silent| !limits.answered(&silent, None, now)));
+        // The bridge is configured: nobody is asked whose it is.
+        let beat = told(&Request::GatewayStatus, Some(&bridge)).unwrap();
+        assert!(!limits.answered(&beat, None, now));
+        assert!(limits.proven.unit(&bridge.digest(), now) == Some(Unit::Bearer(bridge.digest())));
+        // Four refusals take the vouching back, and the owner with it:
+        // the next answer asks the store again.
+        for _ in 0..REFUSALS {
+            assert!(!limits.answered(&status, Some(&Error::Rejected), now));
+        }
+        assert!(!vouched(&limits, &token, now));
+        assert!(limits.answered(&status, None, now));
     }
 
     /// A gateway asks about its players with its own credential, and a
@@ -1258,7 +1483,10 @@ mod tests {
         assert!(!vouched(&limits, &token, at(PROVEN_SECONDS)));
         // Every answer that vouches starts the half hour again.
         let told = told(&Request::RenewSession, Some(&token)).unwrap();
-        limits.answered(&told, None, at(600));
+        assert!(
+            !limits.answered(&told, None, at(600)),
+            "held: nobody is asked"
+        );
         assert!(vouched(&limits, &token, at(600 + PROVEN_SECONDS - 1)));
         assert!(!vouched(&limits, &token, at(600 + PROVEN_SECONDS)));
         // After it the session's next request is a stranger's, is served
@@ -1268,7 +1496,8 @@ mod tests {
             .request(&Request::RenewSession, Some(&token), Some(place(1)), later)
             .unwrap();
         assert!(limits.peers.is_empty());
-        limits.answered(&told, None, later);
+        assert!(limits.answered(&told, None, later), "whose it is, is asked");
+        limits.vouch(&told, None, later);
         limits
             .request(&Request::RenewSession, Some(&token), Some(place(1)), later)
             .unwrap();
@@ -1310,22 +1539,26 @@ mod tests {
         let mut proven = Proven::default();
         for n in 0..PROVEN {
             // The first is the oldest; the rest came a second later.
-            proven.mark(digest(n), start + Duration::from_secs(u64::from(n > 0)));
+            proven.mark(
+                digest(n),
+                None,
+                start + Duration::from_secs(u64::from(n > 0)),
+            );
         }
         assert_eq!(proven.known.len(), PROVEN);
         let soon = start + Duration::from_secs(2);
         // Vouched for again, a bearer needs no new room.
-        proven.mark(digest(1), soon);
+        proven.mark(digest(1), None, soon);
         assert_eq!(proven.known.len(), PROVEN);
         assert!(proven.holds(&digest(0), soon));
         // One more takes the place of the one last vouched for longest ago.
-        proven.mark(digest(PROVEN), soon);
+        proven.mark(digest(PROVEN), None, soon);
         assert_eq!(proven.known.len(), PROVEN);
         assert!(!proven.holds(&digest(0), soon));
         assert!(proven.holds(&digest(1), soon) && proven.holds(&digest(PROVEN), soon));
         // Half an hour on, the next one sweeps everything that passed.
         let later = start + Duration::from_secs(PROVEN_SECONDS + 60);
-        proven.mark(digest(7), later);
+        proven.mark(digest(7), None, later);
         assert_eq!(proven.known.len(), 1);
     }
 
