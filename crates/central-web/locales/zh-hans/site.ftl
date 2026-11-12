@@ -182,7 +182,8 @@ faq-account-a = 单人游玩不需要：套牌构筑器和与内置 AI 的对局
 faq-data-q = 我的数据会怎样处理？
 faq-data-a = 尽可能少；<privacy>隐私声明</privacy>里写得很准确。你的密码不会离开你的浏览器；你的私人数据和聊天消息在到达我们之前，就已在你的设备上加密。
 faq-password-q = 我忘记了密码，怎么办？
-faq-password-a = 你可以凭管理员给你的重置码，在<reset>此页面</reset>设置新密码。只有拥有创建账号时收到的恢复码，你的加密数据才会保留。没有它，你将从一个空保险库开始，那些数据就丢失了。
+# English for now: to be translated.
+faq-password-a = You set a new password with a reset code, <reset>on this page</reset>. If your account has a confirmed e-mail address, you can have the code sent to it there; otherwise an administrator gives you one. Your encrypted data survives only if you have the recovery code you received when you created your account. Without it you start with an empty vault, and that data is lost.
 faq-gateway-q = 什么是 Gateway？
 faq-gateway-a = 在线牌桌所在的服务器。任何人都可以运行一个；<gateways>目录</gateways>列出了 Central 所知道的那些。
 faq-systems-q = 它能在哪些系统上运行？
@@ -247,7 +248,7 @@ fc-policy = 威世智的<policy>《爱好者内容方针》</policy>
 
 privacy-title = 隐私声明
 privacy-lead = 本站和 Baylee Central 会处理你的哪些信息、为什么处理、法律依据是什么，以及保存多久。
-privacy-updated = 截至 2026 年 11 月 11 日
+privacy-updated = 截至 2026 年 11 月 12 日
 privacy-controller-title = 谁是责任方
 privacy-controller = GDPR（《通用数据保护条例》）所称的控制者，是<impressum>法律声明</impressum>中列出的那位自然人，声明中给出了其姓名、邮寄地址和电子邮件地址。你也可以通过联系表单发送隐私方面的问题。我们没有数据保护官；也没有法律要求设置。
 privacy-short-title = 简而言之
@@ -264,6 +265,10 @@ privacy-directory-title = Gateway 目录
 privacy-directory = 我们的服务器从 Baylee Central 读取 Gateway 目录并加以显示；这不涉及关于你的任何信息。Gateway 可以告诉 Central 它此刻有多少玩家已连接、其中有多少人在对局中，以及有多少开放牌桌和对局，Central 也会统计其账号数量；本站会显示这些数字。它们只是数量，绝不是名字，而 Gateway 的数字是其运营者自己的陈述。
 privacy-account-title = 你的账号
 privacy-account = 对于一个账号，Baylee Central 会存储：你的账号 ID、你的登录名、你的显示名及其标签、账号创建的时间和方式、一条 OPAQUE 密码记录（它让你可以证明自己知道密码，而我们的服务器始终不会得知密码）、被你的密码和你的恢复码各加密一次的主密钥、你的加密账号文档和你的加密对象（我们无法读取；我们只看得到大小、修订号和时间）、你接受了哪个版本的条款以及接受的时间、你上次登录的时间、你的会话、管理员角色（如果你有的话），以及你注册的 Gateways 及其令牌。其他玩家看到的是你的显示名和标签，而不是你的登录名。如果管理员给你一个重置码，我们只存储它的摘要，直到该重置码被使用或已过期。管理员对某个账号或 Gateway 所做的操作会记录在案并保存三年（谁、做了什么、涉及哪个账号或 Gateway、何时）。法律依据：GDPR 第 6 条第 1 款 (b) 项（你所请求的账号）；对于上次登录的时间和该记录，则是 GDPR 第 6 条第 1 款 (f) 项（我们在安全、可追溯的运营方面的合法利益）。没有登录名和密码就没有账号；你不需要电子邮件地址。你从 16 岁起可以创建账号。保存到你删除账号为止；删除后，数据会立即从运行中的系统中移除，并最迟在 12 个月内从备份中移除。会话在 30 分钟未使用后结束，最迟在登录 12 小时后结束。
+# English for now: to be translated.
+privacy-email-title = E-mail address
+# English for now: to be translated.
+privacy-email = An e-mail address is optional; an account needs none. If you give one, Baylee Central stores the address and whether and when you confirmed it. Of every code we mail, we store only a digest, until the code is used or has expired. We use the address for three things: to send the code that confirms it, to send a reset code when you ask for one, and to tell the old address when it is replaced or removed. The mail is sent by Baylee's own mail service on the same server through mailbox.org (Heinlein Hosting GmbH, Berlin), which acts as a processor. Legal basis: Art. 6(1)(b) GDPR (the account you asked for). Kept until you remove the address or delete the account.
 privacy-cookie-title = 会话 Cookie
 privacy-cookie = 登录会设置一个 Cookie：<code>__Host-central</code>，它是用来标识你的会话的随机数。它只会发送给 baylee.app，脚本无法读取，并随会话结束而失效，最迟 12 小时后失效。它是让你保持登录所严格必需的，无需同意。法律依据：TDDDG 第 25 条第 2 款第 2 项以及 GDPR 第 6 条第 1 款 (b) 项。
 privacy-chat-title = 聊天和联系人
@@ -499,10 +504,12 @@ code-copy-failed = 这里无法复制。请选中代码，手动复制。
 ## Setting a new password with a reset code
 
 reset-title = 设置新密码
-reset-lead = 适用于忘记密码的情况：管理员会给你一个重置码，你可凭它在这里设置新密码。
+# English for now: to be translated.
+reset-lead = For when you forgot your password: with a reset code you set a new one here. The code comes by e-mail to your confirmed address, or from an administrator.
 reset-noscript = 设置新密码需要 JavaScript：你的密码和恢复码在你的浏览器中处理，绝不会发送给我们。
 reset-code = 重置码
-reset-code-hint = 由管理员提供。以 RESET 开头，生成后 24 小时内有效，且只能使用一次。
+# English for now: to be translated.
+reset-code-hint = By e-mail or from an administrator. It starts with RESET and works once: for one hour if it came by e-mail, for 24 hours if an administrator made it.
 reset-data = 你的加密数据
 reset-keep = 我有恢复码。保留我的数据。
 reset-new = 我没有恢复码。从空保险库开始。
@@ -524,6 +531,24 @@ reset-unsure-title = 没有收到回应
 reset-unsure = 在 Baylee Central 回应之前连接中断了，所以我们无法确定你的新密码是否已设置。请尝试用它登录。如果登录失败，说明没有任何更改：你的重置码仍然有效，请在这里重新输入。
 reset-unsure-code = 如果你的新密码可用，这就是你的新恢复码，旧的已不能使用；它不能再次显示，所以请现在就保存。如果你的新密码不可用，这个码就一文不值。
 reset-to-signin = 登录
+# English for now: to be translated.
+reset-mail-title = No reset code?
+# English for now: to be translated.
+reset-mail-lead = Enter your sign-in name. If your account has a confirmed e-mail address, we send a reset code to it.
+# English for now: to be translated.
+reset-mail-name-hint = The name you sign in with, not your e-mail address.
+# English for now: to be translated.
+reset-mail-submit = Send a code by e-mail
+# English for now: to be translated.
+reset-mail-error-name = That is not a sign-in name. Enter the name you sign in with, not your e-mail address.
+# English for now: to be translated.
+reset-mail-sent = If this account has a confirmed e-mail address, a reset code is on its way to it. It is valid for one hour.
+# English for now: to be translated.
+reset-mail-busy = Too many requests for now. Try again later.
+# English for now: to be translated.
+reset-mail-none = This server sends no mail. Ask an administrator for a reset code.
+# English for now: to be translated.
+reset-mail-early = That was too quick. Try again in a moment.
 
 ## Changing the password
 
@@ -535,6 +560,83 @@ password-missing = 请输入你的当前密码和新密码。
 password-error-current = 当前密码不正确。请检查后重试。
 password-changed = 你的密码已更改。你在这里保持登录，在其他所有地方（包括 Baylee 客户端）都已退出登录；请在那里用新密码登录。
 password-unsure = 没有收到回应，所以我们无法确定你的密码是否已更改。下次登录时，先试新密码，再试旧密码。
+
+## An account's e-mail address
+
+# English for now: to be translated.
+email-title = E-mail address
+# English for now: to be translated.
+email-lead = An e-mail address is optional. We use it to send you a reset code when you ask for one, and to tell you when the address is replaced or removed.
+# English for now: to be translated.
+email-warning = Whoever can read this mailbox can reset your sign-in. Your encrypted data survives a reset only with your recovery code.
+# English for now: to be translated.
+email-no-mail = This server sends no mail, so an e-mail address cannot be set or confirmed here.
+# English for now: to be translated.
+email-unavailable = The e-mail address cannot be shown right now.
+# English for now: to be translated.
+email-password-hint = Your current password, so that nobody else at this browser decides who can reset your sign-in.
+# English for now: to be translated.
+email-submit = Send confirmation code
+# English for now: to be translated.
+email-missing = Enter an e-mail address and your password.
+# English for now: to be translated.
+email-error-address = We cannot write to this address. Enter one plain address such as name@example.org; accented letters and umlauts do not work.
+# English for now: to be translated.
+email-current = Your address
+# English for now: to be translated.
+email-confirmed-at = Confirmed
+# English for now: to be translated.
+email-waiting = Waits for its code
+# English for now: to be translated.
+email-change = Change
+# English for now: to be translated.
+email-change-lead = Your current address stays in use until you have confirmed the new one.
+# English for now: to be translated.
+email-change-cancel = Keep the current address
+# English for now: to be translated.
+email-remove = Remove
+# English for now: to be translated.
+email-remove-ask = Remove this address? We tell the address that it was removed. After that you can no longer get a reset code by e-mail.
+# English for now: to be translated.
+email-remove-ask-no-mail = Remove this address? While this server sends no mail, you cannot set one again.
+# English for now: to be translated.
+email-remove-confirm = Remove address
+# English for now: to be translated.
+email-remove-keep = Keep it
+# English for now: to be translated.
+email-pending = We sent a code to <code>{ $address }</code>. It is valid for 15 minutes.
+# English for now: to be translated.
+email-pending-keeps = Until you confirm it, <code>{ $address }</code> stays your address.
+# English for now: to be translated.
+email-code = Confirmation code
+# English for now: to be translated.
+email-code-hint = Eight characters, as in XXXX-XXXX. Upper or lower case, with or without the hyphen.
+# English for now: to be translated.
+email-confirm = Confirm
+# English for now: to be translated.
+email-resend = Send again
+# English for now: to be translated.
+email-other = Use another address
+# English for now: to be translated.
+email-withdraw = Withdraw
+# English for now: to be translated.
+email-error-code = That is not a confirmation code. It has eight characters, as in XXXX-XXXX.
+# English for now: to be translated.
+email-wrong-code = That code is not right. Check it and try again. After several wrong codes you have to enter the address again.
+# English for now: to be translated.
+email-now-confirmed = Your e-mail address is confirmed.
+# English for now: to be translated.
+email-resent = A new code is on its way. The earlier one no longer works.
+# English for now: to be translated.
+email-withdrawn = The address is withdrawn. No code is waited for any more.
+# English for now: to be translated.
+email-removed = Your e-mail address is removed.
+# English for now: to be translated.
+email-busy = Too many mails for now. Try again later.
+# English for now: to be translated.
+email-same = This is your address already.
+# English for now: to be translated.
+email-unsure = No answer came back, so we cannot tell whether that went through. Look at what is shown here, and try again if it did not.
 
 ## Central's terms
 
@@ -601,6 +703,8 @@ privacy-export-title = 导出你的数据
 privacy-export-lead = Baylee Central 所掌握的关于你账号的信息，以 JSON 文件形式提供：其基本数据、会话、已接受的条款、你的 Gateways，以及点名你账号的审计条目。你的加密内容只能由你的 Baylee 客户端解密并导出。导出需要 30 分钟以内的登录。
 privacy-export-make = 准备导出
 privacy-export-save = 保存导出文件
+# English for now: to be translated.
+privacy-export-no-email = The e-mail address could not be read; it is not in this file.
 privacy-delete-title = 删除你的账号
 privacy-delete-lead = 你的账号、其数据、其会话、你的联系人以及你拥有的 Gateways，会立即并永久地从运行中的系统删除；它们最迟在 12 个月内从备份中消失。Central 也会删除你发送的消息；其他人已经存储在其设备上的内容可能仍会保留在那里。
 privacy-delete-start = 删除我的账号

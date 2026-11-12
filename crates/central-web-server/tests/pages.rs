@@ -548,6 +548,36 @@ async fn the_reset_page_is_linked_from_signing_in_and_listed_nowhere() {
     }
 }
 
+/// The privacy notice tells of the optional e-mail address in a part of
+/// its own, after the account's, in the contents too; the account's part
+/// still says that no account needs one.
+#[tokio::test]
+async fn the_privacy_notice_has_a_part_for_the_e_mail_address() {
+    let app = app(true);
+    for lang in Lang::ALL {
+        let (status, _, html) = get(&app, &format!("/{}/privacy", lang.code()), &[]).await;
+        assert_eq!(status, StatusCode::OK, "{lang:?}");
+        assert_eq!(count(&html, "<h2 id=\"email\">"), 1, "{lang:?}");
+        assert_eq!(count(&html, "href=\"#email\""), 1, "{lang:?}");
+        let at = |id: &str| html.find(&format!("<h2 id=\"{id}\">")).expect("a part");
+        assert!(
+            at("account") < at("email") && at("email") < at("cookie"),
+            "{lang:?}"
+        );
+        assert!(
+            html.contains("mailbox.org (Heinlein Hosting GmbH, Berlin)"),
+            "{lang:?}"
+        );
+    }
+    let (_, _, english) = get(&app, "/en/privacy", &[]).await;
+    assert!(english.contains("An e-mail address is optional; an account needs none."));
+    assert!(english.contains("you need no e-mail address"));
+    assert!(english.contains("As of 12 November 2026"));
+    let (_, _, german) = get(&app, "/de/privacy", &[]).await;
+    assert!(german.contains("Eine E-Mail-Adresse ist freiwillig; ein Account braucht keine."));
+    assert!(german.contains("eine E-Mail-Adresse brauchst du nicht"));
+}
+
 /// Central's figures (the accounts, and what a gateway says is happening
 /// on it): in the strip and on the gateway's card while a source reports
 /// them, and nowhere when nobody does. A number nobody reported is never

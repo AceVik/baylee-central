@@ -182,7 +182,7 @@ faq-account-a = Not to play alone: the deck builder and matches against the hous
 faq-data-q = What happens to my data?
 faq-data-a = As little as possible; the <privacy>privacy notice</privacy> says exactly what. Your password never leaves your browser; your private data and your chat messages are encrypted on your device before they reach us.
 faq-password-q = I forgot my password. What now?
-faq-password-a = You set a new password with a reset code that an administrator gives you, <reset>on this page</reset>. Your encrypted data survives only if you have the recovery code you received when you created your account. Without it you start with an empty vault, and that data is lost.
+faq-password-a = You set a new password with a reset code, <reset>on this page</reset>. If your account has a confirmed e-mail address, you can have the code sent to it there; otherwise an administrator gives you one. Your encrypted data survives only if you have the recovery code you received when you created your account. Without it you start with an empty vault, and that data is lost.
 faq-gateway-q = What is a gateway?
 faq-gateway-a = A server where online tables live. Anyone can run one; the <gateways>directory</gateways> lists those Central knows.
 faq-systems-q = Which systems does it run on?
@@ -247,7 +247,7 @@ fc-policy = Wizards of the Coast's <policy>Fan Content Policy</policy>
 
 privacy-title = Privacy notice
 privacy-lead = What this site and Baylee Central process about you, why, on which legal basis and for how long.
-privacy-updated = As of 11 November 2026
+privacy-updated = As of 12 November 2026
 privacy-controller-title = Who is responsible
 privacy-controller = The controller under the GDPR is the private person named in the <impressum>legal notice</impressum>, which gives their name, postal address and e-mail address. You can also send privacy questions through the contact form. There is no data protection officer; none is required.
 privacy-short-title = In short
@@ -264,6 +264,8 @@ privacy-directory-title = The gateway directory
 privacy-directory = Our server reads the directory of gateways from Baylee Central and shows it; nothing about you is involved. A gateway may tell Central how many players are connected at the moment, how many of them are in a game, and how many open tables and games it has, and Central counts its accounts; the site shows these numbers. They are counts only, never names, and a gateway's numbers are its operator's own statement.
 privacy-account-title = Your account
 privacy-account = For an account, Baylee Central stores: your account id, your sign-in name, your display name with its tag, when and how the account was created, an OPAQUE password record (which lets you prove your password without our server ever learning it), your master key twice encrypted (by your password and by your recovery code), your encrypted account document and your encrypted objects (unreadable to us; we see only size, revision and time), which version of the terms you accepted and when, the time of your last sign-in, your sessions, an administrator role if you have one, and the gateways you register with their tokens. Other players see your display name and tag, never your sign-in name. If an administrator gives you a reset code, we store only its digest until the code is used or has expired. What administrators do to an account or gateway is kept in a record for three years (who, what, which account or gateway, when). Legal basis: Art. 6(1)(b) GDPR (the account you asked for); for the time of the last sign-in and the record, Art. 6(1)(f) GDPR (our legitimate interest in secure, traceable operation). Without a sign-in name and a password there is no account; you need no e-mail address. You may create an account from the age of 16. Kept until you delete the account; it is then removed from the running system at once, and from backups within 12 months at the latest. Sessions end after 30 minutes without use and at the latest 12 hours after signing in.
+privacy-email-title = E-mail address
+privacy-email = An e-mail address is optional; an account needs none. If you give one, Baylee Central stores the address and whether and when you confirmed it. Of every code we mail, we store only a digest, until the code is used or has expired. We use the address for three things: to send the code that confirms it, to send a reset code when you ask for one, and to tell the old address when it is replaced or removed. The mail is sent by Baylee's own mail service on the same server through mailbox.org (Heinlein Hosting GmbH, Berlin), which acts as a processor. Legal basis: Art. 6(1)(b) GDPR (the account you asked for). Kept until you remove the address or delete the account.
 privacy-cookie-title = The session cookie
 privacy-cookie = Signing in sets one cookie, <code>__Host-central</code>: a random number that identifies your session. It is sent only to baylee.app, cannot be read by scripts and ends with the session, after 12 hours at the latest. It is strictly necessary to keep you signed in; it needs no consent. Legal basis: § 25(2) no. 2 TDDDG and Art. 6(1)(b) GDPR.
 privacy-chat-title = Chat and contacts
@@ -499,10 +501,10 @@ code-copy-failed = Copying did not work here. Select the code and copy it by han
 ## Setting a new password with a reset code
 
 reset-title = Set a new password
-reset-lead = For when you forgot your password: an administrator gives you a reset code, and with it you set a new one here.
+reset-lead = For when you forgot your password: with a reset code you set a new one here. The code comes by e-mail to your confirmed address, or from an administrator.
 reset-noscript = Setting a new password needs JavaScript: your password and your recovery code are processed in your browser and never sent to us.
 reset-code = Reset code
-reset-code-hint = From an administrator. It starts with RESET and works once, within 24 hours of being made.
+reset-code-hint = By e-mail or from an administrator. It starts with RESET and works once: for one hour if it came by e-mail, for 24 hours if an administrator made it.
 reset-data = Your encrypted data
 reset-keep = I have my recovery code. My data stays.
 reset-new = I do not have it. Start with an empty vault.
@@ -524,6 +526,15 @@ reset-unsure-title = No answer came back
 reset-unsure = The connection broke before Baylee Central answered, so we cannot tell whether your new password was set. Try to sign in with it. If that fails, nothing was changed: your reset code still works, enter it here again.
 reset-unsure-code = If your new password works, this is your new recovery code and the old one no longer works; it cannot be shown again, so save it now. If your new password does not work, this code is worth nothing.
 reset-to-signin = Sign in
+reset-mail-title = No reset code?
+reset-mail-lead = Enter your sign-in name. If your account has a confirmed e-mail address, we send a reset code to it.
+reset-mail-name-hint = The name you sign in with, not your e-mail address.
+reset-mail-submit = Send a code by e-mail
+reset-mail-error-name = That is not a sign-in name. Enter the name you sign in with, not your e-mail address.
+reset-mail-sent = If this account has a confirmed e-mail address, a reset code is on its way to it. It is valid for one hour.
+reset-mail-busy = Too many requests for now. Try again later.
+reset-mail-none = This server sends no mail. Ask an administrator for a reset code.
+reset-mail-early = That was too quick. Try again in a moment.
 
 ## Changing the password
 
@@ -535,6 +546,46 @@ password-missing = Enter your current password and a new one.
 password-error-current = The current password is not right. Check it and try again.
 password-changed = Your password is changed. You stay signed in here and are signed out everywhere else, the Baylee client included; sign in there with the new password.
 password-unsure = No answer came back, so we cannot tell whether your password was changed. When you sign in next, try the new password first, then the old one.
+
+## An account's e-mail address
+
+email-title = E-mail address
+email-lead = An e-mail address is optional. We use it to send you a reset code when you ask for one, and to tell you when the address is replaced or removed.
+email-warning = Whoever can read this mailbox can reset your sign-in. Your encrypted data survives a reset only with your recovery code.
+email-no-mail = This server sends no mail, so an e-mail address cannot be set or confirmed here.
+email-unavailable = The e-mail address cannot be shown right now.
+email-password-hint = Your current password, so that nobody else at this browser decides who can reset your sign-in.
+email-submit = Send confirmation code
+email-missing = Enter an e-mail address and your password.
+email-error-address = We cannot write to this address. Enter one plain address such as name@example.org; accented letters and umlauts do not work.
+email-current = Your address
+email-confirmed-at = Confirmed
+email-waiting = Waits for its code
+email-change = Change
+email-change-lead = Your current address stays in use until you have confirmed the new one.
+email-change-cancel = Keep the current address
+email-remove = Remove
+email-remove-ask = Remove this address? We tell the address that it was removed. After that you can no longer get a reset code by e-mail.
+email-remove-ask-no-mail = Remove this address? While this server sends no mail, you cannot set one again.
+email-remove-confirm = Remove address
+email-remove-keep = Keep it
+email-pending = We sent a code to <code>{ $address }</code>. It is valid for 15 minutes.
+email-pending-keeps = Until you confirm it, <code>{ $address }</code> stays your address.
+email-code = Confirmation code
+email-code-hint = Eight characters, as in XXXX-XXXX. Upper or lower case, with or without the hyphen.
+email-confirm = Confirm
+email-resend = Send again
+email-other = Use another address
+email-withdraw = Withdraw
+email-error-code = That is not a confirmation code. It has eight characters, as in XXXX-XXXX.
+email-wrong-code = That code is not right. Check it and try again. After several wrong codes you have to enter the address again.
+email-now-confirmed = Your e-mail address is confirmed.
+email-resent = A new code is on its way. The earlier one no longer works.
+email-withdrawn = The address is withdrawn. No code is waited for any more.
+email-removed = Your e-mail address is removed.
+email-busy = Too many mails for now. Try again later.
+email-same = This is your address already.
+email-unsure = No answer came back, so we cannot tell whether that went through. Look at what is shown here, and try again if it did not.
 
 ## Central's terms
 
@@ -601,6 +652,7 @@ privacy-export-title = Export your data
 privacy-export-lead = What Baylee Central knows about your account, as a JSON file: its basic data, sessions, accepted terms, your gateways and the audit entries naming your account. Your encrypted contents can only be decrypted and exported by your Baylee client. The export needs a sign-in less than 30 minutes old.
 privacy-export-make = Prepare the export
 privacy-export-save = Save the export
+privacy-export-no-email = The e-mail address could not be read; it is not in this file.
 privacy-delete-title = Delete your account
 privacy-delete-lead = Your account, its data, its sessions, your contacts and the gateways you own are deleted from the running system at once and for good; they leave the backups within 12 months at the latest. Central deletes the messages you sent as well; what others have already stored on their devices may stay there.
 privacy-delete-start = Delete my account
