@@ -5,6 +5,7 @@
 use super::{Credential, Error, IdentityService, Place, Request, Response, Surface, Token};
 use central_api::reset_code::ResetCode;
 use central_api::wire::ResetVault;
+use central_mail::Mail;
 use std::time::{Duration, Instant};
 
 /// Pending resets at once; a start needs a valid code, so few are expected.
@@ -127,13 +128,22 @@ impl IdentityService {
         if pending.expires <= Instant::now() || pending.surface != surface {
             return Err(Error::Rejected);
         }
-        self.store
+        let account = pending.credential.identity.account;
+        let done = self
+            .store
             .finish_reset(&pending.credential, &pending.digest, record, wrapped, vault)
-            .await?;
+            .await
+            .map(|told| ((), told));
+        // The account's confirmed address is told, later, whether the data
+        // stayed or a new vault began.
+        let new_vault = matches!(vault, ResetVault::New { .. });
+        self.mails.committed(done, account, |to, account, lang| {
+            Mail::reset_done(to, account, lang, new_vault)
+        })?;
         // Whoever knew the old password has no place of the account's any
         // more. The one the code was used from is its own: the code is the
         // stronger secret, and its user signs in there next.
-        self.changed(pending.credential.identity.account, place);
+        self.changed(account, place);
         Ok(Response::Done)
     }
 }

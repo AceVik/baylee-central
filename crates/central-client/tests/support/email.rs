@@ -7,6 +7,11 @@
 //! after a restart, directly: its budgets are its own, so nothing here
 //! spends what the listeners' service counts. The last part asks through
 //! the real listeners, where each address has its hour's requests.
+//!
+//! The notices that a login changed (a reset, a new password, an
+//! administrator's code) are followed through both: the listeners' service
+//! queues them for the resets and the password change made over HTTP, the
+//! second service for those made directly.
 use super::{
     Http,
     browser::{Browser, accept_terms},
@@ -14,11 +19,11 @@ use super::{
     password::{DOCUMENT, NEW, OLD, Registered, browser_sign_in, context, register, sign_in},
 };
 use central_api::{
-    Error, Token,
+    Endpoint, Error, Token,
     admin::{AdminAnswer, AdminRequest},
     email::{EmailRequest, EmailState, MailCode},
     reset_code::ResetCode,
-    wire::{Identity, Request, Response},
+    wire::{Discovery, Identity, Request, Response},
 };
 use central_client::{ResetData, Transport};
 use central_crypto::opaque::server::ServerKeys;
@@ -205,6 +210,62 @@ impl Asked<'_> {
     fn deliver(&self) -> Option<Delivery> {
         self.runtime.block_on(self.service.deliver_mail())
     }
+
+    /// An administrator's request on the website's listener.
+    fn admin(&self, cookie: &Token, request: AdminRequest) -> Result<AdminAnswer, Error> {
+        pace();
+        let reply = self.runtime.block_on(self.service.handle_browser_from(
+            Request::Admin { request },
+            Some(cookie),
+            None,
+            Seen::default(),
+        ))?;
+        let Response::Admin { answer } = reply.response else {
+            panic!("an administrator's answer");
+        };
+        Ok(answer)
+    }
+
+    /// The reset code an administrator makes for `account`.
+    fn issue(&self, cookie: &Token, account: [u8; 16]) -> Result<ResetCode, Error> {
+        let AdminAnswer::ResetCode { code, .. } =
+            self.admin(cookie, AdminRequest::ResetLogin { account })?
+        else {
+            panic!("a reset code");
+        };
+        Ok(code)
+    }
+
+    /// The service as the SDK's transport.
+    fn direct<'a>(&'a self, endpoint: &'a Endpoint) -> Direct<'a> {
+        Direct {
+            service: self.service,
+            runtime: self.runtime,
+            endpoint,
+        }
+    }
+}
+
+/// A service asked directly on the account listener's behalf, as the
+/// SDK's transport: a sign-in, a password change, a reset.
+struct Direct<'a> {
+    service: &'a IdentityService,
+    runtime: &'a Runtime,
+    endpoint: &'a Endpoint,
+}
+
+impl Transport for Direct<'_> {
+    fn endpoint(&self) -> &Endpoint {
+        self.endpoint
+    }
+
+    fn exchange(&self, request: &Request, bearer: Option<&Token>) -> Result<Response, Error> {
+        pace();
+        // As a listener reads it: the request's wire bytes.
+        let request = central_api::decode(&central_api::encode(request)?)?;
+        self.runtime
+            .block_on(self.service.handle_from(request, bearer, None))
+    }
 }
 
 /// A registered account with the terms accepted and a fresh sign-in on
@@ -292,6 +353,13 @@ pub(crate) fn run(fixture: &Fixture<'_>) {
     unsent(fixture, &asked, &flaky);
     without_a_mailer(fixture, &asked, &flaky);
     whole(fixture);
+    let third = Browser {
+        address: fixture.browser.address,
+        client: "198.51.100.92",
+    };
+    let changed = password_notices(fixture, &asked, &third);
+    let admin = reset_notices(fixture, &asked, &third);
+    untold(fixture, &asked, &plain, &changed, &admin);
     listeners(fixture, &home, &owner);
 }
 
@@ -624,7 +692,18 @@ fn stale(fixture: &Fixture<'_>, account: &Account) {
 
 /// Give `account` the confirmed address `address`.
 fn addressed(fixture: &Fixture<'_>, asked: &Asked<'_>, account: &Account, address: &str) {
-    asked.web(&account.cookie, set(address, "en")).unwrap();
+    addressed_in(fixture, asked, account, address, "en");
+}
+
+/// Give `account` the confirmed address `address`, named in `lang`.
+fn addressed_in(
+    fixture: &Fixture<'_>,
+    asked: &Asked<'_>,
+    account: &Account,
+    address: &str,
+    lang: &str,
+) {
+    asked.web(&account.cookie, set(address, lang)).unwrap();
     let code = fixture.mailer.code();
     holds(
         &asked.web(&account.cookie, confirm(&code)).unwrap(),
@@ -716,6 +795,7 @@ fn redeemed(
     reset_code: &str,
 ) {
     let (http, mailer) = (fixture.http, fixture.mailer);
+    let handed = mailer.count();
     let code = || ResetCode::parse(reset_code).unwrap();
     let kept = ResetData::Recovery(&ordinary.registered.code);
     assert!(
@@ -768,11 +848,247 @@ fn redeemed(
         .unwrap()
         .is_some()
     );
-    // With the administrator's code spent, the same request mails one.
+    // With the administrator's code spent, the same request mails one,
+    // the reset code itself: no notice that a code was made goes with it.
     asked.reset(ordinary.name).unwrap();
     assert_eq!(asked.deliver(), Some(Delivery::Sent));
+    assert_eq!(asked.deliver(), None);
     assert_eq!(mailer.count(), before + 1);
     assert_eq!(mailer.last().what, What::Reset);
+    // The two resets and the administrator's code went through the
+    // listeners: their service told the account's confirmed address of
+    // each, in order, and handed nothing over while it answered them.
+    assert_eq!(mailer.count(), handed + 1);
+    let account = ordinary.identity().account;
+    for what in [
+        What::ResetDone { new_vault: false },
+        What::ResetIssued,
+        What::ResetDone { new_vault: true },
+    ] {
+        assert_eq!(
+            fixture.runtime.block_on(fixture.service.deliver_mail()),
+            Some(Delivery::Sent)
+        );
+        noticed(mailer, ("mail-c@example.org", "en", account, what));
+    }
+    assert_eq!(
+        fixture.runtime.block_on(fixture.service.deliver_mail()),
+        None
+    );
+}
+
+/// The last mail handed over is the notice `what`, to `to` in `lang` for
+/// `account`, without a code and without a time to live.
+fn noticed(mailer: &Recorder, (to, lang, account, what): (&str, &str, [u8; 16], What)) {
+    let mail = mailer.last();
+    assert_eq!(
+        (mail.to.as_str(), mail.lang, mail.account, mail.what),
+        (to, lang, account, what)
+    );
+    assert!(mail.code.is_none() && mail.ttl.is_none());
+}
+
+/// Exactly one notice waits at `asked`'s service, and it is the one
+/// [`noticed`] names; it is handed over now, and nothing waits after it.
+fn tells(asked: &Asked<'_>, mailer: &Recorder, expected: (&str, &str, [u8; 16], What)) {
+    let before = mailer.count();
+    assert_eq!(asked.deliver(), Some(Delivery::Sent));
+    assert_eq!(asked.deliver(), None);
+    assert_eq!(mailer.count(), before + 1);
+    noticed(mailer, expected);
+}
+
+/// Nothing waits at `asked`'s service, and nothing is handed over.
+fn quiet(asked: &Asked<'_>, mailer: &Recorder) {
+    let before = mailer.count();
+    assert_eq!(asked.deliver(), None);
+    assert_eq!(mailer.count(), before);
+}
+
+const CHANGED: &str = "mail-g@example.org";
+
+/// A password change tells the account's confirmed address, off the
+/// request and in the language it was confirmed in; a change refused tells
+/// nobody. Returns the account, whose password is [`NEW`] now.
+fn password_notices(fixture: &Fixture<'_>, asked: &Asked<'_>, home: &Browser) -> Account {
+    let mailer = fixture.mailer;
+    let account = account(fixture, home, "mail-g");
+    addressed_in(fixture, asked, &account, CHANGED, "de");
+    let direct = asked.direct(&fixture.http.endpoint);
+    let mut session = central_client::login(&direct, account.identity(), OLD.into()).unwrap();
+    assert_eq!(
+        session
+            .change_password(&direct, "not the password".into(), NEW.into())
+            .err(),
+        Some(Error::Rejected)
+    );
+    quiet(asked, mailer);
+    let before = mailer.count();
+    session
+        .change_password(&direct, OLD.into(), NEW.into())
+        .unwrap();
+    assert_eq!(
+        mailer.count(),
+        before,
+        "nothing is handed over on the request"
+    );
+    let told = (
+        CHANGED,
+        "de",
+        account.identity().account,
+        What::PasswordChanged,
+    );
+    tells(asked, mailer, told);
+    session.logout(&direct).unwrap();
+    account
+}
+
+const RESET: &str = "mail-h@example.org";
+
+/// An administrator's code tells the account's confirmed address that a
+/// code exists, and each reset with it tells whether the data was kept; a
+/// refused code or reset tells nobody, and a notice the mailer does not
+/// take leaves the reset as it is. Returns the administrator.
+fn reset_notices(fixture: &Fixture<'_>, asked: &Asked<'_>, home: &Browser) -> Account {
+    let mailer = fixture.mailer;
+    let admin = account(fixture, home, "mail-i");
+    let holder = account(fixture, home, "mail-h");
+    addressed_in(fixture, asked, &holder, RESET, "it");
+    fixture
+        .runtime
+        .block_on(central_postgres::appoint_admin(fixture.operator, "mail-i"))
+        .unwrap();
+    let target = holder.identity().account;
+    // Refused: a code asked for by no administrator, and one for the
+    // administrator's own account.
+    for (cookie, whose) in [
+        (&holder.cookie, target),
+        (&admin.cookie, admin.identity().account),
+    ] {
+        assert_eq!(asked.issue(cookie, whose).err(), Some(Error::Rejected));
+    }
+    quiet(asked, mailer);
+    let before = mailer.count();
+    let printed = asked.issue(&admin.cookie, target).unwrap().display();
+    assert_eq!(
+        mailer.count(),
+        before,
+        "nothing is handed over on the request"
+    );
+    tells(asked, mailer, (RESET, "it", target, What::ResetIssued));
+    let code = || ResetCode::parse(&printed).unwrap();
+    let direct = asked.direct(&fixture.http.endpoint);
+    let kept = ResetData::Recovery(&holder.registered.code);
+    assert!(
+        central_client::reset(&direct, holder.name.into(), code(), NEW.into(), kept)
+            .unwrap()
+            .is_none()
+    );
+    let kept = What::ResetDone { new_vault: false };
+    tells(asked, mailer, (RESET, "it", target, kept));
+    // The code is spent: a second reset with it is refused, and tells
+    // nobody.
+    assert_eq!(
+        central_client::reset(
+            &direct,
+            holder.name.into(),
+            code(),
+            OLD.into(),
+            ResetData::New(DOCUMENT)
+        )
+        .err(),
+        Some(Error::Rejected)
+    );
+    quiet(asked, mailer);
+    new_vault(fixture, asked, &holder, &admin);
+    admin
+}
+
+/// The second half of [`reset_notices`]: a code used for a new vault, whose
+/// notice the mailer does not take.
+fn new_vault(fixture: &Fixture<'_>, asked: &Asked<'_>, account: &Account, admin: &Account) {
+    let mailer = fixture.mailer;
+    let target = account.identity().account;
+    let code = asked.issue(&admin.cookie, target).unwrap();
+    tells(asked, mailer, (RESET, "it", target, What::ResetIssued));
+    let direct = asked.direct(&fixture.http.endpoint);
+    assert!(
+        central_client::reset(
+            &direct,
+            account.name.into(),
+            code,
+            OLD.into(),
+            ResetData::New(DOCUMENT)
+        )
+        .unwrap()
+        .is_some()
+    );
+    mailer.next(Outcome::Unavailable);
+    assert_eq!(asked.deliver(), Some(Delivery::Failed));
+    assert_eq!(asked.deliver(), None);
+    noticed(
+        mailer,
+        (RESET, "it", target, What::ResetDone { new_vault: true }),
+    );
+    // Not handed over, and tried once: the reset stands all the same.
+    let Discovery::Central { identity } =
+        central_client::discover(&direct, account.name.into()).unwrap()
+    else {
+        panic!("an enrolled account");
+    };
+    assert_eq!(identity.epoch, account.identity().epoch + 1);
+    let session = central_client::login(&direct, identity, OLD.into()).unwrap();
+    assert_eq!(session.document(), DOCUMENT);
+    session.logout(&direct).unwrap();
+    quiet(asked, mailer);
+}
+
+/// Nobody is told where the account has no confirmed address, only one
+/// that waits, and where Central has no mailer.
+fn untold(
+    fixture: &Fixture<'_>,
+    asked: &Asked<'_>,
+    pending: &Account,
+    addressed: &Account,
+    admin: &Account,
+) {
+    let mailer = fixture.mailer;
+    let direct = asked.direct(&fixture.http.endpoint);
+    // `pending`'s address only waits for its code.
+    let mut session = central_client::login(&direct, pending.identity(), OLD.into()).unwrap();
+    session
+        .change_password(&direct, OLD.into(), NEW.into())
+        .unwrap();
+    session.logout(&direct).unwrap();
+    asked
+        .issue(&admin.cookie, pending.identity().account)
+        .unwrap();
+    quiet(asked, mailer);
+    // A Central without a mailer queues nothing, for an account with a
+    // confirmed address too: a password change, an administrator's code
+    // and a reset with it.
+    let central = fixture.central(false);
+    let without = Asked {
+        service: &central,
+        runtime: fixture.runtime,
+    };
+    let direct = without.direct(&fixture.http.endpoint);
+    let before = mailer.count();
+    let mut session = central_client::login(&direct, addressed.identity(), NEW.into()).unwrap();
+    session
+        .change_password(&direct, NEW.into(), OLD.into())
+        .unwrap();
+    let code = without
+        .issue(&admin.cookie, addressed.identity().account)
+        .unwrap();
+    let kept = ResetData::Recovery(&addressed.registered.code);
+    assert!(
+        central_client::reset(&direct, addressed.name.into(), code, NEW.into(), kept)
+            .unwrap()
+            .is_none()
+    );
+    assert_eq!(without.deliver(), None);
+    assert_eq!(mailer.count(), before);
 }
 
 /// A reset code whose mail the mailer does not take is taken back, and
@@ -971,6 +1287,12 @@ fn listeners(fixture: &Fixture<'_>, home: &Browser, account: &Account) {
         ),
         Err(Error::Rejected)
     ));
+    // The SDK's session changes the password over the account listener;
+    // the cookie's session ends with every other one.
+    let mut session = session;
+    session
+        .change_password(http, OLD.into(), NEW.into())
+        .unwrap();
     holds(
         &session.email(http, EmailRequest::Remove).unwrap(),
         None,
@@ -978,18 +1300,28 @@ fn listeners(fixture: &Fixture<'_>, home: &Browser, account: &Account) {
     );
     session.logout(http).unwrap();
     // What the listeners' service queued: thirteen requests, none of
-    // which mails a code, and the notice to the removed address.
+    // which mails a code, the notice that the password was changed to the
+    // address it had then, and the notice to the removed address.
+    let handed = mailer.count();
     let mut done = Vec::new();
     while let Some(delivery) = fixture.runtime.block_on(fixture.service.deliver_mail()) {
         done.push(delivery);
     }
-    assert_eq!(done.len(), 13);
-    assert_eq!(done.last(), Some(&Delivery::Sent));
+    assert_eq!(done.len(), 14);
+    assert_eq!(done[12..], [Delivery::Sent, Delivery::Sent]);
     assert!(
         done[..12]
             .iter()
             .all(|delivery| *delivery == Delivery::Nothing)
     );
-    let notice = mailer.last();
-    assert_eq!((notice.to.as_str(), notice.what), (address, What::Removed));
+    assert_eq!(mailer.count(), handed + 2);
+    let notices = mailer.handed.lock().unwrap()[handed..].to_vec();
+    let account = account.identity().account;
+    for (notice, what) in notices.iter().zip([What::PasswordChanged, What::Removed]) {
+        assert_eq!(
+            (notice.to.as_str(), notice.lang, notice.account, notice.what),
+            (address, "it", account, what)
+        );
+        assert!(notice.code.is_none() && notice.ttl.is_none());
+    }
 }

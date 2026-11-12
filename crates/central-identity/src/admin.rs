@@ -1,9 +1,10 @@
 //! Central administration (`docs/administration.md`): on the browser listener
 //! only, with a browser session whose account holds the administrator role,
 //! checked again by the store in the statement or transaction that acts.
-use super::{Error, IdentityService, Response, Surface, Token};
+use super::{Error, IdentityService, Response, Surface, Token, email::ISSUED_HOURS};
 use central_api::admin::{AccountQuery, AdminAnswer, AdminRequest};
 use central_api::reset_code::ResetCode;
+use central_mail::Mail;
 
 impl IdentityService {
     pub(super) async fn admin_request(
@@ -83,10 +84,15 @@ impl IdentityService {
             // Changes: the store checks the sign-in's age and writes the audit.
             AdminRequest::ResetLogin { account } => {
                 let code = ResetCode::generate()?;
-                let expires_at = self
+                let done = self
                     .store
                     .issue_reset(cookie, account, &code.digest())
-                    .await?;
+                    .await;
+                // The account's confirmed address is told, later, that a
+                // code exists; the code is in the answer only.
+                let expires_at = self.mails.committed(done, account, |to, account, lang| {
+                    Mail::reset_issued(to, account, lang, ISSUED_HOURS)
+                })?;
                 AdminAnswer::ResetCode { code, expires_at }
             }
             AdminRequest::SetAdmin { account, admin } => {

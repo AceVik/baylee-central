@@ -93,7 +93,7 @@ pub(super) async fn run(store: &AccountStore, operator: &DatabaseConnection, key
     let stranger = refusals(store, keys, &credential, &native, &record, &wrapped, &next).await;
     assert_eq!(state(operator, identity).await, before, "nothing changed");
     // The change: both sessions end, one new one of the caller's kind lives.
-    let issued = store
+    let (issued, told) = store
         .change_password(
             Session::Native(&native),
             &credential,
@@ -103,6 +103,7 @@ pub(super) async fn run(store: &AccountStore, operator: &DatabaseConnection, key
         )
         .await
         .unwrap();
+    assert!(told.is_none(), "an account without an address tells nobody");
     assert_eq!(issued.wrapped_master, wrapped);
     assert_eq!(issued.username, "password-store");
     let after = state(operator, identity).await;

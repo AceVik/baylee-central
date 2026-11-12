@@ -46,7 +46,9 @@ pub use reports::{
     ALL_STORED, Filer, GATEWAY_STORED, ImportedHistory, ImportedNote, ImportedReport,
     OFFICIAL_STORED, REPORT_BYTES, ReportImport, ReportImportRefusal,
 };
-pub use reset::{MAILED_RESET_HOURS, MailedReset, RESET_MAIL_GAP_MINUTES, RESET_MAILS_A_DAY};
+pub use reset::{
+    ISSUED_RESET_HOURS, MAILED_RESET_HOURS, MailedReset, RESET_MAIL_GAP_MINUTES, RESET_MAILS_A_DAY,
+};
 pub use sessions::{Issued, Session};
 pub use terms::MAX_GATEWAY_VERSIONS;
 

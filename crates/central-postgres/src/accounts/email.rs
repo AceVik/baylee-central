@@ -49,9 +49,10 @@ impl std::fmt::Debug for Email {
     }
 }
 
-/// A confirmed address that lost its place, to be told so.
+/// A confirmed address to be told of a change: one that was replaced or
+/// removed, or the account's own when its login changed.
 pub struct Told {
-    /// The address that was replaced or removed.
+    /// The address.
     pub address: String,
     /// The language its code was asked in.
     pub lang: String,
@@ -142,8 +143,15 @@ async fn end_mailed_reset(tx: &DatabaseTransaction, account: Uuid) -> Result<(),
     Ok(())
 }
 
-/// The confirmed address of `account` and its language, if it has one.
-async fn confirmed(tx: &DatabaseTransaction, account: Uuid) -> Result<Option<Told>, Error> {
+/// The confirmed address of `account` and its language, if it has one. An
+/// address that only waits for its code is none. A change to the login
+/// reads it in its own transaction, after the account's row is locked, as
+/// every write of the address locks it: it is the address the account had
+/// when the change was committed.
+pub(super) async fn confirmed(
+    tx: &DatabaseTransaction,
+    account: Uuid,
+) -> Result<Option<Told>, Error> {
     tx.query_one_raw(statement(
         "SELECT address, lang FROM central_identity.account_emails WHERE account_id = $1",
         vec![account.into()],
