@@ -9,6 +9,9 @@ import { axe, narrow, targets, watch } from "./check.ts";
 // the recovery code, the sign-in afterwards) is e2e-real's. A registration
 // response only has to be two valid group elements, so a new vault runs
 // here to its end and the result's page is checked as a person sees it.
+//
+// Before the form stands the block that asks for a code by mail
+// (`ResetMail`); a code that arrives in a mailbox is e2e-real's.
 
 const ACCOUNT = [1, 2, 3, 4, 5, 6, 0x70, 8, 0x80, 10, 11, 12, 13, 14, 15, 16];
 const CODE = "RESET-0123-4567-89AB-CDEF-GHJK-MNPQ-RSTV-WXYZ";
@@ -37,6 +40,8 @@ type Answers = {
   finish?: "refused" | "lost";
   /** The account's recovery wrapper, as `ResetChallenge` carries it. */
   recovery?: number[] | null;
+  /** A code by mail: too many asked, a Central that sends none, one that is down, no answer. */
+  mail?: "busy" | "none" | "down" | "lost";
 };
 
 function central(seen: Body[], answers: Answers = {}) {
@@ -66,6 +71,12 @@ function central(seen: Body[], answers: Answers = {}) {
         if (answers.finish === "refused") return rejected();
         if (answers.finish === "lost") return route.abort("connectionreset");
         return json({ result: "done" });
+      case "reset_mail":
+        if (answers.mail === "busy") return route.fulfill({ status: 429, body: "busy\n" });
+        if (answers.mail === "none") return rejected();
+        if (answers.mail === "down") return route.fulfill({ status: 503, body: "unavailable\n" });
+        if (answers.mail === "lost") return route.abort("connectionreset");
+        return json({ result: "done" });
       default:
         return rejected();
     }
@@ -90,8 +101,8 @@ async function open(page: Page, lang = "en") {
 
 /** Fills the form: with `recovery` the data is kept, without it a new vault is chosen and its warning confirmed. */
 async function fill(page: Page, recovery?: string) {
-  await page.getByLabel("Sign-in name").fill("Erika");
-  await page.getByLabel("Reset code").fill(CODE);
+  await form(page).getByLabel("Sign-in name").fill("Erika");
+  await form(page).getByLabel("Reset code").fill(CODE);
   if (recovery === undefined) {
     await page.getByRole("radio", { name: FRESH }).check();
     await page.getByRole("checkbox", { name: "I understand that this data is lost for good." }).check();
@@ -102,6 +113,13 @@ async function fill(page: Page, recovery?: string) {
   await page.getByLabel("Repeat new password").fill(PASSWORD);
 }
 
+/** The form that redeems a code; the block before it has a sign-in name of its own. */
+const form = (page: Page) => page.locator("#reset-steps");
+/** The block that asks for a code by mail. */
+const mail = (page: Page) => page.locator("section[aria-labelledby=reset-mail-title]");
+const mailName = (page: Page) => page.locator("#reset-mail-name");
+const send = (page: Page) => mail(page).getByRole("button", { name: "Send a code by e-mail" });
+const SENT = "If this account has a confirmed e-mail address, a reset code is on its way to it. It is valid for one hour.";
 const submit = (page: Page) => page.getByRole("button", { name: "Set new password" });
 const operations = (seen: Body[]) => seen.map((body) => body.operation);
 
@@ -111,7 +129,7 @@ test("every field is labelled, the data is kept unless chosen otherwise, and the
   await expect(page.getByRole("heading", { level: 1, name: "Set a new password" })).toBeVisible();
   const recovery = page.getByLabel("Recovery code", { exact: true });
   const password = page.getByLabel("New password", { exact: true });
-  for (const field of [page.getByLabel("Sign-in name"), page.getByLabel("Reset code"), recovery, password, page.getByLabel("Repeat new password")]) {
+  for (const field of [form(page).getByLabel("Sign-in name"), form(page).getByLabel("Reset code"), recovery, password, page.getByLabel("Repeat new password")]) {
     await expect(field).toBeVisible();
     await expect(field).toBeEditable();
   }
@@ -168,14 +186,14 @@ test("nothing is sent before the form is complete, and no new vault before the w
   const alert = page.getByRole("alert");
   await submit(page).click();
   await expect(alert).toHaveText(MISSING);
-  await page.getByLabel("Sign-in name").fill("erika");
+  await form(page).getByLabel("Sign-in name").fill("erika");
   await page.getByLabel("New password", { exact: true }).fill(PASSWORD);
   await page.getByLabel("Repeat new password").fill(PASSWORD);
   // a recovery code is no reset code
-  await page.getByLabel("Reset code").fill(RECOVERY);
+  await form(page).getByLabel("Reset code").fill(RECOVERY);
   await submit(page).click();
   await expect(alert).toHaveText("That is not a reset code. It starts with RESET, followed by eight groups of four characters.");
-  await page.getByLabel("Reset code").fill(CODE);
+  await form(page).getByLabel("Reset code").fill(CODE);
   await submit(page).click();
   await expect(alert).toHaveText("Enter your recovery code, or choose the empty vault.");
   await page.getByRole("radio", { name: FRESH }).check();
@@ -210,9 +228,9 @@ test("a name or a code that Central refuses reads the same, whichever it was", a
     expect(operations(seen)).toEqual(asked);
     expect(seen[0]).toEqual({ operation: "discover", username: "erika" });
     // the form is back with what it held, but for the passwords
-    await expect(page.getByLabel("Sign-in name")).toBeFocused();
-    await expect(page.getByLabel("Sign-in name")).toHaveValue("Erika");
-    await expect(page.getByLabel("Reset code")).toHaveValue(CODE);
+    await expect(form(page).getByLabel("Sign-in name")).toBeFocused();
+    await expect(form(page).getByLabel("Sign-in name")).toHaveValue("Erika");
+    await expect(form(page).getByLabel("Reset code")).toHaveValue(CODE);
     await expect(page.getByRole("radio", { name: FRESH })).toBeChecked();
     await expect(page.getByLabel("New password", { exact: true })).toHaveValue("");
     await expect(page.getByLabel("Repeat new password")).toHaveValue("");
@@ -272,6 +290,8 @@ test("a new vault: its recovery code is shown once, copied or saved, and kept be
   await expect(page.locator("#reset-steps [role=status]")).toHaveText("Securing your password … this takes a moment and happens only in your browser.");
   await expect(page.getByRole("heading", { name: "Your new password is set" })).toBeFocused({ timeout: 60_000 });
   await expect(page.getByText("You start with an empty vault and are signed out everywhere.")).toBeVisible();
+  // the block that asks for a code went with the form
+  await expect(mail(page)).toBeHidden();
 
   expect(operations(seen)).toEqual(["discover", "reset_start", "reset_finish", "account_summary"]);
   const finish = seen[2] as { attempt: number[]; record: number[]; wrapped_master: number[]; vault: { kind: string; document: number[]; recovery: number[] } };
@@ -344,9 +364,103 @@ test("a finish that Central refuses changes nothing and shows no code", async ({
   await submit(page).click();
   await expect(page.getByRole("alert")).toHaveText("Something went wrong. Try again; if it keeps happening, tell us.", { timeout: 60_000 });
   await expect(page.locator(".secret")).toHaveCount(0);
-  await expect(page.getByLabel("Reset code")).toHaveValue(CODE);
+  await expect(form(page).getByLabel("Reset code")).toHaveValue(CODE);
   expect(operations(seen)).toEqual(["discover", "reset_start", "reset_finish"]);
   expect(problems).toEqual([]);
+});
+
+test("someone without a code asks for one by mail: only a name is sent, not at a robot's pace, and no mail is promised", async ({ page }) => {
+  const seen: Body[] = [];
+  await page.route("**/api/v1", central(seen));
+  await open(page);
+  const block = mail(page);
+  const alert = block.getByRole("alert");
+  const said = block.getByRole("status");
+  // a form filled in faster than a person types is not sent, and says so
+  await mailName(page).fill("  Erika ");
+  await send(page).click();
+  await expect(alert).toHaveText("That was too quick. Try again in a moment.");
+  expect(seen).toEqual([]);
+
+  // the block stands before the form, with a heading and a field of its own
+  await expect(block.getByRole("heading", { level: 2, name: "No reset code?" })).toBeVisible();
+  await expect(page.locator("section.reset-mail + #reset-steps")).toHaveCount(1);
+  await expect(block).toContainText("If your account has a confirmed e-mail address, we send a reset code to it.");
+  await expect(block.getByLabel("Sign-in name")).toHaveAttribute("id", "reset-mail-name");
+  await expect(mailName(page)).toHaveAccessibleDescription("The name you sign in with, not your e-mail address.");
+  await expect(mailName(page)).toHaveAttribute("autocomplete", "username");
+  await expect(mailName(page)).not.toHaveAttribute("name", /.*/);
+  // the form says where a code comes from, and for how long each kind works
+  await expect(page.locator(".auth-head > .lead")).toHaveText(
+    "For when you forgot your password: with a reset code you set a new one here. The code comes by e-mail to your confirmed address, or from an administrator.",
+  );
+  await expect(form(page).getByLabel("Reset code")).toHaveAccessibleDescription(
+    "By e-mail or from an administrator. It starts with RESET and works once: for one hour if it came by e-mail, for 24 hours if an administrator made it.",
+  );
+  expect(await axe(page)).toEqual([]);
+  expect(await targets(page)).toEqual([]);
+  expect(await narrow(page)).toBe(0);
+  // by keyboard: the name, its button, then the form below
+  await mailName(page).focus();
+  for (const next of [send(page), form(page).getByLabel("Sign-in name"), form(page).getByLabel("Reset code")]) {
+    await page.keyboard.press("Tab");
+    await expect(next).toBeFocused();
+  }
+
+  // what is no sign-in name goes nowhere: Central's refusal would read as "no mail here"
+  await page.waitForTimeout(3_000);
+  const none = "That is not a sign-in name. Enter the name you sign in with, not your e-mail address.";
+  for (const typed of ["", "er", "erika@example.org", "erika mustermann"]) {
+    await mailName(page).fill(typed);
+    await send(page).click();
+    await expect(alert).toHaveText(none);
+  }
+  expect(seen).toEqual([]);
+  await expect(form(page).getByLabel("Sign-in name")).toHaveValue("");
+
+  await mailName(page).fill("  Erika ");
+  await mailName(page).press("Enter");
+  await expect(said).toHaveText(SENT);
+  await expect(alert).toBeHidden();
+  // the name as Central keeps names, the page's language, and nothing else
+  expect(seen).toEqual([{ operation: "reset_mail", username: "erika", lang: "en" }]);
+  // the code that arrives is redeemed below, for this name
+  await expect(form(page).getByLabel("Sign-in name")).toHaveValue("erika");
+  await expect(mailName(page)).toBeFocused();
+  expect(await axe(page)).toEqual([]);
+  expect(await narrow(page)).toBe(0);
+});
+
+test("a code by mail that Central does not send is said as what it is", async ({ page }) => {
+  const seen: Body[] = [];
+  const answers: Answers = {};
+  await page.route("**/api/v1", central(seen, answers));
+  await open(page);
+  const alert = mail(page).getByRole("alert");
+  await mailName(page).fill("erika");
+  await page.waitForTimeout(3_000);
+  const cases: [NonNullable<Answers["mail"]>, string][] = [
+    ["busy", "Too many requests for now. Try again later."],
+    ["none", "This server sends no mail. Ask an administrator for a reset code."],
+    ["down", "Baylee Central is not answering right now. Try again in a moment."],
+    ["lost", "No connection. Check your network and try again."],
+  ];
+  for (const [answer, text] of cases) {
+    answers.mail = answer;
+    await send(page).click();
+    await expect(alert).toHaveText(text);
+    // nothing reads as a sent mail, as a wrong name or as a refused code
+    await expect(mail(page).getByRole("status")).toHaveText("");
+    await expect(form(page).getByRole("alert")).toBeHidden();
+  }
+  expect(operations(seen)).toEqual(["reset_mail", "reset_mail", "reset_mail", "reset_mail"]);
+  // the button is the page's again after each answer
+  await expect(send(page)).not.toHaveAttribute("aria-disabled", "true");
+  delete answers.mail;
+  await send(page).click();
+  await expect(mail(page).getByRole("status")).toHaveText(SENT);
+  await expect(alert).toBeHidden();
+  expect(await axe(page)).toEqual([]);
 });
 
 test("the sign-in form leads to it by a plain link, on its page and in its dialog", async ({ page, baseURL }) => {
@@ -369,6 +483,8 @@ test("the sign-in form leads to it by a plain link, on its page and in its dialo
   const answer = page.locator("section.qa").filter({ hasText: "I forgot my password" });
   await expect(answer.getByRole("link", { name: "on this page" })).toHaveAttribute("href", "/en/reset");
   await expect(answer).not.toContainText("cannot be redeemed");
+  // the answer names the mail, and the administrator for an account without an address
+  await expect(answer).toContainText("If your account has a confirmed e-mail address, you can have the code sent to it there; otherwise an administrator gives you one.");
   const menu = page.locator(".menu-btn");
   if (await menu.isVisible()) await menu.click();
   await page.locator("a.nav-account").click();
@@ -380,7 +496,7 @@ test("the sign-in form leads to it by a plain link, on its page and in its dialo
   await dialog.getByRole("link", { name: "Set a new one with a reset code" }).click();
   await expect(page).toHaveURL(/\/en\/reset$/);
   await expect(page.locator("dialog[open]")).toHaveCount(0);
-  await expect(page.getByLabel("Reset code")).toBeVisible();
+  await expect(form(page).getByLabel("Reset code")).toBeVisible();
   expect(problems).toEqual([]);
 });
 
@@ -392,6 +508,22 @@ test("the page speaks German by hand", async ({ page }) => {
   expect(await axe(page)).toEqual([]);
   expect(await targets(page)).toEqual([]);
   // the warning and its box, in the longer words, on the narrowest phone
+  expect(await narrow(page)).toBe(0);
+
+  // the block that asks for a code by mail, in the page's language
+  const seen: Body[] = [];
+  await page.route("**/api/v1", central(seen));
+  const block = mail(page);
+  await expect(block.getByRole("heading", { level: 2, name: "Kein Reset-Code?" })).toBeVisible();
+  await mailName(page).fill("erika");
+  await page.waitForTimeout(3_000);
+  await block.getByRole("button", { name: "Code per E-Mail schicken" }).click();
+  await expect(block.getByRole("status")).toHaveText(
+    "Wenn dieser Account eine bestätigte E-Mail-Adresse hat, ist ein Reset-Code dorthin unterwegs. Er gilt eine Stunde.",
+  );
+  expect(seen).toEqual([{ operation: "reset_mail", username: "erika", lang: "de" }]);
+  expect(await axe(page)).toEqual([]);
+  expect(await targets(page)).toEqual([]);
   expect(await narrow(page)).toBe(0);
 });
 
@@ -413,7 +545,7 @@ test.describe("without script", () => {
     expect(notice[0].height).toBeGreaterThan(20);
     // the page is whole all the same: its fields, their labels, the choice
     await expect(page.locator("leptos-island")).not.toHaveAttribute("data-hydrated", /.*/);
-    await expect(page.getByLabel("Reset code")).toBeVisible();
+    await expect(form(page).getByLabel("Reset code")).toBeVisible();
     await expect(page.getByRole("radio", { name: KEEP })).toBeChecked();
   });
 });
@@ -430,6 +562,10 @@ test.describe("before the islands run", () => {
     // the WebAssembly never arrives: the island never takes the form over
     await page.route("**/assets/islands.*.wasm", (route) => route.abort());
     await page.goto("/en/reset");
+    // the block that asks for a code by mail is a form as well
+    await page.locator("#reset-mail-name").fill("erika");
+    await page.locator("#reset-mail-name").press("Enter");
+    await page.locator("#reset-mail-name").evaluate((field: HTMLInputElement) => field.form?.requestSubmit());
     await page.locator("#reset-name").fill("erika");
     await page.locator("#reset-code").fill(CODE);
     await page.locator("#reset-recovery").fill(RECOVERY);
