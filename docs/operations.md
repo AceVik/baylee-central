@@ -90,7 +90,9 @@ What this does not bound: eight addresses that withhold four bodies each
 hold all 32 places, and until one comes back the late and large bodies of
 everyone else are refused (429), while every request whose small body is
 there is still served. A flood of whole requests is a matter of rate, which
-the proxy or the network must limit. Caddy can keep withheld bodies away
+the proxy or the network must limit; the firewall's limits
+([below](#connection-limits-in-front-of-the-proxy)) bound the connections
+one address opens and holds, not the requests it sends over one. Caddy can keep withheld bodies away
 from Central altogether (from its documentation, not tried here): with
 `request_buffers` it reads a body up to that size before the upstream sees
 the request. Caddy then holds such a connection itself, under its own
@@ -110,6 +112,127 @@ central.baylee.app {
 	#   }
 }
 ```
+
+### Connection limits in front of the proxy
+
+`ops/central-limits.nft` is an nftables file for the host Caddy runs on. It
+bounds, for each source address (an IPv4 address or an IPv6 /64, what Central
+counts as one place), the connections to the proxy's ports (TCP 80 and 443,
+UDP 443 for HTTP/3):
+
+| Limit | Number | Past it |
+|---|---|---|
+| New connections | 300 a minute, after a burst of 300 | the connection's first packet is dropped |
+| Connections held at once | 512 | the same |
+
+The reasons for the numbers are in the file's head. It is not loaded by
+anything in this repository: loading it is the operator's step, once, and
+again after a change to the file.
+
+**What it does not do.** It counts connections, not requests. A client that
+keeps one connection and sends its requests over it (keep-alive, HTTP/2,
+HTTP/3) is not slowed by it. So it does not keep four addresses from spending
+the 32 requests a second that all clients without a session share
+([below](#sign-in-guesses-and-address-budgets)), and it does not keep eight
+addresses from holding the listener's 32 places for late and large bodies
+(above): each of those needs one connection. It ends what nothing bounded
+before: one address opening connections to the proxy without limit, or as
+fast as it can.
+
+**Before loading.** Three things to check on the host:
+
+- Caddy listens on the host's own addresses (a process on the host, or a
+  container with the host's network). The file's chain is in the `input`
+  hook, which sees what is delivered to the host. A port that Docker
+  publishes for a container is forwarded and passes the chain unseen. This
+  deployment's Caddy proxies to `127.0.0.1`, so it is on the host's network;
+  the check is `ss -ltnp 'sport = :443'`, which must name `caddy`.
+- `nft --version` answers (the file was checked with nftables 1.1.3).
+- Nothing on the host runs `nft flush ruleset` after boot (a stock
+  `/etc/nftables.conf` begins with it): that would remove this table, and
+  Docker's with it. The file itself never flushes: it replaces its own table,
+  `inet baylee_central`, and touches no other.
+
+**Load.**
+
+```sh
+sudo install -m 0644 -o root -g root ops/central-limits.nft /etc/baylee-central/central-limits.nft
+sudo nft -c -f /etc/baylee-central/central-limits.nft   # checks, changes nothing
+sudo nft -f /etc/baylee-central/central-limits.nft      # replaces the table at once
+```
+
+Connections that exist go on; the counts start empty. To load it at every
+boot, a unit of its own (not `nftables.service`, for the reason above):
+
+```ini
+# /etc/systemd/system/baylee-central-limits.service
+[Unit]
+Description=Baylee Central connection limits
+Wants=network-pre.target
+Before=network-pre.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/sbin/nft -f /etc/baylee-central/central-limits.nft
+ExecStop=/usr/sbin/nft delete table inet baylee_central
+
+[Install]
+WantedBy=multi-user.target
+```
+
+**Check.**
+
+```sh
+sudo nft list table inet baylee_central
+```
+
+shows the four rules, each with a counter of the packets it dropped. Then,
+from a machine that is not the host (the host's own requests arrive on the
+loopback interface and are never counted):
+
+- the proxy check of the next section (31 `Discover` in a minute end in one
+  429) must give the same answer as before: 31 connections a minute are a
+  tenth of the limit, so a 429 there is Central's, not the firewall's;
+- a browser signs in, and a game client connects to the official gateway;
+- the counters stay at zero while only that is done.
+
+A counter that grows names no address. The sets do, while an address is
+counted: `sudo nft list set inet baylee_central held4` (and `held6`,
+`fresh4`, `fresh6`). They are in the kernel's memory only, hold source
+addresses and no request, and forget an address two minutes after its last
+new connection (`fresh`) or when its last connection is gone (`held`).
+Nothing here writes a log. Whether the privacy notice's line on technical
+access data kept briefly in memory needs a word about the firewall is the
+owner's to judge.
+
+**Remove.**
+
+```sh
+sudo nft delete table inet baylee_central
+```
+
+at once and without a restart of anything; with the unit,
+`sudo systemctl disable --now baylee-central-limits.service`.
+
+**What it does to a shared address.** A campus, an office behind one address
+or a carrier's shared IPv4 address is one source. Past 512 connections held
+at once (about 170 people playing, at three connections each) the next
+connection from there is dropped until another closes: people who are
+connected go on, new ones wait or fail. Past 300 new connections in a minute
+after a burst of 300 the next ones are dropped: a connect is retried by the
+client's system after one and three seconds, so a short excess shows as a
+slow connect. If such a site reports that, look at the counters, and raise
+the number in both places of the file (IPv4 and IPv6) rather than removing
+the limit. A connection counts as held until both ends closed it, or until
+the kernel's connection tracking forgets it.
+
+**Tested, and not.** The file was checked (`nft -c`), loaded, reloaded and
+removed with nftables 1.1.3 in a throwaway container with no network, and
+exercised over IPv4 between two containers: a burst of 300 connections
+passes, the rate applies after it, the 513th connection held is dropped, and
+closing ten lets ten more in. It was not loaded on the server, not exercised
+over IPv6 or UDP, and not run beside Docker's and the host's own rules.
 
 ### Sign-in guesses and address budgets
 
@@ -161,9 +284,49 @@ or the day ends, counted from the first guess of that window.
   until the window ends; the place of the change is served.
 
 **The proxy must send the client's address.** Caddy does by default. Check
-it after any change to the proxy: 31 `Discover` requests within a minute
-through the public name must end in a 429, and the same from another
-address must not.
+it after any change to the proxy, to the host's firewall or to the site
+block, and after every deploy of Caddy itself: 31 `Discover` requests
+within a minute through the public name must end in a 429, and the same
+from another address must not. From a machine that is not the host:
+
+```sh
+for n in $(seq 1 31); do
+  curl -s -o /dev/null -w '%{http_code}\n' https://central.baylee.app/v1/native \
+    -H 'Content-Type: application/json' \
+    -d '{"operation":"discover","username":"proxy-check"}'
+done | sort | uniq -c
+```
+
+must print 30 answers of `200` and one of `429`. Thirty-one of `200` mean
+Central saw no address: the proxy does not send the header, or something
+other than the proxy reaches the listener. Then run it once more within the
+same minute from a second address: it must begin with `200`. If it begins
+with `429`, both runs were counted as one address: something in front of
+Caddy is the last hop. (The name is made up and need not exist; the answer
+is the same for a name nobody has. The command is written from the wire's
+definition and was not run against the deployed name here.)
+
+Central also says so itself. On the deployed account listener, a request to
+`/v1/native` or `/v1/reports` that arrives without the proxy's address is
+served as before and counted, and the service's log has a fixed line for the
+first one and then at most one an hour:
+
+```
+central: 12 request(s) since start reached the account listener without the proxy's address; they are counted by no address (docs/operations.md, "The proxy must send the client's address")
+```
+
+`journalctl -u <the unit> | grep "without the proxy's address"` shows them.
+The line holds the count and nothing of any request; there is no address to
+write. No such line is the normal state: the released gateway on the same
+host reaches Central through the public name unless it was pointed elsewhere, so through Caddy, and
+`/health/live` is not counted. A line means one of three things: the proxy
+stopped sending `X-Forwarded-For` (run the check above), a process on the
+host talks to `127.0.0.1:28790` directly (a script, a test left running), or
+someone on the host does so on purpose. Such requests are not refused:
+refusing them would refuse every local run and whatever on the host the
+operator points at the listener, and whether to refuse them on the deployed
+listener is the owner's decision. A development listener writes no such
+line.
 
 - Without the header the account listener counts no address at all: each
   account's own count (30 an hour, 100 a day) and the shared budgets still
