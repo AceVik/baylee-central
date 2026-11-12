@@ -121,24 +121,48 @@ export function appoint(name: string) {
 
 /**
  * The administrator signed in on `admin` makes a reset code for `username`
- * (`AdminRequest::ResetLogin`, docs/account-reset.md §"Issuing a reset
- * code"). The new site has no page for it yet, so the request goes out as
- * the page would send it, with the administrator's session.
+ * on the new site's page (`/en/account/admin`, docs/account-reset.md
+ * §"Issuing a reset code"), as a person does: the search, the account, the
+ * warning, the password once more (`password`, the administrator's), and
+ * the code shown once, copied, and gone when its step is left.
  */
-export async function issue(admin: Page, username: string): Promise<string> {
+export async function issue(admin: Page, username: string, password: string): Promise<string> {
+  await open(admin, "/en/account/admin");
+  const search = admin.locator("#admin-search");
+  await expect(admin.locator(".admin-accounts, .admin-results [role=status]").first()).toBeVisible({ timeout: 30_000 });
+  await search.fill(username);
+  await search.press("Enter");
+  const rows = admin.locator(".admin-accounts > li");
+  const row = rows.filter({ has: admin.locator("dd code", { hasText: new RegExp(`^${username}$`) }) });
+  await expect(row).toHaveCount(1, { timeout: 30_000 });
+  await row.getByRole("button", { name: /^Open/ }).click();
+  await expect(admin.locator("#admin-account-title")).toBeFocused({ timeout: 30_000 });
+  await admin.getByRole("button", { name: "Reset login", exact: true }).click();
+  await expect(admin.locator("#admin-warning-title")).toBeFocused();
+  await admin.getByRole("button", { name: "I have checked who is asking", exact: true }).click();
+  await admin.locator("#admin-password").fill(password);
+  await admin.locator("#admin-password").press("Enter");
+  await expect(admin.locator("#admin-code-title")).toBeFocused({ timeout: 60_000 });
+  const steps = admin.locator("#admin-steps");
+  const code = (await steps.locator(".secret code").textContent()) ?? "";
+  expect(code).toMatch(RESET);
+  await expect(steps).toContainText("Valid until ");
+  // the code can be copied as it stands there (the clipboard is this test browser's own)
+  await admin.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+  await steps.getByRole("button", { name: "Copy", exact: true }).click();
+  await expect(steps.getByRole("status")).toHaveText("Copied.");
+  expect(await admin.evaluate(() => navigator.clipboard.readText())).toBe(code);
+  await steps.getByRole("button", { name: "Done", exact: true }).click();
+  await expect(steps.locator(".secret")).toHaveCount(0);
+  expect(await admin.content()).not.toContain(code);
+  // the list shows the account with its code; Central's own record says 24 hours
+  await expect(row.locator("dt").last()).toHaveText("Reset code");
   const listed = await ask(admin, { operation: "admin", request: { action: "accounts", query: username, before: null } });
   expect(listed.status).toBe(200);
-  const rows = (listed.answer["answer"] as { accounts: { id: number[]; username: string }[] }).accounts;
-  const row = rows.find((account) => account.username === username);
-  expect(row).toBeDefined();
-  const made = await ask(admin, { operation: "admin", request: { action: "reset_login", account: row?.id } });
-  expect(made.status).toBe(200);
-  const answer = made.answer["answer"] as { answer: string; code: string; expires_at: number };
-  expect(answer.answer).toBe("reset_code");
-  expect(answer.code).toMatch(RESET);
-  // valid for 24 hours
-  expect(answer.expires_at - Date.now() / 1000).toBeGreaterThan(23 * 3600);
-  return answer.code;
+  const found = (listed.answer["answer"] as { accounts: { username: string; reset_until: number | null }[] }).accounts;
+  const until = found.find((account) => account.username === username)?.reset_until ?? 0;
+  expect(until - Date.now() / 1000).toBeGreaterThan(23 * 3600);
+  return code;
 }
 
 /**

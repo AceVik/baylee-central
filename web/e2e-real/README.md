@@ -141,9 +141,9 @@ REAL_FRONT_SPKI=<pin> REAL_SERVICE=<central-service> REAL_MIGRATE=<the migrator 
 the reset page and the password's change (12.11.2026; steps shared in
 `site.ts`). `site-reset.spec.ts` registers an administrator, whom the
 operator's `--appoint-admin-stdin` appoints as in `area.spec.ts`, and an
-account. The administrator makes reset codes (the new site has no page for
-that yet: the request goes out with the administrator's session, as the page
-would send it), and the account redeems them on `/en/reset`: a recovery code
+account. The administrator makes reset codes on `/en/account/admin` (the
+search, the account, the warning, its password once more, the code shown
+once and copied), and the account redeems them on `/en/reset`: a recovery code
 that is not its own stops before the code is spent; its own keeps the vault;
 the used code is refused in the words of any wrong one; without the recovery
 code a new vault begins at the next epoch and its new recovery code is shown

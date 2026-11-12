@@ -1,17 +1,20 @@
 // The new site's reset page (crates/central-web, /{lang}/reset) against a
 // real Central: real OPAQUE and Argon2 in the page's Worker, the committed
 // central-web-crypto module, PostgreSQL. A synthetic administrator, appointed
-// by the operator's own command, makes reset codes for a synthetic account,
-// which redeems them both ways (docs/account-reset.md): with its recovery
-// code the vault stays, without it a new one begins. What became of the
-// vault is read from outside the page: a client's sign-in over the native
-// listener tells the master key's fingerprint and the stored document.
+// by the operator's own command, makes reset codes for a synthetic account
+// on the site's administration page (`/en/account/admin`, proving its
+// password again for each), and the account redeems them both ways
+// (docs/account-reset.md): with its recovery code the vault stays, without
+// it a new one begins. What became of the vault is read from outside the
+// page: a client's sign-in over the native listener tells the master key's
+// fingerprint and the stored document.
 //
 // REAL_SERVICE: the central-service binary; REAL_MIGRATE: the migrator's
 // document (the appointment takes its database login from it); REAL_NATIVE:
-// the native listener. One run registers two accounts and starts six
-// resets: Central allows five registrations and ten reset starts an hour
-// from one address, so run one project against a Central started afresh.
+// the native listener. One run registers two accounts, signs the
+// administrator in three more times (once per code) and starts six resets:
+// Central allows five registrations and ten reset starts an hour from one
+// address, so run one project against a Central started afresh.
 
 import { expect, test, type Page } from "@playwright/test";
 
@@ -123,6 +126,8 @@ test("a reset code sets a new password: with the recovery code the vault stays, 
     const name = `ru_${info.project.name}_${stamp}`;
     await register(admin, owner, "Reset_Admin", FIRST);
     appoint(owner);
+    const officeBodies = sent(admin);
+    const officeErrors = problems(admin);
     const recovery = await register(page, name, "Reset_User", FIRST);
     const bodies = sent(page);
     const before = await summary(page);
@@ -135,7 +140,7 @@ test("a reset code sets a new password: with the recovery code the vault stays, 
     expect(await alive(first)).toBe(true);
 
     // 1. With a recovery code that is not the account's, nothing is spent.
-    const code = await issue(admin, name);
+    const code = await issue(admin, name, FIRST);
     await redeem(page, name, code, { recovery: NOBODYS }, SECOND);
     await expect(page.locator("#reset-steps [role=alert]")).toHaveText(
       NOT_OPENED,
@@ -182,7 +187,7 @@ test("a reset code sets a new password: with the recovery code the vault stays, 
     expect(second && (await alive(second))).toBe(true);
 
     // 4. Without the recovery code: a new vault at the next epoch, and its new code shown once.
-    const again = await issue(admin, name);
+    const again = await issue(admin, name, FIRST);
     expect(again).not.toBe(code);
     await redeem(page, name, again, "new", THIRD);
     await expect(done(page)).toBeFocused({ timeout: 60_000 });
@@ -221,7 +226,7 @@ test("a reset code sets a new password: with the recovery code the vault stays, 
     expect(third?.revision).toBe(1);
 
     // 5. The old recovery code opens nothing any more; the new one is the vault's.
-    const last = await issue(admin, name);
+    const last = await issue(admin, name, FIRST);
     await redeem(page, name, last, { recovery }, FOURTH);
     await expect(page.locator("#reset-steps [role=alert]")).toHaveText(
       NOT_OPENED,
@@ -265,8 +270,19 @@ test("a reset code sets a new password: with the recovery code the vault stays, 
       last,
     ])
       expect(stored).not.toContain(secret);
+    // the administrator's page sent neither its password nor a code, and keeps none
+    const asked = officeBodies.join("\n");
+    const officeKept = await admin.evaluate(() =>
+      JSON.stringify({ ...localStorage, ...sessionStorage }),
+    );
+    for (const secret of [FIRST, code, again, last]) {
+      expect(asked).not.toContain(secret);
+      expect(officeKept).not.toContain(secret);
+    }
+    expect(admin.url()).not.toContain("RESET");
     // the refusals this run asked for are answers, not faults of the page
     expect(errors).toEqual([]);
+    expect(officeErrors).toEqual([]);
   } finally {
     await office.close();
   }
