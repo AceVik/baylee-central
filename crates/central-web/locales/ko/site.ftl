@@ -18,7 +18,6 @@ nav-sign-in = 로그인
 nav-account = 내 계정
 lang-label = 언어
 theme-label = 색상 모드
-theme-system = 색상: 기기 설정과 같게
 theme-light = 색상: 밝게
 theme-dark = 색상: 어둡게
 

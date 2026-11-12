@@ -18,7 +18,6 @@ nav-sign-in = Войти
 nav-account = Ваш аккаунт
 lang-label = Язык
 theme-label = Цветовая схема
-theme-system = Цвета: как на устройстве
 theme-light = Цвета: светлые
 theme-dark = Цвета: тёмные
 

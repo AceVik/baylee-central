@@ -18,7 +18,6 @@ nav-sign-in = 登录
 nav-account = 你的账号
 lang-label = 语言
 theme-label = 配色
-theme-system = 配色：跟随设备
 theme-light = 配色：浅色
 theme-dark = 配色：深色
 

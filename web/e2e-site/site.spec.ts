@@ -204,22 +204,6 @@ test("each card number explains itself by keyboard", async ({ page }) => {
   await expect(note).toBeHidden();
 });
 
-test("the colour switch cycles and is kept", async ({ page }) => {
-  await page.emulateMedia({ colorScheme: "light" });
-  await page.goto("/en/faq");
-  const html = page.locator("html");
-  const button = page.locator(".bar [data-theme-switch]");
-  test.skip(!(await button.isVisible()), "the bar's switch is for wide screens");
-  await button.click();
-  await expect(html).toHaveAttribute("data-theme", "light");
-  await button.click();
-  await expect(html).toHaveAttribute("data-theme", "dark");
-  await page.reload();
-  await expect(html).toHaveAttribute("data-theme", "dark");
-  await button.click();
-  await expect(html).not.toHaveAttribute("data-theme", /./);
-});
-
 test("the contact form hydrates, checks before it sends, and says what failed", async ({ page }) => {
   await page.goto("/en/contact");
   await expect(page.locator("html")).toHaveAttribute("data-islands", "ready");

@@ -18,7 +18,6 @@ nav-sign-in = Iniciar sesión
 nav-account = Tu cuenta
 lang-label = Idioma
 theme-label = Esquema de color
-theme-system = Colores: como tu dispositivo
 theme-light = Colores: claro
 theme-dark = Colores: oscuro
 

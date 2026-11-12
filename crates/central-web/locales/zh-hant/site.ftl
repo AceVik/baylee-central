@@ -18,7 +18,6 @@ nav-sign-in = 登入
 nav-account = 你的帳號
 lang-label = 語言
 theme-label = 色彩配置
-theme-system = 色彩：跟隨裝置
 theme-light = 色彩：淺色
 theme-dark = 色彩：深色
 

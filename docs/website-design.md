@@ -45,8 +45,12 @@ Baylee in sunlight by day, the blue hour by night.
 Every colour is a custom property in `web/src/styles/tokens.css`, defined
 for the dark scheme in `:root`, for the light scheme under
 `prefers-color-scheme: light` and again under `[data-theme="light"]`. The
-header's colour switch goes from the device's scheme to light, dark and back
-(`src/theme.ts`); the browser keeps the choice like the language (the
+header's colour switch went from the device's scheme to light, dark and back
+(`src/theme.ts`); on the server-rendered site (`crates/central-web/js/boot.js`)
+one press shows the scheme that is not on screen, and a choice the device
+would make anyway is not kept, so the page follows the device again (owner,
+12.11.2026: the first press on a light device had changed nothing). The
+browser keeps the choice like the language (the
 privacy notice's "language and display"), `public/boot.js` applies it before
 the first paint, and `?theme=` overrides it for one visit. No other file names a raw colour, except
 the artwork's own: the memorial's parchment (`memorial-book.css`,

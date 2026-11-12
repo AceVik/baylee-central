@@ -169,12 +169,9 @@ body:has(dialog[open]) .top {
   height: 1.25rem;
 }
 
-.theme-btn[data-state="light"] .when-system,
-.theme-btn[data-state="light"] .when-dark,
-.theme-btn[data-state="dark"] .when-system,
-.theme-btn[data-state="dark"] .when-light,
-.theme-btn:not([data-state="light"], [data-state="dark"]) .when-light,
-.theme-btn:not([data-state="light"], [data-state="dark"]) .when-dark {
+/* the scheme on screen: the sun in the light one, the moon in the dark */
+.theme-btn:not([data-state="light"]) .when-light,
+.theme-btn:not([data-state="dark"]) .when-dark {
   display: none;
 }
 
