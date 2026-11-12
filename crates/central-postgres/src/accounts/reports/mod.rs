@@ -15,11 +15,13 @@ use sha2::{Digest, Sha256};
 use subtle::ConstantTimeEq;
 
 mod import;
+mod level;
 mod list;
 mod triage;
 pub use import::{
     ImportedHistory, ImportedNote, ImportedReport, ReportImport, ReportImportRefusal,
 };
+pub use level::{ALL_STORED, GATEWAY_STORED, OFFICIAL_STORED, REPORT_BYTES};
 
 /// Who files a report: the authenticated gateway and its name in Central then.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -187,11 +189,14 @@ impl AccountStore {
     }
 
     /// File `report` for `filer`, its parts announced. `direct` only from the
-    /// official gateway. Returns the report's id.
+    /// official gateway, and only while the gateway's reports and everyone's
+    /// stay within what they may take (`level.rs`). Returns the report's id.
     ///
     /// # Errors
     /// `Rejected` for a report out of its bounds or a direct one from
-    /// another gateway; storage failure.
+    /// another gateway; `Busy` past what the gateway's reports or all
+    /// reports may take, or while another filing is weighed; storage
+    /// failure.
     pub async fn file_report(
         &self,
         filer: &Filer,
@@ -203,6 +208,7 @@ impl AccountStore {
         }
         let record = report.record.as_ref();
         let tx = self.db.begin().await.map_err(|_| Error::Unavailable)?;
+        level::admit(&tx, filer, report).await?;
         let row = tx
             .query_one_raw(statement(
                 "INSERT INTO central_identity.reports (gateway_id, gateway_label, gateway_says, gateway_url,

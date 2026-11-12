@@ -8,10 +8,11 @@ mod connection;
 mod legacy;
 mod pending;
 pub use accounts::{
-    AUDIT_YEARS, AccountStore, Action, Appointed, Approval, AuditPage, Claim, Credential, Filer,
-    ImportedHistory, ImportedNote, ImportedReport, Issued, LegacyMove, MAX_GATEWAY_VERSIONS,
-    MAX_POLLS, OPEN_IN_ALL, OPEN_PER_ACCOUNT, Profile, PushJob, PushResult, Redeemed, ReportImport,
-    ReportImportRefusal, Session, Status, Summary, Swept, TAG_DRAWS, TagDraw, appoint_admin, sweep,
+    ALL_STORED, AUDIT_YEARS, AccountStore, Action, Appointed, Approval, AuditPage, Claim,
+    Credential, Filer, GATEWAY_STORED, ImportedHistory, ImportedNote, ImportedReport, Issued,
+    LegacyMove, MAX_GATEWAY_VERSIONS, MAX_POLLS, OFFICIAL_STORED, OPEN_IN_ALL, OPEN_PER_ACCOUNT,
+    Profile, PushJob, PushResult, REPORT_BYTES, Redeemed, ReportImport, ReportImportRefusal,
+    Session, Status, Summary, Swept, TAG_DRAWS, TagDraw, appoint_admin, sweep,
 };
 
 pub use connection::{DevConfig, ServerConfig, connect_dev, connect_server, supports_version};

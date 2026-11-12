@@ -199,15 +199,125 @@ proxy as every answer is (`encode zstd gzip`).
   (`Content-Type: application/gzip`, `Content-Length` required): read with
   the announced length as the bound while hashing, refused unless length
   and SHA-256 equal what the report announced, starting with gzip's magic,
-  written once (`409` again), within an hour of the report. Two uploads at
-  a time (a semaphore), so at most 128 MiB of parts is in memory.
+  written once (`409` again), within an hour of the report. Four uploads
+  at a time, two of one gateway, and none for a gateway that left thirty
+  unfinished in the hour (§"What the reports may take" below; until
+  12.11.2026 two at a time for everyone, a semaphore).
 - Budgets: per gateway 120 reports an hour, besides the native listener's
-  global budget every request spends; `429` past them. Nothing of a
+  global budget every request spends, and what a gateway's reports and
+  all reports may take in the store (below); `429` past them. Nothing of a
   body is logged, and nothing else of a report: Central writes no line
   when one is filed. (This said until 11.11.2026 that the log names the
   report id and the gateway; no such line exists.)
 - The crash signature is made at intake as the feedback service makes it,
   with SHA-256 (no MD5 crate), its first 16 bytes in hex.
+
+### What the reports may take (12.11.2026)
+
+An approved gateway is a stranger's server that an administrator let in.
+Until this date one of them could fill the disk (120 reports an hour,
+each announcing up to 66 MiB of parts: about 7.7 GiB an hour) and could
+hold both upload slots with uploads that never finish. Four numbers
+answer that. Each is a constant in the code with its reason beside it,
+and each is the owner's to change.
+
+**In the store** (`central-postgres`, `accounts/reports/level.rs`). A
+filing is weighed before it is written, and refused with `429` (`Busy`)
+past a bound:
+
+| whose reports | may take | constant |
+| --- | --- | --- |
+| a registered gateway's | 2 GiB | `GATEWAY_STORED` |
+| the official gateway's | 8 GiB | `OFFICIAL_STORED` |
+| everyone's together | 16 GiB | `ALL_STORED` |
+
+- What counts: every report as 64 KiB (`REPORT_BYTES`, its body's bound,
+  whatever its length), and each part it announced as its announced
+  length while the part is stored or may still come. A part may come for
+  an hour after its report; one that never came stops counting then. So a
+  gateway that announces and never sends holds room for an hour at most.
+- No count is kept beside the reports. The level is asked of the reports
+  themselves in the filing's transaction (one pass over the reports'
+  rows and the parts' index; no part's bytes are read). It cannot drift,
+  a restart changes nothing, and a report that goes (a purge, the sweep)
+  frees its room. No migration was needed.
+- One filing is weighed at a time, under a transaction's advisory lock
+  that is tried and never waited for. Two filings cannot both take the
+  last room. A filing that finds another being weighed is `429` and is
+  sent again by its gateway (the released gateway waits 250 ms, then a
+  second, before it tells its player the report failed).
+- The report is refused whole, so nothing of it is stored and no part can
+  follow. The released gateway answers its player `503` then; the report
+  is lost unless the player sends it again later.
+- 2 GiB is 31 reports with both parts at their largest, about 2,000 with a
+  megabyte of parts each, or 32,768 without parts. A gateway that
+  announces all it may reaches it in a quarter of an hour.
+- The official gateway has four times as much, since most players play
+  through it. What the one-time copy brought counts in it. The copy
+  itself is the operator's and is not weighed.
+- The official gateway at its bound leaves four registered gateways
+  theirs. More approved gateways than that can fill everyone's 16 GiB
+  between them, and then every gateway's reports are refused, the
+  official one's too.
+- Room comes back when reports go: an administrator purges them (the
+  trash alone frees nothing until its 30 days are over), or the sweep
+  takes them (done for 90 days, in the trash for 30, older than 1,095).
+  [Operations](operations.md) §"What reports may take" has the query that
+  shows each gateway's level.
+- What the numbers do not say: the database's files do not shrink when
+  rows go, and the write-ahead log, indexes and backups take room of
+  their own. 16 GiB counted is more than 16 GiB of disk.
+
+**At the listener** (`central-http`, `uploads.rs`). In the service's
+memory, so a restart frees every slot and forgets the counts:
+
+| what | number | constant |
+| --- | --- | --- |
+| uploads at once | 4 | `UPLOADS` |
+| uploads of one gateway at once | 2 | `UPLOADS_PER_GATEWAY` |
+| uploads a gateway may leave unfinished in an hour | 30 | `UNFINISHED_PER_HOUR` |
+
+- Two for one gateway is what the released gateway sends at once
+  (`baylee-gateway`, `report/central.rs`). With four in all, one gateway
+  that holds its two no longer refuses every other gateway's parts. Two
+  approved gateways that each hold two still do. The official gateway is
+  counted like any other, by its id.
+- Memory. A slot holds its part once while it is read and, by reading the
+  code and not by measurement, up to three times while it is stored (the
+  bytes read, the statement's parameter, the driver's message). A record
+  of 64 MiB is then about 192 MiB, and four of them stored in the same
+  moment about 768 MiB; with two slots it was 384 MiB. (This document
+  said 128 MiB until 12.11.2026, which counted the reading only.) Parts
+  are usually far smaller. A server that cannot spare that much needs
+  `UPLOADS` at 2 again, and then one gateway's two uploads refuse
+  everyone else's as before.
+- Unfinished is an upload that took a slot and ended without its part
+  stored: too slow (`408`), a connection that went away, the upload's
+  minute over, or bytes other than announced. A part that the gateway's
+  other upload stored meanwhile (`409`) and a store that failed (`503`)
+  are held against nobody. Past thirty in an hour, counted from the first,
+  the gateway's uploads are `429` until that hour is over.
+- Why thirty. The released gateway sends a part at most five times (after
+  2, 8, 20 and 40 seconds) and a report has two parts, so a report whose
+  every send fails leaves ten. Thirty is three such reports in one hour.
+  A gateway restarted in the middle of its uploads leaves two. A restart
+  of Central forgets the count. A part that stalls is answered `408` and
+  is not sent again, so it leaves one.
+- A record too large for its gateway's line to carry in a minute is the
+  honest case that reaches the count soonest. The gateway's own minute
+  may end before Central's does, and then it sends the record five times:
+  six such records in an hour are thirty. No number is out of reach of a
+  line that carries nothing.
+- What the count costs an honest gateway that reaches it: its parts are
+  `429` for the rest of that hour and are given up after five sends, the
+  small ones that would have arrived among them; the reports themselves
+  are still filed, without those parts. Every ten more in the number are
+  five more minutes an hour in which two hostile gateways can hold all
+  four slots.
+- What the count does not end: a gateway that keeps the pace and never
+  finishes holds its two slots for up to a quarter of every hour (thirty
+  uploads of a minute each), and two such gateways hold all four for that
+  long.
 
 ### Triage: browser listener, `Admin { request }`
 

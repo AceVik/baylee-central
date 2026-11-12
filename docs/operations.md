@@ -852,7 +852,8 @@ gateway's token with the `sso` scope:
 - `PUT /v1/reports/{id}/client` and `…/record`, `application/gzip` with a
   `Content-Length` (`411` without, `413` past 64 MiB): the credential and
   the report's announcement are checked before the body is read, which must
-  be exactly the announced length; at most two uploads at once, each within
+  be exactly the announced length; at most four uploads at once and two of
+  one gateway (until 12.11.2026 two at once for everyone), each within
   60 seconds (the native listener's connections may last that long; every
   other request keeps its 5 seconds) and bringing at least 16 KiB in every
   five of them until it is whole, else `408` and its slot is free again;
@@ -869,6 +870,62 @@ columns only; `SELECT, INSERT, DELETE` on `report_parts`, `report_notes`,
 `report_seen` and `report_views` (with `UPDATE (query)`); `SELECT, INSERT`
 on `report_audit`. The daily sweep (`--sweep-stdin`) deletes reports past
 their retention and says how many. No secret and no setting is new.
+
+### What reports may take, and how to make room (12.11.2026)
+
+[Reports](reports.md) §"What the reports may take" has the rules and the
+reasons. The numbers are constants in the code; changing one is a build.
+
+| what | number | where |
+| --- | --- | --- |
+| a registered gateway's reports | 2 GiB | `central-postgres`, `GATEWAY_STORED` |
+| the official gateway's reports | 8 GiB | `OFFICIAL_STORED` |
+| all reports | 16 GiB | `ALL_STORED` |
+| uploads at once | 4 | `central-http`, `UPLOADS` |
+| uploads of one gateway at once | 2 | `UPLOADS_PER_GATEWAY` |
+| uploads a gateway may leave unfinished in an hour | 30 | `UNFINISHED_PER_HOUR` |
+
+**Before the first deploy with these bounds**, and whenever reports are
+refused, look at the levels. As `central_migrator` (or any login that may
+read the two tables), with the file from a checkout of the deployed
+revision; the names are the deploy hook's defaults:
+
+```sh
+docker exec -i baylee-postgres-1 psql -X -q -v ON_ERROR_STOP=1 \
+    -U central_migrator -d baylee_central < ops/report-levels.sql
+```
+
+It prints a line for each gateway and one without a gateway for all:
+`bytes` is what a filing is weighed against, `counted` the same in words.
+It changes nothing and reads no part's bytes. If the official gateway's
+line is near 8 GiB (8589934592) before the deploy, its reports will be
+refused from the first one after it: purge first, or raise the number.
+
+**What a gateway sees past a bound:** `429` to `POST /v1/reports`. The
+released gateway asks twice more (after 250 ms and a second) and then
+tells its player the report failed. Nothing is logged: Central writes no
+line for a report, and none for a refusal.
+
+**To make room:** an administrator purges reports on the website
+(*Feedback*: move to the trash, then purge; the trash alone frees nothing
+for its 30 days). The sweep frees what is done for 90 days, in the trash
+for 30 or older than 1,095. A gateway that is filling its bound with
+reports nobody asked for is disabled like any other (`/admin/gateways`);
+its reports stay until they are purged.
+
+**Memory.** With four uploads at once, parts of the largest size (64 MiB)
+can hold about 768 MiB for a moment (by reading the code, not measured;
+two uploads: 384 MiB). The unit sets no memory limit. On a server that
+cannot spare it, build with `UPLOADS` at 2; one gateway's two uploads
+then refuse every other gateway's parts again.
+
+**What these numbers do not bound:** the disk itself. PostgreSQL's files
+do not shrink when rows go, and the write-ahead log, the indexes and the
+backups take room of their own. Watch the volume as before.
+
+Not tested: none of this ran on the server. The bounds and the levels
+query are tested against the PostgreSQL fixture, the slots over HTTP
+against a local listener.
 
 ### The one-time copy of the feedback service's reports
 

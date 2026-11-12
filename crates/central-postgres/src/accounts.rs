@@ -40,7 +40,8 @@ pub use pairing::{Approval, Claim, MAX_POLLS, OPEN_IN_ALL, OPEN_PER_ACCOUNT, Red
 pub use profiles::{Profile, TAG_DRAWS, TagDraw};
 pub use recovery::Summary;
 pub use reports::{
-    Filer, ImportedHistory, ImportedNote, ImportedReport, ReportImport, ReportImportRefusal,
+    ALL_STORED, Filer, GATEWAY_STORED, ImportedHistory, ImportedNote, ImportedReport,
+    OFFICIAL_STORED, REPORT_BYTES, ReportImport, ReportImportRefusal,
 };
 pub use sessions::{Issued, Session};
 pub use terms::MAX_GATEWAY_VERSIONS;

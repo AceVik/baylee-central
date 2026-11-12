@@ -101,6 +101,13 @@ pub(crate) fn run(
         .unwrap(),
         Response::GatewaySession { .. }
     ));
+    super::reports::run(
+        http,
+        &registered.credential,
+        session.identity().account,
+        runtime,
+        operator,
+    );
 }
 
 const COUNTED: GatewayActivity = GatewayActivity {
