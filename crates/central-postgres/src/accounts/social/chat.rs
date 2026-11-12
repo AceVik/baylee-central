@@ -7,6 +7,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 mod inbox;
 mod send;
+pub use send::CHAT_SENDER_SHARE;
 
 fn rejected(_: impl Sized) -> Error {
     Error::Rejected

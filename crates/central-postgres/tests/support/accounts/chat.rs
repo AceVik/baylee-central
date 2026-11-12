@@ -8,6 +8,7 @@ use central_crypto::chat::{DeviceSecrets, Entropy, Recipient, b64::url};
 use central_postgres::Session;
 
 mod groups;
+mod inboxes;
 
 struct Draw(u8);
 impl Entropy for Draw {
@@ -227,6 +228,7 @@ pub(super) async fn run(
     );
     assert_eq!(inbox(store, &b, &bk, 0).await.len(), 3);
     groups::run(store, [&a, &b, &c], [&ak, &bk]).await;
+    inboxes::run(store, operator, [ai, bi, ci], [&a, &b, &c], [&ak, &bk]).await;
     enrolled_tag_is_stable(store, operator, ai).await;
     new_epoch_excludes_old_devices(store, operator, ai, &a, &ak).await;
 }

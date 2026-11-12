@@ -135,6 +135,51 @@ each device's retained inbox also caps at 5000. A full quota currently refuses n
 sends without deleting history. Automatic retention remains an explicit pending
 owner decision and is not enabled by this implementation.
 
+### Full inboxes and one sender's share (12.11.2026)
+
+Nothing deletes a delivery, so an inbox that is full stays full. Until this
+date one contact could fill a device's inbox alone, and a send to a group
+was refused whole while one member's device was full. Since then
+(`central-postgres`, `social/chat/send.rs`):
+
+- **One sender's share.** A device of another account takes a delivery
+  while its inbox holds fewer than 5000 and fewer than 2500 of them are
+  this sender's (`CHAT_SENDER_SHARE`, half an inbox). At half, the two
+  sides of a direct conversation take the same, and it takes two senders
+  to fill an inbox. The sender's own devices are held to the 5000 only:
+  the sender's outbox bounds what they get.
+- **A device without room is left out.** The message is stored and goes to
+  every device that has room. Nothing tells the sender, or the device's
+  owner, that it was left out.
+- **Refused when nobody else has room.** If no device of another account
+  has room, the send is `Busy` (429), so a direct message is never
+  accepted for nobody. This is asked of every other device, a blocker's
+  too, so the answer says nothing about a block. (Before, a full device
+  was not looked at when its owner had blocked the sender: a group send
+  that a full device refused went through once that member blocked.)
+- **The sender's own device full:** `Busy`, as before. A message its own
+  devices cannot keep would be missing when they read their history again.
+- `Busy` is an answer both clients knew already. The native client takes
+  it as a rate refusal and keeps the sealed message to send again
+  (`baylee-client`, `social/central/poll.rs`); the website names it among
+  the errors it shows (`web/src/chat/steps.ts`). For a full inbox or a
+  used-up share the answer does not change until something is deleted,
+  and neither client says which of the reasons it was.
+- **No deletion and no time limit were built.** The review recommended
+  deleting on acknowledged delivery. The wire has no acknowledgement
+  (`Inbox { device, after }` reads by a cursor), both clients read their
+  history again from the start, and the privacy notice in force says
+  history is not deleted automatically. It needs the owner's retention
+  decision and an addition to the protocol.
+- **What stays possible.** Two contacts, or one person with two accounts,
+  fill an inbox for good, 2500 each. A sender who reaches the share is
+  refused in that inbox for good, the busier side of an honest
+  conversation among them. A member whose inbox is full misses group
+  messages and is not told. The sender's 5000 and the device's 5000 are
+  for a lifetime as before.
+- Cost: one query a send, which counts each recipient device's deliveries
+  and how many are the sender's. Before, it counted the deliveries only.
+
 Migrations 000020/000021 add devices, messages, deliveries, groups and members.
 Central object IDs use PostgreSQL UUIDv7 defaults with INSERT RETURNING. The
 sender-generated message correlation UUIDv7 is an explicit offline-client

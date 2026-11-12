@@ -4,6 +4,7 @@ use central_api::social::{Contact, Person, Relation, SocialRequest, SocialRespon
 use sea_orm::{ConnectionTrait, QueryResult, TransactionTrait, prelude::Uuid};
 
 mod chat;
+pub use chat::CHAT_SENDER_SHARE;
 mod contacts;
 mod groups;
 mod limits;

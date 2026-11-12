@@ -2,9 +2,22 @@ use super::{
     ChatResponse, ConnectionTrait, Error, Session, Uuid, account_tag, by_tag, caller, decode,
     lock_accounts, rejected, statement, unavailable,
 };
-use central_api::chat::{Header, MAX_CIPHERTEXT, Sealed};
+use central_api::chat::{Header, MAX_CIPHERTEXT, MAX_DELIVERIES, Sealed};
 use central_crypto::chat::{Envelope, b64};
 use std::collections::{BTreeMap, BTreeSet};
+
+/// What a device's inbox holds (`central_api::chat::MAX_DELIVERIES`).
+const INBOX: i64 = 5_000;
+const _: () = assert!(MAX_DELIVERIES == 5_000);
+
+/// What one other account's messages may take of a device's inbox: half.
+/// Nothing deletes a delivery yet (retention is the owner's pending
+/// decision, `docs/central-chat.md`), so without a share one contact fills
+/// an inbox for good and nobody else is heard there. At half, the two
+/// sides of a direct conversation take the same, and it takes two senders
+/// to fill an inbox. The account's own messages on its own devices are not
+/// held to it: its outbox bounds them.
+pub const CHAT_SENDER_SHARE: i64 = INBOX / 2;
 
 struct Parsed {
     header: Header,
@@ -188,32 +201,94 @@ async fn recipients(
         }
     }
     let mut owners = BTreeSet::new();
-    let mut blocked = Vec::new();
+    let mut devices = Vec::new();
     for row in &rows {
         let id: String = row.try_get("", "fingerprint").map_err(unavailable)?;
         let owner: Uuid = row.try_get("", "account_id").map_err(unavailable)?;
         owners.insert(owner);
-        if row.try_get::<bool>("", "blocked").map_err(unavailable)? {
-            blocked.push(id.clone());
-        }
         if !wraps.contains_key(&id) {
             return Err(Error::Conflict);
         }
+        let blocked = row.try_get::<bool>("", "blocked").map_err(unavailable)?;
+        devices.push((id, owner, blocked));
     }
     if wraps.len() != rows.len() || owners.len() != accounts.len() {
         return Err(Error::Conflict);
     }
-    // Validate every wrap before excluding deliveries to recipients who blocked
-    // this sender. Directory/completeness responses do not reveal those blocks.
-    for device in blocked {
-        wraps.remove(&device);
+    // Every wrap is validated before any delivery is left out, so neither
+    // the directory nor the completeness answers show who is left out.
+    let room = room(db, me, &devices).await?;
+    let mut others = false;
+    let mut heard = false;
+    for (id, owner, blocked) in devices {
+        let fits = room.get(&id).is_none_or(|held| held.fits(owner == me));
+        if owner == me {
+            // The sender's own device is full: refused, as it always was. A
+            // message its own devices cannot keep would vanish from them.
+            if !fits {
+                return Err(Error::Busy);
+            }
+            continue;
+        }
+        others = true;
+        // Whether anybody else has room is asked of every device, a
+        // blocker's too: the answer then says nothing about a block.
+        heard |= fits;
+        if blocked || !fits {
+            wraps.remove(&id);
+        }
     }
-    // A device's queue is bounded independently of the sender's allowance.
-    let full = db.query_one_raw(statement("SELECT device FROM central_identity.chat_deliveries WHERE device = ANY($1) GROUP BY device HAVING count(*) >= 5000 LIMIT 1", vec![wraps.keys().cloned().collect::<Vec<_>>().into()])).await.map_err(unavailable)?.is_some();
-    if full {
+    // Nobody else has room for it (a direct message's only reader among
+    // them): refused, so that the sender is not told it was sent.
+    if others && !heard {
         return Err(Error::Busy);
     }
     Ok(wraps)
+}
+
+/// What a device's inbox holds, and how much of it is one sender's.
+struct Held {
+    total: i64,
+    theirs: i64,
+}
+
+impl Held {
+    /// Whether one more delivery fits: the inbox is not full, and for
+    /// another account's device the sender's share of it is not used up.
+    fn fits(&self, own: bool) -> bool {
+        self.total < INBOX && (own || self.theirs < CHAT_SENDER_SHARE)
+    }
+}
+
+/// How full the inbox of each of `devices` is, and how much of it is
+/// messages of `me`; a device that holds nothing is not in the answer.
+async fn room(
+    db: &impl ConnectionTrait,
+    me: Uuid,
+    devices: &[(String, Uuid, bool)],
+) -> Result<BTreeMap<String, Held>, Error> {
+    let ids: Vec<String> = devices.iter().map(|(id, _, _)| id.clone()).collect();
+    let rows = db
+        .query_all_raw(statement(
+            "SELECT i.device, count(*)::bigint AS total, count(m.id)::bigint AS theirs
+             FROM central_identity.chat_deliveries i
+             LEFT JOIN central_identity.chat_messages m ON m.id = i.message_id AND m.sender = $2
+             WHERE i.device = ANY($1) GROUP BY i.device",
+            vec![ids.into(), me.into()],
+        ))
+        .await
+        .map_err(unavailable)?;
+    rows.iter()
+        .map(|row| {
+            Ok((
+                row.try_get("", "device").map_err(unavailable)?,
+                Held {
+                    total: row.try_get("", "total").map_err(unavailable)?,
+                    theirs: row.try_get("", "theirs").map_err(unavailable)?,
+                },
+            ))
+        })
+        .collect()
 }
 
 async fn store(
@@ -260,7 +335,22 @@ async fn store(
 
 #[cfg(test)]
 mod tests {
-    use super::partner;
+    use super::{CHAT_SENDER_SHARE, Held, INBOX, partner};
+
+    #[test]
+    fn an_inbox_has_room_until_it_is_full_or_the_sender_s_share_is_used_up() {
+        let held = |total, theirs| Held { total, theirs };
+        // another account's device: the sender's share, then the inbox
+        assert!(held(INBOX - 1, CHAT_SENDER_SHARE - 1).fits(false));
+        assert!(!held(INBOX - 1, CHAT_SENDER_SHARE).fits(false));
+        assert!(!held(INBOX, 0).fits(false));
+        // the sender's own device: the inbox only
+        assert!(held(INBOX - 1, INBOX - 1).fits(true));
+        assert!(!held(INBOX, 0).fits(true));
+        // two senders at their share fill an inbox, one alone does not
+        assert_eq!(2 * CHAT_SENDER_SHARE, INBOX);
+    }
+
     #[test]
     fn only_canonical_owned_direct_conversations_resolve() {
         assert_eq!(partner("dm:0007:3fa2", "0007"), Ok(0x3fa2));
