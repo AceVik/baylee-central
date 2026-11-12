@@ -73,12 +73,12 @@ async function newest(to: string, count: number): Promise<Mail> {
   return all[all.length - 1] as Mail;
 }
 
-/** What a mail may hold: no image, no script, nothing from elsewhere, no code in a link. */
+/** What a mail may hold: no image, no script, nothing from elsewhere, links to the site Central names (its `mail` block's `site`, here baylee.app as the browser sees it), no code in a link. */
 function sound(mail: Mail, code: string) {
   expect(mail.html).not.toMatch(/<img|<script|<iframe|<link|@import|url\(/i);
   for (const [, href] of mail.html.matchAll(/href="([^"]*)"/g)) {
     expect(href).toMatch(
-      /^http:\/\/127\.0\.0\.1:\d+\/en\/(reset|account\/security)$/,
+      /^https:\/\/baylee\.app\/en\/(reset|account\/security)$/,
     );
     expect(href).not.toContain(code);
   }
@@ -99,7 +99,7 @@ test("an address is named, confirmed by the mailed code, and a mailed reset code
   const username = `mail${project}${stamp}`;
   const address = `${username}@example.org`;
   const seen = problems(page);
-  const recovery = await register(page, username, `Mail ${project}`, FIRST);
+  const recovery = await register(page, username, `Mail${project}`, FIRST);
 
   // The account area: no address yet. A wrong password names nothing and
   // sends no mail.
