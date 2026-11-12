@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { expect, type Page, type Route, test } from "@playwright/test";
 
 import { axe, narrow, schemes, targets, watch } from "./check.ts";
@@ -314,16 +315,41 @@ test("a new vault: its recovery code is shown once, copied or saved, and kept be
   // the form's fields are gone, and with them what they held
   await expect(page.locator("#reset-steps input[type=password], #reset-steps input[type=text]")).toHaveCount(0);
 
-  await page.getByRole("button", { name: "Copy" }).click();
-  await expect(page.locator("#reset-steps [role=status]")).toHaveText("Copied.");
+  // the registration's ways to keep it (keep.rs), each made only when it is asked for
+  const steps = page.locator("#reset-steps");
+  const way = (name: string) => steps.getByRole("button", { name, exact: true });
+  for (const name of ["Copy", "Save as a text file", "Print", "Mail it to myself"]) await expect(way(name)).toBeVisible();
+  const before = await page.content();
+  expect(before.split(shown)).toHaveLength(2);
+  expect(before).not.toContain("data:text");
+  expect(before).not.toContain("mailto:");
+  await expect(page.locator("a[download], a[href^='mailto:'], .code-sheet")).toHaveCount(0);
+
+  await way("Copy").click();
+  await expect(steps.locator("[role=status]").filter({ hasText: "Copied." })).toHaveCount(1);
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(shown);
-  await expect(page.getByRole("link", { name: "Save as a text file" })).toHaveAttribute(
-    "href",
-    `data:text/plain;charset=utf-8,Baylee%20recovery%20code%3A%20${shown}%0A`,
-  );
+  // the file names the account the reset was for, and its link is gone again
+  const [download] = await Promise.all([page.waitForEvent("download"), way("Save as a text file").click()]);
+  expect(download.suggestedFilename()).toBe("baylee-recovery-code.txt");
+  const file = await readFile(await download.path(), "utf8");
+  expect(file.split("\n").slice(0, 4)).toEqual(["Baylee recovery code", "Sign-in name: erika", "", shown]);
+  await expect(page.locator("a[download]")).toHaveCount(0);
+  // the mail knows no address here: its mail program asks for one
+  const asked: string[] = [];
+  const protocol = await page.context().newCDPSession(page);
+  await protocol.send("Page.enable");
+  protocol.on("Page.frameRequestedNavigation", (event) => asked.push(event.url));
+  await way("Mail it to myself").click();
+  await expect.poll(() => asked.length).toBe(1);
+  const mailto = new URL(asked[0] ?? "");
+  expect(mailto.protocol).toBe("mailto:");
+  expect(mailto.pathname).toBe("");
+  expect(mailto.searchParams.get("body")).toBe(file.replaceAll("\n", "\r\n"));
+  expect(await page.content()).not.toContain("mailto:");
+  await expect(page).toHaveURL(/\/en\/reset$/);
   expect(await axe(page)).toEqual([]);
   expect(await targets(page)).toEqual([]);
-  // the code's one line and its two ways to keep it hold on the narrowest phone
+  // the code's one line and its ways to keep it hold on the narrowest phone
   expect(await narrow(page)).toBe(0);
 
   // no way on before the person says the code is saved
