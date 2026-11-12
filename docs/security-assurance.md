@@ -6280,14 +6280,19 @@ For the owner.
   a password change and an administrator's code is a further use of the
   same address. The texts were not changed here.
 
-Checks. On the code of `2d614e4` (the documents after it change no code):
+Checks. On the code of `b33d07b` (the documents after it change no code):
 `cargo fmt --all --check` and `cargo clippy --locked --workspace
 --all-targets -- -D warnings` pass; `cargo xtask gate` passes (format,
 policy, clippy, 673 tests with the doc tests, the release build); `cargo
-xtask postgres` passes, both suites, and its container was gone afterwards;
-`cargo xtask secrets` passes on the tree and the full history; `cargo xtask
+xtask smoke` passes and found its listener closed; `cargo xtask postgres`
+passes, both suites, and its container was gone afterwards; `cargo xtask
+secrets` passes on the tree and the full history; `cargo xtask
 crypto-scope` and `cargo xtask sqlite-scope` pass; `cargo deny check`
 (0.20.2) and `cargo audit --deny warnings` (0.22.2, with the ignores in
-`.cargo/audit.toml`) pass.
+`.cargo/audit.toml`) pass. One run of `cargo xtask postgres` before that
+timed out: its 300 seconds include compiling the two test binaries, and
+the machine was loaded by other work; with the binaries built first, the
+same code passed. The same fixture had passed on `2d614e4` before the
+words were changed.
 
 Engineering review, not an audit.
