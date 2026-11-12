@@ -223,8 +223,10 @@ mail's button finds the code filled in, "a good, safe way".*
   history and a reload no longer hold it. Another fragment (a place on the
   page) stays. The link opened in a tab that shows the same page already
   is, to the browser, a move within the page, which runs no island: on
-  such a `hashchange` to `#code=` the page loads anew, and takes the code
-  as above. Until the island runs (after the page's largest paint), the
+  such a `hashchange` to `#code=` the fragment is removed the same way and
+  fills nothing, and the page is left as it is (a reload would lose a step
+  shown once, such as a new vault's recovery code); the person types the
+  code. Until the island runs (after the page's largest paint), the
   fragment stands in the address bar; without script it stays there.
 - **Never by itself.** The island sends nothing because of the fragment:
   the person still presses the form's button. A link scanner that opens

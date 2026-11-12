@@ -635,13 +635,11 @@ test.describe("the code from the mail's button", () => {
     await expect(page.locator("html")).toHaveAttribute("data-islands", "ready");
     await expect(form(page).getByLabel("Reset code")).toHaveValue("");
 
-    // The link opened in the tab that shows the page already: a move within
-    // the page, which runs no island; the page loads anew and takes it.
-    await page.goto(`/en/reset#code=${CODE}`);
-    await expect(form(page).getByLabel("Reset code")).toHaveValue(CODE);
-    await expect(page.locator("html")).toHaveAttribute("data-islands", "ready");
-    await expect(page).toHaveURL(/\/en\/reset$/);
     // the form sends the code only once the person sends it
+    await page.goto("/en/");
+    await page.goto(`/en/reset#code=${CODE}`);
+    await expect(page.locator("html")).toHaveAttribute("data-islands", "ready");
+    await expect(form(page).getByLabel("Reset code")).toHaveValue(CODE);
     await form(page).getByLabel("Sign-in name").fill("Erika");
     await page.getByRole("radio", { name: FRESH }).check();
     await page.getByRole("checkbox", { name: "I understand that this data is lost for good." }).check();
@@ -653,6 +651,19 @@ test.describe("the code from the mail's button", () => {
     expect(seen[0]).toEqual({ operation: "discover", username: "erika" });
     expect((seen[1] as { code: string }).code).toBe(CODE);
     await expect(page.getByRole("heading", { name: "Your new password is set" })).toBeVisible({ timeout: 60_000 });
+    const shown = (await page.locator("#reset-steps .secret code").textContent()) ?? "";
+    expect(shown).not.toBe("");
+
+    // The link opened in the tab that shows the page already: a move within
+    // the page, which runs no island. The fragment goes; the page stays as
+    // it was, the new vault's recovery code still shown once.
+    const asked = seen.length;
+    await page.goto(`/en/reset#code=${CODE}`);
+    await expect(page).toHaveURL(/\/en\/reset$/);
+    expect(await page.evaluate(() => location.hash)).toBe("");
+    await expect(page.locator("#reset-steps .secret code")).toHaveText(shown);
+    await expect(page.getByRole("heading", { name: "Your new password is set" })).toBeVisible();
+    expect(seen.length).toBe(asked);
     expect(problems).toEqual([]);
   });
 

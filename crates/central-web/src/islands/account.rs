@@ -1163,7 +1163,7 @@ pub fn Account(lang: Lang, section: Section, worker: String) -> impl IntoView {
     // page of the area, and kept on the security page only, until the
     // e-mail section learns whether an address waits for it. Signed out,
     // or with the area not read, it is dropped unseen. One that arrives
-    // while the page is open loads it anew (`fragment::watch`).
+    // while the page is open is removed and fills nothing (`fragment::watch`).
     fragment::watch();
     let handed = StoredValue::new(
         fragment::code(&fragment::take(), MailCode::parse).filter(|_| section == Section::Security),
