@@ -1,43 +1,38 @@
-# Not translated yet: these are the English words, line for line
-# (locales/en/mail.ftl), until this language has its own.
+# The words of the mails Baylee Central sends (docs/email.md), in Korean.
 #
-# The words of the mails Baylee Central sends (docs/email.md).
-#
-# One message a line: `id = text`. `{ $name }` is replaced when a mail is
-# written. A line that starts with `#` is a comment. No markup: the words go
-# into the plain text as they are and into the HTML escaped.
+# One message a line: `id = text`. `{ $name }` is replaced when a mail is written.
 
 brand = Baylee
-code-label = Your code
-code-secret = Do not pass this code on. Nobody at Baylee asks for it.
-footer = Baylee never asks for your password by e-mail. You get this mail because this address was named for a Baylee account.
+code-label = 내 코드
+code-secret = 이 코드를 다른 사람에게 알려 주지 마세요. Baylee에서는 누구도 이 코드를 묻지 않아요.
+footer = Baylee는 이메일로 비밀번호를 묻지 않아요. 이 주소가 Baylee 계정에 입력되어서 이 메일을 받으셨어요.
 
 # The code that confirms an address.
-confirm-subject = Confirm your e-mail address for Baylee
-confirm-title = Confirm your e-mail address
-confirm-intro = This address was named for a Baylee account. To confirm it, enter this code where you named the address.
-confirm-valid = The code works for { $minutes } minutes.
-confirm-ignore = If this was not you, ignore this mail. The address is not used without the code.
+confirm-subject = Baylee 이메일 주소 확인
+confirm-title = 이메일 주소 확인
+confirm-intro = 이 주소가 Baylee 계정에 입력되었어요. 주소를 확인하려면 주소를 입력한 곳에 이 코드를 입력하세요.
+confirm-valid = 이 코드는 { $minutes }분 동안 유효해요.
+confirm-ignore = 본인이 한 일이 아니라면 이 메일을 무시하세요. 코드 없이는 이 주소가 사용되지 않아요.
 
 # The reset code. `name` is the account's sign-in name.
-reset-subject = Your reset code for Baylee
-reset-title = Set a new password
-reset-intro = A reset code was asked for the Baylee account { $name }.
-reset-how = Enter the code on the reset page to set a new password.
-reset-valid = The code works once, for { $minutes } minutes.
-reset-link = Open the reset page
-reset-ignore = If this was not you, ignore this mail. Your password stays as it is.
+reset-subject = Baylee 재설정 코드
+reset-title = 새 비밀번호 설정
+reset-intro = Baylee 계정 { $name }의 재설정 코드가 요청되었어요.
+reset-how = 재설정 페이지에 이 코드를 입력하면 새 비밀번호를 설정할 수 있어요.
+reset-valid = 이 코드는 한 번만, { $minutes }분 동안 쓸 수 있어요.
+reset-link = 재설정 페이지 열기
+reset-ignore = 본인이 한 일이 아니라면 이 메일을 무시하세요. 비밀번호는 그대로예요.
 
 # The notice to an address that another one replaced.
-replaced-subject = Your e-mail address on Baylee was replaced
-replaced-title = This address was replaced
-replaced-body = This address is no longer the e-mail address of a Baylee account. Another address was confirmed in its place.
+replaced-subject = Baylee의 이메일 주소가 바뀌었어요
+replaced-title = 이 주소는 다른 주소로 바뀌었어요
+replaced-body = 이 주소는 더 이상 Baylee 계정의 이메일 주소가 아니에요. 그 자리에 다른 주소가 확인되었어요.
 
 # The notice to an address that was removed.
-removed-subject = Your e-mail address on Baylee was removed
-removed-title = This address was removed
-removed-body = This address is no longer the e-mail address of a Baylee account. It was removed from the account.
+removed-subject = Baylee의 이메일 주소가 삭제되었어요
+removed-title = 이 주소는 삭제되었어요
+removed-body = 이 주소는 더 이상 Baylee 계정의 이메일 주소가 아니에요. 계정에서 삭제되었어요.
 
 # Both notices.
-notice-check = If this was not you, sign in and look at the security page of your account.
-notice-link = Open the security page
+notice-check = 본인이 한 일이 아니라면 로그인해서 계정의 보안 페이지를 확인하세요.
+notice-link = 보안 페이지 열기

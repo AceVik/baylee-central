@@ -1,43 +1,38 @@
-# Not translated yet: these are the English words, line for line
-# (locales/en/mail.ftl), until this language has its own.
+# The words of the mails Baylee Central sends (docs/email.md), in Japanese.
 #
-# The words of the mails Baylee Central sends (docs/email.md).
-#
-# One message a line: `id = text`. `{ $name }` is replaced when a mail is
-# written. A line that starts with `#` is a comment. No markup: the words go
-# into the plain text as they are and into the HTML escaped.
+# One message a line: `id = text`. `{ $name }` is replaced when a mail is written.
 
 brand = Baylee
-code-label = Your code
-code-secret = Do not pass this code on. Nobody at Baylee asks for it.
-footer = Baylee never asks for your password by e-mail. You get this mail because this address was named for a Baylee account.
+code-label = コード
+code-secret = このコードを他の人に教えないでください。Baylee がコードを尋ねることはありません。
+footer = Baylee がメールでパスワードを尋ねることはありません。このメールは、このアドレスが Baylee のアカウントに指定されたため届いています。
 
-# The code that confirms an address.
-confirm-subject = Confirm your e-mail address for Baylee
-confirm-title = Confirm your e-mail address
-confirm-intro = This address was named for a Baylee account. To confirm it, enter this code where you named the address.
-confirm-valid = The code works for { $minutes } minutes.
-confirm-ignore = If this was not you, ignore this mail. The address is not used without the code.
+# アドレスを確認するコード。
+confirm-subject = Baylee のメールアドレスを確認してください
+confirm-title = メールアドレスの確認
+confirm-intro = このアドレスが Baylee のアカウントに指定されました。確認するには、アドレスを指定した画面でこのコードを入力してください。
+confirm-valid = コードの有効期間は{ $minutes }分です。
+confirm-ignore = 心当たりがない場合は、このメールを無視してください。コードがなければ、このアドレスは使われません。
 
-# The reset code. `name` is the account's sign-in name.
-reset-subject = Your reset code for Baylee
-reset-title = Set a new password
-reset-intro = A reset code was asked for the Baylee account { $name }.
-reset-how = Enter the code on the reset page to set a new password.
-reset-valid = The code works once, for { $minutes } minutes.
-reset-link = Open the reset page
-reset-ignore = If this was not you, ignore this mail. Your password stays as it is.
+# リセットコード。`name` はアカウントのログイン名。
+reset-subject = Baylee のリセットコード
+reset-title = 新しいパスワードの設定
+reset-intro = Baylee のアカウント { $name } のリセットコードが求められました。
+reset-how = リセットページでこのコードを入力すると、新しいパスワードを設定できます。
+reset-valid = コードは1回だけ、{ $minutes }分間有効です。
+reset-link = リセットページを開く
+reset-ignore = 心当たりがない場合は、このメールを無視してください。パスワードはそのままです。
 
-# The notice to an address that another one replaced.
-replaced-subject = Your e-mail address on Baylee was replaced
-replaced-title = This address was replaced
-replaced-body = This address is no longer the e-mail address of a Baylee account. Another address was confirmed in its place.
+# 別のアドレスに置き換えられたアドレスへの通知。
+replaced-subject = Baylee のメールアドレスが置き換えられました
+replaced-title = このアドレスは置き換えられました
+replaced-body = このアドレスは、Baylee のアカウントのメールアドレスではなくなりました。代わりに別のアドレスが確認されました。
 
-# The notice to an address that was removed.
-removed-subject = Your e-mail address on Baylee was removed
-removed-title = This address was removed
-removed-body = This address is no longer the e-mail address of a Baylee account. It was removed from the account.
+# 削除されたアドレスへの通知。
+removed-subject = Baylee のメールアドレスが削除されました
+removed-title = このアドレスは削除されました
+removed-body = このアドレスは、Baylee のアカウントのメールアドレスではなくなりました。アカウントから削除されました。
 
-# Both notices.
-notice-check = If this was not you, sign in and look at the security page of your account.
-notice-link = Open the security page
+# 両方の通知。
+notice-check = 心当たりがない場合は、ログインして、アカウントのセキュリティページを確認してください。
+notice-link = セキュリティページを開く

@@ -183,8 +183,7 @@ faq-account-a = Non per giocare da solo: il deck builder e le partite contro l'I
 faq-data-q = Che cosa succede ai miei dati?
 faq-data-a = Il meno possibile; l'<privacy>informativa sulla privacy</privacy> dice esattamente che cosa. La tua password non lascia mai il tuo browser; i tuoi dati privati e i tuoi messaggi in chat vengono cifrati sul tuo dispositivo prima di arrivare a noi.
 faq-password-q = Ho dimenticato la password. E ora?
-# English for now: to be translated.
-faq-password-a = You set a new password with a reset code, <reset>on this page</reset>. If your account has a confirmed e-mail address, you can have the code sent to it there; otherwise an administrator gives you one. Your encrypted data survives only if you have the recovery code you received when you created your account. Without it you start with an empty vault, and that data is lost.
+faq-password-a = Imposti una nuova password con un codice di reimpostazione, <reset>in questa pagina</reset>. Se il tuo account ha un indirizzo e-mail confermato, puoi farti mandare lì il codice; altrimenti te ne dà uno un amministratore. I tuoi dati cifrati si salvano solo se hai il codice di recupero ricevuto quando hai creato il tuo account. Senza, riparti con una cassaforte vuota, e quei dati sono persi.
 faq-gateway-q = Che cos'è un gateway?
 faq-gateway-a = Un server dove si trovano i tavoli online. Chiunque può gestirne uno; l'<gateways>elenco</gateways> riporta quelli che Central conosce.
 faq-systems-q = Su quali sistemi funziona?
@@ -266,10 +265,8 @@ privacy-directory-title = L'elenco dei gateway
 privacy-directory = Il nostro server legge l'elenco dei gateway da Baylee Central e lo mostra; non è coinvolto nulla che ti riguardi. Un gateway può comunicare a Central quanti giocatori sono connessi al momento, quanti di loro sono in una partita e quanti tavoli aperti e partite ha, e Central conta i propri account; il sito mostra questi numeri. Sono solo conteggi, mai nomi, e i numeri di un gateway sono una dichiarazione del suo gestore.
 privacy-account-title = Il tuo account
 privacy-account = Per un account, Baylee Central memorizza: l'ID del tuo account, il tuo nome di accesso, il tuo nome visualizzato con il suo tag, quando e come è stato creato l'account, un record di password OPAQUE (che ti permette di dimostrare la tua password senza che il nostro server la conosca mai), la tua chiave principale cifrata due volte (dalla tua password e dal tuo codice di recupero), il documento cifrato del tuo account e i tuoi oggetti cifrati (illeggibili per noi; vediamo solo dimensione, revisione e ora), quale versione delle condizioni hai accettato e quando, l'ora del tuo ultimo accesso, le tue sessioni, un ruolo di amministratore se ne hai uno, e i gateway che registri con i loro token. Gli altri giocatori vedono il tuo nome visualizzato e il tag, mai il tuo nome di accesso. Se un amministratore ti dà un codice di reimpostazione, ne memorizziamo solo l'impronta (digest) finché il codice non viene usato o scade. Ciò che gli amministratori fanno a un account o a un gateway viene conservato in un registro per tre anni (chi, che cosa, quale account o gateway, quando). Base giuridica: art. 6, par. 1, lett. b) del GDPR (l'account che hai richiesto); per l'ora dell'ultimo accesso e il registro, art. 6, par. 1, lett. f) del GDPR (il nostro legittimo interesse a un funzionamento sicuro e tracciabile). Senza un nome di accesso e una password non c'è alcun account; non ti serve un indirizzo e-mail. Puoi creare un account a partire dai 16 anni. Conservato finché non elimini l'account; viene poi rimosso subito dal sistema in esercizio, e dai backup al più tardi entro 12 mesi. Le sessioni terminano dopo 30 minuti di inutilizzo e al più tardi 12 ore dopo l'accesso.
-# English for now: to be translated.
-privacy-email-title = E-mail address
-# English for now: to be translated.
-privacy-email = An e-mail address is optional; an account needs none. If you give one, Baylee Central stores the address and whether and when you confirmed it. Of every code we mail, we store only a digest, until the code is used or has expired. We use the address for three things: to send the code that confirms it, to send a reset code when you ask for one, and to tell the old address when it is replaced or removed. The mail is sent by Baylee's own mail service on the same server through mailbox.org (Heinlein Hosting GmbH, Berlin), which acts as a processor. Legal basis: Art. 6(1)(b) GDPR (the account you asked for). Kept until you remove the address or delete the account.
+privacy-email-title = Indirizzo e-mail
+privacy-email = Un indirizzo e-mail è facoltativo; un account non ne richiede nessuno. Se ne indichi uno, Baylee Central memorizza l'indirizzo, la lingua in cui sono scritte le sue e-mail e quando lo hai confermato. Un indirizzo che hai indicato e che attende il suo codice viene conservato finché non lo confermi o lo ritiri, e al massimo un giorno dopo la scadenza del suo codice. Di ogni codice che inviamo per e-mail memorizziamo solo l'impronta (digest), finché il codice non viene usato o scade, e per 24 ore gli orari in cui ti sono stati inviati codici di reimpostazione, così che ne partano al massimo tre al giorno. Usiamo l'indirizzo per tre scopi: inviare il codice che lo conferma, inviare un codice di reimpostazione quando tu o chiunque conosca il tuo nome di accesso ne richiede uno, e avvisare il vecchio indirizzo quando viene sostituito o rimosso. Le e-mail vengono inviate dal servizio di posta di Baylee sullo stesso server tramite mailbox.org (Heinlein Hosting GmbH, Berlino), che opera come responsabile del trattamento e riceve l'indirizzo e l'e-mail. Base giuridica: art. 6, par. 1, lett. b) del GDPR (l'account che hai richiesto). Conservato finché non rimuovi l'indirizzo o non elimini l'account.
 privacy-cookie-title = Il cookie di sessione
 privacy-cookie = L'accesso imposta un solo cookie, <code>__Host-central</code>: un numero casuale che identifica la tua sessione. Viene inviato solo a baylee.app, non può essere letto dagli script e termina con la sessione, al più tardi dopo 12 ore. È strettamente necessario per mantenerti connesso; non richiede consenso. Base giuridica: § 25, comma 2, n. 2 TDDDG e art. 6, par. 1, lett. b) del GDPR.
 privacy-chat-title = Chat e contatti
@@ -293,7 +290,7 @@ privacy-impressum = Le note legali vengono mostrate solo dopo che il tuo browser
     rompicapo più lungo. Base giuridica: art. 6, par. 1, lett. f) del GDPR (il nostro legittimo
     interesse a proteggere l'indirizzo di una persona fisica privata).
 privacy-recipients-title = Destinatari e paesi
-privacy-recipients = Non vendiamo dati e non ne trasmettiamo per pubblicità. I destinatari sono: netcup GmbH (hosting in Germania, come responsabile del trattamento ai sensi dell'art. 28 del GDPR); gli amministratori di Baylee Central, che per l'amministrazione vedono il tuo nome di accesso, il tuo nome visualizzato con il suo tag, l'origine, la creazione e l'ultimo accesso del tuo account, e i tuoi gateway, mai i tuoi dati cifrati; un gateway al quale accedi con il tuo account (riceve l'ID del tuo account, il nome visualizzato e il tag, non la tua password); i tuoi contatti e i membri dei tuoi gruppi (nome visualizzato, tag e i tuoi messaggi); le autorità solo dove la legge ce lo impone. Paesi al di fuori dello Spazio economico europeo: solo quando attivi le notifiche il servizio push del tuo browser (Google, Mozilla o Apple, USA) le trasporta. I gateway gestiti da altri possono trovarsi in qualsiasi paese; accedervi o meno è una tua decisione. Per il resto non trasferiamo dati a paesi al di fuori dello Spazio economico europeo.
+privacy-recipients = Non vendiamo dati e non ne trasmettiamo per pubblicità. I destinatari sono: netcup GmbH (hosting in Germania, come responsabile del trattamento ai sensi dell'art. 28 del GDPR); mailbox.org (Heinlein Hosting GmbH, Berlino), che recapita le e-mail a un indirizzo e-mail che hai indicato, come responsabile del trattamento; gli amministratori di Baylee Central, che per l'amministrazione vedono il tuo nome di accesso, il tuo nome visualizzato con il suo tag, l'origine, la creazione e l'ultimo accesso del tuo account, e i tuoi gateway, mai i tuoi dati cifrati; un gateway al quale accedi con il tuo account (riceve l'ID del tuo account, il nome visualizzato e il tag, non la tua password); i tuoi contatti e i membri dei tuoi gruppi (nome visualizzato, tag e i tuoi messaggi); le autorità solo dove la legge ce lo impone. Paesi al di fuori dello Spazio economico europeo: solo quando attivi le notifiche il servizio push del tuo browser (Google, Mozilla o Apple, USA) le trasporta. I gateway gestiti da altri possono trovarsi in qualsiasi paese; accedervi o meno è una tua decisione. Per il resto non trasferiamo dati a paesi al di fuori dello Spazio economico europeo.
 privacy-rights-title = I tuoi diritti
 privacy-rights = Hai il diritto di accesso (art. 15 GDPR), di rettifica (art. 16), di cancellazione
     (art. 17), di limitazione del trattamento (art. 18) e di portabilità dei dati (art. 20). Puoi
@@ -526,12 +523,10 @@ code-copy-failed = Qui la copia non ha funzionato. Seleziona il codice e copialo
 ## Setting a new password with a reset code
 
 reset-title = Imposta una nuova password
-# English for now: to be translated.
-reset-lead = For when you forgot your password: with a reset code you set a new one here. The code comes by e-mail to your confirmed address, or from an administrator.
+reset-lead = Per quando hai dimenticato la password: con un codice di reimpostazione ne imposti qui una nuova. Il codice arriva per e-mail al tuo indirizzo confermato, oppure da un amministratore.
 reset-noscript = Per impostare una nuova password serve JavaScript: la tua password e il tuo codice di recupero vengono elaborati nel tuo browser e non ci vengono mai inviati.
 reset-code = Codice di reimpostazione
-# English for now: to be translated.
-reset-code-hint = By e-mail or from an administrator. It starts with RESET and works once: for one hour if it came by e-mail, for 24 hours if an administrator made it.
+reset-code-hint = Per e-mail o da un amministratore. Inizia con RESET e vale una volta sola: per un'ora se è arrivato per e-mail, per 24 ore se l'ha creato un amministratore.
 reset-data = I tuoi dati cifrati
 reset-keep = Ho il mio codice di recupero. I miei dati restano.
 reset-new = Non ce l'ho. Ricominciare con una cassaforte vuota.
@@ -553,24 +548,15 @@ reset-unsure-title = Non è arrivata nessuna risposta
 reset-unsure = La connessione si è interrotta prima che Baylee Central rispondesse, quindi non sappiamo dire se la tua nuova password è stata impostata. Prova ad accedere con quella. Se non funziona, non è stato cambiato nulla: il tuo codice di reimpostazione vale ancora, inseriscilo di nuovo qui.
 reset-unsure-code = Se la tua nuova password funziona, questo è il tuo nuovo codice di recupero e quello vecchio non vale più; non può essere mostrato di nuovo, quindi salvalo adesso. Se la tua nuova password non funziona, questo codice non vale nulla.
 reset-to-signin = Accedi
-# English for now: to be translated.
-reset-mail-title = No reset code?
-# English for now: to be translated.
-reset-mail-lead = Enter your sign-in name. If your account has a confirmed e-mail address, we send a reset code to it.
-# English for now: to be translated.
-reset-mail-name-hint = The name you sign in with, not your e-mail address.
-# English for now: to be translated.
-reset-mail-submit = Send a code by e-mail
-# English for now: to be translated.
-reset-mail-error-name = That is not a sign-in name. Enter the name you sign in with, not your e-mail address.
-# English for now: to be translated.
-reset-mail-sent = If this account has a confirmed e-mail address, a reset code is on its way to it. It is valid for one hour.
-# English for now: to be translated.
-reset-mail-busy = Too many requests for now. Try again later.
-# English for now: to be translated.
-reset-mail-none = This server sends no mail. Ask an administrator for a reset code.
-# English for now: to be translated.
-reset-mail-early = That was too quick. Try again in a moment.
+reset-mail-title = Nessun codice di reimpostazione?
+reset-mail-lead = Inserisci il tuo nome di accesso. Se il tuo account ha un indirizzo e-mail confermato, ti mandiamo un codice di reimpostazione.
+reset-mail-name-hint = Il nome con cui accedi, non il tuo indirizzo e-mail.
+reset-mail-submit = Invia un codice per e-mail
+reset-mail-error-name = Questo non è un nome di accesso. Inserisci il nome con cui accedi, non il tuo indirizzo e-mail.
+reset-mail-sent = Se questo account ha un indirizzo e-mail confermato, un codice di reimpostazione è in arrivo lì. Vale un'ora.
+reset-mail-busy = Troppe richieste per ora. Riprova più tardi.
+reset-mail-none = Questo server non invia e-mail. Chiedi un codice di reimpostazione a un amministratore.
+reset-mail-early = Troppo in fretta. Riprova tra un attimo.
 
 ## Changing the password
 
@@ -585,81 +571,44 @@ password-unsure = Non è arrivata nessuna risposta, quindi non sappiamo dire se 
 
 ## An account's e-mail address
 
-# English for now: to be translated.
-email-title = E-mail address
-# English for now: to be translated.
-email-lead = An e-mail address is optional. We use it to send you a reset code when you ask for one, and to tell you when the address is replaced or removed.
-# English for now: to be translated.
-email-warning = Whoever can read this mailbox can reset your sign-in. Your encrypted data survives a reset only with your recovery code.
-# English for now: to be translated.
-email-no-mail = This server sends no mail, so an e-mail address cannot be set or confirmed here.
-# English for now: to be translated.
-email-unavailable = The e-mail address cannot be shown right now.
-# English for now: to be translated.
-email-password-hint = Your current password, so that nobody else at this browser decides who can reset your sign-in.
-# English for now: to be translated.
-email-submit = Send confirmation code
-# English for now: to be translated.
-email-missing = Enter an e-mail address and your password.
-# English for now: to be translated.
-email-error-address = We cannot write to this address. Enter one plain address such as name@example.org; accented letters and umlauts do not work.
-# English for now: to be translated.
-email-current = Your address
-# English for now: to be translated.
-email-confirmed-at = Confirmed
-# English for now: to be translated.
-email-waiting = Waits for its code
-# English for now: to be translated.
-email-change = Change
-# English for now: to be translated.
-email-change-lead = Your current address stays in use until you have confirmed the new one.
-# English for now: to be translated.
-email-change-cancel = Keep the current address
-# English for now: to be translated.
-email-remove = Remove
-# English for now: to be translated.
-email-remove-ask = Remove this address? We tell the address that it was removed. After that you can no longer get a reset code by e-mail.
-# English for now: to be translated.
-email-remove-ask-no-mail = Remove this address? While this server sends no mail, you cannot set one again.
-# English for now: to be translated.
-email-remove-confirm = Remove address
-# English for now: to be translated.
-email-remove-keep = Keep it
-# English for now: to be translated.
-email-pending = We sent a code to <code>{ $address }</code>. It is valid for 15 minutes.
-# English for now: to be translated.
-email-pending-keeps = Until you confirm it, <code>{ $address }</code> stays your address.
-# English for now: to be translated.
-email-code = Confirmation code
-# English for now: to be translated.
-email-code-hint = Eight characters, as in XXXX-XXXX. Upper or lower case, with or without the hyphen.
-# English for now: to be translated.
-email-confirm = Confirm
-# English for now: to be translated.
-email-resend = Send again
-# English for now: to be translated.
-email-other = Use another address
-# English for now: to be translated.
-email-withdraw = Withdraw
-# English for now: to be translated.
-email-error-code = That is not a confirmation code. It has eight characters, as in XXXX-XXXX.
-# English for now: to be translated.
-email-wrong-code = That code is not right. Check it and try again. After several wrong codes you have to enter the address again.
-email-code-dropped = That code was not right either, so the address no longer waits. Enter it again to get a new code.
-# English for now: to be translated.
-email-now-confirmed = Your e-mail address is confirmed.
-# English for now: to be translated.
-email-resent = A new code is on its way. The earlier one no longer works.
-# English for now: to be translated.
-email-withdrawn = The address is withdrawn. No code is waited for any more.
-# English for now: to be translated.
-email-removed = Your e-mail address is removed.
-# English for now: to be translated.
-email-busy = Too many mails for now. Try again later.
-# English for now: to be translated.
-email-same = This is your address already.
-# English for now: to be translated.
-email-unsure = No answer came back, so we cannot tell whether that went through. Look at what is shown here, and try again if it did not.
+email-title = Indirizzo e-mail
+email-lead = Un indirizzo e-mail è facoltativo. Lo usiamo per mandarti un codice di reimpostazione quando ne chiedi uno, e per avvisarti quando l'indirizzo viene sostituito o rimosso.
+email-warning = Chiunque possa leggere questa casella di posta può reimpostare il tuo accesso. I tuoi dati cifrati sopravvivono a una reimpostazione solo con il tuo codice di recupero.
+email-no-mail = Questo server non invia e-mail, quindi qui non si può né inserire né confermare un indirizzo e-mail.
+email-unavailable = Al momento non è possibile mostrare l'indirizzo e-mail.
+email-password-hint = La tua password attuale, perché nessun altro davanti a questo browser decida chi può reimpostare il tuo accesso.
+email-submit = Invia il codice di conferma
+email-missing = Inserisci un indirizzo e-mail e la tua password.
+email-error-address = Non possiamo scrivere a questo indirizzo. Inserisci un indirizzo semplice, come nome@example.org; le lettere accentate e le dieresi non funzionano.
+email-current = Il tuo indirizzo
+email-confirmed-at = Confermato
+email-waiting = Attende il suo codice
+email-change = Cambia
+email-change-lead = Il tuo indirizzo attuale resta in uso finché non hai confermato quello nuovo.
+email-change-cancel = Tieni l'indirizzo attuale
+email-remove = Rimuovi
+email-remove-ask = Rimuovere questo indirizzo? Avvisiamo l'indirizzo che è stato rimosso. Dopo non potrai più ricevere un codice di reimpostazione per e-mail.
+email-remove-ask-no-mail = Rimuovere questo indirizzo? Finché questo server non invia e-mail, non puoi inserirne uno nuovo.
+email-remove-confirm = Rimuovi indirizzo
+email-remove-keep = Tienilo
+email-pending = Abbiamo inviato un codice a <code>{ $address }</code>. Vale 15 minuti.
+email-pending-keeps = Finché non lo confermi, <code>{ $address }</code> resta il tuo indirizzo.
+email-code = Codice di conferma
+email-code-hint = Otto caratteri, come in XXXX-XXXX. Maiuscole o minuscole, con o senza trattino.
+email-confirm = Conferma
+email-resend = Invia di nuovo
+email-other = Usa un altro indirizzo
+email-withdraw = Ritira
+email-error-code = Questo non è un codice di conferma. Ha otto caratteri, come in XXXX-XXXX.
+email-wrong-code = Quel codice non è giusto. Controllalo e riprova. Dopo diversi codici sbagliati devi inserire di nuovo l'indirizzo.
+email-code-dropped = Neanche quel codice era giusto, quindi l'indirizzo non è più in attesa. Inseriscilo di nuovo per ottenere un nuovo codice.
+email-now-confirmed = Il tuo indirizzo e-mail è confermato.
+email-resent = Un nuovo codice è in arrivo. Quello precedente non vale più.
+email-withdrawn = L'indirizzo è ritirato. Non si attende più nessun codice.
+email-removed = Il tuo indirizzo e-mail è rimosso.
+email-busy = Troppe e-mail per ora. Riprova più tardi.
+email-same = È già il tuo indirizzo.
+email-unsure = Non è arrivata nessuna risposta, quindi non sappiamo se è andata a buon fine. Guarda cosa è mostrato qui e riprova se non è andata.
 
 ## Central's terms
 
@@ -726,8 +675,7 @@ privacy-export-title = Esporta i tuoi dati
 privacy-export-lead = Ciò che Baylee Central sa del tuo account, come file JSON: i suoi dati di base, le sessioni, le condizioni accettate, i tuoi gateway e le voci di audit che nominano il tuo account. I tuoi contenuti cifrati possono essere decifrati ed esportati solo dal tuo client di Baylee. L'esportazione richiede un accesso effettuato meno di 30 minuti fa.
 privacy-export-make = Prepara l'esportazione
 privacy-export-save = Salva l'esportazione
-# English for now: to be translated.
-privacy-export-no-email = The e-mail address could not be read; it is not in this file.
+privacy-export-no-email = L'indirizzo e-mail non ha potuto essere letto; non è in questo file.
 privacy-delete-title = Elimina il tuo account
 privacy-delete-lead = Il tuo account, i suoi dati, le sue sessioni, i tuoi contatti e i gateway di cui sei proprietario vengono eliminati subito e definitivamente dal sistema in esercizio; escono dai backup al più tardi entro 12 mesi. Central elimina anche i messaggi che hai inviato; ciò che gli altri hanno già memorizzato sui loro dispositivi può restarvi.
 privacy-delete-start = Elimina il mio account

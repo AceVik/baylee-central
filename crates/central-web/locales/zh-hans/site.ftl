@@ -182,8 +182,7 @@ faq-account-a = 单人游玩不需要：套牌构筑器和与内置 AI 的对局
 faq-data-q = 我的数据会怎样处理？
 faq-data-a = 尽可能少；<privacy>隐私声明</privacy>里写得很准确。你的密码不会离开你的浏览器；你的私人数据和聊天消息在到达我们之前，就已在你的设备上加密。
 faq-password-q = 我忘记了密码，怎么办？
-# English for now: to be translated.
-faq-password-a = You set a new password with a reset code, <reset>on this page</reset>. If your account has a confirmed e-mail address, you can have the code sent to it there; otherwise an administrator gives you one. Your encrypted data survives only if you have the recovery code you received when you created your account. Without it you start with an empty vault, and that data is lost.
+faq-password-a = 新密码要用重置码来设置，就在<reset>这个页面</reset>上。如果你的账号有已确认的电子邮件地址，可以在那里让重置码发到该地址；否则由管理员给你一个。只有你持有创建账号时拿到的恢复码，加密数据才能保留下来。没有恢复码，你就从空保险库开始，那些数据也就丢失了。
 faq-gateway-q = 什么是 Gateway？
 faq-gateway-a = 在线牌桌所在的服务器。任何人都可以运行一个；<gateways>目录</gateways>列出了 Central 所知道的那些。
 faq-systems-q = 它能在哪些系统上运行？
@@ -265,10 +264,8 @@ privacy-directory-title = Gateway 目录
 privacy-directory = 我们的服务器从 Baylee Central 读取 Gateway 目录并加以显示；这不涉及关于你的任何信息。Gateway 可以告诉 Central 它此刻有多少玩家已连接、其中有多少人在对局中，以及有多少开放牌桌和对局，Central 也会统计其账号数量；本站会显示这些数字。它们只是数量，绝不是名字，而 Gateway 的数字是其运营者自己的陈述。
 privacy-account-title = 你的账号
 privacy-account = 对于一个账号，Baylee Central 会存储：你的账号 ID、你的登录名、你的显示名及其标签、账号创建的时间和方式、一条 OPAQUE 密码记录（它让你可以证明自己知道密码，而我们的服务器始终不会得知密码）、被你的密码和你的恢复码各加密一次的主密钥、你的加密账号文档和你的加密对象（我们无法读取；我们只看得到大小、修订号和时间）、你接受了哪个版本的条款以及接受的时间、你上次登录的时间、你的会话、管理员角色（如果你有的话），以及你注册的 Gateways 及其令牌。其他玩家看到的是你的显示名和标签，而不是你的登录名。如果管理员给你一个重置码，我们只存储它的摘要，直到该重置码被使用或已过期。管理员对某个账号或 Gateway 所做的操作会记录在案并保存三年（谁、做了什么、涉及哪个账号或 Gateway、何时）。法律依据：GDPR 第 6 条第 1 款 (b) 项（你所请求的账号）；对于上次登录的时间和该记录，则是 GDPR 第 6 条第 1 款 (f) 项（我们在安全、可追溯的运营方面的合法利益）。没有登录名和密码就没有账号；你不需要电子邮件地址。你从 16 岁起可以创建账号。保存到你删除账号为止；删除后，数据会立即从运行中的系统中移除，并最迟在 12 个月内从备份中移除。会话在 30 分钟未使用后结束，最迟在登录 12 小时后结束。
-# English for now: to be translated.
-privacy-email-title = E-mail address
-# English for now: to be translated.
-privacy-email = An e-mail address is optional; an account needs none. If you give one, Baylee Central stores the address and whether and when you confirmed it. Of every code we mail, we store only a digest, until the code is used or has expired. We use the address for three things: to send the code that confirms it, to send a reset code when you ask for one, and to tell the old address when it is replaced or removed. The mail is sent by Baylee's own mail service on the same server through mailbox.org (Heinlein Hosting GmbH, Berlin), which acts as a processor. Legal basis: Art. 6(1)(b) GDPR (the account you asked for). Kept until you remove the address or delete the account.
+privacy-email-title = 电子邮件地址
+privacy-email = 电子邮件地址是选填的，账号不需要它。如果你提供了地址，Baylee Central 会存储该地址、邮件所用的语言以及你确认它的时间。你填写后正等待确认码的地址，会保留到你确认或撤回为止，最迟在其确认码过期一天后删除。对于我们邮寄的每个码，我们只存储其摘要，直到该码被使用或过期；并在 24 小时内存储向你邮寄重置码的时间，以确保每天最多发出三封。我们把这个地址用于三件事：发送用来确认它的确认码；在你或任何知道你登录名的人请求时发送重置码；在地址被替换或移除时通知旧地址。邮件由 Baylee 在同一台服务器上的自有邮件服务通过 mailbox.org（Heinlein Hosting GmbH，柏林）发送，后者作为处理者接收该地址和邮件。法律依据：GDPR 第 6 条第 1 款 (b) 项（你所请求的账号）。保存到你移除该地址或删除账号为止。
 privacy-cookie-title = 会话 Cookie
 privacy-cookie = 登录会设置一个 Cookie：<code>__Host-central</code>，它是用来标识你的会话的随机数。它只会发送给 baylee.app，脚本无法读取，并随会话结束而失效，最迟 12 小时后失效。它是让你保持登录所严格必需的，无需同意。法律依据：TDDDG 第 25 条第 2 款第 2 项以及 GDPR 第 6 条第 1 款 (b) 项。
 privacy-chat-title = 聊天和联系人
@@ -282,7 +279,7 @@ privacy-contact = 表单会把你的留言、页面的语言和时间发送到�
 privacy-impressum-title = 法律声明的谜题
 privacy-impressum = 法律声明只有在你的浏览器解开一道谜题之后才会显示；这样可以让地址免受收集地址的程序侵扰。谜题由随机数字组成，不含任何关于你的信息。为此，反馈服务只在内存中保存以下内容，绝不写入磁盘，也绝不写入日志：你的 IP 地址请求了多少道谜题（保存一小时；IPv6 地址只取前半部分）、它是否访问了对人类隐藏的链接（保存 24 小时），以及哪些谜题已被解开（保存五分钟，不含地址）。关于你的浏览器的三个“是或否”的判断会决定谜题的难度，且不会被保存：是否有程序在驱动它、它是否没有声明任何语言，以及它是否在没有显卡的情况下绘图。没有人会被拒绝；看起来像程序的浏览器会得到更长的谜题。法律依据：GDPR 第 6 条第 1 款 (f) 项（我们保护私人地址的合法利益）。
 privacy-recipients-title = 接收方和国家
-privacy-recipients = 我们不出售数据，也不为广告而向他人提供数据。接收方有：netcup GmbH（德国的托管服务，依据 GDPR 第 28 条作为处理者）；Baylee Central 的管理员，他们为管理之需会看到你的登录名、你的显示名及其标签、你账号的来源、创建时间和上次登录时间，以及你的 Gateways，但绝不会看到你的加密数据；你用账号登录的 Gateway（它会收到你的账号 ID、显示名和标签，不会收到你的密码）；你的联系人和你所在群组的成员（显示名、标签和你的消息）；仅在法律要求我们提供时才提供给主管机关。欧洲经济区以外的国家：只有当你开启通知时，你浏览器的推送服务（Google、Mozilla 或 Apple，美国）才会承载通知。他人运营的 Gateways 可能位于任何国家；是否在那里登录由你决定。除此之外，我们不向欧洲经济区以外的国家传输任何数据。
+privacy-recipients = 我们不出售数据，也不为广告而向他人提供数据。接收方有：netcup GmbH（德国的托管服务，依据 GDPR 第 28 条作为处理者）；mailbox.org（Heinlein Hosting GmbH，柏林），它作为处理者，把邮件投递到你提供的电子邮件地址；Baylee Central 的管理员，他们为管理之需会看到你的登录名、你的显示名及其标签、你账号的来源、创建时间和上次登录时间，以及你的 Gateways，但绝不会看到你的加密数据；你用账号登录的 Gateway（它会收到你的账号 ID、显示名和标签，不会收到你的密码）；你的联系人和你所在群组的成员（显示名、标签和你的消息）；仅在法律要求我们提供时才提供给主管机关。欧洲经济区以外的国家：只有当你开启通知时，你浏览器的推送服务（Google、Mozilla 或 Apple，美国）才会承载通知。他人运营的 Gateways 可能位于任何国家；是否在那里登录由你决定。除此之外，我们不向欧洲经济区以外的国家传输任何数据。
 privacy-rights-title = 你的权利
 privacy-rights = 你享有访问权（GDPR 第 15 条）、更正权（第 16 条）、删除权（第 17 条）、限制处理权（第 18 条）和数据可携带权（第 20 条）。对于基于我们的合法利益、依据第 6 条第 1 款 (f) 项进行的处理，你可以随时基于与你的具体情况有关的理由提出反对（第 21 条）。你可以随时撤回同意，对今后生效（第 7 条第 3 款）。你账号的数据可以在你账号的设置中导出，账号也可以在那里删除；其他事项，通过联系表单或发送到法律声明中所列的地址留言即可。你可以向数据保护监管机构投诉（第 77 条），例如你居住地的监管机构，或北莱茵-威斯特法伦州数据保护与信息自由事务专员。没有任何法律或合同要求你向我们提供数据；但是，没有登录名和密码，就没有账号。我们不进行自动化决策，也不进行用户画像（第 22 条）。
 privacy-objection-title = 你的反对权
@@ -504,12 +501,10 @@ code-copy-failed = 这里无法复制。请选中代码，手动复制。
 ## Setting a new password with a reset code
 
 reset-title = 设置新密码
-# English for now: to be translated.
-reset-lead = For when you forgot your password: with a reset code you set a new one here. The code comes by e-mail to your confirmed address, or from an administrator.
+reset-lead = 给忘记密码的你：用重置码就能在这里设置新密码。重置码会通过电子邮件发到你已确认的地址，或由管理员提供。
 reset-noscript = 设置新密码需要 JavaScript：你的密码和恢复码在你的浏览器中处理，绝不会发送给我们。
 reset-code = 重置码
-# English for now: to be translated.
-reset-code-hint = By e-mail or from an administrator. It starts with RESET and works once: for one hour if it came by e-mail, for 24 hours if an administrator made it.
+reset-code-hint = 通过电子邮件获得，或由管理员提供。它以 RESET 开头，只能使用一次：通过电子邮件发来的有效一小时，管理员生成的有效 24 小时。
 reset-data = 你的加密数据
 reset-keep = 我有恢复码。保留我的数据。
 reset-new = 我没有恢复码。从空保险库开始。
@@ -531,24 +526,15 @@ reset-unsure-title = 没有收到回应
 reset-unsure = 在 Baylee Central 回应之前连接中断了，所以我们无法确定你的新密码是否已设置。请尝试用它登录。如果登录失败，说明没有任何更改：你的重置码仍然有效，请在这里重新输入。
 reset-unsure-code = 如果你的新密码可用，这就是你的新恢复码，旧的已不能使用；它不能再次显示，所以请现在就保存。如果你的新密码不可用，这个码就一文不值。
 reset-to-signin = 登录
-# English for now: to be translated.
-reset-mail-title = No reset code?
-# English for now: to be translated.
-reset-mail-lead = Enter your sign-in name. If your account has a confirmed e-mail address, we send a reset code to it.
-# English for now: to be translated.
-reset-mail-name-hint = The name you sign in with, not your e-mail address.
-# English for now: to be translated.
-reset-mail-submit = Send a code by e-mail
-# English for now: to be translated.
-reset-mail-error-name = That is not a sign-in name. Enter the name you sign in with, not your e-mail address.
-# English for now: to be translated.
-reset-mail-sent = If this account has a confirmed e-mail address, a reset code is on its way to it. It is valid for one hour.
-# English for now: to be translated.
-reset-mail-busy = Too many requests for now. Try again later.
-# English for now: to be translated.
-reset-mail-none = This server sends no mail. Ask an administrator for a reset code.
-# English for now: to be translated.
-reset-mail-early = That was too quick. Try again in a moment.
+reset-mail-title = 没有重置码？
+reset-mail-lead = 输入你的登录名。如果你的账号有已确认的电子邮件地址，我们会向该地址发送一个重置码。
+reset-mail-name-hint = 是你用来登录的名称，不是你的电子邮件地址。
+reset-mail-submit = 通过电子邮件发送重置码
+reset-mail-error-name = 这不是登录名。请输入你用来登录的名称，而不是电子邮件地址。
+reset-mail-sent = 如果这个账号有已确认的电子邮件地址，重置码正在发往该地址。它的有效期为一小时。
+reset-mail-busy = 目前请求过多。请稍后再试。
+reset-mail-none = 此服务器不发送邮件。请向管理员索取重置码。
+reset-mail-early = 太快了。请稍等片刻再试。
 
 ## Changing the password
 
@@ -563,81 +549,44 @@ password-unsure = 没有收到回应，所以我们无法确定你的密码是�
 
 ## An account's e-mail address
 
-# English for now: to be translated.
-email-title = E-mail address
-# English for now: to be translated.
-email-lead = An e-mail address is optional. We use it to send you a reset code when you ask for one, and to tell you when the address is replaced or removed.
-# English for now: to be translated.
-email-warning = Whoever can read this mailbox can reset your sign-in. Your encrypted data survives a reset only with your recovery code.
-# English for now: to be translated.
-email-no-mail = This server sends no mail, so an e-mail address cannot be set or confirmed here.
-# English for now: to be translated.
-email-unavailable = The e-mail address cannot be shown right now.
-# English for now: to be translated.
-email-password-hint = Your current password, so that nobody else at this browser decides who can reset your sign-in.
-# English for now: to be translated.
-email-submit = Send confirmation code
-# English for now: to be translated.
-email-missing = Enter an e-mail address and your password.
-# English for now: to be translated.
-email-error-address = We cannot write to this address. Enter one plain address such as name@example.org; accented letters and umlauts do not work.
-# English for now: to be translated.
-email-current = Your address
-# English for now: to be translated.
-email-confirmed-at = Confirmed
-# English for now: to be translated.
-email-waiting = Waits for its code
-# English for now: to be translated.
-email-change = Change
-# English for now: to be translated.
-email-change-lead = Your current address stays in use until you have confirmed the new one.
-# English for now: to be translated.
-email-change-cancel = Keep the current address
-# English for now: to be translated.
-email-remove = Remove
-# English for now: to be translated.
-email-remove-ask = Remove this address? We tell the address that it was removed. After that you can no longer get a reset code by e-mail.
-# English for now: to be translated.
-email-remove-ask-no-mail = Remove this address? While this server sends no mail, you cannot set one again.
-# English for now: to be translated.
-email-remove-confirm = Remove address
-# English for now: to be translated.
-email-remove-keep = Keep it
-# English for now: to be translated.
-email-pending = We sent a code to <code>{ $address }</code>. It is valid for 15 minutes.
-# English for now: to be translated.
-email-pending-keeps = Until you confirm it, <code>{ $address }</code> stays your address.
-# English for now: to be translated.
-email-code = Confirmation code
-# English for now: to be translated.
-email-code-hint = Eight characters, as in XXXX-XXXX. Upper or lower case, with or without the hyphen.
-# English for now: to be translated.
-email-confirm = Confirm
-# English for now: to be translated.
-email-resend = Send again
-# English for now: to be translated.
-email-other = Use another address
-# English for now: to be translated.
-email-withdraw = Withdraw
-# English for now: to be translated.
-email-error-code = That is not a confirmation code. It has eight characters, as in XXXX-XXXX.
-# English for now: to be translated.
-email-wrong-code = That code is not right. Check it and try again. After several wrong codes you have to enter the address again.
-email-code-dropped = That code was not right either, so the address no longer waits. Enter it again to get a new code.
-# English for now: to be translated.
-email-now-confirmed = Your e-mail address is confirmed.
-# English for now: to be translated.
-email-resent = A new code is on its way. The earlier one no longer works.
-# English for now: to be translated.
-email-withdrawn = The address is withdrawn. No code is waited for any more.
-# English for now: to be translated.
-email-removed = Your e-mail address is removed.
-# English for now: to be translated.
-email-busy = Too many mails for now. Try again later.
-# English for now: to be translated.
-email-same = This is your address already.
-# English for now: to be translated.
-email-unsure = No answer came back, so we cannot tell whether that went through. Look at what is shown here, and try again if it did not.
+email-title = 电子邮件地址
+email-lead = 电子邮件地址是选填的。当你请求时，我们用它发送重置码；地址被替换或移除时，也用它通知你。
+email-warning = 能读取这个邮箱的人，都可以重置你的登录。只有凭恢复码，你的加密数据才能在重置后保留下来。
+email-no-mail = 此服务器不发送邮件，因此无法在这里设置或确认电子邮件地址。
+email-unavailable = 目前无法显示电子邮件地址。
+email-password-hint = 你的当前密码，这样使用此浏览器的其他人就无法决定谁能重置你的登录。
+email-submit = 发送确认码
+email-missing = 请输入电子邮件地址和你的密码。
+email-error-address = 我们无法向这个地址发信。请输入像 name@example.org 这样的单个普通地址；带重音的字母和变音字母不可用。
+email-current = 你的地址
+email-confirmed-at = 已确认
+email-waiting = 等待确认码
+email-change = 更改
+email-change-lead = 在你确认新地址之前，当前地址继续使用。
+email-change-cancel = 保留当前地址
+email-remove = 移除
+email-remove-ask = 要移除这个地址吗？我们会通知该地址它已被移除。之后你就不能再通过电子邮件获取重置码了。
+email-remove-ask-no-mail = 要移除这个地址吗？只要此服务器不发送邮件，你就无法再次设置地址。
+email-remove-confirm = 移除地址
+email-remove-keep = 保留
+email-pending = 我们已向 <code>{ $address }</code> 发送了一个码。它的有效期为 15 分钟。
+email-pending-keeps = 在你确认之前，<code>{ $address }</code> 仍是你的地址。
+email-code = 确认码
+email-code-hint = 八个字符，如 XXXX-XXXX。大小写均可，有无连字符均可。
+email-confirm = 确认
+email-resend = 再发一次
+email-other = 使用其他地址
+email-withdraw = 撤回
+email-error-code = 这不是确认码。确认码有八个字符，如 XXXX-XXXX。
+email-wrong-code = 这个码不对。请检查后再试。输错几次之后，你需要重新输入地址。
+email-code-dropped = 这个码也不对，所以该地址不再等待确认。请重新输入地址以获取新的码。
+email-now-confirmed = 你的电子邮件地址已确认。
+email-resent = 新的码正在发送。之前的码已失效。
+email-withdrawn = 该地址已撤回。不再等待任何码。
+email-removed = 你的电子邮件地址已移除。
+email-busy = 目前邮件过多。请稍后再试。
+email-same = 这已经是你的地址了。
+email-unsure = 没有收到回应，所以我们无法确定刚才的操作是否成功。请看一下这里显示的内容；如果没有成功，请再试一次。
 
 ## Central's terms
 
@@ -704,8 +653,7 @@ privacy-export-title = 导出你的数据
 privacy-export-lead = Baylee Central 所掌握的关于你账号的信息，以 JSON 文件形式提供：其基本数据、会话、已接受的条款、你的 Gateways，以及点名你账号的审计条目。你的加密内容只能由你的 Baylee 客户端解密并导出。导出需要 30 分钟以内的登录。
 privacy-export-make = 准备导出
 privacy-export-save = 保存导出文件
-# English for now: to be translated.
-privacy-export-no-email = The e-mail address could not be read; it is not in this file.
+privacy-export-no-email = 无法读取电子邮件地址；它不在此文件中。
 privacy-delete-title = 删除你的账号
 privacy-delete-lead = 你的账号、其数据、其会话、你的联系人以及你拥有的 Gateways，会立即并永久地从运行中的系统删除；它们最迟在 12 个月内从备份中消失。Central 也会删除你发送的消息；其他人已经存储在其设备上的内容可能仍会保留在那里。
 privacy-delete-start = 删除我的账号
