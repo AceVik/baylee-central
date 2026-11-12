@@ -14,6 +14,7 @@ use sea_orm::{ConnectionTrait, DatabaseConnection, DbBackend, Statement};
 mod admin;
 mod chat;
 mod deletion;
+mod email;
 mod gateways;
 mod kinds;
 mod legacy_store;
@@ -146,6 +147,7 @@ pub(crate) async fn run(operator: &DatabaseConnection) {
     chat::run(&store, operator, &keys).await;
     social::run(&store, operator, &keys).await;
     notifications::run(&store, operator, &keys).await;
+    email::run(&store, operator, &keys).await;
     // Last: its sweep deletes every unenrolled legacy reservation.
     legacy_store::run(&store, operator, &keys).await;
     store.close().await.unwrap();

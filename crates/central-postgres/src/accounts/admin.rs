@@ -995,12 +995,15 @@ pub struct Swept {
     /// Reports the retention says are over (`docs/reports.md`), their
     /// history kept.
     pub reports: u64,
+    /// E-mail addresses that waited for a code past its end
+    /// (`docs/email.md`).
+    pub addresses: u64,
 }
 
 /// Delete audit events older than [`AUDIT_YEARS`], the digests of expired
-/// reset codes, expired pairings and the reports whose retention is over,
-/// under the operator's (migrator's) login, as the privacy notice allows;
-/// all or none.
+/// reset codes, expired pairings, the reports whose retention is over and
+/// the e-mail addresses whose code is over, under the operator's
+/// (migrator's) login, as the privacy notice allows; all or none.
 ///
 /// # Errors
 /// Storage failure.
@@ -1033,11 +1036,15 @@ pub async fn sweep(db: &DatabaseConnection) -> Result<Swept, Error> {
         .map_err(|_| Error::Unavailable)?
         .rows_affected();
     let reports = super::reports::sweep(&tx).await?;
+    // After the codes: what a confirmed address keeps of a mailed code is
+    // tidied against the codes that are left.
+    let addresses = super::email::sweep(&tx).await?;
     tx.commit().await.map_err(|_| Error::Unavailable)?;
     Ok(Swept {
         events,
         codes,
         pairings,
         reports,
+        addresses,
     })
 }

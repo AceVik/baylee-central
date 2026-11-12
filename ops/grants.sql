@@ -71,3 +71,8 @@ END $legacy$;
 GRANT SELECT, INSERT, UPDATE, DELETE ON central_identity.notification_preferences, central_identity.push_subscriptions, central_identity.push_jobs TO central_runtime;
 GRANT SELECT, INSERT ON central_identity.push_releases TO central_runtime;
 GRANT EXECUTE ON FUNCTION central_identity.queue_push(uuid,smallint), central_identity.push_event() TO central_runtime;
+-- An account's optional e-mail address (docs/email.md): the runtime names,
+-- confirms, replaces and removes it, and keeps on its row what a reset code
+-- by mail needs. The operator's sweep deletes addresses whose code is over.
+GRANT SELECT, INSERT, UPDATE, DELETE ON central_identity.account_emails,
+  central_identity.account_email_pending TO central_runtime;

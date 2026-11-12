@@ -587,7 +587,8 @@ async fn ended(
             events: 0,
             codes: 1,
             pairings: 0,
-            reports: 0
+            reports: 0,
+            addresses: 0,
         })
     );
     assert!(!state(operator, moved).await.code);
