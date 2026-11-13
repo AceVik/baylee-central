@@ -17,6 +17,7 @@ use std::{
 };
 pub(super) mod admin;
 pub(super) mod browser;
+pub(super) mod challenges;
 pub(super) mod deletion;
 pub(super) mod email;
 pub(super) mod gateways;

@@ -57,6 +57,8 @@ impl IdentityService {
             self.require_terms(bearer, surface).await?;
         }
         match request {
+            Request::Challenges { request } => self.challenges(request, bearer, surface).await,
+            Request::ChallengeHost { request } => self.challenge_host(request, bearer).await,
             Request::Notifications { request } => self.notifications(request, bearer).await,
             Request::Social { request } => self.social(request, bearer, surface).await,
             request @ (Request::Terms

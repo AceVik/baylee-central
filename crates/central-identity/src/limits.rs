@@ -186,6 +186,10 @@ fn class(request: &Request) -> Class {
             | Request::EnrollmentFinish { .. }
             | Request::GatewayDirectory { .. }
             | Request::PublicFigures { .. }
+            | Request::Challenges {
+                request: central_api::challenges::Request::Catalogue { .. }
+                    | central_api::challenges::Request::Detail { .. }
+            }
             | Request::Terms
             | Request::GatewayTerms { .. }
             | Request::ResetStart { .. }
@@ -233,7 +237,17 @@ enum Tells {
 /// `central-postgres` to refuse a token it does not know.
 fn tells(request: &Request) -> Tells {
     match request {
-        Request::SessionStatus
+        Request::Challenges { request }
+            if !matches!(
+                request,
+                central_api::challenges::Request::Catalogue { .. }
+                    | central_api::challenges::Request::Detail { .. }
+            ) =>
+        {
+            Tells::Proves
+        }
+        Request::ChallengeHost { .. }
+        | Request::SessionStatus
         | Request::RenewSession
         | Request::AccountSummary
         | Request::TermsStatus

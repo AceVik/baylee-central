@@ -85,6 +85,11 @@ pub(super) fn needs_acceptance(request: &Request) -> bool {
                 | central_api::notifications::NotificationRequest::Set { enabled: true, .. }
         }
         | Request::Social { .. }
+            | Request::Challenges {
+                request: central_api::challenges::Request::Begin { .. }
+                    | central_api::challenges::Request::Hint { .. }
+                    | central_api::challenges::Request::Visibility { listed: true, .. }
+            }
             | Request::CreateObject
             | Request::WriteObject { .. }
             | Request::DeleteObject { .. }

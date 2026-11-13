@@ -38,6 +38,16 @@ pub struct Identity {
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "operation", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Request {
+    /// Global Daily/Weekly catalogue, rankings and account-owned participation.
+    Challenges {
+        /// Closed public or account operation; ownership comes from the session.
+        request: crate::challenges::Request,
+    },
+    /// Restricted challenge publication and execution, for the official bridge only.
+    ChallengeHost {
+        /// Never accepted with an ordinary gateway credential or player session.
+        request: crate::challenges::HostRequest,
+    },
     /// Contacts and encrypted chat shared by native and browser sessions.
     /// Browser notification preferences and subscriptions.
     Notifications {
@@ -641,6 +651,16 @@ pub enum MigrationState {
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "result", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Response {
+    /// Public or account-owned challenge result.
+    Challenges {
+        /// Closed challenge response.
+        response: crate::challenges::Response,
+    },
+    /// Official bridge's private challenge response.
+    ChallengeHost {
+        /// May contain an execution package; never returned to a player.
+        response: crate::challenges::HostResponse,
+    },
     /// The answer to an authenticated social operation.
     /// Browser notification settings.
     Notifications {

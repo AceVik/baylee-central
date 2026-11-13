@@ -82,6 +82,7 @@ fn real_native_login_restore_migration_and_adversarial_paths() {
             client: "198.51.100.7",
         };
         support::browser::run(&browser, &http, &bridge, &runtime, &operator);
+        support::challenges::run(&http, &browser, &bridge);
         support::tokens::run(&http, &bridge, &runtime, &operator);
         support::registration::run(browser_address, &http, &runtime, &operator);
         support::password::run(&http, &browser, &bridge, &runtime, &operator);

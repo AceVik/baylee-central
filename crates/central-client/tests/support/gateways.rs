@@ -39,6 +39,7 @@ pub(crate) fn run(
     let page = central_client::gateway_directory(http, None).unwrap();
     assert_eq!(page.len(), 1);
     assert_eq!(page[0].id, registered.gateway);
+    super::challenges::refuse_gateway(http, &registered.credential, &registered.heartbeat);
     assert!(!page[0].online);
     assert!(
         http.exchange(

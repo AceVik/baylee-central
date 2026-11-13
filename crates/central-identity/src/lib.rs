@@ -22,6 +22,7 @@ use tokio::sync::Semaphore;
 
 mod admin;
 mod challenge;
+mod challenges;
 pub use challenge::{Agent, Seen};
 mod deletion;
 mod dispatch;
@@ -118,7 +119,8 @@ pub struct BrowserReply {
 #[must_use]
 pub fn browser_operation(request: &Request) -> bool {
     match request {
-        Request::Notifications { .. }
+        Request::Challenges { .. }
+        | Request::Notifications { .. }
         | Request::Social { .. }
         | Request::Discover { .. }
         | Request::LoginStart { .. }
@@ -157,7 +159,8 @@ pub fn browser_operation(request: &Request) -> bool {
         | Request::PairCancel { .. }
         | Request::Picture { .. } => true,
         Request::AcceptTerms { subject, .. } => matches!(subject, TermsSubject::Central),
-        Request::CreateObject
+        Request::ChallengeHost { .. }
+        | Request::CreateObject
         | Request::ReadObject { .. }
         | Request::ListObjects { .. }
         | Request::WriteObject { .. }
@@ -219,7 +222,8 @@ fn browser_only(request: &Request) -> bool {
 fn uses_session(request: &Request) -> bool {
     matches!(
         request,
-        Request::Notifications { .. }
+        Request::Challenges { .. }
+            | Request::Notifications { .. }
             | Request::Social { .. }
             | Request::SessionStatus
             | Request::RenewSession

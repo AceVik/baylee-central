@@ -605,9 +605,13 @@ impl Budgets {
             // The public directory needs no session; a page reads it a few
             // times, so a minute's budget leaves room for paging. The public
             // figures are read beside it and spend from the same budget.
-            Request::GatewayDirectory { .. } | Request::PublicFigures { .. } => {
-                self.directory.charge(client, now, 60, MINUTE)
-            }
+            Request::GatewayDirectory { .. }
+            | Request::PublicFigures { .. }
+            | Request::Challenges {
+                request:
+                    central_api::challenges::Request::Catalogue { .. }
+                    | central_api::challenges::Request::Detail { .. },
+            } => self.directory.charge(client, now, 60, MINUTE),
             // A reset needs a code; a few tries an hour leave room for typing it.
             Request::ResetStart { .. } => self.reset.charge(client, now, 10, HOUR),
             // A reset code by mail (`docs/email.md`): the same few an hour
