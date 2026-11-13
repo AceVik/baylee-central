@@ -12,10 +12,10 @@ pub(super) fn view(lang: Lang, hub: Hub, task: &api::Challenge) -> impl IntoView
     let minutes = task.description.expected_minutes;
     let deck = task.description.deck.clone();
     view! {
-        <button type="button" class="button button-ghost" disabled=move || hub.busy.get()
-            on:click=move |_| hub.selected.set(None)>{words::admin_back(lang)}</button>
+        <button id="challenge-back" type="button" class="button button-ghost" disabled=move || hub.busy.get()
+            on:click=move |_| hub.close(id)>{words::admin_back(lang)}</button>
         <article class="card challenge-detail">
-            <p class="eyebrow">{cadence}</p><h2>{title}</h2><p>{instructions}</p>
+            <p class="eyebrow">{cadence}</p><h2 id="challenge-detail-title" tabindex="-1">{title}</h2><p>{instructions}</p>
             {withdrawn.then(|| view! { <p role="status">{words::ch_withdrawn(lang)}</p> })}
             <dl class="challenge-stats">
                 <div><dt>{words::ch_ends(lang)}</dt><dd class="num">{end}</dd></div>
