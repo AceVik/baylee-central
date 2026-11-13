@@ -125,3 +125,24 @@ test("an outage is a retryable error, never an empty success", async ({ page }) 
   await expect(page.locator(".challenge-hub [role=alert]")).toBeEmpty();
   await expect(page.getByRole("button", { name: "Task and rankings" })).toHaveCount(2);
 });
+
+test("rankings refresh automatically without interrupting hint confirmation", async ({ page }) => {
+  await page.clock.install();
+  const { asked, state } = await setup(page, true);
+  await page.goto("/en/challenges");
+  await expect(page.locator(".challenge-badge")).toHaveCount(5);
+  await page.getByRole("button", { name: "Task and rankings" }).first().click();
+  await expect(page.locator(".challenge-table tbody tr")).toHaveCount(2);
+  await page.getByRole("button", { name: "Hint 1", exact: true }).click();
+  const catalogues = () => asked.filter((body) => body.request?.action === "catalogue").length;
+  const before = catalogues();
+  await page.clock.fastForward(61_000);
+  expect(catalogues()).toBe(before);
+  await expect(page.getByRole("button", { name: "Reveal hint", exact: true })).toBeVisible();
+  expect(state.hints).toBe(0);
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  await page.clock.fastForward(61_000);
+  await expect.poll(catalogues).toBeGreaterThan(before);
+  await expect(page.locator(".challenge-table tbody tr")).toHaveCount(2);
+  expect(asked.some((body) => ["hint", "begin"].includes(body.request?.action ?? ""))).toBe(false);
+});
