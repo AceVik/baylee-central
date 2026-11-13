@@ -1,6 +1,7 @@
 //! The ignored database tests of `central-postgres` and `central-client`
 //! against the fixture, with no ambient database credential, for at most
-//! five minutes, and both suites required to have run.
+//! five minutes per suite, and both suites required to have run. Compilation
+//! and a slower native suite must not consume the store suite's entire deadline.
 
 use std::path::Path;
 use std::process::Command;
@@ -14,18 +15,17 @@ use crate::workspace;
 const PASSED: &str = "test result: ok. 1 passed; 0 failed";
 
 pub(super) fn run(root: &Path, port: u16, secrets: &Secrets, tls: &Path) -> Result<()> {
+    for package in ["central-client", "central-postgres"] {
+        run_suite(root, port, secrets, tls, package)?;
+    }
+    Ok(())
+}
+
+fn run_suite(root: &Path, port: u16, secrets: &Secrets, tls: &Path, package: &str) -> Result<()> {
+    println!("Running {package}'s PostgreSQL integration suite.");
     let mut command = Command::new(workspace::cargo());
     command
-        .args([
-            "test",
-            "--locked",
-            "-p",
-            "central-postgres",
-            "-p",
-            "central-client",
-            "--test",
-            "postgres",
-        ])
+        .args(["test", "--locked", "-p", package, "--test", "postgres"])
         .args(["--", "--ignored", "--test-threads=1"])
         .current_dir(root)
         .env_remove("POSTGRES_PASSWORD")
@@ -49,9 +49,9 @@ pub(super) fn run(root: &Path, port: u16, secrets: &Secrets, tls: &Path) -> Resu
         println!("{}", String::from_utf8_lossy(&stderr));
         return Err(Fail::new("PostgreSQL integration tests failed"));
     }
-    if stdout.matches(PASSED).count() != 2 {
+    if stdout.matches(PASSED).count() != 1 {
         return Err(Fail::new(
-            "Expected database and native integration tests did not run",
+            "Expected PostgreSQL integration suite did not run",
         ));
     }
     Ok(())
