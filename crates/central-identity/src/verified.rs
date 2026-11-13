@@ -1,9 +1,11 @@
 //! Central tokens this process issued or verified, so that a session's later requests cost
 //! no signature check (`docs/native-login.md` §"A bearer nobody issued").
 //!
-//! A made-up token never enters: only a token Central signed itself, as it signs it, or one
-//! that verified. So a flood of made-up tokens, from however many places, spends the
-//! signature checks (`limits.rs`) and takes nothing from a session whose token is here.
+//! A made-up token never enters: only a token Central signed itself, as it signs it for a
+//! session it just issued, or one that verified while its session was vouched for, at most
+//! 60 a minute for one place (`limits.rs` `may_remember`). So a flood of made-up tokens, from
+//! however many places, spends the signature checks and takes nothing from a session whose
+//! token is here; to turn the table over takes sign-ins, at the sign-in's budget.
 //!
 //! What it may and may not decide:
 //! - A token is found by the SHA-256 of its whole text. A token that differs in one byte is
@@ -134,7 +136,7 @@ mod tests {
     }
 
     #[test]
-    fn a_token_that_differs_in_one_byte_is_another_token() {
+    fn a_token_that_differs_in_one_byte_is_not_found() {
         let now = Instant::now();
         let mut verified = Verified::default();
         let capability = Token::generate().unwrap();
@@ -206,6 +208,15 @@ mod tests {
             );
         }
         assert_eq!(verified.len(), 10);
+        // within the minute nothing is swept, expired or not
+        verified.remember(
+            key("soon"),
+            &Token::generate().unwrap(),
+            TIME + 600,
+            TIME + 20,
+            start + Duration::from_secs(59),
+        );
+        assert_eq!(verified.len(), 11);
         let later = start + MINUTE;
         verified.remember(
             key("new"),
@@ -214,6 +225,6 @@ mod tests {
             TIME + 20,
             later,
         );
-        assert_eq!(verified.len(), 1);
+        assert_eq!(verified.len(), 2);
     }
 }

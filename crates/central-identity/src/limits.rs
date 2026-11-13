@@ -68,6 +68,12 @@ pub(super) const PLACE_SIGNATURES_PER_SECOND: u32 = SIGNATURES_PER_SECOND / 4;
 const SIGNERS: usize = 4_096;
 const _: () = assert!(SIGNERS > 2 * SIGNATURES_PER_SECOND as usize);
 const _: () = assert!(PLACE_SIGNATURES_PER_SECOND < SIGNATURES_PER_SECOND / 2);
+/// Tokens a minute one place may have remembered once they verified (`verified.rs`): the
+/// sessions of a household or an office after a restart, a few a minute each. Only a token
+/// whose session is vouched for is remembered at all ([`Limits::may_remember`]), so what
+/// turns the table over is sign-ins, and this bounds how fast one place re-enters the
+/// tokens of sessions it signed in before.
+pub(super) const PLACE_REMEMBERED_PER_MINUTE: u32 = 60;
 /// Reads of the key set a second. Each gateway reads it about every five minutes.
 pub(super) const JWKS_PER_SECOND: u32 = 256;
 /// Legacy sign-ins a minute, all names together: the store holds a handful
@@ -471,6 +477,8 @@ pub(super) struct Limits {
     signatures: Window,
     /// Each place's share of them, by its block ([`PLACE_SIGNATURES_PER_SECOND`]).
     signers: BTreeMap<Place, Window>,
+    /// What each place's block had remembered in its minute ([`PLACE_REMEMBERED_PER_MINUTE`]).
+    remembered: Places,
     /// The Central tokens issued or verified here, which need no check (`verified.rs`).
     pub(super) verified: super::verified::Verified,
     /// Reads of the key set.
@@ -704,6 +712,31 @@ impl Limits {
         }
         Ok(())
     }
+    /// Whether a token that just verified may be remembered (`verified.rs`): only while its
+    /// session's bearer is vouched for (an answer of the store, or its issue, within the
+    /// half hour, and not ended or refused since, [`Proven`]), and while `place`'s block has
+    /// remembered fewer than [`PLACE_REMEMBERED_PER_MINUTE`] in its minute. A token that may
+    /// not is verified again next time; nothing is refused here.
+    pub(super) fn may_remember(
+        &mut self,
+        bearer: &[u8; 32],
+        place: Option<Place>,
+        now: Instant,
+    ) -> bool {
+        if self.proven.unit(bearer, now).is_none() {
+            return false;
+        }
+        let around = place.map(block);
+        if !self
+            .remembered
+            .fits(around, now, PLACE_REMEMBERED_PER_MINUTE)
+        {
+            return false;
+        }
+        self.remembered.spend(around, now);
+        true
+    }
+
     /// Spend one read of the key set.
     pub(super) fn jwks(&mut self, now: Instant) -> Result<(), Error> {
         self.jwks.charge(now, JWKS_PER_SECOND)
@@ -2070,5 +2103,51 @@ mod tests {
         }
         assert_eq!(limits.signature(at(1, 1, 0), now), Err(Error::Busy));
         limits.signature(at(2, 0, 0), now).unwrap();
+    }
+
+    #[test]
+    fn only_a_vouched_session_s_token_is_remembered_and_a_place_only_so_often() {
+        let now = Instant::now();
+        let mut limits = Limits::default();
+        let stranger = Token::generate().unwrap();
+        // verified, but no answer vouched for its session: not remembered
+        assert!(!limits.may_remember(&stranger.digest(), Some(v4(1)), now));
+        let mut sessions = Vec::new();
+        for _ in 0..=PLACE_REMEMBERED_PER_MINUTE {
+            let session = Token::generate().unwrap();
+            limits.issued(&session, now);
+            sessions.push(session);
+        }
+        let (last, first) = sessions.split_last().unwrap();
+        for session in first {
+            assert!(limits.may_remember(&session.digest(), Some(v4(1)), now));
+        }
+        // the place's minute is spent; another place, or none, may go on
+        assert!(!limits.may_remember(&last.digest(), Some(v4(1)), now));
+        assert!(limits.may_remember(&last.digest(), Some(v4(2)), now));
+        assert!(limits.may_remember(&last.digest(), None, now));
+        assert!(limits.may_remember(&last.digest(), Some(v4(1)), now + MINUTE));
+        // a session that ended is no longer vouched for
+        let told = told(&Request::Logout, Some(last)).unwrap();
+        assert!(!limits.answered(&told, None, now));
+        assert!(!limits.may_remember(&last.digest(), Some(v4(3)), now));
+    }
+
+    #[test]
+    fn the_places_of_the_signature_checks_stay_bounded_and_a_new_one_is_still_counted() {
+        let start = Instant::now();
+        let mut limits = Limits::default();
+        let mut next = 0_u32;
+        for second in 0..8_u64 {
+            let now = start + Duration::from_secs(second);
+            for _ in 0..SIGNATURES_PER_SECOND {
+                next += 1;
+                let [_, a, b, c] = next.to_be_bytes();
+                limits
+                    .signature(Some(Place::V4([10, a, b, c])), now)
+                    .unwrap();
+                assert!(limits.signers.len() <= SIGNERS);
+            }
+        }
     }
 }

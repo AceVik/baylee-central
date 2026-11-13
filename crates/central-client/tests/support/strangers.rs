@@ -302,9 +302,11 @@ pub(crate) fn run(
 
 /// Made-up signed tokens, read as the account listener reads a bearer (`present`): each
 /// costs a signature check, of its place's quarter of the second's checks and then of all
-/// places' (`limits.rs`). A token Central issued or verified is not checked again
-/// (`verified.rs`), so a flood that spends every check leaves a session its requests, and a
-/// session that ended is still refused by the store.
+/// places' (`limits.rs`). A token Central issued, or one that verified while its session was
+/// vouched for, is not checked again (`verified.rs`), so a flood that spends every check
+/// leaves such a session its requests, and a session that ended is still refused by the
+/// store. A token that verifies but whose session this Central has not vouched for is not
+/// remembered.
 fn made_up_signatures(
     service: &IdentityService,
     restarted: &IdentityService,
@@ -313,19 +315,38 @@ fn made_up_signatures(
     first: &SignedToken,
     runtime: &Runtime,
 ) {
-    const MADE_UP: &str = "Bearer a.b";
     let quarter = 1_024 / 4;
+    // A real token with one character of its signature changed: well formed, decoded,
+    // and refused only by the Ed25519 check itself.
+    let forged = {
+        let mut text = first.bearer().to_string();
+        let at = text.rfind('.').unwrap() + 10;
+        let other = if text.as_bytes()[at] == b'A' {
+            "B"
+        } else {
+            "A"
+        };
+        text.replace_range(at..=at, other);
+        text
+    };
     let session = |presented: Result<Presented, Error>| match presented {
         Ok(Presented::Session(capability)) => capability,
         Ok(Presented::Credential(_)) => panic!("a signed token is no credential"),
         Err(error) => panic!("a session's token beside the flood: {error:?}"),
     };
+    let flood = |service: &IdentityService, places: std::ops::RangeInclusive<u8>| {
+        for last in places {
+            for _ in 0..quarter {
+                let _ = service.present(&forged, Some(place(last)));
+            }
+        }
+    };
 
     // A Central that has verified nothing yet, and one address: a quarter of the second's
-    // checks, each refused at its signature, then nothing more is checked for it.
+    // checks, each refused by the signature, then nothing more is checked for it.
     second();
     let answers: Vec<_> = (0..1_024)
-        .map(|_| restarted.present(MADE_UP, Some(place(165))).err())
+        .map(|_| restarted.present(&forged, Some(place(165))).err())
         .collect();
     assert!(
         answers[..quarter]
@@ -337,33 +358,28 @@ fn made_up_signatures(
             .iter()
             .all(|answer| *answer == Some(Error::Busy))
     );
-    // Another address's real token is still checked, and verifies.
+    // Another address's real token is still checked, and verifies. Its session was heard
+    // by this Central since its start (`after_a_restart`), so it is vouched for and
+    // remembered.
     session(restarted.present(&first.bearer(), Some(place(166))));
     // Four addresses spend the whole second: a fifth's token is not checked, nor one
     // from no known place ...
-    for last in 167..=170 {
-        for _ in 0..quarter {
-            let _ = restarted.present(MADE_UP, Some(place(last)));
-        }
-    }
+    flood(restarted, 167..=170);
     assert_eq!(
-        restarted.present(MADE_UP, Some(place(171))).err(),
+        restarted.present(&forged, Some(place(171))).err(),
         Some(Error::Busy)
     );
-    assert_eq!(restarted.present(MADE_UP, None).err(), Some(Error::Busy));
-    // ... but the token verified a moment ago needs no check.
+    assert_eq!(restarted.present(&forged, None).err(), Some(Error::Busy));
+    // ... but the token remembered a moment ago needs no check.
     session(restarted.present(&first.bearer(), Some(place(171))));
 
-    // A token Central issued needs no check even for its first request.
+    // A token Central issued needs no check even for its first request. Everything below
+    // up to the store's answers is asked within the second the flood spent.
     let (fresh, _) = password::sign_in(http, account.identity, OLD);
     second();
-    for last in 167..=170 {
-        for _ in 0..quarter {
-            let _ = service.present(MADE_UP, Some(place(last)));
-        }
-    }
+    flood(service, 167..=170);
     assert_eq!(
-        service.present(MADE_UP, Some(place(171))).err(),
+        service.present(&forged, Some(place(171))).err(),
         Some(Error::Busy)
     );
     // A value longer than a Central token may be is refused before any of that: neither
@@ -374,19 +390,29 @@ fn made_up_signatures(
         Some(Error::Rejected)
     );
     let live = session(service.present(&fresh.bearer(), Some(place(161))));
+    // The first token's session was replaced long ago. Its token is still read as what it
+    // says, without a check, and the store refuses the session it names.
+    let ended = session(service.present(&first.bearer(), Some(place(161))));
     assert!(
         runtime
             .block_on(native(service, Request::SessionStatus, &live, place(161)))
             .is_ok()
     );
-    // The first token's session was replaced long ago. Its token is still read as what it
-    // says, without a check, and the store refuses the session it names.
-    let ended = session(service.present(&first.bearer(), Some(place(161))));
     assert_eq!(
         runtime
             .block_on(native(service, Request::SessionStatus, &ended, place(161)))
             .err(),
         Some(Error::Rejected)
+    );
+
+    // A token that verifies, but whose session this Central never vouched for (it was
+    // issued by the other one), is not remembered: with the second spent, it waits.
+    second();
+    session(restarted.present(&fresh.bearer(), Some(place(172))));
+    flood(restarted, 167..=170);
+    assert_eq!(
+        restarted.present(&fresh.bearer(), Some(place(172))).err(),
+        Some(Error::Busy)
     );
 }
 

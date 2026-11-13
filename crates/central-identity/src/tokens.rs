@@ -228,18 +228,19 @@ impl IdentityService {
         )
         .map_err(|_| Error::Rejected)?;
         let capability = Token::from_hex(&claims.sid)?;
-        self.remember(key, &capability, claims.exp, time);
-        Ok(Presented::Session(capability))
-    }
-
-    /// Remember a Central token issued or verified here (`verified.rs`). A lock that cannot
-    /// be had only costs the token its next check.
-    fn remember(&self, key: [u8; 32], capability: &Token, expires: i64, time: i64) {
+        // Remembered only while its session is vouched for: a token that verifies may be
+        // one whose session was replaced or ended, which must cost a sign-in to enter, not
+        // a check (`limits.rs` `may_remember`). A lock that cannot be had only costs the
+        // token its next check.
         if let Ok(mut limits) = self.limits.lock() {
-            limits
-                .verified
-                .remember(key, capability, expires, time, Instant::now());
+            let at = Instant::now();
+            if limits.may_remember(&capability.digest(), place, at) {
+                limits
+                    .verified
+                    .remember(key, &capability, claims.exp, time, at);
+            }
         }
+        Ok(Presented::Session(capability))
     }
 
     /// The bearer of a native session. It lasts to the session's cap, and the session's row
@@ -265,8 +266,17 @@ impl IdentityService {
             .signing
             .sign(&claims)
             .map_err(|_| Error::Rejected)?;
-        // Central signed it: its first request needs no check either.
-        self.remember(verified::key(&token), capability, claims.exp, time);
+        // Central signed it for a session it just issued and vouched for (`issued`): its
+        // first request needs no check either.
+        if let Ok(mut limits) = self.limits.lock() {
+            limits.verified.remember(
+                verified::key(&token),
+                capability,
+                claims.exp,
+                time,
+                Instant::now(),
+            );
+        }
         signed(token)
     }
 

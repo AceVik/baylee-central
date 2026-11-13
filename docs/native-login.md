@@ -586,25 +586,33 @@ or response did:
   is known. Since 13.11.2026 two things keep that from reaching sessions
   (until then one address could keep every native session at `Busy`):
   - **Remembered tokens.** A token Central signed is remembered as it is
-    issued, and one that verified as it verified: by the SHA-256 of its
-    whole text, with its capability, until its `exp`, for at most 16,384
-    tokens, the one used longest ago giving way. Such a token is not
-    checked again. A made-up token is never remembered, so a flood, from
-    however many addresses, spends only the checks. What the table says
-    is only what verification said: whether the session is live is the
-    store's to say at every request, so one that ended is refused as
-    before. The key set is read at the start and never changes while the
-    process runs, and the table goes with the process.
+    issued, and one that verified only while its session is vouched for
+    (above: an answer of the store or its issue within the half hour) and
+    at most 60 a minute from one place: by the SHA-256 of its whole text,
+    with its capability, until its `exp`, for at most 16,384 tokens, the
+    one used longest ago giving way. Such a token is not checked again. A
+    made-up token is never remembered, so a flood, from however many
+    addresses, spends only the checks; the token of a session that was
+    replaced still verifies, but enters only while vouched for, so what
+    turns the table over is sign-ins, at the sign-in's budget. What the
+    table says is only what verification said: whether the session is
+    live is the store's to say at every request, so one that ended is
+    refused as before. The key set is read at the start and never changes
+    while the process runs, and the table goes with the process.
   - **A share by place.** One place draws at most a quarter of the
     second's checks, counted by its IPv4 address or its IPv6 /48, before
     all places' second; a place refused at its share spends nothing of
     the others'. A request without a place meets the shared second alone.
 
   What stays: four places, or more, can still spend every check of a
-  second while they keep it up. Then a token Central has not seen since
-  its start, a session's first request after a restart, waits with them;
-  every remembered session goes on. Sign-in, the website and gateways'
-  credentials are not touched.
+  second while they keep it up. Then a token that is not remembered waits
+  with them: a session's first request after a restart, or a session that
+  was quiet while sign-ins elsewhere turned the table over (16,384 of
+  them; at 30 sign-in starts a minute from one address that takes many
+  addresses or hours). The remembered sessions go on. Sign-in, the
+  website and gateways' credentials are not touched. The table holds the
+  session capabilities themselves, beside the signing key, for as long as
+  it remembers them; a memory image of the process gives both.
 - A request without a proxy's address has no place and no share: it meets
   the 64 a second alone, like the other budgets by address. Since
   12.11.2026 the deployed account listener counts such requests and says

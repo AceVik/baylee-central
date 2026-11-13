@@ -7690,3 +7690,63 @@ More than 16,384 sessions active at once would make the least recently used ones
 checked again. Not tested: the account listener's passing of the address it already counts
 by to `present` (`native.rs`), which no test drives over a socket. The fixture's floods
 assume they fit into one wall-clock second, as the strangers' flood does.
+
+**A second, independent review of that fix** (an Opus agent, read-only, 13.11.2026, on
+4f6555e). It found no critical or high issue. It did find that two of the claims above did
+not hold, and the fix was changed:
+
+- **Medium, fixed: the table could be turned over by verification alone.** `present`
+  remembered every token that verified, and a token of a replaced or logged-out session
+  keeps verifying until its `exp`. An attacker with one account could collect such tokens:
+  - sign-ins come at 30 starts a minute per address, so about 16,400 tokens take 2.3 hours
+    from four addresses, each usable for 12 hours;
+  - presenting them at 256 a second per address would then turn the 16,384 entries over
+    about every 16 seconds;
+  - a session quiet for longer than that would miss, and get `Busy` while the checks were
+    spent.
+
+  The reviewer ran this as a simulation on the limits with a clock of its own; the minting
+  rate is from reading only.
+
+  Now a token that verified is remembered only while its session's bearer is vouched for
+  (`Limits::may_remember`: issued, or answered by the store, within the half hour, and not
+  ended or refused since), and at most 60 a minute from one place
+  (`PLACE_REMEMBERED_PER_MINUTE`). A token issued here is remembered as before; issuing
+  vouches for it. What turns the table over is therefore sign-ins at the sign-in's budget,
+  as for the vouched bearers themselves (`PROVEN`). So the claim "protects sessions against
+  a flood from any number of places" above holds only for sessions remembered and not
+  pushed out by others' sign-ins.
+- **Low, open: session capabilities in memory.** The table holds up to 16,384 raw
+  capabilities beside the signing key, for up to their tokens' `exp`. A memory image gives
+  both, which is enough to present those sessions. `BTreeMap` moves values when it
+  rebalances, so wiped `Token`s may leave copies. The way to close it is to carry a
+  capability's digest in `Presented::Session`, since the store needs nothing else, and to
+  keep only digests. That touches every store call that takes the bearer, and is left for a
+  change of its own.
+- **Low, as written above: an empty table after a restart.** IPv4 is counted by single
+  address, as the other budgets by place count it. The listener's own connection
+  accounting groups IPv4 by /24.
+- **Info:**
+  - `nbf` is not looked at again on a hit; this only matters after the wall clock steps
+    back more than 30 seconds;
+  - the eviction scans the whole table under the limits' lock (about 47 µs per insert into
+    a full table in a release build), now bounded by the 60 a minute per place;
+  - a request with no place meets only the shared second, as before (the listener counts
+    and reports such requests).
+- **Tests that did not test what they claimed:**
+  - the fixture's flood used `Bearer a.b`, which is refused at parsing and never reaches
+    Ed25519; it now uses a real token with one character of its signature changed;
+  - the "without a check" assertions now run within the second the flood spent, before any
+    round trip to the database;
+  - new: a token that verified for a session this Central never vouched for is not
+    remembered (it waits while the checks are spent);
+  - the limits' unit tests add the vouched rule, the place's minute, an ended session, and
+    the bound of the signature checks' places;
+  - the table's tests add nothing swept within the minute.
+
+Run on the changed tree:
+- the unit tests of `central-identity` (103);
+- clippy `-D warnings` for `central-identity` and `central-client`;
+- `cargo xtask postgres` (passed, at a load of about 60).
+
+The rest of the checks are recorded in the PR.
