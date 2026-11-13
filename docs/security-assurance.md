@@ -7545,3 +7545,77 @@ hook as a whole, `web/e2e-real` (type-checked only), and anything against a
 real gateway or a real Central.
 
 13.11.2026: `web/` moved to `crates/central-web/browser/`, with the browser test suites and their tooling; the policy, CI and the present-tense docs name the new path.
+
+**An independent re-read of the token paths after the combination** (an Opus agent,
+read-only, 13.11.2026, on f0af0d9; the code under review is unchanged at the PR's head
+but for what is listed as fixed). What it found, and what was done:
+
+- **Medium, open, from #63: one address can keep every native session at `Busy`.** Any
+  bearer with a dot spends one of the 1,024 signature checks a second that all native
+  sessions share (`central-identity/src/tokens.rs` `present`, `limits.rs`), before the
+  body is read and before any budget by address. 1,024 requests a second of
+  `Authorization: Bearer a.b` refuse everyone else's signed requests; kept up, renewals
+  and gateway tokens fail and sessions run out. Verified by a run (the vouched session's
+  real token got `Busy` after 1,024 made-up ones, and verified the next second).
+  Charging the address's budget first weakens nothing but fixes nothing, since
+  `SessionStatus` spends it too. What would fix it: a share of the signature window per
+  place, checked before the global one; a small bounded cache of verified tokens; or a
+  window of its own for a bearer whose unverified `sid` is vouched for. Left to the
+  owner before deploy. `docs/native-login.md` no longer says vouched sessions go on.
+- **Low, fixed: the recorded order.** It is: protocol → signature budget (`presented`)
+  → decode → the address's budget (`Budgets::charge`) → credential gate → `limits.request`.
+  The comment in `limits.rs` said a bare credential is refused "before any budget"; it
+  now says after the address's own. Above, "refuses before any budget" for the
+  strangers' flood means the same and is left as written then.
+- **Low, fixed in the runbook and the hook's words: no dump before 000023 and 000024.**
+  Once the migration has run, the hook's way back (the previous binary) cannot start.
+  `docs/operations.md` §"Before the deploy: a dump" now asks for one and says how to go
+  back, and the hook says so when it fails after a migration may have committed. Still
+  open: `ops/grants.sql` is applied without one transaction.
+- **Info, fixed: one plain copy of the signing seed.** `TokenKeyConfig::keys` now copies
+  it straight into wiped memory; its test adds a 33-byte seed and the active key listed
+  again in `published` (refused: the rotation's step 2 in `docs/operations.md` was
+  corrected for that the same day).
+- **Info, open:** `Presented` can be built by any crate that links `central-identity`
+  (only `central-http` calls `handle_from`, with what `present()` returns); sessions end
+  without a revocation reaching a gateway when they expire unused (their gateway token
+  lasts at most an hour), and a gateway owner's deletion leaves the `sid`s of their
+  origins; issuing a reset code ends no session, only finishing it does; disabling the
+  official gateway revokes its `sid`s once while its tokens go on being issued (as with
+  tickets); the JWKS budget has no share by address.
+- **Info, the owner's to decide: a pending gateway now learns who its players are.**
+  `gateway_grant` issues a player's token for any registered gateway that is not
+  disabled, a pending one with only its credential pair among them, and the token names
+  the player. Under tickets a credential pair needed the approval.
+- **Found beside it:** the administration's dialog said a revoked gateway token stops
+  the gateway from signing players in. Central issues players' tokens for a gateway
+  whatever its own tokens, so the dialog now says what a revoked token loses (the list
+  entry and the catch-up of sign-outs) and that disabling is what stops it.
+
+Checked and found sound by the re-read: the token verification (header compared byte
+for byte, the key only from Central's own set by `kid`, `verify_strict`, sizes bounded
+before decoding, unknown and repeated claims refused, `iss`, `aud`, `iat ≤ nbf < exp`
+and per-kind lifetimes, every failure `Rejected` with no fall-through to the credential
+path); the replay cache; key loading (wiped, weak keys, more than eight and a key
+twice refused, `--check-accounts-stdin` before anything stops); constant-time
+comparisons of the bridge and the other secrets; every path that ends a session deletes
+its row and so revokes its `sid`s in the same transaction; a browser session and a
+native token cannot stand in for each other; the browser listener's Origin and CSRF
+checks on the mail, administration, owner and picture routes; the grants are the union
+of the branches and name no dropped table. Run by it: the unit tests of
+`central-crypto`, `central-identity` and `central-http`, and `cargo xtask postgres`
+(passed once whole; under a load of 30 to 40, other runs timed out in the chat store
+tests or failed once on a budget count that passed in every later run). Not checked: the
+gateway's side (in Baylee's repository), CI, the hook run end to end, a real gateway.
+
+**The feedback report's triage flake** (`feedback-report.spec.ts`, above, and CI's site
+job on #64's b7a4dfb) was a fault of the island, not of the test: the label, duplicate
+and issue fields emptied themselves and then called `change`, which sends nothing
+while another change is on its way, so an Enter in that moment lost what was typed.
+`change` now says whether it sent, the fields are emptied only then, and the controls
+that send are marked `aria-disabled` while a change is on its way, as the note's button
+and the assignee's list already were. The stand-in can hold an answer back, and the
+test now sends a duplicate while the label's change is held. Against the old island it
+fails, first on the missing `aria-disabled` and, without that check, on the emptied
+field (`Received: ""`); with the fix the whole spec passed five times at both sizes
+(70 of 70).

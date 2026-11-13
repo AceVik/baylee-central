@@ -35,13 +35,18 @@ pub(super) struct TokenKeyConfig {
 impl TokenKeyConfig {
     /// The keys, or a refusal of the whole configuration.
     pub(super) fn keys(&self) -> Result<TokenKeys, ()> {
-        let seed: [u8; 32] = self.active.as_slice().try_into().map_err(|_| ())?;
+        // Copied straight into memory that is wiped, never through a plain array.
+        let mut seed = Zeroizing::new([0_u8; 32]);
+        if self.active.len() != seed.len() {
+            return Err(());
+        }
+        seed.copy_from_slice(&self.active);
         let mut others = Vec::with_capacity(self.published.len());
         for public in &self.published {
             let bytes: [u8; 32] = public.as_slice().try_into().map_err(|_| ())?;
             others.push(PublicKey::from_bytes(&bytes).map_err(|_| ())?);
         }
-        TokenKeys::new(SigningKey::from_seed(&Zeroizing::new(seed)), others).map_err(|_| ())
+        TokenKeys::new(SigningKey::from_seed(&seed), others).map_err(|_| ())
     }
 }
 
@@ -180,10 +185,20 @@ mod tests {
                 .keys()
                 .is_ok()
         );
+        // the active key's public half listed again: one key twice stops the start
+        // (docs/operations.md §"Rotating the signing key", step 2)
+        let public = format!(
+            "{:?}",
+            SigningKey::from_seed(&Zeroizing::new([7_u8; 32]))
+                .public()
+                .to_bytes()
+        );
         for text in [
             r#"{"active":[1,2,3]}"#.to_owned(),
             r#"{"active":[]}"#.to_owned(),
+            format!(r#"{{"active":{:?}}}"#, [7_u8; 33]),
             format!(r#"{{"active":{seed},"published":[[1,2,3]]}}"#),
+            format!(r#"{{"active":{seed},"published":[{public}]}}"#),
         ] {
             assert!(config(&text).unwrap().keys().is_err(), "{text}");
         }

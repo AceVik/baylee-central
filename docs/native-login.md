@@ -586,7 +586,9 @@ or response did:
   touched. The signature is checked before the address's own budget,
   which counts only requests without a session. Giving the signature
   budget a share by address is open (combined release, 13.11.2026).
-  Sessions that are vouched for go on, and so does sign-in.
+  Being vouched for does not help here: the signature is checked before
+  anything of the session is known, so vouched sessions wait as well.
+  Sign-in goes on.
 - A request without a proxy's address has no place and no share: it meets
   the 64 a second alone, like the other budgets by address. Since
   12.11.2026 the deployed account listener counts such requests and says

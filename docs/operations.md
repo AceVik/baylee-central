@@ -1367,6 +1367,36 @@ sections. The owner's order, as in Baylee
 A client from before this release drops a refusal's body, so after step 3 it shows its own generic
 sign-in failure until the updater has replaced it.
 
+### Before the deploy: a dump
+
+Two of this release's migrations cannot be undone, and there are no down migrations:
+- 000023 drops `beta_keys` and the accounts' link to a key;
+- 000024 drops `gateway_tickets` and `gateway_leases` and deletes every native session.
+
+After 000024 the previous binary does not start (its startup check needs the tables 000024 drops).
+000025 to 000027 only add. So the way back from this deploy is a restore. Right before step 3,
+take a dump as the database's owner, the way the hook reaches it, into a file only root can read:
+
+```sh
+umask 077
+docker exec baylee-postgres-1 pg_dump -w -U central_migrator -Fc baylee_central \
+  > /root/baylee_central-before-000023.dump
+docker exec -i baylee-postgres-1 pg_restore -l < /root/baylee_central-before-000023.dump | head
+```
+
+The dump holds the credential table. Together with the OPAQUE setup that is credential material
+([secrets](#secrets)): keep it no longer than the deploy needs it.
+
+A failure after the migration has started makes the hook start the previous binary and say that
+the way back is this dump. **The way back:**
+1. Stop Central.
+2. Restore the dump into an empty `baylee_central` (`pg_restore --clean --if-exists`, as the
+   owner).
+3. Put `central-service.previous` back as `central-service`, and the previous `ops/grants.sql`.
+4. Start it.
+
+Nothing of this was rehearsed outside production; rehearse it on a copy first if there is time.
+
 ## Profile pictures
 
 What is built is in [profile pictures](profile-pictures.md); the owner's

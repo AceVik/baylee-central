@@ -134,8 +134,9 @@ enum Class {
     Pairing,
     /// Served without a session, whatever token comes along. (On the
     /// native listener a bare credential that comes along is refused before
-    /// any budget: `credential_operation` keeps it to a gateway's own
-    /// operations, and none of these is one.)
+    /// these budgets, though after the address's own, `Budgets::charge`:
+    /// `credential_operation` keeps it to a gateway's own operations, and
+    /// none of these is one.)
     Public,
     /// A session's or a gateway credential's: status, renewal, a token
     /// for a gateway and a gateway's catch-up on revocations.
