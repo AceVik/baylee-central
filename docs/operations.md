@@ -1330,16 +1330,9 @@ repository, and the deploy hook builds and installs this site instead
   the reset code's `/{lang}/account/admin` ([frontend
   rewrite](proposals/frontend-rewrite.md) §25). It needs no Caddy handle
   of its own: the catch-all passes it, with `central-web`'s headers. The
-  old build's `/admin*` is needed only for what is not rebuilt yet, the
-  feedback's triage (`/admin/feedback`, rebuilt separately as
-  `/{lang}/account/admin/feedback`). Until that is merged, a
-  `handle /admin*` with the old `file_server` block in front of the
-  `central-web` handle keeps it reachable; what `central-web` does not
-  answer carries none of its headers, so that handle needs the old site
-  block's own `header` directives inside it (`web/README.md` §"Serving
-  it": the old build's Content-Security-Policy, Permissions-Policy, COOP,
-  `nosniff`, `no-referrer`), or it is served without a content policy.
-  Once nothing is left there, the handle goes with the old build.
+  feedback's triage is `/{lang}/account/admin/feedback`, and the old
+  build's `/admin…` addresses redirect to these pages (`central-web`,
+  302), so no `handle /admin*` for the old build is needed.
 
 ## The session tokens release
 

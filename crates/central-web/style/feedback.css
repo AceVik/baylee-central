@@ -1,7 +1,7 @@
 /* The feedback moderation (`islands/feedback/`): the list of reports with
    its views, filters, pills, selection and pages, one report's page with
    its triage, notes and history, and the notices at the foot of the
-   screen. The old administration's look (`web/src/styles/feedback.css`)
+   screen. The old React administration's look (removed 12.11.2026)
    rewritten on the site's tokens. Every control is at least 44 px; every
    track may shrink, so nothing scrolls sideways but a table in its own
    box; hovering changes colours only. */

@@ -231,7 +231,7 @@ mod tests {
 
     /// The pinned vector: this nonce at this price has these smallest
     /// counters and this output for part 0's. The page's Worker is held to
-    /// the same counters in a browser (`web/e2e-site/account.spec.ts`), so
+    /// the same counters in a browser (`crates/central-web/browser/e2e-site/account.spec.ts`), so
     /// neither build can drift from the other unseen. The output is also
     /// what OpenSSL 4.1.0's Argon2id gives for the same bytes
     /// (`openssl kdf -keylen 32 -kdfopt hexpass:… -kdfopt hexsalt:…

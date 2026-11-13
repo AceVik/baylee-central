@@ -355,7 +355,7 @@ fn a_kept_chat_identity_resumes_as_the_same_device_and_nothing_else_does() {
 
 /// The pinned vector of `central_crypto::proof`, through what the Worker
 /// calls: searched in turns as the page asks, the counters are the ones
-/// Central's check takes. `web/e2e-site/account.spec.ts` holds the built
+/// Central's check takes. `crates/central-web/browser/e2e-site/account.spec.ts` holds the built
 /// module to the same counters in a browser.
 #[test]
 fn the_proof_of_work_the_worker_searches_is_the_one_central_checks() {

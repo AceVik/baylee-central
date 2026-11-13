@@ -51,8 +51,8 @@ pub const DOWNLOAD: &[Shape] = &[
     Shape::Path("M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"),
     Shape::Path("m7 10 5 5 5-5"),
 ];
-/// The filter's funnel, as the old administration drew it
-/// (`web/src/components/icons.tsx`).
+/// The filter's funnel, as the old React administration drew it (removed
+/// 12.11.2026).
 pub const FILTER: &[Shape] = &[Shape::Path("M3 5h18l-7 8v6l-4 2v-8z")];
 /// `external-link`.
 pub const EXTERNAL: &[Shape] = &[

@@ -4,7 +4,7 @@
 //! counts, saved lists, the chart, crash groups, a selection's actions, the
 //! CSV) and one report at `/{lang}/account/admin/feedback/<id in hex>`
 //! (what was written and sent, the triage, notes, history, the trash).
-//! It rebuilds the old build's `web/src/admin/feedback/` on the wire it
+//! It rebuilds the removed React build's feedback moderation on the wire it
 //! used, `AdminRequest`'s report actions, unchanged.
 //!
 //! A report is a game client's words and data: untrusted. Every field is

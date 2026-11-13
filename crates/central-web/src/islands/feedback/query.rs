@@ -2,7 +2,7 @@
 //! (`/{lang}/account/admin/feedback?…`), so that a list is a link, a saved
 //! view (`AdminRequest::SaveReportView` keeps the query string) and the way
 //! back from a report's page. The query string is the old administration's
-//! exactly (`web/src/admin/feedback/query.ts`): the same keys in the same
+//! exactly (the removed React build's `query.ts`): the same keys in the same
 //! order, encoded as `URLSearchParams` encodes them, so the views saved
 //! there still open and still match. Every part is read as Central would
 //! check it (central-api `ReportFilter::validate`): a part out of its

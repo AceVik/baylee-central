@@ -18,7 +18,7 @@ arithmetic became reachable. Chat changes consolidate equivalent dependency
 aliases and update the test RNG trait; the existing known answers pass.
 
 The reviewed source fingerprint is
-`ddbb34985086f0d853bc6f23db4c8b9acd4e11ffd853d5fba976d6806762d87f`
+`823835c3ae4a69df21a07a4c2975e57ee7c4bd51473d1fa28ea5437f9ffc1e10`
 (§"Changes since the review", 13 November 2026).
 Source mutation/link checks and all exact caller/feature negative checks remain
 mandatory. The source fingerprint's SHA-256 hexadecimal encoding is unchanged
@@ -238,6 +238,12 @@ still shows exactly `crypto-bigint <- elliptic-curve <- opaque-ke/voprf <-
 central-crypto`, and from there only Central's own crates. Both
 reviews stand as written. Fingerprint `ddbb3498…`. This is the merging agent's
 check, not an independent review.
+
+Later the same day one comment in `src/proof.rs` changed: the path of the
+browser spec it names moved from `web/e2e-site/` to
+`crates/central-web/browser/e2e-site/` when the `web/` folder went. Only
+that comment line changed (`git diff` of the crate shows nothing else), so
+the review stands and the fingerprint is `823835c3…`.
 
 
 ## Chat source and graph review, 2 November 2026

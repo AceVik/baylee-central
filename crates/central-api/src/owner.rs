@@ -296,7 +296,7 @@ mod tests {
 
     #[test]
     fn the_text_form_matches_the_websites_vector() {
-        // web/test/account/gateway-token.test.ts formats the same bytes
+        // the vector the removed React build's own test (12.11.2026) held the website to
         let token = Token::from_secret_bytes(Zeroizing::new([0xab; 32]));
         assert_eq!(
             token_text(&token).as_str(),

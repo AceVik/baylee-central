@@ -3,7 +3,7 @@
    width, the details as a sheet over the conversation and docked beside it
    from 70rem. It decides by its own width (a container), not the window's.
 
-   It is drawn as the old site's messenger was (web/src/styles/chat.css):
+   It is drawn as the old React site's messenger was (removed 12.11.2026):
    one calm window, the interface in Inter, a person's words in bubbles,
    one's own in the gold. Nothing moves or grows under the pointer; only
    colours and shades change (owner, 11.11.2026; tests/hover.rs). */
