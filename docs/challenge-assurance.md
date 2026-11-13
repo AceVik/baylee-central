@@ -53,15 +53,33 @@ test's dependence on completing real Ed25519 checks within one second. Developme
 builds now optimise the existing curve25519-dalek and ed25519-dalek arithmetic,
 as they already do Argon2. Production budgets, assertions and dependency versions
 are unchanged. The complete gate and real integration passed with these settings;
-the updated CI run and independent PR review are still pending.
+the updated Linux PostgreSQL CI job also passed in 5 minutes 34 seconds.
 
 The final real automatic publisher check also passed in 128.30 seconds, including
 fresh Daily/Weekly tasks and zero duplicate publications on a repeated pass. A
 second blind agent-played Weekly from the slower pool was won on turn eleven
 through combat, retained burn and correctly ordered triggers. No private proof
-was read and no ranked result was submitted.
+was read and no ranked result was submitted. A subsequent blind Daily was won
+through combat and Giant Growth on turn one, leaving the alternative burn spells
+unused.
+
+Independent PR review examined the authority/API/SQL paths and the website/SDK
+integration separately. The authority review found no actionable issue. The web
+review found two P2 issues: leaving a pending hint confirmation paused background
+refresh indefinitely, and switching between calendar and detail lost keyboard
+focus. Back now clears hint state and restores focus to the task (including its
+archive), with Refresh as a fallback. Opening a task focuses its heading, and
+unchanged refresh responses preserve existing controls. Both corrections passed
+the independent static re-review.
+
+Following the owner's instruction to limit follow-up tests to changed areas,
+only the two affected browser scenarios ran on desktop and phone. All four checks
+passed; two test-selector/expected-open-state mistakes were corrected during the
+focus case, without weakening its assertions. Production assets rebuilt, browser
+type/lint checks passed, and the owned server exited with port 28792 closed.
+The prior complete gate was not repeated for these focused UI corrections.
 
 Boundaries: website browser tests use synthetic responses; the real engine path
-has separate transport/database evidence. Two agent-played games and a finite solver
+has separate transport/database evidence. Three agent-played games and a finite solver
 sample do not establish human difficulty. Retained executors still need a matching
 wire/preset protocol. No production migration, credentials or deployment was used.

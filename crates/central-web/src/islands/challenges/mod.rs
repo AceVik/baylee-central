@@ -66,7 +66,7 @@ pub fn Challenges(lang: Lang, initial: Option<ChallengeFeed>) -> impl IntoView {
     });
     view! {
         <div class="challenge-toolbar">
-            <button type="button" class="button button-ghost" disabled=move || hub.busy.get()
+            <button id="challenge-refresh" type="button" class="button button-ghost" disabled=move || hub.busy.get()
                 on:click=move |_| hub.refresh(None)>{words::fb_refresh(lang)}</button>
             <span role="status">{move || hub.busy.get().then(|| words::ch_loading(lang))}</span>
         </div>
@@ -87,11 +87,12 @@ fn calendar(lang: Lang, hub: Hub) -> impl IntoView {
             Some(feed) => {
                 let current: Vec<_> = feed.challenges.iter().filter(|c| c.description.period.live_at(feed.now)).cloned().collect();
                 let archive: Vec<_> = feed.challenges.iter().filter(|c| !c.description.period.live_at(feed.now)).cloned().collect();
+                let returning_to_archive = archive.iter().any(|task| Some(task.id) == hub.return_to.get_untracked());
                 let before = feed.before;
                 view! {
                     <div class="challenge-grid">{current.into_iter().map(|task| card(lang, hub, task, true)).collect_view()}</div>
                     {feed.challenges.is_empty().then(|| view! { <p class="empty-state">{words::ch_empty(lang)}</p> })}
-                    <details class="challenge-archive" open=current_is_absent(&feed)>
+                    <details class="challenge-archive" open=current_is_absent(&feed) || returning_to_archive>
                         <summary>{words::ch_archive(lang)}</summary>
                         <div class="challenge-grid">{archive.into_iter().map(|task| card(lang, hub, task, false)).collect_view()}</div>
                         {before.map(|cursor| view! { <button type="button" class="button button-ghost" disabled=move || hub.busy.get()
@@ -124,7 +125,7 @@ fn card(lang: Lang, hub: Hub, task: api::Challenge, live: bool) -> impl IntoView
             <p>{description}</p>
             <p class="meta">{if withdrawn { words::ch_withdrawn(lang) } else if live { words::ch_current(lang) } else { words::ch_archive(lang) }}</p>
             <div class="challenge-actions">
-                <button type="button" class="button" disabled=move || hub.busy.get()
+                <button id=format!("challenge-open-{}",crate::data::id_hex(&id)) type="button" class="button" disabled=move || hub.busy.get()
                     on:click=move |_| hub.open(task.clone(), api::Board::FirstWin, 0)>{words::ch_details(lang)}</button>
                 {(!withdrawn).then(|| view! { <a class="button button-ghost" href=play_link(id)>{words::ch_play(lang)}</a> })}
             </div>

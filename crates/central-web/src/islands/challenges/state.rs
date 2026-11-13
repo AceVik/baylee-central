@@ -17,6 +17,7 @@ pub(super) struct Hub {
     pub hint: RwSignal<Option<api::Words>>,
     pub confirm_hint: RwSignal<Option<u8>>,
     pub page: RwSignal<Option<i64>>,
+    pub return_to: RwSignal<Option<[u8; 16]>>,
 }
 
 impl Hub {
@@ -37,6 +38,7 @@ impl Hub {
             hint: RwSignal::new(None),
             confirm_hint: RwSignal::new(None),
             page: RwSignal::new(None),
+            return_to: RwSignal::new(None),
         }
     }
 
@@ -60,11 +62,29 @@ impl Hub {
                     now,
                     challenges,
                     before,
-                }) => self.feed.set(Some(ChallengeFeed {
-                    now,
-                    challenges,
-                    before,
-                })),
+                }) => {
+                    // A clock tick alone must not replace focused calendar controls.
+                    let changed = self.feed.with_untracked(|feed| {
+                        feed.as_ref().is_none_or(|old| {
+                            old.before != before
+                                || old.challenges != challenges
+                                || challenges.iter().any(|task| {
+                                    task.description.period.live_at(old.now)
+                                        != task.description.period.live_at(now)
+                                })
+                        })
+                    });
+                    let feed = Some(ChallengeFeed {
+                        now,
+                        challenges,
+                        before,
+                    });
+                    if changed {
+                        self.feed.set(feed);
+                    } else {
+                        self.feed.update_untracked(|current| *current = feed);
+                    }
+                }
                 Ok(_) => self.error.set(Some(Failure::Malformed)),
                 Err(error) => self.error.set(Some(error)),
             }
@@ -117,7 +137,13 @@ impl Hub {
             return;
         }
         let id = task.id;
-        self.selected.set(Some(task));
+        let entering = self.selected.get_untracked().is_none();
+        if self
+            .selected
+            .with_untracked(|old| old.as_ref() != Some(&task))
+        {
+            self.selected.set(Some(task));
+        }
         self.board.set(board);
         self.offset.set(offset);
         self.rows.set(None);
@@ -128,6 +154,25 @@ impl Hub {
             self.load_detail(id, board, offset).await;
             self.load_personal(id).await;
             self.busy.set(false);
+            if entering {
+                crate::islands::focus::after_render("#challenge-detail-title");
+            }
+        });
+    }
+
+    pub fn close(self, id: [u8; 16]) {
+        let present = self.feed.with_untracked(|feed| {
+            feed.as_ref()
+                .is_some_and(|feed| feed.challenges.iter().any(|task| task.id == id))
+        });
+        self.return_to.set(Some(id));
+        self.selected.set(None);
+        self.confirm_hint.set(None);
+        self.hint.set(None);
+        crate::islands::focus::after_render(if present {
+            format!("#challenge-open-{}", crate::data::id_hex(&id))
+        } else {
+            "#challenge-refresh".into()
         });
     }
 
@@ -144,8 +189,18 @@ impl Hub {
                 standings,
                 ..
             }) => {
-                self.selected.set(Some(challenge));
-                self.rows.set(Some(standings));
+                if self
+                    .selected
+                    .with_untracked(|old| old.as_ref() != Some(&challenge))
+                {
+                    self.selected.set(Some(challenge));
+                }
+                if self
+                    .rows
+                    .with_untracked(|old| old.as_ref() != Some(&standings))
+                {
+                    self.rows.set(Some(standings));
+                }
             }
             Err(error) => self.error.set(Some(error)),
             Ok(_) => self.error.set(Some(Failure::Malformed)),
