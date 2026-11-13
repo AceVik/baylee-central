@@ -164,6 +164,14 @@ The 2026-11-12 bundle (`reset_start`, `reset_keep`, `reset_new`,
 command above under Rosetta, and `cargo xtask wasm --check` passed in the
 same container. The resulting WASM SHA-256 is
 `abeaad928229eb30338a15db4bdc9d5864ed85ffa07c882521675d5cceebbc39`.
+
+The 2026-11-13 bundle is the same crate built from the combined sources of
+the session tokens (#63), the website (#64) and the profile pictures (#65):
+`central-api`'s `Error::UpdateRequired`, which the chat's errors name, and
+the signed token in `central-client`'s session. Its exports and glue did not
+change. Built the same way, under Rosetta, and `cargo xtask wasm --check`
+passed in the same container. The resulting WASM SHA-256 is
+`0c7ae18b463d4dbcf3db0ddfec091b09cf2d3004cde2cd3268ec455ffca3d1b1`.
 `cargo xtask site` takes the committed module (checked against its
 `SHA256SUMS`) and builds none of its own.
 
