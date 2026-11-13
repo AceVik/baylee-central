@@ -7620,8 +7620,9 @@ fails, first on the missing `aria-disabled` and, without that check, on the empt
 field (`Received: ""`); with the fix the whole spec passed five times at both sizes
 (70 of 70).
 
-**The signature budget, closed the same day** (owner, 13.11.2026: done in the combined PR, not
-in a PR of its own). The finding above was a Medium left open; this addresses it.
+**The signature budget, closed the same day** (the owner asked on 13.11.2026 for it to be done
+in the session that combined the PRs; it went into the combined PR as a commit of its own). The
+finding above was a Medium left open; this addresses it.
 
 Design pass. Asset: native sessions' availability. Threat: an unauthenticated sender of
 made-up signed tokens, from one address or many, spending the 1,024 signature checks a
@@ -7670,8 +7671,9 @@ Adversarial pass:
   a remembered token goes on;
 - a token Central issued is served unchecked while the second is spent;
 - a token whose session was replaced is still read as what it says, without a check, and the
-  store refuses it (`crates/central-client/tests/support/strangers.rs`
-  `made_up_signatures`, on PostgreSQL);
+  store refuses it, and a value longer than a Central token is refused while the second is
+  spent (`crates/central-client/tests/support/strangers.rs` `made_up_signatures`, on
+  PostgreSQL);
 - unit tests with a clock of their own:
   - the quarter;
   - a refused place spending nothing of the others';
@@ -7685,4 +7687,6 @@ Adversarial pass:
 What stays: four or more places that keep up their floods still delay a token Central has
 not seen since its start (a session's first request after a restart) while they go on.
 More than 16,384 sessions active at once would make the least recently used ones be
-checked again.
+checked again. Not tested: the account listener's passing of the address it already counts
+by to `present` (`native.rs`), which no test drives over a socket. The fixture's floods
+assume they fit into one wall-clock second, as the strangers' flood does.

@@ -366,6 +366,13 @@ fn made_up_signatures(
         service.present(MADE_UP, Some(place(171))).err(),
         Some(Error::Busy)
     );
+    // A value longer than a Central token may be is refused before any of that: neither
+    // digested nor counted, whatever the second's checks.
+    let long = format!("Bearer {}.b", "a".repeat(2 * 1_024));
+    assert_eq!(
+        service.present(&long, Some(place(171))).err(),
+        Some(Error::Rejected)
+    );
     let live = session(service.present(&fresh.bearer(), Some(place(161))));
     assert!(
         runtime
