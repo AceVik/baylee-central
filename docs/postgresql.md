@@ -160,7 +160,8 @@ read of the figures fail on it; such a database is made anew, not repaired.
 
 Three reads were added and no migration: each reads tables the runtime role
 read before, so `ops/grants.sql` and the startup check are unchanged. The
-number 000027 was kept for this work and is not used.
+number 000027, kept for this work at first, was not needed here; the profile
+pictures took it ([below](#profile-pictures-migration-000027)).
 
 - **Report levels** ([reports](reports.md#what-the-reports-may-take-12112026)).
   `file_report` weighs before it inserts. In its transaction it first takes
@@ -194,8 +195,8 @@ number 000027 was kept for this work and is not used.
 [Profile pictures](profile-pictures.md) add four tables to
 `central_identity`, each hanging on the account's row and gone with it;
 the previous binary names none of them, so it runs unchanged over the
-migration. (The report-levels section above says 000027 was kept and not
-used there; this work takes it.)
+migration. (The report-levels work kept 000027 at first and needed no
+migration; this work takes it, after 000026.)
 - **`pictures`**: one row per account: a 16-byte random `key`, unique and
   new at every upload; the still's `avif` (32 B to 160 KiB) and `png`
   (67 B to 320 KiB); an optional `sequence` (32 B to 512 KiB) for a picture

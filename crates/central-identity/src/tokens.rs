@@ -127,6 +127,7 @@ pub const fn credential_operation(request: &Request) -> bool {
         | Request::ResetMail { .. }
         | Request::Email { .. }
         | Request::Owner { .. }
+        | Request::Picture { .. }
         | Request::Admin { .. }
         | Request::AccountExport
         | Request::DeleteAccountStart { .. }

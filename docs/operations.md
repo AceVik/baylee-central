@@ -24,12 +24,15 @@ never in argv or the environment. Unknown fields fail closed.
   ([below](#rotating-the-signing-key)), and optionally `browser: {"listen": …}` for the
   browser listener (absent means off), `legacy: {"database": …}`, the legacy store's own
   login (absent means no legacy sign-in; [the legacy store](#the-legacy-store)),
-  `official_address` ([the official gateway](#the-official-gateway)'s address on this machine)
-  and `mail: {"endpoint": …, "site": …, "token": …}`, the mailer on this host
-  (absent means Central sends no mail; [mail](#mail)).
+  `official_address` ([the official gateway](#the-official-gateway)'s address on this machine),
+  `mail: {"endpoint": …, "site": …, "token": …}`, the mailer on this host
+  (absent means Central sends no mail; [mail](#mail)), and `pictures: {"socket": …}`, the
+  picture worker's socket (absent means uploads answer `Unavailable` and stored pictures
+  are still served; [profile pictures](#profile-pictures)).
 - `--check-accounts-stdin` reads a service document as `--accounts-stdin` would, connects to
-  nothing and exits, so that a build can be asked whether it would start; a `mail` block the
-  service would refuse is refused here too. The deploy hook asks it before it stops anything.
+  nothing and exits, so that a build can be asked whether it would start; a `mail` block or a
+  picture socket the service would refuse is refused here too. The deploy hook asks it before
+  it stops anything.
 - `--migrate-stdin` applies pending migrations once under the migration login
   and exits. Input: `database` only. The service never migrates by itself.
 - `--legacy-import-stdin` and `--legacy-deadline-stdin` import the official
@@ -1343,8 +1346,9 @@ repository, and the deploy hook builds and installs this site instead
 Migration 000024 and the token model go out together with a gateway and a client that speak them;
 older ones are refused (`426`), and no compatibility path exists. The same deploy applies the
 website release's migrations 000023, 000025 and 000026 ([registration](#registration),
-[what gateways report](#what-gateways-report-migration-000025), [mail](#mail)), whose own
-conditions are in those sections. The owner's order, as in Baylee
+[what gateways report](#what-gateways-report-migration-000025), [mail](#mail)) and the
+profile pictures' 000027 ([below](#profile-pictures)), whose own conditions are in those
+sections. The owner's order, as in Baylee
 `docs/central-login.md` §"Deploying this":
 
 1. **`central.json`, before step 3.** Generate `token_keys` (`--generate-secrets` holds one, or

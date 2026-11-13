@@ -98,7 +98,7 @@ impl Session {
 mod tests {
     use super::*;
     use central_api::wire::{Identity, Request, Response};
-    use central_api::{Endpoint, Token};
+    use central_api::{Bearer, Endpoint, SignedToken};
     use central_crypto::vault::MasterKey;
     use std::cell::RefCell;
 
@@ -112,7 +112,11 @@ mod tests {
         fn endpoint(&self) -> &Endpoint {
             &self.endpoint
         }
-        fn exchange(&self, request: &Request, bearer: Option<&Token>) -> Result<Response, Error> {
+        fn exchange(
+            &self,
+            request: &Request,
+            bearer: Option<Bearer<'_>>,
+        ) -> Result<Response, Error> {
             assert!(bearer.is_some());
             self.asked
                 .borrow_mut()
@@ -136,7 +140,7 @@ mod tests {
                 account: [7; 16],
                 epoch: 1,
             },
-            Token::generate().unwrap(),
+            SignedToken::new(zeroize::Zeroizing::new("synthetic.signed.token".into())).unwrap(),
             MasterKey::generate().unwrap(),
         )
     }
