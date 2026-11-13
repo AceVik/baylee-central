@@ -7619,3 +7619,70 @@ test now sends a duplicate while the label's change is held. Against the old isl
 fails, first on the missing `aria-disabled` and, without that check, on the emptied
 field (`Received: ""`); with the fix the whole spec passed five times at both sizes
 (70 of 70).
+
+**The signature budget, closed the same day** (owner, 13.11.2026: done in the combined PR, not
+in a PR of its own). The finding above was a Medium left open; this addresses it.
+
+Design pass. Asset: native sessions' availability. Threat: an unauthenticated sender of
+made-up signed tokens, from one address or many, spending the 1,024 signature checks a
+second that every signed request needs before anything of its session is known. Charging
+the address's request budget first fixes nothing (`SessionStatus` spends it too). Chosen,
+both:
+- **Remembered tokens** (`central-identity/src/verified.rs`). Central remembers a token as it
+  signs it and as one verifies, by the SHA-256 of its whole text, with its capability, until
+  its `exp`. It holds at most 16,384, the one used longest ago giving way. It is not checked
+  again. This protects sessions against a flood from any number of places.
+- **A share by place** (`PLACE_SIGNATURES_PER_SECOND`, a quarter, counted by the IPv4 address
+  or the IPv6 /48). This keeps one sender from spending the checks that other places' first
+  requests need.
+
+Invariants:
+- the table answers only what verification said (the capability), never whether the session
+  is live, which the store decides on every request as before;
+- nothing enters it but a token Central signed or one that verified;
+- one byte different is another token;
+- no hit at or after `exp` (verification, with its tolerance, decides then);
+- the key set is read once per process and the table lives no longer, so a key dropped by a
+  restart verifies nothing it signed;
+- the table has no `Debug` and nothing of it is logged;
+- the length is bounded (`Kind::Central.max_bytes()`) before the digest, which comes before
+  every budget.
+
+Rejected:
+- reading `sid` from the unverified payload, which parses untrusted JSON ahead of the
+  signature;
+- a cache keyed by the signature alone, which would pair a cached capability with any
+  payload.
+
+Implementation pass:
+- `present(header, place)`: refuse an over-long value, look up the digest, and only on a
+  miss spend the place's share and then all places' check, verify outside the lock, and
+  remember the token;
+- `central_token` remembers what it signs;
+- `native.rs` passes the address it counts by;
+- `central-identity` gains a direct `sha2` (=0.11.1, already in the graph: no new package,
+  the lock file gains only the edge).
+
+Adversarial pass:
+- a flood of `Bearer a.b` from one place: 256 checked and refused, the rest `Busy`; another
+  place's real token still verifies;
+- four places spend the second: a fifth place's token and one with no place get `Busy`, and
+  a remembered token goes on;
+- a token Central issued is served unchecked while the second is spent;
+- a token whose session was replaced is still read as what it says, without a check, and the
+  store refuses it (`crates/central-client/tests/support/strangers.rs`
+  `made_up_signatures`, on PostgreSQL);
+- unit tests with a clock of their own:
+  - the quarter;
+  - a refused place spending nothing of the others';
+  - the /48;
+  - no place;
+  - a hit until `exp` and none at it, an expired token not remembered;
+  - one byte different;
+  - the bound and the eviction of the least recently used;
+  - the sweep.
+
+What stays: four or more places that keep up their floods still delay a token Central has
+not seen since its start (a session's first request after a restart) while they go on.
+More than 16,384 sessions active at once would make the least recently used ones be
+checked again.

@@ -167,7 +167,7 @@ impl Asked<'_> {
     /// reads it.
     fn native(&self, bearer: Bearer<'_>, request: EmailRequest) -> Result<EmailState, Error> {
         pace();
-        let presented = self.service.present(bearer.header().as_str())?;
+        let presented = self.service.present(bearer.header().as_str(), None)?;
         let response = self.runtime.block_on(self.service.handle_from(
             Request::Email { request },
             Some(&presented),
@@ -266,7 +266,7 @@ impl Transport for Direct<'_> {
         pace();
         // As a listener reads it: the bearer's header and the request's wire bytes.
         let presented = bearer
-            .map(|bearer| self.service.present(bearer.header().as_str()))
+            .map(|bearer| self.service.present(bearer.header().as_str(), None))
             .transpose()?;
         let request = central_api::decode(&central_api::encode(request)?)?;
         self.runtime
@@ -418,7 +418,7 @@ fn owner(fixture: &Fixture<'_>, asked: &Asked<'_>, home: &Browser) -> Account {
         None,
     );
     // Each listener takes its own kind of session and no other.
-    let Ok(Presented::Session(capability)) = asked.service.present(&bearer.bearer()) else {
+    let Ok(Presented::Session(capability)) = asked.service.present(&bearer.bearer(), None) else {
         panic!("a session's own token verifies");
     };
     for refused in [

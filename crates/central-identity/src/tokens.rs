@@ -4,11 +4,11 @@
 //! a digest, so the signing key alone forges no session. That capability alone must open
 //! nothing either: [`credential_operation`] keeps the two kinds of bearer apart, so a
 //! capability copied out of a token, presented bare, is refused like any other wrong bearer.
-use super::{Error, IdentityService, Request, Response, Token};
+use super::{Error, IdentityService, Place, Request, Response, Token, verified};
 use central_api::{SignedToken, wire::GatewayPurpose};
 use central_crypto::jwt::{
     self, CENTRAL_TOKEN_SECONDS, CentralClaims, Expected, GATEWAY_TOKEN_SECONDS, GatewayClaims,
-    KeySet, PublicKey, Purpose, REVOCATION_SECONDS, RevocationClaims, SigningKey, TermsClaim,
+    KeySet, Kind, PublicKey, Purpose, REVOCATION_SECONDS, RevocationClaims, SigningKey, TermsClaim,
 };
 use central_postgres::GatewayGrant;
 use std::{
@@ -187,32 +187,59 @@ fn signed(token: Zeroizing<String>) -> Result<SignedToken, Error> {
 }
 
 impl IdentityService {
-    /// Read a request's `Authorization` value. A signed value must be a Central token that
-    /// verifies; everything else about it, and whether it may do what it asks, comes later.
+    /// Read a request's `Authorization` value, sent from `place`. A signed value must be a
+    /// Central token that verifies, or one this process issued or verified before and whose
+    /// `exp` is still ahead (`verified.rs`); everything else about it, and whether it may do
+    /// what it asks, comes later.
     ///
     /// # Errors
-    /// Rejects any other spelling, a token that does not verify, and `Busy` past the budget of
-    /// signature checks, which keeps made-up tokens from costing more than other requests.
-    pub fn present(&self, header: &str) -> Result<Presented, Error> {
+    /// Rejects any other spelling, a token longer than a Central token may be, a token that
+    /// does not verify, and `Busy` past the budget of signature checks, all places' or
+    /// `place`'s share of it, which keeps made-up tokens from costing more than other
+    /// requests.
+    pub fn present(&self, header: &str, place: Option<Place>) -> Result<Presented, Error> {
         let value = header.strip_prefix("Bearer ").ok_or(Error::Rejected)?;
         if !value.contains('.') {
             return Ok(Presented::Credential(Token::from_hex(value)?));
         }
-        self.limits
-            .lock()
-            .map_err(|_| Error::Unavailable)?
-            .signature(Instant::now())?;
+        // Bounded before anything is computed of it: the digest below comes before every
+        // budget.
+        if value.len() > Kind::Central.max_bytes() {
+            return Err(Error::Rejected);
+        }
+        let key = verified::key(value);
+        let time = now()?;
+        {
+            let mut limits = self.limits.lock().map_err(|_| Error::Unavailable)?;
+            let at = Instant::now();
+            if let Some(capability) = limits.verified.find(&key, time, at) {
+                return Ok(Presented::Session(capability));
+            }
+            limits.signature(place, at)?;
+        }
         let claims: CentralClaims = jwt::verify(
             value,
             &self.tokens.published,
             Expected {
                 issuer: &self.origin,
                 audience: &self.origin,
-                now: now()?,
+                now: time,
             },
         )
         .map_err(|_| Error::Rejected)?;
-        Ok(Presented::Session(Token::from_hex(&claims.sid)?))
+        let capability = Token::from_hex(&claims.sid)?;
+        self.remember(key, &capability, claims.exp, time);
+        Ok(Presented::Session(capability))
+    }
+
+    /// Remember a Central token issued or verified here (`verified.rs`). A lock that cannot
+    /// be had only costs the token its next check.
+    fn remember(&self, key: [u8; 32], capability: &Token, expires: i64, time: i64) {
+        if let Ok(mut limits) = self.limits.lock() {
+            limits
+                .verified
+                .remember(key, capability, expires, time, Instant::now());
+        }
     }
 
     /// The bearer of a native session. It lasts to the session's cap, and the session's row
@@ -233,12 +260,14 @@ impl IdentityService {
             nbf: time,
             exp: time + CENTRAL_TOKEN_SECONDS,
         };
-        signed(
-            self.tokens
-                .signing
-                .sign(&claims)
-                .map_err(|_| Error::Rejected)?,
-        )
+        let token = self
+            .tokens
+            .signing
+            .sign(&claims)
+            .map_err(|_| Error::Rejected)?;
+        // Central signed it: its first request needs no check either.
+        self.remember(verified::key(&token), capability, claims.exp, time);
+        signed(token)
     }
 
     /// A token for the gateway a client asked for. `audience` is that origin as asked for.

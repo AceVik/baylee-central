@@ -85,7 +85,7 @@ fn native<'a>(
 /// The capability inside a native session's signed token, as the account
 /// listener reads it.
 fn capability(service: &IdentityService, signed: &SignedToken) -> Token {
-    let Ok(Presented::Session(capability)) = service.present(&signed.bearer()) else {
+    let Ok(Presented::Session(capability)) = service.present(&signed.bearer(), None) else {
         panic!("a session's own token verifies");
     };
     capability
@@ -297,6 +297,90 @@ pub(crate) fn run(
     one_owner_s_tokens(service, store, &cookie, &bearer, runtime);
     after_a_restart(&restarted, &cookie, &bearer, runtime);
     replaced(service, http, &account, bearer, runtime);
+    made_up_signatures(service, &restarted, http, &account, &signed, runtime);
+}
+
+/// Made-up signed tokens, read as the account listener reads a bearer (`present`): each
+/// costs a signature check, of its place's quarter of the second's checks and then of all
+/// places' (`limits.rs`). A token Central issued or verified is not checked again
+/// (`verified.rs`), so a flood that spends every check leaves a session its requests, and a
+/// session that ended is still refused by the store.
+fn made_up_signatures(
+    service: &IdentityService,
+    restarted: &IdentityService,
+    http: &Http,
+    account: &password::Registered,
+    first: &SignedToken,
+    runtime: &Runtime,
+) {
+    const MADE_UP: &str = "Bearer a.b";
+    let quarter = 1_024 / 4;
+    let session = |presented: Result<Presented, Error>| match presented {
+        Ok(Presented::Session(capability)) => capability,
+        Ok(Presented::Credential(_)) => panic!("a signed token is no credential"),
+        Err(error) => panic!("a session's token beside the flood: {error:?}"),
+    };
+
+    // A Central that has verified nothing yet, and one address: a quarter of the second's
+    // checks, each refused at its signature, then nothing more is checked for it.
+    second();
+    let answers: Vec<_> = (0..1_024)
+        .map(|_| restarted.present(MADE_UP, Some(place(165))).err())
+        .collect();
+    assert!(
+        answers[..quarter]
+            .iter()
+            .all(|answer| *answer == Some(Error::Rejected))
+    );
+    assert!(
+        answers[quarter..]
+            .iter()
+            .all(|answer| *answer == Some(Error::Busy))
+    );
+    // Another address's real token is still checked, and verifies.
+    session(restarted.present(&first.bearer(), Some(place(166))));
+    // Four addresses spend the whole second: a fifth's token is not checked, nor one
+    // from no known place ...
+    for last in 167..=170 {
+        for _ in 0..quarter {
+            let _ = restarted.present(MADE_UP, Some(place(last)));
+        }
+    }
+    assert_eq!(
+        restarted.present(MADE_UP, Some(place(171))).err(),
+        Some(Error::Busy)
+    );
+    assert_eq!(restarted.present(MADE_UP, None).err(), Some(Error::Busy));
+    // ... but the token verified a moment ago needs no check.
+    session(restarted.present(&first.bearer(), Some(place(171))));
+
+    // A token Central issued needs no check even for its first request.
+    let (fresh, _) = password::sign_in(http, account.identity, OLD);
+    second();
+    for last in 167..=170 {
+        for _ in 0..quarter {
+            let _ = service.present(MADE_UP, Some(place(last)));
+        }
+    }
+    assert_eq!(
+        service.present(MADE_UP, Some(place(171))).err(),
+        Some(Error::Busy)
+    );
+    let live = session(service.present(&fresh.bearer(), Some(place(161))));
+    assert!(
+        runtime
+            .block_on(native(service, Request::SessionStatus, &live, place(161)))
+            .is_ok()
+    );
+    // The first token's session was replaced long ago. Its token is still read as what it
+    // says, without a check, and the store refuses the session it names.
+    let ended = session(service.present(&first.bearer(), Some(place(161))));
+    assert_eq!(
+        runtime
+            .block_on(native(service, Request::SessionStatus, &ended, place(161)))
+            .err(),
+        Some(Error::Rejected)
+    );
 }
 
 /// One account's gateway tokens are counted together. Four tokens of two

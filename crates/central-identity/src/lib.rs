@@ -46,6 +46,7 @@ pub use reports::PartUpload;
 mod reset;
 mod terms;
 mod tokens;
+mod verified;
 pub use tokens::{Presented, TokenKeys, credential_operation};
 
 /// A mailer as the service knows one ([`IdentityService::with_mailer`]):

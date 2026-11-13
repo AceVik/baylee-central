@@ -211,17 +211,23 @@ fn credential(headers: &HeaderMap, content_type: &str) -> Result<Option<Token>, 
         .transpose()
 }
 
-/// A credential or a signed session, on the route that takes both.
-fn presented(identity: &IdentityService, headers: &HeaderMap) -> Result<Option<Presented>, Error> {
+/// A credential or a signed session, on the route that takes both. A signed session's check
+/// is counted against `place`'s share of the signature checks (`limits.rs`).
+fn presented(
+    identity: &IdentityService,
+    headers: &HeaderMap,
+    place: Option<Place>,
+) -> Result<Option<Presented>, Error> {
     single_headers(headers, "application/json")?;
     headers
         .get(header::AUTHORIZATION)
-        .map(|h| identity.present(h.to_str().map_err(|_| Error::Rejected)?))
+        .map(|h| identity.present(h.to_str().map_err(|_| Error::Rejected)?, place))
         .transpose()
 }
 
 /// One native request from `from`: its bearer read first (a signed session is verified
-/// under its own budget, `limits.rs`), then its address's budget for the operation
+/// under its own budget and its address's share of it, unless Central issued or verified
+/// that token before, `limits.rs` and `verified.rs`), then its address's budget for the operation
 /// (`addresses.rs`), then the service, which is told the address for its guesses at
 /// passwords and its share of the requests without a session.
 async fn process(
@@ -230,7 +236,7 @@ async fn process(
     headers: &HeaderMap,
     body: &[u8],
 ) -> Result<Vec<u8>, Error> {
-    let presented = presented(&native.identity, headers)?;
+    let presented = presented(&native.identity, headers, from.map(Place::from))?;
     let request = central_api::decode(body)?;
     if let Some(client) = from {
         // The guard is gone before anything is awaited.

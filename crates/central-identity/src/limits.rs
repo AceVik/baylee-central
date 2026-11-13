@@ -55,8 +55,19 @@ pub(super) const PENDING: usize = 4096;
 const _: () = assert!(PENDING as u64 > PUBLIC_PER_SECOND as u64 * PENDING_SECONDS);
 
 /// Central tokens verified a second: above the control and data budgets together, so that
-/// no honest load meets it.
+/// no honest load meets it. A token Central issued or verified before is not verified again
+/// (`verified.rs`), so what reaches this is a session's first request after a restart, and
+/// whatever nobody issued.
 pub(super) const SIGNATURES_PER_SECOND: u32 = 1024;
+/// Such checks a second for one place, of those all share: a quarter, so that one address,
+/// or one IPv6 /48 ([`block`]), never spends what the others' first requests need. Four
+/// places together still can; the sessions whose token is remembered then go on unchecked.
+pub(super) const PLACE_SIGNATURES_PER_SECOND: u32 = SIGNATURES_PER_SECOND / 4;
+/// Places one second's signature checks remember. Never full of live seconds: a place is
+/// counted only once the shared window took its check, at most 1,024 a second.
+const SIGNERS: usize = 4_096;
+const _: () = assert!(SIGNERS > 2 * SIGNATURES_PER_SECOND as usize);
+const _: () = assert!(PLACE_SIGNATURES_PER_SECOND < SIGNATURES_PER_SECOND / 2);
 /// Reads of the key set a second. Each gateway reads it about every five minutes.
 pub(super) const JWKS_PER_SECOND: u32 = 256;
 /// Legacy sign-ins a minute, all names together: the store holds a handful
@@ -458,6 +469,10 @@ pub(super) struct Limits {
     reports: BTreeMap<[u8; 16], (Instant, u32)>,
     /// Signature checks of presented Central tokens.
     signatures: Window,
+    /// Each place's share of them, by its block ([`PLACE_SIGNATURES_PER_SECOND`]).
+    signers: BTreeMap<Place, Window>,
+    /// The Central tokens issued or verified here, which need no check (`verified.rs`).
+    pub(super) verified: super::verified::Verified,
     /// Reads of the key set.
     jwks: Window,
 }
@@ -665,8 +680,29 @@ impl Limits {
 
     /// Spend one signature check, before the work: a made-up token costs what any other
     /// request costs, and past this budget nothing is verified until the second is over.
-    pub(super) fn signature(&mut self, now: Instant) -> Result<(), Error> {
-        self.signatures.charge(now, SIGNATURES_PER_SECOND)
+    /// `place`'s block draws its share first ([`PLACE_SIGNATURES_PER_SECOND`]); a request
+    /// the listener knows no place of meets the shared budget alone. Nothing is spent when a
+    /// budget is used up.
+    pub(super) fn signature(&mut self, place: Option<Place>, now: Instant) -> Result<(), Error> {
+        let around = place.map(block);
+        if self.signers.len() >= SIGNERS {
+            self.signers.retain(|_, window| window.live(now));
+        }
+        let room = match around.and_then(|around| self.signers.get(&around)) {
+            Some(window) => window.fits(now, PLACE_SIGNATURES_PER_SECOND),
+            None => around.is_none() || self.signers.len() < SIGNERS,
+        };
+        if !room {
+            return Err(Error::Busy);
+        }
+        self.signatures.charge(now, SIGNATURES_PER_SECOND)?;
+        if let Some(around) = around {
+            self.signers
+                .entry(around)
+                .or_default()
+                .charge(now, PLACE_SIGNATURES_PER_SECOND)?;
+        }
+        Ok(())
     }
     /// Spend one read of the key set.
     pub(super) fn jwks(&mut self, now: Instant) -> Result<(), Error> {
@@ -1965,5 +2001,74 @@ mod tests {
         limits
             .account([1; 16], now + Duration::from_secs(60), 2)
             .unwrap();
+    }
+
+    const fn v4(last: u8) -> Place {
+        Place::V4([198, 51, 100, last])
+    }
+
+    #[test]
+    fn one_place_draws_a_quarter_of_the_signature_checks() {
+        let now = Instant::now();
+        let mut limits = Limits::default();
+        for _ in 0..PLACE_SIGNATURES_PER_SECOND {
+            limits.signature(Some(v4(1)), now).unwrap();
+        }
+        assert_eq!(limits.signature(Some(v4(1)), now), Err(Error::Busy));
+        // another place, and a request with no place, are still checked
+        limits.signature(Some(v4(2)), now).unwrap();
+        limits.signature(None, now).unwrap();
+        // and the place itself the next second
+        limits
+            .signature(Some(v4(1)), now + Duration::from_secs(1))
+            .unwrap();
+    }
+
+    #[test]
+    fn four_places_spend_the_second_and_nothing_is_checked_past_it() {
+        let now = Instant::now();
+        let mut limits = Limits::default();
+        for last in 1..=4 {
+            for _ in 0..PLACE_SIGNATURES_PER_SECOND {
+                limits.signature(Some(v4(last)), now).unwrap();
+            }
+        }
+        assert_eq!(limits.signature(Some(v4(5)), now), Err(Error::Busy));
+        assert_eq!(limits.signature(None, now), Err(Error::Busy));
+        limits
+            .signature(None, now + Duration::from_secs(1))
+            .unwrap();
+    }
+
+    #[test]
+    fn a_place_past_its_share_spends_nothing_of_what_all_share() {
+        let now = Instant::now();
+        let mut limits = Limits::default();
+        for _ in 0..3 * PLACE_SIGNATURES_PER_SECOND {
+            let _ = limits.signature(Some(v4(1)), now);
+        }
+        // three more places take the rest of the second, and exactly that
+        for last in 2..=4 {
+            for _ in 0..PLACE_SIGNATURES_PER_SECOND {
+                limits.signature(Some(v4(last)), now).unwrap();
+            }
+        }
+        assert_eq!(limits.signature(Some(v4(5)), now), Err(Error::Busy));
+    }
+
+    #[test]
+    fn the_64s_of_one_ipv6_48_share_one_share_of_the_signature_checks() {
+        let now = Instant::now();
+        let mut limits = Limits::default();
+        let at = |fifth: u8, sixth: u8, seventh: u8| {
+            Some(Place::V6([
+                0x20, 0x01, 0x0d, 0xb8, 0, fifth, sixth, seventh,
+            ]))
+        };
+        for seventh in 0..=u8::MAX {
+            limits.signature(at(1, 0, seventh), now).unwrap();
+        }
+        assert_eq!(limits.signature(at(1, 1, 0), now), Err(Error::Busy));
+        limits.signature(at(2, 0, 0), now).unwrap();
     }
 }

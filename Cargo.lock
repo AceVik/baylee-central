@@ -888,6 +888,7 @@ dependencies = [
  "central-picture",
  "central-postgres",
  "getrandom 0.4.3",
+ "sha2 0.11.1",
  "subtle",
  "tokio",
  "zeroize",
