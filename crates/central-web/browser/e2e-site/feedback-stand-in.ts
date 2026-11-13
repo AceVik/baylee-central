@@ -200,6 +200,8 @@ export type World = {
   gone: boolean;
   /** How the next request of this action ends instead: a status, or no answer after it was done. */
   next: Record<string, number | "lost">;
+  /** The next administration request is answered only once this settles: a change still on its way. */
+  hold: Promise<void> | null;
   /** The client part's JSON, or a status for its route. */
   client: unknown;
   record: Buffer;
@@ -216,6 +218,7 @@ export function world(more: Partial<World> = {}): World {
     staleUnseen: false,
     gone: false,
     next: {},
+    hold: null,
     client: CLIENT(),
     record: gzipSync(Buffer.from('{"seq":1}\n')),
     parts: [],
@@ -548,9 +551,13 @@ export async function open(page: Page, w: World, path: string): Promise<Opened> 
           source: "registered", recovery: true, admin: w.admin, signed_in_at: w.stale ? now - 3600 : now - 60, expires_at: 4_102_444_800,
         });
       case "admin": {
-        const result = answer(w, body.request ?? {});
-        if (result === "lost") return route.abort();
-        return "status" in result ? refused(result.status) : json(result.json);
+        const held = w.hold ?? Promise.resolve();
+        w.hold = null;
+        return held.then(() => {
+          const result = answer(w, body.request ?? {});
+          if (result === "lost") return route.abort();
+          return "status" in result ? refused(result.status) : json(result.json);
+        });
       }
       case "login_start":
         return json({ result: "login_challenge", attempt: Array(32).fill(7), message: Array.from({ length: 320 }, (_, i) => (i * 37) % 251) });

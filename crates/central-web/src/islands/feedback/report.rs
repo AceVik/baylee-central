@@ -216,13 +216,15 @@ impl Rep {
     }
 
     /// A change to the report's triage, at the revision it was read at;
-    /// the keyboard goes back to `at` once it is drawn again.
-    fn change(self, change: ReportChange, at: String) {
+    /// the keyboard goes back to `at` once it is drawn again. Whether it
+    /// was sent: not while another change is on its way, so that a field
+    /// keeps what was typed until it is.
+    fn change(self, change: ReportChange, at: String) -> bool {
         if self.busy.get_untracked() || change.validate(false).is_err() {
-            return;
+            return false;
         }
         let Some(revision) = self.with(|d| d.summary.revision) else {
-            return;
+            return false;
         };
         self.busy.set(true);
         self.error.set(None);
@@ -238,6 +240,7 @@ impl Rep {
             }
             let _ = self.busy.try_set(false);
         });
+        true
     }
 
     /// A request answered with the report: a note added or removed.
@@ -812,7 +815,7 @@ fn chips_view(r: &Rep) -> impl IntoView + use<> {
                         <button type="button" class="chip-btn" id=id aria-pressed=(now == s).to_string()
                             aria-disabled=(now == s).then_some("true")
                             on:click=move |_| if now != s {
-                                r.change(ReportChange { status: Some(s), ..ReportChange::default() }, at.clone());
+                                let _ = r.change(ReportChange { status: Some(s), ..ReportChange::default() }, at.clone());
                             }>{status_word(lang, s)}</button>
                     }
                 })
@@ -841,7 +844,7 @@ fn chips_view(r: &Rep) -> impl IntoView + use<> {
                         <button type="button" class="chip-btn" id=id aria-pressed=(current == p).to_string()
                             aria-disabled=(current == p).then_some("true")
                             on:click=move |_| if current != p {
-                                r.change(ReportChange { priority: Some(p), ..ReportChange::default() }, at.clone());
+                                let _ = r.change(ReportChange { priority: Some(p), ..ReportChange::default() }, at.clone());
                             }>{priority_text(lang, p)}</button>
                     }
                 })
@@ -886,12 +889,12 @@ fn assignee_view(r: &Rep) -> impl IntoView + use<> {
                     let v = event_target_value(&ev);
                     let whom = super::text::id_of(&v);
                     if whom != now() && (v.is_empty() || whom.is_some()) {
-                        r.change(ReportChange { assignee: Some(whom), ..ReportChange::default() }, "#fb-assignee".into());
+                        let _ = r.change(ReportChange { assignee: Some(whom), ..ReportChange::default() }, "#fb-assignee".into());
                     }
                 }>{options}</select>
                 {move || (now() != Some(me)).then(|| view! {
-                    <button type="button" class="button button-ghost button-sm" on:click=move |_| {
-                        r.change(ReportChange { assignee: Some(Some(me)), ..ReportChange::default() }, "#fb-assignee".into());
+                    <button type="button" class="button button-ghost button-sm" aria-disabled=move || r.busy.get().then_some("true") on:click=move |_| {
+                        let _ = r.change(ReportChange { assignee: Some(Some(me)), ..ReportChange::default() }, "#fb-assignee".into());
                     }>{words::fb_assign_me(lang)}</button>
                 })}
             </div>
@@ -915,8 +918,8 @@ fn labels_view(r: &Rep) -> impl IntoView + use<> {
                     view! {
                         <li>
                             <a class="fb-label" href=href translate="no">{label.clone()}</a>
-                            <button type="button" class="round-btn" on:click=move |_| {
-                                r.change(ReportChange { labels: Some(rest.clone()), ..ReportChange::default() }, "#fb-label-new".into());
+                            <button type="button" class="round-btn" aria-disabled=move || r.busy.get().then_some("true") on:click=move |_| {
+                                let _ = r.change(ReportChange { labels: Some(rest.clone()), ..ReportChange::default() }, "#fb-label-new".into());
                             }>
                                 {glyph::glyph(glyph::CLOSE)}<span class="visually-hidden">{remove}</span>
                             </button>
@@ -944,14 +947,15 @@ fn labels_view(r: &Rep) -> impl IntoView + use<> {
         }
         all.push(label);
         all.sort();
-        r.label.set(String::new());
-        r.change(
+        if r.change(
             ReportChange {
                 labels: Some(all),
                 ..ReportChange::default()
             },
             "#fb-label-new".into(),
-        );
+        ) {
+            r.label.set(String::new());
+        }
     };
     // the labels in use, offered once the field is first reached
     let known = move || {
@@ -991,7 +995,7 @@ fn labels_view(r: &Rep) -> impl IntoView + use<> {
                         r.label_bad.set(false);
                     } />
                 <datalist id="fb-labels-known">{known}</datalist>
-                <button type="submit" class="button button-ghost button-sm">{words::fb_add_label(lang)}</button>
+                <button type="submit" class="button button-ghost button-sm" aria-disabled=move || r.busy.get().then_some("true")>{words::fb_add_label(lang)}</button>
             </form>
             <p class="error" id="fb-label-bad" role="alert">{move || r.label_bad.get().then(|| words::fb_bad_label(lang))}</p>
             {move || full().then(|| view! { <p class="meta">{words::fb_labels_full(lang, &MAX_LABELS.to_string())}</p> })}
@@ -1008,14 +1012,15 @@ fn duplicate_view(r: &Rep) -> impl IntoView + use<> {
         if let Some(target) = read_report_id(&r.dup.get_untracked()).filter(|found| *found != r.id)
         {
             r.dup_bad.set(false);
-            r.dup.set(String::new());
-            r.change(
+            if r.change(
                 ReportChange {
                     duplicate_of: Some(Some(target)),
                     ..ReportChange::default()
                 },
                 "#fb-not-duplicate".into(),
-            );
+            ) {
+                r.dup.set(String::new());
+            }
         } else {
             r.dup_bad.set(true);
             focus::after_render("#fb-duplicate");
@@ -1028,8 +1033,8 @@ fn duplicate_view(r: &Rep) -> impl IntoView + use<> {
                 <p class="fb-legend">{words::fb_duplicate_of(lang)}</p>
                 <div class="fb-inline">
                     <a href=report_path(r.code(), &of, &r.query.get_value())><code>{format!("…{}", short_id(&of))}</code></a>
-                    <button type="button" class="button button-ghost button-sm" id="fb-not-duplicate" on:click=move |_| {
-                        r.change(ReportChange { duplicate_of: Some(None), ..ReportChange::default() }, "#fb-duplicate".into());
+                    <button type="button" class="button button-ghost button-sm" id="fb-not-duplicate" aria-disabled=move || r.busy.get().then_some("true") on:click=move |_| {
+                        let _ = r.change(ReportChange { duplicate_of: Some(None), ..ReportChange::default() }, "#fb-duplicate".into());
                     }>{words::fb_not_duplicate(lang)}</button>
                 </div>
             </div>
@@ -1045,7 +1050,7 @@ fn duplicate_view(r: &Rep) -> impl IntoView + use<> {
                             r.dup.set(event_target_value(&ev));
                             r.dup_bad.set(false);
                         } />
-                    <button type="submit" class="button button-ghost button-sm">{words::fb_mark(lang)}</button>
+                    <button type="submit" class="button button-ghost button-sm" aria-disabled=move || r.busy.get().then_some("true")>{words::fb_mark(lang)}</button>
                 </div>
                 <p class="hint" id="fb-duplicate-hint">{words::fb_duplicate_hint(lang)}</p>
                 <p class="error" role="alert">{move || r.dup_bad.get().then(|| words::fb_bad_duplicate(lang))}</p>
@@ -1123,14 +1128,15 @@ fn issue_view(r: &Rep) -> impl IntoView + use<> {
         ev.prevent_default();
         if let Some(n) = parse_issue(&r.issue.get_untracked()) {
             r.issue_bad.set(false);
-            r.issue.set(String::new());
-            r.change(
+            if r.change(
                 ReportChange {
                     issue: Some(Some(n)),
                     ..ReportChange::default()
                 },
                 "#fb-unlink".into(),
-            );
+            ) {
+                r.issue.set(String::new());
+            }
         } else {
             r.issue_bad.set(true);
             focus::after_render("#fb-issue");
@@ -1143,8 +1149,8 @@ fn issue_view(r: &Rep) -> impl IntoView + use<> {
                 <a class="fb-issue" href=href target="_blank" rel="noopener noreferrer">
                     {format!("#{n}")}{glyph::glyph(EXTERNAL)}<span class="visually-hidden">{" "}{words::fb_new_tab(lang)}</span>
                 </a>
-                <button type="button" class="button button-ghost button-sm" id="fb-unlink" on:click=move |_| {
-                    r.change(ReportChange { issue: Some(None), ..ReportChange::default() }, "#fb-issue".into());
+                <button type="button" class="button button-ghost button-sm" id="fb-unlink" aria-disabled=move || r.busy.get().then_some("true") on:click=move |_| {
+                    let _ = r.change(ReportChange { issue: Some(None), ..ReportChange::default() }, "#fb-issue".into());
                 }>{words::fb_unlink(lang)}</button>
             </div>
         }
@@ -1159,7 +1165,7 @@ fn issue_view(r: &Rep) -> impl IntoView + use<> {
                             r.issue.set(event_target_value(&ev));
                             r.issue_bad.set(false);
                         } />
-                    <button type="submit" class="button button-ghost button-sm">{words::fb_link(lang)}</button>
+                    <button type="submit" class="button button-ghost button-sm" aria-disabled=move || r.busy.get().then_some("true")>{words::fb_link(lang)}</button>
                 </div>
                 <p class="hint" id="fb-issue-hint">{words::fb_issue_hint(lang)}</p>
                 <p class="error" role="alert">{move || r.issue_bad.get().then(|| words::fb_bad_issue(lang))}</p>

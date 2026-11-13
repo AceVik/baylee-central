@@ -18,6 +18,8 @@ test.use({ serviceWorkers: "block" });
 const button = (page: Page, name: string) => page.getByRole("button", { name, exact: true });
 const section = (page: Page, name: string) => page.getByRole("region", { name, exact: true });
 const lastChange = (seen: Parameters<typeof asked>[0]) => asked(seen).findLast((r) => r["action"] === "set_report");
+/** No change is on its way: a field's Enter sends again (a click on a control waits for this by itself). */
+const settled = (page: Page) => expect(button(page, "Add a label")).not.toHaveAttribute("aria-disabled", "true");
 
 /** Tab leads through `stops` in this order, starting behind `from`. */
 async function tabs(page: Page, from: Locator, stops: Locator[]) {
@@ -102,6 +104,7 @@ test("triage: each change is one request at the revision read; a conflict and a 
   await expect(button(page, "Assign to me")).toHaveCount(0);
   await page.locator("#fb-assignee").selectOption("");
   await expect.poll(() => lastChange(o.seen)).toEqual({ action: "set_report", report: id(15), change: { assignee: null }, expected_revision: 6 });
+  await settled(page);
 
   // labels: the whole set; a label Central would refuse is not sent
   const before = o.seen.length;
@@ -115,13 +118,25 @@ test("triage: each change is one request at the revision read; a conflict and a 
   await expect.poll(() => lastChange(o.seen)).toEqual({ action: "set_report", report: id(15), change: { labels: ["needs-repro"] }, expected_revision: 7 });
   await expect(page.locator(".fb-label-list a")).toHaveText("needs-repro");
   await expect(page.locator(".fb-label-list a")).toHaveAttribute("href", `${LIST}?label=needs-repro`);
+  // its answer held back: the change is on its way while a duplicate is pasted
+  const { promise: held, resolve: release } = Promise.withResolvers<void>();
+  w.hold = held;
   await page.getByRole("button", { name: "Remove the label needs-repro" }).click();
   await expect.poll(() => lastChange(o.seen)).toEqual({ action: "set_report", report: id(15), change: { labels: [] }, expected_revision: 8 });
+  await expect(button(page, "Mark")).toHaveAttribute("aria-disabled", "true");
 
-  // a duplicate, pasted as an address; and not one
-  await page.locator("#fb-duplicate").fill(`https://baylee.app${at(12)}`);
+  // a duplicate, pasted as an address: an Enter meanwhile sends nothing and keeps what was typed
+  const address = `https://baylee.app${at(12)}`;
+  await page.locator("#fb-duplicate").fill(address);
+  await page.locator("#fb-duplicate").press("Enter");
+  await expect(page.locator("#fb-duplicate")).toHaveValue(address);
+  expect(lastChange(o.seen)).toEqual({ action: "set_report", report: id(15), change: { labels: [] }, expected_revision: 8 });
+  release();
+  await expect(page.locator(".fb-label-list a")).toHaveCount(0);
+  await settled(page);
   await page.locator("#fb-duplicate").press("Enter");
   await expect.poll(() => lastChange(o.seen)).toEqual({ action: "set_report", report: id(15), change: { duplicate_of: id(12) }, expected_revision: 9 });
+  // and not one
   await button(page, "Not a duplicate").click();
   await expect.poll(() => lastChange(o.seen)).toEqual({ action: "set_report", report: id(15), change: { duplicate_of: null }, expected_revision: 10 });
   await page.locator("#fb-duplicate").fill(hex(id(15)));
