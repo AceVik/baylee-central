@@ -93,3 +93,42 @@ pub enum ExportEntry {
         attempt: ExportedAttempt,
     },
 }
+
+impl ExportEntry {
+    /// Dataset and stable cursor of this row.
+    #[must_use]
+    pub const fn key(&self) -> (ExportTable, [u8; 16]) {
+        match self {
+            Self::Participation { progress } => (ExportTable::Participation, progress.challenge),
+            Self::Attempt { attempt } => (ExportTable::Attempts, attempt.id),
+        }
+    }
+}
+
+/// Validate an export page before following its cursor or handing rows to a caller.
+///
+/// # Errors
+/// Wrong dataset, invalid or nonascending identities, oversized pages or inconsistent cursor.
+pub fn validate_page(
+    table: ExportTable,
+    previous: Option<[u8; 16]>,
+    entries: &[ExportEntry],
+    next: Option<[u8; 16]>,
+) -> Result<(), crate::Error> {
+    if entries.len() > super::PAGE_SIZE {
+        return Err(crate::Error::Rejected);
+    }
+    let mut last = previous;
+    for entry in entries {
+        let (kind, id) = entry.key();
+        if kind != table || !super::validation::uuid_v7(&id) || last.is_some_and(|last| id <= last)
+        {
+            return Err(crate::Error::Rejected);
+        }
+        last = Some(id);
+    }
+    if next.is_some() && (entries.len() != super::PAGE_SIZE || next != last) {
+        return Err(crate::Error::Rejected);
+    }
+    Ok(())
+}

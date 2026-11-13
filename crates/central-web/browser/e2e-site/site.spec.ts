@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { readFileSync } from "node:fs";
 
 import { axe, targets, watch } from "./check.ts";
 
@@ -6,6 +7,7 @@ const PAGES = [
   "",
   "download",
   "gateways",
+  "challenges",
   "faq",
   "security",
   "contact",
@@ -26,6 +28,15 @@ const PAGES = [
 ];
 const LANGS = ["en", "de"];
 const WIDTHS = [320, 375, 768, 1024, 1440, 2560];
+
+test.beforeEach(async ({ page }) => {
+  await page.route("**/api/v1", (route) => {
+    const body = route.request().postDataJSON() as { operation: string; request?: { action: string } };
+    if (body.operation !== "challenges" || body.request?.action !== "catalogue") return route.fallback();
+    const feed: unknown = JSON.parse(readFileSync(new URL("../../../central-web-server/tests/data/challenges.json", import.meta.url), "utf8"));
+    return route.fulfill({ json: { result: "challenges", response: { answer: "catalogue", ...(feed as object) } } });
+  });
+});
 
 for (const lang of LANGS) {
   for (const slug of PAGES) {

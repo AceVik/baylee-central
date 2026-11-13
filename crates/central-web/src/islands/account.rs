@@ -573,6 +573,10 @@ fn export_view(lang: Lang, worker: String) -> impl IntoView {
                     let file = super::email::export_file(&data, email.as_ref()).and_then(|file| {
                         super::picture::merged(&file, held.as_ref(), filed.as_deref())
                     });
+                    let file = match file {
+                        Some(file) => super::challenges::export::merged(&file).await.ok(),
+                        None => None,
+                    };
                     export.set(Some(file.ok_or(Problem::Failed)));
                 }
                 Ok(_) => export.set(Some(Err(Problem::Failed))),

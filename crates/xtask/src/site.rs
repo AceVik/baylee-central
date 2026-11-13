@@ -30,7 +30,7 @@ use crate::fail::{Fail, OrFail, Result};
 use crate::{process, random, wasm, workspace};
 
 /// The stylesheets, in the order they are joined.
-pub const STYLES: [&str; 17] = [
+pub const STYLES: [&str; 18] = [
     "tokens.css",
     "base.css",
     "buttons.css",
@@ -41,6 +41,7 @@ pub const STYLES: [&str; 17] = [
     "pages.css",
     "home.css",
     "gateways.css",
+    "challenges.css",
     "album.css",
     "footer.css",
     "app.css",

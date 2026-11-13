@@ -3,13 +3,17 @@
 
 mod calendar;
 mod personal;
+#[cfg(test)]
+mod personal_tests;
 mod progress;
 #[cfg(test)]
 mod tests;
 mod validation;
 
 pub use calendar::{Kind, Period};
-pub use personal::{ExportEntry, ExportTable, ExportedAttempt, TaskProgress};
+pub use personal::{
+    ExportEntry, ExportTable, ExportedAttempt, TaskProgress, validate_page as validate_export_page,
+};
 pub use progress::{Badge, BadgeKind, Tier};
 use serde::{Deserialize, Serialize};
 

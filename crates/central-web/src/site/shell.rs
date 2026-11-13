@@ -601,6 +601,7 @@ fn bar(page: Page, cx: &Context<'_>) -> impl IntoView + use<> {
                 <nav class="nav" id="nav" popover="auto" aria-label=words::nav_label(lang)>
                     {nav_link(Page::Download, page, lang, words::nav_download(lang))}
                     {nav_link(Page::Gateways, page, lang, words::nav_gateways(lang))}
+                    {nav_link(Page::Challenges, page, lang, words::ch_title(lang))}
                     {nav_link(Page::Security, page, lang, words::nav_security(lang))}
                     {nav_link(Page::Faq, page, lang, words::nav_faq(lang))}
                     {nav_link(Page::Contact, page, lang, words::nav_contact(lang))}
@@ -698,6 +699,7 @@ fn footer(page: Page, cx: &Context<'_>) -> impl IntoView + use<> {
                             <ul class="foot-list">
                                 {link(Page::Download, words::nav_download(lang))}
                                 {link(Page::Gateways, words::nav_gateways(lang))}
+                                {link(Page::Challenges, words::ch_title(lang))}
                                 {link(Page::Faq, words::nav_faq(lang))}
                                 {link(Page::Security, words::nav_security(lang))}
                                 {away(DISCORD.to_owned(), words::foot_discord(lang))}

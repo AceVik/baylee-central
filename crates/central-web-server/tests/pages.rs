@@ -945,7 +945,7 @@ async fn the_privacy_notice_has_a_part_for_the_e_mail_address() {
     let (_, _, english) = get(&app, "/en/privacy", &[]).await;
     assert!(english.contains("An e-mail address is optional; an account needs none."));
     assert!(english.contains("you need no e-mail address"));
-    assert!(english.contains("As of 12 November 2026"));
+    assert!(english.contains("As of 13 November 2026"));
     let (_, _, german) = get(&app, "/de/privacy", &[]).await;
     assert!(german.contains("Eine E-Mail-Adresse ist freiwillig; ein Account braucht keine."));
     assert!(german.contains("eine E-Mail-Adresse brauchst du nicht"));
