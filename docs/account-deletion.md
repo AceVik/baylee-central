@@ -33,6 +33,21 @@ Central cannot read the encrypted data, so an export has two halves:
   website (M4) can offer only the metadata until its Worker holds the key
   after a sign-in, as for a password change.
 
+## Challenge metadata
+
+Daily/Weekly challenge metadata is read separately with the account-owned
+`Challenges::Export { table, after }` operation. `participation` includes hint and
+leaderboard preferences, starts/failures, completion, badge qualification and the
+personal best; `attempts` includes state, claim/game identity, turns, timing and
+receipt time. Each page holds at most thirty rows and an exclusive UUID cursor.
+The older `AccountExport` shape is unchanged. No solution, hidden setup or game
+record is returned by this metadata export. These are the same non-secret fields
+the authenticated account can read in its challenge view.
+
+Migration 000028 binds participation, attempts and completion rows to the account
+with deletion cascades. Deleting the account removes its scores from rankings and
+its progress from the live database; the shared task definition remains.
+
 ## Deletion (Art. 17)
 
 A stolen session must not delete an account, so deletion carries a fresh

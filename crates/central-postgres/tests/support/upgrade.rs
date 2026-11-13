@@ -12,6 +12,7 @@
 //! is rolled back.
 use super::scalar;
 use sea_orm::{ConnectionTrait, DatabaseConnection, TransactionTrait};
+mod challenges;
 
 const PRIOR: [&str; 6] = [
     include_str!("../../../central-migration/src/m20261019_000001_pending_accounts.sql"),
@@ -137,6 +138,7 @@ pub(crate) async fn run(operator: &DatabaseConnection) {
     activity(&tx).await;
     email(&tx).await;
     pictures(&tx).await;
+    challenges::run(&tx).await;
     tx.rollback().await.unwrap();
     assert_eq!(
         scalar(

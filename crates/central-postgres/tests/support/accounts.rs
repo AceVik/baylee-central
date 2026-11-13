@@ -12,6 +12,7 @@ use central_postgres::{AccountStore, Credential};
 use sea_orm::{ConnectionTrait, DatabaseConnection, DbBackend, Statement};
 
 mod admin;
+mod challenges;
 mod chat;
 mod deletion;
 mod email;
@@ -150,6 +151,7 @@ pub(crate) async fn run(operator: &DatabaseConnection) {
     notifications::run(&store, operator, &keys).await;
     email::run(&store, operator, &keys).await;
     pictures::run(&store, operator, &keys).await;
+    challenges::run(&store, operator, &keys).await;
     // Last: its sweep deletes every unenrolled legacy reservation.
     legacy_store::run(&store, operator, &keys).await;
     store.close().await.unwrap();

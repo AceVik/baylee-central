@@ -90,3 +90,9 @@ GRANT SELECT, INSERT ON central_identity.picture_reports TO central_runtime;
 GRANT UPDATE (state, decided_at, decided_by) ON central_identity.picture_reports TO central_runtime;
 GRANT SELECT, INSERT, UPDATE, DELETE ON central_identity.picture_notices TO central_runtime;
 GRANT SELECT, INSERT, UPDATE ON central_identity.picture_budgets TO central_runtime;
+
+-- Global daily/weekly tasks: frozen publications may only be withdrawn.
+GRANT SELECT, INSERT ON central_identity.challenges TO central_runtime;
+GRANT UPDATE (withdrawn) ON central_identity.challenges TO central_runtime;
+GRANT SELECT, INSERT, UPDATE, DELETE ON central_identity.challenge_participation,
+    central_identity.challenge_attempts, central_identity.challenge_completions TO central_runtime;

@@ -57,8 +57,12 @@ impl AccountStore {
              ('pictures', ARRAY['SELECT','INSERT','DELETE'], ARRAY['key','avif','png','sequence','sha256','side','set_at']),
              ('picture_reports', ARRAY['SELECT','INSERT'], ARRAY['state','decided_at','decided_by']),
              ('picture_notices', ARRAY['SELECT','INSERT','UPDATE','DELETE'], NULL),
-             ('picture_budgets', ARRAY['SELECT','INSERT','UPDATE'], NULL))
-             SELECT count(*) = 42 AND bool_and(
+             ('picture_budgets', ARRAY['SELECT','INSERT','UPDATE'], NULL),
+             ('challenges', ARRAY['SELECT','INSERT'], ARRAY['withdrawn']),
+             ('challenge_participation', ARRAY['SELECT','INSERT','UPDATE','DELETE'], NULL),
+             ('challenge_attempts', ARRAY['SELECT','INSERT','UPDATE','DELETE'], NULL),
+             ('challenge_completions', ARRAY['SELECT','INSERT','UPDATE','DELETE'], NULL))
+             SELECT count(*) = 46 AND bool_and(
                NOT pg_catalog.pg_has_role(c.relowner, 'USAGE')
                AND (SELECT bool_and(pg_catalog.has_table_privilege(c.oid, p)) FROM unnest(r.privileges) p)
                AND NOT pg_catalog.has_table_privilege(c.oid, 'TRUNCATE, REFERENCES, TRIGGER, MAINTAIN, SELECT WITH GRANT OPTION, INSERT WITH GRANT OPTION, UPDATE WITH GRANT OPTION, DELETE WITH GRANT OPTION')

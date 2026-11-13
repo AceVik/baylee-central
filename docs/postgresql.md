@@ -93,6 +93,19 @@ change, idempotent retry, foreign-owner access, role restrictions and cancelled
 transactions. Run native clients on Linux, Windows and macOS; Linux-hosted
 PostgreSQL in CI may serve that cross-platform adapter suite.
 
+## Challenge identifiers (migration 000028)
+
+Daily/Weekly tasks and attempts have database-generated UUIDv7 primary keys.
+Two external references are explicit exceptions: `request_id` is the native or
+browser client's UUIDv7 idempotency key, unique per authenticated account;
+`game_id` is the official game host's UUIDv7, unique across claimed attempts.
+Neither grants access. The first is bound to the session account and cannot
+change its challenge; the second is supplied only by the official bridge and
+must match every reported result. Repeated claims retain the original game ID.
+All three account-owned challenge tables cascade on account deletion. Publications
+are immutable: runtime may insert and read, or update `withdrawn` only.
+See [challenges](challenges.md) for scoring and transaction boundaries.
+
 ## Account chat identifiers
 
 The social tables added by migrations 000019–000021 use account UUID foreign

@@ -4,6 +4,7 @@
 #![forbid(unsafe_code)]
 
 pub mod admin;
+pub mod challenges;
 pub mod chat;
 pub mod email;
 mod endpoint;
