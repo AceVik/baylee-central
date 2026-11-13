@@ -635,7 +635,7 @@ Not changed here; listed for the owner:
    Repaired on 11.11.2026 (the owner asked for the protection to be mended
    and improved): the rewrite had lost two of the service's three aids, and
    no test held them. Back, and held by `pages.rs` and
-   `web/e2e-site/impressum.spec.ts`: the bait link to
+   `crates/central-web/browser/e2e-site/impressum.spec.ts`: the bait link to
    `/site/impressum/kontakt` (hidden from people by `hidden`, a class,
    `aria-hidden` and `tabindex="-1"`; whatever follows it gets invented
    details for a day) and the third yes-or-no answer about the browser (a
@@ -721,7 +721,7 @@ Relayed later the same day by the parent session:
   one `h1`, canonical, hreflang, OpenGraph, JSON-LD that parses, no inline
   style or script, sized pictures, the Fan Content notice, nothing from
   elsewhere; addresses and status codes; the download by machine), and
-  `web/e2e-site` (Playwright, CI job `site`).
+  `crates/central-web/browser/e2e-site` (Playwright, CI job `site`).
 
 **Measured (10.11.2026, local, Lighthouse 13.5.0, behind gzip as Caddy
 encodes):**
@@ -772,17 +772,17 @@ address (staging).
   come with the PWA (phase 4).
 - **Tests**: unit tests of the form rules and term selection; server tests
   that every form and account page is an island page, `noindex`, one `h1`;
-  `web/e2e-site/account.spec.ts` drives a sign-in through the real
+  `crates/central-web/browser/e2e-site/account.spec.ts` drives a sign-in through the real
   WebAssembly in its Worker against a stand-in Central that cannot answer
   OPAQUE truthfully (the Worker must refuse, the page must say "wrong
   sign-in", the password must appear in no request), the registration's
   early refusals and the signed-out account area; axe-core and the 44 px
   check now cover the forms and the account pages too.
 - **Not verified here**: a full sign-in and registration against a real
-  Central (`web/e2e-real` describes that setup: PostgreSQL 18 with TLS,
+  Central (`crates/central-web/browser/e2e-real` describes that setup: PostgreSQL 18 with TLS,
   Central in its deployed mode, a TLS stand-in for baylee.app). It is the
   first thing to run on staging before this replaces the old pages.
-  *Done in phase 4*: `web/e2e-real/site-chat.spec.ts` (§13).
+  *Done in phase 4*: `crates/central-web/browser/e2e-real/site-chat.spec.ts` (§13).
 
 ## 13. As built: phase 4 (the messenger and the app)
 
@@ -971,13 +971,13 @@ AVIF, behind the HTML, the stylesheet and three faces on simulated slow
 **Tests.**
 
 - Native units: model, wire checks, base64, times, push.
-- `web/e2e-site/chat.spec.ts`: a stand-in Central and a canned Worker.
+- `crates/central-web/browser/e2e-site/chat.spec.ts`: a stand-in Central and a canned Worker.
   Covers hostile markup kept as text, axe and 44 px with a conversation and
   its details open, the keyboard, changed keys and 320 px.
-- `web/e2e-site/pwa.spec.ts`: offline in German, the cache's contents, and
+- `crates/central-web/browser/e2e-site/pwa.spec.ts`: offline in German, the cache's contents, and
   an update served by a server of its own. The update waits, warns, then
   reloads into the new cache.
-- `web/e2e-real/site-chat.spec.ts` against a real Central, PostgreSQL 18
+- `crates/central-web/browser/e2e-real/site-chat.spec.ts` against a real Central, PostgreSQL 18
   and the committed crypto module, desktop and phone, the service worker
   registered. Two accounts register, become contacts by handle, write both
   ways, reload without a password, compare equal safety numbers, share,
@@ -1186,9 +1186,9 @@ do neither. Nothing on the wire and nothing in Central changed.
   six others the same day), with each language's own vocabulary and a new
   word for "vault". No speaker has read them.
 - **Tests.** Unit tests of every decision the two forms make, server tests
-  of the page and its links, `web/e2e-site/reset.spec.ts` and
+  of the page and its links, `crates/central-web/browser/e2e-site/reset.spec.ts` and
   `password.spec.ts` with a stand-in Central and the real Worker, and
-  `web/e2e-real/site-reset.spec.ts` and `site-password.spec.ts` against a
+  `crates/central-web/browser/e2e-real/site-reset.spec.ts` and `site-password.spec.ts` against a
   real Central ([security assurance](../security-assurance.md), "The website
   redeems a reset code and changes a password").
 
@@ -1248,7 +1248,7 @@ when this was written, the service refused both new requests.
   paragraph "E-mail address" after "Your account", and its date is the
   12th.
 - **Tests.** Unit tests of every decision the section and the block make
-  and of the requests' JSON, `web/e2e-site/email.spec.ts` (every state and
+  and of the requests' JSON, `crates/central-web/browser/e2e-site/email.spec.ts` (every state and
   transition against a stand-in that keeps an address as the contract
   describes it; the sign-in once more in a canned Worker, a wrong password
   in the real one) and the block's tests in `reset.spec.ts`: at both sizes,
@@ -1306,10 +1306,10 @@ makes a reset code for an account, which until now only the old build's
   `error-*`, `account-home`.
 - **Tests.** Unit tests of every decision; a server test that the page
   exists in every language, is not indexed, not in the sitemap and linked
-  from no page the server renders; `web/e2e-site/admin.spec.ts` against a
+  from no page the server renders; `crates/central-web/browser/e2e-site/admin.spec.ts` against a
   stand-in that refuses as Central's store does, at both sizes, at 320 px,
   in German, with the 44 px targets, the keyboard order and axe in both
-  schemes; `web/e2e-real/site-reset.spec.ts` makes its codes through the
+  schemes; `crates/central-web/browser/e2e-real/site-reset.spec.ts` makes its codes through the
   page now (`issue` in `site.ts` drives it), which this change could
   type-check but not run.
 
@@ -1335,7 +1335,7 @@ first paint. The switch shows the sun or the moon of the scheme on screen
 and names it ("Colours: light", "Colours: dark"); while nothing is chosen
 it follows the device changing under an open page. Without script the
 switch stays hidden, as before, and the device decides. `theme-system` and
-the half-filled glyph are gone. `web/e2e-site/theme.spec.ts` presses it
+the half-filled glyph are gone. `crates/central-web/browser/e2e-site/theme.spec.ts` presses it
 once on a dark and on a light device, with nothing, light or dark kept,
 on both sizes (the phone's switch is in the menu), checks the scheme on
 screen, what is kept, and that the kept one is on the root before the body
@@ -1377,7 +1377,7 @@ three short counts (the gateways' cell needs half a line), so that no line
 differs from another by more than one
 cell, the shorter is centred and no cell stands alone. A cell is as wide as
 its share of the line, so two lines' columns stand in line.
-`web/e2e-site/strip.spec.ts` holds the order, the absence of GitHub, axe
+`crates/central-web/browser/e2e-site/strip.spec.ts` holds the order, the absence of GitHub, axe
 and the 44 px targets, and measures the lines for all sixteen sets of
 silent sources at ten widths from 320 to 2560 px (and a phone's own) in
 all eleven languages: counts per line, centring, equal gaps, nothing
@@ -1446,7 +1446,7 @@ are `home.js` and `album.css`; neither has words, so no language changed.
   transform, opacity and `--ratio` through the CSSOM); nothing hovers into
   motion. With less motion asked for, the book is open or shut and the
   photograph changed at once, and nothing follows a finger.
-- **Tests.** `web/e2e-site/album.spec.ts`: every way in and out of the
+- **Tests.** `crates/central-web/browser/e2e-site/album.spec.ts`: every way in and out of the
   book with the order of its states, focus back on the logo, every
   photograph by the buttons, the arrow keys and synthetic touch strokes,
   the falls back, the zoomed finger, the browser's own input (a mouse's
@@ -1515,7 +1515,7 @@ a recovery code".
 - **Reduced motion** now stops the dialogs' backdrop too (`*::backdrop` in
   `base.css`): its colour faded under reduced motion, which `schemes`
   found once the registration's dialog was measured in both schemes.
-- **Tests.** `web/e2e-site/recovery.spec.ts`: the whole registration in
+- **Tests.** `crates/central-web/browser/e2e-site/recovery.spec.ts`: the whole registration in
   the real island against a stand-in Central and a canned crypto Worker;
   every way, the code once in the page before any click, the `mailto:`
   address (to the typed address and to nobody), the file's content, the
@@ -1576,7 +1576,7 @@ a recovery code".
   image or import (its `url(#…)` name its own gradients). Server: 200,
   the type, the exact bytes, no redirect, no cookie, revalidated, in both
   modes; `/en/bimi/…`, `/bimi/`, a trailing slash and another name are
-  not it. `web/e2e-site/bimi.spec.ts`: the same over HTTP with and
+  not it. `crates/central-web/browser/e2e-site/bimi.spec.ts`: the same over HTTP with and
   without `br` and `gzip`, and the footer's mark visible, loaded and at
   least 64 px on five pages in four languages at both sizes.
 - **Not done here.** The DNS record (`docs/operations.md`, "The BIMI
@@ -1713,7 +1713,7 @@ migrations and `Cargo.lock` are untouched); no dependency.
   takes it, what holds a legacy move back, the reports at a glance. Server:
   every page in every language, not indexed, an island, linked from no
   page the server renders, one account's address and its 404s, never
-  kept. Browser (`web/e2e-site/admin-*.spec.ts` with the stand-in
+  kept. Browser (`crates/central-web/browser/e2e-site/admin-*.spec.ts` with the stand-in
   `admin-central.ts`, 54 tests, both sizes): every page with and without
   the role, axe in both schemes, 44 px targets, 320 px in German, the
   keyboard's order, each change's exact request after its confirmation
@@ -1819,7 +1819,7 @@ through `js_sys`, as `clip` does).
   reference pieces, and that a lost answer is no refusal; a server test
   that both pages exist in every language, are not indexed, not in the
   sitemap, linked from nowhere, and that a malformed id is a 404;
-  `web/e2e-site/feedback.spec.ts` and `feedback-report.spec.ts` against a
+  `crates/central-web/browser/e2e-site/feedback.spec.ts` and `feedback-report.spec.ts` against a
   stand-in Central (`feedback-stand-in.ts`) with markup and script in
   every text field: each action's exact request, nothing before a
   confirmation, a purge sent once on a double press and only after the
@@ -1959,14 +1959,14 @@ dependency, no tool.
   `Section::administration()` holds exactly the addresses under
   `account/admin`. It has teeth: with the feedback's pages given the
   public module, it fails. xtask: `the_islands_are_two_modules_with_one_bootstrap`.
-  Browser (`web/e2e-site/modules.spec.ts`, both sizes, by the requests
+  Browser (`crates/central-web/browser/e2e-site/modules.spec.ts`, both sizes, by the requests
   the page makes): the contact page, the sign-in dialog over a page, the
   account area and the messenger (signed in as an administrator) fetch
   the public module's bootstrap, glue and module and nothing of the
   administration's; the overview, the reset code's page, the feedback's
   list and a page refused to someone without the role fetch the
   administration's and nothing of the public one; and each page's
-  islands work. The whole `web/e2e-site` suite ran on the split site
+  islands work. The whole `crates/central-web/browser/e2e-site` suite ran on the split site
   (`--workers=4`): 644 passed, 4 skipped by their own conditions (a test
   for phones only, one desktop-only test, and the screenshots, which need
   `BAYLEE_SRC`): the administration's pages, the feedback's, the area,

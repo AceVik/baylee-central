@@ -275,7 +275,7 @@ beside 0.12.0.
   (only the libsqlite3-sys advisory already on `main` fails);
 - clippy for wasm32;
 - `npm run e2e:site` (188 passed, desktop and Pixel 7);
-- `web/e2e-real/site-chat.spec.ts` against a real Central on desktop and
+- `crates/central-web/browser/e2e-real/site-chat.spec.ts` against a real Central on desktop and
   phone.
 
 ### Behaviour found in 0.9.0-rc1 (11.11.2026)
@@ -284,7 +284,7 @@ beside 0.12.0.
   an element with a `class:` directive: the text keeps the server's words
   and never changes again (the contact form's character count did that).
   Wrapped in a `<span>` of its own it works. No other island has the
-  pattern; `web/e2e-site/site.spec.ts` checks the count.
+  pattern; `crates/central-web/browser/e2e-site/site.spec.ts` checks the count.
 - Hydration writes no derived text at first, and later writes only what
   differs from what it computed then: a view derived from a signal that
   starts from something other than the server's state (fields typed into

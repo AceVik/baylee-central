@@ -401,7 +401,7 @@ Reports about one's own picture are not exported with their reporters.
 
 ## The whole path against a real Central (12.11.2026)
 
-`web/e2e-real/site-picture.spec.ts` runs a picture's whole path against a
+`crates/central-web/browser/e2e-real/site-picture.spec.ts` runs a picture's whole path against a
 throwaway Central built from this branch:
 1. The browser prepares a still and sends it, and sends an animated GIF
    whole, through `front.ts`, which lets the upload through to 9 MiB as the

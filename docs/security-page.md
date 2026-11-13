@@ -193,7 +193,7 @@ page itself cannot read", not "no cookie" (A4); the FAQ sentence points to
 - `cargo test -p central-web -p central-web-server -p xtask --all-targets
   --all-features`, clippy `-D warnings` for the same crates, `cargo fmt --all
   -- --check`, `cargo xtask policy`, `cargo xtask site`.
-- `web/e2e-site/security.spec.ts` (20 tests: desktop and phone; both
+- `crates/central-web/browser/e2e-site/security.spec.ts` (20 tests: desktop and phone; both
   languages and both colour schemes with axe-core for WCAG 2.2 A/AA and the
   44 px target check; the keyboard; reduced motion; no sentence in a
   diagram; 320 to 2560 px without sideways scrolling; the three links to the

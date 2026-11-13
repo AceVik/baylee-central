@@ -281,7 +281,7 @@ These signs cost a careless robot time and a careful one nothing: the
 headers and the report are whatever the sender says. The counts are not.
 
 Checked against a real Central behind the proxy's stand-in (11.11.2026,
-`web/e2e-real`): Chromium's own requests score nothing, and Chromium driven
+`crates/central-web/browser/e2e-real`): Chromium's own requests score nothing, and Chromium driven
 by a test tool reports `webdriver` and is asked for 18 bits, so the
 project's browser tests pay four times the base and no more.
 
@@ -562,7 +562,7 @@ lowers: each value is capped at Central's own, and neither a setting nor a
 request reaches it (the launch never calls it; `the_knob_only_lowers`). The
 PostgreSQL fixture runs at one bit and 64 KiB, the unit tests at 64 KiB;
 the site's suite checks the pinned vector at 64 KiB in the real module and
-plays Central for the rest. `web/e2e-real` meets the real service at the
+plays Central for the rest. `crates/central-web/browser/e2e-real` meets the real service at the
 real price: against a throwaway Central of this tree (release build,
 11.11.2026) Chromium under Playwright was asked 6 bits, two over the base
 for the `navigator.webdriver` it reports, at 16 MiB, one pass and eight
