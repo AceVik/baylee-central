@@ -1032,8 +1032,9 @@ so that nobody holds a token no key verifies:
 1. **Publish.** `umask 077; central-service --generate-token-key > new-key.json`. Add its `public`
    to `published` and restart. Gateways read the key set every five minutes, and on a `kid` they do
    not know, so wait at least ten minutes.
-2. **Sign.** Move `seed` to `active` and the old key's public half to `published`, and restart. The
-   old seed goes, and the old key stays listed.
+2. **Sign.** Move `seed` to `active`, take its `public` out of `published` (a key listed twice
+   stops the start) and put the old key's public half there, and restart. The old seed goes, and
+   the old key stays listed.
 3. **Retire.** At least 12 hours and 30 seconds later, remove the old public key and restart: a
    Central token lives to its session's cap, and a gateway token an hour.
 
