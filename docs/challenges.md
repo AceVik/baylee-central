@@ -128,3 +128,20 @@ Website checks on 13 November:
 
 These checks use synthetic browser responses. They do not yet prove that a real
 engine result appears on the website or that the installed game follows the link.
+
+A subsequent local interactive demo on 13 November used the real PostgreSQL
+fixture, authenticated Central native/browser listeners, a loopback gate and the
+game engine. Its generated Daily and Weekly were solved through the engine; the
+native client and website displayed the same published tasks and earned results
+(Daily: turn 1; Weekly: turn 11), with the browser showing all five earned Bronze
+badge families. No challenge response was mocked. The synthetic solver's very
+short Daily time is fixture evidence, not a human difficulty or timing estimate.
+
+The browser signed in normally using a separate, temporary copy of the crypto
+module bound to the fixture's development issuer. Production sources/assets,
+issuer validation, cookie attributes and origin checks were unchanged. The
+loopback-only `e2e-real/front.ts` accepts omission of `--tls` for this setup.
+Baylee's `docs/central-login.md` documents the bounded demo fixture, fresh,
+completed and resumable accounts, archive task, and owned-service cleanup. The
+website-to-installed-client protocol link remains outside this demo's evidence:
+the isolated native client opens the identical task through its own task browser.

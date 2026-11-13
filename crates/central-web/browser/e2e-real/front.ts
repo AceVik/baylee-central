@@ -9,10 +9,13 @@
 // production.
 //
 //   node e2e-real/front.ts --tls <dir with cert.pem, key.pem> --site <port> [--port 8443] [--listener 47921]
+// Omit --tls only for an isolated numeric-loopback development demo. Its
+// browser listener and separately built crypto module must use the matching
+// development origin/issuer; production assets and cookie checks stay intact.
 
 import { readFileSync } from "node:fs";
-import { request } from "node:http";
-import { createServer } from "node:https";
+import { request, createServer as createHttpServer, type IncomingMessage, type ServerResponse } from "node:http";
+import { createServer as createHttpsServer } from "node:https";
 import { join } from "node:path";
 
 function arg(name: string, fallback: string): string {
@@ -33,8 +36,9 @@ if (!(site > 0)) {
   process.exit(2);
 }
 
-const server = createServer({ key: readFileSync(join(tls, "key.pem")), cert: readFileSync(join(tls, "cert.pem")) }, (req, res) => {
-  const url = new URL(req.url ?? "/", "https://baylee.app");
+const origin = tls ? "https://baylee.app" : `http://127.0.0.1:${port}`;
+const handle = (req: IncomingMessage, res: ServerResponse) => {
+  const url = new URL(req.url ?? "/", origin);
   if (url.pathname.startsWith("/api/")) {
     // request_body max_size 64KiB (9MiB for a picture's upload), then
     // reverse_proxy 127.0.0.1:<listener>
@@ -55,7 +59,7 @@ const server = createServer({ key: readFileSync(join(tls, "key.pem")), cert: rea
         ...req.headers,
         "content-length": String(body.length),
         "x-forwarded-for": req.socket.remoteAddress ?? "",
-        "x-forwarded-proto": "https",
+        "x-forwarded-proto": tls ? "https" : "http",
         "x-forwarded-host": req.headers.host ?? "",
       };
       const upstream = request({ host: "127.0.0.1", port: listener, method: req.method, path: req.url, headers }, (answer) => {
@@ -87,10 +91,16 @@ const server = createServer({ key: readFileSync(join(tls, "key.pem")), cert: rea
     res.end();
   });
   req.pipe(upstream);
-});
+};
+
+// A numeric loopback HTTP origin is also supported by Central's development
+// listener. Its cookie and origin checks stay enabled; no authentication mock.
+const server = tls
+  ? createHttpsServer({ key: readFileSync(join(tls, "key.pem")), cert: readFileSync(join(tls, "cert.pem")) }, handle)
+  : createHttpServer(handle);
 
 server.listen(port, "127.0.0.1", () => {
-  process.stdout.write(`https://baylee.app at 127.0.0.1:${port}, /api/* to 127.0.0.1:${listener}\n`);
+  process.stdout.write(`${origin} at 127.0.0.1:${port}, /api/* to 127.0.0.1:${listener}\n`);
 });
 const stop = () => server.close(() => process.exit(0));
 process.on("SIGINT", stop);
