@@ -16,6 +16,7 @@ pub(super) struct Hub {
     pub error: RwSignal<Option<Failure>>,
     pub hint: RwSignal<Option<api::Words>>,
     pub confirm_hint: RwSignal<Option<u8>>,
+    pub page: RwSignal<Option<i64>>,
 }
 
 impl Hub {
@@ -35,6 +36,7 @@ impl Hub {
             error: RwSignal::new(None),
             hint: RwSignal::new(None),
             confirm_hint: RwSignal::new(None),
+            page: RwSignal::new(None),
         }
     }
 
@@ -51,6 +53,7 @@ impl Hub {
         if !self.start() {
             return;
         }
+        self.page.set(before);
         leptos::task::spawn_local(async move {
             match request(api::Request::Catalogue { before }).await {
                 Ok(api::Response::Catalogue {
@@ -85,6 +88,8 @@ impl Hub {
             self.badges.set(vec![]);
             self.active.set(vec![]);
             self.personal.set(None);
+            self.hint.set(None);
+            self.confirm_hint.set(None);
             return;
         }
         match request(api::Request::Progress).await {
@@ -99,6 +104,8 @@ impl Hub {
                 self.personal.set(None);
                 self.badges.set(vec![]);
                 self.active.set(vec![]);
+                self.hint.set(None);
+                self.confirm_hint.set(None);
             }
             Err(error) => self.error.set(Some(error)),
             Ok(_) => self.error.set(Some(Failure::Malformed)),

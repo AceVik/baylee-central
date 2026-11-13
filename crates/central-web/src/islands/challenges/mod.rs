@@ -49,6 +49,20 @@ pub fn Challenges(lang: Lang, initial: Option<ChallengeFeed>) -> impl IntoView {
     Effect::new(move |_| {
         hub.busy.set(false);
         hub.refresh(None);
+        let timer = set_interval(
+            move || {
+                if hub.confirm_hint.get_untracked().is_none() {
+                    hub.refresh(hub.page.get_untracked());
+                }
+            },
+            std::time::Duration::from_secs(60),
+        )
+        .ok();
+        on_cleanup(move || {
+            if let Some(timer) = timer {
+                timer.clear();
+            }
+        });
     });
     view! {
         <div class="challenge-toolbar">
