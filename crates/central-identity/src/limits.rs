@@ -132,10 +132,13 @@ const _: () = assert!(SHARING > 2 * (SHARED_CONTROL + SHARED_DATA) as usize);
 enum Class {
     /// A client's pairing: no session, a window of its own.
     Pairing,
-    /// Served without a session, whatever token comes along.
+    /// Served without a session, whatever token comes along. (On the
+    /// native listener a bare credential that comes along is refused before
+    /// any budget: `credential_operation` keeps it to a gateway's own
+    /// operations, and none of these is one.)
     Public,
-    /// A session's or a gateway credential's: status, renewal and the
-    /// checks gateways make of their players.
+    /// A session's or a gateway credential's: status, renewal, a token
+    /// for a gateway and a gateway's catch-up on revocations.
     Control,
     /// A session's or a gateway credential's: everything else.
     Data,

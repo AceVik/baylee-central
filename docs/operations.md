@@ -1461,11 +1461,13 @@ including the one the gateway's timer starts for a new release tag.
 - **`prepare`.** As the build user it fetches and checks the revision out in
   `/opt/baylee-central/src`. It then takes `ops/grants.sql` out of the
   revision's commit, before anything is built, and only then builds
-  `central-service` and `central-web-server` in release, each binary named
-  (`--bin central-service --bin central-web`), and the site
+  `central-service`, `central-web-server` and `central-picture-codec` in
+  release, each binary named (`--bin central-service --bin central-web
+  --bin central-picture-worker`; on x86-64 the codecs need `nasm`,
+  [profile pictures](#profile-pictures)), and the site
   (`cargo xtask site` with `BAYLEE_SRC`, for the gateway's screenshots and
-  fallback card status). It stages the two binaries, the grants and the site
-  in `/opt/baylee-central/staged`. The build user needs Rust's
+  fallback card status). It stages the three binaries, the grants and the
+  site in `/opt/baylee-central/staged`. The build user needs Rust's
   `wasm32-unknown-unknown` target and the pinned wasm-bindgen CLI
   ([xtask](xtask.md#the-sites-assets-site)); `brotli` and `gzip` on the
   `PATH` make the compressed copies. A failed fetch answers "not ready" (75), so
@@ -1475,7 +1477,8 @@ including the one the gateway's timer starts for a new release tag.
   whether the staged service accepts `/etc/baylee-central/central.json`
   (`--check-accounts-stdin`, as `central`), and stops with nothing changed
   when not. Then it stops the unit, installs the
-  binary (the old one kept as `central-service.previous`), migrates
+  binary (the old one kept as `central-service.previous`) and the picture
+  worker (systemd starts a fresh one for each picture), migrates
   (`--migrate-stdin` from `/etc/baylee-central/migrate.json` under
   `systemd-run` as `central`), grants as `central_migrator`, starts it and
   waits up to 30 s for `/health/live`. Then the website: the site goes to

@@ -872,6 +872,9 @@ mod tests {
             Request::GatewayDirectory { after: None },
             Request::PublicFigures { after: None },
             Request::AccountSummary,
+            Request::Picture {
+                request: central_api::picture::PictureRequest::Mine,
+            },
             Request::SetRecovery {
                 recovery: vec![1; 73],
             },
@@ -1091,14 +1094,14 @@ mod tests {
                 text[start..].split('"').next().unwrap().to_owned()
             })
             .collect();
-        assert_eq!(named.len(), 66, "every operation is in one of the lists");
+        assert_eq!(named.len(), 67, "every operation is in one of the lists");
     }
 
     #[test]
     fn the_native_listener_refuses_the_websites_own_operations() {
         let (served, _) = (served(), refused());
         let only: Vec<&Request> = served.iter().filter(|r| browser_only(r)).collect();
-        assert_eq!(only.len(), 12);
+        assert_eq!(only.len(), 13);
         // Both ways to ask for a registration challenge: neither is served
         // where no address is counted.
         assert!(browser_only(&Request::RegisterChallenge));

@@ -374,12 +374,13 @@ Only an approved, enabled gateway with a path is called; a pending gateway catch
 sends `POST {origin}{path}`, the compact token as the body, `Content-Type: application/jwt`. `204`
 is taken, `429` and `5xx` are retried, and anything else is refused and not asked again.
 
-**The call** is `central-outbound`'s, Central's one way out, shared with Web Push: HTTPS only, no
-proxy, no redirect, two seconds to connect and five in all, and only the status of the answer is
-read. A name resolves once, and what it resolved to is what is dialled, so it cannot answer
-differently the second time; one private, loopback, link-local, multicast, reserved or
+**The call** is `central-outbound`'s, Central's one way out to another host, shared with Web Push:
+HTTPS only, no proxy, no redirect, two seconds to connect and five in all, and only the status of
+the answer is read. A name resolves once, and what it resolved to is what is dialled, so it cannot
+answer differently the second time; one private, loopback, link-local, multicast, reserved or
 documentation address among its answers refuses the whole name, however the address is spelled.
-A development service runs no sender.
+A development service runs no sender. (The mailer is on Central's own host, reached by
+`central-mail`'s loopback-only client; [mail](operations.md#mail).)
 
 **One exception.** The official gateway runs on Central's machine, where its public name may not
 lead back to it. `official_address` in the service's configuration names one loopback or private

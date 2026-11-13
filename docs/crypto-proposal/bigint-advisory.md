@@ -232,8 +232,10 @@ lockfile. Every other file of the crate is byte for byte one side's, which was
 checked file by file against both branches, and each side's fingerprint was
 recomputed from its own tree before the combined one was pinned. Checked by
 running: `cargo xtask crypto-scope` (graph guard, then the fingerprint) passes,
-and `cargo tree -i crypto-bigint --all-features` still shows exactly
-`crypto-bigint <- elliptic-curve <- opaque-ke/voprf <- central-crypto`. Both
+and `cargo tree -i crypto-bigint --all-features`, read in full on the final graph
+(with the profile pictures' codec crates merged as well, which reach neither),
+still shows exactly `crypto-bigint <- elliptic-curve <- opaque-ke/voprf <-
+central-crypto`, and from there only Central's own crates. Both
 reviews stand as written. Fingerprint `ddbb3498…`. This is the merging agent's
 check, not an independent review.
 
