@@ -29,7 +29,7 @@ pub(super) struct Fixture {
     tls: Option<OwnedDir>,
 }
 
-pub(crate) fn run(root: &Path, exercise_failure: bool) -> Result<()> {
+pub(crate) fn run(root: &Path, exercise_failure: bool, tower_only: bool) -> Result<()> {
     let name = format!("central-test-{}", random::hex(8)?);
     println!("Owned PostgreSQL fixture: {name}");
     let mut fixture = Fixture {
@@ -38,14 +38,19 @@ pub(crate) fn run(root: &Path, exercise_failure: bool) -> Result<()> {
         port: None,
         tls: None,
     };
-    let outcome = exercise(&mut fixture, root, exercise_failure);
+    let outcome = exercise(&mut fixture, root, exercise_failure, tower_only);
     let cleanup = fixture.clean();
     after_cleanup(outcome, cleanup)?;
     println!("PostgreSQL fixture passed and its owned container/listener were removed.");
     Ok(())
 }
 
-fn exercise(fixture: &mut Fixture, root: &Path, exercise_failure: bool) -> Result<()> {
+fn exercise(
+    fixture: &mut Fixture,
+    root: &Path,
+    exercise_failure: bool,
+    tower_only: bool,
+) -> Result<()> {
     container::ensure_image()?;
     let tls = fixture.tls.insert(tls::authority()?);
     let secrets = roles::Secrets::new()?;
@@ -56,5 +61,5 @@ fn exercise(fixture: &mut Fixture, root: &Path, exercise_failure: bool) -> Resul
         return Err(Fail::new("Synthetic fixture failure"));
     }
     fixture.bootstrap(&secrets)?;
-    suite::run(root, port, &secrets, &tls_path)
+    suite::run(root, port, &secrets, &tls_path, tower_only)
 }

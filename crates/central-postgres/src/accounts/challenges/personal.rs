@@ -90,8 +90,9 @@ fn exported_attempt(row: &QueryResult) -> Result<api::ExportedAttempt, Error> {
         id: *get::<Uuid>(row, "id")?.as_bytes(),
         challenge: *get::<Uuid>(row, "challenge_id")?.as_bytes(),
         kind: match kind.as_str() {
-            "daily" => api::Kind::Daily,
-            "weekly" => api::Kind::Weekly,
+            "daily" => api::AttemptKind::Daily,
+            "weekly" => api::AttemptKind::Weekly,
+            "tower" => api::AttemptKind::Tower,
             _ => return Err(Error::Unavailable),
         },
         request_id: *get::<Uuid>(row, "request_id")?.as_bytes(),

@@ -36,7 +36,9 @@ pub(super) async fn dispatch(
             participation(db, me, challenge, listed).await?;
             Ok(Response::Updated)
         }
-        Request::Catalogue { .. } | Request::Detail { .. } => Err(Error::Rejected),
+        Request::Catalogue { .. } | Request::Detail { .. } | Request::Tower { .. } => {
+            Err(Error::Rejected)
+        }
     }
 }
 
@@ -69,6 +71,7 @@ async fn begin(
         "SELECT * FROM central_identity.challenge_attempts WHERE account_id=$1 AND request_id=$2",
         vec![me.into(), uuid(request).into()],
     )).await.map_err(unavailable)? {
+        if row.try_get::<String>("", "kind").map_err(unavailable)? == "tower" { return Err(Error::Rejected); }
         let previous = attempt(&row, host)?;
         if previous.challenge != challenge { return Err(Error::Conflict); }
         return Ok(Response::Attempt { attempt: previous });
@@ -155,6 +158,9 @@ async fn abandon(
         "UPDATE central_identity.challenge_attempts SET state='abandoned',finished_at=pg_catalog.clock_timestamp()
          WHERE id=$1 RETURNING *", vec![uuid(id).into()],
     )).await.map_err(unavailable)?.ok_or(Error::Unavailable)?;
+    if ended.try_get::<String>("", "kind").map_err(unavailable)? == "tower" {
+        super::tower::complete(db, me, &ended).await?;
+    }
     Ok(Response::Attempt {
         attempt: attempt(&ended, host)?,
     })

@@ -12,7 +12,8 @@ mod validation;
 
 pub use calendar::{Kind, Period};
 pub use personal::{
-    ExportEntry, ExportTable, ExportedAttempt, TaskProgress, validate_page as validate_export_page,
+    AttemptKind, ExportEntry, ExportTable, ExportedAttempt, TaskProgress,
+    validate_page as validate_export_page,
 };
 pub use progress::{Badge, BadgeKind, Tier};
 use serde::{Deserialize, Serialize};
@@ -165,6 +166,11 @@ pub struct Standing {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(tag = "action", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Request {
+    /// Weekly expedition operations using the same account and official executor boundary.
+    Tower {
+        /// Bounded expedition operation.
+        request: crate::tower::Request,
+    },
     /// Current tasks and an archive page; future packages are never returned.
     Catalogue {
         /// Strictly older than this UTC start; omitted for the latest page.
@@ -232,6 +238,11 @@ pub enum Request {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(tag = "answer", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Response {
+    /// Expedition result without private execution content.
+    Tower {
+        /// Bounded expedition response.
+        response: Box<crate::tower::Response>,
+    },
     /// Public calendar and archive.
     Catalogue {
         /// Central's current Unix seconds.
@@ -337,6 +348,16 @@ pub struct Publication {
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(tag = "action", rename_all = "snake_case", deny_unknown_fields)]
 pub enum HostRequest {
+    /// Stage and activate an entire expedition through the official publishing capability.
+    Tower {
+        /// Bounded publisher operation.
+        request: crate::tower::HostRequest,
+    },
+    /// Resolve the tested executor without exposing a private tower node publicly.
+    Executor {
+        /// Existing account-bound reservation.
+        attempt: [u8; 16],
+    },
     /// List occupied slots in a bounded future window, without engine packages.
     Inventory {
         /// Inclusive UTC Unix seconds.
@@ -402,6 +423,16 @@ pub struct Completion {
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(tag = "answer", rename_all = "snake_case", deny_unknown_fields)]
 pub enum HostResponse {
+    /// Bounded staged/published tower inventory.
+    Tower {
+        /// At most six weekly slots.
+        stock: Vec<crate::tower::Stock>,
+    },
+    /// Public executor metadata restricted to an existing reservation.
+    Executor {
+        /// Build identifier read from its immutable publication.
+        executor: String,
+    },
     /// Occupied slots, including future ones, at most 64.
     Inventory {
         /// Known tasks.

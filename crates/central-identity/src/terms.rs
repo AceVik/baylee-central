@@ -89,6 +89,12 @@ pub(super) fn needs_acceptance(request: &Request) -> bool {
                 request: central_api::challenges::Request::Begin { .. }
                     | central_api::challenges::Request::Hint { .. }
                     | central_api::challenges::Request::Visibility { listed: true, .. }
+                    | central_api::challenges::Request::Tower {
+                        request: central_api::tower::Request::Begin { .. }
+                            | central_api::tower::Request::Start { .. }
+                            | central_api::tower::Request::Choose { .. }
+                            | central_api::tower::Request::Visibility { listed: true, .. }
+                    }
             }
             | Request::CreateObject
             | Request::WriteObject { .. }

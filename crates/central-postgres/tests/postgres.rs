@@ -32,6 +32,17 @@ async fn scalar(db: &impl ConnectionTrait, query: &str) -> i64 {
 }
 
 #[tokio::test]
+#[ignore = "requires the owned PostgreSQL container from `cargo xtask postgres --tower-only`"]
+async fn tower_authority() {
+    let operator = connect_dev(config("central_migrator", "CENTRAL_TEST_MIGRATOR_PASSWORD"))
+        .await
+        .unwrap();
+    central_migration::apply(&operator).await.unwrap();
+    support::tower(&operator).await;
+    operator.close().await.unwrap();
+}
+
+#[tokio::test]
 #[ignore = "requires the owned PostgreSQL container from `cargo xtask postgres`"]
 async fn migrations_ids_roles_rollback_and_locking() {
     let operator = connect_dev(config("central_migrator", "CENTRAL_TEST_MIGRATOR_PASSWORD"))
@@ -159,7 +170,7 @@ async fn verify_migrations(operator: &sea_orm::DatabaseConnection) {
             "SELECT count(*)::bigint AS value FROM seaql_migrations"
         )
         .await,
-        27
+        28
     );
 
     operator.execute_unprepared(

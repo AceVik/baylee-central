@@ -23,6 +23,7 @@ pub mod reset_code;
 pub mod social;
 pub mod terms;
 mod token;
+pub mod tower;
 pub mod wire;
 pub use endpoint::{
     Endpoint, LEGACY_ORIGIN, LIVE_ORIGIN, OFFICIAL_ALIASES, OFFICIAL_ORIGIN, is_official_origin,

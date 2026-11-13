@@ -9,6 +9,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 mod boundaries;
 mod edges;
 mod results;
+mod tower;
 
 const HOST: &str = "http://127.0.0.1:28780";
 const EXECUTOR: &str = "synthetic-challenge-test-v1";
@@ -198,4 +199,23 @@ pub(super) async fn run(store: &AccountStore, operator: &DatabaseConnection, key
     results::run(store, keys, &daily, &weekly).await;
     edges::run(store, keys, now, &daily, &weekly).await;
     boundaries::run(store, operator, keys, now).await;
+    tower::run(store, operator, keys, now).await;
+}
+
+pub(super) async fn tower_only(
+    store: &AccountStore,
+    operator: &DatabaseConnection,
+    keys: &ServerKeys,
+) {
+    let now: i64 = operator
+        .query_one_raw(Statement::from_string(
+            DbBackend::Postgres,
+            "SELECT floor(extract(epoch FROM pg_catalog.clock_timestamp()))::bigint AS now",
+        ))
+        .await
+        .unwrap()
+        .unwrap()
+        .try_get("", "now")
+        .unwrap();
+    tower::run(store, operator, keys, now).await;
 }

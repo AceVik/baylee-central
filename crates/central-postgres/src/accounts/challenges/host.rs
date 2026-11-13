@@ -12,6 +12,23 @@ pub(super) async fn dispatch(
     origin: &str,
 ) -> Result<api::HostResponse, Error> {
     match request {
+        api::HostRequest::Tower { request } => Ok(api::HostResponse::Tower {
+            stock: super::tower::publish(db, request).await?,
+        }),
+        api::HostRequest::Executor { attempt: id } => {
+            let row = attempt_row(db, id, None).await?;
+            if !state(&row)?.active() {
+                return Err(Error::Conflict);
+            }
+            let task_id: Uuid = row.try_get("", "challenge_id").map_err(unavailable)?;
+            let task = task(db, *task_id.as_bytes(), true).await?;
+            if task.withdrawn {
+                return Err(Error::Conflict);
+            }
+            Ok(api::HostResponse::Executor {
+                executor: task.description.executor,
+            })
+        }
         api::HostRequest::Inventory { from, until } => inventory(db, from, until).await,
         api::HostRequest::Publish { publication } => publish(db, &publication).await,
         api::HostRequest::Claim {
@@ -53,7 +70,7 @@ async fn inventory(
     let rows = db
         .query_all_raw(statement(
             "SELECT id,description::text,digest,withdrawn FROM central_identity.challenges
-         WHERE starts_at>=$1 AND starts_at<$2 ORDER BY starts_at,kind LIMIT 64",
+         WHERE scope=0 AND starts_at>=$1 AND starts_at<$2 ORDER BY starts_at,kind LIMIT 64",
             vec![from.into(), until.into()],
         ))
         .await
@@ -80,12 +97,12 @@ async fn publish(
     }
     db.execute_raw(statement(
         "INSERT INTO central_identity.challenges(kind,starts_at,ends_at,description,digest,publication)
-         VALUES($1,$2,$3,$4::jsonb,$5,$6) ON CONFLICT(kind,starts_at) DO NOTHING",
+         VALUES($1,$2,$3,$4::jsonb,$5,$6) ON CONFLICT(kind,starts_at,scope) DO NOTHING",
         vec![period.kind.name().into(), period.starts_at.into(), period.ends_at.into(), description.into(),
             value.digest.to_vec().into(), central_api::encode(value)?.into()],
     )).await.map_err(unavailable)?;
     let row = db.query_one_raw(statement(
-        "SELECT id,description::text,digest,withdrawn FROM central_identity.challenges WHERE kind=$1 AND starts_at=$2",
+        "SELECT id,description::text,digest,withdrawn FROM central_identity.challenges WHERE kind=$1 AND starts_at=$2 AND scope=0",
         vec![period.kind.name().into(), period.starts_at.into()],
     )).await.map_err(unavailable)?.ok_or(Error::Unavailable)?;
     let challenge = challenge(&row)?;

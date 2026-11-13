@@ -68,6 +68,17 @@ async fn grant(operator: &DatabaseConnection) {
     operator.execute_unprepared(GRANTS).await.unwrap();
 }
 
+pub(crate) async fn tower_only(operator: &DatabaseConnection) {
+    grant(operator).await;
+    let store =
+        AccountStore::connect_dev(config("central_runtime", "CENTRAL_TEST_RUNTIME_PASSWORD"))
+            .await
+            .unwrap();
+    let keys = ServerKeys::generate();
+    challenges::tower_only(&store, operator, &keys).await;
+    store.close().await.unwrap();
+}
+
 pub(crate) async fn run(operator: &DatabaseConnection) {
     // Default grants are insufficient. Grant only the runtime CRUD operations.
     assert!(

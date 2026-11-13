@@ -12,6 +12,7 @@ mod host;
 mod owned;
 mod personal;
 mod read;
+mod tower;
 
 fn unavailable(_: impl Sized) -> Error {
     Error::Unavailable
@@ -93,7 +94,7 @@ fn challenge(row: &QueryResult) -> Result<Challenge, Error> {
 async fn task(db: &impl ConnectionTrait, id: [u8; 16], private: bool) -> Result<Challenge, Error> {
     let row = db.query_one_raw(statement(
             &format!("SELECT id,description::text,digest,withdrawn FROM central_identity.challenges
-         WHERE id=$1 AND ($2 OR starts_at<=floor(extract(epoch FROM pg_catalog.clock_timestamp()))){}",
+         WHERE id=$1 AND ($2 OR (scope=0 AND starts_at<=floor(extract(epoch FROM pg_catalog.clock_timestamp())))){}",
              if private { " FOR SHARE" } else { "" }),
         vec![uuid(id).into(), private.into()],
     )).await.map_err(unavailable)?.ok_or(Error::Rejected)?;
@@ -155,13 +156,27 @@ impl AccountStore {
         request: Request,
         host: &str,
     ) -> Result<Response, Error> {
-        let public = matches!(request, Request::Catalogue { .. } | Request::Detail { .. });
+        let public = matches!(
+            request,
+            Request::Catalogue { .. }
+                | Request::Detail { .. }
+                | Request::Tower {
+                    request: central_api::tower::Request::Read { .. }
+                }
+        );
         let write = matches!(
             request,
             Request::Begin { .. }
                 | Request::Abandon { .. }
                 | Request::Hint { .. }
                 | Request::Visibility { .. }
+                | Request::Tower {
+                    request: central_api::tower::Request::Begin { .. }
+                        | central_api::tower::Request::Start { .. }
+                        | central_api::tower::Request::Choose { .. }
+                        | central_api::tower::Request::Abandon { .. }
+                        | central_api::tower::Request::Visibility { .. }
+                }
         );
         let db = if write {
             self.db.begin().await
@@ -185,6 +200,9 @@ impl AccountStore {
             None => return Err(Error::Rejected),
         };
         let response = match request {
+            Request::Tower { request } => Response::Tower {
+                response: Box::new(tower::dispatch(&db, me, request, host).await?),
+            },
             Request::Catalogue { before } => read::catalogue(&db, before).await?,
             Request::Detail {
                 challenge,
