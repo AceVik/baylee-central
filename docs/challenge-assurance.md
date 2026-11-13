@@ -39,10 +39,19 @@ starts/results, conflicting replays, assistance, publication immutability, archi
 rewards, withdrawal, equal ranks, late delivery and the exact UTC deadline, export
 isolation, upgrade and deletion. The final complete gate (format, policy, clippy,
 tests, doc tests and release build), HTTP smoke, crypto scope, audit 0.22.2, deny
-0.20.2, browser type/lint and secret scans passed. The final PostgreSQL rerun and
-independent PR review are still pending when this record is written.
+0.20.2, browser type/lint and secret scans passed. The final PostgreSQL rerun passed:
+real native HTTP integration in 106.90 seconds and the complete store suite in
+90.69 seconds, with its owned container/listener removed. Earlier runs under
+concurrent compilation hit statement/fixture deadlines; those failures were not
+counted as passes. Independent PR review is still pending.
+
+The final real automatic publisher check also passed in 128.30 seconds, including
+fresh Daily/Weekly tasks and zero duplicate publications on a repeated pass. A
+second blind agent-played Weekly from the slower pool was won on turn eleven
+through combat, retained burn and correctly ordered triggers. No private proof
+was read and no ranked result was submitted.
 
 Boundaries: website browser tests use synthetic responses; the real engine path
-has separate transport/database evidence. One agent-played game and a finite solver
+has separate transport/database evidence. Two agent-played games and a finite solver
 sample do not establish human difficulty. Retained executors still need a matching
 wire/preset protocol. No production migration, credentials or deployment was used.

@@ -91,8 +91,8 @@ migration or deployment is part of the PR authorization.
   UUID/null-version bounds and account-deletion cascades. Owned fixture cleanup passed.
 
 These are synthetic accounting fixtures, not engine-solution certificates. The
-actual generator, player/client flow and complete three-round feature validation
-remain to be connected and tested before the PR review.
+actual generator, player/client flow and three-round feature validation were
+subsequently exercised as recorded in [challenge assurance](challenge-assurance.md).
 
 ## Website and personal export
 
