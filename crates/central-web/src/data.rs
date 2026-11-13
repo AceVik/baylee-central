@@ -4,6 +4,17 @@
 
 use serde::{Deserialize, Serialize};
 
+/// Central's public calendar, rendered before hydration and refreshed by the browser.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ChallengeFeed {
+    /// Central's clock at this snapshot, in Unix seconds.
+    pub now: i64,
+    /// Current tasks and the first archive page; no private execution material.
+    pub challenges: Vec<central_api::challenges::Challenge>,
+    /// Exclusive cursor for older tasks.
+    pub before: Option<i64>,
+}
+
 /// A platform Baylee's client is built for.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum Platform {

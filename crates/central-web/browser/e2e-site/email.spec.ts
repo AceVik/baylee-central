@@ -119,6 +119,10 @@ function central(seen: Body[], w: World) {
         });
       case "account_export":
         return json({ result: "account_export", export: EXPORT });
+      case "challenges":
+        return body.request?.action === "export"
+          ? json({ result: "challenges", response: { answer: "export", entries: [], after: null } })
+          : refused(401);
       case "email": {
         if (w.deaf) return refused(401);
         const asked = body.request ?? {};
@@ -141,6 +145,10 @@ const EXPORT = {
   account: ACCOUNT, username: "erika", display_name: "Erika", display_name_at: THEN, tag: 0x1a2b, source: "registered", legacy_id: null,
   created_at: THEN, last_sign_in_at: THEN, vault_epoch: 1, document_revision: 1, state: "enrolled", admin: false, recovery: true,
   reset_until: null, objects: 0, object_bytes: 0, archives: 0, sessions: [], terms: [], gateways: [], administers: [], audit: [], complete: true,
+};
+const CHALLENGES = {
+  participation: { entries: [], complete: true, after: null },
+  attempts: { entries: [], complete: true, after: null },
 };
 
 /** The sign-in once more, canned: the stand-in's OPAQUE answers are none. */
@@ -608,12 +616,16 @@ test("the export's file holds the address beside the export, or the page says th
   // the address is asked for once the export answered
   // the picture's facts and the reports filed join the file (picture.spec.ts)
   const after = seen.slice(asked);
-  expect(after.filter((body) => body.operation !== "picture")).toEqual([{ operation: "account_export" }, { operation: "email", request: { action: "status" } }]);
+  expect(after.filter((body) => body.operation !== "picture")).toEqual([
+    { operation: "account_export" }, { operation: "email", request: { action: "status" } },
+    { operation: "challenges", request: { action: "export", table: "participation", after: null } },
+    { operation: "challenges", request: { action: "export", table: "attempts", after: null } },
+  ]);
   expect(after.filter((body) => body.operation === "picture").map((body) => body.request?.action).sort()).toEqual(["mine", "reports"]);
   const whole = await file();
   // Central's export as it is, and the account's own data of the address:
   // whether this Central sends mail is not the account's
-  expect(whole).toEqual({ ...EXPORT, email: { address: OLD, confirmed_at: THEN, pending: NEW, pending_until: THEN + 900 } });
+  expect(whole).toEqual({ ...EXPORT, challenges: CHALLENGES, email: { address: OLD, confirmed_at: THEN, pending: NEW, pending_until: THEN + 900 } });
   await expect(page.locator("#export-no-email")).toHaveCount(0);
   await sound(page);
 
@@ -625,7 +637,7 @@ test("the export's file holds the address beside the export, or the page says th
   await page.getByRole("button", { name: "Prepare the export" }).click();
   await expect(page.locator("#export-save")).toBeFocused();
   await expect(page.locator("#export-no-email")).toHaveText("The e-mail address could not be read; it is not in this file.");
-  expect(await file()).toEqual(EXPORT);
+  expect(await file()).toEqual({ ...EXPORT, challenges: CHALLENGES });
   expect(await page.evaluate(() => localStorage.getItem("baylee-central-session"))).not.toBeNull();
   await sound(page);
 });

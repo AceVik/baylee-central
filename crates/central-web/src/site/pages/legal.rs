@@ -104,7 +104,7 @@ type Section = (
 );
 
 /// The privacy notice's contents, in the order its parts stand.
-const PRIVACY_PARTS: [Part; 21] = [
+const PRIVACY_PARTS: [Part; 22] = [
     ("controller", words::privacy_controller_title),
     ("short", words::privacy_short_title),
     ("hosting", words::privacy_hosting_title),
@@ -114,6 +114,7 @@ const PRIVACY_PARTS: [Part; 21] = [
     ("links", words::privacy_links_title),
     ("directory", words::privacy_directory_title),
     ("account", words::privacy_account_title),
+    ("challenges", words::privacy_challenges_title),
     ("email", words::privacy_email_title),
     ("picture", words::privacy_picture_title),
     ("cookie", words::privacy_cookie_title),
@@ -212,6 +213,7 @@ pub fn privacy(cx: &Context<'_>) -> Built {
             {section("links", words::privacy_links_title(lang), words::privacy_links(lang).into_any())}
             {directory}
             {section("account", words::privacy_account_title(lang), words::privacy_account(lang).into_any())}
+            {section("challenges", words::privacy_challenges_title(lang), words::privacy_challenges(lang).into_any())}
             {section("email", words::privacy_email_title(lang), words::privacy_email(lang).into_any())}
             {section("picture", words::privacy_picture_title(lang), words::privacy_picture(lang).into_any())}
             {section("cookie", words::privacy_cookie_title(lang), plain(words::privacy_cookie(lang)))}

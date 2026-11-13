@@ -1,0 +1,34 @@
+{
+  "now": 1794564000,
+  "before": null,
+  "challenges": [
+    {
+      "id": [0,0,0,0,0,1,112,0,128,0,0,0,0,0,0,1],
+      "description": {
+        "period": {"kind":"daily","starts_at":1794528000,"ends_at":1794614400},
+        "title": {"en":"Daily fixture","de":"Daily-Testaufgabe"},
+        "instructions": {"en":"Find a winning line with the provided setup.","de":"Finde einen siegreichen Weg mit dem vorgegebenen Aufbau."},
+        "deck":"60 Synthetic card",
+        "executor":"synthetic-site-v1",
+        "target_turn":5,
+        "expected_minutes":15
+      },
+      "digest":[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+      "withdrawn":false
+    },
+    {
+      "id": [0,0,0,0,0,1,112,0,128,0,0,0,0,0,0,2],
+      "description": {
+        "period": {"kind":"weekly","starts_at":1794182400,"ends_at":1794787200},
+        "title": {"en":"Weekly fixture","de":"Weekly-Testaufgabe"},
+        "instructions": {"en":"Plan a longer winning sequence.","de":"Plane eine längere siegreiche Zugfolge."},
+        "deck":"60 Synthetic card",
+        "executor":"synthetic-site-v1",
+        "target_turn":9,
+        "expected_minutes":45
+      },
+      "digest":[2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2],
+      "withdrawn":false
+    }
+  ]
+}

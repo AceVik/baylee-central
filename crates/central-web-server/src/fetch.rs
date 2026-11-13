@@ -54,6 +54,7 @@ fn same(one: &Snapshot, other: &Snapshot) -> bool {
         repo,
         accounts,
         views,
+        challenges,
     } = one;
     *release == other.release
         && *cards == other.cards
@@ -61,6 +62,7 @@ fn same(one: &Snapshot, other: &Snapshot) -> bool {
         && *repo == other.repo
         && *accounts == other.accounts
         && *views == other.views
+        && *challenges == other.challenges
 }
 
 /// Change the data in `shared` with `change`: a new snapshot when that
@@ -522,6 +524,7 @@ pub fn fallback(dir: Option<&Path>) -> Snapshot {
         repo: read(dir, "repo.json").unwrap_or_default(),
         accounts: read(dir, "accounts.json"),
         views: read(dir, "views.json"),
+        challenges: read(dir, "challenges.json"),
     }
 }
 
@@ -535,7 +538,7 @@ fn forget_figures(snapshot: &mut Snapshot) {
 }
 
 /// Keeps `shared` fresh until the process ends: GitHub every ten minutes,
-/// Central's directory and figures every minute.
+/// Central's directory, figures and challenge calendar every minute.
 pub fn spawn(config: &Config, shared: &Shared) {
     if config.github {
         let shared = Arc::clone(shared);
@@ -579,21 +582,66 @@ pub fn spawn(config: &Config, shared: &Shared) {
                 every.tick().await;
                 let (host, origin) = (host.clone(), origin.clone());
                 let found = tokio::task::spawn_blocking(move || {
-                    directory(&agent(false), central, &host, &origin)
+                    let agent = agent(false);
+                    let directory = directory(&agent, central, &host, &origin);
+                    let feed = challenge_feed(&Central {
+                        agent: &agent,
+                        address: central,
+                        host: &host,
+                        origin: &origin,
+                    });
+                    (directory, feed)
                 })
                 .await;
-                install(&shared, |snapshot| match found {
-                    Ok(Some((gateways, accounts))) => {
-                        snapshot.gateways = Some(gateways);
-                        snapshot.accounts = accounts;
+                install(&shared, |snapshot| {
+                    if let Ok((directory, feed)) = found {
+                        snapshot.challenges = feed;
+                        match directory {
+                            Some((gateways, accounts)) => {
+                                snapshot.gateways = Some(gateways);
+                                snapshot.accounts = accounts;
+                            }
+                            None => forget_figures(snapshot),
+                        }
+                    } else {
+                        // The directory keeps its last good value; "right now"
+                        // does not: without Central nobody says it any more.
+                        forget_figures(snapshot);
+                        snapshot.challenges = None;
                     }
-                    // The directory keeps its last good value; "right now"
-                    // does not: without Central nobody says it any more.
-                    _ => forget_figures(snapshot),
                 });
             }
         });
     }
+}
+
+fn challenge_feed(central: &Central<'_>) -> Option<central_web::data::ChallengeFeed> {
+    use central_api::challenges as api;
+    let Response::Challenges {
+        response:
+            api::Response::Catalogue {
+                now,
+                challenges,
+                before,
+            },
+    } = central.ask(&Request::Challenges {
+        request: api::Request::Catalogue { before: None },
+    })?
+    else {
+        return None;
+    };
+    if challenges.len() > api::PAGE_SIZE
+        || challenges
+            .iter()
+            .any(|c| c.description.validate().is_err() || c.description.period.starts_at > now)
+    {
+        return None;
+    }
+    Some(central_web::data::ChallengeFeed {
+        now,
+        challenges,
+        before,
+    })
 }
 
 #[cfg(test)]

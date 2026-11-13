@@ -23,6 +23,8 @@ pub enum Page {
     Download,
     /// `/{lang}/gateways`.
     Gateways,
+    /// `/{lang}/challenges`: shared Daily/Weekly tasks, rankings and permanent badges.
+    Challenges,
     /// `/{lang}/faq`.
     Faq,
     /// `/{lang}/security`.
@@ -55,10 +57,11 @@ pub enum Page {
 
 impl Page {
     /// Every page with an address, in the sitemap's order.
-    pub const LISTED: [Page; 10] = [
+    pub const LISTED: [Page; 11] = [
         Page::Home,
         Page::Download,
         Page::Gateways,
+        Page::Challenges,
         Page::Faq,
         Page::Security,
         Page::Contact,
@@ -81,6 +84,7 @@ impl Page {
             Page::Account(section) => section.slug(),
             Page::Download => "download",
             Page::Gateways => "gateways",
+            Page::Challenges => "challenges",
             Page::Faq => "faq",
             Page::Security => "security",
             Page::Contact => "contact",
@@ -213,6 +217,8 @@ pub struct Snapshot {
     /// How often the site's pages were opened, where the deployment counts
     /// it (`central-web-server`'s `views`), as it stood at the last minute.
     pub views: Option<crate::data::Views>,
+    /// Central's public challenge calendar; absent when it could not be refreshed.
+    pub challenges: Option<crate::data::ChallengeFeed>,
 }
 
 /// What a page needs besides its own words.

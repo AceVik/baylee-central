@@ -93,3 +93,38 @@ migration or deployment is part of the PR authorization.
 These are synthetic accounting fixtures, not engine-solution certificates. The
 actual generator, player/client flow and complete three-round feature validation
 remain to be connected and tested before the PR review.
+
+## Website and personal export
+
+`/{lang}/challenges` renders the public calendar in its first HTML response.
+The browser then reads rankings and, for a remembered session, account-owned
+progress. The server-side cache is public only. Every existing site language
+has the interface and data-use notice; task descriptions currently use their
+English or German publication text. `baylee://challenge/<32 lowercase hex digits>`
+hands the task identity to the installed client without an account, seed or token
+in the link. Account operations remain same-origin cookie requests.
+
+Listing is an explicit per-task opt-in. A hint requires a second confirmation
+before Central records assistance and returns its text. Already-earned results
+remain visible, and withdrawing the listing refreshes the displayed ranking.
+The account's metadata download includes both paginated challenge datasets, with
+strict cursor validation and explicit completeness/cursor fields at its browser
+limit of 7,680 rows per dataset. `Session::export_challenges` streams the full
+dataset to native callers without holding it all in memory.
+
+Website checks on 13 November:
+
+- 143 web/server library tests passed; shared export cursor regressions passed.
+- Production public/admin WebAssembly asset builds and browser type/lint checks passed.
+- 10 targeted desktop/phone browser tests passed: server rendering without
+  JavaScript, opaque client links, escaped names, shared ranks, hints, persistent
+  consent, outage/retry and the combined account export.
+- 10 additional checks passed: English/German challenge pages in both colour
+  schemes, accessibility, control target sizes and every page at 320–2,560 px in
+  portrait/landscape. Browser servers exited and port 28792 was closed.
+- Fixed findings: an inert medal element rejected by Trusted Types, duplicate
+  landmark names, a table inaccessible to keyboard scrolling, small deck controls,
+  and clicks arriving before hydration. The site's security policy was retained.
+
+These checks use synthetic browser responses. They do not yet prove that a real
+engine result appears on the website or that the installed game follows the link.

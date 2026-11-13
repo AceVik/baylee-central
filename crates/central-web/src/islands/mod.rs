@@ -16,6 +16,7 @@ mod admin;
 mod auth;
 mod b64;
 mod central;
+mod challenges;
 mod chat;
 mod clip;
 mod contact;
@@ -49,6 +50,8 @@ pub(crate) use account::Account;
 pub(crate) use admin::Administration;
 #[cfg(not(target_arch = "wasm32"))]
 pub(crate) use auth::{Register, SignIn};
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) use challenges::Challenges;
 #[cfg(not(target_arch = "wasm32"))]
 pub(crate) use chat::Messenger;
 #[cfg(not(target_arch = "wasm32"))]
