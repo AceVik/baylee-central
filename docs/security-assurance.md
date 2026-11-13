@@ -7522,3 +7522,24 @@ is; the hook builds the worker with the other two binaries, each named, and
 installs it after its checks. #65 adds no route to the account listener, so
 nothing of it escapes the protocol layer; its upload route is the browser
 listener's. Its SDK stand-in issues a signed token.
+
+Run on the final tree, after #65 and the rebuilt browser crypto (macOS on
+Apple Silicon, under heavy load from other work on the machine): `cargo xtask
+gate` (format, policy, both advisory scopes, clippy, tests, doc tests and the
+release build: passed); the two `wasm32` clippy runs, plain and with
+`--features admin`; `cargo xtask crypto-scope`; `cargo xtask smoke`; `cargo
+xtask secrets`; `cargo xtask postgres` (twice it ran out of its 300 seconds
+while the machine's load was above 40, then passed alone); `cargo deny check`
+(0.20.2) and `cargo audit --deny warnings` (0.22.2) on the graph with the
+picture codecs; `cargo xtask wasm` and `cargo xtask wasm --check` in the
+pinned image; `cargo build -p central-web-server` and `cargo xtask site`; in
+`web/`, `npm ci` and `npm run check`; the whole `web/e2e-site` suite with four
+workers: 684 passed, 9 skipped by their own conditions, 9 failed, eight of them
+on the test's time limit at a load above 60, and all eight passed when run
+again on one worker. The ninth, the feedback report's triage
+(`feedback-report.spec.ts:84`), failed once more and then passed seven times
+of eight: a flake in a test and an island that the merges left byte for byte
+as #65 had them. Not run: CI itself, the x86-64 build of the picture codecs
+with `nasm`, the codec's `ffmpeg` tests (skipped without it here), the deploy
+hook as a whole, `web/e2e-real` (type-checked only), and anything against a
+real gateway or a real Central.
