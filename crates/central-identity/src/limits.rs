@@ -189,6 +189,7 @@ fn class(request: &Request) -> Class {
             | Request::Challenges {
                 request: central_api::challenges::Request::Catalogue { .. }
                     | central_api::challenges::Request::Detail { .. }
+                    | central_api::challenges::Request::Tower { request: central_api::tower::Request::Read { .. } }
             }
             | Request::Terms
             | Request::GatewayTerms { .. }
@@ -242,6 +243,9 @@ fn tells(request: &Request) -> Tells {
                 request,
                 central_api::challenges::Request::Catalogue { .. }
                     | central_api::challenges::Request::Detail { .. }
+                    | central_api::challenges::Request::Tower {
+                        request: central_api::tower::Request::Read { .. }
+                    }
             ) =>
         {
             Tells::Proves

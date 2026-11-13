@@ -31,7 +31,15 @@ fn every_task_and_flag_parses() {
     assert_eq!(
         parse(&args("postgres --exercise-failure")),
         Ok(Task::Postgres {
-            exercise_failure: true
+            exercise_failure: true,
+            tower_only: false,
+        })
+    );
+    assert_eq!(
+        parse(&args("postgres --tower-only")),
+        Ok(Task::Postgres {
+            exercise_failure: false,
+            tower_only: true,
         })
     );
     assert_eq!(

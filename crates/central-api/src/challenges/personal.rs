@@ -1,5 +1,5 @@
 //! Account-owned task progress and paginated metadata export.
-use super::{AttemptState, Kind};
+use super::AttemptState;
 use serde::{Deserialize, Serialize};
 
 /// Permanent task progress. Failed later retries never erase accomplishments.
@@ -40,6 +40,18 @@ pub enum ExportTable {
     Attempts,
 }
 
+/// Execution activity, separate from the two calendar cadences.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AttemptKind {
+    /// A daily task.
+    Daily,
+    /// A weekly task.
+    Weekly,
+    /// One manually played expedition floor.
+    Tower,
+}
+
 /// One attempt's personal metadata. No token, private package or record is exported.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -49,7 +61,7 @@ pub struct ExportedAttempt {
     /// Task identity.
     pub challenge: [u8; 16],
     /// Kind, retained with the attempt.
-    pub kind: Kind,
+    pub kind: AttemptKind,
     /// Original client idempotency identity, not a capability.
     pub request_id: [u8; 16],
     /// Claimed game identity.

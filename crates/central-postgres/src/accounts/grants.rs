@@ -61,8 +61,15 @@ impl AccountStore {
              ('challenges', ARRAY['SELECT','INSERT'], ARRAY['withdrawn']),
              ('challenge_participation', ARRAY['SELECT','INSERT','UPDATE','DELETE'], NULL),
              ('challenge_attempts', ARRAY['SELECT','INSERT','UPDATE','DELETE'], NULL),
-             ('challenge_completions', ARRAY['SELECT','INSERT','UPDATE','DELETE'], NULL))
-             SELECT count(*) = 46 AND bool_and(
+             ('challenge_completions', ARRAY['SELECT','INSERT','UPDATE','DELETE'], NULL),
+             ('tower_seasons', ARRAY['SELECT','INSERT'], ARRAY['published','withdrawn']),
+             ('tower_nodes', ARRAY['SELECT','INSERT'], NULL),
+             ('tower_participation', ARRAY['SELECT','INSERT','UPDATE','DELETE'], NULL),
+             ('tower_runs', ARRAY['SELECT','INSERT','UPDATE','DELETE'], NULL),
+             ('tower_actions', ARRAY['SELECT','INSERT','DELETE'], NULL),
+             ('tower_scores', ARRAY['SELECT','INSERT','UPDATE','DELETE'], NULL),
+             ('tower_accomplishments', ARRAY['SELECT','INSERT','UPDATE','DELETE'], NULL))
+             SELECT count(*) = 53 AND bool_and(
                NOT pg_catalog.pg_has_role(c.relowner, 'USAGE')
                AND (SELECT bool_and(pg_catalog.has_table_privilege(c.oid, p)) FROM unnest(r.privileges) p)
                AND NOT pg_catalog.has_table_privilege(c.oid, 'TRUNCATE, REFERENCES, TRIGGER, MAINTAIN, SELECT WITH GRANT OPTION, INSERT WITH GRANT OPTION, UPDATE WITH GRANT OPTION, DELETE WITH GRANT OPTION')

@@ -29,6 +29,8 @@ pub enum Task {
     Postgres {
         /// Fail on purpose once the fixture is up, to prove its cleanup.
         exercise_failure: bool,
+        /// Only expedition state, accounting and migration regressions.
+        tower_only: bool,
     },
     /// The development listener smoke test.
     Smoke {
@@ -56,7 +58,7 @@ tasks:
   gate [--client]               fmt, policy, clippy, tests, doc tests, release build;
                                 --client: only the client's crates, no release build
   policy [--compiler-probe]     the code policy: unsafe, native sources, links, dependencies
-  postgres [--exercise-failure] the PostgreSQL integration fixture (needs Docker and OpenSSL)
+  postgres [--exercise-failure | --tower-only] the PostgreSQL integration fixture (needs Docker and OpenSSL)
   smoke [--exercise-failure]    the development listener smoke test (build --release first)
   secrets                       the secret scan of the tree and the full history (pinned gitleaks)
   wasm [--check]                the website's WebAssembly crypto and glue (crates/central-web/crypto)
@@ -87,9 +89,15 @@ pub fn parse(args: &[String]) -> Result<Task> {
         }),
         ("postgres", None) => Ok(Task::Postgres {
             exercise_failure: false,
+            tower_only: false,
         }),
         ("postgres", Some("--exercise-failure")) => Ok(Task::Postgres {
             exercise_failure: true,
+            tower_only: false,
+        }),
+        ("postgres", Some("--tower-only")) => Ok(Task::Postgres {
+            exercise_failure: false,
+            tower_only: true,
         }),
         ("smoke", None) => Ok(Task::Smoke {
             exercise_failure: false,
@@ -121,7 +129,10 @@ pub fn run(args: &[String]) -> Result<()> {
             println!("{}", policy::PASSED);
             Ok(())
         }
-        Task::Postgres { exercise_failure } => postgres::run(&root, exercise_failure),
+        Task::Postgres {
+            exercise_failure,
+            tower_only,
+        } => postgres::run(&root, exercise_failure, tower_only),
         Task::Smoke { exercise_failure } => smoke::run(&root, exercise_failure),
         Task::Secrets => secrets::run(&root),
         Task::Wasm { check } => wasm::run(&root, check),

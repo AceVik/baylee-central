@@ -70,19 +70,23 @@ pub(super) async fn complete(
         .await
         .map_err(unavailable)?
         .ok_or(Error::Unavailable)?;
-    match effective {
-        AttemptState::Won => award(db, me, &challenge, &row, result).await?,
-        AttemptState::Lost | AttemptState::Abandoned => {
-            db.execute_raw(statement(
-                "UPDATE central_identity.challenge_participation SET failures=failures+1
+    if row.try_get::<String>("", "kind").map_err(unavailable)? == "tower" {
+        super::tower::complete(db, me, &row).await?;
+    } else {
+        match effective {
+            AttemptState::Won => award(db, me, &challenge, &row, result).await?,
+            AttemptState::Lost | AttemptState::Abandoned => {
+                db.execute_raw(statement(
+                    "UPDATE central_identity.challenge_participation SET failures=failures+1
                  WHERE account_id=$1 AND challenge_id=$2",
-                vec![me.into(), task_id.into()],
-            ))
-            .await
-            .map_err(unavailable)?;
+                    vec![me.into(), task_id.into()],
+                ))
+                .await
+                .map_err(unavailable)?;
+            }
+            AttemptState::Void => {}
+            AttemptState::Reserved | AttemptState::Playing => return Err(Error::Rejected),
         }
-        AttemptState::Void => {}
-        AttemptState::Reserved | AttemptState::Playing => return Err(Error::Rejected),
     }
     Ok(api::HostResponse::Attempt {
         attempt: attempt(&row, origin)?,

@@ -35,6 +35,7 @@ mod m20261111_000025_gateway_activity;
 mod m20261112_000026_email;
 mod m20261112_000027_pictures;
 mod m20261113_000028_challenges;
+mod m20261113_000029_tower;
 
 use sea_orm_migration::{
     MigrationTrait, MigratorTrait,
@@ -75,6 +76,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261112_000026_email::Migration),
             Box::new(m20261112_000027_pictures::Migration),
             Box::new(m20261113_000028_challenges::Migration),
+            Box::new(m20261113_000029_tower::Migration),
         ]
     }
 }

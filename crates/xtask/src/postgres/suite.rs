@@ -14,14 +14,30 @@ use crate::workspace;
 
 const PASSED: &str = "test result: ok. 1 passed; 0 failed";
 
-pub(super) fn run(root: &Path, port: u16, secrets: &Secrets, tls: &Path) -> Result<()> {
+pub(super) fn run(
+    root: &Path,
+    port: u16,
+    secrets: &Secrets,
+    tls: &Path,
+    tower_only: bool,
+) -> Result<()> {
+    if tower_only {
+        return run_suite(root, port, secrets, tls, "central-postgres", true);
+    }
     for package in ["central-client", "central-postgres"] {
-        run_suite(root, port, secrets, tls, package)?;
+        run_suite(root, port, secrets, tls, package, false)?;
     }
     Ok(())
 }
 
-fn run_suite(root: &Path, port: u16, secrets: &Secrets, tls: &Path, package: &str) -> Result<()> {
+fn run_suite(
+    root: &Path,
+    port: u16,
+    secrets: &Secrets,
+    tls: &Path,
+    package: &str,
+    tower_only: bool,
+) -> Result<()> {
     println!("Running {package}'s PostgreSQL integration suite.");
     let mut command = Command::new(workspace::cargo());
     command
@@ -38,6 +54,13 @@ fn run_suite(root: &Path, port: u16, secrets: &Secrets, tls: &Path, package: &st
         .env("CENTRAL_TEST_LEGACY_PASSWORD", &secrets.legacy)
         .env("CENTRAL_TEST_CA_PEM", tls.join("ca.pem"))
         .env("CENTRAL_TEST_WRONG_CA_PEM", tls.join("wrong.pem"));
+    if package == "central-postgres" {
+        command.arg(if tower_only {
+            "tower_authority"
+        } else {
+            "migrations_ids_roles_rollback_and_locking"
+        });
+    }
     let tests = Watched::start(&mut command, "PostgreSQL integration tests failed")?;
     let (status, stdout, stderr) = tests.finish(
         Duration::from_secs(300),

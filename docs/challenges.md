@@ -51,6 +51,10 @@ Unfinished or uncertified generation is never published as a fallback.
 
 ## Deliverables
 
+The related [Oak Tower expedition](tower.md) reuses the official execution and
+delivery boundary. Its private nodes, attempts, rankings and rewards are a
+separate activity, never additional Daily/Weekly calendar entries.
+
 - Daily and more demanding weekly candidates, automatic advance generation,
   fresh executions and exact replay verification, three witnesses from at least
   two conservatively recognised solution families.

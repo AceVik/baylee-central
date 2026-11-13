@@ -12,7 +12,7 @@ pub(super) async fn catalogue(
     let rows = db
         .query_all_raw(statement(
             "SELECT id,description::text,digest,withdrawn FROM central_identity.challenges
-         WHERE starts_at<=floor(extract(epoch FROM pg_catalog.clock_timestamp()))
+         WHERE scope=0 AND starts_at<=floor(extract(epoch FROM pg_catalog.clock_timestamp()))
          AND ($1::bigint IS NULL OR starts_at<$1) ORDER BY starts_at DESC,kind LIMIT 31",
             vec![before.into()],
         ))
@@ -130,7 +130,7 @@ pub(super) async fn progress(
     let rows = db
         .query_all_raw(statement(
             "SELECT * FROM central_identity.challenge_attempts WHERE account_id=$1
-         AND state IN ('reserved','playing') ORDER BY created_at,id LIMIT 2",
+         AND kind!='tower' AND state IN ('reserved','playing') ORDER BY created_at,id LIMIT 2",
             vec![me.into()],
         ))
         .await

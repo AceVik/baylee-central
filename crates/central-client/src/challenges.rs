@@ -9,7 +9,11 @@ use central_api::challenges as api;
 pub fn read(transport: &impl Transport, request: api::Request) -> Result<api::Response, Error> {
     if !matches!(
         request,
-        api::Request::Catalogue { .. } | api::Request::Detail { .. }
+        api::Request::Catalogue { .. }
+            | api::Request::Detail { .. }
+            | api::Request::Tower {
+                request: central_api::tower::Request::Read { .. }
+            }
     ) {
         return Err(Error::Rejected);
     }
