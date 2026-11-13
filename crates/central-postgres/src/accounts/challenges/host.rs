@@ -42,12 +42,16 @@ pub(super) async fn dispatch(
         }),
         api::HostRequest::Finish { result } => finish::complete(db, &result, origin).await,
         api::HostRequest::Withdraw { challenge: id } => {
-            db.execute_raw(statement(
-                "UPDATE central_identity.challenges SET withdrawn=true WHERE id=$1",
-                vec![uuid(id).into()],
-            ))
-            .await
-            .map_err(unavailable)?;
+            let changed = db
+                .execute_raw(statement(
+                    "UPDATE central_identity.challenges SET withdrawn=true WHERE id=$1 AND scope=0",
+                    vec![uuid(id).into()],
+                ))
+                .await
+                .map_err(unavailable)?;
+            if changed.rows_affected() != 1 {
+                return Err(Error::Rejected);
+            }
             Ok(api::HostResponse::Challenge {
                 challenge: task(db, id, true).await?,
             })

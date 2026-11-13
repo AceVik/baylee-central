@@ -24,6 +24,29 @@ pub(super) async fn result(
     let started = start(store, token, run).await;
     let attempt = claim(store, started.attempt.unwrap(), owner).await;
     finish(store, completion(&attempt, state, 10, milliseconds)).await;
+    let found = mutate(
+        store,
+        token,
+        tower::Request::Locate {
+            game: attempt.game.unwrap(),
+        },
+    )
+    .await;
+    assert_eq!(
+        found.id, run.id,
+        "finished games retain their exact expedition context"
+    );
+    assert!(matches!(
+        call(
+            store,
+            None,
+            tower::Request::Locate {
+                game: attempt.game.unwrap()
+            }
+        )
+        .await,
+        Err(Error::Rejected)
+    ));
     read_run(store, token, run.id).await
 }
 

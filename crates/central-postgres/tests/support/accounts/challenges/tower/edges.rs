@@ -215,6 +215,16 @@ async fn withdrawal(store: &AccountStore, a: &Token, alice: Identity, season: [u
     )
     .await;
     let playing = play::start(store, a, &ready).await;
+    assert!(matches!(
+        host(
+            store,
+            HostRequest::Withdraw {
+                challenge: ready.encounter.id
+            }
+        )
+        .await,
+        Err(Error::Rejected)
+    ));
     let attempt = claim(store, playing.attempt.unwrap(), alice).await;
     publish_tower(store, tower::HostRequest::Withdraw { season })
         .await

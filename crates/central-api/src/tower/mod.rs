@@ -211,6 +211,11 @@ pub enum Request {
         /// Owned identity.
         run: [u8; 16],
     },
+    /// Restore the expedition context of an owned game after a client restart.
+    Locate {
+        /// Official game identity, matched through this account's reserved attempt.
+        game: [u8; 16],
+    },
     /// Start a new expedition with three lives; does not reveal an opening.
     Begin {
         /// Public season identity.

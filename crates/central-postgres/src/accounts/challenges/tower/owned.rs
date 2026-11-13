@@ -13,6 +13,7 @@ pub(super) async fn dispatch(
     let run = match &request {
         api::Request::Read { .. } => return Err(Error::Rejected),
         api::Request::Run { run } => *run,
+        api::Request::Locate { game } => locate(db, me, *game).await?,
         api::Request::Begin {
             season,
             request_id,
@@ -92,6 +93,17 @@ pub(super) async fn dispatch(
     Ok(api::Response::Run {
         run: Box::new(load(db, me, run, origin).await?),
     })
+}
+
+async fn locate(db: &DatabaseTransaction, me: Uuid, game: [u8; 16]) -> Result<[u8; 16], Error> {
+    id_valid(game)?;
+    let row = db.query_one_raw(statement(
+        "SELECT t.run_id FROM central_identity.challenge_attempts a
+         JOIN central_identity.tower_actions t ON t.account_id=a.account_id AND t.request_id=a.request_id
+         WHERE a.account_id=$1 AND a.game_id=$2 AND a.kind='tower'",
+        vec![me.into(), uuid(game).into()])).await.map_err(unavailable)?.ok_or(Error::Rejected)?;
+    let run: Uuid = row.try_get("", "run_id").map_err(unavailable)?;
+    Ok(*run.as_bytes())
 }
 
 async fn begin(
