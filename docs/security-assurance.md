@@ -10,6 +10,11 @@ need a written rationale. Source: https://github.com/OWASP/ASVS/tree/v5.0.0
 
 ## Three-pass method for every security milestone
 
+The Daily/Weekly feature's design, implementation and adversarial evidence is
+recorded in [the challenge assurance record](challenge-assurance.md). Its three
+engineering improvement rounds precede the independent PR review; neither is
+a production release approval.
+
 1. Design: identify assets, caller trust, failure modes and invariants before code.
 2. Implementation: inspect boundaries, default-deny behavior, resource limits,
    secrets/diagnostics, ownership, cancellation and dependencies.
