@@ -1,9 +1,12 @@
-# central-wasm — the browser crypto, built
+# The browser crypto, built
 
 Generated: do not edit. `central-web-crypto` (`crates/central-web-crypto`,
 `docs/web-accounts.md` §"Browser crypto") built to WebAssembly and wrapped by
 wasm-bindgen 0.2.130, the version of the crate's own `wasm-bindgen`
-dependency. It is committed so that `npm run build` needs no Rust.
+dependency. It is committed so that the site's build (`cargo xtask site`)
+and the browser tests take the exact module CI checked. It lived in
+`web/src/central-wasm/` until the React build of `web/` was removed
+(12.11.2026); the bytes did not change.
 
 | file | what |
 | --- | --- |
@@ -11,6 +14,7 @@ dependency. It is committed so that `npm run build` needs no Rust.
 | `central_web_crypto.js` | wasm-bindgen's glue (`--target web`) |
 | `central_web_crypto.d.ts`, `central_web_crypto_bg.wasm.d.ts` | its types |
 | `SHA256SUMS` | the SHA-256 of each of the four |
+| `package.json` | kept by hand: tells Node that the glue is an ES module, for `web/e2e-real/site.ts`, which imports it |
 
 Only the account and chat crypto workers import it: the module runs in module
 workers, never on the page's thread.
@@ -45,5 +49,7 @@ docker run --rm --platform linux/amd64 -v "$PWD":/work -w /work -e CARGO_TARGET_
 
 `cargo xtask wasm --check` builds into a temporary directory and fails
 unless every file here equals that build byte for byte; CI runs it, so what
-is committed is what the source builds. `test/central-wasm.test.ts` checks
-the sums and runs the module itself on every `npm run check`.
+is committed is what the source builds. `cargo xtask site` checks the sums
+before it puts the module into the site, and the site's browser tests run it
+in its Worker (`web/e2e-site`, the sign-in, registration, reset and chat
+specs); `web/e2e-real/site.ts` runs it in Node against a real Central.

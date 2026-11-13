@@ -1369,7 +1369,6 @@ admin-legacy-locked = 锁定至 { $until }
 
 ## The feedback moderation (/account/admin/feedback)
 
-fb-to-overview = Administration overview
 fb-title = 反馈与崩溃报告
 fb-report-title = 报告
 fb-reports = 报告

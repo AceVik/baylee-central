@@ -39,8 +39,10 @@ pub const GENERATED: [&str; 4] = [
 ];
 /// The sums file beside them.
 pub const SUMS: &str = "SHA256SUMS";
-/// Files in the committed directory that the build does not write.
-const KEPT: [&str; 1] = ["README.md"];
+/// Files in the committed directory that the build does not write: what the
+/// module is, and the `package.json` that tells Node the glue is an ES
+/// module (the real-service browser tests import it from outside `web/`).
+const KEPT: [&str; 2] = ["README.md", "package.json"];
 
 const TARGET: &str = "wasm32-unknown-unknown";
 const PROFILE: &str = "wasm";
@@ -341,7 +343,9 @@ mod tests {
             fs::write(committed.path().join(name), name).unwrap();
         }
         fs::write(committed.path().join(SUMS), sums(fresh.path()).unwrap()).unwrap();
-        fs::write(committed.path().join("README.md"), "kept").unwrap();
+        for name in KEPT {
+            fs::write(committed.path().join(name), "kept").unwrap();
+        }
         compare(fresh.path(), committed.path()).unwrap();
 
         fs::write(

@@ -1377,11 +1377,12 @@ admin-legacy-restored = Wiederhergestellt
 admin-legacy-banned = Gesperrt
 admin-legacy-must-change = Neues Passwort verlangt
 admin-legacy-locked = Ausgesperrt bis { $until }
+
+
 ## Die Moderation von Feedback und Absturzberichten (/account/admin/feedback)
 
 fb-title = Feedback und Absturzberichte
 fb-report-title = Bericht
-fb-to-overview = Übersicht der Verwaltung
 fb-reports = Berichte
 fb-refresh = Neu laden
 fb-views = Ansichten

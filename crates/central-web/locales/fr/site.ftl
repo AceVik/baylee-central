@@ -1501,7 +1501,6 @@ admin-legacy-locked = Verrouillé jusqu’à { $until }
 
 ## The feedback moderation (/account/admin/feedback)
 
-fb-to-overview = Administration overview
 fb-title = Retours et rapports de plantage
 fb-report-title = Rapport
 fb-reports = Rapports

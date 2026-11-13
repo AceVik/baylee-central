@@ -1725,6 +1725,7 @@ migrations and `Cargo.lock` are untouched); no dependency.
   against a real Central and PostgreSQL; deleting the old build once the
   feedback is here.
 
+
 ## 26. As built: the feedback moderation (12.11.2026)
 
 The old build's report moderation (`web/src/admin/feedback/`, removed 12.11.2026, its routes

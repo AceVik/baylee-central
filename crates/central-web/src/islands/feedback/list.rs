@@ -32,6 +32,7 @@ use super::shared::{
 use super::text::{
     alias, day_of, first_line, hex, kind_word, priority_text, short_id, size, status_word,
 };
+use crate::data::Section;
 use crate::words::{self, Lang};
 
 /// The list as it was read.
@@ -1942,9 +1943,8 @@ pub fn page(c: Ctx) -> AnyView {
             view! { <p class="meta">{words::fb_trash_hint(lang, &days)}</p> }
         })
     };
-    let overview = format!("/{}/account/admin/overview", lang.code());
     view! {
-        <p class="fb-back"><a href=overview class="text-link">{glyph::glyph(glyph::BACK)}<span>{words::fb_to_overview(lang)}</span></a></p>
+        {super::super::admin::nav(lang, Section::Feedback)}
         <div class="card fb-panel">
             <div class="fb-panel-head">
                 <h2 id="fb-list-title" tabindex="-1">{words::fb_reports(lang)}</h2>

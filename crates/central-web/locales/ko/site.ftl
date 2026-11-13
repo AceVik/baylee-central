@@ -1369,7 +1369,6 @@ admin-legacy-locked = { $until }까지 잠김
 
 ## The feedback moderation (/account/admin/feedback)
 
-fb-to-overview = Administration overview
 fb-title = 피드백과 크래시 신고
 fb-report-title = 신고
 fb-reports = 신고

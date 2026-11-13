@@ -37,6 +37,9 @@ mod overview;
 mod user;
 mod users;
 
+/// The administration's navigation, which the feedback's pages show too.
+pub use common::nav;
+
 use std::sync::Arc;
 
 use central_api::admin::{AccountQuery, AccountState, AdminAccount, AdminAnswer, AdminRequest};

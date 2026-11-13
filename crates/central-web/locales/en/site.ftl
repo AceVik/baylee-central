@@ -1375,11 +1375,12 @@ admin-legacy-restored = Restored
 admin-legacy-banned = Banned
 admin-legacy-must-change = New password required
 admin-legacy-locked = Locked until { $until }
+
+
 ## The feedback moderation (/account/admin/feedback)
 
 fb-title = Feedback and crash reports
 fb-report-title = Report
-fb-to-overview = Administration overview
 fb-reports = Reports
 fb-refresh = Refresh
 fb-views = Views

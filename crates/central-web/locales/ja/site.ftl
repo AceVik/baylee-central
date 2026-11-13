@@ -1373,7 +1373,6 @@ admin-legacy-locked = { $until }までロック中
 
 ## The feedback moderation (/account/admin/feedback)
 
-fb-to-overview = Administration overview
 fb-title = フィードバックとクラッシュ報告
 fb-report-title = 報告
 fb-reports = 報告

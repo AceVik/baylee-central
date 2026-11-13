@@ -1387,7 +1387,6 @@ admin-legacy-locked = Заблокирован до { $until }
 
 ## The feedback moderation (/account/admin/feedback)
 
-fb-to-overview = Administration overview
 fb-title = Отзывы и отчёты о сбоях
 fb-report-title = Отчёт
 fb-reports = Отчёты

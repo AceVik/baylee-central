@@ -763,7 +763,6 @@ async fn the_administration_s_other_pages_are_islands_linked_from_nowhere() {
     assert_eq!(status, StatusCode::FOUND);
     assert_eq!(headers["location"], "/de/account/admin/gateways");
 }
-
 /// The feedback moderation: the list and one report's page, under the
 /// account area as the reset code's page is, not indexed, in no sitemap
 /// and linked from no page the server renders. Every report's address is

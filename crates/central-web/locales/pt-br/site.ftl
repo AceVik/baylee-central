@@ -1378,7 +1378,6 @@ admin-legacy-locked = Bloqueada até { $until }
 
 ## The feedback moderation (/account/admin/feedback)
 
-fb-to-overview = Administration overview
 fb-title = Feedback e relatórios de falhas
 fb-report-title = Relatório
 fb-reports = Relatórios

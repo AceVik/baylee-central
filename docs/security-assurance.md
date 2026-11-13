@@ -1109,7 +1109,7 @@ including responsive light/dark palettes and a local photograph album. Keep
 account protocols, server boundaries, CSP, dependency versions and external
 origins unchanged. Photographs are the existing metadata-stripped derivatives;
 no production account, private database or credentials enter the test setup.
-Asset provenance is in `web/assets-sunlight.md`.
+Asset provenance is in `web/assets-sunlight.md` (since 12.11.2026 `docs/assets-sunlight.md`).
 
 Implementation pass: decorative images ignore pointer input; the interactive
 cloud is a labelled native button opening the shared native dialog. No HTML
@@ -7058,6 +7058,7 @@ find one element each), `cargo xtask postgres`, `smoke`, `cargo audit`,
 `cargo deny` (no dependency changed).
 
 Engineering review, not an audit.
+
 
 ## The new site moderates bug and crash reports, 12 November 2026
 

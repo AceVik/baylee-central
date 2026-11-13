@@ -69,8 +69,11 @@ ships from `main` until M1 and M6 below are done.
   browser API under `/api`, proxied to Central's browser routes.
   `central.baylee.app` stays the native API. Its boundary (no Origin, no
   cookies) stays as it is.
-- The web app lives in this repository under `web/`. Stack as Baylee's
-  `web/feedback`: React 19, TypeScript 7, Vite, oxlint, vitest and Playwright.
+- The web app lived in this repository under `web/` (React 19, TypeScript 7,
+  Vite, oxlint, vitest and Playwright). Since 12.11.2026 the website is the
+  server-rendered Rust site in `crates/central-web*`
+  ([proposal](proposals/frontend-rewrite.md)); `web/` keeps only its browser
+  tests.
   German and English, mobile first, WCAG 2.1 AA, no third-party trackers.
 - Browser sign-in uses the same OPAQUE protocol, compiled to WebAssembly from
   `central-crypto`'s client side; the server never sees the password. The browser

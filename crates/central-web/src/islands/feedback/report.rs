@@ -35,6 +35,7 @@ use super::text::{
     short_id, size, status_word,
 };
 use super::tree::tree;
+use crate::data::Section;
 use crate::words::{self, Lang};
 
 #[derive(Clone, Debug)]
@@ -1479,10 +1480,8 @@ pub fn page(c: Ctx) -> AnyView {
         .as_ref()
         .and_then(|l| l.search().ok())
         .unwrap_or_default();
-    let overview = format!("/{}/account/admin/overview", lang.code());
-    let back = view! {
-        <p class="fb-back"><a href=overview class="text-link">{glyph::glyph(glyph::BACK)}<span>{words::fb_to_overview(lang)}</span></a></p>
-    };
+    // the administration's navigation stands above every state of the page
+    let back = super::super::admin::nav(lang, Section::Report);
     let Some(id) = query::report_at(&path) else {
         // an address no report has: nothing is asked
         return view! {
