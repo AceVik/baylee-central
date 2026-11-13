@@ -30,6 +30,15 @@ opt-level = 3
 [profile.dev.package.blake2]
 opt-level = 3
 
+# The real signature-flood integration exercises a one-second verification
+# budget. Unoptimised curve arithmetic on CI can take longer than that window
+# to make the requests themselves. Keep the production limits and assertions;
+# optimise the same vetted signature arithmetic, with overflow checks retained.
+[profile.dev.package.curve25519-dalek]
+opt-level = 3
+[profile.dev.package.ed25519-dalek]
+opt-level = 3
+
 # The picture worker's codecs (docs/profile-pictures.md) unoptimised take
 # seconds per AVIF and per hostile file in the tests; optimised, the suite
 # and its mutation loops stay short. Checks stay on.

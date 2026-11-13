@@ -52,6 +52,10 @@ cargo xtask gate
 cargo xtask postgres
 ```
 
+The native HTTP and store suites run separately against the same owned fixture,
+each with a five-minute deadline and an explicit check that its expected test ran.
+Both must pass; a completed first suite cannot consume the second suite's deadline.
+
 ([xtask](xtask.md)). The latter creates a fresh pinned official PostgreSQL image with ephemeral data,
 a loopback-only random published port, memory/CPU/process limits and random
 synthetic credentials. DDL and runtime logins are distinct. PUBLIC database TEMP

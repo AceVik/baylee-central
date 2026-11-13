@@ -40,10 +40,20 @@ rewards, withdrawal, equal ranks, late delivery and the exact UTC deadline, expo
 isolation, upgrade and deletion. The final complete gate (format, policy, clippy,
 tests, doc tests and release build), HTTP smoke, crypto scope, audit 0.22.2, deny
 0.20.2, browser type/lint and secret scans passed. The final PostgreSQL rerun passed:
-real native HTTP integration in 106.90 seconds and the complete store suite in
-90.69 seconds, with its owned container/listener removed. Earlier runs under
+real native HTTP integration in 160.54 seconds and the complete store suite in
+147.15 seconds, with its owned container/listener removed. Earlier runs under
 concurrent compilation hit statement/fixture deadlines; those failures were not
-counted as passes. Independent PR review is still pending.
+counted as passes. The runner now gives each required suite its own five-minute
+deadline and reports it separately. One cold run still exceeded that bound; the
+subsequent run with compiled binaries passed both suites. A process sample showed
+active Argon2 enrollment work rather than a database deadlock.
+
+The PR's first Linux PostgreSQL CI run also exposed the existing signature-flood
+test's dependence on completing real Ed25519 checks within one second. Development
+builds now optimise the existing curve25519-dalek and ed25519-dalek arithmetic,
+as they already do Argon2. Production budgets, assertions and dependency versions
+are unchanged. The complete gate and real integration passed with these settings;
+the updated CI run and independent PR review are still pending.
 
 The final real automatic publisher check also passed in 128.30 seconds, including
 fresh Daily/Weekly tasks and zero duplicate publications on a repeated pass. A
