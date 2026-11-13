@@ -74,6 +74,7 @@ impl Presented {
 pub const fn credential_operation(request: &Request) -> bool {
     match request {
         Request::GatewayHeartbeat { .. }
+        | Request::GatewayPulse { .. }
         | Request::GatewayStatus
         | Request::RegisterInvalidate { .. }
         | Request::GatewayRevocations { .. }
@@ -94,6 +95,7 @@ pub const fn credential_operation(request: &Request) -> bool {
         | Request::DeleteObject { .. }
         | Request::RegisterGateway { .. }
         | Request::GatewayDirectory { .. }
+        | Request::PublicFigures { .. }
         | Request::SetGatewayAdmins { .. }
         | Request::Discover { .. }
         | Request::LoginStart { .. }
@@ -101,6 +103,8 @@ pub const fn credential_operation(request: &Request) -> bool {
         | Request::LegacyLogin { .. }
         | Request::LegacyExport
         | Request::LegacyLink { .. }
+        | Request::RegisterChallenge
+        | Request::RegisterChallengeFor { .. }
         | Request::Register { .. }
         | Request::EnrollmentStart { .. }
         | Request::EnrollmentFinish { .. }
@@ -120,6 +124,8 @@ pub const fn credential_operation(request: &Request) -> bool {
         | Request::ChangePasswordFinish { .. }
         | Request::ResetStart { .. }
         | Request::ResetFinish { .. }
+        | Request::ResetMail { .. }
+        | Request::Email { .. }
         | Request::Owner { .. }
         | Request::Admin { .. }
         | Request::AccountExport

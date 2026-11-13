@@ -488,9 +488,9 @@ vouched for:
   store refuses for a token that is no live session or credential:
   `SessionStatus`, `RenewSession`, `AccountSummary`, `TermsStatus`,
   `Social`, `Notifications`, the object and document requests,
-  `GatewayTicket`, `GatewaySession`, `GatewayProfile`, `RedeemGateway`,
-  `GatewayHeartbeat`, `GatewayPulse`, `GatewayStatus`, `CheckGatewayAdmin`
-  (a request that is not on this list vouches for nothing);
+  `GatewayToken`, `RegisterInvalidate`, `GatewayRevocations`,
+  `GatewayHeartbeat`, `GatewayPulse`, `GatewayStatus` (a request that is
+  not on this list vouches for nothing);
 - the official gateway's bridge credential, always.
 
 A bearer stays vouched for for 30 minutes after the last such answer (a
@@ -501,6 +501,20 @@ back, and the session's end does at once: `Logout`, a password change's
 finish, a deletion's finish, and `PairCancel`, which is answered alike for
 any token. Being vouched for is a count's input and nothing else: what a
 token may do is the store's to decide at every request, as before.
+
+**Signed bearers** (*since migration 000024*). On the account listener a
+native session's bearer is a signed Central token
+([gateway registry](gateway-registry.md#session-tokens)). It is verified
+before these budgets count anything, under a budget of its own: 1,024
+signature checks a second for all native requests together
+(`SIGNATURES_PER_SECOND`). A token that does not verify is refused there,
+and a capability presented bare is refused for a client's operation
+(`credential_operation`), both before these budgets. What reaches them as
+a session's bearer is the capability inside a token that verified, and
+that is what is vouched for: a sign-in, a password change or a pairing
+vouches for it where it is issued. So on that listener the "any other
+bearer" below is mostly a token whose session ended, and a gateway's bare
+credential.
 
 **Counted.**
 
@@ -562,8 +576,16 @@ or response did:
   second all the time; one alone fills it for nine or ten seconds of each
   minute. A session that is not vouched for then waits: after a restart,
   after half an hour without a request, or after four refusals in a row
-  (refusals of a gateway's questions about a player's lease or ticket are
-  not counted: no player's bad ticket makes a gateway a stranger).
+  (every refusal counts: no request carries a player's token to Central
+  any more, so no player's bad token makes a gateway a stranger).
+- Made-up signed tokens spend nothing of these budgets, but each costs one
+  of the 1,024 signature checks a second that every native session's
+  requests share, and that budget has no share by address. One address
+  that sends them faster than that keeps native sessions at `Busy` while
+  it goes on; sign-in, the website and gateways' credentials are not
+  touched. The signature is checked before the address's own budget,
+  which counts only requests without a session. Giving the signature
+  budget a share by address is open (combined release, 13.11.2026).
   Sessions that are vouched for go on, and so does sign-in.
 - A request without a proxy's address has no place and no share: it meets
   the 64 a second alone, like the other budgets by address. Since

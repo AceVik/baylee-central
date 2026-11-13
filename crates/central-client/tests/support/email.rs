@@ -19,7 +19,7 @@ use super::{
     password::{DOCUMENT, NEW, OLD, Registered, browser_sign_in, context, register, sign_in},
 };
 use central_api::{
-    Endpoint, Error, Token,
+    Bearer, Endpoint, Error, SignedToken, Token,
     admin::{AdminAnswer, AdminRequest},
     email::{EmailRequest, EmailState, MailCode},
     reset_code::ResetCode,
@@ -28,7 +28,7 @@ use central_api::{
 use central_client::{ResetData, Transport};
 use central_crypto::opaque::server::ServerKeys;
 use central_identity::{
-    Delivery, IdentityService, Seen,
+    Delivery, IdentityService, Presented, Seen,
     mail::{Mail, Mailer, Outcome, What},
 };
 use central_postgres::AccountStore;
@@ -122,6 +122,7 @@ impl Fixture<'_> {
             ServerKeys::from_secret_bytes(&self.keys.to_secret_bytes()).unwrap(),
             self.bridge,
             "http://127.0.0.1:28766",
+            super::token_keys(),
         )
         .unwrap()
         .with_terms(Some(super::terms::central_document()));
@@ -162,12 +163,14 @@ impl Asked<'_> {
         Ok(state)
     }
 
-    /// The client's request, with its bearer.
-    fn native(&self, bearer: &Token, request: EmailRequest) -> Result<EmailState, Error> {
+    /// The client's request, with its bearer, read as the account listener
+    /// reads it.
+    fn native(&self, bearer: Bearer<'_>, request: EmailRequest) -> Result<EmailState, Error> {
         pace();
+        let presented = self.service.present(bearer.header().as_str())?;
         let response = self.runtime.block_on(self.service.handle_from(
             Request::Email { request },
-            Some(bearer),
+            Some(&presented),
             None,
         ))?;
         let Response::Email { state } = response else {
@@ -259,12 +262,15 @@ impl Transport for Direct<'_> {
         self.endpoint
     }
 
-    fn exchange(&self, request: &Request, bearer: Option<&Token>) -> Result<Response, Error> {
+    fn exchange(&self, request: &Request, bearer: Option<Bearer<'_>>) -> Result<Response, Error> {
         pace();
-        // As a listener reads it: the request's wire bytes.
+        // As a listener reads it: the bearer's header and the request's wire bytes.
+        let presented = bearer
+            .map(|bearer| self.service.present(bearer.header().as_str()))
+            .transpose()?;
         let request = central_api::decode(&central_api::encode(request)?)?;
         self.runtime
-            .block_on(self.service.handle_from(request, bearer, None))
+            .block_on(self.service.handle_from(request, presented.as_ref(), None))
     }
 }
 
@@ -274,7 +280,7 @@ struct Account {
     name: &'static str,
     registered: Registered,
     cookie: Token,
-    bearer: Token,
+    bearer: SignedToken,
 }
 
 impl Account {
@@ -412,10 +418,13 @@ fn owner(fixture: &Fixture<'_>, asked: &Asked<'_>, home: &Browser) -> Account {
         None,
     );
     // Each listener takes its own kind of session and no other.
+    let Ok(Presented::Session(capability)) = asked.service.present(&bearer.bearer()) else {
+        panic!("a session's own token verifies");
+    };
     for refused in [
-        asked.web(&bearer, EmailRequest::Status),
-        asked.native(&cookie, EmailRequest::Status),
-        asked.native(&Token::generate().unwrap(), EmailRequest::Status),
+        asked.web(&capability, EmailRequest::Status),
+        asked.native((&cookie).into(), EmailRequest::Status),
+        asked.native((&Token::generate().unwrap()).into(), EmailRequest::Status),
     ] {
         assert_eq!(refused.err(), Some(Error::Rejected));
     }
@@ -453,7 +462,7 @@ fn owner(fixture: &Fixture<'_>, asked: &Asked<'_>, home: &Browser) -> Account {
     // other session too. Nobody is told of a first address.
     assert_eq!(asked.web(&cookie, wrong()).err(), Some(Error::Rejected));
     holds(
-        &asked.native(&bearer, confirm(&code)).unwrap(),
+        &asked.native((&bearer).into(), confirm(&code)).unwrap(),
         Some(FIRST),
         None,
     );
@@ -531,7 +540,7 @@ fn replaced_and_removed(fixture: &Fixture<'_>, asked: &Asked<'_>, account: &Acco
     let withdrawn = mailer.code();
     holds(
         &asked
-            .native(&account.bearer, EmailRequest::Withdraw)
+            .native((&account.bearer).into(), EmailRequest::Withdraw)
             .unwrap(),
         Some(SECOND),
         None,
@@ -587,7 +596,10 @@ fn wrong_codes(fixture: &Fixture<'_>, asked: &Asked<'_>, account: &Account) {
     );
     assert_eq!(
         asked
-            .native(&account.bearer, set("mail-a-fifth@example.org", "en"))
+            .native(
+                (&account.bearer).into(),
+                set("mail-a-fifth@example.org", "en")
+            )
             .err(),
         Some(Error::Busy)
     );
@@ -661,7 +673,7 @@ fn stale(fixture: &Fixture<'_>, account: &Account) {
     let before = mailer.count();
     for refused in [
         asked.web(&account.cookie, set("mail-d@example.org", "en")),
-        asked.native(&account.bearer, set("mail-d@example.org", "en")),
+        asked.native((&account.bearer).into(), set("mail-d@example.org", "en")),
     ] {
         assert_eq!(refused.err(), Some(Error::Rejected));
     }
@@ -1172,7 +1184,9 @@ fn without_a_mailer(fixture: &Fixture<'_>, mailing: &Asked<'_>, account: &Accoun
     let state = asked.web(cookie, EmailRequest::Withdraw).unwrap();
     assert_eq!(state.address.as_deref(), Some(KEPT));
     assert!(state.pending.is_none());
-    let state = asked.native(&account.bearer, EmailRequest::Remove).unwrap();
+    let state = asked
+        .native((&account.bearer).into(), EmailRequest::Remove)
+        .unwrap();
     assert!(!state.mail && state.address.is_none() && state.pending.is_none());
     // No mailer, no notice.
     assert_eq!(asked.deliver(), None);

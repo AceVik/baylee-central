@@ -19,7 +19,7 @@ use central_crypto::jwt::{
     self, CentralClaims, Expected, GATEWAY_TOKEN_SECONDS, GatewayClaims, JwtError, ReplayCache,
     RevocationClaims,
 };
-use central_identity::{Delivery, GatewayDelivery};
+use central_identity::{GatewayDelivery, GatewayOutcome};
 use sea_orm::{ConnectionTrait, DatabaseConnection, DbBackend, Statement, prelude::Uuid};
 use std::sync::{Arc, Mutex};
 use tokio::runtime::Runtime;
@@ -66,12 +66,12 @@ impl Transport for Recording<'_> {
 
 /// A gateway that answers as it is told, and keeps what it was sent.
 struct Recorded {
-    answer: Delivery,
+    answer: GatewayOutcome,
     calls: Mutex<Vec<(String, String)>>,
 }
 
 impl GatewayDelivery for Recorded {
-    fn deliver(&self, url: &str, message: &SignedToken) -> Delivery {
+    fn deliver(&self, url: &str, message: &SignedToken) -> GatewayOutcome {
         self.calls
             .lock()
             .unwrap()
@@ -427,7 +427,7 @@ fn revocations_reach_the_gateway(
 
     // A push: to the approved origin and the registered path, naming only that `sid`.
     let delivery = Arc::new(Recorded {
-        answer: Delivery::Taken,
+        answer: GatewayOutcome::Taken,
         calls: Mutex::new(Vec::new()),
     });
     let mut pushed = 0;

@@ -7,7 +7,7 @@ use central_postgres::GatewayPushResult;
 
 /// What became of one call to a gateway.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum Delivery {
+pub enum GatewayOutcome {
     /// `204`: taken, or taken before.
     Taken,
     /// Refused or answered with anything unexpected: asking again changes nothing.
@@ -20,7 +20,7 @@ pub enum Delivery {
 /// with one operator-set exception for the official gateway's own host (`central-outbound`).
 pub trait GatewayDelivery: Send + Sync {
     /// `POST` the message to this URL, built from the approved origin and registered path.
-    fn deliver(&self, url: &str, message: &SignedToken) -> Delivery;
+    fn deliver(&self, url: &str, message: &SignedToken) -> GatewayOutcome;
 }
 
 impl IdentityService {
@@ -49,9 +49,9 @@ impl IdentityService {
             let delivered =
                 tokio::task::spawn_blocking(move || delivery.deliver(&url, &message)).await;
             match delivered {
-                Ok(Delivery::Taken) => GatewayPushResult::Delivered,
-                Ok(Delivery::Refused) => GatewayPushResult::Refused,
-                Ok(Delivery::Retry) | Err(_) => GatewayPushResult::Retry,
+                Ok(GatewayOutcome::Taken) => GatewayPushResult::Delivered,
+                Ok(GatewayOutcome::Refused) => GatewayPushResult::Refused,
+                Ok(GatewayOutcome::Retry) | Err(_) => GatewayPushResult::Retry,
             }
         } else {
             // The table's check holds this too; a path outside the rule is never called.

@@ -7315,3 +7315,89 @@ deny check` (0.20.2). Nothing ran against a real Central, and CI's
 `site` job, which now builds two modules and lints one more, did not
 run: nothing was pushed. This is an engineering review of a build
 change, not an audit.
+
+## Session tokens and the website's release combined, 13 November 2026
+
+PR #63 (signed session tokens, `c42/session-tokens`) and PR #64 (the
+server-rendered website, mail, open registration, budgets by address) were
+written side by side from one base and merged into one branch
+(`claude/central-combined`). Neither line had been deployed; production is at
+migration 000022.
+
+Design pass: what each line assumed of the other. #63 makes a native
+session's bearer a signed Central token, verified before dispatch, and keeps
+a gateway's bare credential and a client's signed session apart
+(`credential_operation`); every native request names its protocol. #64 counts
+requests by address and by bearer, vouches for a bearer once an answer shows
+the store knows it, and puts the gateway's pulse on the heartbeat's path.
+Invariants kept: no check of either line is dropped; the protocol refusal and
+the bearer's kind come before every budget, the budgets before dispatch; the
+budgets still see a session by its capability, never by its signed text.
+
+Implementation pass, the places where the two met:
+
+- *Migrations.* #63's 000023 became `m20261111_000024_session_tokens`, between
+  #64's 000023 (open registration) and 000025 (gateway activity); the upgrade
+  fixture runs 000023 to 000026 in that order over one chain. No grant names
+  the tables 000024 drops; the runtime's grant list is the union (38 tables).
+- *The native handler.* The protocol layer and the key set stay as #63 wrote
+  them; `process` reads the bearer (`present`), decodes, charges the address's
+  budget, then `handle_from` with the place. `handle_from` takes `Presented`
+  and applies the credential gate before `limits.request`.
+- *Vouching for an issued session.* A native answer carries the signed token,
+  not the capability the budgets count by, so a sign-in, a password change and
+  a pairing now vouch for the capability where it is issued
+  (`IdentityService::issued`) instead of reading it from the answer.
+- *Which answers vouch.* `GatewayToken`, `RegisterInvalidate` and
+  `GatewayRevocations` replace the ticket and lease operations: the store
+  refuses each for a dead bearer (`gateway_grant` locks a live native session;
+  the other two authenticate the credential or compare the bridge). The
+  exemption for refusals of a player's lease or ticket went with those
+  operations: every refusal counts now. `credential_operation` names #64's six
+  operations: `GatewayPulse` is a gateway's, `PublicFigures`,
+  `RegisterChallenge`, `RegisterChallengeFor`, `ResetMail` and `Email` are not.
+- *The pulse* answers as the heartbeat does, `GatewayHeartbeat {
+  last_revocation }`, as #64's note expected; `central_client::gateway_pulse`
+  returns that number.
+- *Starting.* `--check-accounts-stdin` refuses a `mail` block the service would
+  refuse; the deploy hook asks it after #64's checks of the grants and their
+  login, before anything stops. The signing key is read before a port is bound.
+- *Names.* #63's `push::Delivery` became `GatewayOutcome`; #64's mail
+  `Delivery` keeps its name. The two `Http::raw` test helpers became `raw` and
+  `written`.
+
+Adversarial pass, what was found:
+
+- **A shared signature budget.** Made-up signed tokens spend none of #64's
+  budgets but each costs one of the 1,024 signature checks a second all native
+  sessions share, which has no share by address. One address can keep native
+  sessions at `Busy` while it sends them; sign-in, the website and gateways'
+  credentials are not touched. Left open and written down ([native
+  login](native-login.md#a-bearer-nobody-issued)).
+- **The protocol refusal** comes after #64's boundary has read a small body
+  within its bounds, not before any read; the comment and the docs say so now.
+- **The strangers' flood** (`tests/support/strangers.rs`) sent made-up bare
+  tokens to client operations, which the credential gate now refuses before
+  any budget. It now presents capabilities as if their signature had verified,
+  which over a socket is the token of a session that ended, so it still
+  reaches the budgets it tests. All the fixture's services share one signing
+  key, as a restart restores it.
+- **Stale statements** that both lines left: a lease's updatable expiry in the
+  sessions runbook, tickets and leases in the deletion and objects docs and the
+  account area's session list. Corrected.
+- **Callers that would have been refused at run time** without a compile
+  error: the report uploads of the client fixture and `web/e2e-real` lacked
+  the protocol header, and `web/e2e-real` read the session token as bytes.
+
+Run on the merge of #64: `cargo fmt --all --check`; `cargo clippy --workspace
+--all-targets -- -D warnings`; `cargo clippy -p central-web -p
+central-web-islands --target wasm32-unknown-unknown --lib -- -D warnings`,
+and again with `--features admin`; `cargo xtask crypto-scope`; the unit tests
+of `central-identity`, `central-http`, `central-service` and
+`central-client`; `cargo xtask postgres` (both fixtures, the combined chain
+and the strangers' flood included: passed); `cargo audit --deny warnings`
+(0.22.2), `cargo deny check` (0.20.2); in `web/`, `npm ci` and `npm run
+check`. The rest of the checks ran once more after #65 and the rebuilt
+browser crypto, and are recorded with them. Nothing ran against a real
+gateway or a real Central. This is the merging agent's engineering review,
+not an independent audit, and the owner's release gates still apply.

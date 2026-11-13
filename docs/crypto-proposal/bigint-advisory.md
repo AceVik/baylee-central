@@ -18,7 +18,8 @@ arithmetic became reachable. Chat changes consolidate equivalent dependency
 aliases and update the test RNG trait; the existing known answers pass.
 
 The reviewed source fingerprint is
-`52af94eaea7f01607ce337dd40e5e2a9866cca43bba51dee5b49278c1f2d10e2`.
+`ddbb34985086f0d853bc6f23db4c8b9acd4e11ffd853d5fba976d6806762d87f`
+(§"Changes since the review", 13 November 2026).
 Source mutation/link checks and all exact caller/feature negative checks remain
 mandatory. The source fingerprint's SHA-256 hexadecimal encoding is unchanged
 by its migration to digest 0.11.
@@ -218,6 +219,23 @@ allocates for a check only at the price it kept with the nonce, never
 above its own 16 MiB (`central-identity`'s `challenge.rs`). It found
 nothing to change. A review by another model or a person is still open
 (`Review: pending`).
+
+### 13 November 2026: the token format and the proof of work together
+
+Combining the session tokens (§"Re-review for the token format", fingerprint
+`aea8b222…`) with the website's release, which brought the proof of work above
+(fingerprint `52af94ea…`), changes no line of either reviewed change. They
+touch different files but one, `lib.rs`, where each adds its own module
+declaration (`jwt` behind its feature, `proof` on every build); the manifest
+is the token format's, since the proof of work changed neither manifest nor
+lockfile. Every other file of the crate is byte for byte one side's, which was
+checked file by file against both branches, and each side's fingerprint was
+recomputed from its own tree before the combined one was pinned. Checked by
+running: `cargo xtask crypto-scope` (graph guard, then the fingerprint) passes,
+and `cargo tree -i crypto-bigint --all-features` still shows exactly
+`crypto-bigint <- elliptic-curve <- opaque-ke/voprf <- central-crypto`. Both
+reviews stand as written. Fingerprint `ddbb3498…`. This is the merging agent's
+check, not an independent review.
 
 
 ## Chat source and graph review, 2 November 2026

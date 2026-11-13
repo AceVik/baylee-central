@@ -149,11 +149,12 @@ read of the figures fail on it; such a database is made anew, not repaired.
   columns and runs unchanged over the migrated table (its statement is in the
   upgrade fixture). It leaves a stored activity as it is, which matters only
   if the two releases beat for one gateway in turn; the 90 seconds bound it.
-- **Number.** 000024 is left free: the session-token line of work has its own
-  migration with the number 000023 beside this line's `open_registration`,
-  and one of them takes the next number when the two meet. The order that
-  counts is the list in `central-migration/src/lib.rs`; this migration
-  depends only on the `gateways` table of 000004 and 000009.
+- **Number.** 000024 was left free: the session-token line of work had its
+  own migration with the number 000023 beside this line's
+  `open_registration`. When the two were combined (13.11.2026) it took
+  000024, before this one; neither line's 000023 had been deployed. The
+  order that counts is the list in `central-migration/src/lib.rs`; this
+  migration depends only on the `gateways` table of 000004 and 000009.
 
 ## Report levels, a bearer's owner and an inbox's room (12.11.2026)
 

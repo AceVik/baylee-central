@@ -254,8 +254,8 @@ a moved account for a name before its own arrives.
   moved one not carried yet) is `Rejected`.
 - `AccountSummary` carries `display_name` and `tag` (its shape is step 2's).
 - `LegacyReserve` and `LegacyProfile`, the bridge's, are in [native
-  login](native-login.md); `GatewayProfile`, a gateway's, in [gateway
-  registry](gateway-registry.md).
+  login](native-login.md); what a gateway learns of them, in its token's
+  `name` and `tag`, in [gateway registry](gateway-registry.md#session-tokens).
 
 **Schema: migration `m20261023_000011_profiles`.** `accounts.display_name
 text` with the rule as a CHECK (`^[A-Za-z0-9][A-Za-z0-9_-]{1,14}[A-Za-z0-9]$`),
@@ -522,10 +522,12 @@ the account through a live browser session of the current credential
 
 - `Sessions` → the account's live sessions, the asking one first: kind
   (`browser` or `native`), whether it is the asking one, its password
-  sign-in, its end, and for each the gateways it holds a live lease at (their
-  origins). Central keeps no device; the page says so.
+  sign-in, its end, and for each the gateways it holds a token for (the
+  streams of its `sid`s, their origins). Central keeps no device; the page
+  says so.
 - `EndClientSession` → `Done`: deletes the account's native session, and with
-  it its tickets and leases (their foreign keys cascade). The website's own
+  it its `sid`s, each a revocation the gateway that held it learns
+  ([gateway registry](gateway-registry.md#revocations)). The website's own
   session ends with `Logout`.
 - `Gateways`, `AddGateway { origin, name }`, `CreateToken { gateway, name,
   scopes, days }` and `RevokeToken { token }`: [gateway

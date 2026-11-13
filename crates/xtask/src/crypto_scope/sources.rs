@@ -6,7 +6,7 @@ use sha2::{Digest, Sha256};
 
 use crate::fail::{Fail, OrFail, Result};
 
-const REVIEWED: &str = "aea8b222bd01ea3e0faa2682007a2050ef89c34613e07b45b582d1462c7f4904";
+const REVIEWED: &str = "ddbb34985086f0d853bc6f23db4c8b9acd4e11ffd853d5fba976d6806762d87f";
 const FAILURE: &str = "Crypto sources changed; review RUSTSEC-2026-0387 again";
 
 pub(super) fn verify(root: &Path) -> Result<()> {

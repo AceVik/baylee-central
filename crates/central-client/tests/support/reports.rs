@@ -3,7 +3,7 @@
 //! is stored meanwhile, and a slot is free again once its connection went.
 use super::{Http, pace};
 use central_api::{
-    Token,
+    PROTOCOL_HEADER, PROTOCOL_VERSION, Token,
     reports::{Announced, Channel, GatewaySays, ReportIntake, ReportKind},
 };
 use sea_orm::{ConnectionTrait, DatabaseConnection, DbBackend, Statement, prelude::Uuid};
@@ -91,7 +91,7 @@ fn begun(http: &Http, line: &str, kind: &str, length: usize, bearer: &Token) -> 
         .unwrap();
     write!(
         stream,
-        "{line} HTTP/1.1\r\nHost: {}\r\nContent-Type: {kind}\r\nContent-Length: {length}\r\nAuthorization: {}\r\n\r\n",
+        "{line} HTTP/1.1\r\nHost: {}\r\n{PROTOCOL_HEADER}: {PROTOCOL_VERSION}\r\nContent-Type: {kind}\r\nContent-Length: {length}\r\nAuthorization: {}\r\n\r\n",
         http.address,
         bearer.bearer().as_str()
     )

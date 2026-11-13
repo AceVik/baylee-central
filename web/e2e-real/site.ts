@@ -193,6 +193,8 @@ export function native(body: Json, bearer?: string): Promise<{ status: number; a
   return new Promise((done, fail) => {
     const headers: Record<string, string | number> = {
       host: "central.baylee.app",
+      // The protocol this build speaks; Central answers any other with 426.
+      "baylee-central-protocol": "2",
       "content-type": "application/json",
       "content-length": Buffer.byteLength(data),
       "x-forwarded-for": "127.0.0.1",
@@ -259,7 +261,8 @@ export async function client(username: string, password: string, tag: number): P
   const chat = chat_unlock(key, bytes(session.answer["wrapped_master"]), tag);
   const device = chat.device;
   chat.free();
-  const bearer = `Bearer ${hex(session.answer["token"])}`;
+  // a signed Central token, which a client presents as it got it
+  const bearer = `Bearer ${session.answer["token"] as string}`;
   const read = await native({ operation: "read_document" }, bearer);
   expect(read.status).toBe(200);
   return { bearer, identity, device, document: hex(read.answer["document"]), revision: read.answer["revision"] as number };

@@ -5,21 +5,28 @@
 //! not keep out were signed in over the real listeners. The numbers, the
 //! half hour and the table's bound are counted with a clock of their own
 //! in `central-identity`'s unit tests.
+//!
+//! On the account listener a session's bearer is a signed token, read
+//! before the budgets are: a made-up one is refused at its signature, and a
+//! capability presented bare is refused for a client's operation
+//! (`central_identity::credential_operation`). So the flood here is what
+//! still reaches the budgets: capabilities as if their signature had
+//! verified, which over a socket is the token of a session that ended.
 use super::{
     Http,
     browser::Browser,
     password::{self, OLD},
 };
 use central_api::{
-    Error, Token,
+    Error, SignedToken, Token,
     gateway::GatewayMetadata,
     notifications::NotificationRequest,
     owner::GatewayScopes,
     social::SocialRequest,
-    wire::{Request, Response, TicketPurpose},
+    wire::{GatewayPurpose, Request, Response},
 };
 use central_crypto::opaque::server::ServerKeys;
-use central_identity::{IdentityService, Place, Seen};
+use central_identity::{IdentityService, Place, Presented, Seen, credential_operation};
 use central_postgres::AccountStore;
 use std::{future::Future, pin::Pin, task::Poll, time::Duration};
 use tokio::runtime::Runtime;
@@ -53,14 +60,35 @@ async fn in_order(asked: Vec<Asked<'_>>) -> Vec<Result<Response, Error>> {
         .collect()
 }
 
-/// As the account listener hands a request on.
+/// As the account listener hands a request on once it read the bearer: a
+/// gateway's operation with a bare credential, any other with a verified
+/// session's capability.
 fn native<'a>(
     service: &'a IdentityService,
     request: Request,
     bearer: &'a Token,
     from: Place,
 ) -> Asked<'a> {
-    Box::pin(async move { service.handle_from(request, Some(bearer), Some(from)).await })
+    let capability = Token::from_secret_bytes(bearer.to_secret_bytes());
+    let presented = if credential_operation(&request) {
+        Presented::Credential(capability)
+    } else {
+        Presented::Session(capability)
+    };
+    Box::pin(async move {
+        service
+            .handle_from(request, Some(&presented), Some(from))
+            .await
+    })
+}
+
+/// The capability inside a native session's signed token, as the account
+/// listener reads it.
+fn capability(service: &IdentityService, signed: &SignedToken) -> Token {
+    let Ok(Presented::Session(capability)) = service.present(&signed.bearer()) else {
+        panic!("a session's own token verifies");
+    };
+    capability
 }
 
 /// As the website's listener hands a request on.
@@ -109,7 +137,6 @@ fn flood<'a>(
 /// listener serves them. (A pulse is a heartbeat with numbers, on the
 /// heartbeat's path.)
 fn vouching() -> Vec<Request> {
-    let purpose = TicketPurpose::Admit;
     vec![
         Request::SessionStatus,
         Request::RenewSession,
@@ -134,22 +161,14 @@ fn vouching() -> Vec<Request> {
             expected_revision: 1,
             document: vec![7; 64],
         },
-        Request::GatewayTicket {
+        Request::GatewayToken {
             gateway: "http://127.0.0.1:28766".into(),
-            purpose,
+            purpose: GatewayPurpose::Admit,
         },
-        Request::GatewaySession {
-            lease: Token::generate().unwrap(),
-            purpose,
+        Request::RegisterInvalidate {
+            path: "/auth/central/invalidate".into(),
         },
-        Request::GatewayProfile {
-            lease: Token::generate().unwrap(),
-            purpose,
-        },
-        Request::RedeemGateway {
-            ticket: Token::generate().unwrap(),
-            purpose,
-        },
+        Request::GatewayRevocations { after: 0 },
         Request::GatewayHeartbeat {
             metadata: GatewayMetadata {
                 name: "Synthetic".into(),
@@ -158,7 +177,6 @@ fn vouching() -> Vec<Request> {
             },
         },
         Request::GatewayStatus,
-        Request::CheckGatewayAdmin { account: [7; 16] },
     ]
 }
 
@@ -215,6 +233,7 @@ pub(crate) fn run(
         ServerKeys::from_secret_bytes(&keys.to_secret_bytes()).unwrap(),
         bridge,
         "http://127.0.0.1:28766",
+        super::token_keys(),
     )
     .unwrap()
     .with_terms(Some(super::terms::central_document()));
@@ -226,7 +245,8 @@ pub(crate) fn run(
     // Both sessions over the real listeners: nothing but the sign-in
     // itself has vouched for them when the flood begins.
     let cookie = password::browser_sign_in(&home, account.identity, account.context, OLD);
-    let (bearer, _) = password::sign_in(http, account.identity, OLD);
+    let (signed, _) = password::sign_in(http, account.identity, OLD);
+    let bearer = capability(service, &signed);
 
     // One address, 900 made-up bearers in one instant: 600 control
     // requests where all sessions share 512 a second, 300 data requests
@@ -398,7 +418,8 @@ fn replaced(
 ) {
     let mut ended = vec![first];
     let live = loop {
-        let (next, _) = password::sign_in(http, account.identity, OLD);
+        let (signed, _) = password::sign_in(http, account.identity, OLD);
+        let next = capability(service, &signed);
         if ended.len() == 4 {
             break next;
         }

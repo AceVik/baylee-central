@@ -4,7 +4,7 @@
 //! one compiled host at the address the operator set. A development service runs no sender.
 use central_api::{OFFICIAL_ORIGIN, SignedToken};
 use central_crypto::jwt::{PublicKey, SigningKey};
-use central_identity::{Delivery, GatewayDelivery, IdentityService, TokenKeys};
+use central_identity::{GatewayDelivery, GatewayOutcome, IdentityService, TokenKeys};
 use central_outbound::{Agent, Limits, Pin, agent};
 use serde::Deserialize;
 use std::{net::SocketAddr, sync::Arc, time::Duration};
@@ -60,11 +60,11 @@ pub(super) fn official_pin(address: Option<&str>) -> Result<Option<Pin>, ()> {
 
 /// What a gateway's answer means. Only `204` is taken; anything unexpected, a redirect
 /// among them, is not asked again, and catch-up carries the numbers.
-const fn classify(status: u16) -> Delivery {
+const fn classify(status: u16) -> GatewayOutcome {
     match status {
-        204 => Delivery::Taken,
-        429 | 500..=599 => Delivery::Retry,
-        _ => Delivery::Refused,
+        204 => GatewayOutcome::Taken,
+        429 | 500..=599 => GatewayOutcome::Retry,
+        _ => GatewayOutcome::Refused,
     }
 }
 
@@ -72,12 +72,12 @@ const fn classify(status: u16) -> Delivery {
 struct HttpsDelivery(Agent);
 
 impl GatewayDelivery for HttpsDelivery {
-    fn deliver(&self, url: &str, message: &SignedToken) -> Delivery {
+    fn deliver(&self, url: &str, message: &SignedToken) -> GatewayOutcome {
         self.0
             .post(url)
             .header("Content-Type", "application/jwt")
             .send(message.expose())
-            .map_or(Delivery::Retry, |response| {
+            .map_or(GatewayOutcome::Retry, |response| {
                 classify(response.status().as_u16())
             })
     }
@@ -142,12 +142,12 @@ mod tests {
 
     #[test]
     fn only_204_is_taken_and_only_a_wait_is_retried() {
-        assert_eq!(classify(204), Delivery::Taken);
+        assert_eq!(classify(204), GatewayOutcome::Taken);
         for status in [429, 500, 502, 503, 599] {
-            assert_eq!(classify(status), Delivery::Retry, "{status}");
+            assert_eq!(classify(status), GatewayOutcome::Retry, "{status}");
         }
         for status in [200, 201, 301, 302, 307, 308, 400, 401, 403, 404, 426] {
-            assert_eq!(classify(status), Delivery::Refused, "{status}");
+            assert_eq!(classify(status), GatewayOutcome::Refused, "{status}");
         }
     }
 

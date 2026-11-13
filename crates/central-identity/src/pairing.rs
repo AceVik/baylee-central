@@ -105,6 +105,8 @@ impl IdentityService {
                     .store
                     .redeem_pairing(&handle.digest(), &challenge, &token)
                     .await?;
+                // Vouched for here, where its capability is at hand (`limits.rs`).
+                self.issued(&token);
                 Ok(Response::PairSession {
                     token: self.central_token(&token, redeemed.identity.account)?,
                     identity: redeemed.identity,

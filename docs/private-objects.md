@@ -31,8 +31,8 @@ require application reconciliation against the current authenticated manifest.
 Exactly one session is active per account, including on the same device. A
 successful OPAQUE login replaces the previous session atomically. Database row
 locking and a unique account index enforce this under concurrent logins. Failed
-proofs preserve the existing session. Revocation cascades to gateway tickets and
-leases; device identities and encrypted data remain. Authenticated mutations lock
+proofs preserve the existing session. Revocation ends the session's `sid`s, each a
+revocation the gateway that held it learns; device identities and encrypted data remain. Authenticated mutations lock
 the account and recheck the session after acquiring that lock, preventing a query
 that waited behind a replacement login from using its earlier authorization
 snapshot. An already authorized operation may finish before the replacement

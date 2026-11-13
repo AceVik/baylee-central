@@ -292,7 +292,7 @@ fn around(address: SocketAddr, http: &Http) {
         // a made-up token is no session and no bridge
         let made_up = Token::generate().unwrap();
         assert_eq!(
-            http.exchange(&request, Some(&made_up)).err(),
+            http.exchange(&request, Some((&made_up).into())).err(),
             Some(Error::Rejected)
         );
     }

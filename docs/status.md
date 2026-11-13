@@ -408,12 +408,14 @@ This is test evidence, not independent security review or production readiness.
 
 ## Session tokens, 6 November 2026
 
-Branch `c42/session-tokens`, not merged and not deployed. Tickets and leases are replaced by signed
+Branch `c42/session-tokens`, combined on 13.11.2026 with the website's release (#64) on
+`claude/central-combined`, and not deployed. Tickets and leases are replaced by signed
 tokens a gateway checks by itself, numbered revocations with catch-up, and a bounded push to approved
 origins ([gateway registry](gateway-registry.md#session-tokens)). The Central token is a signed JWT;
 the website's cookie stays an opaque capability. An independent review of the new crypto and outbound
 paths has not happened yet, and neither has a run against a real gateway. Deploying needs migration
-000023, `token_keys` and the order in [operations](operations.md#the-session-tokens-release).
+000024 (renumbered from 000023 when it was combined), `token_keys` and the order in
+[operations](operations.md#the-session-tokens-release).
 
 ## Remaining implementation and release gates
 

@@ -101,7 +101,9 @@ pub fn public_figures(
 /// gateway. Sending it is the operator's choice; a plain heartbeat afterwards
 /// withdraws the counts. A Central built before the pulse answers `Rejected`,
 /// as it does for a wrong credential: a gateway then sends its plain
-/// heartbeat and tries the pulse again later.
+/// heartbeat and tries the pulse again later. Answered as the heartbeat is:
+/// the gateway's last revocation number, so that it can tell whether it
+/// missed one (`docs/gateway-registry.md` §"Session tokens").
 ///
 /// # Errors
 /// Rejects metadata that is unsafe or off `origin`, a count above its bound
@@ -113,14 +115,14 @@ pub fn gateway_pulse(
     origin: &str,
     metadata: GatewayMetadata,
     activity: GatewayActivity,
-) -> Result<(), Error> {
+) -> Result<u64, Error> {
     metadata.validate(origin)?;
     activity.validate()?;
     match transport.exchange(
         &Request::GatewayPulse { metadata, activity },
-        Some(credential),
+        Some(credential.into()),
     )? {
-        Response::Done => Ok(()),
+        Response::GatewayHeartbeat { last_revocation } => Ok(last_revocation),
         _ => Err(Error::Rejected),
     }
 }
@@ -233,7 +235,11 @@ mod tests {
         fn endpoint(&self) -> &Endpoint {
             &self.endpoint
         }
-        fn exchange(&self, request: &Request, bearer: Option<&Token>) -> Result<Response, Error> {
+        fn exchange(
+            &self,
+            request: &Request,
+            bearer: Option<central_api::Bearer<'_>>,
+        ) -> Result<Response, Error> {
             let text = String::from_utf8(central_api::encode(request)?).unwrap();
             self.asked.borrow_mut().push((text, bearer.is_some()));
             central_api::decode(&self.answer)
@@ -330,7 +336,7 @@ mod tests {
     #[test]
     fn a_pulse_sends_only_what_central_would_take() {
         let token = Token::generate().unwrap();
-        let central = Answering::with(&Response::Done);
+        let central = Answering::with(&Response::GatewayHeartbeat { last_revocation: 9 });
         let over = GatewayActivity {
             players: GatewayActivity::MOST + 1,
             ..COUNTED
@@ -352,7 +358,11 @@ mod tests {
             Err(Error::Rejected)
         );
         assert!(central.asked.borrow().is_empty(), "none of them was sent");
-        gateway_pulse(&central, &token, ORIGIN, metadata(), COUNTED).unwrap();
+        assert_eq!(
+            gateway_pulse(&central, &token, ORIGIN, metadata(), COUNTED),
+            Ok(9),
+            "a pulse is answered as a heartbeat is: the last revocation"
+        );
         assert_eq!(
             *central.asked.borrow(),
             [(
@@ -365,11 +375,18 @@ mod tests {
                 true
             )]
         );
-        // Only `Done` is a pulse taken.
-        let odd = Answering::with(&page(&[], COUNTED));
-        assert_eq!(
-            gateway_pulse(&odd, &token, ORIGIN, metadata(), COUNTED),
-            Err(Error::Rejected)
-        );
+        // Only the heartbeat's answer is a pulse taken.
+        for answer in [page(&[], COUNTED), Response::Done] {
+            assert_eq!(
+                gateway_pulse(
+                    &Answering::with(&answer),
+                    &token,
+                    ORIGIN,
+                    metadata(),
+                    COUNTED
+                ),
+                Err(Error::Rejected)
+            );
+        }
     }
 }

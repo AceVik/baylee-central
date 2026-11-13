@@ -35,7 +35,7 @@ impl Session {
             | EmailRequest::Withdraw
             | EmailRequest::Remove => {}
         }
-        match transport.exchange(&Request::Email { request }, Some(&self.token))? {
+        match transport.exchange(&Request::Email { request }, Some((&self.token).into()))? {
             Response::Email { state } => Ok(state),
             _ => Err(Error::Rejected),
         }
@@ -63,9 +63,10 @@ pub fn reset_mail(transport: &impl Transport, username: String, lang: String) ->
 #[cfg(test)]
 mod tests {
     use super::*;
-    use central_api::{Endpoint, Token, email::MailCode, wire::Identity};
+    use central_api::{Endpoint, SignedToken, email::MailCode, wire::Identity};
     use central_crypto::vault::MasterKey;
     use std::cell::RefCell;
+    use zeroize::Zeroizing;
 
     /// A stand-in Central: one prepared answer for whatever is asked, and
     /// what was asked, with whether a credential came along.
@@ -93,7 +94,11 @@ mod tests {
         fn endpoint(&self) -> &Endpoint {
             &self.endpoint
         }
-        fn exchange(&self, request: &Request, bearer: Option<&Token>) -> Result<Response, Error> {
+        fn exchange(
+            &self,
+            request: &Request,
+            bearer: Option<central_api::Bearer<'_>>,
+        ) -> Result<Response, Error> {
             let text = String::from_utf8(central_api::encode(request)?).unwrap();
             self.asked.borrow_mut().push((text, bearer.is_some()));
             central_api::decode(self.answer.as_ref().map_err(|error| *error)?)
@@ -107,7 +112,7 @@ mod tests {
                 account: [7; 16],
                 epoch: 1,
             },
-            Token::generate().unwrap(),
+            SignedToken::new(Zeroizing::new("synthetic.signed.token".into())).unwrap(),
             MasterKey::generate().unwrap(),
         )
     }

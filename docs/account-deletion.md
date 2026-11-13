@@ -52,10 +52,11 @@ OPAQUE proof of the password, as a password change does:
    unfinished legacy move (the bridge's move is still open; it is finished
    or invalidated first).
 3. One transaction under the account's lock deletes the `accounts` row.
-   Foreign keys take everything else with it: sessions (and their gateway
-   tickets and leases, so every gateway sees the lease refused at its next
-   check), private objects, migration archives, the gateways it owns (with
-   their approvals, administrator lists and leases), its places
+   Foreign keys take everything else with it: sessions (and their `sid`s,
+   each a revocation the gateway that held it learns, [gateway
+   registry](gateway-registry.md#revocations)), private objects, migration
+   archives, the gateways it owns (with their approvals and administrator
+   lists), its places
    on other gateways' administrator lists, its terms acceptances and roles,
    and since migration 000026 its e-mail address and one that waits.
    Audit events stay: they name only ids, which no longer resolve. The

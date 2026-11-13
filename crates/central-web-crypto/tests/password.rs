@@ -8,7 +8,7 @@
 use std::cell::RefCell;
 
 use central_api::{
-    Endpoint, Error, Token,
+    Bearer, Endpoint, Error, SignedToken, Token,
     reset_code::ResetCode,
     wire::{Discovery, Identity, Request, ResetVault, Response},
 };
@@ -117,21 +117,27 @@ impl Central {
         }
     }
 
-    fn live(&self, bearer: Option<&Token>) -> Result<(), Error> {
+    /// A client's own session, as its signed bearer. This stand-in signs
+    /// nothing: its bearer is the capability's hex, which a client never
+    /// reads, and a bare capability is no session.
+    fn live(&self, bearer: Option<Bearer<'_>>) -> Result<(), Error> {
         let session = self.stored.borrow().session;
-        match (session, bearer) {
-            (Some(session), Some(bearer)) if session == bearer.digest() => Ok(()),
+        let Some(Bearer::Signed(bearer)) = bearer else {
+            return Err(Error::Rejected);
+        };
+        match session {
+            Some(session) if session == Token::from_hex(bearer.expose())?.digest() => Ok(()),
             _ => Err(Error::Rejected),
         }
     }
 
     /// One new session, in place of any other.
     fn session(&self) -> Response {
-        let token = Token::generate().unwrap();
+        let capability = Token::generate().unwrap();
         let mut stored = self.stored.borrow_mut();
-        stored.session = Some(token.digest());
+        stored.session = Some(capability.digest());
         Response::Session {
-            token,
+            token: SignedToken::new(capability.hex()).unwrap(),
             identity: Identity {
                 account: ACCOUNT,
                 epoch: stored.epoch,
@@ -236,7 +242,7 @@ impl Transport for Central {
         &self.endpoint
     }
 
-    fn exchange(&self, request: &Request, bearer: Option<&Token>) -> Result<Response, Error> {
+    fn exchange(&self, request: &Request, bearer: Option<Bearer<'_>>) -> Result<Response, Error> {
         match request {
             Request::Discover { username } if username == USERNAME => Ok(Response::Discovery {
                 discovery: Discovery::Central {
@@ -307,7 +313,10 @@ impl Transport for Central {
 
 /// The page's sign-in up to Central's yes: the Worker's state, the session
 /// and the wrapper `LoginFinish` answered.
-fn page_signs_in(central: &Central, password: &str) -> Result<(SignedIn, Token, Vec<u8>), Error> {
+fn page_signs_in(
+    central: &Central,
+    password: &str,
+) -> Result<(SignedIn, SignedToken, Vec<u8>), Error> {
     let identity = central.identity();
     let (state, message) = login_start(password.into(), &identity.account, identity.epoch)
         .map_err(|_| Error::Rejected)?;
@@ -424,7 +433,7 @@ fn page_changes(central: &Central, current: &str, new: &str) -> Result<(), Error
             login,
             registration,
         },
-        Some(&token),
+        Some((&token).into()),
     )?
     else {
         return Err(Error::Rejected);
@@ -438,7 +447,7 @@ fn page_changes(central: &Central, current: &str, new: &str) -> Result<(), Error
             record: changed.record,
             wrapped_master: sent.clone(),
         },
-        Some(&token),
+        Some((&token).into()),
     )?
     else {
         return Err(Error::Rejected);
@@ -721,7 +730,7 @@ fn a_password_change_is_refused_in_the_worker() {
                 login,
                 registration,
             },
-            Some(&token),
+            Some((&token).into()),
         )
         .unwrap()
     else {
@@ -744,7 +753,7 @@ fn a_password_change_is_refused_in_the_worker() {
                 login,
                 registration,
             },
-            Some(&token),
+            Some((&token).into()),
         )
         .unwrap()
     else {
