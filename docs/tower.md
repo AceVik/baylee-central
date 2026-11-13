@@ -142,3 +142,12 @@ The runtime can insert/read immutable manifests and nodes, update only publicati
 and withdrawal flags on a season, and mutate only account-owned progression.
 After an interrupted upload, rerun the identical staged manifest; do not replace
 a conflicting weekly draft. A withdrawn season retains earned accomplishments.
+
+### Recovery and withdrawal refinement
+
+An authenticated `Locate { game }` follows the account-owned attempt's request
+identity to its expedition. It restores the exact run after restart even when the
+duel has finished or the week has changed; no public game-to-account lookup is
+available. Individual tower nodes reject the calendar withdrawal operation, so
+operators explicitly withdraw the complete season. The focused PostgreSQL 18.6
+fixture passed these additions in 2.71 seconds and verified cleanup.
