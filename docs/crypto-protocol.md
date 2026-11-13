@@ -255,7 +255,7 @@ lanes:1 -kdfopt memcost:64 -kdfopt iter:1 ARGON2ID`), and one output is
 compared with the Argon2 that `opaque-ke` brings. The same counters come
 from the function the Worker calls (`central-web-crypto`, `tests/flow.rs`)
 and from the committed WebAssembly module in Chromium
-(`web/e2e-site/account.spec.ts`), so either side drifting fails a test.
+(`crates/central-web/browser/e2e-site/account.spec.ts`), so either side drifting fails a test.
 Also tested: a solution for a lower price is refused, a search in turns
 finds what one search finds, the ceilings and the nonce's shape are refused
 before any work. Not done: a second reviewer has not read the module

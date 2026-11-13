@@ -16,7 +16,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
 
-const ROOT = fileURLToPath(new URL("../..", import.meta.url));
+const ROOT = fileURLToPath(new URL("../../../..", import.meta.url));
 const PORT = 28795;
 const ORIGIN = `http://127.0.0.1:${PORT}`;
 

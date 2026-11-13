@@ -9,7 +9,8 @@
 //! - the whole tree holds no link, no C/C++ or assembly source, and no
 //!   unsafe block, inline assembly or unsafe allowance in a Rust file; skipped are only
 //!   tool output: `.git`, `target` and `node_modules` at the root, and
-//!   `web/node_modules`, npm's install of the web app;
+//!   `crates/central-web/browser/node_modules`, npm's install of the browser
+//!   suites;
 //! - every dependency outside the workspace comes from crates.io, at a
 //!   version and with features `docs/dependency-proposal/approved-packages.json`
 //!   approves;

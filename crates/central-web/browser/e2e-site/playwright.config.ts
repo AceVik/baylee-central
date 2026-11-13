@@ -19,7 +19,7 @@ export default defineConfig({
   use: { baseURL: `http://127.0.0.1:${PORT}`, trace: "retain-on-failure" },
   webServer: {
     command: "target/debug/central-web --dev target/site crates/central-web-server/tests/data",
-    cwd: "../..",
+    cwd: "../../../..",
     url: `http://127.0.0.1:${PORT}/robots.txt`,
     reuseExistingServer: false,
     timeout: 30_000,

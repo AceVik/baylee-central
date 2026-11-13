@@ -4,7 +4,7 @@
 
 *30.10.2026.* How baylee.app looks, moves and is put together: the public
 pages, the account area and the administration. It binds every change under
-`web/`. The words were in the old `web/README.md` §"The words" (removed 12.11.2026); the security rules of
+`crates/central-web/`. The words were in the old `web/README.md` §"The words" (removed 12.11.2026); the security rules of
 the pages are in [web accounts](web-accounts.md). Where this document and a
 stylesheet disagree, the stylesheet is wrong.
 

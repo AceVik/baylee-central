@@ -83,7 +83,7 @@ the package may be in the lock file at 0.37.0 and in no build.
   no C/C++ or assembly source, and no unsafe block, inline assembly or unsafe
   allowance in any `.rs` file (textually: comments and strings count). Only
   tool output is skipped: `.git`, `target` and `node_modules` at the root, and
-  `web/node_modules` exactly, as a real directory. No Cargo target may live in
+  `crates/central-web/browser/node_modules` exactly, as a real directory. No Cargo target may live in
   any of them.
 - Every dependency outside the workspace comes from crates.io at a version
   `docs/dependency-proposal/approved-packages.json` approves, with only the

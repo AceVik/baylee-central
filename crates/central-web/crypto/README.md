@@ -14,7 +14,7 @@ and the browser tests take the exact module CI checked. It lived in
 | `central_web_crypto.js` | wasm-bindgen's glue (`--target web`) |
 | `central_web_crypto.d.ts`, `central_web_crypto_bg.wasm.d.ts` | its types |
 | `SHA256SUMS` | the SHA-256 of each of the four |
-| `package.json` | kept by hand: tells Node that the glue is an ES module, for `web/e2e-real/site.ts`, which imports it |
+| `package.json` | kept by hand: tells Node that the glue is an ES module, for `crates/central-web/browser/e2e-real/site.ts`, which imports it |
 
 Only the account and chat crypto workers import it: the module runs in module
 workers, never on the page's thread.
@@ -51,5 +51,5 @@ docker run --rm --platform linux/amd64 -v "$PWD":/work -w /work -e CARGO_TARGET_
 unless every file here equals that build byte for byte; CI runs it, so what
 is committed is what the source builds. `cargo xtask site` checks the sums
 before it puts the module into the site, and the site's browser tests run it
-in its Worker (`web/e2e-site`, the sign-in, registration, reset and chat
-specs); `web/e2e-real/site.ts` runs it in Node against a real Central.
+in its Worker (`crates/central-web/browser/e2e-site`, the sign-in, registration, reset and chat
+specs); `crates/central-web/browser/e2e-real/site.ts` runs it in Node against a real Central.

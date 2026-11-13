@@ -14,7 +14,7 @@ import { resolve } from "node:path";
 
 import { expect, type Page } from "@playwright/test";
 
-import { chat_unlock, initSync, login_finish, login_start } from "../../crates/central-web/crypto/central_web_crypto.js";
+import { chat_unlock, initSync, login_finish, login_start } from "../../crypto/central_web_crypto.js";
 
 /** A recovery code as the page shows it. */
 export const RECOVERY = /^[0-9A-HJKMNP-TV-Z]{4}(-[0-9A-HJKMNP-TV-Z]{4}){7}$/;
@@ -238,7 +238,7 @@ let loaded = false;
  */
 export async function client(username: string, password: string, tag: number): Promise<Client | null> {
   if (!loaded) {
-    initSync({ module: readFileSync(resolve("../crates/central-web/crypto/central_web_crypto_bg.wasm")) });
+    initSync({ module: readFileSync(resolve("../crypto/central_web_crypto_bg.wasm")) });
     loaded = true;
   }
   const found = await native({ operation: "discover", username });

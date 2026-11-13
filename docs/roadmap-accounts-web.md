@@ -72,8 +72,8 @@ ships from `main` until M1 and M6 below are done.
 - The web app lived in this repository under `web/` (React 19, TypeScript 7,
   Vite, oxlint, vitest and Playwright). Since 12.11.2026 the website is the
   server-rendered Rust site in `crates/central-web*`
-  ([proposal](proposals/frontend-rewrite.md)); `web/` keeps only its browser
-  tests.
+  ([proposal](proposals/frontend-rewrite.md)); `crates/central-web/browser/` (formerly
+  `web/`) keeps only the browser tests.
   German and English, mobile first, WCAG 2.1 AA, no third-party trackers.
 - Browser sign-in uses the same OPAQUE protocol, compiled to WebAssembly from
   `central-crypto`'s client side; the server never sees the password. The browser

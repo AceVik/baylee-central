@@ -1,11 +1,11 @@
-# web/ — the browser test suites
+# The browser test suites (`crates/central-web/browser/`)
 
 The site at https://baylee.app is rendered by the server, in the `central-web`
-crate (`../crates/central-web`, `../docs/proposals/frontend-rewrite.md`), with
-its administration. The old React app that lived in this folder was removed on
+crate (`..`, `../../../docs/proposals/frontend-rewrite.md`), with
+its administration. The old React app that lived in `web/` was removed on
 12.11.2026. Nothing here builds or serves the site: this folder holds only the
 Playwright suites that test it in a real browser, and the TypeScript and lint
-checks for them.
+checks for them. It was `web/` until 13.11.2026.
 
 | path | what |
 | --- | --- |
@@ -13,7 +13,7 @@ checks for them.
 | `e2e-real/` | the same site's account, reset, password and chat steps against a real Central, run by hand (its `README.md`) |
 | `e2e-real/front.ts` | the TLS stand-in for baylee.app's Caddy site block, for `e2e-real` only |
 | `e2e-real/mailer.ts` | the stand-in for `baylee-mailer`, for `e2e-real` only |
-| `e2e-real/site.ts` | the steps the `e2e-real` specs share; loads the committed WebAssembly crypto from `../crates/central-web/crypto` |
+| `e2e-real/site.ts` | the steps the `e2e-real` specs share; loads the committed WebAssembly crypto from `../crypto` |
 | `tsconfig.json`, `.oxlintrc.json` | the typecheck and lint settings of both suites |
 
 ## Commands
@@ -38,7 +38,7 @@ npx playwright install chromium
 ```
 
 ```bash
-cd .. && cargo build -p central-web-server && cargo xtask site && cd web
+cd ../../.. && cargo build -p central-web-server && cargo xtask site && cd crates/central-web/browser
 ```
 
 ```bash

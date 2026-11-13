@@ -6,7 +6,7 @@ import { expect, test } from "@playwright/test";
 // page shows the same file, since a mark certificate asks that it was
 // public on the domain for a year.
 
-const SOURCE = new URL("../../crates/central-web/assets/bimi/baylee.svg", import.meta.url);
+const SOURCE = new URL("../../assets/bimi/baylee.svg", import.meta.url);
 
 test("the mark answers at /bimi/baylee.svg as an SVG with the approved bytes, without a redirect", async ({ request }) => {
   const answer = await request.get("/bimi/baylee.svg", { maxRedirects: 0 });

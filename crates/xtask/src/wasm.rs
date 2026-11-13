@@ -41,7 +41,8 @@ pub const GENERATED: [&str; 4] = [
 pub const SUMS: &str = "SHA256SUMS";
 /// Files in the committed directory that the build does not write: what the
 /// module is, and the `package.json` that tells Node the glue is an ES
-/// module (the real-service browser tests import it from outside `web/`).
+/// module (the real-service browser tests, in `crates/central-web/browser/`,
+/// import it from outside that folder).
 const KEPT: [&str; 2] = ["README.md", "package.json"];
 
 const TARGET: &str = "wasm32-unknown-unknown";

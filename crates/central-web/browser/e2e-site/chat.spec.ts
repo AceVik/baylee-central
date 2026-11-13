@@ -1,7 +1,7 @@
 // The messenger's interface (docs/proposals/frontend-rewrite.md §6.3)
 // against a stand-in for Central and a canned crypto Worker: what the page
 // does with what the Worker and Central say, not the cryptography, which
-// web/e2e-real/site-chat.spec.ts runs for real. The stand-ins speak
+// crates/central-web/browser/e2e-real/site-chat.spec.ts runs for real. The stand-ins speak
 // central-api's exact JSON, which the page parses strictly.
 //
 // The canned Worker "opens" a delivery by reading its text from the

@@ -7543,3 +7543,5 @@ as #65 had them. Not run: CI itself, the x86-64 build of the picture codecs
 with `nasm`, the codec's `ffmpeg` tests (skipped without it here), the deploy
 hook as a whole, `web/e2e-real` (type-checked only), and anything against a
 real gateway or a real Central.
+
+13.11.2026: `web/` moved to `crates/central-web/browser/`, with the browser test suites and their tooling; the policy, CI and the present-tense docs name the new path.

@@ -1,8 +1,9 @@
 //! The walk over the whole reviewed tree: no link anywhere, no native or
 //! assembly source, no unsafe marker in a Rust file. Skipped are only tool
 //! output: `.git`, `target` and `node_modules` at the root (any case), and
-//! `web/node_modules` exactly, as a real directory (a link of that name is
-//! refused like any other), whose `.bin` npm fills with links.
+//! `crates/central-web/browser/node_modules` exactly, as a real directory (a
+//! link of that name is refused like any other), whose `.bin` npm fills with
+//! links.
 
 use std::fs::{self, Metadata};
 use std::path::{Path, PathBuf};
@@ -13,7 +14,7 @@ use crate::fail::{Fail, OrFail, Result};
 const ROOT_SKIPS: [&str; 3] = [".git", "target", "node_modules"];
 
 pub(super) fn check(root: &Path) -> Result<()> {
-    let web = root.join("web");
+    let web = root.join("crates/central-web/browser");
     let mut pending = vec![root.to_path_buf()];
     let mut files: Vec<(PathBuf, String)> = Vec::new();
     while let Some(dir) = pending.pop() {

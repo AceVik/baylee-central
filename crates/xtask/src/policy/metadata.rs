@@ -17,7 +17,12 @@ use crate::workspace;
 const CRATES_IO: &str = "registry+https://github.com/rust-lang/crates.io-index";
 /// Tool output under the root, which may hold no target (compared ignoring
 /// case, as on the case-insensitive file systems of Windows and macOS).
-const EXCLUDED: [&str; 4] = [".git", "target", "node_modules", "web/node_modules"];
+const EXCLUDED: [&str; 4] = [
+    ".git",
+    "target",
+    "node_modules",
+    "crates/central-web/browser/node_modules",
+];
 
 /// `cargo metadata` for the workspace at `root`, with or without its graph.
 pub(crate) struct Metadata {

@@ -13,7 +13,7 @@ only that `Host` and `Origin`, and a `__Host-` cookie needs HTTPS. Chromium maps
 `/api/*` to the listener with the Host unchanged and `X-Forwarded-For` set, every
 other request to the server-rendered site), and the tests accept its throwaway
 certificate. The deployed mode compiles in the live issuer, which the committed
-WebAssembly module (`../../crates/central-web/crypto`) is bound to: no
+WebAssembly module (`../../crypto`) is bound to: no
 development build is needed.
 
 ## Setting up (from the repository root)
@@ -37,11 +37,11 @@ development build is needed.
 ## The new site (`crates/central-web`)
 
 The same Central serves the server-rendered site
-(`../../docs/proposals/frontend-rewrite.md`). Build it with `cargo xtask site`,
+(`../../../../docs/proposals/frontend-rewrite.md`). Build it with `cargo xtask site`,
 start `target/debug/central-web --dev target/site
 crates/central-web-server/tests/data` (it listens on `127.0.0.1:28792`), and
 put the front before it: `node e2e-real/front.ts --tls <its folder> --site
-28792`. Run the specs in `web/`. Then
+28792`. Run the specs in `crates/central-web/browser/`. Then
 
 ```bash
 REAL_FRONT_SPKI=<pin> REAL_OUT=<empty folder> npx playwright test -c e2e-real/playwright.config.ts e2e-real/site-chat.spec.ts
@@ -87,7 +87,7 @@ the chat identity, which is derived from the master key (the same after a kept
 reset and a password change, another after a new vault), and the stored
 document with its revision. A passing run prints no password, code or token and
 writes none; a failing one may, in its assertion's message and in its trace
-(`web/test-results-real`, kept on failure), which holds what was typed and sent,
+(`crates/central-web/browser/test-results-real`, kept on failure), which holds what was typed and sent,
 the reset code in `ResetStart` included. All of it is synthetic; delete the
 folder after reading. One project registers three accounts and starts six
 resets (ten an hour from one address): run one project against a Central

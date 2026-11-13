@@ -134,14 +134,15 @@ jobs:
       - name: Rebuild central-web-crypto and compare with crates/central-web/crypto
         run: cargo xtask wasm --check
 
-  # The browser test suites' own checks (web/README.md): the typecheck and the
-  # lint of the Playwright suites. The suites themselves run in the site job.
+  # The browser test suites' own checks (crates/central-web/browser/README.md):
+  # the typecheck and the lint of the Playwright suites. The suites themselves
+  # run in the site job.
   web:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     defaults:
       run:
-        working-directory: web
+        working-directory: crates/central-web/browser
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -150,7 +151,7 @@ jobs:
         with:
           node-version: 24.21.0
           cache: npm
-          cache-dependency-path: web/package-lock.json
+          cache-dependency-path: crates/central-web/browser/package-lock.json
       - run: npm ci --no-audit --no-fund
       - run: npm run check
 
@@ -183,10 +184,10 @@ jobs:
         with:
           node-version: 24.21.0
           cache: npm
-          cache-dependency-path: web/package-lock.json
+          cache-dependency-path: crates/central-web/browser/package-lock.json
       - run: npm ci --no-audit --no-fund
-        working-directory: web
+        working-directory: crates/central-web/browser
       - run: npx playwright install --with-deps chromium
-        working-directory: web
+        working-directory: crates/central-web/browser
       - run: npm run e2e:site
-        working-directory: web
+        working-directory: crates/central-web/browser

@@ -1,4 +1,4 @@
-// A stand-in for baylee.app's Caddy site block (../docs/operations.md
+// A stand-in for baylee.app's Caddy site block (../../../../docs/operations.md
 // §"The browser listener"), for a local run against a real Central only
 // (e2e-real/README.md): TLS for baylee.app with a throwaway certificate,
 // /api/* passed to Central's browser listener with the Host unchanged and

@@ -706,7 +706,7 @@ Rust toolchain; `cargo xtask wasm` rebuilds it on x86-64 Linux (other machines u
 pinned container), and `cargo xtask wasm --check` (a CI job) proves the
 committed bytes are what the source builds ([xtask](xtask.md)).
 
-## Web pages (`web/`)
+## Web pages (`crates/central-web/`)
 
 `/register`, `/signin` and `/account` (shows the account's handle and, small,
 its sign-in name; signs out). The header gains "Sign in" and the account's

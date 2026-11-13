@@ -125,7 +125,7 @@ release migration, legal and independent security-review gates still apply.
   §13) keeps the worker's push handling, the payload, the bits, the nonce and every
   storage name unchanged; its `/sw.js` adds a per-build cache and the update offer.
   Its settings page (`/{lang}/account/notifications`) switches categories against a
-  real Central in `web/e2e-real/site-chat.spec.ts`; enabling a device there was not
+  real Central in `crates/central-web/browser/e2e-real/site-chat.spec.ts`; enabling a device there was not
   run locally (it needs a push provider), so it belongs to the staging run below.
 - Actual provider delivery and OS-specific installation behavior require a staging
   acceptance run; local tests do not send notifications to human devices.

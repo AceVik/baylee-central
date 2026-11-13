@@ -376,7 +376,7 @@ Reports about one's own picture are not exported with their reporters.
   - the runtime's grants both ways;
   - the sweep, deletion's cascade, and the upgrade over 000026 with the
     sequence column's bounds.
-- **The site (`web/e2e-site/picture.spec.ts`):**
+- **The site (`crates/central-web/browser/e2e-site/picture.spec.ts`):**
   - PNG, JPEG, GIF, WebP, AVIF, BMP, ICO and SVG through the browser,
     checked by decoding what was sent;
   - EXIF orientation;

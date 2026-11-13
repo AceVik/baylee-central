@@ -374,7 +374,7 @@ the owner's acceptance, why this is the vetted primitive and nothing of our
 own, and the pinned vector that holds the two builds together: one nonce,
 price and set of counters is checked natively, through the function the
 Worker calls, and in Chromium with the committed module
-(`web/e2e-site/account.spec.ts`), and OpenSSL's Argon2id gives the vector's
+(`crates/central-web/browser/e2e-site/account.spec.ts`), and OpenSSL's Argon2id gives the vector's
 bytes too.
 
 ### The numbers in force

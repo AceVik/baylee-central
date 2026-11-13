@@ -208,7 +208,7 @@ pairings, in one transaction, and prints the three counts on standard error. A d
 - `Accounts` searches no account id; `Account` takes one.
 - The account row has no restriction yet, and `Account` no restrictions or
   reports: they come with the design's steps 6 and 8. The admin answers are
-  the browser's alone and change together with `web/`, so adding fields
+  the browser's alone and change together with `crates/central-web/`, so adding fields
   then breaks no gateway or client.
 - The native client has no administration (the SDK has no call): the
   owner's design serves it on the website only.
