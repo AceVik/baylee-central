@@ -91,6 +91,14 @@ and reduced motion are acceptance conditions, not follow-up work.
 
 ## Assurance and improvement passes
 
+The full website CI run passed 718 cases and exposed three navigation-overflow
+cases at the first unfolded desktop widths after adding Tower. The follow-up
+keeps the full text size and target height while tightening horizontal link
+padding from 1081 to 1279 px. The affected language and Japanese strip checks
+then passed on desktop and phone (four cases, 20.6 seconds), with 1099/1100 px
+added to the existing language breakpoint matrix. This correction was separately
+reviewed; the other passing website cases were not repeated locally.
+
 1. Rules and authority: contract, graph validation, ownership and migration.
 2. Execution: real generated encounters, launch, recovery and durable outcomes.
 3. Progression: upgrade choices, lives, score eligibility and permanent rewards.
