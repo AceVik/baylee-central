@@ -234,6 +234,30 @@ impl Session {
         }
     }
 
+    /// Obtain scoped identity access after restoration. Only the returned trusted
+    /// Tower origin may receive this credential; it is not a Central session.
+    /// # Errors
+    /// Unconfirmed restoration, disabled Tower, dead session or invalid destination.
+    pub fn tower_token(
+        &self,
+        transport: &impl Transport,
+    ) -> Result<central_api::tower_access::Grant, Error> {
+        self.same_endpoint(transport)?;
+        if !self.confirmed {
+            return Err(Error::Rejected);
+        }
+        match transport.exchange(&Request::TowerToken {}, Some((&self.token).into()))? {
+            Response::TowerToken { grant } => {
+                central_api::gateway::validate_origin(
+                    &grant.origin,
+                    self.endpoint.legacy_origin().is_none(),
+                )?;
+                Ok(grant)
+            }
+            _ => Err(Error::Rejected),
+        }
+    }
+
     /// Revoke the session remotely. Callers drop this SDK object afterward to wipe local secrets.
     ///
     /// # Errors

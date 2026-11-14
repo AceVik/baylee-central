@@ -205,6 +205,8 @@ fn class(request: &Request) -> Class {
     if matches!(
         request,
         Request::SessionStatus
+            | Request::TowerToken {}
+            | Request::TowerIdentity {}
             | Request::RenewSession
             | Request::GatewayToken { .. }
             | Request::GatewayRevocations { .. }
@@ -250,7 +252,9 @@ fn tells(request: &Request) -> Tells {
         {
             Tells::Proves
         }
-        Request::ChallengeHost { .. }
+        Request::TowerToken {}
+        | Request::TowerIdentity {}
+        | Request::ChallengeHost { .. }
         | Request::SessionStatus
         | Request::RenewSession
         | Request::AccountSummary

@@ -79,6 +79,9 @@ impl Database {
 #[serde(deny_unknown_fields)]
 struct Service {
     listen: String,
+    /// Sole trusted HTTPS Tower authority; absent disables Tower identity access.
+    #[serde(default)]
+    tower_origin: Option<String>,
     /// The website's browser listener; absent means off.
     #[serde(default)]
     browser: Option<Browser>,
@@ -351,6 +354,7 @@ async fn serve() -> Result<(), ()> {
         OFFICIAL_ORIGIN,
         tokens,
     )
+    .and_then(|identity| identity.with_tower(settings.tower_origin.as_deref()))
     .map_err(|_| ())
     .map(|identity| composed(identity, legacy.as_ref(), push.as_deref(), outside));
     drop(settings);
@@ -396,6 +400,12 @@ async fn serve() -> Result<(), ()> {
 /// service from starting stops this.
 fn configured(bytes: &[u8]) -> Result<(), ()> {
     let mut settings: Service = parse(bytes)?;
+    if let Some(origin) = &settings.tower_origin {
+        central_api::gateway::validate_origin(origin, false).map_err(|_| ())?;
+        if origin == central_api::LIVE_ORIGIN {
+            return Err(());
+        }
+    }
     if let Some(push) = &settings.push {
         central_push::Sender::new(&push.vapid_key, "https://baylee.app/contact".into())
             .map_err(|_| ())?;
@@ -669,6 +679,25 @@ mod tests {
         // The secrets are moved out, not copied, into the connector.
         assert_eq!(settings.database.password, "");
         assert_eq!(settings.database.ca_certificate, "");
+    }
+
+    #[test]
+    fn tower_configuration_requires_a_distinct_canonical_https_origin() {
+        assert!(configured(service("").as_bytes()).is_ok());
+        assert!(
+            configured(service(r#","tower_origin":"https://tower.example.invalid""#).as_bytes())
+                .is_ok()
+        );
+        for origin in [
+            "http://127.0.0.1:29871",
+            "https://central.baylee.app",
+            "https://user@tower.example.invalid",
+            "https://tower.example.invalid/path",
+            "https://tower.example.invalid/",
+        ] {
+            let extra = format!(r#","tower_origin":"{origin}""#);
+            assert!(configured(service(&extra).as_bytes()).is_err());
+        }
     }
 
     #[test]

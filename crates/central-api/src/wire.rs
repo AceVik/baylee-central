@@ -38,6 +38,10 @@ pub struct Identity {
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "operation", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Request {
+    /// Issue short-lived identity access to the configured separate Tower authority.
+    TowerToken {},
+    /// Introspect only a Tower credential from the Authorization header.
+    TowerIdentity {},
     /// Global Daily/Weekly catalogue, rankings and account-owned participation.
     Challenges {
         /// Closed public or account operation; ownership comes from the session.
@@ -651,6 +655,16 @@ pub enum MigrationState {
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "result", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Response {
+    /// Scoped identity access; contains no ordinary Central session capability.
+    TowerToken {
+        /// Destination, opaque bearer and expiry.
+        grant: crate::tower_access::Grant,
+    },
+    /// Current identity under a live Tower credential and its original session.
+    TowerIdentity {
+        /// No rules, currency, permissions or accomplishment claims.
+        identity: crate::tower_access::Identity,
+    },
     /// Public or account-owned challenge result.
     Challenges {
         /// Closed challenge response.

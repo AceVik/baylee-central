@@ -21,6 +21,16 @@ pub(super) fn run(
     tls: &Path,
     scope: Scope,
 ) -> Result<()> {
+    if scope == Scope::TowerAccess {
+        return run_suite(
+            root,
+            port,
+            secrets,
+            tls,
+            "central-client",
+            Some("tower_access::scoped_identity"),
+        );
+    }
     if scope != Scope::All {
         return run_suite(
             root,
@@ -28,12 +38,29 @@ pub(super) fn run(
             secrets,
             tls,
             "central-postgres",
-            scope == Scope::Tower,
+            Some(if scope == Scope::Tower {
+                "tower_authority"
+            } else {
+                "migrations_ids_roles_rollback_and_locking"
+            }),
         );
     }
     for package in ["central-client", "central-postgres"] {
-        run_suite(root, port, secrets, tls, package, false)?;
+        let filter = if package == "central-postgres" {
+            "migrations_ids_roles_rollback_and_locking"
+        } else {
+            "real_native_login_restore_migration_and_adversarial_paths"
+        };
+        run_suite(root, port, secrets, tls, package, Some(filter))?;
     }
+    run_suite(
+        root,
+        port,
+        secrets,
+        tls,
+        "central-client",
+        Some("tower_access::scoped_identity"),
+    )?;
     Ok(())
 }
 
@@ -43,7 +70,7 @@ fn run_suite(
     secrets: &Secrets,
     tls: &Path,
     package: &str,
-    tower_only: bool,
+    filter: Option<&str>,
 ) -> Result<()> {
     println!("Running {package}'s PostgreSQL integration suite.");
     let mut command = Command::new(workspace::cargo());
@@ -61,12 +88,8 @@ fn run_suite(
         .env("CENTRAL_TEST_LEGACY_PASSWORD", &secrets.legacy)
         .env("CENTRAL_TEST_CA_PEM", tls.join("ca.pem"))
         .env("CENTRAL_TEST_WRONG_CA_PEM", tls.join("wrong.pem"));
-    if package == "central-postgres" {
-        command.arg(if tower_only {
-            "tower_authority"
-        } else {
-            "migrations_ids_roles_rollback_and_locking"
-        });
+    if let Some(filter) = filter {
+        command.arg(filter);
     }
     let tests = Watched::start(&mut command, "PostgreSQL integration tests failed")?;
     let (status, stdout, stderr) = tests.finish(

@@ -22,6 +22,8 @@ use std::{
 use tokio::{runtime::Runtime, sync::oneshot};
 
 mod support;
+#[path = "support/tower_access.rs"]
+mod tower_access;
 use support::{Http, config};
 
 #[test]
