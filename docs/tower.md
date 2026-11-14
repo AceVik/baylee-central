@@ -1,4 +1,4 @@
-# Oak Tower expeditions
+# The Verdant Tower
 
 Design milestone, 13 November 2026. Implementation is in progress; the contracts
 below are acceptance criteria until the implementation evidence is recorded.
@@ -151,3 +151,45 @@ duel has finished or the week has changed; no public game-to-account lookup is
 available. Individual tower nodes reject the calendar withdrawal operation, so
 operators explicitly withdraw the complete season. The focused PostgreSQL 18.6
 fixture passed these additions in 2.71 seconds and verified cleanup.
+
+### Deadline and recovery adversarial pass
+
+The extended PostgreSQL fixture passed in 4.61 seconds on 14 November. It
+reconstructs a historical publication and claims using only the isolated
+operator role. Production has no clock override. A victory delivered after the
+week closes still qualifies when its authenticated finish precedes the deadline;
+a finish at the exact boundary does not. Later practice preserves the prior
+ranked prefix while granting distinct-floor rewards. The current-week response
+still returns the previous week's active run. Foreign-account game lookup is
+refused. Two complete timed summits receive the same rank on both boards.
+The owned container and listener were removed. The complete SDK PostgreSQL
+suite then passed in 107.66 seconds. Its following store suite found an obsolete
+migration-count expectation in the search-path regression. After correction,
+`cargo xtask postgres --store-only` passed in 78.23 seconds, including the new
+populated-calendar upgrade preservation assertions. That owned container and
+listener were also removed. The default PostgreSQL gate still runs both suites;
+the narrow option avoids repeating successful transport work during a store fix.
+
+### Web and native presentation in progress
+
+The native Lobby entrance, five-floor route, lives, exact three-way replacement
+preview, explicit confirmation, recovery link and three original relic motifs
+are implemented. Thirty-six focused client/core checks passed, including
+keyboard navigation, deep links, account changes and uncertain mutation retries.
+The subsequent local-state refactor passed all four Tower core tests again.
+
+The website exposes only public season metadata in its server-side snapshot.
+Owned progress and consent are loaded separately in the browser. Account export
+includes a separately bounded Tower dataset with strict ascending UUIDv7 cursors
+and an explicit completeness marker. The export and Trusted Types/inert-element
+checks passed. Localized Tower copy and the privacy description cover all eleven
+site languages.
+
+The first real desktop/phone pass ran fourteen focused browser checks: eleven
+passed, and three found duplicate ranking landmark names or an unfocusable
+horizontal table. The correction gives the Tower ranking a distinct accessible
+name and keyboard access, and hides empty table scaffolding. The inspected
+desktop screenshot also prompted a full-width tier gallery, replacing the tall
+single-card expansion, a smaller expedition title, and corrected pagination
+labels. These latest visual changes await the next rendered pass; no final
+visual approval or independent PR review is claimed yet.

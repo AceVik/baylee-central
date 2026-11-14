@@ -1,7 +1,7 @@
 //! The command line takes exactly the tasks and flags the scripts had.
 #![forbid(unsafe_code)]
 
-use xtask::cli::{Task, USAGE, parse};
+use xtask::cli::{PostgresScope, Task, USAGE, parse};
 
 fn args(line: &str) -> Vec<String> {
     line.split_whitespace().map(str::to_owned).collect()
@@ -32,14 +32,21 @@ fn every_task_and_flag_parses() {
         parse(&args("postgres --exercise-failure")),
         Ok(Task::Postgres {
             exercise_failure: true,
-            tower_only: false,
+            scope: PostgresScope::All,
         })
     );
     assert_eq!(
         parse(&args("postgres --tower-only")),
         Ok(Task::Postgres {
             exercise_failure: false,
-            tower_only: true,
+            scope: PostgresScope::Tower,
+        })
+    );
+    assert_eq!(
+        parse(&args("postgres --store-only")),
+        Ok(Task::Postgres {
+            exercise_failure: false,
+            scope: PostgresScope::Store,
         })
     );
     assert_eq!(

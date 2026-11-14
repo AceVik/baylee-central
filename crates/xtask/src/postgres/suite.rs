@@ -7,7 +7,7 @@ use std::path::Path;
 use std::process::Command;
 use std::time::Duration;
 
-use super::roles::Secrets;
+use super::{Scope, roles::Secrets};
 use crate::fail::{Fail, Result};
 use crate::process::Watched;
 use crate::workspace;
@@ -19,10 +19,17 @@ pub(super) fn run(
     port: u16,
     secrets: &Secrets,
     tls: &Path,
-    tower_only: bool,
+    scope: Scope,
 ) -> Result<()> {
-    if tower_only {
-        return run_suite(root, port, secrets, tls, "central-postgres", true);
+    if scope != Scope::All {
+        return run_suite(
+            root,
+            port,
+            secrets,
+            tls,
+            "central-postgres",
+            scope == Scope::Tower,
+        );
     }
     for package in ["central-client", "central-postgres"] {
         run_suite(root, port, secrets, tls, package, false)?;

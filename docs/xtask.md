@@ -25,7 +25,9 @@ ordinary tests of the crate (`crates/xtask/tests/policy/`), so `cargo test`
 and the gate run them (they replaced `scripts/test-policy.ps1`). CI runs the
 tasks under bash, on the runners the next section names.
 
-`cargo xtask postgres --tower-only` runs the expedition authority regression
+`cargo xtask postgres --store-only` reruns the store/migration suite without
+repeating an already successful SDK transport suite. The default still requires
+both. `cargo xtask postgres --tower-only` runs the expedition authority regression
 against the same owned PostgreSQL 18 fixture and cleanup checks, omitting the
 unrelated account/HTTP suites. It is a focused development check, not a replacement
 for the full `postgres` release gate, which also includes the expedition tests.

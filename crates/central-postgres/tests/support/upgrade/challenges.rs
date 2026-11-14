@@ -45,6 +45,7 @@ pub(super) async fn run(tx: &DatabaseTransaction) {
     )
     .await;
     refused(tx, "UPDATE upgrade_probe.challenge_attempts SET request_id='00000000-0000-0000-0000-000000000000'").await;
+    tower_upgrade(tx).await;
     tx.execute_unprepared("DELETE FROM upgrade_probe.accounts WHERE id IN (SELECT account_id FROM upgrade_probe.challenge_participation)").await.unwrap();
     for table in [
         "challenge_participation",
@@ -68,4 +69,62 @@ pub(super) async fn run(tx: &DatabaseTransaction) {
         .await,
         1
     );
+}
+
+async fn tower_upgrade(tx: &DatabaseTransaction) {
+    use sea_orm::{DbBackend, Statement};
+    let snapshot = "SELECT jsonb_agg(to_jsonb(r) ORDER BY id)::text AS rows FROM
+        (SELECT id,kind,starts_at,ends_at,description,digest,publication FROM upgrade_probe.challenges) r";
+    let before: String = tx
+        .query_one_raw(Statement::from_string(DbBackend::Postgres, snapshot))
+        .await
+        .unwrap()
+        .unwrap()
+        .try_get("", "rows")
+        .unwrap();
+    tx.execute_unprepared(&scratch(include_str!(
+        "../../../../central-migration/src/m20261113_000029_tower.sql"
+    )))
+    .await
+    .unwrap();
+    let after: String = tx
+        .query_one_raw(Statement::from_string(DbBackend::Postgres, snapshot))
+        .await
+        .unwrap()
+        .unwrap()
+        .try_get("", "rows")
+        .unwrap();
+    assert_eq!(
+        before, after,
+        "tower migration preserves existing calendar publications byte for byte"
+    );
+    assert_eq!(
+        scalar(
+            tx,
+            "SELECT count(*)::bigint AS value FROM upgrade_probe.challenges WHERE scope=0"
+        )
+        .await,
+        1
+    );
+    for table in [
+        "challenge_attempts",
+        "challenge_completions",
+        "challenge_participation",
+    ] {
+        assert_eq!(
+            scalar(
+                tx,
+                &format!("SELECT count(*)::bigint AS value FROM upgrade_probe.{table}")
+            )
+            .await,
+            1
+        );
+    }
+    refused(
+        tx,
+        "UPDATE upgrade_probe.challenges SET scope=1 WHERE kind='daily'",
+    )
+    .await;
+    refused(tx, "INSERT INTO upgrade_probe.challenges(kind,starts_at,ends_at,description,digest,publication)
+        VALUES('daily',86400,172800,'{}',decode(repeat('02',32),'hex'),'duplicate')").await;
 }
