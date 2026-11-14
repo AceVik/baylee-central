@@ -1,11 +1,13 @@
 //! Weekly, manually played expeditions. Private packages have no player response type.
 
+mod export;
 mod progress;
 #[cfg(test)]
 mod tests;
 mod validation;
 
 use crate::challenges::{Attempt, Challenge, Period, Publication, Words};
+pub use export::{Accomplishment, ExportEntry, ExportTable, RankedScore};
 pub use progress::{Badge, BadgeKind, Phase, Progress};
 use serde::{Deserialize, Serialize};
 
@@ -259,8 +261,10 @@ pub enum Request {
         /// Explicit consent; false also works before accepting changed terms.
         listed: bool,
     },
-    /// Page through all owned runs, including choices and scores.
+    /// Page through owned durable expedition records.
     Export {
+        /// Dataset to export independently.
+        table: ExportTable,
         /// Exclusive `UUIDv7` cursor; never another account's identity.
         after: Option<[u8; 16]>,
     },
@@ -290,10 +294,10 @@ pub enum Response {
         /// No seeds, proof records or seat capabilities.
         run: Box<Run>,
     },
-    /// At most ten complete owned runs, ascending by identity.
+    /// At most ten owned records, ascending by dataset identity.
     Export {
         /// Records, never another account's.
-        runs: Vec<Run>,
+        entries: Vec<ExportEntry>,
         /// Next exclusive cursor, absent at the end.
         after: Option<[u8; 16]>,
     },

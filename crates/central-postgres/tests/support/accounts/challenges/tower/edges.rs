@@ -11,6 +11,7 @@ pub(super) async fn run(
 ) {
     rewards(store, a, alice, season).await;
     privacy(store, a, b, season, completed.id).await;
+    super::export::privacy(store, a, b, season).await;
     defeats(store, a, alice, season).await;
     withdrawal(store, a, alice, season).await;
     deletion(store, operator, a, alice, completed.id).await;
@@ -118,16 +119,23 @@ async fn privacy(
         panic!();
     };
     assert!(standings.is_empty());
-    let tower::Response::Export { runs, after } =
-        call(store, Some(a), tower::Request::Export { after: None })
-            .await
-            .unwrap()
-    else {
+    let tower::Response::Export { entries, after } = call(
+        store,
+        Some(a),
+        tower::Request::Export {
+            table: tower::ExportTable::Runs,
+            after: None,
+        },
+    )
+    .await
+    .unwrap() else {
         panic!();
     };
-    assert_eq!(runs.len(), 2);
-    assert_eq!(runs[0].id, completed);
-    assert_eq!(runs[1].progress.route.len(), 4);
+    assert_eq!(entries.len(), 2);
+    assert_eq!(entries[0].identity().1, completed);
+    assert!(
+        matches!(&entries[1], tower::ExportEntry::Run { run, .. } if run.progress.route.len() == 4)
+    );
     assert!(after.is_none());
     let Response::Export { entries, .. } = public(
         store,
@@ -142,14 +150,19 @@ async fn privacy(
         panic!();
     };
     assert!(entries.iter().all(|entry| matches!(entry, ExportEntry::Attempt { attempt } if attempt.kind == AttemptKind::Tower)));
-    let tower::Response::Export { runs, .. } =
-        call(store, Some(b), tower::Request::Export { after: None })
-            .await
-            .unwrap()
-    else {
+    let tower::Response::Export { entries, .. } = call(
+        store,
+        Some(b),
+        tower::Request::Export {
+            table: tower::ExportTable::Runs,
+            after: None,
+        },
+    )
+    .await
+    .unwrap() else {
         panic!();
     };
-    assert!(runs.is_empty());
+    assert!(entries.is_empty());
 }
 
 async fn defeats(store: &AccountStore, a: &Token, alice: Identity, season: [u8; 16]) {

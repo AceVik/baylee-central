@@ -95,36 +95,21 @@ impl Hub {
                     ..
                 }) => {
                     let season = season.map(|season| *season);
+                    let changed = self
+                        .season
+                        .with_untracked(|prior| prior.as_ref().map(|s| s.id))
+                        != season.as_ref().map(|s| s.id);
                     if self.season.get_untracked() != season {
                         self.season.set(season);
                     }
-                    let same_rows = self.rows.with_untracked(|rows| {
-                        rows.len() == standings.len()
-                            && rows.iter().zip(&standings).all(|(a, b)| {
-                                (
-                                    a.rank,
-                                    &a.name,
-                                    a.tag,
-                                    a.own,
-                                    a.floors,
-                                    a.losses,
-                                    a.turns,
-                                    a.milliseconds,
-                                ) == (
-                                    b.rank,
-                                    &b.name,
-                                    b.tag,
-                                    b.own,
-                                    b.floors,
-                                    b.losses,
-                                    b.turns,
-                                    b.milliseconds,
-                                )
-                            })
-                    });
-                    if !same_rows {
-                        self.rows.set(standings);
+                    if changed && offset > 0 {
+                        self.offset.set(0);
+                        self.rows.set(Vec::new());
+                        self.busy.set(false);
+                        self.refresh();
+                        return;
                     }
+                    update_rows(self.rows, standings);
                     if stamp.is_some() {
                         if !self.signed_in.get_untracked() {
                             self.signed_in.set(true);
@@ -173,7 +158,7 @@ impl Hub {
         self.refresh();
     }
 
-    pub fn visibility(self, run: &api::Run) {
+    pub fn visibility(self, run: &api::Run, listed: bool, checked: RwSignal<bool>) {
         if self.busy.get_untracked() {
             return;
         }
@@ -186,7 +171,7 @@ impl Hub {
         self.busy.set(true);
         self.error.set(None);
         let season = run.season.id;
-        let listed = !run.listed;
+        let prior = run.listed;
         let generation = self.generation.get_untracked();
         leptos::task::spawn_local(async move {
             let response = request(api::Request::Visibility { season, listed }).await;
@@ -200,19 +185,64 @@ impl Hub {
             }
             match response {
                 Ok(api::Response::Updated) => {
+                    // The mutation is acknowledged even if the subsequent Read fails.
+                    // Rollbacks must use this last confirmed value, never a stale run.
+                    for signal in [self.run, self.active] {
+                        if signal.with_untracked(|run| {
+                            run.as_ref().is_some_and(|run| run.season.id == season)
+                        }) {
+                            signal.update(|run| {
+                                if let Some(run) = run {
+                                    run.listed = listed;
+                                }
+                            });
+                        }
+                    }
                     self.busy.set(false);
                     self.refresh();
                 }
                 Ok(_) => {
+                    checked.try_set(prior);
                     self.error.set(Some(Failure::Malformed));
                     self.busy.set(false);
                 }
                 Err(error) => {
+                    checked.try_set(prior);
                     self.error.set(Some(error));
                     self.busy.set(false);
                 }
             }
         });
+    }
+}
+
+fn update_rows(signal: RwSignal<Vec<api::Standing>>, standings: Vec<api::Standing>) {
+    let same = signal.with_untracked(|rows| {
+        rows.len() == standings.len()
+            && rows.iter().zip(&standings).all(|(a, b)| {
+                (
+                    a.rank,
+                    &a.name,
+                    a.tag,
+                    a.own,
+                    a.floors,
+                    a.losses,
+                    a.turns,
+                    a.milliseconds,
+                ) == (
+                    b.rank,
+                    &b.name,
+                    b.tag,
+                    b.own,
+                    b.floors,
+                    b.losses,
+                    b.turns,
+                    b.milliseconds,
+                )
+            })
+    });
+    if !same {
+        signal.set(standings);
     }
 }
 

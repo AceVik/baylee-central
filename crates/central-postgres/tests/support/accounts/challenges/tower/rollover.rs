@@ -54,6 +54,7 @@ pub(super) async fn run(
         "the previously ranked prefix stays frozen"
     );
     assert_eq!(badges[0].count, 2, "practice still grants a distinct floor");
+    super::export::frozen_prefix(store, &a, run.id).await;
     let tower::Response::Read {
         season: current,
         active,
@@ -88,6 +89,7 @@ pub(super) async fn run(
     )
     .await;
     sprint_ties(store, operator, [(&a, alice), (&b, bob)], season, end).await;
+    super::concurrent::withdraw_during_first_reward(store, operator, keys, season).await;
 }
 
 async fn sprint_ties(
