@@ -10,6 +10,10 @@ need a written rationale. Source: https://github.com/OWASP/ASVS/tree/v5.0.0
 
 ## Three-pass method for every security milestone
 
+The separate native Tower identity scope is recorded in
+[Tower access](tower-access.md), including design, implementation and targeted
+real-transport adversarial evidence. It adds no Tower gameplay authority to Central.
+
 The Daily/Weekly feature's design, implementation and adversarial evidence is
 recorded in [the challenge assurance record](challenge-assurance.md). Its three
 engineering improvement rounds precede the independent PR review; neither is

@@ -9,6 +9,12 @@ e-mail address and a reset code by mail need the `mail` block
 ([below](#mail)). Nothing here enables browser SSO for gateways. Sessions
 renew ([below](#sessions)).
 
+The optional `tower_origin` setting enables identity access to the separate
+Baylee Tower authority. It accepts a distinct canonical HTTPS origin and is
+disabled when absent. [Tower access](tower-access.md) describes migration 30,
+runtime grants and the online introspection contract; it enables no game hosting
+or Tower economy inside Central.
+
 ## Launcher modes
 
 `central-service` takes exactly one mode argument and no other argument. Every

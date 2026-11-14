@@ -6,6 +6,11 @@ versions require the same migration and integration suite before support is
 claimed. Pin the deployment to a reviewed minor release and container digest,
 with regular security updates. No SQLite substitution in integration tests.
 
+Migration 30 adds scoped identity tokens for the separate Tower service, with
+two database-constrained slots per native session and deletion cascading from
+that session. It adds no gameplay tables. See [Tower access](tower-access.md)
+for expiry, grants, refresh serialization and focused integration evidence.
+
 ## IDs and client-side encryption
 
 Use native `uuid` columns with `DEFAULT pg_catalog.uuidv7()` and primary/unique

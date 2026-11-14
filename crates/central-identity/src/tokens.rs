@@ -73,7 +73,8 @@ impl Presented {
 #[must_use]
 pub const fn credential_operation(request: &Request) -> bool {
     match request {
-        Request::ChallengeHost { .. }
+        Request::TowerIdentity {}
+        | Request::ChallengeHost { .. }
         | Request::GatewayHeartbeat { .. }
         | Request::GatewayPulse { .. }
         | Request::GatewayStatus
@@ -85,7 +86,8 @@ pub const fn credential_operation(request: &Request) -> bool {
         | Request::LegacyClose { .. }
         | Request::LegacyProfile { .. }
         | Request::LegacyStatus { .. } => true,
-        Request::Challenges { .. }
+        Request::TowerToken {}
+        | Request::Challenges { .. }
         | Request::Notifications { .. }
         | Request::Social { .. }
         | Request::SessionStatus

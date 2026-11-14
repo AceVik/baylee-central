@@ -47,6 +47,7 @@ pub use reports::PartUpload;
 mod reset;
 mod terms;
 mod tokens;
+mod tower_access;
 mod verified;
 pub use tokens::{Presented, TokenKeys, credential_operation};
 
@@ -159,7 +160,9 @@ pub fn browser_operation(request: &Request) -> bool {
         | Request::PairCancel { .. }
         | Request::Picture { .. } => true,
         Request::AcceptTerms { subject, .. } => matches!(subject, TermsSubject::Central),
-        Request::ChallengeHost { .. }
+        Request::TowerToken {}
+        | Request::TowerIdentity {}
+        | Request::ChallengeHost { .. }
         | Request::CreateObject
         | Request::ReadObject { .. }
         | Request::ListObjects { .. }
@@ -286,6 +289,8 @@ fn signed_in(
 /// Shared service state. Pending challenges are bounded, expiring and single-use.
 pub struct IdentityService {
     store: AccountStore,
+    /// Operator-configured separate Tower service; absent means no Tower credentials.
+    tower_origin: Option<String>,
     issuer: [u8; 32],
     /// Central's own origin: every signed token's `iss`, and a Central token's `aud`.
     origin: String,
@@ -352,6 +357,7 @@ impl IdentityService {
         };
         Ok(Self {
             store,
+            tower_origin: None,
             issuer: endpoint.issuer(),
             origin: endpoint.origin().to_owned(),
             tokens,

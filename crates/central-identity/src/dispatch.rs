@@ -57,6 +57,8 @@ impl IdentityService {
             self.require_terms(bearer, surface).await?;
         }
         match request {
+            Request::TowerToken {} => self.tower_token(bearer).await,
+            Request::TowerIdentity {} => self.tower_identity(bearer).await,
             Request::Challenges { request } => self.challenges(request, bearer, surface).await,
             Request::ChallengeHost { request } => self.challenge_host(request, bearer).await,
             Request::Notifications { request } => self.notifications(request, bearer).await,

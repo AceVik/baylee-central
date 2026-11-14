@@ -30,6 +30,8 @@ pub enum Scope {
     Store,
     /// The focused expedition authority regression only.
     Tower,
+    /// Only native Tower identity over the real SDK/HTTP/database boundary.
+    TowerAccess,
 }
 
 /// What the fixture owns, for its cleanup.

@@ -31,6 +31,10 @@ both. `cargo xtask postgres --tower-only` runs the expedition authority regressi
 against the same owned PostgreSQL 18 fixture and cleanup checks, omitting the
 unrelated account/HTTP suites. It is a focused development check, not a replacement
 for the full `postgres` release gate, which also includes the expedition tests.
+`cargo xtask postgres --tower-access-only` exercises just native Tower identity
+issuance/introspection through the real SDK, HTTP listener and PostgreSQL, including
+credential separation, concurrent refresh bounds and revocation. It uses the same
+owned fixture and cleanup checks. The full command includes it as well.
 
 ## Which runner runs what
 
