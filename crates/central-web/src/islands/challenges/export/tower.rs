@@ -3,30 +3,58 @@ use crate::islands::{central::Failure, tower::request};
 use central_api::tower as api;
 
 pub(super) async fn runs() -> Result<serde_json::Value, Failure> {
+    let mut datasets = serde_json::Map::new();
+    let mut complete = true;
+    for (table, name) in [
+        (api::ExportTable::Runs, "runs"),
+        (api::ExportTable::Actions, "actions"),
+        (api::ExportTable::Participation, "participation"),
+    ] {
+        let (entries, after) = dataset(table).await?;
+        complete &= after.is_none();
+        datasets.insert(
+            name.into(),
+            serde_json::json!({ "entries": entries, "complete": after.is_none(), "after": after }),
+        );
+    }
+    datasets.insert("complete".into(), complete.into());
+    Ok(datasets.into())
+}
+
+async fn dataset(
+    table: api::ExportTable,
+) -> Result<(Vec<api::ExportEntry>, Option<[u8; 16]>), Failure> {
     let mut after = None;
     let mut all = Vec::new();
     for _ in 0..256 {
-        let api::Response::Export { runs, after: next } =
-            request(api::Request::Export { after }).await?
+        let api::Response::Export {
+            entries,
+            after: next,
+        } = request(api::Request::Export { table, after }).await?
         else {
             return Err(Failure::Malformed);
         };
-        let ids: Vec<_> = runs.iter().map(|run| run.id).collect();
-        cursor(after, &ids, next)?;
-        for run in &runs {
-            run.progress.validate().map_err(|_| Failure::Malformed)?;
-            run.season
-                .theme
-                .validate()
-                .map_err(|_| Failure::Malformed)?;
+        if entries.iter().any(|entry| entry.identity().0 != table) {
+            return Err(Failure::Malformed);
         }
-        all.extend(runs);
+        let ids: Vec<_> = entries.iter().map(|entry| entry.identity().1).collect();
+        cursor(after, &ids, next)?;
+        for entry in &entries {
+            if let api::ExportEntry::Run { run, .. } = entry {
+                run.progress.validate().map_err(|_| Failure::Malformed)?;
+                run.season
+                    .theme
+                    .validate()
+                    .map_err(|_| Failure::Malformed)?;
+            }
+        }
+        all.extend(entries);
         after = next;
         if after.is_none() {
             break;
         }
     }
-    Ok(serde_json::json!({ "runs": all, "complete": after.is_none(), "after": after }))
+    Ok((all, after))
 }
 
 fn cursor(

@@ -180,8 +180,10 @@ The subsequent local-state refactor passed all four Tower core tests again.
 
 The website exposes only public season metadata in its server-side snapshot.
 Owned progress and consent are loaded separately in the browser. Account export
-includes a separately bounded Tower dataset with strict ascending UUIDv7 cursors
-and an explicit completeness marker. The export and Trusted Types/inert-element
+includes three independently bounded Tower datasets with strict ascending UUIDv7
+cursors and per-dataset completeness markers: runs (including the frozen ranked
+prefix and creation metadata), accepted retry-safe actions, and participation
+(including consent without a run and exact earned floors). The export and Trusted Types/inert-element
 checks passed. Localized Tower copy and the privacy description cover all eleven
 site languages.
 
@@ -204,4 +206,33 @@ was removed. TypeScript/lint and affected Rust clippy also passed.
 The native fifth refinement passed nine targeted controls/core/publisher checks;
 its actual Tower window still awaits the required test display. The implementing
 agent has not claimed native visual acceptance or representative human difficulty.
-Independent PR review and complete graph/network evidence remain in progress.
+Independent PR review found and corrected season pagination, failed-consent
+rollback, native upgrade retry visibility, ranking-week labeling, complete
+personal exports and the season/reward foreign-key lock order. Host mutations
+use `FOR NO KEY UPDATE`: season identities are immutable, and results already
+holding a node share lock can still acquire the reward foreign-key key-share
+lock. The controlled concurrent withdrawal/result regression and complete export
+regressions passed in PostgreSQL 18.6 in 11.76 seconds; the fixture verified owned
+container/listener removal. Static re-review closed both authority findings.
+
+The full 35-node generated expedition now has at least three contributing wins
+in at least two terminal families per node, each checked through fresh execution,
+exact replay and reconstructed opponent policy. Observed witness turns range
+from 9 to 33; these are existence witnesses, not optimal or human difficulty
+measurements. The sibling Baylee's full challenge integration passed in 91.46
+seconds against real isolated PostgreSQL/Central/gateway/agent/game servers.
+It covered Daily/Weekly plus five Tower victories, four upgrades, exact retries,
+owned recovery, disconnect/resume Sprint exclusion and permanent rewards. The
+actual stock executable resumed a deliberately interrupted upload and its second
+invocation published nothing. The fixture removed its owned services, database
+and listener. Its first attempt exposed an outdated copy of runtime grants in
+Baylee's fixture; that copy was aligned with migration 000029 before the pass.
+
+Final browser regressions after the review corrections passed all twelve
+desktop/phone cases in 11.1 seconds. This includes an acknowledged opt-in followed
+by a failed refresh and failed opt-out: the checkbox retains the last confirmed
+server state. New-season pagination returns to the first page while preserving
+the old active run, and the downloadable account file includes all three Tower
+datasets. All eight focused native/core cases passed as well (0.80/0.01 seconds).
+All five independent review areas have no remaining reported findings after
+their correction reviews; this is a code review, not an external security audit.

@@ -46,6 +46,7 @@ fn owned(lang: Lang, hub: Hub, run: api::Run) -> impl IntoView {
         Vec::new()
     };
     let listed = run.listed;
+    let checked = RwSignal::new(listed);
     view! {
         <article class="card tower-owned">
             <p class="eyebrow">{status}</p><h3>{text(lang,&run.season.theme.title)}</h3>
@@ -55,8 +56,8 @@ fn owned(lang: Lang, hub: Hub, run: api::Run) -> impl IntoView {
                 <div><dt>{words::ch_turn(lang)}</dt><dd>{progress.turns}</dd></div>
             </dl>
             <div class="challenge-actions"><a class="button" href=play(id)>{words::ch_play(lang)}</a></div>
-            <label class="challenge-consent" for="tower-consent"><input id="tower-consent" type="checkbox" prop:checked=listed disabled=move || hub.busy.get()
-                on:change=move |_| hub.visibility(&run)/><span>{words::ch_consent(lang)}</span></label>
+            <label class="challenge-consent" for="tower-consent"><input id="tower-consent" type="checkbox" prop:checked=move || checked.get() disabled=move || hub.busy.get()
+                on:change=move |event| { let listed = event_target_checked(&event); checked.set(listed); hub.visibility(&run, listed, checked); }/><span>{words::ch_consent(lang)}</span></label>
             {(!offers.is_empty()).then(|| view! { <div class="tower-upgrades">{offers.into_iter().map(|offer| view! {
                 <article><h4>{text(lang,&offer.title)}</h4><p>{text(lang,&offer.summary)}</p>
                     <p class="tower-replacement"><span>{offer.copies}{" × "}{offer.remove}</span><span aria-hidden="true">{"↓"}</span><strong>{offer.copies}{" × "}{offer.add}</strong></p>

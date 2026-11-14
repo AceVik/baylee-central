@@ -30,8 +30,10 @@ async fn stock(db: &impl ConnectionTrait, row: &QueryResult) -> Result<api::Stoc
 }
 
 async fn row(db: &impl ConnectionTrait, id: [u8; 16]) -> Result<QueryResult, Error> {
+    // Season keys never change. Serialize host mutations while allowing reward
+    // foreign-key KEY SHARE locks from a result already holding its node SHARE lock.
     db.query_one_raw(statement(
-        "SELECT id,manifest::text,published,withdrawn FROM central_identity.tower_seasons WHERE id=$1 FOR UPDATE",
+        "SELECT id,manifest::text,published,withdrawn FROM central_identity.tower_seasons WHERE id=$1 FOR NO KEY UPDATE",
         vec![uuid(id).into()])).await.map_err(unavailable)?.ok_or(Error::Rejected)
 }
 
@@ -135,7 +137,7 @@ async fn stage(
          ON CONFLICT(starts_at) DO NOTHING",
         vec![period.starts_at.into(), period.ends_at.into(), json(central_api::encode(value)?)?.into()])).await.map_err(unavailable)?;
     let season = db.query_one_raw(statement(
-        "SELECT id,manifest::text,published,withdrawn FROM central_identity.tower_seasons WHERE starts_at=$1 FOR UPDATE",
+        "SELECT id,manifest::text,published,withdrawn FROM central_identity.tower_seasons WHERE starts_at=$1 FOR NO KEY UPDATE",
         vec![period.starts_at.into()])).await.map_err(unavailable)?.ok_or(Error::Unavailable)?;
     if manifest(&season)? != *value
         || season

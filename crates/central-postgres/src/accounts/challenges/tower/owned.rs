@@ -3,6 +3,7 @@
 use super::{api, id_valid, json, load, now, save, season_row, statement, unavailable, uuid};
 use central_api::Error;
 use sea_orm::{ConnectionTrait, DatabaseTransaction, prelude::Uuid};
+mod export;
 
 pub(super) async fn dispatch(
     db: &DatabaseTransaction,
@@ -88,7 +89,9 @@ pub(super) async fn dispatch(
             consent(db, me, *season, *listed).await?;
             return Ok(api::Response::Updated);
         }
-        api::Request::Export { after } => return export(db, me, *after, origin).await,
+        api::Request::Export { table, after } => {
+            return export::page(db, me, *table, *after, origin).await;
+        }
     };
     Ok(api::Response::Run {
         run: Box::new(load(db, me, run, origin).await?),
@@ -259,33 +262,4 @@ async fn budget(db: &impl ConnectionTrait, me: Uuid) -> Result<(), Error> {
         return Err(Error::Busy);
     }
     Ok(())
-}
-
-async fn export(
-    db: &impl ConnectionTrait,
-    me: Uuid,
-    after: Option<[u8; 16]>,
-    origin: &str,
-) -> Result<api::Response, Error> {
-    if let Some(id) = after {
-        id_valid(id)?;
-    }
-    let mut rows = db.query_all_raw(statement(
-        "SELECT id FROM central_identity.tower_runs WHERE account_id=$1 AND ($2::uuid IS NULL OR id>$2)
-         ORDER BY id LIMIT 11", vec![me.into(), after.map(uuid).into()])).await.map_err(unavailable)?;
-    let more = rows.len() > 10;
-    if more {
-        rows.pop();
-    }
-    let mut runs = Vec::with_capacity(rows.len());
-    for row in rows {
-        let id: Uuid = row.try_get("", "id").map_err(unavailable)?;
-        runs.push(load(db, me, *id.as_bytes(), origin).await?);
-    }
-    let after = if more {
-        runs.last().map(|run| run.id)
-    } else {
-        None
-    };
-    Ok(api::Response::Export { runs, after })
 }

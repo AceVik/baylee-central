@@ -7,10 +7,11 @@ type Season = { id: number[]; withdrawn: boolean; theme: { title: { en: string; 
 const feed = JSON.parse(readFileSync(new URL("../../../central-web-server/tests/data/challenges.json", import.meta.url), "utf8")) as {
   now: number; before: number | null; challenges: unknown[]; tower: Season;
 };
-type Request = { action: string; listed?: boolean; board?: string; request?: Request };
+type Request = { action: string; listed?: boolean; board?: string; offset?: number; request?: Request };
 
 async function setup(page: Page) {
-  const state = { listed: false, signedIn: true, boards: [] as string[], pause: null as (() => Promise<void>) | null, held: false, delivered: false };
+  const state = { listed: false, signedIn: true, boards: [] as string[], offsets: [] as number[], consent: [] as boolean[], failConsent: false,
+    season: structuredClone(feed.tower), rowCount: 2, failRead: false, pause: null as (() => Promise<void>) | null, held: false, delivered: false };
   await page.addInitScript(() => localStorage.setItem("baylee-central-session", JSON.stringify({ expiresAt: 4_102_444_800 })));
   await page.route("**/api/v1", async (route) => {
     const body = route.request().postDataJSON() as { operation: string; request: Request };
@@ -28,17 +29,23 @@ async function setup(page: Page) {
     const request = op.request;
     expect(request).toBeDefined();
     if (request?.action === "visibility") {
+      state.consent.push(request.listed ?? false);
+      if (state.failConsent) { state.failConsent = false; return route.fulfill({ status: 503, body: "unavailable\n" }); }
       state.listed = request.listed ?? false;
       return json({ answer: "tower", response: { answer: "updated" } });
     }
     expect(request?.action).toBe("read");
+    if (state.failRead) { state.failRead = false; return route.fulfill({ status: 503, body: "unavailable\n" }); }
     state.boards.push(request?.board ?? "");
+    const offset = request?.offset ?? 0;
+    state.offsets.push(offset);
     const run = { id: [...feed.tower.id.slice(0, 15), 4], season: feed.tower, revision: 3,
       progress: { phase: "choosing", cleared: 1, lives: 3, route: [], turns: 9, milliseconds: 32000, competitive: true },
       encounter: feed.challenges[1], attempt: null, listed: state.listed };
-    const response = { answer: "tower", response: { answer: "read", now: feed.now, season: feed.tower,
-      standings: [{ rank: 1, name: "<script>not markup</script>", tag: null, own: false, floors: 5, losses: 0, turns: 63, milliseconds: 320000 },
-        { rank: 1, name: "Equal ascent", tag: 80000, own: true, floors: 5, losses: 0, turns: 63, milliseconds: null }],
+    const examples = [{ rank: 1, name: "<script>not markup</script>", tag: null, own: false, floors: 5, losses: 0, turns: 63, milliseconds: 320000 },
+      { rank: 1, name: "Equal ascent", tag: 80000, own: true, floors: 5, losses: 0, turns: 63, milliseconds: null }];
+    const response = { answer: "tower", response: { answer: "read", now: feed.now, season: state.season,
+      standings: Array.from({ length: state.rowCount }, (_, i) => examples[i % 2]).slice(offset, offset + 30),
       run: state.signedIn ? run : null, active: state.signedIn ? run : null,
       badges: state.signedIn ? [{ kind: "pathfinder", count: 15, tier: "silver", next: 50 }, { kind: "summit", count: 1, tier: "bronze", next: 4 }, { kind: "unbroken", count: 0, tier: null, next: 1 }] : [],
     } };
@@ -60,6 +67,52 @@ test("the expedition is server rendered and its game link carries only the publi
   await expect(tower.getByRole("link", { name: "Play in Baylee" })).toHaveAttribute("href", /^baylee:\/\/tower\/[0-9a-f]{32}$/);
   const html = await tower.innerHTML();
   for (const forbidden of ["record_digest", "private-execution-package", "policy_seed", "seat_token"]) expect(html).not.toContain(forbidden);
+});
+
+test("a failed consent change resets the checkbox and never inverts the next explicit choice", async ({ page }) => {
+  const state = await setup(page);
+  await page.goto("/en/challenges");
+  const consent = page.locator(".tower-hub").getByRole("checkbox");
+  await expect(consent).not.toBeChecked();
+  state.failConsent = true;
+  await consent.click();
+  await expect.poll(() => state.consent).toEqual([true]);
+  await expect(consent).not.toBeChecked();
+  await expect(consent).toBeEnabled();
+  state.failRead = true;
+  await consent.check();
+  await expect.poll(() => state.listed).toBe(true);
+  await expect(consent).toBeEnabled();
+  state.failConsent = true;
+  await consent.click();
+  await expect.poll(() => state.consent).toEqual([true, true, false]);
+  await expect(consent).toBeChecked();
+  await expect(consent).toBeEnabled();
+  await consent.uncheck();
+  await expect.poll(() => state.consent).toEqual([true, true, false, false]);
+  await expect.poll(() => state.listed).toBe(false);
+});
+
+test("a new season resets a later ranking page and preserves the old active expedition", async ({ page }) => {
+  const state = await setup(page);
+  state.rowCount = 31;
+  await page.goto("/en/challenges");
+  const tower = page.locator(".tower-hub");
+  await expect(tower.locator(".challenge-table tbody tr")).toHaveCount(30);
+  await tower.getByRole("button", { name: "Next", exact: true }).click();
+  await expect(tower.locator(".challenge-table tbody tr")).toHaveCount(1);
+  expect(state.offsets.at(-1)).toBe(30);
+  state.season = structuredClone(feed.tower);
+  state.season.id[15] = 9;
+  state.season.theme.title.en = "Next week's ascent";
+  state.season.theme.period.starts_at += 604800;
+  state.season.theme.period.ends_at += 604800;
+  state.rowCount = 1;
+  await tower.getByRole("button", { name: "Refresh", exact: true }).click();
+  await expect.poll(() => state.offsets.slice(-2)).toEqual([30, 0]);
+  await expect(tower.locator(".challenge-table tbody tr")).toHaveCount(1);
+  await expect(tower.getByRole("button", { name: "Previous", exact: true })).toBeDisabled();
+  await expect(tower.locator(".tower-owned")).toHaveCount(1);
 });
 
 test("a delayed response from the old account cannot restore private progress after another tab signs out", async ({ page }) => {
