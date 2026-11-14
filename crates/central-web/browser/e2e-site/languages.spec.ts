@@ -90,7 +90,7 @@ test("the bar's sections stand in one row beside each other from where they unfo
   test.slow();
   for (const lang of Object.keys(TAGS)) {
     await page.goto(`/${lang}/`);
-    for (const width of [1080, 1081, 1140, 1279, 1280]) {
+    for (const width of [1080, 1081, 1099, 1100, 1140, 1279, 1280]) {
       await page.setViewportSize({ width, height: 800 });
       const bar = await page.evaluate(() => {
         const links = [...document.querySelectorAll<HTMLElement>(".nav > a")].filter((link) => link.offsetParent !== null);

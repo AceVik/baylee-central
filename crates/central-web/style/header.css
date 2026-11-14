@@ -577,7 +577,7 @@ body:has(dialog[open]) .top {
   transform: translateY(-6px) rotate(-45deg);
 }
 
-/* Below this the sections fold into the menu: six of them, the account and
+/* Below this the sections fold into the menu: eight of them, the account and
    the tools stand side by side from here on in every language (Spanish and
    French are the widest). */
 @media (max-width: 1080px) {
@@ -660,6 +660,16 @@ body:has(dialog[open]) .top {
 @media (min-width: 1081px) and (max-width: 1279px) {
   .lang-name {
     display: none;
+  }
+
+  /* Challenges and the Tower also fit in the first unfolded row, including
+     the longer translated labels. Keep their full height and readable type. */
+  .nav a {
+    padding-inline: 0.5em;
+  }
+
+  .nav .nav-account {
+    padding-inline: 0.65em;
   }
 }
 
