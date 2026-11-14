@@ -24,7 +24,10 @@ jobs:
       matrix:
         os: [ubuntu-24.04, windows-2025, macos-15, macos-15-intel]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 25
+    # A cold Linux build includes the complete gate and release linking before
+    # both lifecycle smoke checks. The 25-minute bound canceled release linking
+    # after the tests passed on 2026-11-14; keep every check and bound the job.
+    timeout-minutes: 40
     # bash on every runner, Windows' Git Bash included: the checks are
     # `cargo xtask` tasks (crates/xtask, docs/xtask.md), not shell scripts.
     defaults:

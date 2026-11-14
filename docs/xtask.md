@@ -45,6 +45,12 @@ desktop client links from this repository.
 | ubuntu-24.04 | `gate` (the whole workspace, release build included), then `smoke` and `smoke --exercise-failure`; the separate Linux jobs run `postgres`, `crypto-scope` and `sqlite-scope` with the audit and deny tools, `secrets`, `wasm --check` and the web app |
 | windows-2025, macos-15 (ARM64), macos-15-intel (x86-64) | `gate --client` |
 
+The verification job has a 40-minute ceiling. On 14 November 2026 its former
+25-minute ceiling canceled a cold Linux release build after the tests and doc
+tests had passed, while `central-service` was still compiling. The larger bound
+retains the complete gate and the lifecycle smoke checks; it does not change
+their assertions, per-operation deadlines or which checks are required to merge.
+
 `gate --client` runs the format check (the whole tree), the policy with its
 compiler probe and the crypto scope exactly as `gate` does, then clippy
 `-D warnings`, the tests and the doc tests with all features and a `-p` for
