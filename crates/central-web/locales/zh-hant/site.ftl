@@ -1816,3 +1816,24 @@ ch-platinum = 鉑金
 ch-obsidian = 黑曜石
 privacy-challenges-title = Daily 與 Weekly 挑戰
 privacy-challenges = Central 將嘗試、結果、已用提示、排行榜公開設定和永久徽章進度儲存在你的帳戶中。官方伺服器傳送對局結果和測量的時間。名稱、識別碼和成績僅在你開啟該任務的排行榜公開設定後公開；關閉後會從排行榜移除。紀錄保留至帳戶刪除，備份期限見帳戶部分。挑戰中繼資料包含在帳戶資料匯出中。
+
+# Tower expeditions
+tower-title = 翠綠之塔
+tower-lead = 五場對決，三條生命。你的選擇塑造牌組。
+tower-rules = 使用提供的牌組親自進行每場對決。前四次勝利後，各選擇一項強化。每次失敗損失一條生命，三次失敗結束遠征。重新連線會保留對局，技術原因造成的無效對局不會消耗生命。所有人挑戰同一座每週之塔。本週結束後，練習仍可獲得永久徽章。
+tower-floors = 層數
+tower-lives = 生命
+tower-rewards = 登塔遺物
+tower-reward-rules = 開拓者記錄每週不同樓層的勝利，王冠守護者記錄每週登頂，不屈者記錄每週無敗登頂。同一週重複相同成就不會增加進度。遺物永不失效，也不要求連續遊玩。
+tower-conquered = 王冠屬於你
+tower-choosing = 請在遊戲中選擇下一項強化
+tower-ended = 遠征結束
+tower-pathfinder = 開拓者
+tower-summit = 王冠守護者
+tower-unbroken = 不屈者
+tower-tiers = 查看全部五個等級
+tower-ascent = 登塔
+tower-sprint = 完美衝刺
+tower-scoring = 登塔依序比較通過的樓層、較少的失敗次數及獲勝對局的較少回合數。衝刺記錄無敗且獲勝對局未中斷時登頂所用的實際思考時間。只顯示你最佳的有效成績，相同成績共享名次。
+tower-privacy = Central 會在你的帳戶中儲存遠征、所選強化、剩餘生命、結果、排行榜公開設定和遺物的永久進度。只有啟用賽季排行榜時，才會公開你的顯示名稱、標籤和有效最佳成績。關閉後，該項目會從排行榜移除。帳戶資料匯出包含遠征和嘗試紀錄。刪除帳戶也會刪除這些進度，但仍適用「帳戶」部分所述的備份保留期限。
+tower-guide = 遠征規則

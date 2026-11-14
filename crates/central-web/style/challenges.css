@@ -34,6 +34,121 @@
 .challenge-badges { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 12rem), 1fr)); gap: var(--space-4); margin-block: var(--space-5); }
 .challenge-badge { text-align: center; }
 .challenge-badge h3 { font-size: var(--text-lg); }
-.challenge-medal { display: grid; place-items: center; inline-size: var(--space-9); block-size: var(--space-9); margin-inline: auto; border: 2px solid var(--edge); border-radius: 50%; color: var(--ink-soft); font-size: var(--text-xl); }
-.challenge-earned .challenge-medal { border-color: var(--gold); color: var(--gold); }
 .challenge-badge progress { inline-size: 100%; block-size: var(--space-3); accent-color: var(--gold); }
+.retention-medal {
+  --medal-metal: #84929e;
+  --medal-gem: #7c9ba9;
+  position: relative;
+  display: block;
+  width: 8rem;
+  max-width: 100%;
+  aspect-ratio: 1;
+  margin-inline: auto;
+  isolation: isolate;
+  filter: drop-shadow(0 4px 6px #0009);
+}
+.retention-medal svg { width: 100%; height: 100%; overflow: visible; }
+.retention-medal[data-motif="0"] { --medal-gem: #edaf4b; }
+.retention-medal[data-motif="1"] { --medal-gem: #79b6f0; }
+.retention-medal[data-motif="2"] { --medal-gem: #c68cdb; }
+.retention-medal[data-motif="3"] { --medal-gem: #ed8c67; }
+.retention-medal[data-motif="4"], .retention-medal[data-motif="5"] { --medal-gem: #70d6ac; }
+.retention-medal[data-motif="6"] { --medal-gem: #f5cb6e; }
+.retention-medal[data-motif="7"] { --medal-gem: #b2a2ee; }
+.tier-1 { --medal-metal: #cf8e5b; }
+.tier-2 { --medal-metal: #c2d2e0; }
+.tier-3 { --medal-metal: #eac46a; }
+.tier-4 { --medal-metal: #caedef; }
+.tier-5 { --medal-metal: #ac9be0; }
+.tier-0 { opacity: .55; filter: grayscale(1); }
+.medal-disc { fill: #222631; stroke: var(--medal-metal); stroke-width: 4; }
+.medal-bezel { fill: none; stroke: var(--medal-metal); stroke-width: 1; opacity: .6; }
+.medal-enamel { fill: #0a141a; stroke: #fff2; stroke-width: 1; }
+.medal-emblem { fill: none; stroke: var(--medal-metal); stroke-width: 2.8; stroke-linecap: round; stroke-linejoin: round; }
+.medal-detail { fill: none; stroke: var(--medal-metal); stroke-width: 1.5; }
+.medal-wreath, .medal-crown { fill: var(--medal-metal); stroke: #fff4; stroke-width: .6; }
+.medal-gems { fill: var(--medal-gem); stroke: var(--medal-metal); stroke-width: 1.5; }
+.retention-medal:not(.tier-0)::after {
+  content: "";
+  position: absolute;
+  inset: 20%;
+  border-radius: 50%;
+  background: conic-gradient(from 35deg, transparent 0deg 240deg, #fff3 275deg, transparent 300deg);
+  mix-blend-mode: screen;
+  pointer-events: none;
+  animation: medal-reflection 14s linear infinite;
+}
+.tier-5::before {
+  content: "";
+  position: absolute;
+  inset: 7%;
+  border-radius: 50%;
+  box-shadow: 0 0 20px color-mix(in srgb, var(--medal-gem) 24%, transparent);
+  z-index: -1;
+}
+@keyframes medal-reflection { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .retention-medal::after { animation: none !important; transform: rotate(30deg); }
+}
+
+/* A quiet, symmetrical expedition dashboard; the route carries the ornament. */
+.tower-hub { margin-block: var(--space-8); padding-block: var(--space-7); border-block-start: 1px solid var(--edge); }
+.tower-header { display: flex; align-items: center; justify-content: space-between; gap: var(--space-5); }
+.tower-header h2 { margin-block: var(--space-2); }
+.tower-hub > .lead { max-inline-size: var(--prose); }
+.tower-guide { margin-block: var(--space-4); border-block: 1px solid var(--edge-soft); text-align: center; }
+.tower-guide > p { max-inline-size: var(--prose); margin-inline: auto; }
+.tower-hub > [role="alert"]:empty, .tower-hub > [role="status"]:empty { display: none; }
+.tower-stage { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-7); align-items: center; margin-block: var(--space-5); overflow: hidden; background: radial-gradient(ellipse at 90% 10%, #70d6ac12, transparent 65%), var(--panel); }
+.tower-stage-copy { min-inline-size: 0; text-align: center; padding: var(--space-4); }
+.tower-stage-copy h3 { color: var(--title); font-size: clamp(1.75rem, 3vw, 2.75rem); text-wrap: balance; }
+.tower-stage-copy p { max-inline-size: 40rem; margin-inline: auto; }
+.tower-stage-copy .button { margin-block-start: var(--space-4); }
+.tower-floors { list-style: none; padding: var(--space-4); margin: 0; display: grid; gap: var(--space-3); }
+.tower-floors li { position: relative; display: grid; grid-template-columns: 3rem 1fr; align-items: center; gap: var(--space-4); min-block-size: 4rem; }
+.tower-floors li:not(:last-child)::after { content: ""; position: absolute; inset-inline-start: 1.5rem; inset-block-start: 3.5rem; block-size: calc(var(--space-3) + .5rem); border-inline-start: 1px solid var(--edge); }
+.tower-floor-number { display: grid; place-items: center; inline-size: 3rem; block-size: 3rem; border: 1px solid var(--edge); border-radius: 25%; background: var(--bg-alt); color: var(--gold); font-family: var(--font-prose); box-shadow: inset 0 0 0 4px var(--panel), inset 0 0 0 5px var(--edge-soft); }
+.tower-cleared .tower-floor-number { background: #214337; border-color: #70d6ac; color: #b6f3d7; }
+.tower-floors [aria-current="step"] { color: var(--title); }
+.tower-floors [aria-current="step"] .tower-floor-number { border-color: var(--gold); box-shadow: inset 0 0 0 4px var(--panel), inset 0 0 0 5px var(--gold), 0 0 16px #eac46a19; }
+.tower-floors li:last-child .tower-floor-number { border-block-start-width: 3px; border-start-start-radius: .3rem; border-start-end-radius: .3rem; }
+.tower-owned, .tower-account, .tower-rewards, .tower-rankings { text-align: center; margin-block: var(--space-6); }
+.tower-owned > .challenge-stats { display: grid; grid-template-columns: repeat(3, 1fr); max-inline-size: 36rem; margin-inline: auto; }
+.tower-owned dd { font-size: var(--text-xl); font-variant-numeric: tabular-nums; }
+.tower-rewards > p, .tower-rankings > .meta { max-inline-size: var(--prose); margin-inline: auto; }
+.tower-relics, .tower-upgrades { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-4); margin-block: var(--space-5); }
+.tower-relics .challenge-badge { display: flex; flex-direction: column; align-items: center; min-inline-size: 0; }
+.tower-relics .challenge-badge > h4 { font-size: var(--text-lg); margin-block: var(--space-3); }
+.tower-relics .challenge-badge > progress { margin-block-end: var(--space-4); }
+.challenge-badge > .button { margin-block-start: var(--space-4); }
+.tower-hub summary { cursor: pointer; min-block-size: 44px; padding: var(--space-3); }
+.tower-tier-gallery { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--space-3); padding-block: var(--space-3); }
+.tower-tier-gallery > div { border: 1px solid var(--edge-soft); border-radius: var(--radius-sm); padding: var(--space-2); }
+.tower-tier-gallery p { margin-block: var(--space-1); }
+.tower-tier-gallery .retention-medal { width: 9rem; }
+.medal-preview { margin-block: var(--space-4); text-align: center; }
+.medal-preview h4 { color: var(--title); margin: 0; }
+.tower-tier-gallery .relic-earned { border-color: var(--gold); background: var(--panel-2); }
+.tower-upgrades > article { padding: var(--space-4); border: 1px solid var(--edge); border-radius: var(--radius-sm); background: var(--bg-alt); }
+.tower-upgrades h4 { color: var(--gold); }
+.tower-replacement { display: grid; gap: var(--space-2); overflow-wrap: anywhere; }
+.tower-replacement > span:first-child { color: var(--ink-soft); }
+.tower-replacement > strong { color: var(--title); }
+@media (max-width: 52rem) {
+  .tower-stage { grid-template-columns: 1fr; gap: var(--space-3); }
+  .tower-floors { max-inline-size: 30rem; inline-size: 100%; margin-inline: auto; }
+  .tower-relics, .tower-upgrades { grid-template-columns: 1fr; }
+  .tower-relics .challenge-badge { display: grid; grid-template-columns: 5.5rem minmax(0, 1fr); gap: var(--space-2) var(--space-4); text-align: start; }
+  .tower-relics .challenge-badge > .retention-medal { grid-column: 1; grid-row: 1 / 5; width: 5.5rem; }
+  .tower-relics .challenge-badge > h4, .tower-relics .challenge-badge > p, .tower-relics .challenge-badge > progress { grid-column: 2; margin: 0; }
+  .tower-relics .challenge-badge > .button { grid-column: 1 / -1; justify-self: center; margin-block-start: var(--space-3); }
+  .tower-tier-gallery { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .tower-tier-gallery > div:last-child { grid-column: auto; }
+}
+@media (max-width: 30rem) {
+  .tower-header { align-items: start; gap: var(--space-3); }
+  .tower-stage-copy, .tower-floors { padding-inline: 0; }
+  .tower-tier-gallery { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tower-tier-gallery > div:last-child { grid-column: 1 / -1; }
+  .tower-owned > .challenge-stats { gap: var(--space-3); }
+}

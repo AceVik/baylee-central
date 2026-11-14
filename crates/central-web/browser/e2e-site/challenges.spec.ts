@@ -4,7 +4,7 @@ import type { Page, Route } from "@playwright/test";
 import { axe, targets, watch } from "./check.ts";
 
 type Task = { id: number[]; description: { period: { kind: string; starts_at: number; ends_at: number }; title: { en: string; de: string } }; withdrawn: boolean };
-type Feed = { now: number; before: number | null; challenges: Task[] };
+type Feed = { now: number; before: number | null; challenges: Task[]; tower: unknown };
 const feed = JSON.parse(readFileSync(new URL("../../../central-web-server/tests/data/challenges.json", import.meta.url), "utf8")) as Feed;
 type Body = { operation: string; request?: { action: string; challenge?: number[]; board?: string; listed?: boolean; level?: number } };
 
@@ -31,7 +31,8 @@ async function setup(page: Page, signedIn = false) {
     if (state.unavailable) return route.fulfill({ status: 503, body: "unavailable" });
     const task = feed.challenges.find((c) => JSON.stringify(c.id) === JSON.stringify(op.challenge)) ?? feed.challenges[0];
     switch (op.action) {
-      case "catalogue": return answer({ answer: "catalogue", ...feed, now: state.now });
+      case "catalogue": return answer({ answer: "catalogue", challenges: feed.challenges, before: feed.before, now: state.now });
+      case "tower": return answer({ answer: "tower", response: { answer: "read", now: state.now, season: feed.tower, standings: [], run: null, active: null, badges: [] } });
       case "detail": return answer({ answer: "detail", now: feed.now, challenge: task, standings: [
         { rank: 1, name: "<script>not markup</script>", tag: 80000, own: false, failures: 0, turn: 4, milliseconds: 92000 },
         { rank: 1, name: "Equal score", tag: null, own: true, failures: 0, turn: 4, milliseconds: null },
@@ -113,7 +114,7 @@ test("public rankings escape names, preserve ties and remain accessible on a pho
 test("a hint requires an explicit second action, persists assistance and never opts the player in", async ({ page }) => {
   const { asked, state } = await setup(page, true);
   await page.goto("/en/challenges");
-  await expect(page.locator(".challenge-badge")).toHaveCount(5);
+  await expect(page.locator(".challenge-achievements .challenge-badge")).toHaveCount(5);
   await page.getByRole("button", { name: "Task and rankings" }).first().click();
   const consent = page.getByRole("checkbox", { name: "Show my public name and tag in this task's rankings." });
   await expect(consent).not.toBeChecked();
@@ -138,10 +139,10 @@ test("an outage is a retryable error, never an empty success", async ({ page }) 
   const { state } = await setup(page);
   state.unavailable = true;
   await page.goto("/en/challenges");
-  await expect(page.locator(".challenge-hub [role=alert]")).not.toBeEmpty();
+  await expect(page.locator("#challenge-error")).not.toBeEmpty();
   state.unavailable = false;
-  await page.getByRole("button", { name: "Refresh", exact: true }).click();
-  await expect(page.locator(".challenge-hub [role=alert]")).toBeEmpty();
+  await page.locator("#challenge-refresh").click();
+  await expect(page.locator("#challenge-error")).toBeEmpty();
   await expect(page.getByRole("button", { name: "Task and rankings" })).toHaveCount(2);
 });
 
@@ -149,7 +150,7 @@ test("rankings refresh automatically without interrupting hint confirmation", as
   await page.clock.install();
   const { asked, state } = await setup(page, true);
   await page.goto("/en/challenges");
-  await expect(page.locator(".challenge-badge")).toHaveCount(5);
+  await expect(page.locator(".challenge-achievements .challenge-badge")).toHaveCount(5);
   await page.getByRole("button", { name: "Task and rankings" }).first().click();
   await expect(page.locator(".challenge-table tbody tr")).toHaveCount(2);
   await page.getByRole("button", { name: "Hint 1", exact: true }).click();

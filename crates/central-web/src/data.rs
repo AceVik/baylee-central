@@ -7,6 +7,9 @@ use serde::{Deserialize, Serialize};
 /// Central's public calendar, rendered before hydration and refreshed by the browser.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ChallengeFeed {
+    /// Public expedition metadata only; personal progression is never server-cached.
+    #[serde(default)]
+    pub tower: Option<central_api::tower::Season>,
     /// Central's clock at this snapshot, in Unix seconds.
     pub now: i64,
     /// Current tasks and the first archive page; no private execution material.

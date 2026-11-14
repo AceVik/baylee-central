@@ -1948,3 +1948,24 @@ ch-platinum = Platine
 ch-obsidian = Obsidienne
 privacy-challenges-title = Défis Daily et Weekly
 privacy-challenges = Central conserve avec votre compte les tentatives, résultats, indices utilisés, préférences de classement et progression permanente des badges. L'hôte officiel envoie le résultat et le temps mesuré. Nom, identifiant public et scores ne sont publics que si vous activez le classement du défi ; le désactiver les retire du classement. Ces données restent jusqu'à la suppression du compte, avec les délais de sauvegarde indiqués dans Compte. Les métadonnées des défis figurent dans l'export de votre compte.
+
+# Tower expeditions
+tower-title = La Tour verdoyante
+tower-lead = Cinq duels. Trois vies. Un deck façonné par vos décisions.
+tower-rules = Jouez chaque duel vous-même avec un deck fourni. Après chacune des quatre premières victoires, choisissez une amélioration. Une défaite coûte une vie ; trois défaites terminent l’expédition. Une reconnexion conserve la rencontre ; une annulation technique ne coûte aucune vie. La tour hebdomadaire est commune à tous. Après la semaine, l’entraînement permet encore de gagner des badges permanents.
+tower-floors = Étages
+tower-lives = Vies
+tower-rewards = Reliques de l’ascension
+tower-reward-rules = Éclaireur compte les étages hebdomadaires distincts ; Gardien de la couronne compte les sommets hebdomadaires ; Invaincu compte les sommets hebdomadaires sans défaite. Répéter le même exploit la même semaine n’ajoute rien. Les reliques n’expirent jamais et n’exigent aucune série.
+tower-conquered = La couronne vous appartient
+tower-choosing = Choisissez votre prochaine amélioration dans le jeu
+tower-ended = Expédition terminée
+tower-pathfinder = Éclaireur
+tower-summit = Gardien de la couronne
+tower-unbroken = Invaincu
+tower-tiers = Découvrir les cinq niveaux
+tower-ascent = Ascension
+tower-sprint = Sprint parfait
+tower-scoring = L’ascension classe les étages franchis, puis le moins de défaites, puis le moins de tours gagnants. Le sprint mesure le temps de réflexion actif d’un sommet sans défaite ni victoire interrompue. Seul votre meilleur parcours admissible apparaît. Les scores égaux partagent le même rang.
+tower-privacy = Central conserve avec votre compte vos expéditions, améliorations choisies, vies restantes, résultats, préférences de classement et progression permanente des reliques. Votre nom public, identifiant et meilleur score admissible apparaissent uniquement si vous activez le classement de la saison. Le désactiver retire cette entrée. L’export de votre compte inclut les expéditions et tentatives. La suppression du compte efface aussi cette progression, sous réserve des délais de sauvegarde décrits dans Compte.
+tower-guide = Règles de l’expédition

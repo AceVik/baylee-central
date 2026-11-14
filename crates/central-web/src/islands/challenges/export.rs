@@ -1,5 +1,6 @@
 //! Merge separately paginated challenge metadata into the account's downloadable file.
 use super::{Failure, api, request};
+mod tower;
 
 /// The browser bounds the download to 7680 rows per dataset. The file explicitly marks
 /// an incomplete dataset, matching the account export's existing bounded-list convention.
@@ -36,5 +37,8 @@ pub(crate) async fn merged(file: &str) -> Result<String, Failure> {
     file.as_object_mut()
         .ok_or(Failure::Malformed)?
         .insert("challenges".into(), datasets.into());
+    file.as_object_mut()
+        .ok_or(Failure::Malformed)?
+        .insert("tower".into(), tower::runs().await?);
     serde_json::to_string_pretty(&file).map_err(|_| Failure::Malformed)
 }

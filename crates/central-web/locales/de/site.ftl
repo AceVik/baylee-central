@@ -1827,3 +1827,24 @@ ch-platinum = Platin
 ch-obsidian = Obsidian
 privacy-challenges-title = Daily- und Weekly-Aufgaben
 privacy-challenges = Central speichert Versuche, Ergebnisse, genutzte Hinweise, Ranglisten-Einstellungen und dauerhafte Abzeichen-Fortschritte bei deinem Konto. Der offizielle Host übermittelt Ergebnis und gemessene Zeit der Partie. Name, Kennung und Ergebnisse sind nur öffentlich, wenn du die Rangliste für diese Aufgabe aktivierst; beim Deaktivieren verschwinden sie dort. Die Daten bleiben bis zur Kontolöschung gespeichert; für Sicherungen gelten die unter Konto genannten Fristen. Aufgaben-Metadaten sind im Datenexport deines Kontos enthalten.
+
+# Tower expeditions
+tower-title = Der grüne Turm
+tower-lead = Fünf Duelle. Drei Leben. Ein Deck, das mit deinen Entscheidungen wächst.
+tower-rules = Spiele jedes Duell selbst mit einem vorgegebenen Deck. Wähle nach den ersten vier Siegen jeweils eine Verbesserung. Eine Niederlage kostet ein Leben; drei Niederlagen beenden die Expedition. Beim Wiederverbinden bleibt die Begegnung erhalten; technisch ungültige Partien kosten kein Leben. Derselbe wöchentliche Turm gilt für alle. Nach Ende der Woche zählen Übungssiege weiter für dauerhafte Abzeichen.
+tower-floors = Etappen
+tower-lives = Leben
+tower-rewards = Relikte des Aufstiegs
+tower-reward-rules = Pfadfinder zählt unterschiedliche wöchentliche Etappen; Hüter der Krone zählt wöchentliche Gipfelsiege; Ungebrochen zählt makellose wöchentliche Gipfelsiege. Dieselbe Errungenschaft in derselben Woche erneut zu erreichen zählt nicht zusätzlich. Relikte verfallen nie und verlangen keine Serie.
+tower-conquered = Die Krone gehört dir
+tower-choosing = Wähle im Spiel deine nächste Verbesserung
+tower-ended = Expedition beendet
+tower-pathfinder = Pfadfinder
+tower-summit = Hüter der Krone
+tower-unbroken = Ungebrochen
+tower-tiers = Alle fünf Stufen erkunden
+tower-ascent = Aufstieg
+tower-sprint = Makelloser Sprint
+tower-scoring = Aufstieg wertet geschaffte Etappen, dann weniger Niederlagen, dann weniger Züge in gewonnenen Duellen. Sprint misst die aktive Bedenkzeit eines makellosen Gipfelsiegs ohne unterbrochenen Sieg. Nur dein bester gültiger Lauf zählt. Gleiche Ergebnisse teilen sich einen Rang.
+tower-privacy = Central speichert deine Expeditionen, gewählten Verbesserungen, verbleibenden Leben, Ergebnisse, Ranglistenfreigaben und dauerhaften Abzeichenfortschritte bei deinem Konto. Nur wenn du die Rangliste einer Saison freigibst, erscheinen dein öffentlicher Name, Tag und bestes gültiges Ergebnis. Beim Deaktivieren verschwindet dieser Eintrag. Der Kontodatenexport enthält Expeditionen und Versuche. Beim Löschen des Kontos werden auch diese Fortschritte gelöscht; es gelten die unter Konto beschriebenen Sicherungsfristen.
+tower-guide = Expeditionsregeln

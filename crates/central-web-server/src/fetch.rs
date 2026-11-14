@@ -638,10 +638,38 @@ fn challenge_feed(central: &Central<'_>) -> Option<central_web::data::ChallengeF
         return None;
     }
     Some(central_web::data::ChallengeFeed {
+        tower: tower_feed(central),
         now,
         challenges,
         before,
     })
+}
+
+fn tower_feed(central: &Central<'_>) -> Option<central_api::tower::Season> {
+    use central_api::{challenges, tower};
+    let Response::Challenges {
+        response: challenges::Response::Tower { response },
+    } = central.ask(&Request::Challenges {
+        request: challenges::Request::Tower {
+            request: tower::Request::Read {
+                season: None,
+                board: tower::Board::Ascent,
+                offset: 0,
+            },
+        },
+    })?
+    else {
+        return None;
+    };
+    let tower::Response::Read {
+        season: Some(season),
+        now,
+        ..
+    } = *response
+    else {
+        return None;
+    };
+    (season.theme.validate().is_ok() && season.theme.period.starts_at <= now).then_some(*season)
 }
 
 #[cfg(test)]
