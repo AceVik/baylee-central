@@ -4,6 +4,7 @@ use central_api::tower;
 
 mod edges;
 mod play;
+mod rollover;
 
 async fn call(
     store: &AccountStore,
@@ -194,4 +195,5 @@ pub(super) async fn run(
     }
     let completed = play::ascent(store, &a, &b, alice, bob, first).await;
     edges::run(store, operator, &a, &b, alice, season, completed).await;
+    rollover::run(store, operator, keys, now).await;
 }

@@ -21,6 +21,17 @@ use crate::fail::{Fail, Result, after_cleanup};
 use crate::owned::OwnedDir;
 use crate::random;
 
+/// Which independently bounded integration suite to exercise.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Scope {
+    /// The SDK transport suite followed by the complete store suite.
+    All,
+    /// Schema, migration, account and authority regressions only.
+    Store,
+    /// The focused expedition authority regression only.
+    Tower,
+}
+
 /// What the fixture owns, for its cleanup.
 pub(super) struct Fixture {
     name: String,
@@ -29,7 +40,7 @@ pub(super) struct Fixture {
     tls: Option<OwnedDir>,
 }
 
-pub(crate) fn run(root: &Path, exercise_failure: bool, tower_only: bool) -> Result<()> {
+pub(crate) fn run(root: &Path, exercise_failure: bool, scope: Scope) -> Result<()> {
     let name = format!("central-test-{}", random::hex(8)?);
     println!("Owned PostgreSQL fixture: {name}");
     let mut fixture = Fixture {
@@ -38,7 +49,7 @@ pub(crate) fn run(root: &Path, exercise_failure: bool, tower_only: bool) -> Resu
         port: None,
         tls: None,
     };
-    let outcome = exercise(&mut fixture, root, exercise_failure, tower_only);
+    let outcome = exercise(&mut fixture, root, exercise_failure, scope);
     let cleanup = fixture.clean();
     after_cleanup(outcome, cleanup)?;
     println!("PostgreSQL fixture passed and its owned container/listener were removed.");
@@ -49,7 +60,7 @@ fn exercise(
     fixture: &mut Fixture,
     root: &Path,
     exercise_failure: bool,
-    tower_only: bool,
+    scope: Scope,
 ) -> Result<()> {
     container::ensure_image()?;
     let tls = fixture.tls.insert(tls::authority()?);
@@ -61,5 +72,5 @@ fn exercise(
         return Err(Fail::new("Synthetic fixture failure"));
     }
     fixture.bootstrap(&secrets)?;
-    suite::run(root, port, &secrets, &tls_path, tower_only)
+    suite::run(root, port, &secrets, &tls_path, scope)
 }
