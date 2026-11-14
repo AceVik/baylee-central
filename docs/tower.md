@@ -178,7 +178,7 @@ populated-calendar upgrade preservation assertions. That owned container and
 listener were also removed. The default PostgreSQL gate still runs both suites;
 the narrow option avoids repeating successful transport work during a store fix.
 
-### Web and native presentation in progress
+### Web and native presentation
 
 The native Lobby entrance, five-floor route, lives, exact three-way replacement
 preview, explicit confirmation, recovery link and three original relic motifs
@@ -211,9 +211,16 @@ through refresh, dark/light contrast, 44-pixel targets, 320-pixel layout and
 reduced motion. Desktop and phone captures were inspected. The fixture's listener
 was removed. TypeScript/lint and affected Rust clippy also passed.
 
-The native fifth refinement passed nine targeted controls/core/publisher checks;
-its actual Tower window still awaits the required test display. The implementing
-agent has not claimed native visual acceptance or representative human difficulty.
+The native fifth refinement passed nine targeted controls/core/publisher checks.
+Subsequent rendered acceptance used the owner's explicitly approved passive main
+display, virtual input and synthetic local accounts. At 1440 × 900 and
+1280 × 720 logical pixels, inspection prompted a more prominent upgrade decision,
+reachable confirmation and a corrected completion glyph. Native selection,
+cancellation and Central-confirmed deck improvement, the completed route, ranking
+and earned relics were verified. Five-tier animation and the reduced-motion
+setting were checked using bounded recordings and identical-frame controls; the
+full evidence and sampling limits are in Baylee's `docs/tower.md`. This is not
+representative human difficulty evidence. All owned test services were stopped.
 Independent PR review found and corrected season pagination, failed-consent
 rollback, native upgrade retry visibility, ranking-week labeling, complete
 personal exports and the season/reward foreign-key lock order. Host mutations
