@@ -1949,3 +1949,24 @@ ch-platinum = Platino
 ch-obsidian = Ossidiana
 privacy-challenges-title = Sfide Daily e Weekly
 privacy-challenges = Central conserva nel tuo account tentativi, risultati, suggerimenti usati, preferenze di classifica e progressi permanenti dei distintivi. L'host ufficiale invia risultato e tempo misurato. Nome, tag e risultati sono pubblici solo se attivi la classifica della sfida; disattivandola vengono rimossi. I dati rimangono fino all'eliminazione dell'account, con i tempi dei backup descritti in Account. I metadati delle sfide sono inclusi nell'esportazione dei dati dell'account.
+
+# Tower expeditions
+tower-title = La Torre verdeggiante
+tower-lead = Cinque duelli. Tre vite. Un mazzo plasmato dalle tue decisioni.
+tower-rules = Gioca ogni duello di persona con un mazzo fornito. Dopo ciascuna delle prime quattro vittorie, scegli un miglioramento. Una sconfitta costa una vita; tre sconfitte terminano la spedizione. Riconnettersi conserva l’incontro; gli annullamenti tecnici non costano vite. La torre settimanale è uguale per tutti. Dopo la settimana, l’allenamento assegna ancora distintivi permanenti.
+tower-floors = Piani
+tower-lives = Vite
+tower-rewards = Reliquie dell’ascesa
+tower-reward-rules = Esploratore conta i diversi piani settimanali; Custode della corona conta le vette settimanali; Invitto conta le vette settimanali senza sconfitte. Ripetere la stessa impresa nella stessa settimana non aggiunge progressi. Le reliquie non scadono e non richiedono serie consecutive.
+tower-conquered = La corona è tua
+tower-choosing = Scegli il prossimo miglioramento nel gioco
+tower-ended = Spedizione conclusa
+tower-pathfinder = Esploratore
+tower-summit = Custode della corona
+tower-unbroken = Invitto
+tower-tiers = Esplora tutti e cinque i livelli
+tower-ascent = Ascesa
+tower-sprint = Sprint perfetto
+tower-scoring = L’ascesa ordina i piani superati, poi le minori sconfitte, poi i minori turni delle vittorie. Lo sprint misura il tempo di riflessione attivo per una vetta senza sconfitte né vittorie interrotte. Compare solo la tua migliore spedizione valida. I punteggi uguali condividono la posizione.
+tower-privacy = Central conserva nel tuo account spedizioni, miglioramenti scelti, vite rimaste, risultati, preferenze di classifica e progressi permanenti delle reliquie. Nome pubblico, tag e miglior punteggio valido appaiono solo se abiliti la classifica della stagione. Disabilitandola rimuovi la voce. L’esportazione dell’account include spedizioni e tentativi. Eliminando l’account elimini anche questi progressi, fatti salvi i tempi dei backup descritti in Account.
+tower-guide = Regole della spedizione

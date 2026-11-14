@@ -120,6 +120,7 @@ function central(seen: Body[], w: World) {
       case "account_export":
         return json({ result: "account_export", export: EXPORT });
       case "challenges":
+        if (body.request?.action === "tower") return json({ result: "challenges", response: { answer: "tower", response: { answer: "export", runs: [], after: null } } });
         return body.request?.action === "export"
           ? json({ result: "challenges", response: { answer: "export", entries: [], after: null } })
           : refused(401);
@@ -620,12 +621,13 @@ test("the export's file holds the address beside the export, or the page says th
     { operation: "account_export" }, { operation: "email", request: { action: "status" } },
     { operation: "challenges", request: { action: "export", table: "participation", after: null } },
     { operation: "challenges", request: { action: "export", table: "attempts", after: null } },
+    { operation: "challenges", request: { action: "tower", request: { action: "export", after: null } } },
   ]);
   expect(after.filter((body) => body.operation === "picture").map((body) => body.request?.action).sort()).toEqual(["mine", "reports"]);
   const whole = await file();
   // Central's export as it is, and the account's own data of the address:
   // whether this Central sends mail is not the account's
-  expect(whole).toEqual({ ...EXPORT, challenges: CHALLENGES, email: { address: OLD, confirmed_at: THEN, pending: NEW, pending_until: THEN + 900 } });
+  expect(whole).toEqual({ ...EXPORT, challenges: CHALLENGES, tower: { runs: [], complete: true, after: null }, email: { address: OLD, confirmed_at: THEN, pending: NEW, pending_until: THEN + 900 } });
   await expect(page.locator("#export-no-email")).toHaveCount(0);
   await sound(page);
 
@@ -637,7 +639,7 @@ test("the export's file holds the address beside the export, or the page says th
   await page.getByRole("button", { name: "Prepare the export" }).click();
   await expect(page.locator("#export-save")).toBeFocused();
   await expect(page.locator("#export-no-email")).toHaveText("The e-mail address could not be read; it is not in this file.");
-  expect(await file()).toEqual({ ...EXPORT, challenges: CHALLENGES });
+  expect(await file()).toEqual({ ...EXPORT, challenges: CHALLENGES, tower: { runs: [], complete: true, after: null } });
   expect(await page.evaluate(() => localStorage.getItem("baylee-central-session"))).not.toBeNull();
   await sound(page);
 });

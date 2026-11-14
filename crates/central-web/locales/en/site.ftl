@@ -1825,3 +1825,24 @@ ch-platinum = Platinum
 ch-obsidian = Obsidian
 privacy-challenges-title = Daily and Weekly challenges
 privacy-challenges = Central keeps attempts, results, hints used, ranking preferences and permanent badge progress with your account. The official host sends the game's result and measured time. Names, tags and scores are public only when you enable the ranking for that task; disabling it removes them from the ranking. These records remain until account deletion, with the backup periods described under Account. Challenge metadata is included in your account's data export.
+
+# Tower expeditions
+tower-title = The Verdant Tower
+tower-lead = Five duels. Three lives. A deck shaped by your decisions.
+tower-rules = Play every duel yourself with a supplied deck. After each of the first four victories, choose an improvement. A defeat costs one life; three defeats end the expedition. Reconnecting preserves the encounter; technical voids cost no life. Everyone shares the same weekly tower. After the week ends, practice still earns permanent badges.
+tower-floors = Floors
+tower-lives = Lives
+tower-rewards = Relics of the ascent
+tower-reward-rules = Pathfinder counts distinct weekly floors; Crown keeper counts weekly summits; Unbroken counts flawless weekly summits. Repeating the same accomplishment in the same week adds no progress. Earned relics never expire and require no streak.
+tower-conquered = The crown is yours
+tower-choosing = Choose your next improvement in the game
+tower-ended = Expedition ended
+tower-pathfinder = Pathfinder
+tower-summit = Crown keeper
+tower-unbroken = Unbroken
+tower-tiers = Explore all five tiers
+tower-ascent = Ascent
+tower-sprint = Flawless sprint
+tower-scoring = Ascent ranks floors cleared, then fewer defeats, then fewer winning turns. Sprint measures active thinking time for a flawless summit with no interrupted victory. Only your best eligible run appears. Equal scores share a rank.
+tower-privacy = Central stores your expedition runs, chosen improvements, remaining lives, results, ranking preferences and permanent relic progress with your account. Only your public name, tag and best eligible score appear when you enable a season's ranking. Disabling it removes that listing. Your account export includes expedition runs and attempts. Account deletion also deletes this progression, subject to the backup periods described under Account.
+tower-guide = Expedition rules

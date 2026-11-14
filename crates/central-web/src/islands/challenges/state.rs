@@ -75,6 +75,7 @@ impl Hub {
                         })
                     });
                     let feed = Some(ChallengeFeed {
+                        tower: None,
                         now,
                         challenges,
                         before,

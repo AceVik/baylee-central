@@ -70,7 +70,7 @@ pub fn Challenges(lang: Lang, initial: Option<ChallengeFeed>) -> impl IntoView {
                 on:click=move |_| hub.refresh(None)>{words::fb_refresh(lang)}</button>
             <span role="status">{move || hub.busy.get().then(|| words::ch_loading(lang))}</span>
         </div>
-        <p class="error" role="alert">{move || hub.error.get().map(|failure| problem_text(lang, failure.into()))}</p>
+        <p id="challenge-error" class="error" role="alert">{move || hub.error.get().map(|failure| problem_text(lang, failure.into()))}</p>
         {move || match hub.selected.get() {
             Some(task) => detail::view(lang, hub, &task).into_any(),
             None => calendar(lang, hub).into_any(),

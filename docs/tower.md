@@ -191,5 +191,17 @@ horizontal table. The correction gives the Tower ranking a distinct accessible
 name and keyboard access, and hides empty table scaffolding. The inspected
 desktop screenshot also prompted a full-width tier gallery, replacing the tall
 single-card expansion, a smaller expedition title, and corrected pagination
-labels. These latest visual changes await the next rendered pass; no final
-visual approval or independent PR review is claimed yet.
+labels. The fourth rendered pass then passed all four focused checks in 5.8
+seconds. The fifth pass adds compact horizontal relic cards on phones, explicit
+current-floor and summit markers, and an immediate cross-tab session generation
+guard. All six desktop/phone checks passed in 14.2 seconds: SSR without WASM,
+opaque links, private-state clearing with a deliberately late old response,
+reversible consent, equal ranks, safe name rendering, stable focus and preview
+through refresh, dark/light contrast, 44-pixel targets, 320-pixel layout and
+reduced motion. Desktop and phone captures were inspected. The fixture's listener
+was removed. TypeScript/lint and affected Rust clippy also passed.
+
+The native fifth refinement passed nine targeted controls/core/publisher checks;
+its actual Tower window still awaits the required test display. The implementing
+agent has not claimed native visual acceptance or representative human difficulty.
+Independent PR review and complete graph/network evidence remain in progress.

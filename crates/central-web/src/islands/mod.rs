@@ -30,6 +30,7 @@ mod focus;
 mod fragment;
 mod impressum;
 mod keep;
+mod medals;
 #[cfg(any(not(target_arch = "wasm32"), feature = "admin"))]
 mod moderation;
 pub(crate) mod net;
@@ -39,6 +40,7 @@ mod pow;
 mod push;
 mod reset;
 mod session;
+mod tower;
 #[cfg(target_arch = "wasm32")]
 mod trusted;
 
@@ -60,3 +62,5 @@ pub(crate) use contact::ContactForm;
 pub(crate) use impressum::Impressum;
 #[cfg(not(target_arch = "wasm32"))]
 pub(crate) use reset::Reset;
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) use tower::Tower;

@@ -1,7 +1,7 @@
 //! The global challenge calendar, with public task cards in the first HTML response.
 use super::Built;
 use crate::{
-    islands::Challenges,
+    islands::{Challenges, Tower},
     site::{Context, Page, shell::Meta},
     words,
 };
@@ -21,6 +21,7 @@ pub fn page(cx: &Context<'_>) -> Built {
         </section>
         <div class="wrap challenge-hub">
             <Challenges lang=lang initial=cx.data.challenges.clone() />
+            <Tower lang=lang initial=cx.data.challenges.as_ref().and_then(|feed| feed.tower.clone()) />
         </div>
     }
     .into_any();

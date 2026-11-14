@@ -1825,3 +1825,24 @@ ch-platinum = Platino
 ch-obsidian = Obsidiana
 privacy-challenges-title = Desafíos Daily y Weekly
 privacy-challenges = Central guarda en tu cuenta intentos, resultados, pistas usadas, preferencias de clasificación y progreso permanente de insignias. El servidor oficial envía el resultado y el tiempo medido. Nombre, etiqueta y resultados solo son públicos si activas la clasificación del desafío; al desactivarla se retiran. Los datos permanecen hasta eliminar la cuenta, con los plazos de copias de seguridad indicados en Cuenta. Los metadatos de los desafíos se incluyen en la exportación de datos de tu cuenta.
+
+# Tower expeditions
+tower-title = La Torre verde
+tower-lead = Cinco duelos. Tres vidas. Un mazo que crece con tus decisiones.
+tower-rules = Juega cada duelo personalmente con un mazo proporcionado. Después de cada una de las primeras cuatro victorias, elige una mejora. Una derrota cuesta una vida; tres derrotas terminan la expedición. Reconectarse conserva el encuentro; las anulaciones técnicas no cuestan vidas. Todos comparten la misma torre semanal. Tras terminar la semana, la práctica sigue otorgando insignias permanentes.
+tower-floors = Pisos
+tower-lives = Vidas
+tower-rewards = Reliquias del ascenso
+tower-reward-rules = Explorador cuenta pisos semanales distintos; Guardián de la corona cuenta cimas semanales; Invicto cuenta cimas semanales sin derrotas. Repetir el mismo logro en la misma semana no añade progreso. Las reliquias nunca caducan y no requieren rachas.
+tower-conquered = La corona es tuya
+tower-choosing = Elige tu próxima mejora en el juego
+tower-ended = Expedición terminada
+tower-pathfinder = Explorador
+tower-summit = Guardián de la corona
+tower-unbroken = Invicto
+tower-tiers = Explora los cinco niveles
+tower-ascent = Ascenso
+tower-sprint = Sprint perfecto
+tower-scoring = Ascenso ordena los pisos superados, luego menos derrotas y luego menos turnos en victorias. Sprint mide el tiempo activo de reflexión hasta una cima sin derrotas ni victorias interrumpidas. Solo aparece tu mejor expedición válida. Las puntuaciones iguales comparten puesto.
+tower-privacy = Central guarda en tu cuenta las expediciones, mejoras elegidas, vidas restantes, resultados, preferencias de clasificación y progreso permanente de las reliquias. Tu nombre público, etiqueta y mejor puntuación válida solo aparecen si activas la clasificación de la temporada. Al desactivarla se retira esa entrada. La exportación de tu cuenta incluye expediciones e intentos. Eliminar la cuenta también elimina estos progresos, sujetos a los plazos de las copias de seguridad descritos en Cuenta.
+tower-guide = Reglas de la expedición
