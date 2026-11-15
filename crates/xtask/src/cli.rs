@@ -59,7 +59,7 @@ tasks:
   gate [--client]               fmt, policy, clippy, tests, doc tests, release build;
                                 --client: only the client's crates, no release build
   policy [--compiler-probe]     the code policy: unsafe, native sources, links, dependencies
-  postgres [--exercise-failure | --store-only | --tower-only | --tower-access-only] the PostgreSQL integration fixture (needs Docker and OpenSSL)
+  postgres [--exercise-failure | --store-only | --tower-only | --tower-access-only | --tower-awards-only] the PostgreSQL integration fixture (needs Docker and OpenSSL)
   smoke [--exercise-failure]    the development listener smoke test (build --release first)
   secrets                       the secret scan of the tree and the full history (pinned gitleaks)
   wasm [--check]                the website's WebAssembly crypto and glue (crates/central-web/crypto)
@@ -103,6 +103,10 @@ pub fn parse(args: &[String]) -> Result<Task> {
         ("postgres", Some("--tower-access-only")) => Ok(Task::Postgres {
             exercise_failure: false,
             scope: postgres::Scope::TowerAccess,
+        }),
+        ("postgres", Some("--tower-awards-only")) => Ok(Task::Postgres {
+            exercise_failure: false,
+            scope: postgres::Scope::TowerAwards,
         }),
         ("postgres", Some("--store-only")) => Ok(Task::Postgres {
             exercise_failure: false,

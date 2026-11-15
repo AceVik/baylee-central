@@ -38,6 +38,7 @@ pub use social::CHAT_SENDER_SHARE;
 mod terms;
 mod tokens;
 mod tower_access;
+mod tower_awards;
 pub use admin::{AUDIT_YEARS, Action, Appointed, AuditPage, Swept, appoint_admin, sweep};
 pub use email::{EMAIL_FRESH_MINUTES, Email, MAIL_CODE_MINUTES, MAIL_CODE_TRIES, Told};
 pub use legacy::LegacyMove;
@@ -62,6 +63,7 @@ pub use streams::{
     REVOCATION_PAGE, RevocationPage,
 };
 pub use terms::MAX_GATEWAY_VERSIONS;
+pub use tower_awards::provision_tower_award_issuer;
 
 /// An OPAQUE credential snapshot. It cannot issue sessions without proof verification.
 pub struct Credential {

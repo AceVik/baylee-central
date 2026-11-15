@@ -7,6 +7,7 @@ mod accounts;
 mod migration;
 mod tls;
 mod upgrade;
+pub(super) use accounts::awards_only as tower_awards;
 pub(super) use accounts::run as accounts;
 pub(super) use accounts::tower_only as tower;
 pub(super) use migration::search_path as migration_search_path;

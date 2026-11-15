@@ -67,3 +67,55 @@ full-history secret checks pass in `/tmp/central-tower-awards-policy-20261115.lo
 and `/tmp/central-tower-awards-secrets-20261115.log`. This pure contract adds no
 database migration, network endpoint or issuer trust grant yet, and does not claim
 end-to-end award delivery or an independent security review.
+
+## Ingestion persistence — design pass
+
+A separate issuer registry is provisioned with migration/operator credentials.
+Runtime may read it and update only its last-use timestamp: it cannot insert an
+issuer, replace a credential, change an origin or enable a revoked issuer. The
+last-use update also locks/rechecks the issuer before accepting any fact. This
+deliberately serializes the small background delivery stream per issuer; no game
+request waits for this path. Then ingestion locks the existing Central account,
+checks an exact prior receipt and validates the next ordinal before atomically
+saving the run receipt and its permanent counters.
+
+Only the digest of the existing reviewed random Token credential is stored. No
+custom signing or token scheme is added. Receipts are fixed-size, bounded facts;
+the per-account lifetime intake limit is one million duels. At capacity, retries
+of existing receipts still succeed; new deliveries remain queued at Baylee. This
+explicit operational bound needs monitoring and an archival design before raising
+it, rather than silently discarding deduplication history. Deleted accounts return
+a terminal no-account disposition and cannot be recreated by delivery. Existing
+but unrestored accounts are retryable, not treated as deleted. The issuer registry
+contains no player names or gameplay data; all account-owned rows cascade on
+deletion. A separately paginated own-account export is required before exposure.
+
+Implementation pass: migration 31 and the restricted store adapter now implement
+issuer provisioning through an operator connection, live credential/origin checks,
+immutable exact receipts, sequential run receipt heads and atomic permanent
+totals. A reused event is compared before even returning a no-account disposition,
+so changing its target to a nonexistent account cannot conceal a conflict. Normal
+runtime grants cannot provision/re-enable issuers, replace credentials or rewrite
+receipts. Extra issuer UPDATE privilege fails startup checks. The own-account
+store export returns at most 128 rows plus an exclusive cursor; all reads use a
+consistent snapshot and a live surface-bound session.
+
+Adversarial validation passes against owned loopback PostgreSQL 18 in
+`/tmp/central-tower-awards-store-tests-20261115-r4.log` (1.31s): real enrolled and
+restored synthetic accounts, restricted runtime grants, concurrent exact retries,
+issuer/session/origin confusion, account/event substitution, out-of-order results,
+an injected write failure with full rollback, eight-win/flawless accounting,
+129-row pagination and account isolation, capacity with exact retry, revocation,
+simultaneous account deletion/ingestion and late delivery without resurrection.
+The migration probe reconstructs v30 around a real enrolled account, applies the
+exact new SQL and checks preservation before rolling the probe back. Owned
+database processes/listeners/clusters are closed, including diagnostic failures.
+
+Strict API/store/migration/xtask library/test Clippy passes in
+`/tmp/central-tower-awards-store-clippy-20261115-r5.log`; policy and full-history
+secret scans pass in `/tmp/central-tower-awards-store-policy-20261115.log` and
+`/tmp/central-tower-awards-store-secrets-20261115.log`. The targeted check is
+available as `cargo xtask postgres --tower-awards-only` and remains part of the
+full store suite. No dependency versions or features changed. No new network
+endpoint, SDK delivery worker or UI badge display is claimed by this storage
+milestone; those integrations still need their own transport and visual checks.

@@ -32,6 +32,17 @@ async fn scalar(db: &impl ConnectionTrait, query: &str) -> i64 {
 }
 
 #[tokio::test]
+#[ignore = "requires the owned PostgreSQL fixture from `cargo xtask postgres --tower-awards-only`"]
+async fn tower_awards() {
+    let operator = connect_dev(config("central_migrator", "CENTRAL_TEST_MIGRATOR_PASSWORD"))
+        .await
+        .unwrap();
+    central_migration::apply(&operator).await.unwrap();
+    support::tower_awards(&operator).await;
+    operator.close().await.unwrap();
+}
+
+#[tokio::test]
 #[ignore = "requires the owned PostgreSQL container from `cargo xtask postgres --tower-only`"]
 async fn tower_authority() {
     let operator = connect_dev(config("central_migrator", "CENTRAL_TEST_MIGRATOR_PASSWORD"))
