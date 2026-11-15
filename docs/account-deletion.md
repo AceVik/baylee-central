@@ -48,6 +48,14 @@ Migration 000028 binds participation, attempts and completion rows to the accoun
 with deletion cascades. Deleting the account removes its scores from rankings and
 its progress from the live database; the shared task definition remains.
 
+The separate v2 Tower award store (migration 31) cascades run receipt heads,
+immutable receipts and cosmetic totals from the account. Ingestion takes the
+same account row lock as deletion, and a late delivery cannot recreate the
+account. Its store-level own-account export has 128-row exclusive UUID pages,
+accepted facts, issuer origins and receipt timestamps, with no issuer credential
+or game record. HTTP/SDK and user-facing export integration are still pending;
+this is not yet exposed through the existing AccountExport response.
+
 ## Deletion (Art. 17)
 
 A stolen session must not delete an account, so deletion carries a fresh

@@ -38,10 +38,10 @@ pub(super) fn run(
             secrets,
             tls,
             "central-postgres",
-            Some(if scope == Scope::Tower {
-                "tower_authority"
-            } else {
-                "migrations_ids_roles_rollback_and_locking"
+            Some(match scope {
+                Scope::Tower => "tower_authority",
+                Scope::TowerAwards => "tower_awards",
+                _ => "migrations_ids_roles_rollback_and_locking",
             }),
         );
     }

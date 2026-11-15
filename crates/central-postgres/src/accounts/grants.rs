@@ -69,8 +69,12 @@ impl AccountStore {
              ('tower_actions', ARRAY['SELECT','INSERT','DELETE'], NULL),
              ('tower_scores', ARRAY['SELECT','INSERT','UPDATE','DELETE'], NULL),
              ('tower_accomplishments', ARRAY['SELECT','INSERT','UPDATE','DELETE'], NULL),
-             ('tower_access', ARRAY['SELECT','INSERT','DELETE'], NULL))
-             SELECT count(*) = 54 AND bool_and(
+             ('tower_access', ARRAY['SELECT','INSERT','DELETE'], NULL),
+             ('tower_award_issuers', ARRAY['SELECT'], ARRAY['last_used_at']),
+             ('tower_award_runs', ARRAY['SELECT','INSERT','UPDATE'], NULL),
+             ('tower_award_progress', ARRAY['SELECT','INSERT','UPDATE'], NULL),
+             ('tower_award_receipts', ARRAY['SELECT','INSERT'], NULL))
+             SELECT count(*) = 58 AND bool_and(
                NOT pg_catalog.pg_has_role(c.relowner, 'USAGE')
                AND (SELECT bool_and(pg_catalog.has_table_privilege(c.oid, p)) FROM unnest(r.privileges) p)
                AND NOT pg_catalog.has_table_privilege(c.oid, 'TRUNCATE, REFERENCES, TRIGGER, MAINTAIN, SELECT WITH GRANT OPTION, INSERT WITH GRANT OPTION, UPDATE WITH GRANT OPTION, DELETE WITH GRANT OPTION')

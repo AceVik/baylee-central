@@ -32,6 +32,8 @@ pub enum Scope {
     Tower,
     /// Only native Tower identity over the real SDK/HTTP/database boundary.
     TowerAccess,
+    /// Verified permanent Tower receipt and account-projection storage only.
+    TowerAwards,
 }
 
 /// What the fixture owns, for its cleanup.

@@ -125,5 +125,73 @@ const fn uuid7(id: [u8; 16]) -> bool {
     id[6] >> 4 == 7 && id[8] >> 6 == 2
 }
 
+/// Durable ingestion disposition, available only to the authenticated issuer.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Disposition {
+    /// This exact fact was durably recorded, including an identical retry.
+    Recorded,
+    /// The target account no longer exists; delivery must never recreate it.
+    AccountGone,
+}
+
+/// Exact response binding to check before acknowledging the Baylee outbox.
+#[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Receipt {
+    /// Echo of the immutable event UUID.
+    pub event: [u8; 16],
+    /// Echo of the target account UUID.
+    pub account: [u8; 16],
+    /// Echo of the immutable run UUID.
+    pub run: [u8; 16],
+    /// Echo of the completed ordinal.
+    pub stage: u8,
+    /// Durable recorded result or terminal absence of the target account.
+    pub disposition: Disposition,
+}
+
+impl Receipt {
+    /// Bind a result to its request; the caller establishes durable provenance.
+    #[must_use]
+    pub const fn new(delivery: &Delivery, disposition: Disposition) -> Self {
+        Self {
+            event: delivery.event,
+            account: delivery.account,
+            run: delivery.fact.run,
+            stage: delivery.fact.stage,
+            disposition,
+        }
+    }
+}
+
+/// One account-owned receipt, without issuer credentials or game material.
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ExportedReceipt {
+    /// Central's database-generated receipt `UUIDv7` and pagination cursor.
+    pub id: [u8; 16],
+    /// Stable Baylee outbox identity.
+    pub event: [u8; 16],
+    /// Explicit public origin of the approved issuer.
+    pub origin: String,
+    /// Accepted verified fact.
+    pub fact: Fact,
+    /// Receipt creation time in Unix seconds.
+    pub accepted_at: i64,
+}
+
+/// Bounded own-account export, independent of legacy Tower and Daily/Weekly state.
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Export {
+    /// Permanent totals from the same snapshot as the receipt page.
+    pub progress: Progress,
+    /// At most 128 receipt rows; no other account's identifiers are selected.
+    pub receipts: Vec<ExportedReceipt>,
+    /// Last returned receipt UUID when another page remains.
+    pub next: Option<[u8; 16]>,
+}
+
 #[cfg(test)]
 mod tests;

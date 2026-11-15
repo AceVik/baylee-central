@@ -11,6 +11,16 @@ two database-constrained slots per native session and deletion cascading from
 that session. It adds no gameplay tables. See [Tower access](tower-access.md)
 for expiry, grants, refresh serialization and focused integration evidence.
 
+Migration 31 adds only the separate Tower accomplishment issuer registry,
+immutable receipts, per-run receipt head and permanent cosmetic totals. Runtime
+cannot provision/re-enable an issuer or change its credential; the exact grants
+in `ops/grants.sql` are checked at startup. New Central IDs use DEFAULT UUIDv7
+and RETURNING; remote run/event UUIDs are explicit external references. Apply
+forward through the existing operator migration command, then apply the updated
+grants before starting the new service. There is no destructive down migration;
+failed migrations roll back and recovery after committed data requires a forward
+fix or a reviewed backup restore. See [the Tower boundary](tower-echoes.md).
+
 ## IDs and client-side encryption
 
 Use native `uuid` columns with `DEFAULT pg_catalog.uuidv7()` and primary/unique
