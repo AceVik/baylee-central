@@ -48,6 +48,7 @@ mod reset;
 mod terms;
 mod tokens;
 mod tower_access;
+mod tower_awards;
 mod verified;
 pub use tokens::{Presented, TokenKeys, credential_operation};
 
@@ -120,7 +121,9 @@ pub struct BrowserReply {
 #[must_use]
 pub fn browser_operation(request: &Request) -> bool {
     match request {
-        Request::Challenges { .. }
+        Request::TowerProgress {}
+        | Request::TowerAwardExport { .. }
+        | Request::Challenges { .. }
         | Request::Notifications { .. }
         | Request::Social { .. }
         | Request::Discover { .. }
@@ -162,6 +165,7 @@ pub fn browser_operation(request: &Request) -> bool {
         Request::AcceptTerms { subject, .. } => matches!(subject, TermsSubject::Central),
         Request::TowerToken {}
         | Request::TowerIdentity {}
+        | Request::TowerAward { .. }
         | Request::ChallengeHost { .. }
         | Request::CreateObject
         | Request::ReadObject { .. }

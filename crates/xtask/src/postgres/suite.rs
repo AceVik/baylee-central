@@ -21,6 +21,24 @@ pub(super) fn run(
     tls: &Path,
     scope: Scope,
 ) -> Result<()> {
+    if scope == Scope::TowerAwards {
+        run_suite(
+            root,
+            port,
+            secrets,
+            tls,
+            "central-postgres",
+            Some("tower_awards"),
+        )?;
+        return run_suite(
+            root,
+            port,
+            secrets,
+            tls,
+            "central-client",
+            Some("tower_awards::scoped_delivery"),
+        );
+    }
     if scope == Scope::TowerAccess {
         return run_suite(
             root,
@@ -60,6 +78,14 @@ pub(super) fn run(
         tls,
         "central-client",
         Some("tower_access::scoped_identity"),
+    )?;
+    run_suite(
+        root,
+        port,
+        secrets,
+        tls,
+        "central-client",
+        Some("tower_awards::scoped_delivery"),
     )?;
     Ok(())
 }

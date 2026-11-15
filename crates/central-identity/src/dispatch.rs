@@ -59,6 +59,11 @@ impl IdentityService {
         match request {
             Request::TowerToken {} => self.tower_token(bearer).await,
             Request::TowerIdentity {} => self.tower_identity(bearer).await,
+            Request::TowerAward { delivery } => self.tower_award(&delivery, bearer).await,
+            Request::TowerProgress {} => self.tower_progress(bearer, surface).await,
+            Request::TowerAwardExport { after } => {
+                self.tower_award_export(after, bearer, surface).await
+            }
             Request::Challenges { request } => self.challenges(request, bearer, surface).await,
             Request::ChallengeHost { request } => self.challenge_host(request, bearer).await,
             Request::Notifications { request } => self.notifications(request, bearer).await,

@@ -254,6 +254,9 @@ fn tells(request: &Request) -> Tells {
         }
         Request::TowerToken {}
         | Request::TowerIdentity {}
+        | Request::TowerAward { .. }
+        | Request::TowerProgress {}
+        | Request::TowerAwardExport { .. }
         | Request::ChallengeHost { .. }
         | Request::SessionStatus
         | Request::RenewSession

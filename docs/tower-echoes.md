@@ -15,8 +15,9 @@ the calendar activities, login or already earned badges.
 Before accepting achievements from another service, define the permitted issuer
 and scope, server-authenticated result provenance, account ownership, replay and
 duplicate protection, and deletion/export behavior. A registered gateway is not
-automatically trusted to award unrestricted global achievements. No new award
-endpoint or trust grant is implemented by this design note.
+automatically trusted to award unrestricted global achievements. The milestones
+below implement the separate scoped contract; deployment still requires explicit
+operator provisioning and the Baylee delivery worker.
 
 The current Central-owned five-floor certified expedition (`tower.md`) predates
 this clarification. It is implemented but does not yet satisfy the new Tower
@@ -119,3 +120,42 @@ available as `cargo xtask postgres --tower-awards-only` and remains part of the
 full store suite. No dependency versions or features changed. No new network
 endpoint, SDK delivery worker or UI badge display is claimed by this storage
 milestone; those integrations still need their own transport and visual checks.
+
+## Native ingestion and own-account reads — three passes
+
+Design: `TowerAward { delivery }` is an issuer-only native credential operation.
+It accepts the fixed-size contract above and returns `TowerAward { receipt }`.
+The browser listener rejects it even with the correct issuer secret. Signed
+player sessions, Tower identity grants and the challenge bridge cannot ingest.
+`TowerProgress {}` and `TowerAwardExport { after }` instead require a live,
+surface-bound player session, work on both account surfaces, and return only that
+account's totals or at most 128 receipts. They remain readable when the Tower
+service is unavailable or a new terms version needs acceptance. An issuer cannot
+use these operations to read accounts. Existing HTTP body/rate limits apply; none
+of the operations bypasses authentication through an in-memory rate-limit cache.
+
+Implementation: the native SDK checks event, account, run and ordinal in the
+durable receipt before the caller may acknowledge its outbox. Wrong response
+variants are rejected. Session methods enforce their original Central endpoint,
+validate counters, ordered UUIDv7 export pages, the exclusive cursor and canonical
+issuer origin. No counters, credentials or submitted payloads gain Debug output.
+No dependency version or feature changed. These are additive native/browser RPC
+operations; the permanent badges are not yet wired into either player interface.
+
+Adversarial evidence: `/tmp/central-tower-awards-transport-tests-20261115-r4.log`
+passes both the existing Tower identity transport test and the new award test
+against real owned PostgreSQL 18 and native/browser loopback HTTP (2 tests,
+4.42s). It covers issuer/bridge/player/Tower scope confusion, browser refusal,
+idempotent delivery, changed facts, unknown JSON fields, own-account reads/export,
+terms changes, issuer revocation and account deletion without resurrection.
+Six contract tests and the SDK receipt-substitution test pass in
+`/tmp/central-tower-awards-projection-sdk-tests-20261115.log`. Strict touched-crate
+Clippy passes in `/tmp/central-tower-awards-transport-clippy-20261115-r3.log`.
+The targeted `cargo xtask postgres --tower-awards-only` now runs both store and
+native SDK slices. All owned listeners and database processes exited. A temporary
+native fixture shutdown bug was corrected to use PostgreSQL fast shutdown rather
+than SIGKILL; the final run also leaves no new System-V shared-memory segment.
+These checks are local engineering evidence, not an independent security audit.
+Policy and full-history secret checks pass in
+`/tmp/central-tower-awards-transport-policy-20261115.log` and
+`/tmp/central-tower-awards-transport-secrets-20261115.log`.

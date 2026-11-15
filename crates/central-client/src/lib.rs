@@ -28,6 +28,7 @@ mod session;
 mod social;
 mod terms;
 mod tower_access;
+mod tower_awards;
 pub use central_crypto::pairing::PairingSecret;
 pub use deletion::Deletion;
 pub use email::reset_mail;
@@ -43,6 +44,7 @@ pub use reset::{ResetData, reset};
 pub use session::Session;
 pub use terms::{TermsStatus, central_terms, gateway_terms};
 pub use tower_access::tower_identity;
+pub use tower_awards::deliver_tower_award;
 
 /// Transport contract: verified HTTPS in live mode, no redirects, bounded bodies/timeouts,
 /// no ambient proxy credentials and no logging of headers, bodies or remote diagnostics.

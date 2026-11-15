@@ -289,3 +289,89 @@ fn permanent_tiers_cover_exact_thresholds_without_reset_or_wraparound() {
         [0; 3]
     );
 }
+
+#[test]
+fn exports_reject_oversized_reordered_or_nonprogressing_pages() {
+    let row = ExportedReceipt {
+        id: uuid(10),
+        event: uuid(11),
+        origin: "https://tower.example.invalid".into(),
+        fact: first(),
+        accepted_at: 1,
+    };
+    let valid = Export {
+        progress: Progress {
+            duels: 1,
+            victories: 1,
+            ..Progress::default()
+        },
+        receipts: vec![row.clone()],
+        next: None,
+    };
+    valid.validate(None).unwrap();
+    assert_eq!(valid.validate(Some(row.id)), Err(Error::Rejected));
+    assert_eq!(
+        Export {
+            next: Some(row.id),
+            ..valid.clone()
+        }
+        .validate(None),
+        Err(Error::Rejected)
+    );
+    assert_eq!(
+        Export {
+            progress: Progress::default(),
+            ..valid.clone()
+        }
+        .validate(None),
+        Err(Error::Rejected)
+    );
+    assert_eq!(
+        Export {
+            receipts: vec![row.clone(); 129],
+            ..valid.clone()
+        }
+        .validate(None),
+        Err(Error::Rejected)
+    );
+    for bad in [
+        ExportedReceipt {
+            event: [0; 16],
+            ..row.clone()
+        },
+        ExportedReceipt {
+            accepted_at: 0,
+            ..row.clone()
+        },
+        ExportedReceipt {
+            origin: "http://attacker.invalid".into(),
+            ..row.clone()
+        },
+    ] {
+        assert_eq!(
+            Export {
+                receipts: vec![bad],
+                ..valid.clone()
+            }
+            .validate(None),
+            Err(Error::Rejected)
+        );
+    }
+    let mut page = Export {
+        progress: Progress {
+            duels: 128,
+            victories: 128,
+            ..Progress::default()
+        },
+        receipts: (1..=128)
+            .map(|n| ExportedReceipt {
+                id: uuid(n),
+                ..row.clone()
+            })
+            .collect(),
+        next: Some(uuid(128)),
+    };
+    page.validate(None).unwrap();
+    page.receipts.swap(0, 1);
+    assert_eq!(page.validate(None), Err(Error::Rejected));
+}
