@@ -17,7 +17,8 @@ and scope, server-authenticated result provenance, account ownership, replay and
 duplicate protection, and deletion/export behavior. A registered gateway is not
 automatically trusted to award unrestricted global achievements. The milestones
 below implement the separate scoped contract; deployment still requires explicit
-operator provisioning and the Baylee delivery worker.
+operator provisioning. Baylee's delivery worker is implemented separately; neither
+repository's feature branch is an external deployment.
 
 The current Central-owned five-floor certified expedition (`tower.md`) predates
 this clarification. It is implemented but does not yet satisfy the new Tower
@@ -159,3 +160,74 @@ These checks are local engineering evidence, not an independent security audit.
 Policy and full-history secret checks pass in
 `/tmp/central-tower-awards-transport-policy-20261115.log` and
 `/tmp/central-tower-awards-transport-secrets-20261115.log`.
+
+## Website collection and export — design and implementation
+
+The challenges page reads confirmed v2 accomplishments directly from Central,
+independently of the Tower gameplay service. It presents three separate original
+motifs: crossed swords for duel victories, a crowned spire for eight-win clears,
+and an infinity shield for flawless clears. The shared API supplies the permanent
+thresholds; no client increments them or infers a win from a table closing. The
+five-tier preview uses the existing ornaments and reduced-motion preference, with
+distinct motifs and colours from the legacy expedition badges. All eleven site
+languages contain the collection's names, requirements and confirmation notice.
+
+Each page starts with unknown progress, not invented zero totals. A transient or
+malformed reply preserves the last confirmed values for that session. Rejection,
+logout or account replacement removes them and any open earned-tier preview.
+The minute refresh keeps unchanged cards and keyboard focus stable. Old in-flight
+responses are fenced by the session generation; they cannot restore the previous
+account's collection after a storage event. This browser-local fence supplements
+the server's live-cookie account authorization; it is not an authentication token.
+
+The account download collects at most 7,680 ordered v2 receipts, with explicit
+continuation metadata. It validates every page and refuses an unavailable or
+malformed dataset rather than offering a silently incomplete merged file. The
+whole assembly is tied to the session from before its first account request;
+cross-tab session changes remove an existing download and invalidate pending work.
+Each sign-in now changes a non-secret random browser marker, even for identical
+expiry seconds; the new reads and export compare the whole marker. No player name,
+account identity or credential is stored in it. The same-session expiry collision
+found during the implementation review therefore also emits a cross-tab event.
+No new dependency or public score-ingestion path is added. The native client's
+badge integration and operator release gates remain separate work.
+
+Adversarial and visual evidence, 15 November 2026:
+
+- `/tmp/central-echoes-browser-tests-20261115-r2.log`: 42 Chromium desktop/phone
+  cases pass (23.8s), covering the new collection/export and affected Daily/Weekly
+  and legacy expedition views. They check tier thresholds, distinct silhouettes,
+  unchanged-refresh focus, 320px reflow, 44px controls, dark/light WCAG checks,
+  reduced motion, unavailable/corrupt/rejected progress, old-account delayed replies,
+  two-page export, repeated cursors, retry and session changes during both the
+  initial account request and receipt collection. An earlier run's two failures
+  were a test selecting an intentionally hidden empty alert; the corrected selector
+  checks its actual DOM text rather than requiring it in the accessibility tree.
+- `/tmp/central-echoes-session-export-tests-20261115.log`: ten selected desktop/phone
+  cases pass (9.5s), including existing account/email export behavior, fresh local
+  markers for equal-expiry sign-ins, and injected entropy/storage failures that
+  remove the previous marker. These browser tests use synthetic server/crypto
+  stand-ins; the earlier transport milestone provides the real session evidence.
+- `/tmp/central-echoes-web-visual-20261115/`: reviewed English dark/light and German
+  maximum-tier screenshots. A second visual pass shortened the maximum-tier count,
+  applied locale number formatting and captured the section in a taller viewport
+  at the checked width, keeping the real sticky navigation above the collection.
+  Four targeted screenshot cases pass in 6.3s. All Playwright-owned servers and
+  browser contexts stopped; the owned loopback listener at 28792 is closed.
+- `/tmp/central-echoes-web-tests-20261115-r2.log`: 125 library and six contrast,
+  hover and inert-element tests pass; the doc-test target contains no examples.
+  Strict all-target/all-feature web Clippy, formatting, the full first-party policy
+  with compiler probe and tree/history secret scans pass in the corresponding
+  `central-echoes-web-{clippy,policy,secrets}` logs (`r7`, `r2`, `r2`).
+- The final public/admin WebAssembly and hashed site build passes in
+  `/tmp/central-echoes-site-build-20261115-r5.log`. The macOS debug server links
+  successfully, with the existing large-DWARF-unwind-table linker warning; this
+  does not claim a Linux release build, production deployment or independent audit.
+- The changed `central-web` library also passes its locked, all-feature release
+  build in `/tmp/central-echoes-web-release-20261115.log` (2m 59s). Crypto/SQLite
+  dependency-scope checks pass without dependency changes. This is the scoped
+  gate requested by the owner; a whole-workspace server gate was not rerun.
+
+No engine, database, issuer or courier behavior changed in this UI milestone, so
+their long suites were not repeated. The native collection still needs its own
+renderer, interaction and measured shader checks.

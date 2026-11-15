@@ -755,11 +755,16 @@ The CSP gains `'wasm-unsafe-eval'` in `script-src`.
   Since 23.10.2026 the name it shows is the handle of the account's
   `AccountSummary` (§"Display name and tag"), always Central's, held in
   memory; without a display name the header says "Your account".
-- The page keeps only the session's end in localStorage
+- The page keeps the session's end and a random non-secret change marker in localStorage
   (`baylee-central-session`), so after a reload it knows to ask whose
   session it is (`AccountSummary` since 23.10.2026, `SessionStatus` before;
   until then the header says "Your account"), and forgets it on signing
-  out, at its end or on Central's 401.
+  out, at its end or on Central's 401. The marker changes on every sign-in, including
+  two sessions with the same expiry second, so other tabs can invalidate private
+  UI state. It contains no account identity and grants no authority; only the
+  server's cookie authenticates a browser. Expiry-only records from older clients
+  remain readable. The marker uses the already reviewed random source, and a
+  failure to obtain randomness removes the old record rather than retaining it.
   The privacy notice says so. The earlier key that also held the name
   (`baylee-central-account`) is deleted wherever the page finds it.
 

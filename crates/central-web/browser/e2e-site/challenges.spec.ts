@@ -22,6 +22,9 @@ async function setup(page: Page, signedIn = false) {
       display_name: "Synthetic player", tag: 80000, source: "registered", recovery: true, admin: false,
       signed_in_at: 1_794_000_000, expires_at: 4_102_444_800,
     });
+    if (body.operation === "tower_progress" && signedIn) return json({
+      result: "tower_progress", progress: { duels: 0, victories: 0, clears: 0, flawless: 0 },
+    });
     if (body.operation !== "challenges") return rejected();
     expect(route.request().headers()["x-baylee-central"]).toBe("1");
     expect(route.request().headers()["authorization"]).toBeUndefined();

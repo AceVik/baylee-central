@@ -21,6 +21,9 @@ async function setup(page: Page) {
       display_name: "Synthetic player", tag: 80000, source: "registered", recovery: true, admin: false,
       signed_in_at: feed.now, expires_at: 4_102_444_800,
     } });
+    if (body.operation === "tower_progress") return route.fulfill({ json: {
+      result: "tower_progress", progress: { duels: 0, victories: 0, clears: 0, flawless: 0 },
+    } });
     if (body.operation !== "challenges") return route.fulfill({ status: 401, body: "account request rejected\n" });
     const op = body.request;
     if (op.action === "catalogue") return json({ answer: "catalogue", now: feed.now, before: feed.before, challenges: feed.challenges });
