@@ -24,6 +24,8 @@ use tokio::{runtime::Runtime, sync::oneshot};
 mod support;
 #[path = "support/tower_access.rs"]
 mod tower_access;
+#[path = "support/tower_awards.rs"]
+mod tower_awards;
 use support::{Http, config};
 
 #[test]

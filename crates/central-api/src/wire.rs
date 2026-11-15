@@ -42,6 +42,18 @@ pub enum Request {
     TowerToken {},
     /// Introspect only a Tower credential from the Authorization header.
     TowerIdentity {},
+    /// Accept one verified permanent fact under a dedicated Tower issuer credential.
+    TowerAward {
+        /// Never accepted under a player, gateway or Tower identity credential.
+        delivery: crate::tower_awards::Delivery,
+    },
+    /// Read this live session owner's permanent v2 Tower totals.
+    TowerProgress {},
+    /// Export only this live session owner's permanent receipt history.
+    TowerAwardExport {
+        /// Exclusive database receipt cursor; at most 128 rows per response.
+        after: Option<[u8; 16]>,
+    },
     /// Global Daily/Weekly catalogue, rankings and account-owned participation.
     Challenges {
         /// Closed public or account operation; ownership comes from the session.
@@ -664,6 +676,21 @@ pub enum Response {
     TowerIdentity {
         /// No rules, currency, permissions or accomplishment claims.
         identity: crate::tower_access::Identity,
+    },
+    /// Exact durable result binding for an authenticated accomplishment delivery.
+    TowerAward {
+        /// Exact event/account/run/ordinal and durable disposition.
+        receipt: crate::tower_awards::Receipt,
+    },
+    /// Session-owned permanent totals, independent of live Tower availability.
+    TowerProgress {
+        /// Deduplicated permanent cosmetic counters.
+        progress: crate::tower_awards::Progress,
+    },
+    /// Session-owned bounded receipt export.
+    TowerAwardExport {
+        /// Bounded owned receipts and exclusive continuation cursor.
+        export: crate::tower_awards::Export,
     },
     /// Public or account-owned challenge result.
     Challenges {

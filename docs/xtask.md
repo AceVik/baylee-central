@@ -36,10 +36,11 @@ issuance/introspection through the real SDK, HTTP listener and PostgreSQL, inclu
 credential separation, concurrent refresh bounds and revocation. It uses the same
 owned fixture and cleanup checks. The full command includes it as well.
 
-`cargo xtask postgres --tower-awards-only` runs the v2 permanent award store slice:
-restricted issuer grants, atomic/deduplicated progression, receipt ordering,
-bounded account export, migration and deletion races. It does not run game rules
-or claim an HTTP delivery test. The full store suite includes this scenario.
+`cargo xtask postgres --tower-awards-only` runs the v2 permanent award store and
+native SDK/HTTP slices: restricted issuer grants, atomic/deduplicated progression,
+receipt ordering, bounded account export, migration and deletion races, credential
+scope confusion, browser refusal and bound SDK acknowledgments. It does not run
+game rules. The full PostgreSQL command includes both scenarios.
 
 ## Which runner runs what
 

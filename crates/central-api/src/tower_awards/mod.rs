@@ -193,5 +193,39 @@ pub struct Export {
     pub next: Option<[u8; 16]>,
 }
 
+impl Export {
+    /// Validate bounded ordered pagination before a reader consumes the facts.
+    /// # Errors
+    /// Invalid totals, receipt shape, ordering, issuer origin or continuation cursor.
+    pub fn validate(&self, after: Option<[u8; 16]>) -> Result<(), Error> {
+        self.progress.validate()?;
+        if after.is_some_and(|id| !uuid7(id))
+            || self.receipts.len() > 128
+            || u64::try_from(self.receipts.len()).map_or(true, |count| count > self.progress.duels)
+            || self.next.is_some_and(|next| {
+                self.receipts.len() != 128
+                    || self.receipts.last().is_none_or(|last| last.id != next)
+            })
+        {
+            return Err(Error::Rejected);
+        }
+        let mut previous = after;
+        for item in &self.receipts {
+            if !uuid7(item.id)
+                || !uuid7(item.event)
+                || item.accepted_at <= 0
+                || previous.is_some_and(|id| item.id <= id)
+            {
+                return Err(Error::Rejected);
+            }
+            item.fact.validate()?;
+            crate::gateway::validate_origin(&item.origin, false)
+                .or_else(|_| crate::gateway::validate_origin(&item.origin, true))?;
+            previous = Some(item.id);
+        }
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests;

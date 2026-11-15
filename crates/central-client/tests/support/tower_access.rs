@@ -9,6 +9,12 @@ const ORIGIN: &str = "http://127.0.0.1:29871";
 #[test]
 #[ignore = "owned fixture: cargo xtask postgres --tower-access-only"]
 fn scoped_identity() {
+    with_fixture(exercise);
+}
+
+pub(super) fn with_fixture(
+    exercise: impl FnOnce(&Http, &Token, &Runtime, &DatabaseConnection, &AccountStore),
+) {
     let runtime = Runtime::new().unwrap();
     let operator = runtime.block_on(prepare());
     let store = runtime

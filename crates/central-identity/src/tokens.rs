@@ -74,6 +74,7 @@ impl Presented {
 pub const fn credential_operation(request: &Request) -> bool {
     match request {
         Request::TowerIdentity {}
+        | Request::TowerAward { .. }
         | Request::ChallengeHost { .. }
         | Request::GatewayHeartbeat { .. }
         | Request::GatewayPulse { .. }
@@ -87,6 +88,8 @@ pub const fn credential_operation(request: &Request) -> bool {
         | Request::LegacyProfile { .. }
         | Request::LegacyStatus { .. } => true,
         Request::TowerToken {}
+        | Request::TowerProgress {}
+        | Request::TowerAwardExport { .. }
         | Request::Challenges { .. }
         | Request::Notifications { .. }
         | Request::Social { .. }
