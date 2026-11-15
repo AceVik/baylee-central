@@ -22,6 +22,7 @@ mod clip;
 mod contact;
 mod crypto;
 mod early;
+mod echoes;
 mod email;
 #[cfg(any(not(target_arch = "wasm32"), feature = "admin"))]
 mod feedback;
@@ -58,6 +59,8 @@ pub(crate) use challenges::Challenges;
 pub(crate) use chat::Messenger;
 #[cfg(not(target_arch = "wasm32"))]
 pub(crate) use contact::ContactForm;
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) use echoes::Echoes;
 #[cfg(not(target_arch = "wasm32"))]
 pub(crate) use impressum::Impressum;
 #[cfg(not(target_arch = "wasm32"))]

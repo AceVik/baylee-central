@@ -55,6 +55,9 @@
 .retention-medal[data-motif="4"], .retention-medal[data-motif="5"] { --medal-gem: #70d6ac; }
 .retention-medal[data-motif="6"] { --medal-gem: #f5cb6e; }
 .retention-medal[data-motif="7"] { --medal-gem: #b2a2ee; }
+.retention-medal[data-motif="8"] { --medal-gem: #ee9b78; }
+.retention-medal[data-motif="9"] { --medal-gem: #80d7e1; }
+.retention-medal[data-motif="10"] { --medal-gem: #e3b1f1; }
 .tier-1 { --medal-metal: #cf8e5b; }
 .tier-2 { --medal-metal: #c2d2e0; }
 .tier-3 { --medal-metal: #eac46a; }
@@ -92,13 +95,14 @@
 }
 
 /* A quiet, symmetrical expedition dashboard; the route carries the ornament. */
-.tower-hub { margin-block: var(--space-8); padding-block: var(--space-7); border-block-start: 1px solid var(--edge); }
+.tower-hub, .echoes-accomplishments { margin-block: var(--space-8); padding-block: var(--space-7); border-block-start: 1px solid var(--edge); }
 .tower-header { display: flex; align-items: center; justify-content: space-between; gap: var(--space-5); }
 .tower-header h2 { margin-block: var(--space-2); }
-.tower-hub > .lead { max-inline-size: var(--prose); }
+.tower-hub > .lead, .echoes-accomplishments > .lead { max-inline-size: var(--prose); }
 .tower-guide { margin-block: var(--space-4); border-block: 1px solid var(--edge-soft); text-align: center; }
 .tower-guide > p { max-inline-size: var(--prose); margin-inline: auto; }
-.tower-hub > [role="alert"]:empty, .tower-hub > [role="status"]:empty { display: none; }
+.tower-hub > [role="alert"]:empty, .tower-hub > [role="status"]:empty,
+.echoes-accomplishments > [role="alert"]:empty, .echoes-accomplishments > [role="status"]:empty { display: none; }
 .tower-stage { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-7); align-items: center; margin-block: var(--space-5); overflow: hidden; background: radial-gradient(ellipse at 90% 10%, #70d6ac12, transparent 65%), var(--panel); }
 .tower-stage-copy { min-inline-size: 0; text-align: center; padding: var(--space-4); }
 .tower-stage-copy h3 { color: var(--title); font-size: clamp(1.75rem, 3vw, 2.75rem); text-wrap: balance; }
@@ -119,6 +123,8 @@
 .tower-relics, .tower-upgrades { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-4); margin-block: var(--space-5); }
 .tower-relics .challenge-badge { display: flex; flex-direction: column; align-items: center; min-inline-size: 0; }
 .tower-relics .challenge-badge > h4 { font-size: var(--text-lg); margin-block: var(--space-3); }
+.echoes-accomplishments .challenge-badge > h3 { margin-block: var(--space-3); }
+.echoes-accomplishments .echoes-badge-goal { flex: 1; }
 .tower-relics .challenge-badge > progress { margin-block-end: var(--space-4); }
 .challenge-badge > .button { margin-block-start: var(--space-4); }
 .tower-hub summary { cursor: pointer; min-block-size: 44px; padding: var(--space-3); }
@@ -141,6 +147,7 @@
   .tower-relics .challenge-badge { display: grid; grid-template-columns: 5.5rem minmax(0, 1fr); gap: var(--space-2) var(--space-4); text-align: start; }
   .tower-relics .challenge-badge > .retention-medal { grid-column: 1; grid-row: 1 / 5; width: 5.5rem; }
   .tower-relics .challenge-badge > h4, .tower-relics .challenge-badge > p, .tower-relics .challenge-badge > progress { grid-column: 2; margin: 0; }
+  .echoes-accomplishments .challenge-badge > h3 { grid-column: 2; margin: 0; }
   .tower-relics .challenge-badge > .button { grid-column: 1 / -1; justify-self: center; margin-block-start: var(--space-3); }
   .tower-tier-gallery { grid-template-columns: repeat(5, minmax(0, 1fr)); }
   .tower-tier-gallery > div:last-child { grid-column: auto; }

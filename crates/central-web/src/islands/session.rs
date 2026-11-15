@@ -1,7 +1,8 @@
-//! What the browser remembers of a sign-in: only when the session ends
-//! (localStorage `baylee-central-session`, `{"expiresAt": <unix seconds>}`,
-//! as before), so a page knows to ask Central whose session it is. The
-//! session itself is the `__Host-central` cookie, which no script reads.
+//! What the browser remembers of a sign-in: its expiry and a random, non-secret
+//! change marker, so pages know to ask Central whose session it is. The marker
+//! distinguishes even two sign-ins with the same expiry second; it carries no
+//! identity and grants no authority. The session itself is the `__Host-central`
+//! cookie, which no script reads. Old expiry-only records remain readable.
 
 /// The key, unchanged from the previous site.
 #[cfg(target_arch = "wasm32")]
@@ -16,10 +17,22 @@ fn storage() -> Option<web_sys::Storage> {
 #[cfg(target_arch = "wasm32")]
 pub fn remember(expires_at: i64) {
     if let Some(storage) = storage() {
-        let _ = storage.set_item(
-            KEY,
-            &serde_json::json!({ "expiresAt": expires_at }).to_string(),
-        );
+        let mut change = [0_u8; 16];
+        if getrandom::fill(&mut change).is_err() {
+            // Without a distinct marker do not leave another tab believing its
+            // previous account is still current. The cookie remains server-owned.
+            let _ = storage.remove_item(KEY);
+            return;
+        }
+        if storage
+            .set_item(
+                KEY,
+                &serde_json::json!({ "expiresAt": expires_at, "change": change }).to_string(),
+            )
+            .is_err()
+        {
+            let _ = storage.remove_item(KEY);
+        }
     }
 }
 
@@ -44,6 +57,29 @@ pub fn remembered() -> Option<i64> {
         .parse()
         .ok()?;
     (ends > now).then_some(ends)
+}
+
+/// A local snapshot for fencing private UI work, never for authorization. The
+/// full record distinguishes different sign-ins even when their expiry is equal.
+#[cfg(target_arch = "wasm32")]
+#[must_use]
+pub fn marker() -> Option<String> {
+    remembered()?;
+    read(KEY)
+}
+
+/// Invalidate account-owned page state after another tab changes its sign-in.
+/// The listener is removed with the current Leptos owner.
+#[cfg(target_arch = "wasm32")]
+pub fn on_change(callback: impl Fn() + 'static) {
+    let listener = leptos::prelude::window_event_listener_untyped("storage", move |event| {
+        let key =
+            js_sys::Reflect::get(event.as_ref(), &wasm_bindgen::JsValue::from_str("key")).ok();
+        if key.is_some_and(|key| key.is_null() || key.as_string().as_deref() == Some(KEY)) {
+            callback();
+        }
+    });
+    leptos::prelude::on_cleanup(move || listener.remove());
 }
 
 /// The text localStorage keeps under `key`.
@@ -121,6 +157,17 @@ pub fn forget() {}
 pub fn remembered() -> Option<i64> {
     None
 }
+
+/// The server retains no browser session marker.
+#[cfg(not(target_arch = "wasm32"))]
+#[must_use]
+pub fn marker() -> Option<String> {
+    None
+}
+
+/// The server has no cross-tab browser events.
+#[cfg(not(target_arch = "wasm32"))]
+pub fn on_change(_callback: impl Fn() + 'static) {}
 
 /// On the server nothing is kept.
 #[cfg(not(target_arch = "wasm32"))]

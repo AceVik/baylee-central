@@ -1,4 +1,4 @@
-//! Original vector counterparts of the client's eight procedural insignia.
+//! Original vector insignia, with a distinct silhouette for every accomplishment.
 use crate::words::{self, Lang};
 use central_api::challenges::Tier;
 use leptos::prelude::*;
@@ -46,7 +46,7 @@ pub(super) fn gallery(lang: Lang, selected: RwSignal<Option<Preview>>) -> impl I
         [Tier::Bronze,Tier::Silver,Tier::Gold,Tier::Platinum,Tier::Obsidian]
             .into_iter().zip(thresholds).map(|(material,target)| view! {
                 <div class:relic-earned={count >= target}>{view(motif,Some(material))}
-                    <p>{tier(lang,Some(material))}</p><p class="num">{target}</p>
+                    <p>{tier(lang,Some(material))}</p><p class="num">{words::number(lang,u64::from(target))}</p>
                     {(count >= target).then(|| view! { <span aria-label=words::ch_completed(lang)>{"✓"}</span> })}
                 </div>
             }).collect_view()
@@ -78,6 +78,13 @@ pub(super) fn view(motif: u8, tier: Option<Tier>) -> impl IntoView {
         }
         5 => "M-26 22L0-23L26 22M6 24L-7 9L5-3M18-27L21-20L27-17L21-14L18-7L15-14L9-17L15-20Z",
         6 => "M-12 24V-10H12V24M-22-11V-25L-11-18L0-29L11-18L22-25V-11ZM-4 24V10A4 4 0 0 1 4 10V24",
+        8 => {
+            "M-22 23L18-23L24-24L24-18L-17 27M22 23L-18-23L-24-24L-24-18L17 27M-27 12L-12 26M27 12L12 26 M0-27V-19"
+        }
+        9 => {
+            "M-16 23V-10H16V23M-24-10L-26-26L-13-17L0-30L13-17L26-26L24-10ZM-8 23V8H8V23M-23 0L-31 8L-24 13M23 0L31 8L24 13"
+        }
+        10 => "M-24-23H24V0Q23 17 0 29Q-23 17-24 0ZM0 0C-21-23-24 23 0 0C21-23 24 23 0 0Z",
         _ => "M-23-23H23V0Q21 15 0 28Q-21 15-23 0ZM0-15L12 2L0 19L-12 2Z",
     };
     view! {

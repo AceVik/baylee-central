@@ -119,6 +119,8 @@ function central(seen: Body[], w: World) {
         });
       case "account_export":
         return json({ result: "account_export", export: EXPORT });
+      case "tower_award_export":
+        return json({ result: "tower_award_export", export: { progress: ECHOES.progress, receipts: [], next: null } });
       case "challenges":
         if (body.request?.action === "tower") return json({ result: "challenges", response: { answer: "tower", response: { answer: "export", entries: [], after: null } } });
         return body.request?.action === "export"
@@ -151,6 +153,7 @@ const CHALLENGES = {
   participation: { entries: [], complete: true, after: null },
   attempts: { entries: [], complete: true, after: null },
 };
+const ECHOES = { progress: { duels: 0, victories: 0, clears: 0, flawless: 0 }, receipts: [], complete: true, after: null };
 
 /** The sign-in once more, canned: the stand-in's OPAQUE answers are none. */
 const WORKER = `
@@ -356,6 +359,47 @@ test("a wrong code is said and the state read again; after several the address i
   expect(await page.evaluate(() => localStorage.getItem("baylee-central-session"))).not.toBeNull();
   await sound(page);
 });
+
+test("same-second sign-ins get distinct non-secret local change markers", async ({ page }) => {
+  await open(page, world());
+  const marker = async () => JSON.parse(await page.evaluate(() => localStorage.getItem("baylee-central-session")) ?? "{}") as {
+    expiresAt: number; change: number[];
+  };
+  await send(page, NEW);
+  await expect(code(page)).toBeVisible();
+  const first = await marker();
+  expect(Object.keys(first).sort()).toEqual(["change", "expiresAt"]);
+  expect(first.change).toHaveLength(16);
+  await button(page, "Use another address").click();
+  await expect(address(page)).toBeVisible();
+  await send(page, OLD);
+  await expect(code(page)).toBeVisible();
+  const second = await marker();
+  expect(second.expiresAt).toBe(first.expiresAt);
+  expect(second.change).toHaveLength(16);
+  expect(second.change).not.toEqual(first.change);
+});
+
+for (const failure of ["entropy", "storage"] as const) {
+  test(`a ${failure} failure never retains the previous sign-in marker`, async ({ page }) => {
+    await open(page, world());
+    expect(await page.evaluate(() => localStorage.getItem("baylee-central-session"))).not.toBeNull();
+    await page.evaluate((mode) => {
+      if (mode === "entropy") {
+        crypto.getRandomValues = () => { throw new DOMException("synthetic entropy failure"); };
+      } else {
+        const original = Storage.prototype.setItem;
+        Storage.prototype.setItem = function (key, value) {
+          if (key === "baylee-central-session") throw new DOMException("synthetic quota", "QuotaExceededError");
+          return original.call(this, key, value);
+        };
+      }
+    }, failure);
+    await send(page, NEW);
+    await expect(code(page)).toBeVisible();
+    expect(await page.evaluate(() => localStorage.getItem("baylee-central-session"))).toBeNull();
+  });
+}
 
 test("a code is sent again, too many mails are said, and another address takes the waiting one's place", async ({ page }) => {
   const w = world(waiting());
@@ -622,13 +666,14 @@ test("the export's file holds the address beside the export, or the page says th
     { operation: "challenges", request: { action: "export", table: "participation", after: null } },
     { operation: "challenges", request: { action: "export", table: "attempts", after: null } },
     ...["runs", "actions", "participation"].map((table) => ({ operation: "challenges", request: { action: "tower", request: { action: "export", table, after: null } } })),
+    { operation: "tower_award_export", after: null },
   ]);
   expect(after.filter((body) => body.operation === "picture").map((body) => body.request?.action).sort()).toEqual(["mine", "reports"]);
   const whole = await file();
   // Central's export as it is, and the account's own data of the address:
   // whether this Central sends mail is not the account's
   const tower = { ...Object.fromEntries(["runs", "actions", "participation"].map((table) => [table, { entries: [], complete: true, after: null }])), complete: true };
-  expect(whole).toEqual({ ...EXPORT, challenges: CHALLENGES, tower, email: { address: OLD, confirmed_at: THEN, pending: NEW, pending_until: THEN + 900 } });
+  expect(whole).toEqual({ ...EXPORT, challenges: CHALLENGES, tower, tower_echoes: ECHOES, email: { address: OLD, confirmed_at: THEN, pending: NEW, pending_until: THEN + 900 } });
   await expect(page.locator("#export-no-email")).toHaveCount(0);
   await sound(page);
 
@@ -640,7 +685,7 @@ test("the export's file holds the address beside the export, or the page says th
   await page.getByRole("button", { name: "Prepare the export" }).click();
   await expect(page.locator("#export-save")).toBeFocused();
   await expect(page.locator("#export-no-email")).toHaveText("The e-mail address could not be read; it is not in this file.");
-  expect(await file()).toEqual({ ...EXPORT, challenges: CHALLENGES, tower });
+  expect(await file()).toEqual({ ...EXPORT, challenges: CHALLENGES, tower, tower_echoes: ECHOES });
   expect(await page.evaluate(() => localStorage.getItem("baylee-central-session"))).not.toBeNull();
   await sound(page);
 });

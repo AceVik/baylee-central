@@ -558,18 +558,44 @@ enum Deletion {
 /// the export alone, and the page says that the address is not in it.
 fn export_view(lang: Lang, worker: String) -> impl IntoView {
     let export = RwSignal::new(None::<Result<String, Problem>>);
+    let busy = RwSignal::new(false);
+    let generation = RwSignal::new(0_u64);
     let without_email = RwSignal::new(false);
     let picture = RwSignal::new(None::<central_api::picture::PictureKey>);
     let needs_reauth = RwSignal::new(false);
+    session::on_change(move || {
+        generation.update(|value| *value = value.wrapping_add(1));
+        export.set(None);
+        picture.set(None);
+        without_email.set(false);
+        needs_reauth.set(false);
+        busy.set(false);
+    });
     let run_export = move || {
+        if busy.get_untracked() {
+            return;
+        }
+        let Some(stamp) = session::marker() else {
+            needs_reauth.set(true);
+            return;
+        };
+        let started = generation.get_untracked();
+        export.set(None);
+        busy.set(true);
         leptos::task::spawn_local(async move {
-            match call(&Request::AccountExport).await {
+            let result = call(&Request::AccountExport).await;
+            if generation.get_untracked() != started {
+                return;
+            }
+            if session::marker().as_ref() != Some(&stamp) {
+                busy.set(false);
+                return;
+            }
+            match result {
                 Ok(Response::AccountExport { export: data }) => {
                     // asked once the export answered: a refusal here is not the export's
                     let email = super::email::for_export().await;
                     let (held, filed) = super::picture::for_export().await;
-                    without_email.set(email.is_none());
-                    picture.set(held.as_ref().map(|p| p.key));
                     let file = super::email::export_file(&data, email.as_ref()).and_then(|file| {
                         super::picture::merged(&file, held.as_ref(), filed.as_deref())
                     });
@@ -577,18 +603,29 @@ fn export_view(lang: Lang, worker: String) -> impl IntoView {
                         Some(file) => super::challenges::export::merged(&file).await.ok(),
                         None => None,
                     };
+                    if generation.get_untracked() != started {
+                        return;
+                    }
+                    if session::marker().as_ref() != Some(&stamp) {
+                        busy.set(false);
+                        return;
+                    }
+                    without_email.set(email.is_none());
+                    picture.set(held.as_ref().map(|p| p.key));
                     export.set(Some(file.ok_or(Problem::Failed)));
                 }
                 Ok(_) => export.set(Some(Err(Problem::Failed))),
                 Err(Failure::Rejected) => needs_reauth.set(true),
                 Err(failure) => export.set(Some(Err(failure.into()))),
             }
+            busy.set(false);
         });
     };
     view! {
         <section class="card" aria-labelledby="export-title">
             <h2 id="export-title">{words::privacy_export_title(lang)}</h2>
             <p>{words::privacy_export_lead(lang)}</p>
+            <span class="meta" role="status">{move || busy.get().then(||words::account_loading(lang))}</span>
             {move || match export.get() {
                 Some(Ok(json)) => {
                     super::focus::when_shown("#export-save");
@@ -603,9 +640,11 @@ fn export_view(lang: Lang, worker: String) -> impl IntoView {
                 }
                 Some(Err(problem)) => {
                     super::focus::when_shown("#export-error");
-                    view! { <p class="error" id="export-error" role="alert" tabindex="-1">{problem_text(lang, problem)}</p> }.into_any()
+                    view! { <p class="error" id="export-error" role="alert" tabindex="-1">{problem_text(lang, problem)}</p>
+                        <button type="button" class="button" on:click=move |_| run_export()>{words::privacy_export_make(lang)}</button>
+                    }.into_any()
                 }
-                None => view! { <button type="button" class="button" on:click=move |_| run_export()>{words::privacy_export_make(lang)}</button> }.into_any(),
+                None => view! { <button type="button" class="button" disabled=move || busy.get() on:click=move |_| run_export()>{words::privacy_export_make(lang)}</button> }.into_any(),
             }}
             <Show when=move || needs_reauth.get()>
                 {reauth(lang, worker.clone(), Callback::new(move |()| { needs_reauth.set(false); run_export(); }))}
