@@ -744,17 +744,11 @@ fn dev_crypto(root: &Path, target: &Path, endpoint: &str) -> Result<(Vec<u8>, Ve
 
 fn loopback_dev_origin(value: &str) -> Option<String> {
     let rest = value.strip_prefix("http://")?;
-    let (host, port_str) = rest.rsplit_once(':')?;
-    let host_clean = host.trim_matches(['[', ']']);
-    let ip: std::net::IpAddr = host_clean.parse().ok()?;
-    let port: u16 = port_str.parse().ok()?;
-    if !ip.is_loopback() || port == 0 {
+    let address: std::net::SocketAddr = rest.parse().ok()?;
+    if !address.ip().is_loopback() || address.port() == 0 {
         return None;
     }
-    Some(match ip {
-        std::net::IpAddr::V4(v4) => format!("http://{v4}:{port}"),
-        std::net::IpAddr::V6(v6) => format!("http://[{v6}]:{port}"),
-    })
+    Some(format!("http://{address}"))
 }
 
 /// Brotli and gzip copies of the text files, where the tools exist; a
@@ -1153,6 +1147,14 @@ mod tests {
             "http://127.0.0.1:0",
             "http://127.0.0.1:28790/",
             "http://127.0.0.1:28790/v1",
+            "http://[[::1]]:28790",
+            "http://::1:28790",
+            "http://[127.0.0.1]:28790",
+            "http://127.0.0.1:28790?host=example.com",
+            "http://127.0.0.1:28790#fragment",
+            "http://user@127.0.0.1:28790",
+            "http://127.0.0.1:65536",
+            "http://[::ffff:127.0.0.1]:28790",
         ] {
             assert_eq!(super::loopback_dev_origin(bad), None, "{bad}");
         }
