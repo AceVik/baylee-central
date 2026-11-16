@@ -15,6 +15,12 @@ crate-type = ["cdylib", "rlib"]
 [lints]
 workspace = true
 
+[features]
+# Explicit local numeric-loopback development override for `cargo xtask site`
+# when `BAYLEE_CENTRAL_DEV_ENDPOINT` is set; never enabled in `cargo xtask wasm`
+# or committed production artifacts.
+dev-endpoint = []
+
 [dependencies]
 central-client = { path = "../central-client", version = "=0.1.0" }
 central-api = { path = "../central-api", version = "=0.1.0" }

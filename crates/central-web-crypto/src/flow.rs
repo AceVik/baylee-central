@@ -33,10 +33,33 @@ const _: () = assert!(
 /// accepts it, so the account lists the official gateway.
 pub const DOCUMENT: &[u8] = br#"{"version":1,"gateways":["https://baylee.acevik.de"],"preferences":{},"legacy":null,"chat":{"devices":[],"installations":[]}}"#;
 
-/// The Central every step is bound to: the live one, compiled in.
+/// The Central every step is bound to: the live one in production, or the
+/// validated numeric-loopback development endpoint when built with
+/// `dev-endpoint`.
 #[must_use]
 pub fn endpoint() -> Endpoint {
-    Endpoint::live()
+    #[cfg(feature = "dev-endpoint")]
+    {
+        return Endpoint::development(env!("BAYLEE_CENTRAL_DEV_ENDPOINT"))
+            .expect("valid loopback development Central endpoint");
+    }
+    #[cfg(not(feature = "dev-endpoint"))]
+    {
+        Endpoint::live()
+    }
+}
+
+fn initial_document() -> Vec<u8> {
+    #[cfg(feature = "dev-endpoint")]
+    if let Some(gateway) = option_env!("BAYLEE_CENTRAL_DEV_GATEWAY") {
+        let ep = Endpoint::development(gateway).expect("valid loopback development gateway origin");
+        return format!(
+            r#"{{"version":1,"gateways":["{}"],"preferences":{{}},"legacy":null,"chat":{{"devices":[],"installations":[]}}}}"#,
+            ep.origin()
+        )
+        .into_bytes();
+    }
+    DOCUMENT.to_vec()
 }
 
 fn context(account: &[u8], epoch: u64) -> Result<([u8; 16], Context), CryptoError> {
@@ -108,7 +131,8 @@ pub fn enrollment_finish(state: Registering, response: &[u8]) -> Result<Register
     let wrapped_master = result.wrapping_key.wrap(&master)?;
     let code = RecoveryCode::generate()?;
     let recovery = code.wrap(context, &master)?;
-    let document = master.seal_object(ObjectContext::new(context, account, 1)?, DOCUMENT)?;
+    let initial = initial_document();
+    let document = master.seal_object(ObjectContext::new(context, account, 1)?, &initial)?;
     Ok(Registered {
         record: result.upload,
         wrapped_master,
