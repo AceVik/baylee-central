@@ -36,12 +36,19 @@ pub const DOCUMENT: &[u8] = br#"{"version":1,"gateways":["https://baylee.acevik.
 /// The Central every step is bound to: the live one in production, or the
 /// validated numeric-loopback development endpoint when built with
 /// `dev-endpoint`.
+/// # Panics
+/// An invalid compile-time development origin is a broken build configuration.
+/// The site builder validates it before compiling the development artifact.
 #[must_use]
 pub fn endpoint() -> Endpoint {
     #[cfg(feature = "dev-endpoint")]
     {
-        return Endpoint::development(env!("BAYLEE_CENTRAL_DEV_ENDPOINT"))
-            .expect("valid loopback development Central endpoint");
+        // Feature-matrix checks also build this crate without a site endpoint.
+        // Keep that artifact on an unusable loopback endpoint, never live.
+        Endpoint::development(
+            option_env!("BAYLEE_CENTRAL_DEV_ENDPOINT").unwrap_or("http://127.0.0.1:9"),
+        )
+        .expect("valid loopback development Central endpoint")
     }
     #[cfg(not(feature = "dev-endpoint"))]
     {
@@ -49,7 +56,7 @@ pub fn endpoint() -> Endpoint {
     }
 }
 
-fn initial_document() -> Vec<u8> {
+fn initial_document() -> std::borrow::Cow<'static, [u8]> {
     #[cfg(feature = "dev-endpoint")]
     if let Some(gateway) = option_env!("BAYLEE_CENTRAL_DEV_GATEWAY") {
         let ep = Endpoint::development(gateway).expect("valid loopback development gateway origin");
@@ -57,9 +64,9 @@ fn initial_document() -> Vec<u8> {
             r#"{{"version":1,"gateways":["{}"],"preferences":{{}},"legacy":null,"chat":{{"devices":[],"installations":[]}}}}"#,
             ep.origin()
         )
-        .into_bytes();
+        .into_bytes().into();
     }
-    DOCUMENT.to_vec()
+    std::borrow::Cow::Borrowed(DOCUMENT)
 }
 
 fn context(account: &[u8], epoch: u64) -> Result<([u8; 16], Context), CryptoError> {

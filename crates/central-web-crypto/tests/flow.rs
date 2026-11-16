@@ -3,7 +3,7 @@
 //! fixed Argon2 profile: what the WebAssembly exports do, driven on the host.
 #![forbid(unsafe_code)]
 
-use central_api::{Endpoint, LEGACY_ORIGIN, LIVE_ORIGIN};
+use central_api::{Endpoint, LEGACY_ORIGIN};
 use central_crypto::{
     Context, CryptoError,
     opaque::{Enrollment, Login, server::ServerKeys},
@@ -20,7 +20,7 @@ const ACCOUNT: [u8; 16] = [
 const PASSWORD: &str = "synthetic test-only password";
 
 fn context(epoch: u64) -> Context {
-    Context::new(Endpoint::live().issuer(), ACCOUNT, epoch).unwrap()
+    Context::new(flow::endpoint().issuer(), ACCOUNT, epoch).unwrap()
 }
 
 /// Registers `ACCOUNT` at `epoch`; the server's record and what the browser sent.
@@ -49,10 +49,26 @@ fn the_document_is_the_designs_bytes_and_names_the_official_gateway() {
 }
 
 #[test]
+#[cfg(not(feature = "dev-endpoint"))]
 fn every_step_is_bound_to_the_live_central() {
     let endpoint = flow::endpoint();
-    assert_eq!(endpoint.origin(), LIVE_ORIGIN);
+    assert_eq!(endpoint.origin(), central_api::LIVE_ORIGIN);
     assert_eq!(endpoint.issuer(), Endpoint::live().issuer());
+}
+
+#[test]
+#[cfg(feature = "dev-endpoint")]
+fn development_steps_are_bound_to_loopback_and_never_the_live_issuer() {
+    let endpoint = flow::endpoint();
+    assert_ne!(endpoint.issuer(), Endpoint::live().issuer());
+    let socket: std::net::SocketAddr = endpoint
+        .origin()
+        .strip_prefix("http://")
+        .unwrap()
+        .parse()
+        .unwrap();
+    assert!(socket.ip().is_loopback());
+    assert_ne!(socket.port(), 0);
 }
 
 #[test]

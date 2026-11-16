@@ -32,7 +32,7 @@ const SECOND: &str = "synthetic second password";
 const THIRD: &str = "synthetic third password";
 
 fn context(epoch: u64) -> Context {
-    Context::new(Endpoint::live().issuer(), ACCOUNT, epoch).unwrap()
+    Context::new(flow::endpoint().issuer(), ACCOUNT, epoch).unwrap()
 }
 
 /// What Central stores of the one account.
@@ -74,7 +74,7 @@ impl Central {
         let response = keys.enrollment_response(context(1), &request).unwrap();
         let registered = enrollment_finish(state, &response).unwrap();
         let central = Self {
-            endpoint: Endpoint::live(),
+            endpoint: flow::endpoint(),
             stored: RefCell::new(Stored {
                 epoch: 1,
                 record: ServerKeys::enrollment_record(&registered.record).unwrap(),
