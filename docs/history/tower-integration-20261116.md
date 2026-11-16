@@ -20,3 +20,6 @@ pinned Docker runner could not start because Docker's overlay filesystem is
 read-only. No container was created and no unrelated container was changed.
 Production WASM reproducibility remains unverified for this milestone; do not
 mark the PR ready or claim the full Central gates passed on this evidence.
+The final recheck on 16 November reproduced the same Docker overlay error
+(`/tmp/central-tower-wasm-recheck-20261116.log`, exit 125). The exact named
+container was absent afterward; no service or container was left running.
