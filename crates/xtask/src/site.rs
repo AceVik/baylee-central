@@ -112,7 +112,7 @@ pub(crate) fn run(root: &Path) -> Result<()> {
         site.add(name, &bytes)?;
     }
     islands(root, &target, &mut site)?;
-    crypto(root, &mut site)?;
+    crypto(root, &target, &mut site)?;
     let mut css = String::new();
     for name in STYLES {
         css.push_str(&lean_css(
@@ -614,26 +614,20 @@ fn module(
     Ok((module, glue))
 }
 
-/// The committed browser crypto (`crates/central-web/crypto`, which `wasm
-/// --check` proves to be what the source builds), checked against its
-/// `SHA256SUMS`, and the Worker that loads it.
-fn crypto(root: &Path, site: &mut Site) -> Result<()> {
-    let dir = root.join(wasm::OUTPUT);
-    let sums =
-        fs::read_to_string(dir.join(wasm::SUMS)).or_fail("the crypto's SHA256SUMS is missing")?;
-    let read = |name: &str| -> Result<Vec<u8>> {
-        let bytes = fs::read(dir.join(name)).or_fail("a crypto file is missing")?;
-        let want = sums
-            .lines()
-            .find_map(|line| line.strip_suffix(name).map(str::trim))
-            .or_fail("SHA256SUMS does not name a crypto file")?;
-        if random::to_hex(&Sha256::digest(&bytes)) != want {
-            return Err(Fail::new(format!("{name} does not match SHA256SUMS")));
+/// The browser crypto (`crates/central-web/crypto`, checked against its
+/// `SHA256SUMS` in production, or built with `--features dev-endpoint` when
+/// `BAYLEE_CENTRAL_DEV_ENDPOINT` names a strict loopback HTTP origin), and
+/// the Worker that loads it.
+fn crypto(root: &Path, target: &Path, site: &mut Site) -> Result<()> {
+    let (glue, module) = match std::env::var_os("BAYLEE_CENTRAL_DEV_ENDPOINT") {
+        Some(raw) => {
+            let endpoint = raw
+                .to_str()
+                .ok_or_else(|| Fail::new("BAYLEE_CENTRAL_DEV_ENDPOINT must be valid UTF-8"))?;
+            dev_crypto(root, target, endpoint)?
         }
-        Ok(bytes)
+        None => committed_crypto(root)?,
     };
-    let glue = read("central_web_crypto.js")?;
-    let module = read("central_web_crypto_bg.wasm")?;
     let glue_url = site.add("crypto-glue.js", &glue)?;
     let module_url = site.add("crypto.wasm", &module)?;
     let template = fs::read_to_string(root.join(WEB).join("js/crypto-worker.js"))
@@ -649,6 +643,118 @@ fn crypto(root: &Path, site: &mut Site) -> Result<()> {
     }
     site.add("crypto-worker.js", worker.as_bytes())?;
     Ok(())
+}
+
+fn committed_crypto(root: &Path) -> Result<(Vec<u8>, Vec<u8>)> {
+    let dir = root.join(wasm::OUTPUT);
+    let sums =
+        fs::read_to_string(dir.join(wasm::SUMS)).or_fail("the crypto's SHA256SUMS is missing")?;
+    let read = |name: &str| -> Result<Vec<u8>> {
+        let bytes = fs::read(dir.join(name)).or_fail("a crypto file is missing")?;
+        let want = sums
+            .lines()
+            .find_map(|line| line.strip_suffix(name).map(str::trim))
+            .or_fail("SHA256SUMS does not name a crypto file")?;
+        if random::to_hex(&Sha256::digest(&bytes)) != want {
+            return Err(Fail::new(format!("{name} does not match SHA256SUMS")));
+        }
+        Ok(bytes)
+    };
+    Ok((
+        read("central_web_crypto.js")?,
+        read("central_web_crypto_bg.wasm")?,
+    ))
+}
+
+fn dev_crypto(root: &Path, target: &Path, endpoint: &str) -> Result<(Vec<u8>, Vec<u8>)> {
+    let endpoint = loopback_dev_origin(endpoint)
+        .ok_or_else(|| Fail::new("BAYLEE_CENTRAL_DEV_ENDPOINT must be http://<loopback>:<port>"))?;
+    let gateway = match std::env::var_os("BAYLEE_CENTRAL_DEV_GATEWAY") {
+        Some(raw) => {
+            let text = raw
+                .to_str()
+                .ok_or_else(|| Fail::new("BAYLEE_CENTRAL_DEV_GATEWAY must be valid UTF-8"))?;
+            Some(loopback_dev_origin(text).ok_or_else(|| {
+                Fail::new("BAYLEE_CENTRAL_DEV_GATEWAY must be http://<loopback>:<port>")
+            })?)
+        }
+        None => None,
+    };
+    let bindgen = wasm::cli(target)?;
+    let home = wasm::cargo_home()?;
+    let mut cargo_cmd = Command::new(workspace::cargo());
+    cargo_cmd
+        .args([
+            "build",
+            "--locked",
+            "-p",
+            "central-web-crypto",
+            "--target",
+            TARGET,
+            "--profile",
+            "wasm",
+            "--features",
+            "dev-endpoint",
+        ])
+        .env("CARGO_ENCODED_RUSTFLAGS", wasm::remap_flags(root, &home))
+        .env("BAYLEE_CENTRAL_DEV_ENDPOINT", &endpoint)
+        .current_dir(root);
+    if let Some(gw) = &gateway {
+        cargo_cmd.env("BAYLEE_CENTRAL_DEV_GATEWAY", gw);
+    } else {
+        cargo_cmd.env_remove("BAYLEE_CENTRAL_DEV_GATEWAY");
+    }
+    process::succeed(
+        &mut cargo_cmd,
+        "the development crypto WebAssembly build failed",
+    )?;
+
+    let built = target
+        .join(TARGET)
+        .join("wasm")
+        .join("central_web_crypto.wasm");
+    let glue_dir = target.join("site-bindgen").join("dev-crypto");
+    if glue_dir.exists() {
+        fs::remove_dir_all(&glue_dir).or_fail("the dev-crypto glue folder could not be cleared")?;
+    }
+    process::succeed(
+        Command::new(bindgen)
+            .args([
+                "--target",
+                "web",
+                "--remove-name-section",
+                "--remove-producers-section",
+                "--out-dir",
+            ])
+            .arg(&glue_dir)
+            .arg(&built),
+        "wasm-bindgen failed for development crypto",
+    )?;
+    let module = fs::read(glue_dir.join("central_web_crypto_bg.wasm"))
+        .or_fail("the development crypto module is missing")?;
+    for local in [root, &home] {
+        if wasm::contains(&module, local.to_string_lossy().as_bytes()) {
+            return Err(Fail::new("development crypto.wasm names a local path"));
+        }
+    }
+    let glue = fs::read(glue_dir.join("central_web_crypto.js"))
+        .or_fail("the development crypto glue is missing")?;
+    Ok((glue, module))
+}
+
+fn loopback_dev_origin(value: &str) -> Option<String> {
+    let rest = value.strip_prefix("http://")?;
+    let (host, port_str) = rest.rsplit_once(':')?;
+    let host_clean = host.trim_matches(['[', ']']);
+    let ip: std::net::IpAddr = host_clean.parse().ok()?;
+    let port: u16 = port_str.parse().ok()?;
+    if !ip.is_loopback() || port == 0 {
+        return None;
+    }
+    Some(match ip {
+        std::net::IpAddr::V4(v4) => format!("http://{v4}:{port}"),
+        std::net::IpAddr::V6(v6) => format!("http://[{v6}]:{port}"),
+    })
 }
 
 /// Brotli and gzip copies of the text files, where the tools exist; a
@@ -1025,6 +1131,30 @@ mod tests {
                 "{code}: {same} of {} messages are the English ones",
                 lines.len()
             );
+        }
+    }
+
+    #[test]
+    fn loopback_dev_origin_accepts_only_loopback_http_with_nonzero_port() {
+        assert_eq!(
+            super::loopback_dev_origin("http://127.0.0.1:28790").as_deref(),
+            Some("http://127.0.0.1:28790")
+        );
+        assert_eq!(
+            super::loopback_dev_origin("http://[::1]:28790").as_deref(),
+            Some("http://[::1]:28790")
+        );
+        for bad in [
+            "https://baylee.app",
+            "https://central.baylee.app",
+            "https://127.0.0.1:28790",
+            "http://localhost:28790",
+            "http://192.168.0.53:28790",
+            "http://127.0.0.1:0",
+            "http://127.0.0.1:28790/",
+            "http://127.0.0.1:28790/v1",
+        ] {
+            assert_eq!(super::loopback_dev_origin(bad), None, "{bad}");
         }
     }
 }
