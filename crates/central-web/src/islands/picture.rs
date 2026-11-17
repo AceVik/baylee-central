@@ -1278,11 +1278,18 @@ mod browser {
             }
         }
         let doc = document();
-        if let Ok(links) = doc.query_selector_all("a[data-account-href]") {
-            for index in 0..links.length() {
-                let Some(node) = links.get(index) else {
-                    continue;
-                };
+        // Through `Reflect`, as the clipboard and the early fields are read:
+        // `web-sys`'s `NodeList` is not among the reviewed features
+        // (`docs/dependency-proposal/approved-packages.json`).
+        let links = js_sys::Reflect::get(&doc, &JsValue::from_str("querySelectorAll"))
+            .ok()
+            .and_then(|find| find.dyn_into::<js_sys::Function>().ok())
+            .and_then(|find| {
+                find.call1(&doc, &JsValue::from_str("a[data-account-href]"))
+                    .ok()
+            });
+        if let Some(links) = links {
+            for node in js_sys::Array::from(&links).iter() {
                 let Ok(link) = node.dyn_into::<web_sys::Element>() else {
                     continue;
                 };
