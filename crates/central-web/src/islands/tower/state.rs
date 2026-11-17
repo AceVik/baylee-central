@@ -1,4 +1,5 @@
-use super::{Failure, api, request, session};
+use super::{Failure, api, progress, request, session};
+use crate::islands::medals;
 use leptos::prelude::*;
 
 #[derive(Clone, Copy)]
@@ -8,28 +9,34 @@ pub(super) struct Hub {
     pub active: RwSignal<Option<api::Run>>,
     pub rows: RwSignal<Vec<api::Standing>>,
     pub badges: RwSignal<Vec<api::Badge>>,
+    pub selected: RwSignal<Option<medals::Preview>>,
     pub board: RwSignal<api::Board>,
     pub offset: RwSignal<u32>,
     pub busy: RwSignal<bool>,
+    pub loading: RwSignal<bool>,
     pub error: RwSignal<Option<Failure>>,
     pub signed_in: RwSignal<bool>,
-    stamp: RwSignal<Option<i64>>,
+    in_flight: RwSignal<bool>,
+    stamp: RwSignal<Option<String>>,
     generation: RwSignal<u64>,
 }
 
 impl Hub {
-    pub fn new(season: Option<api::Season>) -> Self {
+    pub fn new(season: Option<api::Season>, standings: Vec<api::Standing>) -> Self {
         Self {
             season: RwSignal::new(season),
             run: RwSignal::new(None),
             active: RwSignal::new(None),
-            rows: RwSignal::new(Vec::new()),
+            rows: RwSignal::new(standings),
             badges: RwSignal::new(Vec::new()),
+            selected: RwSignal::new(None),
             board: RwSignal::new(api::Board::Ascent),
             offset: RwSignal::new(0),
             busy: RwSignal::new(true),
+            loading: RwSignal::new(false),
             error: RwSignal::new(None),
             signed_in: RwSignal::new(false),
+            in_flight: RwSignal::new(false),
             stamp: RwSignal::new(None),
             generation: RwSignal::new(0),
         }
@@ -41,6 +48,7 @@ impl Hub {
         if !self.badges.with_untracked(Vec::is_empty) {
             self.badges.set(Vec::new());
         }
+        self.selected.set(None);
         if self.signed_in.get_untracked() {
             self.signed_in.set(false);
         }
@@ -53,20 +61,30 @@ impl Hub {
         self.clear_private();
         self.stamp.set(None);
         self.busy.set(false);
-        self.refresh();
+        self.loading.set(false);
+        self.in_flight.set(false);
+        self.refresh(false);
     }
 
-    pub fn refresh(self) {
-        if self.busy.get_untracked() {
+    pub fn refresh(self, interactive: bool) {
+        if interactive {
+            if self.busy.get_untracked() {
+                return;
+            }
+            self.generation
+                .update(|generation| *generation = generation.wrapping_add(1));
+            self.busy.set(true);
+            self.loading.set(true);
+        } else if self.busy.get_untracked() || self.in_flight.get_untracked() {
             return;
         }
-        self.busy.set(true);
+        self.in_flight.set(true);
         self.error.set(None);
-        let stamp = session::remembered();
+        let stamp = session::marker();
         let generation = self.generation.get_untracked();
         if self.stamp.get_untracked() != stamp {
             self.clear_private();
-            self.stamp.set(stamp);
+            self.stamp.set(stamp.clone());
         }
         let board = self.board.get_untracked();
         let offset = self.offset.get_untracked();
@@ -80,9 +98,11 @@ impl Hub {
             if self.generation.get_untracked() != generation {
                 return;
             }
-            if session::remembered() != stamp {
+            if session::marker() != stamp {
                 self.clear_private();
                 self.busy.set(false);
+                self.loading.set(false);
+                self.in_flight.set(false);
                 return;
             }
             match response {
@@ -104,9 +124,10 @@ impl Hub {
                     }
                     if changed && offset > 0 {
                         self.offset.set(0);
-                        self.rows.set(Vec::new());
                         self.busy.set(false);
-                        self.refresh();
+                        self.loading.set(false);
+                        self.in_flight.set(false);
+                        self.refresh(interactive);
                         return;
                     }
                     update_rows(self.rows, standings);
@@ -117,6 +138,15 @@ impl Hub {
                         update_run(self.run, run.map(|run| *run));
                         update_run(self.active, active.map(|run| *run));
                         if self.badges.get_untracked() != badges {
+                            self.selected.update(|selected| {
+                                if let Some(preview) = selected
+                                    && let Some(updated) = badges
+                                        .iter()
+                                        .find(|b| progress::motif_of(b.kind) == preview.motif)
+                                {
+                                    preview.count = updated.count;
+                                }
+                            });
                             self.badges.set(badges);
                         }
                     } else {
@@ -127,11 +157,15 @@ impl Hub {
                 Err(error) => {
                     self.error.set(Some(error));
                     if error == Failure::Rejected {
+                        session::forget();
+                        self.stamp.set(None);
                         self.clear_private();
                     }
                 }
             }
             self.busy.set(false);
+            self.loading.set(false);
+            self.in_flight.set(false);
         });
     }
 
@@ -141,8 +175,7 @@ impl Hub {
         }
         self.board.set(board);
         self.offset.set(0);
-        self.rows.set(Vec::new());
-        self.refresh();
+        self.refresh(true);
     }
 
     pub fn page(self, next: bool) {
@@ -155,32 +188,53 @@ impl Hub {
         } else {
             offset.saturating_sub(30)
         });
-        self.refresh();
+        self.refresh(true);
     }
 
-    pub fn visibility(self, run: &api::Run, listed: bool, checked: RwSignal<bool>) {
+    pub fn visibility(self, season: [u8; 16], listed: bool, checked: RwSignal<bool>) {
+        let prior = self
+            .active
+            .with_untracked(|r| {
+                r.as_ref()
+                    .filter(|r| r.season.id == season)
+                    .map(|r| r.listed)
+            })
+            .or_else(|| {
+                self.run.with_untracked(|r| {
+                    r.as_ref()
+                        .filter(|r| r.season.id == season)
+                        .map(|r| r.listed)
+                })
+            })
+            .unwrap_or(!listed);
         if self.busy.get_untracked() {
+            checked.try_set(prior);
             return;
         }
-        let stamp = session::remembered();
+        let stamp = session::marker();
         if stamp.is_none() || self.stamp.get_untracked() != stamp {
+            checked.try_set(prior);
             self.clear_private();
-            self.refresh();
+            self.refresh(false);
             return;
         }
+        self.generation
+            .update(|generation| *generation = generation.wrapping_add(1));
         self.busy.set(true);
+        self.loading.set(true);
+        self.in_flight.set(true);
         self.error.set(None);
-        let season = run.season.id;
-        let prior = run.listed;
         let generation = self.generation.get_untracked();
         leptos::task::spawn_local(async move {
             let response = request(api::Request::Visibility { season, listed }).await;
             if self.generation.get_untracked() != generation {
                 return;
             }
-            if session::remembered() != stamp {
+            if session::marker() != stamp {
                 self.clear_private();
                 self.busy.set(false);
+                self.loading.set(false);
+                self.in_flight.set(false);
                 return;
             }
             match response {
@@ -188,28 +242,37 @@ impl Hub {
                     // The mutation is acknowledged even if the subsequent Read fails.
                     // Rollbacks must use this last confirmed value, never a stale run.
                     for signal in [self.run, self.active] {
-                        if signal.with_untracked(|run| {
-                            run.as_ref().is_some_and(|run| run.season.id == season)
-                        }) {
-                            signal.update(|run| {
-                                if let Some(run) = run {
-                                    run.listed = listed;
-                                }
-                            });
-                        }
+                        signal.update_untracked(|run| {
+                            if let Some(run) = run
+                                && run.season.id == season
+                            {
+                                run.listed = listed;
+                            }
+                        });
                     }
                     self.busy.set(false);
-                    self.refresh();
+                    self.loading.set(false);
+                    self.in_flight.set(false);
+                    self.refresh(false);
                 }
                 Ok(_) => {
                     checked.try_set(prior);
                     self.error.set(Some(Failure::Malformed));
                     self.busy.set(false);
+                    self.loading.set(false);
+                    self.in_flight.set(false);
                 }
                 Err(error) => {
                     checked.try_set(prior);
                     self.error.set(Some(error));
+                    if error == Failure::Rejected {
+                        session::forget();
+                        self.stamp.set(None);
+                        self.clear_private();
+                    }
                     self.busy.set(false);
+                    self.loading.set(false);
+                    self.in_flight.set(false);
                 }
             }
         });
@@ -219,27 +282,10 @@ impl Hub {
 fn update_rows(signal: RwSignal<Vec<api::Standing>>, standings: Vec<api::Standing>) {
     let same = signal.with_untracked(|rows| {
         rows.len() == standings.len()
-            && rows.iter().zip(&standings).all(|(a, b)| {
-                (
-                    a.rank,
-                    &a.name,
-                    a.tag,
-                    a.own,
-                    a.floors,
-                    a.losses,
-                    a.turns,
-                    a.milliseconds,
-                ) == (
-                    b.rank,
-                    &b.name,
-                    b.tag,
-                    b.own,
-                    b.floors,
-                    b.losses,
-                    b.turns,
-                    b.milliseconds,
-                )
-            })
+            && rows
+                .iter()
+                .zip(&standings)
+                .all(|(a, b)| crate::data::standing_eq(a, b))
     });
     if !same {
         signal.set(standings);

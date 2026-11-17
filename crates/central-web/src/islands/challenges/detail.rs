@@ -1,10 +1,12 @@
-use super::{Hub, Lang, api, kind, play_link, text, words};
+use super::{
+    Hub, Lang, api, kind, play_link, standing_duration, standing_handle, words, words_text,
+};
 use leptos::prelude::*;
 
 pub(super) fn view(lang: Lang, hub: Hub, task: &api::Challenge) -> impl IntoView + use<> {
     let id = task.id;
-    let title = text(lang, &task.description.title);
-    let instructions = text(lang, &task.description.instructions);
+    let title = words_text(lang, &task.description.title);
+    let instructions = words_text(lang, &task.description.instructions);
     let end = super::super::account::when(lang, task.description.period.ends_at);
     let cadence = kind(lang, task.description.period.kind);
     let withdrawn = task.withdrawn;
@@ -22,7 +24,7 @@ pub(super) fn view(lang: Lang, hub: Hub, task: &api::Challenge) -> impl IntoView
                 <div><dt>{words::ch_estimated(lang)}</dt><dd class="num">{format!("{minutes} min")}</dd></div>
                 <div><dt>{words::ch_target(lang)}</dt><dd class="num">{target}</dd></div>
             </dl>
-            {(!withdrawn).then(|| view! { <a class="button primary" href=play_link(id)>{words::ch_play(lang)}</a> })}
+            {(!withdrawn).then(|| view! { <a class="button" href=play_link(id)>{words::ch_play(lang)}</a> })}
             <p class="small">{words::ch_play_help(lang)}" "<a href=format!("/{}/download",lang.code())>{words::nav_download(lang)}</a></p>
             <details><summary>{words::ch_deck(lang)}</summary><pre class="challenge-deck" translate="no">{deck}</pre></details>
             {personal(lang, hub, id, withdrawn)}
@@ -36,9 +38,9 @@ fn personal(lang: Lang, hub: Hub, id: [u8; 16], withdrawn: bool) -> impl IntoVie
         <section class="challenge-personal" aria-label=words::ch_progress(lang)>
             <h3>{words::ch_progress(lang)}</h3>
             <dl class="challenge-stats">
-                <div><dt>{words::ch_attempts(lang)}</dt><dd class="num">{own.starts}</dd></div>
-                <div><dt>{words::ch_failures(lang)}</dt><dd class="num">{own.failures}</dd></div>
-                <div><dt>{words::ch_best_turns(lang)}</dt><dd class="num">{own.best_turn.map_or_else(|| "—".into(), |n| n.to_string())}</dd></div>
+                <div><dt>{words::ch_attempts(lang)}</dt><dd class="num">{words::number(lang, u64::from(own.starts))}</dd></div>
+                <div><dt>{words::ch_failures(lang)}</dt><dd class="num">{words::number(lang, u64::from(own.failures))}</dd></div>
+                <div><dt>{words::ch_best_turns(lang)}</dt><dd class="num">{own.best_turn.map_or_else(|| "—".into(), |n| words::number(lang, u64::from(n)))}</dd></div>
             </dl>
             {own.completed_at.is_some().then(|| view! { <p class="meta">{words::ch_completed(lang)}</p> })}
             { (own.hint_level > 0).then(|| view! { <p class="meta">{words::ch_assisted(lang)}</p> }) }
@@ -57,7 +59,7 @@ fn personal(lang: Lang, hub: Hub, id: [u8; 16], withdrawn: bool) -> impl IntoVie
                     <button type="button" class="button button-ghost" on:click=move |_| hub.confirm_hint.set(None)>{words::picture_cancel(lang)}</button>
                 </div>
             })}
-            {move || hub.hint.get().map(|hint| view! { <p class="challenge-hint" role="status">{text(lang,&hint)}</p> })}
+            {move || hub.hint.get().map(|hint| view! { <p class="challenge-hint" role="status">{words_text(lang,&hint)}</p> })}
         </section>
     })} }
 }
@@ -86,26 +88,26 @@ fn rankings(lang: Lang, hub: Hub, task: &api::Challenge) -> impl IntoView + use<
             </div>
             {move || hub.rows.get().map(|rows| if rows.is_empty() {
                 view! { <p class="empty-state">{words::ch_no_scores(lang)}</p> }.into_any()
-            } else { table(lang,rows).into_any() })}
+            } else { table(lang, hub, rows).into_any() })}
             <div class="challenge-actions">
                 <button type="button" class="button button-ghost" disabled=move || hub.busy.get() || hub.offset.get()==0
-                    on:click=move |_| hub.open(previous.clone(),hub.board.get_untracked(),hub.offset.get_untracked().saturating_sub(30))>{words::admin_back(lang)}</button>
+                    on:click=move |_| hub.open(previous.clone(),hub.board.get_untracked(),hub.offset.get_untracked().saturating_sub(30))>{words::shots_previous(lang)}</button>
                 <button type="button" class="button button-ghost" disabled=move || { hub.busy.get() || hub.rows.with(|r| r.as_ref().is_none_or(|r| r.len()<30)) || hub.offset.get()>=3000 }
-                    on:click=move |_| hub.open(next.clone(),hub.board.get_untracked(),hub.offset.get_untracked()+30)>{words::ch_more(lang)}</button>
+                    on:click=move |_| hub.open(next.clone(),hub.board.get_untracked(),hub.offset.get_untracked()+30)>{words::shots_next(lang)}</button>
             </div>
         </section>
     }
 }
 
-fn table(lang: Lang, rows: Vec<api::Standing>) -> impl IntoView {
-    view! { <div class="challenge-table" tabindex="0" role="group" aria-label=words::ch_rankings(lang)><table>
+fn table(lang: Lang, hub: Hub, rows: Vec<api::Standing>) -> impl IntoView {
+    view! { <div class="challenge-table" tabindex="0" role="group" aria-label=words::ch_rankings(lang) aria-busy=move || hub.is_loading().then_some("true")><table>
         <thead><tr><th scope="col">{words::ch_rank(lang)}</th><th scope="col">{words::ch_player(lang)}</th>
             <th scope="col">{words::ch_failures(lang)}</th><th scope="col">{words::ch_turn(lang)}</th><th scope="col">{words::ch_time(lang)}</th></tr></thead>
         <tbody>{rows.into_iter().map(|row| {
-            let name = row.tag.map_or_else(|| row.name.clone(), |tag| central_api::profile::handle(&row.name,tag));
-            let time = row.milliseconds.map_or_else(|| "—".into(), |ms| format!("{}:{:02}.{:03}",ms/60000,ms/1000%60,ms%1000));
-            view! { <tr class:challenge-own=row.own><td class="num">{row.rank}</td><th scope="row"><bdi translate="no">{name}</bdi></th>
-                <td class="num">{row.failures}</td><td class="num">{row.turn}</td><td class="num">{time}</td></tr> }
+            let name = standing_handle(&row.name, row.tag);
+            let time = standing_duration(row.milliseconds);
+            view! { <tr class:challenge-own=row.own><td class="num">{words::number(lang, u64::from(row.rank))}</td><th scope="row"><bdi translate="no">{name}</bdi></th>
+                <td class="num">{words::number(lang, u64::from(row.failures))}</td><td class="num">{words::number(lang, u64::from(row.turn))}</td><td class="num">{time}</td></tr> }
         }).collect_view()}</tbody>
     </table></div> }
 }

@@ -22,7 +22,6 @@ use central_api::wire::{Request, Response};
 use leptos::prelude::*;
 
 use super::account::when;
-use super::auth::{Problem, problem_text};
 use super::central::{Failure, call};
 use crate::words::{self, Lang};
 
@@ -55,14 +54,19 @@ pub fn sequence_url(key: &PictureKey) -> String {
 /// One that `moving` plays its sequence, unless the person asked their
 /// system for less motion: then its still, the first frame, stands.
 pub fn face(key: &PictureKey, moving: bool, alt: String) -> impl IntoView + use<> {
+    face_view(key, moving, alt, true)
+}
+
+fn face_view(key: &PictureKey, moving: bool, alt: String, lazy: bool) -> impl IntoView + use<> {
     let sequence = moving.then(|| {
         view! { <source type="image/avif" media="(prefers-reduced-motion: no-preference)" srcset=sequence_url(key) /> }
     });
+    let loading = lazy.then_some("lazy");
     view! {
         <picture class="face">
             {sequence}
             <source type="image/avif" srcset=url(key, true) />
-            <img src=url(key, false) alt=alt loading="lazy" decoding="async" width="256" height="256" />
+            <img src=url(key, false) alt=alt loading=loading decoding="async" width="256" height="256" />
         </picture>
     }
 }
@@ -467,7 +471,7 @@ struct Own {
     block: Option<UploadBlock>,
 }
 
-async fn mine() -> Result<Own, Problem> {
+async fn mine() -> Result<Own, Trouble> {
     match call(&Request::Picture {
         request: PictureRequest::Mine,
     })
@@ -482,8 +486,9 @@ async fn mine() -> Result<Own, Problem> {
             notice,
             block,
         }),
-        Ok(_) => Err(Problem::Failed),
-        Err(failure) => Err(failure.into()),
+        Err(Failure::Rejected) => Err(Trouble::SignedOut),
+        Err(Failure::Busy) => Err(Trouble::Busy),
+        Ok(_) | Err(_) => Err(Trouble::Failed),
     }
 }
 
@@ -541,7 +546,10 @@ pub fn reason_text(lang: Lang, reason: PictureReason) -> &'static str {
     }
 }
 
-fn notice_view(lang: Lang, own: &Own) -> impl IntoView + use<> {
+fn notice_view(lang: Lang, own: &Own) -> Option<impl IntoView + use<>> {
+    if own.notice.is_none() && own.block.is_none() {
+        return None;
+    }
     let notice = own.notice.clone().map(|notice| {
         let note = notice.note.clone().map(|note| view! { <p translate="no">{note}</p> });
         let contact = format!("/{}/contact", lang.code());
@@ -559,7 +567,7 @@ fn notice_view(lang: Lang, own: &Own) -> impl IntoView + use<> {
             view! { <p id="picture-block">{words::picture_blocked_lifted(lang)}</p> }.into_any()
         }
     });
-    view! { <div class="picture-notice" role="note">{notice}{block}</div> }
+    Some(view! { <div class="picture-notice" role="note">{notice}{block}</div> })
 }
 
 /// What the card shows below the current picture.
@@ -587,8 +595,9 @@ pub enum Sending {
 #[derive(Clone, Copy)]
 struct Card {
     lang: Lang,
-    own: RwSignal<Option<Result<Own, Problem>>>,
+    own: RwSignal<Option<Result<Own, Trouble>>>,
     step: RwSignal<Step>,
+    busy: RwSignal<bool>,
     crop: RwSignal<Crop>,
     trouble: RwSignal<Option<Trouble>>,
     said: RwSignal<Option<&'static str>>,
@@ -596,30 +605,54 @@ struct Card {
     /// The last saved animation was kept as its still.
     kept_still: RwSignal<bool>,
     dragging: StoredValue<Option<(f64, f64, Crop)>>,
+    generation: RwSignal<u64>,
 }
 
 impl Card {
     fn reload(self) {
+        self.generation
+            .update(|value| *value = value.wrapping_add(1));
+        let started = self.generation.get_untracked();
+        let Some(stamp) = super::session::marker() else {
+            browser::remember(None);
+            self.own.set(Some(Err(Trouble::SignedOut)));
+            return;
+        };
         leptos::task::spawn_local(async move {
             let own = mine().await;
-            if let Ok(own) = &own {
-                browser::remember(own.picture.as_ref());
+            if self.generation.get_untracked() != started {
+                return;
+            }
+            if super::session::marker().as_deref() != Some(stamp.as_str()) {
+                return;
+            }
+            match &own {
+                Ok(own) => browser::remember(own.picture.as_ref()),
+                Err(Trouble::SignedOut) => {
+                    super::session::forget();
+                    browser::remember(None);
+                }
+                Err(_) => {}
             }
             self.own.set(Some(own));
         });
     }
 
     fn choose(self) {
+        let prior = self.step.get_untracked();
         self.trouble.set(None);
         self.said.set(None);
         self.step.set(Step::Opening);
         leptos::task::spawn_local(async move {
             match browser::open().await {
-                Ok((width, height, sending)) => {
+                Ok(Some((width, height, sending))) => {
                     self.crop.set(Crop::new(width, height));
                     self.sending.set(sending);
                     self.step.set(Step::Editing);
                     super::focus::after_render("#picture-preview");
+                }
+                Ok(None) => {
+                    self.step.set(prior);
                 }
                 Err(problem) => {
                     self.trouble.set(Some(problem));
@@ -630,10 +663,11 @@ impl Card {
     }
 
     fn save(self) {
-        if self.step.get_untracked() == Step::Saving {
+        if self.step.get_untracked() == Step::Saving || self.busy.get_untracked() {
             return;
         }
         self.step.set(Step::Saving);
+        self.busy.set(true);
         self.trouble.set(None);
         self.kept_still.set(false);
         let moving = self.sending.get_untracked() == Sending::Moving;
@@ -652,26 +686,40 @@ impl Card {
                     self.step.set(Step::Idle);
                 }
                 Err(problem) => {
+                    if problem == Trouble::SignedOut {
+                        super::session::forget();
+                        browser::remember(None);
+                    }
                     self.trouble.set(Some(problem));
                     self.step.set(Step::Editing);
                 }
             }
+            self.busy.set(false);
         });
     }
 
     fn remove(self) {
+        if self.busy.get_untracked() {
+            return;
+        }
+        self.busy.set(true);
         leptos::task::spawn_local(async move {
             let done = call(&Request::Picture {
                 request: PictureRequest::Remove,
             })
             .await;
+            self.busy.set(false);
             self.step.set(Step::Idle);
             match done {
                 Ok(_) => {
                     self.said.set(Some(words::picture_removed(self.lang)));
                     self.reload();
                 }
-                Err(Failure::Rejected) => self.trouble.set(Some(Trouble::SignedOut)),
+                Err(Failure::Rejected) => {
+                    super::session::forget();
+                    browser::remember(None);
+                    self.trouble.set(Some(Trouble::SignedOut));
+                }
                 Err(_) => self.trouble.set(Some(Trouble::Failed)),
             }
         });
@@ -717,15 +765,28 @@ impl Card {
     fn current(self) -> AnyView {
         let (lang, step) = (self.lang, self.step);
         match self.own.get() {
-            None => view! { <p class="meta" role="status">{words::account_loading(lang)}</p> }
-                .into_any(),
+            None => {
+                let placeholder = if browser::has_remembered_key() {
+                    view! { <div class="picture-current" aria-hidden="true">{""}</div> }.into_any()
+                } else {
+                    view! { <p class="meta" role="status">{words::account_loading(lang)}</p> }
+                        .into_any()
+                };
+                view! {
+                    {placeholder}
+                    <div class="actions">
+                        <span class="button" aria-disabled="true">{words::picture_choose(lang)}</span>
+                    </div>
+                }
+                .into_any()
+            }
             Some(Err(problem)) => {
-                view! { <p class="error" role="alert">{problem_text(lang, problem)}</p> }.into_any()
+                view! { <p class="error" role="alert">{trouble_text(lang, problem)}</p> }.into_any()
             }
             Some(Ok(own)) => {
                 let shown = own.picture.as_ref().map_or_else(
                     || view! { <p id="picture-none">{words::picture_none(lang)}</p> }.into_any(),
-                    |picture| view! { <div class="picture-current">{face(&picture.key, picture.sequence_bytes.is_some(), words::picture_current(lang).to_owned())}</div> }.into_any(),
+                    |picture| view! { <div class="picture-current">{face_view(&picture.key, picture.sequence_bytes.is_some(), words::picture_current(lang).to_owned(), false)}</div> }.into_any(),
                 );
                 let can_remove = own.picture.is_some();
                 let blocked = own.block.is_some();
@@ -736,8 +797,8 @@ impl Card {
                     </Show>
                     {notice_view(lang, &own)}
                     <div class="actions" hidden=move || step.get() != Step::Idle>
-                        <label class="button primary" for="picture-file" hidden=blocked>{words::picture_choose(lang)}</label>
-                        <button type="button" class="button" hidden=!can_remove on:click=move |_| step.set(Step::Removing)>{words::picture_remove(lang)}</button>
+                        <label class="button" for="picture-file" hidden=blocked>{words::picture_choose(lang)}</label>
+                        <button type="button" class="button button-ghost" hidden=!can_remove on:click=move |_| step.set(Step::Removing)>{words::picture_remove(lang)}</button>
                     </div>
                 }
                 .into_any()
@@ -778,11 +839,11 @@ impl Card {
                     <p class="meta" id="picture-moving">{words::picture_moving(lang)}</p>
                 </Show>
                 <div class="actions">
-                    <button type="button" class="button primary" on:click=move |_| self.save()
+                    <button type="button" class="button" on:click=move |_| self.save()
                         aria-disabled=move || (step.get() == Step::Saving).then_some("true")>
                         {move || if step.get() == Step::Saving { words::picture_saving(lang) } else { words::picture_save(lang) }}
                     </button>
-                    <button type="button" class="button" on:click=move |_| { browser::close(); step.set(Step::Idle); }>
+                    <button type="button" class="button button-ghost" on:click=move |_| { browser::close(); step.set(Step::Idle); }>
                         {words::picture_cancel(lang)}
                     </button>
                 </div>
@@ -798,15 +859,30 @@ pub fn card(lang: Lang, name: String) -> impl IntoView {
         lang,
         own: RwSignal::new(None),
         step: RwSignal::new(Step::Idle),
+        busy: RwSignal::new(false),
         crop: RwSignal::new(Crop::new(1.0, 1.0)),
         trouble: RwSignal::new(None),
         said: RwSignal::new(None),
         sending: RwSignal::new(Sending::Square),
         kept_still: RwSignal::new(false),
         dragging: StoredValue::new(None),
+        generation: RwSignal::new(0),
     };
     let step = card.step;
-    Effect::new(move |_| card.reload());
+    Effect::new(move |_| {
+        card.reload();
+        #[cfg(target_arch = "wasm32")]
+        super::session::on_change(move || {
+            browser::close();
+            card.step.set(Step::Idle);
+            card.busy.set(false);
+            card.trouble.set(None);
+            card.said.set(None);
+            card.own.set(None);
+            card.reload();
+        });
+    });
+    on_cleanup(browser::close);
     // The preview follows the square.
     Effect::new(move |_| {
         let at = card.crop.get();
@@ -828,8 +904,8 @@ pub fn card(lang: Lang, name: String) -> impl IntoView {
                 <div class="confirm" role="group" aria-labelledby="picture-remove-ask">
                     <p id="picture-remove-ask">{words::picture_remove_confirm(lang)}</p>
                     <div class="actions">
-                        <button type="button" class="button danger" on:click=move |_| card.remove()>{words::picture_remove_yes(lang)}</button>
-                        <button type="button" class="button" on:click=move |_| step.set(Step::Idle)>{words::picture_cancel(lang)}</button>
+                        <button type="button" class="button danger" aria-disabled=move || card.busy.get().then_some("true") on:click=move |_| card.remove()>{words::picture_remove_yes(lang)}</button>
+                        <button type="button" class="button button-ghost" on:click=move |_| step.set(Step::Idle)>{words::picture_cancel(lang)}</button>
                     </div>
                 </div>
             </Show>
@@ -847,12 +923,16 @@ pub fn card(lang: Lang, name: String) -> impl IntoView {
 /// its button. The person reported is never told who reported.
 pub fn report(lang: Lang, tag: u32, key: PictureKey) -> impl IntoView {
     let open = RwSignal::new(false);
+    let busy = RwSignal::new(false);
     let reason = RwSignal::new(PictureReason::Other);
     let note = RwSignal::new(String::new());
     let said = RwSignal::new(None::<&'static str>);
     let failed = RwSignal::new(None::<&'static str>);
     let send = move |event: leptos::ev::SubmitEvent| {
         event.prevent_default();
+        if busy.get_untracked() {
+            return;
+        }
         let typed = note.get_untracked();
         let note = (!typed.trim().is_empty()).then_some(typed);
         if note
@@ -870,6 +950,7 @@ pub fn report(lang: Lang, tag: u32, key: PictureKey) -> impl IntoView {
                 note,
             },
         };
+        busy.set(true);
         leptos::task::spawn_local(async move {
             match call(&request).await {
                 Ok(Response::Social {
@@ -884,6 +965,7 @@ pub fn report(lang: Lang, tag: u32, key: PictureKey) -> impl IntoView {
                 Err(Failure::Rejected) => failed.set(Some(words::picture_report_gone(lang))),
                 _ => failed.set(Some(words::picture_error_failed(lang))),
             }
+            busy.set(false);
         });
     };
     let reasons = PictureReason::ALL
@@ -895,7 +977,7 @@ pub fn report(lang: Lang, tag: u32, key: PictureKey) -> impl IntoView {
     let reason_id = format!("{id}-reason");
     view! {
         <div class="picture-report">
-            <button type="button" class="button" aria-expanded=move || open.get().to_string()
+            <button type="button" class="button button-ghost" aria-expanded=move || open.get().to_string()
                 on:click=move |_| { open.update(|o| *o = !*o); said.set(None); }>{words::picture_report(lang)}</button>
             <Show when=move || open.get()>
                 <form class="form card" novalidate=true on:submit=send aria-label=words::picture_report_title(lang)>
@@ -915,7 +997,7 @@ pub fn report(lang: Lang, tag: u32, key: PictureKey) -> impl IntoView {
                         <p class="hint">{words::picture_report_note_hint(lang)}</p>
                     </div>
                     <p class="error" role="alert">{move || failed.get()}</p>
-                    <button type="submit" class="button primary">{words::picture_report_send(lang)}</button>
+                    <button type="submit" class="button" aria-disabled=move || busy.get().then_some("true")>{words::picture_report_send(lang)}</button>
                 </form>
             </Show>
             <p class="meta" role="status">{move || said.get()}</p>
@@ -923,10 +1005,15 @@ pub fn report(lang: Lang, tag: u32, key: PictureKey) -> impl IntoView {
     }
 }
 
+/// Dimensions and delivery mode of an opened picture file.
+type OpenedPicture = (f64, f64, Sending);
+
 /// The browser's half: opening the file, drawing the square, sending it.
 #[cfg(target_arch = "wasm32")]
 mod browser {
-    use super::{Crop, MAX_SIDE, Own, PREVIEW, Sending, Trouble, answered, checked, moving};
+    use super::{
+        Crop, MAX_SIDE, OpenedPicture, Own, PREVIEW, Sending, Trouble, answered, checked, moving,
+    };
     use leptos::prelude::*;
     use wasm_bindgen::{JsCast, JsValue, closure::Closure};
     use wasm_bindgen_futures::JsFuture;
@@ -1025,13 +1112,13 @@ mod browser {
     }
 
     /// Opens the chosen file: its sides, and how it will be sent.
-    pub async fn open() -> Result<(f64, f64, Sending), Trouble> {
-        close();
+    /// `Ok(None)` when the person closed the file dialog without a file.
+    pub async fn open() -> Result<Option<OpenedPicture>, Trouble> {
         let input: HtmlInputElement = element("picture-file").ok_or(Trouble::Failed)?;
-        let file = input
-            .files()
-            .and_then(|files| files.get(0))
-            .ok_or(Trouble::Open)?;
+        let Some(file) = input.files().and_then(|files| files.get(0)) else {
+            return Ok(None);
+        };
+        close();
         input.set_value("");
         let head = head(&file).await;
         checked(file.size(), &head)?;
@@ -1078,7 +1165,7 @@ mod browser {
                     readable: false,
                 });
             });
-            return Ok((1.0, 1.0, Sending::Original));
+            return Ok(Some((1.0, 1.0, Sending::Original)));
         } else {
             return Err(Trouble::Open);
         };
@@ -1093,7 +1180,7 @@ mod browser {
                 readable,
             });
         });
-        Ok((width, height, sending))
+        Ok(Some((width, height, sending)))
     }
 
     fn close_source(source: Source) {
@@ -1113,20 +1200,110 @@ mod browser {
         }
     }
 
+    /// Whether this tab already remembers a profile picture key in `sessionStorage`.
+    pub fn has_remembered_key() -> bool {
+        let Some(text) = web_sys::window()
+            .and_then(|w| w.session_storage().ok().flatten())
+            .and_then(|s| s.get_item("baylee-central-own-picture").ok().flatten())
+        else {
+            return false;
+        };
+        serde_json::from_str::<serde_json::Value>(&text)
+            .ok()
+            .and_then(|v| v.get("key")?.as_str().map(str::len))
+            .is_some_and(|len| len == 32)
+    }
+
+    fn sync_nav_face(
+        doc: &web_sys::Document,
+        face: &web_sys::Element,
+        picture: Option<&central_api::picture::Picture>,
+    ) {
+        while let Some(child) = face.first_child() {
+            let _ = face.remove_child(&child);
+        }
+        if let Some(p) = picture {
+            let _ = face.remove_attribute("data-none");
+            let key = central_api::picture::key_hex(&p.key);
+            let base = format!("/api/v1/pictures/{key}");
+            let Ok(pic) = doc.create_element("picture") else {
+                return;
+            };
+            if p.sequence_bytes.is_some()
+                && let Ok(moving) = doc.create_element("source")
+            {
+                let _ = moving.set_attribute("type", "image/avif");
+                let _ = moving.set_attribute("media", "(prefers-reduced-motion: no-preference)");
+                let _ = moving.set_attribute("srcset", &format!("{base}.sequence.avif"));
+                let _ = pic.append_child(&moving);
+            }
+            if let Ok(still) = doc.create_element("source") {
+                let _ = still.set_attribute("type", "image/avif");
+                let _ = still.set_attribute("srcset", &format!("{base}.avif"));
+                let _ = pic.append_child(&still);
+            }
+            if let Ok(img) = doc.create_element("img") {
+                let _ = img.set_attribute("src", &format!("{base}.png"));
+                let _ = img.set_attribute("alt", "");
+                let _ = img.set_attribute("width", "24");
+                let _ = img.set_attribute("height", "24");
+                let _ = img.set_attribute("decoding", "async");
+                let _ = pic.append_child(&img);
+            }
+            let _ = face.append_child(&pic);
+        } else {
+            let _ = face.set_attribute("data-none", "");
+        }
+    }
+
     /// Tells this tab's header (`boot.js`) the account's own picture: its
-    /// key and whether it moves, or that there is none. Nothing else.
+    /// key and whether it moves, or that there is none, and updates the
+    /// current page's header avatar in place.
     pub fn remember(picture: Option<&central_api::picture::Picture>) {
-        let held = picture.map_or_else(
-            || serde_json::json!({ "key": null }),
-            |p| {
-                serde_json::json!({
-                    "key": central_api::picture::key_hex(&p.key),
-                    "moving": p.sequence_bytes.is_some(),
-                })
-            },
-        );
+        let signed_in = super::super::session::marker().is_some();
         if let Some(storage) = web_sys::window().and_then(|w| w.session_storage().ok().flatten()) {
-            let _ = storage.set_item("baylee-central-own-picture", &held.to_string());
+            if signed_in {
+                let held = picture.map_or_else(
+                    || serde_json::json!({ "key": null }),
+                    |p| {
+                        serde_json::json!({
+                            "key": central_api::picture::key_hex(&p.key),
+                            "moving": p.sequence_bytes.is_some(),
+                        })
+                    },
+                );
+                let _ = storage.set_item("baylee-central-own-picture", &held.to_string());
+            } else {
+                let _ = storage.remove_item("baylee-central-own-picture");
+            }
+        }
+        let doc = document();
+        if let Ok(links) = doc.query_selector_all("a[data-account-href]") {
+            for index in 0..links.length() {
+                let Some(node) = links.get(index) else {
+                    continue;
+                };
+                let Ok(link) = node.dyn_into::<web_sys::Element>() else {
+                    continue;
+                };
+                let existing = link.query_selector(".nav-face").ok().flatten();
+                if !signed_in {
+                    if let Some(face) = existing {
+                        let _ = link.remove_child(&face);
+                    }
+                    continue;
+                }
+                let face = existing.or_else(|| {
+                    let span = doc.create_element("span").ok()?;
+                    let _ = span.set_attribute("class", "nav-face");
+                    let _ = span.set_attribute("aria-hidden", "true");
+                    let _ = link.insert_before(&span, link.first_child().as_ref());
+                    Some(span)
+                });
+                if let Some(face) = face {
+                    sync_nav_face(&doc, &face, picture);
+                }
+            }
         }
     }
 
@@ -1218,14 +1395,17 @@ mod browser {
 /// On the server nothing is opened, drawn or sent.
 #[cfg(not(target_arch = "wasm32"))]
 mod browser {
-    use super::{Crop, Own, Trouble};
+    use super::{Crop, OpenedPicture, Own, Trouble};
 
     /// The checks run as in the browser, on nothing; nothing is opened.
-    pub fn open() -> std::future::Ready<Result<(f64, f64, super::Sending), Trouble>> {
+    pub fn open() -> std::future::Ready<Result<Option<OpenedPicture>, Trouble>> {
         let _ = super::moving(&[]);
         std::future::ready(super::checked(0.0, &[]).and(Err(Trouble::Open)))
     }
     pub fn close() {}
+    pub fn has_remembered_key() -> bool {
+        false
+    }
     pub fn remember(_: Option<&central_api::picture::Picture>) {}
     pub fn draw(_: Crop) {}
     pub fn shown() -> f64 {

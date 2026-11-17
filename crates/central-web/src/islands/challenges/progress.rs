@@ -2,61 +2,94 @@ use super::{Hub, Lang, api, play_link, words};
 use crate::islands::medals;
 use leptos::prelude::*;
 
-pub(super) fn view(lang: Lang, hub: Hub) -> AnyView {
-    if !hub.signed_in.get() {
-        return view! { <section class="card challenge-account"><h2>{words::ch_badges(lang)}</h2>
-            <p>{words::ch_badges_lead(lang)}</p><a class="button" href=format!("/{}/signin",lang.code())>{words::nav_sign_in(lang)}</a>
-        </section> }.into_any();
-    }
-    let active = hub.active.get();
-    let selected = RwSignal::new(None);
+pub(super) fn view(lang: Lang, hub: Hub) -> impl IntoView {
+    let selected = hub.selected_medal;
     view! {
-        <section class="challenge-achievements" aria-labelledby="challenge-badges-title">
-            <h2 id="challenge-badges-title">{words::ch_badges(lang)}</h2><p>{words::ch_badges_lead(lang)}</p>
-            <div class="challenge-badges">{hub.badges.get().iter().map(|badge| badge_card(lang,badge,selected)).collect_view()}</div>
-            {medals::gallery(lang, selected)}
-            {(!active.is_empty()).then(|| view! { <div class="card"><h3>{words::ch_active(lang)}</h3>
-                {active.into_iter().map(|attempt| view! { <a class="button button-ghost" href=play_link(attempt.challenge)>{words::ch_play(lang)}</a> }).collect_view()}
-            </div> })}
-        </section>
-    }.into_any()
+        <Show when=move || hub.signed_in.get() fallback=move || view! {
+            <section class="card challenge-account">
+                <h2>{words::ch_badges(lang)}</h2>
+                <p>{words::ch_badges_lead(lang)}</p>
+                <a class="button button-ghost" href=format!("/{}/signin", lang.code())>{words::nav_sign_in(lang)}</a>
+            </section>
+        }>
+            <section class="challenge-achievements" aria-labelledby="challenge-badges-title">
+                <h2 id="challenge-badges-title">{words::ch_badges(lang)}</h2>
+                <p>{words::ch_badges_lead(lang)}</p>
+                <div class="challenge-badges">
+                    {api::BadgeKind::ALL.into_iter().map(|kind| badge_card(lang, hub, kind, selected)).collect_view()}
+                </div>
+                {medals::gallery(lang, selected)}
+                {move || {
+                    let active = hub.active.get();
+                    (!active.is_empty()).then(|| view! {
+                        <div class="card">
+                            <h3>{words::ch_active(lang)}</h3>
+                            <div class="challenge-actions">
+                                {active.into_iter().map(|attempt| view! {
+                                    <a class="button button-ghost" href=play_link(attempt.challenge)>{words::ch_play(lang)}</a>
+                                }).collect_view()}
+                            </div>
+                        </div>
+                    })
+                }}
+            </section>
+        </Show>
+    }
 }
 
-fn badge_card(
-    lang: Lang,
-    badge: &api::Badge,
-    selected: RwSignal<Option<medals::Preview>>,
-) -> impl IntoView + use<> {
-    let motif = match badge.kind {
+pub(super) fn motif_of(kind: api::BadgeKind) -> u8 {
+    match kind {
         api::BadgeKind::Daily => 0,
         api::BadgeKind::Weekly => 1,
         api::BadgeKind::Tactician => 2,
         api::BadgeKind::FirstTry => 3,
         api::BadgeKind::Regular => 4,
-    };
-    let title = match badge.kind {
+    }
+}
+
+fn badge_card(
+    lang: Lang,
+    hub: Hub,
+    kind: api::BadgeKind,
+    selected: RwSignal<Option<medals::Preview>>,
+) -> impl IntoView {
+    let motif = motif_of(kind);
+    let title = match kind {
         api::BadgeKind::Daily => words::ch_badge_daily(lang),
         api::BadgeKind::Weekly => words::ch_badge_weekly(lang),
         api::BadgeKind::Tactician => words::ch_badge_tactician(lang),
         api::BadgeKind::FirstTry => words::ch_badge_first_try(lang),
         api::BadgeKind::Regular => words::ch_badge_regular(lang),
     };
-    let tier = match badge.tier {
-        None => words::ch_badge_locked(lang),
-        Some(api::Tier::Bronze) => words::ch_bronze(lang),
-        Some(api::Tier::Silver) => words::ch_silver(lang),
-        Some(api::Tier::Gold) => words::ch_gold(lang),
-        Some(api::Tier::Platinum) => words::ch_platinum(lang),
-        Some(api::Tier::Obsidian) => words::ch_obsidian(lang),
-    };
-    let progress = badge.next.map_or_else(
-        || badge.count.to_string(),
-        |next| format!("{} / {next}", badge.count),
-    );
-    view! { <article class="card challenge-badge" class:challenge-earned=badge.tier.is_some()>
-        {crate::islands::medals::view(motif, badge.tier)}<h3>{title}</h3><p>{tier}</p>
-        <p class="num">{progress.clone()}</p>
-        <progress max=badge.next.unwrap_or(badge.count.max(1)) value=badge.count aria-label=title aria-valuetext=progress></progress>
-        {medals::inspect(lang, selected, medals::Preview { motif, count:badge.count, thresholds:badge.kind.thresholds(),title })}
-    </article> }
+    let thresholds = kind.thresholds();
+    let badge = Memo::new(move |_| {
+        hub.badges
+            .with(|badges| badges.iter().find(|b| b.kind == kind).cloned())
+            .unwrap_or_else(|| kind.progress(0))
+    });
+    let progress = Memo::new(move |_| {
+        let b = badge.get();
+        medals::progress_text(lang, u64::from(b.count), b.next.map(u64::from))
+    });
+    let preview = Signal::derive(move || medals::Preview {
+        motif,
+        count: badge.get().count,
+        thresholds,
+        title,
+    });
+    view! {
+        <article class="card challenge-badge">
+            {move || medals::view(motif, badge.get().tier)}
+            <h3>{title}</h3>
+            <p>{move || medals::tier(lang, badge.get().tier)}</p>
+            <p class="num">{move || progress.get()}</p>
+            <progress
+                max=move || badge.get().next.unwrap_or_else(|| badge.get().count.max(1))
+                value=move || badge.get().count
+                aria-label=title
+                aria-valuetext=move || progress.get()
+            ></progress>
+            {medals::inspect(lang, selected, preview)}
+        </article>
+    }
 }
