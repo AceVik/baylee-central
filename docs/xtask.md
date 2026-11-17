@@ -195,6 +195,14 @@ the signed token in `central-client`'s session. Its exports and glue did not
 change. Built the same way, under Rosetta, and `cargo xtask wasm --check`
 passed in the same container. The resulting WASM SHA-256 is
 `0c7ae18b463d4dbcf3db0ddfec091b09cf2d3004cde2cd3268ec455ffca3d1b1`.
+
+The 2026-11-17 bundle is the same crate built from the Tower branch's
+sources: `central-api`'s and `central-client`'s Tower operations, and
+`enrollment_finish` in `central-web-crypto`'s `flow.rs`. Its three glue
+files did not change. Built with the command above, in the pinned Rust image
+on Apple Silicon under Docker Desktop's x86-64 emulation, and `cargo xtask
+wasm --check` passed in the same container. The resulting WASM SHA-256 is
+`dc2af609bbd78db237d96a87e2a242f8c9773596a486c09cbebff86b1dffba31`.
 `cargo xtask site` takes the committed module (checked against its
 `SHA256SUMS`) and builds none of its own.
 
