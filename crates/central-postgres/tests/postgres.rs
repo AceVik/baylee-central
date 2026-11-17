@@ -181,7 +181,7 @@ async fn verify_migrations(operator: &sea_orm::DatabaseConnection) {
             "SELECT count(*)::bigint AS value FROM seaql_migrations"
         )
         .await,
-        29
+        30
     );
 
     operator.execute_unprepared(
