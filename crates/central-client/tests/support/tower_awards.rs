@@ -51,7 +51,7 @@ fn exercise(
             defeats: 0,
         },
     };
-    browser_rejects_issuer(http, runtime, &credential, delivery);
+    browser_listener(http, runtime, &credential, delivery, account);
     assert_eq!(
         session.tower_award_progress(http).unwrap(),
         Progress::default()
@@ -113,7 +113,15 @@ fn signed_session_refuses_issuer_scope(http: &Http, account: Identity, delivery:
     );
 }
 
-fn browser_rejects_issuer(http: &Http, runtime: &Runtime, credential: &Token, delivery: Delivery) {
+/// The website's listener: it refuses the issuer's delivery, and it serves the
+/// two reads to the cookie's session and to nobody without one.
+fn browser_listener(
+    http: &Http,
+    runtime: &Runtime,
+    credential: &Token,
+    delivery: Delivery,
+    account: Identity,
+) {
     let server = runtime
         .block_on(DevelopmentServer::bind(browser_policy_config()))
         .unwrap();
@@ -133,6 +141,29 @@ fn browser_rejects_issuer(http: &Http, runtime: &Runtime, credential: &Token, de
                 .answer(&Request::TowerAward { delivery }, Some(credential))
                 .is_err()
         );
+        let cookie = support::password::browser_sign_in(
+            &browser,
+            account,
+            support::password::context(http, account),
+            support::password::OLD,
+        );
+        // Nothing has been delivered yet: the signed-in page reads an empty
+        // record, and the same requests without the cookie read nothing.
+        assert!(matches!(
+            browser.answer(&Request::TowerProgress {}, Some(&cookie)),
+            Ok(Response::TowerProgress { progress }) if progress == Progress::default()
+        ));
+        assert!(matches!(
+            browser.answer(&Request::TowerAwardExport { after: None }, Some(&cookie)),
+            Ok(Response::TowerAwardExport { export }) if export.receipts.is_empty()
+        ));
+        for read in [
+            Request::TowerProgress {},
+            Request::TowerAwardExport { after: None },
+        ] {
+            assert!(browser.answer(&read, None).is_err());
+        }
+        browser.answer(&Request::Logout, Some(&cookie)).unwrap();
     }));
     let _ = stop.send(());
     runtime.block_on(async {

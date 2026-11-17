@@ -229,7 +229,9 @@ fn browser_only(request: &Request) -> bool {
 fn uses_session(request: &Request) -> bool {
     matches!(
         request,
-        Request::Challenges { .. }
+        Request::TowerProgress {}
+            | Request::TowerAwardExport { .. }
+            | Request::Challenges { .. }
             | Request::Notifications { .. }
             | Request::Social { .. }
             | Request::SessionStatus
