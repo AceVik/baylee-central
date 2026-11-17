@@ -36,6 +36,7 @@ body {
   font-optical-sizing: auto;
   /* a weight the font has not is not smeared on: both fonts are variable */
   font-synthesis-weight: none;
+  font-size-adjust: from-font;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -83,6 +84,7 @@ body {
   --serif: "Literata", var(--cjk), system-ui, sans-serif;
 
   font-synthesis-style: none;
+  font-size-adjust: none;
 }
 
 /* a Japanese title breaks between phrases where the browser can tell them */

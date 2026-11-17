@@ -269,8 +269,19 @@
   font-weight: 500;
 }
 
-.error:empty {
+.error:empty,
+.meta[role="status"]:empty {
   display: none;
+}
+
+.empty-state {
+  margin-block: var(--space-5);
+  padding: var(--space-5);
+  border: var(--hairline) dashed var(--edge-soft);
+  border-radius: var(--radius-sm);
+  background: var(--bg-alt);
+  color: var(--ink-soft);
+  text-align: center;
 }
 
 /* ---- Forms --------------------------------------------------------------- */

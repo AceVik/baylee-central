@@ -58,10 +58,14 @@ enum Load {
 }
 
 async fn summary() -> Load {
-    if session::remembered().is_none() {
+    let Some(stamp) = session::marker() else {
+        return Load::SignedOut;
+    };
+    let answer = call(&Request::AccountSummary).await;
+    if session::marker().as_deref() != Some(stamp.as_str()) {
         return Load::SignedOut;
     }
-    match call(&Request::AccountSummary).await {
+    match answer {
         Ok(Response::AccountSummary {
             #[cfg(any(not(target_arch = "wasm32"), feature = "admin"))]
             identity,
@@ -141,6 +145,9 @@ fn reauth(lang: Lang, worker: String, done: Callback<()>) -> impl IntoView {
     let username = RwSignal::new(String::new());
     let submit = move |event: leptos::ev::SubmitEvent| {
         event.prevent_default();
+        if busy.get_untracked() {
+            return;
+        }
         let (name, secret, worker) = (
             username.get_untracked(),
             password.get_untracked(),
@@ -172,7 +179,7 @@ fn reauth(lang: Lang, worker: String, done: Callback<()>) -> impl IntoView {
                     on:input=move |ev| password.set(event_target_value(&ev)) prop:value=move || password.get() />
             </div>
             <p class="error" role="alert">{move || error.get()}</p>
-            <button type="submit" class="button primary" aria-disabled=move || busy.get().then_some("true")>{words::reauth_submit(lang)}</button>
+            <button type="submit" class="button" aria-disabled=move || busy.get().then_some("true")>{words::reauth_submit(lang)}</button>
         </form>
     }
 }
@@ -245,7 +252,7 @@ fn registration_switch(lang: Lang, worker: String) -> AnyView {
                         words::admin_registration_close(lang)
                     };
                     view! {
-                        <p><button type="button" class="button" id="registration-switch" aria-disabled=move || (busy.get() || open.get().is_none()).then_some("true")
+                        <p><button type="button" class="button button-ghost" id="registration-switch" aria-disabled=move || (busy.get() || open.get().is_none()).then_some("true")
                             on:click=move |_| if !busy.get_untracked() { change() }>{label}</button></p>
                     }
                     .into_any()
@@ -308,8 +315,8 @@ fn home(lang: Lang, summary: &Summary, worker: &str) -> AnyView {
         view! {
             {registration_switch(lang, worker.to_owned())}
             <p class="actions">
-                <a class="button" href=format!("/{code}/account/admin")>{words::admin_reset_title(lang)}</a>
-                <a class="button" href=format!("/{code}/account/admin/overview")>{words::account_admin(lang)}</a>
+                <a class="button button-ghost" href=format!("/{code}/account/admin")>{words::admin_reset_title(lang)}</a>
+                <a class="button button-ghost" href=format!("/{code}/account/admin/overview")>{words::account_admin(lang)}</a>
             </p>
         }
     });
@@ -335,14 +342,19 @@ fn profile(
 ) -> AnyView {
     let chosen = RwSignal::new(String::new());
     let error = RwSignal::new(None::<&'static str>);
+    let saving = RwSignal::new(false);
     let choose = summary.display_name.is_none().then(|| {
         let save = move |event: leptos::ev::SubmitEvent| {
             event.prevent_default();
+            if saving.get_untracked() {
+                return;
+            }
             let name = chosen.get_untracked();
             if !central_api::profile::choosable(&name) {
                 error.set(Some(words::register_error_display(lang)));
                 return;
             }
+            saving.set(true);
             leptos::task::spawn_local(async move {
                 match call(&Request::SetDisplayName { display_name: name }).await {
                     Ok(_) => {
@@ -353,6 +365,7 @@ fn profile(
                     Err(Failure::Conflict) => error.set(Some(words::profile_name_taken(lang))),
                     Err(failure) => error.set(Some(problem_text(lang, failure.into()))),
                 }
+                saving.set(false);
             });
         };
         view! {
@@ -364,7 +377,7 @@ fn profile(
                     <p class="hint" id="profile-name-hint">{words::register_display_hint(lang)}</p>
                 </div>
                 <p class="error" role="alert">{move || error.get()}</p>
-                <button type="submit" class="button primary">{words::profile_choose_submit(lang)}</button>
+                <button type="submit" class="button" aria-disabled=move || saving.get().then_some("true")>{words::profile_choose_submit(lang)}</button>
             </form>
         }
     });
@@ -518,7 +531,7 @@ fn security(
             <p class="meta" role="status">{move || notice.get()}</p>
             <p class="actions">
                 <button type="button" class="button danger" on:click=end_client>{words::security_end_client(lang)}</button>
-                <button type="button" class="button" on:click=leave>{words::security_sign_out(lang)}</button>
+                <button type="button" class="button button-ghost" on:click=leave>{words::security_sign_out(lang)}</button>
             </p>
         </section>
         <section class="card" aria-labelledby="password-title">
@@ -541,7 +554,7 @@ fn download_link(lang: Lang, json: &str) -> impl IntoView + use<> {
             let _ = write!(href, "%{byte:02X}");
         }
     }
-    view! { <a class="button primary" id="export-save" href=href download="baylee-account.json">{words::privacy_export_save(lang)}</a> }
+    view! { <a class="button" id="export-save" href=href download="baylee-account.json">{words::privacy_export_save(lang)}</a> }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -633,10 +646,10 @@ fn export_view(lang: Lang, worker: String) -> impl IntoView {
                         view! { <p class="meta" id="export-no-email">{words::privacy_export_no_email(lang)}</p> }
                     });
                     let png = picture.get().map(|key| view! {
-                        <a class="button" id="export-picture" href=super::picture::url(&key, false)
+                        <a class="button button-ghost" id="export-picture" href=super::picture::url(&key, false)
                             download="baylee-profile-picture.png">{words::privacy_export_picture(lang)}</a>
                     });
-                    view! { {download_link(lang, &json)}{png}{lacks} }.into_any()
+                    view! { <div class="actions">{download_link(lang, &json)}{png}</div>{lacks} }.into_any()
                 }
                 Some(Err(problem)) => {
                     super::focus::when_shown("#export-error");
@@ -653,16 +666,51 @@ fn export_view(lang: Lang, worker: String) -> impl IntoView {
     }
 }
 
+fn deletion_proven_view(
+    lang: Lang,
+    gateways: Vec<String>,
+    busy: RwSignal<bool>,
+    deletion: RwSignal<Deletion>,
+    delete: Callback<()>,
+) -> AnyView {
+    let owned = (!gateways.is_empty()).then(|| {
+        let list = gateways
+            .into_iter()
+            .map(|origin| view! { <li><code translate="no">{origin}</code></li> })
+            .collect_view();
+        view! { <p>{words::privacy_delete_gateways(lang)}</p><ul>{list}</ul> }
+    });
+    // the last word before the end, not the button that ends it
+    super::focus::when_shown("#delete-last");
+    view! {
+        <p class="notice" id="delete-last" role="alert" tabindex="-1">{words::privacy_delete_last(lang)}</p>
+        {owned}
+        <p class="actions">
+            <button type="button" class="button danger" aria-disabled=move || busy.get().then_some("true") on:click=move |_| delete.run(())>{words::privacy_delete_confirm(lang)}</button>
+            <button type="button" class="button button-ghost" on:click=move |_| {
+                deletion.set(Deletion::Idle);
+                super::focus::after_render("#delete-start");
+            }>{words::privacy_delete_cancel(lang)}</button>
+        </p>
+    }
+    .into_any()
+}
+
 fn deletion_view(lang: Lang, worker: String) -> impl IntoView {
     let deletion = RwSignal::new(Deletion::Idle);
     let password = RwSignal::new(String::new());
     let error = RwSignal::new(None::<&'static str>);
+    let busy = RwSignal::new(false);
     let proof = StoredValue::new_local(None::<(central_api::Token, Vec<u8>)>);
     let worker_delete = worker.clone();
     let prove = move |event: leptos::ev::SubmitEvent| {
         event.prevent_default();
+        if busy.get_untracked() {
+            return;
+        }
         let (secret, worker) = (password.get_untracked(), worker_delete.clone());
         password.set(String::new());
+        busy.set(true);
         leptos::task::spawn_local(async move {
             match prove_deletion(&worker, secret).await {
                 Ok((attempt, kept, gateways)) => {
@@ -672,13 +720,18 @@ fn deletion_view(lang: Lang, worker: String) -> impl IntoView {
                 }
                 Err(problem) => error.set(Some(problem_text(lang, problem))),
             }
+            busy.set(false);
         });
     };
-    let delete = move |_| {
+    let delete = Callback::new(move |()| {
+        if busy.get_untracked() {
+            return;
+        }
         let Some((attempt, kept)) = proof.try_update_value(Option::take).flatten() else {
             return;
         };
         let worker = worker.clone();
+        busy.set(true);
         leptos::task::spawn_local(async move {
             match call(&Request::DeleteAccountFinish {
                 attempt,
@@ -699,8 +752,9 @@ fn deletion_view(lang: Lang, worker: String) -> impl IntoView {
                     super::focus::after_render("#delete-start");
                 }
             }
+            busy.set(false);
         });
-    };
+    });
     let code = lang.code();
     view! {
         <section class="card danger-zone" aria-labelledby="delete-title">
@@ -718,29 +772,11 @@ fn deletion_view(lang: Lang, worker: String) -> impl IntoView {
                                 <label for="delete-password">{words::privacy_delete_password(lang)}</label>
                                 <input id="delete-password" type="password" autocomplete="current-password" on:input=move |ev| password.set(event_target_value(&ev)) />
                             </div>
-                            <button type="submit" class="button danger">{words::privacy_delete_prove(lang)}</button>
+                            <button type="submit" class="button danger" aria-disabled=move || busy.get().then_some("true")>{words::privacy_delete_prove(lang)}</button>
                         </form>
                     }.into_any()
                 }
-                Deletion::Proven { gateways } => {
-                    let owned = (!gateways.is_empty()).then(|| {
-                        let list = gateways.into_iter().map(|origin| view! { <li><code translate="no">{origin}</code></li> }).collect_view();
-                        view! { <p>{words::privacy_delete_gateways(lang)}</p><ul>{list}</ul> }
-                    });
-                    // the last word before the end, not the button that ends it
-                    super::focus::when_shown("#delete-last");
-                    view! {
-                        <p class="notice" id="delete-last" role="alert" tabindex="-1">{words::privacy_delete_last(lang)}</p>
-                        {owned}
-                        <p class="actions">
-                            <button type="button" class="button danger" on:click=delete.clone()>{words::privacy_delete_confirm(lang)}</button>
-                            <button type="button" class="button quiet" on:click=move |_| {
-                                deletion.set(Deletion::Idle);
-                                super::focus::after_render("#delete-start");
-                            }>{words::privacy_delete_cancel(lang)}</button>
-                        </p>
-                    }.into_any()
-                }
+                Deletion::Proven { gateways } => deletion_proven_view(lang, gateways, busy, deletion, delete),
                 Deletion::Deleted => {
                     super::focus::when_shown("#deleted");
                     view! {
@@ -905,8 +941,12 @@ fn add_form(
 ) -> impl IntoView {
     let origin = RwSignal::new(String::new());
     let label = RwSignal::new(String::new());
+    let busy = RwSignal::new(false);
     let add = move |event: leptos::ev::SubmitEvent| {
         event.prevent_default();
+        if busy.get_untracked() {
+            return;
+        }
         let (origin_value, name) = (
             origin.get_untracked().trim().to_owned(),
             label.get_untracked().trim().to_owned(),
@@ -915,6 +955,7 @@ fn add_form(
             notice.set(Some(words::gateways_invalid(lang)));
             return;
         }
+        busy.set(true);
         leptos::task::spawn_local(async move {
             match call(&Request::Owner {
                 request: OwnerRequest::AddGateway {
@@ -931,6 +972,7 @@ fn add_form(
                 Err(Failure::Conflict) => notice.set(Some(words::gateways_taken(lang))),
                 Err(failure) => notice.set(Some(problem_text(lang, failure.into()))),
             }
+            busy.set(false);
         });
     };
     view! {
@@ -945,7 +987,7 @@ fn add_form(
                 <label for="gateway-name">{words::gateways_name(lang)}</label>
                 <input id="gateway-name" type="text" maxlength="80" on:input=move |ev| label.set(event_target_value(&ev)) />
             </div>
-            <button type="submit" class="button">{words::gateways_add(lang)}</button>
+            <button type="submit" class="button" aria-disabled=move || busy.get().then_some("true")>{words::gateways_add(lang)}</button>
         </form>
     }
 }
@@ -1204,7 +1246,7 @@ fn notifications(lang: Lang, admin: bool) -> AnyView {
             {move || matches!(now.get(), Some(Err(_))).then(|| view! { <p class="error" role="alert">{words::push_failed(lang)}</p> })}
             <p class="error" role="alert">{move || error.get()}</p>
             <div class="push-device">
-                <button type="button" class="button" role="switch" aria-checked=move || active().to_string()
+                <button type="button" class="button button-ghost" role="switch" aria-checked=move || active().to_string()
                     aria-disabled=move || (busy.get() || !supported || key().is_none()).then_some("true")
                     on:click=device>{words::push_device(lang)}</button>
                 <p class="meta">{move || if active() { words::push_on(lang) } else { words::push_off(lang) }}</p>
@@ -1242,6 +1284,7 @@ where
     F: Fn(Summary, Area) -> AnyView + Send + Sync + 'static,
 {
     let state = RwSignal::new(Load::Loading);
+    let generation = RwSignal::new(0_u64);
     // where the focus goes once a reload an action asked for is drawn
     let focus_next = StoredValue::new(None::<&'static str>);
     // A confirmation code the mail's link handed in the address's
@@ -1255,8 +1298,13 @@ where
         fragment::code(&fragment::take(), MailCode::parse).filter(|_| section == Section::Security),
     );
     let reload = Callback::new(move |()| {
+        generation.update(|value| *value = value.wrapping_add(1));
+        let started = generation.get_untracked();
         leptos::task::spawn_local(async move {
             let load = summary().await;
+            if generation.get_untracked() != started {
+                return;
+            }
             if !matches!(load, Load::Ready(_)) {
                 handed.set_value(None);
             }
@@ -1264,7 +1312,11 @@ where
         });
     });
     // Effects run in the browser only: the server renders "loading".
-    Effect::new(move |_| reload.run(()));
+    Effect::new(move |_| {
+        reload.run(());
+        #[cfg(target_arch = "wasm32")]
+        session::on_change(move || reload.run(()));
+    });
     let area = Area {
         reload,
         focus_next,

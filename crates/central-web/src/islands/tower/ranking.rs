@@ -1,4 +1,4 @@
-use super::{Hub, Lang, api, words};
+use super::{Hub, Lang, api, standing_duration, standing_handle, words};
 use leptos::prelude::*;
 
 pub(super) fn view(lang: Lang, hub: Hub) -> impl IntoView {
@@ -13,14 +13,15 @@ pub(super) fn view(lang: Lang, hub: Hub) -> impl IntoView {
             }</div>
             <p class="meta">{words::tower_scoring(lang)}</p>
             <div class="challenge-table" tabindex="0" role="group" aria-label=words::ch_rankings(lang)
+                aria-busy=move || hub.loading.get().then_some("true")
                 hidden=move || hub.rows.with(Vec::is_empty)><table><thead><tr><th scope="col">{words::ch_rank(lang)}</th><th scope="col">{words::ch_player(lang)}</th>
                 <th scope="col">{words::tower_floors(lang)}</th><th scope="col">{words::ch_failures(lang)}</th>
                 <th scope="col">{words::ch_turn(lang)}</th><th scope="col">{words::ch_time(lang)}</th>
             </tr></thead><tbody>{move || hub.rows.get().into_iter().map(|row| {
-                let name = row.tag.map_or(row.name.clone(), |tag| format!("{}#{tag:04x}",row.name));
-                let duration = row.milliseconds.map_or_else(|| "—".into(), |ms| format!("{}:{:02}.{:03}",ms/60_000,ms/1000%60,ms%1000));
-                view! { <tr class:challenge-own=row.own><td class="num">{row.rank}</td><th scope="row"><bdi>{name}</bdi></th>
-                    <td class="num">{row.floors}{" / 5"}</td><td class="num">{row.losses}</td><td class="num">{row.turns}</td><td class="num">{duration}</td>
+                let name = standing_handle(&row.name, row.tag);
+                let duration = standing_duration(row.milliseconds);
+                view! { <tr class:challenge-own=row.own><td class="num">{words::number(lang, u64::from(row.rank))}</td><th scope="row"><bdi translate="no">{name}</bdi></th>
+                    <td class="num">{row.floors}{" / 5"}</td><td class="num">{words::number(lang, u64::from(row.losses))}</td><td class="num">{words::number(lang, u64::from(row.turns))}</td><td class="num">{duration}</td>
                 </tr> }
             }).collect_view()}</tbody></table></div>
             {move || hub.rows.with(Vec::is_empty).then(|| view! { <p class="empty-state">{words::ch_no_scores(lang)}</p> })}

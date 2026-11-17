@@ -637,15 +637,25 @@ fn challenge_feed(central: &Central<'_>) -> Option<central_web::data::ChallengeF
     {
         return None;
     }
+    let (tower, tower_standings) = match tower_feed(central) {
+        Some((season, standings)) => (Some(season), standings),
+        None => (None, Vec::new()),
+    };
     Some(central_web::data::ChallengeFeed {
-        tower: tower_feed(central),
+        tower,
+        tower_standings,
         now,
         challenges,
         before,
     })
 }
 
-fn tower_feed(central: &Central<'_>) -> Option<central_api::tower::Season> {
+fn tower_feed(
+    central: &Central<'_>,
+) -> Option<(
+    central_api::tower::Season,
+    Vec<central_api::tower::Standing>,
+)> {
     use central_api::{challenges, tower};
     let Response::Challenges {
         response: challenges::Response::Tower { response },
@@ -663,13 +673,21 @@ fn tower_feed(central: &Central<'_>) -> Option<central_api::tower::Season> {
     };
     let tower::Response::Read {
         season: Some(season),
+        mut standings,
         now,
         ..
     } = *response
     else {
         return None;
     };
-    (season.theme.validate().is_ok() && season.theme.period.starts_at <= now).then_some(*season)
+    if season.theme.validate().is_err() || season.theme.period.starts_at > now {
+        return None;
+    }
+    standings.truncate(30);
+    for row in &mut standings {
+        row.own = false;
+    }
+    Some((*season, standings))
 }
 
 #[cfg(test)]

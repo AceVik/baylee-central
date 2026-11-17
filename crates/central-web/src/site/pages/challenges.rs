@@ -13,6 +13,11 @@ pub fn page(cx: &Context<'_>) -> Built {
     meta.islands = true;
     meta.trail
         .push((words::ch_title(lang).to_owned(), Page::Challenges));
+    let mut challenges = cx.data.challenges.clone();
+    let (tower, standings) = match challenges.as_mut() {
+        Some(feed) => (feed.tower.take(), std::mem::take(&mut feed.tower_standings)),
+        None => (None, Vec::new()),
+    };
     let body = view! {
         <section class="page-head wrap" aria-labelledby="challenges-title">
             <p class="eyebrow">{words::ch_eyebrow(lang)}</p>
@@ -20,9 +25,9 @@ pub fn page(cx: &Context<'_>) -> Built {
             <p class="lead">{words::ch_lead(lang)}</p>
         </section>
         <div class="wrap challenge-hub">
-            <Challenges lang=lang initial=cx.data.challenges.clone() />
+            <Challenges lang=lang initial=challenges />
             <Echoes lang=lang />
-            <Tower lang=lang initial=cx.data.challenges.as_ref().and_then(|feed| feed.tower.clone()) />
+            <Tower lang=lang initial=tower standings=standings />
         </div>
     }
     .into_any();

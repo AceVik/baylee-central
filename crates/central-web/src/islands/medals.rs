@@ -14,6 +14,19 @@ pub(super) fn tier(lang: Lang, tier: Option<Tier>) -> &'static str {
     }
 }
 
+pub(super) fn progress_text(lang: Lang, count: u64, next: Option<u64>) -> String {
+    next.map_or_else(
+        || words::number(lang, count),
+        |next| {
+            format!(
+                "{} / {}",
+                words::number(lang, count),
+                words::number(lang, next)
+            )
+        },
+    )
+}
+
 #[derive(Clone, Copy)]
 pub(super) struct Preview {
     pub motif: u8,
@@ -25,12 +38,18 @@ pub(super) struct Preview {
 pub(super) fn inspect(
     lang: Lang,
     selected: RwSignal<Option<Preview>>,
-    badge: Preview,
+    badge: Signal<Preview>,
 ) -> impl IntoView {
-    view! { <button id=format!("medal-preview-{}",badge.motif) class="button button-ghost" type="button"
-        aria-label=format!("{} · {}", badge.title, words::tower_tiers(lang))
-        aria-pressed=move || selected.with(|value| if value.is_some_and(|value| value.motif == badge.motif) { "true" } else { "false" })
-        on:click=move |_| selected.update(|value| *value = if value.is_some_and(|value| value.motif == badge.motif) { None } else { Some(badge) })>
+    let initial = badge.get_untracked();
+    let motif = initial.motif;
+    let title = initial.title;
+    view! { <button id=format!("medal-preview-{motif}") class="button button-ghost" type="button"
+        aria-label=format!("{title} · {}", words::tower_tiers(lang))
+        aria-pressed=move || selected.with(|value| if value.is_some_and(|value| value.motif == motif) { "true" } else { "false" })
+        on:click=move |_| {
+            let current = badge.get_untracked();
+            selected.update(|value| *value = if value.is_some_and(|value| value.motif == motif) { None } else { Some(current) });
+        }>
         {words::tower_tiers(lang)}
     </button> }
 }
@@ -78,6 +97,7 @@ pub(super) fn view(motif: u8, tier: Option<Tier>) -> impl IntoView {
         }
         5 => "M-26 22L0-23L26 22M6 24L-7 9L5-3M18-27L21-20L27-17L21-14L18-7L15-14L9-17L15-20Z",
         6 => "M-12 24V-10H12V24M-22-11V-25L-11-18L0-29L11-18L22-25V-11ZM-4 24V10A4 4 0 0 1 4 10V24",
+        7 => "M-23-23H23V0Q21 15 0 28Q-21 15-23 0ZM0-15L12 2L0 19L-12 2Z",
         8 => {
             "M-22 23L18-23L24-24L24-18L-17 27M22 23L-18-23L-24-24L-24-18L17 27M-27 12L-12 26M27 12L12 26 M0-27V-19"
         }
@@ -85,7 +105,7 @@ pub(super) fn view(motif: u8, tier: Option<Tier>) -> impl IntoView {
             "M-16 23V-10H16V23M-24-10L-26-26L-13-17L0-30L13-17L26-26L24-10ZM-8 23V8H8V23M-23 0L-31 8L-24 13M23 0L31 8L24 13"
         }
         10 => "M-24-23H24V0Q23 17 0 29Q-23 17-24 0ZM0 0C-21-23-24 23 0 0C21-23 24 23 0 0Z",
-        _ => "M-23-23H23V0Q21 15 0 28Q-21 15-23 0ZM0-15L12 2L0 19L-12 2Z",
+        _ => "M0-18A18 18 0 1 0 0 18A18 18 0 1 0 0-18",
     };
     view! {
         <span class=format!("retention-medal tier-{tier}") data-motif=motif aria-hidden="true">

@@ -1,13 +1,18 @@
 /* Daily and Weekly share the site's surfaces, type and interaction colours. */
 .challenge-hub { padding-block-end: var(--space-9); }
-.challenge-toolbar, .challenge-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: var(--space-3); margin-block: var(--space-4); }
-.challenge-toolbar { min-block-size: var(--space-7); }
+.challenge-hub > leptos-island { display: block; }
+.challenge-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: var(--space-3); margin-block: var(--space-4); }
+.challenge-toolbar { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: var(--space-3); min-block-size: var(--target); margin-block: var(--space-4); }
+.challenge-toolbar > #challenge-refresh { grid-column: 2; }
+.challenge-toolbar > .challenge-status { grid-column: 3; justify-self: start; margin: 0; }
 .challenge-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 24rem), 1fr)); gap: var(--space-5); }
 .challenge-card { display: flex; flex-direction: column; align-items: center; text-align: center; min-inline-size: 0; }
 .challenge-card .eyebrow { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-3); }
 .challenge-card .challenge-actions { margin-block-start: auto; padding-block-start: var(--space-4); }
 .challenge-card h2 { font-size: var(--text-xl); }
-.challenge-detail, .challenge-rankings, .challenge-account { margin-block: var(--space-5); text-align: center; }
+.challenge-detail, .challenge-rankings { margin-block: var(--space-5); text-align: center; }
+.challenge-account, .tower-account { display: grid; align-content: center; justify-items: center; gap: var(--space-3); min-block-size: 9.5rem; margin-block: var(--space-6); text-align: center; }
+.challenge-account > :is(h2, h3, p), .tower-account > :is(h3, p) { max-inline-size: var(--prose); margin: 0; }
 .challenge-detail > p { max-inline-size: var(--prose); margin-inline: auto; }
 .challenge-stats { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-6); margin-block: var(--space-5); }
 .challenge-stats dt { color: var(--ink-soft); font-size: var(--text-sm); }
@@ -21,7 +26,8 @@
 .challenge-consent input { flex: 0 0 auto; margin-block-start: var(--space-1); }
 .challenge-hint-confirm, .challenge-hint { padding: var(--space-4); margin-block: var(--space-4); background: var(--bg-alt); border-radius: var(--radius-sm); }
 .challenge-hint-confirm p { max-inline-size: var(--prose); margin-inline: auto; }
-.challenge-table { overflow-x: auto; margin-block: var(--space-4); }
+.challenge-table { overflow-x: auto; margin-block: var(--space-4); transition: opacity var(--dur-fast) ease; }
+.challenge-table[aria-busy="true"] { opacity: 0.68; }
 .challenge-table table { inline-size: 100%; border-collapse: collapse; text-align: start; }
 .challenge-table th, .challenge-table td { padding: var(--space-3); border-block-end: 1px solid var(--edge-soft); }
 .challenge-table th { font-family: var(--font-ui); }
@@ -52,7 +58,8 @@
 .retention-medal[data-motif="1"] { --medal-gem: #79b6f0; }
 .retention-medal[data-motif="2"] { --medal-gem: #c68cdb; }
 .retention-medal[data-motif="3"] { --medal-gem: #ed8c67; }
-.retention-medal[data-motif="4"], .retention-medal[data-motif="5"] { --medal-gem: #70d6ac; }
+.retention-medal[data-motif="4"] { --medal-gem: #5ec9c6; }
+.retention-medal[data-motif="5"] { --medal-gem: #70d6ac; }
 .retention-medal[data-motif="6"] { --medal-gem: #f5cb6e; }
 .retention-medal[data-motif="7"] { --medal-gem: #b2a2ee; }
 .retention-medal[data-motif="8"] { --medal-gem: #ee9b78; }
@@ -98,11 +105,12 @@
 .tower-hub, .echoes-accomplishments { margin-block: var(--space-8); padding-block: var(--space-7); border-block-start: 1px solid var(--edge); }
 .tower-header { display: flex; align-items: center; justify-content: space-between; gap: var(--space-5); }
 .tower-header h2 { margin-block: var(--space-2); }
+.tower-header-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--space-3); }
+.tower-header-actions > .meta { margin: 0; }
 .tower-hub > .lead, .echoes-accomplishments > .lead { max-inline-size: var(--prose); }
 .tower-guide { margin-block: var(--space-4); border-block: 1px solid var(--edge-soft); text-align: center; }
 .tower-guide > p { max-inline-size: var(--prose); margin-inline: auto; }
-.tower-hub > [role="alert"]:empty, .tower-hub > [role="status"]:empty,
-.echoes-accomplishments > [role="alert"]:empty, .echoes-accomplishments > [role="status"]:empty { display: none; }
+.tower-hub > [role="alert"]:empty, .echoes-accomplishments > [role="alert"]:empty { display: none; }
 .tower-stage { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-7); align-items: center; margin-block: var(--space-5); overflow: hidden; background: radial-gradient(ellipse at 90% 10%, #70d6ac12, transparent 65%), var(--panel); }
 .tower-stage-copy { min-inline-size: 0; text-align: center; padding: var(--space-4); }
 .tower-stage-copy h3 { color: var(--title); font-size: clamp(1.75rem, 3vw, 2.75rem); text-wrap: balance; }
@@ -116,27 +124,26 @@
 .tower-floors [aria-current="step"] { color: var(--title); }
 .tower-floors [aria-current="step"] .tower-floor-number { border-color: var(--gold); box-shadow: inset 0 0 0 4px var(--panel), inset 0 0 0 5px var(--gold), 0 0 16px #eac46a19; }
 .tower-floors li:last-child .tower-floor-number { border-block-start-width: 3px; border-start-start-radius: .3rem; border-start-end-radius: .3rem; }
-.tower-owned, .tower-account, .tower-rewards, .tower-rankings { text-align: center; margin-block: var(--space-6); }
+.tower-owned, .tower-rewards, .tower-rankings { text-align: center; margin-block: var(--space-6); }
 .tower-owned > .challenge-stats { display: grid; grid-template-columns: repeat(3, 1fr); max-inline-size: 36rem; margin-inline: auto; }
 .tower-owned dd { font-size: var(--text-xl); font-variant-numeric: tabular-nums; }
 .tower-rewards > p, .tower-rankings > .meta { max-inline-size: var(--prose); margin-inline: auto; }
 .tower-relics, .tower-upgrades { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-4); margin-block: var(--space-5); }
 .tower-relics .challenge-badge { display: flex; flex-direction: column; align-items: center; min-inline-size: 0; }
-.tower-relics .challenge-badge > h4 { font-size: var(--text-lg); margin-block: var(--space-3); }
-.echoes-accomplishments .challenge-badge > h3 { margin-block: var(--space-3); }
+.tower-relics .challenge-badge > h3 { font-size: var(--text-lg); margin-block: var(--space-3); }
+.tower-relics .challenge-badge > .tower-badge-tier { margin-block-start: auto; }
 .echoes-accomplishments .echoes-badge-goal { flex: 1; }
-.tower-relics .challenge-badge > progress { margin-block-end: var(--space-4); }
 .challenge-badge > .button { margin-block-start: var(--space-4); }
 .tower-hub summary { cursor: pointer; min-block-size: 44px; padding: var(--space-3); }
 .tower-tier-gallery { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--space-3); padding-block: var(--space-3); }
 .tower-tier-gallery > div { border: 1px solid var(--edge-soft); border-radius: var(--radius-sm); padding: var(--space-2); }
 .tower-tier-gallery p { margin-block: var(--space-1); }
-.tower-tier-gallery .retention-medal { width: 9rem; }
+.tower-tier-gallery .retention-medal { width: 6.5rem; }
 .medal-preview { margin-block: var(--space-4); text-align: center; }
-.medal-preview h4 { color: var(--title); margin: 0; }
+.medal-preview h4 { color: var(--title); margin: 0; font: 600 var(--text-lg) / var(--leading-tight) var(--serif); letter-spacing: -0.01em; text-transform: none; }
 .tower-tier-gallery .relic-earned { border-color: var(--gold); background: var(--panel-2); }
 .tower-upgrades > article { padding: var(--space-4); border: 1px solid var(--edge); border-radius: var(--radius-sm); background: var(--bg-alt); }
-.tower-upgrades h4 { color: var(--gold); }
+.tower-upgrades h4 { color: var(--gold); font: 600 var(--text-md) / var(--leading-tight) var(--serif); letter-spacing: -0.01em; text-transform: none; }
 .tower-replacement { display: grid; gap: var(--space-2); overflow-wrap: anywhere; }
 .tower-replacement > span:first-child { color: var(--ink-soft); }
 .tower-replacement > strong { color: var(--title); }
@@ -146,13 +153,15 @@
   .tower-relics, .tower-upgrades { grid-template-columns: 1fr; }
   .tower-relics .challenge-badge { display: grid; grid-template-columns: 5.5rem minmax(0, 1fr); gap: var(--space-2) var(--space-4); text-align: start; }
   .tower-relics .challenge-badge > .retention-medal { grid-column: 1; grid-row: 1 / 5; width: 5.5rem; }
-  .tower-relics .challenge-badge > h4, .tower-relics .challenge-badge > p, .tower-relics .challenge-badge > progress { grid-column: 2; margin: 0; }
-  .echoes-accomplishments .challenge-badge > h3 { grid-column: 2; margin: 0; }
+  .echoes-accomplishments .challenge-badge > .retention-medal { grid-row: 1 / 6; }
+  .tower-relics .challenge-badge > :is(h3, p, progress) { grid-column: 2; margin: 0; }
   .tower-relics .challenge-badge > .button { grid-column: 1 / -1; justify-self: center; margin-block-start: var(--space-3); }
-  .tower-tier-gallery { grid-template-columns: repeat(5, minmax(0, 1fr)); }
-  .tower-tier-gallery > div:last-child { grid-column: auto; }
+}
+@media (max-width: 44rem) {
+  .tower-tier-gallery { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 @media (max-width: 30rem) {
+  .challenge-toolbar { display: flex; flex-wrap: wrap; justify-content: center; }
   .tower-header { align-items: start; gap: var(--space-3); }
   .tower-stage-copy, .tower-floors { padding-inline: 0; }
   .tower-tier-gallery { grid-template-columns: repeat(2, minmax(0, 1fr)); }
