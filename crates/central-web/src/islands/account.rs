@@ -327,7 +327,7 @@ fn home(lang: Lang, summary: &Summary, worker: &str) -> AnyView {
         .then(|| view! { <span class="me-role">{words::account_admin(lang)}</span> });
     view! {
         <section class="card me" aria-labelledby="me-name">
-            {super::picture::own_face(face_name)}
+            {super::picture::own_face(&face_name)}
             <div class="me-text">
                 {handle}
                 <p class="meta">{words::account_signin_name(lang, &summary.username)}{role}</p>

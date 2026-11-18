@@ -369,6 +369,44 @@ async fn mails_here() -> bool {
     )
 }
 
+/// The handle a new account got, its name and its tag told apart.
+fn handle_line(lang: Lang, handle: String) -> impl IntoView + use<> {
+    let (name, tag) = match handle.rsplit_once('#') {
+        Some((name, tag)) => (name.to_owned(), format!("#{tag}")),
+        None => (handle, String::new()),
+    };
+    view! {
+        <p class="who">
+            <span class="who-label">{words::code_handle_label(lang)}</span>
+            <span class="who-handle" translate="no">
+                <span class="who-name">{name}</span>
+                <span class="who-tag">{tag}</span>
+            </span>
+        </p>
+    }
+}
+
+/// The code step's field for an address, where this Central mails: what is
+/// typed goes to `typed`, and what naming a mailbox means unfolds once one
+/// is being named.
+fn code_email(lang: Lang, typed: RwSignal<String>) -> impl IntoView + use<> {
+    view! {
+        <div class="field">
+            <label for="code-email">{words::code_email_label(lang)}</label>
+            <div class="inset">
+                {field::mark(glyph::MAIL)}
+                <input id="code-email" type="email" inputmode="email" autocomplete="email" autocapitalize="none" spellcheck="false" maxlength="254"
+                    aria-describedby="code-email-hint code-email-warning"
+                    on:input=move |ev| typed.set(event_target_value(&ev)) prop:value=move || typed.get() />
+            </div>
+            <p class="hint" id="code-email-hint">{words::code_email_hint(lang)}</p>
+            <div class="unfold" class:open=move || !typed.get().trim().is_empty()>
+                <p class="hint" id="code-email-warning">{words::email_warning(lang)}</p>
+            </div>
+        </div>
+    }
+}
+
 /// The code step: shown once, with the ways to keep it (`keep.rs`), and
 /// left only once the person says it is kept. After a registration, where
 /// this Central mails, it also takes an address for the account. Naming one
@@ -388,22 +426,7 @@ fn code_view(lang: Lang, step: RwSignal<Step>, code: &NewCode, who: Who) -> impl
         });
     }
     let ways = super::keep::ways(lang, &code.code, &who.username, typed);
-    // the handle a new account got, its name and its tag told apart
-    let handle_line = who.handle.clone().map(|handle| {
-        let (name, tag) = match handle.rsplit_once('#') {
-            Some((name, tag)) => (name.to_owned(), format!("#{tag}")),
-            None => (handle, String::new()),
-        };
-        view! {
-            <p class="who">
-                <span class="who-label">{words::code_handle_label(lang)}</span>
-                <span class="who-handle" translate="no">
-                    <span class="who-name">{name}</span>
-                    <span class="who-tag">{tag}</span>
-                </span>
-            </p>
-        }
-    });
+    let handle_line = who.handle.clone().map(|handle| handle_line(lang, handle));
     // a registration's step says first that the account is there
     let created = (!optional).then(|| {
         view! {
@@ -453,26 +476,7 @@ fn code_view(lang: Lang, step: RwSignal<Step>, code: &NewCode, who: Who) -> impl
         let skip = move |_| session::go(&format!("/{}/account", lang.code()));
         view! { <button type="button" class="button quiet" on:click=skip>{words::code_later(lang)}</button> }
     });
-    let email = move || {
-        mails.get().then(|| {
-            view! {
-                <div class="field">
-                    <label for="code-email">{words::code_email_label(lang)}</label>
-                    <div class="inset">
-                        {field::mark(glyph::MAIL)}
-                        <input id="code-email" type="email" inputmode="email" autocomplete="email" autocapitalize="none" spellcheck="false" maxlength="254"
-                            aria-describedby="code-email-hint code-email-warning"
-                            on:input=move |ev| typed.set(event_target_value(&ev)) prop:value=move || typed.get() />
-                    </div>
-                    <p class="hint" id="code-email-hint">{words::code_email_hint(lang)}</p>
-                    // what naming a mailbox means, once one is being named
-                    <div class="unfold" class:open=move || !typed.get().trim().is_empty()>
-                        <p class="hint" id="code-email-warning">{words::email_warning(lang)}</p>
-                    </div>
-                </div>
-            }
-        })
-    };
+    let email = move || mails.get().then(|| code_email(lang, typed));
     view! {
         <section class="card step step-code" aria-labelledby="code-title">
             <header class="step-head">

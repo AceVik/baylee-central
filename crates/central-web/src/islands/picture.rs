@@ -856,7 +856,7 @@ impl Card {
 /// Central said which, else the initials of `name`, in one mark of a fixed
 /// size. Asking also tells the header which picture is the account's
 /// (`session.rs`), so it shows from the first page after a sign-in.
-pub fn own_face(name: String) -> impl IntoView {
+pub fn own_face(name: &str) -> impl IntoView {
     let own = RwSignal::new(None::<Option<(PictureKey, bool)>>);
     Effect::new(move |_| {
         leptos::task::spawn_local(async move {
