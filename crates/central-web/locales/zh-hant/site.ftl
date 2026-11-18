@@ -485,7 +485,6 @@ register-error-taken = 這個登入名稱已被使用。請選另一個。
 ## The recovery code
 
 code-title = 你的救援碼
-code-handle = 你的代號：{ $handle }
 code-lead = 如果你忘記密碼，只有靠這組救援碼，你的加密資料才保得住。我們不知道它，也無法恢復。請把它存放在安全的地方，遠離這台裝置。
 code-shown-once = 只顯示這一次
 code-download = 儲存為文字檔
@@ -1849,3 +1848,12 @@ echoes-ascents = 王冠征服者
 echoes-ascents-goal = 取得八場勝利並完成遠征。
 echoes-unbroken = 完美無瑕
 echoes-unbroken-goal = 在沒有失敗或平手的情況下取得八場勝利。
+
+## the steps after signing in (code and terms, redesign)
+code-created = Account created
+code-handle-label = Your handle
+code-keep-title = Keep it now, in at least one of these ways
+code-mail-opened = Your mail program should open now with a draft. If nothing happens, this browser has none set up: keep the code another way.
+terms-step-version = Version { $version }
+terms-read-hint = Read the text to its end, then you can accept.
+terms-read-done = Read to the end.

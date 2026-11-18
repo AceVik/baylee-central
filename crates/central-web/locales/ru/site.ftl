@@ -485,7 +485,6 @@ register-error-taken = Это имя для входа занято. Выбер�
 ## The recovery code
 
 code-title = Ваш код восстановления
-code-handle = Ваш хэндл: { $handle }
 code-lead = Ваши зашифрованные данные сохранятся, если вы забудете пароль, только при наличии этого кода. Мы его не знаем и восстановить не можем. Храните его в надёжном месте, отдельно от этого устройства.
 code-shown-once = Показывается только сейчас
 code-download = Сохранить как текстовый файл
@@ -1867,3 +1866,12 @@ echoes-ascents = Покоритель короны
 echoes-ascents-goal = Завершайте экспедиции с восемью победами.
 echoes-unbroken = Безупречность
 echoes-unbroken-goal = Добейтесь восьми побед без поражений и ничьих.
+
+## the steps after signing in (code and terms, redesign)
+code-created = Account created
+code-handle-label = Your handle
+code-keep-title = Keep it now, in at least one of these ways
+code-mail-opened = Your mail program should open now with a draft. If nothing happens, this browser has none set up: keep the code another way.
+terms-step-version = Version { $version }
+terms-read-hint = Read the text to its end, then you can accept.
+terms-read-done = Read to the end.

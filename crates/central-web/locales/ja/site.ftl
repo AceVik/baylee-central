@@ -485,7 +485,6 @@ register-error-taken = このログイン名は使われています。別の名
 ## The recovery code
 
 code-title = 回復コード
-code-handle = あなたのハンドル：{ $handle }
 code-lead = パスワードを忘れたとき、暗号化されたデータが残るのは、このコードがある場合だけです。私たちはこのコードを知らず、復元もできません。この端末から離れた安全な場所に保管してください。
 code-shown-once = 表示は今だけです
 code-download = テキストファイルとして保存
@@ -1853,3 +1852,12 @@ echoes-ascents = 王冠の征服者
 echoes-ascents-goal = 8勝して遠征を完了する。
 echoes-unbroken = 完全無欠
 echoes-unbroken-goal = 敗北も引き分けもせずに8勝する。
+
+## the steps after signing in (code and terms, redesign)
+code-created = Account created
+code-handle-label = Your handle
+code-keep-title = Keep it now, in at least one of these ways
+code-mail-opened = Your mail program should open now with a draft. If nothing happens, this browser has none set up: keep the code another way.
+terms-step-version = Version { $version }
+terms-read-hint = Read the text to its end, then you can accept.
+terms-read-done = Read to the end.

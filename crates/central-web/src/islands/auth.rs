@@ -386,10 +386,31 @@ fn code_view(lang: Lang, step: RwSignal<Step>, code: &NewCode, who: Who) -> impl
         });
     }
     let ways = super::keep::ways(lang, &code.code, &who.username, typed);
-    let handle_line = who
-        .handle
-        .clone()
-        .map(|handle| view! { <p>{words::code_handle(lang, &handle)}</p> });
+    // the handle a new account got, its name and its tag told apart
+    let handle_line = who.handle.clone().map(|handle| {
+        let (name, tag) = match handle.rsplit_once('#') {
+            Some((name, tag)) => (name.to_owned(), format!("#{tag}")),
+            None => (handle, String::new()),
+        };
+        view! {
+            <p class="who">
+                <span class="who-label">{words::code_handle_label(lang)}</span>
+                <span class="who-handle" translate="no">
+                    <span class="who-name">{name}</span>
+                    <span class="who-tag">{tag}</span>
+                </span>
+            </p>
+        }
+    });
+    // a registration's step says first that the account is there
+    let created = (!optional).then(|| {
+        view! {
+            <p class="step-badge">
+                {glyph::glyph(glyph::SHIELD_CHECK)}
+                <span>{words::code_created(lang)}</span>
+            </p>
+        }
+    });
     let recovery = code.recovery.clone();
     let go_on = move |_| {
         if !kept.get_untracked() {
@@ -442,18 +463,26 @@ fn code_view(lang: Lang, step: RwSignal<Step>, code: &NewCode, who: Who) -> impl
                             on:input=move |ev| typed.set(event_target_value(&ev)) prop:value=move || typed.get() />
                     </div>
                     <p class="hint" id="code-email-hint">{words::code_email_hint(lang)}</p>
-                    <p class="hint" id="code-email-warning">{words::email_warning(lang)}</p>
+                    // what naming a mailbox means, once one is being named
+                    <div class="unfold" class:open=move || !typed.get().trim().is_empty()>
+                        <p class="hint" id="code-email-warning">{words::email_warning(lang)}</p>
+                    </div>
                 </div>
             }
         })
     };
     view! {
-        <section class="card step" aria-labelledby="code-title">
-            <h2 id="code-title" tabindex="-1" data-step-focus>{words::code_title(lang)}</h2>
-            {handle_line}
-            <p>{words::code_lead(lang)}</p>
-            <p class="eyebrow">{words::code_shown_once(lang)}</p>
-            <p class="secret" translate="no"><code>{code.code.clone()}</code></p>
+        <section class="card step step-code" aria-labelledby="code-title">
+            <header class="step-head">
+                {created}
+                <h2 id="code-title" tabindex="-1" data-step-focus>{words::code_title(lang)}</h2>
+                {handle_line}
+            </header>
+            <p class="step-lead">{words::code_lead(lang)}</p>
+            <div class="secret-frame">
+                <p class="eyebrow">{words::code_shown_once(lang)}</p>
+                <p class="secret" translate="no"><code>{code.code.clone()}</code></p>
+            </div>
             {ways}
             {email}
             <div class="check">
@@ -461,10 +490,13 @@ fn code_view(lang: Lang, step: RwSignal<Step>, code: &NewCode, who: Who) -> impl
                 <label for="code-kept">{words::code_kept(lang)}</label>
             </div>
             <p class="error" role="alert">{move || error.get()}</p>
-            <p class="actions">
-                <button type="button" class="button primary" on:click=go_on>{words::code_continue(lang)}</button>
+            <div class="step-actions">
+                <button type="button" class="button primary step-go" on:click=go_on>
+                    <span>{words::code_continue(lang)}</span>
+                    {glyph::glyph(glyph::FORWARD)}
+                </button>
                 {later}
-            </p>
+            </div>
         </section>
     }
 }
@@ -479,7 +511,56 @@ fn terms_view(
 ) -> impl IntoView + use<> {
     let text = text_in(document, lang).map(|text| markdown::render(&text.markdown));
     let TermsVersion { version, digest } = document.version.clone();
+    let named = words::terms_step_version(lang, &version);
+    // Accepting follows reading, as in the game client: the button works
+    // once the text was read to its end (or fits its box without
+    // scrolling). `read` never goes back, and `seen` is how far down the
+    // reader is, for the line under the text.
+    let read = RwSignal::new(false);
+    let seen = RwSignal::new(0_u8);
+    let pressed = RwSignal::new(false);
+    let measure = move |top: f64, shown: f64, whole: f64| {
+        let rest = whole - shown;
+        let share = if rest <= 4.0 {
+            1.0
+        } else {
+            (top / rest).clamp(0.0, 1.0)
+        };
+        #[expect(
+            clippy::cast_possible_truncation,
+            clippy::cast_sign_loss,
+            reason = "a share of one, in eighths"
+        )]
+        seen.set((share * 8.0).floor() as u8);
+        if rest - top <= 4.0 {
+            read.set(true);
+        }
+    };
+    let scrolled = move |event: leptos::ev::Event| {
+        let target = event_target::<leptos::web_sys::Element>(&event);
+        measure(
+            f64::from(target.scroll_top()),
+            f64::from(target.client_height()),
+            f64::from(target.scroll_height()),
+        );
+    };
+    let text_box = NodeRef::<leptos::html::Div>::new();
+    // a text that fits its box is read as it stands
+    Effect::new(move |_| {
+        if let Some(text_box) = text_box.get() {
+            measure(
+                f64::from(text_box.scroll_top()),
+                f64::from(text_box.client_height()),
+                f64::from(text_box.scroll_height()),
+            );
+        }
+    });
     let accept = move |_| {
+        if !read.get_untracked() {
+            // the button stays reachable so it can say why it does nothing
+            pressed.set(true);
+            return;
+        }
         let (version, code, who) = (version.clone(), code.clone(), who.clone());
         step.set(Step::Working);
         leptos::task::spawn_local(async move {
@@ -504,14 +585,28 @@ fn terms_view(
         });
     };
     view! {
-        <section class="card step" aria-labelledby="terms-step-title">
-            <h2 id="terms-step-title" tabindex="-1" data-step-focus>{words::terms_step_title(lang)}</h2>
-            <p>{words::terms_step_lead(lang)}</p>
-            <div class="terms-text prose" tabindex="0" role="region" aria-labelledby="terms-step-title">{text}</div>
-            <p class="actions">
-                <button type="button" class="button primary" on:click=accept>{words::terms_accept(lang)}</button>
-                <button type="button" class="button quiet" on:click=decline>{words::terms_decline(lang)}</button>
+        <section class="card step step-terms" aria-labelledby="terms-step-title">
+            <header class="step-head">
+                <h2 id="terms-step-title" tabindex="-1" data-step-focus>{words::terms_step_title(lang)}</h2>
+                <p class="step-version">{named}</p>
+            </header>
+            <p class="step-lead">{words::terms_step_lead(lang)}</p>
+            <div class="terms-box">
+                <div class="terms-text prose" tabindex="0" role="region" aria-labelledby="terms-step-title"
+                    node_ref=text_box on:scroll=scrolled>{text}</div>
+                <p class="terms-seen" aria-hidden="true" data-seen=move || seen.get().to_string() data-read=move || read.get().then_some("")></p>
+            </div>
+            <p class="terms-hint" id="terms-read-hint" role="status" class:asked=move || pressed.get() && !read.get()>
+                {move || if read.get() { words::terms_read_done(lang) } else { words::terms_read_hint(lang) }}
             </p>
+            <div class="step-actions two">
+                <button type="button" class="button quiet" on:click=decline>{words::terms_decline(lang)}</button>
+                <button type="button" class="button primary step-go" aria-describedby="terms-read-hint"
+                    aria-disabled=move || if read.get() { "false" } else { "true" } on:click=accept>
+                    {glyph::glyph(glyph::SHIELD_CHECK)}
+                    <span>{words::terms_accept(lang)}</span>
+                </button>
+            </div>
         </section>
     }
 }

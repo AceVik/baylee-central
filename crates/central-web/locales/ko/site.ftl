@@ -485,7 +485,6 @@ register-error-taken = 이미 사용 중인 로그인 이름이에요. 다른 �
 ## The recovery code
 
 code-title = 복구 코드
-code-handle = 내 핸들: { $handle }
 code-lead = 비밀번호를 잊어버렸을 때 이 코드가 있어야만 암호화된 데이터가 남아 있어요. 우리는 이 코드를 알지 못하며 복원할 수도 없어요. 이 기기와 떨어진 안전한 곳에 보관해 주세요.
 code-shown-once = 지금만 표시돼요
 code-download = 텍스트 파일로 저장
@@ -1849,3 +1848,12 @@ echoes-ascents = 왕관 정복자
 echoes-ascents-goal = 8승으로 원정을 완료하세요.
 echoes-unbroken = 무결점
 echoes-unbroken-goal = 패배나 무승부 없이 8승을 달성하세요.
+
+## the steps after signing in (code and terms, redesign)
+code-created = Account created
+code-handle-label = Your handle
+code-keep-title = Keep it now, in at least one of these ways
+code-mail-opened = Your mail program should open now with a draft. If nothing happens, this browser has none set up: keep the code another way.
+terms-step-version = Version { $version }
+terms-read-hint = Read the text to its end, then you can accept.
+terms-read-done = Read to the end.

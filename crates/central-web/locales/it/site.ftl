@@ -507,7 +507,6 @@ register-error-taken = Questo nome di accesso è già in uso. Scegline un altro.
 ## The recovery code
 
 code-title = Il tuo codice di recupero
-code-handle = Il tuo handle: { $handle }
 code-lead = Solo con questo codice i tuoi dati cifrati si salvano se dimentichi la password. Noi non lo conosciamo e non possiamo ripristinarlo. Conservalo in un posto sicuro, lontano da questo dispositivo.
 code-shown-once = Mostrato solo ora
 code-download = Salva come file di testo
@@ -1982,3 +1981,12 @@ echoes-ascents = Conquistatore della corona
 echoes-ascents-goal = Completa spedizioni con otto vittorie.
 echoes-unbroken = Impeccabile
 echoes-unbroken-goal = Raggiungi otto vittorie senza sconfitte né pareggi.
+
+## the steps after signing in (code and terms, redesign)
+code-created = Account created
+code-handle-label = Your handle
+code-keep-title = Keep it now, in at least one of these ways
+code-mail-opened = Your mail program should open now with a draft. If nothing happens, this browser has none set up: keep the code another way.
+terms-step-version = Version { $version }
+terms-read-hint = Read the text to its end, then you can accept.
+terms-read-done = Read to the end.
