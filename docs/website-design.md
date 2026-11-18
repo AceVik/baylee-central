@@ -424,8 +424,8 @@ The Content Security Policy holds for what is put in place as for any
 page: no inline script, no inline handler, no foreign origin. Trusted
 Types allow one more policy for this, `baylee-nav`, which passes a string
 to the parser for that one use and vouches for no other script address.
-A page view is still counted only for a document the server sent to a
-navigation, so going from page to page inside a visit is not counted.
+What the strip counts is a visit (`central-web-server`, `views.rs`): a document sent to a
+navigation that did not start on one of the site's own pages and is not a reload. Going from page to page is never counted again, whether the page is put in place here or loads a document (another language, the account area).
 
 ### The messenger
 
