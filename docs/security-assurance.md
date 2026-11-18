@@ -7911,3 +7911,72 @@ Adversarial pass, what was tried and what holds:
   `storage` listener.
 
 These passes are by the implementing agent and are not an independent audit.
+
+## The donation page, what it asks Liberapay and `/funding.json`, 18 November 2026
+
+Design pass. The site gains `/donate`: the monthly goal, how much of it is covered, what the
+money pays for, and three places to give (GitHub Sponsors, Liberapay, Ko-fi), each as a link
+and a QR code. The bar and the footer link to it, and `/funding.json` says the goal's figures
+to a program.
+
+- **No money and no donor here.** The site takes no payment, has no form on the page and
+  learns nothing about who gave: paying happens on the platform, in a new tab opened with
+  `noopener noreferrer`. The three addresses are constants (`data::GIVING`); nothing a reader
+  or a platform sends becomes a link's target.
+- **One new outbound request.** `central-web-server` asks
+  `https://liberapay.com/AceVik/public.json` every thirty minutes (`funding.rs`), with the
+  agent the GitHub requests use: HTTPS only, no proxy, no redirect followed, ten seconds in
+  all, sixteen kibibytes of headers. Liberapay publishes this document for anybody; no key
+  exists, and the server still holds no secret. A reader's browser never asks a platform:
+  the policy's `connect-src` is unchanged, and the codes are files of this origin.
+- **What is kept of the answer.** Two numbers: what is received a week, in euro cents, and
+  from how many. The answer also carries the recipient's name, picture address and own
+  texts; they are not deserialised (the struct names two fields), not logged and not passed
+  on. Nothing in the answer names a donor. The numbers live in memory only.
+- **GitHub Sponsors and Ko-fi are not asked.** Their figures need a token or a webhook with
+  a verification secret, and this process has no place for either by design. The page says
+  which platform the bar counts. Counting them is a later change with a design of its own
+  (where the secret lives, which process answers the webhook).
+- **`/funding.json`** is a public document of constants and those figures: goal, covered,
+  percentage, number of supporters, which platforms are counted, the page's address, the
+  three places. It is sent with the headers every generated document gets and is the same
+  for every reader.
+- **The buttons' light** is CSS alone (a gradient that travels under the label, a glow on the
+  heart); no script, no inline style, nothing under reduced motion.
+
+Implementation pass: `central-web/src/data.rs` (`GIVING`, `Pledges`, `Funding`),
+`site/pages/donate.rs`, `style/donate.css`, three SVG files under `assets/img/`, the bar's and
+the footer's link in `site/shell.rs`, a part of the privacy notice (`legal.rs`, 44 words in
+eleven languages); `central-web-server/src/funding.rs` (asking and reading), `fetch.rs` (the
+half-hourly task, the fallback's file), `config.rs` (`funding`, on unless switched off),
+`generated.rs` and `routes.rs` (`/funding.json`, `/donate` among the addresses that lead to a
+language). No dependency is new: `ureq` and `serde_json` were there. Central's service, its
+wire and its database are untouched.
+
+Adversarial pass, what was tried and what holds:
+- **A hostile or broken answer.** The body is read up to 64 KiB and no further; anything but
+  status 200 is dropped. An amount is digits with at most one point and one or two digits
+  after it, at most nine digits before: no sign, exponent, grouping, blank or other script's
+  digits (tested with twenty-one spellings). Another currency, a missing amount, an amount
+  that is a JSON number, or more than a hundred thousand euros a week drops the answer; the
+  supporters' count is capped at a million. The month's figure is `week * 52 / 12` on values
+  bounded so that it cannot overflow, and the percentage is capped at 100. So the worst a
+  platform (or whoever answers in its place, past TLS) can do is show a wrong amount up to
+  that bound on one page; no text of the answer reaches a page.
+- **A platform that stops answering** keeps its last figures; one that never answered leaves
+  the bar out and a line says that no figure is known. Zero is drawn as an invitation, never
+  as a count of nobody that could be read as a statement about people.
+- **The codes.** Each is a static SVG made by Baylee's `cargo tools site qr` from the address
+  in `GIVING` (one path, no script, no reference to anything outside the file) and was read
+  back with macOS's detector before it was added: each says exactly its address. A file is
+  served under its content hash like every asset; changing an address means making its file
+  anew, and the page test pins the three addresses beside the three files.
+- **The links.** `target="_blank"` with `rel="noopener noreferrer"` on all six (tested in
+  every language): the platform learns neither the opener nor the page the reader came from.
+- **The legal rule.** The page's own part names neither Wizards nor the game it plays
+  (tested in every language); the footer's fan-content notice stands on it as on every page,
+  which is the disclaimer the policy asks for and not a connection to a sponsor.
+- **Abuse of the route.** `/funding.json` is a GET of a few hundred bytes built from memory;
+  it asks nobody anything, so a flood of it reaches no platform.
+
+These passes are by the implementing agent and are not an independent audit.
