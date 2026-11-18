@@ -1,12 +1,23 @@
 //! Merge separately paginated challenge metadata into the account's downloadable file.
-use super::{Failure, api, request};
+use super::{
+    central::{Failure, call},
+    session,
+};
+use central_api::{challenges as api, wire};
 mod echoes;
-mod tower;
+pub(super) mod tower;
+
+pub(super) async fn request(request: api::Request) -> Result<api::Response, Failure> {
+    match call(&wire::Request::Challenges { request }).await? {
+        wire::Response::Challenges { response } => Ok(response),
+        _ => Err(Failure::Malformed),
+    }
+}
 
 /// The browser bounds the download to 7680 rows per dataset. The file explicitly marks
 /// an incomplete dataset, matching the account export's existing bounded-list convention.
 pub(crate) async fn merged(file: &str) -> Result<String, Failure> {
-    let stamp = super::super::session::marker().ok_or(Failure::Rejected)?;
+    let stamp = session::marker().ok_or(Failure::Rejected)?;
     let mut file: serde_json::Value = serde_json::from_str(file).map_err(|_| Failure::Malformed)?;
     let mut datasets = serde_json::Map::new();
     for (table, name) in [
@@ -45,7 +56,7 @@ pub(crate) async fn merged(file: &str) -> Result<String, Failure> {
     file.as_object_mut()
         .ok_or(Failure::Malformed)?
         .insert("tower_echoes".into(), echoes::receipts().await?);
-    if super::super::session::marker().as_ref() != Some(&stamp) {
+    if session::marker().as_ref() != Some(&stamp) {
         return Err(Failure::Rejected);
     }
     serde_json::to_string_pretty(&file).map_err(|_| Failure::Malformed)

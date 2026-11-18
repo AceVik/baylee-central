@@ -24,6 +24,7 @@ mod crypto;
 mod early;
 mod echoes;
 mod email;
+mod export;
 #[cfg(any(not(target_arch = "wasm32"), feature = "admin"))]
 mod feedback;
 mod field;
