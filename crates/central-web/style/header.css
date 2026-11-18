@@ -656,7 +656,7 @@ body:has(dialog[open]) .top {
 }
 
 /* beside the sections the language's code stands for it until there is room
-   for its name ("Português (Brasil)") */
+   for its name */
 @media (min-width: 1081px) and (max-width: 1279px) {
   .lang-name {
     display: none;

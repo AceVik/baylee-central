@@ -95,7 +95,7 @@ impl Lang {
             Lang::Fr => "Français",
             Lang::It => "Italiano",
             Lang::Es => "Español",
-            Lang::PtBr => "Português (Brasil)",
+            Lang::PtBr => "Português",
             Lang::Ru => "Русский",
             Lang::Ja => "日本語",
             Lang::Ko => "한국어",
