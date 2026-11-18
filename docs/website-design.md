@@ -302,13 +302,13 @@ to feel slow and over the 60 ms where it reads as a snap.
   ride in, a small fluid on the GPU (stable fluids with vorticity
   confinement on a 112-cell-high grid, the clouds on a finer one): it drags
   the air along its path, a swift stroke more of it than a slow one and
-  never faster than itself; stirred vapour thins, rises a little and is drawn out like smoke,
-  and gathers again as the air forgets the stir, with nothing pulled back
-  or popping in; a press sends a gust outwards. The air moves alike at
-  every refresh rate: at most a hundred steps a second while stirred (a
-  120 Hz screen shows every second frame), thirty while calm, when the
-  solve rests altogether. Thinner behind the words, fuller towards the
-  edges, and under the veil that keeps the words readable; a still
+  never faster than itself; stirred vapour thins, rises a little and is
+  drawn out like smoke, and gathers again as the air forgets the stir, with
+  nothing pulled back or popping in; a press sends a gust outwards. The air
+  moves alike at every refresh rate: at most a hundred steps a second while
+  stirred (a 120 Hz screen shows every second frame), thirty while calm,
+  when the solve rests altogether. Thinner behind the words, fuller towards
+  the edges, and under the veil that keeps the words readable; a still
   picture under reduced motion and where WebGL 2 renders in software, the
   painting alone without WebGL 2. The memorial's light
   is its own (limited to 20 draws a second, its GPU context given back when
