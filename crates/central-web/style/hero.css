@@ -233,6 +233,13 @@ body:has(dialog[open]) .wave {
 .glow {
   color: var(--link);
   font-style: italic;
+  /* The gradient below is painted only inside the box, and the box is one
+     line-height (1.1) tall: the descenders and the slant of the italic's
+     last line fell outside it and were cut. The padding gives the paint
+     room, the negative margin takes it out of the layout again, so the
+     title is as tight as before. */
+  padding-block: 0.14em 0.2em;
+  margin-block: -0.14em -0.2em;
 }
 
 /* a slow glint runs through the title's last words, where the browser can
@@ -711,8 +718,36 @@ body:has(dialog[open]) .wave {
   background: color-mix(in srgb, var(--gold) 9%, transparent);
 }
 
+/* the main build says which x86-64 level it needs; the archive for older
+   processors stands under it, a step in, quieter, with a rule at its side */
+.dl-level {
+  margin-inline-start: 0.45rem;
+  padding: 0.04em 0.45em;
+  border: 1px solid var(--edge-soft);
+  border-radius: 6px;
+  color: var(--ink-faint);
+  font: 600 0.66rem var(--mono);
+  vertical-align: 0.08em;
+}
+
+.dl-item.is-old {
+  margin-inline-start: 1.1rem;
+  border-inline-start: 2px solid var(--edge);
+  border-start-start-radius: 4px;
+  border-end-start-radius: 4px;
+}
+
 .dl-item.is-old strong {
+  color: var(--ink-soft);
   font-weight: 500;
+}
+
+/* said once per system, under its rows: who the older-processor archive is for */
+.menu-note {
+  margin: 0.2rem 0.6rem 0.35rem 1.7rem;
+  color: var(--ink-faint);
+  font: 400 0.74rem/1.4 var(--sans);
+  text-wrap: pretty;
 }
 
 /* the systems arrive one after the other as the menu opens */
@@ -793,13 +828,29 @@ body:has(dialog[open]) .wave {
   white-space: nowrap;
 }
 
+/* No underline here: the line's text-shadow (for legibility over the
+   painting) was drawn under the transparent underline as a dark stroke.
+   Hover and keyboard focus are a colour and a soft tint behind the words;
+   neither moves nor resizes anything. */
 .dl-sub a {
   display: inline-flex;
   align-items: center;
   min-height: var(--target);
   padding: 0 0.1em;
+  border-radius: 6px;
   color: var(--link-hover);
   font-weight: 600;
+  text-decoration: none;
+  transition:
+    color var(--dur-fast) ease,
+    background-color var(--dur-fast) ease;
+}
+
+.dl-sub a:hover,
+.dl-sub a:focus-visible {
+  background-color: color-mix(in srgb, var(--gold) 16%, transparent);
+  color: var(--title);
+  text-decoration: none;
 }
 
 .dl-arch {
