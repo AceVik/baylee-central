@@ -147,6 +147,26 @@ impl Page {
         }
     }
 
+    /// The form that stands open at this address: signing in, registering
+    /// and setting a new password are dialogs over any page, and their own
+    /// addresses show the start page with that dialog open (`boot.js`).
+    #[must_use]
+    pub const fn form(self) -> Option<&'static str> {
+        match self {
+            Page::SignIn => Some("signin"),
+            Page::Register => Some("register"),
+            Page::Reset => Some("reset"),
+            _ => None,
+        }
+    }
+
+    /// Whether the page shows the start page: itself, or one of the three
+    /// forms over it.
+    #[must_use]
+    pub const fn start(self) -> bool {
+        matches!(self, Page::Home) || self.form().is_some()
+    }
+
     /// Whether the server keeps the page once rendered: every page but one
     /// account's in the administration, whose address the visitor chooses
     /// (a kept page per id would let requests fill the table).

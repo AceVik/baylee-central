@@ -8,7 +8,7 @@ use leptos::tachys::html::attribute::custom::custom_attribute;
 use serde_json::{Value, json};
 
 use super::{Assets, Context, Page, icons};
-use crate::islands::{Register, SignIn};
+use crate::islands::{Register, Reset, SignIn};
 use crate::rich::{icon, rich};
 use crate::solid;
 use crate::words::{self, Lang};
@@ -133,7 +133,7 @@ fn crumbs(lang: Lang, trail: &[(String, Page)]) -> Option<impl IntoView + use<>>
 /// page's painting (its largest paint) and the faces the first screen
 /// is set in.
 fn preloads(page: Page, lang: Lang, assets: &Assets) -> impl IntoView + use<> {
-    let painting = (page == Page::Home).then(|| {
+    let painting = page.start().then(|| {
         let set = format!(
             "{} 640w, {} 960w, {} 1600w",
             assets.url("img/world-640.avif"),
@@ -161,8 +161,8 @@ fn preloads(page: Page, lang: Lang, assets: &Assets) -> impl IntoView + use<> {
         Lang::Ja | Lang::Ko | Lang::ZhHans | Lang::ZhHant => ("latin", false),
         _ => ("latin", true),
     };
-    let italic = (page == Page::Home && slanted)
-        .then(|| font(&format!("fonts/Literata-Italic-{subset}.woff2")));
+    let italic =
+        (page.start() && slanted).then(|| font(&format!("fonts/Literata-Italic-{subset}.woff2")));
     view! {
         {painting}
         {font(&format!("fonts/Inter-{subset}.woff2"))}
@@ -205,7 +205,7 @@ fn head(page: Page, cx: &Context<'_>, meta: &Meta) -> impl IntoView + use<> {
     // a page's own script: the start page's album and screenshots, the
     // gateway directory's finding
     let own = match page {
-        Page::Home => Some("home.js"),
+        page if page.start() => Some("home.js"),
         Page::Gateways => Some("directory.js"),
         _ => None,
     }
@@ -213,7 +213,7 @@ fn head(page: Page, cx: &Context<'_>, meta: &Meta) -> impl IntoView + use<> {
     // the start page's sky: clouds the pointer stirs; the script waits for
     // the page to have loaded and the browser to be idle before it begins.
     // A phone has no pointer to stir with and is not sent it.
-    let sky = (page == Page::Home && !cx.machine.mobile).then(|| {
+    let sky = (page.start() && !cx.machine.mobile).then(|| {
         view! { <script type="module" src=assets.url("clouds.js") integrity=assets.integrity("clouds.js") fetchpriority="low"></script> }
     });
     // every page that can open the sign-in over itself has its islands
@@ -278,9 +278,9 @@ fn head(page: Page, cx: &Context<'_>, meta: &Meta) -> impl IntoView + use<> {
 pub fn document(page: Page, cx: &Context<'_>, meta: &Meta, body: AnyView) -> impl IntoView + use<> {
     let lang = cx.lang;
     // the start page has the world in its hero; every other one behind it
-    let world = (page != Page::Home).then(|| world(cx));
+    let world = (!page.start()).then(|| world(cx));
     view! {
-        <html lang=lang.tag() dir="ltr">
+        <html lang=lang.tag() dir="ltr" data-auth=page.form()>
             {head(page, cx, meta)}
             <body>
                 <a class="skip" href="#main">{words::skip(lang)}</a>
@@ -288,6 +288,7 @@ pub fn document(page: Page, cx: &Context<'_>, meta: &Meta, body: AnyView) -> imp
                 {bar(page, cx)}
                 <div class="page">
                     <main id="main" tabindex="-1">
+                        {auth_noscript(page, lang)}
                         {crumbs(lang, &meta.trail)}
                         {body}
                     </main>
@@ -312,17 +313,15 @@ pub fn islands_script(page: Page) -> &'static str {
     }
 }
 
-/// Whether signing in and registering open over this page. Not over their
-/// own pages, not in the signed-in area, and not on the page a device
-/// shows without a connection.
+/// Whether signing in, registering and setting a new password open over
+/// this page. Not in the signed-in area, and not on the page a device shows
+/// without a connection. Their own addresses (`/{lang}/signin`, `/register`,
+/// `/reset`) are the start page with the dialog open (`Page::form`).
 fn has_auth_dialogs(page: Page) -> bool {
-    !matches!(
-        page,
-        Page::SignIn | Page::Register | Page::Reset | Page::Account(_) | Page::Offline
-    )
+    !matches!(page, Page::Account(_) | Page::Offline)
 }
 
-/// One of the two dialogs: Baylee's mark, the title, a line, the form.
+/// One of the three dialogs: Baylee's mark, the title, a line, the form.
 fn auth_dialog(
     cx: &Context<'_>,
     id: &'static str,
@@ -384,10 +383,29 @@ fn auth_dialogs(page: Page, cx: &Context<'_>) -> Option<impl IntoView + use<>> {
             "auth-register",
             words::register_title(lang),
             words::register_lead(lang),
-            view! { <Register lang=lang worker=worker pow=pow /> }.into_any(),
+            view! { <Register lang=lang worker=worker.clone() pow=pow /> }.into_any(),
+            None,
+        )}
+        {auth_dialog(
+            cx,
+            "auth-reset",
+            words::reset_title(lang),
+            words::reset_lead(lang),
+            view! { <Reset lang=lang worker=worker /> }.into_any(),
             None,
         )}
     })
+}
+
+/// What a form's own address says where no script runs: the dialogs open
+/// by script, and their forms work the password in the browser.
+fn auth_noscript(page: Page, lang: Lang) -> Option<impl IntoView + use<>> {
+    let words = match page {
+        Page::SignIn | Page::Register => words::signin_noscript(lang),
+        Page::Reset => words::reset_noscript(lang),
+        _ => return None,
+    };
+    Some(view! { <noscript><p class="notice auth-noscript wrap">{words}</p></noscript> })
 }
 
 /// The address of the same page in `lang`.

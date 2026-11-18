@@ -346,10 +346,20 @@ WCAG 2.1 AA, mobile first:
 | Public | `/`, `/download`, `/cards`, `/gateways`, `/contact`, legal pages | the bar, sections, the footer |
 | Account | `/account`, `/account/chat`, `/account/contacts`, `/account/security`, `/account/gateways` | the app frame; the messenger on chat and contacts |
 | Administration | `/admin` (the overview), `/admin/feedback`, `/admin/feedback/<id>`, `/admin/users`, `/admin/users/<id>`, `/admin/gateways`, `/admin/audit`, `/admin/legacy` | the app frame, loaded only for an administrator |
-| Sign-in | `/signin`, `/register` | a centred card beside Baylee's cloud |
+| Sign-in | `/signin`, `/register`, `/reset` | a dialog over the page that asked; at its own address, over the start page |
 
 The account area and the administration are loaded lazily and only after a
 sign-in; a visitor's first page fetches neither.
+
+The three forms (signing in, registering, a new password with a reset code)
+are dialogs, never pages of their own. Every page outside the account area
+carries them closed; a link to one opens it and puts the form's address in
+the bar, closing it goes that step back, and Back closes it. Entered
+directly (or reached from a reset mail, whose code rides in the fragment),
+the address shows the start page with the dialog open, and closing it
+leaves for the start page. Without script the address shows the start page
+under a line that says the form needs script. The addresses stay out of the
+index and the sitemap.
 
 ### The messenger
 

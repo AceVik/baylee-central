@@ -2,62 +2,6 @@
    §6.2): the forms beside the cloud, the frame with its navigation, the
    steps that show a secret once. */
 
-/* ---- Signing in and registering ------------------------------------------ */
-
-/* the words and the form in a column of their own; Baylee on her cloud
-   beside them on a wide screen, floating, as the old site had her */
-.auth {
-  position: relative;
-  display: grid;
-  gap: var(--space-6);
-  align-items: start;
-}
-
-.auth-head {
-  padding-block-end: var(--space-section);
-}
-
-.auth-form {
-  inline-size: 100%;
-  max-inline-size: 34rem;
-  margin: var(--space-5) auto 0;
-  padding: clamp(1.2rem, 3vw, 1.8rem);
-  text-align: start;
-}
-
-.auth-cloud {
-  display: none;
-}
-
-@media (min-width: 62.5rem) {
-  .auth {
-    grid-template-columns: minmax(0, min(48vw, 38rem)) minmax(0, 1fr);
-    min-block-size: 80svh;
-  }
-
-  .auth-cloud {
-    position: sticky;
-    inset-block-start: calc(var(--top-h) + 6vh);
-    display: block;
-    inline-size: min(40vw, 40rem);
-    max-inline-size: 100%;
-    margin: clamp(3rem, 8vh, 6rem) auto 0;
-    filter: drop-shadow(0 16px 35px #d8b67325);
-    animation: cloud-float 9s ease-in-out infinite;
-  }
-}
-
-@keyframes cloud-float {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-
-  50% {
-    transform: translateY(-10px);
-  }
-}
-
 /* ---- a field's inside: its glyph, and a password's eye ------------------- */
 
 .inset {
@@ -141,7 +85,13 @@
   display: none;
 }
 
-/* ---- signing in and registering over the page that asked ------------------ */
+/* ---- signing in, registering and a new password, over the page that asked - */
+
+/* a form's own address without script: the dialog cannot open, the line
+   says why, above the start page */
+.auth-noscript {
+  margin-block: calc(var(--top-h) + var(--space-4)) 0;
+}
 
 .auth-dialog {
   inline-size: min(31rem, calc(100vw - 2 * var(--gutter)));
@@ -267,8 +217,7 @@
 }
 
 /* the one thing to do here is as wide as the fields above it */
-.auth-card .form > .button.primary,
-.auth-form .form > .button.primary {
+.auth-card .form > .button.primary {
   inline-size: 100%;
   justify-content: center;
 }
