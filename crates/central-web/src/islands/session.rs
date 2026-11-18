@@ -3,6 +3,13 @@
 //! distinguishes even two sign-ins with the same expiry second; it carries no
 //! identity and grants no authority. The session itself is the `__Host-central`
 //! cookie, which no script reads. Old expiry-only records remain readable.
+//!
+//! Beside it stands the header's note of who is signed in (`OWN`): the
+//! display name, the tag and the own picture's key, each what other people
+//! see of the account, and the session record the note belongs to. The
+//! pages that learn them write it, `boot.js` draws the account link from
+//! it without asking anyone, and it goes with the session: at signing out,
+//! at another sign-in, and when a page finds no live session.
 
 /// The key, unchanged from the previous site.
 #[cfg(target_arch = "wasm32")]
@@ -17,6 +24,8 @@ fn storage() -> Option<web_sys::Storage> {
 #[cfg(target_arch = "wasm32")]
 pub fn remember(expires_at: i64) {
     if let Some(storage) = storage() {
+        // another sign-in: what the header noted of the one before goes
+        let _ = storage.remove_item(OWN);
         let mut change = [0_u8; 16];
         if getrandom::fill(&mut change).is_err() {
             // Without a distinct marker do not leave another tab believing its
@@ -41,7 +50,95 @@ pub fn remember(expires_at: i64) {
 pub fn forget() {
     if let Some(storage) = storage() {
         let _ = storage.remove_item(KEY);
+        let _ = storage.remove_item(OWN);
     }
+}
+
+/// The key of the header's note of who is signed in (`boot.js`).
+#[cfg(target_arch = "wasm32")]
+pub const OWN: &str = "baylee-central-own";
+
+/// Changes the header's note of who is signed in and tells the page
+/// (`baylee:own`, at which `boot.js` draws the account link again). The
+/// note holds the session record it belongs to (`of`), so one of another
+/// sign-in is started afresh here and never shown there; without a session
+/// there is no note.
+#[cfg(target_arch = "wasm32")]
+fn note(change: impl FnOnce(&mut serde_json::Map<String, serde_json::Value>)) {
+    use serde_json::Value;
+    let Some(storage) = storage() else {
+        return;
+    };
+    if let Some(of) = marker() {
+        let mut held = storage
+            .get_item(OWN)
+            .ok()
+            .flatten()
+            .and_then(|text| serde_json::from_str::<Value>(&text).ok())
+            .and_then(|value| match value {
+                Value::Object(held) => Some(held),
+                _ => None,
+            })
+            .filter(|held| held.get("of").and_then(Value::as_str) == Some(of.as_str()))
+            .unwrap_or_default();
+        held.insert("of".to_owned(), Value::String(of));
+        change(&mut held);
+        if storage
+            .set_item(OWN, &Value::Object(held).to_string())
+            .is_err()
+        {
+            let _ = storage.remove_item(OWN);
+        }
+    } else {
+        let _ = storage.remove_item(OWN);
+    }
+    if let Some(window) = web_sys::window()
+        && let Ok(event) = web_sys::Event::new("baylee:own")
+    {
+        let _ = window.dispatch_event(&event);
+    }
+}
+
+/// Notes the signed-in account's display name and tag for the header, or
+/// that it has none yet. Both are what other people see of the account.
+#[cfg(target_arch = "wasm32")]
+pub fn note_name(name: Option<&str>, tag: Option<u32>) {
+    note(|held| {
+        if let Some((name, tag)) = name.zip(tag) {
+            held.insert("name".to_owned(), name.into());
+            held.insert("tag".to_owned(), central_api::profile::tag_text(tag).into());
+        } else {
+            held.remove("name");
+            held.remove("tag");
+        }
+    });
+}
+
+/// Notes the signed-in account's own picture for the header: its key in
+/// hexadecimal and whether it moves, or that there is none.
+#[cfg(target_arch = "wasm32")]
+pub fn note_picture(key: Option<&str>, moving: bool) {
+    note(|held| {
+        held.insert(
+            "key".to_owned(),
+            key.map_or(serde_json::Value::Null, Into::into),
+        );
+        held.insert("moving".to_owned(), moving.into());
+    });
+}
+
+/// Whether the header's note of this sign-in holds a picture's key.
+#[cfg(target_arch = "wasm32")]
+#[must_use]
+pub fn noted_picture() -> bool {
+    let Some(of) = marker() else {
+        return false;
+    };
+    read(OWN)
+        .and_then(|text| serde_json::from_str::<serde_json::Value>(&text).ok())
+        .filter(|held| held.get("of").and_then(serde_json::Value::as_str) == Some(of.as_str()))
+        .and_then(|held| held.get("key")?.as_str().map(str::len))
+        .is_some_and(|len| len == 32)
 }
 
 /// When the remembered session ends, if one is remembered and has not.
@@ -169,6 +266,10 @@ pub fn open(_address: &str) {}
 /// On the server nothing is remembered.
 #[cfg(not(target_arch = "wasm32"))]
 pub fn forget() {}
+
+/// On the server nothing is noted.
+#[cfg(not(target_arch = "wasm32"))]
+pub fn note_name(_name: Option<&str>, _tag: Option<u32>) {}
 
 /// On the server nothing is remembered.
 #[cfg(not(target_arch = "wasm32"))]

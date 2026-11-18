@@ -77,17 +77,21 @@ async fn summary() -> Load {
             admin,
             expires_at,
             ..
-        }) => Load::Ready(Summary {
-            #[cfg(any(not(target_arch = "wasm32"), feature = "admin"))]
-            account: identity.account,
-            username,
-            display_name,
-            tag,
-            moved: source == AccountSource::Legacy,
-            recovery,
-            admin,
-            expires_at,
-        }),
+        }) => {
+            // the header names the account on every page from here on
+            session::note_name(display_name.as_deref(), tag);
+            Load::Ready(Summary {
+                #[cfg(any(not(target_arch = "wasm32"), feature = "admin"))]
+                account: identity.account,
+                username,
+                display_name,
+                tag,
+                moved: source == AccountSource::Legacy,
+                recovery,
+                admin,
+                expires_at,
+            })
+        }
         Ok(_) => Load::Failed(Problem::Failed),
         Err(Failure::Rejected) => {
             session::forget();

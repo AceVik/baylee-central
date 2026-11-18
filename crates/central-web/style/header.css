@@ -179,11 +179,31 @@ body:has(dialog[open]) .top {
   object-fit: cover;
 }
 
-.nav-account span {
-  max-width: 14ch;
+/* Whose account it is (boot.js): the display name, cut with an ellipsis
+   where it is long, and the tag after it, always whole, in gold. Before a
+   page noted them the link says "Your account" in the same place. */
+.nav-account > span:not(.nav-face) {
+  display: inline-flex;
+  align-items: baseline;
+  min-inline-size: 0;
+  max-inline-size: 22ch;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.nav-account .nav-name {
+  flex: 0 1 auto;
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.nav-account .nav-tag {
+  flex: none;
+  color: var(--gold);
+  font: 600 0.86em / 1 var(--mono);
+  letter-spacing: 0.01em;
 }
 
 /* ---- the tools: the colour switch and the language menu ------------------- */
