@@ -583,9 +583,9 @@ pub fn spawn(config: &Config, shared: &Shared) {
                 let found =
                     tokio::task::spawn_blocking(|| crate::funding::liberapay(&agent(true))).await;
                 // a platform that does not answer keeps its last figures
-                if let Ok(Some(pledges)) = found {
+                if let Ok(Some(monthly)) = found {
                     install(&shared, |snapshot| {
-                        snapshot.funding.get_or_insert_default().liberapay = Some(pledges);
+                        snapshot.funding.get_or_insert_default().liberapay = Some(monthly);
                     });
                 }
             }

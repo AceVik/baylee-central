@@ -13,6 +13,7 @@ use leptos::prelude::*;
 
 use super::Built;
 use crate::data::{Funding, GIVING};
+use crate::format;
 use crate::rich::icon;
 use crate::site::shell::Meta;
 use crate::site::{Context, Page, icons};
@@ -89,33 +90,90 @@ fn euros(lang: Lang, euros: u64) -> String {
     }
 }
 
-/// The goal and how much of it is covered: the bar, the two amounts and
-/// which platforms the figure counts. Only what a platform said is drawn;
-/// without a figure the bar is left out and a line says so.
+/// The goal and how much of it is covered: the two amounts, the bar with a
+/// part for each platform, the platforms' amounts under it, and what was
+/// given once as a figure of its own (it is no part of a month's goal).
+/// Only what is known is drawn: without any figure the bar is left out and
+/// a line says so, and a platform without one is named as not counted.
 fn progress(lang: Lang, funding: Option<&Funding>) -> impl IntoView + use<> {
     let goal = euros(lang, Funding::GOAL / 100);
-    let Some((month, patrons)) = funding.and_then(Funding::covered) else {
+    let Some((funding, (month, supporters))) =
+        funding.and_then(|funding| funding.covered().map(|covered| (funding, covered)))
+    else {
         return view! { <p class="give-counted small">{words::donate_progress_none(lang)}</p> }
             .into_any();
     };
-    let percent = Funding::percent(month);
+    let percent = words::donate_progress_percent(lang, &Funding::percent(month).to_string());
     let have = euros(lang, (month + 50) / 100);
-    let label = words::donate_progress_label(lang);
+    let label = format!("{}: {percent}", words::donate_progress_label(lang));
+    // the bar is as wide as the goal, or as what is given where that is more
+    let whole = month.max(Funding::GOAL);
+    let mut at = 0;
+    let mut bars = Vec::new();
+    let mut split = Vec::new();
+    let mut missing = Vec::new();
+    for (key, name, monthly) in funding.platforms() {
+        let Some(monthly) = monthly else {
+            missing.push(name);
+            continue;
+        };
+        let part = format!("give-part give-part-{key}");
+        let width = monthly.month.saturating_mul(10_000) / whole;
+        if width > 0 {
+            bars.push(view! {
+                <rect class=part.clone() x=at.to_string() y="0" width=width.to_string() height="100" />
+            });
+            at += width;
+        }
+        split.push(view! {
+            <li>
+                <span class=format!("give-dot {part}") aria-hidden="true"></span>
+                <span>{name}</span>
+                <strong class="num">{euros(lang, (monthly.month + 50) / 100)}</strong>
+            </li>
+        });
+    }
     // nobody yet: an invitation says more than a count of none
-    let counted = if month == 0 && patrons == 0 {
+    let counted = if month == 0 && supporters == 0 {
         words::donate_progress_first(lang).to_owned()
     } else {
-        words::donate_progress_counted(lang, &words::number(lang, patrons))
+        words::donate_progress_supporters(lang, &words::number(lang, supporters))
     };
+    let missing = (!missing.is_empty()).then(|| {
+        format!(
+            " {}",
+            words::donate_progress_missing(lang, &missing.join(", "))
+        )
+    });
+    let once = funding.once.as_ref().map(|once| {
+        let since = once
+            .day()
+            .map(|day| view! { <span>{words::donate_once_since(lang, &format::date(lang, day))}</span> });
+        view! {
+            <div class="give-once">
+                <p class="eyebrow">{words::donate_once_title(lang)}</p>
+                <p class="give-once-figures">
+                    <strong class="num">{euros(lang, (once.total + 50) / 100)}</strong>
+                    {since}
+                    <span class="num">{words::donate_once_count(lang, &words::number(lang, once.count))}</span>
+                </p>
+                <p class="give-counted small">{words::donate_once_note(lang)}</p>
+            </div>
+        }
+    });
     view! {
         <div class="give-progress">
             <p class="give-figures">
                 <strong class="num">{words::donate_progress(lang, &have, &goal)}</strong>
-                <span class="give-percent num">{words::donate_progress_percent(lang, &percent.to_string())}</span>
+                <span class="give-percent num">{percent}</span>
             </p>
-            <progress class="give-meter" max="100" value=percent.to_string() aria-label=label></progress>
-            <p class="give-counted small">{counted}</p>
+            <svg class="give-meter" viewBox="0 0 10000 100" preserveAspectRatio="none" role="img" aria-label=label>
+                {bars}
+            </svg>
+            <ul class="give-split">{split}</ul>
+            <p class="give-counted small">{counted}{missing}</p>
         </div>
+        {once}
     }
     .into_any()
 }

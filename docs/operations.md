@@ -1267,11 +1267,16 @@ repository, and the deploy hook builds and installs this site instead
   `https://liberapay.com/AceVik/public.json` every thirty minutes for the
   figure behind the donation page's bar and `/funding.json`: outbound
   HTTPS to `liberapay.com` must then be allowed. Of the answer it keeps
-  two numbers, what is given a week and by how many, and those in memory
-  only (`crates/central-web-server/src/funding.rs`). With
-  `"funding": false`, or until Liberapay has answered once, the page shows
-  the goal without a bar; an answer that fails later leaves the last
-  figure standing until the process restarts.
+  two numbers, what is given (the week's amount as a month's) and by how
+  many, and those in memory only
+  (`crates/central-web-server/src/funding.rs`). With `"funding": false`,
+  or until Liberapay has answered once, the page shows the goal without a
+  bar; an answer that fails later leaves the last figure standing until
+  the process restarts. The page and the document also have a place for
+  GitHub Sponsors' and Ko-fi's monthly figures and for the sum of what
+  was given once. This process cannot fill them (it holds no secret); they
+  stay empty, and the page names the two platforms as not counted yet,
+  until Baylee Central collects them.
 
   `views` may name a file, for example `/var/lib/baylee-app/views.json`
   in a directory this user owns (`StateDirectory=baylee-app`, or

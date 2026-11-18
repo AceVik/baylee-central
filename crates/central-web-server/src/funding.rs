@@ -1,17 +1,18 @@
 //! What the donation platforms publish of the monthly goal
 //! (`central_web::data::Funding`): today Liberapay's public figures, which
 //! it gives anybody without a key. The server asks, never a reader's
-//! browser, and keeps two numbers of the answer: what is given per week and
-//! by how many. The answer also names the recipient and carries his own
+//! browser, and keeps two numbers of the answer: what is given per week (as
+//! a month's amount) and by how many. The answer also names the recipient and carries his own
 //! texts; none of that is read, kept or passed on, and nothing in it names a
 //! donor.
 //!
 //! GitHub Sponsors and Ko-fi publish no figure without a key or a webhook,
-//! and this server holds no secret (`config.rs`), so they are not asked.
+//! and this server holds no secret (`config.rs`), so it does not ask them:
+//! their figures are Baylee Central's to collect.
 
 use std::time::Duration;
 
-use central_web::data::Pledges;
+use central_web::data::Monthly;
 use serde::Deserialize;
 
 /// Liberapay's public page of the recipient, as JSON.
@@ -63,27 +64,28 @@ fn cents(text: &str) -> Option<u64> {
     whole.checked_mul(100)?.checked_add(part)
 }
 
-/// Liberapay's answer as the two figures kept of it: what is received a
-/// week, in euro cents, and from how many. `None` for an answer that is
+/// Liberapay's answer as the two figures kept of it: what is received, as
+/// a month's amount in euro cents (a week's counts as 52/12 of a month's),
+/// and from how many. `None` for an answer that is
 /// not JSON of this shape, hides the amount, is in another currency or is
 /// beyond belief.
 #[must_use]
-pub fn read(text: &str) -> Option<Pledges> {
+pub fn read(text: &str) -> Option<Monthly> {
     let public: Public = serde_json::from_str(text).ok()?;
     let receiving = public.receiving?;
     if receiving.currency != "EUR" {
         return None;
     }
     let week = cents(&receiving.amount).filter(|week| *week <= MOST)?;
-    Some(Pledges {
-        week,
-        patrons: public.npatrons.unwrap_or(0).min(1_000_000),
+    Some(Monthly {
+        month: week * 52 / 12,
+        supporters: public.npatrons.unwrap_or(0).min(1_000_000),
     })
 }
 
 /// Asks Liberapay.
 #[must_use]
-pub fn liberapay(agent: &ureq::Agent) -> Option<Pledges> {
+pub fn liberapay(agent: &ureq::Agent) -> Option<Monthly> {
     let mut response = agent
         .get(LIBERAPAY)
         .header("Accept", "application/json")
@@ -145,9 +147,9 @@ mod tests {
             "statements":[{"content":"words","lang":"en"}],"username":"Somebody"}"#;
         assert_eq!(
             read(text),
-            Some(Pledges {
-                week: 2310,
-                patrons: 3
+            Some(Monthly {
+                month: 10_010,
+                supporters: 3
             })
         );
     }
@@ -169,9 +171,9 @@ mod tests {
         // without a count the amount still stands
         assert_eq!(
             read(r#"{"receiving":{"amount":"5.00","currency":"EUR"}}"#),
-            Some(Pledges {
-                week: 500,
-                patrons: 0
+            Some(Monthly {
+                month: 2166,
+                supporters: 0
             })
         );
     }

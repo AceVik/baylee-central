@@ -450,14 +450,28 @@ word of it: a donation buys nothing, no donor is named, Wizards is not put
 beside a request for money, and the page says that a donation is a gift to
 a private person and not tax-deductible.
 
-- **The goal** (`.goal-card`) is the amount in the title face, the bar
-  (`.give-meter`: the browser's `<progress>`, since the policy allows no
-  inline width) and one line on what the figure counts. Only what a
-  platform said is drawn: without a figure the bar is left out and a line
-  says so, and where nobody gives yet the line invites the first instead of
-  counting nobody. Beside it stands what a month costs, each amount a
-  thinner bar against the goal (`.cost-bar`). The card's button leads down
-  to the three places.
+- **The goal** (`.goal-card`) is the amount in the title face, what the
+  recurring donations of the three platforms add up to against it, and the
+  bar (`.give-meter`). The bar is a drawing, since the policy allows no
+  inline width: an SVG stretched over the track with one rectangle for
+  each platform (`.give-part-github`, `-liberapay`, `-kofi`), its width
+  the platform's share of the goal, or of the sum once the sum is past the
+  goal. The three parts have fixed colours of their own, the same in both
+  schemes, because the schemes' accents fall together in the light one.
+  Under the bar a legend names each platform with its colour and its
+  amount (`.give-split`), then one line counts the supporters. Only what
+  a platform said is drawn: a platform without a figure has no part and is
+  named in a line as not counted yet, without any figure the bar is left
+  out and a line says so, and where nobody gives yet the line invites the
+  first instead of counting nobody.
+- **What was given once** (`.give-once`) is a figure of its own under the
+  month's, never a part of the bar: the sum in euros, since when it is
+  counted, how many donations it holds, and a line saying that other
+  currencies were converted at the rate of the day they came. It is shown
+  only when the sum is known.
+- **What a month costs** stands beside the goal, each amount a thinner bar
+  against the goal (`.cost-bar`, the browser's `<progress>`). The goal
+  card's button leads down to the three places.
 - **The three places** (`.way`) are cards of one build: the platform's
   name with a sign, one line on what kind of giving it is, its address as a
   QR code, the address as text, and the button. The code stands on a white
@@ -478,7 +492,9 @@ a private person and not tax-deductible.
 - **`/funding.json`** says the same to a program, the game client first:
   the goal in euro cents, what is covered, the percentage and the number
   of supporters where a platform answered, which platforms the figure
-  counts, the page's address and the three places. It names nobody.
+  counts and each one's monthly amount (`platforms`), what was given once
+  (`once`: sum, count, since when) where it is known, the page's address
+  and the three places. It names nobody.
 
 ### Going from page to page
 
