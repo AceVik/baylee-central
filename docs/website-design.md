@@ -293,11 +293,22 @@ to feel slow and over the 60 ms where it reads as a snap.
 - **Ambient**: the online dot breathes slowly (2.4 s); the painting drifts
   with the scroll; the hero's light and Baylee's cloud move slowly, and only
   while the hero is on screen and no dialog covers it. The hero's clouds
-  (`HeroShader.tsx`, `clouds/`) drift on a slow wind and heal into their
-  banks; the pointer stirs the air they ride in, a small fluid on the GPU
-  (stable fluids with vorticity confinement on a 112-cell-high grid, the
-  clouds on a finer one, lit towards the sun), and a press sends a gust
-  outwards. Thinner behind the words, fuller towards the edges; a still
+  (`js/clouds.js`) drift on a wind that comes in slow gusts and gather into
+  their banks: cumulus, small puffs in front of them and thin streaks high
+  behind, light in both colour schemes (sunlit by day, as bright under the
+  blue hour's veil as the painted ones) with a soft shade of their own and a
+  warm rim towards the sun. Their wisps turn over slowly in a calm sky, each
+  finer layer drifting against the coarser. The pointer stirs the air they
+  ride in, a small fluid on the GPU (stable fluids with vorticity
+  confinement on a 112-cell-high grid, the clouds on a finer one): it drags
+  the air along its path, a swift stroke more of it than a slow one and
+  never faster than itself; stirred vapour thins, rises a little and is drawn out like smoke,
+  and gathers again as the air forgets the stir, with nothing pulled back
+  or popping in; a press sends a gust outwards. The air moves alike at
+  every refresh rate: at most a hundred steps a second while stirred (a
+  120 Hz screen shows every second frame), thirty while calm, when the
+  solve rests altogether. Thinner behind the words, fuller towards the
+  edges, and under the veil that keeps the words readable; a still
   picture under reduced motion and where WebGL 2 renders in software, the
   painting alone without WebGL 2. The memorial's light
   is its own (limited to 20 draws a second, its GPU context given back when
