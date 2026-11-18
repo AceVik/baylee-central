@@ -8031,3 +8031,65 @@ Adversarial pass, what was tried and what holds:
   month 13, markup, another script's digits) is shown on no page and said in no document
   (`the_one_time_sum_s_day_is_a_date_or_nothing`,
   `the_funding_document_says_a_date_or_none`).
+
+## The strip, the gateway directory's new face, the account's numbers and what an audit changed, 18 November 2026
+
+Design pass. Five changes to what the site shows, none to what it holds, asks or is told:
+
+- **The strip** has six cells (players, games, open tables, gateways as "5 / 7", accounts, page
+  views) in place of its lines. Every figure was in the strip before or is a sum of the
+  directory's own rows; a silent source still drops its cell, never shows a zero.
+- **The gateway directory** has new cards, a row of figure tiles and a list with column heads.
+  Its script (`js/directory.js`) gained a third chip (current version), chips that narrow
+  together, and sorting by a column's head.
+- **The account's overview** ends with "Baylee in numbers": the directory's four tiles, the
+  accounts at Central, the playable cards and the page views. These are the public figures the
+  start page shows every visitor, rendered by the server from the same snapshot; nothing of the
+  signed-in account is in them, and the part is the same with nobody signed in.
+- **The start page** asks once for support (a card that links to `/donate`).
+- **An audit of every public page** (axe-core, the head's data, side scroll from 320 to 2560 px)
+  led to four corrections: the numbers card's class, a page's title naming the site, the
+  footer's columns as lists under one landmark, and two amounts that stood outside their box at
+  320 px. Ninety texts in nine languages were translated by machine, and the donation page's
+  colours moved into the token sheet.
+
+Implementation pass: `site/pages/home.rs` (the strip, `stat_tile`, the directory's cards),
+`site/pages/info.rs`, `site/pages/account.rs` (`numbers`), `site/pages/donate.rs` (`band`),
+`site/shell.rs` (`titled`, the footer's columns), `js/directory.js`, the style sheets, the
+locale files, and the browser suite's specs. No new request, route, dependency, storage key or
+field of Central's answers; the policy and the headers are untouched.
+
+Adversarial pass, what was tried and what holds:
+- **Text a gateway chose** (its name, its address, its version) still reaches a card only as
+  text and attribute values that the renderer escapes; the redesign added no place where it is
+  markup, a class, a link's scheme or a style. The figures a gateway reports stay numbers,
+  and only an online gateway's count as now (`shown`, in `fetch.rs`, untouched).
+- **The address's query** (`?q=`, `show`, `sort`, `view`). `show` is split and each word kept
+  only if it is one of the chips the server wrote (`SHOWS.includes`); `sort` only if it is one
+  of the menu's values (`SORTS.has`); `q` is cut to 80 characters and put into the field's
+  value, where it is compared with text and never inserted as markup. The script still builds
+  no markup string: it sets `hidden`, `aria-pressed`, `data-view`, the order of existing
+  nodes and one text node (the count, through `Intl.NumberFormat`), and rewrites the
+  address's query on its own path (`history.replaceState`). A crafted address can therefore
+  choose a view, and nothing else.
+- **Many gateways.** Above 48 cards the view transition is skipped, so a long directory costs
+  a reorder, not a named animation per card.
+- **The numbers card is not a member's data.** It was checked signed out and signed in: the
+  same markup, from the server, with no request by the page; with no source reporting, the
+  part is absent (`the_account_s_overview_shows_the_public_figures`).
+- **A title** is the page's own words plus a constant; the test reads one `Baylee` in the
+  title of five pages in every language, so a translation that already names it does not
+  get it twice (`a_title_names_the_site_and_the_footer_is_one_landmark`).
+- **The translations and the donation rules.** The texts on giving were read in all nine
+  languages for the four sentences that bind them (nothing is bought, no name on a list, a
+  gift to a private person, not tax-deductible), and searched for the rights holder's and the
+  game's names in Latin, Cyrillic, kana, hangul and Chinese spellings: none. The build still
+  refuses a language whose value has other variables or tags than the English.
+- **The browser suite** was brought back to the site as it is (49 stale tests) and cut from
+  718 to 562 runs: the phone project keeps the specs whose subject depends on the layout, a
+  test that sets its own sizes runs once. No test was removed and no check of the policy, of
+  axe or of foreign requests left either project's page lists; the last full run was green
+  one commit before the colours became tokens, and the page specs were run again after it.
+- **Not done here:** WebKit and Firefox were not run (only Chromium is installed), and the
+  operating systems' menu names in the nine translated download steps were written from the
+  translator's memory, not read off those systems.
