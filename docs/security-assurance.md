@@ -7860,3 +7860,54 @@ Adversarial pass, what was tried and what holds:
   `aria-controls` and `aria-expanded`.
 
 These passes are by the implementing agent and are not an independent audit.
+
+## The header's note of who is signed in and the account's overview, 18 November 2026
+
+Design pass. The header's account link now says who is signed in on every page (display name,
+tag, own picture), and the account's first page opens with the same three, the game's download
+and the area's sections as tiles.
+
+- **What is kept, and where.** One `localStorage` record, `baylee-central-own`: the display
+  name, the tag, the own picture's key in hexadecimal, whether that picture moves, and the
+  session record it belongs to (`of`). All four are what any other signed-in account is shown
+  of this one; the sign-in name is not among them and stays out of browser storage as decided
+  on 12 November. The earlier per-tab key for the picture (`sessionStorage`) is gone: one
+  place, and a second tab draws the header without asking Central.
+- **Its lifetime is the session's.** `session::remember` (another sign-in) and
+  `session::forget` (signing out, a session Central no longer knows) remove it; `boot.js`
+  removes it on any page that finds no live session record; and a note whose `of` is not the
+  current session record is neither shown nor extended, so what one sign-in noted is never
+  drawn for the next, also when two tabs race.
+- **Who writes it.** The pages that learn the values anyway: signing in and the account
+  summary write name and tag, the own picture's answer writes the key. No request exists for
+  the header's sake, and public pages ask Central nothing.
+- **How it is drawn.** `boot.js` builds the link from text nodes and an `<img>` whose address
+  is `/api/v1/pictures/` plus a key that must be thirty-two lowercase hexadecimal digits; a tag
+  is drawn only if it is four to eight such digits. Nothing from the note becomes markup, an
+  attribute other than that address, or a link's target.
+- **The account's overview** is server markup around two islands as before. The server's page
+  holds no link to the administration (the tested rule stands); an administrator's links are
+  drawn by the island after Central said so. The page now varies by the reader's machine (the
+  download it offers), so the server keeps it per machine like the start page; the bounds on
+  kept pages are unchanged.
+
+Implementation pass: `islands/session.rs` gains the note (`note_name`, `note_picture`,
+`noted_picture`), `islands/picture.rs` loses its own header code and storage in favour of it,
+`islands/auth.rs` and `islands/account.rs` call `note_name`, `boot.js` draws. No request, no
+cookie and no secret's lifetime changes; the wire is untouched.
+
+Adversarial pass, what was tried and what holds:
+- **A note of hostile content** (written by hand in the console, or by a script that already
+  runs in the origin): a name of markup is drawn as text, a key or tag of another shape is
+  not drawn, and a note without the current session's record is ignored. A script that can
+  write the note can read the page anyway; the note grants nothing and no decision reads it.
+- **A shared computer.** After signing out the note is gone with the session record. After a
+  session that merely ran out it stays until this site is opened again in that browser, as
+  the session record does; it then holds a display name, a tag and a picture key, which every
+  signed-in account can see of this one, and no sign-in name. The privacy notice says so.
+- **Two tabs, two accounts.** Tab B signs in as another account: `remember` removes the note
+  and changes the session record; tab A's later write finds a note of another `of` (or none)
+  and starts afresh under the current record, and A's own pages are reset by the existing
+  `storage` listener.
+
+These passes are by the implementing agent and are not an independent audit.
