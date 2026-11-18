@@ -54,7 +54,9 @@ would make anyway is not kept, so the page follows the device again (owner,
 12.11.2026: the first press on a light device had changed nothing). The
 browser keeps the choice like the language (the
 privacy notice's "language and display"), `public/boot.js` applies it before
-the first paint, and `?theme=` overrides it for one visit. No other file names a raw colour, except
+the first paint, and `?theme=` overrides it for one visit. Colours that are the same in both schemes
+are tokens too (the avatars' tints; the donation page's heart, its three platforms' parts of the
+goal's bar and the white under a QR code). No other file names a raw colour, except
 the artwork's own: the memorial's parchment (`memorial-book.css`,
 `remembrance.css`) and the painted light over the world (`hero.css`,
 `world.css`).
@@ -366,7 +368,14 @@ never shows a server's diagnostic.
 WCAG 2.1 AA, mobile first:
 
 - Landmarks (`header`, `nav`, `main`, `footer`), one `h1` per page, a skip
-  link to `#main`, `document.title` per page.
+  link to `#main`, `document.title` per page. A page's title says its own
+  name and then the site's ("Contact – Baylee") unless its own already
+  names Baylee (`shell::titled`); the preview a link gets elsewhere keeps
+  the bare title, since `og:site_name` names the site. The footer is one
+  navigation landmark: its three columns are lists named by their heading
+  (`ul[aria-labelledby]`), not three regions more on every page. A named
+  region's name is its own on the page (the account's "Play" card met the
+  footer's "Play" column once).
 - Every control works by keyboard, in reading order, with a visible focus
   ring (`--focus`, 3 px, offset 3 px). Menus close with Escape and return
   focus to their button, and close when focus or a tap goes elsewhere.
@@ -674,6 +683,24 @@ above, with these of their own:
   in under its main build.
 
 ## How it is held
+
+Today (the server-rendered site):
+
+- `crates/central-web-server/tests/pages.rs` renders every page in every
+  language and reads the markup: one title and one `h1`, the head's words,
+  the policy, no inline script or style, each part of a page this document
+  describes.
+- `crates/central-web/browser/e2e-site/` runs the site in Chromium against
+  synthetic data: every page in both schemes with axe-core (WCAG 2.2 A/AA
+  and its best practices), 44 px controls, no request to another origin, no
+  sideways scroll from 320 to 2560 px in every language, the keyboard's
+  paths, and each island's steps. The desktop project runs every spec; the
+  phone project runs those whose subject depends on the layout, and a test
+  that sets its own window sizes runs once (its `README.md`,
+  `playwright.config.ts`).
+
+What held the React app until it was removed on 12.11.2026, kept for the
+rules it names:
 
 - `test/styles/contrast.test.ts`: the token pairs above in both schemes.
 - `test/csp.test.ts`: the policy names GitHub only at Baylee's repository,

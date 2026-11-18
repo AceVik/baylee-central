@@ -20,7 +20,7 @@
   position: absolute;
   inset: 0;
   z-index: -1;
-  background: linear-gradient(105deg, transparent 40%, rgb(255 255 255 / 0.5) 50%, transparent 60%)
+  background: linear-gradient(105deg, transparent 40%, var(--give-sheen) 50%, transparent 60%)
     no-repeat 140% 0 / 260% 100%;
   pointer-events: none;
   animation: give-sheen 6s ease-in-out infinite;
@@ -69,7 +69,7 @@
 /* the bar's entry: a link like the others with a heart before its word, in
    a soft frame so that the light has something to cross */
 .nav .nav-give {
-  --give-glow: #ff8fa3;
+  --give-glow: var(--heart-glow);
   gap: 0.45em;
   border: 1px solid var(--edge-soft);
   color: var(--title);
@@ -78,7 +78,7 @@
 .nav .nav-give .icon {
   inline-size: 1.05em;
   block-size: 1.05em;
-  color: #f0728a;
+  color: var(--heart);
 }
 
 /* the frame is the mark; the bar's underline is for its plain links */
@@ -93,7 +93,7 @@
 }
 
 .give {
-  --give-glow: rgb(255 255 255 / 0.85);
+  --give-glow: var(--give-shine);
 }
 
 /* the start page's band: one card in the middle, a heart over a sentence,
@@ -113,10 +113,10 @@
   place-items: center;
   inline-size: 3rem;
   block-size: 3rem;
-  border: 1px solid color-mix(in srgb, #f0728a 45%, transparent);
+  border: 1px solid color-mix(in srgb, var(--heart) 45%, transparent);
   border-radius: var(--radius-full);
-  background: color-mix(in srgb, #f0728a 14%, transparent);
-  color: #f0728a;
+  background: color-mix(in srgb, var(--heart) 14%, transparent);
+  color: var(--heart);
 }
 
 .give-band-sign .icon {
@@ -224,18 +224,18 @@
   background: var(--violet-soft);
 }
 
-/* three colours of their own: the schemes' accents fall together in the
-   light scheme, and the parts must be told apart in both */
+/* three colours of their own (`tokens.css`): the schemes' accents fall
+   together in the light scheme, and the parts must be told apart in both */
 .give-part-github {
-  --part: #7c8cf0;
+  --part: var(--give-github);
 }
 
 .give-part-liberapay {
-  --part: #e0b050;
+  --part: var(--give-liberapay);
 }
 
 .give-part-kofi {
-  --part: #f0728a;
+  --part: var(--give-kofi);
 }
 
 .give-part {
@@ -417,7 +417,7 @@
   padding: 0.5rem;
   border: 1px solid var(--edge-soft);
   border-radius: var(--radius-md);
-  background: #fff;
+  background: var(--code-paper);
   line-height: 0;
 }
 
