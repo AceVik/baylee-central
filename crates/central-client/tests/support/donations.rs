@@ -80,6 +80,29 @@ fn deliver(http: &Http, hop: &str, headers: &[(&str, &str)], body: &[u8]) -> (u1
     (status, String::from_utf8(body).unwrap())
 }
 
+/// A delivery that announces `length` bytes of body and sends none: the status.
+fn declared(http: &Http, hop: &str, length: usize) -> u16 {
+    use std::io::{Read, Write};
+    super::pace();
+    let mut stream =
+        std::net::TcpStream::connect_timeout(&http.address, std::time::Duration::from_secs(3))
+            .unwrap();
+    stream
+        .set_read_timeout(Some(std::time::Duration::from_secs(10)))
+        .unwrap();
+    write!(
+        stream,
+        "POST /v1/kofi HTTP/1.1\r\nHost: {}\r\nX-Forwarded-For: {hop}\r\n\
+         Content-Type: application/x-www-form-urlencoded\r\nContent-Length: {length}\r\n\r\n",
+        http.address
+    )
+    .unwrap();
+    let mut response = Vec::new();
+    stream.read_to_end(&mut response).unwrap();
+    let head = String::from_utf8_lossy(&response);
+    head.split_whitespace().nth(1).unwrap().parse().unwrap()
+}
+
 fn figures(http: &Http) -> Funding {
     let Ok(Response::PublicFunding { funding }) = http.exchange(&Request::PublicFunding {}, None)
     else {
@@ -138,7 +161,7 @@ pub(crate) fn run(http: &Http, browser: &Browser, runtime: &Runtime) {
     let counts = refusing(http);
     refresh();
     assert_eq!(figures(http).once.unwrap().total, 300);
-    bounding(http, &first, counts);
+    bounding(http, counts);
     flooding(http, &first, counts);
     reading(http, browser);
 }
@@ -270,7 +293,7 @@ fn refusing(http: &Http) -> KofiCounts {
 /// Larger than what the listener reads: refused before it is read, also when the
 /// length is only declared, and not counted. A browser's request is no delivery,
 /// and another method is not the route's; neither is counted either.
-fn bounding(http: &Http, first: &[u8], counts: KofiCounts) {
+fn bounding(http: &Http, counts: KofiCounts) {
     let long = form(&delivery(
         "synthetic-kofi-0040",
         &[("message", Some(&format!("\"{}\"", "x".repeat(KOFI_LIMIT))))],
@@ -280,18 +303,19 @@ fn bounding(http: &Http, first: &[u8], counts: KofiCounts) {
     let mut sized = counts;
     sized.refused[7] += 1;
     assert_eq!(http.identity.kofi_counts().refused, sized.refused);
-    let huge = form(&delivery(
-        "synthetic-kofi-0041",
-        &[("message", Some(&format!("\"{}\"", "x".repeat(KOFI_READ))))],
-    ));
-    assert!(huge.len() > KOFI_READ);
-    assert_eq!(deliver(http, "198.51.100.142", &[FORM], &huge).0, 413);
+    // Past what the listener reads: refused on the declared length, before a
+    // byte of the body is waited for. The body is not sent: a server that
+    // closes with unread bytes in its buffer resets the connection, and the
+    // answer could be lost to the test (it was, once in four runs).
+    assert_eq!(declared(http, "198.51.100.142", KOFI_READ + 1), 413);
     assert_eq!(
         deliver(
             http,
             "198.51.100.141",
             &[FORM, ("Origin", "https://ko-fi.com")],
-            first
+            // refused on its headers; a body left unread could reset the
+            // connection before the answer is read
+            b""
         )
         .0,
         403
