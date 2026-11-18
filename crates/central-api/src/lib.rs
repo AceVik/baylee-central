@@ -9,6 +9,7 @@ pub mod chat;
 pub mod email;
 mod endpoint;
 pub mod export;
+pub mod funding;
 pub mod gateway;
 pub mod groups;
 pub mod legacy;
