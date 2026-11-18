@@ -852,6 +852,33 @@ impl Card {
     }
 }
 
+/// The signed-in account's own face for the overview: its picture once
+/// Central said which, else the initials of `name`, in one mark of a fixed
+/// size. Asking also tells the header which picture is the account's
+/// (`session.rs`), so it shows from the first page after a sign-in.
+pub fn own_face(name: String) -> impl IntoView {
+    let own = RwSignal::new(None::<Option<(PictureKey, bool)>>);
+    Effect::new(move |_| {
+        leptos::task::spawn_local(async move {
+            if let Ok(mine) = mine().await {
+                browser::remember(mine.picture.as_ref());
+                own.set(Some(
+                    mine.picture.map(|p| (p.key, p.sequence_bytes.is_some())),
+                ));
+            }
+        });
+    });
+    let initials: String = name.chars().take(1).flat_map(char::to_uppercase).collect();
+    view! {
+        <span class="me-face" aria-hidden="true">
+            {move || match own.get().flatten() {
+                Some((key, moving)) => face_view(&key, moving, String::new(), false).into_any(),
+                None => view! { <span class="me-initials">{initials.clone()}</span> }.into_any(),
+            }}
+        </span>
+    }
+}
+
 /// The profile page's card: the picture, choosing one, placing its square,
 /// saving it, removing it.
 pub fn card(lang: Lang, name: String) -> impl IntoView {

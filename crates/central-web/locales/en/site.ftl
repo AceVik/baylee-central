@@ -1868,6 +1868,7 @@ contact-again = Write another message
 
 ## the footer's last line (which build this is)
 foot-build = This site's build:
+
 ## download (variants and page)
 dl-v2-name = Older processors (x86-64-v2)
 dl-v2-help = For processors older than about 2013–2015, or if the main build does not start.
@@ -1887,3 +1888,10 @@ dl-howto-linux-3 = The archive needs no installation: unpack it and start <code>
 dl-soon-title = Coming later
 dl-soon-text = Baylee runs on a computer for now. These are planned; there is nothing to download yet.
 dl-soon-web = In the browser
+
+## the account overview and its navigation (redesign)
+account-group-account = Account
+account-play-title = Play
+account-play-lead = Get the game and sign in there with this account.
+account-chat-lead = Messages and your contacts, encrypted end to end.
+account-push-lead = Let this device tell you about new messages.
