@@ -7811,3 +7811,52 @@ there until recently; the script then parses without a policy and makes scripts 
 same address check), and the browser tests of `e2e-site`, which wait for their update.
 
 These passes are by the implementing agent and are not an independent audit.
+
+## The steps after a form, the contact form, the footer's build and what is counted, 18 November 2026
+
+Four changes to the website's pages and one to its server, none to Central's wire or data.
+
+Design pass, what each one could open:
+- **The recovery code's step.** Mailing the code to oneself stays a `mailto:` address the
+  browser hands to the person's own mail program; nothing is sent by the site or by Central,
+  and the code is never part of a request. The warning (the code then lies in a mailbox) is no
+  longer always on screen: it unfolds when the mail tile is pressed or an address is typed, and
+  the first press of the tile only shows it, so the mail program opens on a second, informed
+  press at the earliest. The handle shown is the one Central returned for the new account.
+- **The terms' step.** Accepting waits for the end of the text. This is a help to the reader
+  and not a control: Central records the acceptance of a version and its digest as before, and
+  a page that sent `accept_terms` without scrolling would be accepted as before.
+- **The contact form.** While a message is on its way the fields are read-only and a second
+  submit is ignored; the request, its honeypot and the feedback service's own limits are
+  unchanged. The view after a send is built element by element (an inline `<svg>` written as
+  static markup was refused by Trusted Types in the first run, the page's policy working as
+  meant).
+- **The footer's last line.** The build's release tag, commit and that commit's day, read
+  from the checkout by `cargo xtask site` and carried in the asset manifest. The repository is
+  public, so the line says nothing an observer could not read there; it does tell an attacker
+  which commit runs, which the hashed asset names told already. A tag is shown only if it is
+  short and of letters, digits and `.-_+`; a commit becomes part of a link only if it is forty
+  lowercase hexadecimal digits; both are text in the page, never markup.
+- **What the strip counts.** A visit instead of a page opened: a navigation that says
+  `Sec-Fetch-Site: same-origin` (it started on one of the site's own pages) or carries
+  `Cache-Control` (a reload) is not counted again. Both are read from the single request;
+  still nothing is stored about a visitor (no address, no cookie, no identifier), and the
+  count stays one number. A client can send any headers it likes, so the number can be driven
+  up by a script as before; it is a figure for the start page and nothing is decided by it.
+
+Implementation pass: `islands/keep.rs` and `islands/auth.rs` change markup and two signals
+(`asked`, `read`); no request, no storage and no secret's lifetime changes. `views.rs` gains
+two header checks and a test of them. `xtask` runs `git` with fixed arguments in the
+workspace root and ignores a failure (a build outside a checkout has no such line).
+
+Adversarial pass, what was tried and what holds:
+- **A tag or commit of hostile shape** (a tag named like markup or a path): refused by the
+  shape checks in `site::Build`, and the page writes text nodes only.
+- **A view with static SVG in an island** raised the Trusted Types error above in a headless
+  Chromium under the real policy; the tick is now drawn by `glyph`, element by element.
+- **A double submit of the contact form**: the second is dropped while the first is on its way.
+- **The warning hidden from a reader.** While shut, the unfolded region is `visibility:
+  hidden` (not read, not focusable); open, it is a `role="note"` the mail tile names with
+  `aria-controls` and `aria-expanded`.
+
+These passes are by the implementing agent and are not an independent audit.
