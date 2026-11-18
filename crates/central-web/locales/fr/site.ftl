@@ -1992,3 +1992,6 @@ terms-read-done = Read to the end.
 
 ## the contact form (redesign)
 contact-again = Write another message
+
+## the footer's last line (which build this is)
+foot-build = This site's build:

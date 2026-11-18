@@ -1870,3 +1870,6 @@ terms-read-done = Bis zum Ende gelesen.
 
 ## the contact form (redesign)
 contact-again = Noch eine Nachricht schreiben
+
+## the footer's last line (which build this is)
+foot-build = Stand dieser Website:

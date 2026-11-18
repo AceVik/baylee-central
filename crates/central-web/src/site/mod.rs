@@ -191,6 +191,73 @@ pub struct Asset {
 pub struct Assets {
     /// By logical name, `site.css`, `img/world-1200.avif`.
     pub files: BTreeMap<String, Asset>,
+    /// What this build is called, for the footer's last line.
+    #[serde(default)]
+    pub build: Build,
+}
+
+/// What a build of the site is called (`cargo xtask site`): the release it
+/// descends from and the commit it was made of, as far as the build could
+/// tell (a build outside a checkout knows neither).
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Build {
+    /// The digest of every asset's address, as the service worker carries
+    /// it; empty where no build wrote the assets.
+    #[serde(default)]
+    pub id: String,
+    /// The newest release tag the commit descends from, `v0.1.1-beta.9b`.
+    #[serde(default)]
+    pub version: Option<String>,
+    /// How many commits it is past that tag.
+    #[serde(default)]
+    pub ahead: u32,
+    /// The commit, forty hexadecimal digits.
+    #[serde(default)]
+    pub commit: Option<String>,
+    /// The commit's day, `YYYY-MM-DD`.
+    #[serde(default)]
+    pub date: Option<String>,
+}
+
+impl Build {
+    /// The commit where it is one: forty lowercase hexadecimal digits, so
+    /// that nothing else is ever made part of an address.
+    #[must_use]
+    pub fn commit(&self) -> Option<&str> {
+        self.commit
+            .as_deref()
+            .filter(|c| c.len() == 40 && c.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f')))
+    }
+
+    /// The version as the footer writes it: the tag, and how far past it
+    /// the build is (`v0.1.1-beta.9b+37`).
+    #[must_use]
+    pub fn version(&self) -> Option<String> {
+        let tag = self.version.as_deref().filter(|tag| {
+            !tag.is_empty()
+                && tag.len() <= 48
+                && tag
+                    .bytes()
+                    .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'-' | b'_' | b'+'))
+        })?;
+        Some(if self.ahead == 0 {
+            tag.to_owned()
+        } else {
+            format!("{tag}+{}", self.ahead)
+        })
+    }
+
+    /// The commit's day where it is one (`YYYY-MM-DD`).
+    #[must_use]
+    pub fn date(&self) -> Option<&str> {
+        self.date.as_deref().filter(|d| {
+            d.len() == 10
+                && d.bytes().enumerate().all(|(at, b)| match at {
+                    4 | 7 => b == b'-',
+                    _ => b.is_ascii_digit(),
+                })
+        })
+    }
 }
 
 impl Assets {

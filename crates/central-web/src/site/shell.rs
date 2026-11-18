@@ -759,10 +759,39 @@ fn footer(page: Page, cx: &Context<'_>) -> impl IntoView + use<> {
                             <li>"Rust & Bevy"</li>
                         </ul>
                     </div>
+                    {build_line(lang, &assets.build)}
                 </div>
             </div>
         </footer>
     }
+}
+
+/// The footer's last line, small and faint: which release this site
+/// descends from, the commit it was built of (a link to it) and that
+/// commit's day. A build that knows none of it has no such line.
+fn build_line(lang: Lang, build: &super::Build) -> Option<impl IntoView + use<>> {
+    let version = build.version();
+    let commit = build.commit().map(|commit| {
+        let short = commit.get(..8).unwrap_or(commit).to_owned();
+        view! {
+            <a href=format!("{CENTRAL_REPOSITORY}/commit/{commit}") target="_blank" rel="noopener noreferrer"
+                translate="no">{short}</a>
+        }
+    });
+    let day = build.date().map(|iso| {
+        view! { <time datetime=iso.to_owned()>{crate::format::date(lang, iso)}</time> }
+    });
+    if version.is_none() && commit.is_none() {
+        return None;
+    }
+    Some(view! {
+        <p class="foot-build">
+            <span class="visually-hidden">{words::foot_build(lang)}</span>
+            {version.map(|version| view! { <span translate="no">{version}</span> })}
+            {commit}
+            {day}
+        </p>
+    })
 }
 
 /// The update offer: hidden until `pwa.js` finds a new version waiting.
