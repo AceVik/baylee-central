@@ -13,7 +13,7 @@ use axum::extract::{Request, State};
 use axum::http::{HeaderMap, HeaderValue, Method, StatusCode, Uri, header};
 use axum::middleware::{self, Next};
 use axum::response::{IntoResponse, Response};
-use central_web::data::{Machine, machine};
+use central_web::data::{Machine, Section, machine};
 use central_web::site::{self, Assets, Context, Page, Snapshot};
 use central_web::words::Lang;
 
@@ -40,22 +40,27 @@ pub struct App {
 
 /// Most pages kept for one snapshot of the data, and their most bytes
 /// together. A page is about 25 KB (the start page about 75 KB). Only the
-/// start page and the download depend on the visitor's machine ([`varies`]);
-/// every other page is kept once per language. Some forty pages in eleven
-/// languages, and those two for each of the at most 28 machines told apart
-/// (seven platforms, read or assumed, phone or not), are about 1,050 pages
-/// and 45 MB: both bounds hold every page there can be, so no request can
+/// start page, the download and the account's overview depend on the
+/// visitor's machine ([`varies`]); every other page is kept once per
+/// language. Some forty pages in eleven languages, and those three for
+/// each of the at most 28 machines told apart (seven platforms, read or
+/// assumed, phone or not), are about 1,360 pages and 55 MB: both bounds
+/// hold every page there can be, so no request can
 /// fill the table with rare pages and leave the common ones to be rendered
 /// each time. Past either bound a page is rendered for its request and not
 /// kept.
 const PAGES: usize = 2_048;
 const PAGE_BYTES: usize = 64 * 1024 * 1024;
 
-/// Whether a page is written for the visitor's machine: the two with the
-/// download for it. They say so to caches (`Vary`), and only they are kept
-/// per machine.
+/// Whether a page is written for the visitor's machine: the three with the
+/// download for it (the start page, the download page and the account's
+/// overview). They say so to caches (`Vary`), and only they are kept per
+/// machine.
 const fn varies(page: Page) -> bool {
-    matches!(page, Page::Home | Page::Download)
+    matches!(
+        page,
+        Page::Home | Page::Download | Page::Account(Section::Home)
+    )
 }
 
 /// A page as rendered: its bytes and their entity tag.

@@ -861,12 +861,31 @@
   min-inline-size: 0;
 }
 
+/* The navigation in groups (the account, playing). On a narrow screen it
+   is one line that scrolls sideways, the groups behind one another with a
+   rule between; from 64rem a column, each group under its name. */
 .frame-nav ul {
   display: flex;
   gap: var(--space-1);
+  margin: 0;
   padding: 0;
-  overflow-x: auto;
   list-style: none;
+}
+
+.frame-groups {
+  overflow-x: auto;
+}
+
+.frame-group {
+  display: flex;
+  flex: none;
+  align-items: center;
+}
+
+.frame-group + .frame-group {
+  margin-inline-start: var(--space-2);
+  padding-inline-start: var(--space-2);
+  border-inline-start: var(--hairline) solid var(--edge-soft);
 }
 
 .frame-nav a {
@@ -909,11 +928,10 @@
   box-shadow: inset 3px 0 0 var(--gold);
 }
 
-/* "Your account" above the list, as the old site had it (the list's own
-   name is the navigation's label) */
+/* a group's name above its links, where the navigation is a column */
 .frame-nav-head {
   display: none;
-  margin: 0 0 var(--space-2) var(--space-3);
+  margin: 0 0 var(--space-1) var(--space-3);
   color: var(--violet);
   font: 700 var(--text-xs) var(--sans);
   letter-spacing: 0.16em;
@@ -960,6 +978,20 @@
     overflow: visible;
   }
 
+  .frame-groups {
+    gap: var(--space-5);
+  }
+
+  .frame-group {
+    display: block;
+  }
+
+  .frame-group + .frame-group {
+    margin-inline-start: 0;
+    padding-inline-start: 0;
+    border-inline-start: 0;
+  }
+
   .frame-nav-head {
     display: block;
   }
@@ -969,29 +1001,218 @@
   }
 }
 
-.account-who .handle {
-  color: var(--title);
-  font-family: var(--font-prose);
-  font-size: var(--text-xl);
-  font-weight: 700;
+/* ---- The overview ---------------------------------------------------------- */
+
+/* Who is signed in: the face, the handle with its tag set apart, and the
+   way to the profile at the far end (under the text on a phone). */
+.me {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-4) var(--space-5);
+  align-items: center;
 }
 
+.me-face {
+  display: grid;
+  place-items: center;
+  inline-size: clamp(4rem, 3rem + 4vw, 5.5rem);
+  aspect-ratio: 1;
+  overflow: hidden;
+  border: 2px solid var(--edge);
+  border-radius: var(--radius-full);
+  background: var(--avatar-0);
+  color: var(--on-avatar);
+}
+
+.me-face img {
+  display: block;
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: cover;
+}
+
+.me-initials {
+  font: 700 clamp(1.6rem, 1.2rem + 1.6vw, 2.2rem) / 1 var(--serif);
+}
+
+.me-text {
+  display: grid;
+  gap: 0.15rem;
+  min-inline-size: 0;
+}
+
+.me-handle {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 0.1em;
+  margin: 0 0 0.2rem;
+  color: var(--title);
+  font: 700 clamp(1.5rem, 1.15rem + 1.5vw, 2.2rem) / var(--leading-tight) var(--serif);
+  overflow-wrap: anywhere;
+}
+
+.me-tag {
+  color: var(--gold);
+  font: 600 0.62em / 1 var(--mono);
+}
+
+.me .meta {
+  margin: 0;
+}
+
+.me-role {
+  display: inline-block;
+  margin-inline-start: var(--space-2);
+  padding: 0.1em 0.6em;
+  border: var(--hairline) solid var(--edge);
+  border-radius: var(--radius-full);
+  color: var(--gold);
+  font: 700 var(--text-xs) var(--sans);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.me-edit {
+  grid-column: 1 / -1;
+  justify-self: start;
+}
+
+@media (min-width: 40rem) {
+  .me {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .me-edit {
+    grid-column: auto;
+    justify-self: end;
+  }
+}
+
+/* Where to go on playing: the words on one side, the start page's download
+   for this machine on the other; one under the other where it is narrow. */
+.play-card {
+  display: grid;
+  gap: var(--space-5);
+  align-items: center;
+}
+
+.play-card h2 {
+  margin-block-end: var(--space-2);
+  font-size: var(--text-lg);
+}
+
+.play-card .actions {
+  margin-block-start: var(--space-4);
+}
+
+.play-card .dl {
+  align-items: flex-start;
+  margin: 0;
+  text-align: start;
+}
+
+@media (min-width: 56rem) {
+  .play-card {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 30rem);
+  }
+
+  .play-card .dl {
+    align-items: flex-end;
+    text-align: end;
+  }
+}
+
+/* Every part of the account as a tile of one size: its sign, its name and
+   a line on what is there. The whole tile is the link. */
 .tiles {
-  margin-block-start: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 17rem), 1fr));
+  gap: var(--space-4);
+  margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.tiles h2 {
-  font-size: var(--text-lg);
+.tiles > li {
+  display: grid;
+}
+
+.tile {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-4);
+  align-items: start;
+  color: inherit;
+  text-decoration: none;
+  transition:
+    border-color var(--dur-fast) ease,
+    background-color var(--dur-fast) ease;
+}
+
+.tile:hover {
+  border-color: var(--edge);
+  background: var(--panel-2);
+}
+
+.tile-sign {
+  display: grid;
+  place-items: center;
+  inline-size: 2.75rem;
+  block-size: 2.75rem;
+  border-radius: var(--radius-md);
+  background: var(--violet-soft);
+  color: var(--gold);
+}
+
+.tile-sign .icon {
+  inline-size: 1.35rem;
+  block-size: 1.35rem;
+}
+
+.tile-text {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.tile-name {
+  color: var(--title);
+  font: 700 var(--text-lg) / var(--leading-tight) var(--serif);
+  /* a long word (Benachrichtigungen) breaks before it leaves the tile */
+  overflow-wrap: anywhere;
+  hyphens: auto;
+}
+
+.tile-lead {
+  color: var(--ink-soft);
+  font-size: var(--text-sm);
+}
+
+/* beside each other the tiles are narrow: the sign stands over the words */
+@media (min-width: 40rem) {
+  .tile {
+    grid-template-columns: minmax(0, 1fr);
+    align-content: start;
+    gap: var(--space-3);
+  }
+}
+
+/* the administration, for the accounts that have it: its pages as a row of
+   buttons that wraps */
+.admin-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  list-style: none;
 }
 
 .needs ul {
   margin-block-start: var(--space-2);
 }
 
-.needs a,
-.tiles h2 a {
+.needs a {
   display: inline-flex;
   align-items: center;
   min-block-size: var(--target);

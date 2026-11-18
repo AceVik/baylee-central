@@ -225,6 +225,25 @@ Each lives in one stylesheet named after it and one component under
   with the current tab in sight. The current item is marked with
   `aria-current="page"` and the gold rule. Its head is start-aligned, beside
   the navigation, unlike the centred page heads of the public pages.
+  The account's navigation is in two groups, the account (overview,
+  profile, security, privacy and data, notifications) and playing (chat,
+  which holds the contacts, and gateways and tokens); the group names show
+  beside the side navigation and not above the row of tabs. The server's
+  page never links to the administration: an administrator's links are
+  drawn by the island once Central said so.
+- **The account's overview** (`.me`, `.play-card`, `.tiles`): who is
+  signed in first (own picture or the name's first letter, display name
+  with its tag, the sign-in name, when the session ends), then what needs
+  attention, then for an administrator the administration's pages, then
+  the game (the start page's download button for the reader's machine and
+  the gateway list), then every part of the area as a tile that is one
+  link: its sign over its name and one line on what is there, the sign
+  beside the words on a phone.
+- **The header's account link** (`.nav-account`, `boot.js`): signed out
+  it says "Sign in"; signed in it shows the own picture, the display name
+  and the tag where a page noted them (`docs/web-accounts.md`), otherwise
+  "Your account". The name is cut with an ellipsis before the bar breaks,
+  the tag never; a screen reader hears "Your account:" before the name.
 - **Dialogs** (`components/Modal.tsx`): the native `<dialog>`, centred,
   focus inside, Escape and the close button close it, focus returns to the
   opener (or to the main content when the opener is gone). A dialog the

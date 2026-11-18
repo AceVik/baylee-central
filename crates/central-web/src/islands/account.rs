@@ -283,55 +283,59 @@ fn home(lang: Lang, summary: &Summary, worker: &str) -> AnyView {
             </section>
         }
     });
-    let links = [
-        (
-            "profile",
-            words::account_profile(lang),
-            words::account_profile_lead(lang),
-        ),
-        (
-            "security",
-            words::account_security(lang),
-            words::account_security_lead(lang),
-        ),
-        (
-            "privacy",
-            words::account_privacy(lang),
-            words::account_privacy_lead(lang),
-        ),
-        (
-            "gateways",
-            words::account_gateways(lang),
-            words::account_gateways_lead(lang),
-        ),
-    ]
-    .map(|(slug, title, lead)| {
-        view! {
-            <li class="card">
-                <h2><a href=format!("/{code}/account/{slug}")>{title}</a></h2>
-                <p>{lead}</p>
-            </li>
-        }
-    });
-    // only an administrator is led to the administration: its overview,
+    // only an administrator is led to the administration: what waits there
+    // (the reports, the reported pictures), its overview, the accounts,
     // and the page that makes reset codes
     let admin = summary.admin.then(|| {
+        let to = |slug: &'static str, name: &'static str| {
+            view! { <li><a class="button button-ghost" href=format!("/{code}/account/admin{slug}")>{name}</a></li> }
+        };
         view! {
+            <section class="card admin-card" aria-labelledby="admin-card-title">
+                <h2 id="admin-card-title">{words::account_admin(lang)}</h2>
+                <ul class="admin-links">
+                    {to("/overview", words::account_home(lang))}
+                    {to("/feedback", words::fb_title(lang))}
+                    {to("/pictures", words::admin_pictures_title(lang))}
+                    {to("/users", words::admin_accounts(lang))}
+                    {to("", words::admin_reset_title(lang))}
+                </ul>
+            </section>
             {registration_switch(lang, worker.to_owned())}
-            <p class="actions">
-                <a class="button button-ghost" href=format!("/{code}/account/admin")>{words::admin_reset_title(lang)}</a>
-                <a class="button button-ghost" href=format!("/{code}/account/admin/overview")>{words::account_admin(lang)}</a>
-            </p>
         }
     });
+    // who is signed in: the picture, the name with its tag set apart, the
+    // name to sign in with and how long the session lasts
+    let named = summary.display_name.clone().zip(summary.tag);
+    let face_name = summary
+        .display_name
+        .clone()
+        .unwrap_or_else(|| summary.username.clone());
+    let handle = match named {
+        Some((name, tag)) => view! {
+            <p class="me-handle" id="me-name" translate="no">
+                <bdi class="me-name">{name}</bdi>
+                <span class="me-tag">{format!("#{}", central_api::profile::tag_text(tag))}</span>
+            </p>
+        }
+        .into_any(),
+        None => view! { <p class="me-handle" id="me-name">{words::account_unnamed(lang)}</p> }
+            .into_any(),
+    };
+    let role = summary
+        .admin
+        .then(|| view! { <span class="me-role">{words::account_admin(lang)}</span> });
     view! {
-        <div class="account-who">
-            <p class="handle" translate="no">{summary.handle().unwrap_or_else(|| words::account_unnamed(lang).to_owned())}</p>
-            <p class="meta">{words::account_signin_name(lang, &summary.username)}</p>
-            <p class="meta">{words::account_until(lang, &when(lang, summary.expires_at))}</p>
-        </div>
+        <section class="card me" aria-labelledby="me-name">
+            {super::picture::own_face(face_name)}
+            <div class="me-text">
+                {handle}
+                <p class="meta">{words::account_signin_name(lang, &summary.username)}{role}</p>
+                <p class="meta">{words::account_until(lang, &when(lang, summary.expires_at))}</p>
+            </div>
+            <a class="button button-ghost me-edit" href=format!("/{code}/account/profile")>{words::account_profile(lang)}</a>
+        </section>
         {attention}
-        <ul class="cards-grid tiles">{links}</ul>
         {admin}
     }
     .into_any()
