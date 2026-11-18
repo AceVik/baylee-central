@@ -4,64 +4,6 @@
 
 use serde::{Deserialize, Serialize};
 
-/// Central's public calendar, rendered before hydration and refreshed by the browser.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct ChallengeFeed {
-    /// Public expedition metadata only; personal progression is never server-cached.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub tower: Option<central_api::tower::Season>,
-    /// Public Ascent standings for `tower`, without account-specific `own` flags.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub tower_standings: Vec<central_api::tower::Standing>,
-    /// Central's clock at this snapshot, in Unix seconds.
-    pub now: i64,
-    /// Current tasks and the first archive page; no private execution material.
-    pub challenges: Vec<central_api::challenges::Challenge>,
-    /// Exclusive cursor for older tasks.
-    pub before: Option<i64>,
-}
-
-/// Whether two Tower standing rows carry identical public fields.
-#[must_use]
-pub fn standing_eq(a: &central_api::tower::Standing, b: &central_api::tower::Standing) -> bool {
-    (
-        a.rank,
-        &a.name,
-        a.tag,
-        a.own,
-        a.floors,
-        a.losses,
-        a.turns,
-        a.milliseconds,
-    ) == (
-        b.rank,
-        &b.name,
-        b.tag,
-        b.own,
-        b.floors,
-        b.losses,
-        b.turns,
-        b.milliseconds,
-    )
-}
-
-impl PartialEq for ChallengeFeed {
-    fn eq(&self, other: &Self) -> bool {
-        self.tower == other.tower
-            && self.now == other.now
-            && self.challenges == other.challenges
-            && self.before == other.before
-            && self.tower_standings.len() == other.tower_standings.len()
-            && self
-                .tower_standings
-                .iter()
-                .zip(&other.tower_standings)
-                .all(|(a, b)| standing_eq(a, b))
-    }
-}
-
-impl Eq for ChallengeFeed {}
-
 /// A platform Baylee's client is built for.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum Platform {

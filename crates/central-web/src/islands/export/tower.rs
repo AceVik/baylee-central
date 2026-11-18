@@ -2,7 +2,7 @@
 use crate::islands::central::{Failure, call};
 use central_api::{challenges, tower as api, wire};
 
-pub(in crate::islands) async fn request(request: api::Request) -> Result<api::Response, Failure> {
+async fn request(request: api::Request) -> Result<api::Response, Failure> {
     match call(&wire::Request::Challenges {
         request: challenges::Request::Tower { request },
     })

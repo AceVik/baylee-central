@@ -370,6 +370,14 @@ WCAG 2.1 AA, mobile first:
 The account area and the administration are loaded lazily and only after a
 sign-in; a visitor's first page fetches neither.
 
+An address the site had and took away for good answers 410, in every
+language, with a page that says so and leads to the start page
+(`Page::REMOVED`, `Page::Gone`). `/challenges` is one since 18.11.2026:
+Daily and Weekly tasks, the Tower, their rankings and the consent to be
+listed in them are shown by the game client, and the website shows none of
+it. A page whose content lives on elsewhere on the site is a permanent
+redirect instead (`/cards` to `/#cards`).
+
 The three forms (signing in, registering, a new password with a reset code)
 are dialogs, never pages of their own. Every page outside the account area
 carries them closed; a link to one opens it and puts the form's address in
