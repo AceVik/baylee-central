@@ -6,7 +6,7 @@
 // every width.
 import { expect, type Locator, type Page, test } from "@playwright/test";
 
-import { axe, targets } from "./check.ts";
+import { axe, onlyDesktop, targets } from "./check.ts";
 
 const TITLES = {
   en: "Passwords, keys and chats: what goes where",
@@ -172,7 +172,8 @@ test("a diagram holds no sentence: only its actors' names, which fit, and the st
   }
 });
 
-test("no sideways scrolling from 320 to 2560 px, in both languages", async ({ page }) => {
+test("no sideways scrolling from 320 to 2560 px, in both languages", async ({ page }, info) => {
+  onlyDesktop(info, "sets its own window sizes, so the project's size is irrelevant");
   test.slow();
   for (const width of WIDTHS) {
     for (const height of [width < 1024 ? 812 : 900, 360]) {
@@ -192,7 +193,8 @@ test("the footer, the questions and the sign-in page lead here", async ({ page }
   await page.goto("/en/faq");
   await expect(page.locator('main a[href="/en/security"]')).toHaveCount(1);
   await page.goto("/de/signin");
-  await page.locator('main a[href="/de/security"]').click();
+  // the sign-in form stands in a dialog, whose line about the sign-in's steps leads here
+  await page.locator('#auth-signin a[href="/de/security"]').click();
   await expect(page).toHaveURL(/\/de\/security$/);
   await expect(page.locator("h1")).toHaveText(TITLES.de);
 });

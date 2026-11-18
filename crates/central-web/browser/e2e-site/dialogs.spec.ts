@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { axe, targets, watch } from "./check.ts";
+import { axe, onlyDesktop, targets, watch } from "./check.ts";
 
 /** Presses the bar's sign-in link; on a phone it lies in the menu. */
 async function ask(page: Page): Promise<void> {
@@ -24,7 +24,10 @@ test("signing in opens over the page that asked, and fetches its WebAssembly onl
 
   await ask(page);
   await expect(dialog).toBeVisible();
-  await expect(page).toHaveURL(/\/en\/faq$/);
+  // the dialog has its address (one step in the history), and the page that
+  // asked stays beneath it
+  await expect(page).toHaveURL(/\/en\/signin$/);
+  await expect(page.locator("main h1")).toHaveText("Questions and answers");
   // the keyboard is in the first field, and what is typed before the
   // island runs stays
   const name = dialog.getByLabel("Sign-in name");
@@ -69,7 +72,8 @@ test("the two dialogs lead to each other, and close by Escape, their button and 
   await signin.getByRole("link", { name: "Create one" }).click();
   await expect(register).toBeVisible();
   await expect(signin).toBeHidden();
-  await expect(page).toHaveURL(/\/en\/$/);
+  // the form's address replaces the other's: still one step in the history
+  await expect(page).toHaveURL(/\/en\/register$/);
   await expect(register.getByLabel("Sign-in name")).toBeFocused();
   await expect(register.locator("leptos-island")).toHaveAttribute("data-hydrated", "", { timeout: 15_000 });
   // each password has an eye of its own
@@ -84,19 +88,24 @@ test("the two dialogs lead to each other, and close by Escape, their button and 
   await register.getByRole("link", { name: "Sign in" }).click();
   await expect(signin).toBeVisible();
   await expect(register).toBeHidden();
+  await expect(page).toHaveURL(/\/en\/signin$/);
 
+  // closing goes that one step back, to the page that asked
   await page.keyboard.press("Escape");
   await expect(signin).toBeHidden();
+  await expect(page).toHaveURL(/\/en\/$/);
 
   await ask(page);
   await expect(signin).toBeVisible();
   await signin.getByRole("button", { name: "Close" }).click();
   await expect(signin).toBeHidden();
+  await expect(page).toHaveURL(/\/en\/$/);
 
   await ask(page);
   await expect(signin).toBeVisible();
   await page.mouse.click(4, 4);
   await expect(signin).toBeHidden();
+  await expect(page).toHaveURL(/\/en\/$/);
 });
 
 test("a link to the registration in a page's text opens the dialog too; a modifier key keeps the link", async ({ page, context }) => {
@@ -114,14 +123,19 @@ test("a link to the registration in a page's text opens the dialog too; a modifi
   await expect(page.locator("#auth-register")).toBeHidden();
 });
 
-test("the pages for signing in and registering stay pages, without a dialog of their own", async ({ page }) => {
+test("the addresses for signing in and registering show their dialog over the start page, and closing it leaves for the start page", async ({ page }) => {
   for (const slug of ["signin", "register"]) {
     await page.goto(`/en/${slug}`);
-    await expect(page.locator("dialog.auth-dialog")).toHaveCount(0);
-    await expect(page.locator("html")).toHaveAttribute("data-islands", "ready", { timeout: 15_000 });
-    const eye = page.getByRole("button", { name: "Show the password" }).first();
+    const dialog = page.locator(`#auth-${slug}`);
+    await expect(dialog).toBeVisible();
+    await expect(dialog.locator("leptos-island")).toHaveAttribute("data-hydrated", "", { timeout: 15_000 });
+    const eye = dialog.getByRole("button", { name: "Show the password" }).first();
     await eye.click();
     await expect(eye).toHaveAttribute("aria-pressed", "true");
+    // the dialog stood open as the page came: there is no step to go back to
+    await page.keyboard.press("Escape");
+    await expect(dialog).toBeHidden();
+    await expect(page).toHaveURL(/\/en\/$/);
   }
 });
 
@@ -147,7 +161,8 @@ for (const [what, word] of [
   ["the German heading", "Dein Wiederherstellungscode"],
   ["a word nothing hyphenates", "MMMMMMMMMMMMMMMMMMMMMMMMMMMMMM"],
 ] as const) {
-  test(`a step with a long word in its heading stays inside the registration dialog at 320 px: ${what}`, async ({ page }) => {
+  test(`a step with a long word in its heading stays inside the registration dialog at 320 px: ${what}`, async ({ page }, info) => {
+    onlyDesktop(info, "sets its own window size, so the project's size is irrelevant");
     await page.setViewportSize({ width: 320, height: 760 });
     await page.goto("/de/");
     await ask(page);
