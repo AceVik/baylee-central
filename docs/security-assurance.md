@@ -8135,8 +8135,10 @@ Design pass, the assets, who could act and what must hold:
   is a **new exposure** of a parser to an outside answer, disclosed here: the body is bounded to
   64 KiB before it is parsed, document type declarations are refused (so no entity is ever
   expanded and no external one fetched), and the nodes are bounded (1024). The ECB's JSON data
-  service was tried first: on 18.11.2026 a query for every currency took over a minute to start
-  answering on a cold cache (two of three tries), the XML feed a tenth of a second. A rate is
+  service was tried first, on 18.11.2026: a query for every currency gave no byte within 20 s,
+  then none within 60 s, and a third try right after answered in 0.14 s from a cache that
+  lives 30 s; queries for one and three currencies took 1.7 s and 6.5 s. The XML feed answered
+  in about 0.1 s each of three times. A rate is
   decimal text read into millionths; no amount passes through a float. A currency without a
   rate is stored unconverted and not counted, and its code is logged; nothing is guessed.
 - **What is stored** (migration 000032): platform, kind, amount, currency, euro value, Central's
@@ -8160,7 +8162,8 @@ reader and conversion, Ko-fi's two-step reader, the reference digest); `central-
 sweep's fold, the grants' list from 58 to 61 tables) and `ops/grants.sql`; `central-identity`
 (`funding.rs`: the state, Ko-fi's intake, the figures from memory; the operation decided in
 every exhaustive list: browser, session, credential, budgets class); `central-http` (the route,
-its budget of 30 a minute an address, a 16 KiB body bound of its own in the boundary, the
+its budget of 30 a minute an address, a body bound of its own in the boundary (64 KiB read,
+16 KiB taken), the
 public operation under the directory's 60); `central-service` (the `funding` block, the polling
 task with an injectable fetch, the check mode, the start's and the sweep's lines);
 `central-web-server` (reads `PublicFunding`, `funding.rs` and the `funding` setting removed);
@@ -8180,9 +8183,12 @@ PostgreSQL 18 (`crates/central-client/tests/support/donations.rs`, in `cargo xta
   (`a_wrong_or_missing_token_is_refused_before_anything_else_is_read`).
 - **Malformed bodies**: JSON as the body, no content type, another field than `data`, `data`
   twice, truncated JSON, an array: the same `400`, counted as `content type`, `form` or `json`.
-- **Oversized**: a well-formed delivery of 16 KiB and more is refused with `413` before it is
-  read; a declared length is refused before the body is waited for. These are not among the
-  counted reasons (the boundary refuses them before the service sees them).
+- **Oversized**: a well-formed delivery past 16 KiB is read (up to 64 KiB), refused with the
+  same `400` and counted as `size`: a real payment with a long message, once form-encoded, must
+  not vanish unseen while Ko-fi's format is unconfirmed (the first form of this change
+  refused it with an uncounted `413`; the review before the commit moved the bound). Past
+  64 KiB the boundary refuses with `413` before reading, also for a length only declared;
+  those are in no count.
 - **Replay**: the same delivery three times, and once more with another amount and kind:
   `200` each time, one row, the first amount stands (`again` counted); eight concurrent
   deliveries of one transaction leave one row (store test).

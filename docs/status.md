@@ -476,3 +476,20 @@ notice's new section for the owner to read, and the versioned
 `legal/privacy.*.md`, which still says a profile picture will follow; the
 nine languages besides English and German; the game client's decoder
 ([proposal §11](dependency-proposal/profile-picture.md)).
+
+## Donation figures, 18 November 2026
+
+Baylee Central collects what GitHub Sponsors, Liberapay and Ko-fi report and
+gives the website totals in euros ([operations](operations.md#donations)):
+
+- a new crate, `central-funding`, reads the platforms' answers, the ECB's
+  rates and Ko-fi's deliveries strictly; the polling task and the optional
+  `funding` block in `central-service`; one new inbound route, `POST
+  /v1/kofi`; migration 000032 (40 days, then one sum per platform);
+  `PublicFunding` on both listeners; the website reads it and asks no
+  platform itself.
+
+Open: GitHub's token scope (the owner tests `read:user`); Ko-fi's format,
+confirmed only by its test delivery with `kofi.record` off; whether Ko-fi
+reports a cancelled membership; the versioned `legal/privacy.*.md`, which
+does not mention donations; the nine languages besides English and German.

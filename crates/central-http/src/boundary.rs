@@ -94,7 +94,7 @@ fn upload(request: &Request) -> bool {
 /// listener's.
 fn limit(state: &Boundary, request: &Request) -> usize {
     if request.uri().path() == super::native::KOFI_PATH {
-        central_identity::KOFI_LIMIT.min(state.request_bytes)
+        central_identity::KOFI_READ.min(state.request_bytes)
     } else {
         state.request_bytes
     }

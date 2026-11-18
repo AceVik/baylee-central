@@ -6,8 +6,9 @@
 //! `roxmltree`, which is safe Rust, with document type declarations refused (so no
 //! entity is ever expanded) and a bound on its nodes, from a body the caller has
 //! already bounded ([`LIMIT`]). The ECB's statistical data service also answers in
-//! JSON, but on 18.11.2026 a query for every currency took over a minute to start
-//! answering when its cache was cold, while this feed answered in a tenth of a second.
+//! JSON, but on 18.11.2026 a query for every currency gave no byte within 20 s, then
+//! none within 60 s, before its 30-second cache answered a third try at once, while
+//! this feed answered in about a tenth of a second each time.
 
 use crate::Currency;
 use std::collections::BTreeMap;

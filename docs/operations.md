@@ -1187,7 +1187,8 @@ own, never part of the bar.
 
 The euro reference rates come from the European Central Bank's daily feed
 (`https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml`), fetched
-every six hours (every 30 minutes until a first one is held) when GitHub or
+every six hours after a fetch that worked and 30 minutes after one that
+failed, when GitHub or
 Ko-fi is on. An amount in a currency without a rate is stored without a
 euro value and **not counted**; it is converted once a rate comes, if that
 is within seven days; the log names its currency's code, never an amount.
@@ -1249,8 +1250,10 @@ A poll that fails leaves the last figure standing until the next restart.
   site block passes every path to the account listener already; Caddy needs
   no change.
 - What the route takes: `POST` with `Content-Type:
-  application/x-www-form-urlencoded`, at most 16 KiB (a longer body is
-  refused with `413` before it is read), one field `data` holding JSON.
+  application/x-www-form-urlencoded`, at most 16 KiB (a longer one, up to
+  64 KiB, is read, refused and counted as `size`; one past 64 KiB is
+  refused with `413` before it is read and is in no count), one field
+  `data` holding JSON.
   Central reads the token first and compares it in constant time; only with
   the right one does it read `type`, `amount`, `currency`,
   `is_subscription_payment`, `is_first_subscription_payment` and
@@ -1275,7 +1278,9 @@ A poll that fails leaves the last figure standing until the next restart.
      delivery(ies) verified and read, and not recorded (kofi.record is
      false)`: the format fits; or `central: Ko-fi deliveries refused since
      start, by reason: …`: it does not, and the reason (`content type`,
-     `form`, `json`, `token`, `shape`, `amount`, `currency`) says where.
+     `form`, `json`, `token`, `shape`, `amount`, `currency`, `size`) says
+     where. Neither line within a minute means the delivery never reached
+     the service: a body past 64 KiB (`413`), or the `403` below.
      `token` alone means the token in the file is not the one Ko-fi shows.
      A delivery with an `Origin` or `Sec-Fetch-Site` header would be
      refused with `403` before it is read (the account listener's rule)
@@ -1322,6 +1327,15 @@ rows, and Ko-fi's refusals by reason since the start. At once, when they
 change: the number of Ko-fi payments recorded, verified while `record` is
 off, or verified as sales. No line holds a token, an amount, a name, an id
 or a body. The sweep prints how many donations it folded and deleted.
+
+**The legal texts.** The website's privacy page says, in its part on
+donations, what Central collects and keeps of a payment and for how long
+(German and English; the nine other languages carry the English until a
+translation follows). The binding privacy policy (`legal/privacy.*.md`)
+does not mention donations yet; whether it gains a section, and with it a
+new version, is the owner's review, as it was for mail. This runbook does
+not decide whether GitHub's token or Ko-fi's recording may be switched on
+before that.
 
 **Figures one can diff.** The public sum changes when a donation is
 counted, at most a minute later, so whoever watches `/funding.json` can
