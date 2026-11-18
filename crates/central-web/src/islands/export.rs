@@ -1,13 +1,16 @@
-//! Merge separately paginated challenge metadata into the account's downloadable file.
+//! Merge the separately paginated records of play (Daily and Weekly tasks,
+//! the Tower's runs, the Echoes receipts) into the account's downloadable
+//! file. No page of the site shows them, the game client does; the download
+//! carries what Central keeps of them.
 use super::{
     central::{Failure, call},
     session,
 };
 use central_api::{challenges as api, wire};
 mod echoes;
-pub(super) mod tower;
+mod tower;
 
-pub(super) async fn request(request: api::Request) -> Result<api::Response, Failure> {
+async fn request(request: api::Request) -> Result<api::Response, Failure> {
     match call(&wire::Request::Challenges { request }).await? {
         wire::Response::Challenges { response } => Ok(response),
         _ => Err(Failure::Malformed),

@@ -100,6 +100,12 @@ subsequently exercised as recorded in [challenge assurance](challenge-assurance.
 
 ## Website and personal export
 
+*Status, 18.11.2026: the owner took the page `/{lang}/challenges` off the
+website; the address answers 410 ([website design](website-design.md#areas)).
+The calendar, the rankings, hints and the consent to be listed are in the game
+client. Of what this section describes, only the account's metadata download
+remains on the website; the rest records the page as it was built and checked.*
+
 `/{lang}/challenges` renders the public calendar in its first HTML response.
 The browser then reads rankings and, for a remembered session, account-owned
 progress. The server-side cache is public only. Every existing site language

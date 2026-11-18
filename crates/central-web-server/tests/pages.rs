@@ -463,6 +463,56 @@ async fn addresses_and_status_codes() {
     assert!(!headers.contains_key("vary"));
 }
 
+/// The challenges page left the site for good (Daily and Weekly tasks and
+/// the Tower are the game client's): its address says so in the reader's
+/// language instead of leading somewhere else, and nothing the site sends
+/// still leads to it.
+#[tokio::test]
+async fn the_removed_challenges_page_is_gone_and_linked_from_nowhere() {
+    let app = app(true);
+    assert!(Page::REMOVED.contains(&"challenges"));
+    for lang in Lang::ALL {
+        let path = format!("/{}/challenges", lang.code());
+        let (status, headers, html) = get(&app, &path, &[]).await;
+        assert_eq!(status, StatusCode::GONE, "{path}");
+        assert!(!headers.contains_key("location"), "{path}: no redirect");
+        assert_eq!(headers["x-robots-tag"], "noindex, noarchive, nosnippet");
+        secured(&headers);
+        assert!(
+            html.contains(&format!("<html lang=\"{}\"", lang.tag())),
+            "{path}: in its language"
+        );
+        assert_eq!(count(&html, "<h1"), 1, "{path}: one h1");
+        assert!(html.contains(">410<"), "{path}: says what it is");
+        let home = format!(" href=\"{}\"", Page::Home.path(lang));
+        assert!(
+            tags(&html, "a")
+                .iter()
+                .any(|a| a.contains("class=\"button primary\"") && a.contains(&home)),
+            "{path}: leads to the start page"
+        );
+        assert!(
+            !html.contains("rel=\"canonical\"") && !html.contains("hreflang=\"x-default\""),
+            "{path}: no address of its own for a search engine"
+        );
+    }
+    // It never had an address without a language, and has none now.
+    let (status, _, _) = get(&app, "/challenges", &[("accept-language", "de")]).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    for lang in Lang::ALL {
+        for page in Page::LISTED {
+            let (_, _, html) = get(&app, &page.path(lang), &[]).await;
+            assert!(
+                !html.contains("/challenges"),
+                "{page:?} {}: a link to the removed page",
+                lang.code()
+            );
+        }
+    }
+    let (_, _, sitemap) = get(&app, "/sitemap.xml", &[]).await;
+    assert!(!sitemap.contains("challenges"), "the sitemap");
+}
+
 #[tokio::test]
 async fn generated_documents() {
     let app = app(true);

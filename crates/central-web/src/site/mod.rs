@@ -23,8 +23,6 @@ pub enum Page {
     Download,
     /// `/{lang}/gateways`.
     Gateways,
-    /// `/{lang}/challenges`: shared Daily/Weekly tasks, rankings and permanent badges.
-    Challenges,
     /// `/{lang}/faq`.
     Faq,
     /// `/{lang}/security`.
@@ -57,11 +55,10 @@ pub enum Page {
 
 impl Page {
     /// Every page with an address, in the sitemap's order.
-    pub const LISTED: [Page; 11] = [
+    pub const LISTED: [Page; 10] = [
         Page::Home,
         Page::Download,
         Page::Gateways,
-        Page::Challenges,
         Page::Faq,
         Page::Security,
         Page::Contact,
@@ -70,6 +67,11 @@ impl Page {
         Page::Terms,
         Page::FanContent,
     ];
+
+    /// The slugs of pages the site had and removed for good; each answers
+    /// as [`Page::Gone`] in every language. `challenges`: Daily and Weekly
+    /// tasks, the Tower and their rankings are the game client's to show.
+    pub const REMOVED: [&'static str; 1] = ["challenges"];
 
     /// The path after the language prefix, without a leading slash; the
     /// home page's is empty.
@@ -84,7 +86,6 @@ impl Page {
             Page::Account(section) => section.slug(),
             Page::Download => "download",
             Page::Gateways => "gateways",
-            Page::Challenges => "challenges",
             Page::Faq => "faq",
             Page::Security => "security",
             Page::Contact => "contact",
@@ -106,6 +107,9 @@ impl Page {
             })
         {
             return Some(Page::Account(Section::Report));
+        }
+        if Page::REMOVED.contains(&slug) {
+            return Some(Page::Gone);
         }
         Page::LISTED
             .into_iter()
@@ -304,8 +308,6 @@ pub struct Snapshot {
     /// How often the site's pages were opened, where the deployment counts
     /// it (`central-web-server`'s `views`), as it stood at the last minute.
     pub views: Option<crate::data::Views>,
-    /// Central's public challenge calendar; absent when it could not be refreshed.
-    pub challenges: Option<crate::data::ChallengeFeed>,
 }
 
 /// What a page needs besides its own words.

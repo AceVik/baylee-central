@@ -163,6 +163,11 @@ Policy and full-history secret checks pass in
 
 ## Website collection and export — design and implementation
 
+*Status, 18.11.2026: the challenges page, and with it the medal collection,
+left the website ([website design](website-design.md#areas)); the game client
+shows the collection. The account download described below remains. The rest
+of this section records the page as it was built and checked.*
+
 The challenges page reads confirmed v2 accomplishments directly from Central,
 independently of the Tower gameplay service. It presents three separate original
 motifs: crossed swords for duel victories, a crowned spire for eight-win clears,
