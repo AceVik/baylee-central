@@ -94,8 +94,18 @@ fn dated(text: &str) -> bool {
         })
 }
 
-/// Whether a request is a browser opening a page for a person: a
-/// navigation to a document, not fetched ahead of a visit.
+/// Whether a request is a person arriving at the site: a browser's
+/// navigation to a document, not fetched ahead of a visit, that did not
+/// start on one of the site's own pages and is not the same page loaded
+/// again.
+///
+/// Going on from page to page is the same visit: a link the site puts in
+/// place itself (`nav.js`) is no navigation at all, and one that loads a
+/// document (another language, the way into the account area) says
+/// `Sec-Fetch-Site: same-origin`. A reload says `Cache-Control` (`max-age=0`,
+/// or `no-cache` for the hard one), which a browser sends on no other
+/// navigation. All of it is read from the request and nothing is kept, so
+/// a visit is counted without knowing the visitor.
 #[must_use]
 pub fn is_visit(headers: &HeaderMap) -> bool {
     let says = |name: &str, value: &str| {
@@ -106,6 +116,8 @@ pub fn is_visit(headers: &HeaderMap) -> bool {
     };
     says("sec-fetch-mode", "navigate")
         && says("sec-fetch-dest", "document")
+        && !says("sec-fetch-site", "same-origin")
+        && !headers.contains_key("cache-control")
         && !headers.contains_key("sec-purpose")
         && !headers.contains_key("purpose")
 }
@@ -276,6 +288,32 @@ mod tests {
         let mut ahead = visit.to_vec();
         ahead.push(("sec-purpose", "prefetch"));
         assert!(!is_visit(&headers(&ahead)));
+    }
+
+    #[test]
+    fn going_on_within_the_site_and_a_reload_are_the_same_visit() {
+        let arriving = |site: &'static str| {
+            headers(&[
+                ("sec-fetch-mode", "navigate"),
+                ("sec-fetch-dest", "document"),
+                ("sec-fetch-site", site),
+            ])
+        };
+        // typed or from a bookmark, from a search engine, from a sister site
+        assert!(is_visit(&arriving("none")));
+        assert!(is_visit(&arriving("cross-site")));
+        assert!(is_visit(&arriving("same-site")));
+        // a link of the site's own that loads a document
+        assert!(!is_visit(&arriving("same-origin")));
+        // the same page again, softly and hard
+        for again in ["max-age=0", "no-cache"] {
+            assert!(!is_visit(&headers(&[
+                ("sec-fetch-mode", "navigate"),
+                ("sec-fetch-dest", "document"),
+                ("sec-fetch-site", "none"),
+                ("cache-control", again),
+            ])));
+        }
     }
 
     #[test]
