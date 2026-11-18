@@ -1867,3 +1867,6 @@ code-mail-opened = Dein Mailprogramm sollte sich jetzt mit einem Entwurf öffnen
 terms-step-version = Fassung { $version }
 terms-read-hint = Lies den Text bis zum Ende, dann kannst du akzeptieren.
 terms-read-done = Bis zum Ende gelesen.
+
+## the contact form (redesign)
+contact-again = Noch eine Nachricht schreiben
