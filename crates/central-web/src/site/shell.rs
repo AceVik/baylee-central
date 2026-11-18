@@ -247,6 +247,7 @@ fn head(page: Page, cx: &Context<'_>, meta: &Meta) -> impl IntoView + use<> {
             <link rel="stylesheet" href=assets.url("site.css") integrity=assets.integrity("site.css") />
             <script src=assets.url("boot.js") integrity=assets.integrity("boot.js")></script>
             <script type="module" src=assets.url("pwa.js") integrity=assets.integrity("pwa.js")></script>
+            <script type="module" src=assets.url("nav.js") integrity=assets.integrity("nav.js")></script>
             <script type="module" src=assets.url("hint.js") integrity=assets.integrity("hint.js") fetchpriority="low"></script>
             {own}
             {sky}

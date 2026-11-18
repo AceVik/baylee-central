@@ -159,3 +159,7 @@ document.addEventListener("click", (event) => {
     for (const box of boxes()) box.hidden = true;
   });
 });
+// a page put in place without a new document (`nav.js`) shows the offer too
+document.addEventListener("baylee:page", () => {
+  if (deferred) for (const box of boxes()) box.hidden = false;
+});

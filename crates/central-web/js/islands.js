@@ -17,6 +17,11 @@
 // until the dialog opens, and waits for that. Such an island is taken over
 // when its dialog first opens, not before: its form counts its time from
 // the moment a person can see it.
+//
+// A page put in place without a new document (`nav.js`) is watched the
+// same way from the moment it stands; once the WebAssembly is here, its
+// islands are taken over at once.
+const root = document.documentElement;
 if (document.readyState !== "complete") {
   await new Promise((resolve) => window.addEventListener("load", resolve, { once: true }));
 }
@@ -40,43 +45,21 @@ await new Promise((resolve) => {
   painted.observe({ type: "largest-contentful-paint", buffered: true });
   setTimeout(resolve, 1000);
 });
-await new Promise((resolve) => {
-  const all = [...document.querySelectorAll("leptos-island")];
-  if (
-    all.length === 0 ||
-    typeof IntersectionObserver !== "function" ||
-    all.some((island) => island.getClientRects().length === 0 && !island.closest("dialog:not([open])"))
-  ) {
-    resolve();
-    return;
-  }
-  const watch = new IntersectionObserver(
-    (entries) => {
-      if (entries.some((entry) => entry.isIntersecting)) start();
-    },
-    { rootMargin: "100% 0px" },
-  );
-  const reach = (event) => {
-    if (event.target instanceof Element && event.target.closest("leptos-island")) start();
-  };
-  function start() {
-    watch.disconnect();
-    document.removeEventListener("focusin", reach, true);
-    document.removeEventListener("pointerdown", reach, true);
-    resolve();
-  }
-  document.addEventListener("focusin", reach, true);
-  document.addEventListener("pointerdown", reach, true);
-  for (const island of all) watch.observe(island);
-});
-const islands = await import("./islands-glue.js");
 
-await islands.default({ module_or_path: "./islands.wasm" });
-islands.hydrate();
+// the WebAssembly, fetched once for the document
+let loading = null;
+let islands = null;
+const load = () =>
+  (loading ??= (async () => {
+    const glue = await import("./islands-glue.js");
+    await glue.default({ module_or_path: "./islands.wasm" });
+    glue.hydrate();
+    islands = glue;
+  })());
 
 async function hydrate(element) {
   if ("hydrated" in element.dataset) return;
-  const run = islands[element.dataset.component ?? ""];
+  const run = islands?.[element.dataset.component ?? ""];
   if (typeof run !== "function") return;
   const done = run(element);
   if (done && typeof done.then === "function") await done;
@@ -104,5 +87,64 @@ async function walk(node) {
   }
 }
 
-await walk(document.body);
-document.documentElement.dataset.islands = "ready";
+// what watches the page on screen for a reader coming near an island
+let unwatch = () => {};
+
+/** Resolves once the page's islands are wanted; never for a page that left first. */
+function wanted() {
+  return new Promise((resolve) => {
+    const all = [...document.querySelectorAll("leptos-island")];
+    if (
+      islands ||
+      all.length === 0 ||
+      typeof IntersectionObserver !== "function" ||
+      all.some((island) => island.getClientRects().length === 0 && !island.closest("dialog:not([open])"))
+    ) {
+      resolve();
+      return;
+    }
+    const watch = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) start();
+      },
+      { rootMargin: "100% 0px" },
+    );
+    const reach = (event) => {
+      if (event.target instanceof Element && event.target.closest("leptos-island")) start();
+    };
+    function stop() {
+      watch.disconnect();
+      document.removeEventListener("focusin", reach, true);
+      document.removeEventListener("pointerdown", reach, true);
+    }
+    function start() {
+      stop();
+      resolve();
+    }
+    unwatch = stop;
+    document.addEventListener("focusin", reach, true);
+    document.addEventListener("pointerdown", reach, true);
+    for (const island of all) watch.observe(island);
+  });
+}
+
+let pages = 0;
+async function page() {
+  const mine = ++pages;
+  delete root.dataset.islands;
+  await wanted();
+  if (mine !== pages) return;
+  await load();
+  if (mine !== pages) return;
+  await walk(document.body);
+  if (mine === pages) root.dataset.islands = "ready";
+}
+
+document.addEventListener("baylee:leave", () => {
+  pages += 1;
+  unwatch();
+  unwatch = () => {};
+  waiting.disconnect();
+});
+document.addEventListener("baylee:page", () => void page());
+await page();

@@ -359,7 +359,46 @@ directly (or reached from a reset mail, whose code rides in the fragment),
 the address shows the start page with the dialog open, and closing it
 leaves for the start page. Without script the address shows the start page
 under a line that says the form needs script. The addresses stay out of the
-index and the sitemap.
+index and the sitemap. Leaving a form for good (signed in, declined) takes
+its entry's place in the history, so Back does not open it again.
+
+### Going from page to page
+
+Every page is a complete document at its own address, and that is what a
+first visit, a search engine and a browser without script get. Between
+pages of the public site `js/nav.js` fetches the next page (the same
+request a navigation makes) and puts its part of the document in place of
+the one on screen: the title, the head's words about that page, and the
+body. The style sheet, the fonts, the scripts and the WebAssembly stay, the
+bar does not blink, and Back and Forward bring a page back where it stood.
+A link is fetched a moment before its press (the pointer over it, the
+keyboard on it, a finger down), not at all where the device asks to save
+data; a page that still takes longer than a blink shows a line running
+under the bar. After a swap the keyboard is on `<main>` and a status line
+says the page's title.
+
+The document is loaded anew, exactly as before, when the link leaves the
+language, enters or leaves the account area, when an island on screen was
+taken over (its state ends with its document), and when the response is
+not a page of the build on screen, not HTML, or failed. Structured data is
+not carried over: it is for readers of the server's document.
+
+The scripts of a page follow one contract: `baylee:leave` goes out before a
+page is taken away (stop loops, let go of what hangs on the document),
+`baylee:page` once the next one stands (start over on its nodes). A script
+that binds only to a page's own nodes needs the second alone.
+
+What makes this safe (`docs/security-assurance.md`, the three passes): the
+response is parsed into a document that runs nothing, and its nodes are
+put in place as nodes; a script that came with it does not run, a page's
+own scripts are made here from their address and integrity value, and the
+address must be one of the site's hashed scripts (`/assets/<name>.js`).
+The Content Security Policy holds for what is put in place as for any
+page: no inline script, no inline handler, no foreign origin. Trusted
+Types allow one more policy for this, `baylee-nav`, which passes a string
+to the parser for that one use and vouches for no other script address.
+A page view is still counted only for a document the server sent to a
+navigation, so going from page to page inside a visit is not counted.
 
 ### The messenger
 

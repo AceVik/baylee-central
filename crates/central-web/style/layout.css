@@ -261,6 +261,36 @@
   }
 }
 
+/* ---- a page on its way --------------------------------------------------------
+   A page that takes longer than a blink to fetch (nav.js) shows a line
+   running under the bar; it stands still where motion is not welcome. */
+
+:root[data-loading] .top::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  inset-block-end: -2px;
+  block-size: 2px;
+  background: linear-gradient(90deg, transparent, var(--gold), transparent) 0 0 / 40% 100% no-repeat;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  :root[data-loading] .top::after {
+    animation: page-fetch 900ms linear infinite;
+  }
+}
+
+@keyframes page-fetch {
+  from {
+    background-position: -70% 0;
+  }
+
+  to {
+    background-position: 170% 0;
+  }
+}
+
 /* ---- movement between and within pages ---------------------------------------
    Only where motion is welcome. From page to page the bar stays and the page
    under it fades over; a page's head settles into place (it moves, it never

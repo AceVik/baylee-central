@@ -7759,3 +7759,55 @@ Run on the changed tree:
 - `cargo xtask postgres` (passed, at a load of about 60).
 
 The rest of the checks are recorded in the PR.
+
+## Going from page to page without a new document, 18 November 2026
+
+`js/nav.js` (`docs/website-design.md` §"Going from page to page") fetches the next page of
+the public site and puts its head's words and its body in place. It needs one more Trusted
+Types policy, `baylee-nav`, so the site's Content Security Policy changed by that one name.
+
+Design pass: the asset is the page's script context (the password's Worker and the session
+live in it). What is new: a string becomes DOM (the parser), a script element is made at run
+time, and an entry of the history names a page. The rules chosen: only a same-origin path
+under a language prefix is fetched; only `text/html` with status 200 that ends on this origin
+is used; the parser's document runs nothing and its nodes are imported, never written as a
+string into the live document; a script is made only for an address that matches
+`/assets/<name>.js`, with the integrity value the page named; the account area is never
+entered or left this way; an island that was taken over ends the swap and loads a document.
+
+Implementation pass: the policy object stays inside the module and is not on `window`; a
+second policy of the name cannot be made (no `allow-duplicates`). `createHTML` is the
+identity, which is only acceptable because its one caller feeds `DOMParser`, whose document
+has no browsing context. `createScriptURL` and the path without Trusted Types share one
+check. Everything that fails falls back to the browser loading the address.
+
+Adversarial pass, what was tried and what holds:
+- **A script in the fetched page.** Imported from a parsed document it is inert; a module
+  the page names is made anew only from an address of the site's hashed scripts. Inline
+  handlers and inline scripts stay refused by `script-src 'self'`.
+- **A page's structured data.** Importing a `<script type="application/ld+json">` set a
+  script's text from a string and was refused by Trusted Types (seen as console errors in the
+  first run). It is no longer carried over; the one on screen is removed with its page.
+- **A foreign address in the history.** An entry's `page` is written only from
+  `location.pathname`, which can be `//host/…` for an address typed that way. Back to such an
+  entry is checked again: same origin and a language prefix, else the document is reloaded.
+  `connect-src 'self'` refuses the request besides, and a response that ended elsewhere is not
+  used.
+- **A redirect.** Followed by `fetch` on this origin only; one that leaves it fails the
+  request, and the browser then loads the address as a press on the link would.
+- **A response that is not a page** (`/api/…` is no language prefix; JSON, a picture, an error
+  status): not used.
+- **A release going out between two pages.** Another style sheet or another islands module in
+  the response loads the document.
+- **The service worker.** It answers only requests whose mode is `navigate`; a fetched page is
+  none, so the offline page is never put in place under another address.
+- **Counting.** A fetched page is not a navigation, so it does not raise the count of views.
+
+Run on the changed tree: the tests of `central-web`, `central-web-server` and `xtask`; a
+headless Chromium over the built site under the real policy (page to page, Back and Forward
+with the place a page stood at, a form's dialog over a swapped page, a taken-over island
+forcing a document), with no console error. Not run: WebKit and Firefox (no Trusted Types
+there until recently; the script then parses without a policy and makes scripts under the
+same address check), and the browser tests of `e2e-site`, which wait for their update.
+
+These passes are by the implementing agent and are not an independent audit.
