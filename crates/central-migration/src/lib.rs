@@ -38,6 +38,7 @@ mod m20261113_000028_challenges;
 mod m20261113_000029_tower;
 mod m20261114_000030_tower_access;
 mod m20261115_000031_tower_awards;
+mod m20261118_000032_donations;
 
 use sea_orm_migration::{
     MigrationTrait, MigratorTrait,
@@ -81,6 +82,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261113_000029_tower::Migration),
             Box::new(m20261114_000030_tower_access::Migration),
             Box::new(m20261115_000031_tower_awards::Migration),
+            Box::new(m20261118_000032_donations::Migration),
         ]
     }
 }

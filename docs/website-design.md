@@ -472,12 +472,22 @@ a private person and not tax-deductible.
   a platform said is drawn: a platform without a figure has no part and is
   named in a line as not counted yet, without any figure the bar is left
   out and a line says so, and where nobody gives yet the line invites the
-  first instead of counting nobody.
+  first instead of counting nobody. Every figure comes from Baylee Central
+  (`PublicFunding`, read with the directory each minute; `docs/operations.md`
+  §"Donations"); the site asks no platform itself. "Not counted yet" means
+  that Central has no figure for that platform: it is not configured there
+  (GitHub Sponsors without its token, Ko-fi without its webhook or with
+  `kofi.record` still `false`), it has not answered since Central started,
+  or GitHub's monthly figure waits for the first dollar rate. A platform
+  that is counted and has no supporters is a part of nought with its
+  amount in the legend, not a platform "not counted".
 - **What was given once** (`.give-once`) is a figure of its own under the
   month's, never a part of the bar: the sum in euros, since when it is
   counted, how many donations it holds, and a line saying that other
   currencies were converted at the rate of the day they came. It is shown
-  only when the sum is known.
+  only when the sum is known: when Central collects GitHub Sponsors or
+  records Ko-fi's payments; with Liberapay alone, which publishes no
+  single donations, there is none.
 - **What a month costs** stands beside the goal, each amount a thinner bar
   against the goal (`.cost-bar`, the browser's `<progress>`). The goal
   card's button leads down to the three places.

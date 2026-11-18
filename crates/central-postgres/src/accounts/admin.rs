@@ -1014,11 +1014,16 @@ pub struct Swept {
     /// Picture reports decided more than a year ago
     /// (`docs/profile-pictures.md`).
     pub picture_reports: u64,
+    /// Donations older than [`super::DONATION_DAYS`], what was given once
+    /// and what went back first added to their platform's sums
+    /// (`docs/operations.md` §"Donations").
+    pub donations: u64,
 }
 
 /// Delete audit events older than [`AUDIT_YEARS`], the digests of expired
 /// reset codes, expired pairings, the reports whose retention is over and
-/// the e-mail addresses whose code is over, under the operator's
+/// the e-mail addresses whose code is over, and fold the donations older
+/// than [`super::DONATION_DAYS`] into their sums, under the operator's
 /// (migrator's) login, as the privacy notice allows; all or none.
 ///
 /// # Errors
@@ -1056,6 +1061,7 @@ pub async fn sweep(db: &DatabaseConnection) -> Result<Swept, Error> {
     // tidied against the codes that are left.
     let addresses = super::email::sweep(&tx).await?;
     let picture_reports = super::pictures::sweep(&tx).await?;
+    let donations = super::donations::sweep(&tx).await?;
     tx.commit().await.map_err(|_| Error::Unavailable)?;
     Ok(Swept {
         events,
@@ -1064,5 +1070,6 @@ pub async fn sweep(db: &DatabaseConnection) -> Result<Swept, Error> {
         reports,
         addresses,
         picture_reports,
+        donations,
     })
 }

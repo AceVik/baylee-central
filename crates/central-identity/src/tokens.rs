@@ -103,6 +103,7 @@ pub const fn credential_operation(request: &Request) -> bool {
         | Request::RegisterGateway { .. }
         | Request::GatewayDirectory { .. }
         | Request::PublicFigures { .. }
+        | Request::PublicFunding {}
         | Request::SetGatewayAdmins { .. }
         | Request::Discover { .. }
         | Request::LoginStart { .. }

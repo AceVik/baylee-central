@@ -68,6 +68,7 @@ impl IdentityService {
             Request::ChallengeHost { request } => self.challenge_host(request, bearer).await,
             Request::Notifications { request } => self.notifications(request, bearer).await,
             Request::Social { request } => self.social(request, bearer, surface).await,
+            Request::PublicFunding {} => self.public_funding(),
             request @ (Request::Terms
             | Request::GatewayTerms { .. }
             | Request::TermsStatus

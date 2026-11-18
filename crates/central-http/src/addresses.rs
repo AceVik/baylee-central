@@ -37,6 +37,12 @@ pub(crate) const RESET_MAIL: u32 = 5;
 /// side, and a minute's budget leaves room for paging.
 pub(crate) const DIRECTORY: u32 = 60;
 
+/// Deliveries to Ko-fi's webhook a minute (`docs/operations.md` §"Donations"):
+/// Ko-fi sends one a payment from a few addresses of its own, and a minute's
+/// thirty leave room for a burst of retries. Spent before the token is read, so
+/// that guessing it costs a guesser this budget too.
+pub(crate) const KOFI: u32 = 30;
+
 /// Each budget's addresses; one is forgotten once its window has passed.
 #[derive(Default)]
 pub(crate) struct Budgets {
@@ -46,6 +52,7 @@ pub(crate) struct Budgets {
     reset: Book,
     directory: Book,
     reset_mail: Book,
+    kofi: Book,
 }
 
 impl Budgets {
@@ -60,11 +67,17 @@ impl Budgets {
             Request::LegacyLogin { .. } => self.legacy.charge(client, now, LEGACY, MINUTE),
             Request::ResetStart { .. } => self.reset.charge(client, now, RESET, HOUR),
             Request::ResetMail { .. } => self.reset_mail.charge(client, now, RESET_MAIL, HOUR),
-            Request::GatewayDirectory { .. } | Request::PublicFigures { .. } => {
-                self.directory.charge(client, now, DIRECTORY, MINUTE)
-            }
+            Request::GatewayDirectory { .. }
+            | Request::PublicFigures { .. }
+            | Request::PublicFunding {} => self.directory.charge(client, now, DIRECTORY, MINUTE),
             _ => true,
         }
+    }
+
+    /// Spend one of `client`'s deliveries to Ko-fi's webhook; `false` when none is
+    /// left.
+    pub(crate) fn charge_kofi(&mut self, client: Client, now: Instant) -> bool {
+        self.kofi.charge(client, now, KOFI, MINUTE)
     }
 }
 
@@ -205,6 +218,48 @@ mod tests {
             );
         }
         assert!(budgets.charge(&directory, client(1), start + MINUTE));
+        // The donation figures are read beside them and spend the same budget.
+        let mut budgets = Budgets::default();
+        let funding = Request::PublicFunding {};
+        assert_eq!(
+            served(&mut budgets, &funding, client(1), start, DIRECTORY + 1),
+            DIRECTORY
+        );
+        assert!(!budgets.charge(&directory, client(1), start));
+        assert!(!budgets.charge(&figures, client(1), start));
+        assert!(budgets.charge(&funding, client(2), start));
+    }
+
+    /// Ko-fi's deliveries have their own budget, which no other spends.
+    #[test]
+    fn ko_fi_s_deliveries_have_their_own_budget_an_address() {
+        let start = Instant::now();
+        let mut budgets = Budgets::default();
+        let mut served = 0;
+        for _ in 0..KOFI + 10 {
+            served += u32::from(budgets.charge_kofi(client(1), start));
+        }
+        assert_eq!(served, KOFI);
+        assert!(budgets.charge_kofi(client(2), start));
+        // the address's directory and other budgets are whole
+        assert!(budgets.charge(&Request::PublicFunding {}, client(1), start));
+        for (request, limit, _) in requests() {
+            assert_eq!(
+                served_of(&mut budgets, &request, client(1), start, limit),
+                limit
+            );
+        }
+        assert!(budgets.charge_kofi(client(1), start + MINUTE));
+    }
+
+    fn served_of(
+        budgets: &mut Budgets,
+        request: &Request,
+        client: Client,
+        now: Instant,
+        count: u32,
+    ) -> u32 {
+        served(budgets, request, client, now, count)
     }
 
     #[test]

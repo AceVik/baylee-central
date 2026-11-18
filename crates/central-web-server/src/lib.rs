@@ -1,15 +1,15 @@
 //! baylee.app's web server (`docs/proposals/frontend-rewrite.md` §3): it
 //! renders every page (`central-web`), serves the built assets, writes the
-//! sitemap and reads the public data (GitHub, Central's directory). It has
-//! no database, no secret and no session: account requests go from the
-//! browser to Central's browser listener (`/api/*`, routed by Caddy), and
-//! this process never sees the session cookie.
+//! sitemap and reads the public data (GitHub; Central's directory, figures
+//! and donation figures). It has no database, no secret and no session:
+//! account requests go from the browser to Central's browser listener
+//! (`/api/*`, routed by Caddy), and this process never sees the session
+//! cookie.
 #![forbid(unsafe_code)]
 
 pub mod config;
 pub mod fetch;
 pub mod files;
-pub mod funding;
 pub mod generated;
 pub mod routes;
 pub mod views;

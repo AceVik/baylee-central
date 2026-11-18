@@ -2076,6 +2076,55 @@ fn the_goal_s_card_draws_only_what_is_known() {
     assert!(!over.contains("Yours would be the first."));
 }
 
+/// What Baylee Central says with nothing configured but Liberapay, and what
+/// it says before any platform answered: the page with Liberapay's part and
+/// the other two not counted yet, and the goal without a bar. The figures
+/// come from Central's answer (`PublicFunding`), never from a platform the
+/// site asks itself.
+#[test]
+fn central_s_figures_are_drawn_as_they_come() {
+    use central_web::data::{Funding, Monthly};
+    let mut data = fallback(Some(&data()));
+    let assets = Assets::default();
+    let mut page = |funding: Option<Funding>| {
+        data.funding = funding;
+        render(
+            Page::Donate,
+            &Context {
+                lang: Lang::En,
+                origin: "https://baylee.app",
+                assets: &assets,
+                data: &data,
+                machine: machine("", None, None, None),
+                verification: None,
+            },
+        )
+    };
+    // a Central with Liberapay alone: one part, the others not counted yet,
+    // no sum of what was given once
+    let liberapay = page(Some(Funding {
+        liberapay: Some(Monthly {
+            month: 10_010,
+            supporters: 3,
+        }),
+        ..Funding::default()
+    }));
+    assert_eq!(
+        count(&liberapay, "class=\"give-part give-part-liberapay\""),
+        1
+    );
+    assert!(liberapay.contains("Not counted yet: GitHub Sponsors, Ko-fi."));
+    assert!(!liberapay.contains("One-time donations"));
+    // a Central that knows the figures and has none yet, and a Central from
+    // before them: the goal without a bar, alike
+    for nothing in [Some(Funding::default()), None] {
+        let html = page(nothing);
+        assert!(html.contains("€800"));
+        assert_eq!(count(&html, "class=\"give-meter\""), 0);
+        assert_eq!(count(&html, "give-part-"), 0);
+    }
+}
+
 /// The start page asks once, after the open-source section, and leads to
 /// the donation page; it names the amount and nothing a donation would buy.
 #[tokio::test]
