@@ -9,8 +9,8 @@ mod entity {
     pub struct Model {
         #[sea_orm(primary_key, auto_increment = false)]
         pub id: Uuid,
-        pub created_at: DateTimeWithTimeZone,
-        pub expires_at: DateTimeWithTimeZone,
+        pub created_at: TimeDateTimeWithTimeZone,
+        pub expires_at: TimeDateTimeWithTimeZone,
     }
 
     #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
@@ -105,7 +105,7 @@ impl PendingAccountStore {
         }
         Ok(PendingAccount {
             id,
-            expires_at: model.expires_at.timestamp(),
+            expires_at: model.expires_at.unix_timestamp(),
         })
     }
 
