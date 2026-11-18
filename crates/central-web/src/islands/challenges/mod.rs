@@ -1,28 +1,16 @@
 //! Public calendar and rankings, with account-owned progress loaded only after hydration.
-use super::{
-    auth::problem_text,
-    central::{Failure, call},
-    session,
-};
+use super::{auth::problem_text, central::Failure, export::request, session};
 use crate::{
     data::ChallengeFeed,
     words::{self, Lang},
 };
-use central_api::{challenges as api, wire};
+use central_api::challenges as api;
 use leptos::prelude::*;
 
 mod detail;
-pub(super) mod export;
 mod progress;
 mod state;
 use state::Hub;
-
-async fn request(request: api::Request) -> Result<api::Response, Failure> {
-    match call(&wire::Request::Challenges { request }).await? {
-        wire::Response::Challenges { response } => Ok(response),
-        _ => Err(Failure::Malformed),
-    }
-}
 
 pub(in crate::islands) fn words_text(lang: Lang, words: &api::Words) -> String {
     if lang == Lang::De {

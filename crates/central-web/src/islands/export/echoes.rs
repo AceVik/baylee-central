@@ -1,5 +1,5 @@
 //! Bounded own-account export; a session change invalidates the whole collection.
-use super::super::super::{
+use super::super::{
     central::{Failure, call},
     session,
 };

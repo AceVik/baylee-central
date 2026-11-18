@@ -1,30 +1,18 @@
 //! Global public expedition, with private progression loaded only in the browser.
 use super::{
     auth::problem_text,
-    central::{Failure, call},
+    central::Failure,
     challenges::{standing_duration, standing_handle, words_text},
+    export::tower::request,
     session,
 };
 use crate::words::{self, Lang};
-use central_api::{challenges, tower as api, wire};
+use central_api::tower as api;
 use leptos::prelude::*;
 mod progress;
 mod ranking;
 mod state;
 use state::Hub;
-
-pub(super) async fn request(request: api::Request) -> Result<api::Response, Failure> {
-    match call(&wire::Request::Challenges {
-        request: challenges::Request::Tower { request },
-    })
-    .await?
-    {
-        wire::Response::Challenges {
-            response: challenges::Response::Tower { response },
-        } => Ok(*response),
-        _ => Err(Failure::Malformed),
-    }
-}
 
 fn play(id: [u8; 16]) -> String {
     format!("baylee://tower/{}", crate::data::id_hex(&id))

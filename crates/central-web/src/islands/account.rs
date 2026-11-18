@@ -621,7 +621,7 @@ fn export_view(lang: Lang, worker: String) -> impl IntoView {
                         super::picture::merged(&file, held.as_ref(), filed.as_deref())
                     });
                     let file = match file {
-                        Some(file) => super::challenges::export::merged(&file).await.ok(),
+                        Some(file) => super::export::merged(&file).await.ok(),
                         None => None,
                     };
                     if generation.get_untracked() != started {

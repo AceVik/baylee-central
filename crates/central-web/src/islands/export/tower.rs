@@ -1,6 +1,19 @@
 //! Bounded personal expedition export; cursors must advance through owned run identities.
-use crate::islands::{central::Failure, tower::request};
-use central_api::tower as api;
+use crate::islands::central::{Failure, call};
+use central_api::{challenges, tower as api, wire};
+
+pub(in crate::islands) async fn request(request: api::Request) -> Result<api::Response, Failure> {
+    match call(&wire::Request::Challenges {
+        request: challenges::Request::Tower { request },
+    })
+    .await?
+    {
+        wire::Response::Challenges {
+            response: challenges::Response::Tower { response },
+        } => Ok(*response),
+        _ => Err(Failure::Malformed),
+    }
+}
 
 pub(super) async fn runs() -> Result<serde_json::Value, Failure> {
     let mut datasets = serde_json::Map::new();
