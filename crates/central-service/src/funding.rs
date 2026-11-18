@@ -85,10 +85,26 @@ struct Kofi {
 pub(super) struct Plan {
     liberapay: bool,
     github: Option<Zeroizing<String>>,
+    /// Ko-fi's webhook is answered, and whether it records (`kofi.record`).
+    kofi: Option<bool>,
+}
+
+impl Plan {
     /// Rates are needed when anything may come in another currency.
-    rates: bool,
+    fn rates(&self) -> bool {
+        self.github.is_some() || self.kofi.is_some()
+    }
+
     /// The store's sums are read when anything is stored.
-    sums: bool,
+    fn sums(&self) -> bool {
+        self.github.is_some() || self.kofi == Some(true)
+    }
+
+    /// Ko-fi's counts go to the log whenever its webhook is answered, also
+    /// while nothing is recorded (the test delivery's line).
+    fn kofi(&self) -> bool {
+        self.kofi.is_some()
+    }
 }
 
 /// A GitHub token's shape: 20 to 255 visible ASCII characters (a classic token
@@ -120,13 +136,11 @@ impl Funding {
             github: github.is_some(),
             kofi,
         };
-        let stored = github.is_some() || kofi.is_some_and(|kofi| kofi.record);
         Ok((
             sources,
             Plan {
                 liberapay: self.liberapay,
-                rates: github.is_some() || kofi.is_some(),
-                sums: stored,
+                kofi: kofi.map(|kofi| kofi.record),
                 github,
             },
         ))
@@ -143,8 +157,7 @@ impl Funding {
             Plan {
                 liberapay: true,
                 github: None,
-                rates: false,
-                sums: false,
+                kofi: None,
             },
         )
     }
@@ -380,7 +393,9 @@ async fn work(
     fetch: Arc<dyn Fetch>,
     mut stop: watch::Receiver<bool>,
 ) {
-    if !plan.liberapay && plan.github.is_none() && !plan.rates && !plan.sums {
+    let (rates, sums_on, kofi) = (plan.rates(), plan.sums(), plan.kofi());
+    // nothing to ask: rates are on whenever GitHub or Ko-fi is
+    if !plan.liberapay && !rates {
         return;
     }
     let mut log = Log::default();
@@ -389,7 +404,7 @@ async fn work(
     let github = plan.github.map(Arc::new);
     while !*stop.borrow() {
         let now = Instant::now();
-        if plan.rates && now >= rates_due {
+        if rates && now >= rates_due {
             let fresh = blocking(&fetch, reference_rates).await.flatten();
             rates_due = now
                 + if fresh.is_some() {
@@ -420,8 +435,11 @@ async fn work(
                 poll_github(&identity, &fetch, token, &mut log).await;
             }
         }
-        if plan.sums {
+        if sums_on {
             sums(&identity, &mut log).await;
+        }
+        if kofi {
+            deliveries(&identity, &mut log);
         }
         rest(SUMS, &mut stop).await;
     }
@@ -478,6 +496,12 @@ async fn sums(identity: &IdentityService, log: &mut Log) {
         log.store
             .say(|| "central: the donations' store did not answer".to_owned());
     }
+}
+
+/// What became of Ko-fi's deliveries since the last look, for the log: what
+/// was recorded, verified without recording or verified as a sale at once,
+/// the refusals by reason once an hour at most.
+fn deliveries(identity: &IdentityService, log: &mut Log) {
     let now = identity.kofi_counts();
     for line in counted(&now, &log.said) {
         eprintln!("{line}");
@@ -510,10 +534,10 @@ mod tests {
     fn without_a_block_liberapay_alone_is_read() {
         let (sources, plan) = Funding::absent();
         assert!(sources.liberapay && !sources.github && sources.kofi.is_none());
-        assert!(plan.liberapay && plan.github.is_none() && !plan.rates && !plan.sums);
+        assert!(plan.liberapay && plan.github.is_none() && !plan.rates() && !plan.sums());
         let (sources, plan) = parsed("{}").unwrap().plan().unwrap();
         assert!(sources.liberapay && !sources.github && sources.kofi.is_none());
-        assert!(!plan.rates);
+        assert!(!plan.rates());
         assert_eq!(announced(&sources), "central: donations: Liberapay");
     }
 
@@ -529,7 +553,7 @@ mod tests {
         assert!(kofi.record);
         assert_eq!(kofi.token, kofi_digest(KOFI));
         assert_eq!(plan.github.as_deref().map(String::as_str), Some(GITHUB));
-        assert!(plan.rates && plan.sums && !plan.liberapay);
+        assert!(plan.rates() && plan.sums() && !plan.liberapay);
         assert_eq!(
             all.github.as_ref().unwrap().token,
             "",
@@ -547,14 +571,18 @@ mod tests {
         .plan()
         .unwrap();
         assert!(!sources.github && sources.kofi.is_none() && plan.github.is_none());
-        assert!(!plan.rates && !plan.sums);
+        assert!(!plan.rates() && !plan.sums() && !plan.kofi());
         // Ko-fi without recording: verified only, nothing stored, rates still kept
         let (sources, plan) = parsed(&format!(r#"{{"kofi":{{"token":"{KOFI}"}}}}"#))
             .unwrap()
             .plan()
             .unwrap();
         assert!(!sources.kofi.unwrap().record);
-        assert!(plan.rates && !plan.sums);
+        assert!(plan.rates() && !plan.sums());
+        assert!(
+            plan.kofi(),
+            "its counts are logged while nothing is recorded"
+        );
         assert_eq!(
             announced(&sources),
             "central: donations: Liberapay, Ko-fi (verifying only, kofi.record is false)"
