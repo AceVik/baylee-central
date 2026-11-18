@@ -7998,9 +7998,10 @@ legend with each amount, and the one-time sum as a block of its own; `/funding.j
   live, what of a payment is kept). Until then the two platforms and the one-time sum are
   absent, and the page says which platforms are not counted yet.
 - **Nothing new is asked, kept or sent.** No new request, no new dependency, no new field
-  read from Liberapay's answer. The amounts stay numbers: the page formats them itself, and
-  the only text taken from the data is a date of the shape `YYYY-MM-DD`, which is parsed
-  into a date before a page shows it, never passed through as text.
+  read from Liberapay's answer. The amounts stay numbers: the page formats them itself. The
+  only text taken from the data is the day the one-time count began, and it goes through
+  one guard (`Once::day`: four digits, two, two, a month from 1 to 12, a day from 1 to 31)
+  before the page words it or `/funding.json` says it; anything else is left out of both.
 - **No inline style.** The bar's geometry is in SVG attributes (`x`, `width` on a
   10 000 wide view box), which the policy's `style-src` does not touch; the colours are
   classes.
@@ -8019,6 +8020,14 @@ Adversarial pass, what was tried and what holds:
 - **An absent figure is not a zero.** A platform that said nothing has no part and no legend
   entry and is named as not counted; the supporters' line counts only the platforms that
   answered.
-- **The fallback file** (`tests/data/funding.json` in tests, the snapshot's file in
-  production) is this process's own: the same parser reads it, unknown fields are ignored
-  and a missing one is absent, so an older file still loads.
+- **The fallback file** (`funding.json` in the deployment's fallback directory, the
+  tests' data) is placed by the operator; the process never writes it. Fields it does not
+  know are passed over and a missing platform is absent. A file of the first shape (a
+  week's amount, as the page's first day had it) does not parse and leaves the funding part
+  out, so the page shows the goal without a bar; the directory's other files are read on
+  their own and are unaffected
+  (`a_funding_file_of_another_shape_is_not_read_as_figures`).
+- **A date that is not one.** A count's day of any other shape (empty, a time appended, a
+  month 13, markup, another script's digits) is shown on no page and said in no document
+  (`the_one_time_sum_s_day_is_a_date_or_nothing`,
+  `the_funding_document_says_a_date_or_none`).

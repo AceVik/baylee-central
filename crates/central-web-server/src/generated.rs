@@ -166,10 +166,13 @@ pub fn funding(origin: &str, data: &Snapshot) -> String {
             map.insert("supporters".to_owned(), supporters.into());
         }
         if let Some(once) = funding.once {
-            map.insert(
-                "once".to_owned(),
-                serde_json::json!({ "total": once.total, "count": once.count, "since": once.since }),
-            );
+            // the date is said only where it is one (`Once::day`): a
+            // program reads this document, and gets no other text from it
+            let mut given = serde_json::json!({ "total": once.total, "count": once.count });
+            if let (Some(day), Some(given)) = (once.day(), given.as_object_mut()) {
+                given.insert("since".to_owned(), day.into());
+            }
+            map.insert("once".to_owned(), given);
         }
     }
     let mut text = out.to_string();
@@ -183,6 +186,38 @@ pub const TDMREP: &str = "[{\"location\":\"/\",\"tdm-reservation\":1}]\n";
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The one-time sum's date reaches the document only as a date.
+    #[test]
+    fn the_funding_document_says_a_date_or_none() {
+        let with = |since: &str| {
+            let data = Snapshot {
+                funding: Some(Funding {
+                    once: Some(central_web::data::Once {
+                        total: 500,
+                        count: 1,
+                        since: since.to_owned(),
+                    }),
+                    ..Funding::default()
+                }),
+                ..Snapshot::default()
+            };
+            let json: serde_json::Value =
+                serde_json::from_str(&funding("https://baylee.app", &data)).expect("JSON");
+            json["once"].clone()
+        };
+        assert_eq!(
+            with("2026-11-18"),
+            serde_json::json!({ "total": 500, "count": 1, "since": "2026-11-18" })
+        );
+        for other in ["", "soon", "<script>", "2026-13-40", "2026-11-18T00:00:00Z"] {
+            assert_eq!(
+                with(other),
+                serde_json::json!({ "total": 500, "count": 1 }),
+                "{other:?}"
+            );
+        }
+    }
 
     #[test]
     fn robots_and_sitemap() {

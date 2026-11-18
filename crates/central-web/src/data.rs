@@ -752,6 +752,32 @@ pub struct Repo {
 mod tests {
     use super::*;
 
+    /// A funding file says each platform's month; a field it does not
+    /// know is passed over, and a file of the first shape (a week's amount
+    /// under other names) is no funding at all rather than a wrong figure.
+    #[test]
+    fn a_funding_file_of_another_shape_is_not_read_as_figures() {
+        let now: Funding = serde_json::from_str(
+            r#"{"liberapay":{"month":10010,"supporters":3,"later":true},"other":1}"#,
+        )
+        .expect("today's shape, with fields of a later one");
+        assert_eq!(
+            now.liberapay,
+            Some(Monthly {
+                month: 10_010,
+                supporters: 3
+            })
+        );
+        assert_eq!(now.covered(), Some((10_010, 3)));
+        assert!(
+            serde_json::from_str::<Funding>(r#"{"liberapay":{"week":2310,"patrons":3}}"#).is_err()
+        );
+        assert_eq!(
+            serde_json::from_str::<Funding>("{}").expect("empty"),
+            Funding::default()
+        );
+    }
+
     /// Of the one-time sum's date only a date is shown: four digits, two,
     /// two, a month and a day that exist on a calendar's face.
     #[test]
