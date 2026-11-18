@@ -102,6 +102,7 @@ pub fn page(cx: &Context<'_>) -> Built {
         {cards(lang, cx.data.cards.as_ref())}
         {contact(lang)}
         {source(cx)}
+        {super::donate::band(lang)}
         {album(cx)}
     }
     .into_any();

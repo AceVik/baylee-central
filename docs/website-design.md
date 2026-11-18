@@ -472,7 +472,9 @@ a private person and not tax-deductible.
   reduced motion the button is still.
 - **Where it is linked.** The bar's last entry before the account's, a
   heart before its word in a soft frame (the frame replaces the bar's
-  underline), and the footer's project column.
+  underline); the footer's project column; and one card on the start page
+  after the open-source section (`.give-band-card`): a heart, a sentence,
+  the amount and the button. The site asks nowhere else.
 - **`/funding.json`** says the same to a program, the game client first:
   the goal in euro cents, what is covered, the percentage and the number
   of supporters where a platform answered, which platforms the figure
