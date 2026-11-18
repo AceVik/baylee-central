@@ -289,9 +289,38 @@ async fn the_download_follows_the_machine() {
     let (_, _, html) = get(&app, "/de/download", &phone).await;
     assert!(html.contains("Für Handys und Tablets gibt es noch keine Version."));
     assert!(
-        html.contains("Archiv für ältere Prozessoren"),
+        html.contains("Ältere Prozessoren (x86-64-v2)"),
         "the -v2 fallback is offered"
     );
+    assert!(
+        html.contains("Für Prozessoren, die älter sind als etwa 2013–2015"),
+        "and says who needs it"
+    );
+    // every variant of the release is on the page, once in the menu and
+    // once in its system's card, the main build and its fallback apart
+    for name in [
+        "baylee-client-0.2.0-beta.o1-x86_64-pc-windows-msvc-v2.zip",
+        "baylee-client-0.2.0-beta.o1-x86_64-apple-darwin-v2.zip",
+        "baylee-client-0.2.0-beta.o1-x86_64-unknown-linux-gnu-v2.tar.gz",
+    ] {
+        assert!(html.contains(name), "{name}");
+    }
+    for slug in [
+        "windows-x64",
+        "mac-arm64",
+        "mac-x64",
+        "linux-x64",
+        "linux-arm64",
+    ] {
+        assert!(html.contains(&format!("id=\"{slug}\"")), "{slug} card");
+    }
+    // the visitor's own system leads the cards
+    let (_, _, html) = get(&app, "/en/download", &windows).await;
+    let first = html
+        .find("class=\"plat glass reveal mine\"")
+        .or_else(|| html.find("plat glass reveal"));
+    assert!(first.is_some());
+    assert!(html.contains("Coming later"), "what has no download yet");
 }
 
 #[tokio::test]

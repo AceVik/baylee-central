@@ -498,6 +498,26 @@ above, with these of their own:
   the pointer or the keyboard; the rest folds (the log, the system, the
   settings, the whole object as a tree drawn only as it is unfolded).
 
+## Scrollbars, text smoothing and the download
+
+- **One scrollbar everywhere** (`base.css`): the root sets `scrollbar-color`
+  (it inherits) and `*` sets `scrollbar-width: thin`, so the page and every
+  box that scrolls, listed or not, wears a thin bar in the page's ink on no
+  track; Safari before `scrollbar-color` gets the same by `::-webkit-scrollbar`
+  under `@supports not`. A component that needs its own bar sets its own.
+  A new scrolling box needs no rule.
+- **Text is antialiased** (`-webkit-font-smoothing`, `-moz-osx-font-smoothing`,
+  `text-rendering`) on `:root`; form controls and placeholders say `inherit`.
+- **A link in the download line carries no underline** (a text-shadow was
+  drawing under the transparent one); hover and focus tint behind the words.
+- **The download page** shows three system cards (the visitor's first, in
+  gold), an architecture in each with its files, checksums and signatures,
+  then, apart, the `x86-64-v2` archive for processors older than about
+  2013-2015, with one sentence on who needs it; the steps of a first start per
+  system; and what has no download yet (Android, iOS, browser). The menu of the
+  download button shows the same variants, the older-processor archive a step
+  in under its main build.
+
 ## How it is held
 
 - `test/styles/contrast.test.ts`: the token pairs above in both schemes.
