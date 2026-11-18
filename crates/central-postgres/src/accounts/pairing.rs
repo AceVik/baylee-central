@@ -528,7 +528,7 @@ async fn paired_session(
                 uuid(identity.account).into(),
                 revision.into(),
                 pairing
-                    .try_get::<sea_orm::prelude::DateTimeWithTimeZone>("", "proven_at")
+                    .try_get::<sea_orm::prelude::TimeDateTimeWithTimeZone>("", "proven_at")
                     .map_err(|_| Error::Unavailable)?
                     .into(),
             ],

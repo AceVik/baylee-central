@@ -89,7 +89,8 @@ login endpoints are exposed. ID allocation does not resolve this protocol gate.
 
 ## Integration gate
 
-SeaORM 2.0.4 and sea-orm-migration 2.0.4 are selected. Versioned migrations live
+SeaORM 2.0.4 is selected; sea-orm-migration 2.0.4 ran the migrations until
+18.11.2026 ([below](#the-migration-runner-18112026)). Versioned migrations live
 in a separate crate; no entity schema-sync or automatic destructive schema reset
 runs in the service. Pending migrations fail readiness; an explicit operator
 command applies them under a migration lock and separate DDL credentials.
@@ -348,3 +349,34 @@ id. Nothing names the giver.
   was given once over the rows and the sums), never per request.
 - **The day the count began** is the one row of `donation_count`, written
   by the migration in UTC; the runtime cannot change it.
+
+## The migration runner, 18.11.2026
+
+`sea-orm-migration` 2.0.4 depends on SeaORM with all its default features,
+which brought `chrono` (RUSTSEC-2026-0543, unmaintained), `rust_decimal`,
+`bigdecimal`, `borsh`, `ouroboros` and others into the service, and no
+newer release existed. `central-migration` now runs the migrations itself
+on plain SeaORM:
+
+- **The list.** `MIGRATIONS` in `crates/central-migration/src/lib.rs`, one
+  SQL file each, named as before (`m20261019_000003_ticket_purpose`, whose
+  SQL was inline, has a file of the same statements now). The order is the
+  names' order, which the history is read in; a test holds both.
+- **The history.** `public.seaql_migrations`, created if absent with the
+  DDL `sea-orm-migration` 2.0.4 used (`version varchar NOT NULL PRIMARY
+  KEY, applied_at bigint NOT NULL`, read from it on 18.11.2026), always
+  qualified with `public`. A database it migrated carries on without a
+  change: its 31 names are the list's beginning.
+- **Stricter than before.** The recorded names must be exactly the list's
+  beginning; SeaORM accepted any subset. An unknown name, a gap or another
+  order refuses the whole run before any DDL.
+- **Unchanged.** One outer transaction, the advisory lock, the
+  transaction-local `search_path = public, pg_temp`, the timeouts, the
+  PostgreSQL 18 gate and the refusal of a missing or inaccessible `public`.
+  `applied_at` is the server's clock in Unix seconds (SeaORM took the
+  client's).
+
+With SeaORM's `with-time` in place of `with-chrono` (two timestamps in
+`central-postgres`), no crate of the workspace builds `chrono`. It stays in
+`Cargo.lock` only because SeaORM names `sea-orm-arrow` as an optional
+dependency, which no build here turns on.

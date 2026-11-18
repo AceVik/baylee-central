@@ -184,6 +184,8 @@ async fn verify_migrations(operator: &sea_orm::DatabaseConnection) {
         31
     );
 
+    history_as_sea_orm_left_it(operator).await;
+
     operator.execute_unprepared(
         "INSERT INTO seaql_migrations (version, applied_at) VALUES ('unexpected_future_version', 0)"
     ).await.unwrap();
@@ -264,5 +266,61 @@ async fn verify_constraints_and_rollback(runtime: &sea_orm::DatabaseConnection) 
         )
         .await,
         0
+    );
+}
+
+/// The history as sea-orm-migration 2.0.4 left it, and a database one migration
+/// behind: the runner reads the one and finishes the other.
+async fn history_as_sea_orm_left_it(operator: &sea_orm::DatabaseConnection) {
+    // The history has the shape sea-orm-migration 2.0.4 gave it, so a database
+    // that crate migrated is read by this runner as it was written.
+    assert_eq!(
+        scalar(
+            operator,
+            "SELECT (pg_catalog.string_agg(column_name || ' ' || data_type || ' ' || is_nullable, ', '
+                ORDER BY ordinal_position) = 'version character varying NO, applied_at bigint NO')
+                ::integer::bigint AS value
+             FROM information_schema.columns
+             WHERE table_schema = 'public' AND table_name = 'seaql_migrations'"
+        )
+        .await,
+        1
+    );
+    assert_eq!(
+        scalar(
+            operator,
+            "SELECT count(*)::bigint AS value FROM pg_catalog.pg_constraint
+             WHERE conrelid = 'public.seaql_migrations'::regclass AND contype = 'p'
+               AND pg_catalog.pg_get_constraintdef(oid) = 'PRIMARY KEY (version)'"
+        )
+        .await,
+        1
+    );
+    // A database at the 30 migrations before donations runs the one after them
+    // alone: every other file would fail if it ran twice.
+    operator
+        .execute_unprepared(
+            "DROP TABLE central_identity.donations, central_identity.donation_sums,
+                central_identity.donation_count;
+             DELETE FROM public.seaql_migrations WHERE version = 'm20261118_000032_donations'",
+        )
+        .await
+        .unwrap();
+    central_migration::apply(operator).await.unwrap();
+    assert_eq!(
+        scalar(
+            operator,
+            "SELECT count(*)::bigint AS value FROM public.seaql_migrations"
+        )
+        .await,
+        31
+    );
+    assert_eq!(
+        scalar(
+            operator,
+            "SELECT count(*)::bigint AS value FROM central_identity.donation_count"
+        )
+        .await,
+        1
     );
 }

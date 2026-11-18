@@ -8245,3 +8245,40 @@ warnings` and `cargo deny check` (0.22.2 and 0.20.2, as CI pins them) fail on on
 RUSTSEC-2026-0543 (`chrono` is unmaintained), which SeaORM brings in and which fails the base
 of this change (`a6eb2e4b`) in the same way: this change adds no package to the lock file.
 These passes are by the implementing agent and are not an independent audit.
+
+## The migrations' runner is first-party, and `chrono` leaves the build, 18 November 2026
+
+`cargo audit` and `cargo deny` failed on RUSTSEC-2026-0543 (`chrono` is unmaintained). The owner
+asked for it to be resolved by upgrading what can be upgraded, with any migration that needs.
+No newer `sea-orm-migration` existed, and 2.0.4 takes SeaORM with all default features,
+`with-chrono` among them, so no feature of ours could take `chrono` out.
+
+Design pass. What must hold is the database's migration history: production's
+`public.seaql_migrations` was written by `sea-orm-migration`, and a runner that read it otherwise
+could run a migration twice or skip one. The new runner in `central-migration` keeps the table as
+that crate created it (its DDL read from the crate on 18.11.2026 and pinned by a test), qualifies
+it with `public` everywhere, and is stricter: the recorded names must be exactly the list's
+beginning, where SeaORM accepted any subset. Everything else stays as it was: one outer
+transaction, the advisory lock, the transaction-local `search_path`, the timeouts and the gate. No
+destructive operation exists. `central-postgres` takes SeaORM's `with-time` in place of
+`with-chrono`; `time` was in the graph already, and two timestamps change type.
+
+Implementation pass: the 31 migration modules are gone; a macro builds the list from the files'
+names (`include_str!(concat!(name, ".sql"))`), so a name and its SQL cannot drift apart;
+000003's inline SQL is a file now, the same statements. `sea-orm-migration`, `sea-orm-cli`,
+`bigdecimal`, `rust_decimal`, `borsh`, `ouroboros`, `nix`, `pgvector`, `tracing-subscriber` and 16
+other packages leave `Cargo.lock`; none is added.
+
+Adversarial pass, what was run and what holds: `cargo xtask postgres` whole on the old lock file,
+with every existing test of the migration layer unchanged (a collision rolls the history back, a
+shadow history in another schema or in `pg_temp` is ignored, a missing or inaccessible `public`
+is refused, an unknown version is refused, a concurrent run waits for the lock and a cancelled one
+leaves it free), the session's `proven_at` round trip through `with-time` in the pairing suite,
+and two new checks: the history's columns, types, nullability and key are SeaORM's, and a database
+at the 30 migrations before 000032 runs 000032 alone (every other file fails if run twice). Unit
+tests hold the list's order and shape, the captured DDL, and the refusal of an unknown name, a
+foreign name and a gap. `chrono` is in no build of the workspace on any target; it stays in the
+lock file only as an optional dependency of `sea-orm-arrow`, which nothing here turns on (see the
+record that follows for what `cargo audit` makes of that).
+
+These passes are by the implementing agent and are not an independent audit.
