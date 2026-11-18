@@ -370,7 +370,7 @@ async fn a_gateway_card_shows_what_central_has() {
     // none for a gateway that is offline
     assert_eq!(count(&html, "href=\"baylee://gateway/add?origin="), 5);
     assert!(html.contains("href=\"baylee://gateway/add?origin=https%3A%2F%2Fgateway.baylee.app\""));
-    assert!(html.contains("origin=https%3A%2F%2Fspiel.example.de%3A8443\""));
+    assert!(html.contains("origin=https%3A%2F%2Fmondschein.example%3A8443\""));
     assert!(!html.contains("origin=https%3A%2F%2Fmagic.example.org"));
     // 8 of 12, 22 of 27 and 4 of 5 players in a game; nobody on a fourth
     for (share, steps) in [("67%", "13"), ("81%", "16"), ("80%", "16")] {
