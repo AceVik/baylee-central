@@ -294,13 +294,75 @@
     if (menu && !(event.relatedTarget instanceof Node && menu.contains(event.relatedTarget))) close(menu);
   });
 
-  // Signing in and registering open over the page that asked for them:
-  // every link to either shows its dialog where the page has one. A press
-  // with a modifier key, a browser without <dialog>, or a page without
-  // them (the two pages themselves) follows the link as ever. The dialog
-  // closes by its button, by Escape, and by a press on the veil around it
-  // that also began there (a text selection dragged out of a field is not
-  // one).
+  // Signing in, registering and setting a new password open over the page
+  // that asked for them: every link to one of the three shows its dialog
+  // where the page has one. A press with a modifier key, a browser without
+  // <dialog>, or a page without them (the signed-in area) follows the link
+  // as ever, and the address it leads to is the start page with that dialog
+  // open (`data-auth` on the document). The dialog closes by its button, by
+  // Escape, and by a press on the veil around it that also began there (a
+  // text selection dragged out of a field is not one).
+  //
+  // An open dialog has its address: opening one puts the form's address in
+  // the bar (one step in the history, however often the forms change
+  // places), closing it goes that step back, and Back closes it. A dialog
+  // that stood open when the page came (the address was entered, or a mail
+  // led here) has nothing to go back to and leaves for the start page.
+  const AUTH = /^\/([A-Za-z-]+)\/(signin|register|reset)\/?$/;
+  const authDialog = (which) => {
+    const dialog = which ? document.getElementById(`auth-${which}`) : null;
+    return dialog instanceof HTMLDialogElement && typeof dialog.showModal === "function" ? dialog : null;
+  };
+  // Closing one dialog to show another, or because the address changed, is
+  // not the visitor leaving the forms. The `close` event comes later, in a
+  // task of its own, so the dialog itself carries the mark until then.
+  const shutAll = () => {
+    for (const other of document.querySelectorAll("dialog.auth-dialog[open]")) {
+      other.dataset.changing = "";
+      other.close();
+    }
+  };
+  const beneath = document.title;
+  const show = (dialog) => {
+    shutAll();
+    const nav = document.getElementById("nav");
+    if (nav?.matches(":popover-open")) nav.hidePopover();
+    const title = dialog.querySelector("h2")?.textContent;
+    if (title) document.title = `${title} – Baylee`;
+    dialog.showModal();
+  };
+  document.addEventListener(
+    "close",
+    (event) => {
+      const closed = event.target;
+      if (!(closed instanceof HTMLDialogElement) || !closed.matches(".auth-dialog")) return;
+      if ("changing" in closed.dataset) {
+        delete closed.dataset.changing;
+        return;
+      }
+      const at = AUTH.exec(location.pathname);
+      if (!at) return;
+      document.title = beneath;
+      if (history.state?.auth === true) history.back();
+      else location.replace(`/${at[1]}/`);
+    },
+    true,
+  );
+  window.addEventListener("popstate", () => {
+    const dialog = authDialog(AUTH.exec(location.pathname)?.[2]);
+    if (dialog) {
+      show(dialog);
+    } else {
+      shutAll();
+      document.title = beneath;
+    }
+  });
+  const opening = () => {
+    const dialog = authDialog(root.dataset.auth);
+    if (dialog && !dialog.open) show(dialog);
+  };
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", opening, { once: true });
+  else opening();
   let pressed = null;
   document.addEventListener("pointerdown", (event) => {
     pressed = event.target;
@@ -320,14 +382,13 @@
     if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
     const link = target.closest("a[href]");
     if (!(link instanceof HTMLAnchorElement) || link.origin !== location.origin || link.target === "_blank") return;
-    const which = /^\/[A-Za-z-]+\/(signin|register)\/?$/.exec(link.pathname)?.[1];
-    const dialog = which ? document.getElementById(`auth-${which}`) : null;
-    if (!(dialog instanceof HTMLDialogElement) || typeof dialog.showModal !== "function") return;
+    const dialog = authDialog(AUTH.exec(link.pathname)?.[2]);
+    if (!dialog) return;
     event.preventDefault();
-    for (const other of document.querySelectorAll("dialog.auth-dialog[open]")) other.close();
-    const nav = document.getElementById("nav");
-    if (nav?.matches(":popover-open")) nav.hidePopover();
-    dialog.showModal();
+    const address = link.pathname + link.hash;
+    if (AUTH.test(location.pathname)) history.replaceState(history.state, "", address);
+    else history.pushState({ auth: true }, "", address);
+    show(dialog);
   });
 
   // An island's form works only once its island runs. Until then the

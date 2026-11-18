@@ -838,11 +838,12 @@ async fn the_feedback_moderation_is_two_pages_linked_from_nowhere() {
     assert_eq!(headers["location"], "/de/account/admin/feedback?status=new");
 }
 
-/// The reset page (`docs/account-reset.md`): a form page as signing in is,
-/// complete in the first response with every field labelled and the
-/// warning before a new vault; reached by a plain link from the sign-in
-/// form (on its page and in its dialog) and from the FAQ; in no sitemap.
-/// Without script it says that it needs script, of the recovery code too.
+/// The reset form (`docs/account-reset.md`): a dialog as signing in is, at
+/// an address of its own that shows the start page with it open; complete
+/// in the first response with every field labelled and the warning before a
+/// new vault; reached by a plain link from the sign-in form and from the
+/// FAQ; in no sitemap. Without script its address says that it needs
+/// script, of the recovery code too.
 #[tokio::test]
 async fn the_reset_page_is_linked_from_signing_in_and_listed_nowhere() {
     let app = app(true);
@@ -893,19 +894,48 @@ async fn the_reset_page_is_linked_from_signing_in_and_listed_nowhere() {
         .collect();
     assert_eq!(named, Vec::<&str>::new());
     let noscript = html.split("<noscript>").nth(1).expect("a noscript");
-    assert!(noscript.starts_with("<p class=\"notice\">Setting a new password needs JavaScript"));
-    // a form page of its own has no dialogs over it
-    assert!(!html.contains("id=\"auth-signin\""));
+    assert!(noscript.starts_with(
+        "<p class=\"notice auth-noscript wrap\">Setting a new password needs JavaScript"
+    ));
+    // the address is the start page with this dialog named as the open one;
+    // the three dialogs are each there once, and it stays out of the index
+    assert!(html.contains("<html lang=\"en\" dir=\"ltr\" data-auth=\"reset\">"));
+    assert!(html.contains("id=\"hero-title\""));
+    for id in ["auth-signin", "auth-register", "auth-reset"] {
+        assert_eq!(count(&html, &format!(" id=\"{id}\"")), 1, "{id}");
+    }
+    assert!(html.contains("<meta name=\"robots\" content=\"noindex"));
+    assert!(!html.contains("rel=\"canonical\""));
 
     let (status, headers, _) = get(&app, "/reset", &[("accept-language", "de")]).await;
     assert_eq!(status, StatusCode::FOUND);
     assert_eq!(headers["location"], "/de/reset");
 
-    // the sign-in form's link, on its page and in the dialog over a page
+    // the other two forms' addresses likewise, and a page that is not a
+    // form names none
+    for (path, form) in [("/de/signin", "signin"), ("/de/register", "register")] {
+        let (status, _, html) = get(&app, path, &[]).await;
+        assert_eq!(status, StatusCode::OK, "{path}");
+        assert!(
+            html.contains(&format!(
+                "<html lang=\"de\" dir=\"ltr\" data-auth=\"{form}\">"
+            )),
+            "{path}"
+        );
+        assert!(html.contains("id=\"hero-title\""), "{path}");
+        assert!(
+            html.contains("<meta name=\"robots\" content=\"noindex"),
+            "{path}"
+        );
+    }
+
+    // the sign-in form's link, in the dialog every page carries
     let (_, _, signin) = get(&app, "/de/signin", &[]).await;
     assert_eq!(count(&signin, "href=\"/de/reset\""), 1);
     let (_, _, home) = get(&app, "/de/", &[]).await;
     assert_eq!(count(&home, "href=\"/de/reset\""), 1, "in the dialog");
+    assert!(home.contains("<html lang=\"de\" dir=\"ltr\">"));
+    assert_eq!(count(&home, " id=\"auth-reset\""), 1);
     // the FAQ's answer, beside the dialog's
     let (_, _, faq) = get(&app, "/en/faq", &[]).await;
     assert_eq!(count(&faq, "href=\"/en/reset\""), 2);
