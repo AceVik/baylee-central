@@ -171,6 +171,19 @@ fn preloads(page: Page, lang: Lang, assets: &Assets) -> impl IntoView + use<> {
     }
 }
 
+/// A page's title as the tab, a bookmark and a search result show it: the
+/// page's own, then the site's name, unless the page's own already says it.
+/// The preview a link gets elsewhere keeps the bare title: it names the site
+/// in a field of its own (`og:site_name`).
+#[must_use]
+pub fn titled(title: &str) -> String {
+    if title.contains("Baylee") {
+        title.to_owned()
+    } else {
+        format!("{title} – Baylee")
+    }
+}
+
 /// Everything in `<head>`.
 fn head(page: Page, cx: &Context<'_>, meta: &Meta) -> impl IntoView + use<> {
     let lang = cx.lang;
@@ -233,7 +246,7 @@ fn head(page: Page, cx: &Context<'_>, meta: &Meta) -> impl IntoView + use<> {
                 name="viewport"
                 content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content"
             />
-            <title>{meta.title.clone()}</title>
+            <title>{titled(&meta.title)}</title>
             <meta name="description" content=meta.description.clone() />
             {listed.then(|| view! { <link rel="canonical" href=canonical.clone() /> })}
             {alternates}
@@ -716,9 +729,9 @@ fn footer(page: Page, cx: &Context<'_>) -> impl IntoView + use<> {
                         </div>
                     </div>
                     <nav class="foot-map" aria-label=words::foot_label(lang)>
-                        <section aria-labelledby="foot-play">
+                        <div class="foot-col">
                             <h2 class="foot-head" id="foot-play">{words::foot_play(lang)}</h2>
-                            <ul class="foot-list">
+                            <ul class="foot-list" aria-labelledby="foot-play">
                                 {link(Page::Download, words::nav_download(lang))}
                                 {link(Page::Gateways, words::nav_gateways(lang))}
                                 {link(Page::Faq, words::nav_faq(lang))}
@@ -727,10 +740,10 @@ fn footer(page: Page, cx: &Context<'_>) -> impl IntoView + use<> {
                                 {away(WHATSAPP.to_owned(), words::hero_whatsapp(lang))}
                                 {link(Page::Contact, words::nav_contact(lang))}
                             </ul>
-                        </section>
-                        <section aria-labelledby="foot-project">
+                        </div>
+                        <div class="foot-col">
                             <h2 class="foot-head" id="foot-project">{words::foot_project(lang)}</h2>
-                            <ul class="foot-list">
+                            <ul class="foot-list" aria-labelledby="foot-project">
                                 {away(REPOSITORY.to_owned(), words::foot_source(lang))}
                                 {away(CENTRAL_REPOSITORY.to_owned(), words::foot_central(lang))}
                                 {away(format!("{CENTRAL_REPOSITORY}/tree/main/crates/central-web"), words::foot_central_source(lang))}
@@ -738,16 +751,16 @@ fn footer(page: Page, cx: &Context<'_>) -> impl IntoView + use<> {
                                 {away(format!("{REPOSITORY}/issues"), words::foot_issues(lang))}
                                 {link(Page::Donate, words::nav_donate(lang))}
                             </ul>
-                        </section>
-                        <section aria-labelledby="foot-legal">
+                        </div>
+                        <div class="foot-col">
                             <h2 class="foot-head" id="foot-legal">{words::foot_legal(lang)}</h2>
-                            <ul class="foot-list">
+                            <ul class="foot-list" aria-labelledby="foot-legal">
                                 {link(Page::Terms, words::title_terms(lang))}
                                 {link(Page::Privacy, words::title_privacy(lang))}
                                 {link(Page::Impressum, words::title_impressum(lang))}
                                 {link(Page::FanContent, words::title_fan_content(lang))}
                             </ul>
-                        </section>
+                        </div>
                     </nav>
                 </div>
                 <div class="foot-bottom">
