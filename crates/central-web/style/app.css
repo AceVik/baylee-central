@@ -1138,6 +1138,36 @@
   display: grid;
 }
 
+/* Baylee in numbers, under the tiles: the directory's four, then up to
+   three more, each row as many columns as it has tiles */
+.numbers {
+  margin-block-start: var(--space-6);
+}
+
+.numbers > h2 {
+  margin-block-end: var(--space-1);
+  font-size: var(--text-lg);
+}
+
+.numbers-lead {
+  margin: 0 0 var(--space-4);
+  color: var(--ink-soft);
+}
+
+.numbers > .dir-stats {
+  margin-block-end: var(--space-3);
+}
+
+@media (min-width: 600px) {
+  .numbers > .dir-stats[data-count="2"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .numbers > .dir-stats[data-count="3"] {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
 .tile {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);

@@ -641,21 +641,30 @@ pub fn newest<'a>(cx: &Context<'a>) -> Option<&'a str> {
     Some(tag.strip_prefix('v').unwrap_or(tag))
 }
 
+/// A number as a tile (`.dir-stat`): its glyph and value over its label,
+/// and after the value what it is a part of ("5 / 7").
+pub fn stat_tile(
+    glyph: &'static str,
+    label: &str,
+    value: String,
+    of: Option<String>,
+) -> impl IntoView + use<> {
+    let of = of.map(|all| view! { <span class="dir-stat-of">{format!("/ {all}")}</span> });
+    view! {
+        <div class="dir-stat glass">
+            <dt>{label.to_owned()}</dt>
+            <dd><span class="dir-stat-mark">{icon(glyph)}</span><span class="num">{value}</span>{of}</dd>
+        </div>
+    }
+}
+
 /// The directory in four numbers, on the start page and above the
 /// directory: the gateways online of those listed, and what the online
 /// ones say is happening on them, added up (only while one says so: a
 /// number nobody reported is never drawn as a zero).
 pub fn gateway_totals(lang: Lang, all: &[Gateway]) -> impl IntoView + use<> {
     let count = |n: usize| words::number(lang, u64::try_from(n).unwrap_or(u64::MAX));
-    let tile = |glyph: &'static str, label: &'static str, value: String, of: Option<String>| {
-        let of = of.map(|all| view! { <span class="dir-stat-of">{format!("/ {all}")}</span> });
-        view! {
-            <div class="dir-stat glass">
-                <dt>{label}</dt>
-                <dd><span class="dir-stat-mark">{icon(glyph)}</span><span class="num">{value}</span>{of}</dd>
-            </div>
-        }
-    };
+    let tile = stat_tile;
     let online = all.iter().filter(|gateway| gateway.online).count();
     let now = data::activity_of(all).map(|(players, _, tables, games)| {
         view! {

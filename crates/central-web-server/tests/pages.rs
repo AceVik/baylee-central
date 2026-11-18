@@ -2054,3 +2054,30 @@ async fn the_start_page_asks_once_and_leads_to_the_donation_page() {
     let (_, _, german) = get(&app, "/de/", &[]).await;
     assert!(german.contains("kosten etwa 800\u{a0}€ im Monat"));
 }
+
+/// The account's overview shows Baylee in numbers: the public figures the
+/// site holds, the same for every reader, and only those a source
+/// reported. Without any, the part is not there.
+#[tokio::test]
+async fn the_account_s_overview_shows_the_public_figures() {
+    let (_, _, html) = get(&app(true), "/en/account", &[]).await;
+    assert_eq!(count(&html, "id=\"numbers-title\""), 1);
+    let (_, numbers) = html.split_once("id=\"numbers-title\"").expect("the part");
+    let numbers = numbers.split_once("</section>").expect("its end").0;
+    // the directory's four, then accounts, cards and visits
+    assert_eq!(count(numbers, "class=\"dir-stat glass\""), 7);
+    for said in [
+        "<span class=\"num\">5</span><span class=\"dir-stat-of\">/ 7</span>",
+        "<dt>Accounts at Baylee Central</dt>",
+        "<span class=\"num\">1,234</span>",
+        "<dt>Playable cards</dt>",
+        "<span class=\"num\">8,348</span><span class=\"dir-stat-of\">/ ",
+        "<dt>Page views since 1 November 2026</dt>",
+        "<span class=\"num\">48,213</span>",
+    ] {
+        assert!(numbers.contains(said), "{said}");
+    }
+    let (_, _, bare) = get(&app(false), "/en/account", &[]).await;
+    assert_eq!(count(&bare, "id=\"numbers-title\""), 0);
+    assert_eq!(count(&bare, "dir-stat"), 0);
+}

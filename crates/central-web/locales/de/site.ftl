@@ -895,6 +895,7 @@ strip-l-games = Partien
 strip-l-tables = Offene Tische
 strip-l-accounts = Konten
 strip-l-views = Aufrufe
+stat-cards = Spielbare Karten
 hero-badges = Auf einen Blick
 hero-badge-beta = Offene Beta
 hero-badge-free = Kostenlos
@@ -1781,6 +1782,7 @@ dl-soon-web = Im Browser
 account-group-account = Konto
 account-play-title = Spielen
 account-play-lead = Hol dir das Spiel und melde dich dort mit diesem Account an.
+account-numbers-lead = Öffentliche Zahlen, wie die Gateways und Baylee Central sie gerade melden.
 account-chat-lead = Nachrichten und deine Kontakte, Ende-zu-Ende-verschlüsselt.
 account-push-lead = Lass dieses Gerät neue Nachrichten melden.
 
@@ -1831,7 +1833,7 @@ privacy-donate-title = Spenden
 privacy-donate = Die Spendenseite verlinkt GitHub Sponsors (GitHub, Inc., USA), Liberapay (Liberapay, Frankreich) und Ko-fi (Ko-fi Labs Limited, Vereinigtes Königreich). Erst wenn du einem dieser Links folgst, verbindet sich dein Browser mit der Plattform; bezahlt wird dort und über deren Zahlungsdienst (Stripe oder PayPal), und es gilt die Datenschutzerklärung der Plattform. Wir nehmen auf dieser Website keine Zahlung an und erhalten von den Plattformen, was sie einem Empfänger über eine Zahlung mitteilen. Die Seite zeigt, wie viel vom Monatsziel gedeckt ist: Danach fragt unser Server Liberapay, nicht dein Browser, und die Zahl nennt niemanden. Wir veröffentlichen keine Namen von Spendern.
 
 ## gateways directory (redesign)
-gw-play-hint = „In Baylee öffnen“ übergibt das Gateway an den installierten Client (ab 0.1.1-beta.9b). Er zeigt die Adresse und fragt nach, bevor er es hinzufügt. Angemeldet wird dort, nicht hier. Noch kein Client? <download>Baylee herunterladen</download>.
+gw-play-hint = „In Baylee öffnen“ übergibt das Gateway an den installierten Client. Er zeigt die Adresse und fragt nach, bevor er es hinzufügt. Angemeldet wird dort, nicht hier. Noch kein Client? <download>Baylee herunterladen</download>.
 gw-fineprint = Online heißt, Central hat in den letzten anderthalb Minuten von dem Gateway gehört; ein Versprechen, dass es antwortet, ist das nicht. Namen, Versionen und Zahlen sind die Angaben der Betreiber.
 gw-fig-players = Spieler
 gw-fig-playing = Im Spiel
