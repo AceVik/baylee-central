@@ -24,6 +24,10 @@ pub struct Config {
     /// Ask GitHub for the newest release, the CI state and the card status.
     #[serde(default = "yes")]
     pub github: bool,
+    /// Ask the donation platforms how much of the monthly goal is covered
+    /// (`funding.rs`: Liberapay's public figures, no key).
+    #[serde(default = "yes")]
+    pub funding: bool,
     /// Data to use when GitHub or Central do not answer (and in tests in
     /// place of them): `release.json`, `cards.json`, `gateways.json`,
     /// `repo.json` in the shapes of `central_web::data`.
@@ -102,6 +106,7 @@ impl Config {
             site,
             central: None,
             github: false,
+            funding: false,
             fallback,
             verification: None,
             views: None,

@@ -373,7 +373,7 @@ WCAG 2.1 AA, mobile first:
 
 | area | paths | frame |
 | --- | --- | --- |
-| Public | `/`, `/download`, `/cards`, `/gateways`, `/contact`, legal pages | the bar, sections, the footer |
+| Public | `/`, `/download`, `/cards`, `/gateways`, `/contact`, `/donate`, legal pages | the bar, sections, the footer |
 | Account | `/account`, `/account/chat`, `/account/contacts`, `/account/security`, `/account/gateways` | the app frame; the messenger on chat and contacts |
 | Administration | `/admin` (the overview), `/admin/feedback`, `/admin/feedback/<id>`, `/admin/users`, `/admin/users/<id>`, `/admin/gateways`, `/admin/audit`, `/admin/legacy` | the app frame, loaded only for an administrator |
 | Sign-in | `/signin`, `/register`, `/reset` | a dialog over the page that asked; at its own address, over the start page |
@@ -426,6 +426,42 @@ wide as the step with its glyph, or two answers of equal width.
   the tab order and its sentence, `aria-describedby`), and a press makes
   that sentence speak up instead. A text that fits its box without
   scrolling counts as read. Declining is the quiet button of the two.
+
+### The donation page
+
+`/donate` asks for help with what Baylee costs each month, and it is the
+one page that does. Baylee's `docs/legal.md` ("Donations") binds every
+word of it: a donation buys nothing, no donor is named, Wizards is not put
+beside a request for money, and the page says that a donation is a gift to
+a private person and not tax-deductible.
+
+- **The goal** (`.goal-card`) is the amount in the title face, the bar
+  (`.give-meter`: the browser's `<progress>`, since the policy allows no
+  inline width) and one line on what the figure counts. Only what a
+  platform said is drawn: without a figure the bar is left out and a line
+  says so, and where nobody gives yet the line invites the first instead of
+  counting nobody. Beside it stands what a month costs, each amount a
+  thinner bar against the goal (`.cost-bar`). The card's button leads down
+  to the three places.
+- **The three places** (`.way`) are cards of one build: the platform's
+  name with a sign, one line on what kind of giving it is, its address as a
+  QR code, the address as text, and the button. The code stands on a white
+  tile in both schemes (a camera wants dark on light) and is a file made by
+  Baylee's `cargo tools site qr`, not drawn by script; below 30rem it is
+  left out, since a phone does not photograph its own screen. Every link
+  to a platform opens a new tab with `noopener noreferrer`.
+- **A donation button's light.** A button that leads to giving (`.give`,
+  and the bar's `.nav-give`) has the shape, size and place of its
+  neighbours and catches the eye by light alone: every six seconds a sheen
+  crosses it and its heart glows. Nothing moves or changes size, and under
+  reduced motion the button is still.
+- **Where it is linked.** The bar's last entry before the account's, a
+  heart before its word in a soft frame (the frame replaces the bar's
+  underline), and the footer's project column.
+- **`/funding.json`** says the same to a program, the game client first:
+  the goal in euro cents, what is covered, the percentage and the number
+  of supporters where a platform answered, which platforms the figure
+  counts, the page's address and the three places. It names nobody.
 
 ### Going from page to page
 

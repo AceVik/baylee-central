@@ -54,6 +54,7 @@ fn same(one: &Snapshot, other: &Snapshot) -> bool {
         repo,
         accounts,
         views,
+        funding,
     } = one;
     *release == other.release
         && *cards == other.cards
@@ -61,6 +62,7 @@ fn same(one: &Snapshot, other: &Snapshot) -> bool {
         && *repo == other.repo
         && *accounts == other.accounts
         && *views == other.views
+        && *funding == other.funding
 }
 
 /// Change the data in `shared` with `change`: a new snapshot when that
@@ -522,6 +524,7 @@ pub fn fallback(dir: Option<&Path>) -> Snapshot {
         repo: read(dir, "repo.json").unwrap_or_default(),
         accounts: read(dir, "accounts.json"),
         views: read(dir, "views.json"),
+        funding: read(dir, "funding.json"),
     }
 }
 
@@ -535,7 +538,8 @@ fn forget_figures(snapshot: &mut Snapshot) {
 }
 
 /// Keeps `shared` fresh until the process ends: GitHub every ten minutes,
-/// Central's directory and figures every minute.
+/// the donation platforms every half hour, Central's directory and figures
+/// every minute.
 pub fn spawn(config: &Config, shared: &Shared) {
     if config.github {
         let shared = Arc::clone(shared);
@@ -565,6 +569,23 @@ pub fn spawn(config: &Config, shared: &Shared) {
                         if repo.ci.is_some() || repo.commit.is_some() || repo.stars.is_some() {
                             snapshot.repo = repo;
                         }
+                    });
+                }
+            }
+        });
+    }
+    if config.funding {
+        let shared = Arc::clone(shared);
+        tokio::spawn(async move {
+            let mut every = tokio::time::interval(crate::funding::EVERY);
+            loop {
+                every.tick().await;
+                let found =
+                    tokio::task::spawn_blocking(|| crate::funding::liberapay(&agent(true))).await;
+                // a platform that does not answer keeps its last figures
+                if let Ok(Some(pledges)) = found {
+                    install(&shared, |snapshot| {
+                        snapshot.funding.get_or_insert_default().liberapay = Some(pledges);
                     });
                 }
             }

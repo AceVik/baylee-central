@@ -23,6 +23,8 @@ pub enum Page {
     Download,
     /// `/{lang}/gateways`.
     Gateways,
+    /// `/{lang}/donate`: the monthly goal and the places to give.
+    Donate,
     /// `/{lang}/faq`.
     Faq,
     /// `/{lang}/security`.
@@ -55,13 +57,14 @@ pub enum Page {
 
 impl Page {
     /// Every page with an address, in the sitemap's order.
-    pub const LISTED: [Page; 10] = [
+    pub const LISTED: [Page; 11] = [
         Page::Home,
         Page::Download,
         Page::Gateways,
         Page::Faq,
         Page::Security,
         Page::Contact,
+        Page::Donate,
         Page::Impressum,
         Page::Privacy,
         Page::Terms,
@@ -89,6 +92,7 @@ impl Page {
             Page::Faq => "faq",
             Page::Security => "security",
             Page::Contact => "contact",
+            Page::Donate => "donate",
             Page::Impressum => "impressum",
             Page::Privacy => "privacy",
             Page::Terms => "terms",
@@ -293,6 +297,8 @@ impl Assets {
 /// The public data the server read, each part absent until read once.
 #[derive(Clone, Debug, Default)]
 pub struct Snapshot {
+    /// What the donation platforms say of the monthly goal.
+    pub funding: Option<crate::data::Funding>,
     /// The newest release.
     pub release: Option<Release>,
     /// Its card status.

@@ -441,6 +441,63 @@ pub struct Views {
     pub since: String,
 }
 
+/// The places the developer is given to (Baylee `docs/legal.md`,
+/// "Donations"), each under his developer name and not the project's: the
+/// platform's own name and the address, in the order they are shown.
+pub const GIVING: [(&str, &str); 3] = [
+    ("GitHub Sponsors", "https://github.com/sponsors/AceVik"),
+    ("Liberapay", "https://liberapay.com/AceVik"),
+    ("Ko-fi", "https://ko-fi.com/acevik"),
+];
+
+/// What a donation platform says is given through it: an amount a week
+/// and by how many. No platform's answer is kept beyond these two figures.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Pledges {
+    /// What is given a week, in euro cents.
+    pub week: u64,
+    /// How many people give.
+    pub patrons: u64,
+}
+
+/// How much of the monthly goal the donation platforms say is covered.
+/// Each platform is absent until it answered; a platform that publishes no
+/// figure without a key (GitHub Sponsors, Ko-fi) has no field yet.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Funding {
+    /// Liberapay's public figures.
+    pub liberapay: Option<Pledges>,
+}
+
+impl Funding {
+    /// The goal the owner set on every platform (18.11.2026): what
+    /// development and operation cost a month, in euro cents.
+    pub const GOAL: u64 = 80_000;
+
+    /// What is covered a month, in euro cents, and by how many people;
+    /// `None` while no platform said anything. A week's amount counts as
+    /// 52/12 of a month's.
+    #[must_use]
+    pub fn covered(&self) -> Option<(u64, u64)> {
+        let pledges = self.liberapay?;
+        Some((pledges.week.saturating_mul(52) / 12, pledges.patrons))
+    }
+
+    /// The share of the goal that `month` euro cents cover, in whole per
+    /// cent, at most a hundred; anything given at all shows as one.
+    #[must_use]
+    pub const fn percent(month: u64) -> u64 {
+        let percent = month.saturating_mul(100) / Self::GOAL;
+        if percent > 100 {
+            100
+        } else if percent == 0 && month > 0 {
+            1
+        } else {
+            percent
+        }
+    }
+}
+
 /// A page of the signed-in area (`/{lang}/account/…`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Section {
