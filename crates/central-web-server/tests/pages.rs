@@ -1775,3 +1775,160 @@ fn a_page_is_a_pure_function_of_what_it_is_rendered_from() {
         }
     }
 }
+
+/// The donation page: the goal with what the platforms said, the three
+/// places as links that tell the other site nothing about where the reader
+/// came from, each with its code as a file of this site, and the sentences
+/// every place a donation is asked for must carry (Baylee `docs/legal.md`,
+/// "Donations"): nothing is bought, nobody is named, not tax-deductible,
+/// and Wizards is not put beside the request.
+#[tokio::test]
+async fn the_donation_page_names_three_places_and_sells_nothing() {
+    let with = app(true);
+    for lang in Lang::ALL {
+        let (status, _, html) = get(&with, &format!("/{}/donate", lang.code()), &[]).await;
+        assert_eq!(status, StatusCode::OK, "{lang:?}");
+        let (_, own) = html
+            .split_once("id=\"donate-title\"")
+            .unwrap_or_else(|| panic!("{lang:?}: the page's head"));
+        let own = own.split_once("</main>").map_or(own, |(own, _)| own);
+        for (name, address) in central_web::data::GIVING {
+            assert_eq!(
+                count(
+                    own,
+                    &format!("href=\"{address}\" target=\"_blank\" rel=\"noopener noreferrer\"")
+                ),
+                2,
+                "{lang:?}: {name} is linked from its code and its button"
+            );
+            assert!(
+                own.contains(address.trim_start_matches("https://")),
+                "{lang:?}: {name}'s address is in sight"
+            );
+        }
+        assert_eq!(count(own, "class=\"way card glass\""), 3, "{lang:?}");
+        for code in [
+            "img/qr-github.svg",
+            "img/qr-liberapay.svg",
+            "img/qr-ko-fi.svg",
+        ] {
+            assert_eq!(count(own, code), 1, "{lang:?}: {code}");
+        }
+        assert!(!own.contains("Wizards"), "{lang:?}");
+        assert!(!own.contains("Magic"), "{lang:?}");
+        // the bar and the footer lead here from every page
+        let (_, _, home) = get(&with, &format!("/{}/", lang.code()), &[]).await;
+        assert!(
+            count(&home, &format!("href=\"/{}/donate\"", lang.code())) >= 2,
+            "{lang:?}"
+        );
+    }
+    let (_, _, en) = get(&with, "/en/donate", &[]).await;
+    for said in [
+        "not tax-deductible",
+        "no name on a list",
+        "about €800 a month",
+        // 23.10 a week is 100.10 a month, an eighth of the goal
+        "€100 of €800 a month",
+        "12 % covered",
+        "supporters: 3",
+    ] {
+        assert!(en.contains(said), "{said}");
+    }
+    assert_eq!(count(&en, "class=\"give-meter\""), 1);
+    let (_, _, de) = get(&with, "/de/donate", &[]).await;
+    for said in [
+        "steuerlich nicht absetzbar",
+        "100\u{a0}€ von 800\u{a0}€ im Monat",
+    ] {
+        assert!(de.contains(said), "{said}");
+    }
+    // a figure nobody reported is not drawn as a zero
+    let (_, _, bare) = get(&app(false), "/en/donate", &[]).await;
+    assert_eq!(count(&bare, "class=\"give-meter\""), 0);
+    assert!(bare.contains("not told us a figure yet"));
+    assert!(bare.contains("about €800 a month"));
+    // the privacy notice has its part
+    let (_, _, privacy) = get(&with, "/en/privacy", &[]).await;
+    assert!(privacy.contains("<h2 id=\"donate\">"));
+    assert!(privacy.contains("href=\"#donate\""));
+}
+
+/// `/funding.json`: the goal and what is covered, for the game client; and
+/// the short address a program or a printed line can name.
+#[tokio::test]
+async fn the_goal_s_figures_are_a_small_document() {
+    let (status, headers, body) = get(&app(true), "/funding.json", &[]).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(headers["content-type"], "application/json");
+    assert_eq!(headers["x-content-type-options"], "nosniff");
+    let json: serde_json::Value = serde_json::from_str(&body).expect("JSON");
+    assert_eq!(
+        json,
+        serde_json::json!({
+            "version": 1,
+            "currency": "EUR",
+            "goal": 80_000,
+            "covered": 10_010,
+            "percent": 12,
+            "supporters": 3,
+            "counted": ["liberapay"],
+            "page": "https://baylee.app/donate",
+            "ways": [
+                { "name": "GitHub Sponsors", "address": "https://github.com/sponsors/AceVik" },
+                { "name": "Liberapay", "address": "https://liberapay.com/AceVik" },
+                { "name": "Ko-fi", "address": "https://ko-fi.com/acevik" },
+            ],
+        })
+    );
+    let (_, _, bare) = get(&app(false), "/funding.json", &[]).await;
+    let bare: serde_json::Value = serde_json::from_str(&bare).expect("JSON");
+    assert_eq!(bare.get("covered"), None);
+    assert_eq!(bare.get("percent"), None);
+    assert_eq!(bare["counted"], serde_json::json!([]));
+    assert_eq!(bare["goal"], 80_000);
+    let (status, headers, _) = get(&app(true), "/donate", &[("accept-language", "de")]).await;
+    assert!(status.is_redirection());
+    assert_eq!(headers["location"], "/de/donate");
+}
+
+/// Before anybody gives, the goal's card invites and does not count
+/// nobody; the bar still stands, empty.
+#[test]
+fn a_goal_nobody_gives_to_yet_invites_the_first() {
+    use central_web::data::{Funding, Pledges};
+    let mut data = fallback(Some(&data()));
+    let assets = Assets::default();
+    let mut page = |pledges| {
+        data.funding = Some(Funding {
+            liberapay: Some(pledges),
+        });
+        render(
+            Page::Donate,
+            &Context {
+                lang: Lang::En,
+                origin: "https://baylee.app",
+                assets: &assets,
+                data: &data,
+                machine: machine("", None, None, None),
+                verification: None,
+            },
+        )
+    };
+    let none = page(Pledges {
+        week: 0,
+        patrons: 0,
+    });
+    assert!(none.contains("€0 of €800 a month"));
+    assert!(none.contains("Yours would be the first."));
+    assert!(!none.contains("supporters:"));
+    assert_eq!(count(&none, "class=\"give-meter\""), 1);
+    // a goal more than met is drawn full, not beyond
+    let over = page(Pledges {
+        week: 50_000,
+        patrons: 40,
+    });
+    assert!(over.contains("100 % covered"));
+    assert!(over.contains("supporters: 40"));
+    assert!(!over.contains("Yours would be the first."));
+}

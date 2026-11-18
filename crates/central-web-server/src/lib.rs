@@ -9,6 +9,7 @@
 pub mod config;
 pub mod fetch;
 pub mod files;
+pub mod funding;
 pub mod generated;
 pub mod routes;
 pub mod views;

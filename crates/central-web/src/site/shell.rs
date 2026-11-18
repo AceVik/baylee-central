@@ -623,6 +623,10 @@ fn bar(page: Page, cx: &Context<'_>) -> impl IntoView + use<> {
                     {nav_link(Page::Security, page, lang, words::nav_security(lang))}
                     {nav_link(Page::Faq, page, lang, words::nav_faq(lang))}
                     {nav_link(Page::Contact, page, lang, words::nav_contact(lang))}
+                    <a class="nav-give" href=Page::Donate.path(lang) aria-current=(page == Page::Donate).then_some("page")>
+                        {icon(icons::HEART)}
+                        <span>{words::nav_donate(lang)}</span>
+                    </a>
                     <a
                         class="nav-account"
                         href=format!("/{}/signin", lang.code())
@@ -732,6 +736,7 @@ fn footer(page: Page, cx: &Context<'_>) -> impl IntoView + use<> {
                                 {away(format!("{CENTRAL_REPOSITORY}/tree/main/crates/central-web"), words::foot_central_source(lang))}
                                 {away(format!("{REPOSITORY}/releases"), words::foot_releases(lang))}
                                 {away(format!("{REPOSITORY}/issues"), words::foot_issues(lang))}
+                                {link(Page::Donate, words::nav_donate(lang))}
                             </ul>
                         </section>
                         <section aria-labelledby="foot-legal">

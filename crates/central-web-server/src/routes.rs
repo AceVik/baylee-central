@@ -365,10 +365,11 @@ fn page(app: &App, headers: &HeaderMap, page: Page, lang: Lang) -> Response {
 }
 
 /// Old and unprefixed paths that live on under a language.
-const MOVED: [&str; 13] = [
+const MOVED: [&str; 14] = [
     "download",
     "gateways",
     "contact",
+    "donate",
     "impressum",
     "privacy",
     "terms",
@@ -593,6 +594,12 @@ fn answer(app: &App, headers: &HeaderMap, uri: &Uri) -> Response {
             return text(
                 "application/xml; charset=utf-8",
                 generated::sitemap(&app.config.origin, &snapshot(app)),
+            );
+        }
+        "/funding.json" => {
+            return text(
+                "application/json",
+                generated::funding(&app.config.origin, &snapshot(app)),
             );
         }
         "/.well-known/tdmrep.json" => {

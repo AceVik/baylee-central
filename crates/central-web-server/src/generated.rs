@@ -3,6 +3,7 @@
 
 use std::fmt::Write as _;
 
+use central_web::data::{Funding, GIVING};
 use central_web::site::{Assets, Page, Snapshot};
 use central_web::words::{self, Lang};
 
@@ -124,6 +125,35 @@ pub fn manifest(lang: Lang, assets: &Assets) -> String {
         ]
     })
     .to_string()
+}
+
+/// `/funding.json`: the monthly goal and how much of it the donation
+/// platforms say is covered, for a program that shows it (the game client)
+/// without asking the platforms itself. Amounts are euro cents a month;
+/// `covered` is absent while no platform said anything, and `counted`
+/// names the platforms the figure adds up. Nothing here names a donor.
+#[must_use]
+pub fn funding(origin: &str, data: &Snapshot) -> String {
+    let covered = data.funding.as_ref().and_then(Funding::covered);
+    let mut out = serde_json::json!({
+        "version": 1,
+        "currency": "EUR",
+        "goal": Funding::GOAL,
+        "counted": if covered.is_some() { vec!["liberapay"] } else { Vec::new() },
+        "page": format!("{origin}/{}", Page::Donate.slug()),
+        "ways": GIVING
+            .iter()
+            .map(|(name, address)| serde_json::json!({ "name": name, "address": address }))
+            .collect::<Vec<_>>(),
+    });
+    if let (Some((month, patrons)), Some(map)) = (covered, out.as_object_mut()) {
+        map.insert("covered".to_owned(), month.into());
+        map.insert("percent".to_owned(), Funding::percent(month).into());
+        map.insert("supporters".to_owned(), patrons.into());
+    }
+    let mut text = out.to_string();
+    text.push('\n');
+    text
 }
 
 /// `/.well-known/tdmrep.json` (W3C TDMRep): mining reserved site-wide.

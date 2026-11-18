@@ -1263,6 +1263,16 @@ repository, and the deploy hook builds and installs this site instead
   and Central's browser listener on loopback (every minute): outbound HTTPS
   to GitHub must be allowed. It logs nothing about requests.
 
+  `funding` (`true` unless the file says otherwise) lets the process ask
+  `https://liberapay.com/AceVik/public.json` every thirty minutes for the
+  figure behind the donation page's bar and `/funding.json`: outbound
+  HTTPS to `liberapay.com` must then be allowed. Of the answer it keeps
+  two numbers, what is given a week and by how many, and those in memory
+  only (`crates/central-web-server/src/funding.rs`). With
+  `"funding": false`, or until Liberapay has answered once, the page shows
+  the goal without a bar; an answer that fails later leaves the last
+  figure standing until the process restarts.
+
   `views` may name a file, for example `/var/lib/baylee-app/views.json`
   in a directory this user owns (`StateDirectory=baylee-app`, or
   `ReadWritePaths=` under `ProtectSystem=strict`): the site then counts
