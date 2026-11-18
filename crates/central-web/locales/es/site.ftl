@@ -889,6 +889,7 @@ strip-l-games = Partidas
 strip-l-tables = Mesas abiertas
 strip-l-accounts = Cuentas
 strip-l-views = Vistas
+stat-cards = Cartas jugables
 hero-badges = De un vistazo
 hero-badge-beta = Beta abierta
 hero-badge-free = Gratis
@@ -1778,6 +1779,7 @@ dl-soon-web = In the browser
 account-group-account = Account
 account-play-title = Play
 account-play-lead = Get the game and sign in there with this account.
+account-numbers-lead = Public figures, as the gateways and Baylee Central report them right now.
 account-chat-lead = Messages and your contacts, encrypted end to end.
 account-push-lead = Let this device tell you about new messages.
 
@@ -1828,7 +1830,7 @@ privacy-donate-title = Donations
 privacy-donate = The donation page links to GitHub Sponsors (GitHub, Inc., USA), Liberapay (Liberapay, France) and Ko-fi (Ko-fi Labs Limited, United Kingdom). Only when you follow one of these links does your browser connect to that platform; payment happens there and with its payment service (Stripe or PayPal), and the platform's own privacy notice applies. We take no payment on this site and receive from the platforms what they tell a recipient about a payment. The page shows how much of the monthly goal is covered: our server asks Liberapay for the public total, not your browser, and the figure names nobody. We publish no donor's name.
 
 ## gateways directory (redesign)
-gw-play-hint = “Open in Baylee” hands the gateway to the installed client (0.1.1-beta.9b or newer), which shows the address and asks before it adds it. You sign in there, not here. No client yet? <download>Download Baylee</download>.
+gw-play-hint = “Open in Baylee” hands the gateway to the installed client, which shows the address and asks before it adds it. You sign in there, not here. No client yet? <download>Download Baylee</download>.
 gw-fineprint = Online means Central heard from the gateway within the last minute and a half; it is no promise that it answers. Names, versions and figures are what each operator reports.
 gw-fig-players = Players
 gw-fig-playing = In a game

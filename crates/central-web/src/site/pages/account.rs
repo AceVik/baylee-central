@@ -5,7 +5,9 @@
 use leptos::prelude::*;
 
 use super::Built;
+use super::home::{gateway_totals, stat_tile};
 use crate::data::Section;
+use crate::format;
 use crate::islands::{Account, Administration, Messenger};
 use crate::rich::icon;
 use crate::site::icons;
@@ -77,6 +79,76 @@ fn section_name(lang: Lang, section: Section) -> (&'static str, &'static str) {
 /// everyone and so rendered here: where to go on playing (the start page's
 /// download for the visitor's machine, and the gateways), and every part of
 /// the account as a tile.
+/// Baylee in numbers, for a signed-in reader (owner, 18.11.2026): the
+/// directory's four, and Central's accounts, the playable cards of all and
+/// the site's visits. They are the public figures the site holds, the same
+/// for every reader: the server does not know who is signed in, and none
+/// of them is about a person. Only what a source reported is a tile, and
+/// without any the part is left out.
+fn numbers(cx: &Context<'_>) -> Option<impl IntoView + use<>> {
+    let lang = cx.lang;
+    let data = cx.data;
+    let number = |n: u64| words::number(lang, n);
+    let mut more: Vec<AnyView> = Vec::with_capacity(3);
+    if let Some(accounts) = data.accounts {
+        more.push(
+            stat_tile(
+                icons::USER_CHECK,
+                words::strip_accounts(lang),
+                number(accounts),
+                None,
+            )
+            .into_any(),
+        );
+    }
+    if let Some(status) = data.cards.as_ref() {
+        let s = status.stats;
+        let playable = s
+            .implemented
+            .saturating_add(s.generated)
+            .saturating_add(s.partial);
+        more.push(
+            stat_tile(
+                icons::LAYERS,
+                words::stat_cards(lang),
+                number(playable),
+                Some(number(s.total)),
+            )
+            .into_any(),
+        );
+    }
+    if let Some(views) = data.views.as_ref() {
+        more.push(
+            stat_tile(
+                icons::EYE,
+                &words::strip_views(lang, &format::date(lang, &views.since)),
+                number(views.count),
+                None,
+            )
+            .into_any(),
+        );
+    }
+    let directory = data
+        .gateways
+        .as_deref()
+        .map(|all| gateway_totals(lang, all));
+    if directory.is_none() && more.is_empty() {
+        return None;
+    }
+    let count = more.len().to_string();
+    let more = (!more.is_empty()).then(|| {
+        view! { <dl class="dir-stats" data-count=count aria-label=words::status_label(lang)>{more}</dl> }
+    });
+    Some(view! {
+        <section class="numbers" aria-labelledby="numbers-title">
+            <h2 id="numbers-title">{words::status_label(lang)}</h2>
+            <p class="small numbers-lead">{words::account_numbers_lead(lang)}</p>
+            {directory}
+            {more}
+        </section>
+    })
+}
+
 fn home_extras(cx: &Context<'_>) -> impl IntoView + use<> {
     let lang = cx.lang;
     let tiles = [
@@ -113,6 +185,7 @@ fn home_extras(cx: &Context<'_>) -> impl IntoView + use<> {
             {super::download::download_block(cx, false)}
         </section>
         <ul class="tiles">{tiles}</ul>
+        {numbers(cx)}
     }
 }
 
