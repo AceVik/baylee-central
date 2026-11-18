@@ -2108,6 +2108,15 @@ async fn the_start_page_asks_once_and_leads_to_the_donation_page() {
 async fn the_account_s_overview_shows_the_public_figures() {
     let (_, _, html) = get(&app(true), "/en/account", &[]).await;
     assert_eq!(count(&html, "id=\"numbers-title\""), 1);
+    // its own class: `.numbers` is the start page's grid of four, which once
+    // laid this part's title, lead and tiles out in one row
+    assert_eq!(
+        count(
+            &html,
+            "<section aria-labelledby=\"numbers-title\" class=\"in-numbers\">"
+        ),
+        1
+    );
     let (_, numbers) = html.split_once("id=\"numbers-title\"").expect("the part");
     let numbers = numbers.split_once("</section>").expect("its end").0;
     // the directory's four, then accounts, cards and visits
@@ -2126,4 +2135,54 @@ async fn the_account_s_overview_shows_the_public_figures() {
     let (_, _, bare) = get(&app(false), "/en/account", &[]).await;
     assert_eq!(count(&bare, "id=\"numbers-title\""), 0);
     assert_eq!(count(&bare, "dir-stat"), 0);
+}
+
+/// A page's title says the site's name after its own, unless its own
+/// already does; the preview a link gets elsewhere keeps the bare title,
+/// since it names the site in a field of its own. And the footer's three
+/// columns are lists with a name under one landmark, not three landmarks
+/// more on every page.
+#[tokio::test]
+async fn a_title_names_the_site_and_the_footer_is_one_landmark() {
+    let app = app(true);
+    for (path, title, bare) in [
+        ("/en/contact", "Contact – Baylee", "Contact"),
+        (
+            "/de/terms",
+            "Nutzungsbedingungen – Baylee",
+            "Nutzungsbedingungen",
+        ),
+        ("/en/download", "Download Baylee", "Download Baylee"),
+        // the account area names the site itself, and so its title stays
+        ("/en/account", "Overview – Baylee", "Overview – Baylee"),
+    ] {
+        let (_, _, html) = get(&app, path, &[]).await;
+        assert!(html.contains(&format!("<title>{title}</title>")), "{path}");
+        assert!(
+            html.contains(&format!("property=\"og:title\" content=\"{bare}\"")),
+            "{path}"
+        );
+        let (_, foot) = html.split_once("<footer").expect("the footer");
+        let foot = foot.split_once("</footer>").expect("its end").0;
+        assert_eq!(count(foot, "<section"), 0, "{path}");
+        assert_eq!(count(foot, "<nav"), 1, "{path}");
+        for id in ["foot-play", "foot-project", "foot-legal"] {
+            assert_eq!(
+                count(
+                    foot,
+                    &format!("<ul aria-labelledby=\"{id}\" class=\"foot-list\">")
+                ),
+                1,
+                "{path}: {id}"
+            );
+        }
+    }
+    for lang in Lang::ALL {
+        for page in ["", "faq", "privacy", "donate", "account"] {
+            let (_, _, html) = get(&app, &format!("/{}/{page}", lang.code()), &[]).await;
+            let (_, rest) = html.split_once("<title>").expect("a title");
+            let title = rest.split_once("</title>").expect("its end").0;
+            assert_eq!(count(title, "Baylee"), 1, "{lang:?} {page}: {title}");
+        }
+    }
 }

@@ -140,9 +140,9 @@ fn numbers(cx: &Context<'_>) -> Option<impl IntoView + use<>> {
         view! { <dl class="dir-stats" data-count=count aria-label=words::status_label(lang)>{more}</dl> }
     });
     Some(view! {
-        <section class="numbers" aria-labelledby="numbers-title">
+        <section class="in-numbers" aria-labelledby="numbers-title">
             <h2 id="numbers-title">{words::status_label(lang)}</h2>
-            <p class="small numbers-lead">{words::account_numbers_lead(lang)}</p>
+            <p class="small in-numbers-lead">{words::account_numbers_lead(lang)}</p>
             {directory}
             {more}
         </section>
