@@ -127,7 +127,8 @@ const operations = (seen: Body[]) => seen.map((body) => body.operation);
 test("every field is labelled, the data is kept unless chosen otherwise, and the warning stands before a new vault", async ({ page, baseURL }) => {
   const problems = watch(page, baseURL ?? "");
   await open(page);
-  await expect(page.getByRole("heading", { level: 1, name: "Set a new password" })).toBeVisible();
+  // the form stands in a dialog, which its address opens
+  await expect(page.locator("#auth-reset").getByRole("heading", { level: 2, name: "Set a new password" })).toBeVisible();
   const recovery = page.getByLabel("Recovery code", { exact: true });
   const password = page.getByLabel("New password", { exact: true });
   for (const field of [form(page).getByLabel("Sign-in name"), form(page).getByLabel("Reset code"), recovery, password, page.getByLabel("Repeat new password")]) {
@@ -339,6 +340,10 @@ test("a new vault: its recovery code is shown once, copied or saved, and kept be
   const protocol = await page.context().newCDPSession(page);
   await protocol.send("Page.enable");
   protocol.on("Page.frameRequestedNavigation", (event) => asked.push(event.url));
+  // the first press unfolds the warning, the second hands the draft over
+  await way("Mail it to myself").click();
+  await expect(way("Mail it to myself")).toHaveAttribute("aria-expanded", "true");
+  expect(asked).toEqual([]);
   await way("Mail it to myself").click();
   await expect.poll(() => asked.length).toBe(1);
   const mailto = new URL(asked[0] ?? "");
@@ -476,7 +481,7 @@ test("someone without a code asks for one by mail: only a name is sent, not at a
   await expect(mailName(page)).toHaveAttribute("autocomplete", "username");
   await expect(mailName(page)).not.toHaveAttribute("name", /.*/);
   // the form says where a code comes from, and for how long each kind works
-  await expect(page.locator(".auth-head > .lead")).toHaveText(
+  await expect(page.locator("#auth-reset .auth-lead")).toHaveText(
     "For when you forgot your password: with a reset code you set a new one here. The code comes by e-mail to your confirmed address, or from an administrator.",
   );
   await expect(form(page).getByLabel("Reset code")).toHaveAccessibleDescription(
@@ -537,7 +542,7 @@ test("a code by mail that Central does not send is said as what it is", async ({
     await send(page).click();
     await expect(alert).toHaveText(text);
     // nothing reads as a sent mail, as a wrong name or as a refused code
-    await expect(mail(page).getByRole("status")).toHaveText("");
+    await expect(mail(page).locator("[role=status]")).toHaveText("");
     await expect(form(page).getByRole("alert")).toBeHidden();
   }
   expect(operations(seen)).toEqual(["reset_mail", "reset_mail", "reset_mail", "reset_mail"]);
@@ -550,21 +555,21 @@ test("a code by mail that Central does not send is said as what it is", async ({
   expect(await axe(page)).toEqual([]);
 });
 
-test("the sign-in form leads to it by a plain link, on its page and in its dialog", async ({ page, baseURL }) => {
+test("the sign-in form leads to it by a plain link, on its address and over another page", async ({ page, baseURL }) => {
   const problems = watch(page, baseURL ?? "");
+  // its address shows the form's dialog over the start page
   await page.goto("/en/signin");
   await expect(page.locator("html")).toHaveAttribute("data-islands", "ready");
-  const link = page.getByRole("link", { name: "Set a new one with a reset code" });
+  const link = page.locator("#auth-signin").getByRole("link", { name: "Set a new one with a reset code" });
   await expect(link).toHaveAttribute("href", "/en/reset");
-  await expect(page.getByText("Forgot your password?")).toBeVisible();
+  await expect(page.locator("#auth-signin").getByText("Forgot your password?")).toBeVisible();
   expect(await axe(page)).toEqual([]);
   expect(await targets(page)).toEqual([]);
   await link.click();
   await expect(page).toHaveURL(/\/en\/reset$/);
-  await expect(page.getByRole("heading", { level: 1, name: "Set a new password" })).toBeVisible();
-  // a form page of its own: no dialog lies over it, and the bar's link
-  // leads to the sign-in's page
-  await expect(page.locator("dialog.auth-dialog")).toHaveCount(0);
+  // the link opens the reset's dialog in place of the sign-in's
+  await expect(page.locator("#auth-reset").getByRole("heading", { level: 2, name: "Set a new password" })).toBeVisible();
+  await expect(page.locator("#auth-signin")).toBeHidden();
 
   await page.goto("/en/faq");
   const answer = page.locator("section.qa").filter({ hasText: "I forgot my password" });
@@ -582,14 +587,15 @@ test("the sign-in form leads to it by a plain link, on its page and in its dialo
   expect(await targets(page)).toEqual([]);
   await dialog.getByRole("link", { name: "Set a new one with a reset code" }).click();
   await expect(page).toHaveURL(/\/en\/reset$/);
-  await expect(page.locator("dialog[open]")).toHaveCount(0);
+  await expect(page.locator("dialog[open]")).toHaveCount(1);
+  await expect(page.locator("#auth-reset")).toBeVisible();
   await expect(form(page).getByLabel("Reset code")).toBeVisible();
   expect(problems).toEqual([]);
 });
 
 test("the page speaks German by hand", async ({ page }) => {
   await open(page, "de");
-  await expect(page.getByRole("heading", { level: 1, name: "Neues Passwort setzen" })).toBeVisible();
+  await expect(page.locator("#auth-reset").getByRole("heading", { level: 2, name: "Neues Passwort setzen" })).toBeVisible();
   await page.getByRole("radio", { name: "Ich habe ihn nicht. Mit einem leeren Tresor neu anfangen." }).check();
   await expect(page.locator("#reset-warning")).toContainText("Niemand kann sie zurückholen, auch wir nicht.");
   expect(await axe(page)).toEqual([]);
@@ -622,7 +628,7 @@ test.describe("without script", () => {
   // it and drew it, in the form's own box.
   test("the page says that it needs script, and why", async ({ page }) => {
     await page.goto("/en/reset");
-    const notice = await page.locator(".auth-form noscript > p.notice").evaluateAll((all) =>
+    const notice = await page.locator("noscript > p.notice.auth-noscript").evaluateAll((all) =>
       all.map((element) => ({ text: element.textContent, height: element.getBoundingClientRect().height })),
     );
     expect(notice).toHaveLength(1);
@@ -630,10 +636,12 @@ test.describe("without script", () => {
       "Setting a new password needs JavaScript: your password and your recovery code are processed in your browser and never sent to us.",
     );
     expect(notice[0].height).toBeGreaterThan(20);
-    // the page is whole all the same: its fields, their labels, the choice
-    await expect(page.locator("leptos-island")).not.toHaveAttribute("data-hydrated", /.*/);
-    await expect(form(page).getByLabel("Reset code")).toBeVisible();
-    await expect(page.getByRole("radio", { name: KEEP })).toBeChecked();
+    // the form stands in a dialog that only script opens: it stays shut, but
+    // its fields, their labels and the choice are in the markup all the same
+    await expect(page.locator("leptos-island").first()).not.toHaveAttribute("data-hydrated", /.*/);
+    await expect(page.locator("dialog[open]")).toHaveCount(0);
+    await expect(form(page).getByLabel("Reset code")).toHaveCount(1);
+    await expect(page.getByLabel(KEEP)).toBeChecked();
   });
 });
 

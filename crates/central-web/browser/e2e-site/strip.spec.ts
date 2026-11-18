@@ -1,27 +1,30 @@
 // The strip under the bar (docs/proposals/frontend-rewrite.md §18): Baylee
-// in numbers, nothing of GitHub's, the most telling first, and its cells in
-// even, centred rows for every count the server can write, at every width.
+// in numbers (six cells: players, games, open tables, gateways, accounts,
+// page views), nothing of GitHub's, and its cells in even, centred rows for
+// every count the server can write, at every width.
 import { expect, test, type Page } from "@playwright/test";
 
-import { axe, targets } from "./check.ts";
+import { axe, onlyDesktop, targets } from "./check.ts";
 
 /** The widths a reader brings: phones, a tablet, desks, and both sides of each step. */
 const WIDTHS = [320, 375, 599, 600, 768, 1024, 1099, 1100, 1440, 2560];
 
 /**
- * The list's groups as the server writes them with every source reporting:
- * the gateways' four counts (one group), then the gateways, the accounts,
- * the cards and the page views, one cell each. The gateways' cell is always
- * there; each other group is left out while its source is silent.
+ * The list's cells as the server writes them with every source reporting:
+ * the gateways' three live counts (players, games, open tables: one source,
+ * so they come and go together), then the gateways, the accounts and the
+ * page views, one cell each. The gateways' cell is always there (while the
+ * directory is silent it only links to it); each other group is left out
+ * while its source is silent.
  */
-const ORDER = ["live", "gateways", "accounts", "cards", "views"];
-const OPTIONAL = ["live", "accounts", "cards", "views"];
-/** Every set of silent sources: sixteen. */
-const SILENCES = [...Array(16).keys()].map((bits) => OPTIONAL.filter((_, at) => ((bits >> at) & 1) === 1));
+const ORDER = ["live", "live", "live", "gateways", "accounts", "views"];
+const OPTIONAL = ["live", "accounts", "views"];
+/** Every set of silent sources: eight. */
+const SILENCES = [...Array(8).keys()].map((bits) => OPTIONAL.filter((_, at) => ((bits >> at) & 1) === 1));
 
 /**
  * Leave out what silent sources would leave out and say how many cells
- * remain, as the server would (the groups are kept aside and put back, so
+ * remain, as the server would (the cells are kept aside and put back, so
  * one page serves every set).
  */
 async function silence(page: Page, gone: string[]): Promise<number> {
@@ -29,10 +32,10 @@ async function silence(page: Page, gone: string[]): Promise<number> {
     ([order, silent]) => {
       const list = document.querySelector<HTMLElement>(".strip-list");
       if (!list) throw new Error("no strip");
-      const kept: unknown = Reflect.get(window, "stripGroups");
+      const kept: unknown = Reflect.get(window, "stripCells");
       const all = Array.isArray(kept) ? (kept as Element[]) : [...list.children];
-      Reflect.set(window, "stripGroups", all);
-      if (all.length !== order.length) throw new Error(`${all.length} groups`);
+      Reflect.set(window, "stripCells", all);
+      if (all.length !== order.length) throw new Error(`${all.length} cells`);
       list.replaceChildren(...all.filter((_, at) => !silent.includes(order[at] ?? "")));
       const count = list.querySelectorAll(".strip-cell").length;
       list.setAttribute("data-count", String(count));
@@ -105,24 +108,22 @@ function faults(count: number, { rows, cut, scroll }: Awaited<ReturnType<typeof 
   return found;
 }
 
-test("the strip shows Baylee in numbers, the most telling first, and nothing of GitHub's", async ({ page }) => {
+test("the strip shows Baylee in numbers and nothing of GitHub's", async ({ page }) => {
   await page.goto("/en/");
   const strip = page.getByRole("region", { name: "Baylee in numbers" });
   await expect(strip).toBeVisible();
-  // each cell's label (for a screen reader) comes before its value
-  await expect(strip.locator(".strip-cell")).toHaveText([
-    /^\s*12 players$/,
-    /^\s*8 in a game$/,
-    /^\s*4 games$/,
-    /^\s*3 open tables$/,
-    /^\s*Gateways\s*1 online\s*1 offline$/,
-    /^\s*Accounts at Baylee Central\s*1,234 accounts$/,
-    /^\s*Playable cards\s*8,348\s*cards$/,
-    /^\s*Page views since 1 November 2026\s*48,213 views$/,
-  ]);
-  await expect(strip.locator(".strip-list")).toHaveAttribute("data-count", "8");
-  // the gateways' counts are one term of the list, as they report them
-  await expect(strip.locator(".strip-live dt")).toHaveText("Right now on the gateways, as they report it");
+  // each cell: its label (the term) and its value, the six the test data has
+  const cells = strip.locator(".strip-cell");
+  await expect(cells.locator("dt .strip-label")).toHaveText(["Players", "Games", "Open tables", "Gateways", "Accounts", "Views"]);
+  await expect(cells.locator("dd.num")).toHaveText([/^44$/, /^12$/, /^4$/, /^5\s*\/\s*7$/, /^1,234$/, /^48,213$/]);
+  await expect(strip.locator(".strip-list")).toHaveAttribute("data-count", "6");
+  // the three live counts are the gateways' own claim, said under the pointer
+  for (const at of [0, 1, 2]) await expect(cells.nth(at)).toHaveAttribute("title", "Right now on the gateways, as they report it");
+  await expect(cells.nth(0).locator("dd .dot.live")).toHaveCount(1);
+  // the gateways, as "5 / 7", lead to the directory's part of the page
+  await expect(cells.nth(3)).toHaveAttribute("title", "Gateways: 5 online, 2 offline");
+  await expect(cells.nth(3).locator("a")).toHaveAttribute("href", "#gateways");
+  await expect(cells.nth(5)).toHaveAttribute("title", "Page views since 1 November 2026");
   // nothing of GitHub's: no release, no checks, no commit, no stars, no link there
   await expect(strip).not.toContainText(/v0\.2\.0|passing|failing|Build|Commit|Stars|GitHub/);
   await expect(strip.locator("a[href*='github.com']")).toHaveCount(0);
@@ -134,19 +135,20 @@ test("the strip shows Baylee in numbers, the most telling first, and nothing of 
 test("in German the strip is named and counts as German does", async ({ page }) => {
   await page.goto("/de/");
   const strip = page.getByRole("region", { name: "Baylee in Zahlen" });
-  await expect(strip.locator(".strip-cell").first()).toHaveText("12 Spieler");
-  await expect(strip).toContainText("1.234 Konten");
+  await expect(strip.locator(".strip-cell").first().locator(".strip-label")).toHaveText("Spieler");
+  await expect(strip.locator(".strip-cell").first().locator("dd")).toHaveText("44");
+  await expect(strip.locator("dd.num").nth(4)).toHaveText("1.234");
+  await expect(strip.locator("dd.num").nth(5)).toHaveText("48.213");
 });
 
 for (const lang of ["en", "de", "fr", "it", "es", "pt-br", "ru", "ja", "ko", "zh-hans", "zh-hant"]) {
   test(`${lang}: the strip's lines are even and centred for every set of silent sources, at every width`, async ({ page }, info) => {
-    // a phone has one width; the desk goes through them all
-    const widths = info.project.name === "phone" ? [page.viewportSize()?.width ?? 412] : WIDTHS;
+    onlyDesktop(info, "sets its own window sizes, so the project's size is irrelevant");
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.goto(`/${lang}/`);
     const problems: string[] = [];
-    for (const width of widths) {
-      if (info.project.name !== "phone") await page.setViewportSize({ width, height: 800 });
+    for (const width of WIDTHS) {
+      await page.setViewportSize({ width, height: 800 });
       for (const gone of SILENCES) {
         const count = await silence(page, gone);
         const silent = gone.length === 0 ? "none silent" : `${gone.join(", ")} silent`;

@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { axe, targets, watch } from "./check.ts";
+import { axe, onlyDesktop, targets, watch } from "./check.ts";
 
 // The nine languages a machine translated, and German beside them: every
 // page holds at every width in every one of them (their words are longer
@@ -38,6 +38,7 @@ const PAGES = [
   "gateways",
   "faq",
   "security",
+  "donate",
   "contact",
   "impressum",
   "privacy",
@@ -55,7 +56,8 @@ const FIRST = ["", "download", "gateways", "faq", "signin", "privacy", "terms"];
 const WIDTHS = [320, 375, 768, 1440];
 
 for (const [lang, tag] of Object.entries(TAGS)) {
-  test(`${lang}: no page needs sideways scrolling from 320 to 1440 px`, async ({ page }) => {
+  test(`${lang}: no page needs sideways scrolling from 320 to 1440 px`, async ({ page }, info) => {
+    onlyDesktop(info, "sets its own window sizes, so the project's size is irrelevant");
     test.slow();
     for (const width of WIDTHS) {
       await page.setViewportSize({ width, height: width < 1024 ? 812 : 900 });
@@ -71,7 +73,9 @@ for (const [lang, tag] of Object.entries(TAGS)) {
   test(`${lang}: the first pages pass WCAG 2.2 AA, load nothing from elsewhere and say a machine translated them`, async ({
     page,
     baseURL,
-  }) => {
+  }, info) => {
+    // desktop for every language; on the phone the two whose scripts set the hardest lines
+    onlyDesktop(info, "the phone project checks Japanese and Russian only", lang === "ja" || lang === "ru");
     test.slow();
     const problems = watch(page, baseURL ?? "");
     for (const slug of FIRST) {
@@ -86,7 +90,8 @@ for (const [lang, tag] of Object.entries(TAGS)) {
   });
 }
 
-test("the bar's sections stand in one row beside each other from where they unfold, in every language", async ({ page }) => {
+test("the bar's sections stand in one row beside each other from where they unfold, in every language", async ({ page }, info) => {
+  onlyDesktop(info, "sets its own window sizes, so the project's size is irrelevant");
   test.slow();
   for (const lang of Object.keys(TAGS)) {
     await page.goto(`/${lang}/`);

@@ -6,7 +6,7 @@
 //
 // A browser fetches a service worker's script past Playwright's routing,
 // so the update test serves two builds itself: its own central-web on
-// 127.0.0.1:28795, first with target/site, then with a copy whose sw.js
+// 127.0.0.1 three ports above the suite's own, first with target/site, then with a copy whose sw.js
 // carries another stamp. Every process it starts it stops and awaits.
 import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
 import { once } from "node:events";
@@ -17,7 +17,9 @@ import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
 
 const ROOT = fileURLToPath(new URL("../../../..", import.meta.url));
-const PORT = 28795;
+// three above the suite's own port (28795 beside the default 28792), so a run
+// on another port (`CENTRAL_WEB_E2E_PORT`) never meets another's server
+const PORT = Number(process.env.CENTRAL_WEB_E2E_PORT ?? 28792) + 3;
 const ORIGIN = `http://127.0.0.1:${PORT}`;
 
 async function serve(site: string): Promise<ChildProcessWithoutNullStreams> {
