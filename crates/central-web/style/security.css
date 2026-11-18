@@ -480,52 +480,44 @@
   color: var(--gold-ink);
 }
 
-/* a flow's notes: what else holds, and where it ends */
+/* A flow's notes: what else holds, and where it ends. Plain text under the
+   chart, each note behind a thin rule; a limit is a note like the others,
+   told apart by its rule and its first words, not by a box that warns. */
 .sec-notes {
   display: grid;
-  gap: var(--space-3);
+  gap: var(--space-4);
   max-inline-size: 52rem;
-  margin: var(--space-5) auto 0;
+  margin: var(--space-6) auto 0;
 }
 
 .sec-note {
-  display: flex;
-  gap: var(--space-3);
   margin: 0;
-  padding: 0.85rem 1rem;
-  border: 1px solid var(--edge-soft);
-  border-radius: var(--radius-md);
-  background: var(--panel);
+  padding-inline-start: var(--space-4);
+  border-inline-start: 2px solid var(--edge);
   color: var(--ink-soft);
   font-size: 0.97rem;
+  text-wrap: pretty;
 }
 
-.sec-note .icon {
-  margin-block-start: 0.2em;
-  color: var(--violet);
+.sec-limit {
+  border-inline-start-color: var(--gold);
 }
 
 .sec-note strong,
+.sec-status strong,
 .sec-limits strong {
   color: var(--title);
   font-family: var(--sans);
-}
-
-.sec-warn {
-  border-color: var(--edge);
-  background: var(--warn-tint);
-  color: var(--ink);
-}
-
-.sec-warn .icon {
-  color: var(--warn);
 }
 
 /* what a reader has to know before a chart stands above it */
 .sec-status {
   max-inline-size: 52rem;
   margin: 0 auto var(--space-5);
-  text-align: start;
+  color: var(--ink-soft);
+  font-size: 0.97rem;
+  text-align: center;
+  text-wrap: pretty;
 }
 
 .sec-limits {
@@ -979,7 +971,6 @@
   }
 
   .sec-l,
-  .sec-note,
   .sec-toc a {
     border: 1px solid CanvasText;
   }

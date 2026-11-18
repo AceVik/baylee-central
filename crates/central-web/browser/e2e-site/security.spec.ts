@@ -48,7 +48,7 @@ for (const lang of LANGS) {
         await expect(figure.locator("ol.sec-list > li")).toHaveCount(5);
         await expect(figure.getByRole("radio")).toHaveCount(6);
         // every flow says where it ends
-        await expect(page.locator(`#${flow} .sec-note.sec-warn`).first()).toBeVisible();
+        await expect(page.locator(`#${flow} :is(.sec-limit, .sec-status)`).first()).toBeVisible();
       }
       await expect(page.locator("#limits .sec-limits > li")).toHaveCount(5);
       expect(await axe(page)).toEqual([]);
