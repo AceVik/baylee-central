@@ -25,7 +25,7 @@ const NAMES = [
   "Français",
   "Italiano",
   "Español",
-  "Português (Brasil)",
+  "Português",
   "Русский",
   "日本語",
   "한국어",
