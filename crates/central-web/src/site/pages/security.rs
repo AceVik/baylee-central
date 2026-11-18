@@ -611,21 +611,15 @@ fn section(lang: Lang, at: usize, flow: &Flow) -> impl IntoView + use<> {
         .notes
         .iter()
         .map(|note| match *note {
-            Note::More(text) => view! {
-                <p class="sec-note">{icon(icons::INFO)}<span>{plain(text(lang))}</span></p>
+            Note::More(text) => view! { <p class="sec-note">{plain(text(lang))}</p> }.into_any(),
+            Note::Limit(text) => {
+                view! { <p class="sec-note sec-limit">{plain(text(lang))}</p> }.into_any()
             }
-            .into_any(),
-            Note::Limit(text) => view! {
-                <p class="sec-note sec-warn">{icon(icons::TRIANGLE_ALERT)}<span>{plain(text(lang))}</span></p>
-            }
-            .into_any(),
         })
         .collect_view();
-    let status = flow.status.map(|text| {
-        view! {
-            <p class="sec-note sec-warn sec-status">{icon(icons::TRIANGLE_ALERT)}<span>{plain(text(lang))}</span></p>
-        }
-    });
+    let status = flow
+        .status
+        .map(|text| view! { <p class="sec-status">{plain(text(lang))}</p> });
     let class = if at.is_multiple_of(2) {
         "band alt"
     } else {
