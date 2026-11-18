@@ -4,7 +4,9 @@ use leptos::prelude::*;
 use serde_json::json;
 
 use super::Built;
-use super::home::{contact_columns, gateway_card};
+use super::home::{
+    contact_columns, gateway_card, gateway_columns, gateway_totals, newest, recommended,
+};
 use crate::data::Gateway;
 use crate::rich::{icon, plain, rich};
 use crate::site::shell::{DISCORD, Meta, REPOSITORY};
@@ -39,8 +41,7 @@ pub fn gateways(cx: &Context<'_>) -> Built {
             <p class="eyebrow">{words::gw_eyebrow(lang)}</p>
             <h1 id="gateways-title">{words::gws_title(lang)}</h1>
             <p class="lead">{words::gw_lead(lang)}</p>
-            <p class="small page-note">{words::gw_how_to(lang)}</p>
-            {directory(lang, cx.data.gateways.as_deref())}
+            {directory(cx)}
         </section>
         {self_host(lang)}
     }
@@ -48,48 +49,23 @@ pub fn gateways(cx: &Context<'_>) -> Built {
     (meta, body)
 }
 
-/// The directory in numbers: how many gateways are listed and online, and
-/// what the online ones say is happening on them, added up (only while one
-/// says so).
-fn directory_stats(lang: Lang, all: &[Gateway]) -> impl IntoView + use<> {
-    let count = |n: usize| u64::try_from(n).unwrap_or(u64::MAX);
-    let tile = |glyph: &'static str, label: &'static str, value: u64, live: bool| {
-        view! {
-            <div class="dir-stat glass" class:is-live=live>
-                <dt>{icon(glyph)}<span>{label}</span></dt>
-                <dd class="num">{words::number(lang, value)}</dd>
-            </div>
-        }
-    };
-    let online = all.iter().filter(|gateway| gateway.online).count();
-    let now = crate::data::activity_of(all).map(|(players, playing, tables, games)| {
-        view! {
-            {tile(icons::USERS, words::gw_stat_players(lang), players, false)}
-            {tile(icons::SWORDS, words::gw_stat_playing(lang), playing, false)}
-            {tile(icons::LAYOUT_DASHBOARD, words::gw_stat_tables(lang), tables, false)}
-            {tile(icons::GAMEPAD_2, words::gw_stat_games(lang), games, false)}
-        }
-    });
-    view! {
-        <dl class="dir-stats" aria-label=words::gw_stats(lang)>
-            {tile(icons::SERVER, words::gw_stat_listed(lang), count(all.len()), false)}
-            {tile(icons::GLOBE, words::gw_stat_online(lang), count(online), online > 0)}
-            {now}
-        </dl>
-    }
-}
-
 /// Finding, narrowing, sorting and laying out the directory: all of it is
 /// `directory.js`'s over the cards the server wrote, so the bar is hidden
-/// until that script shows it.
-fn directory_tools(lang: Lang, all: &[Gateway]) -> impl IntoView + use<> {
+/// until that script shows it. The chips narrow together (online and with
+/// open tables shows the gateways that are both), and one that would show
+/// nothing is not offered; "current" only while a release is known to hold
+/// a version against.
+fn directory_tools(lang: Lang, all: &[Gateway], newest: Option<&str>) -> impl IntoView + use<> {
     let count = |n: usize| words::number(lang, u64::try_from(n).unwrap_or(u64::MAX));
     let online = all.iter().filter(|gateway| gateway.online).count();
     let tables = all
         .iter()
         .filter(|gateway| gateway.online && gateway.activity.is_some_and(|now| now.tables > 0))
         .count();
-    // a chip that would show nothing is not offered
+    let current = all
+        .iter()
+        .filter(|gateway| newest.is_some_and(|newest| newest == gateway.version))
+        .count();
     let chip = |show: &'static str, label: &'static str, n: usize, dot: bool| {
         (show.is_empty() || n > 0).then(|| {
             view! {
@@ -104,7 +80,7 @@ fn directory_tools(lang: Lang, all: &[Gateway]) -> impl IntoView + use<> {
     let sort =
         |value: &'static str, label: &'static str| view! { <option value=value>{label}</option> };
     view! {
-        <div class="dir-tools" hidden=true data-find-bar="">
+        <div class="dir-tools glass" hidden=true data-find-bar="">
             <div class="dir-row">
                 <div class="dir-search">
                     <span class="dir-search-mark">{icon(icons::SEARCH)}</span>
@@ -117,9 +93,9 @@ fn directory_tools(lang: Lang, all: &[Gateway]) -> impl IntoView + use<> {
                     <label for="dir-sort">{icon(icons::ARROW_UP_DOWN)}<span class="visually-hidden">{words::gw_sort(lang)}</span></label>
                     <select id="dir-sort" data-sort="">
                         {sort("", words::gw_sort_best(lang))}
-                        {sort("name", words::gw_sort_name(lang))}
                         {sort("players", words::gw_sort_players(lang))}
                         {sort("tables", words::gw_sort_tables(lang))}
+                        {sort("name", words::gw_sort_name(lang))}
                         {sort("version", words::gw_sort_version(lang))}
                     </select>
                 </div>
@@ -132,49 +108,58 @@ fn directory_tools(lang: Lang, all: &[Gateway]) -> impl IntoView + use<> {
                     </button>
                 </div>
             </div>
-            <div class="dir-chips" role="group" aria-label=words::gw_show(lang)>
-                {chip("", words::gw_show_every(lang), all.len(), false)}
-                {chip("online", words::gw_show_online(lang), online, true)}
-                {chip("tables", words::gw_show_tables(lang), tables, false)}
+            <div class="dir-row dir-narrow">
+                <div class="dir-chips" role="group" aria-label=words::gw_show(lang)>
+                    {chip("", words::gw_show_every(lang), all.len(), false)}
+                    {chip("online", words::gw_show_online(lang), online, true)}
+                    {chip("tables", words::gw_show_tables(lang), tables, false)}
+                    {chip("current", words::gw_show_current(lang), current, false)}
+                </div>
+                <output class="small dir-count" data-dir-count="" data-shown=words::gw_shown(lang, "{n}", "{all}")></output>
             </div>
         </div>
     }
 }
 
-/// Every gateway Central lists, in the server's order: the directory in
-/// numbers, then the cards. Finding one by name or address, narrowing to
-/// those online or with open tables, sorting and the list view are
-/// `directory.js`'s (without it every card shows, in this order). No
-/// gateway is marked or offered as official (owner, 12.11.2026).
-fn directory(lang: Lang, all: Option<&[Gateway]>) -> impl IntoView + use<> {
-    let Some(all) = all else {
+/// Every gateway Central lists, in the recommended order (`recommended`):
+/// the directory in numbers, the bar that finds, narrows, sorts and lays
+/// out, then the cards. All of the bar is `directory.js`'s (without it
+/// every card shows, in this order). No gateway is marked or offered as
+/// official (owner, 12.11.2026).
+fn directory(cx: &Context<'_>) -> impl IntoView + use<> {
+    let lang = cx.lang;
+    let Some(all) = cx.data.gateways.as_deref() else {
         return view! { <p class="notice dir-failure glass">{words::gws_failed(lang)}</p> }
             .into_any();
     };
     if all.is_empty() {
-        return view! { <p class="small dir-count">{words::gw_none(lang)}</p> }.into_any();
+        return view! { <p class="small dir-empty">{words::gw_none(lang)}</p> }.into_any();
     }
-    let online = all.iter().filter(|gateway| gateway.online).count();
-    let count = words::gw_count(
-        lang,
-        u64::try_from(all.len()).unwrap_or(u64::MAX),
-        &words::number(lang, u64::try_from(online).unwrap_or(u64::MAX)),
-    );
-    let tools = (all.len() > 1).then(|| directory_tools(lang, all));
-    let cards = all
-        .iter()
-        .map(|gateway| gateway_card(lang, gateway, true))
+    let newest = newest(cx);
+    let tools = (all.len() > 1).then(|| directory_tools(lang, all, newest));
+    let columns = (all.len() > 1).then(|| gateway_columns(lang, true));
+    let cards = recommended(all)
+        .into_iter()
+        .enumerate()
+        .map(|(at, gateway)| gateway_card(lang, gateway, at, newest, true))
         .collect_view();
+    let download = Page::Download.path(lang);
+    let hint = rich(words::gw_play_hint(lang), move |tag| {
+        (tag == "download").then(|| download.clone())
+    });
     view! {
         <div class="directory">
-            {directory_stats(lang, all)}
+            {gateway_totals(lang, all)}
             {tools}
-            <output class="small dir-count" data-dir-count="" data-shown=words::gw_shown(lang, "{n}", "{all}")>{count}</output>
-            <p class="dir-none" hidden=true data-no-match="">
-                {words::gw_no_match(lang)}" "
+            <div class="dir-none glass" hidden=true data-no-match="">
+                {icon(icons::SEARCH)}
+                <p>{words::gw_no_match(lang)}</p>
                 <button type="button" class="button button-ghost button-sm">{words::gw_show_all(lang)}</button>
-            </p>
-            <ul class="gateways grid-cards stagger" data-directory="">{cards}</ul>
+            </div>
+            {columns}
+            <ul class="gateways dir-list stagger" data-directory="">{cards}</ul>
+            <p class="small gw-hint">{hint}</p>
+            <p class="small gw-fineprint">{words::gw_fineprint(lang)}</p>
         </div>
     }
     .into_any()

@@ -1,4 +1,9 @@
 [
   {"origin": "https://gateway.baylee.app", "name": "Sanctuary", "version": "0.2.0-beta.o1", "website": "https://gateway.baylee.app/", "online": true, "official": true, "activity": {"players": 12, "playing": 8, "tables": 3, "games": 4}},
-  {"origin": "https://magic.example.org", "name": "Kitchen <Table>", "version": "0.1.1-beta.9b", "website": "https://magic.example.org/", "online": false, "official": false}
+  {"origin": "https://magic.example.org", "name": "Kitchen <Table>", "version": "0.1.1-beta.9b", "website": "https://magic.example.org/", "online": false, "official": false},
+  {"origin": "https://tavern.example.net", "name": "Tavern of the Seven Lands", "version": "0.2.0-beta.o1", "website": "https://tavern.example.net/", "online": true, "official": false, "activity": {"players": 27, "playing": 22, "tables": 1, "games": 7}},
+  {"origin": "https://spiel.example.de:8443", "name": "Mondschein-Runde", "version": "0.1.1-beta.9b", "website": "https://spiel.example.de:8443/", "online": true, "official": false, "activity": {"players": 0, "playing": 0, "tables": 0, "games": 0}},
+  {"origin": "https://neko.example.jp", "name": "猫の卓", "version": "0.2.0-beta.o1", "website": "https://neko.example.jp/", "online": true, "official": false},
+  {"origin": "https://commander-night.old-lighthouse.example.com", "name": "Commander Night at the Old Lighthouse Community Centre", "version": "0.1.1-beta.9b", "website": "https://commander-night.old-lighthouse.example.com/", "online": true, "official": false, "activity": {"players": 5, "playing": 4, "tables": 0, "games": 1}},
+  {"origin": "https://atelier.example.fr", "name": "Atelier", "version": "0.2.0-beta.o1", "website": "https://atelier.example.fr/", "online": false, "official": false}
 ]

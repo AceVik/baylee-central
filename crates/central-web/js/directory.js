@@ -1,11 +1,12 @@
 // The gateway directory's finding (the gateways page), over the cards the
-// server wrote: a name or an address narrows them, a chip shows only those
-// online or with open tables, the menu sorts them, and the two
-// round buttons lay them out as cards or as a list. Escape empties the
-// field, Ctrl+K or ⌘K goes to it. What is chosen stands in the address
-// (?q= &show= &sort= &view=), so a view can be kept or passed on; nothing
-// is stored. Plain DOM, no markup strings. Without this script every
-// gateway shows, in the server's order.
+// server wrote: a name or an address narrows them, the chips show only those
+// online, with open tables or on the current version (together: each chip
+// pressed narrows further, "All" lets go of them), the menu or a column's
+// head sorts them, and the two round buttons lay them out as cards or as a
+// list. Escape empties the field, Ctrl+K or ⌘K goes to it. What is chosen
+// stands in the address (?q= &show= &sort= &view=), so a view can be kept or
+// passed on; nothing is stored. Plain DOM, no markup strings. Without this
+// script every gateway shows, in the server's order.
 
 // Each page it stands on starts it over (`nav.js`); what it hangs on the
 // document goes when that page leaves.
@@ -21,14 +22,17 @@ function page() {
     const cards = [...list.querySelectorAll("li[data-find]")];
     const chips = [...bar.querySelectorAll("[data-show]")];
     const views = [...bar.querySelectorAll("[data-view]")];
-    const count = document.querySelector("[data-dir-count]");
+    const columns = document.querySelector("[data-columns]");
+    const heads = [...(columns?.querySelectorAll("[data-sort-by]") ?? [])];
+    const count = bar.querySelector("[data-dir-count]");
     const none = document.querySelector("[data-no-match]");
-    const every = count?.textContent ?? "";
     const template = count?.getAttribute("data-shown") ?? "";
-    const SHOWS = new Set(chips.map((chip) => chip.getAttribute("data-show") ?? ""));
+    // what a chip can ask for, in the chips' order: the address names them so
+    const SHOWS = chips.map((chip) => chip.getAttribute("data-show") ?? "").filter((name) => name !== "");
     const SORTS = new Set([...menu.options].map((option) => option.value));
+    const figures = new Intl.NumberFormat(document.documentElement.lang || undefined);
 
-    let show = "";
+    const show = new Set();
     let view = "";
 
     const number = (card, name) => Number(card.getAttribute(name) ?? -1);
@@ -49,10 +53,12 @@ function page() {
       tables: (a, b) => number(b, "data-tables") - number(a, "data-tables"),
       version: newer,
     };
-    const shows = (card) =>
-      show === "" ||
-      (show === "online" && card.getAttribute("data-online") === "true") ||
-      (show === "tables" && number(card, "data-tables") > 0);
+    const IS = {
+      online: (card) => card.getAttribute("data-online") === "true",
+      tables: (card) => number(card, "data-tables") > 0,
+      current: (card) => card.getAttribute("data-current") === "true",
+    };
+    const shows = (card) => [...show].every((name) => IS[name]?.(card) ?? true);
 
     const apply = () => {
       const words = field.value.trim().toLowerCase();
@@ -65,22 +71,24 @@ function page() {
       // the server's order is the cards' own; a sort is stable upon it
       const order = ORDER[menu.value];
       list.append(...(order ? [...cards].sort(order) : cards));
-      for (const chip of chips) chip.setAttribute("aria-pressed", String((chip.getAttribute("data-show") ?? "") === show));
+      for (const chip of chips) {
+        const name = chip.getAttribute("data-show") ?? "";
+        chip.setAttribute("aria-pressed", String(name === "" ? show.size === 0 : show.has(name)));
+      }
       for (const button of views) button.setAttribute("aria-pressed", String((button.getAttribute("data-view") ?? "") === view));
+      for (const head of heads) head.setAttribute("aria-pressed", String(head.getAttribute("data-sort-by") === menu.value));
       if (view === "") list.removeAttribute("data-view");
       else list.setAttribute("data-view", view);
+      if (columns) columns.hidden = view !== "list" || shown === 0;
       if (count) {
-        count.textContent =
-          words === "" && show === ""
-            ? every
-            : template.replace("{n}", String(shown)).replace("{all}", String(cards.length));
+        count.textContent = template.replace("{n}", figures.format(shown)).replace("{all}", figures.format(cards.length));
       }
       if (none) none.hidden = shown > 0;
       list.hidden = shown === 0;
       // the address says what is shown
       const query = new URLSearchParams();
       if (words !== "") query.set("q", field.value.trim());
-      if (show !== "") query.set("show", show);
+      if (show.size > 0) query.set("show", SHOWS.filter((name) => show.has(name)).join(" "));
       if (menu.value !== "") query.set("sort", menu.value);
       if (view !== "") query.set("view", view);
       const text = query.toString();
@@ -88,12 +96,13 @@ function page() {
     };
     // A press on a chip, the sort or the layout: the cards glide to their new
     // places where the browser can show one state giving way to another (a
-    // view transition) and nobody asked for less motion. Typing does not wait
-    // for that: each letter narrows at once.
+    // view transition), nobody asked for less motion and the directory is
+    // small enough for each card to be followed. Typing does not wait for
+    // that: each letter narrows at once.
     const calm = matchMedia("(prefers-reduced-motion: reduce)");
     let gliding = 0;
     const glide = () => {
-      if (typeof document.startViewTransition !== "function" || calm.matches) {
+      if (typeof document.startViewTransition !== "function" || calm.matches || cards.length > 48) {
         apply();
         return;
       }
@@ -103,7 +112,10 @@ function page() {
         card.style.viewTransitionName = `gw-${at}`;
         card.style.viewTransitionClass = "gw-card";
       });
-      document.startViewTransition(apply).finished.finally(() => {
+      const turn = document.startViewTransition(apply);
+      // a press that follows at once skips this one's motion, not its change
+      turn.ready.catch(() => {});
+      turn.finished.finally(() => {
         // a later press has its own names on the cards
         if (mine !== gliding) return;
         delete document.documentElement.dataset.gliding;
@@ -115,7 +127,7 @@ function page() {
     };
     const reset = () => {
       field.value = "";
-      show = "";
+      show.clear();
       apply();
       field.focus();
     };
@@ -123,7 +135,9 @@ function page() {
     // what the address asked for, where it is something this page offers
     const asked = new URLSearchParams(location.search);
     field.value = (asked.get("q") ?? "").slice(0, 80);
-    if (SHOWS.has(asked.get("show") ?? "")) show = asked.get("show") ?? "";
+    for (const name of (asked.get("show") ?? "").split(/[\s,]+/)) {
+      if (SHOWS.includes(name)) show.add(name);
+    }
     if (SORTS.has(asked.get("sort") ?? "")) menu.value = asked.get("sort") ?? "";
     if (asked.get("view") === "list") view = "list";
 
@@ -145,14 +159,23 @@ function page() {
     for (const chip of chips) {
       chip.addEventListener("click", () => {
         const asks = chip.getAttribute("data-show") ?? "";
-        // a pressed chip pressed again shows all
-        show = asks === show ? "" : asks;
+        // "All" lets go of every chip; any other is pressed and let go
+        if (asks === "") show.clear();
+        else if (!show.delete(asks)) show.add(asks);
         glide();
       });
     }
     for (const button of views) {
       button.addEventListener("click", () => {
         view = button.getAttribute("data-view") ?? "";
+        glide();
+      });
+    }
+    // a column's head sorts by it; pressed again, the recommended order is back
+    for (const head of heads) {
+      head.addEventListener("click", () => {
+        const by = head.getAttribute("data-sort-by") ?? "";
+        menu.value = menu.value === by || !SORTS.has(by) ? "" : by;
         glide();
       });
     }

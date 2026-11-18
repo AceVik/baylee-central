@@ -151,7 +151,11 @@ The scale (`--text-*`, rem at a root of 16–20 px by viewport):
   navigation to a top row).
 - **Grids** use `repeat(auto-fill, minmax(…, 1fr))`, so every column of a
   row is as wide as the others; a lone last card sits in the middle
-  (`.grid-centred`).
+  (`.grid-centred`). The gateways' cards (`.gateways`) are one, two or
+  three in a row by the breakpoints, on a grid with twice as many columns,
+  so a last row that is not full stands in the middle too; the cards of a
+  row share their lines (subgrid), so their figures and buttons stand
+  level.
 - **Sections** alternate `--bg` and `--bg-alt`, each with an eyebrow, a
   centred title and an optional lead.
 - **No sideways scroll** at 320 px. Wide tables scroll inside their own box.
@@ -175,8 +179,9 @@ Each lives in one stylesheet named after it and one component under
 `web/src/components/` (removed 12.11.2026) when it has behaviour.
 
 - **Buttons** (`buttons.css`): `.button` gold, primary, one per view (one
-  exception: a queue whose rows each wait for the same decision, the
-  gateways awaiting approval, gives that decision the gold in every row);
+  exception: a list whose rows each offer the same step gives that step
+  the gold in every row: the gateways awaiting approval, and the gateway
+  directory's "Open in Baylee");
   `.button-ghost` for every other action; `.button-danger` (ghost that
   turns `--bad`) for revoke, lock and delete; `.round-btn` for an icon
   alone, always with a hidden label; `.chip-btn` for a filter or a choice
@@ -317,8 +322,8 @@ to feel slow and over the 60 ms where it reads as a snap.
   through the same View Transitions API and only where it exists: a new
   colour scheme spreads in a circle from its switch (560 ms), and the
   gateway directory's cards glide to their new places when a chip, the sort
-  or the layout is pressed (360 ms); typing in the search does not wait for
-  it. A menu comes in with its rows one after the other (260 ms) and
+  or the layout is pressed (360 ms; up to 48 gateways, more change at
+  once); typing in the search does not wait for it. A menu comes in with its rows one after the other (260 ms) and
   leaves as it came (150 ms).
 - **Baylee's album**: a page turns as paper does (920 ms): the leaf is cut
   into ten strips, each hinged on the one before, so it bends while its
@@ -500,6 +505,54 @@ Types allow one more policy for this, `baylee-nav`, which passes a string
 to the parser for that one use and vouches for no other script address.
 What the strip counts is a visit (`central-web-server`, `views.rs`): a document sent to a
 navigation that did not start on one of the site's own pages and is not a reload. Going from page to page is never counted again, whether the page is put in place here or loads a document (another language, the account area).
+
+### The gateway directory
+
+Every gateway Central lists (`pages/info.rs`, the card in `pages/home.rs`,
+`style/gateways.css`, `js/directory.js`), and its first four on the start
+page in the same look. It shows what Central has and derives the rest from
+it; nothing is made up, and a number nobody reported is never a zero.
+
+- **In numbers.** Four equal tiles above the list: the gateways online of
+  those listed ("5 / 7"), the players online, the games running and the
+  open tables, added up from what the online gateways report. Four in a
+  row, two and two on a phone; while no gateway reports, the first alone in
+  the middle.
+- **A gateway.** A card: a mark (the first letter of its name on one of the
+  six avatar tints, chosen by its address), its name, its host under a lock
+  (the address without `https://`; the copy button gives it whole), and
+  whether it is online, as a pill with the word. Then the four counts it
+  reports, each a glyph, a figure and its word; the share of its players
+  in a game as a bar and a sentence (the bar is drawn in twentieths from
+  `data-load`: a page carries no inline style); its version, with the pill
+  "Current" when it is exactly the newest release's and no word when it is
+  not (a gateway may run a newer build, and the suffixes do not order).
+  One that reports nothing, or is offline, has a line in words in place of
+  the figures. An offline gateway is flat, without the card's light and its
+  mark's tint, and never dimmed: its words keep their contrast.
+- **What to do.** "Open in Baylee" (gold, the same step on every card) is
+  the client's link `baylee://gateway/add?origin=…`, offered only while
+  the gateway is online; beside it two round buttons, copying the address
+  and the gateway's website. A line under the list says what the link does
+  and where the client is to be had.
+- **The order.** Online before offline, then Central's own order, then the
+  busier first; this is the order without script and the one called
+  "Recommended". No gateway is called official (owner, 12.11.2026).
+- **The bar.** One search field (name or address), the order, the layout,
+  and under them the chips with their counts and how many are shown. The
+  chips narrow together: "Online", "With open tables" and "Current
+  version" pressed at once show what is all three; "All" lets go of them.
+  From 860 px the bar stays in sight under the page's own. What is chosen
+  stands in the address (`?q= &show= &sort= &view=`). Nothing found is a
+  panel with the sentence and "Show all".
+- **The list.** From 1100 px the layout can be a list: one panel, a
+  gateway a row, the same parts in columns under a head that names them;
+  the head's sortable columns are buttons that sort (pressed again: the
+  recommended order), the one in use in gold. It is a list restyled, not a
+  table, and a figure keeps its word for a screen reader. Below 1100 px
+  the cards stay cards. The start page shows its four as such rows from
+  1100 px, without the sorting, and as shorter cards below (three on a
+  phone).
 
 ### The messenger
 

@@ -332,10 +332,76 @@ async fn operator_text_is_never_markup() {
         "a gateway's name is text"
     );
     assert!(!html.contains("Kitchen <Table>"));
-    // the server's order: the origin Central's API calls official first
-    let first = html.find("Sanctuary").expect("first");
-    let other = html.find("Kitchen").expect("other");
-    assert!(first < other, "the server's order");
+    // the recommended order: the gateways online before those that are
+    // not, among them the origin Central's API calls official first, then
+    // the busier before the quieter
+    let at = |name: &str| {
+        html.find(name)
+            .unwrap_or_else(|| panic!("{name} is listed"))
+    };
+    let order = [
+        "Sanctuary",
+        "Tavern of the Seven Lands",
+        "Commander Night",
+        "Mondschein-Runde",
+        "猫の卓",
+        "Kitchen",
+        "Atelier",
+    ];
+    for pair in order.windows(2) {
+        assert!(at(pair[0]) < at(pair[1]), "{} before {}", pair[0], pair[1]);
+    }
+}
+
+/// A gateway's card says what Central has, and nothing it has not: the
+/// client's link only while the gateway is online, the share of its players
+/// in a game only while it reports players, "current" only for the version
+/// of the newest release, and a line in words where there are no figures.
+#[tokio::test]
+async fn a_gateway_card_shows_what_central_has() {
+    let app = app(true);
+    let (_, _, html) = get(&app, "/en/gateways", &[]).await;
+    // seven listed, five online, each a card with a heading of its own
+    assert_eq!(count(&html, "<li data-find=\""), 7);
+    assert_eq!(count(&html, "class=\"gw-name\""), 7);
+    assert_eq!(count(&html, "class=\"gw reveal\""), 5);
+    assert_eq!(count(&html, "class=\"gw reveal gw-off\""), 2);
+    // the client's link: the origin percent-encoded, a port with it, and
+    // none for a gateway that is offline
+    assert_eq!(count(&html, "href=\"baylee://gateway/add?origin="), 5);
+    assert!(html.contains("href=\"baylee://gateway/add?origin=https%3A%2F%2Fgateway.baylee.app\""));
+    assert!(html.contains("origin=https%3A%2F%2Fspiel.example.de%3A8443\""));
+    assert!(!html.contains("origin=https%3A%2F%2Fmagic.example.org"));
+    // 8 of 12, 22 of 27 and 4 of 5 players in a game; nobody on a fourth
+    for (share, steps) in [("67%", "13"), ("81%", "16"), ("80%", "16")] {
+        assert!(
+            html.contains(&format!("{share} of its players are in a game")),
+            "{share}"
+        );
+        assert!(html.contains(&format!("data-load=\"{steps}\"")), "{steps}");
+    }
+    assert_eq!(count(&html, "class=\"gw-load-bar\""), 3);
+    assert_eq!(count(&html, "Nobody is here right now."), 1);
+    // one online reports nothing, two are offline: said in words
+    assert_eq!(count(&html, "Reports no figures."), 1);
+    assert_eq!(count(&html, "Central has not heard from it lately."), 2);
+    // the newest release is v0.2.0-beta.o1: four run exactly that
+    assert_eq!(count(&html, "data-current=\"true\""), 4);
+    assert_eq!(count(&html, "pill ok gw-current"), 4);
+    // every card copies its whole address and links its website safely
+    assert_eq!(count(&html, "data-copy=\"https://"), 7);
+    assert_eq!(count(&html, "rel=\"noopener noreferrer nofollow\""), 7);
+    // where to get the client, for whoever has none
+    assert!(html.contains("href=\"/en/download\">Download Baylee</a>"));
+
+    // without a release nothing is called current, and no chip offers it
+    let state = central_web_server::app(Config::development(site(), Some(data()))).expect("app");
+    let app = router(Arc::clone(&state));
+    install(&state.data, |snapshot| snapshot.release = None);
+    let (_, _, html) = get(&app, "/en/gateways", &[]).await;
+    assert!(!html.contains("gw-current"));
+    assert!(!html.contains("data-show=\"current\""));
+    assert_eq!(count(&html, "data-current=\"false\""), 7);
 }
 
 /// There are no official gateways (owner, 12.11.2026): no card, list,
@@ -1068,25 +1134,29 @@ async fn the_privacy_notice_has_a_part_for_the_e_mail_address() {
 async fn the_figures_are_shown_only_while_a_source_reports_them() {
     let reported = app(true);
     let (_, _, home) = get(&reported, "/de/", &[]).await;
+    // the strip adds up what the four reporting gateways say
     for number in [
         "1.234 Konten",
-        "12 Spieler",
-        "8 im Spiel",
-        "3 offene Tische",
-        "4 Partien",
+        "44 Spieler",
+        "34 im Spiel",
+        "4 offene Tische",
+        "12 Partien",
     ] {
-        assert_eq!(
-            count(&home, number),
-            2 - usize::from(number.contains("Konten")),
-            "{number}"
-        );
+        assert_eq!(count(&home, number), 1, "{number}");
     }
+    // the section's four tiles: 5 of 7 online, and the same sums
+    assert_eq!(count(&home, "class=\"dir-stat glass\""), 4);
+    assert!(home.contains("<span class=\"num\">5</span><span class=\"dir-stat-of\">/ 7</span>"));
+    assert_eq!(count(&home, "<span class=\"num\">44</span>"), 1);
+    // its first four gateways, each with its counts
+    assert_eq!(count(&home, "<li data-find=\""), 4);
+    assert_eq!(count(&home, "class=\"gw-now\""), 4);
     let (_, _, gateways) = get(&reported, "/en/gateways", &[]).await;
-    // the online gateway that reports, not the offline one beside it
-    assert_eq!(count(&gateways, "class=\"gw-now\""), 1);
-    for number in ["12 players", "8 in a game", "3 open tables", "4 games"] {
-        assert_eq!(count(&gateways, number), 1, "{number}");
-    }
+    // the online gateways that report, not the silent and the offline ones
+    assert_eq!(count(&gateways, "class=\"gw-now\""), 4);
+    assert_eq!(count(&gateways, "class=\"dir-stat glass\""), 4);
+    assert_eq!(count(&gateways, "<span class=\"num\">44</span>"), 1);
+    assert_eq!(count(&gateways, "<dt>Players</dt>"), 4);
 
     let silent = app(false);
     for path in ["/de/", "/en/", "/en/gateways"] {
@@ -1157,9 +1227,9 @@ async fn the_strip_has_a_cell_for_each_reported_figure_and_nothing_of_github() {
         // the most telling first: what is played, the gateways, the
         // accounts, the cards, the views
         let order: Vec<usize> = [
-            (live, "12 players"),
-            (live, "4 games"),
-            (true, "1 online"),
+            (live, "44 players"),
+            (live, "12 games"),
+            (true, "5 online"),
             (accounts, "1,234 accounts"),
             (cards, "8,348"),
             (views, "48,213 views"),

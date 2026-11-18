@@ -908,7 +908,6 @@ hero-badge-free = 免费
 hero-badge-open = 开源
 hero-badge-fan = 非官方爱好者内容
 gws-open-client = 在 Baylee 中打开
-gws-open-client-help = “Open in Baylee”（在 Baylee 中打开）会启动已安装的客户端（0.1.1-beta.9b 或更新版本）。它会显示地址，并在添加该 Gateway 之前征求你的同意。
 dl-menu-title = 所有系统
 ci-passing = 通过
 ci-failing = 失败
@@ -970,10 +969,6 @@ source-repoTitle = 仓库的当前状态
 source-stars = 星标
 source-issues = 未解决的问题和拉取请求
 source-note = 由本站的服务器每十分钟从 GitHub 的公开 API 读取。你的浏览器不会向 GitHub 请求任何内容。
-gw-count =
-    { $n ->
-       *[other] 已列出 { $n } 个 Gateway，其中 { $online } 个在线。
-    }
 gw-none = 目前还没有列出任何 Gateway。
 contact-intro = 一个问题、一个想法、一款你希望看到的游戏，或者你不想公开发布的事：这份表单会直接送到 Baylee 背后的那个人手里。如果想要回复，请留下电子邮件地址；没有的话，我们只能阅读。
 contact-f8 = 结算错误的牌，最好在游戏中用 <kbd>F8</kbd> 报告，因为报告可以包含整局游戏。
@@ -996,17 +991,14 @@ ai-hostingLink = Gateway 托管与 LLM 设置
 
 # The gateways and the contact page, as the old site wrote them (owner, 11.11.2026)
 gw-lead = Gateway 是在线牌桌所在的服务器：账号、套牌、房间，以及每局对局一个引擎进程。这里列出的是已在 Baylee Central 注册并经其管理员批准的 Gateway。每个 Gateway 由其运营者为他们的群组运行，适用他们自己的规则。列入目录不代表对该 Gateway 的做法作出任何承诺。
-gw-howTo = 要在某个 Gateway 上游玩，请把它的地址复制到客户端的入口处。在线是指 Central 在最近一分半钟内收到过该 Gateway 的消息；这并不保证它会响应。名称和版本由各运营者自行报告。
 gw-find = 查找 Gateway
 gw-findHint = 名称或地址
 gw-shown = 显示 { $n } / { $all }
 gw-noMatch = 到目前为止加载的 Gateway 中没有匹配项。
 gw-showAll = 显示全部
 gw-stats = 目录概况
-gw-stat-listed = 已列出的 Gateway
 gw-stat-online = 当前在线
 gw-stat-players = 在线玩家
-gw-stat-playing = 其中对局中
 gw-stat-tables = 开放牌桌
 gw-stat-games = 进行中的对局
 gw-show = 显示
@@ -1345,7 +1337,6 @@ chat-write-first = 写下第一条消息
 people-copy-handle = 复制你的用户标识
 people-copy-failed = 这里无法复制。请选中上方你的用户标识，手动复制。
 
-
 # ==== the administration's other pages (islands/admin/) ========================
 # Translated by a model (Claude Sonnet) on 12.11.2026; no native speaker has read it yet.
 admin-accounts = 账号
@@ -1454,8 +1445,6 @@ admin-legacy-restored = 已恢复
 admin-legacy-banned = 已封禁
 admin-legacy-must-change = 需要新密码
 admin-legacy-locked = 锁定至 { $until }
-
-
 
 ## The feedback moderation (/account/admin/feedback)
 
@@ -1763,7 +1752,6 @@ privacy-challenges = Central 将尝试、结果、已用提示、排行榜公开
 tower-title = 翠绿之塔
 tower-privacy = Central 会在你的账户中保存远征、所选强化、剩余生命、结果、排行榜公开设置和遗物的永久进度。只有启用赛季排行榜时，才会公开你的显示名称、标签和有效最佳成绩。关闭后，该条目会从排行榜移除。账户数据导出包含远征和尝试记录。删除账户也会删除这些进度，但仍适用“账户”部分所述的备份保留期限。
 
-
 ## the steps after signing in (code and terms, redesign)
 code-created = Account created
 code-handle-label = Your handle
@@ -1851,3 +1839,21 @@ donate-band-lead = Servers and tools cost about { $amount } a month. A donation 
 donate-band-button = Ways to donate
 privacy-donate-title = Donations
 privacy-donate = The donation page links to GitHub Sponsors (GitHub, Inc., USA), Liberapay (Liberapay, France) and Ko-fi (Ko-fi Labs Limited, United Kingdom). Only when you follow one of these links does your browser connect to that platform; payment happens there and with its payment service (Stripe or PayPal), and the platform's own privacy notice applies. We take no payment on this site and receive from the platforms what they tell a recipient about a payment. The page shows how much of the monthly goal is covered: our server asks Liberapay for the public total, not your browser, and the figure names nobody. We publish no donor's name.
+
+## gateways directory (redesign)
+gw-play-hint = “Open in Baylee” hands the gateway to the installed client (0.1.1-beta.9b or newer), which shows the address and asks before it adds it. You sign in there, not here. No client yet? <download>Download Baylee</download>.
+gw-fineprint = Online means Central heard from the gateway within the last minute and a half; it is no promise that it answers. Names, versions and figures are what each operator reports.
+gw-fig-players = Players
+gw-fig-playing = In a game
+gw-fig-tables = Open tables
+gw-fig-games = Games
+gw-load = { $n }% of its players are in a game
+gw-load-empty = Nobody is here right now.
+gw-silent = Reports no figures.
+gw-away = Central has not heard from it lately.
+gw-current = Current
+gw-current-title = Runs the version of the newest release.
+gw-secure = Encrypted connection (HTTPS)
+gw-show-current = Current version
+gw-col-gateway = Gateway
+gw-col-state = Status
