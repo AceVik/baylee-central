@@ -52,8 +52,9 @@ pub const STYLES: [&str; 18] = [
 ];
 
 /// The scripts served under hashed names.
-const SCRIPTS: [&str; 7] = [
+const SCRIPTS: [&str; 8] = [
     "boot.js",
+    "nav.js",
     "pwa.js",
     "hint.js",
     "clouds.js",

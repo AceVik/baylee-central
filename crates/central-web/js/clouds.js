@@ -775,12 +775,30 @@ function run(hero, canvas) {
     look();
     if (still) picture();
   };
-  new MutationObserver(themed).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
-  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", themed);
-  new ResizeObserver(() => {
+  // The sky goes with its page (`nav.js` puts another in place without a
+  // new document): the loop stops, what watched the document lets go, and
+  // the context is given back, since a browser keeps only so many.
+  const leaving = new AbortController();
+  const theme = new MutationObserver(themed);
+  theme.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", themed, { signal: leaving.signal });
+  const sized = new ResizeObserver(() => {
     if (still) picture();
     else size();
-  }).observe(canvas);
+  });
+  sized.observe(canvas);
+  document.addEventListener(
+    "baylee:leave",
+    () => {
+      leaving.abort();
+      theme.disconnect();
+      sized.disconnect();
+      lost = true;
+      cancelAnimationFrame(frame);
+      canvas.getContext("webgl2")?.getExtension("WEBGL_lose_context")?.loseContext();
+    },
+    { once: true },
+  );
   canvas.addEventListener("webglcontextlost", (event) => {
     // the painting alone from here on: the page is read once, a context
     // given back is not worth a second start
@@ -802,10 +820,16 @@ function run(hero, canvas) {
   requestAnimationFrame(() => canvas.classList.add("on"));
 }
 
-const hero = document.querySelector(".hero");
-if (hero && matchMedia("(hover: hover) and (pointer: fine)").matches) {
+/** The sky of the page on screen, once the browser is idle; each page that has a hero starts its own. */
+function page() {
+  const hero = document.querySelector(".hero");
+  if (!hero || !matchMedia("(hover: hover) and (pointer: fine)").matches) return;
   const idle = window.requestIdleCallback ?? ((run) => setTimeout(run, 200));
-  const begin = () => idle(() => start(hero));
-  if (document.readyState === "complete") begin();
-  else addEventListener("load", begin, { once: true });
+  idle(() => {
+    if (hero.isConnected) start(hero);
+  });
 }
+
+if (document.readyState === "complete") page();
+else addEventListener("load", page, { once: true });
+document.addEventListener("baylee:page", page);

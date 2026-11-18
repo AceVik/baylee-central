@@ -215,17 +215,6 @@
         });
       }
     }
-    // Invoker commands (<button commandfor command>) where the browser has none.
-    if (!("command" in HTMLButtonElement.prototype)) {
-      document.addEventListener("click", (event) => {
-        const button = event.target instanceof Element ? event.target.closest("button[commandfor]") : null;
-        const dialog = button ? document.getElementById(button.getAttribute("commandfor") ?? "") : null;
-        if (!(dialog instanceof HTMLDialogElement)) return;
-        const command = button.getAttribute("command");
-        if (command === "show-modal" && !dialog.open) dialog.showModal();
-        else if (command === "close") dialog.close();
-      });
-    }
     // What stands on screen as the page opens is there at once: rising and
     // brightening on the way into view (home.css) is for what comes after.
     // A card that started half in view would otherwise wait half faded.
@@ -236,6 +225,21 @@
   };
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", ready, { once: true });
   else ready();
+  // a page put in place without a new document (`nav.js`) is made ready as
+  // a loaded one is
+  document.addEventListener("baylee:page", ready);
+
+  // Invoker commands (<button commandfor command>) where the browser has none.
+  if (!("command" in HTMLButtonElement.prototype)) {
+    document.addEventListener("click", (event) => {
+      const button = event.target instanceof Element ? event.target.closest("button[commandfor]") : null;
+      const dialog = button ? document.getElementById(button.getAttribute("commandfor") ?? "") : null;
+      if (!(dialog instanceof HTMLDialogElement)) return;
+      const command = button.getAttribute("command");
+      if (command === "show-modal" && !dialog.open) dialog.showModal();
+      else if (command === "close") dialog.close();
+    });
+  }
 
   // The dropdowns (the language menu, the download's other systems) are
   // <details data-menu>: they open without script; with it, one at a time,
@@ -322,7 +326,8 @@
       other.close();
     }
   };
-  const beneath = document.title;
+  // the title of the page a dialog stands over
+  let beneath = document.title;
   const show = (dialog) => {
     shutAll();
     const nav = document.getElementById("nav");
@@ -348,21 +353,26 @@
     },
     true,
   );
-  window.addEventListener("popstate", () => {
+  // The dialog the address names is the one that stands open: as the page
+  // comes, as the history moves, and when another page is put in place
+  // under the same address (`nav.js`, Back to a page a form stood over).
+  const match = () => {
     const dialog = authDialog(AUTH.exec(location.pathname)?.[2]);
+    if (dialog?.open) return;
     if (dialog) {
       show(dialog);
-    } else {
+    } else if (document.querySelector("dialog.auth-dialog[open]")) {
       shutAll();
       document.title = beneath;
     }
-  });
-  const opening = () => {
-    const dialog = authDialog(root.dataset.auth);
-    if (dialog && !dialog.open) show(dialog);
   };
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", opening, { once: true });
-  else opening();
+  window.addEventListener("popstate", match);
+  document.addEventListener("baylee:page", () => {
+    beneath = document.title;
+    match();
+  });
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", match, { once: true });
+  else match();
   let pressed = null;
   document.addEventListener("pointerdown", (event) => {
     pressed = event.target;
@@ -387,7 +397,7 @@
     event.preventDefault();
     const address = link.pathname + link.hash;
     if (AUTH.test(location.pathname)) history.replaceState(history.state, "", address);
-    else history.pushState({ auth: true }, "", address);
+    else history.pushState({ auth: true, page: history.state?.page ?? location.pathname + location.search }, "", address);
     show(dialog);
   });
 
