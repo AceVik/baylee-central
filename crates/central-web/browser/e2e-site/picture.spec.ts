@@ -279,12 +279,12 @@ test("a photo's own orientation turns it upright before the square is cut", asyn
   expect(near(seen.tl, BLUE), `${seen.tl}`).toBe(true);
 });
 
-test("an SVG is drawn through an image, without its script and without loading anything", async ({ page }) => {
+test("an SVG is drawn through an image, without its script and without loading anything", async ({ page, baseURL }) => {
   const w = world();
   const problems = await open(page, w);
   const outside: string[] = [];
   page.on("request", (request) => {
-    if (!request.url().startsWith("http://127.0.0.1:28792")) outside.push(request.url());
+    if (!request.url().startsWith(baseURL ?? "")) outside.push(request.url());
   });
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 100 100" width="100" height="100" onload="alert('onload')">
     <script>alert('script')</script>
