@@ -362,6 +362,33 @@ under a line that says the form needs script. The addresses stay out of the
 index and the sitemap. Leaving a form for good (signed in, declined) takes
 its entry's place in the history, so Back does not open it again.
 
+A form can be followed by a step in the same dialog: the recovery code of a
+new account (or of a reset), and Central's terms where the current version
+is not accepted yet. A step is the dialog's whole matter (`.step`): the
+dialog widens to 46rem, its own heading and line make way for the step's,
+which is centred, and the step ends in `.step-actions`, the one way on as
+wide as the step with its glyph, or two answers of equal width.
+
+- **The code step** says first that the account exists and names it, the
+  username in the title's ink and its tag in gold (`.who`). The code stands
+  in a dashed gold frame and breaks at its hyphens into lines of equal
+  length. The ways to keep it (`.keep-ways`, `islands/keep.rs`) are tiles
+  of one size, each a glyph over its words: two in a row on a phone, all in
+  one row from 600 px. Mailing it to oneself is the last of them and no more
+  than a `mailto:` the person's own mail program opens; its warning (the
+  code then lies in a mailbox) unfolds under the row when the tile is
+  pressed or an address is typed (`.unfold`: it opens downward and fades
+  in, stands at once under reduced motion, and is not there for a reader or
+  the keyboard while shut), and the line under the tiles says that the mail
+  program was asked.
+- **The terms step** shows the text in a box that scrolls, with a line
+  under it that fills as the reader goes down and turns to `--ok` at the
+  end. Accepting waits for the end of the text, as it does in the game
+  client: until then the button is `aria-disabled` (it keeps its place in
+  the tab order and its sentence, `aria-describedby`), and a press makes
+  that sentence speak up instead. A text that fits its box without
+  scrolling counts as read. Declining is the quiet button of the two.
+
 ### Going from page to page
 
 Every page is a complete document at its own address, and that is what a

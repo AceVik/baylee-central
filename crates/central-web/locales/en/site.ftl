@@ -485,7 +485,6 @@ register-error-taken = This sign-in name is taken. Choose another.
 ## The recovery code
 
 code-title = Your recovery code
-code-handle = Your handle: { $handle }
 code-lead = Only with this code does your encrypted data survive if you forget your password. We do not know it and cannot restore it. Keep it somewhere safe where you will find it even without this device.
 code-shown-once = Shown only now
 code-download = Save as a text file
@@ -1857,3 +1856,12 @@ echoes-ascents = Crown conqueror
 echoes-ascents-goal = Complete expeditions with eight victories.
 echoes-unbroken = Flawless
 echoes-unbroken-goal = Reach eight victories without a defeat or draw.
+
+## the steps after signing in (code and terms, redesign)
+code-created = Account created
+code-handle-label = Your handle
+code-keep-title = Keep it now, in at least one of these ways
+code-mail-opened = Your mail program should open now with a draft. If nothing happens, this browser has none set up: keep the code another way.
+terms-step-version = Version { $version }
+terms-read-hint = Read the text to its end, then you can accept.
+terms-read-done = Read to the end.

@@ -486,7 +486,6 @@ register-error-taken = Dieser Anmeldename ist vergeben. Wähle einen anderen.
 ## Der Wiederherstellungscode
 
 code-title = Dein Wiederherstellungscode
-code-handle = Dein Handle: { $handle }
 code-lead = Nur mit diesem Code bleiben deine verschlüsselten Daten erhalten, wenn du dein Passwort vergisst. Wir kennen ihn nicht und können ihn nicht wiederherstellen. Bewahre ihn sicher auf, so dass du ihn auch ohne dieses Gerät findest.
 code-shown-once = Nur jetzt sichtbar
 code-download = Als Textdatei speichern
@@ -1859,3 +1858,12 @@ echoes-ascents = Kronenbezwinger
 echoes-ascents-goal = Schließe Expeditionen mit acht Siegen ab.
 echoes-unbroken = Makellos
 echoes-unbroken-goal = Erreiche acht Siege ohne Niederlage oder Unentschieden.
+
+## the steps after signing in (code and terms, redesign)
+code-created = Account angelegt
+code-handle-label = Dein Handle
+code-keep-title = Sichere ihn jetzt, auf mindestens einem dieser Wege
+code-mail-opened = Dein Mailprogramm sollte sich jetzt mit einem Entwurf öffnen. Passiert nichts, ist in diesem Browser keines eingerichtet: Sichere den Code dann auf einem anderen Weg.
+terms-step-version = Fassung { $version }
+terms-read-hint = Lies den Text bis zum Ende, dann kannst du akzeptieren.
+terms-read-done = Bis zum Ende gelesen.

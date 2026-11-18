@@ -34,6 +34,8 @@ pub const SEND: &[Shape] = &[
 ];
 /// `arrow-left`.
 pub const BACK: &[Shape] = &[Path("m12 19-7-7 7-7"), Path("M19 12H5")];
+/// `arrow-right`.
+pub const FORWARD: &[Shape] = &[Path("M5 12h14"), Path("m12 5 7 7-7 7")];
 /// `users`.
 pub const USERS: &[Shape] = &[
     Path("M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"),

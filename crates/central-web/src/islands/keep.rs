@@ -251,17 +251,34 @@ pub fn ways(lang: Lang, code: &str, name: &str, to: RwSignal<String>) -> impl In
             }));
         });
     };
-    let mail = move |_| {
+    // The mail to oneself puts the code in a mailbox, and says so first:
+    // its warning unfolds at the first press, or as soon as an address
+    // stands in `to`, and only a press with the warning on screen hands the
+    // draft to the mail program. A browser does not tell a page whether a
+    // mail program took it, so the step says what should have happened and
+    // what to do if nothing did.
+    let asked = RwSignal::new(false);
+    let warned = Memo::new(move |_| asked.get() || !to.get().trim().is_empty());
+    let send = move || {
         session::open(&mailto(
             &to.get_untracked(),
             words::code_mail_subject(lang),
             &text.read_value(),
         ));
+        said.set(Some(words::code_mail_opened(lang)));
+    };
+    let mail = move |_| {
+        if warned.get_untracked() {
+            send();
+        } else {
+            asked.set(true);
+        }
     };
     let (code, name) = (code.to_owned(), name.to_owned());
     view! {
         <div class="keep">
-            <p class="actions">
+            <p class="keep-title">{words::code_keep_title(lang)}</p>
+            <div class="keep-ways">
                 {copy}
                 <button type="button" class="button" on:click=save>
                     {glyph::glyph(DOWNLOAD)}
@@ -277,18 +294,20 @@ pub fn ways(lang: Lang, code: &str, name: &str, to: RwSignal<String>) -> impl In
                         <span>{words::code_manager(lang)}</span>
                     </button>
                 })}
-            </p>
-            {copied}
-            <p class="meta" role="status">{move || said.get()}</p>
-        </div>
-        <div class="keep-mail">
-            <p class="notice" id="code-mail-warning">{words::code_mail_warning(lang)}</p>
-            <p class="actions">
-                <button type="button" class="button quiet" aria-describedby="code-mail-warning" on:click=mail>
+                <button type="button" class="button" aria-controls="code-mail-warning"
+                    aria-expanded=move || if warned.get() { "true" } else { "false" } on:click=mail>
                     {glyph::glyph(glyph::MAIL)}
                     <span>{words::code_mail(lang)}</span>
                 </button>
-            </p>
+            </div>
+            <div class="unfold" class:open=move || warned.get()>
+                <div class="keep-warning" id="code-mail-warning" role="note">
+                    {glyph::glyph(glyph::SHIELD_ALERT)}
+                    <p>{words::code_mail_warning(lang)}</p>
+                </div>
+            </div>
+            {copied}
+            <p class="meta" role="status">{move || said.get()}</p>
         </div>
         {move || printing.get().then(|| sheet(lang, &code, &name))}
     }

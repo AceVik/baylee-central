@@ -485,7 +485,6 @@ register-error-taken = 此登录名已被占用。请选择别的。
 ## The recovery code
 
 code-title = 你的恢复码
-code-handle = 你的用户标识：{ $handle }
 code-lead = 只有凭此恢复码，你的加密数据才能在你忘记密码时保留下来。我们不知道它，也无法恢复它。请把它保存在安全的地方，远离这台设备。
 code-shown-once = 仅此一次显示
 code-download = 保存为文本文件
@@ -1849,3 +1848,12 @@ echoes-ascents = 王冠征服者
 echoes-ascents-goal = 取得八场胜利并完成远征。
 echoes-unbroken = 完美无瑕
 echoes-unbroken-goal = 在没有失败或平局的情况下取得八场胜利。
+
+## the steps after signing in (code and terms, redesign)
+code-created = Account created
+code-handle-label = Your handle
+code-keep-title = Keep it now, in at least one of these ways
+code-mail-opened = Your mail program should open now with a draft. If nothing happens, this browser has none set up: keep the code another way.
+terms-step-version = Version { $version }
+terms-read-hint = Read the text to its end, then you can accept.
+terms-read-done = Read to the end.
