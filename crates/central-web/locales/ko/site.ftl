@@ -879,29 +879,14 @@ strip-gateways = Gateway
 strip-online = 온라인
 strip-offline = 오프라인
 strip-directory = 목록
-strip-cards = 플레이 가능한 카드
-strip-cards-unit = 장
 strip-accounts = Baylee Central의 계정
 strip-live = 지금 Gateways가 보고한 수치
 strip-views = { $date }부터의 페이지 조회수
-live-views = { $n ->
-   *[other] 조회 { $n }회
-}
-live-accounts = { $n ->
-   *[other] 계정 { $n }개
-}
-live-players = { $n ->
-   *[other] 플레이어 { $n }명
-}
-live-playing = { $n ->
-   *[other] 게임 중 { $n }명
-}
-live-tables = { $n ->
-   *[other] 열린 테이블 { $n }개
-}
-live-games = { $n ->
-   *[other] 게임 { $n }개
-}
+strip-l-players = 플레이어
+strip-l-games = 게임
+strip-l-tables = 열린 테이블
+strip-l-accounts = 계정
+strip-l-views = 조회
 hero-badges = 한눈에 보기
 hero-badge-beta = 오픈 베타
 hero-badge-free = 무료

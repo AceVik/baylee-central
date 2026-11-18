@@ -883,41 +883,14 @@ strip-gateways = Gateway
 strip-online = онлайн
 strip-offline = офлайн
 strip-directory = каталог
-strip-cards = Игровых карт
-strip-cards-unit = карт
 strip-accounts = Аккаунтов в Baylee Central
 strip-live = Сейчас на Gateway, по их данным
 strip-views = Просмотров страниц с { $date }
-live-views = { $n ->
-    [one] { $n } просмотр
-    [few] { $n } просмотра
-   *[many] { $n } просмотров
-}
-live-accounts = { $n ->
-    [one] { $n } аккаунт
-    [few] { $n } аккаунта
-   *[many] { $n } аккаунтов
-}
-live-players = { $n ->
-    [one] { $n } игрок
-    [few] { $n } игрока
-   *[many] { $n } игроков
-}
-live-playing = { $n ->
-    [one] { $n } в партии
-    [few] { $n } в партии
-   *[many] { $n } в партии
-}
-live-tables = { $n ->
-    [one] { $n } открытый стол
-    [few] { $n } открытых стола
-   *[many] { $n } открытых столов
-}
-live-games = { $n ->
-    [one] { $n } партия
-    [few] { $n } партии
-   *[many] { $n } партий
-}
+strip-l-players = Игроки
+strip-l-games = Партии
+strip-l-tables = Открытые столы
+strip-l-accounts = Аккаунты
+strip-l-views = Просмотры
 hero-badges = Коротко
 hero-badge-beta = Открытая бета
 hero-badge-free = Бесплатно

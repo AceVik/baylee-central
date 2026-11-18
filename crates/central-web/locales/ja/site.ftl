@@ -879,33 +879,14 @@ strip-gateways = Gateway
 strip-online = オンライン
 strip-offline = オフライン
 strip-directory = 一覧
-strip-cards = プレイ可能なカード
-strip-cards-unit = 枚
 strip-accounts = Baylee Central のアカウント
 strip-live = Gateway が報告する、今の数
 strip-views = { $date } からのページビュー
-live-views = { $n ->
-   *[other] { $n } ビュー
-}
-live-accounts = { $n ->
-    [one] { $n } アカウント
-   *[other] { $n } アカウント
-}
-live-players = { $n ->
-    [one] { $n } 人のプレイヤー
-   *[other] { $n } 人のプレイヤー
-}
-live-playing = { $n ->
-   *[other] { $n } 人がゲーム中
-}
-live-tables = { $n ->
-    [one] 開いているテーブル { $n } 件
-   *[other] 開いているテーブル { $n } 件
-}
-live-games = { $n ->
-    [one] { $n } ゲーム
-   *[other] { $n } ゲーム
-}
+strip-l-players = プレイヤー
+strip-l-games = ゲーム
+strip-l-tables = 空きテーブル
+strip-l-accounts = アカウント
+strip-l-views = ビュー
 hero-badges = 概要
 hero-badge-beta = オープンベータ
 hero-badge-free = 無料

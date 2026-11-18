@@ -192,116 +192,115 @@ fn hero(cx: &Context<'_>) -> impl IntoView + use<> {
     }
 }
 
-/// One of the strip's figures, a cell of its own: its value, glyph first,
-/// whose words say what it counts; the label is for a screen reader and the
-/// pointer's tooltip. The glyph runs with the words, so where a narrow cell
-/// breaks them it stays beside the first.
-fn strip_stat(label: &str, value: AnyView) -> impl IntoView + use<> {
-    let label = label.to_owned();
-    let title = label.clone();
+/// One of the strip's figures, a cell of its own: the term is a glyph with
+/// a short label, the value stands apart so that the stylesheet can set it
+/// above the label or between glyph and label. `title` says the figure in
+/// full under the pointer.
+fn strip_cell(title: &str, glyph: &'static str, label: &'static str, value: AnyView) -> AnyView {
     view! {
-        <div class="strip-cell" title=title>
-            <dt class="visually-hidden">{label}</dt>
-            <dd>{value}</dd>
+        <div class="strip-cell" title=title.to_owned()>
+            <dt>{icon(glyph)}<span class="strip-label">{label}</span></dt>
+            <dd class="num">{value}</dd>
         </div>
     }
+    .into_any()
 }
 
-/// The strip under the bar: Baylee in numbers, the most telling first.
-/// What the online gateways say is happening on them, added up (players,
-/// of them in a game, running games, open tables: the three short ones
-/// first, which a phone puts on a line of their own where the count is
-/// odd), the gateways online and not, Central's accounts, the playable
-/// cards and how often the site's pages were opened. Only what a source
-/// said is shown: a number nobody reported is left out, never drawn as a
-/// zero, and while the directory has not answered the strip links to it
-/// instead. Nothing here is GitHub's any more (owner, 12.11.2026); the
-/// project's state is in the source section. The server counts the cells
-/// (`data-count`), and the stylesheet
-/// lays that many out in even lines at every width (`header.css`).
+/// The strip under the bar: Baylee in numbers, the six the owner named
+/// (18.11.2026) and in his order. What the online gateways say is
+/// happening on them, added up (players, running games, open tables), the
+/// gateways online of all that are listed, Central's accounts, and how
+/// often the site's pages were opened. Only what a source said is shown: a
+/// number nobody reported is left out, never drawn as a zero, and while
+/// the directory has not answered the strip links to it instead. Nothing
+/// here is GitHub's (owner, 12.11.2026), and the cards' numbers stand in
+/// their own section. The server counts the cells (`data-count`), and the
+/// stylesheet lays that many out in even lines at every width
+/// (`header.css`).
 fn strip(cx: &Context<'_>) -> impl IntoView + use<> {
     let lang = cx.lang;
-    let mut cells = 0_usize;
-    // the gateways' own counts: one claim of theirs, so one term for the
-    // four values, each a cell
-    let now = cx
-        .data
-        .gateways
-        .as_deref()
-        .and_then(data::activity_of)
-        .map(|(players, playing, tables, games)| {
-            cells += 4;
-            let live = words::strip_live(lang);
-            view! {
-                <div class="strip-live" title=live>
-                    <dt class="visually-hidden">{live}</dt>
-                    <dd class="strip-cell"><span class="dot ok live" aria-hidden="true"></span><span class="num">{words::live_players(lang, players)}</span></dd>
-                    <dd class="strip-cell">{icon(icons::SWORDS)}<span class="num">{words::live_playing(lang, playing)}</span></dd>
-                    <dd class="strip-cell">{icon(icons::GAMEPAD_2)}<span class="num">{words::live_games(lang, games)}</span></dd>
-                    <dd class="strip-cell">{icon(icons::LAYOUT_DASHBOARD)}<span class="num">{words::live_tables(lang, tables)}</span></dd>
-                </div>
-            }
-        });
-    let gateways = match cx.data.gateways.as_deref() {
+    let number = |n: u64| words::number(lang, n);
+    let mut cells: Vec<AnyView> = Vec::with_capacity(6);
+    // the gateways' own counts: their claim, as the tooltip says
+    if let Some((players, _, tables, games)) =
+        cx.data.gateways.as_deref().and_then(data::activity_of)
+    {
+        let live = words::strip_live(lang);
+        cells.push(strip_cell(
+            live,
+            icons::USERS,
+            words::strip_l_players(lang),
+            view! { <span class="dot ok live" aria-hidden="true"></span>{number(players)} }
+                .into_any(),
+        ));
+        cells.push(strip_cell(
+            live,
+            icons::SWORDS,
+            words::strip_l_games(lang),
+            number(games).into_any(),
+        ));
+        cells.push(strip_cell(
+            live,
+            icons::LAYOUT_DASHBOARD,
+            words::strip_l_tables(lang),
+            number(tables).into_any(),
+        ));
+    }
+    let gateways = words::strip_gateways(lang);
+    cells.push(match cx.data.gateways.as_deref() {
         Some(all) => {
             let online = all.iter().filter(|g| g.online).count();
-            let offline = all.len() - online;
-            let count = |n: usize| words::number(lang, u64::try_from(n).unwrap_or(u64::MAX));
-            let dot = if online > 0 { "dot ok live" } else { "dot off" };
-            view! {
-                <a href="#gateways">
-                    {icon(icons::SERVER)}
-                    <span class="stat-part num"><span class=dot aria-hidden="true"></span>{format!("{} {}", count(online), words::strip_online(lang))}</span>
-                    <span class="stat-part num"><span class="dot off" aria-hidden="true"></span>{format!("{} {}", count(offline), words::strip_offline(lang))}</span>
-                </a>
-            }
-            .into_any()
+            let count = |n: usize| number(u64::try_from(n).unwrap_or(u64::MAX));
+            let title = format!(
+                "{gateways}: {} {}, {} {}",
+                count(online),
+                words::strip_online(lang),
+                count(all.len() - online),
+                words::strip_offline(lang),
+            );
+            strip_cell(
+                &title,
+                icons::SERVER,
+                gateways,
+                view! {
+                    <a href="#gateways">
+                        <span>{count(online)}</span>
+                        <span class="strip-of">{format!("/ {}", count(all.len()))}</span>
+                    </a>
+                }
+                .into_any(),
+            )
         }
-        None => view! { <a href=Page::Gateways.path(lang)>{icon(icons::SERVER)}<span>{words::strip_directory(lang)}</span></a> }
-            .into_any(),
-    };
-    cells += 1;
-    let gateways = strip_stat(words::strip_gateways(lang), gateways);
-    let accounts = cx.data.accounts.map(|accounts| {
-        cells += 1;
-        strip_stat(
+        None => strip_cell(
+            gateways,
+            icons::SERVER,
+            gateways,
+            view! { <a class="strip-way" href=Page::Gateways.path(lang)>{words::strip_directory(lang)}</a> }
+                .into_any(),
+        ),
+    });
+    if let Some(accounts) = cx.data.accounts {
+        cells.push(strip_cell(
             words::strip_accounts(lang),
-            view! { {icon(icons::USERS)}<span class="num">{words::live_accounts(lang, accounts)}</span> }.into_any(),
-        )
-    });
-    let cards = cx.data.cards.as_ref().map(|status| {
-        cells += 1;
-        let s = status.stats;
-        let playable = s
-            .implemented
-            .saturating_add(s.generated)
-            .saturating_add(s.partial);
-        strip_stat(
-            words::strip_cards(lang),
-            view! {
-                <a href="#cards">{icon(icons::LAYERS)}<span class="num">{words::number(lang, playable)}</span><span class="small">{words::strip_cards_unit(lang)}</span></a>
-            }
-            .into_any(),
-        )
-    });
+            icons::USER_CHECK,
+            words::strip_l_accounts(lang),
+            number(accounts).into_any(),
+        ));
+    }
     // how often the site's pages were opened, where the deployment counts it
-    let views = cx.data.views.as_ref().map(|views| {
-        cells += 1;
-        strip_stat(
+    if let Some(views) = cx.data.views.as_ref() {
+        cells.push(strip_cell(
             &words::strip_views(lang, &format::date(lang, &views.since)),
-            view! { {icon(icons::EYE)}<span class="num">{words::live_views(lang, views.count)}</span> }.into_any(),
-        )
-    });
+            icons::EYE,
+            words::strip_l_views(lang),
+            number(views.count).into_any(),
+        ));
+    }
+    let count = cells.len().to_string();
     view! {
         <section class="strip" aria-label=words::status_label(lang)>
             <div class="strip-inner">
-                <dl class="strip-list" data-count=cells.to_string()>
-                    {now}
-                    {gateways}
-                    {accounts}
-                    {cards}
-                    {views}
-                </dl>
+                <dl class="strip-list" data-count=count>{cells}</dl>
             </div>
         </section>
     }

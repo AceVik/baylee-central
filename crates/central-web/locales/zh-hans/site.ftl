@@ -879,29 +879,14 @@ strip-gateways = Gateways
 strip-online = 在线
 strip-offline = 离线
 strip-directory = 目录
-strip-cards = 可玩牌张
-strip-cards-unit = 张牌
 strip-accounts = Baylee Central 上的账号
 strip-live = 各 Gateway 此刻的上报数据
 strip-views = 自 { $date } 起的页面浏览量
-live-views = { $n ->
-   *[other] { $n } 次浏览
-}
-live-accounts = { $n ->
-   *[other] { $n } 个账号
-}
-live-players = { $n ->
-   *[other] { $n } 位玩家
-}
-live-playing = { $n ->
-   *[other] { $n } 位对局中
-}
-live-tables = { $n ->
-   *[other] { $n } 张开放牌桌
-}
-live-games = { $n ->
-   *[other] { $n } 局对局
-}
+strip-l-players = 玩家
+strip-l-games = 对局
+strip-l-tables = 开放牌桌
+strip-l-accounts = 账号
+strip-l-views = 浏览
 hero-badges = 一览
 hero-badge-beta = 公开测试
 hero-badge-free = 免费

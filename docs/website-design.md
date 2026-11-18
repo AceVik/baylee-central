@@ -249,6 +249,16 @@ Each lives in one stylesheet named after it and one component under
   and the tag where a page noted them (`docs/web-accounts.md`), otherwise
   "Your account". The name is cut with an ellipsis before the bar breaks,
   the tag never; a screen reader hears "Your account:" before the name.
+- **The strip** (`.strip` in `header.css`, `pages/home.rs`): Baylee in
+  six numbers under the bar of the start page, in the owner's order
+  (18.11.2026): players, running games and open tables as the online
+  gateways report them, the gateways online of all that are listed,
+  Central's accounts, and the visits. A cell is a value, a glyph and a
+  short label; a number nobody reported is no cell. A phone stands the
+  cells three to a line, the value over its label; from 600 px they share
+  one line evenly with a hairline between neighbours, and from 1100 px a
+  cell is one line, glyph, value, label. The cards' numbers are not here;
+  they have their section.
 - **Dialogs** (`components/Modal.tsx`): the native `<dialog>`, centred,
   focus inside, Escape and the close button close it, focus returns to the
   opener (or to the main content when the opener is gone). A dialog the
