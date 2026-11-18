@@ -1861,3 +1861,6 @@ code-mail-opened = Your mail program should open now with a draft. If nothing ha
 terms-step-version = Version { $version }
 terms-read-hint = Read the text to its end, then you can accept.
 terms-read-done = Read to the end.
+
+## the contact form (redesign)
+contact-again = Write another message
