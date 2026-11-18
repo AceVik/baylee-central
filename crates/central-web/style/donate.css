@@ -213,8 +213,9 @@
 }
 
 /* the goal's bar: a drawing with a part for each platform, in the
-   platform's colour, on a rounded track */
-.give-meter {
+   platform's colour, on a rounded track; a cost's bar has the same track */
+.give-meter,
+.cost-bar {
   display: block;
   inline-size: 100%;
   block-size: 0.8rem;
@@ -299,13 +300,7 @@
 /* the costs' bars: the browser's own progress element, drawn as a rounded
    track */
 .cost-bar {
-  display: block;
-  inline-size: 100%;
-  block-size: 0.8rem;
-  overflow: hidden;
   border: 0;
-  border-radius: var(--radius-full);
-  background: var(--violet-soft);
   appearance: none;
 }
 
