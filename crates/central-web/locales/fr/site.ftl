@@ -904,35 +904,14 @@ strip-gateways = Gateways
 strip-online = en ligne
 strip-offline = hors ligne
 strip-directory = l’annuaire
-strip-cards = Cartes jouables
-strip-cards-unit = cartes
 strip-accounts = Comptes sur Baylee Central
 strip-live = En ce moment sur les gateways, selon leurs déclarations
 strip-views = Pages vues depuis le { $date }
-live-views = { $n ->
-    [one] { $n } vue
-   *[other] { $n } vues
-}
-live-accounts = { $n ->
-    [one] { $n } compte
-   *[other] { $n } comptes
-}
-live-players = { $n ->
-    [one] { $n } joueur
-   *[other] { $n } joueurs
-}
-live-playing = { $n ->
-    [one] { $n } en partie
-   *[other] { $n } en partie
-}
-live-tables = { $n ->
-    [one] { $n } table ouverte
-   *[other] { $n } tables ouvertes
-}
-live-games = { $n ->
-    [one] { $n } partie
-   *[other] { $n } parties
-}
+strip-l-players = Joueurs
+strip-l-games = Parties
+strip-l-tables = Tables ouvertes
+strip-l-accounts = Comptes
+strip-l-views = Vues
 hero-badges = En un coup d’œil
 hero-badge-beta = Beta ouverte
 hero-badge-free = Gratuit

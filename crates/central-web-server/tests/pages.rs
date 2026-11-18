@@ -1134,16 +1134,28 @@ async fn the_privacy_notice_has_a_part_for_the_e_mail_address() {
 async fn the_figures_are_shown_only_while_a_source_reports_them() {
     let reported = app(true);
     let (_, _, home) = get(&reported, "/de/", &[]).await;
-    // the strip adds up what the four reporting gateways say
-    for number in [
-        "1.234 Konten",
-        "44 Spieler",
-        "34 im Spiel",
-        "4 offene Tische",
-        "12 Partien",
+    // the strip adds up what the four reporting gateways say: a short
+    // label, and the value apart from it
+    for (label, value) in [
+        (
+            "Spieler",
+            "<span aria-hidden=\"true\" class=\"dot ok live\"></span>44",
+        ),
+        ("Partien", "12"),
+        ("Offene Tische", "4"),
+        ("Konten", "1.234"),
     ] {
-        assert_eq!(count(&home, number), 1, "{number}");
+        let cell = format!(
+            "<span class=\"strip-label\">{label}</span></dt><dd class=\"num\">{value}</dd>"
+        );
+        assert_eq!(count(&home, &cell), 1, "{label}");
     }
+    // the gateways online, of all that are listed
+    assert_eq!(
+        count(&home, "<span>5</span><span class=\"strip-of\">/ 7</span>"),
+        1
+    );
+    assert!(home.contains("title=\"Gateways: 5 online, 2 offline\""));
     // the section's four tiles: 5 of 7 online, and the same sums
     assert_eq!(count(&home, "class=\"dir-stat glass\""), 4);
     assert!(home.contains("<span class=\"num\">5</span><span class=\"dir-stat-of\">/ 7</span>"));
@@ -1164,13 +1176,14 @@ async fn the_figures_are_shown_only_while_a_source_reports_them() {
         for never in [
             "gw-now",
             "Konten",
-            " accounts<",
             "Spieler<",
-            " players<",
-            " im Spiel<",
-            " in a game<",
-            "0 Partien",
-            "0 games",
+            "strip-label\">Players",
+            "strip-label\">Accounts",
+            "strip-label\">Partien",
+            "strip-label\">Games",
+            "strip-label\">Offene Tische",
+            "strip-label\">Open tables",
+            "<dd class=\"num\">0</dd>",
         ] {
             assert!(!html.contains(never), "{path}: {never}");
         }
@@ -1184,15 +1197,14 @@ async fn the_figures_are_shown_only_while_a_source_reports_them() {
 /// them out in even lines).
 #[tokio::test]
 async fn the_strip_has_a_cell_for_each_reported_figure_and_nothing_of_github() {
-    for silent in 0_u8..16 {
+    for silent in 0_u8..8 {
         let mut config = Config::development(site(), Some(data()));
         config.origin = "https://baylee.app".into();
         let state = central_web_server::app(config).expect("app");
         let app = router(Arc::clone(&state));
         let live = silent & 1 == 0;
         let accounts = silent & 2 == 0;
-        let cards = silent & 4 == 0;
-        let views = silent & 8 == 0;
+        let views = silent & 4 == 0;
         install(&state.data, |snapshot| {
             if !live {
                 for gateway in snapshot.gateways.iter_mut().flatten() {
@@ -1202,9 +1214,6 @@ async fn the_strip_has_a_cell_for_each_reported_figure_and_nothing_of_github() {
             if !accounts {
                 snapshot.accounts = None;
             }
-            if !cards {
-                snapshot.cards = None;
-            }
             if !views {
                 snapshot.views = None;
             }
@@ -1213,26 +1222,22 @@ async fn the_strip_has_a_cell_for_each_reported_figure_and_nothing_of_github() {
         let mark = home.find("class=\"strip\"").expect("the strip");
         let start = home[..mark].rfind("<section").expect("its section");
         let strip = &home[start..start + home[start..].find("</section>").expect("its end")];
-        let cells = 1
-            + 4 * usize::from(live)
-            + usize::from(accounts)
-            + usize::from(cards)
-            + usize::from(views);
+        let cells = 1 + 3 * usize::from(live) + usize::from(accounts) + usize::from(views);
         assert_eq!(count(strip, "class=\"strip-cell\""), cells, "{silent:04b}");
         assert!(
             strip.contains(&format!("data-count=\"{cells}\"")),
             "{silent:04b}"
         );
         assert!(strip.contains("aria-label=\"Baylee in numbers\""));
-        // the most telling first: what is played, the gateways, the
-        // accounts, the cards, the views
+        // the owner's six, in his order: players, running games, open
+        // tables, the gateways online of all, the accounts, the views
         let order: Vec<usize> = [
-            (live, "44 players"),
-            (live, "12 games"),
-            (true, "5 online"),
-            (accounts, "1,234 accounts"),
-            (cards, "8,348"),
-            (views, "48,213 views"),
+            (live, ">Players</span></dt><dd class=\"num\"><span aria-hidden=\"true\" class=\"dot ok live\"></span>44</dd>"),
+            (live, ">Games</span></dt><dd class=\"num\">12</dd>"),
+            (live, ">Open tables</span></dt><dd class=\"num\">4</dd>"),
+            (true, ">Gateways</span></dt><dd class=\"num\"><a href=\"#gateways\"><span>5</span><span class=\"strip-of\">/ 7</span></a></dd>"),
+            (accounts, ">Accounts</span></dt><dd class=\"num\">1,234</dd>"),
+            (views, ">Views</span></dt><dd class=\"num\">48,213</dd>"),
         ]
         .iter()
         .map(|(shown, words)| {
@@ -1251,6 +1256,10 @@ async fn the_strip_has_a_cell_for_each_reported_figure_and_nothing_of_github() {
             "Commit",
             "Stars",
             "GitHub",
+            // the cards' numbers stand in their own section (18.11.2026)
+            "8,348",
+            "cards",
+            "in a game",
         ] {
             assert!(!strip.contains(never), "{silent:04b}: {never}");
         }
@@ -1264,10 +1273,22 @@ async fn the_strip_has_a_cell_for_each_reported_figure_and_nothing_of_github() {
 async fn page_views_are_shown_and_told_only_where_they_are_counted() {
     let counted = app(true);
     let (_, _, home) = get(&counted, "/de/", &[]).await;
-    assert_eq!(count(&home, "48.213 Aufrufe"), 1);
+    assert_eq!(
+        count(
+            &home,
+            "<span class=\"strip-label\">Aufrufe</span></dt><dd class=\"num\">48.213</dd>"
+        ),
+        1
+    );
     assert!(home.contains("Seitenaufrufe seit 1. November 2026"));
     let (_, _, english) = get(&counted, "/en/", &[]).await;
-    assert_eq!(count(&english, "48,213 views"), 1);
+    assert_eq!(
+        count(
+            &english,
+            "<span class=\"strip-label\">Views</span></dt><dd class=\"num\">48,213</dd>"
+        ),
+        1
+    );
     let (_, _, privacy) = get(&counted, "/de/privacy", &[]).await;
     assert_eq!(count(&privacy, "id=\"views\""), 1);
     assert_eq!(count(&privacy, "href=\"#views\""), 1);
@@ -1276,7 +1297,7 @@ async fn page_views_are_shown_and_told_only_where_they_are_counted() {
     let silent = app(false);
     for path in ["/de/", "/en/", "/de/privacy", "/en/privacy"] {
         let (_, _, html) = get(&silent, path, &[]).await;
-        for never in ["Aufruf", " views<", "id=\"views\"", "#views"] {
+        for never in ["Aufruf", ">Views<", "id=\"views\"", "#views"] {
             assert!(!html.contains(never), "{path}: {never}");
         }
     }
@@ -1307,7 +1328,10 @@ async fn a_visit_counts_once_and_never_changes_the_page_it_gets() {
     let (status, first_headers, first) = get(&app, "/en/", &visit).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(views.now().count, 42);
-    assert_eq!(count(&first, "41 views"), 1);
+    assert_eq!(
+        count(&first, ">Views</span></dt><dd class=\"num\">41</dd>"),
+        1
+    );
     // the second visit counts, and gets the very same page
     let (_, again_headers, again) = get(&app, "/en/", &visit).await;
     assert_eq!(views.now().count, 43);
@@ -1345,7 +1369,10 @@ async fn a_visit_counts_once_and_never_changes_the_page_it_gets() {
     // installed, the pages show it; saved, the file holds it and no more
     install(&state.data, |snapshot| snapshot.views = Some(views.now()));
     let (_, _, later) = get(&app, "/en/", &[]).await;
-    assert_eq!(count(&later, "44 views"), 1);
+    assert_eq!(
+        count(&later, ">Views</span></dt><dd class=\"num\">44</dd>"),
+        1
+    );
     views.save();
     assert_eq!(
         std::fs::read_to_string(&file).expect("the file").trim(),
