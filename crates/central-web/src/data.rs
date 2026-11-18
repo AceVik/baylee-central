@@ -776,6 +776,41 @@ mod tests {
                 "baylee-client-0.2.0-x86_64-pc-windows-msvc.zip.sha256",
                 None,
             ),
+            (
+                "baylee-client-0.2.0-x86_64-unknown-linux-gnu-v2.tar.gz",
+                Some((Platform::LinuxX64, Kind::Fallback)),
+            ),
+            (
+                "baylee-client-0.2.0-x86_64-unknown-linux-gnu.tar.gz",
+                Some((Platform::LinuxX64, Kind::Archive)),
+            ),
+            (
+                "baylee-client-0.2.0-beta.o1-x86_64-apple-darwin.zip",
+                Some((Platform::MacX64, Kind::Archive)),
+            ),
+            (
+                "baylee-client-0.2.0-aarch64-apple-darwin.zip",
+                Some((Platform::MacArm64, Kind::Archive)),
+            ),
+            (
+                "baylee-client-0.2.0-aarch64-pc-windows-msvc.zip",
+                Some((Platform::WindowsArm64, Kind::Archive)),
+            ),
+            (
+                "baylee-client-0.2.0-x86_64-pc-windows-msvc-v2.zip.sig",
+                None,
+            ),
+            // a fallback exists for the three x86-64 systems only, and only
+            // as the archive: no other level, no ARM, no installer
+            ("baylee-client-0.2.0-x86_64-pc-windows-msvc-v3.zip", None),
+            (
+                "baylee-client-0.2.0-aarch64-unknown-linux-gnu-v2.tar.gz",
+                None,
+            ),
+            ("baylee-client-0.2.0-aarch64-apple-darwin-v2.zip", None),
+            ("Baylee-0.2.0-x86_64-v2.AppImage", None),
+            ("baylee_0.2.0_amd64-v2.deb", None),
+            ("Baylee-Setup-0.2.0-x64-v2.exe", None),
             ("Baylee-Setup--x64.exe", None),
             ("Baylee-Setup-1 2-x64.exe", None),
             ("evil-Baylee-0.2.0-aarch64.dmg", None),
