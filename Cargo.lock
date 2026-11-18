@@ -897,6 +897,7 @@ version = "0.1.0"
 dependencies = [
  "central-api",
  "central-crypto",
+ "central-funding",
  "central-mail",
  "central-picture",
  "central-postgres",
@@ -998,6 +999,7 @@ version = "0.1.0-beta.9c"
 dependencies = [
  "central-api",
  "central-crypto",
+ "central-funding",
  "central-http",
  "central-identity",
  "central-mail",

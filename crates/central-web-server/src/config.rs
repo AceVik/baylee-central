@@ -18,16 +18,13 @@ pub struct Config {
     pub origin: String,
     /// The built assets (`cargo xtask site`): `manifest.json` and the files.
     pub site: PathBuf,
-    /// Central's browser listener on loopback, for the gateway directory.
+    /// Central's browser listener on loopback, for the gateway directory, the
+    /// public figures and the donation figures.
     #[serde(default)]
     pub central: Option<SocketAddr>,
     /// Ask GitHub for the newest release, the CI state and the card status.
     #[serde(default = "yes")]
     pub github: bool,
-    /// Ask the donation platforms how much of the monthly goal is covered
-    /// (`funding.rs`: Liberapay's public figures, no key).
-    #[serde(default = "yes")]
-    pub funding: bool,
     /// Data to use when GitHub or Central do not answer (and in tests in
     /// place of them): `release.json`, `cards.json`, `gateways.json`,
     /// `repo.json` in the shapes of `central_web::data`.
@@ -106,7 +103,6 @@ impl Config {
             site,
             central: None,
             github: false,
-            funding: false,
             fallback,
             verification: None,
             views: None,
@@ -201,5 +197,14 @@ mod tests {
         let text =
             r#"{"listen":"127.0.0.1:1","origin":"https://baylee.app","site":"s","secret":"x"}"#;
         assert!(serde_json::from_str::<Config>(text).is_err());
+        // The donation figures are Central's since 18.11.2026: the old switch
+        // for asking Liberapay is unknown now, and a file with it is refused
+        // (docs/operations.md says to take it out before the deploy).
+        for funding in ["true", "false"] {
+            let text = format!(
+                r#"{{"listen":"127.0.0.1:1","origin":"https://baylee.app","site":"s","funding":{funding}}}"#
+            );
+            assert!(serde_json::from_str::<Config>(&text).is_err(), "{funding}");
+        }
     }
 }

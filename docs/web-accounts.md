@@ -392,7 +392,9 @@ the public gateway directory of the `/gateways` page ([gateway
 registry](gateway-registry.md)), and since 11.11.2026 `PublicFigures`, the
 numbers read beside it ([gateway
 registry](gateway-registry.md#activity-and-the-public-figures); both
-listeners, no session), since 28.10.2026 `ChangePasswordStart`
+listeners, no session), since 18.11.2026 `PublicFunding`, the donation
+figures ([operations](operations.md#donations); both listeners, no
+session), since 28.10.2026 `ChangePasswordStart`
 and `ChangePasswordFinish` ([native login](native-login.md) §"Password
 change"; served on both listeners, the page's form since 12.11.2026), and
 `Admin`, an administrator's requests ([administration](administration.md);
@@ -475,7 +477,7 @@ room, so a crowd of addresses cannot lock new ones out.
 | `RegisterChallenge` and `RegisterChallengeFor` | 20 an hour, together |
 | `Discover` | 30 a minute |
 | `LoginStart` | 30 a minute, apart from `Discover` |
-| `GatewayDirectory` and `PublicFigures` | 60 a minute for the two together, apart from the others |
+| `GatewayDirectory`, `PublicFigures` and `PublicFunding` | 60 a minute for the three together, apart from the others |
 | `ResetStart` | 10 an hour |
 | Every request that needs no session | 600 a minute, of the 32 a second all clients share; when those are spent, an address that was served fewer than 30 in its minute draws on 8 a second kept beside them (12.11.2026, [native login](native-login.md#guessing-a-password-online)) |
 

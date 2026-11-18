@@ -20,7 +20,8 @@ use std::time::Duration;
 use central_api::gateway::{GatewayListing, validate_origin};
 use central_api::wire::{Request, Response};
 use central_web::data::{
-    Activity, CardStats, CardStatus, Gateway, Release, ReleaseFile, Repo, classify,
+    Activity, CardStats, CardStatus, Funding, Gateway, Monthly, Once, Release, ReleaseFile, Repo,
+    classify,
 };
 use central_web::site::Snapshot;
 use serde::Deserialize;
@@ -461,6 +462,39 @@ fn figures(central: &Central<'_>) -> Option<(u64, BTreeMap<[u8; 16], Activity>)>
     Some((counted?, all))
 }
 
+/// Central's donation figures (`docs/operations.md` §"Donations"), checked
+/// against their bounds, in the shape the pages show. `None` when Central does
+/// not answer, answers wrong or is a Central from before the figures; the
+/// figures the site holds then stay as they are.
+fn donations(central: &Central<'_>) -> Option<Funding> {
+    let Response::PublicFunding { funding } = central.ask(&Request::PublicFunding {})? else {
+        return None;
+    };
+    donated(funding)
+}
+
+/// Central's answer in the pages' shape, when every figure is within its
+/// bound and the count's day is a date.
+fn donated(funding: central_api::funding::Funding) -> Option<Funding> {
+    funding.validate().ok()?;
+    let monthly = |figure: Option<central_api::funding::Monthly>| {
+        figure.map(|figure| Monthly {
+            month: figure.month,
+            supporters: figure.supporters,
+        })
+    };
+    Some(Funding {
+        github: monthly(funding.github),
+        liberapay: monthly(funding.liberapay),
+        kofi: monthly(funding.kofi),
+        once: funding.once.map(|once| Once {
+            total: once.total,
+            count: once.count,
+            since: once.since,
+        }),
+    })
+}
+
 /// The directory as the pages show it, official first, each online gateway
 /// with what it reports.
 fn shown(all: Vec<GatewayListing>, reported: &BTreeMap<[u8; 16], Activity>) -> Vec<Gateway> {
@@ -484,26 +518,34 @@ fn shown(all: Vec<GatewayListing>, reported: &BTreeMap<[u8; 16], Activity>) -> V
     out
 }
 
-/// Central's directory with its figures: the gateways, and the number of
-/// accounts when Central says it. `None` when the directory does not come.
-fn directory(
-    agent: &ureq::Agent,
-    central: std::net::SocketAddr,
-    host: &str,
-    origin: &str,
-) -> Option<(Vec<Gateway>, Option<u64>)> {
+/// What one minute's reading of Central found.
+struct Read {
+    /// The gateways, and the number of accounts when Central says it; `None`
+    /// when the directory does not come.
+    directory: Option<(Vec<Gateway>, Option<u64>)>,
+    /// The donation figures, when Central says them.
+    funding: Option<Funding>,
+}
+
+/// Central's directory with its figures, and its donation figures.
+fn directory(agent: &ureq::Agent, central: std::net::SocketAddr, host: &str, origin: &str) -> Read {
     let central = Central {
         agent,
         address: central,
         host,
         origin,
     };
-    let all = listings(&central)?;
-    let (accounts, reported) = match figures(&central) {
-        Some((accounts, reported)) => (Some(accounts), reported),
-        None => (None, BTreeMap::new()),
-    };
-    Some((shown(all, &reported), accounts))
+    let directory = listings(&central).map(|all| {
+        let (accounts, reported) = match figures(&central) {
+            Some((accounts, reported)) => (Some(accounts), reported),
+            None => (None, BTreeMap::new()),
+        };
+        (shown(all, &reported), accounts)
+    });
+    Read {
+        directory,
+        funding: donations(&central),
+    }
 }
 
 fn read<T: DeserializeOwned>(dir: &Path, name: &str) -> Option<T> {
@@ -538,8 +580,7 @@ fn forget_figures(snapshot: &mut Snapshot) {
 }
 
 /// Keeps `shared` fresh until the process ends: GitHub every ten minutes,
-/// the donation platforms every half hour, Central's directory and figures
-/// every minute.
+/// Central's directory, figures and donation figures every minute.
 pub fn spawn(config: &Config, shared: &Shared) {
     if config.github {
         let shared = Arc::clone(shared);
@@ -574,23 +615,6 @@ pub fn spawn(config: &Config, shared: &Shared) {
             }
         });
     }
-    if config.funding {
-        let shared = Arc::clone(shared);
-        tokio::spawn(async move {
-            let mut every = tokio::time::interval(crate::funding::EVERY);
-            loop {
-                every.tick().await;
-                let found =
-                    tokio::task::spawn_blocking(|| crate::funding::liberapay(&agent(true))).await;
-                // a platform that does not answer keeps its last figures
-                if let Ok(Some(monthly)) = found {
-                    install(&shared, |snapshot| {
-                        snapshot.funding.get_or_insert_default().liberapay = Some(monthly);
-                    });
-                }
-            }
-        });
-    }
     if let Some(central) = config.central {
         let (host, origin) = config.central_site();
         let shared = Arc::clone(shared);
@@ -603,14 +627,25 @@ pub fn spawn(config: &Config, shared: &Shared) {
                     directory(&agent(false), central, &host, &origin)
                 })
                 .await;
-                install(&shared, |snapshot| match found {
-                    Ok(Some((gateways, accounts))) => {
-                        snapshot.gateways = Some(gateways);
-                        snapshot.accounts = accounts;
+                let Ok(read) = found else {
+                    install(&shared, forget_figures);
+                    continue;
+                };
+                install(&shared, |snapshot| {
+                    match read.directory {
+                        Some((gateways, accounts)) => {
+                            snapshot.gateways = Some(gateways);
+                            snapshot.accounts = accounts;
+                        }
+                        // The directory keeps its last good value; "right now"
+                        // does not: without Central nobody says it any more.
+                        None => forget_figures(snapshot),
                     }
-                    // The directory keeps its last good value; "right now"
-                    // does not: without Central nobody says it any more.
-                    _ => forget_figures(snapshot),
+                    // The donation figures are a month's and a sum: a Central
+                    // that does not say them leaves the last ones standing.
+                    if read.funding.is_some() {
+                        snapshot.funding = read.funding;
+                    }
                 });
             }
         });
@@ -773,6 +808,55 @@ mod tests {
         assert_eq!(gateways.len(), 4);
         assert!(gateways.iter().all(|gateway| gateway.activity.is_none()));
         assert_eq!(central_web::data::activity_of(&gateways), None);
+    }
+
+    /// Central's donation figures reach the pages as they are, or not at all.
+    #[test]
+    fn central_s_donation_figures_are_taken_within_their_bounds() {
+        use central_api::funding as wire;
+        let said = wire::Funding {
+            github: Some(wire::Monthly {
+                month: 4_194,
+                supporters: 2,
+            }),
+            liberapay: Some(wire::Monthly {
+                month: 10_010,
+                supporters: 3,
+            }),
+            kofi: None,
+            once: Some(wire::Once {
+                total: 23_500,
+                count: 12,
+                since: "2026-11-18".into(),
+            }),
+        };
+        let shown = donated(said.clone()).expect("figures");
+        assert_eq!(
+            shown.github,
+            Some(Monthly {
+                month: 4_194,
+                supporters: 2
+            })
+        );
+        assert_eq!(shown.kofi, None, "absent stays absent, never zero");
+        assert_eq!(shown.once.map(|once| once.total), Some(23_500));
+        // Central with no figure yet: the page shows the goal without a bar
+        let none = donated(wire::Funding::default()).expect("figures");
+        assert_eq!(none.covered(), None);
+        // a figure beyond its bound or a day of another shape: nothing is taken
+        let mut beyond = said.clone();
+        beyond.liberapay = Some(wire::Monthly {
+            month: wire::MOST_MONTH + 1,
+            supporters: 1,
+        });
+        assert_eq!(donated(beyond), None);
+        let mut dated = said;
+        dated.once = Some(wire::Once {
+            total: 1,
+            count: 1,
+            since: "<b>today</b>".into(),
+        });
+        assert_eq!(donated(dated), None);
     }
 
     #[test]

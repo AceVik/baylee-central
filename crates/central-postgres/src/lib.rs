@@ -18,6 +18,13 @@ pub use accounts::{
     ReportImport, ReportImportRefusal, RevocationPage, Session, Status, Summary, Swept, TAG_DRAWS,
     TagDraw, Told, appoint_admin, provision_tower_award_issuer, sweep,
 };
+/// Donations (`docs/operations.md` §"Donations", migration 000032).
+pub mod donations {
+    pub use super::accounts::{
+        CONVERT_DAYS, DONATION_DAYS, Donation, DonationKind, DonationSums, GITHUB_WINDOW_DAYS,
+        KOFI_WINDOW_DAYS, MOST_AMOUNT, MOST_EURO_CENTS, Platform, Recorded,
+    };
+}
 /// Profile pictures (`docs/profile-pictures.md`).
 pub mod pictures {
     pub use super::accounts::{

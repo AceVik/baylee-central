@@ -7,6 +7,7 @@ use central_policy::config::{Config, is_reserved_setting};
 use std::process::ExitCode;
 
 mod accounts;
+mod funding;
 mod gateway_push;
 mod legacy;
 mod listeners;

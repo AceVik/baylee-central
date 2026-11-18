@@ -108,6 +108,7 @@ fn real_native_login_restore_migration_and_adversarial_paths() {
             operator: &operator,
         });
         support::guessing::run(&http, &browser);
+        support::donations::run(&http, &browser, &runtime);
         support::strangers::run(&service, &store, &keys, &bridge, &http, &browser, &runtime);
     }));
     // Cleanup runs even if an assertion panics; listeners and pools belong to this fixture only.
@@ -157,7 +158,17 @@ fn serving(
         .with_terms(Some(support::terms::central_document()))
         .with_mailer(mailer)
         // many registrations: the proof of work's check, not its cost
-        .with_registration_challenge(1, 64, std::time::Duration::ZERO),
+        .with_registration_challenge(1, 64, std::time::Duration::ZERO)
+        // Ko-fi's webhook with a synthetic token, recording; nothing is polled
+        // here, so Liberapay and GitHub stay off (`support/donations.rs`)
+        .with_funding(central_identity::FundingSources {
+            liberapay: false,
+            github: false,
+            kofi: Some(central_identity::KofiIntake {
+                token: central_identity::kofi_digest(support::donations::TOKEN),
+                record: true,
+            }),
+        }),
     )
 }
 

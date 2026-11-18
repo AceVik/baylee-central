@@ -313,3 +313,38 @@ digests.
   and it would replace a mailed code like any other, since it does not
   know one. Its account deletion removes both rows by the cascade.
 - **No way back.** The migration has no `down`, as its siblings have none.
+
+## Donations (migration 000032)
+
+What a donation leaves behind ([operations](operations.md#donations)):
+`central_identity.donations` holds GitHub Sponsors' one-time sponsorships and
+refunds and Ko-fi's payments, each with a server-generated UUIDv7, its
+platform and kind, the amount in hundredths of its currency, the currency,
+the euro value at the rate held when it came (NULL without one), Central's
+time of arrival and a 32-byte SHA-256 digest of the platform's transaction
+id. Nothing names the giver.
+
+- **Once per transaction.** `UNIQUE (platform, reference)`; the service
+  inserts with `ON CONFLICT DO NOTHING`, so concurrent deliveries of one
+  payment leave one row and the later ones are answered as the first.
+- **Checks in the table, not only in the service.** Platform and kind are
+  closed lists; a regular payment is Ko-fi's and a refund GitHub's; an
+  amount is 1 to 99 999 999 999 hundredths; a currency is three capital
+  letters (`COLLATE "C"`); a euro value is at most 10 000 000 cents; the
+  digest is 32 bytes; the id is a v7 UUID.
+- **Grants.** The runtime has `SELECT, INSERT` and `UPDATE (euro_cents)` on
+  `donations` and `SELECT` on `donation_sums` and `donation_count`; the
+  startup check (`grants.rs`, now 61 tables) refuses a role with more or
+  less. Its one update converts a row that came without a rate, guarded by
+  `euro_cents IS NULL`, the currency and seven days.
+- **Retention.** 40 days, then the operator's sweep, in its one
+  transaction, adds what was given once and what went back to
+  `donation_sums` and deletes the rows (a data-modifying CTE: the rows
+  deleted are the rows added). A row older than 40 days cannot come back:
+  GitHub's activities are read again for 30 days only, and Ko-fi delivers a
+  payment when it is made.
+- **Reads.** The public figures read two sums once a minute (Ko-fi's
+  payments in the last 31 days by `received_at`, which is indexed, and what
+  was given once over the rows and the sums), never per request.
+- **The day the count began** is the one row of `donation_count`, written
+  by the migration in UTC; the runtime cannot change it.
