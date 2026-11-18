@@ -67,9 +67,8 @@ fn graph() -> Value {
             vec!["zeroize"],
         ),
         ("ed25519", "3.0.0", vec!["signature"], vec![]),
-        ("signature", "3.0.0", vec![], vec![]),
-        ("signature@2", "2.2.0", vec![], vec!["alloc", "std"]),
-        ("jsonwebtoken", "11.1.0", vec!["signature@2"], vec![]),
+        ("signature", "3.0.0", vec![], vec!["alloc", "rand_core"]),
+        ("jsonwebtoken", "12.0.0", vec!["signature"], vec![]),
     ];
     json!({
         "workspace_members": ["central-crypto"],
@@ -103,7 +102,6 @@ fn rejects_new_consumers_at_every_affected_boundary() {
         "ed25519-dalek",
         "ed25519",
         "signature",
-        "signature@2",
     ] {
         let mut changed = graph();
         changed["resolve"]["nodes"]
@@ -118,7 +116,7 @@ fn rejects_new_consumers_at_every_affected_boundary() {
 
 #[test]
 fn rejects_changed_missing_and_duplicate_packages_and_nodes() {
-    for index in 0..14 {
+    for index in 0..13 {
         for key in ["source", "version"] {
             let mut changed = graph();
             changed["packages"][index][key] = json!("unreviewed");
@@ -147,7 +145,7 @@ fn rejects_changed_missing_and_duplicate_packages_and_nodes() {
 
 #[test]
 fn rejects_feature_expansion_removed_edges_and_nonworkspace_crypto() {
-    for index in 1..14 {
+    for index in 1..13 {
         let mut changed = graph();
         changed["resolve"]["nodes"][index]["features"]
             .as_array_mut()
@@ -156,8 +154,8 @@ fn rejects_feature_expansion_removed_edges_and_nonworkspace_crypto() {
         assert!(verify(&changed).is_err());
     }
     // Every row with dependencies: central-crypto, opaque-ke, voprf,
-    // elliptic-curve, hpke and x25519-dalek.
-    for index in [0, 1, 2, 3, 7, 8, 9, 10, 13] {
+    // elliptic-curve, hpke, x25519-dalek, ed25519-dalek, ed25519 and jsonwebtoken.
+    for index in [0, 1, 2, 3, 7, 8, 9, 10, 12] {
         let mut changed = graph();
         changed["resolve"]["nodes"][index]["dependencies"] = json!([]);
         assert!(verify(&changed).is_err());
@@ -186,13 +184,13 @@ fn rejects_a_third_curve25519_dalek_generation() {
 fn rejects_push_provider_reaching_the_affected_arithmetic() {
     for dependency in ["crypto-bigint", "elliptic-curve", "voprf"] {
         let mut changed = graph();
-        changed["resolve"]["nodes"][13]["dependencies"]
+        changed["resolve"]["nodes"][12]["dependencies"]
             .as_array_mut()
             .unwrap()
             .push(json!(dependency));
         assert!(verify(&changed).is_err(), "{dependency}");
     }
     let mut changed = graph();
-    changed["resolve"]["nodes"][13]["features"] = json!(["rust_crypto"]);
+    changed["resolve"]["nodes"][12]["features"] = json!(["rust_crypto"]);
     assert!(verify(&changed).is_err());
 }

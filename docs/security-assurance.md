@@ -8282,3 +8282,44 @@ lock file only as an optional dependency of `sea-orm-arrow`, which nothing here 
 record that follows for what `cargo audit` makes of that).
 
 These passes are by the implementing agent and are not an independent audit.
+
+## The dependency upgrade, and an exception moved from SQLite to `chrono`, 18 November 2026
+
+The owner asked for every crate to be upgraded, major versions included, with the migrations they
+need ([the inventory](dependency-proposal/upgrade-2026-11-18.md)).
+
+Design pass. What could break is what the upgrades touch: the database driver (`sqlx` 0.9.1), the
+VAPID signature of Web Push (`jsonwebtoken` 12), the wiping of secrets (`zeroize` 1.9.2), the
+outbound client (`ureq` 3.5.2) and the browser's crypto module, which links `zeroize` too. What
+must not move: OPAQUE's record and protocol, so `opaque-ke` 4.0.1 and the generation of `digest`,
+`rand_core` and `getrandom` under it stay as they are, deliberately. New code from outside is
+disclosed and was accepted by the owner in the form before it was taken: `whoami`'s platform calls
+(its own `unsafe` over `libc` on the Linux server, `objc2-*` foreign bindings on Apple targets
+only, `libredox` on Redox only). The SQLite exception's own removal rule applied (`sqlx` allows the
+fixed `libsqlite3-sys`); the owner chose the same kind of bounded exception for `chrono`, which
+the migration runner took out of every build but which stays in the lock file through SeaORM's
+optional `sea-orm-arrow`.
+
+Implementation pass: `cargo update` and the exact pins in the manifests; three pins that
+`cargo upgrade` moved past OPAQUE's generation were set back by hand; `approved-packages.json`
+gained the 39 new versions and the new features of five packages with an approval entry, nothing
+else changed in it; `deny.toml`'s BSL-1.0 exception follows `xxhash-rust` to 0.8.21 and two skips
+for duplicates that no longer exist went; `.cargo/audit.toml` ignores RUSTSEC-2026-0543 in place
+of RUSTSEC-2026-0459; `sqlite-scope` became `chrono-scope` (in the gate, CI's dependency job and
+`docs/xtask.md`), failing when `chrono`, `sea-orm-arrow` or `sea-orm-migration` is in any build or
+`chrono` changes version in the lock file; `crypto-scope` follows `jsonwebtoken` 12 to one
+`signature` generation (3.0.0, callers `ed25519` and `jsonwebtoken`, features `alloc` and
+`rand_core`; `elliptic-curve` and `crypto-bigint` keep their callers) and renews the source
+fingerprint for the one manifest line `zeroize` 1.9.2 (`crypto-proposal/bigint-advisory.md`); the
+browser module was rebuilt in the pinned x86-64 image and committed.
+
+Adversarial pass, what was run on the final tree: `cargo xtask gate` (format, policy with its
+compiler probe, clippy `-D warnings`, every test, the doc tests, the release build),
+`crypto-scope`, `chrono-scope`, `cargo xtask postgres` whole (the store, the SDK over real HTTP,
+the migration runner's history and the sessions' timestamps through `sqlx` 0.9.1 and `with-time`),
+`smoke` and `smoke --exercise-failure`, `secrets`, `cargo audit --deny warnings` and `cargo deny
+check` (both with the pinned 0.22.2 and 0.20.2), and `wasm --check` after the rebuild. What was not
+done: no source audit of the new packages, and no run on a Mac of what only builds there beyond
+the workspace's own tests.
+
+These passes are by the implementing agent and are not an independent audit.
