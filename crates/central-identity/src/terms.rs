@@ -103,6 +103,7 @@ pub(super) fn needs_acceptance(request: &Request) -> bool {
             | Request::RegisterGateway { .. }
             | Request::SetGatewayAdmins { .. }
             | Request::GatewayToken { .. }
+            | Request::TowerToken {}
             | Request::SetRecovery { .. }
             | Request::SetDisplayName { .. }
             | Request::ChangePasswordStart { .. }

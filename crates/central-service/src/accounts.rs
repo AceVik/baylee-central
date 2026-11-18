@@ -19,6 +19,9 @@ use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 struct Settings {
     endpoint: String,
     gateway: String,
+    /// Separate loopback Tower authority; absent disables Tower identity access.
+    #[serde(default)]
+    tower_origin: Option<String>,
     /// Further numeric-loopback origins of the official gateway, as a live
     /// service has its compiled aliases; absent means none.
     #[serde(default)]
@@ -53,6 +56,17 @@ struct Settings {
     /// one that has `libaom-av1`, animations are kept as their stills.
     #[serde(default)]
     picture_ffmpeg: Option<String>,
+}
+
+impl Settings {
+    fn identity_destinations(
+        &self,
+        identity: IdentityService,
+    ) -> Result<IdentityService, central_api::Error> {
+        identity
+            .with_aliases(self.gateway_aliases.clone())?
+            .with_tower(self.tower_origin.as_deref())
+    }
 }
 
 /// The development picture worker: the configured binary, or the one built
@@ -210,7 +224,7 @@ async fn serve() -> Result<(), ()> {
         &settings.gateway,
         settings.token_keys.keys()?,
     )
-    .and_then(|identity| identity.with_aliases(settings.gateway_aliases.clone()))
+    .and_then(|identity| settings.identity_destinations(identity))
     .map(|identity| match &legacy {
         Some(legacy) => identity.with_legacy(legacy.clone()),
         None => identity,

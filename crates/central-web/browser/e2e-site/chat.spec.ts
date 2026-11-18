@@ -14,7 +14,7 @@ import { fileURLToPath } from "node:url";
 
 import { expect, type Locator, type Page, type Route, test } from "@playwright/test";
 
-import { axe, narrow, schemes, targets } from "./check.ts";
+import { axe, narrow, onlyDesktop, schemes, targets } from "./check.ts";
 
 const ACCOUNT = [1, 2, 3, 4, 5, 6, 0x70, 8, 0x80, 10, 11, 12, 13, 14, 15, 16];
 const OWN = 0x1a2b;
@@ -340,7 +340,8 @@ test("pictures stand beside every name: one size, initials without one, the stil
   expect(problems).toEqual([]);
 });
 
-test("the messenger fits from 320 px without sideways scrolling", async ({ page }) => {
+test("the messenger fits from 320 px without sideways scrolling", async ({ page }, info) => {
+  onlyDesktop(info, "sets its own window sizes, so the project's size is irrelevant");
   await open(page);
   for (const width of [320, 375, 768, 1024, 1440]) {
     await page.setViewportSize({ width, height: 800 });

@@ -148,3 +148,7 @@ document.addEventListener("keydown", (event) => {
     walk();
   }
 });
+
+// a page put in place without a new document (`nav.js`): the hint of the
+// one that left goes with it
+document.addEventListener("baylee:leave", hide);

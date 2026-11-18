@@ -122,12 +122,10 @@ dl-linux-unsure = Tu navegador no indica tu procesador; se supone x86-64. El arc
 dl-missing = Esta versión no tiene archivo para tu sistema. Las versiones anteriores están en la <releases>página de versiones</releases>.
 dl-none = GitHub no respondió en este momento. Todas las versiones están en la <releases>página de versiones</releases>.
 dl-yours = Tu sistema
-dl-more-files = Más archivos ({ $count })
 dl-installer = Instalador
 dl-deb = Paquete Debian
 dl-archive = Archivo
 dl-fallback = Archivo para procesadores antiguos
-dl-fallback-help = Para procesadores x86-64 sin AVX2 (anteriores a 2013, más o menos). Las compilaciones principales de Baylee necesitan AVX2 y no arrancan sin él.
 plat-windows-x64 = Windows
 plat-windows-x64-sub = la mayoría de los PC: Intel o AMD de 64 bits
 plat-windows-arm64 = Windows en ARM
@@ -255,7 +253,7 @@ privacy-hosting = El sitio funciona en un servidor que alquilamos a netcup GmbH,
 privacy-views-title = El recuento de páginas vistas
 privacy-views = El sitio cuenta cuántas veces se abren sus páginas: un único número para todas las páginas y todos los visitantes juntos, que se muestra en la página de inicio. Una página abierta en un navegador le suma uno. Para ello no se almacena nada sobre ti: ni dirección IP, ni cookie, ni identificador, ni siquiera de qué página se trataba.
 privacy-device-title = Lo que guarda tu navegador
-privacy-device = Este sitio no instala ninguna cookie hasta que inicias sesión. Lo que tu navegador guarda en tu dispositivo, y solo con JavaScript: tu elección de color, si la hiciste (<code>baylee-site-theme</code>); mientras tienes la sesión iniciada, cuándo termina tu sesión (<code>baylee-central-session</code>), tu clave de chat y las claves de confianza de tus contactos (véase Chat); si activaste las notificaciones, un número aleatorio de este dispositivo (<code>baylee-push-installation-v1</code>, <code>baylee-push</code>); y, solo una vez que hayas iniciado sesión, instalado el sitio como aplicación o activado las notificaciones, una copia de los archivos públicos del sitio (estructura de la página, tipografías, scripts), para que arranque sin conexión y puedan llegar las notificaciones. Si ya no se da ninguna de las tres circunstancias, la copia se elimina la próxima vez que abras el sitio. Nada de esto se nos envía, salvo que un apartado siguiente diga lo contrario. Las entradas del chat y de la sesión se eliminan al cerrar sesión; todo lo demás lo eliminas borrando los datos del sitio en tu navegador. Base jurídica: § 25, apdo. 2, n.º 2 TDDDG (estrictamente necesario para la función que usas); para el número aleatorio de las notificaciones, tu consentimiento (§ 25, apdo. 1 TDDDG).
+privacy-device = Este sitio no instala ninguna cookie hasta que inicias sesión. Lo que tu navegador guarda en tu dispositivo, y solo con JavaScript: tu elección de color, si la hiciste (<code>baylee-site-theme</code>); mientras tienes la sesión iniciada, cuándo termina tu sesión y un marcador aleatorio para detectar cambios de inicio de sesión (<code>baylee-central-session</code>), tu nombre visible, tu etiqueta y la clave con la que se obtiene tu imagen de perfil, para que la cabecera muestre quién ha iniciado sesión (<code>baylee-central-own</code>; se elimina cuando cierras sesión, o la próxima vez que se abra el sitio después de que tu sesión haya terminado), tu clave de chat y las claves de confianza de tus contactos (véase Chat); si activaste las notificaciones, un número aleatorio de este dispositivo (<code>baylee-push-installation-v1</code>, <code>baylee-push</code>); y, solo una vez que hayas iniciado sesión, instalado el sitio como aplicación o activado las notificaciones, una copia de los archivos públicos del sitio (estructura de la página, tipografías, scripts), para que arranque sin conexión y puedan llegar las notificaciones. Si ya no se da ninguna de las tres circunstancias, la copia se elimina la próxima vez que abras el sitio. Nada de esto se nos envía, salvo que un apartado siguiente diga lo contrario. Las entradas del chat y de la sesión se eliminan al cerrar sesión; todo lo demás lo eliminas borrando los datos del sitio en tu navegador. Base jurídica: § 25, apdo. 2, n.º 2 TDDDG (estrictamente necesario para la función que usas); para el número aleatorio de las notificaciones, tu consentimiento (§ 25, apdo. 1 TDDDG).
 privacy-device-manager = Si guardas tu código de recuperación en el gestor de contraseñas de tu navegador, te lo envías por correo, lo guardas como archivo o lo imprimes en el paso que lo muestra, lo conservan tu navegador, tu programa de correo, tus archivos o tu papel, nunca este sitio: el código se genera en tu navegador y nunca se nos envía. Borrar los datos del sitio no lo elimina de allí.
 privacy-github-title = GitHub
 privacy-github = La página de descarga y la página de inicio muestran la última versión, el estado de las pruebas y las cifras de las cartas. Es nuestro servidor quien se las pide a GitHub, no tu navegador; GitHub no averigua nada sobre ti con ello. Solo cuando haces clic en una descarga o en un enlace de GitHub se conecta tu navegador a GitHub (GitHub, Inc., EE. UU.) y le envía tu dirección IP y lo que lleva toda petición; a partir de ahí se aplica la política de privacidad del propio GitHub.
@@ -485,7 +483,6 @@ register-error-taken = Este nombre de inicio de sesión ya está en uso. Elige o
 ## The recovery code
 
 code-title = Tu código de recuperación
-code-handle = Tu identificador: { $handle }
 code-lead = Solo con este código se conservan tus datos cifrados si olvidas tu contraseña. No lo conocemos y no podemos restaurarlo. Guárdalo en un lugar seguro, lejos de este dispositivo.
 code-shown-once = Se muestra solo ahora
 code-download = Guardar como archivo de texto
@@ -884,44 +881,22 @@ strip-gateways = Gateways
 strip-online = online
 strip-offline = sin conexión
 strip-directory = el directorio
-strip-cards = Cartas jugables
-strip-cards-unit = cartas
 strip-accounts = Cuentas en Baylee Central
 strip-live = Ahora mismo en los gateways, según informan
 strip-views = Páginas vistas desde { $date }
-live-views = { $n ->
-    [one] { $n } vista
-   *[other] { $n } vistas
-}
-live-accounts = { $n ->
-    [one] { $n } cuenta
-   *[other] { $n } cuentas
-}
-live-players = { $n ->
-    [one] { $n } jugador
-   *[other] { $n } jugadores
-}
-live-playing = { $n ->
-    [one] { $n } en partida
-   *[other] { $n } en partida
-}
-live-tables = { $n ->
-    [one] { $n } mesa abierta
-   *[other] { $n } mesas abiertas
-}
-live-games = { $n ->
-    [one] { $n } partida
-   *[other] { $n } partidas
-}
+strip-l-players = Jugadores
+strip-l-games = Partidas
+strip-l-tables = Mesas abiertas
+strip-l-accounts = Cuentas
+strip-l-views = Vistas
+stat-cards = Cartas jugables
 hero-badges = De un vistazo
 hero-badge-beta = Beta abierta
 hero-badge-free = Gratis
 hero-badge-open = Código abierto
 hero-badge-fan = Contenido de fans no oficial
 gws-open-client = Abrir en Baylee
-gws-open-client-help = «Abrir en Baylee» inicia el cliente instalado (0.1.1-beta.9b o posterior). Muestra la dirección y pregunta antes de añadir el gateway.
 dl-menu-title = Todos los sistemas
-dl-old-cpu = procesadores antiguos (sin AVX2)
 ci-passing = correcto
 ci-failing = con fallos
 dl-button = Descargar Baylee
@@ -982,11 +957,6 @@ source-repoTitle = El repositorio ahora mismo
 source-stars = Estrellas
 source-issues = Incidencias y pull requests abiertas
 source-note = El servidor de este sitio lo lee de la API pública de GitHub cada diez minutos. Tu navegador no le pregunta nada a GitHub.
-gw-count =
-    { $n ->
-        [one] { $n } gateway listado, { $online } online.
-       *[other] { $n } gateways listados, { $online } online.
-    }
 gw-none = Todavía no hay ningún gateway listado.
 contact-intro = Una pregunta, una idea, un juego que te gustaría ver o algo que prefieres no publicar en abierto: este formulario va directo a la persona que está detrás de Baylee. Deja una dirección de correo electrónico si quieres respuesta; sin ella solo podemos leerlo.
 contact-f8 = Lo mejor para informar de una carta que se resolvió mal es hacerlo desde el juego con <kbd>F8</kbd>, porque el informe puede llevar toda la partida.
@@ -1009,17 +979,14 @@ ai-hostingLink = Alojamiento de gateways y configuración de LLM
 
 # The gateways and the contact page, as the old site wrote them (owner, 11.11.2026)
 gw-lead = Un gateway es un servidor donde viven las mesas online: cuentas, mazos, salas y un proceso del motor por partida. Estos son los registrados en Baylee Central y aprobados por su administrador. Cada uno lo llevan sus operadores para sus grupos, y allí rigen sus propias reglas. Que aparezca en la lista no es una promesa sobre lo que hace un gateway.
-gw-howTo = Para jugar en uno, copia su dirección en la puerta de entrada del cliente. Online significa que Central ha tenido noticias del gateway en el último minuto y medio; no es una promesa de que responda. Los nombres y las versiones son los que comunica cada operador.
 gw-find = Buscar un gateway
 gw-findHint = Nombre o dirección
 gw-shown = { $n } de { $all } mostrados
 gw-noMatch = Ningún gateway cargado hasta ahora coincide.
 gw-showAll = Mostrar todos
 gw-stats = El directorio en cifras
-gw-stat-listed = Gateways listados
 gw-stat-online = Online ahora
 gw-stat-players = Jugadores online
-gw-stat-playing = De ellos, en partida
 gw-stat-tables = Mesas abiertas
 gw-stat-games = Partidas en curso
 gw-show = Mostrar
@@ -1358,7 +1325,6 @@ chat-write-first = Escribe el primer mensaje
 people-copy-handle = Copiar tu identificador
 people-copy-failed = No se pudo copiar aquí. Selecciona tu identificador de arriba y cópialo a mano.
 
-
 # ==== the administration's other pages (islands/admin/) ========================
 # Translated by a model (Claude Sonnet) on 12.11.2026; no native speaker has read it yet.
 admin-accounts = Cuentas
@@ -1467,8 +1433,6 @@ admin-legacy-restored = Restaurada
 admin-legacy-banned = Vetada
 admin-legacy-must-change = Requiere contraseña nueva
 admin-legacy-locked = Bloqueada hasta { $until }
-
-
 
 ## The feedback moderation (/account/admin/feedback)
 
@@ -1768,81 +1732,122 @@ fb-json-base64 = { $n } caracteres de base64
 fb-json-more = Mostrar los siguientes { $n } (quedan: { $left })
 fb-json-items = elementos: { $n }
 fb-json-keys = claves: { $n }
-## Global daily and weekly challenges
-ch-title = Desafíos
-ch-lead = El mismo desafío para todos, juegues donde juegues. Encuentra tu solución, mejora tu resultado y reúne una colección duradera de insignias.
-ch-eyebrow = Una razón para volver
-ch-daily = Diario
-ch-weekly = Semanal
-ch-loading = Cargando…
-ch-play-help = El enlace abre el desafío en Baylee. También está en la sección Desafíos del cliente.
-ch-unavailable = No se pudieron cargar los desafíos. Inténtalo de nuevo.
-ch-empty = Todavía no hay ningún desafío verificado.
-ch-archive = Archivo
-ch-older = Desafíos anteriores
-ch-withdrawn = Retirado: este desafío ya no se puede iniciar ni clasificar.
-ch-current = Desafío activo
-ch-details = Desafío y clasificaciones
-ch-play = Jugar en Baylee
-ch-ends = Fin de la clasificación en vivo
-ch-estimated = Duración estimada
-ch-target = Objetivo de turnos
-ch-deck = Mazo proporcionado
-ch-progress = Tu progreso
-ch-attempts = Intentos iniciados
-ch-failures = Intentos fallidos
-ch-best-turns = Menos turnos
-ch-completed = Completado: tu progreso está guardado.
-ch-assisted = Has usado pistas: los nuevos intentos cuentan como asistidos y no entran en las clasificaciones competitivas.
-ch-consent = Mostrar mi nombre público y mi etiqueta en las clasificaciones de este desafío.
-ch-hint-one = Pista 1
-ch-hint-two = Pista 2
-ch-hint-confirm = Revelar pista
-ch-hint-warning = Revelar una pista marca este desafío como asistido para tu cuenta, también en intentos posteriores. Las insignias por completarlo siguen contando. Los resultados anteriores sin ayuda siguen siendo válidos.
-ch-first-win = Primera victoria
-ch-sprint = Sprint
-ch-rankings = Clasificaciones globales
-ch-ranking-rules = Primera victoria: menos intentos fallidos y después menos turnos. Menos turnos: tu mejor victoria sin ayuda. Sprint: tiempo medido por el servidor sin pausas ni desconexiones. Los resultados iguales comparten puesto. Solo cuentan las victorias terminadas durante el periodo activo.
-ch-no-scores = Aún no hay resultados públicos válidos.
-ch-more = Página siguiente
-ch-rank = Puesto
-ch-player = Jugador
-ch-turn = Turno
-ch-time = Tiempo
-ch-badges = Tu colección de insignias
-ch-badges-lead = Cada desafío cuenta una vez. Los niveles de las insignias son permanentes; faltar un día no borra tu progreso. Las victorias del archivo también cuentan para Diario, Semanal y Táctico.
-ch-active = Continuar un intento activo
-ch-badge-daily = Explorador diario
-ch-badge-weekly = Explorador semanal
-ch-badge-tactician = Táctico
-ch-badge-first-try = A la primera
-ch-badge-regular = Visitante habitual
-ch-badge-locked = Todavía sin conseguir
-ch-bronze = Bronce
-ch-silver = Plata
-ch-gold = Oro
-ch-platinum = Platino
-ch-obsidian = Obsidiana
+## The privacy notice: what Central keeps of Daily and Weekly tasks
 privacy-challenges-title = Desafíos Daily y Weekly
 privacy-challenges = Central guarda en tu cuenta intentos, resultados, pistas usadas, preferencias de clasificación y progreso permanente de insignias. El servidor oficial envía el resultado y el tiempo medido. Nombre, etiqueta y resultados solo son públicos si activas la clasificación del desafío; al desactivarla se retiran. Los datos permanecen hasta eliminar la cuenta, con los plazos de copias de seguridad indicados en Cuenta. Los metadatos de los desafíos se incluyen en la exportación de datos de tu cuenta.
 
-# Tower expeditions
+# The privacy notice: what Central keeps of Tower expeditions
 tower-title = La Torre verde
-tower-lead = Cinco duelos. Tres vidas. Un mazo que crece con tus decisiones.
-tower-rules = Juega cada duelo personalmente con un mazo proporcionado. Después de cada una de las primeras cuatro victorias, elige una mejora. Una derrota cuesta una vida; tres derrotas terminan la expedición. Reconectarse conserva el encuentro; las anulaciones técnicas no cuestan vidas. Todos comparten la misma torre semanal. Tras terminar la semana, la práctica sigue otorgando insignias permanentes.
-tower-floors = Pisos
-tower-lives = Vidas
-tower-rewards = Reliquias del ascenso
-tower-reward-rules = Explorador cuenta pisos semanales distintos; Guardián de la corona cuenta cimas semanales; Invicto cuenta cimas semanales sin derrotas. Repetir el mismo logro en la misma semana no añade progreso. Las reliquias nunca caducan y no requieren rachas.
-tower-conquered = La corona es tuya
-tower-choosing = Elige tu próxima mejora en el juego
-tower-ended = Expedición terminada
-tower-pathfinder = Explorador
-tower-summit = Guardián de la corona
-tower-unbroken = Invicto
-tower-tiers = Explora los cinco niveles
-tower-ascent = Ascenso
-tower-sprint = Sprint perfecto
-tower-scoring = Ascenso ordena los pisos superados, luego menos derrotas y luego menos turnos en victorias. Sprint mide el tiempo activo de reflexión hasta una cima sin derrotas ni victorias interrumpidas. Solo aparece tu mejor expedición válida. Las puntuaciones iguales comparten puesto.
 tower-privacy = Central guarda en tu cuenta las expediciones, mejoras elegidas, vidas restantes, resultados, preferencias de clasificación y progreso permanente de las reliquias. Tu nombre público, etiqueta y mejor puntuación válida solo aparecen si activas la clasificación de la temporada. Al desactivarla se retira esa entrada. La exportación de tu cuenta incluye expediciones e intentos. Eliminar la cuenta también elimina estos progresos, sujetos a los plazos de las copias de seguridad descritos en Cuenta.
-tower-guide = Reglas de la expedición
+
+## the steps after signing in (code and terms, redesign)
+code-created = Cuenta creada
+code-handle-label = Tu identificador
+code-keep-title = Guárdalo ahora, al menos de una de estas formas
+code-mail-opened = Tu programa de correo debería abrirse ahora con un borrador. Si no pasa nada, este navegador no tiene ninguno configurado: guarda el código de otra manera.
+terms-step-version = Versión { $version }
+terms-read-hint = Lee el texto hasta el final y luego podrás aceptar.
+terms-read-done = Leído hasta el final.
+
+## the contact form (redesign)
+contact-again = Escribir otro mensaje
+
+## the footer's last line (which build this is)
+foot-build = Versión de este sitio:
+
+## download (variants and page)
+dl-v2-name = Procesadores antiguos (x86-64-v2)
+dl-v2-help = Para procesadores anteriores a 2013–2015 aproximadamente, o si la versión principal no arranca.
+dl-os-windows = Windows 10 u 11
+dl-os-mac = macOS 11 o posterior
+dl-os-linux = glibc 2.35 o posterior y un controlador Vulkan
+dl-howto-title = Instalación
+dl-howto-windows-1 = Descarga el instalador y ejecútalo.
+dl-howto-windows-2 = Si Windows te avisa, elige <i>Más información</i> y después <i>Ejecutar de todas formas</i>: las versiones no están firmadas digitalmente.
+dl-howto-windows-3 = Inicia Baylee desde el menú Inicio.
+dl-howto-mac-1 = Abre el <code>.dmg</code> y arrastra Baylee a <i>Aplicaciones</i>.
+dl-howto-mac-2 = En el primer inicio, abre <i>Ajustes del Sistema → Privacidad y seguridad</i> y elige <i>Abrir igualmente</i>.
+dl-howto-mac-3 = ¿No sabes qué chip tiene tu Mac? <i>Menú Apple → Acerca de este Mac</i> te lo dice.
+dl-howto-linux-1 = Haz ejecutable el AppImage con <code>chmod +x</code> y ejecútalo.
+dl-howto-linux-2 = O instala el paquete: <code>sudo apt install ./baylee_*.deb</code>.
+dl-howto-linux-3 = El archivo comprimido no necesita instalación: descomprímelo e inicia <code>baylee</code>.
+dl-soon-title = Llegará más adelante
+dl-soon-text = Por ahora Baylee funciona en un ordenador. Estos sistemas están previstos; todavía no hay nada que descargar.
+dl-soon-web = En el navegador
+
+## the account overview and its navigation (redesign)
+account-group-account = Cuenta
+account-play-title = Jugar
+account-play-lead = Consigue el juego e inicia sesión allí con esta cuenta.
+account-numbers-lead = Cifras públicas, tal como las informan ahora los gateways y Baylee Central.
+account-chat-lead = Mensajes y tus contactos, cifrados de extremo a extremo.
+account-push-lead = Deja que este dispositivo te avise de los mensajes nuevos.
+
+## donations (the page, the bar's entry, the start page's band)
+nav-donate = Donar
+donate-title = Mantener Baylee en desarrollo
+donate-eyebrow = Apoyar
+donate-description = Baylee es gratuito y seguirá siéndolo. Si te gusta, puedes ayudar a cubrir lo que cuesta cada mes: en GitHub Sponsors, Liberapay o Ko-fi.
+donate-lead = Baylee es gratuito y seguirá siéndolo: sin muro de pago, sin funciones de pago, sin publicidad. Se hace en el tiempo libre y aun así cuesta dinero cada mes. Si te gusta, puedes ayudar a cubrirlo.
+donate-goal-title = El objetivo
+donate-goal-amount = unos { $amount } al mes
+donate-goal-lead = Es aproximadamente lo que cuestan cada mes el desarrollo y el funcionamiento.
+donate-progress = { $have } de { $goal } al mes
+donate-progress-label = Cuánto del objetivo mensual está cubierto
+donate-progress-percent = { $percent } % cubierto
+donate-progress-supporters = Personas que apoyan: { $n }.
+donate-progress-missing = Aún no contado: { $platforms }.
+donate-progress-first = Todavía no hay ninguna donación periódica. La tuya sería la primera.
+donate-progress-none = Las plataformas aún no nos han dado una cifra.
+donate-once-title = Donaciones únicas
+donate-once-since = desde { $date }
+donate-once-count = Donaciones: { $n }
+donate-once-note = Se dieron una sola vez, así que no cuentan para el objetivo mensual. Las demás divisas se convierten a euros al cambio del día en que llegaron.
+donate-costs-title = Para qué sirve
+donate-costs-lead = Cifras mensuales redondeadas.
+donate-cost-ai = Asistentes de IA
+donate-cost-ai-note = Claude y Gemini. Sin ellos no se podría seguir desarrollando el proyecto.
+donate-cost-servers = Servidores
+donate-cost-servers-note = El gateway público, Baylee Central y este sitio web.
+donate-cost-art = Imágenes, vídeo y música
+donate-cost-art-note = Las herramientas con las que se crean los fondos y la música.
+donate-cost-tools = Herramientas de desarrollo
+donate-cost-tools-note = GitHub, el editor, el programa de desarrollador para dispositivos Apple, el dominio y el correo electrónico.
+donate-cost-fees = Comisiones
+donate-cost-fees-note = Lo que se quedan las plataformas y los servicios de pago, aproximadamente una décima parte.
+donate-cost-about = unos { $amount }
+donate-ways-title = Tres formas de donar
+donate-ways-lead = Las tres llevan al desarrollador de Baylee, AceVik, que paga estos costes. Elige la que prefieras.
+donate-github-lead = Al mes o una sola vez, con tu cuenta de GitHub.
+donate-liberapay-lead = Una donación periódica, con tarjeta o PayPal. Liberapay la gestiona una organización sin ánimo de lucro.
+donate-kofi-lead = Una propina única, sin cuenta, con tarjeta o PayPal.
+donate-open = Abrir { $platform }
+donate-qr-alt = Código QR de { $address }
+donate-nothing-title = Qué compra una donación
+donate-nothing = Nada, y es a propósito. Ninguna función, ninguna ventaja en una partida, ningún acceso anticipado o exclusivo, ninguna insignia y ningún nombre en una lista: todos tienen el mismo Baylee. Una donación es un agradecimiento, un regalo a una persona privada; no es deducible de impuestos.
+donate-other-title = Otras formas de ayudar
+donate-other = Jugar, avisar de lo que no funciona y hablar de Baylee a tus amigos. Eso ayuda igual de mucho.
+donate-privacy = El pago se hace en la plataforma que elijas y con su servicio de pago. Este sitio no cobra nada y no sabe quién ha donado.
+donate-band-title = Baylee es gratuito. Ayuda a que siga adelante.
+donate-band-lead = Los servidores y las herramientas cuestan unos { $amount } al mes. Una donación no compra nada y ayuda mucho.
+donate-band-button = Formas de donar
+privacy-donate-title = Donaciones
+privacy-donate = The donation page links to GitHub Sponsors (GitHub, Inc., USA), Liberapay (Liberapay, France) and Ko-fi (Ko-fi Labs Limited, United Kingdom). Only when you follow one of these links does your browser connect to that platform; payment happens there and with its payment service (Stripe or PayPal), and the platform's own privacy notice applies. We take no payment on this site. The page shows how much of the monthly goal is covered and what was given once. Baylee Central collects these figures, not your browser: it asks Liberapay for its public total and GitHub Sponsors for the account's own totals and one-time sponsorships, without the sponsors' names, takes the euro exchange rates from the European Central Bank, and is notified by Ko-fi of each payment. Of a payment Central keeps only the amount, the currency, the time, whether it was given once or regularly, and a fingerprint of the platform's transaction number so that a notice that comes twice counts once; everything else in a notice, such as a name, an e-mail address or a message, is discarded without being stored or logged. After 40 days the amounts are added to a total and the single records are deleted. The figures name nobody, and we publish no donor's name.
+
+## gateways directory (redesign)
+gw-play-hint = “Abrir en Baylee” entrega el gateway al cliente instalado, que muestra la dirección y pregunta antes de añadirlo. Allí inicias sesión, no aquí. ¿Aún no tienes el cliente? <download>Descargar Baylee</download>.
+gw-fineprint = Online significa que Central ha tenido noticias del gateway en el último minuto y medio; no es una promesa de que responda. Los nombres, las versiones y las cifras son los que informa cada operador.
+gw-fig-players = Jugadores
+gw-fig-playing = En una partida
+gw-fig-tables = Mesas abiertas
+gw-fig-games = Partidas
+gw-load = { $n } % de sus jugadores están en una partida
+gw-load-empty = Ahora mismo no hay nadie.
+gw-silent = No informa de cifras.
+gw-away = Central no ha sabido nada de él últimamente.
+gw-current = Al día
+gw-current-title = Funciona con la última versión publicada.
+gw-secure = Conexión cifrada (HTTPS)
+gw-show-current = Versión actual
+gw-col-gateway = Gateway
+gw-col-state = Estado

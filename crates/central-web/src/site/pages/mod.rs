@@ -6,7 +6,7 @@ use super::shell::{self, Meta};
 use super::{Context, Page};
 
 mod account;
-mod challenges;
+mod donate;
 mod download;
 mod errors;
 mod home;
@@ -20,10 +20,10 @@ pub fn document(page: Page, cx: &Context<'_>) -> impl IntoView + use<> {
         Page::Home => home::page(cx),
         Page::Download => download::page(cx),
         Page::Gateways => info::gateways(cx),
-        Page::Challenges => challenges::page(cx),
         Page::Faq => info::faq(cx),
         Page::Security => security::page(cx),
         Page::Contact => info::contact(cx),
+        Page::Donate => donate::page(cx),
         Page::Impressum => legal::impressum(cx),
         Page::Privacy => legal::privacy(cx),
         Page::Terms => legal::terms(cx),

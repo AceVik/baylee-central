@@ -8,7 +8,7 @@ use leptos::tachys::html::attribute::custom::custom_attribute;
 use serde_json::{Value, json};
 
 use super::{Assets, Context, Page, icons};
-use crate::islands::{Register, SignIn};
+use crate::islands::{Register, Reset, SignIn};
 use crate::rich::{icon, rich};
 use crate::solid;
 use crate::words::{self, Lang};
@@ -133,7 +133,7 @@ fn crumbs(lang: Lang, trail: &[(String, Page)]) -> Option<impl IntoView + use<>>
 /// page's painting (its largest paint) and the faces the first screen
 /// is set in.
 fn preloads(page: Page, lang: Lang, assets: &Assets) -> impl IntoView + use<> {
-    let painting = (page == Page::Home).then(|| {
+    let painting = page.start().then(|| {
         let set = format!(
             "{} 640w, {} 960w, {} 1600w",
             assets.url("img/world-640.avif"),
@@ -161,13 +161,26 @@ fn preloads(page: Page, lang: Lang, assets: &Assets) -> impl IntoView + use<> {
         Lang::Ja | Lang::Ko | Lang::ZhHans | Lang::ZhHant => ("latin", false),
         _ => ("latin", true),
     };
-    let italic = (page == Page::Home && slanted)
-        .then(|| font(&format!("fonts/Literata-Italic-{subset}.woff2")));
+    let italic =
+        (page.start() && slanted).then(|| font(&format!("fonts/Literata-Italic-{subset}.woff2")));
     view! {
         {painting}
         {font(&format!("fonts/Inter-{subset}.woff2"))}
         {font(&format!("fonts/Literata-{subset}.woff2"))}
         {italic}
+    }
+}
+
+/// A page's title as the tab, a bookmark and a search result show it: the
+/// page's own, then the site's name, unless the page's own already says it.
+/// The preview a link gets elsewhere keeps the bare title: it names the site
+/// in a field of its own (`og:site_name`).
+#[must_use]
+pub fn titled(title: &str) -> String {
+    if title.contains("Baylee") {
+        title.to_owned()
+    } else {
+        format!("{title} – Baylee")
     }
 }
 
@@ -205,7 +218,7 @@ fn head(page: Page, cx: &Context<'_>, meta: &Meta) -> impl IntoView + use<> {
     // a page's own script: the start page's album and screenshots, the
     // gateway directory's finding
     let own = match page {
-        Page::Home => Some("home.js"),
+        page if page.start() => Some("home.js"),
         Page::Gateways => Some("directory.js"),
         _ => None,
     }
@@ -213,7 +226,7 @@ fn head(page: Page, cx: &Context<'_>, meta: &Meta) -> impl IntoView + use<> {
     // the start page's sky: clouds the pointer stirs; the script waits for
     // the page to have loaded and the browser to be idle before it begins.
     // A phone has no pointer to stir with and is not sent it.
-    let sky = (page == Page::Home && !cx.machine.mobile).then(|| {
+    let sky = (page.start() && !cx.machine.mobile).then(|| {
         view! { <script type="module" src=assets.url("clouds.js") integrity=assets.integrity("clouds.js") fetchpriority="low"></script> }
     });
     // every page that can open the sign-in over itself has its islands
@@ -233,7 +246,7 @@ fn head(page: Page, cx: &Context<'_>, meta: &Meta) -> impl IntoView + use<> {
                 name="viewport"
                 content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content"
             />
-            <title>{meta.title.clone()}</title>
+            <title>{titled(&meta.title)}</title>
             <meta name="description" content=meta.description.clone() />
             {listed.then(|| view! { <link rel="canonical" href=canonical.clone() /> })}
             {alternates}
@@ -247,6 +260,7 @@ fn head(page: Page, cx: &Context<'_>, meta: &Meta) -> impl IntoView + use<> {
             <link rel="stylesheet" href=assets.url("site.css") integrity=assets.integrity("site.css") />
             <script src=assets.url("boot.js") integrity=assets.integrity("boot.js")></script>
             <script type="module" src=assets.url("pwa.js") integrity=assets.integrity("pwa.js")></script>
+            <script type="module" src=assets.url("nav.js") integrity=assets.integrity("nav.js")></script>
             <script type="module" src=assets.url("hint.js") integrity=assets.integrity("hint.js") fetchpriority="low"></script>
             {own}
             {sky}
@@ -278,9 +292,9 @@ fn head(page: Page, cx: &Context<'_>, meta: &Meta) -> impl IntoView + use<> {
 pub fn document(page: Page, cx: &Context<'_>, meta: &Meta, body: AnyView) -> impl IntoView + use<> {
     let lang = cx.lang;
     // the start page has the world in its hero; every other one behind it
-    let world = (page != Page::Home).then(|| world(cx));
+    let world = (!page.start()).then(|| world(cx));
     view! {
-        <html lang=lang.tag() dir="ltr">
+        <html lang=lang.tag() dir="ltr" data-auth=page.form()>
             {head(page, cx, meta)}
             <body>
                 <a class="skip" href="#main">{words::skip(lang)}</a>
@@ -288,6 +302,7 @@ pub fn document(page: Page, cx: &Context<'_>, meta: &Meta, body: AnyView) -> imp
                 {bar(page, cx)}
                 <div class="page">
                     <main id="main" tabindex="-1">
+                        {auth_noscript(page, lang)}
                         {crumbs(lang, &meta.trail)}
                         {body}
                     </main>
@@ -312,17 +327,15 @@ pub fn islands_script(page: Page) -> &'static str {
     }
 }
 
-/// Whether signing in and registering open over this page. Not over their
-/// own pages, not in the signed-in area, and not on the page a device
-/// shows without a connection.
+/// Whether signing in, registering and setting a new password open over
+/// this page. Not in the signed-in area, and not on the page a device shows
+/// without a connection. Their own addresses (`/{lang}/signin`, `/register`,
+/// `/reset`) are the start page with the dialog open (`Page::form`).
 fn has_auth_dialogs(page: Page) -> bool {
-    !matches!(
-        page,
-        Page::SignIn | Page::Register | Page::Reset | Page::Account(_) | Page::Offline
-    )
+    !matches!(page, Page::Account(_) | Page::Offline)
 }
 
-/// One of the two dialogs: Baylee's mark, the title, a line, the form.
+/// One of the three dialogs: Baylee's mark, the title, a line, the form.
 fn auth_dialog(
     cx: &Context<'_>,
     id: &'static str,
@@ -384,10 +397,29 @@ fn auth_dialogs(page: Page, cx: &Context<'_>) -> Option<impl IntoView + use<>> {
             "auth-register",
             words::register_title(lang),
             words::register_lead(lang),
-            view! { <Register lang=lang worker=worker pow=pow /> }.into_any(),
+            view! { <Register lang=lang worker=worker.clone() pow=pow /> }.into_any(),
+            None,
+        )}
+        {auth_dialog(
+            cx,
+            "auth-reset",
+            words::reset_title(lang),
+            words::reset_lead(lang),
+            view! { <Reset lang=lang worker=worker /> }.into_any(),
             None,
         )}
     })
+}
+
+/// What a form's own address says where no script runs: the dialogs open
+/// by script, and their forms work the password in the browser.
+fn auth_noscript(page: Page, lang: Lang) -> Option<impl IntoView + use<>> {
+    let words = match page {
+        Page::SignIn | Page::Register => words::signin_noscript(lang),
+        Page::Reset => words::reset_noscript(lang),
+        _ => return None,
+    };
+    Some(view! { <noscript><p class="notice auth-noscript wrap">{words}</p></noscript> })
 }
 
 /// The address of the same page in `lang`.
@@ -601,10 +633,13 @@ fn bar(page: Page, cx: &Context<'_>) -> impl IntoView + use<> {
                 <nav class="nav" id="nav" popover="auto" aria-label=words::nav_label(lang)>
                     {nav_link(Page::Download, page, lang, words::nav_download(lang))}
                     {nav_link(Page::Gateways, page, lang, words::nav_gateways(lang))}
-                    {nav_link(Page::Challenges, page, lang, words::ch_title(lang))}
                     {nav_link(Page::Security, page, lang, words::nav_security(lang))}
                     {nav_link(Page::Faq, page, lang, words::nav_faq(lang))}
                     {nav_link(Page::Contact, page, lang, words::nav_contact(lang))}
+                    <a class="nav-give" href=Page::Donate.path(lang) aria-current=(page == Page::Donate).then_some("page")>
+                        {icon(icons::HEART)}
+                        <span>{words::nav_donate(lang)}</span>
+                    </a>
                     <a
                         class="nav-account"
                         href=format!("/{}/signin", lang.code())
@@ -694,38 +729,38 @@ fn footer(page: Page, cx: &Context<'_>) -> impl IntoView + use<> {
                         </div>
                     </div>
                     <nav class="foot-map" aria-label=words::foot_label(lang)>
-                        <section aria-labelledby="foot-play">
+                        <div class="foot-col">
                             <h2 class="foot-head" id="foot-play">{words::foot_play(lang)}</h2>
-                            <ul class="foot-list">
+                            <ul class="foot-list" aria-labelledby="foot-play">
                                 {link(Page::Download, words::nav_download(lang))}
                                 {link(Page::Gateways, words::nav_gateways(lang))}
-                                {link(Page::Challenges, words::ch_title(lang))}
                                 {link(Page::Faq, words::nav_faq(lang))}
                                 {link(Page::Security, words::nav_security(lang))}
                                 {away(DISCORD.to_owned(), words::foot_discord(lang))}
                                 {away(WHATSAPP.to_owned(), words::hero_whatsapp(lang))}
                                 {link(Page::Contact, words::nav_contact(lang))}
                             </ul>
-                        </section>
-                        <section aria-labelledby="foot-project">
+                        </div>
+                        <div class="foot-col">
                             <h2 class="foot-head" id="foot-project">{words::foot_project(lang)}</h2>
-                            <ul class="foot-list">
+                            <ul class="foot-list" aria-labelledby="foot-project">
                                 {away(REPOSITORY.to_owned(), words::foot_source(lang))}
                                 {away(CENTRAL_REPOSITORY.to_owned(), words::foot_central(lang))}
                                 {away(format!("{CENTRAL_REPOSITORY}/tree/main/crates/central-web"), words::foot_central_source(lang))}
                                 {away(format!("{REPOSITORY}/releases"), words::foot_releases(lang))}
                                 {away(format!("{REPOSITORY}/issues"), words::foot_issues(lang))}
+                                {link(Page::Donate, words::nav_donate(lang))}
                             </ul>
-                        </section>
-                        <section aria-labelledby="foot-legal">
+                        </div>
+                        <div class="foot-col">
                             <h2 class="foot-head" id="foot-legal">{words::foot_legal(lang)}</h2>
-                            <ul class="foot-list">
+                            <ul class="foot-list" aria-labelledby="foot-legal">
                                 {link(Page::Terms, words::title_terms(lang))}
                                 {link(Page::Privacy, words::title_privacy(lang))}
                                 {link(Page::Impressum, words::title_impressum(lang))}
                                 {link(Page::FanContent, words::title_fan_content(lang))}
                             </ul>
-                        </section>
+                        </div>
                     </nav>
                 </div>
                 <div class="foot-bottom">
@@ -740,10 +775,39 @@ fn footer(page: Page, cx: &Context<'_>) -> impl IntoView + use<> {
                             <li>"Rust & Bevy"</li>
                         </ul>
                     </div>
+                    {build_line(lang, &assets.build)}
                 </div>
             </div>
         </footer>
     }
+}
+
+/// The footer's last line, small and faint: which release this site
+/// descends from, the commit it was built of (a link to it) and that
+/// commit's day. A build that knows none of it has no such line.
+fn build_line(lang: Lang, build: &super::Build) -> Option<impl IntoView + use<>> {
+    let version = build.version();
+    let commit = build.commit().map(|commit| {
+        let short = commit.get(..8).unwrap_or(commit).to_owned();
+        view! {
+            <a href=format!("{CENTRAL_REPOSITORY}/commit/{commit}") target="_blank" rel="noopener noreferrer"
+                translate="no">{short}</a>
+        }
+    });
+    let day = build.date().map(|iso| {
+        view! { <time datetime=iso.to_owned()>{crate::format::date(lang, iso)}</time> }
+    });
+    if version.is_none() && commit.is_none() {
+        return None;
+    }
+    Some(view! {
+        <p class="foot-build">
+            <span class="visually-hidden">{words::foot_build(lang)}</span>
+            {version.map(|version| view! { <span translate="no">{version}</span> })}
+            {commit}
+            {day}
+        </p>
+    })
 }
 
 /// The update offer: hidden until `pwa.js` finds a new version waiting.

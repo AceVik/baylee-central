@@ -122,12 +122,10 @@ dl-linux-unsure = Your browser does not name your processor; x86-64 is assumed. 
 dl-missing = This release has no file for your system. Older releases are on the <releases>releases page</releases>.
 dl-none = GitHub did not answer just now. Every release is on the <releases>releases page</releases>.
 dl-yours = Your system
-dl-more-files = More files ({ $count })
 dl-installer = Installer
 dl-deb = Debian package
 dl-archive = Archive
 dl-fallback = Archive for older processors
-dl-fallback-help = For x86-64 processors without AVX2 (before about 2013). Baylee's main builds need AVX2 and do not start without it.
 plat-windows-x64 = Windows
 plat-windows-x64-sub = most PCs: 64‑bit Intel or AMD
 plat-windows-arm64 = Windows on ARM
@@ -245,7 +243,7 @@ fc-policy = Wizards of the Coast's <policy>Fan Content Policy</policy>
 
 privacy-title = Privacy notice
 privacy-lead = What this site and Baylee Central process about you, why, on which legal basis and for how long.
-privacy-updated = As of 13 November 2026
+privacy-updated = As of 18 November 2026
 privacy-controller-title = Who is responsible
 privacy-controller = The controller under the GDPR is the private person named in the <impressum>legal notice</impressum>, which gives their name, postal address and e-mail address. You can also send privacy questions through the contact form. There is no data protection officer; none is required.
 privacy-short-title = In short
@@ -253,9 +251,9 @@ privacy-short = No tracking, no advertising, no analytics, no cookie unless you 
 privacy-hosting-title = Visiting the site
 privacy-hosting = The site runs on a server we rent from netcup GmbH in Germany. When you open a page, your browser sends what every request carries: your IP address, the address asked for, the time, your browser's language and its identification (user agent). The server needs this to answer; it picks the language version from the language, and the download page uses the user agent to suggest the right file. The web server keeps no access log, so these requests are not stored. The server's own operating messages (its system journal) can, in rare error cases, contain an IP address; they are deleted after 14 days at the latest. Legal basis: Art. 6(1)(f) GDPR; our legitimate interest is delivering the site safely and reliably.
 privacy-views-title = Counting page views
-privacy-views = The website counts how often its pages are opened: one single number for all pages and all visitors together, shown on the start page. A page opened in a browser adds one to it. Nothing about you is stored for this: no IP address, no cookie, no identifier, not even which page it was.
+privacy-views = The website counts how often it is visited: one single number for all pages and all visitors together, shown on the start page. What is counted is a visit: a browser arriving at the website adds one; going on from page to page, or loading a page again, is not counted again. The server reads that from the single request (whether it came from one of our own pages, and whether it is a reload). Nothing about you is stored for this: no IP address, no cookie, no identifier, not even which page it was.
 privacy-device-title = What your browser keeps
-privacy-device = This site sets no cookie until you sign in. What your browser keeps on your device, and only with JavaScript: your colour choice if you made one (<code>baylee-site-theme</code>); while you are signed in, when your session ends (<code>baylee-central-session</code>), your chat key and your contacts' trusted keys (see Chat); if you turned on notifications, a random number for this device (<code>baylee-push-installation-v1</code>, <code>baylee-push</code>); and, only once you have signed in, installed the site as an app or turned on notifications, a copy of the site's public files (page shell, fonts, scripts), so that it starts without a connection and notifications can arrive. If none of the three applies any more, the copy is removed the next time you open the site. None of this is sent to us unless a section below says so. The chat and session entries are deleted when you sign out; you remove everything else by clearing the site's data in your browser. Legal basis: § 25(2) no. 2 TDDDG (strictly necessary for the function you use); for the notifications' random number, your consent (§ 25(1) TDDDG).
+privacy-device = This site sets no cookie until you sign in. What your browser keeps on your device, and only with JavaScript: your colour choice if you made one (<code>baylee-site-theme</code>); while you are signed in, when your session ends and a random marker that detects sign-in changes (<code>baylee-central-session</code>), your display name, your tag and the key your profile picture is fetched by, so that the header can show who is signed in (<code>baylee-central-own</code>; removed when you sign out, or the next time the site is opened after your session has ended), your chat key and your contacts' trusted keys (see Chat); if you turned on notifications, a random number for this device (<code>baylee-push-installation-v1</code>, <code>baylee-push</code>); and, only once you have signed in, installed the site as an app or turned on notifications, a copy of the site's public files (page shell, fonts, scripts), so that it starts without a connection and notifications can arrive. If none of the three applies any more, the copy is removed the next time you open the site. None of this is sent to us unless a section below says so. The chat and session entries are deleted when you sign out; you remove everything else by clearing the site's data in your browser. Legal basis: § 25(2) no. 2 TDDDG (strictly necessary for the function you use); for the notifications' random number, your consent (§ 25(1) TDDDG).
 privacy-device-manager = If you keep your recovery code in your browser's password manager, mail it to yourself, save it as a file or print it on the step that shows it, your browser, your mail program, your files or your paper keep it, never this site: the code is made in your browser and never sent to us. Clearing the site's data does not remove it from there.
 privacy-github-title = GitHub
 privacy-github = The download page and the start page show the newest release, the test status and the card numbers. Our server asks GitHub for them, not your browser; GitHub learns nothing about you from that. Only when you click a download or GitHub link does your browser connect to GitHub (GitHub, Inc., USA) and send it your IP address and what every request carries; GitHub's own privacy notice then applies.
@@ -485,7 +483,6 @@ register-error-taken = This sign-in name is taken. Choose another.
 ## The recovery code
 
 code-title = Your recovery code
-code-handle = Your handle: { $handle }
 code-lead = Only with this code does your encrypted data survive if you forget your password. We do not know it and cannot restore it. Keep it somewhere safe where you will find it even without this device.
 code-shown-once = Shown only now
 code-download = Save as a text file
@@ -889,44 +886,22 @@ strip-gateways = Gateways
 strip-online = online
 strip-offline = offline
 strip-directory = the directory
-strip-cards = Playable cards
-strip-cards-unit = cards
 strip-accounts = Accounts at Baylee Central
 strip-live = Right now on the gateways, as they report it
 strip-views = Page views since { $date }
-live-views = { $n ->
-    [one] { $n } view
-   *[other] { $n } views
-}
-live-accounts = { $n ->
-    [one] { $n } account
-   *[other] { $n } accounts
-}
-live-players = { $n ->
-    [one] { $n } player
-   *[other] { $n } players
-}
-live-playing = { $n ->
-    [one] { $n } in a game
-   *[other] { $n } in a game
-}
-live-tables = { $n ->
-    [one] { $n } open table
-   *[other] { $n } open tables
-}
-live-games = { $n ->
-    [one] { $n } game
-   *[other] { $n } games
-}
+strip-l-players = Players
+strip-l-games = Games
+strip-l-tables = Open tables
+strip-l-accounts = Accounts
+strip-l-views = Views
+stat-cards = Playable cards
 hero-badges = At a glance
 hero-badge-beta = Open beta
 hero-badge-free = Free
 hero-badge-open = Open source
 hero-badge-fan = Unofficial fan content
 gws-open-client = Open in Baylee
-gws-open-client-help = “Open in Baylee” starts the installed client (0.1.1-beta.9b or newer). It shows the address and asks before it adds the gateway.
 dl-menu-title = All systems
-dl-old-cpu = older processors (no AVX2)
 ci-passing = passing
 ci-failing = failing
 dl-button = Download Baylee
@@ -987,11 +962,6 @@ source-repoTitle = The repository right now
 source-stars = Stars
 source-issues = Open issues and pull requests
 source-note = Read from GitHub's public API by this site's server every ten minutes. Your browser asks GitHub nothing.
-gw-count = 
-    { $n ->
-        [one] { $n } gateway listed, { $online } online.
-       *[other] { $n } gateways listed, { $online } online.
-    }
 gw-none = No gateway is listed yet.
 contact-intro = A question, an idea, a game you would like to see, or something you would rather not post in public: this form goes straight to the person behind Baylee. Leave an e-mail address if you want an answer; without one we can only read it.
 contact-f8 = A card that resolved wrongly is best reported from the game with <kbd>F8</kbd>, because the report can carry the whole game.
@@ -1014,17 +984,14 @@ ai-hostingLink = Gateway hosting & LLM setup
 
 # The gateways and the contact page, as the old site wrote them (owner, 11.11.2026)
 gw-lead = A gateway is a server where online tables live: accounts, decks, rooms and one engine process per game. These are the ones registered with Baylee Central and approved by its administrator. Each is run by its operators for their groups, and their own rules apply there. A listing is not a promise about what a gateway does.
-gw-howTo = To play on one, copy its address into the client's front door. Online means Central heard from the gateway within the last minute and a half; it is no promise that it answers. Names and versions are what each operator reports.
 gw-find = Find a gateway
 gw-findHint = Name or address
 gw-shown = { $n } of { $all } shown
 gw-noMatch = No gateway loaded so far matches.
 gw-showAll = Show all
 gw-stats = The directory in numbers
-gw-stat-listed = Gateways listed
 gw-stat-online = Online now
 gw-stat-players = Players online
-gw-stat-playing = Of them in a game
 gw-stat-tables = Open tables
 gw-stat-games = Games running
 gw-show = Show
@@ -1358,7 +1325,6 @@ privacy-export-picture = Your profile picture (PNG)
 privacy-picture-title = Profile picture
 privacy-picture = A profile picture is optional. If you choose one, your browser makes a square copy of it without the photo's details (such as place, camera or time) and sends that; where your browser does not allow this, it sends the file itself, and Central's converter keeps only its pixels. Central turns it into a 256 × 256 pixel AVIF and PNG picture that holds nothing else, and if the picture moves, also into an animation (AVIF, at most 100 frames) made from its frames alone by a converter program (ffmpeg) that never sees your file; it stores them with a fingerprint (a SHA-256 digest of the PNG and of the animation, if there is one) and the time you set it, under a random key that changes with every new picture. The converter runs as a separate process for each picture and keeps nothing. Everyone can see your picture, people who are not signed in included, at its address; it is shown beside your display name. It is kept until you replace or remove it, an administrator removes it, or you delete your account, and is then deleted at once; a browser that showed it may keep a copy for up to an hour. Anyone signed in can report a picture with a reason and an optional note: the report holds the reporting account, the picture's fingerprint, the reason, the note and the time. Administrators see who reported it; the person whose picture it is never does. If an administrator removes your picture, you are told when and why, and new pictures may be blocked for a time. Decided reports are kept for one year. Per account, Central counts uploads (ten an hour, thirty a day). Legal basis: Art. 6(1)(b) GDPR for the picture; Art. 6(1)(f) GDPR for reports, the counts and moderation (our legitimate interest in keeping the service free of unlawful and abusive content).
 
-
 # ==== the administration's other pages (islands/admin/) ========================
 # Rebuilt from the old build's /admin pages: the counts, the accounts, one
 # account, the gateways, the audit log and the legacy store.
@@ -1468,7 +1434,6 @@ admin-legacy-restored = Restored
 admin-legacy-banned = Banned
 admin-legacy-must-change = New password required
 admin-legacy-locked = Locked until { $until }
-
 
 ## The feedback moderation (/account/admin/feedback)
 
@@ -1768,81 +1733,122 @@ fb-json-base64 = { $n } characters of base64
 fb-json-more = Show the next { $n } (left: { $left })
 fb-json-items = items: { $n }
 fb-json-keys = keys: { $n }
-## Global daily and weekly challenges
-ch-title = Challenges
-ch-lead = The same challenge for everyone, wherever you play. Find your solution, improve your score and build a lasting collection of badges.
-ch-eyebrow = A reason to return
-ch-daily = Daily
-ch-weekly = Weekly
-ch-loading = Loading…
-ch-play-help = The link opens the task in Baylee. You can also find it in the client's Challenges area.
-ch-unavailable = Challenges could not be loaded. Please try again.
-ch-empty = No verified challenge is available yet.
-ch-archive = Archive
-ch-older = Earlier challenges
-ch-withdrawn = Withdrawn — this task cannot be started or ranked.
-ch-current = Live challenge
-ch-details = Task and rankings
-ch-play = Play in Baylee
-ch-ends = Live ranking closes
-ch-estimated = Estimated time
-ch-target = Turn target
-ch-deck = Provided deck
-ch-progress = Your progress
-ch-attempts = Started attempts
-ch-failures = Failed attempts
-ch-best-turns = Fewest turns
-ch-completed = Completed — your progress is saved.
-ch-assisted = Hints used: new attempts are assisted and do not enter the competitive rankings.
-ch-consent = Show my public name and tag in this task's rankings.
-ch-hint-one = Hint 1
-ch-hint-two = Hint 2
-ch-hint-confirm = Reveal hint
-ch-hint-warning = Revealing a hint marks this task as assisted for your account, including later attempts. Completion badges still count. Earlier unassisted scores stay valid.
-ch-first-win = First victory
-ch-sprint = Sprint
-ch-rankings = Global rankings
-ch-ranking-rules = First victory: fewer failed attempts, then fewer turns. Fewest turns: your best unassisted win. Sprint: server-measured time without a pause or disconnect. Equal scores share a rank. Only victories finished during the live period qualify.
-ch-no-scores = No qualifying public scores yet.
-ch-more = Next page
-ch-rank = Rank
-ch-player = Player
-ch-turn = Turn
-ch-time = Time
-ch-badges = Your badge collection
-ch-badges-lead = Each task counts once. Badges gain permanent tiers; missed days never erase progress. Archive wins also count toward Daily, Weekly and Tactician.
-ch-active = Continue an active attempt
-ch-badge-daily = Daily explorer
-ch-badge-weekly = Weekly explorer
-ch-badge-tactician = Tactician
-ch-badge-first-try = First-try solver
-ch-badge-regular = Regular visitor
-ch-badge-locked = Not earned yet
-ch-bronze = Bronze
-ch-silver = Silver
-ch-gold = Gold
-ch-platinum = Platinum
-ch-obsidian = Obsidian
+## The privacy notice: what Central keeps of Daily and Weekly tasks
 privacy-challenges-title = Daily and Weekly challenges
 privacy-challenges = Central keeps attempts, results, hints used, ranking preferences and permanent badge progress with your account. The official host sends the game's result and measured time. Names, tags and scores are public only when you enable the ranking for that task; disabling it removes them from the ranking. These records remain until account deletion, with the backup periods described under Account. Challenge metadata is included in your account's data export.
 
-# Tower expeditions
+# The privacy notice: what Central keeps of Tower expeditions
 tower-title = The Verdant Tower
-tower-lead = Five duels. Three lives. A deck shaped by your decisions.
-tower-rules = Play every duel yourself with a supplied deck. After each of the first four victories, choose an improvement. A defeat costs one life; three defeats end the expedition. Reconnecting preserves the encounter; technical voids cost no life. Everyone shares the same weekly tower. After the week ends, practice still earns permanent badges.
-tower-floors = Floors
-tower-lives = Lives
-tower-rewards = Relics of the ascent
-tower-reward-rules = Pathfinder counts distinct weekly floors; Crown keeper counts weekly summits; Unbroken counts flawless weekly summits. Repeating the same accomplishment in the same week adds no progress. Earned relics never expire and require no streak.
-tower-conquered = The crown is yours
-tower-choosing = Choose your next improvement in the game
-tower-ended = Expedition ended
-tower-pathfinder = Pathfinder
-tower-summit = Crown keeper
-tower-unbroken = Unbroken
-tower-tiers = Explore all five tiers
-tower-ascent = Ascent
-tower-sprint = Flawless sprint
-tower-scoring = Ascent ranks floors cleared, then fewer defeats, then fewer winning turns. Sprint measures active thinking time for a flawless summit with no interrupted victory. Only your best eligible run appears. Equal scores share a rank.
 tower-privacy = Central stores your expedition runs, chosen improvements, remaining lives, results, ranking preferences and permanent relic progress with your account. Only your public name, tag and best eligible score appear when you enable a season's ranking. Disabling it removes that listing. Your account export includes expedition runs and attempts. Account deletion also deletes this progression, subject to the backup periods described under Account.
-tower-guide = Expedition rules
+
+## the steps after signing in (code and terms, redesign)
+code-created = Account created
+code-handle-label = Your handle
+code-keep-title = Keep it now, in at least one of these ways
+code-mail-opened = Your mail program should open now with a draft. If nothing happens, this browser has none set up: keep the code another way.
+terms-step-version = Version { $version }
+terms-read-hint = Read the text to its end, then you can accept.
+terms-read-done = Read to the end.
+
+## the contact form (redesign)
+contact-again = Write another message
+
+## the footer's last line (which build this is)
+foot-build = This site's build:
+
+## download (variants and page)
+dl-v2-name = Older processors (x86-64-v2)
+dl-v2-help = For processors older than about 2013–2015, or if the main build does not start.
+dl-os-windows = Windows 10 or 11
+dl-os-mac = macOS 11 or later
+dl-os-linux = glibc 2.35 or newer and a Vulkan driver
+dl-howto-title = Installing
+dl-howto-windows-1 = Download the installer and run it.
+dl-howto-windows-2 = If Windows warns you, choose <i>More info</i> and then <i>Run anyway</i>: the builds are not code-signed.
+dl-howto-windows-3 = Start Baylee from the Start menu.
+dl-howto-mac-1 = Open the <code>.dmg</code> and drag Baylee into <i>Applications</i>.
+dl-howto-mac-2 = On the first start, open <i>System Settings → Privacy & Security</i> and choose <i>Open Anyway</i>.
+dl-howto-mac-3 = Not sure which chip your Mac has? <i>Apple menu → About This Mac</i> tells you.
+dl-howto-linux-1 = Make the AppImage executable with <code>chmod +x</code> and run it.
+dl-howto-linux-2 = Or install the package: <code>sudo apt install ./baylee_*.deb</code>.
+dl-howto-linux-3 = The archive needs no installation: unpack it and start <code>baylee</code>.
+dl-soon-title = Coming later
+dl-soon-text = Baylee runs on a computer for now. These are planned; there is nothing to download yet.
+dl-soon-web = In the browser
+
+## the account overview and its navigation (redesign)
+account-group-account = Account
+account-play-title = Play
+account-play-lead = Get the game and sign in there with this account.
+account-numbers-lead = Public figures, as the gateways and Baylee Central report them right now.
+account-chat-lead = Messages and your contacts, encrypted end to end.
+account-push-lead = Let this device tell you about new messages.
+
+## donations (the page, the bar's entry, the start page's band)
+nav-donate = Donate
+donate-title = Keep Baylee in development
+donate-eyebrow = Support
+donate-description = Baylee is free and stays free. If you like it, you can help carry what it costs each month: on GitHub Sponsors, Liberapay or Ko-fi.
+donate-lead = Baylee is free and stays free: no paywall, no paid features, no ads. It is built in spare time, and it still costs money every month. If you like it, you can help carry that.
+donate-goal-title = The goal
+donate-goal-amount = about { $amount } a month
+donate-goal-lead = That is roughly what development and operation cost each month.
+donate-progress = { $have } of { $goal } a month
+donate-progress-label = How much of the monthly goal is covered
+donate-progress-percent = { $percent } % covered
+donate-progress-supporters = Supporters: { $n }.
+donate-progress-missing = Not counted yet: { $platforms }.
+donate-progress-first = No recurring donation yet. Yours would be the first.
+donate-progress-none = The platforms have not told us a figure yet.
+donate-once-title = One-time donations
+donate-once-since = since { $date }
+donate-once-count = Donations: { $n }
+donate-once-note = Given once, so no part of the monthly goal. Other currencies are converted to euros at the rate of the day they came.
+donate-costs-title = What it pays for
+donate-costs-lead = Rounded monthly figures.
+donate-cost-ai = AI assistants
+donate-cost-ai-note = Claude and Gemini. Without them the project could not be developed any further.
+donate-cost-servers = Servers
+donate-cost-servers-note = The public gateway, Baylee Central and this website.
+donate-cost-art = Pictures, video and music
+donate-cost-art-note = The tools the backgrounds and the music are made with.
+donate-cost-tools = Development tools
+donate-cost-tools-note = GitHub, the editor, the developer programme for Apple devices, the domain and e-mail.
+donate-cost-fees = Fees
+donate-cost-fees-note = What the platforms and payment services keep, about a tenth.
+donate-cost-about = about { $amount }
+donate-ways-title = Three ways to give
+donate-ways-lead = All three lead to the developer of Baylee, AceVik, who pays these costs. Pick the one you like.
+donate-github-lead = Monthly or once, with your GitHub account.
+donate-liberapay-lead = A recurring donation, by card or PayPal. Liberapay is run by a non-profit.
+donate-kofi-lead = A one-time tip, without an account, by card or PayPal.
+donate-open = Open { $platform }
+donate-qr-alt = QR code for { $address }
+donate-nothing-title = What a donation buys
+donate-nothing = Nothing, and that is on purpose. No feature, no advantage in a game, no earlier or exclusive access, no badge, and no name on a list: everyone gets the same Baylee. A donation is a thank-you, a gift to a private person; it is not tax-deductible.
+donate-other-title = Other ways to help
+donate-other = Play, report what is broken and tell your friends. That helps just as much.
+donate-privacy = Payment happens on the platform you choose and with its payment service. This site takes no payment and learns nothing about who gave.
+donate-band-title = Baylee is free. Help keep it going.
+donate-band-lead = Servers and tools cost about { $amount } a month. A donation buys nothing and helps a lot.
+donate-band-button = Ways to donate
+privacy-donate-title = Donations
+privacy-donate = The donation page links to GitHub Sponsors (GitHub, Inc., USA), Liberapay (Liberapay, France) and Ko-fi (Ko-fi Labs Limited, United Kingdom). Only when you follow one of these links does your browser connect to that platform; payment happens there and with its payment service (Stripe or PayPal), and the platform's own privacy notice applies. We take no payment on this site. The page shows how much of the monthly goal is covered and what was given once. Baylee Central collects these figures, not your browser: it asks Liberapay for its public total and GitHub Sponsors for the account's own totals and one-time sponsorships, without the sponsors' names, takes the euro exchange rates from the European Central Bank, and is notified by Ko-fi of each payment. Of a payment Central keeps only the amount, the currency, the time, whether it was given once or regularly, and a fingerprint of the platform's transaction number so that a notice that comes twice counts once; everything else in a notice, such as a name, an e-mail address or a message, is discarded without being stored or logged. After 40 days the amounts are added to a total and the single records are deleted. The figures name nobody, and we publish no donor's name.
+
+## gateways directory (redesign)
+gw-play-hint = “Open in Baylee” hands the gateway to the installed client, which shows the address and asks before it adds it. You sign in there, not here. No client yet? <download>Download Baylee</download>.
+gw-fineprint = Online means Central heard from the gateway within the last minute and a half; it is no promise that it answers. Names, versions and figures are what each operator reports.
+gw-fig-players = Players
+gw-fig-playing = In a game
+gw-fig-tables = Open tables
+gw-fig-games = Games
+gw-load = { $n }% of its players are in a game
+gw-load-empty = Nobody is here right now.
+gw-silent = Reports no figures.
+gw-away = Central has not heard from it lately.
+gw-current = Current
+gw-current-title = Runs the version of the newest release.
+gw-secure = Encrypted connection (HTTPS)
+gw-show-current = Current version
+gw-col-gateway = Gateway
+gw-col-state = Status

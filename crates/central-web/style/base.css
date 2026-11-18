@@ -18,6 +18,12 @@ html {
   scroll-padding-block-start: calc(var(--top-h) + 0.8rem);
   scroll-behavior: smooth;
   background: var(--bg);
+  /* grayscale antialiasing for the whole document, the top layer's dialogs
+     and popovers and the viewport's scrollbar text included; both
+     properties inherit, so one place says it for all */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 body {
@@ -36,6 +42,7 @@ body {
   font-optical-sizing: auto;
   /* a weight the font has not is not smeared on: both fonts are variable */
   font-synthesis-weight: none;
+  font-size-adjust: from-font;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -83,6 +90,7 @@ body {
   --serif: "Literata", var(--cjk), system-ui, sans-serif;
 
   font-synthesis-style: none;
+  font-size-adjust: none;
 }
 
 /* a Japanese title breaks between phrases where the browser can tell them */
@@ -257,6 +265,18 @@ select,
 textarea {
   font: inherit;
   color: inherit;
+  /* a form control's own UA sheet resets these: say "as the page" */
+  -webkit-font-smoothing: inherit;
+  -moz-osx-font-smoothing: inherit;
+  text-rendering: inherit;
+}
+
+::placeholder,
+::file-selector-button {
+  font: inherit;
+  -webkit-font-smoothing: inherit;
+  -moz-osx-font-smoothing: inherit;
+  text-rendering: inherit;
 }
 
 .num {
@@ -378,33 +398,48 @@ dialog[open] {
   }
 }
 
-/* What floats and scrolls on its own (the sign-in and registration
-   dialogs, a dropdown, the phone's menu, the terms): a thin bar in the
-   page's ink on no track, so that it does not cut a grey stripe through a
-   rounded panel. */
-.auth-dialog,
-.menu,
-.nav[popover],
-.terms-text {
-  scrollbar-width: thin;
-  scrollbar-color: color-mix(in srgb, var(--ink-soft) 55%, transparent) transparent;
+/* Every scroller (the page, a dropdown, a dialog, a text box, a panel, a
+   table, a list a script made later) wears one thin bar in the page's ink
+   on no track, so that it cuts no grey stripe through a rounded panel.
+   `scrollbar-color` inherits, so the root says it once for the page and for
+   everything below it; `scrollbar-width` does not, so the universal
+   selector (specificity 0: any component's own bar still wins) says it for
+   every box. This replaces a list of the boxes that had to be named one by
+   one, and which the download menu was not on. */
+:root {
+  --scrollbar: color-mix(in srgb, var(--ink-soft) 55%, transparent);
+  --scrollbar-hover: color-mix(in srgb, var(--ink-soft) 85%, transparent);
+  scrollbar-color: var(--scrollbar) transparent;
 }
 
-/* Safari before `scrollbar-color`: the same by its own pseudo-elements */
+* {
+  scrollbar-width: thin;
+}
+
+/* Safari before `scrollbar-color` (18.1 and older) and WebKit-based views:
+   the same by pseudo-elements. Where the standard properties exist, they
+   are what draws the bar, and these would turn it into a custom-drawn one,
+   so they stay out of those browsers. */
 @supports not (scrollbar-color: auto) {
-  :is(.auth-dialog, .menu, .nav[popover], .terms-text)::-webkit-scrollbar {
+  *::-webkit-scrollbar {
     inline-size: 10px;
+    block-size: 10px;
   }
 
-  :is(.auth-dialog, .menu, .nav[popover], .terms-text)::-webkit-scrollbar-track {
+  *::-webkit-scrollbar-track,
+  *::-webkit-scrollbar-corner {
     margin-block: 0.4rem;
     background: transparent;
   }
 
-  :is(.auth-dialog, .menu, .nav[popover], .terms-text)::-webkit-scrollbar-thumb {
+  *::-webkit-scrollbar-thumb {
     border: 3px solid transparent;
     border-radius: 999px;
-    background: color-mix(in srgb, var(--ink-soft) 55%, transparent) padding-box;
+    background: var(--scrollbar) padding-box;
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background: var(--scrollbar-hover) padding-box;
   }
 }
 

@@ -3,7 +3,7 @@
 use crate::fail::{Fail, Result};
 pub use crate::postgres::Scope as PostgresScope;
 use crate::{
-    crypto_scope, gate, policy, postgres, secrets, site, smoke, sqlite_scope, wasm, workspace,
+    chrono_scope, crypto_scope, gate, policy, postgres, secrets, site, smoke, wasm, workspace,
 };
 
 /// What to run.
@@ -18,9 +18,9 @@ pub enum Task {
     },
     /// The exact source and dependency bounds for the bigint advisory.
     CryptoScope,
-    /// The bound of the `libsqlite3-sys` advisory's exception: in the lock
-    /// file only, in no build.
-    SqliteScope,
+    /// The bound of the `chrono` advisory's exception: in the lock file
+    /// only, in no build.
+    ChronoScope,
     /// The code policy.
     Policy {
         /// Also check that rustc rejects unsafe code under the forbid lint.
@@ -55,11 +55,11 @@ pub const USAGE: &str = "usage: cargo xtask <task>
 
 tasks:
   crypto-scope                 verify the reviewed Ristretto advisory scope
-  sqlite-scope                 verify libsqlite3-sys is in Cargo.lock only, in no build
+  chrono-scope                 verify chrono is in Cargo.lock only, in no build
   gate [--client]               fmt, policy, clippy, tests, doc tests, release build;
                                 --client: only the client's crates, no release build
   policy [--compiler-probe]     the code policy: unsafe, native sources, links, dependencies
-  postgres [--exercise-failure | --store-only | --tower-only] the PostgreSQL integration fixture (needs Docker and OpenSSL)
+  postgres [--exercise-failure | --store-only | --tower-only | --tower-access-only | --tower-awards-only] the PostgreSQL integration fixture (needs Docker and OpenSSL)
   smoke [--exercise-failure]    the development listener smoke test (build --release first)
   secrets                       the secret scan of the tree and the full history (pinned gitleaks)
   wasm [--check]                the website's WebAssembly crypto and glue (crates/central-web/crypto)
@@ -81,7 +81,7 @@ pub fn parse(args: &[String]) -> Result<Task> {
         ("gate", None) => Ok(Task::Gate { client: false }),
         ("gate", Some("--client")) => Ok(Task::Gate { client: true }),
         ("crypto-scope", None) => Ok(Task::CryptoScope),
-        ("sqlite-scope", None) => Ok(Task::SqliteScope),
+        ("chrono-scope", None) => Ok(Task::ChronoScope),
         ("policy", None) => Ok(Task::Policy {
             compiler_probe: false,
         }),
@@ -99,6 +99,14 @@ pub fn parse(args: &[String]) -> Result<Task> {
         ("postgres", Some("--tower-only")) => Ok(Task::Postgres {
             exercise_failure: false,
             scope: postgres::Scope::Tower,
+        }),
+        ("postgres", Some("--tower-access-only")) => Ok(Task::Postgres {
+            exercise_failure: false,
+            scope: postgres::Scope::TowerAccess,
+        }),
+        ("postgres", Some("--tower-awards-only")) => Ok(Task::Postgres {
+            exercise_failure: false,
+            scope: postgres::Scope::TowerAwards,
         }),
         ("postgres", Some("--store-only")) => Ok(Task::Postgres {
             exercise_failure: false,
@@ -128,7 +136,7 @@ pub fn run(args: &[String]) -> Result<()> {
     match task {
         Task::Gate { client } => gate::run(&root, client),
         Task::CryptoScope => crypto_scope::check(&root),
-        Task::SqliteScope => sqlite_scope::check(&root),
+        Task::ChronoScope => chrono_scope::check(&root),
         Task::Policy { compiler_probe } => {
             policy::check(&root, compiler_probe)?;
             println!("{}", policy::PASSED);

@@ -11,4 +11,4 @@ description = "Central's bounded outbound HTTPS: public addresses only, pinned a
 workspace = true
 
 [dependencies]
-ureq = { version = "=3.5.1", default-features = false, features = ["rustls"] }
+ureq = { version = "=3.5.2", default-features = false, features = ["rustls"] }

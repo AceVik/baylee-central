@@ -23,8 +23,8 @@ pub enum Page {
     Download,
     /// `/{lang}/gateways`.
     Gateways,
-    /// `/{lang}/challenges`: shared Daily/Weekly tasks, rankings and permanent badges.
-    Challenges,
+    /// `/{lang}/donate`: the monthly goal and the places to give.
+    Donate,
     /// `/{lang}/faq`.
     Faq,
     /// `/{lang}/security`.
@@ -61,15 +61,20 @@ impl Page {
         Page::Home,
         Page::Download,
         Page::Gateways,
-        Page::Challenges,
         Page::Faq,
         Page::Security,
         Page::Contact,
+        Page::Donate,
         Page::Impressum,
         Page::Privacy,
         Page::Terms,
         Page::FanContent,
     ];
+
+    /// The slugs of pages the site had and removed for good; each answers
+    /// as [`Page::Gone`] in every language. `challenges`: Daily and Weekly
+    /// tasks, the Tower and their rankings are the game client's to show.
+    pub const REMOVED: [&'static str; 1] = ["challenges"];
 
     /// The path after the language prefix, without a leading slash; the
     /// home page's is empty.
@@ -84,10 +89,10 @@ impl Page {
             Page::Account(section) => section.slug(),
             Page::Download => "download",
             Page::Gateways => "gateways",
-            Page::Challenges => "challenges",
             Page::Faq => "faq",
             Page::Security => "security",
             Page::Contact => "contact",
+            Page::Donate => "donate",
             Page::Impressum => "impressum",
             Page::Privacy => "privacy",
             Page::Terms => "terms",
@@ -106,6 +111,9 @@ impl Page {
             })
         {
             return Some(Page::Account(Section::Report));
+        }
+        if Page::REMOVED.contains(&slug) {
+            return Some(Page::Gone);
         }
         Page::LISTED
             .into_iter()
@@ -147,6 +155,26 @@ impl Page {
         }
     }
 
+    /// The form that stands open at this address: signing in, registering
+    /// and setting a new password are dialogs over any page, and their own
+    /// addresses show the start page with that dialog open (`boot.js`).
+    #[must_use]
+    pub const fn form(self) -> Option<&'static str> {
+        match self {
+            Page::SignIn => Some("signin"),
+            Page::Register => Some("register"),
+            Page::Reset => Some("reset"),
+            _ => None,
+        }
+    }
+
+    /// Whether the page shows the start page: itself, or one of the three
+    /// forms over it.
+    #[must_use]
+    pub const fn start(self) -> bool {
+        matches!(self, Page::Home) || self.form().is_some()
+    }
+
     /// Whether the server keeps the page once rendered: every page but one
     /// account's in the administration, whose address the visitor chooses
     /// (a kept page per id would let requests fill the table).
@@ -171,6 +199,73 @@ pub struct Asset {
 pub struct Assets {
     /// By logical name, `site.css`, `img/world-1200.avif`.
     pub files: BTreeMap<String, Asset>,
+    /// What this build is called, for the footer's last line.
+    #[serde(default)]
+    pub build: Build,
+}
+
+/// What a build of the site is called (`cargo xtask site`): the release it
+/// descends from and the commit it was made of, as far as the build could
+/// tell (a build outside a checkout knows neither).
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Build {
+    /// The digest of every asset's address, as the service worker carries
+    /// it; empty where no build wrote the assets.
+    #[serde(default)]
+    pub id: String,
+    /// The newest release tag the commit descends from, `v0.1.1-beta.9b`.
+    #[serde(default)]
+    pub version: Option<String>,
+    /// How many commits it is past that tag.
+    #[serde(default)]
+    pub ahead: u32,
+    /// The commit, forty hexadecimal digits.
+    #[serde(default)]
+    pub commit: Option<String>,
+    /// The commit's day, `YYYY-MM-DD`.
+    #[serde(default)]
+    pub date: Option<String>,
+}
+
+impl Build {
+    /// The commit where it is one: forty lowercase hexadecimal digits, so
+    /// that nothing else is ever made part of an address.
+    #[must_use]
+    pub fn commit(&self) -> Option<&str> {
+        self.commit
+            .as_deref()
+            .filter(|c| c.len() == 40 && c.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f')))
+    }
+
+    /// The version as the footer writes it: the tag, and how far past it
+    /// the build is (`v0.1.1-beta.9b+37`).
+    #[must_use]
+    pub fn version(&self) -> Option<String> {
+        let tag = self.version.as_deref().filter(|tag| {
+            !tag.is_empty()
+                && tag.len() <= 48
+                && tag
+                    .bytes()
+                    .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'-' | b'_' | b'+'))
+        })?;
+        Some(if self.ahead == 0 {
+            tag.to_owned()
+        } else {
+            format!("{tag}+{}", self.ahead)
+        })
+    }
+
+    /// The commit's day where it is one (`YYYY-MM-DD`).
+    #[must_use]
+    pub fn date(&self) -> Option<&str> {
+        self.date.as_deref().filter(|d| {
+            d.len() == 10
+                && d.bytes().enumerate().all(|(at, b)| match at {
+                    4 | 7 => b == b'-',
+                    _ => b.is_ascii_digit(),
+                })
+        })
+    }
 }
 
 impl Assets {
@@ -202,6 +297,8 @@ impl Assets {
 /// The public data the server read, each part absent until read once.
 #[derive(Clone, Debug, Default)]
 pub struct Snapshot {
+    /// What the donation platforms say of the monthly goal.
+    pub funding: Option<crate::data::Funding>,
     /// The newest release.
     pub release: Option<Release>,
     /// Its card status.
@@ -217,8 +314,6 @@ pub struct Snapshot {
     /// How often the site's pages were opened, where the deployment counts
     /// it (`central-web-server`'s `views`), as it stood at the last minute.
     pub views: Option<crate::data::Views>,
-    /// Central's public challenge calendar; absent when it could not be refreshed.
-    pub challenges: Option<crate::data::ChallengeFeed>,
 }
 
 /// What a page needs besides its own words.

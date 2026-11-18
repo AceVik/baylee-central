@@ -27,7 +27,12 @@ pub use challenge::{Agent, Seen};
 mod deletion;
 mod dispatch;
 mod email;
+mod funding;
 pub use email::Delivery;
+pub use funding::{
+    KOFI_LIMIT, KOFI_READ, Kofi as KofiIntake, KofiAnswer, KofiCounts, Sources as FundingSources,
+    kofi_digest,
+};
 mod gateways;
 mod guesses;
 pub use guesses::Place;
@@ -47,6 +52,8 @@ pub use reports::PartUpload;
 mod reset;
 mod terms;
 mod tokens;
+mod tower_access;
+mod tower_awards;
 mod verified;
 pub use tokens::{Presented, TokenKeys, credential_operation};
 
@@ -112,14 +119,16 @@ pub struct BrowserReply {
 
 /// The operations the browser listener serves (`docs/web-accounts.md`); every
 /// other one is refused before anything else happens. Terms are accepted there
-/// for Central only; the public gateway directory and the public figures are
-/// read there without a session. A gateway's pulse, like its heartbeat, is
+/// for Central only; the public gateway directory, the public figures and the
+/// donation figures are read there without a session. A gateway's pulse, like its heartbeat, is
 /// the native route's. The match names every operation, so a new one does
 /// not compile until it is decided here.
 #[must_use]
 pub fn browser_operation(request: &Request) -> bool {
     match request {
-        Request::Challenges { .. }
+        Request::TowerProgress {}
+        | Request::TowerAwardExport { .. }
+        | Request::Challenges { .. }
         | Request::Notifications { .. }
         | Request::Social { .. }
         | Request::Discover { .. }
@@ -137,6 +146,7 @@ pub fn browser_operation(request: &Request) -> bool {
         | Request::TermsStatus
         | Request::GatewayDirectory { .. }
         | Request::PublicFigures { .. }
+        | Request::PublicFunding {}
         | Request::AccountSummary
         | Request::SetRecovery { .. }
         | Request::SetDisplayName { .. }
@@ -159,7 +169,10 @@ pub fn browser_operation(request: &Request) -> bool {
         | Request::PairCancel { .. }
         | Request::Picture { .. } => true,
         Request::AcceptTerms { subject, .. } => matches!(subject, TermsSubject::Central),
-        Request::ChallengeHost { .. }
+        Request::TowerToken {}
+        | Request::TowerIdentity {}
+        | Request::TowerAward { .. }
+        | Request::ChallengeHost { .. }
         | Request::CreateObject
         | Request::ReadObject { .. }
         | Request::ListObjects { .. }
@@ -222,7 +235,9 @@ fn browser_only(request: &Request) -> bool {
 fn uses_session(request: &Request) -> bool {
     matches!(
         request,
-        Request::Challenges { .. }
+        Request::TowerProgress {}
+            | Request::TowerAwardExport { .. }
+            | Request::Challenges { .. }
             | Request::Notifications { .. }
             | Request::Social { .. }
             | Request::SessionStatus
@@ -286,6 +301,8 @@ fn signed_in(
 /// Shared service state. Pending challenges are bounded, expiring and single-use.
 pub struct IdentityService {
     store: AccountStore,
+    /// Operator-configured separate Tower service; absent means no Tower credentials.
+    tower_origin: Option<String>,
     issuer: [u8; 32],
     /// Central's own origin: every signed token's `iss`, and a Central token's `aud`.
     origin: String,
@@ -321,6 +338,8 @@ pub struct IdentityService {
     mails: email::Mails,
     /// The picture worker and the upload slots (`pictures.rs`).
     pictures: pictures::Pictures,
+    /// The donation figures and Ko-fi's deliveries (`funding.rs`).
+    funding: funding::Funding,
 }
 
 impl IdentityService {
@@ -352,6 +371,7 @@ impl IdentityService {
         };
         Ok(Self {
             store,
+            tower_origin: None,
             issuer: endpoint.issuer(),
             origin: endpoint.origin().to_owned(),
             tokens,
@@ -371,6 +391,7 @@ impl IdentityService {
             push_key: None,
             mails: email::Mails::default(),
             pictures: pictures::Pictures::default(),
+            funding: funding::Funding::default(),
         })
     }
 

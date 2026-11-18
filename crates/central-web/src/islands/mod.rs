@@ -16,13 +16,13 @@ mod admin;
 mod auth;
 mod b64;
 mod central;
-mod challenges;
 mod chat;
 mod clip;
 mod contact;
 mod crypto;
 mod early;
 mod email;
+mod export;
 #[cfg(any(not(target_arch = "wasm32"), feature = "admin"))]
 mod feedback;
 mod field;
@@ -30,7 +30,6 @@ mod focus;
 mod fragment;
 mod impressum;
 mod keep;
-mod medals;
 #[cfg(any(not(target_arch = "wasm32"), feature = "admin"))]
 mod moderation;
 pub(crate) mod net;
@@ -40,7 +39,6 @@ mod pow;
 mod push;
 mod reset;
 mod session;
-mod tower;
 #[cfg(target_arch = "wasm32")]
 mod trusted;
 
@@ -53,8 +51,6 @@ pub(crate) use admin::Administration;
 #[cfg(not(target_arch = "wasm32"))]
 pub(crate) use auth::{Register, SignIn};
 #[cfg(not(target_arch = "wasm32"))]
-pub(crate) use challenges::Challenges;
-#[cfg(not(target_arch = "wasm32"))]
 pub(crate) use chat::Messenger;
 #[cfg(not(target_arch = "wasm32"))]
 pub(crate) use contact::ContactForm;
@@ -62,5 +58,3 @@ pub(crate) use contact::ContactForm;
 pub(crate) use impressum::Impressum;
 #[cfg(not(target_arch = "wasm32"))]
 pub(crate) use reset::Reset;
-#[cfg(not(target_arch = "wasm32"))]
-pub(crate) use tower::Tower;

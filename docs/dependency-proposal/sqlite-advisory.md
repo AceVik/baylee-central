@@ -1,4 +1,11 @@
-# RUSTSEC-2026-0459 in `libsqlite3-sys`: a bounded exception
+# RUSTSEC-2026-0459 in `libsqlite3-sys`: a bounded exception (ended)
+
+*Ended 18.11.2026.* `sqlx` 0.9.1 allows `libsqlite3-sys` 0.40.0, which
+holds the fix, and the owner approved the lock change the same day
+("alle crates upgraden"). The ignore left `.cargo/audit.toml`, and
+`sqlite-scope` became `chrono-scope`, the same bound for the next
+lock-only advisory ([chrono](chrono-advisory.md)). What follows is the
+record of the exception as it stood.
 
 *Owner's decision, 12.11.2026.* `cargo audit --deny warnings` fails on
 RUSTSEC-2026-0459 (`libsqlite3-sys` 0.37.0, fixed in 0.39.0). The package

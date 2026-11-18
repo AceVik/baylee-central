@@ -9,6 +9,12 @@ e-mail address and a reset code by mail need the `mail` block
 ([below](#mail)). Nothing here enables browser SSO for gateways. Sessions
 renew ([below](#sessions)).
 
+The optional `tower_origin` setting enables identity access to the separate
+Baylee Tower authority. It accepts a distinct canonical HTTPS origin and is
+disabled when absent. [Tower access](tower-access.md) describes migration 30,
+runtime grants and the online introspection contract; it enables no game hosting
+or Tower economy inside Central.
+
 ## Launcher modes
 
 `central-service` takes exactly one mode argument and no other argument. Every
@@ -26,9 +32,12 @@ never in argv or the environment. Unknown fields fail closed.
   login (absent means no legacy sign-in; [the legacy store](#the-legacy-store)),
   `official_address` ([the official gateway](#the-official-gateway)'s address on this machine),
   `mail: {"endpoint": …, "site": …, "token": …}`, the mailer on this host
-  (absent means Central sends no mail; [mail](#mail)), and `pictures: {"socket": …}`, the
+  (absent means Central sends no mail; [mail](#mail)), `pictures: {"socket": …}`, the
   picture worker's socket (absent means uploads answer `Unavailable` and stored pictures
-  are still served; [profile pictures](#profile-pictures)).
+  are still served; [profile pictures](#profile-pictures)), and
+  `funding: {"liberapay": …, "github": {"token": …}, "kofi": {"token": …, "record": …}}`,
+  the donation platforms (absent means Liberapay's public figures and nothing else;
+  [donations](#donations)).
 - `--check-accounts-stdin` reads a service document as `--accounts-stdin` would, connects to
   nothing and exits, so that a build can be asked whether it would start; a `mail` block or a
   picture socket the service would refuse is refused here too. The deploy hook asks it before
@@ -377,9 +386,9 @@ back; a vouched-for bearer's own 128 control and 64 data requests a second,
 its address's 256 and 128, of the 512 and 256 all share),
 `central-http/src/addresses.rs` (the native
 listener's `Discover` 30 and `LoginStart` 30 a minute, `LegacyLogin` 10 a
-minute, `ResetStart` 10 an hour, the directory and the public figures 60 a
-minute together) and `central-http/src/browser.rs` (the
-browser listener's). Lower numbers slow guessing and make it cheaper to
+minute, `ResetStart` 10 an hour, the directory, the public figures and the
+donation figures 60 a minute together, Ko-fi's webhook 30 a minute) and
+`central-http/src/browser.rs` (the browser listener's). Lower numbers slow guessing and make it cheaper to
 keep someone out; higher ones the reverse. Changing one needs a build and a
 deploy; none is in `central.json`.
 
@@ -410,7 +419,8 @@ Per-address budgets read the last `X-Forwarded-For` hop, which Caddy sets to
 the client it saw: 5 registrations an hour, 30 discoveries and 30 sign-in starts
 a minute, and 60 reads of the gateway directory a minute (`GatewayDirectory`,
 which needs no session; the website's `/gateways` page; `PublicFigures`, the
-numbers the site shows, spends the same 60). IPv6 addresses count by their /64. The counters live in memory only,
+numbers the site shows, and `PublicFunding`, the donation figures, spend the
+same 60). IPv6 addresses count by their /64. The counters live in memory only,
 at most 4096 addresses per budget, and forget an address once its window has
 passed (at the latest a window's length later). Every request that needs no
 session also draws on its address's 600 a minute, and the sign-in's guesses
@@ -1017,7 +1027,9 @@ regenerated: replacing it locks every enrolled account out. Keep an offline
 copy. The bridge credential is shared only with the official gateway's
 `BAYLEE_CENTRAL_CONFIG_FILE`, and only when legacy migration is enabled.
 The mailer's token is not generated here: it is the one the mailer holds
-for Central ([mail](#mail)).
+for Central ([mail](#mail)). Neither are the donation platforms' two: GitHub
+Sponsors' token and Ko-fi's verification token come from the owner's
+accounts there ([donations](#donations)).
 
 The OPAQUE setup together with a copy of the credential table permits offline
 password guessing. Treat any backup that holds both as credential material.
@@ -1153,6 +1165,183 @@ knows a reset code's digest only as an administrator's. Bringing those
 lines up to date is the owner's review. This runbook does not decide
 whether the block may be enabled before that.
 
+## Donations
+
+*Since migration 000032 (18.11.2026); the owner's order: the three
+platforms added up in euros, with a bar and a sum. Not deployed yet.*
+
+Central collects what the three donation platforms say and gives the
+website totals only (`PublicFunding`, on both listeners, under the
+directory's budget): each platform's monthly figure in euro cents with its
+supporters, and the sum of what was given once with its count and the day
+the count began. No row, no transaction id and no time of a single
+donation leaves Central. The bar counts the recurring giving of the three
+platforms against the monthly goal; what was given once is a figure of its
+own, never part of the bar.
+
+| platform | how Central learns it | what it gives |
+| --- | --- | --- |
+| Liberapay | `GET https://liberapay.com/AceVik/public.json` every 30 minutes, no key | the week's receipts as a month's (× 52/12) and the patrons' count |
+| GitHub Sponsors | GraphQL at `https://api.github.com/graphql` every 30 minutes, with the sponsored account's token | the monthly estimate (US cents, converted at the latest rate each time it is read), the active sponsorships, and the one-time sponsorships and their refunds of the last 30 days (stored once each) |
+| Ko-fi | Ko-fi's webhook delivers each payment to `https://central.baylee.app/v1/kofi` | a one-time payment counts to the sum; a membership's payments of the last 31 days make Ko-fi's monthly figure, each payment one supporter |
+
+The euro reference rates come from the European Central Bank's daily feed
+(`https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml`), fetched
+every six hours after a fetch that worked and 30 minutes after one that
+failed, when GitHub or
+Ko-fi is on. An amount in a currency without a rate is stored without a
+euro value and **not counted**; it is converted once a rate comes, if that
+is within seven days; the log names its currency's code, never an amount.
+Nothing is guessed.
+
+### The `funding` block
+
+```json
+"funding": {
+  "liberapay": true,
+  "github": {"token": "…", "on": true},
+  "kofi": {"token": "…", "record": false, "on": true}
+}
+```
+
+- Without the block Central reads Liberapay and nothing else; GitHub's and
+  Ko-fi's figures and the one-time sum are **absent**, never zero, and the
+  page names the two platforms as not counted yet.
+- `liberapay` (optional, `true` when absent): `false` stops asking Liberapay.
+- `github.token`: a token of the sponsored account (20 to 255 visible
+  characters). **Which scope GitHub needs for these fields is not
+  documented**: the owner tests a classic token with `read:user` and notes
+  here what was needed. A token without the scope gets an answer with
+  errors, which Central treats as no answer: the log says `central: GitHub
+  Sponsors' figures did not come …` once an hour and the figure stays
+  absent. The query asks for no sponsor's name or login
+  (`crates/central-funding/src/github.rs`).
+- `kofi.token`: the verification token Ko-fi shows at
+  `https://ko-fi.com/manage/webhooks` under *Advanced* (8 to 128 visible
+  characters). Central keeps only its SHA-256 digest after the start.
+- `kofi.record` (optional, `false` when absent): whether a verified payment
+  is stored and counted. With `false` every delivery is verified and read
+  and nothing is kept, and Ko-fi's figure is not shown: the state for
+  Ko-fi's test delivery (below).
+- `on` (optional, `true` when absent) in either block: `false` keeps the
+  token in the file and switches the platform off. Switched off, GitHub is
+  not asked, and `/v1/kofi` answers `404` as if it did not exist.
+- A token of another shape, or an unknown key, stops the start
+  (`central: invalid configuration`, naming no value); the check mode
+  (`--check-accounts-stdin`) refuses it too.
+
+**Where the tokens go.** Into `/etc/baylee-central/central.json` beside the
+other secrets (root's, `0600`, opened by systemd as standard input), and
+nowhere else: not in the repository, an argument, the environment, a unit
+file, a URL or a chat. To change one: edit the file and restart the service.
+To withdraw one: delete it at the platform, then remove it here.
+
+**Outbound HTTPS** (port 443) from Central's host must be allowed to
+`liberapay.com`, `api.github.com` and `www.ecb.europa.eu`. Central reaches
+them through `central-outbound`: public addresses only, no proxy, no
+redirect, 15 seconds a request, bounded bodies (64 KiB, 256 KiB, 64 KiB).
+A poll that fails leaves the last figure standing until the next restart.
+
+### Ko-fi's webhook
+
+- **Address for Ko-fi's settings** (`https://ko-fi.com/manage/webhooks`,
+  *Webhook URL*): `https://central.baylee.app/v1/kofi`. No secret is in the
+  address; Ko-fi sends the token in the delivery. The `central.baylee.app`
+  site block passes every path to the account listener already; Caddy needs
+  no change.
+- What the route takes: `POST` with `Content-Type:
+  application/x-www-form-urlencoded`, at most 16 KiB (a longer one, up to
+  64 KiB, is read, refused and counted as `size`; one past 64 KiB is
+  refused with `413` before it is read and is in no count), one field
+  `data` holding JSON.
+  Central reads the token first and compares it in constant time; only with
+  the right one does it read `type`, `amount`, `currency`,
+  `is_subscription_payment`, `is_first_subscription_payment` and
+  `kofi_transaction_id`. The giver's name, e-mail address, message,
+  shipping data and links are never parsed into anything, stored or logged.
+  `Donation` counts once (or as a membership's payment when
+  `is_subscription_payment` says so), `Subscription` as a membership's
+  payment; `Commission` and `Shop Order` are sales, verified and not
+  counted. Every refusal (wrong or missing token, malformed body, unknown
+  shape, hostile amount or currency) is the same plain `400`; a delivery
+  taken, also one that comes again, is `200`; 30 deliveries a minute from
+  one address, then `429`.
+- **The format is not confirmed.** It was taken from descriptions of
+  Ko-fi's webhook, not from Ko-fi's own documentation, which could not be
+  read automatically. The first test delivery decides:
+  1. Deploy with `"kofi": {"token": "…", "record": false}` and restart.
+     The start line says `central: donations: …, Ko-fi (verifying only,
+     kofi.record is false)`.
+  2. In Ko-fi's webhook settings enter the address above and press *Send
+     Test*.
+  3. Within a minute the journal says either `central: 1 Ko-fi
+     delivery(ies) verified and read, and not recorded (kofi.record is
+     false)`: the format fits; or `central: Ko-fi deliveries refused since
+     start, by reason: …`: it does not, and the reason (`content type`,
+     `form`, `json`, `token`, `shape`, `amount`, `currency`, `size`) says
+     where. Neither line within a minute means the delivery never reached
+     the service: a body past 64 KiB (`413`), or the `403` below.
+     `token` alone means the token in the file is not the one Ko-fi shows.
+     A delivery with an `Origin` or `Sec-Fetch-Site` header would be
+     refused with `403` before it is read (the account listener's rule)
+     and appear in neither line; then report it, do not loosen the rule by
+     hand.
+  4. When the format fits, set `"record": true` and restart. Ko-fi's test
+     delivery is never counted that way, since it arrived while recording
+     was off. A test sent while recording is on is stored like a donation
+     (its id is Ko-fi's, and a second test with the same id counts once);
+     only the migrator's login can take it out again, by its platform and
+     the minute it came, before the sweep folds it into the sum.
+- **Cancellations.** Whether Ko-fi reports a membership that ends is not
+  known. Ko-fi's monthly figure therefore counts the membership payments of
+  the last 31 days, each payment one supporter: a supporter who stops drops
+  out at most 31 days after their last payment; one whose payments are
+  fewer than 31 days apart (February) counts twice for up to three days.
+
+### What is stored, and for how long
+
+Migration 000032 adds `central_identity.donations`: platform, kind (given
+once, a membership's payment, a refund), the amount in hundredths of its
+currency, the currency, the amount in euro cents at the rate held when it
+came (or none), when it came by Central's clock, and a SHA-256 digest of
+the platform's transaction id, unique per platform, so that a delivery
+that comes twice is kept once. Nothing about the giver. Rows are kept 40
+days, longer than Ko-fi's window (31 days) and the window of GitHub's
+activities that is read again (30 days), so that a swept row never comes
+back as a new one. The daily sweep (`--sweep-stdin`) then adds what was
+given once and what went back to `central_identity.donation_sums` (one
+sum and one count per platform and kind) and deletes the rows; a
+membership's payment past its window and a row that never got a rate are
+deleted without a trace. `central_identity.donation_count` holds the day
+the count began (the day the migration ran). The runtime may add a row,
+set a row's euro value once, and read; it cannot change an amount, delete
+a row or write a sum (`ops/grants.sql`, checked at every start).
+
+### What Central logs
+
+At the start: `central: donations: Liberapay, GitHub Sponsors, Ko-fi` (the
+sources that are on). Then, each at most once an hour: that Liberapay's,
+GitHub's figures or the ECB's rates did not come, that the store did not
+answer, the currencies of donations waiting for a rate with their number of
+rows, and Ko-fi's refusals by reason since the start. At once, when they
+change: the number of Ko-fi payments recorded, verified while `record` is
+off, or verified as sales. No line holds a token, an amount, a name, an id
+or a body. The sweep prints how many donations it folded and deleted.
+
+**The legal texts.** The website's privacy page says, in its part on
+donations, what Central collects and keeps of a payment and for how long
+(German and English; the nine other languages carry the English until a
+translation follows). The binding privacy policy (`legal/privacy.*.md`)
+says the same in § 3 and § 7 since its version 2026-11-18 (the owner's
+decision of 18.11.2026; [legal texts](../legal/README.md)); like every
+version it awaits the owner's full review before it is published.
+
+**Figures one can diff.** The public sum changes when a donation is
+counted, at most a minute later, so whoever watches `/funding.json` can
+tell the amount of a single donation that came alone. It names nobody and
+no time finer than the minute the site read it; hiding it would need the
+figures to be published in steps, which is the owner's call.
+
 ## Supervision
 
 Keep the configuration root-owned `0600` and let the supervisor open it, so the
@@ -1256,6 +1445,20 @@ repository, and the deploy hook builds and installs this site instead
   `raw.githubusercontent.com` (Baylee's repository only, every ten minutes)
   and Central's browser listener on loopback (every minute): outbound HTTPS
   to GitHub must be allowed. It logs nothing about requests.
+
+  The donation page's bar and `/funding.json` show what Baylee Central
+  says of the donations (`PublicFunding`, asked with the directory every
+  minute; [donations](#donations)): each platform's monthly figure and
+  the sum of what was given once, all in euros. This process asks no
+  donation platform any more and needs no outbound HTTPS for them. A
+  Central from before the figures, or one that does not answer, leaves
+  the figures the site holds standing (at the start the fallback's
+  `funding.json`, or none); with none the page shows the goal without a
+  bar. **The `funding` setting is gone (18.11.2026)**: the file is read
+  with unknown fields refused, so a `web.json` that still says
+  `"funding": …` stops the start (`central-web: the settings are malformed`).
+  Take the key out of `/etc/baylee-app/web.json` before the first deploy
+  of this build.
 
   `views` may name a file, for example `/var/lib/baylee-app/views.json`
   in a directory this user owns (`StateDirectory=baylee-app`, or

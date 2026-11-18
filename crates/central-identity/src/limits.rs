@@ -186,6 +186,7 @@ fn class(request: &Request) -> Class {
             | Request::EnrollmentFinish { .. }
             | Request::GatewayDirectory { .. }
             | Request::PublicFigures { .. }
+            | Request::PublicFunding {}
             | Request::Challenges {
                 request: central_api::challenges::Request::Catalogue { .. }
                     | central_api::challenges::Request::Detail { .. }
@@ -205,6 +206,8 @@ fn class(request: &Request) -> Class {
     if matches!(
         request,
         Request::SessionStatus
+            | Request::TowerToken {}
+            | Request::TowerIdentity {}
             | Request::RenewSession
             | Request::GatewayToken { .. }
             | Request::GatewayRevocations { .. }
@@ -250,7 +253,12 @@ fn tells(request: &Request) -> Tells {
         {
             Tells::Proves
         }
-        Request::ChallengeHost { .. }
+        Request::TowerToken {}
+        | Request::TowerIdentity {}
+        | Request::TowerAward { .. }
+        | Request::TowerProgress {}
+        | Request::TowerAwardExport { .. }
+        | Request::ChallengeHost { .. }
         | Request::SessionStatus
         | Request::RenewSession
         | Request::AccountSummary

@@ -6,6 +6,7 @@
 
 use leptos::prelude::*;
 
+use super::chat::glyph;
 use super::net;
 use crate::words::{self, Lang};
 
@@ -155,16 +156,28 @@ pub fn ContactForm(lang: Lang) -> impl IntoView {
         State::Ready | State::Sending | State::Sent => None,
     };
     let field_error = move |which: State| move || state.get() == which;
+    // While a message is on its way its fields hold still: they keep the
+    // focus and can be read, and take no further typing.
+    let sending = move || state.get() == State::Sending;
+    // Another message after one that arrived: the name and the address
+    // stay, the text is new.
+    let again = move |_| {
+        message.set(String::new());
+        state.set(State::Ready);
+        super::focus::after_render("#contact-message");
+    };
     view! {
         <Show
             when=move || state.get() == State::Sent
             fallback=move || {
                 view! {
-                    <form class="form" method="post" novalidate=true on:submit=send>
+                    <form class="form contact-form" method="post" novalidate=true
+                        aria-busy=move || sending().then_some("true") on:submit=send>
                         <div class="field">
                             <label for="contact-name">{words::contact_name(lang)}</label>
                             <input id="contact-name" type="text" autocomplete="name" maxlength="100"
                                 aria-describedby="contact-name-hint"
+                                readonly=sending
                                 on:input=move |ev| name.set(event_target_value(&ev))
                                 prop:value=move || name.get() />
                             <p class="hint" id="contact-name-hint">{words::contact_name_hint(lang)}</p>
@@ -174,6 +187,7 @@ pub fn ContactForm(lang: Lang) -> impl IntoView {
                             <input id="contact-email" type="email" autocomplete="email" maxlength="254"
                                 aria-describedby="contact-email-hint contact-error"
                                 aria-invalid=move || field_error(State::Email)().then_some("true")
+                                readonly=sending
                                 on:input=move |ev| email.set(event_target_value(&ev))
                                 prop:value=move || email.get() />
                             <p class="hint" id="contact-email-hint">{words::contact_email_hint(lang)}</p>
@@ -183,6 +197,7 @@ pub fn ContactForm(lang: Lang) -> impl IntoView {
                             <textarea id="contact-message" rows="7" maxlength=MAX_MESSAGE.to_string() required=true
                                 aria-describedby="contact-count contact-error"
                                 aria-invalid=move || field_error(State::Empty)().then_some("true")
+                                readonly=sending
                                 on:input=move |ev| message.set(event_target_value(&ev))
                                 prop:value=move || message.get()></textarea>
                             <p class="hint num" id="contact-count" class:near=near>
@@ -195,19 +210,38 @@ pub fn ContactForm(lang: Lang) -> impl IntoView {
                                 on:input=move |ev| trap.set(event_target_value(&ev)) />
                         </div>
                         <p class="error" id="contact-error" role="alert">{problem}</p>
-                        <button type="submit" class="button primary" aria-disabled=move || (state.get() == State::Sending).then_some("true")>
-                            {move || if state.get() == State::Sending { words::contact_sending(lang) } else { words::contact_send(lang) }}
+                        <button type="submit" class="button primary contact-send" class:busy=sending
+                            aria-disabled=move || sending().then_some("true")>
+                            <span class="send-sign" aria-hidden="true">{glyph::glyph(glyph::SEND)}</span>
+                            <span>{move || if sending() { words::contact_sending(lang) } else { words::contact_send(lang) }}</span>
                         </button>
                     </form>
                 }
             }
         >
-            <div class="card done" role="status">
+            <div class="sent" role="status">
+                {fireworks()}
+                <span class="sent-check">{glyph::glyph(glyph::CIRCLE_CHECK)}</span>
                 <h2 class="contact-sent" tabindex="-1">{words::contact_sent_title(lang)}</h2>
                 <p>{words::contact_sent(lang)}</p>
+                <button type="button" class="button quiet" on:click=again>{words::contact_again(lang)}</button>
             </div>
         </Show>
     }
+}
+
+/// A moment of fireworks over a message that arrived: three bursts of
+/// sparks, drawn and timed by the style sheet (`components.css`), once, and
+/// not at all for a reader who asked for less motion. Nothing a reader of
+/// the page is told about.
+fn fireworks() -> impl IntoView {
+    const BURSTS: usize = 3;
+    const SPARKS: usize = 12;
+    let burst = || {
+        let sparks = (0..SPARKS).map(|_| view! { <i></i> }).collect_view();
+        view! { <span class="burst">{sparks}</span> }
+    };
+    view! { <div class="sparks" aria-hidden="true">{(0..BURSTS).map(|_| burst()).collect_view()}</div> }
 }
 
 #[cfg(test)]

@@ -1,5 +1,5 @@
-<!-- version: 2026-11-11 -->
-<!-- updated: 2026-11-12 -->
+<!-- version: 2026-11-18 -->
+<!-- updated: 2026-11-18 -->
 
 # Baylee Central privacy policy
 
@@ -48,6 +48,7 @@ data protection officer, as none is required.
 - **Anonymous usage count:** during an offline game the client sends a random identifier of that game once a minute and nothing else; we keep it in memory only – counting how many people play offline. *Art. 6(1)(f) GDPR*; can be switched off ("Send anonymous usage count").
 - **Reports about content or accounts, moderation decisions** – enforcing the terms, duties as a hosting service. *Art. 6(1)(c) and (f) GDPR*
 - **A record of what our administrators did** (who acted, what, which account or gateway it concerned, when; no names, reasons or notes) – keeping administrative decisions traceable. *Art. 6(1)(c) and (f) GDPR*
+- **Donations through GitHub Sponsors and Ko-fi:** the amount, the currency, when it reached us, whether it was given once, regularly or refunded, and a fingerprint (SHA-256) of the platform's transaction number so that a payment reported twice counts once; no names, addresses, messages or accounts. Ko-fi notifies us of each payment; everything else in the notice is discarded without being stored or logged. Of GitHub Sponsors we ask only the account's totals and its one-time sponsorships, without the sponsors' names, of Liberapay only its public weekly total; the euro exchange rates come from the European Central Bank – showing how much of the monthly costs is covered and what was given once, as totals only, never as a single donation. *Art. 6(1)(f) GDPR (our interest in showing openly how Baylee is funded)*
 - **Technical access data (IP address, time, requested address) briefly in memory and in logs** – security, defending against abuse and overload. *Art. 6(1)(f) GDPR*
 
 Our legitimate interest in the last item is secure and undisturbed
@@ -160,6 +161,9 @@ whether you sign in there is your decision.
   year after they arrived at the latest.
 - The anonymous usage count forgets a game 150 seconds after its last sign
   of life.
+- Single donation records are deleted after 40 days; before that their
+  amounts are added to one total per platform, from which no single
+  donation can be read any more.
 - The record of which version of our terms you accepted is kept for as long as
   your account exists.
 

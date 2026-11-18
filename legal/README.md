@@ -1,6 +1,7 @@
 # Legal texts of Baylee Central
 
-**Status: the terms and the privacy policy are at version 2026-11-11** (the
+**Status: the terms are at version 2026-11-11 and the privacy policy at
+2026-11-18** (the
 owner asked for the texts to be corrected on 11.11.2026: an administrator's
 reset code, deleting the account in its settings on the website, the Fan
 Content notice in its given words, the chat's and the notifications' legal
@@ -26,6 +27,13 @@ outside local tests has accepted 2026-11-11 before the change. The same
 day the privacy policy's e-mail line gained the notices to a confirmed
 address (a reset finished, the password changed, an administrator's
 reset code), which Central sends since then; the version stayed.
+
+On 18.11.2026 the owner decided that the donations Baylee Central collects
+(`docs/operations.md` §"Donations") make a new version of the privacy
+policy, 2026-11-18: § 3 names what a donation leaves behind and why, § 7
+how long a single record is kept (40 days, then one total per platform).
+The terms are unchanged and stay at 2026-11-11, so nobody is asked to
+accept anything again; a new privacy policy is shown, not accepted.
 
 | file | what |
 | --- | --- |

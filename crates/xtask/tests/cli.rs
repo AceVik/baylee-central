@@ -15,7 +15,7 @@ fn every_task_and_flag_parses() {
         Ok(Task::Gate { client: true })
     );
     assert_eq!(parse(&args("crypto-scope")), Ok(Task::CryptoScope));
-    assert_eq!(parse(&args("sqlite-scope")), Ok(Task::SqliteScope));
+    assert_eq!(parse(&args("chrono-scope")), Ok(Task::ChronoScope));
     assert_eq!(
         parse(&args("policy")),
         Ok(Task::Policy {
@@ -50,6 +50,13 @@ fn every_task_and_flag_parses() {
         })
     );
     assert_eq!(
+        parse(&args("postgres --tower-access-only")),
+        Ok(Task::Postgres {
+            exercise_failure: false,
+            scope: PostgresScope::TowerAccess,
+        })
+    );
+    assert_eq!(
         parse(&args("smoke")),
         Ok(Task::Smoke {
             exercise_failure: false
@@ -69,7 +76,7 @@ fn anything_else_is_the_usage() {
         "gate --client --client",
         "gate --clients",
         "crypto-scope --skip",
-        "sqlite-scope --skip",
+        "chrono-scope --skip",
         "policy --exercise-failure",
         "smoke --exercise-failure extra",
         "wasm --exercise-failure",

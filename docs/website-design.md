@@ -54,7 +54,9 @@ would make anyway is not kept, so the page follows the device again (owner,
 12.11.2026: the first press on a light device had changed nothing). The
 browser keeps the choice like the language (the
 privacy notice's "language and display"), `public/boot.js` applies it before
-the first paint, and `?theme=` overrides it for one visit. No other file names a raw colour, except
+the first paint, and `?theme=` overrides it for one visit. Colours that are the same in both schemes
+are tokens too (the avatars' tints; the donation page's heart, its three platforms' parts of the
+goal's bar and the white under a QR code). No other file names a raw colour, except
 the artwork's own: the memorial's parchment (`memorial-book.css`,
 `remembrance.css`) and the painted light over the world (`hero.css`,
 `world.css`).
@@ -63,20 +65,20 @@ Tokens are named for what they mean, not for how they look:
 
 | token | meaning | dark (blue hour) | light (sunlight) |
 | --- | --- | --- | --- |
-| `--bg` | the page ground | `#0f1b2d` | `#f2efe4` |
-| `--bg-alt` | every other section's ground | `#13223a` | `#e4ebe5` |
-| `--panel-solid` | a panel, card or field ground | `#172741` | `#fffefa` |
-| `--panel` | the same, translucent over the painting | `rgba(23 39 65 / 0.94)` | `rgba(255 254 250 / 0.97)` |
-| `--panel-2` | a raised or hovered surface inside a panel | `#1f3253` | `#e8ebe1` |
-| `--ink` | body text | `#eef1f8` | `#233e43` |
-| `--ink-soft` | secondary text | `#cdd6ea` | `#415c5e` |
-| `--ink-faint` | captions, labels, meta | `#a3b3d1` | `#506968` |
-| `--title` | headings | `#fff7e4` | `#173c43` |
-| `--gold` | the primary action, the selected choice | `#e3c07e` | `#235b66` |
+| `--bg` | the page ground | `#0f1b2d` | `#ebe6d6` |
+| `--bg-alt` | every other section's ground | `#13223a` | `#dce6e0` |
+| `--panel-solid` | a panel, card or field ground | `#172741` | `#fffffd` |
+| `--panel` | the same, translucent over the painting | `rgba(23 39 65 / 0.94)` | `rgba(255 255 253 / 0.98)` |
+| `--panel-2` | a raised or hovered surface inside a panel | `#1f3253` | `#e2e8dc` |
+| `--ink` | body text | `#eef1f8` | `#14282d` |
+| `--ink-soft` | secondary text | `#cdd6ea` | `#2e464a` |
+| `--ink-faint` | captions, labels, meta | `#a3b3d1` | `#465d60` |
+| `--title` | headings | `#fff7e4` | `#0e3037` |
+| `--gold` | the primary action, the selected choice | `#e3c07e` | `#1b5562` |
 | `--gold-ink` | text on `--gold` | `#1a1306` | `#fffaf0` |
-| `--violet` | information: eyebrows, links in lists, the info accent | `#aebfff` | `#326b75` |
-| `--link` | a link in prose | `#ebcd8f` | `#76511c` |
-| `--focus` | the focus ring | `#ffe7a6` | `#235b66` |
+| `--violet` | information: eyebrows, links in lists, the info accent | `#aebfff` | `#2a626d` |
+| `--link` | a link in prose | `#ebcd8f` | `#6b4712` |
+| `--focus` | the focus ring | `#ffe7a6` | `#1b5562` |
 | `--ok`, `--warn`, `--bad`, `--off` | states: fine, attention, failure or danger, inactive | | |
 | `--edge`, `--edge-soft` | a border that matters, a border that only separates | | |
 | `--chart-reports`, `--chart-crashes` | the two series of the feedback section's 30-day chart, nowhere else | `#6f8ae8`, `#e0665a` | `#1b7fae`, `#b8402f` |
@@ -151,7 +153,11 @@ The scale (`--text-*`, rem at a root of 16–20 px by viewport):
   navigation to a top row).
 - **Grids** use `repeat(auto-fill, minmax(…, 1fr))`, so every column of a
   row is as wide as the others; a lone last card sits in the middle
-  (`.grid-centred`).
+  (`.grid-centred`). The gateways' cards (`.gateways`) are one, two or
+  three in a row by the breakpoints, on a grid with twice as many columns,
+  so a last row that is not full stands in the middle too; the cards of a
+  row share their lines (subgrid), so their figures and buttons stand
+  level.
 - **Sections** alternate `--bg` and `--bg-alt`, each with an eyebrow, a
   centred title and an optional lead.
 - **No sideways scroll** at 320 px. Wide tables scroll inside their own box.
@@ -175,8 +181,9 @@ Each lives in one stylesheet named after it and one component under
 `web/src/components/` (removed 12.11.2026) when it has behaviour.
 
 - **Buttons** (`buttons.css`): `.button` gold, primary, one per view (one
-  exception: a queue whose rows each wait for the same decision, the
-  gateways awaiting approval, gives that decision the gold in every row);
+  exception: a list whose rows each offer the same step gives that step
+  the gold in every row: the gateways awaiting approval, and the gateway
+  directory's "Open in Baylee");
   `.button-ghost` for every other action; `.button-danger` (ghost that
   turns `--bad`) for revoke, lock and delete; `.round-btn` for an icon
   alone, always with a hidden label; `.chip-btn` for a filter or a choice
@@ -225,6 +232,35 @@ Each lives in one stylesheet named after it and one component under
   with the current tab in sight. The current item is marked with
   `aria-current="page"` and the gold rule. Its head is start-aligned, beside
   the navigation, unlike the centred page heads of the public pages.
+  The account's navigation is in two groups, the account (overview,
+  profile, security, privacy and data, notifications) and playing (chat,
+  which holds the contacts, and gateways and tokens); the group names show
+  beside the side navigation and not above the row of tabs. The server's
+  page never links to the administration: an administrator's links are
+  drawn by the island once Central said so.
+- **The account's overview** (`.me`, `.play-card`, `.tiles`): who is
+  signed in first (own picture or the name's first letter, display name
+  with its tag, the sign-in name, when the session ends), then what needs
+  attention, then for an administrator the administration's pages, then
+  the game (the start page's download button for the reader's machine and
+  the gateway list), then every part of the area as a tile that is one
+  link: its sign over its name and one line on what is there, the sign
+  beside the words on a phone.
+- **The header's account link** (`.nav-account`, `boot.js`): signed out
+  it says "Sign in"; signed in it shows the own picture, the display name
+  and the tag where a page noted them (`docs/web-accounts.md`), otherwise
+  "Your account". The name is cut with an ellipsis before the bar breaks,
+  the tag never; a screen reader hears "Your account:" before the name.
+- **The strip** (`.strip` in `header.css`, `pages/home.rs`): Baylee in
+  six numbers under the bar of the start page, in the owner's order
+  (18.11.2026): players, running games and open tables as the online
+  gateways report them, the gateways online of all that are listed,
+  Central's accounts, and the visits. A cell is a value, a glyph and a
+  short label; a number nobody reported is no cell. A phone stands the
+  cells three to a line, the value over its label; from 600 px they share
+  one line evenly with a hairline between neighbours, and from 1100 px a
+  cell is one line, glyph, value, label. The cards' numbers are not here;
+  they have their section.
 - **Dialogs** (`components/Modal.tsx`): the native `<dialog>`, centred,
   focus inside, Escape and the close button close it, focus returns to the
   opener (or to the main content when the opener is gone). A dialog the
@@ -274,11 +310,22 @@ to feel slow and over the 60 ms where it reads as a snap.
 - **Ambient**: the online dot breathes slowly (2.4 s); the painting drifts
   with the scroll; the hero's light and Baylee's cloud move slowly, and only
   while the hero is on screen and no dialog covers it. The hero's clouds
-  (`HeroShader.tsx`, `clouds/`) drift on a slow wind and heal into their
-  banks; the pointer stirs the air they ride in, a small fluid on the GPU
-  (stable fluids with vorticity confinement on a 112-cell-high grid, the
-  clouds on a finer one, lit towards the sun), and a press sends a gust
-  outwards. Thinner behind the words, fuller towards the edges; a still
+  (`js/clouds.js`) drift on a wind that comes in slow gusts and gather into
+  their banks: cumulus, small puffs in front of them and thin streaks high
+  behind, light in both colour schemes (sunlit by day, as bright under the
+  blue hour's veil as the painted ones) with a soft shade of their own and a
+  warm rim towards the sun. Their wisps turn over slowly in a calm sky, each
+  finer layer drifting against the coarser. The pointer stirs the air they
+  ride in, a small fluid on the GPU (stable fluids with vorticity
+  confinement on a 112-cell-high grid, the clouds on a finer one): it drags
+  the air along its path, a swift stroke more of it than a slow one and
+  never faster than itself; stirred vapour thins, rises a little and is
+  drawn out like smoke, and gathers again as the air forgets the stir, with
+  nothing pulled back or popping in; a press sends a gust outwards. The air
+  moves alike at every refresh rate: at most a hundred steps a second while
+  stirred (a 120 Hz screen shows every second frame), thirty while calm,
+  when the solve rests altogether. Thinner behind the words, fuller towards
+  the edges, and under the veil that keeps the words readable; a still
   picture under reduced motion and where WebGL 2 renders in software, the
   painting alone without WebGL 2. The memorial's light
   is its own (limited to 20 draws a second, its GPU context given back when
@@ -287,8 +334,8 @@ to feel slow and over the 60 ms where it reads as a snap.
   through the same View Transitions API and only where it exists: a new
   colour scheme spreads in a circle from its switch (560 ms), and the
   gateway directory's cards glide to their new places when a chip, the sort
-  or the layout is pressed (360 ms); typing in the search does not wait for
-  it. A menu comes in with its rows one after the other (260 ms) and
+  or the layout is pressed (360 ms; up to 48 gateways, more change at
+  once); typing in the search does not wait for it. A menu comes in with its rows one after the other (260 ms) and
   leaves as it came (150 ms).
 - **Baylee's album**: a page turns as paper does (920 ms): the leaf is cut
   into ten strips, each hinged on the one before, so it bends while its
@@ -321,7 +368,14 @@ never shows a server's diagnostic.
 WCAG 2.1 AA, mobile first:
 
 - Landmarks (`header`, `nav`, `main`, `footer`), one `h1` per page, a skip
-  link to `#main`, `document.title` per page.
+  link to `#main`, `document.title` per page. A page's title says its own
+  name and then the site's ("Contact – Baylee") unless its own already
+  names Baylee (`shell::titled`); the preview a link gets elsewhere keeps
+  the bare title, since `og:site_name` names the site. The footer is one
+  navigation landmark: its three columns are lists named by their heading
+  (`ul[aria-labelledby]`), not three regions more on every page. A named
+  region's name is its own on the page (the account's "Play" card met the
+  footer's "Play" column once).
 - Every control works by keyboard, in reading order, with a visible focus
   ring (`--focus`, 3 px, offset 3 px). Menus close with Escape and return
   focus to their button, and close when focus or a tap goes elsewhere.
@@ -343,13 +397,209 @@ WCAG 2.1 AA, mobile first:
 
 | area | paths | frame |
 | --- | --- | --- |
-| Public | `/`, `/download`, `/cards`, `/gateways`, `/contact`, legal pages | the bar, sections, the footer |
+| Public | `/`, `/download`, `/cards`, `/gateways`, `/contact`, `/donate`, legal pages | the bar, sections, the footer |
 | Account | `/account`, `/account/chat`, `/account/contacts`, `/account/security`, `/account/gateways` | the app frame; the messenger on chat and contacts |
 | Administration | `/admin` (the overview), `/admin/feedback`, `/admin/feedback/<id>`, `/admin/users`, `/admin/users/<id>`, `/admin/gateways`, `/admin/audit`, `/admin/legacy` | the app frame, loaded only for an administrator |
-| Sign-in | `/signin`, `/register` | a centred card beside Baylee's cloud |
+| Sign-in | `/signin`, `/register`, `/reset` | a dialog over the page that asked; at its own address, over the start page |
 
 The account area and the administration are loaded lazily and only after a
 sign-in; a visitor's first page fetches neither.
+
+An address the site had and took away for good answers 410, in every
+language, with a page that says so and leads to the start page
+(`Page::REMOVED`, `Page::Gone`). `/challenges` is one since 18.11.2026:
+Daily and Weekly tasks, the Tower, their rankings and the consent to be
+listed in them are shown by the game client, and the website shows none of
+it. A page whose content lives on elsewhere on the site is a permanent
+redirect instead (`/cards` to `/#cards`).
+
+The three forms (signing in, registering, a new password with a reset code)
+are dialogs, never pages of their own. Every page outside the account area
+carries them closed; a link to one opens it and puts the form's address in
+the bar, closing it goes that step back, and Back closes it. Entered
+directly (or reached from a reset mail, whose code rides in the fragment),
+the address shows the start page with the dialog open, and closing it
+leaves for the start page. Without script the address shows the start page
+under a line that says the form needs script. The addresses stay out of the
+index and the sitemap. Leaving a form for good (signed in, declined) takes
+its entry's place in the history, so Back does not open it again.
+
+A form can be followed by a step in the same dialog: the recovery code of a
+new account (or of a reset), and Central's terms where the current version
+is not accepted yet. A step is the dialog's whole matter (`.step`): the
+dialog widens to 46rem, its own heading and line make way for the step's,
+which is centred, and the step ends in `.step-actions`, the one way on as
+wide as the step with its glyph, or two answers of equal width.
+
+- **The code step** says first that the account exists and names it, the
+  username in the title's ink and its tag in gold (`.who`). The code stands
+  in a dashed gold frame and breaks at its hyphens into lines of equal
+  length. The ways to keep it (`.keep-ways`, `islands/keep.rs`) are tiles
+  of one size, each a glyph over its words: two in a row on a phone, all in
+  one row from 600 px. Mailing it to oneself is the last of them and no more
+  than a `mailto:` the person's own mail program opens; its warning (the
+  code then lies in a mailbox) unfolds under the row when the tile is
+  pressed or an address is typed (`.unfold`: it opens downward and fades
+  in, stands at once under reduced motion, and is not there for a reader or
+  the keyboard while shut), and the line under the tiles says that the mail
+  program was asked.
+- **The terms step** shows the text in a box that scrolls, with a line
+  under it that fills as the reader goes down and turns to `--ok` at the
+  end. Accepting waits for the end of the text, as it does in the game
+  client: until then the button is `aria-disabled` (it keeps its place in
+  the tab order and its sentence, `aria-describedby`), and a press makes
+  that sentence speak up instead. A text that fits its box without
+  scrolling counts as read. Declining is the quiet button of the two.
+
+### The donation page
+
+`/donate` asks for help with what Baylee costs each month, and it is the
+one page that does. Baylee's `docs/legal.md` ("Donations") binds every
+word of it: a donation buys nothing, no donor is named, Wizards is not put
+beside a request for money, and the page says that a donation is a gift to
+a private person and not tax-deductible.
+
+- **The goal** (`.goal-card`) is the amount in the title face, what the
+  recurring donations of the three platforms add up to against it, and the
+  bar (`.give-meter`). The bar is a drawing, since the policy allows no
+  inline width: an SVG stretched over the track with one rectangle for
+  each platform (`.give-part-github`, `-liberapay`, `-kofi`), its width
+  the platform's share of the goal, or of the sum once the sum is past the
+  goal. The three parts have fixed colours of their own, the same in both
+  schemes, because the schemes' accents fall together in the light one.
+  Under the bar a legend names each platform with its colour and its
+  amount (`.give-split`), then one line counts the supporters. Only what
+  a platform said is drawn: a platform without a figure has no part and is
+  named in a line as not counted yet, without any figure the bar is left
+  out and a line says so, and where nobody gives yet the line invites the
+  first instead of counting nobody. Every figure comes from Baylee Central
+  (`PublicFunding`, read with the directory each minute; `docs/operations.md`
+  §"Donations"); the site asks no platform itself. "Not counted yet" means
+  that Central has no figure for that platform: it is not configured there
+  (GitHub Sponsors without its token, Ko-fi without its webhook or with
+  `kofi.record` still `false`), it has not answered since Central started,
+  or GitHub's monthly figure waits for the first dollar rate. A platform
+  that is counted and has no supporters is a part of nought with its
+  amount in the legend, not a platform "not counted".
+- **What was given once** (`.give-once`) is a figure of its own under the
+  month's, never a part of the bar: the sum in euros, since when it is
+  counted, how many donations it holds, and a line saying that other
+  currencies were converted at the rate of the day they came. It is shown
+  only when the sum is known: when Central collects GitHub Sponsors or
+  records Ko-fi's payments; with Liberapay alone, which publishes no
+  single donations, there is none.
+- **What a month costs** stands beside the goal, each amount a thinner bar
+  against the goal (`.cost-bar`, the browser's `<progress>`). The goal
+  card's button leads down to the three places.
+- **The three places** (`.way`) are cards of one build: the platform's
+  name with a sign, one line on what kind of giving it is, its address as a
+  QR code, the address as text, and the button. The code stands on a white
+  tile in both schemes (a camera wants dark on light) and is a file made by
+  Baylee's `cargo tools site qr`, not drawn by script; below 30rem it is
+  left out, since a phone does not photograph its own screen. Every link
+  to a platform opens a new tab with `noopener noreferrer`.
+- **A donation button's light.** A button that leads to giving (`.give`,
+  and the bar's `.nav-give`) has the shape, size and place of its
+  neighbours and catches the eye by light alone: every six seconds a sheen
+  crosses it and its heart glows. Nothing moves or changes size, and under
+  reduced motion the button is still.
+- **Where it is linked.** The bar's last entry before the account's, a
+  heart before its word in a soft frame (the frame replaces the bar's
+  underline); the footer's project column; and one card on the start page
+  after the open-source section (`.give-band-card`): a heart, a sentence,
+  the amount and the button. The site asks nowhere else.
+- **`/funding.json`** says the same to a program, the game client first:
+  the goal in euro cents, what is covered, the percentage and the number
+  of supporters where a platform answered, which platforms the figure
+  counts and each one's monthly amount (`platforms`), what was given once
+  (`once`: sum, count, since when) where it is known, the page's address
+  and the three places. It names nobody.
+
+### Going from page to page
+
+Every page is a complete document at its own address, and that is what a
+first visit, a search engine and a browser without script get. Between
+pages of the public site `js/nav.js` fetches the next page (the same
+request a navigation makes) and puts its part of the document in place of
+the one on screen: the title, the head's words about that page, and the
+body. The style sheet, the fonts, the scripts and the WebAssembly stay, the
+bar does not blink, and Back and Forward bring a page back where it stood.
+A link is fetched a moment before its press (the pointer over it, the
+keyboard on it, a finger down), not at all where the device asks to save
+data; a page that still takes longer than a blink shows a line running
+under the bar. After a swap the keyboard is on `<main>` and a status line
+says the page's title.
+
+The document is loaded anew, exactly as before, when the link leaves the
+language, enters or leaves the account area, when an island on screen was
+taken over (its state ends with its document), and when the response is
+not a page of the build on screen, not HTML, or failed. Structured data is
+not carried over: it is for readers of the server's document.
+
+The scripts of a page follow one contract: `baylee:leave` goes out before a
+page is taken away (stop loops, let go of what hangs on the document),
+`baylee:page` once the next one stands (start over on its nodes). A script
+that binds only to a page's own nodes needs the second alone.
+
+What makes this safe (`docs/security-assurance.md`, the three passes): the
+response is parsed into a document that runs nothing, and its nodes are
+put in place as nodes; a script that came with it does not run, a page's
+own scripts are made here from their address and integrity value, and the
+address must be one of the site's hashed scripts (`/assets/<name>.js`).
+The Content Security Policy holds for what is put in place as for any
+page: no inline script, no inline handler, no foreign origin. Trusted
+Types allow one more policy for this, `baylee-nav`, which passes a string
+to the parser for that one use and vouches for no other script address.
+What the strip counts is a visit (`central-web-server`, `views.rs`): a document sent to a
+navigation that did not start on one of the site's own pages and is not a reload. Going from page to page is never counted again, whether the page is put in place here or loads a document (another language, the account area).
+
+### The gateway directory
+
+Every gateway Central lists (`pages/info.rs`, the card in `pages/home.rs`,
+`style/gateways.css`, `js/directory.js`), and its first four on the start
+page in the same look. It shows what Central has and derives the rest from
+it; nothing is made up, and a number nobody reported is never a zero.
+
+- **In numbers.** Four equal tiles above the list: the gateways online of
+  those listed ("5 / 7"), the players online, the games running and the
+  open tables, added up from what the online gateways report. Four in a
+  row, two and two on a phone; while no gateway reports, the first alone in
+  the middle.
+- **A gateway.** A card: a mark (the first letter of its name on one of the
+  six avatar tints, chosen by its address), its name, its host under a lock
+  (the address without `https://`; the copy button gives it whole), and
+  whether it is online, as a pill with the word. Then the four counts it
+  reports, each a glyph, a figure and its word; the share of its players
+  in a game as a bar and a sentence (the bar is drawn in twentieths from
+  `data-load`: a page carries no inline style); its version, with the pill
+  "Current" when it is exactly the newest release's and no word when it is
+  not (a gateway may run a newer build, and the suffixes do not order).
+  One that reports nothing, or is offline, has a line in words in place of
+  the figures. An offline gateway is flat, without the card's light and its
+  mark's tint, and never dimmed: its words keep their contrast.
+- **What to do.** "Open in Baylee" (gold, the same step on every card) is
+  the client's link `baylee://gateway/add?origin=…`, offered only while
+  the gateway is online; beside it two round buttons, copying the address
+  and the gateway's website. A line under the list says what the link does
+  and where the client is to be had.
+- **The order.** Online before offline, then Central's own order, then the
+  busier first; this is the order without script and the one called
+  "Recommended". No gateway is called official (owner, 12.11.2026).
+- **The bar.** One search field (name or address), the order, the layout,
+  and under them the chips with their counts and how many are shown. The
+  chips narrow together: "Online", "With open tables" and "Current
+  version" pressed at once show what is all three; "All" lets go of them.
+  From 860 px the bar stays in sight under the page's own. What is chosen
+  stands in the address (`?q= &show= &sort= &view=`). Nothing found is a
+  panel with the sentence and "Show all".
+- **The list.** From 1100 px the layout can be a list: one panel, a
+  gateway a row, the same parts in columns under a head that names them;
+  the head's sortable columns are buttons that sort (pressed again: the
+  recommended order), the one in use in gold. It is a list restyled, not a
+  table, and a figure keeps its word for a screen reader. Below 1100 px
+  the cards stay cards. The start page shows its four as such rows from
+  1100 px, without the sorting, and as shorter cards below (three on a
+  phone).
 
 ### The messenger
 
@@ -422,7 +672,45 @@ above, with these of their own:
   the pointer or the keyboard; the rest folds (the log, the system, the
   settings, the whole object as a tree drawn only as it is unfolded).
 
+## Scrollbars, text smoothing and the download
+
+- **One scrollbar everywhere** (`base.css`): the root sets `scrollbar-color`
+  (it inherits) and `*` sets `scrollbar-width: thin`, so the page and every
+  box that scrolls, listed or not, wears a thin bar in the page's ink on no
+  track; Safari before `scrollbar-color` gets the same by `::-webkit-scrollbar`
+  under `@supports not`. A component that needs its own bar sets its own.
+  A new scrolling box needs no rule.
+- **Text is antialiased** (`-webkit-font-smoothing`, `-moz-osx-font-smoothing`,
+  `text-rendering`) on `:root`; form controls and placeholders say `inherit`.
+- **A link in the download line carries no underline** (a text-shadow was
+  drawing under the transparent one); hover and focus tint behind the words.
+- **The download page** shows three system cards (the visitor's first, in
+  gold), an architecture in each with its files, checksums and signatures,
+  then, apart, the `x86-64-v2` archive for processors older than about
+  2013-2015, with one sentence on who needs it; the steps of a first start per
+  system; and what has no download yet (Android, iOS, browser). The menu of the
+  download button shows the same variants, the older-processor archive a step
+  in under its main build.
+
 ## How it is held
+
+Today (the server-rendered site):
+
+- `crates/central-web-server/tests/pages.rs` renders every page in every
+  language and reads the markup: one title and one `h1`, the head's words,
+  the policy, no inline script or style, each part of a page this document
+  describes.
+- `crates/central-web/browser/e2e-site/` runs the site in Chromium against
+  synthetic data: every page in both schemes with axe-core (WCAG 2.2 A/AA
+  and its best practices), 44 px controls, no request to another origin, no
+  sideways scroll from 320 to 2560 px in every language, the keyboard's
+  paths, and each island's steps. The desktop project runs every spec; the
+  phone project runs those whose subject depends on the layout, and a test
+  that sets its own window sizes runs once (its `README.md`,
+  `playwright.config.ts`).
+
+What held the React app until it was removed on 12.11.2026, kept for the
+rules it names:
 
 - `test/styles/contrast.test.ts`: the token pairs above in both schemes.
 - `test/csp.test.ts`: the policy names GitHub only at Baylee's repository,

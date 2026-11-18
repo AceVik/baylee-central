@@ -122,12 +122,10 @@ dl-linux-unsure = ブラウザーがプロセッサーの種類を示さない�
 dl-missing = このリリースには、お使いのシステム用のファイルがありません。以前のリリースは<releases>リリース一覧</releases>にあります。
 dl-none = GitHub からいま応答がありませんでした。すべてのリリースは<releases>リリース一覧</releases>にあります。
 dl-yours = お使いのシステム
-dl-more-files = ほかのファイル（{ $count }）
 dl-installer = インストーラー
 dl-deb = Debian パッケージ
 dl-archive = アーカイブ
 dl-fallback = 古いプロセッサー向けアーカイブ
-dl-fallback-help = AVX2 のない x86-64 プロセッサー（2013年ごろより前）向けです。Baylee の通常ビルドは AVX2 が必要で、なければ起動しません。
 plat-windows-x64 = Windows
 plat-windows-x64-sub = 多くのPC：64ビットの Intel または AMD
 plat-windows-arm64 = Windows on ARM
@@ -255,7 +253,7 @@ privacy-hosting = このサイトは、ドイツの netcup GmbH から借りて�
 privacy-views-title = ページビューの集計
 privacy-views = このサイトは、ページが開かれた回数を数えています。すべてのページとすべての訪問者をまとめた1つの数だけで、トップページに表示されます。ブラウザでページが開かれると、この数が1増えます。このために、あなたに関することは何も保存しません。IPアドレスも、クッキーも、識別子も、どのページだったかさえ保存しません。
 privacy-device-title = ブラウザーが保持するもの
-privacy-device = ログインするまで、このサイトはクッキーを設定しません。ブラウザーがお使いの端末に保持するものは次のとおりで、JavaScript を使う場合に限ります。配色を選んだ場合はその選択（<code>baylee-site-theme</code>）。ログイン中は、セッションの終了時刻（<code>baylee-central-session</code>）、チャットの鍵、連絡先の信頼済みの鍵（チャットの項を参照）。通知をオンにした場合は、この端末の乱数（<code>baylee-push-installation-v1</code>、<code>baylee-push</code>）。そして、ログインした、サイトをアプリとしてインストールした、通知をオンにした、のいずれかの場合に限り、サイトの公開ファイル（ページの枠、フォント、スクリプト）の控え。これにより、接続がなくても起動でき、通知を受け取れます。この三つのいずれにも当てはまらなくなった場合、控えは次にサイトを開いたときに削除されます。以下の項に記載がない限り、これらが私たちに送られることはありません。チャットとセッションの項目はログアウト時に削除されます。それ以外は、ブラウザーでサイトのデータを消去すれば削除できます。法的根拠：TDDDG第25条第2項第2号（利用する機能に厳密に必要なもの）。通知の乱数については、同意（TDDDG第25条第1項）。
+privacy-device = ログインするまで、このサイトはクッキーを設定しません。ブラウザーがお使いの端末に保持するものは次のとおりで、JavaScript を使う場合に限ります。配色を選んだ場合はその選択（<code>baylee-site-theme</code>）。ログイン中は、セッションの終了時刻とログインの切り替えを検知するランダムな目印（<code>baylee-central-session</code>）、ヘッダーにログイン中のアカウントを表示するための表示名、タグ、プロフィール画像を取得する鍵（<code>baylee-central-own</code>。ログアウトしたとき、またはセッション終了後に次にサイトを開いたときに削除されます）、チャットの鍵、連絡先の信頼済みの鍵（チャットの項を参照）。通知をオンにした場合は、この端末の乱数（<code>baylee-push-installation-v1</code>、<code>baylee-push</code>）。そして、ログインした、サイトをアプリとしてインストールした、通知をオンにした、のいずれかの場合に限り、サイトの公開ファイル（ページの枠、フォント、スクリプト）の控え。これにより、接続がなくても起動でき、通知を受け取れます。この三つのいずれにも当てはまらなくなった場合、控えは次にサイトを開いたときに削除されます。以下の項に記載がない限り、これらが私たちに送られることはありません。チャットとセッションの項目はログアウト時に削除されます。それ以外は、ブラウザーでサイトのデータを消去すれば削除できます。法的根拠：TDDDG第25条第2項第2号（利用する機能に厳密に必要なもの）。通知の乱数については、同意（TDDDG第25条第1項）。
 privacy-device-manager = 回復コードをブラウザーのパスワードマネージャーに保存したり、自分宛てにメールで送ったり、ファイルとして保存したり、表示される手順で印刷したりした場合、コードを保持するのは、ブラウザー、メールソフト、ファイル、紙であり、このサイトではありません。コードはお使いのブラウザー内で作られ、私たちには送られません。サイトのデータを消去しても、それらの場所からは消えません。
 privacy-github-title = GitHub
 privacy-github = ダウンロードページとトップページには、最新のリリース、テストの状況、カードの数が表示されます。これらはブラウザーではなく私たちのサーバーが GitHub に問い合わせて取得するため、GitHub があなたについて知ることはありません。ダウンロードや GitHub へのリンクを押したときに限り、ブラウザーが GitHub（GitHub, Inc.、米国）に接続し、IPアドレスとすべてのリクエストに付くものを送ります。その後は GitHub 自身のプライバシー通知が適用されます。
@@ -485,7 +483,6 @@ register-error-taken = このログイン名は使われています。別の名
 ## The recovery code
 
 code-title = 回復コード
-code-handle = あなたのハンドル：{ $handle }
 code-lead = パスワードを忘れたとき、暗号化されたデータが残るのは、このコードがある場合だけです。私たちはこのコードを知らず、復元もできません。この端末から離れた安全な場所に保管してください。
 code-shown-once = 表示は今だけです
 code-download = テキストファイルとして保存
@@ -882,42 +879,22 @@ strip-gateways = Gateway
 strip-online = オンライン
 strip-offline = オフライン
 strip-directory = 一覧
-strip-cards = プレイ可能なカード
-strip-cards-unit = 枚
 strip-accounts = Baylee Central のアカウント
 strip-live = Gateway が報告する、今の数
 strip-views = { $date } からのページビュー
-live-views = { $n ->
-   *[other] { $n } ビュー
-}
-live-accounts = { $n ->
-    [one] { $n } アカウント
-   *[other] { $n } アカウント
-}
-live-players = { $n ->
-    [one] { $n } 人のプレイヤー
-   *[other] { $n } 人のプレイヤー
-}
-live-playing = { $n ->
-   *[other] { $n } 人がゲーム中
-}
-live-tables = { $n ->
-    [one] 開いているテーブル { $n } 件
-   *[other] 開いているテーブル { $n } 件
-}
-live-games = { $n ->
-    [one] { $n } ゲーム
-   *[other] { $n } ゲーム
-}
+strip-l-players = プレイヤー
+strip-l-games = ゲーム
+strip-l-tables = 空きテーブル
+strip-l-accounts = アカウント
+strip-l-views = ビュー
+stat-cards = プレイ可能なカード
 hero-badges = 概要
 hero-badge-beta = オープンベータ
 hero-badge-free = 無料
 hero-badge-open = オープンソース
 hero-badge-fan = 非公式ファンコンテンツ
 gws-open-client = Baylee で開く
-gws-open-client-help = 「Baylee で開く」は、インストール済みのクライアント（0.1.1-beta.9b 以降）を起動します。アドレスを表示し、Gateway を追加する前に確認します。
 dl-menu-title = すべてのシステム
-dl-old-cpu = 古いプロセッサー（AVX2 なし）
 ci-passing = 成功
 ci-failing = 失敗
 dl-button = Baylee をダウンロード
@@ -978,10 +955,6 @@ source-repoTitle = リポジトリの現在の状況
 source-stars = スター
 source-issues = 未解決の Issue とプルリクエスト
 source-note = このサイトのサーバーが GitHub の公開 API から10分ごとに読み取っています。ブラウザーが GitHub に問い合わせることはありません。
-gw-count =
-    { $n ->
-       *[other] 登録されている Gateway は { $n } 件で、{ $online } 件がオンラインです。
-    }
 gw-none = 登録されている Gateway はまだありません。
 contact-intro = 質問、アイデア、遊んでみたいゲーム、公開の場には書きたくないこと。このフォームは、Baylee の作者に直接届きます。返信が必要な場合はメールアドレスを残してください。なければ、読むことしかできません。
 contact-f8 = 誤って解決されたカードは、ゲーム内で <kbd>F8</kbd> から報告するのがいちばんです。報告にはゲーム全体を添えられるからです。
@@ -1004,17 +977,14 @@ ai-hostingLink = Gateway のホスティングと LLM の設定
 
 # The gateways and the contact page, as the old site wrote them (owner, 11.11.2026)
 gw-lead = Gateway は、オンラインのテーブルがあるサーバーです。アカウント、デッキ、ルーム、ゲームごとに1つのエンジンプロセスがあります。ここに載っているのは、Baylee Central に登録され、その管理者が承認したものです。それぞれ運営者が自分たちのグループのために運営しており、そこでは運営者自身のルールが適用されます。一覧に載っていることは、Gateway の動作についての約束ではありません。
-gw-howTo = Gateway で遊ぶには、そのアドレスをクライアントの入口にコピーします。オンラインとは、Central が直近1分半以内にその Gateway から連絡を受けたという意味で、応答する約束ではありません。名前とバージョンは、各運営者が報告したものです。
 gw-find = Gateway を探す
 gw-findHint = 名前またはアドレス
 gw-shown = { $all } 件中 { $n } 件を表示
 gw-noMatch = 読み込み済みの Gateway には、一致するものがありません。
 gw-showAll = すべて表示
 gw-stats = ディレクトリの数字
-gw-stat-listed = 掲載中の Gateway
 gw-stat-online = 現在オンライン
 gw-stat-players = オンラインのプレイヤー
-gw-stat-playing = うちゲーム中
 gw-stat-tables = 開いているテーブル
 gw-stat-games = 進行中のゲーム
 gw-show = 表示
@@ -1353,7 +1323,6 @@ chat-write-first = 最初のメッセージを書く
 people-copy-handle = 自分のハンドルをコピー
 people-copy-failed = ここではコピーできませんでした。上のハンドルを選択して、手でコピーしてください。
 
-
 # ==== the administration's other pages (islands/admin/) ========================
 # Translated by a model (Claude Sonnet) on 12.11.2026; no native speaker has read it yet.
 admin-accounts = アカウント
@@ -1462,8 +1431,6 @@ admin-legacy-restored = 復元済み
 admin-legacy-banned = 利用停止
 admin-legacy-must-change = 新しいパスワードが必要
 admin-legacy-locked = { $until }までロック中
-
-
 
 ## The feedback moderation (/account/admin/feedback)
 
@@ -1763,81 +1730,122 @@ fb-json-base64 = base64 の { $n } 文字
 fb-json-more = 次の { $n } 文字を表示（残り：{ $left }）
 fb-json-items = 項目：{ $n }
 fb-json-keys = キー：{ $n }
-## Global daily and weekly challenges
-ch-title = チャレンジ
-ch-lead = どのゲートで遊んでも、全員に同じ課題。自分なりの解法を見つけ、記録を伸ばし、バッジを集めましょう。
-ch-eyebrow = また遊びたくなる課題
-ch-daily = デイリー
-ch-weekly = ウィークリー
-ch-loading = 読み込み中…
-ch-play-help = リンクを開くとBayleeでこの課題を表示します。クライアントの「チャレンジ」からも選べます。
-ch-unavailable = 課題を読み込めませんでした。もう一度お試しください。
-ch-empty = 検証済みの課題はまだありません。
-ch-archive = アーカイブ
-ch-older = 過去の課題
-ch-withdrawn = 取り下げ済み — この課題は開始もランキングへの登録もできません。
-ch-current = 開催中
-ch-details = 課題とランキング
-ch-play = Bayleeで遊ぶ
-ch-ends = ランキングの締め切り
-ch-estimated = 目安の時間
-ch-target = 目標ターン数
-ch-deck = 指定デッキ
-ch-progress = あなたの進捗
-ch-attempts = 開始した挑戦
-ch-failures = 失敗した挑戦
-ch-best-turns = 最少ターン数
-ch-completed = クリア済み — 進捗を保存しました。
-ch-assisted = ヒントを使用済みです。新たな挑戦は補助ありとなり、競技ランキングには登録されません。
-ch-consent = この課題のランキングに公開名とタグを表示する。
-ch-hint-one = ヒント1
-ch-hint-two = ヒント2
-ch-hint-confirm = ヒントを見る
-ch-hint-warning = ヒントを見ると、このアカウントでは今後の挑戦も含めてこの課題が補助ありになります。クリアのバッジは引き続き獲得できます。以前の補助なしの記録は有効なままです。
-ch-first-win = 初勝利
-ch-sprint = スプリント
-ch-rankings = 共通ランキング
-ch-ranking-rules = 初勝利は失敗回数が少ない順、次にターン数が少ない順です。最少ターン数は補助なしの勝利の自己ベストです。スプリントは一時停止や切断のないサーバー計測時間です。同じ記録は同順位となります。開催期間内に終えた勝利だけが対象です。
-ch-no-scores = 対象となる公開記録はまだありません。
-ch-more = 次のページ
-ch-rank = 順位
-ch-player = プレイヤー
-ch-turn = ターン
-ch-time = 時間
-ch-badges = バッジコレクション
-ch-badges-lead = 各課題は一度だけ加算されます。バッジの段階は永続で、休んだ日があっても進捗は失われません。アーカイブでの勝利もデイリー、ウィークリー、戦術家に加算されます。
-ch-active = 進行中の挑戦を再開
-ch-badge-daily = デイリー探求者
-ch-badge-weekly = ウィークリー探求者
-ch-badge-tactician = 戦術家
-ch-badge-first-try = 一発クリア
-ch-badge-regular = 常連
-ch-badge-locked = 未獲得
-ch-bronze = ブロンズ
-ch-silver = シルバー
-ch-gold = ゴールド
-ch-platinum = プラチナ
-ch-obsidian = オブシディアン
+## The privacy notice: what Central keeps of Daily and Weekly tasks
 privacy-challenges-title = Daily・Weeklyチャレンジ
 privacy-challenges = Centralは挑戦回数、結果、使用したヒント、ランキングの公開設定、バッジの累積進捗をアカウントに保存します。公式ホストが結果と計測時間を送信します。名前、タグ、成績は、その課題のランキング公開を有効にした場合のみ公開され、無効にするとランキングから消えます。記録はアカウント削除まで保存されます。バックアップの期間はアカウントの項目をご覧ください。課題のメタデータはアカウントのデータエクスポートに含まれます。
 
-# Tower expeditions
+# The privacy notice: what Central keeps of Tower expeditions
 tower-title = 翠緑の塔
-tower-lead = 5つの対戦、3つのライフ。あなたの選択で育つデッキ。
-tower-rules = 用意されたデッキで、すべての対戦を自分でプレイします。最初の4勝のあとに、それぞれ強化を1つ選びます。敗北するとライフを1つ失い、3敗で遠征終了です。再接続しても対戦内容は変わらず、技術的な無効試合ではライフを失いません。毎週、全員が同じ塔に挑みます。週が終わっても練習で永続バッジを獲得できます。
-tower-floors = 階層
-tower-lives = ライフ
-tower-rewards = 登頂の遺物
-tower-reward-rules = 道を拓く者は週ごとの異なる階層、冠の守り手は週ごとの登頂、不屈は無敗での週ごとの登頂を数えます。同じ週に同じ達成を繰り返しても進捗は増えません。遺物は消えず、連続プレイも必要ありません。
-tower-conquered = 冠はあなたのもの
-tower-choosing = ゲーム内で次の強化を選んでください
-tower-ended = 遠征終了
-tower-pathfinder = 道を拓く者
-tower-summit = 冠の守り手
-tower-unbroken = 不屈
-tower-tiers = 5段階すべてを見る
-tower-ascent = 登頂
-tower-sprint = 完全スプリント
-tower-scoring = 登頂は攻略階層数、敗北の少なさ、勝利した対戦のターン数の少なさで順位を決めます。スプリントは無敗かつ勝利した対戦を中断せずに登頂した際の実際の思考時間です。有効な最高記録だけが掲載され、同じ記録は同順位になります。
 tower-privacy = Central は遠征、選んだ強化、残りライフ、結果、ランキング設定、レリックの永続的な進捗をアカウントに保存します。シーズンのランキングを有効にした場合のみ、公開名、タグ、有効な最高記録が表示されます。無効にすると掲載が削除されます。アカウントのエクスポートには遠征と挑戦履歴が含まれます。アカウントを削除するとこれらの進捗も削除されますが、アカウントの項に記載したバックアップ保管期間が適用されます。
-tower-guide = 遠征のルール
+
+## the steps after signing in (code and terms, redesign)
+code-created = アカウントを作成しました
+code-handle-label = あなたのハンドル
+code-keep-title = いますぐ、次のうち少なくとも一つの方法で保管してください
+code-mail-opened = メールソフトが下書きを開いたはずです。何も起きない場合は、このブラウザーに設定がありません。ほかの方法でコードを保管してください。
+terms-step-version = バージョン { $version }
+terms-read-hint = 最後まで読むと、同意できるようになります。
+terms-read-done = 最後まで読みました。
+
+## the contact form (redesign)
+contact-again = 別のメッセージを書く
+
+## the footer's last line (which build this is)
+foot-build = このサイトのビルド：
+
+## download (variants and page)
+dl-v2-name = 古いプロセッサー（x86-64-v2）
+dl-v2-help = 2013〜2015年ごろより前のプロセッサー向けです。メインのビルドが起動しない場合にもお使いください。
+dl-os-windows = Windows 10 または 11
+dl-os-mac = macOS 11 以降
+dl-os-linux = glibc 2.35 以降と Vulkan ドライバー
+dl-howto-title = インストール
+dl-howto-windows-1 = インストーラーをダウンロードして実行します。
+dl-howto-windows-2 = Windows から警告が出たら、<i>詳細情報</i>から<i>実行</i>を選んでください。ビルドにコード署名がないためです。
+dl-howto-windows-3 = スタートメニューから Baylee を起動します。
+dl-howto-mac-1 = <code>.dmg</code> を開き、Baylee を<i>アプリケーション</i>にドラッグします。
+dl-howto-mac-2 = 初回の起動時に<i>システム設定 → プライバシーとセキュリティ</i>を開き、<i>このまま開く</i>を選んでください。
+dl-howto-mac-3 = お使いの Mac のチップがわからない場合は、<i>Apple メニュー → この Mac について</i>で確認できます。
+dl-howto-linux-1 = <code>chmod +x</code> で AppImage を実行可能にして、実行します。
+dl-howto-linux-2 = パッケージをインストールすることもできます：<code>sudo apt install ./baylee_*.deb</code>。
+dl-howto-linux-3 = アーカイブはインストール不要です。展開して <code>baylee</code> を起動してください。
+dl-soon-title = 今後の予定
+dl-soon-text = Baylee はいまのところパソコンで動きます。以下は計画中で、まだダウンロードできるものはありません。
+dl-soon-web = ブラウザー版
+
+## the account overview and its navigation (redesign)
+account-group-account = アカウント
+account-play-title = 遊ぶ
+account-play-lead = ゲームを入手して、このアカウントでログインしましょう。
+account-numbers-lead = いま Gateway と Baylee Central が報告している公開の数字です。
+account-chat-lead = メッセージと連絡先。エンドツーエンドで暗号化されています。
+account-push-lead = 新しいメッセージを、この端末でお知らせします。
+
+## donations (the page, the bar's entry, the start page's band)
+nav-donate = 寄付
+donate-title = Baylee の開発を続けるために
+donate-eyebrow = 支援
+donate-description = Baylee は無料で、これからも無料です。気に入っていただけたら、毎月の費用を支える手助けができます。GitHub Sponsors、Liberapay、Ko-fi からどうぞ。
+donate-lead = Baylee は無料で、これからも無料です。課金の壁も、有料の機能も、広告もありません。空いた時間に作っていますが、それでも毎月お金がかかります。気に入っていただけたら、その負担を支えていただけます。
+donate-goal-title = 目標
+donate-goal-amount = 月に約 { $amount }
+donate-goal-lead = 開発と運営に毎月かかる費用のおおよそです。
+donate-progress = 月 { $goal } のうち { $have }
+donate-progress-label = 月の目標のうち、まかなえている割合
+donate-progress-percent = { $percent } % をまかなえています
+donate-progress-supporters = 支援者：{ $n } 人。
+donate-progress-missing = まだ数に入っていません：{ $platforms }。
+donate-progress-first = 継続的な寄付はまだありません。あなたが最初の一人になります。
+donate-progress-none = 各プラットフォームから、まだ金額の連絡がありません。
+donate-once-title = 一度きりの寄付
+donate-once-since = { $date } 以降
+donate-once-count = 寄付：{ $n } 件
+donate-once-note = 一度きりなので、月の目標には含めません。ほかの通貨は、届いた日のレートでユーロに換算しています。
+donate-costs-title = 使い道
+donate-costs-lead = 毎月の金額を丸めて示しています。
+donate-cost-ai = AI アシスタント
+donate-cost-ai-note = Claude と Gemini です。これらがなければ、プロジェクトはこれ以上開発できません。
+donate-cost-servers = サーバー
+donate-cost-servers-note = 公開 Gateway、Baylee Central、そしてこのウェブサイト。
+donate-cost-art = 画像、動画、音楽
+donate-cost-art-note = 背景や音楽を作るためのツールです。
+donate-cost-tools = 開発ツール
+donate-cost-tools-note = GitHub、エディター、Apple デバイス向けのデベロッパープログラム、ドメイン、メール。
+donate-cost-fees = 手数料
+donate-cost-fees-note = プラットフォームと決済サービスが受け取る分で、約1割です。
+donate-cost-about = 約 { $amount }
+donate-ways-title = 寄付の方法は三つ
+donate-ways-lead = どれも、これらの費用を支払っている Baylee の開発者 AceVik に届きます。お好きなものをお選びください。
+donate-github-lead = 毎月でも一度きりでも、GitHub アカウントで。
+donate-liberapay-lead = 継続的な寄付を、カードまたは PayPal で。Liberapay は非営利団体が運営しています。
+donate-kofi-lead = 一度きりのチップを、アカウントなしで、カードまたは PayPal で。
+donate-open = { $platform } を開く
+donate-qr-alt = { $address } の QR コード
+donate-nothing-title = 寄付で得られるもの
+donate-nothing = 何もありません。それは意図したことです。機能も、ゲーム内の優位も、早期や限定のアクセスも、バッジも、一覧に載る名前もありません。誰もが同じ Baylee を使います。寄付は感謝のしるしで、個人への贈り物です。税控除の対象にはなりません。
+donate-other-title = ほかの助け方
+donate-other = 遊ぶこと、壊れているところを報告すること、友達に伝えること。それも同じくらい助けになります。
+donate-privacy = 支払いは、お選びのプラットフォームとその決済サービスで行われます。このサイトは支払いを受け付けず、誰が寄付したかも知りません。
+donate-band-title = Baylee は無料です。続けていくために、力を貸してください。
+donate-band-lead = サーバーとツールに月に約 { $amount } かかります。寄付で得られるものはありませんが、大きな助けになります。
+donate-band-button = 寄付の方法
+privacy-donate-title = 寄付
+privacy-donate = The donation page links to GitHub Sponsors (GitHub, Inc., USA), Liberapay (Liberapay, France) and Ko-fi (Ko-fi Labs Limited, United Kingdom). Only when you follow one of these links does your browser connect to that platform; payment happens there and with its payment service (Stripe or PayPal), and the platform's own privacy notice applies. We take no payment on this site. The page shows how much of the monthly goal is covered and what was given once. Baylee Central collects these figures, not your browser: it asks Liberapay for its public total and GitHub Sponsors for the account's own totals and one-time sponsorships, without the sponsors' names, takes the euro exchange rates from the European Central Bank, and is notified by Ko-fi of each payment. Of a payment Central keeps only the amount, the currency, the time, whether it was given once or regularly, and a fingerprint of the platform's transaction number so that a notice that comes twice counts once; everything else in a notice, such as a name, an e-mail address or a message, is discarded without being stored or logged. After 40 days the amounts are added to a total and the single records are deleted. The figures name nobody, and we publish no donor's name.
+
+## gateways directory (redesign)
+gw-play-hint = 「Baylee で開く」を押すと、Gateway がインストール済みのクライアントに渡されます。クライアントがアドレスを表示し、追加する前に確認します。ログインはここではなく、そちらで行います。まだクライアントがない場合は、<download>Baylee をダウンロード</download>してください。
+gw-fineprint = オンラインとは、直近1分半以内に Central が Gateway から連絡を受けたことを指し、応答を保証するものではありません。名前、バージョン、数字は、各運営者の申告です。
+gw-fig-players = プレイヤー
+gw-fig-playing = ゲーム中
+gw-fig-tables = 空きテーブル
+gw-fig-games = ゲーム
+gw-load = プレイヤーの { $n }% がゲーム中です
+gw-load-empty = いまは誰もいません。
+gw-silent = 数字の報告がありません。
+gw-away = 最近、Central に連絡がありません。
+gw-current = 最新
+gw-current-title = 最新リリースのバージョンで動いています。
+gw-secure = 暗号化された接続（HTTPS）
+gw-show-current = 最新バージョン
+gw-col-gateway = Gateway
+gw-col-state = 状態

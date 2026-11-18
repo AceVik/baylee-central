@@ -11,6 +11,10 @@ import { axe, targets } from "./check.ts";
 // refuse its challenge: that proves the module ran and the refusal reaches
 // the page as "wrong sign-in", with nothing sent that should not be.
 
+// Signing in and registering stand in dialogs, which their addresses open
+// over the start page: a form is looked for in its own.
+const dialogOf = (page: Page, which: "signin" | "register") => page.locator(`#auth-${which}`);
+
 const ACCOUNT = [1, 2, 3, 4, 5, 6, 0x70, 8, 0x80, 10, 11, 12, 13, 14, 15, 16];
 
 async function central(route: Route, seen: unknown[]) {
@@ -40,9 +44,10 @@ test("a sign-in runs the real crypto in its Worker and refuses a false challenge
   const seen: Record<string, unknown>[] = [];
   await page.route("**/api/v1", (route) => central(route, seen));
   await page.goto("/en/signin");
+  const signin = dialogOf(page, "signin");
   await expect(page.locator("html")).toHaveAttribute("data-islands", "ready");
-  await page.getByLabel("Sign-in name").fill("Erika");
-  await page.getByLabel("Password", { exact: true }).fill("correct horse battery staple");
+  await signin.getByLabel("Sign-in name").fill("Erika");
+  await signin.getByLabel("Password", { exact: true }).fill("correct horse battery staple");
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(page.getByRole("alert")).toHaveText("That sign-in name and password do not match. Check both and try again.", { timeout: 30_000 });
   expect(seen.map((b) => b.operation)).toEqual(["discover", "login_start"]);
@@ -56,19 +61,20 @@ test("a sign-in runs the real crypto in its Worker and refuses a false challenge
   // form's first field after that.
   await expect(page.getByRole("button", { name: "Try again" })).toBeFocused();
   await page.keyboard.press("Enter");
-  await expect(page.getByLabel("Sign-in name")).toBeFocused();
+  await expect(signin.getByLabel("Sign-in name")).toBeFocused();
   expect(problems).toEqual([]);
 });
 
 test("registration says early what Central would refuse", async ({ page }) => {
   await page.goto("/de/register");
+  const register = dialogOf(page, "register");
   await expect(page.locator("html")).toHaveAttribute("data-islands", "ready");
   // the open beta asks for no key
-  await expect(page.getByLabel("Beta-Key")).toHaveCount(0);
+  await expect(register.getByLabel("Beta-Key")).toHaveCount(0);
   await page.getByRole("button", { name: "Account anlegen" }).click();
   await expect(page.getByRole("alert")).toHaveText("Der Anmeldename braucht 3 bis 24 Kleinbuchstaben, Ziffern, Punkte, Binde- oder Unterstriche.");
-  await page.getByLabel("Anmeldename").fill("erika");
-  await page.getByLabel("Anzeigename").fill("Admin");
+  await register.getByLabel("Anmeldename").fill("erika");
+  await register.getByLabel("Anzeigename").fill("Admin");
   await page.getByRole("button", { name: "Account anlegen" }).click();
   await expect(page.getByRole("alert")).toHaveText("Dieser Anzeigename ist reserviert. Wähle einen anderen.");
 });
@@ -88,14 +94,15 @@ test("registration refuses a robot's haste and its hidden field, and says when i
   });
   await page.goto("/en/register");
   await expect(page.locator("html")).toHaveAttribute("data-islands", "ready");
-  await page.getByLabel("Sign-in name").fill("erika");
-  await page.getByLabel("Display name").fill("Erika");
+  const register = dialogOf(page, "register");
+  await register.getByLabel("Sign-in name").fill("erika");
+  await register.getByLabel("Display name").fill("Erika");
   const fill = async () => {
-    await page.getByLabel("Password", { exact: true }).fill("violet lantern harbour");
-    await page.getByLabel("Repeat password").fill("violet lantern harbour");
+    await register.getByLabel("Password", { exact: true }).fill("violet lantern harbour");
+    await register.getByLabel("Repeat password").fill("violet lantern harbour");
   };
   await fill();
-  await page.getByLabel("I am 16 or older.").check();
+  await register.getByLabel("I am 16 or older.").check();
   await page.getByRole("checkbox", { name: /I accept the terms of use/ }).check();
   const refused = "The registration was not accepted. Try again.";
   // faster than a person: not sent
@@ -127,11 +134,12 @@ test("registration refuses a robot's haste and its hidden field, and says when i
 async function fillRegistration(page: Page) {
   await page.goto("/en/register");
   await expect(page.locator("html")).toHaveAttribute("data-islands", "ready");
-  await page.getByLabel("Sign-in name").fill("erika");
-  await page.getByLabel("Display name").fill("Erika");
-  await page.getByLabel("Password", { exact: true }).fill("violet lantern harbour");
-  await page.getByLabel("Repeat password").fill("violet lantern harbour");
-  await page.getByLabel("I am 16 or older.").check();
+  const register = dialogOf(page, "register");
+  await register.getByLabel("Sign-in name").fill("erika");
+  await register.getByLabel("Display name").fill("Erika");
+  await register.getByLabel("Password", { exact: true }).fill("violet lantern harbour");
+  await register.getByLabel("Repeat password").fill("violet lantern harbour");
+  await register.getByLabel("I am 16 or older.").check();
   await page.getByRole("checkbox", { name: /I accept the terms of use/ }).check();
   await page.waitForTimeout(3_000);
 }

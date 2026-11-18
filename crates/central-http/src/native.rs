@@ -18,7 +18,7 @@ use central_api::{
     Error, PROTOCOL_HEADER, PROTOCOL_VERSION, Token, UPDATE_REQUIRED_BODY, UPDATE_REQUIRED_STATUS,
     reports::Part,
 };
-use central_identity::{IdentityService, Place, Presented};
+use central_identity::{IdentityService, KofiAnswer, Place, Presented};
 use std::{
     sync::{Arc, Mutex},
     time::Instant,
@@ -51,6 +51,9 @@ pub(crate) fn router(identity: Arc<IdentityService>, deployed: bool) -> Router {
         // Above this line every route speaks the protocol; the key set below is public.
         .layer(middleware::from_fn(protocol))
         .route("/.well-known/jwks.json", get(jwks))
+        // Ko-fi's webhook (`docs/operations.md` §"Donations"): Ko-fi speaks no
+        // protocol of ours, so it stands below the protocol's layer too.
+        .route(KOFI_PATH, post(kofi))
         .with_state(Native {
             identity,
             uploads: Uploads::default(),
@@ -115,6 +118,46 @@ async fn jwks(State(native): State<Native>) -> Response {
         )
             .into_response(),
         Err(error) => failure(error),
+    }
+}
+
+/// Where Ko-fi delivers: the one route that takes a platform's word for a
+/// payment. No secret is in it; the token is in the body.
+pub(crate) const KOFI_PATH: &str = "/v1/kofi";
+
+/// `POST /v1/kofi`: one delivery from Ko-fi. Not found while Ko-fi is not
+/// configured. The address's budget is spent first, then the service reads the
+/// token before anything else of the body, and every refusal, whatever its
+/// reason, is the same plain `400`; a delivery taken, also one that came
+/// before, is `200`. The body is never logged, kept or echoed.
+async fn kofi(
+    State(native): State<Native>,
+    extensions: Extensions,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Response {
+    if !native.identity.kofi_listening() {
+        return (StatusCode::NOT_FOUND, "not found\n").into_response();
+    }
+    if let Some(client) = native.origin(&extensions) {
+        // The guard is gone before anything is awaited.
+        let charged = native
+            .budgets
+            .lock()
+            .is_ok_and(|mut budgets| budgets.charge_kofi(client, Instant::now()));
+        if !charged {
+            return (StatusCode::TOO_MANY_REQUESTS, REJECTED).into_response();
+        }
+    }
+    let mut types = headers.get_all(header::CONTENT_TYPE).iter();
+    let content_type = match (types.next(), types.next()) {
+        (Some(one), None) => Some(one.as_bytes()),
+        _ => None,
+    };
+    match native.identity.kofi(content_type, &body).await {
+        KofiAnswer::Taken => (StatusCode::OK, "ok\n").into_response(),
+        KofiAnswer::Refused => (StatusCode::BAD_REQUEST, REJECTED).into_response(),
+        KofiAnswer::Unavailable => (StatusCode::SERVICE_UNAVAILABLE, REJECTED).into_response(),
     }
 }
 

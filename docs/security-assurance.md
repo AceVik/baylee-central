@@ -10,6 +10,10 @@ need a written rationale. Source: https://github.com/OWASP/ASVS/tree/v5.0.0
 
 ## Three-pass method for every security milestone
 
+The separate native Tower identity scope is recorded in
+[Tower access](tower-access.md), including design, implementation and targeted
+real-transport adversarial evidence. It adds no Tower gameplay authority to Central.
+
 The Daily/Weekly feature's design, implementation and adversarial evidence is
 recorded in [the challenge assurance record](challenge-assurance.md). Its three
 engineering improvement rounds precede the independent PR review; neither is
@@ -7755,3 +7759,567 @@ Run on the changed tree:
 - `cargo xtask postgres` (passed, at a load of about 60).
 
 The rest of the checks are recorded in the PR.
+
+## Going from page to page without a new document, 18 November 2026
+
+`js/nav.js` (`docs/website-design.md` §"Going from page to page") fetches the next page of
+the public site and puts its head's words and its body in place. It needs one more Trusted
+Types policy, `baylee-nav`, so the site's Content Security Policy changed by that one name.
+
+Design pass: the asset is the page's script context (the password's Worker and the session
+live in it). What is new: a string becomes DOM (the parser), a script element is made at run
+time, and an entry of the history names a page. The rules chosen: only a same-origin path
+under a language prefix is fetched; only `text/html` with status 200 that ends on this origin
+is used; the parser's document runs nothing and its nodes are imported, never written as a
+string into the live document; a script is made only for an address that matches
+`/assets/<name>.js`, with the integrity value the page named; the account area is never
+entered or left this way; an island that was taken over ends the swap and loads a document.
+
+Implementation pass: the policy object stays inside the module and is not on `window`; a
+second policy of the name cannot be made (no `allow-duplicates`). `createHTML` is the
+identity, which is only acceptable because its one caller feeds `DOMParser`, whose document
+has no browsing context. `createScriptURL` and the path without Trusted Types share one
+check. Everything that fails falls back to the browser loading the address.
+
+Adversarial pass, what was tried and what holds:
+- **A script in the fetched page.** Imported from a parsed document it is inert; a module
+  the page names is made anew only from an address of the site's hashed scripts. Inline
+  handlers and inline scripts stay refused by `script-src 'self'`.
+- **A page's structured data.** Importing a `<script type="application/ld+json">` set a
+  script's text from a string and was refused by Trusted Types (seen as console errors in the
+  first run). It is no longer carried over; the one on screen is removed with its page.
+- **A foreign address in the history.** An entry's `page` is written only from
+  `location.pathname`, which can be `//host/…` for an address typed that way. Back to such an
+  entry is checked again: same origin and a language prefix, else the document is reloaded.
+  `connect-src 'self'` refuses the request besides, and a response that ended elsewhere is not
+  used.
+- **A redirect.** Followed by `fetch` on this origin only; one that leaves it fails the
+  request, and the browser then loads the address as a press on the link would.
+- **A response that is not a page** (`/api/…` is no language prefix; JSON, a picture, an error
+  status): not used.
+- **A release going out between two pages.** Another style sheet or another islands module in
+  the response loads the document.
+- **The service worker.** It answers only requests whose mode is `navigate`; a fetched page is
+  none, so the offline page is never put in place under another address.
+- **Counting.** A fetched page is not a navigation, so it does not raise the count of views.
+
+Run on the changed tree: the tests of `central-web`, `central-web-server` and `xtask`; a
+headless Chromium over the built site under the real policy (page to page, Back and Forward
+with the place a page stood at, a form's dialog over a swapped page, a taken-over island
+forcing a document), with no console error. Not run: WebKit and Firefox (no Trusted Types
+there until recently; the script then parses without a policy and makes scripts under the
+same address check), and the browser tests of `e2e-site`, which wait for their update.
+
+These passes are by the implementing agent and are not an independent audit.
+
+## The steps after a form, the contact form, the footer's build and what is counted, 18 November 2026
+
+Four changes to the website's pages and one to its server, none to Central's wire or data.
+
+Design pass, what each one could open:
+- **The recovery code's step.** Mailing the code to oneself stays a `mailto:` address the
+  browser hands to the person's own mail program; nothing is sent by the site or by Central,
+  and the code is never part of a request. The warning (the code then lies in a mailbox) is no
+  longer always on screen: it unfolds when the mail tile is pressed or an address is typed, and
+  the first press of the tile only shows it, so the mail program opens on a second, informed
+  press at the earliest. The handle shown is the one Central returned for the new account.
+- **The terms' step.** Accepting waits for the end of the text. This is a help to the reader
+  and not a control: Central records the acceptance of a version and its digest as before, and
+  a page that sent `accept_terms` without scrolling would be accepted as before.
+- **The contact form.** While a message is on its way the fields are read-only and a second
+  submit is ignored; the request, its honeypot and the feedback service's own limits are
+  unchanged. The view after a send is built element by element (an inline `<svg>` written as
+  static markup was refused by Trusted Types in the first run, the page's policy working as
+  meant).
+- **The footer's last line.** The build's release tag, commit and that commit's day, read
+  from the checkout by `cargo xtask site` and carried in the asset manifest. The repository is
+  public, so the line says nothing an observer could not read there; it does tell an attacker
+  which commit runs, which the hashed asset names told already. A tag is shown only if it is
+  short and of letters, digits and `.-_+`; a commit becomes part of a link only if it is forty
+  lowercase hexadecimal digits; both are text in the page, never markup.
+- **What the strip counts.** A visit instead of a page opened: a navigation that says
+  `Sec-Fetch-Site: same-origin` (it started on one of the site's own pages) or carries
+  `Cache-Control` (a reload) is not counted again. Both are read from the single request;
+  still nothing is stored about a visitor (no address, no cookie, no identifier), and the
+  count stays one number. A client can send any headers it likes, so the number can be driven
+  up by a script as before; it is a figure for the start page and nothing is decided by it.
+
+Implementation pass: `islands/keep.rs` and `islands/auth.rs` change markup and two signals
+(`asked`, `read`); no request, no storage and no secret's lifetime changes. `views.rs` gains
+two header checks and a test of them. `xtask` runs `git` with fixed arguments in the
+workspace root and ignores a failure (a build outside a checkout has no such line).
+
+Adversarial pass, what was tried and what holds:
+- **A tag or commit of hostile shape** (a tag named like markup or a path): refused by the
+  shape checks in `site::Build`, and the page writes text nodes only.
+- **A view with static SVG in an island** raised the Trusted Types error above in a headless
+  Chromium under the real policy; the tick is now drawn by `glyph`, element by element.
+- **A double submit of the contact form**: the second is dropped while the first is on its way.
+- **The warning hidden from a reader.** While shut, the unfolded region is `visibility:
+  hidden` (not read, not focusable); open, it is a `role="note"` the mail tile names with
+  `aria-controls` and `aria-expanded`.
+
+These passes are by the implementing agent and are not an independent audit.
+
+## The header's note of who is signed in and the account's overview, 18 November 2026
+
+Design pass. The header's account link now says who is signed in on every page (display name,
+tag, own picture), and the account's first page opens with the same three, the game's download
+and the area's sections as tiles.
+
+- **What is kept, and where.** One `localStorage` record, `baylee-central-own`: the display
+  name, the tag, the own picture's key in hexadecimal, whether that picture moves, and the
+  session record it belongs to (`of`). All four are what any other signed-in account is shown
+  of this one; the sign-in name is not among them and stays out of browser storage as decided
+  on 12 November. The earlier per-tab key for the picture (`sessionStorage`) is gone: one
+  place, and a second tab draws the header without asking Central.
+- **Its lifetime is the session's.** `session::remember` (another sign-in) and
+  `session::forget` (signing out, a session Central no longer knows) remove it; `boot.js`
+  removes it on any page that finds no live session record; and a note whose `of` is not the
+  current session record is neither shown nor extended, so what one sign-in noted is never
+  drawn for the next, also when two tabs race.
+- **Who writes it.** The pages that learn the values anyway: signing in and the account
+  summary write name and tag, the own picture's answer writes the key. No request exists for
+  the header's sake, and public pages ask Central nothing.
+- **How it is drawn.** `boot.js` builds the link from text nodes and an `<img>` whose address
+  is `/api/v1/pictures/` plus a key that must be thirty-two lowercase hexadecimal digits; a tag
+  is drawn only if it is four to eight such digits. Nothing from the note becomes markup, an
+  attribute other than that address, or a link's target.
+- **The account's overview** is server markup around two islands as before. The server's page
+  holds no link to the administration (the tested rule stands); an administrator's links are
+  drawn by the island after Central said so. The page now varies by the reader's machine (the
+  download it offers), so the server keeps it per machine like the start page; the bounds on
+  kept pages are unchanged.
+
+Implementation pass: `islands/session.rs` gains the note (`note_name`, `note_picture`,
+`noted_picture`), `islands/picture.rs` loses its own header code and storage in favour of it,
+`islands/auth.rs` and `islands/account.rs` call `note_name`, `boot.js` draws. No request, no
+cookie and no secret's lifetime changes; the wire is untouched.
+
+Adversarial pass, what was tried and what holds:
+- **A note of hostile content** (written by hand in the console, or by a script that already
+  runs in the origin): a name of markup is drawn as text, a key or tag of another shape is
+  not drawn, and a note without the current session's record is ignored. A script that can
+  write the note can read the page anyway; the note grants nothing and no decision reads it.
+- **A shared computer.** After signing out the note is gone with the session record. After a
+  session that merely ran out it stays until this site is opened again in that browser, as
+  the session record does; it then holds a display name, a tag and a picture key, which every
+  signed-in account can see of this one, and no sign-in name. The privacy notice says so.
+- **Two tabs, two accounts.** Tab B signs in as another account: `remember` removes the note
+  and changes the session record; tab A's later write finds a note of another `of` (or none)
+  and starts afresh under the current record, and A's own pages are reset by the existing
+  `storage` listener.
+
+These passes are by the implementing agent and are not an independent audit.
+
+## The donation page, what it asks Liberapay and `/funding.json`, 18 November 2026
+
+Design pass. The site gains `/donate`: the monthly goal, how much of it is covered, what the
+money pays for, and three places to give (GitHub Sponsors, Liberapay, Ko-fi), each as a link
+and a QR code. The bar and the footer link to it, and `/funding.json` says the goal's figures
+to a program.
+
+- **No money and no donor here.** The site takes no payment, has no form on the page and
+  learns nothing about who gave: paying happens on the platform, in a new tab opened with
+  `noopener noreferrer`. The three addresses are constants (`data::GIVING`); nothing a reader
+  or a platform sends becomes a link's target.
+- **One new outbound request.** `central-web-server` asks
+  `https://liberapay.com/AceVik/public.json` every thirty minutes (`funding.rs`), with the
+  agent the GitHub requests use: HTTPS only, no proxy, no redirect followed, ten seconds in
+  all, sixteen kibibytes of headers. Liberapay publishes this document for anybody; no key
+  exists, and the server still holds no secret. A reader's browser never asks a platform:
+  the policy's `connect-src` is unchanged, and the codes are files of this origin.
+- **What is kept of the answer.** Two numbers: what is received a week, in euro cents, and
+  from how many. The answer also carries the recipient's name, picture address and own
+  texts; they are not deserialised (the struct names two fields), not logged and not passed
+  on. Nothing in the answer names a donor. The numbers live in memory only.
+- **GitHub Sponsors and Ko-fi are not asked.** Their figures need a token or a webhook with
+  a verification secret, and this process has no place for either by design. The page says
+  which platform the bar counts. Counting them is a later change with a design of its own
+  (where the secret lives, which process answers the webhook).
+- **`/funding.json`** is a public document of constants and those figures: goal, covered,
+  percentage, number of supporters, which platforms are counted, the page's address, the
+  three places. It is sent with the headers every generated document gets and is the same
+  for every reader.
+- **The buttons' light** is CSS alone (a gradient that travels under the label, a glow on the
+  heart); no script, no inline style, nothing under reduced motion.
+
+Implementation pass: `central-web/src/data.rs` (`GIVING`, `Pledges`, `Funding`),
+`site/pages/donate.rs`, `style/donate.css`, three SVG files under `assets/img/`, the bar's and
+the footer's link in `site/shell.rs`, a part of the privacy notice (`legal.rs`, 44 words in
+eleven languages); `central-web-server/src/funding.rs` (asking and reading), `fetch.rs` (the
+half-hourly task, the fallback's file), `config.rs` (`funding`, on unless switched off),
+`generated.rs` and `routes.rs` (`/funding.json`, `/donate` among the addresses that lead to a
+language). No dependency is new: `ureq` and `serde_json` were there. Central's service, its
+wire and its database are untouched.
+
+Adversarial pass, what was tried and what holds:
+- **A hostile or broken answer.** The body is read up to 64 KiB and no further; anything but
+  status 200 is dropped. An amount is digits with at most one point and one or two digits
+  after it, at most nine digits before: no sign, exponent, grouping, blank or other script's
+  digits (tested with twenty-one spellings). Another currency, a missing amount, an amount
+  that is a JSON number, or more than a hundred thousand euros a week drops the answer; the
+  supporters' count is capped at a million. The month's figure is `week * 52 / 12` on values
+  bounded so that it cannot overflow, and the percentage is capped at 100. So the worst a
+  platform (or whoever answers in its place, past TLS) can do is show a wrong amount up to
+  that bound on one page; no text of the answer reaches a page.
+- **A platform that stops answering** keeps its last figures; one that never answered leaves
+  the bar out and a line says that no figure is known. Zero is drawn as an invitation, never
+  as a count of nobody that could be read as a statement about people.
+- **The codes.** Each is a static SVG made by Baylee's `cargo tools site qr` from the address
+  in `GIVING` (one path, no script, no reference to anything outside the file) and was read
+  back with macOS's detector before it was added: each says exactly its address. A file is
+  served under its content hash like every asset; changing an address means making its file
+  anew, and the page test pins the three addresses beside the three files.
+- **The links.** `target="_blank"` with `rel="noopener noreferrer"` on all six (tested in
+  every language): the platform learns neither the opener nor the page the reader came from.
+- **The legal rule.** The page's own part names neither Wizards nor the game it plays
+  (tested in every language); the footer's fan-content notice stands on it as on every page,
+  which is the disclaimer the policy asks for and not a connection to a sponsor.
+- **Abuse of the route.** `/funding.json` is a GET of a few hundred bytes built from memory;
+  it asks nobody anything, so a flood of it reaches no platform.
+
+These passes are by the implementing agent and are not an independent audit.
+
+### Addendum, the same day: a part for each platform, and what was given once
+
+Design pass. The owner asked for one figure over the three platforms, with a bar and a sum,
+and for one-time donations summed in euros. This change is the website's half and moves no
+trust boundary: `Funding` now holds a monthly figure for each platform (`github`,
+`liberapay`, `kofi`, each optional) and an optional sum of what was given once (cents,
+count, a date). The page draws the bar as an SVG with one rectangle for each platform, a
+legend with each amount, and the one-time sum as a block of its own; `/funding.json` gains
+`platforms` and `once`.
+
+- **Who fills what.** `central-web-server` still fills Liberapay's figure only, from the
+  same public document as before, and still holds no secret. GitHub's figure needs a token
+  and Ko-fi's a webhook with a verification secret: both are Baylee Central's to collect,
+  in a change of their own with its own three passes (one inbound route, where the secrets
+  live, what of a payment is kept). Until then the two platforms and the one-time sum are
+  absent, and the page says which platforms are not counted yet.
+- **Nothing new is asked, kept or sent.** No new request, no new dependency, no new field
+  read from Liberapay's answer. The amounts stay numbers: the page formats them itself. The
+  only text taken from the data is the day the one-time count began, and it goes through
+  one guard (`Once::day`: four digits, two, two, a month from 1 to 12, a day from 1 to 31)
+  before the page words it or `/funding.json` says it; anything else is left out of both.
+- **No inline style.** The bar's geometry is in SVG attributes (`x`, `width` on a
+  10 000 wide view box), which the policy's `style-src` does not touch; the colours are
+  classes.
+
+Implementation pass: `central-web/src/data.rs` (`Monthly`, `Once`, `Funding` with
+`platforms()`, `covered()`, `percent()`; `Pledges` is gone), `site/pages/donate.rs`,
+`style/donate.css`, six words in eleven languages (two replaced);
+`central-web-server/src/funding.rs` (the week's amount as a month's), `fetch.rs`,
+`generated.rs`, the test data and its notes.
+
+Adversarial pass, what was tried and what holds:
+- **Amounts at the bounds.** Zero for every platform draws the track without a part and the
+  invitation; one platform alone draws one part; a sum past the goal fills the track exactly
+  (the parts are scaled by the sum, the percentage is capped at 100) and no rectangle can be
+  wider than the view box (`the_goal_s_card_draws_only_what_is_known`).
+- **An absent figure is not a zero.** A platform that said nothing has no part and no legend
+  entry and is named as not counted; the supporters' line counts only the platforms that
+  answered.
+- **The fallback file** (`funding.json` in the deployment's fallback directory, the
+  tests' data) is placed by the operator; the process never writes it. Fields it does not
+  know are passed over and a missing platform is absent. A file of the first shape (a
+  week's amount, as the page's first day had it) does not parse and leaves the funding part
+  out, so the page shows the goal without a bar; the directory's other files are read on
+  their own and are unaffected
+  (`a_funding_file_of_another_shape_is_not_read_as_figures`).
+- **A date that is not one.** A count's day of any other shape (empty, a time appended, a
+  month 13, markup, another script's digits) is shown on no page and said in no document
+  (`the_one_time_sum_s_day_is_a_date_or_nothing`,
+  `the_funding_document_says_a_date_or_none`).
+
+## The strip, the gateway directory's new face, the account's numbers and what an audit changed, 18 November 2026
+
+Design pass. Five changes to what the site shows, none to what it holds, asks or is told:
+
+- **The strip** has six cells (players, games, open tables, gateways as "5 / 7", accounts, page
+  views) in place of its lines. Every figure was in the strip before or is a sum of the
+  directory's own rows; a silent source still drops its cell, never shows a zero.
+- **The gateway directory** has new cards, a row of figure tiles and a list with column heads.
+  Its script (`js/directory.js`) gained a third chip (current version), chips that narrow
+  together, and sorting by a column's head.
+- **The account's overview** ends with "Baylee in numbers": the directory's four tiles, the
+  accounts at Central, the playable cards and the page views. These are the public figures the
+  start page shows every visitor, rendered by the server from the same snapshot; nothing of the
+  signed-in account is in them, and the part is the same with nobody signed in.
+- **The start page** asks once for support (a card that links to `/donate`).
+- **An audit of every public page** (axe-core, the head's data, side scroll from 320 to 2560 px)
+  led to four corrections: the numbers card's class, a page's title naming the site, the
+  footer's columns as lists under one landmark, and two amounts that stood outside their box at
+  320 px. Ninety texts in nine languages were translated by machine, and the donation page's
+  colours moved into the token sheet.
+
+Implementation pass: `site/pages/home.rs` (the strip, `stat_tile`, the directory's cards),
+`site/pages/info.rs`, `site/pages/account.rs` (`numbers`), `site/pages/donate.rs` (`band`),
+`site/shell.rs` (`titled`, the footer's columns), `js/directory.js`, the style sheets, the
+locale files, and the browser suite's specs. No new request, route, dependency, storage key or
+field of Central's answers; the policy and the headers are untouched.
+
+Adversarial pass, what was tried and what holds:
+- **Text a gateway chose** (its name, its address, its version) still reaches a card only as
+  text and attribute values that the renderer escapes; the redesign added no place where it is
+  markup, a class, a link's scheme or a style. The figures a gateway reports stay numbers,
+  and only an online gateway's count as now (`shown`, in `fetch.rs`, untouched).
+- **The address's query** (`?q=`, `show`, `sort`, `view`). `show` is split and each word kept
+  only if it is one of the chips the server wrote (`SHOWS.includes`); `sort` only if it is one
+  of the menu's values (`SORTS.has`); `q` is cut to 80 characters and put into the field's
+  value, where it is compared with text and never inserted as markup. The script still builds
+  no markup string: it sets `hidden`, `aria-pressed`, `data-view`, the order of existing
+  nodes and one text node (the count, through `Intl.NumberFormat`), and rewrites the
+  address's query on its own path (`history.replaceState`). A crafted address can therefore
+  choose a view, and nothing else.
+- **Many gateways.** Above 48 cards the view transition is skipped, so a long directory costs
+  a reorder, not a named animation per card.
+- **The numbers card is not a member's data.** It was checked signed out and signed in: the
+  same markup, from the server, with no request by the page; with no source reporting, the
+  part is absent (`the_account_s_overview_shows_the_public_figures`).
+- **A title** is the page's own words plus a constant; the test reads one `Baylee` in the
+  title of five pages in every language, so a translation that already names it does not
+  get it twice (`a_title_names_the_site_and_the_footer_is_one_landmark`).
+- **The translations and the donation rules.** The texts on giving were read in all nine
+  languages for the four sentences that bind them (nothing is bought, no name on a list, a
+  gift to a private person, not tax-deductible), and searched for the rights holder's and the
+  game's names in Latin, Cyrillic, kana, hangul and Chinese spellings: none. The build still
+  refuses a language whose value has other variables or tags than the English.
+- **The browser suite** was brought back to the site as it is (49 stale tests) and cut from
+  718 to 562 runs: the phone project keeps the specs whose subject depends on the layout, a
+  test that sets its own sizes runs once. No test was removed and no check of the policy, of
+  axe or of foreign requests left either project's page lists; the last full run was green
+  one commit before the colours became tokens, and the page specs were run again after it.
+- **Not done here:** WebKit and Firefox were not run (only Chromium is installed), and the
+  operating systems' menu names in the nine translated download steps were written from the
+  translator's memory, not read off those systems.
+
+## Baylee Central collects the donation figures, 18 November 2026
+
+The change the donation page's record left to Central ("Baylee Central's to collect, in a change
+of their own with its own three passes"). Central reads Liberapay and GitHub Sponsors, takes the
+ECB's reference rates, answers Ko-fi's webhook, stores what a donation leaves behind and gives
+the website totals; the website asks no platform any more.
+
+Design pass, the assets, who could act and what must hold:
+
+- **The two tokens.** GitHub's token reads the sponsored account's sponsorship data; Ko-fi's
+  verification token is what makes a delivery believed. Both come from the owner's accounts, live
+  only in the service's configuration (standard input from a root-owned file), are checked for
+  their shape at the start, and are never logged, echoed in an error, put in a URL or kept past
+  their use: GitHub's stays in the polling task and is sent to `api.github.com` in a header
+  alone; Ko-fi's is reduced to its SHA-256 digest at the start.
+- **One new inbound route**, `POST /v1/kofi` on the account listener (the one behind
+  `central.baylee.app`), below the protocol's layer like the key set, `404` while Ko-fi is not
+  configured. Who can reach it: anybody. What must hold: nothing of a body is used before its
+  token is compared in constant time; a wrong or missing token gets the same plain refusal as a
+  malformed body; only the six fields a sum needs are ever deserialised (`type`, `amount`,
+  `currency`, the two subscription flags, `kofi_transaction_id`), and the struct names none of
+  the giver's fields, so a name, address, message, shipping data or link is skipped by the
+  parser and never stored or logged; a transaction counts once; amounts are read by the one
+  strict rule and bounded; refusals are counted by reason; no body is logged; the address has a
+  budget of its own; no secret is in the path. Ko-fi's format is taken from third-party
+  descriptions and is not confirmed; an unknown shape must be refused cleanly, and recording
+  stays off (`kofi.record`) until Ko-fi's own test delivery has shown the format fits.
+- **The timestamp is not read.** The task listed the delivery's `timestamp` among the fields;
+  Central times a row by its own clock instead, so no sender chooses where a payment falls in
+  Ko-fi's 31-day window. The cost: a delivery Ko-fi retries late is dated by its arrival.
+- **Outbound requests.** Three fixed HTTPS addresses (`liberapay.com`, `api.github.com`,
+  `www.ecb.europa.eu`), all through `central-outbound` (public addresses only, checked and
+  dialled in one step, port 443, no proxy, no redirect, 15 s, bounded bodies). The GraphQL query
+  names no sponsor (`sponsor`, `sponsorEntity`, login, name). A poll that fails leaves the last
+  figure; a source that never answered stays absent, never zero.
+- **The rates.** The ECB's daily feed is XML. `roxmltree` 0.21.2 is already approved and in the
+  lock file (the picture worker's SVG path uses it through `usvg`), is `#![forbid(unsafe_code)]`
+  and depends only on `memchr`, which the service links already; using it in the service process
+  is a **new exposure** of a parser to an outside answer, disclosed here: the body is bounded to
+  64 KiB before it is parsed, document type declarations are refused (so no entity is ever
+  expanded and no external one fetched), and the nodes are bounded (1024). The ECB's JSON data
+  service was tried first, on 18.11.2026: a query for every currency gave no byte within 20 s,
+  then none within 60 s, and a third try right after answered in 0.14 s from a cache that
+  lives 30 s; queries for one and three currencies took 1.7 s and 6.5 s. The XML feed answered
+  in about 0.1 s each of three times. A rate is
+  decimal text read into millionths; no amount passes through a float. A currency without a
+  rate is stored unconverted and not counted, and its code is logged; nothing is guessed.
+- **What is stored** (migration 000032): platform, kind, amount, currency, euro value, Central's
+  time and a digest of the platform's transaction id (not the id: a reader of the store cannot
+  look a donation up at the platform). Rows are kept 40 days and then folded into one sum per
+  platform and kind by the operator's sweep. The runtime may insert, set a row's euro value
+  once, and read; the startup check refuses any other grant.
+- **What leaves Central.** `PublicFunding` (a sibling of `PublicFigures`, since `Response`
+  refuses fields it does not know: a field added to the figures would break every older reader)
+  answers totals from memory: each platform's month and supporters, the one-time sum with its
+  count and the day the count began (the migration's day, never a donation's). The website reads
+  it with the directory each minute; the sums are read from the store once a minute, never per
+  request, so a flood of the public operation reads no row.
+- **No donor is named anywhere**, as Baylee's `docs/legal.md` binds: nothing that names one is
+  read, and the answer has no place for a name.
+
+Implementation pass: `central-funding` (new, no transport, no store: the amount rule,
+Liberapay's reader moved from `central-web-server` with its tests, GitHub's reader, the ECB
+reader and conversion, Ko-fi's two-step reader, the reference digest); `central-api`
+(`funding` types, `PublicFunding`); migration 000032, `central-postgres` (`donations.rs`, the
+sweep's fold, the grants' list from 58 to 61 tables) and `ops/grants.sql`; `central-identity`
+(`funding.rs`: the state, Ko-fi's intake, the figures from memory; the operation decided in
+every exhaustive list: browser, session, credential, budgets class); `central-http` (the route,
+its budget of 30 a minute an address, a body bound of its own in the boundary (64 KiB read,
+16 KiB taken), the
+public operation under the directory's 60); `central-service` (the `funding` block, the polling
+task with an injectable fetch, the check mode, the start's and the sweep's lines);
+`central-web-server` (reads `PublicFunding`, `funding.rs` and the `funding` setting removed);
+the privacy notice's part on donations in eleven files (German and English written, the nine
+others the new English until a translation follows), `docs/operations.md` §"Donations",
+`docs/postgresql.md`, `docs/website-design.md`, `docs/web-accounts.md`, `docs/native-login.md`,
+`docs/threat-model.md`. No package is new to the lock file; `roxmltree`, `form_urlencoded`,
+`subtle`, `sha2`, `serde_json` and `serde` are new direct dependencies of the new crate, each
+at an approved version with approved features.
+
+Adversarial pass, what was tried and what holds. Against the real account listener and
+PostgreSQL 18 (`crates/central-client/tests/support/donations.rs`, in `cargo xtask postgres`):
+
+- **Wrong token** (one letter's case), **missing**, **empty**, **a number**: `400` with the
+  route's fixed text, nothing stored, counted as `token` (or `json` for the number). With a
+  wrong token and broken fields, the fields are never looked at: the reason is `token`
+  (`a_wrong_or_missing_token_is_refused_before_anything_else_is_read`).
+- **Malformed bodies**: JSON as the body, no content type, another field than `data`, `data`
+  twice, truncated JSON, an array: the same `400`, counted as `content type`, `form` or `json`.
+- **Oversized**: a well-formed delivery past 16 KiB is read (up to 64 KiB), refused with the
+  same `400` and counted as `size`: a real payment with a long message, once form-encoded, must
+  not vanish unseen while Ko-fi's format is unconfirmed (the first form of this change
+  refused it with an uncounted `413`; the review before the commit moved the bound). Past
+  64 KiB the boundary refuses with `413` before reading, also for a length only declared;
+  those are in no count.
+- **Replay**: the same delivery three times, and once more with another amount and kind:
+  `200` each time, one row, the first amount stands (`again` counted); eight concurrent
+  deliveries of one transaction leave one row (store test).
+- **Hostile amounts and currencies**: `-3.00`, `1e9`, `0.00`, `3,00`, a JSON number,
+  ten digits, `100000.01` euros (beyond the 100 000 € a payment may be worth), `eur`, `<b>`,
+  and in the unit tests the amount rule's own list (signs, exponents, other scripts' digits,
+  blanks, `NaN`): refused as `amount`, `currency` or `shape`; the largest amount the rule takes is
+  taken and bounded again in euros. A currency no rate is held for is kept, not counted and
+  converted later; the store refuses to convert past the bound.
+- **A flood**: 31 wrong-token deliveries from one address within a minute: 30 refused as
+  `400` and counted, the 31st `429` before the token is read; the right token from that address
+  is `429` too; another address is served meanwhile.
+- **A browser at the route**: an `Origin` header is refused with `403` by the account listener's
+  rule before the body is read. If Ko-fi's real deliveries carry one, the test delivery will
+  show it (`docs/operations.md`); the rule was not loosened on speculation.
+- **The answer names no single donation**: the public answer, encoded, holds none of the
+  delivery's id, name, address, message or time; the wire refuses `public_funding` with a
+  field and an answer with an unknown field.
+- **The store**: the runtime cannot change an amount, a time or a reference, delete a row, or
+  write a sum or the count's day; the table's own checks refuse another platform, a refund on
+  Ko-fi, a regular payment on GitHub, a lowercase currency, a zero amount, a short digest, a
+  non-v7 id and a euro value past the bound, whoever writes. The sweep folds what is older than
+  40 days and the public sums stay what they were; a refund larger than what was given leaves
+  the sum at nought.
+- **The platforms' answers** (unit tests): GitHub's answer with errors (the shape a missing
+  scope gives, with status 200), errors beside data, negative or absurd figures, a node of
+  another id shape, a broken cursor, 101 nodes, and a sponsor's name added to a node (passed
+  over, the result unchanged); pages that fail or never end give nothing. The ECB feed with no
+  day, two days, a malformed date, a lowercase or long currency, a negative, comma or zero rate,
+  the euro itself, a currency twice, an element that is no rate, the wrong namespace, a
+  document type with growing entities ("billion laughs"), 2000 extra nodes, 65 currencies and a
+  body past the bound: no rates. Liberapay's ten broken answers: nothing.
+- **Configuration**: a token too short or with blanks, an unknown key, a block of another
+  type, and a switched-off block with a bad token stop the start and the check mode, naming no
+  value; the old `funding` switch of the website's file is refused.
+
+What was not done: no call with real sponsor data was made, and GitHub's token scope for these
+fields is unknown (the owner tests a classic token with `read:user`). Ko-fi's format is
+unconfirmed until its test delivery; whether Ko-fi reports a cancelled membership is unknown,
+which is why its monthly figure is a 31-day window of payments (a supporter counts twice for
+up to three days around February). On the owner's decision of the same day the binding privacy
+policy (`legal/privacy.*.md`) has a new version, 2026-11-18, naming what a donation leaves
+behind (§ 3) and how long a single record is kept (§ 7); the owner's review of the text is
+still to come. The owner also kept `roxmltree` for the rates and Central's own clock for the
+time of a Ko-fi payment, both as designed above.
+
+What was run on the final commit of the change: `cargo xtask gate` (format, policy, clippy
+`-D warnings` over the workspace, every test, the doc tests, the release build),
+`crypto-scope`, `smoke` and `smoke --exercise-failure` (the injected failure reported as CI
+expects), `postgres` whole (store, SDK and HTTP), `secrets` (tree and history), and
+`wasm --check` in the pinned x86-64 image: the committed browser crypto equals a fresh build,
+since `central-web-crypto` uses nothing of the wire's new variant. `cargo audit --deny
+warnings` and `cargo deny check` (0.22.2 and 0.20.2, as CI pins them) fail on one advisory,
+RUSTSEC-2026-0543 (`chrono` is unmaintained), which SeaORM brings in and which fails the base
+of this change (`a6eb2e4b`) in the same way: this change adds no package to the lock file.
+These passes are by the implementing agent and are not an independent audit.
+
+## The migrations' runner is first-party, and `chrono` leaves the build, 18 November 2026
+
+`cargo audit` and `cargo deny` failed on RUSTSEC-2026-0543 (`chrono` is unmaintained). The owner
+asked for it to be resolved by upgrading what can be upgraded, with any migration that needs.
+No newer `sea-orm-migration` existed, and 2.0.4 takes SeaORM with all default features,
+`with-chrono` among them, so no feature of ours could take `chrono` out.
+
+Design pass. What must hold is the database's migration history: production's
+`public.seaql_migrations` was written by `sea-orm-migration`, and a runner that read it otherwise
+could run a migration twice or skip one. The new runner in `central-migration` keeps the table as
+that crate created it (its DDL read from the crate on 18.11.2026 and pinned by a test), qualifies
+it with `public` everywhere, and is stricter: the recorded names must be exactly the list's
+beginning, where SeaORM accepted any subset. Everything else stays as it was: one outer
+transaction, the advisory lock, the transaction-local `search_path`, the timeouts and the gate. No
+destructive operation exists. `central-postgres` takes SeaORM's `with-time` in place of
+`with-chrono`; `time` was in the graph already, and two timestamps change type.
+
+Implementation pass: the 31 migration modules are gone; a macro builds the list from the files'
+names (`include_str!(concat!(name, ".sql"))`), so a name and its SQL cannot drift apart;
+000003's inline SQL is a file now, the same statements. `sea-orm-migration`, `sea-orm-cli`,
+`bigdecimal`, `rust_decimal`, `borsh`, `ouroboros`, `nix`, `pgvector`, `tracing-subscriber` and 16
+other packages leave `Cargo.lock`; none is added.
+
+Adversarial pass, what was run and what holds: `cargo xtask postgres` whole on the old lock file,
+with every existing test of the migration layer unchanged (a collision rolls the history back, a
+shadow history in another schema or in `pg_temp` is ignored, a missing or inaccessible `public`
+is refused, an unknown version is refused, a concurrent run waits for the lock and a cancelled one
+leaves it free), the session's `proven_at` round trip through `with-time` in the pairing suite,
+and two new checks: the history's columns, types, nullability and key are SeaORM's, and a database
+at the 30 migrations before 000032 runs 000032 alone (every other file fails if run twice). Unit
+tests hold the list's order and shape, the captured DDL, and the refusal of an unknown name, a
+foreign name and a gap. `chrono` is in no build of the workspace on any target; it stays in the
+lock file only as an optional dependency of `sea-orm-arrow`, which nothing here turns on (see the
+record that follows for what `cargo audit` makes of that).
+
+These passes are by the implementing agent and are not an independent audit.
+
+## The dependency upgrade, and an exception moved from SQLite to `chrono`, 18 November 2026
+
+The owner asked for every crate to be upgraded, major versions included, with the migrations they
+need ([the inventory](dependency-proposal/upgrade-2026-11-18.md)).
+
+Design pass. What could break is what the upgrades touch: the database driver (`sqlx` 0.9.1), the
+VAPID signature of Web Push (`jsonwebtoken` 12), the wiping of secrets (`zeroize` 1.9.2), the
+outbound client (`ureq` 3.5.2) and the browser's crypto module, which links `zeroize` too. What
+must not move: OPAQUE's record and protocol, so `opaque-ke` 4.0.1 and the generation of `digest`,
+`rand_core` and `getrandom` under it stay as they are, deliberately. New code from outside is
+disclosed and was accepted by the owner in the form before it was taken: `whoami`'s platform calls
+(its own `unsafe` over `libc` on the Linux server, `objc2-*` foreign bindings on Apple targets
+only, `libredox` on Redox only). The SQLite exception's own removal rule applied (`sqlx` allows the
+fixed `libsqlite3-sys`); the owner chose the same kind of bounded exception for `chrono`, which
+the migration runner took out of every build but which stays in the lock file through SeaORM's
+optional `sea-orm-arrow`.
+
+Implementation pass: `cargo update` and the exact pins in the manifests; three pins that
+`cargo upgrade` moved past OPAQUE's generation were set back by hand; `approved-packages.json`
+gained the 39 new versions and the new features of five packages with an approval entry, nothing
+else changed in it; `deny.toml`'s BSL-1.0 exception follows `xxhash-rust` to 0.8.21 and two skips
+for duplicates that no longer exist went; `.cargo/audit.toml` ignores RUSTSEC-2026-0543 in place
+of RUSTSEC-2026-0459; `sqlite-scope` became `chrono-scope` (in the gate, CI's dependency job and
+`docs/xtask.md`), failing when `chrono`, `sea-orm-arrow` or `sea-orm-migration` is in any build or
+`chrono` changes version in the lock file; `crypto-scope` follows `jsonwebtoken` 12 to one
+`signature` generation (3.0.0, callers `ed25519` and `jsonwebtoken`, features `alloc` and
+`rand_core`; `elliptic-curve` and `crypto-bigint` keep their callers) and renews the source
+fingerprint for the one manifest line `zeroize` 1.9.2 (`crypto-proposal/bigint-advisory.md`); the
+browser module was rebuilt in the pinned x86-64 image and committed.
+
+Adversarial pass, what was run on the final tree: `cargo xtask gate` (format, policy with its
+compiler probe, clippy `-D warnings`, every test, the doc tests, the release build),
+`crypto-scope`, `chrono-scope`, `cargo xtask postgres` whole (the store, the SDK over real HTTP,
+the migration runner's history and the sessions' timestamps through `sqlx` 0.9.1 and `with-time`),
+`smoke` and `smoke --exercise-failure`, `secrets`, `cargo audit --deny warnings` and `cargo deny
+check` (both with the pinned 0.22.2 and 0.20.2), and `wasm --check` after the rebuild. What was not
+done: no source audit of the new packages, and no run on a Mac of what only builds there beyond
+the workspace's own tests.
+
+These passes are by the implementing agent and are not an independent audit.

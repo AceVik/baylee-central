@@ -25,7 +25,7 @@ test("without the role every page of the administration says so, has no navigati
   const w = world({ admin: false });
   const { seen, problems } = await open(page, w, "/en/account");
   // the account's own overview leads nowhere there
-  await expect(page.locator(".account-who")).toBeVisible();
+  await expect(page.locator("section.me")).toBeVisible();
   await expect(page.locator("a[href*='/account/admin']")).toHaveCount(0);
   // the reported pictures' page too (its moderation is picture.spec.ts's)
   for (const [path, title] of [...PAGES, ["/en/account/admin/pictures", "Reported profile pictures"] as const]) {
@@ -47,7 +47,7 @@ test("an administrator finds the navigation on every page of the administration,
   const w = world();
   const { problems } = await open(page, w, "/en/account");
   // the account area's overview leads to the administration's
-  const link = page.getByRole("link", { name: "Administration", exact: true });
+  const link = page.locator(".admin-card").getByRole("link", { name: "Overview", exact: true });
   await expect(link).toHaveAttribute("href", "/en/account/admin/overview");
   await link.click();
   await expect(page).toHaveURL(/\/en\/account\/admin\/overview$/);

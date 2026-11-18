@@ -15,6 +15,7 @@ mod admin;
 mod challenges;
 mod chat;
 mod deletion;
+mod donations;
 mod email;
 mod gateways;
 mod kinds;
@@ -36,6 +37,7 @@ mod revocation_race;
 mod single_session;
 mod social;
 mod terms;
+mod tower_awards;
 
 fn context(identity: Identity) -> Context {
     Context::new(
@@ -76,6 +78,16 @@ pub(crate) async fn tower_only(operator: &DatabaseConnection) {
             .unwrap();
     let keys = ServerKeys::generate();
     challenges::tower_only(&store, operator, &keys).await;
+    store.close().await.unwrap();
+}
+
+pub(crate) async fn awards_only(operator: &DatabaseConnection) {
+    grant(operator).await;
+    let store =
+        AccountStore::connect_dev(config("central_runtime", "CENTRAL_TEST_RUNTIME_PASSWORD"))
+            .await
+            .unwrap();
+    tower_awards::run(&store, operator, &ServerKeys::generate()).await;
     store.close().await.unwrap();
 }
 
@@ -163,6 +175,8 @@ pub(crate) async fn run(operator: &DatabaseConnection) {
     email::run(&store, operator, &keys).await;
     pictures::run(&store, operator, &keys).await;
     challenges::run(&store, operator, &keys).await;
+    tower_awards::run(&store, operator, &keys).await;
+    donations::run(&store, operator).await;
     // Last: its sweep deletes every unenrolled legacy reservation.
     legacy_store::run(&store, operator, &keys).await;
     store.close().await.unwrap();

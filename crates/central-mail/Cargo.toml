@@ -10,8 +10,8 @@ description = "Central's mails and the bounded loopback client that hands them t
 workspace = true
 [dependencies]
 central-api = { path = "../central-api", version = "=0.1.0" }
-ureq = { version = "=3.5.1", default-features = false, features = ["rustls"] }
+ureq = { version = "=3.5.2", default-features = false, features = ["rustls"] }
 serde = { version = "=1.0.229", features = ["derive"] }
 serde_json = "=1.0.154"
-zeroize = { version = "=1.9.1", features = ["alloc"] }
+zeroize = { version = "=1.9.2", features = ["alloc"] }
 getrandom = "=0.4.3"

@@ -9,6 +9,7 @@ pub mod chat;
 pub mod email;
 mod endpoint;
 pub mod export;
+pub mod funding;
 pub mod gateway;
 pub mod groups;
 pub mod legacy;
@@ -24,6 +25,8 @@ pub mod social;
 pub mod terms;
 mod token;
 pub mod tower;
+pub mod tower_access;
+pub mod tower_awards;
 pub mod wire;
 pub use endpoint::{
     Endpoint, LEGACY_ORIGIN, LIVE_ORIGIN, OFFICIAL_ALIASES, OFFICIAL_ORIGIN, is_official_origin,

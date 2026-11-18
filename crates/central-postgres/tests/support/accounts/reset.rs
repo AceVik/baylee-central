@@ -593,6 +593,7 @@ async fn ended(
             reports: 0,
             addresses: 0,
             picture_reports: 0,
+            donations: 0,
         })
     );
     assert!(!state(operator, moved).await.code);

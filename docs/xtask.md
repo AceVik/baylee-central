@@ -11,7 +11,7 @@ the gate starts never replace the running executable, which Windows refuses.
 | --- | --- | --- |
 | `cargo xtask gate [--client]` | `cargo fmt --check`, the policy with its compiler probe, clippy `-D warnings`, every test, the doc tests, the release build; `--client` limits clippy and the tests to the client's crates and drops the release build ([below](#which-runner-runs-what)) | `scripts/test.ps1` |
 | `cargo xtask crypto-scope` | exact graph and source bounds of the unreachable bigint advisory; also mandatory in `gate` | (new, 2026-10-28) |
-| `cargo xtask sqlite-scope` | `libsqlite3-sys` (RUSTSEC-2026-0459) is in `Cargo.lock` at 0.37.0 only and in no build; also mandatory in `gate` | (new, 2026-11-12) |
+| `cargo xtask chrono-scope` | `chrono` (RUSTSEC-2026-0543) is in `Cargo.lock` at 0.4.45 only and in no build; also mandatory in `gate` | (new, 2026-11-18; `sqlite-scope` before it, 2026-11-12 to 2026-11-18) |
 | `cargo xtask policy [--compiler-probe]` | the code policy (below) | `scripts/check-policy.ps1` |
 | `cargo xtask postgres [--exercise-failure]` | the `PostgreSQL` integration fixture ([database development](database-development.md)) | `scripts/test-postgres.ps1` |
 | `cargo xtask smoke [--exercise-failure]` | the development listener's HTTP boundary ([dev mode](dev-mode.md)); build `--release` first | `scripts/smoke-dev.ps1` |
@@ -31,6 +31,16 @@ both. `cargo xtask postgres --tower-only` runs the expedition authority regressi
 against the same owned PostgreSQL 18 fixture and cleanup checks, omitting the
 unrelated account/HTTP suites. It is a focused development check, not a replacement
 for the full `postgres` release gate, which also includes the expedition tests.
+`cargo xtask postgres --tower-access-only` exercises just native Tower identity
+issuance/introspection through the real SDK, HTTP listener and PostgreSQL, including
+credential separation, concurrent refresh bounds and revocation. It uses the same
+owned fixture and cleanup checks. The full command includes it as well.
+
+`cargo xtask postgres --tower-awards-only` runs the v2 permanent award store and
+native SDK/HTTP slices: restricted issuer grants, atomic/deduplicated progression,
+receipt ordering, bounded account export, migration and deletion races, credential
+scope confusion, browser refusal and bound SDK acknowledgments. It does not run
+game rules. The full PostgreSQL command includes both scenarios.
 
 ## Which runner runs what
 
@@ -42,7 +52,7 @@ desktop client links from this repository.
 
 | runner | runs |
 | --- | --- |
-| ubuntu-24.04 | `gate` (the whole workspace, release build included), then `smoke` and `smoke --exercise-failure`; the separate Linux jobs run `postgres`, `crypto-scope` and `sqlite-scope` with the audit and deny tools, `secrets`, `wasm --check` and the web app |
+| ubuntu-24.04 | `gate` (the whole workspace, release build included), then `smoke` and `smoke --exercise-failure`; the separate Linux jobs run `postgres`, `crypto-scope` and `chrono-scope` with the audit and deny tools, `secrets`, `wasm --check` and the web app |
 | windows-2025, macos-15 (ARM64), macos-15-intel (x86-64) | `gate --client` |
 
 The verification job has a 40-minute ceiling. On 14 November 2026 its former
@@ -84,9 +94,11 @@ The gate additionally enforces the reviewed Ristretto advisory scope through
 `crypto-scope` ([review and removal condition](crypto-proposal/bigint-advisory.md)).
 CI's dependency job runs it before the pinned audit and deny tools. A scanner
 pass alone does not validate the exception's reachability bounds.
-It enforces the `libsqlite3-sys` advisory's exception the same way through
-`sqlite-scope` ([the bound and its removal](dependency-proposal/sqlite-advisory.md)):
-the package may be in the lock file at 0.37.0 and in no build.
+It enforces the `chrono` advisory's exception the same way through
+`chrono-scope` ([the bound and its removal](dependency-proposal/chrono-advisory.md)):
+the package may be in the lock file at 0.4.45 and in no build. (Until
+18.11.2026 `sqlite-scope` held `libsqlite3-sys` the same way;
+[ended](dependency-proposal/sqlite-advisory.md).)
 
 - The workspace sets `unsafe_code = "forbid"`. Every member inherits the
   workspace lints, is not published (an absent `publish`, which allows
@@ -185,6 +197,14 @@ the signed token in `central-client`'s session. Its exports and glue did not
 change. Built the same way, under Rosetta, and `cargo xtask wasm --check`
 passed in the same container. The resulting WASM SHA-256 is
 `0c7ae18b463d4dbcf3db0ddfec091b09cf2d3004cde2cd3268ec455ffca3d1b1`.
+
+The 2026-11-17 bundle is the same crate built from the Tower branch's
+sources: `central-api`'s and `central-client`'s Tower operations, and
+`enrollment_finish` in `central-web-crypto`'s `flow.rs`. Its three glue
+files did not change. Built with the command above, in the pinned Rust image
+on Apple Silicon under Docker Desktop's x86-64 emulation, and `cargo xtask
+wasm --check` passed in the same container. The resulting WASM SHA-256 is
+`dc2af609bbd78db237d96a87e2a242f8c9773596a486c09cbebff86b1dffba31`.
 `cargo xtask site` takes the committed module (checked against its
 `SHA256SUMS`) and builds none of its own.
 

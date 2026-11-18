@@ -9,7 +9,8 @@ use serde_json::{Value, json};
 use super::Built;
 use crate::data::{Kind, Platform, Release, ReleaseFile};
 use crate::format;
-use crate::rich::{plain, rich};
+use crate::rich::{icon, plain, rich};
+use crate::site::icons;
 use crate::site::shell::{Meta, REPOSITORY};
 use crate::site::{Context, Page};
 use crate::solid;
@@ -56,6 +57,15 @@ fn arch(platform: Platform) -> &'static str {
         Platform::MacX64 => "Intel (x64)",
         Platform::WindowsArm64 | Platform::LinuxArm64 => "ARM64",
         Platform::WindowsX64 | Platform::LinuxX64 => "x64",
+    }
+}
+
+/// The x86-64 level the main build of a platform needs: v3 (AVX2, 2013-2015
+/// and later). `None` for ARM, whose builds have no such split.
+fn cpu_level(platform: Platform) -> Option<&'static str> {
+    match platform {
+        Platform::WindowsX64 | Platform::MacX64 | Platform::LinuxX64 => Some("x86-64-v3"),
+        _ => None,
     }
 }
 
@@ -122,10 +132,10 @@ fn menu_items(lang: Lang, release: &Release, mine: Option<Platform>) -> impl Int
                 .into_iter()
                 .map(|(platform, file, old)| {
                     let is_mine = mine == Some(platform) && !old;
-                    let title = if old {
-                        format!("{} · {}", arch(platform), words::dl_old_cpu(lang))
+                    let (title, level) = if old {
+                        (words::dl_v2_name(lang).to_owned(), None)
                     } else {
-                        arch(platform).to_owned()
+                        (arch(platform).to_owned(), cpu_level(platform))
                     };
                     let kind = if old {
                         words::dl_archive(lang)
@@ -134,11 +144,13 @@ fn menu_items(lang: Lang, release: &Release, mine: Option<Platform>) -> impl Int
                     };
                     let yours = is_mine
                         .then(|| view! { <span class="mine-tag">{words::dl_yours(lang)}</span> });
+                    let level = level.map(|level| view! { <span class="dl-level" translate="no">{level}</span> });
+                    let note = old.then(|| view! { <li class="menu-note">{words::dl_v2_help(lang)}</li> });
                     view! {
                         <li>
                             <a class="menu-item dl-item" class:is-mine=is_mine class:is-old=old href=file.url.clone() target="_blank" rel="noopener noreferrer">
                                 <span class="dl-plat">
-                                    <strong>{title}</strong>
+                                    <strong>{title}{level}</strong>
                                     <span class="dl-file num">
                                         {kind}
                                         {sep()}
@@ -150,6 +162,7 @@ fn menu_items(lang: Lang, release: &Release, mine: Option<Platform>) -> impl Int
                                 {solid::icon_as(solid::DOWNLOAD, "dl-get")}
                             </a>
                         </li>
+                        {note}
                     }
                 })
                 .collect_view();
@@ -250,7 +263,7 @@ pub fn download_block(cx: &Context<'_>, on_page: bool) -> impl IntoView + use<> 
     let archive = best
         .as_ref()
         .filter(|(_, file)| file.kind == Kind::Fallback)
-        .map(|_| view! { <p class="dl-arch">{words::dl_fallback_help(lang)}</p> });
+        .map(|_| view! { <p class="dl-arch">{words::dl_v2_help(lang)}</p> });
     let note = machine_note(cx).map(|note| view! { <p class="dl-arch">{note}</p> });
     view! {
         <div class="dl">
@@ -313,8 +326,8 @@ pub fn software(cx: &Context<'_>) -> Value {
     app
 }
 
-/// One file of a platform's card: its name, what it is and how large, and
-/// its checksum and signature, as the old site listed them.
+/// One file of an architecture's list: its name, what it is and how large,
+/// and its checksum and signature where the release has them.
 fn file_row(lang: Lang, file: &ReleaseFile) -> impl IntoView + use<> {
     let checksum = file.checksum.clone().map(|url| {
         view! { <a href=url target="_blank" rel="noopener noreferrer" translate="no">".sha256"</a> }
@@ -322,18 +335,22 @@ fn file_row(lang: Lang, file: &ReleaseFile) -> impl IntoView + use<> {
     let signature = file.signature.clone().map(|url| {
         view! { <a href=url target="_blank" rel="noopener noreferrer" translate="no">".sig"</a> }
     });
-    let between = (checksum.is_some() && signature.is_some()).then_some(" · ");
-    let aux = (file.checksum.is_some() || file.signature.is_some())
-        .then(|| view! { <span class="aux">{checksum}{between}{signature}</span> });
-    let help = (file.kind == Kind::Fallback)
-        .then(|| view! { <span class="help">{words::dl_fallback_help(lang)}</span> });
+    let aux = (checksum.is_some() || signature.is_some())
+        .then(|| view! { <span class="aux">{checksum}{signature}</span> });
+    let kind = if file.kind == Kind::Fallback {
+        words::dl_archive(lang)
+    } else {
+        kind_name(lang, file.kind)
+    };
     view! {
         <li>
-            <a class="file" href=file.url.clone() target="_blank" rel="noopener noreferrer" translate="no">{file.name.clone()}</a>
-            <span class="kind">{kind_name(lang, file.kind)}</span>
+            <a class="file" href=file.url.clone() target="_blank" rel="noopener noreferrer" translate="no">
+                {solid::icon_as(solid::DOWNLOAD, "dl-get")}
+                <span class="file-name">{file.name.clone()}</span>
+            </a>
+            <span class="kind">{kind}</span>
             <span class="size num">{words::dl_size(lang, &format::megabytes(lang, file.size))}</span>
             {aux}
-            {help}
         </li>
     }
 }
@@ -368,42 +385,149 @@ fn install(lang: Lang) -> impl IntoView + use<> {
     }
 }
 
-/// Every file of the release, a card per platform, the visitor's marked.
+/// The systems of the page, in the order of the menu: the mark, the name,
+/// what it needs, its two architectures and the steps of a first start.
+type System = (
+    &'static str,
+    solid::Mark,
+    fn(Lang) -> &'static str,
+    [Platform; 2],
+    [AnyView; 3],
+);
+
+fn systems(lang: Lang) -> [System; 3] {
+    [
+        (
+            "Windows",
+            solid::WINDOWS,
+            words::dl_os_windows,
+            [Platform::WindowsX64, Platform::WindowsArm64],
+            [
+                words::dl_howto_windows_1(lang).into_any(),
+                plain(words::dl_howto_windows_2(lang)),
+                words::dl_howto_windows_3(lang).into_any(),
+            ],
+        ),
+        (
+            "macOS",
+            solid::APPLE,
+            words::dl_os_mac,
+            [Platform::MacArm64, Platform::MacX64],
+            [
+                plain(words::dl_howto_mac_1(lang)),
+                plain(words::dl_howto_mac_2(lang)),
+                plain(words::dl_howto_mac_3(lang)),
+            ],
+        ),
+        (
+            "Linux",
+            solid::LINUX,
+            words::dl_os_linux,
+            [Platform::LinuxX64, Platform::LinuxArm64],
+            [
+                plain(words::dl_howto_linux_1(lang)),
+                plain(words::dl_howto_linux_2(lang)),
+                plain(words::dl_howto_linux_3(lang)),
+            ],
+        ),
+    ]
+}
+
+/// One architecture of a system: the main files (installer, package,
+/// archive), and under them, set apart, the archive for older processors.
+fn arch_block(
+    cx: &Context<'_>,
+    release: &Release,
+    platform: Platform,
+) -> Option<impl IntoView + use<>> {
+    let lang = cx.lang;
+    let files = release.for_platform(platform);
+    if files.is_empty() {
+        return None;
+    }
+    let (main, old): (Vec<_>, Vec<_>) = files.into_iter().partition(|f| f.kind != Kind::Fallback);
+    let yours = cx.machine.platform == Some(platform);
+    let mark = yours.then(|| view! { <span class="mine-tag">{words::dl_yours(lang)}</span> });
+    let level = cpu_level(platform)
+        .map(|level| view! { <span class="dl-level" translate="no">{level}</span> });
+    let main_list = (!main.is_empty()).then(|| {
+        let rows = main
+            .into_iter()
+            .map(|file| file_row(lang, file))
+            .collect::<Vec<_>>();
+        view! { <ul class="plat-files">{rows}</ul> }
+    });
+    let old_list = (!old.is_empty()).then(|| {
+        let rows = old
+            .into_iter()
+            .map(|file| file_row(lang, file))
+            .collect::<Vec<_>>();
+        view! {
+            <div class="plat-old">
+                <p class="plat-old-name">{words::dl_v2_name(lang)}</p>
+                <p class="plat-old-help">{words::dl_v2_help(lang)}</p>
+                <ul class="plat-files">{rows}</ul>
+            </div>
+        }
+    });
+    Some(view! {
+        <div class="arch" id=platform.slug() class:mine=yours>
+            <h4 class="arch-name">
+                <span>{arch(platform)}</span>
+                {level}
+                {mark}
+            </h4>
+            <p class="arch-sub">{platform_name(lang, platform).1}</p>
+            {main_list}
+            {old_list}
+        </div>
+    })
+}
+
+/// Every file of the release, a card per system, the visitor's first and
+/// in gold; in it an architecture each, with its files, the archive for
+/// older processors apart, and the steps of a first start.
 fn platforms(cx: &Context<'_>, release: &Release) -> impl IntoView + use<> {
     let lang = cx.lang;
-    let cards = Platform::ALL
+    let mut order = systems(lang);
+    // the visitor's own system leads; the others keep the menu's order
+    order.sort_by_key(|(_, _, _, platforms, _)| {
+        cx.machine
+            .platform
+            .is_none_or(|mine| !platforms.contains(&mine))
+    });
+    let cards = order
         .into_iter()
-        .map(|platform| {
-            let (name, sub) = platform_name(lang, platform);
-            let yours = cx.machine.platform == Some(platform);
-            let files = release.for_platform(platform);
-            let list = if files.is_empty() {
+        .map(|(name, mark, needs, platforms, steps)| {
+            let yours = cx
+                .machine
+                .platform
+                .is_some_and(|mine| platforms.contains(&mine));
+            let blocks = platforms
+                .into_iter()
+                .filter_map(|platform| arch_block(cx, release, platform))
+                .collect::<Vec<_>>();
+            let body = if blocks.is_empty() {
                 view! { <p class="plat-none">{words::plat_none(lang)}</p> }.into_any()
             } else {
-                // the file most people want stands open; the others (archives,
-                // the build for older processors) fold under it, so that every
-                // card is as tall as its neighbours
-                let mut files = files.into_iter();
-                let first = files.next().map(|file| file_row(lang, file));
-                let rest = files.map(|file| file_row(lang, file)).collect::<Vec<_>>();
-                let more = (!rest.is_empty()).then(|| {
-                    let count = words::number(lang, rest.len() as u64);
-                    view! {
-                        <details class="plat-more">
-                            <summary>{words::dl_more_files(lang, &count)}</summary>
-                            <ul class="plat-files">{rest}</ul>
-                        </details>
-                    }
-                });
-                view! { <ul class="plat-files">{first}</ul>{more} }.into_any()
+                view! { <div class="archs">{blocks}</div> }.into_any()
             };
-            let mark =
-                yours.then(|| view! { <span class="mine-tag">{words::dl_yours(lang)}</span> });
+            let steps = steps
+                .into_iter()
+                .map(|step| view! { <li>{step}</li> })
+                .collect::<Vec<_>>();
             view! {
-                <li class="plat glass reveal" id=platform.slug() class:mine=yours>
-                    <h3 class="plat-name">{name}{mark}</h3>
-                    <p class="plat-sub">{sub}</p>
-                    {list}
+                <li class="plat glass reveal" class:mine=yours>
+                    <h3 class="plat-name">
+                        {solid::mark(mark, "os")}
+                        <span translate="no">{name}</span>
+                    </h3>
+                    <p class="plat-sub">{needs(lang)}</p>
+                    {body}
+                    <div class="howto">
+                        <h4>{words::dl_howto_title(lang)}</h4>
+                        <ol>{steps}</ol>
+                    </div>
                 </li>
             }
         })
@@ -424,8 +548,24 @@ fn platforms(cx: &Context<'_>, release: &Release) -> impl IntoView + use<> {
                     <a href=format!("{REPOSITORY}/releases") target="_blank" rel="noopener noreferrer">{words::release_all(lang)}</a>
                 </p>
                 <ul class="platforms stagger">{cards}</ul>
+                {soon(lang)}
             </div>
         </section>
+    }
+}
+
+/// What has no download yet: said, so that nobody looks for it.
+fn soon(lang: Lang) -> impl IntoView + use<> {
+    view! {
+        <div class="soon glass reveal">
+            <h3>{words::dl_soon_title(lang)}</h3>
+            <ul class="soon-list">
+                <li>{icon(icons::SMARTPHONE)}<span translate="no">"Android"</span></li>
+                <li>{icon(icons::SMARTPHONE)}<span translate="no">"iOS"</span></li>
+                <li>{icon(icons::GLOBE)}<span>{words::dl_soon_web(lang)}</span></li>
+            </ul>
+            <p>{words::dl_soon_text(lang)}</p>
+        </div>
     }
 }
 

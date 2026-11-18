@@ -68,8 +68,8 @@ test("the account area and the messenger load the public module, an administrato
   const paths = fetched(page);
   const { problems } = await open(page, world(), "/en/account");
   // the area works, and leads the administrator on
-  await expect(page.locator(".account-who")).toBeVisible();
-  await expect(page.getByRole("link", { name: "Administration", exact: true })).toHaveAttribute("href", "/en/account/admin/overview");
+  await expect(page.locator("section.me")).toBeVisible();
+  await expect(page.locator(".admin-card").getByRole("link", { name: "Overview", exact: true })).toHaveAttribute("href", "/en/account/admin/overview");
   await page.goto("/en/account/chat");
   await expect(page.locator("html")).toHaveAttribute("data-islands", "ready");
   await expect(page.locator("leptos-island")).toHaveAttribute("data-hydrated", "");

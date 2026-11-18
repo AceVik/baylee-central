@@ -5,110 +5,50 @@
 use leptos::prelude::*;
 
 use super::Built;
+use super::home::{gateway_totals, stat_tile};
 use crate::data::Section;
-use crate::islands::{Account, Administration, Messenger, Register, Reset, SignIn};
-use crate::rich::{icon, rich};
+use crate::format;
+use crate::islands::{Account, Administration, Messenger};
+use crate::rich::icon;
 use crate::site::icons;
 use crate::site::shell::Meta;
 use crate::site::{Context, Page};
 use crate::words::{self, Lang};
 
-/// The forms explain themselves without script: the password is processed
-/// in the browser, so there is nothing to send without it. A reset says so
-/// of the recovery code as well.
-fn noscript(lang: Lang, page: Page) -> impl IntoView + use<> {
-    let words = if page == Page::Reset {
-        words::reset_noscript(lang)
-    } else {
-        words::signin_noscript(lang)
-    };
-    view! { <noscript><p class="notice">{words}</p></noscript> }
-}
-
-fn form_page(
-    cx: &Context<'_>,
-    title: &'static str,
-    lead: &'static str,
-    page: Page,
-    form: AnyView,
-) -> Built {
-    let lang = cx.lang;
+/// One of the three forms at its own address. The form is a dialog every
+/// page carries (`shell::auth_dialogs`), so its address shows the start page
+/// with that dialog standing open over it (`boot.js` opens the one the
+/// document names in `data-auth`). The head is the form's own: its title and
+/// its lead, and none of the start page's structured data, because these
+/// addresses are in no index.
+fn over_start(cx: &Context<'_>, title: &'static str, lead: &'static str) -> Built {
+    let (_, body) = super::home::page(cx);
     let mut meta = Meta::new(format!("{title} – Baylee"), lead, "img/og.jpg");
     meta.islands = true;
-    meta.trail.push((title.to_owned(), page));
-    // as the old site set it: the words and the form on the left, Baylee
-    // on her cloud beside them, floating
-    let cloud = format!(
-        "{} 600w, {} 1200w",
-        cx.assets.url("img/cloud-600.webp"),
-        cx.assets.url("img/cloud-1200.webp")
-    );
-    // signing in says where its password goes
-    let more = (page == Page::SignIn).then(|| {
-        let security = Page::Security.path(lang);
-        let link = rich(words::sec_signin_link(lang), move |tag| {
-            (tag == "security").then(|| security.clone())
-        });
-        view! { <p class="hint">{link}</p> }
-    });
-    let body = view! {
-        <div class="wrap auth">
-            <section class="page-head auth-head" aria-labelledby="auth-title">
-                <p class="eyebrow">{words::acct_eyebrow(lang)}</p>
-                <h1 id="auth-title">{title}</h1>
-                <p class="lead">{lead}</p>
-                <div class="auth-form glass">
-                    {form}
-                    {noscript(lang, page)}
-                </div>
-                {more}
-            </section>
-            <img class="auth-cloud" src=cx.assets.url("img/cloud-600.webp") srcset=cloud sizes="min(40vw, 40rem)"
-                width="600" height="400" alt="" loading="lazy" decoding="async" />
-        </div>
-    }
-    .into_any();
     (meta, body)
 }
 
 pub fn sign_in(cx: &Context<'_>) -> Built {
-    let lang = cx.lang;
-    let worker = cx.assets.url("crypto-worker.js");
-    form_page(
+    over_start(
         cx,
-        words::signin_title(lang),
-        words::signin_lead(lang),
-        Page::SignIn,
-        view! { <SignIn lang=lang worker=worker /> }.into_any(),
+        words::signin_title(cx.lang),
+        words::signin_lead(cx.lang),
     )
 }
 
 pub fn register(cx: &Context<'_>) -> Built {
-    let lang = cx.lang;
-    let worker = cx.assets.url("crypto-worker.js");
-    let pow = cx.assets.url("pow-worker.js");
-    form_page(
+    over_start(
         cx,
-        words::register_title(lang),
-        words::register_lead(lang),
-        Page::Register,
-        view! { <Register lang=lang worker=worker pow=pow /> }.into_any(),
+        words::register_title(cx.lang),
+        words::register_lead(cx.lang),
     )
 }
 
 /// A new password with an administrator's reset code
-/// (`docs/account-reset.md`): reached by its link from the sign-in form,
-/// in no navigation and no sitemap.
+/// (`docs/account-reset.md`): reached by its link from the sign-in form and
+/// from the reset mail, in no navigation and no sitemap.
 pub fn reset(cx: &Context<'_>) -> Built {
-    let lang = cx.lang;
-    let worker = cx.assets.url("crypto-worker.js");
-    form_page(
-        cx,
-        words::reset_title(lang),
-        words::reset_lead(lang),
-        Page::Reset,
-        view! { <Reset lang=lang worker=worker /> }.into_any(),
-    )
+    over_start(cx, words::reset_title(cx.lang), words::reset_lead(cx.lang))
 }
 
 /// A section's title and its icon.
@@ -135,6 +75,120 @@ fn section_name(lang: Lang, section: Section) -> (&'static str, &'static str) {
     }
 }
 
+/// What the overview shows besides the account itself, the same for
+/// everyone and so rendered here: where to go on playing (the start page's
+/// download for the visitor's machine, and the gateways), and every part of
+/// the account as a tile.
+/// Baylee in numbers, for a signed-in reader (owner, 18.11.2026): the
+/// directory's four, and Central's accounts, the playable cards of all and
+/// the site's visits. They are the public figures the site holds, the same
+/// for every reader: the server does not know who is signed in, and none
+/// of them is about a person. Only what a source reported is a tile, and
+/// without any the part is left out.
+fn numbers(cx: &Context<'_>) -> Option<impl IntoView + use<>> {
+    let lang = cx.lang;
+    let data = cx.data;
+    let number = |n: u64| words::number(lang, n);
+    let mut more: Vec<AnyView> = Vec::with_capacity(3);
+    if let Some(accounts) = data.accounts {
+        more.push(
+            stat_tile(
+                icons::USER_CHECK,
+                words::strip_accounts(lang),
+                number(accounts),
+                None,
+            )
+            .into_any(),
+        );
+    }
+    if let Some(status) = data.cards.as_ref() {
+        let s = status.stats;
+        let playable = s
+            .implemented
+            .saturating_add(s.generated)
+            .saturating_add(s.partial);
+        more.push(
+            stat_tile(
+                icons::LAYERS,
+                words::stat_cards(lang),
+                number(playable),
+                Some(number(s.total)),
+            )
+            .into_any(),
+        );
+    }
+    if let Some(views) = data.views.as_ref() {
+        more.push(
+            stat_tile(
+                icons::EYE,
+                &words::strip_views(lang, &format::date(lang, &views.since)),
+                number(views.count),
+                None,
+            )
+            .into_any(),
+        );
+    }
+    let directory = data
+        .gateways
+        .as_deref()
+        .map(|all| gateway_totals(lang, all));
+    if directory.is_none() && more.is_empty() {
+        return None;
+    }
+    let count = more.len().to_string();
+    let more = (!more.is_empty()).then(|| {
+        view! { <dl class="dir-stats" data-count=count aria-label=words::status_label(lang)>{more}</dl> }
+    });
+    Some(view! {
+        <section class="in-numbers" aria-labelledby="numbers-title">
+            <h2 id="numbers-title">{words::status_label(lang)}</h2>
+            <p class="small in-numbers-lead">{words::account_numbers_lead(lang)}</p>
+            {directory}
+            {more}
+        </section>
+    })
+}
+
+fn home_extras(cx: &Context<'_>) -> impl IntoView + use<> {
+    let lang = cx.lang;
+    let tiles = [
+        (Section::Profile, words::account_profile_lead(lang)),
+        (Section::Security, words::account_security_lead(lang)),
+        (Section::Privacy, words::account_privacy_lead(lang)),
+        (Section::Notifications, words::account_push_lead(lang)),
+        (Section::Chat, words::account_chat_lead(lang)),
+        (Section::Gateways, words::account_gateways_lead(lang)),
+    ]
+    .map(|(item, lead)| {
+        let (name, glyph) = section_name(lang, item);
+        view! {
+            <li>
+                <a class="tile card" href=Page::Account(item).path(lang)>
+                    <span class="tile-sign" aria-hidden="true">{icon(glyph)}</span>
+                    <span class="tile-text">
+                        <span class="tile-name">{name}</span>
+                        <span class="tile-lead">{lead}</span>
+                    </span>
+                </a>
+            </li>
+        }
+    });
+    view! {
+        <section class="card play-card" aria-labelledby="play-title">
+            <div class="play-text">
+                <h2 id="play-title">{words::account_play_title(lang)}</h2>
+                <p>{words::account_play_lead(lang)}</p>
+                <p class="actions">
+                    <a class="button button-ghost" href=Page::Gateways.path(lang)>{icon(icons::SERVER)}<span>{words::nav_gateways(lang)}</span></a>
+                </p>
+            </div>
+            {super::download::download_block(cx, false)}
+        </section>
+        <ul class="tiles">{tiles}</ul>
+        {numbers(cx)}
+    }
+}
+
 pub fn area(cx: &Context<'_>, section: Section) -> Built {
     let lang = cx.lang;
     let (title, _) = section_name(lang, section);
@@ -144,21 +198,45 @@ pub fn area(cx: &Context<'_>, section: Section) -> Built {
         "img/og.jpg",
     );
     meta.islands = true;
-    let links = Section::ALL
-        .into_iter()
-        .map(|item| {
-            let (name, glyph) = section_name(lang, item);
-            let here = item == section;
-            view! {
-                <li>
-                    <a href=Page::Account(item).path(lang) aria-current=here.then_some("page")>
-                        {icon(glyph)}
-                        <span>{name}</span>
-                    </a>
-                </li>
-            }
-        })
-        .collect_view();
+    // The navigation in two groups: the account itself, and playing. The
+    // contacts are a tab of the messenger (their own address still opens
+    // it there), so the chat's entry stands for both. The administration
+    // is in no navigation: the overview leads an administrator to it.
+    let link = |item: Section| {
+        let (name, glyph) = section_name(lang, item);
+        let here = item == section || (item == Section::Chat && section == Section::Contacts);
+        view! {
+            <li>
+                <a href=Page::Account(item).path(lang) aria-current=here.then_some("page")>
+                    {icon(glyph)}
+                    <span>{name}</span>
+                </a>
+            </li>
+        }
+    };
+    let group = |name: &'static str, items: &[Section]| {
+        view! {
+            <li class="frame-group">
+                <p class="frame-nav-head">{name}</p>
+                <ul>{items.iter().copied().map(link).collect_view()}</ul>
+            </li>
+        }
+    };
+    let own = group(
+        words::account_group_account(lang),
+        &[
+            Section::Home,
+            Section::Profile,
+            Section::Security,
+            Section::Privacy,
+            Section::Notifications,
+        ],
+    );
+    let play = group(
+        words::account_play_title(lang),
+        &[Section::Chat, Section::Gateways],
+    );
+    let extras = (section == Section::Home).then(|| home_extras(cx));
     let worker = cx.assets.url("crypto-worker.js");
     let messenger = matches!(section, Section::Chat | Section::Contacts);
     // the administration's pages have an island of their own, in a module
@@ -173,8 +251,7 @@ pub fn area(cx: &Context<'_>, section: Section) -> Built {
     let body = view! {
         <div class="frame" class:frame-messenger=messenger>
             <nav class="frame-nav" aria-label=words::account_nav(lang)>
-                <p class="frame-nav-head" aria-hidden="true">{words::app_account(lang)}</p>
-                <ul>{links}</ul>
+                <ul class="frame-groups">{own}{play}</ul>
                 // shown by pwa.js where the browser offers to install the app
                 <p class="install" data-install-box hidden>
                     <button type="button" class="button" data-install>
@@ -188,6 +265,7 @@ pub fn area(cx: &Context<'_>, section: Section) -> Built {
                     <h1>{title}</h1>
                 </header>
                 {island}
+                {extras}
             </div>
         </div>
     }

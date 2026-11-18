@@ -99,6 +99,21 @@ GRANT SELECT, INSERT, DELETE ON central_identity.tower_actions TO central_runtim
 GRANT SELECT, INSERT, UPDATE, DELETE ON central_identity.tower_participation,
     central_identity.tower_runs, central_identity.tower_scores,
     central_identity.tower_accomplishments TO central_runtime;
+GRANT SELECT, INSERT, DELETE ON central_identity.tower_access TO central_runtime;
+GRANT SELECT ON central_identity.tower_award_issuers TO central_runtime;
+GRANT UPDATE (last_used_at) ON central_identity.tower_award_issuers TO central_runtime;
+GRANT SELECT, INSERT, UPDATE ON central_identity.tower_award_runs,
+    central_identity.tower_award_progress TO central_runtime;
+GRANT SELECT, INSERT ON central_identity.tower_award_receipts TO central_runtime;
 GRANT UPDATE (withdrawn) ON central_identity.challenges TO central_runtime;
 GRANT SELECT, INSERT, UPDATE, DELETE ON central_identity.challenge_participation,
     central_identity.challenge_attempts, central_identity.challenge_completions TO central_runtime;
+
+-- Donations (docs/operations.md §"Donations", migration 000032): the runtime
+-- adds a row once and converts one that came without a rate, and reads the
+-- sums and the day the count began. It never changes an amount and never
+-- deletes a row or writes a sum: the operator's sweep folds rows older than
+-- 40 days into the sums under the migrator's login.
+GRANT SELECT, INSERT ON central_identity.donations TO central_runtime;
+GRANT UPDATE (euro_cents) ON central_identity.donations TO central_runtime;
+GRANT SELECT ON central_identity.donation_sums, central_identity.donation_count TO central_runtime;

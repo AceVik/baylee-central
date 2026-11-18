@@ -79,6 +79,9 @@ impl Database {
 #[serde(deny_unknown_fields)]
 struct Service {
     listen: String,
+    /// Sole trusted HTTPS Tower authority; absent disables Tower identity access.
+    #[serde(default)]
+    tower_origin: Option<String>,
     /// The website's browser listener; absent means off.
     #[serde(default)]
     browser: Option<Browser>,
@@ -107,6 +110,21 @@ struct Service {
     /// `Unavailable`, while stored pictures are still served.
     #[serde(default)]
     pictures: Option<Pictures>,
+    /// The donation platforms (`docs/operations.md` §"Donations"): absent
+    /// means Liberapay's public figures and nothing else.
+    #[serde(default)]
+    funding: Option<super::funding::Funding>,
+}
+
+/// What the `funding` block turns on, or Liberapay alone without one. A token
+/// of another shape stops the start.
+fn funding(
+    settings: &mut Service,
+) -> Result<(central_identity::FundingSources, super::funding::Plan), ()> {
+    settings.funding.as_mut().map_or_else(
+        || Ok(super::funding::Funding::absent()),
+        super::funding::Funding::plan,
+    )
 }
 
 /// Where systemd accepts for the picture worker: an absolute path.
@@ -190,7 +208,8 @@ fn parse<T: for<'de> Deserialize<'de>>(bytes: &[u8]) -> Result<T, ()> {
 
 /// Serve the live account protocol until SIGTERM/SIGINT.
 pub(super) async fn run_service() -> ExitCode {
-    if serve().await.is_ok() {
+    // On the heap: the service's future holds every task it joins.
+    if Box::pin(serve()).await.is_ok() {
         ExitCode::SUCCESS
     } else {
         eprintln!("central: account service rejected configuration or failed");
@@ -278,6 +297,7 @@ fn announce(
     browser: Option<&DevelopmentServer>,
     legacy: bool,
     mailing: bool,
+    donations: &central_identity::FundingSources,
 ) {
     println!(
         "central: account listener at http://{} for {}",
@@ -296,6 +316,7 @@ fn announce(
     if mailing {
         println!("central: mail through the mailer on this host");
     }
+    println!("{}", super::funding::announced(donations));
 }
 
 async fn serve() -> Result<(), ()> {
@@ -312,6 +333,7 @@ async fn serve() -> Result<(), ()> {
         .transpose()
         .map_err(|_| ())?;
     let outside = outside(&mut settings)?;
+    let (donations, plan) = funding(&mut settings)?;
     // A signing key that does not restore stops the start here too.
     let tokens = settings.token_keys.keys()?;
     let endpoint = Endpoint::live();
@@ -351,8 +373,11 @@ async fn serve() -> Result<(), ()> {
         OFFICIAL_ORIGIN,
         tokens,
     )
+    .and_then(|identity| identity.with_tower(settings.tower_origin.as_deref()))
     .map_err(|_| ())
-    .map(|identity| composed(identity, legacy.as_ref(), push.as_deref(), outside));
+    .map(|identity| {
+        composed(identity, legacy.as_ref(), push.as_deref(), outside).with_funding(donations)
+    });
     drop(settings);
     let result = async {
         let identity = Arc::new(identity?);
@@ -362,9 +387,11 @@ async fn serve() -> Result<(), ()> {
             browser.as_ref(),
             legacy.is_some(),
             mailing,
+            &donations,
         );
         let (stop, _) = watch::channel(false);
         let mail = super::mail::run(identity.clone(), stop.subscribe());
+        let funding = super::funding::run(identity.clone(), plan, stop.subscribe());
         let native = server.run_with_identity(&endpoint, identity.clone(), stopped(&stop));
         let revocations = super::gateway_push::run(identity.clone(), official, stop.subscribe());
         let browser = browser
@@ -375,11 +402,12 @@ async fn serve() -> Result<(), ()> {
                 .await
                 .map_err(|_| ())?;
         }
-        let (result, (), (), ()) = tokio::join!(
+        let (result, (), (), (), ()) = tokio::join!(
             together(&stop, native, browser, shutdown()),
             super::push::run(store.clone(), push, stop.subscribe()),
             revocations,
-            mail
+            mail,
+            funding
         );
         result.map_err(|_| ())
     }
@@ -396,11 +424,18 @@ async fn serve() -> Result<(), ()> {
 /// service from starting stops this.
 fn configured(bytes: &[u8]) -> Result<(), ()> {
     let mut settings: Service = parse(bytes)?;
+    if let Some(origin) = &settings.tower_origin {
+        central_api::gateway::validate_origin(origin, false).map_err(|_| ())?;
+        if origin == central_api::LIVE_ORIGIN {
+            return Err(());
+        }
+    }
     if let Some(push) = &settings.push {
         central_push::Sender::new(&push.vapid_key, "https://baylee.app/contact".into())
             .map_err(|_| ())?;
     }
     outside(&mut settings)?;
+    funding(&mut settings)?;
     listener_configs(&settings)?;
     ServerKeys::from_secret_bytes(&settings.opaque_setup).map_err(|_| ())?;
     super::gateway_push::official_pin(settings.official_address.as_deref())?;
@@ -494,6 +529,11 @@ pub(super) async fn run_sweep() -> ExitCode {
         eprintln!(
             "central: {} e-mail addresses whose code was over deleted",
             swept.addresses
+        );
+        eprintln!(
+            "central: {} donations older than {} days added to their sums and deleted",
+            swept.donations,
+            central_postgres::donations::DONATION_DAYS
         );
         eprintln!(
             "central: {} moved and {} expired legacy accounts and {} unused legacy reservations deleted",
@@ -672,6 +712,25 @@ mod tests {
     }
 
     #[test]
+    fn tower_configuration_requires_a_distinct_canonical_https_origin() {
+        assert!(configured(service("").as_bytes()).is_ok());
+        assert!(
+            configured(service(r#","tower_origin":"https://tower.example.invalid""#).as_bytes())
+                .is_ok()
+        );
+        for origin in [
+            "http://127.0.0.1:29871",
+            "https://central.baylee.app",
+            "https://user@tower.example.invalid",
+            "https://tower.example.invalid/path",
+            "https://tower.example.invalid/",
+        ] {
+            let extra = format!(r#","tower_origin":"{origin}""#);
+            assert!(configured(service(&extra).as_bytes()).is_err());
+        }
+    }
+
+    #[test]
     fn development_shaped_or_extended_documents_are_rejected() {
         // The development launcher's fields name a selectable endpoint and a
         // loopback-only database; neither exists in production.
@@ -793,6 +852,29 @@ mod tests {
                 parse::<Service>(service(extra).as_bytes()).is_err(),
                 "{extra}"
             );
+        }
+    }
+
+    #[test]
+    fn the_donations_block_is_optional_and_its_tokens_are_checked_at_the_start() {
+        let mut settings: Service = parse(service("").as_bytes()).unwrap();
+        assert!(settings.funding.is_none(), "absent means Liberapay alone");
+        let (sources, _) = funding(&mut settings).unwrap();
+        assert!(sources.liberapay && !sources.github && sources.kofi.is_none());
+        let block = r#","funding":{"github":{"token":"synthetic-github-token-0123456789"},"kofi":{"token":"synthetic-kofi-verification-token","record":true}}"#;
+        assert!(configured(service(block).as_bytes()).is_ok());
+        let mut settings: Service = parse(service(block).as_bytes()).unwrap();
+        let (sources, _) = funding(&mut settings).unwrap();
+        assert!(sources.github && sources.kofi.is_some_and(|kofi| kofi.record));
+        // Each would stop the service: found out before anything is stopped.
+        for extra in [
+            r#","funding":{"github":{"token":"short"}}"#,
+            r#","funding":{"kofi":{"token":"a token with spaces"}}"#,
+            r#","funding":{"kofi":{}}"#,
+            r#","funding":{"patreon":{"token":"synthetic-patreon-token-01234"}}"#,
+            r#","funding":true"#,
+        ] {
+            assert!(configured(service(extra).as_bytes()).is_err(), "{extra}");
         }
     }
 

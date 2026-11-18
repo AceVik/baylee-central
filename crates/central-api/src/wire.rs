@@ -38,6 +38,22 @@ pub struct Identity {
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "operation", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Request {
+    /// Issue short-lived identity access to the configured separate Tower authority.
+    TowerToken {},
+    /// Introspect only a Tower credential from the Authorization header.
+    TowerIdentity {},
+    /// Accept one verified permanent fact under a dedicated Tower issuer credential.
+    TowerAward {
+        /// Never accepted under a player, gateway or Tower identity credential.
+        delivery: crate::tower_awards::Delivery,
+    },
+    /// Read this live session owner's permanent v2 Tower totals.
+    TowerProgress {},
+    /// Export only this live session owner's permanent receipt history.
+    TowerAwardExport {
+        /// Exclusive database receipt cursor; at most 128 rows per response.
+        after: Option<[u8; 16]>,
+    },
     /// Global Daily/Weekly catalogue, rankings and account-owned participation.
     Challenges {
         /// Closed public or account operation; ownership comes from the session.
@@ -143,6 +159,12 @@ pub enum Request {
         /// Exclusive pagination cursor, or None for the first page.
         after: Option<[u8; 16]>,
     },
+    /// Public, no credential: the donation figures, sums and counts only
+    /// ([`crate::funding`]). Answered with [`Response::PublicFunding`]; served
+    /// like [`Request::PublicFigures`], under the same budgets. A sibling of it
+    /// rather than a field, so that no reader of the figures meets a field it
+    /// does not know.
+    PublicFunding {},
     /// Owner-authorized, revision-checked replacement of this gateway's administrator list.
     SetGatewayAdmins {
         /// Owned gateway ID.
@@ -651,6 +673,31 @@ pub enum MigrationState {
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "result", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Response {
+    /// Scoped identity access; contains no ordinary Central session capability.
+    TowerToken {
+        /// Destination, opaque bearer and expiry.
+        grant: crate::tower_access::Grant,
+    },
+    /// Current identity under a live Tower credential and its original session.
+    TowerIdentity {
+        /// No rules, currency, permissions or accomplishment claims.
+        identity: crate::tower_access::Identity,
+    },
+    /// Exact durable result binding for an authenticated accomplishment delivery.
+    TowerAward {
+        /// Exact event/account/run/ordinal and durable disposition.
+        receipt: crate::tower_awards::Receipt,
+    },
+    /// Session-owned permanent totals, independent of live Tower availability.
+    TowerProgress {
+        /// Deduplicated permanent cosmetic counters.
+        progress: crate::tower_awards::Progress,
+    },
+    /// Session-owned bounded receipt export.
+    TowerAwardExport {
+        /// Bounded owned receipts and exclusive continuation cursor.
+        export: crate::tower_awards::Export,
+    },
     /// Public or account-owned challenge result.
     Challenges {
         /// Closed challenge response.
@@ -733,6 +780,13 @@ pub enum Response {
         /// the final ID as the next cursor. A gateway that does not report
         /// is not here, though the directory lists it.
         gateways: Vec<crate::gateway::GatewayFigures>,
+    },
+    /// The donation figures ([`Request::PublicFunding`]): totals only, no row of a
+    /// single donation, no time of one and nothing about who gave.
+    PublicFunding {
+        /// Each platform's monthly part and what was given once, each absent while
+        /// Central has no figure for it.
+        funding: crate::funding::Funding,
     },
     /// Administrator-list update committed.
     GatewayAdmins {
@@ -1616,6 +1670,60 @@ mod tests {
         ] {
             assert!(crate::decode::<Request>(bad.as_bytes()).is_err(), "{bad}");
         }
+    }
+
+    /// The donation figures: nothing in, totals out, and nothing else either way.
+    #[test]
+    fn the_donation_figures_have_the_designed_shapes() {
+        use crate::funding::{Funding, Monthly, Once};
+        let request = r#"{"operation":"public_funding"}"#;
+        assert_eq!(text(&Request::PublicFunding {}), request);
+        assert!(matches!(
+            crate::decode::<Request>(request.as_bytes()).unwrap(),
+            Request::PublicFunding {}
+        ));
+        for bad in [
+            r#"{"operation":"public_funding","after":null}"#,
+            r#"{"operation":"public_funding","platform":"kofi"}"#,
+        ] {
+            assert!(crate::decode::<Request>(bad.as_bytes()).is_err(), "{bad}");
+        }
+        let funding = Funding {
+            github: None,
+            liberapay: Some(Monthly {
+                month: 10_010,
+                supporters: 3,
+            }),
+            kofi: Some(Monthly {
+                month: 0,
+                supporters: 0,
+            }),
+            once: Some(Once {
+                total: 23_500,
+                count: 12,
+                since: "2026-11-18".into(),
+            }),
+        };
+        let answer = r#"{"result":"public_funding","funding":{"github":null,"liberapay":{"month":10010,"supporters":3},"kofi":{"month":0,"supporters":0},"once":{"total":23500,"count":12,"since":"2026-11-18"}}}"#;
+        assert_eq!(
+            text(&Response::PublicFunding {
+                funding: funding.clone()
+            }),
+            answer
+        );
+        let Response::PublicFunding { funding: read } = crate::decode(answer.as_bytes()).unwrap()
+        else {
+            panic!("the donation figures");
+        };
+        assert_eq!(read, funding);
+        assert!(
+            crate::decode::<Response>(
+                answer
+                    .replace(r#""count":12,"#, r#""count":12,"donors":[],"#)
+                    .as_bytes()
+            )
+            .is_err()
+        );
     }
 
     /// The figures: a cursor in, the accounts and a page of counts out.
