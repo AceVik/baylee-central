@@ -119,13 +119,32 @@ pub fn local(path: &str) -> bool {
         && !path.bytes().any(|b| b.is_ascii_control())
 }
 
-/// Sends the browser to `path` on this site.
+/// Whether `path` is a form's own address, `/{lang}/signin`, `/register`
+/// or `/reset`: the entry in the history a dialog stands at (`boot.js`).
+#[cfg(any(target_arch = "wasm32", test))]
+#[must_use]
+pub fn form_address(path: &str) -> bool {
+    let mut parts = path.trim_end_matches('/').split('/');
+    parts.next() == Some("")
+        && parts.next().is_some_and(|lang| !lang.is_empty())
+        && matches!(parts.next(), Some("signin" | "register" | "reset"))
+        && parts.next().is_none()
+}
+
+/// Sends the browser to `path` on this site. From a form's own address the
+/// new page takes that entry's place in the history: the form is done
+/// with, and Back from where it led does not open it again.
 #[cfg(target_arch = "wasm32")]
 pub fn go(path: &str) {
     if local(path)
         && let Some(window) = web_sys::window()
     {
-        let _ = window.location().assign(path);
+        let location = window.location();
+        let _ = if location.pathname().is_ok_and(|at| form_address(&at)) {
+            location.replace(path)
+        } else {
+            location.assign(path)
+        };
     }
 }
 
@@ -190,7 +209,7 @@ pub fn go(_path: &str) {}
 
 #[cfg(test)]
 mod tests {
-    use super::local;
+    use super::{form_address, local};
 
     #[test]
     fn only_a_path_on_this_site_is_gone_to() {
@@ -211,6 +230,25 @@ mod tests {
             "/de/account\t",
         ] {
             assert!(!local(path), "{path}");
+        }
+    }
+
+    #[test]
+    fn a_form_has_three_addresses_in_each_language() {
+        for path in ["/de/signin", "/en/register", "/pt-br/reset", "/de/signin/"] {
+            assert!(form_address(path), "{path}");
+        }
+        for path in [
+            "/de/",
+            "/de",
+            "/signin",
+            "//signin",
+            "/de/account",
+            "/de/signin/more",
+            "/de/account/signin",
+            "de/signin",
+        ] {
+            assert!(!form_address(path), "{path}");
         }
     }
 }
