@@ -1,10 +1,13 @@
-//! The bound of the RUSTSEC-2026-0459 exception (`libsqlite3-sys`, owner,
-//! 12.11.2026, `docs/dependency-proposal/sqlite-advisory.md`): `cargo
-//! audit` ignores that advisory only while the package is in `Cargo.lock`
-//! and in no graph a build of this workspace resolves, with every feature
-//! of every member, for every target, with build and dev dependencies. A
-//! build that takes it, or a lock file that holds another version or none,
-//! fails here, and the ignore has to be reviewed or removed.
+//! The bound of the RUSTSEC-2026-0543 exception (`chrono` is unmaintained;
+//! owner, 18.11.2026, `docs/dependency-proposal/chrono-advisory.md`):
+//! `cargo audit` ignores that advisory only while the package is in
+//! `Cargo.lock` and in no graph a build of this workspace resolves, with every
+//! feature of every member, for every target, with build and dev
+//! dependencies. A build that takes it, or a lock file that holds another
+//! version or none, fails here, and the ignore has to be reviewed or removed.
+//!
+//! It replaced the same bound for `libsqlite3-sys` (RUSTSEC-2026-0459), which
+//! ended on 18.11.2026 when `sqlx` 0.9.1 took the fixed release.
 
 use std::{fs, path::Path, process::Command};
 
@@ -12,15 +15,16 @@ use crate::fail::{Fail, OrFail, Result};
 use crate::{process, workspace};
 
 /// The advisory's package and the one version the exception was given for.
-const PACKAGE: &str = "libsqlite3-sys";
-const VERSION: &str = "0.37.0";
-/// The package that would bring it into a build.
-const DRIVER: &str = "sqlx-sqlite";
+const PACKAGE: &str = "chrono";
+const VERSION: &str = "0.4.45";
+/// The packages that would bring it into a build: `SeaORM`'s optional Arrow
+/// support, the one way left to it, and the migrator that once took it.
+const CARRIERS: [&str; 2] = ["sea-orm-arrow", "sea-orm-migration"];
 
 const BUILT: &str =
-    "libsqlite3-sys is in a build of the workspace; RUSTSEC-2026-0459 may no longer be ignored";
-const MOVED: &str = "libsqlite3-sys 0.37.0 is no longer what Cargo.lock holds; review or remove the RUSTSEC-2026-0459 ignore in .cargo/audit.toml";
-const FAILURE: &str = "SQLite advisory scope could not be read";
+    "chrono is in a build of the workspace; RUSTSEC-2026-0543 may no longer be ignored";
+const MOVED: &str = "chrono 0.4.45 is no longer what Cargo.lock holds; review or remove the RUSTSEC-2026-0543 ignore in .cargo/audit.toml";
+const FAILURE: &str = "chrono advisory scope could not be read";
 
 pub(crate) fn check(root: &Path) -> Result<()> {
     let lock = fs::read_to_string(root.join("Cargo.lock")).or_fail(FAILURE)?;
@@ -55,12 +59,10 @@ pub(crate) fn check(root: &Path) -> Result<()> {
     if !names(&tree, "central-api") {
         return Err(Fail::new(FAILURE));
     }
-    if names(&tree, PACKAGE) || names(&tree, DRIVER) {
+    if names(&tree, PACKAGE) || CARRIERS.iter().any(|carrier| names(&tree, carrier)) {
         return Err(Fail::new(BUILT));
     }
-    println!(
-        "SQLite advisory scope passed (libsqlite3-sys 0.37.0 in Cargo.lock only, in no build)."
-    );
+    println!("chrono advisory scope passed (chrono 0.4.45 in Cargo.lock only, in no build).");
     Ok(())
 }
 
@@ -96,20 +98,22 @@ mod tests {
 
     #[test]
     fn the_lock_file_is_read_by_name_and_version() {
-        let lock = "[[package]]\nname = \"libsqlite3-sys\"\nversion = \"0.37.0\"\nsource = \"x\"\n\n[[package]]\nname = \"libsqlite3-sys-extra\"\nversion = \"1.0.0\"\n";
-        assert_eq!(locked_versions(lock, PACKAGE), ["0.37.0"]);
-        let two = format!("{lock}\n[[package]]\nname = \"libsqlite3-sys\"\nversion = \"0.39.0\"\n");
-        assert_eq!(locked_versions(&two, PACKAGE), ["0.37.0", "0.39.0"]);
+        let lock = "[[package]]\nname = \"chrono\"\nversion = \"0.4.45\"\nsource = \"x\"\n\n[[package]]\nname = \"chrono-tz\"\nversion = \"1.0.0\"\n";
+        assert_eq!(locked_versions(lock, PACKAGE), ["0.4.45"]);
+        let two = format!("{lock}\n[[package]]\nname = \"chrono\"\nversion = \"0.4.46\"\n");
+        assert_eq!(locked_versions(&two, PACKAGE), ["0.4.45", "0.4.46"]);
         assert_eq!(locked_versions("", PACKAGE), Vec::<&str>::new());
     }
 
     #[test]
     fn a_tree_names_a_package_by_its_first_word_only() {
         let tree =
-            "central-api v0.1.0 (/src/crates/central-api)\nsqlx v0.9.0\nsqlx-postgres v0.9.0 (*)\n";
-        assert!(names(tree, "central-api") && names(tree, "sqlx"));
-        assert!(!names(tree, DRIVER) && !names(tree, PACKAGE));
-        assert!(names("libsqlite3-sys v0.37.0 (*)\n", PACKAGE));
-        assert!(!names("libsqlite3-sys-extra v1.0.0\n", PACKAGE));
+            "central-api v0.1.0 (/src/crates/central-api)\nsea-orm v2.0.4\ntime v0.3.55 (*)\n";
+        assert!(names(tree, "central-api") && names(tree, "sea-orm"));
+        assert!(!names(tree, PACKAGE));
+        assert!(CARRIERS.iter().all(|carrier| !names(tree, carrier)));
+        assert!(names("chrono v0.4.45 (*)\n", PACKAGE));
+        assert!(names("sea-orm-arrow v2.0.0-rc.5\n", CARRIERS[0]));
+        assert!(!names("chrono-tz v1.0.0\n", PACKAGE));
     }
 }

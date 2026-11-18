@@ -309,3 +309,26 @@ the crate pins the fingerprint again and repeats this check.
 
 Pinned once more the same day: a verified payload, which holds a Central token's capability, is
 now wiped when dropped. No import or dependency changed.
+
+## One signature generation again — 2026-11-18
+
+The dependency upgrade the owner asked for on 18.11.2026
+(docs/dependency-proposal/upgrade-2026-11-18.md) takes jsonwebtoken 12.0.0
+with jsonwebtoken-openssl 3.0.0. jsonwebtoken 12 builds on signature 3.0.0
+(`alloc`, `rand_core`), so signature 2.2.0 leaves the graph and one
+generation serves Ed25519 and the JWT provider trait. The guard pins
+signature 3.0.0 with exactly the callers ed25519 and jsonwebtoken and
+exactly those two features, and jsonwebtoken 12.0.0 with no features (its
+RustCrypto provider, which would reach p256 and with it elliptic-curve,
+stays off). elliptic-curve is still reached from opaque-ke and voprf alone
+and crypto-bigint from elliptic-curve alone (checked on the resolved graph
+of that day). The negative tests that enable JWT's RustCrypto provider or
+add an edge from JWT to the affected arithmetic stay. This is a
+trait-inventory change, not an extension of the advisory's reachable-code
+exception.
+
+The same day the source fingerprint of `central-crypto` was renewed to
+`90a16779381ae9646d5c460fd42db79c060e91b3fd40738f58a9359990aa865c` for one
+line of its manifest: `zeroize` 1.9.1 → 1.9.2. No source file, feature or
+other dependency of the crate changed; `opaque-sha2` 0.10.9 and `rand`
+0.8.8 stay pinned to OPAQUE's generation.

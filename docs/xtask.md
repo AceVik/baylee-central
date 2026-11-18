@@ -11,7 +11,7 @@ the gate starts never replace the running executable, which Windows refuses.
 | --- | --- | --- |
 | `cargo xtask gate [--client]` | `cargo fmt --check`, the policy with its compiler probe, clippy `-D warnings`, every test, the doc tests, the release build; `--client` limits clippy and the tests to the client's crates and drops the release build ([below](#which-runner-runs-what)) | `scripts/test.ps1` |
 | `cargo xtask crypto-scope` | exact graph and source bounds of the unreachable bigint advisory; also mandatory in `gate` | (new, 2026-10-28) |
-| `cargo xtask sqlite-scope` | `libsqlite3-sys` (RUSTSEC-2026-0459) is in `Cargo.lock` at 0.37.0 only and in no build; also mandatory in `gate` | (new, 2026-11-12) |
+| `cargo xtask chrono-scope` | `chrono` (RUSTSEC-2026-0543) is in `Cargo.lock` at 0.4.45 only and in no build; also mandatory in `gate` | (new, 2026-11-18; `sqlite-scope` before it, 2026-11-12 to 2026-11-18) |
 | `cargo xtask policy [--compiler-probe]` | the code policy (below) | `scripts/check-policy.ps1` |
 | `cargo xtask postgres [--exercise-failure]` | the `PostgreSQL` integration fixture ([database development](database-development.md)) | `scripts/test-postgres.ps1` |
 | `cargo xtask smoke [--exercise-failure]` | the development listener's HTTP boundary ([dev mode](dev-mode.md)); build `--release` first | `scripts/smoke-dev.ps1` |
@@ -52,7 +52,7 @@ desktop client links from this repository.
 
 | runner | runs |
 | --- | --- |
-| ubuntu-24.04 | `gate` (the whole workspace, release build included), then `smoke` and `smoke --exercise-failure`; the separate Linux jobs run `postgres`, `crypto-scope` and `sqlite-scope` with the audit and deny tools, `secrets`, `wasm --check` and the web app |
+| ubuntu-24.04 | `gate` (the whole workspace, release build included), then `smoke` and `smoke --exercise-failure`; the separate Linux jobs run `postgres`, `crypto-scope` and `chrono-scope` with the audit and deny tools, `secrets`, `wasm --check` and the web app |
 | windows-2025, macos-15 (ARM64), macos-15-intel (x86-64) | `gate --client` |
 
 The verification job has a 40-minute ceiling. On 14 November 2026 its former
@@ -94,9 +94,11 @@ The gate additionally enforces the reviewed Ristretto advisory scope through
 `crypto-scope` ([review and removal condition](crypto-proposal/bigint-advisory.md)).
 CI's dependency job runs it before the pinned audit and deny tools. A scanner
 pass alone does not validate the exception's reachability bounds.
-It enforces the `libsqlite3-sys` advisory's exception the same way through
-`sqlite-scope` ([the bound and its removal](dependency-proposal/sqlite-advisory.md)):
-the package may be in the lock file at 0.37.0 and in no build.
+It enforces the `chrono` advisory's exception the same way through
+`chrono-scope` ([the bound and its removal](dependency-proposal/chrono-advisory.md)):
+the package may be in the lock file at 0.4.45 and in no build. (Until
+18.11.2026 `sqlite-scope` held `libsqlite3-sys` the same way;
+[ended](dependency-proposal/sqlite-advisory.md).)
 
 - The workspace sets `unsafe_code = "forbid"`. Every member inherits the
   workspace lints, is not published (an absent `publish`, which allows

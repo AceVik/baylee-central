@@ -15,6 +15,7 @@ pub mod policy;
 pub mod random;
 pub mod secrets;
 
+mod chrono_scope;
 mod client;
 mod crypto_scope;
 mod gate;
@@ -23,7 +24,6 @@ mod process;
 mod site;
 mod smoke;
 mod socket;
-mod sqlite_scope;
 mod wasm;
 mod workspace;
 

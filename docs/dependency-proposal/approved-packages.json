@@ -82,12 +82,15 @@
     "borsh@1.8.1",
     "built@0.8.1",
     "bumpalo@3.20.3",
+    "bumpalo@3.20.4",
     "bytemuck@1.25.2",
     "byteorder-lite@0.1.0",
     "byteorder@1.5.0",
     "bytes@1.12.1",
+    "bytes@1.12.2",
     "camino@1.2.6",
     "cc@1.11.0",
+    "cc@1.11.2",
     "cc@1.9.0",
     "cexpr@0.6.0",
     "cfg-if@1.0.5",
@@ -129,6 +132,7 @@
     "crypto-common@0.2.2",
     "ctutils@0.4.5",
     "ctutils@0.4.7",
+    "ctutils@0.4.8",
     "curve25519-dalek-derive@0.1.1",
     "curve25519-dalek@4.1.3",
     "curve25519-dalek@5.0.0",
@@ -158,6 +162,7 @@
     "equivalent@1.0.3",
     "erased@0.1.2",
     "errno@0.3.14",
+    "errno@0.3.15",
     "etcetera@0.11.0",
     "euclid@0.22.14",
     "event-listener-strategy@0.5.4",
@@ -196,6 +201,7 @@
     "glob@0.3.4",
     "gloo-net@0.7.0",
     "gloo-utils@0.3.0",
+    "gloo-utils@0.3.1",
     "group@0.13.0",
     "guardian@1.3.0",
     "half@2.7.1",
@@ -247,6 +253,7 @@
     "indoc@2.0.8",
     "inout@0.2.4",
     "inout@0.2.5",
+    "inout@0.2.6",
     "interpolate_name@0.2.4",
     "interpolator@0.5.0",
     "inventory@0.3.25",
@@ -254,11 +261,14 @@
     "itertools@0.14.0",
     "itertools@0.15.0",
     "itoa@1.0.18",
+    "itoa@1.0.19",
     "jobserver@0.1.35",
     "js-sys@0.3.106",
     "js-sys@0.3.107",
     "jsonwebtoken-openssl@2.0.0",
+    "jsonwebtoken-openssl@3.0.0",
     "jsonwebtoken@11.1.0",
+    "jsonwebtoken@12.0.0",
     "konst@0.2.20",
     "konst_macro_rules@0.2.19",
     "kurbo@0.13.1",
@@ -281,7 +291,9 @@
     "libfuzzer-sys@0.4.13",
     "libloading@0.8.9",
     "libm@0.2.16",
+    "libredox@0.1.25",
     "libsqlite3-sys@0.37.0",
+    "libsqlite3-sys@0.40.0",
     "litemap@0.8.3",
     "lock_api@0.4.14",
     "log@0.4.34",
@@ -297,10 +309,12 @@
     "memchr@2.8.3",
     "memoffset@0.9.1",
     "mime@0.3.17",
+    "mime@0.3.18",
     "minimal-lexical@0.2.1",
     "miniz_oxide@0.8.9",
     "miniz_oxide@0.9.1",
     "mio@1.2.4",
+    "mio@1.2.5",
     "moxcms@0.8.1",
     "nasm-rs@0.3.2",
     "new_debug_unreachable@1.0.6",
@@ -318,6 +332,8 @@
     "num-integer@0.1.47",
     "num-rational@0.4.2",
     "num-traits@0.2.19",
+    "objc2-core-foundation@0.3.2",
+    "objc2-system-configuration@0.3.2",
     "oco_ref@0.2.1",
     "once_cell@1.21.4",
     "opaque-ke@4.0.1",
@@ -366,6 +382,7 @@
     "r-efi@5.3.0",
     "r-efi@6.0.0",
     "rand@0.10.3",
+    "rand@0.10.4",
     "rand@0.8.8",
     "rand@0.9.5",
     "rand_chacha@0.10.0",
@@ -385,8 +402,11 @@
     "reactive_stores_macro@0.5.0-rc1",
     "redox_syscall@0.5.18",
     "regex-automata@0.4.18",
+    "regex-automata@0.4.19",
     "regex-syntax@0.8.11",
+    "regex-syntax@0.8.12",
     "regex@1.13.1",
+    "regex@1.13.2",
     "resvg@0.50.0",
     "rgb@0.8.53",
     "ring@0.17.14",
@@ -396,7 +416,9 @@
     "rustc-hash@2.1.3",
     "rustc_version@0.4.1",
     "rustls-pki-types@1.15.1",
+    "rustls-pki-types@1.16.0",
     "rustls-webpki@0.103.16",
+    "rustls-webpki@0.103.17",
     "rustls@0.23.46",
     "rustversion@1.0.23",
     "ryu@1.0.23",
@@ -443,15 +465,23 @@
     "slotmap@1.1.1",
     "smallvec@1.16.3",
     "smallvec@1.16.4",
+    "smallvec@1.16.6",
     "socket2@0.6.5",
     "spin@0.9.9",
     "sqlx-core@0.9.0",
+    "sqlx-core@0.9.1",
     "sqlx-macros-core@0.9.0",
+    "sqlx-macros-core@0.9.1",
     "sqlx-macros@0.9.0",
+    "sqlx-macros@0.9.1",
     "sqlx-mysql@0.9.0",
+    "sqlx-mysql@0.9.1",
     "sqlx-postgres@0.9.0",
+    "sqlx-postgres@0.9.1",
     "sqlx-sqlite@0.9.0",
+    "sqlx-sqlite@0.9.1",
     "sqlx@0.9.0",
+    "sqlx@0.9.1",
     "stable_deref_trait@1.2.1",
     "static_assertions@1.1.0",
     "strict-num@0.1.1",
@@ -462,6 +492,7 @@
     "subtle@2.6.1",
     "svgtypes@0.16.2",
     "syn@2.0.119",
+    "syn@3.0.10",
     "syn@3.0.9",
     "sync_wrapper@1.0.2",
     "synstructure@0.14.0",
@@ -488,7 +519,9 @@
     "tokio@1.53.3",
     "tokio@1.54.1",
     "toml@1.2.0+spec-1.1.0",
+    "toml@1.2.1+spec-1.1.0",
     "toml_datetime@1.1.2+spec-1.1.0",
+    "toml_datetime@1.1.3+spec-1.1.0",
     "toml_edit@0.25.17+spec-1.1.0",
     "toml_parser@1.1.5+spec-1.1.0",
     "toml_writer@1.2.0+spec-1.1.0",
@@ -517,6 +550,7 @@
     "ureq-proto@0.7.1",
     "ureq@3.5.0",
     "ureq@3.5.1",
+    "ureq@3.5.2",
     "url@2.5.8",
     "usvg@0.50.0",
     "utf8-zero@0.8.1",
@@ -525,6 +559,7 @@
     "utf_types@1.0.0",
     "uuid@1.28.0",
     "uuid@1.29.0",
+    "uuid@1.29.3",
     "v_frame@0.3.9",
     "vcpkg@0.2.15",
     "version_check@0.9.5",
@@ -548,6 +583,7 @@
     "web-time@1.1.0",
     "webpki-roots@1.0.10",
     "webpki-roots@1.0.11",
+    "webpki-roots@1.0.12",
     "weezl@0.1.12",
     "whoami@2.1.3",
     "winapi-util@0.1.11",
@@ -569,10 +605,12 @@
     "windows_x86_64_gnullvm@0.52.6",
     "windows_x86_64_msvc@0.52.6",
     "winnow@1.0.4",
+    "winnow@1.0.5",
     "wit-bindgen@0.57.1",
     "writeable@0.6.4",
     "x25519-dalek@3.0.0",
     "xxhash-rust@0.8.19",
+    "xxhash-rust@0.8.21",
     "y4m@0.8.0",
     "yansi@1.0.1",
     "yoke-derive@0.8.4",
@@ -586,6 +624,7 @@
     "zerofrom-derive@0.1.8",
     "zerofrom@0.1.8",
     "zeroize@1.9.1",
+    "zeroize@1.9.2",
     "zeroize_derive@1.5.0",
     "zerotrie@0.2.5",
     "zerovec-derive@0.11.6",
@@ -670,7 +709,8 @@
     ],
     "bitflags@2.13.2": [
       "serde",
-      "serde_core"
+      "serde_core",
+      "std"
     ],
     "tokio@1.53.3": [
       "bytes",
@@ -1857,7 +1897,9 @@
     "wasm-bindgen-shared@0.2.129": [],
     "web-time@1.1.0": [],
     "webpki-roots@1.0.10": [],
-    "whoami@2.1.3": [],
+    "whoami@2.1.3": [
+      "std"
+    ],
     "windows_aarch64_gnullvm@0.52.6": [],
     "windows_aarch64_msvc@0.52.6": [],
     "windows_i686_gnu@0.52.6": [],
@@ -1934,7 +1976,10 @@
       "zeroize"
     ],
     "ed25519@3.0.0": [],
-    "signature@3.0.0": [],
+    "signature@3.0.0": [
+      "alloc",
+      "rand_core"
+    ],
     "aws-lc-sys@0.41.0": [
       "all-bindings",
       "bindgen",
@@ -2872,6 +2917,246 @@
     ],
     "zune-jpeg@0.5.15": [
       "std"
+    ],
+    "bumpalo@3.20.4": [
+      "default"
+    ],
+    "bytes@1.12.2": [
+      "default",
+      "std"
+    ],
+    "cc@1.11.2": [
+      "parallel"
+    ],
+    "errno@0.3.15": [
+      "default",
+      "std"
+    ],
+    "gloo-utils@0.3.1": [
+      "serde"
+    ],
+    "libredox@0.1.25": [
+      "base",
+      "call",
+      "libc"
+    ],
+    "libsqlite3-sys@0.40.0": [
+      "pkg-config",
+      "vcpkg"
+    ],
+    "mio@1.2.5": [
+      "net",
+      "os-ext",
+      "os-poll"
+    ],
+    "objc2-core-foundation@0.3.2": [
+      "CFArray",
+      "CFDictionary",
+      "CFError",
+      "CFRunLoop",
+      "CFString",
+      "bitflags"
+    ],
+    "objc2-system-configuration@0.3.2": [
+      "SCDynamicStore",
+      "SCDynamicStoreCopySpecific"
+    ],
+    "rand@0.10.4": [
+      "alloc",
+      "std",
+      "std_rng",
+      "sys_rng",
+      "thread_rng"
+    ],
+    "regex@1.13.2": [
+      "default",
+      "perf",
+      "perf-backtrack",
+      "perf-cache",
+      "perf-dfa",
+      "perf-inline",
+      "perf-literal",
+      "perf-onepass",
+      "std",
+      "unicode",
+      "unicode-age",
+      "unicode-bool",
+      "unicode-case",
+      "unicode-gencat",
+      "unicode-perl",
+      "unicode-script",
+      "unicode-segment"
+    ],
+    "regex-automata@0.4.19": [
+      "alloc",
+      "dfa-onepass",
+      "hybrid",
+      "meta",
+      "nfa-backtrack",
+      "nfa-pikevm",
+      "nfa-thompson",
+      "perf-inline",
+      "perf-literal",
+      "perf-literal-multisubstring",
+      "perf-literal-substring",
+      "std",
+      "syntax",
+      "unicode",
+      "unicode-age",
+      "unicode-bool",
+      "unicode-case",
+      "unicode-gencat",
+      "unicode-perl",
+      "unicode-script",
+      "unicode-segment",
+      "unicode-word-boundary"
+    ],
+    "regex-syntax@0.8.12": [
+      "default",
+      "std",
+      "unicode",
+      "unicode-age",
+      "unicode-bool",
+      "unicode-case",
+      "unicode-gencat",
+      "unicode-perl",
+      "unicode-script",
+      "unicode-segment"
+    ],
+    "rustls-pki-types@1.16.0": [
+      "alloc",
+      "default",
+      "std"
+    ],
+    "rustls-webpki@0.103.17": [
+      "alloc",
+      "ring",
+      "std"
+    ],
+    "smallvec@1.16.6": [
+      "const_generics",
+      "const_new",
+      "serde"
+    ],
+    "sqlx@0.9.1": [
+      "_rt-tokio",
+      "postgres",
+      "runtime-tokio",
+      "sqlx-postgres",
+      "time",
+      "tls-rustls",
+      "tls-rustls-ring",
+      "tls-rustls-ring-webpki",
+      "uuid"
+    ],
+    "sqlx-core@0.9.1": [
+      "_rt-tokio",
+      "_tls-rustls",
+      "_tls-rustls-ring-webpki",
+      "any",
+      "crc",
+      "default",
+      "json",
+      "migrate",
+      "offline",
+      "rustls",
+      "serde",
+      "serde_json",
+      "sha2",
+      "time",
+      "tokio",
+      "tokio-stream",
+      "uuid",
+      "webpki-roots"
+    ],
+    "sqlx-macros@0.9.1": [
+      "_rt-tokio",
+      "_tls-rustls-ring-webpki",
+      "default",
+      "postgres",
+      "time",
+      "uuid"
+    ],
+    "sqlx-macros-core@0.9.1": [
+      "_rt-tokio",
+      "_tls-rustls-ring-webpki",
+      "default",
+      "postgres",
+      "sqlx-postgres",
+      "time",
+      "tokio",
+      "uuid"
+    ],
+    "sqlx-mysql@0.9.1": [
+      "migrate",
+      "offline",
+      "serde",
+      "time",
+      "uuid"
+    ],
+    "sqlx-postgres@0.9.1": [
+      "json",
+      "migrate",
+      "offline",
+      "time",
+      "uuid"
+    ],
+    "sqlx-sqlite@0.9.1": [
+      "migrate",
+      "offline",
+      "serde",
+      "time",
+      "uuid"
+    ],
+    "syn@3.0.10": [
+      "clone-impls",
+      "default",
+      "derive",
+      "extra-traits",
+      "fold",
+      "full",
+      "parsing",
+      "printing",
+      "proc-macro",
+      "visit",
+      "visit-mut"
+    ],
+    "toml@1.2.1+spec-1.1.0": [
+      "parse",
+      "std"
+    ],
+    "toml_datetime@1.1.3+spec-1.1.0": [
+      "alloc",
+      "std"
+    ],
+    "ureq@3.5.2": [
+      "_ring",
+      "_rustls",
+      "_tls",
+      "rustls",
+      "rustls-no-provider",
+      "rustls-webpki-roots"
+    ],
+    "uuid@1.29.3": [
+      "default",
+      "std"
+    ],
+    "winnow@1.0.5": [
+      "alloc",
+      "ascii",
+      "binary",
+      "default",
+      "parser",
+      "std"
+    ],
+    "xxhash-rust@0.8.21": [
+      "const_xxh64"
+    ],
+    "zeroize@1.9.2": [
+      "alloc",
+      "default",
+      "derive",
+      "zeroize_derive"
     ]
   },
   "approvals": [
@@ -2957,6 +3242,54 @@
         "web-sys@0.3.107 gains CanvasRenderingContext2d, File, FileList, ImageBitmap, ImageBitmapOptions and ImageOrientation (the profile page decodes and crops the picture in the browser)"
       ],
       "implied": "Dependency-internal unsafe code and assembly (rav1e, rav1d, the SIMD crates) were disclosed in profile-picture.md; first-party unsafe stays forbidden. Not a third-party source audit."
+    },
+    {
+      "approved_on": "2026-11-18",
+      "reason": "owner 18.11.2026: \"alle crates upgraden (auch major versionen, führe migration durch)\"; in the form the same day \"Ja, sqlx 0.9.1\" after whoami std and its FFI packages were disclosed",
+      "for": "the dependency upgrade of 18.11.2026 (docs/dependency-proposal/upgrade-2026-11-18.md): compatible updates of the lock file, zeroize 1.9.2, ureq 3.5.2, regex 1.13.2, jsonwebtoken 12.0.0 with jsonwebtoken-openssl 3.0.0, sqlx 0.9.1",
+      "entries": [
+        "bumpalo@3.20.4",
+        "bytes@1.12.2",
+        "cc@1.11.2",
+        "ctutils@0.4.8",
+        "errno@0.3.15",
+        "gloo-utils@0.3.1",
+        "inout@0.2.6",
+        "itoa@1.0.19",
+        "jsonwebtoken@12.0.0",
+        "jsonwebtoken-openssl@3.0.0",
+        "libredox@0.1.25",
+        "libsqlite3-sys@0.40.0",
+        "mime@0.3.18",
+        "mio@1.2.5",
+        "objc2-core-foundation@0.3.2",
+        "objc2-system-configuration@0.3.2",
+        "rand@0.10.4",
+        "regex@1.13.2",
+        "regex-automata@0.4.19",
+        "regex-syntax@0.8.12",
+        "rustls-pki-types@1.16.0",
+        "rustls-webpki@0.103.17",
+        "smallvec@1.16.6",
+        "sqlx@0.9.1",
+        "sqlx-core@0.9.1",
+        "sqlx-macros@0.9.1",
+        "sqlx-macros-core@0.9.1",
+        "sqlx-mysql@0.9.1",
+        "sqlx-postgres@0.9.1",
+        "sqlx-sqlite@0.9.1",
+        "syn@3.0.10",
+        "toml@1.2.1+spec-1.1.0",
+        "toml_datetime@1.1.3+spec-1.1.0",
+        "ureq@3.5.2",
+        "uuid@1.29.3",
+        "webpki-roots@1.0.12",
+        "winnow@1.0.5",
+        "xxhash-rust@0.8.21",
+        "zeroize@1.9.2",
+        "new features on approved packages: bitflags@2.13.2 std; signature@3.0.0 alloc, rand_core; whoami@2.1.3 std"
+      ],
+      "implied": "whoami 2.1.3 gains std through sqlx-postgres 0.9.1: its own libc calls on Linux, objc2-core-foundation and objc2-system-configuration (FFI) on Apple targets only, libredox on Redox only; libsqlite3-sys 0.40.0 stays in no build. Disclosed in upgrade-2026-11-18.md; first-party unsafe stays forbidden. Not a third-party source audit."
     }
   ]
 }
