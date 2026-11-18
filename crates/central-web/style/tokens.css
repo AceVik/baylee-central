@@ -200,6 +200,18 @@
   --avatar-5: #8a3b2e;
   --on-avatar: #fffdf7;
 
+  /* Giving: the heart of a donation button, the three platforms' parts of
+     the goal's bar and the paper under a QR code, the same in both schemes
+     (a camera wants dark on white, and the parts must stay apart). */
+  --heart: #f0728a;
+  --heart-glow: #ff8fa3;
+  --give-github: #7c8cf0;
+  --give-liberapay: #e0b050;
+  --give-kofi: #f0728a;
+  --code-paper: #fff;
+  --give-sheen: rgb(255 255 255 / 0.5);
+  --give-shine: rgb(255 255 255 / 0.85);
+
   /* Type: the serif for reading, the sans for every control. */
   --serif: "Literata", "Iowan Old Style", Georgia, "Times New Roman", serif;
   --sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
