@@ -8093,3 +8093,139 @@ Adversarial pass, what was tried and what holds:
 - **Not done here:** WebKit and Firefox were not run (only Chromium is installed), and the
   operating systems' menu names in the nine translated download steps were written from the
   translator's memory, not read off those systems.
+
+## Baylee Central collects the donation figures, 18 November 2026
+
+The change the donation page's record left to Central ("Baylee Central's to collect, in a change
+of their own with its own three passes"). Central reads Liberapay and GitHub Sponsors, takes the
+ECB's reference rates, answers Ko-fi's webhook, stores what a donation leaves behind and gives
+the website totals; the website asks no platform any more.
+
+Design pass, the assets, who could act and what must hold:
+
+- **The two tokens.** GitHub's token reads the sponsored account's sponsorship data; Ko-fi's
+  verification token is what makes a delivery believed. Both come from the owner's accounts, live
+  only in the service's configuration (standard input from a root-owned file), are checked for
+  their shape at the start, and are never logged, echoed in an error, put in a URL or kept past
+  their use: GitHub's stays in the polling task and is sent to `api.github.com` in a header
+  alone; Ko-fi's is reduced to its SHA-256 digest at the start.
+- **One new inbound route**, `POST /v1/kofi` on the account listener (the one behind
+  `central.baylee.app`), below the protocol's layer like the key set, `404` while Ko-fi is not
+  configured. Who can reach it: anybody. What must hold: nothing of a body is used before its
+  token is compared in constant time; a wrong or missing token gets the same plain refusal as a
+  malformed body; only the six fields a sum needs are ever deserialised (`type`, `amount`,
+  `currency`, the two subscription flags, `kofi_transaction_id`), and the struct names none of
+  the giver's fields, so a name, address, message, shipping data or link is skipped by the
+  parser and never stored or logged; a transaction counts once; amounts are read by the one
+  strict rule and bounded; refusals are counted by reason; no body is logged; the address has a
+  budget of its own; no secret is in the path. Ko-fi's format is taken from third-party
+  descriptions and is not confirmed; an unknown shape must be refused cleanly, and recording
+  stays off (`kofi.record`) until Ko-fi's own test delivery has shown the format fits.
+- **The timestamp is not read.** The task listed the delivery's `timestamp` among the fields;
+  Central times a row by its own clock instead, so no sender chooses where a payment falls in
+  Ko-fi's 31-day window. The cost: a delivery Ko-fi retries late is dated by its arrival.
+- **Outbound requests.** Three fixed HTTPS addresses (`liberapay.com`, `api.github.com`,
+  `www.ecb.europa.eu`), all through `central-outbound` (public addresses only, checked and
+  dialled in one step, port 443, no proxy, no redirect, 15 s, bounded bodies). The GraphQL query
+  names no sponsor (`sponsor`, `sponsorEntity`, login, name). A poll that fails leaves the last
+  figure; a source that never answered stays absent, never zero.
+- **The rates.** The ECB's daily feed is XML. `roxmltree` 0.21.2 is already approved and in the
+  lock file (the picture worker's SVG path uses it through `usvg`), is `#![forbid(unsafe_code)]`
+  and depends only on `memchr`, which the service links already; using it in the service process
+  is a **new exposure** of a parser to an outside answer, disclosed here: the body is bounded to
+  64 KiB before it is parsed, document type declarations are refused (so no entity is ever
+  expanded and no external one fetched), and the nodes are bounded (1024). The ECB's JSON data
+  service was tried first: on 18.11.2026 a query for every currency took over a minute to start
+  answering on a cold cache (two of three tries), the XML feed a tenth of a second. A rate is
+  decimal text read into millionths; no amount passes through a float. A currency without a
+  rate is stored unconverted and not counted, and its code is logged; nothing is guessed.
+- **What is stored** (migration 000032): platform, kind, amount, currency, euro value, Central's
+  time and a digest of the platform's transaction id (not the id: a reader of the store cannot
+  look a donation up at the platform). Rows are kept 40 days and then folded into one sum per
+  platform and kind by the operator's sweep. The runtime may insert, set a row's euro value
+  once, and read; the startup check refuses any other grant.
+- **What leaves Central.** `PublicFunding` (a sibling of `PublicFigures`, since `Response`
+  refuses fields it does not know: a field added to the figures would break every older reader)
+  answers totals from memory: each platform's month and supporters, the one-time sum with its
+  count and the day the count began (the migration's day, never a donation's). The website reads
+  it with the directory each minute; the sums are read from the store once a minute, never per
+  request, so a flood of the public operation reads no row.
+- **No donor is named anywhere**, as Baylee's `docs/legal.md` binds: nothing that names one is
+  read, and the answer has no place for a name.
+
+Implementation pass: `central-funding` (new, no transport, no store: the amount rule,
+Liberapay's reader moved from `central-web-server` with its tests, GitHub's reader, the ECB
+reader and conversion, Ko-fi's two-step reader, the reference digest); `central-api`
+(`funding` types, `PublicFunding`); migration 000032, `central-postgres` (`donations.rs`, the
+sweep's fold, the grants' list from 58 to 61 tables) and `ops/grants.sql`; `central-identity`
+(`funding.rs`: the state, Ko-fi's intake, the figures from memory; the operation decided in
+every exhaustive list: browser, session, credential, budgets class); `central-http` (the route,
+its budget of 30 a minute an address, a 16 KiB body bound of its own in the boundary, the
+public operation under the directory's 60); `central-service` (the `funding` block, the polling
+task with an injectable fetch, the check mode, the start's and the sweep's lines);
+`central-web-server` (reads `PublicFunding`, `funding.rs` and the `funding` setting removed);
+the privacy notice's part on donations in eleven files (German and English written, the nine
+others the new English until a translation follows), `docs/operations.md` §"Donations",
+`docs/postgresql.md`, `docs/website-design.md`, `docs/web-accounts.md`, `docs/native-login.md`,
+`docs/threat-model.md`. No package is new to the lock file; `roxmltree`, `form_urlencoded`,
+`subtle`, `sha2`, `serde_json` and `serde` are new direct dependencies of the new crate, each
+at an approved version with approved features.
+
+Adversarial pass, what was tried and what holds. Against the real account listener and
+PostgreSQL 18 (`crates/central-client/tests/support/donations.rs`, in `cargo xtask postgres`):
+
+- **Wrong token** (one letter's case), **missing**, **empty**, **a number**: `400` with the
+  route's fixed text, nothing stored, counted as `token` (or `json` for the number). With a
+  wrong token and broken fields, the fields are never looked at: the reason is `token`
+  (`a_wrong_or_missing_token_is_refused_before_anything_else_is_read`).
+- **Malformed bodies**: JSON as the body, no content type, another field than `data`, `data`
+  twice, truncated JSON, an array: the same `400`, counted as `content type`, `form` or `json`.
+- **Oversized**: a well-formed delivery of 16 KiB and more is refused with `413` before it is
+  read; a declared length is refused before the body is waited for. These are not among the
+  counted reasons (the boundary refuses them before the service sees them).
+- **Replay**: the same delivery three times, and once more with another amount and kind:
+  `200` each time, one row, the first amount stands (`again` counted); eight concurrent
+  deliveries of one transaction leave one row (store test).
+- **Hostile amounts and currencies**: `-3.00`, `1e9`, `0.00`, `3,00`, a JSON number,
+  ten digits, `100000.01` euros (beyond the 100 000 € a payment may be worth), `eur`, `<b>`,
+  and in the unit tests the amount rule's own list (signs, exponents, other scripts' digits,
+  blanks, `NaN`): refused as `amount`, `currency` or `shape`; the largest amount the rule takes is
+  taken and bounded again in euros. A currency no rate is held for is kept, not counted and
+  converted later; the store refuses to convert past the bound.
+- **A flood**: 31 wrong-token deliveries from one address within a minute: 30 refused as
+  `400` and counted, the 31st `429` before the token is read; the right token from that address
+  is `429` too; another address is served meanwhile.
+- **A browser at the route**: an `Origin` header is refused with `403` by the account listener's
+  rule before the body is read. If Ko-fi's real deliveries carry one, the test delivery will
+  show it (`docs/operations.md`); the rule was not loosened on speculation.
+- **The answer names no single donation**: the public answer, encoded, holds none of the
+  delivery's id, name, address, message or time; the wire refuses `public_funding` with a
+  field and an answer with an unknown field.
+- **The store**: the runtime cannot change an amount, a time or a reference, delete a row, or
+  write a sum or the count's day; the table's own checks refuse another platform, a refund on
+  Ko-fi, a regular payment on GitHub, a lowercase currency, a zero amount, a short digest, a
+  non-v7 id and a euro value past the bound, whoever writes. The sweep folds what is older than
+  40 days and the public sums stay what they were; a refund larger than what was given leaves
+  the sum at nought.
+- **The platforms' answers** (unit tests): GitHub's answer with errors (the shape a missing
+  scope gives, with status 200), errors beside data, negative or absurd figures, a node of
+  another id shape, a broken cursor, 101 nodes, and a sponsor's name added to a node (passed
+  over, the result unchanged); pages that fail or never end give nothing. The ECB feed with no
+  day, two days, a malformed date, a lowercase or long currency, a negative, comma or zero rate,
+  the euro itself, a currency twice, an element that is no rate, the wrong namespace, a
+  document type with growing entities ("billion laughs"), 2000 extra nodes, 65 currencies and a
+  body past the bound: no rates. Liberapay's ten broken answers: nothing.
+- **Configuration**: a token too short or with blanks, an unknown key, a block of another
+  type, and a switched-off block with a bad token stop the start and the check mode, naming no
+  value; the old `funding` switch of the website's file is refused.
+
+What was not done: no call with real sponsor data was made, and GitHub's token scope for these
+fields is unknown (the owner tests a classic token with `read:user`). Ko-fi's format is
+unconfirmed until its test delivery; whether Ko-fi reports a cancelled membership is unknown,
+which is why its monthly figure is a 31-day window of payments (a supporter counts twice for
+up to three days around February). The binding privacy policy (`legal/privacy.*.md`) does not
+mention donations yet; the website's privacy page does, and whether the policy needs a new
+version is the owner's call. The workspace's full gate (release build) was not run in this
+change for want of disk space; the crates touched passed clippy (`-D warnings`) and their
+tests, and `cargo xtask postgres` passed whole. These passes are by the implementing agent and
+are not an independent audit.
