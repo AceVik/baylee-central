@@ -921,7 +921,6 @@ hero-badge-free = Free
 hero-badge-open = Open source
 hero-badge-fan = Unofficial fan content
 gws-open-client = Open in Baylee
-gws-open-client-help = “Open in Baylee” starts the installed client (0.1.1-beta.9b or newer). It shows the address and asks before it adds the gateway.
 dl-menu-title = All systems
 ci-passing = passing
 ci-failing = failing
@@ -983,11 +982,6 @@ source-repoTitle = The repository right now
 source-stars = Stars
 source-issues = Open issues and pull requests
 source-note = Read from GitHub's public API by this site's server every ten minutes. Your browser asks GitHub nothing.
-gw-count = 
-    { $n ->
-        [one] { $n } gateway listed, { $online } online.
-       *[other] { $n } gateways listed, { $online } online.
-    }
 gw-none = No gateway is listed yet.
 contact-intro = A question, an idea, a game you would like to see, or something you would rather not post in public: this form goes straight to the person behind Baylee. Leave an e-mail address if you want an answer; without one we can only read it.
 contact-f8 = A card that resolved wrongly is best reported from the game with <kbd>F8</kbd>, because the report can carry the whole game.
@@ -1010,17 +1004,14 @@ ai-hostingLink = Gateway hosting & LLM setup
 
 # The gateways and the contact page, as the old site wrote them (owner, 11.11.2026)
 gw-lead = A gateway is a server where online tables live: accounts, decks, rooms and one engine process per game. These are the ones registered with Baylee Central and approved by its administrator. Each is run by its operators for their groups, and their own rules apply there. A listing is not a promise about what a gateway does.
-gw-howTo = To play on one, copy its address into the client's front door. Online means Central heard from the gateway within the last minute and a half; it is no promise that it answers. Names and versions are what each operator reports.
 gw-find = Find a gateway
 gw-findHint = Name or address
 gw-shown = { $n } of { $all } shown
 gw-noMatch = No gateway loaded so far matches.
 gw-showAll = Show all
 gw-stats = The directory in numbers
-gw-stat-listed = Gateways listed
 gw-stat-online = Online now
 gw-stat-players = Players online
-gw-stat-playing = Of them in a game
 gw-stat-tables = Open tables
 gw-stat-games = Games running
 gw-show = Show
@@ -1354,7 +1345,6 @@ privacy-export-picture = Your profile picture (PNG)
 privacy-picture-title = Profile picture
 privacy-picture = A profile picture is optional. If you choose one, your browser makes a square copy of it without the photo's details (such as place, camera or time) and sends that; where your browser does not allow this, it sends the file itself, and Central's converter keeps only its pixels. Central turns it into a 256 × 256 pixel AVIF and PNG picture that holds nothing else, and if the picture moves, also into an animation (AVIF, at most 100 frames) made from its frames alone by a converter program (ffmpeg) that never sees your file; it stores them with a fingerprint (a SHA-256 digest of the PNG and of the animation, if there is one) and the time you set it, under a random key that changes with every new picture. The converter runs as a separate process for each picture and keeps nothing. Everyone can see your picture, people who are not signed in included, at its address; it is shown beside your display name. It is kept until you replace or remove it, an administrator removes it, or you delete your account, and is then deleted at once; a browser that showed it may keep a copy for up to an hour. Anyone signed in can report a picture with a reason and an optional note: the report holds the reporting account, the picture's fingerprint, the reason, the note and the time. Administrators see who reported it; the person whose picture it is never does. If an administrator removes your picture, you are told when and why, and new pictures may be blocked for a time. Decided reports are kept for one year. Per account, Central counts uploads (ten an hour, thirty a day). Legal basis: Art. 6(1)(b) GDPR for the picture; Art. 6(1)(f) GDPR for reports, the counts and moderation (our legitimate interest in keeping the service free of unlawful and abusive content).
 
-
 # ==== the administration's other pages (islands/admin/) ========================
 # Rebuilt from the old build's /admin pages: the counts, the accounts, one
 # account, the gateways, the audit log and the legacy store.
@@ -1464,7 +1454,6 @@ admin-legacy-restored = Restored
 admin-legacy-banned = Banned
 admin-legacy-must-change = New password required
 admin-legacy-locked = Locked until { $until }
-
 
 ## The feedback moderation (/account/admin/feedback)
 
@@ -1859,3 +1848,21 @@ donate-band-lead = Servers and tools cost about { $amount } a month. A donation 
 donate-band-button = Ways to donate
 privacy-donate-title = Donations
 privacy-donate = The donation page links to GitHub Sponsors (GitHub, Inc., USA), Liberapay (Liberapay, France) and Ko-fi (Ko-fi Labs Limited, United Kingdom). Only when you follow one of these links does your browser connect to that platform; payment happens there and with its payment service (Stripe or PayPal), and the platform's own privacy notice applies. We take no payment on this site and receive from the platforms what they tell a recipient about a payment. The page shows how much of the monthly goal is covered: our server asks Liberapay for the public total, not your browser, and the figure names nobody. We publish no donor's name.
+
+## gateways directory (redesign)
+gw-play-hint = “Open in Baylee” hands the gateway to the installed client (0.1.1-beta.9b or newer), which shows the address and asks before it adds it. You sign in there, not here. No client yet? <download>Download Baylee</download>.
+gw-fineprint = Online means Central heard from the gateway within the last minute and a half; it is no promise that it answers. Names, versions and figures are what each operator reports.
+gw-fig-players = Players
+gw-fig-playing = In a game
+gw-fig-tables = Open tables
+gw-fig-games = Games
+gw-load = { $n }% of its players are in a game
+gw-load-empty = Nobody is here right now.
+gw-silent = Reports no figures.
+gw-away = Central has not heard from it lately.
+gw-current = Current
+gw-current-title = Runs the version of the newest release.
+gw-secure = Encrypted connection (HTTPS)
+gw-show-current = Current version
+gw-col-gateway = Gateway
+gw-col-state = Status

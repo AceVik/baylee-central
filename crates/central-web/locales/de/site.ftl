@@ -922,7 +922,6 @@ hero-badge-free = Kostenlos
 hero-badge-open = Open Source
 hero-badge-fan = Inoffizieller Fan-Inhalt
 gws-open-client = In Baylee öffnen
-gws-open-client-help = „In Baylee öffnen“ startet den installierten Client (ab 0.1.1-beta.9b). Er zeigt die Adresse und fragt nach, bevor er das Gateway hinzufügt.
 dl-menu-title = Alle Systeme
 ci-passing = grün
 ci-failing = rot
@@ -984,11 +983,6 @@ source-repoTitle = Das Repository gerade jetzt
 source-stars = Sterne
 source-issues = Offene Issues und Pull Requests
 source-note = Vom Server dieser Seite alle zehn Minuten aus GitHubs öffentlicher API gelesen. Dein Browser fragt GitHub nichts.
-gw-count = 
-    { $n ->
-        [one] { $n } Gateway gelistet, { $online } online.
-       *[other] { $n } Gateways gelistet, { $online } online.
-    }
 gw-none = Noch ist kein Gateway gelistet.
 contact-intro = Eine Frage, eine Idee, ein Spiel, das du gern sehen würdest, oder etwas, das du lieber nicht öffentlich schreibst: Dieses Formular geht direkt an die Person hinter Baylee. Lass eine E-Mail-Adresse da, wenn du eine Antwort willst; ohne können wir es nur lesen.
 contact-f8 = Eine Karte, die falsch verrechnet wurde, meldest du am besten im Spiel mit <kbd>F8</kbd>, weil der Bericht das ganze Spiel mitnehmen kann.
@@ -1011,17 +1005,14 @@ ai-hostingLink = Gateway-Hosting & LLM-Setup
 
 # The gateways and the contact page, as the old site wrote them (owner, 11.11.2026)
 gw-lead = Ein Gateway ist ein Server für Online-Tische: Accounts, Decks, Räume und ein Engine-Prozess pro Spiel. Hier stehen die bei Baylee Central registrierten, die dessen Administrator freigegeben hat. Jedes gehört seinen Betreibern, und dort gelten deren Regeln. Ein Eintrag ist kein Versprechen darüber, was ein Gateway tut.
-gw-howTo = Um auf einem zu spielen, kopiere seine Adresse in die Eingangstür des Clients. Online heißt, Central hat in den letzten anderthalb Minuten von dem Gateway gehört; ein Versprechen, dass es antwortet, ist das nicht. Namen und Versionen sind die Angaben der Betreiber.
 gw-find = Gateway finden
 gw-findHint = Name oder Adresse
 gw-shown = { $n } von { $all } angezeigt
 gw-noMatch = Kein bisher geladenes Gateway passt.
 gw-showAll = Alle zeigen
 gw-stats = Das Verzeichnis in Zahlen
-gw-stat-listed = Gateways gelistet
 gw-stat-online = Jetzt online
 gw-stat-players = Spieler online
-gw-stat-playing = Davon im Spiel
 gw-stat-tables = Offene Tische
 gw-stat-games = Laufende Partien
 gw-show = Anzeigen
@@ -1356,7 +1347,6 @@ privacy-export-picture = Dein Profilbild (PNG)
 privacy-picture-title = Profilbild
 privacy-picture = Ein Profilbild ist freiwillig. Wählst du eines, macht dein Browser eine quadratische Kopie ohne die Angaben des Fotos (etwa Ort, Kamera oder Zeit) und schickt diese; wo dein Browser das nicht erlaubt, schickt er die Datei selbst, und Centrals Umwandler behält nur ihre Pixel. Central macht daraus ein AVIF- und ein PNG-Bild mit 256 × 256 Pixeln, die nichts anderes enthalten, und wenn sich das Bild bewegt, auch eine Animation (AVIF, höchstens 100 Einzelbilder) allein aus seinen Einzelbildern, durch ein Umwandlungsprogramm (ffmpeg), das deine Datei nie sieht; es speichert sie mit einem Fingerabdruck (einem SHA-256-Hashwert des PNG und der Animation, falls es eine gibt) und dem Zeitpunkt, zu dem du es gesetzt hast, unter einem zufälligen Schlüssel, der sich mit jedem neuen Bild ändert. Der Umwandler läuft für jedes Bild als eigener Prozess und behält nichts. Dein Bild kann jeder unter seiner Adresse sehen, auch wer nicht angemeldet ist; es erscheint neben deinem Anzeigenamen. Es bleibt gespeichert, bis du es ersetzt oder entfernst, ein Administrator es entfernt oder du deinen Account löschst, und wird dann sofort gelöscht; ein Browser, der es gezeigt hat, kann eine Kopie bis zu einer Stunde behalten. Wer angemeldet ist, kann ein Bild mit einem Grund und einem freiwilligen Hinweis melden: Die Meldung enthält den meldenden Account, den Fingerabdruck des Bilds, den Grund, den Hinweis und den Zeitpunkt. Die Administratoren sehen, wer gemeldet hat; die Person, deren Bild es ist, nie. Entfernt ein Administrator dein Bild, erfährst du wann und warum, und neue Bilder können für eine Zeit gesperrt werden. Entschiedene Meldungen werden ein Jahr aufbewahrt. Je Account zählt Central die hochgeladenen Bilder (zehn in der Stunde, dreißig am Tag). Rechtsgrundlage: Art. 6 Abs. 1 lit. b DSGVO für das Bild; Art. 6 Abs. 1 lit. f DSGVO für Meldungen, die Zählung und die Moderation (unser berechtigtes Interesse, den Dienst frei von rechtswidrigen und missbräuchlichen Inhalten zu halten).
 
-
 # ==== the administration's other pages (islands/admin/) ========================
 # Rebuilt from the old build's /admin pages: the counts, the accounts, one
 # account, the gateways, the audit log and the legacy store.
@@ -1466,7 +1456,6 @@ admin-legacy-restored = Wiederhergestellt
 admin-legacy-banned = Gesperrt
 admin-legacy-must-change = Neues Passwort verlangt
 admin-legacy-locked = Ausgesperrt bis { $until }
-
 
 ## Die Moderation von Feedback und Absturzberichten (/account/admin/feedback)
 
@@ -1861,3 +1850,21 @@ donate-band-lead = Server und Werkzeuge kosten etwa { $amount } im Monat. Eine S
 donate-band-button = Wege zu spenden
 privacy-donate-title = Spenden
 privacy-donate = Die Spendenseite verlinkt GitHub Sponsors (GitHub, Inc., USA), Liberapay (Liberapay, Frankreich) und Ko-fi (Ko-fi Labs Limited, Vereinigtes Königreich). Erst wenn du einem dieser Links folgst, verbindet sich dein Browser mit der Plattform; bezahlt wird dort und über deren Zahlungsdienst (Stripe oder PayPal), und es gilt die Datenschutzerklärung der Plattform. Wir nehmen auf dieser Website keine Zahlung an und erhalten von den Plattformen, was sie einem Empfänger über eine Zahlung mitteilen. Die Seite zeigt, wie viel vom Monatsziel gedeckt ist: Danach fragt unser Server Liberapay, nicht dein Browser, und die Zahl nennt niemanden. Wir veröffentlichen keine Namen von Spendern.
+
+## gateways directory (redesign)
+gw-play-hint = „In Baylee öffnen“ übergibt das Gateway an den installierten Client (ab 0.1.1-beta.9b). Er zeigt die Adresse und fragt nach, bevor er es hinzufügt. Angemeldet wird dort, nicht hier. Noch kein Client? <download>Baylee herunterladen</download>.
+gw-fineprint = Online heißt, Central hat in den letzten anderthalb Minuten von dem Gateway gehört; ein Versprechen, dass es antwortet, ist das nicht. Namen, Versionen und Zahlen sind die Angaben der Betreiber.
+gw-fig-players = Spieler
+gw-fig-playing = Im Spiel
+gw-fig-tables = Offene Tische
+gw-fig-games = Partien
+gw-load = { $n } % der Spieler sind im Spiel
+gw-load-empty = Gerade ist niemand da.
+gw-silent = Meldet keine Zahlen.
+gw-away = Central hat zuletzt nichts von ihm gehört.
+gw-current = Aktuell
+gw-current-title = Läuft mit der Version des neuesten Releases.
+gw-secure = Verschlüsselte Verbindung (HTTPS)
+gw-show-current = Aktuelle Version
+gw-col-gateway = Gateway
+gw-col-state = Status

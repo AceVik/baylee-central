@@ -939,7 +939,6 @@ hero-badge-free = Gratuit
 hero-badge-open = Open source
 hero-badge-fan = Contenu de fan non officiel
 gws-open-client = Ouvrir dans Baylee
-gws-open-client-help = « Open in Baylee » [Ouvrir dans Baylee] lance le client installé (0.1.1-beta.9b ou plus récent). Il affiche l’adresse et demande avant d’ajouter la gateway.
 dl-menu-title = Tous les systèmes
 ci-passing = réussi
 ci-failing = échoué
@@ -1006,11 +1005,6 @@ source-repoTitle = Le dépôt en ce moment
 source-stars = Étoiles
 source-issues = Tickets et pull requests ouverts
 source-note = Lu depuis l’API publique de GitHub par le serveur de ce site toutes les dix minutes. Votre navigateur ne demande rien à GitHub.
-gw-count =
-    { $n ->
-        [one] { $n } gateway listée, { $online } en ligne.
-       *[other] { $n } gateways listées, { $online } en ligne.
-    }
 gw-none = Aucune gateway n’est encore listée.
 contact-intro = Une question, une idée, un jeu que vous aimeriez voir, ou quelque chose que vous préférez ne pas publier : ce formulaire va directement à la personne derrière Baylee. Laissez une adresse e-mail si vous voulez une réponse ; sans elle, nous ne pouvons que le lire.
 contact-f8 = Une carte mal résolue se signale au mieux depuis le jeu avec <kbd>F8</kbd>, car le rapport peut contenir toute la partie.
@@ -1033,17 +1027,14 @@ ai-hostingLink = Hébergement de gateway et configuration LLM
 
 # The gateways and the contact page, as the old site wrote them (owner, 11.11.2026)
 gw-lead = Une gateway est un serveur où vivent des tables en ligne : comptes, decks, salons et un processus de moteur par jeu. Ce sont celles enregistrées auprès de Baylee Central et approuvées par son administrateur. Chacune est exploitée par ses opérateurs pour leurs groupes, et leurs propres règles s’y appliquent. Figurer dans la liste n’est pas une promesse sur ce que fait une gateway.
-gw-howTo = Pour jouer sur l’une d’elles, copiez son adresse dans l’écran d’accueil du client. En ligne signifie que Central a eu des nouvelles de la gateway au cours de la dernière minute et demie ; ce n’est pas une promesse qu’elle répond. Les noms et les versions sont ceux que chaque exploitant indique.
 gw-find = Trouver une gateway
 gw-findHint = Nom ou adresse
 gw-shown = { $n } sur { $all } affichées
 gw-noMatch = Aucune gateway chargée jusqu’ici ne correspond.
 gw-showAll = Tout afficher
 gw-stats = L’annuaire en chiffres
-gw-stat-listed = Gateways listées
 gw-stat-online = En ligne maintenant
 gw-stat-players = Joueurs en ligne
-gw-stat-playing = Dont en partie
 gw-stat-tables = Tables ouvertes
 gw-stat-games = Parties en cours
 gw-show = Afficher
@@ -1477,7 +1468,6 @@ chat-write-first = Écrivez le premier message
 people-copy-handle = Copier votre identifiant
 people-copy-failed = La copie n’a pas fonctionné ici. Sélectionnez votre identifiant ci-dessus et copiez-le à la main.
 
-
 # ==== the administration's other pages (islands/admin/) ========================
 # Translated by a model (Claude Sonnet) on 12.11.2026; no native speaker has read it yet.
 admin-accounts = Comptes
@@ -1586,8 +1576,6 @@ admin-legacy-restored = Restauré
 admin-legacy-banned = Banni
 admin-legacy-must-change = Nouveau mot de passe requis
 admin-legacy-locked = Verrouillé jusqu’à { $until }
-
-
 
 ## The feedback moderation (/account/admin/feedback)
 
@@ -1895,7 +1883,6 @@ privacy-challenges = Central conserve avec votre compte les tentatives, résulta
 tower-title = La Tour verdoyante
 tower-privacy = Central conserve avec votre compte vos expéditions, améliorations choisies, vies restantes, résultats, préférences de classement et progression permanente des reliques. Votre nom public, identifiant et meilleur score admissible apparaissent uniquement si vous activez le classement de la saison. Le désactiver retire cette entrée. L’export de votre compte inclut les expéditions et tentatives. La suppression du compte efface aussi cette progression, sous réserve des délais de sauvegarde décrits dans Compte.
 
-
 ## the steps after signing in (code and terms, redesign)
 code-created = Account created
 code-handle-label = Your handle
@@ -1983,3 +1970,21 @@ donate-band-lead = Servers and tools cost about { $amount } a month. A donation 
 donate-band-button = Ways to donate
 privacy-donate-title = Donations
 privacy-donate = The donation page links to GitHub Sponsors (GitHub, Inc., USA), Liberapay (Liberapay, France) and Ko-fi (Ko-fi Labs Limited, United Kingdom). Only when you follow one of these links does your browser connect to that platform; payment happens there and with its payment service (Stripe or PayPal), and the platform's own privacy notice applies. We take no payment on this site and receive from the platforms what they tell a recipient about a payment. The page shows how much of the monthly goal is covered: our server asks Liberapay for the public total, not your browser, and the figure names nobody. We publish no donor's name.
+
+## gateways directory (redesign)
+gw-play-hint = “Open in Baylee” hands the gateway to the installed client (0.1.1-beta.9b or newer), which shows the address and asks before it adds it. You sign in there, not here. No client yet? <download>Download Baylee</download>.
+gw-fineprint = Online means Central heard from the gateway within the last minute and a half; it is no promise that it answers. Names, versions and figures are what each operator reports.
+gw-fig-players = Players
+gw-fig-playing = In a game
+gw-fig-tables = Open tables
+gw-fig-games = Games
+gw-load = { $n }% of its players are in a game
+gw-load-empty = Nobody is here right now.
+gw-silent = Reports no figures.
+gw-away = Central has not heard from it lately.
+gw-current = Current
+gw-current-title = Runs the version of the newest release.
+gw-secure = Encrypted connection (HTTPS)
+gw-show-current = Current version
+gw-col-gateway = Gateway
+gw-col-state = Status

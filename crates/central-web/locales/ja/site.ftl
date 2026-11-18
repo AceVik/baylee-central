@@ -912,7 +912,6 @@ hero-badge-free = 無料
 hero-badge-open = オープンソース
 hero-badge-fan = 非公式ファンコンテンツ
 gws-open-client = Baylee で開く
-gws-open-client-help = 「Baylee で開く」は、インストール済みのクライアント（0.1.1-beta.9b 以降）を起動します。アドレスを表示し、Gateway を追加する前に確認します。
 dl-menu-title = すべてのシステム
 ci-passing = 成功
 ci-failing = 失敗
@@ -974,10 +973,6 @@ source-repoTitle = リポジトリの現在の状況
 source-stars = スター
 source-issues = 未解決の Issue とプルリクエスト
 source-note = このサイトのサーバーが GitHub の公開 API から10分ごとに読み取っています。ブラウザーが GitHub に問い合わせることはありません。
-gw-count =
-    { $n ->
-       *[other] 登録されている Gateway は { $n } 件で、{ $online } 件がオンラインです。
-    }
 gw-none = 登録されている Gateway はまだありません。
 contact-intro = 質問、アイデア、遊んでみたいゲーム、公開の場には書きたくないこと。このフォームは、Baylee の作者に直接届きます。返信が必要な場合はメールアドレスを残してください。なければ、読むことしかできません。
 contact-f8 = 誤って解決されたカードは、ゲーム内で <kbd>F8</kbd> から報告するのがいちばんです。報告にはゲーム全体を添えられるからです。
@@ -1000,17 +995,14 @@ ai-hostingLink = Gateway のホスティングと LLM の設定
 
 # The gateways and the contact page, as the old site wrote them (owner, 11.11.2026)
 gw-lead = Gateway は、オンラインのテーブルがあるサーバーです。アカウント、デッキ、ルーム、ゲームごとに1つのエンジンプロセスがあります。ここに載っているのは、Baylee Central に登録され、その管理者が承認したものです。それぞれ運営者が自分たちのグループのために運営しており、そこでは運営者自身のルールが適用されます。一覧に載っていることは、Gateway の動作についての約束ではありません。
-gw-howTo = Gateway で遊ぶには、そのアドレスをクライアントの入口にコピーします。オンラインとは、Central が直近1分半以内にその Gateway から連絡を受けたという意味で、応答する約束ではありません。名前とバージョンは、各運営者が報告したものです。
 gw-find = Gateway を探す
 gw-findHint = 名前またはアドレス
 gw-shown = { $all } 件中 { $n } 件を表示
 gw-noMatch = 読み込み済みの Gateway には、一致するものがありません。
 gw-showAll = すべて表示
 gw-stats = ディレクトリの数字
-gw-stat-listed = 掲載中の Gateway
 gw-stat-online = 現在オンライン
 gw-stat-players = オンラインのプレイヤー
-gw-stat-playing = うちゲーム中
 gw-stat-tables = 開いているテーブル
 gw-stat-games = 進行中のゲーム
 gw-show = 表示
@@ -1349,7 +1341,6 @@ chat-write-first = 最初のメッセージを書く
 people-copy-handle = 自分のハンドルをコピー
 people-copy-failed = ここではコピーできませんでした。上のハンドルを選択して、手でコピーしてください。
 
-
 # ==== the administration's other pages (islands/admin/) ========================
 # Translated by a model (Claude Sonnet) on 12.11.2026; no native speaker has read it yet.
 admin-accounts = アカウント
@@ -1458,8 +1449,6 @@ admin-legacy-restored = 復元済み
 admin-legacy-banned = 利用停止
 admin-legacy-must-change = 新しいパスワードが必要
 admin-legacy-locked = { $until }までロック中
-
-
 
 ## The feedback moderation (/account/admin/feedback)
 
@@ -1767,7 +1756,6 @@ privacy-challenges = Centralは挑戦回数、結果、使用したヒント、�
 tower-title = 翠緑の塔
 tower-privacy = Central は遠征、選んだ強化、残りライフ、結果、ランキング設定、レリックの永続的な進捗をアカウントに保存します。シーズンのランキングを有効にした場合のみ、公開名、タグ、有効な最高記録が表示されます。無効にすると掲載が削除されます。アカウントのエクスポートには遠征と挑戦履歴が含まれます。アカウントを削除するとこれらの進捗も削除されますが、アカウントの項に記載したバックアップ保管期間が適用されます。
 
-
 ## the steps after signing in (code and terms, redesign)
 code-created = Account created
 code-handle-label = Your handle
@@ -1855,3 +1843,21 @@ donate-band-lead = Servers and tools cost about { $amount } a month. A donation 
 donate-band-button = Ways to donate
 privacy-donate-title = Donations
 privacy-donate = The donation page links to GitHub Sponsors (GitHub, Inc., USA), Liberapay (Liberapay, France) and Ko-fi (Ko-fi Labs Limited, United Kingdom). Only when you follow one of these links does your browser connect to that platform; payment happens there and with its payment service (Stripe or PayPal), and the platform's own privacy notice applies. We take no payment on this site and receive from the platforms what they tell a recipient about a payment. The page shows how much of the monthly goal is covered: our server asks Liberapay for the public total, not your browser, and the figure names nobody. We publish no donor's name.
+
+## gateways directory (redesign)
+gw-play-hint = “Open in Baylee” hands the gateway to the installed client (0.1.1-beta.9b or newer), which shows the address and asks before it adds it. You sign in there, not here. No client yet? <download>Download Baylee</download>.
+gw-fineprint = Online means Central heard from the gateway within the last minute and a half; it is no promise that it answers. Names, versions and figures are what each operator reports.
+gw-fig-players = Players
+gw-fig-playing = In a game
+gw-fig-tables = Open tables
+gw-fig-games = Games
+gw-load = { $n }% of its players are in a game
+gw-load-empty = Nobody is here right now.
+gw-silent = Reports no figures.
+gw-away = Central has not heard from it lately.
+gw-current = Current
+gw-current-title = Runs the version of the newest release.
+gw-secure = Encrypted connection (HTTPS)
+gw-show-current = Current version
+gw-col-gateway = Gateway
+gw-col-state = Status

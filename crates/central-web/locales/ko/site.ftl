@@ -908,7 +908,6 @@ hero-badge-free = 무료
 hero-badge-open = 오픈 소스
 hero-badge-fan = 비공식 팬 콘텐츠
 gws-open-client = Baylee에서 열기
-gws-open-client-help = “Baylee에서 열기”는 설치된 클라이언트(0.1.1-beta.9b 이상)를 실행해요. 클라이언트가 주소를 보여 주고, Gateway를 추가하기 전에 물어봐요.
 dl-menu-title = 모든 시스템
 ci-passing = 통과
 ci-failing = 실패
@@ -970,10 +969,6 @@ source-repoTitle = 저장소 현황
 source-stars = 스타
 source-issues = 열린 이슈와 풀 리퀘스트
 source-note = 이 사이트의 서버가 10분마다 GitHub의 공개 API에서 읽어 와요. 브라우저는 GitHub에 아무것도 요청하지 않아요.
-gw-count =
-    { $n ->
-       *[other] 등록된 Gateway { $n }개, 그중 온라인 { $online }개.
-    }
 gw-none = 아직 등록된 Gateway가 없어요.
 contact-intro = 질문, 아이디어, 보고 싶은 게임, 또는 공개로 올리고 싶지 않은 이야기라면, 이 양식은 Baylee를 만든 사람에게 바로 전달돼요. 답장을 원하면 이메일 주소를 남겨 주세요. 주소가 없으면 읽을 수만 있어요.
 contact-f8 = 잘못 처리된 카드는 게임 전체를 보고서에 담을 수 있으므로 게임에서 <kbd>F8</kbd>로 신고하는 것이 가장 좋아요.
@@ -996,17 +991,14 @@ ai-hostingLink = Gateway 호스팅과 LLM 설정
 
 # The gateways and the contact page, as the old site wrote them (owner, 11.11.2026)
 gw-lead = Gateway는 온라인 테이블이 있는 서버예요. 계정, 덱, 방, 그리고 게임마다 엔진 프로세스 하나가 거기 있어요. 여기에 나오는 것은 Baylee Central에 등록되고 관리자가 승인한 Gateway예요. 각 Gateway는 운영자가 자기 그룹을 위해 운영하며, 거기서는 운영자의 규칙이 적용돼요. 목록에 있다고 해서 그 Gateway가 하는 일을 보증하는 것은 아니에요.
-gw-howTo = Gateway에서 플레이하려면 주소를 복사해 클라이언트의 첫 화면에 붙여 넣으세요. 온라인은 Central이 최근 1분 30초 안에 그 Gateway에서 소식을 받았다는 뜻이며, 응답한다는 보장은 아니에요. 이름과 버전은 각 운영자가 알려 준 그대로예요.
 gw-find = Gateway 찾기
 gw-findHint = 이름 또는 주소
 gw-shown = { $all }개 중 { $n }개 표시
 gw-noMatch = 지금까지 불러온 Gateway 중 일치하는 것이 없어요.
 gw-showAll = 모두 보기
 gw-stats = 숫자로 보는 디렉터리
-gw-stat-listed = 등록된 Gateway
 gw-stat-online = 지금 온라인
 gw-stat-players = 온라인 플레이어
-gw-stat-playing = 그중 게임 중
 gw-stat-tables = 열린 테이블
 gw-stat-games = 진행 중인 게임
 gw-show = 표시
@@ -1345,7 +1337,6 @@ chat-write-first = 첫 메시지를 써 보세요
 people-copy-handle = 내 핸들 복사
 people-copy-failed = 여기서는 복사가 되지 않았어요. 위의 핸들을 선택해서 직접 복사해 주세요.
 
-
 # ==== the administration's other pages (islands/admin/) ========================
 # Translated by a model (Claude Sonnet) on 12.11.2026; no native speaker has read it yet.
 admin-accounts = 계정
@@ -1454,8 +1445,6 @@ admin-legacy-restored = 복원됨
 admin-legacy-banned = 차단됨
 admin-legacy-must-change = 새 비밀번호 필요
 admin-legacy-locked = { $until }까지 잠김
-
-
 
 ## The feedback moderation (/account/admin/feedback)
 
@@ -1763,7 +1752,6 @@ privacy-challenges = Central은 시도, 결과, 사용한 힌트, 순위 공개 
 tower-title = 초록빛 탑
 tower-privacy = Central은 원정, 선택한 강화, 남은 목숨, 결과, 순위 공개 설정과 유물의 영구 진행 상황을 계정에 저장합니다. 시즌 순위를 활성화한 경우에만 공개 이름, 태그와 유효한 최고 기록이 표시됩니다. 비활성화하면 해당 항목이 순위에서 삭제됩니다. 계정 내보내기에는 원정과 도전 기록이 포함됩니다. 계정을 삭제하면 이 진행 상황도 삭제되며, 계정 항목에 설명된 백업 보관 기간이 적용됩니다.
 
-
 ## the steps after signing in (code and terms, redesign)
 code-created = Account created
 code-handle-label = Your handle
@@ -1851,3 +1839,21 @@ donate-band-lead = Servers and tools cost about { $amount } a month. A donation 
 donate-band-button = Ways to donate
 privacy-donate-title = Donations
 privacy-donate = The donation page links to GitHub Sponsors (GitHub, Inc., USA), Liberapay (Liberapay, France) and Ko-fi (Ko-fi Labs Limited, United Kingdom). Only when you follow one of these links does your browser connect to that platform; payment happens there and with its payment service (Stripe or PayPal), and the platform's own privacy notice applies. We take no payment on this site and receive from the platforms what they tell a recipient about a payment. The page shows how much of the monthly goal is covered: our server asks Liberapay for the public total, not your browser, and the figure names nobody. We publish no donor's name.
+
+## gateways directory (redesign)
+gw-play-hint = “Open in Baylee” hands the gateway to the installed client (0.1.1-beta.9b or newer), which shows the address and asks before it adds it. You sign in there, not here. No client yet? <download>Download Baylee</download>.
+gw-fineprint = Online means Central heard from the gateway within the last minute and a half; it is no promise that it answers. Names, versions and figures are what each operator reports.
+gw-fig-players = Players
+gw-fig-playing = In a game
+gw-fig-tables = Open tables
+gw-fig-games = Games
+gw-load = { $n }% of its players are in a game
+gw-load-empty = Nobody is here right now.
+gw-silent = Reports no figures.
+gw-away = Central has not heard from it lately.
+gw-current = Current
+gw-current-title = Runs the version of the newest release.
+gw-secure = Encrypted connection (HTTPS)
+gw-show-current = Current version
+gw-col-gateway = Gateway
+gw-col-state = Status
