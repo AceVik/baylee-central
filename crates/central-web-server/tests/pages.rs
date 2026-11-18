@@ -1925,18 +1925,43 @@ async fn the_donation_page_names_three_places_and_sells_nothing() {
         "not tax-deductible",
         "no name on a list",
         "about €800 a month",
-        // 23.10 a week is 100.10 a month, an eighth of the goal
-        "€100 of €800 a month",
-        "12 % covered",
-        "supporters: 3",
+        // the three platforms' months added up: 46 + 100.10 + 15
+        "€161 of €800 a month",
+        "20 % covered",
+        "Supporters: 6.",
+        // what was given once is a figure of its own
+        "One-time donations",
+        "<strong class=\"num\">€235</strong>",
+        "since 18 November 2026",
+        "Donations: 12",
     ] {
         assert!(en.contains(said), "{said}");
     }
     assert_eq!(count(&en, "class=\"give-meter\""), 1);
+    // the bar has a part for each platform, and the amounts stand under it
+    for (key, name, amount) in [
+        ("github", "GitHub Sponsors", "€46"),
+        ("liberapay", "Liberapay", "€100"),
+        ("kofi", "Ko-fi", "€15"),
+    ] {
+        assert_eq!(
+            count(&en, &format!("class=\"give-part give-part-{key}\"")),
+            1,
+            "{key}"
+        );
+        assert!(
+            en.contains(&format!(
+                "<span>{name}</span><strong class=\"num\">{amount}</strong>"
+            )),
+            "{key}"
+        );
+    }
+    assert!(!en.contains("Not counted yet"));
     let (_, _, de) = get(&with, "/de/donate", &[]).await;
     for said in [
         "steuerlich nicht absetzbar",
-        "100\u{a0}€ von 800\u{a0}€ im Monat",
+        "161\u{a0}€ von 800\u{a0}€ im Monat",
+        "Einmalige Spenden",
     ] {
         assert!(de.contains(said), "{said}");
     }
@@ -1944,6 +1969,7 @@ async fn the_donation_page_names_three_places_and_sells_nothing() {
     let (_, _, bare) = get(&app(false), "/en/donate", &[]).await;
     assert_eq!(count(&bare, "class=\"give-meter\""), 0);
     assert!(bare.contains("not told us a figure yet"));
+    assert!(!bare.contains("One-time donations"));
     assert!(bare.contains("about €800 a month"));
     // the privacy notice has its part
     let (_, _, privacy) = get(&with, "/en/privacy", &[]).await;
@@ -1966,10 +1992,16 @@ async fn the_goal_s_figures_are_a_small_document() {
             "version": 1,
             "currency": "EUR",
             "goal": 80_000,
-            "covered": 10_010,
-            "percent": 12,
-            "supporters": 3,
-            "counted": ["liberapay"],
+            "covered": 16_110,
+            "percent": 20,
+            "supporters": 6,
+            "counted": ["github", "liberapay", "kofi"],
+            "platforms": [
+                { "name": "github", "month": 4600, "supporters": 2 },
+                { "name": "liberapay", "month": 10_010, "supporters": 3 },
+                { "name": "kofi", "month": 1500, "supporters": 1 },
+            ],
+            "once": { "total": 23_500, "count": 12, "since": "2026-11-18" },
             "page": "https://baylee.app/donate",
             "ways": [
                 { "name": "GitHub Sponsors", "address": "https://github.com/sponsors/AceVik" },
@@ -1983,22 +2015,27 @@ async fn the_goal_s_figures_are_a_small_document() {
     assert_eq!(bare.get("covered"), None);
     assert_eq!(bare.get("percent"), None);
     assert_eq!(bare["counted"], serde_json::json!([]));
+    assert_eq!(bare["platforms"], serde_json::json!([]));
+    assert_eq!(bare.get("once"), None);
     assert_eq!(bare["goal"], 80_000);
     let (status, headers, _) = get(&app(true), "/donate", &[("accept-language", "de")]).await;
     assert!(status.is_redirection());
     assert_eq!(headers["location"], "/de/donate");
 }
 
-/// Before anybody gives, the goal's card invites and does not count
-/// nobody; the bar still stands, empty.
+/// The goal's card with less than everything known: one platform alone
+/// is one part of the bar and the others are named as not counted; before
+/// anybody gives, the card invites and does not count nobody; a goal more
+/// than met is drawn full, not beyond; and nothing given once is no block.
 #[test]
-fn a_goal_nobody_gives_to_yet_invites_the_first() {
-    use central_web::data::{Funding, Pledges};
+fn the_goal_s_card_draws_only_what_is_known() {
+    use central_web::data::{Funding, Monthly};
     let mut data = fallback(Some(&data()));
     let assets = Assets::default();
-    let mut page = |pledges| {
+    let mut page = |month, supporters| {
         data.funding = Some(Funding {
-            liberapay: Some(pledges),
+            liberapay: Some(Monthly { month, supporters }),
+            ..Funding::default()
         });
         render(
             Page::Donate,
@@ -2012,21 +2049,30 @@ fn a_goal_nobody_gives_to_yet_invites_the_first() {
             },
         )
     };
-    let none = page(Pledges {
-        week: 0,
-        patrons: 0,
-    });
+    let none = page(0, 0);
     assert!(none.contains("€0 of €800 a month"));
     assert!(none.contains("Yours would be the first."));
-    assert!(!none.contains("supporters:"));
+    assert!(none.contains("Not counted yet: GitHub Sponsors, Ko-fi."));
+    assert!(!none.contains("Supporters:"));
+    assert!(!none.contains("One-time donations"));
     assert_eq!(count(&none, "class=\"give-meter\""), 1);
-    // a goal more than met is drawn full, not beyond
-    let over = page(Pledges {
-        week: 50_000,
-        patrons: 40,
-    });
+    assert_eq!(
+        count(&none, "class=\"give-part give-part-"),
+        0,
+        "nothing given is no part of the bar"
+    );
+    let some = page(10_010, 3);
+    assert!(some.contains("€100 of €800 a month"));
+    assert!(some.contains("12 % covered"));
+    assert!(some.contains("Supporters: 3."));
+    assert!(some.contains("width=\"1251\""), "an eighth of the bar");
+    assert_eq!(count(&some, "class=\"give-part give-part-liberapay\""), 1);
+    assert_eq!(count(&some, "give-part-github"), 0);
+    // a goal more than met fills the bar and no more
+    let over = page(216_666, 40);
     assert!(over.contains("100 % covered"));
-    assert!(over.contains("supporters: 40"));
+    assert!(over.contains("Supporters: 40."));
+    assert!(over.contains("width=\"10000\""));
     assert!(!over.contains("Yours would be the first."));
 }
 

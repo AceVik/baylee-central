@@ -7980,3 +7980,45 @@ Adversarial pass, what was tried and what holds:
   it asks nobody anything, so a flood of it reaches no platform.
 
 These passes are by the implementing agent and are not an independent audit.
+
+### Addendum, the same day: a part for each platform, and what was given once
+
+Design pass. The owner asked for one figure over the three platforms, with a bar and a sum,
+and for one-time donations summed in euros. This change is the website's half and moves no
+trust boundary: `Funding` now holds a monthly figure for each platform (`github`,
+`liberapay`, `kofi`, each optional) and an optional sum of what was given once (cents,
+count, a date). The page draws the bar as an SVG with one rectangle for each platform, a
+legend with each amount, and the one-time sum as a block of its own; `/funding.json` gains
+`platforms` and `once`.
+
+- **Who fills what.** `central-web-server` still fills Liberapay's figure only, from the
+  same public document as before, and still holds no secret. GitHub's figure needs a token
+  and Ko-fi's a webhook with a verification secret: both are Baylee Central's to collect,
+  in a change of their own with its own three passes (one inbound route, where the secrets
+  live, what of a payment is kept). Until then the two platforms and the one-time sum are
+  absent, and the page says which platforms are not counted yet.
+- **Nothing new is asked, kept or sent.** No new request, no new dependency, no new field
+  read from Liberapay's answer. The amounts stay numbers: the page formats them itself, and
+  the only text taken from the data is a date of the shape `YYYY-MM-DD`, which is parsed
+  into a date before a page shows it, never passed through as text.
+- **No inline style.** The bar's geometry is in SVG attributes (`x`, `width` on a
+  10 000 wide view box), which the policy's `style-src` does not touch; the colours are
+  classes.
+
+Implementation pass: `central-web/src/data.rs` (`Monthly`, `Once`, `Funding` with
+`platforms()`, `covered()`, `percent()`; `Pledges` is gone), `site/pages/donate.rs`,
+`style/donate.css`, six words in eleven languages (two replaced);
+`central-web-server/src/funding.rs` (the week's amount as a month's), `fetch.rs`,
+`generated.rs`, the test data and its notes.
+
+Adversarial pass, what was tried and what holds:
+- **Amounts at the bounds.** Zero for every platform draws the track without a part and the
+  invitation; one platform alone draws one part; a sum past the goal fills the track exactly
+  (the parts are scaled by the sum, the percentage is capped at 100) and no rectangle can be
+  wider than the view box (`the_goal_s_card_draws_only_what_is_known`).
+- **An absent figure is not a zero.** A platform that said nothing has no part and no legend
+  entry and is named as not counted; the supporters' line counts only the platforms that
+  answered.
+- **The fallback file** (`tests/data/funding.json` in tests, the snapshot's file in
+  production) is this process's own: the same parser reads it, unknown fields are ignored
+  and a missing one is absent, so an older file still loads.

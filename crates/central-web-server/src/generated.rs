@@ -134,22 +134,43 @@ pub fn manifest(lang: Lang, assets: &Assets) -> String {
 /// names the platforms the figure adds up. Nothing here names a donor.
 #[must_use]
 pub fn funding(origin: &str, data: &Snapshot) -> String {
-    let covered = data.funding.as_ref().and_then(Funding::covered);
+    let funding = data.funding.clone().unwrap_or_default();
+    let platforms: Vec<_> = funding
+        .platforms()
+        .into_iter()
+        .filter_map(|(key, _, monthly)| monthly.map(|monthly| (key, monthly)))
+        .collect();
     let mut out = serde_json::json!({
         "version": 1,
         "currency": "EUR",
         "goal": Funding::GOAL,
-        "counted": if covered.is_some() { vec!["liberapay"] } else { Vec::new() },
+        "counted": platforms.iter().map(|(key, _)| *key).collect::<Vec<_>>(),
+        "platforms": platforms
+            .iter()
+            .map(|(key, monthly)| serde_json::json!({
+                "name": key,
+                "month": monthly.month,
+                "supporters": monthly.supporters,
+            }))
+            .collect::<Vec<_>>(),
         "page": format!("{origin}/{}", Page::Donate.slug()),
         "ways": GIVING
             .iter()
             .map(|(name, address)| serde_json::json!({ "name": name, "address": address }))
             .collect::<Vec<_>>(),
     });
-    if let (Some((month, patrons)), Some(map)) = (covered, out.as_object_mut()) {
-        map.insert("covered".to_owned(), month.into());
-        map.insert("percent".to_owned(), Funding::percent(month).into());
-        map.insert("supporters".to_owned(), patrons.into());
+    if let Some(map) = out.as_object_mut() {
+        if let Some((month, supporters)) = funding.covered() {
+            map.insert("covered".to_owned(), month.into());
+            map.insert("percent".to_owned(), Funding::percent(month).into());
+            map.insert("supporters".to_owned(), supporters.into());
+        }
+        if let Some(once) = funding.once {
+            map.insert(
+                "once".to_owned(),
+                serde_json::json!({ "total": once.total, "count": once.count, "since": once.since }),
+            );
+        }
     }
     let mut text = out.to_string();
     text.push('\n');

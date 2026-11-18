@@ -212,8 +212,92 @@
   margin-block-start: var(--space-4);
 }
 
-/* the bars: the browser's own progress element, drawn as a rounded track */
-.give-meter,
+/* the goal's bar: a drawing with a part for each platform, in the
+   platform's colour, on a rounded track */
+.give-meter {
+  display: block;
+  inline-size: 100%;
+  block-size: 0.8rem;
+  overflow: hidden;
+  border-radius: var(--radius-full);
+  background: var(--violet-soft);
+}
+
+/* three colours of their own: the schemes' accents fall together in the
+   light scheme, and the parts must be told apart in both */
+.give-part-github {
+  --part: #7c8cf0;
+}
+
+.give-part-liberapay {
+  --part: #e0b050;
+}
+
+.give-part-kofi {
+  --part: #f0728a;
+}
+
+.give-part {
+  fill: var(--part);
+}
+
+/* what each platform adds, under the bar: its colour, its name, its amount */
+.give-split {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 1.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--ink-soft);
+  font-size: var(--text-sm);
+}
+
+.give-split > li {
+  display: inline-flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.give-split strong {
+  color: var(--title);
+}
+
+.give-dot {
+  flex: none;
+  inline-size: 0.6rem;
+  block-size: 0.6rem;
+  border-radius: var(--radius-full);
+  background: var(--part);
+}
+
+/* what was given once: a figure of its own under the month's */
+.give-once {
+  margin-block-end: var(--space-5);
+  padding-block-start: var(--space-4);
+  border-block-start: 1px solid var(--edge-soft);
+}
+
+.give-once > .eyebrow {
+  margin: 0 0 0.2rem;
+}
+
+.give-once-figures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem 0.9rem;
+  align-items: baseline;
+  margin: 0 0 0.3rem;
+  color: var(--ink-soft);
+}
+
+.give-once-figures > strong {
+  color: var(--title);
+  font: 700 var(--text-xl) / 1.2 var(--serif);
+}
+
+/* the costs' bars: the browser's own progress element, drawn as a rounded
+   track */
 .cost-bar {
   display: block;
   inline-size: 100%;
@@ -225,29 +309,17 @@
   appearance: none;
 }
 
-.cost-bar {
-  block-size: 0.4rem;
-}
-
-:is(.give-meter, .cost-bar)::-webkit-progress-bar {
+.cost-bar::-webkit-progress-bar {
   background: transparent;
 }
 
-:is(.give-meter, .cost-bar)::-webkit-progress-value {
-  border-radius: var(--radius-full);
-  background: linear-gradient(90deg, var(--gold), var(--gold-2));
-}
-
-:is(.give-meter, .cost-bar)::-moz-progress-bar {
-  border-radius: var(--radius-full);
-  background: linear-gradient(90deg, var(--gold), var(--gold-2));
-}
-
 .cost-bar::-webkit-progress-value {
+  border-radius: var(--radius-full);
   background: var(--violet);
 }
 
 .cost-bar::-moz-progress-bar {
+  border-radius: var(--radius-full);
   background: var(--violet);
 }
 
