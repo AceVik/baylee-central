@@ -1,5 +1,5 @@
-<!-- version: 2026-11-11 -->
-<!-- updated: 2026-11-12 -->
+<!-- version: 2026-11-18 -->
+<!-- updated: 2026-11-18 -->
 
 # Datenschutzerklärung von Baylee Central
 
@@ -49,6 +49,7 @@ Datenschutzbeauftragten gibt es nicht, weil keine Pflicht dazu besteht.
 - **Anonyme Nutzungszählung:** während einer Offline-Partie sendet der Client einmal pro Minute eine zufällige Kennung dieser Partie, sonst nichts; wir halten sie nur im Arbeitsspeicher – zählen, wie viele offline spielen. *Art. 6 Abs. 1 lit. f DSGVO*; abschaltbar unter „Anonyme Nutzungszahl senden“.
 - **Meldungen über Inhalte oder Konten, Moderationsentscheidungen** – Durchsetzung der Bedingungen, Pflichten als Hostingdienst. *Art. 6 Abs. 1 lit. c und f DSGVO*
 - **Protokoll dessen, was unsere Administratoren getan haben** (wer gehandelt hat, was, welches Konto oder Gateway es betraf, wann; keine Namen, Begründungen oder Notizen) – administrative Entscheidungen nachvollziehbar halten. *Art. 6 Abs. 1 lit. c und f DSGVO*
+- **Spenden über GitHub Sponsors und Ko-fi:** Betrag, Währung, Zeitpunkt des Eingangs bei uns, ob einmalig, regelmäßig oder zurückerstattet, und ein Fingerabdruck (SHA-256) der Transaktionsnummer der Plattform, damit eine doppelt gemeldete Zahlung nur einmal zählt; keine Namen, Adressen, Nachrichten oder Konten. Ko-fi benachrichtigt uns über jede Zahlung; alles andere in der Benachrichtigung verwerfen wir, ohne es zu speichern oder zu protokollieren. Bei GitHub Sponsors fragen wir nur die Summen des Kontos und die einmaligen Sponsorings ab, ohne die Namen der Sponsoren, bei Liberapay nur die öffentliche Wochensumme; die Euro-Wechselkurse holen wir bei der Europäischen Zentralbank – zeigen, wie viel der monatlichen Kosten gedeckt ist und was einmalig gegeben wurde, nur als Summen, nie als einzelne Spende. *Art. 6 Abs. 1 lit. f DSGVO (unser Interesse, offen zu zeigen, wie Baylee finanziert wird)*
 - **technische Zugriffsdaten (IP-Adresse, Zeitpunkt, angefragte Adresse) kurzzeitig im Arbeitsspeicher und in Protokollen** – Sicherheit, Abwehr von Missbrauch und Überlastung. *Art. 6 Abs. 1 lit. f DSGVO*
 
 Unser berechtigtes Interesse beim letzten Punkt ist der sichere und
@@ -175,6 +176,9 @@ anmeldest, entscheidest du.
   erledigt sind, spätestens ein Jahr nach Eingang.
 - Die anonyme Nutzungszählung vergisst eine Partie 150 Sekunden nach ihrem
   letzten Lebenszeichen.
+- Einzelne Spendeneinträge löschen wir nach 40 Tagen; vorher werden ihre
+  Beträge zu einer Summe je Plattform addiert, aus der sich keine einzelne
+  Spende mehr ablesen lässt.
 - Den Nachweis, welche Fassung unserer Bedingungen du angenommen hast,
   bewahren wir für die Dauer deines Kontos auf.
 

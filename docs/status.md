@@ -491,5 +491,6 @@ gives the website totals in euros ([operations](operations.md#donations)):
 
 Open: GitHub's token scope (the owner tests `read:user`); Ko-fi's format,
 confirmed only by its test delivery with `kofi.record` off; whether Ko-fi
-reports a cancelled membership; the versioned `legal/privacy.*.md`, which
-does not mention donations; the nine languages besides English and German.
+reports a cancelled membership; the privacy policy's new version 2026-11-18
+(§§ 3 and 7) for the owner to read; the nine languages besides English and
+German.

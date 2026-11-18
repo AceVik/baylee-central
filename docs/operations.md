@@ -1332,10 +1332,9 @@ or a body. The sweep prints how many donations it folded and deleted.
 donations, what Central collects and keeps of a payment and for how long
 (German and English; the nine other languages carry the English until a
 translation follows). The binding privacy policy (`legal/privacy.*.md`)
-does not mention donations yet; whether it gains a section, and with it a
-new version, is the owner's review, as it was for mail. This runbook does
-not decide whether GitHub's token or Ko-fi's recording may be switched on
-before that.
+says the same in § 3 and § 7 since its version 2026-11-18 (the owner's
+decision of 18.11.2026; [legal texts](../legal/README.md)); like every
+version it awaits the owner's full review before it is published.
 
 **Figures one can diff.** The public sum changes when a donation is
 counted, at most a minute later, so whoever watches `/funding.json` can
