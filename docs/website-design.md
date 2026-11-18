@@ -63,20 +63,20 @@ Tokens are named for what they mean, not for how they look:
 
 | token | meaning | dark (blue hour) | light (sunlight) |
 | --- | --- | --- | --- |
-| `--bg` | the page ground | `#0f1b2d` | `#f2efe4` |
-| `--bg-alt` | every other section's ground | `#13223a` | `#e4ebe5` |
-| `--panel-solid` | a panel, card or field ground | `#172741` | `#fffefa` |
-| `--panel` | the same, translucent over the painting | `rgba(23 39 65 / 0.94)` | `rgba(255 254 250 / 0.97)` |
-| `--panel-2` | a raised or hovered surface inside a panel | `#1f3253` | `#e8ebe1` |
-| `--ink` | body text | `#eef1f8` | `#233e43` |
-| `--ink-soft` | secondary text | `#cdd6ea` | `#415c5e` |
-| `--ink-faint` | captions, labels, meta | `#a3b3d1` | `#506968` |
-| `--title` | headings | `#fff7e4` | `#173c43` |
-| `--gold` | the primary action, the selected choice | `#e3c07e` | `#235b66` |
+| `--bg` | the page ground | `#0f1b2d` | `#ebe6d6` |
+| `--bg-alt` | every other section's ground | `#13223a` | `#dce6e0` |
+| `--panel-solid` | a panel, card or field ground | `#172741` | `#fffffd` |
+| `--panel` | the same, translucent over the painting | `rgba(23 39 65 / 0.94)` | `rgba(255 255 253 / 0.98)` |
+| `--panel-2` | a raised or hovered surface inside a panel | `#1f3253` | `#e2e8dc` |
+| `--ink` | body text | `#eef1f8` | `#14282d` |
+| `--ink-soft` | secondary text | `#cdd6ea` | `#2e464a` |
+| `--ink-faint` | captions, labels, meta | `#a3b3d1` | `#465d60` |
+| `--title` | headings | `#fff7e4` | `#0e3037` |
+| `--gold` | the primary action, the selected choice | `#e3c07e` | `#1b5562` |
 | `--gold-ink` | text on `--gold` | `#1a1306` | `#fffaf0` |
-| `--violet` | information: eyebrows, links in lists, the info accent | `#aebfff` | `#326b75` |
-| `--link` | a link in prose | `#ebcd8f` | `#76511c` |
-| `--focus` | the focus ring | `#ffe7a6` | `#235b66` |
+| `--violet` | information: eyebrows, links in lists, the info accent | `#aebfff` | `#2a626d` |
+| `--link` | a link in prose | `#ebcd8f` | `#6b4712` |
+| `--focus` | the focus ring | `#ffe7a6` | `#1b5562` |
 | `--ok`, `--warn`, `--bad`, `--off` | states: fine, attention, failure or danger, inactive | | |
 | `--edge`, `--edge-soft` | a border that matters, a border that only separates | | |
 | `--chart-reports`, `--chart-crashes` | the two series of the feedback section's 30-day chart, nowhere else | `#6f8ae8`, `#e0665a` | `#1b7fae`, `#b8402f` |

@@ -285,26 +285,28 @@
 @media (prefers-color-scheme: light) {
   :root:not([data-theme="dark"]) {
     color-scheme: light;
-    --bg: #f2efe4;
-    --bg-alt: #e4ebe5;
-    --panel: rgb(255 254 250 / 0.97);
-    --panel-solid: #fffefa;
-    --panel-2: #e8ebe1;
-    --edge: rgb(132 100 42 / 0.36);
-    --edge-soft: rgb(31 58 64 / 0.16);
-    --field-edge: #6f7f8f;
-    --ink: #233e43;
-    --ink-soft: #415c5e;
-    --ink-faint: #506968;
-    --title: #173c43;
-    --gold: #235b66;
-    --gold-2: #174955;
+    /* parchment a shade deeper than its cards, so a card stands on it;
+       inks dark enough to read in the sun */
+    --bg: #ebe6d6;
+    --bg-alt: #dce6e0;
+    --panel: rgb(255 255 253 / 0.98);
+    --panel-solid: #fffffd;
+    --panel-2: #e2e8dc;
+    --edge: rgb(120 86 28 / 0.46);
+    --edge-soft: rgb(22 48 54 / 0.24);
+    --field-edge: #5b6c7c;
+    --ink: #14282d;
+    --ink-soft: #2e464a;
+    --ink-faint: #465d60;
+    --title: #0e3037;
+    --gold: #1b5562;
+    --gold-2: #124450;
     --gold-ink: #fffaf0;
-    --violet: #326b75;
-    --violet-soft: rgb(50 107 117 / 0.1);
-    --link: #76511c;
-    --link-hover: #583b11;
-    --focus: #235b66;
+    --violet: #2a626d;
+    --violet-soft: rgb(42 98 109 / 0.12);
+    --link: #6b4712;
+    --link-hover: #4c310a;
+    --focus: #1b5562;
     --ok: #1e7a4a;
     --warn: #8a5a05;
     --bad: #a1332a;
@@ -315,8 +317,8 @@
     --bubble-own: #dcebe6;
     --hero-shadow: 0 1px 2px rgb(255 255 255 / 0.6), 0 2px 18px rgb(255 255 255 / 0.55);
     --shadow:
-      0 1px 2px rgb(20 38 45 / 0.07), 0 4px 10px -4px rgb(20 38 45 / 0.12), 0 16px 32px -18px rgb(20 38 45 / 0.3),
-      0 36px 64px -44px rgb(20 38 45 / 0.28);
+      0 1px 2px rgb(20 38 45 / 0.1), 0 4px 10px -4px rgb(20 38 45 / 0.16), 0 16px 32px -18px rgb(20 38 45 / 0.36),
+      0 36px 64px -44px rgb(20 38 45 / 0.32);
     --shadow-lift:
       0 2px 4px rgb(20 38 45 / 0.1), 0 22px 44px -20px rgb(20 38 45 / 0.36), 0 44px 80px -48px rgb(20 38 45 / 0.32),
       0 0 0 1px var(--edge);
@@ -327,12 +329,12 @@
     --sheen: rgb(255 255 255 / 0.75);
     --bar-shadow: 0 8px 20px -8px rgb(20 38 45 / 0.22), 0 2px 5px rgb(20 38 45 / 0.12);
     --top-bg: rgb(251 248 236 / 0.96);
-    --code-bg: #233e43;
+    --code-bg: #173339;
     --code-ink: #f3f6f4;
     --kbd-bg: #e3e8f1;
     --field-bg: rgb(255 255 255 / 0.9);
     --scene-veil: rgb(250 247 232 / 0.96);
-    --bar-ink: #233e43;
+    --bar-ink: #14282d;
     --tool-bg: rgb(255 255 255 / 0.65);
     --photo-ground: #05080f;
     --backdrop: rgb(23 40 45 / 0.55);
@@ -344,26 +346,26 @@
 
 :root[data-theme="light"] {
   color-scheme: light;
-  --bg: #f2efe4;
-  --bg-alt: #e4ebe5;
-  --panel: rgb(255 254 250 / 0.97);
-  --panel-solid: #fffefa;
-  --panel-2: #e8ebe1;
-  --edge: rgb(132 100 42 / 0.36);
-  --edge-soft: rgb(31 58 64 / 0.16);
-  --field-edge: #6f7f8f;
-  --ink: #233e43;
-  --ink-soft: #415c5e;
-  --ink-faint: #506968;
-  --title: #173c43;
-  --gold: #235b66;
-  --gold-2: #174955;
+  --bg: #ebe6d6;
+  --bg-alt: #dce6e0;
+  --panel: rgb(255 255 253 / 0.98);
+  --panel-solid: #fffffd;
+  --panel-2: #e2e8dc;
+  --edge: rgb(120 86 28 / 0.46);
+  --edge-soft: rgb(22 48 54 / 0.24);
+  --field-edge: #5b6c7c;
+  --ink: #14282d;
+  --ink-soft: #2e464a;
+  --ink-faint: #465d60;
+  --title: #0e3037;
+  --gold: #1b5562;
+  --gold-2: #124450;
   --gold-ink: #fffaf0;
-  --violet: #326b75;
-  --violet-soft: rgb(50 107 117 / 0.1);
-  --link: #76511c;
-  --link-hover: #583b11;
-  --focus: #235b66;
+  --violet: #2a626d;
+  --violet-soft: rgb(42 98 109 / 0.12);
+  --link: #6b4712;
+  --link-hover: #4c310a;
+  --focus: #1b5562;
   --ok: #1e7a4a;
   --warn: #8a5a05;
   --bad: #a1332a;
@@ -374,8 +376,8 @@
   --bubble-own: #dcebe6;
   --hero-shadow: 0 1px 2px rgb(255 255 255 / 0.6), 0 2px 18px rgb(255 255 255 / 0.55);
   --shadow:
-    0 1px 2px rgb(20 38 45 / 0.07), 0 4px 10px -4px rgb(20 38 45 / 0.12), 0 16px 32px -18px rgb(20 38 45 / 0.3),
-    0 36px 64px -44px rgb(20 38 45 / 0.28);
+    0 1px 2px rgb(20 38 45 / 0.1), 0 4px 10px -4px rgb(20 38 45 / 0.16), 0 16px 32px -18px rgb(20 38 45 / 0.36),
+    0 36px 64px -44px rgb(20 38 45 / 0.32);
   --shadow-lift:
     0 2px 4px rgb(20 38 45 / 0.1), 0 22px 44px -20px rgb(20 38 45 / 0.36), 0 44px 80px -48px rgb(20 38 45 / 0.32),
     0 0 0 1px var(--edge);
@@ -386,12 +388,12 @@
   --sheen: rgb(255 255 255 / 0.75);
   --bar-shadow: 0 8px 20px -8px rgb(20 38 45 / 0.22), 0 2px 5px rgb(20 38 45 / 0.12);
   --top-bg: rgb(251 248 236 / 0.96);
-  --code-bg: #233e43;
+  --code-bg: #173339;
   --code-ink: #f3f6f4;
   --kbd-bg: #e3e8f1;
   --field-bg: rgb(255 255 255 / 0.9);
   --scene-veil: rgb(250 247 232 / 0.96);
-  --bar-ink: #233e43;
+  --bar-ink: #14282d;
   --tool-bg: rgb(255 255 255 / 0.65);
   --photo-ground: #05080f;
   --backdrop: rgb(23 40 45 / 0.55);
