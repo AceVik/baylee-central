@@ -96,6 +96,48 @@
   --give-glow: rgb(255 255 255 / 0.85);
 }
 
+/* the start page's band: one card in the middle, a heart over a sentence,
+   the amount and the way to the page */
+.give-band-card {
+  display: grid;
+  gap: var(--space-3);
+  justify-items: center;
+  max-inline-size: 44rem;
+  margin-inline: auto;
+  padding: var(--space-7) var(--space-5);
+  text-align: center;
+}
+
+.give-band-sign {
+  display: grid;
+  place-items: center;
+  inline-size: 3rem;
+  block-size: 3rem;
+  border: 1px solid color-mix(in srgb, #f0728a 45%, transparent);
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, #f0728a 14%, transparent);
+  color: #f0728a;
+}
+
+.give-band-sign .icon {
+  inline-size: 1.4rem;
+  block-size: 1.4rem;
+}
+
+/* smaller than a section's title: the sentence stays on one line where
+   there is room for it */
+.give-band-card h2 {
+  margin: 0;
+  font-size: clamp(1.3rem, 1rem + 1vw, 1.55rem);
+  text-wrap: balance;
+}
+
+.give-band-card p {
+  max-inline-size: 34rem;
+  margin: 0 0 var(--space-2);
+  color: var(--ink-soft);
+}
+
 /* the goal beside what it pays for; one under the other where it is narrow */
 .give-goal {
   display: grid;

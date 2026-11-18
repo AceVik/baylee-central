@@ -164,6 +164,27 @@ fn way(cx: &Context<'_>, way: &Way) -> impl IntoView + use<> {
     }
 }
 
+/// The start page's band: one sentence on why, the amount, and the way to
+/// this page. It asks once and quietly, after the open-source section.
+pub fn band(lang: Lang) -> impl IntoView + use<> {
+    let goal = euros(lang, Funding::GOAL / 100);
+    view! {
+        <section class="band alt give-band" id="support" aria-labelledby="support-title">
+            <div class="wrap">
+                <div class="give-band-card card glass reveal">
+                    <span class="give-band-sign" aria-hidden="true">{icon(icons::HEART)}</span>
+                    <h2 id="support-title">{words::donate_band_title(lang)}</h2>
+                    <p>{words::donate_band_lead(lang, &goal)}</p>
+                    <a class="button primary give" href=Page::Donate.path(lang)>
+                        {icon(icons::HEART)}
+                        <span>{words::donate_band_button(lang)}</span>
+                    </a>
+                </div>
+            </div>
+        </section>
+    }
+}
+
 pub fn page(cx: &Context<'_>) -> Built {
     let lang = cx.lang;
     let mut meta = Meta::new(

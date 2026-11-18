@@ -2029,3 +2029,28 @@ fn a_goal_nobody_gives_to_yet_invites_the_first() {
     assert!(over.contains("supporters: 40"));
     assert!(!over.contains("Yours would be the first."));
 }
+
+/// The start page asks once, after the open-source section, and leads to
+/// the donation page; it names the amount and nothing a donation would buy.
+#[tokio::test]
+async fn the_start_page_asks_once_and_leads_to_the_donation_page() {
+    let app = app(true);
+    for lang in Lang::ALL {
+        let (_, _, home) = get(&app, &format!("/{}/", lang.code()), &[]).await;
+        assert_eq!(count(&home, "id=\"support\""), 1, "{lang:?}");
+        let at = |id: &str| home.find(&format!("id=\"{id}\"")).expect("a section");
+        assert!(at("source") < at("support"), "{lang:?}");
+        let (_, band) = home.split_at(at("support"));
+        let band = band.split_once("</section>").expect("its end").0;
+        assert_eq!(
+            count(band, &format!("href=\"/{}/donate\"", lang.code())),
+            1,
+            "{lang:?}"
+        );
+        assert!(!band.contains("Wizards"), "{lang:?}");
+    }
+    let (_, _, english) = get(&app, "/en/", &[]).await;
+    assert!(english.contains("cost about €800 a month"));
+    let (_, _, german) = get(&app, "/de/", &[]).await;
+    assert!(german.contains("kosten etwa 800\u{a0}€ im Monat"));
+}
