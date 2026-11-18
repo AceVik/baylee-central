@@ -8229,9 +8229,11 @@ What was not done: no call with real sponsor data was made, and GitHub's token s
 fields is unknown (the owner tests a classic token with `read:user`). Ko-fi's format is
 unconfirmed until its test delivery; whether Ko-fi reports a cancelled membership is unknown,
 which is why its monthly figure is a 31-day window of payments (a supporter counts twice for
-up to three days around February). The binding privacy policy (`legal/privacy.*.md`) does not
-mention donations yet; the website's privacy page does, and whether the policy needs a new
-version is the owner's call.
+up to three days around February). On the owner's decision of the same day the binding privacy
+policy (`legal/privacy.*.md`) has a new version, 2026-11-18, naming what a donation leaves
+behind (§ 3) and how long a single record is kept (§ 7); the owner's review of the text is
+still to come. The owner also kept `roxmltree` for the rates and Central's own clock for the
+time of a Ko-fi payment, both as designed above.
 
 What was run on the final commit of the change: `cargo xtask gate` (format, policy, clippy
 `-D warnings` over the workspace, every test, the doc tests, the release build),
