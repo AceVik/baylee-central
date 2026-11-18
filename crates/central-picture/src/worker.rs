@@ -228,6 +228,20 @@ fn run_socket(path: &PathBuf, request: &[u8]) -> Result<Vec<u8>, Refusal> {
 mod tests {
     use super::*;
 
+    /// The tests that start a worker take turns. On macOS `std` makes a
+    /// child's pipes with `pipe()` and marks them close-on-exec only after
+    /// (Linux has `pipe2(O_CLOEXEC)` and no such moment), so a worker another
+    /// test starts in between inherits this test's pipe and holds it open:
+    /// the read here then sees no end until that worker is ended, which for
+    /// `exec sleep 60` is the deadline, and the test fails its time bound
+    /// (seen once in about nine runs of the suite, 18.11.2026). Deployed, the
+    /// worker is started by systemd's socket on Linux and has no such pipe.
+    fn one_at_a_time() -> std::sync::MutexGuard<'static, ()> {
+        static TURN: std::sync::Mutex<()> = std::sync::Mutex::new(());
+        TURN.lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+    }
+
     /// A stand-in worker: `sh -c script`, with the request on its input.
     fn shell(script: &str) -> Worker {
         Worker(Kind::Program {
@@ -240,6 +254,7 @@ mod tests {
 
     #[test]
     fn the_declared_type_must_match_before_any_worker_runs() {
+        let _turn = one_at_a_time();
         // /nonexistent is never started: the bytes decide first
         let worker = Worker::program("/nonexistent/worker");
         assert_eq!(worker.convert(Format::Png, GIF), Err(Refusal::WrongType));
@@ -252,6 +267,7 @@ mod tests {
 
     #[test]
     fn a_worker_that_crashes_hangs_or_babbles_is_ended_and_refused() {
+        let _turn = one_at_a_time();
         let cases = [
             // exits with failure, says nothing
             "exit 3",
@@ -277,6 +293,7 @@ mod tests {
 
     #[test]
     fn a_worker_that_hangs_is_killed_at_the_deadline() {
+        let _turn = one_at_a_time();
         let started = Instant::now();
         assert_eq!(
             shell("exec sleep 60").convert(Format::Gif, GIF),
@@ -291,6 +308,7 @@ mod tests {
 
     #[test]
     fn a_worker_s_refusal_is_passed_on_and_its_environment_is_empty() {
+        let _turn = one_at_a_time();
         assert_eq!(
             shell("cat > /dev/null; printf 'BCPA\\002\\001\\006'").convert(Format::Gif, GIF),
             Err(Refusal::Malformed)
@@ -313,6 +331,7 @@ mod tests {
 
     #[test]
     fn a_well_framed_answer_that_fails_its_checks_is_refused() {
+        let _turn = one_at_a_time();
         // A frame with pictures of the right sizes that are not a PNG
         // master and an AVIF: a worker cannot pass off anything else.
         let script = "cat > /dev/null; printf 'BCPA\\002\\000\\000\\000\\000\\001X\\000\\000\\000\\001Y\\000'";
