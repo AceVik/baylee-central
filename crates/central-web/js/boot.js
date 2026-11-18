@@ -3,8 +3,9 @@
 // visitor chose (localStorage "baylee-site-theme", as before), shows the
 // colour switch, which turns the scheme shown into the other one, and lets
 // a new scheme spread from it, names the account link while a session is remembered
-// ("baylee-central-session", which holds only when it ends) and puts the
-// account's own picture beside it, opens
+// ("baylee-central-session", which holds only when it ends): with the
+// account's own picture, display name and tag where a page noted them
+// ("baylee-central-own"), opens
 // dialogs in browsers without invoker commands, closes the dropdowns as a
 // menu closes, copies a gateway's address, pauses the hero's light off
 // screen, and marks what is on screen as the page opens. Nothing here is
@@ -100,24 +101,29 @@
       } else {
         indexedDB.deleteDatabase("baylee-chat");
       }
-      // and the header's note of the account's own picture
+      // and the header's note of who was signed in (the second key is
+      // the note's earlier, per-tab home)
+      localStorage.removeItem("baylee-central-own");
       sessionStorage.removeItem("baylee-central-own-picture");
     } catch {
       // no storage here, nothing kept
     }
   }
 
-  // The account's own picture beside the account link
-  // (docs/profile-pictures.md). Asked of nobody: the profile page writes
-  // its key, and whether it moves, to "baylee-central-own-picture" in this
-  // tab's sessionStorage whenever it reads or changes it. Only Central's own
-  // files under their random key; a moving one plays only where the system
-  // allows motion. Until the key is known, or without a picture, a neutral
-  // mark of the same fixed size, so nothing shifts.
-  const OWN = "baylee-central-own-picture";
-  const ownPicture = () => {
+  // Who is signed in, beside the account link (docs/web-accounts.md,
+  // docs/profile-pictures.md). Asked of nobody: the pages that learn the
+  // display name, the tag and the own picture's key note them in
+  // localStorage ("baylee-central-own") with the session record they
+  // belong to, and tell this page ("baylee:own"). A note of another
+  // sign-in is not shown. Only Central's own files under their random key;
+  // a moving picture plays only where the system allows motion. Until the
+  // key is known, or without a picture, a neutral mark of the same fixed
+  // size, so nothing shifts.
+  const own = () => {
     try {
-      return JSON.parse(sessionStorage.getItem(OWN) ?? "null");
+      const held = JSON.parse(read("baylee-central-own") ?? "null");
+      const session = read("baylee-central-session");
+      return held && typeof held === "object" && session !== null && held.of === session ? held : null;
     } catch {
       return null;
     }
@@ -152,6 +158,40 @@
     }
     link.prepend(face);
   };
+  // The account link of a signed-in visitor: where it leads, whose it is
+  // (the handle, its tag set apart; "Your account" until a page noted
+  // one) and the picture. Drawn again whenever the note changes.
+  const account = () => {
+    const live = signedIn();
+    const held = live ? own() : null;
+    for (const link of document.querySelectorAll("a[data-account-href]")) {
+      link.querySelector(".nav-face")?.remove();
+      if (!live) continue;
+      link.href = link.dataset.accountHref;
+      const text = link.querySelector(":scope > span");
+      if (text) {
+        const named = typeof held?.name === "string" && held.name !== "" && /^[0-9a-f]{4,8}$/.test(held.tag ?? "");
+        if (named) {
+          const whose = document.createElement("span");
+          whose.className = "visually-hidden";
+          whose.textContent = `${link.dataset.account}: `;
+          const name = document.createElement("bdi");
+          name.className = "nav-name";
+          name.textContent = held.name;
+          const tag = document.createElement("span");
+          tag.className = "nav-tag";
+          tag.textContent = `#${held.tag}`;
+          text.replaceChildren(whose, name, tag);
+          text.translate = false;
+        } else {
+          text.textContent = link.dataset.account;
+          text.translate = true;
+        }
+      }
+      ownFace(link, held);
+    }
+  };
+  window.addEventListener("baylee:own", account);
 
   const ready = () => {
     for (const button of document.querySelectorAll("[data-theme-switch]")) {
@@ -159,16 +199,8 @@
       label(button);
       button.addEventListener("click", turn);
     }
+    account();
     if (signedIn()) {
-      for (const link of document.querySelectorAll("a[data-account-href]")) {
-        link.href = link.dataset.accountHref;
-        const text = link.querySelector("span");
-        if (text) text.textContent = link.dataset.account;
-      }
-      const held = ownPicture();
-      for (const link of document.querySelectorAll("a[data-account-href]")) {
-        if (!link.querySelector(".nav-face")) ownFace(link, held);
-      }
       for (const line of document.querySelectorAll("[data-signed-out]")) line.hidden = true;
     }
     // The hero's slow light moves only while the hero is on screen.

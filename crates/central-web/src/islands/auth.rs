@@ -205,6 +205,8 @@ async fn finish_sign_in(
     if source == Some(AccountSource::Registered) && !recovery {
         return Err(Problem::Failed);
     }
+    // the header names who signed in from now on
+    session::note_name(display_name.as_deref(), tag);
     let handle = display_name
         .zip(tag)
         .map(|(name, tag)| central_api::profile::handle(&name, tag));
