@@ -22,8 +22,13 @@ use std::sync::{
     atomic::{AtomicU64, Ordering},
 };
 
-/// The most of a Ko-fi delivery's body the listener reads.
+/// The most of a Ko-fi delivery's body that is taken; a longer one is refused and
+/// counted as `size`.
 pub const KOFI_LIMIT: usize = kofi::LIMIT;
+
+/// The most of a Ko-fi delivery's body the listener reads at all, so that a delivery
+/// past [`KOFI_LIMIT`] is counted; a longer one is refused before it is read.
+pub const KOFI_READ: usize = kofi::READ;
 
 /// The digest Central holds of Ko-fi's verification token ([`Kofi::token`]).
 #[must_use]

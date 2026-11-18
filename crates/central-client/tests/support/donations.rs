@@ -10,7 +10,7 @@ use central_api::{
     wire::{Request, Response},
 };
 use central_client::Transport;
-use central_identity::{KOFI_LIMIT, KofiCounts};
+use central_identity::{KOFI_LIMIT, KOFI_READ, KofiCounts};
 use tokio::runtime::Runtime;
 
 /// The fixture's synthetic verification token (`postgres.rs`, `serving`).
@@ -253,8 +253,8 @@ fn refusing(http: &Http) -> KofiCounts {
     assert_eq!(
         counts,
         KofiCounts {
-            // content type, form, json, token, shape, amount, currency
-            refused: [2, 2, 3, 3, 4, 6, 2],
+            // content type, form, json, token, shape, amount, currency, size
+            refused: [2, 2, 3, 3, 4, 6, 2, 0],
             recorded: 3,
             unconverted: 1,
             again: 3,
@@ -265,15 +265,27 @@ fn refusing(http: &Http) -> KofiCounts {
     counts
 }
 
-/// Larger than the route's bound: refused before it is read. A browser's request is
-/// no delivery, and another method is not the route's. None of them is counted.
+/// Larger than the route's bound: refused as every refusal is, and counted as
+/// `size`, so that a real payment with a long message does not vanish unseen.
+/// Larger than what the listener reads: refused before it is read, also when the
+/// length is only declared, and not counted. A browser's request is no delivery,
+/// and another method is not the route's; neither is counted either.
 fn bounding(http: &Http, first: &[u8], counts: KofiCounts) {
     let long = form(&delivery(
         "synthetic-kofi-0040",
         &[("message", Some(&format!("\"{}\"", "x".repeat(KOFI_LIMIT))))],
     ));
-    assert!(long.len() > KOFI_LIMIT);
-    assert_eq!(deliver(http, "198.51.100.140", &[FORM], &long).0, 413);
+    assert!(long.len() > KOFI_LIMIT && long.len() < KOFI_READ);
+    assert_eq!(deliver(http, "198.51.100.140", &[FORM], &long), refused());
+    let mut sized = counts;
+    sized.refused[7] += 1;
+    assert_eq!(http.identity.kofi_counts().refused, sized.refused);
+    let huge = form(&delivery(
+        "synthetic-kofi-0041",
+        &[("message", Some(&format!("\"{}\"", "x".repeat(KOFI_READ))))],
+    ));
+    assert!(huge.len() > KOFI_READ);
+    assert_eq!(deliver(http, "198.51.100.142", &[FORM], &huge).0, 413);
     assert_eq!(
         deliver(
             http,
@@ -286,7 +298,7 @@ fn bounding(http: &Http, first: &[u8], counts: KofiCounts) {
     );
     let (status, _, _) = http.raw("GET /v1/kofi", &[], b"");
     assert_ne!(status, 200);
-    assert_eq!(http.identity.kofi_counts().refused, counts.refused);
+    assert_eq!(http.identity.kofi_counts().refused, sized.refused);
 }
 
 /// A flood from one address: thirty a minute, then the budget's answer before the

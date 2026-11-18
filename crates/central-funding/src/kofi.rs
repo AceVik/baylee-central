@@ -15,9 +15,15 @@ use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use subtle::ConstantTimeEq;
 
-/// The most of a delivery's body that is read: a payment with a long message fits
-/// several times over; anything larger is refused before it is read.
+/// The most of a delivery's body that is taken: a payment with a long message fits
+/// several times over. A longer body is refused as [`Refusal::Size`]; the listener
+/// reads up to [`READ`] so that such a refusal is counted, and refuses a body longer
+/// than that before reading it.
 pub const LIMIT: usize = 16 * 1024;
+
+/// The most of a delivery's body the listener reads at all: four times [`LIMIT`], the
+/// light bound of the account listener's boundary.
+pub const READ: usize = 4 * LIMIT;
 
 /// The most one payment may be, in hundredths of its currency: the amount rule's own
 /// bound. A sum in euros is bounded again when it is converted.
@@ -41,11 +47,13 @@ pub enum Refusal {
     Amount,
     /// The currency is not a currency's code.
     Currency,
+    /// The body is longer than [`LIMIT`].
+    Size,
 }
 
 impl Refusal {
     /// Every reason, in the order the operator's line names them.
-    pub const ALL: [Self; 7] = [
+    pub const ALL: [Self; 8] = [
         Self::ContentType,
         Self::Form,
         Self::Json,
@@ -53,6 +61,7 @@ impl Refusal {
         Self::Shape,
         Self::Amount,
         Self::Currency,
+        Self::Size,
     ];
 
     /// The reason's name in the operator's line.
@@ -66,6 +75,7 @@ impl Refusal {
             Self::Shape => "shape",
             Self::Amount => "amount",
             Self::Currency => "currency",
+            Self::Size => "size",
         }
     }
 }
@@ -171,7 +181,7 @@ pub fn read(
         return Err(Refusal::ContentType);
     }
     if body.len() > LIMIT {
-        return Err(Refusal::Form);
+        return Err(Refusal::Size);
     }
     let data = data(body)?;
     // An object, and not the array serde would also read a struct from.
@@ -391,8 +401,10 @@ mod tests {
         let long = json(&[("message", &format!("\"{}\"", "x".repeat(LIMIT)))]);
         assert_eq!(
             read(Some(FORM), &body(&long), &expected),
-            Err(Refusal::Form)
+            Err(Refusal::Size)
         );
+        // the listener reads four times as much, so that such a body is counted
+        assert!(body(&long).len() < READ);
     }
 
     #[test]

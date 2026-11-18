@@ -431,9 +431,13 @@ async fn work(
                     }),
                 }
             }
-            if let Some(token) = &github {
+            // a stop that came during a request is not kept waiting for the next
+            if let Some(token) = github.as_ref().filter(|_| !*stop.borrow()) {
                 poll_github(&identity, &fetch, token, &mut log).await;
             }
+        }
+        if *stop.borrow() {
+            break;
         }
         if sums_on {
             sums(&identity, &mut log).await;

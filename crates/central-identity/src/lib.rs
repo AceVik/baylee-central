@@ -30,7 +30,8 @@ mod email;
 mod funding;
 pub use email::Delivery;
 pub use funding::{
-    KOFI_LIMIT, Kofi as KofiIntake, KofiAnswer, KofiCounts, Sources as FundingSources, kofi_digest,
+    KOFI_LIMIT, KOFI_READ, Kofi as KofiIntake, KofiAnswer, KofiCounts, Sources as FundingSources,
+    kofi_digest,
 };
 mod gateways;
 mod guesses;
