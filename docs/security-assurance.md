@@ -8231,7 +8231,15 @@ unconfirmed until its test delivery; whether Ko-fi reports a cancelled membershi
 which is why its monthly figure is a 31-day window of payments (a supporter counts twice for
 up to three days around February). The binding privacy policy (`legal/privacy.*.md`) does not
 mention donations yet; the website's privacy page does, and whether the policy needs a new
-version is the owner's call. The workspace's full gate (release build) was not run in this
-change for want of disk space; the crates touched passed clippy (`-D warnings`) and their
-tests, and `cargo xtask postgres` passed whole. These passes are by the implementing agent and
-are not an independent audit.
+version is the owner's call.
+
+What was run on the final commit of the change: `cargo xtask gate` (format, policy, clippy
+`-D warnings` over the workspace, every test, the doc tests, the release build),
+`crypto-scope`, `smoke` and `smoke --exercise-failure` (the injected failure reported as CI
+expects), `postgres` whole (store, SDK and HTTP), `secrets` (tree and history), and
+`wasm --check` in the pinned x86-64 image: the committed browser crypto equals a fresh build,
+since `central-web-crypto` uses nothing of the wire's new variant. `cargo audit --deny
+warnings` and `cargo deny check` (0.22.2 and 0.20.2, as CI pins them) fail on one advisory,
+RUSTSEC-2026-0543 (`chrono` is unmaintained), which SeaORM brings in and which fails the base
+of this change (`a6eb2e4b`) in the same way: this change adds no package to the lock file.
+These passes are by the implementing agent and are not an independent audit.
