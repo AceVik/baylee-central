@@ -1,14 +1,62 @@
 use super::{Change, ConnectionTrait, Error, Locked, Uuid, limits, room, statement, unavailable};
+use std::collections::BTreeSet;
 
+/// Whose view of the group a change altered, for the push socket: what each
+/// member sees is the group snapshot (`snapshot.rs`). A joined member sees
+/// the name, the members and the invited; an invitee only the group's name
+/// and its own inviter. So the joined members see every change, an invitee
+/// a rename, the group's end and the end of its own invitation, and nobody
+/// outside the group anything.
+struct Seen<'a> {
+    group: &'a Locked,
+    accounts: BTreeSet<Uuid>,
+}
+
+impl<'a> Seen<'a> {
+    fn joined(group: &'a Locked) -> Self {
+        Self {
+            group,
+            accounts: group.accounts().into_iter().collect(),
+        }
+    }
+
+    /// The invitees too.
+    fn everyone(group: &'a Locked) -> Self {
+        Self {
+            group,
+            accounts: group.members.iter().map(|member| member.account).collect(),
+        }
+    }
+
+    fn and(mut self, account: Uuid) -> Self {
+        self.accounts.insert(account);
+        self
+    }
+
+    /// The invitees `inviter` invited, whose invitation ends with its membership.
+    fn invited_by(mut self, inviter: Uuid) -> Self {
+        self.accounts.extend(
+            self.group
+                .members
+                .iter()
+                .filter(|member| !member.accepted && member.inviter == inviter)
+                .map(|member| member.account),
+        );
+        self
+    }
+}
+
+/// Apply `change`, and say whose view it altered: nobody's when it changed
+/// nothing (an invitation that stands, a join already made).
 pub(super) async fn apply(
     db: &impl ConnectionTrait,
     group: &Locked,
     me: Uuid,
     target: Option<Uuid>,
     change: Change,
-) -> Result<(), Error> {
+) -> Result<BTreeSet<Uuid>, Error> {
     let is_owner = group.owner == me;
-    match change {
+    let seen = match change {
         Change::Rename { name } if is_owner => {
             if !central_api::groups::valid_name(&name) {
                 return Err(Error::Rejected);
@@ -19,13 +67,23 @@ pub(super) async fn apply(
             ))
             .await
             .map_err(unavailable)?;
+            Seen::everyone(group)
         }
         Change::Invite { .. } if group.joined(me) => {
-            invite(db, group, me, target.ok_or(Error::Rejected)?).await?;
+            let target = target.ok_or(Error::Rejected)?;
+            if invite(db, group, me, target).await? {
+                Seen::joined(group).and(target)
+            } else {
+                return Ok(BTreeSet::new());
+            }
         }
         Change::Join => {
             let member = group.member(me).ok_or(Error::Rejected)?;
-            if !member.accepted {
+            // Joined already: nothing changes.
+            if member.accepted {
+                return Ok(BTreeSet::new());
+            }
+            {
                 let blocked = db.query_one_raw(statement(
                     "SELECT 1 FROM central_identity.social_blocks WHERE (owner = $1 AND blocked = $2) OR (owner = $2 AND blocked = $1)",
                     vec![me.into(), member.inviter.into()],
@@ -35,6 +93,7 @@ pub(super) async fn apply(
                 }
                 // Once joined, membership must survive deletion of the original inviter.
                 db.execute_raw(statement("UPDATE central_identity.chat_members SET accepted = true, inviter = account_id, created_at = pg_catalog.clock_timestamp() WHERE group_id = $1 AND account_id = $2", vec![group.id.into(), me.into()])).await.map_err(unavailable)?;
+                Seen::joined(group).and(me)
             }
         }
         Change::Withdraw { .. } => {
@@ -44,6 +103,7 @@ pub(super) async fn apply(
                 return Err(Error::Rejected);
             }
             remove(db, group.id, target).await?;
+            Seen::joined(group).and(target)
         }
         Change::Remove { .. } => {
             let target = target.ok_or(Error::Rejected)?;
@@ -51,6 +111,7 @@ pub(super) async fn apply(
                 return Err(Error::Rejected);
             }
             remove(db, group.id, target).await?;
+            Seen::joined(group).invited_by(target)
         }
         Change::Transfer { .. } if is_owner => {
             let target = target.ok_or(Error::Rejected)?;
@@ -63,6 +124,7 @@ pub(super) async fn apply(
             ))
             .await
             .map_err(unavailable)?;
+            Seen::joined(group)
         }
         Change::Delete if is_owner => {
             // Only membership metadata is deleted. Retained encrypted history has no group FK.
@@ -72,10 +134,11 @@ pub(super) async fn apply(
             ))
             .await
             .map_err(unavailable)?;
+            Seen::everyone(group)
         }
         _ => return Err(Error::Rejected),
-    }
-    Ok(())
+    };
+    Ok(seen.accounts)
 }
 
 async fn invite(
@@ -83,7 +146,7 @@ async fn invite(
     group: &Locked,
     me: Uuid,
     other: Uuid,
-) -> Result<(), Error> {
+) -> Result<bool, Error> {
     if me == other {
         return Err(Error::Rejected);
     }
@@ -96,7 +159,7 @@ async fn invite(
         return Err(Error::Rejected);
     }
     if group.member(other).is_some() {
-        return Ok(());
+        return Ok(false);
     }
     if group.members.len() >= 50 {
         return Err(Error::Busy);
@@ -106,7 +169,7 @@ async fn invite(
     db.query_one_raw(statement(
         "INSERT INTO central_identity.chat_members (group_id, account_id, inviter) VALUES ($1, $2, $3) RETURNING id", vec![group.id.into(), other.into(), me.into()],
     )).await.map_err(unavailable)?.ok_or(Error::Unavailable)?;
-    Ok(())
+    Ok(true)
 }
 
 async fn remove(db: &impl ConnectionTrait, group: Uuid, account: Uuid) -> Result<(), Error> {

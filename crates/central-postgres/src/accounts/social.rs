@@ -1,5 +1,5 @@
 //! Central social state. Session ownership is checked at the database boundary.
-use super::{AccountStore, Error, Session, statement};
+use super::{AccountStore, Error, Session, live::Concerns, statement};
 use central_api::social::{Contact, Person, Relation, SocialRequest, SocialResponse};
 use sea_orm::{ConnectionTrait, QueryResult, TransactionTrait, prelude::Uuid};
 
@@ -79,33 +79,62 @@ impl AccountStore {
         session: Session<'_>,
         request: SocialRequest,
     ) -> Result<SocialResponse, Error> {
+        self.social_concerning(session, request)
+            .await
+            .map(|(response, _)| response)
+    }
+
+    /// [`Self::social`], and whose view the operation changed, once it has
+    /// committed ([`Concerns`]): the accounts a push socket tells. Read in
+    /// the transaction that changed it, from the rows it locked, so it costs
+    /// no statement of its own, and names nobody for a read or a change that
+    /// changed nothing.
+    ///
+    /// # Errors
+    /// As [`Self::social`].
+    pub async fn social_concerning(
+        &self,
+        session: Session<'_>,
+        request: SocialRequest,
+    ) -> Result<(SocialResponse, Concerns), Error> {
         let tx = self.db.begin().await.map_err(unavailable)?;
         let me = caller(&tx, session, false).await?;
-        let response = match request {
-            SocialRequest::Group { request } => SocialResponse::Group {
-                response: groups::dispatch(&tx, session, me, request).await?,
-            },
-            SocialRequest::Chat { request } => SocialResponse::Chat {
-                response: chat::dispatch(&tx, session, me, request).await?,
-            },
-            SocialRequest::Contacts => SocialResponse::Contacts {
-                contacts: snapshot(&tx, me).await?,
-            },
+        let (response, concerns) = match request {
+            SocialRequest::Group { request } => {
+                let (response, concerns) = groups::dispatch(&tx, session, me, request).await?;
+                (SocialResponse::Group { response }, concerns)
+            }
+            SocialRequest::Chat { request } => {
+                let (response, concerns) = chat::dispatch(&tx, session, me, request).await?;
+                (SocialResponse::Chat { response }, concerns)
+            }
+            SocialRequest::Contacts => (
+                SocialResponse::Contacts {
+                    contacts: snapshot(&tx, me).await?,
+                },
+                Concerns::default(),
+            ),
             SocialRequest::Lookup { tag } => {
                 lock_accounts(&tx, vec![me]).await?;
                 caller(&tx, session, true).await?;
                 limits::charge(&tx, me, limits::Budget::Lookup).await?;
                 let found = by_tag(&tx, tag).await?;
-                SocialResponse::Person {
-                    person: found.as_ref().map(person).transpose()?,
-                }
+                (
+                    SocialResponse::Person {
+                        person: found.as_ref().map(person).transpose()?,
+                    },
+                    Concerns::default(),
+                )
             }
             SocialRequest::Pictures { tags } => {
                 lock_accounts(&tx, vec![me]).await?;
                 caller(&tx, session, true).await?;
-                SocialResponse::Pictures {
-                    pictures: super::pictures::pictures(&tx, me, &tags).await?,
-                }
+                (
+                    SocialResponse::Pictures {
+                        pictures: super::pictures::pictures(&tx, me, &tags).await?,
+                    },
+                    Concerns::default(),
+                )
             }
             SocialRequest::ReportPicture {
                 tag,
@@ -118,7 +147,7 @@ impl AccountStore {
                 lock_accounts(&tx, vec![me]).await?;
                 caller(&tx, session, true).await?;
                 super::pictures::report(&tx, me, other, key, reason, note.as_deref()).await?;
-                SocialResponse::Done
+                (SocialResponse::Done, Concerns::default())
             }
             SocialRequest::Contact { tag, change } => {
                 let other = by_tag(&tx, tag).await?.ok_or(Error::Rejected)?;
@@ -128,12 +157,24 @@ impl AccountStore {
                 }
                 lock_accounts(&tx, vec![me, other]).await?;
                 caller(&tx, session, true).await?;
-                contacts::change(&tx, me, other, change).await?;
-                SocialResponse::Done
+                let changed = contacts::change(&tx, me, other, change).await?;
+                let concerns = Concerns {
+                    social: [(changed.me, me), (changed.other, other)]
+                        .into_iter()
+                        .filter(|(changed, _)| *changed)
+                        .map(|(_, account)| account.into_bytes())
+                        .collect(),
+                    // Whether they are friends now is read again, not
+                    // inferred from the action: a request can accept.
+                    pair: (changed.me || changed.other)
+                        .then_some((me.into_bytes(), other.into_bytes())),
+                    ..Concerns::default()
+                };
+                (SocialResponse::Done, concerns)
             }
         };
         tx.commit().await.map_err(unavailable)?;
-        Ok(response)
+        Ok((response, concerns))
     }
 }
 

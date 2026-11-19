@@ -22,24 +22,57 @@ async fn room(db: &impl ConnectionTrait, me: Uuid, cap: usize, sql: &str) -> Res
 
 const FRIENDS: &str = "SELECT count(*) FROM central_identity.social_contacts WHERE accepted AND (low = $1 OR high = $1)";
 
+/// Whose own view of the pair a change altered: the caller's (`me`), the
+/// other account's (`other`), both or neither. A block, and lifting one, is the
+/// blocker's alone: the blocked account sees no list of who blocked it, only a
+/// contact that ended, if there was one.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(super) struct Changed {
+    pub(super) me: bool,
+    pub(super) other: bool,
+}
+
+impl Changed {
+    const BOTH: Self = Self {
+        me: true,
+        other: true,
+    };
+    const NEITHER: Self = Self {
+        me: false,
+        other: false,
+    };
+
+    fn or(self, more: Self) -> Self {
+        Self {
+            me: self.me || more.me,
+            other: self.other || more.other,
+        }
+    }
+}
+
 pub(super) async fn change(
     db: &impl ConnectionTrait,
     me: Uuid,
     other: Uuid,
     action: ContactAction,
-) -> Result<(), Error> {
+) -> Result<Changed, Error> {
     let (low, high) = if me < other { (me, other) } else { (other, me) };
-    match action {
-        ContactAction::Remove => {
-            remove(db, low, high).await?;
-        }
+    Ok(match action {
+        ContactAction::Remove => remove(db, low, high).await?,
         ContactAction::Unblock => {
-            db.execute_raw(statement(
-                "DELETE FROM central_identity.social_blocks WHERE owner = $1 AND blocked = $2",
-                vec![me.into(), other.into()],
-            ))
-            .await
-            .map_err(unavailable)?;
+            let lifted = db
+                .execute_raw(statement(
+                    "DELETE FROM central_identity.social_blocks WHERE owner = $1 AND blocked = $2",
+                    vec![me.into(), other.into()],
+                ))
+                .await
+                .map_err(unavailable)?
+                .rows_affected()
+                > 0;
+            Changed {
+                me: lifted,
+                other: false,
+            }
         }
         ContactAction::Block => {
             let already = db.query_one_raw(statement("SELECT owner FROM central_identity.social_blocks WHERE owner = $1 AND blocked = $2", vec![me.into(), other.into()])).await.map_err(unavailable)?.is_some();
@@ -58,7 +91,11 @@ pub(super) async fn change(
                 .await
                 .map_err(unavailable)?;
             }
-            remove(db, low, high).await?;
+            let blocked = Changed {
+                me: !already,
+                other: false,
+            };
+            blocked.or(remove(db, low, high).await?)
         }
         ContactAction::Request | ContactAction::Accept => {
             let blocked = db.query_one_raw(statement(
@@ -68,10 +105,9 @@ pub(super) async fn change(
             if blocked {
                 return Err(Error::Rejected);
             }
-            request(db, me, other, low, high, action).await?;
+            request(db, me, other, low, high, action).await?
         }
-    }
-    Ok(())
+    })
 }
 
 async fn request(
@@ -81,16 +117,16 @@ async fn request(
     low: Uuid,
     high: Uuid,
     action: ContactAction,
-) -> Result<(), Error> {
+) -> Result<Changed, Error> {
     let old = db.query_one_raw(statement("SELECT requested_by, accepted FROM central_identity.social_contacts WHERE low = $1 AND high = $2", vec![low.into(), high.into()])).await.map_err(unavailable)?;
     if let Some(old) = old {
         if old.try_get::<bool>("", "accepted").map_err(unavailable)? {
-            return Ok(());
+            return Ok(Changed::NEITHER);
         }
         let from: Uuid = old.try_get("", "requested_by").map_err(unavailable)?;
         if from == me {
             return if action == ContactAction::Request {
-                Ok(())
+                Ok(Changed::NEITHER)
             } else {
                 Err(Error::Rejected)
             };
@@ -109,15 +145,23 @@ async fn request(
         limits::charge(db, me, limits::Budget::Request).await?;
         db.execute_raw(statement("INSERT INTO central_identity.social_contacts (low, high, requested_by) VALUES ($1, $2, $3)", vec![low.into(), high.into(), me.into()])).await.map_err(unavailable)?;
     }
-    Ok(())
+    Ok(Changed::BOTH)
 }
 
-async fn remove(db: &impl ConnectionTrait, low: Uuid, high: Uuid) -> Result<(), Error> {
-    db.execute_raw(statement(
-        "DELETE FROM central_identity.social_contacts WHERE low = $1 AND high = $2",
-        vec![low.into(), high.into()],
-    ))
-    .await
-    .map_err(unavailable)?;
-    Ok(())
+/// The pair's contact ended, whatever it was (a request either way or a
+/// friendship): both saw it. Nothing to remove changed nothing.
+async fn remove(db: &impl ConnectionTrait, low: Uuid, high: Uuid) -> Result<Changed, Error> {
+    let removed = db
+        .execute_raw(statement(
+            "DELETE FROM central_identity.social_contacts WHERE low = $1 AND high = $2",
+            vec![low.into(), high.into()],
+        ))
+        .await
+        .map_err(unavailable)?
+        .rows_affected();
+    Ok(if removed > 0 {
+        Changed::BOTH
+    } else {
+        Changed::NEITHER
+    })
 }

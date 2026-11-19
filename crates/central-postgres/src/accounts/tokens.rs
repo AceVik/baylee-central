@@ -169,11 +169,12 @@ impl AccountStore {
     }
 
     /// End the client (native) session of the account behind `browser`,
-    /// and with it its tokens at gateways.
+    /// and with it its tokens at gateways. Returns the account, whose push
+    /// sockets check their session again (`docs/push-socket.md`).
     ///
     /// # Errors
     /// `Rejected` without a live browser session; storage failure.
-    pub async fn end_client_session(&self, browser: &Token) -> Result<(), Error> {
+    pub async fn end_client_session(&self, browser: &Token) -> Result<[u8; 16], Error> {
         let tx = self.db.begin().await.map_err(|_| Error::Unavailable)?;
         let (account, _) = owner(&tx, browser, true).await?;
         tx.execute_raw(statement(
@@ -182,7 +183,8 @@ impl AccountStore {
         ))
         .await
         .map_err(|_| Error::Unavailable)?;
-        tx.commit().await.map_err(|_| Error::Unavailable)
+        tx.commit().await.map_err(|_| Error::Unavailable)?;
+        Ok(account.into_bytes())
     }
 
     /// The gateways the account behind `browser` owns, newest first, with

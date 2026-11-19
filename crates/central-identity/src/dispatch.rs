@@ -189,9 +189,14 @@ impl IdentityService {
         {
             return Err(Error::Rejected);
         }
-        Ok(Response::Social {
-            response: self.store.social(surface.session(bearer)?, request).await?,
-        })
+        let (response, concerns) = self
+            .store
+            .social_concerning(surface.session(bearer)?, request)
+            .await?;
+        // Committed: the push sockets of exactly the accounts it concerns are
+        // told, whichever listener the change came from (`live.rs`).
+        self.tell(&concerns).await;
+        Ok(Response::Social { response })
     }
 
     async fn notifications(
@@ -229,6 +234,10 @@ impl IdentityService {
             }),
             Request::Logout => {
                 self.store.logout(session).await?;
+                // A native session's push sockets end with it.
+                if let central_postgres::Session::Native(token) = session {
+                    self.live.ended(&token.digest());
+                }
                 Ok(Response::Done)
             }
             Request::SessionStatus => {

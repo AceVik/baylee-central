@@ -16,7 +16,8 @@ impl IdentityService {
                 sessions: self.store.owner_sessions(cookie).await?,
             },
             OwnerRequest::EndClientSession => {
-                self.store.end_client_session(cookie).await?;
+                let account = self.store.end_client_session(cookie).await?;
+                self.sessions_changed(&account);
                 return Ok(Response::Done);
             }
             OwnerRequest::Gateways => OwnerAnswer::Gateways {
