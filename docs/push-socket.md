@@ -148,9 +148,10 @@ to hide it.
 
 | event | database | in memory |
 | --- | --- | --- |
-| dial | the session's status, the terms' acceptance, the account's friends if no socket of it is open, and the session and its choice again if news of an ended session or a changed choice came meanwhile: 2–4 statements | bounded registry entries |
+| dial | the session's status, the terms' acceptance, the choice again (in the account's turn) if a choice settled meanwhile, the account's friends if no socket of it is open, and the session again if news of an ended session came meanwhile: 2–5 statements | bounded registry entries |
 | chat send, group change, new device | none beyond the operation's own | bits for the named accounts' sockets (at most 51 accounts × 4 sockets for a group) |
-| a choice (`SetPresence`) | one statement, in turn with every other choice and a dial's second reading of one | bits for the account's sockets, and its followers' if how it is shown changed |
+| a choice (`SetPresence`) | the session's status and the write: two statements, in the account's turn | bits for the account's sockets, and its followers' if how it is shown changed |
+| a reading of it (`Presence`) | the session's status: one statement | — |
 | a report (`ReportPresence`) | none | bits for its followers, only if how it is shown changed |
 | contact change | for a friendship that began or ended only, one read of each of the two accounts' friends that holds a socket (≤ 2 statements of ≤ 300 rows), in a task the request does not wait for; a request or a block of a stranger reads nothing | presence bits for the two and whom their lists gained or lost |
 | sign-out | none | bits for that session's sockets |
@@ -241,20 +242,22 @@ and the client says what it is doing (`central_api::presence`).
 - **The choice** (`SetPresence`, on either listener, under Central's terms):
   `online`, `afk` (away) or `offline`. Stored with the account
   (`accounts.presence`, migration 000033, online by default), so it holds on
-  every device and after a restart; it is read with the dial's status. It is
-  not in the account's export, which released clients decode strictly
-  (`docs/account-deletion.md`). An
-  account that chose `offline` is never shown: its friends see it offline,
-  and its own news still reaches its sockets.
+  every device and after a restart; it is read with the dial's status.
+  `Presence` (either listener, without the terms) reads it back; the
+  website's download carries it. It is not in the account's export, which
+  released clients decode strictly (`docs/account-deletion.md`). An account
+  that chose `offline` is never shown: its friends see it offline, and its own
+  news still reaches its sockets.
 - **What the client does** (`ReportPresence`, native only): `playing` (it sits
   in a game that is running, online or against the house AI), `table` (it sits
   at a table whose game has not begun), or neither; and `idle` (no input for
   ten minutes, which shows the account away). Watching a game and building a
   deck are neither: online. Only these fixed values exist: no game, table,
   room or gateway is named. Heard only from a session that holds a push
-  socket, and kept in memory while the account holds one; a report without a
-  socket changes and keeps nothing, and is answered alike. The last report of
-  any of the account's sockets stands.
+  socket, and kept in memory on that session's sockets, going with them; a
+  report without a socket changes and keeps nothing, and is answered alike.
+  The newest report of the account's sockets stands, so a device that went
+  says nothing more of what it did.
 - **What friends see**: an account is shown while one of its sockets said
   `ready` and it did not choose `offline`; then away if it chose `afk` or is
   idle, and its activity. Friends are told only when that changes: connecting,
@@ -267,21 +270,27 @@ and the client says what it is doing (`central_api::presence`).
   choice. At 300 friends with eight-digit tags the frame is 3,659 bytes, below
   the 4,096 the client reads (a const assertion holds it). A socket says
   presence at most once a second; news within that second waits, and the
-  frame that follows says the latest.
-- **In the store's order**: a choice is written and then taken by the
-  registry in one step of its own, which a dropped request does not cut short
-  (it runs in a task), and every choice and every dial's second reading of
-  one takes its turn (`Live::settle`, `Live::recheck`): so the registry takes
-  choices in the order the store wrote them, and never ends at one the store
-  no longer holds. The turn is one for the service, since a choice is rare
-  (ten a minute a session) and one statement. What remains: an answer lost
-  after the store wrote (the store gone between its commit and its answer)
-  leaves the registry at the choice before, which the account's own sockets
-  say as `me` until its sockets close; its friends see what `me` says.
-- **Budgets**: 10 choices a minute a session (each is a statement) and 30
-  reports (none is); the registry's tables hold at most 4,096 sessions, a
-  newcomer taking the oldest's place, and a report is counted only for a
-  session with a socket.
+  frame that follows says the latest. A frame said takes whatever was held
+  back with it, so the next change waits a whole second again.
+- **The account's turn** (`Live::turn`): a choice holds its account's turn
+  from before its write until the registry has taken it, in a task of its own
+  that a dropped request does not cut short (`Live::settle`); a dial admits
+  its socket in the same turn (`Live::admit_in_turn`). So the registry takes
+  an account's choices in the order the store wrote them, and a socket is
+  never admitted with an older choice than the store's: a dial reads its
+  status (one statement, with the choice), and only if a choice settled
+  meanwhile reads it again in the turn, where no write is under way; its
+  reading then replaces the entry's, whose sockets say it. Only a choice
+  counts as settled, never a reading, so no dial makes another read again. A
+  write that fails may still have been stored: a failed `offline` is taken
+  all the same (hidden is the side to err on); any other is left to the next
+  dial's reading. One account's turn never waits for another's; the turns
+  are kept only while held or awaited.
+- **Budgets, before the work**: 10 choices and readings a minute a session,
+  spent before the terms are read for a choice; 30 reports, spent before the
+  registry looks for the session's sockets (found by the session, not by a
+  pass over all). The registry's tables hold at most 4,096 sessions, a
+  newcomer taking the oldest's place.
 
 ### For the client
 
@@ -292,7 +301,7 @@ and the client says what it is doing (`central_api::presence`).
   ends (online or against the house AI), and when ten minutes without input
   begin or end. Nothing else, and not more than 30 times a minute.
 - Set the choice with `set_presence`; the answer is the stored choice, and
-  every socket of the account says it as `me`.
+  every socket of the account says it as `me`. `presence_choice` reads it.
 - Read a frame with `central_client::read_presence`: when `states` is missing
   (an older Central), not exactly as long as `online`, or holds a letter not
   known, every friend it does not describe is read as online, never as an

@@ -362,9 +362,10 @@ How an account chose to be shown to its friends ([push socket](push-socket.md#st
 - **Read and written.** A session's status (and so every dial) reads it;
   `SetPresence` writes it with one `UPDATE … RETURNING` that names the account
   through its standing session. The runtime's existing `UPDATE` on `accounts`
-  covers it; the grants check is unchanged. The account's export does not
-  carry it (`docs/account-deletion.md`: released clients decode the export
-  strictly).
+  covers it; the grants check is unchanged. `Request::Presence` reads it
+  with the session's status. The account's export does not carry it
+  (`docs/account-deletion.md`: released clients decode the export strictly);
+  the website's download adds it.
 - **Additive.** A default and no rewrite of the table's rows (PostgreSQL 11
   and later store a constant default in the catalogue), so the previous
   binary, which never names the column, starts and serves on the migrated

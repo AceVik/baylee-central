@@ -8534,3 +8534,46 @@ the registry at the one before until the account's sockets close (its own socket
 has not run on production, which has its own gate. The privacy policy's § 5a paragraph and § 7 point changed after the owner read them, so his
 review does not cover the status sentences. These passes are by the implementing agent and are not
 an independent audit.
+
+Addendum, the same day: an independent review (a separate agent at the PM's request, at `973f4d0f`;
+the PM checked its export finding against Baylee) found, and the implementing agent confirmed in
+the code:
+
+- An account that chose `offline` could be shown. The count that told a dial to read the choice
+  again rose only when the registry took a choice, after the store's answer, and a dial's reading
+  never replaced a standing entry's choice. A dial that read `online` just before a write of
+  `offline` committed was admitted with `online` and said `ready` before the registry took the
+  write, so friends saw the account for up to the second the frame was held back; a dial whose
+  reading was older than the entry's left the entry older than the store; and a lost answer was
+  not healed by redials, whose fresh `offline` readings were thrown away. Now each account has a
+  turn: a choice holds it from before its write until the registry took it, a dial admits in it
+  and reads the choice again if one settled meanwhile, and the dial's reading, the store's
+  current, replaces the entry's. A failed write of `offline` is taken as `offline`.
+- The export broke the released Baylee client (found by the implementing agent's own check the
+  same hour as well): Baylee pins `central-api` at 4b14dcf0, whose `AccountExport` refuses unknown
+  fields, and reads the export for the lobby's name after every sign-in. The export is as released
+  again, and a frozen copy of 4b14dcf0's types decodes it in a test. The choice is read with its
+  own `Request::Presence` (either listener, no terms), and the website's download adds it. Of the
+  other answers Baylee decodes at 4b14dcf0, none changed: `central-api` only gained variants,
+  sent only for new requests, and the push frame is decoded leniently.
+- Dials and choices waited on one turn for the whole service, and every dial that overlapped
+  another's second reading read again, since a reading counted as a change: after a restart's
+  redials that could feed itself. A turn is per account now, and only a choice counts.
+- What a device reported outlived it: another device of the account that said nothing kept
+  showing it for up to twelve hours. A report lives on the sockets of the session that sent it.
+- A choice's budget was spent after the terms' statement, and a report's after a pass over all
+  sockets under the registry's lock, with a session without a socket never charged. Both budgets
+  come first now, and a session's sockets are found by the session.
+- Smaller: a presence frame said at once left an earlier deadline in place, so a second frame
+  could follow within the second; a frame said now takes it with it.
+
+Each fix's test is red without it, the fix taken back one at a time: the dial waiting for a choice
+under way (and the two ordering tests from before, the turn taken out of `settle`), a fresh
+reading replacing a standing entry's, a failed `offline` taken, one account's turn not waiting
+for another's and a reading counting nothing, a device's report going with it, a report charged
+first, the frame said at once clearing its deadline, and the frozen export (red with the choice in
+the export). The choice's budget before the terms is tested over real TCP: a session that has not
+accepted the terms is answered `TermsRequired` nine times and then `Busy`; the end-to-end scenario
+also reports playing and idle while `offline` and reads the choice back natively and on the
+website. The website's download is checked by its browser specs, which the implementing agent
+updated but did not run (they need packages it did not download); CI's `site` job runs them.
