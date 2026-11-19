@@ -110,10 +110,29 @@ The status (the owner's decision of 19.11.2026, relayed by the PM; in short:
 a person sets itself online, AFK or offline, a busy or in-game status is set
 by itself, and at a table; [push socket](../docs/push-socket.md) §"Status")
 is in the same unpublished version 2026-11-19: § 5a says what
-friends see (away, playing, at a table; never where or what), that offline
+friends see (away, playing, at a table; never what, and where only for a
+shared table, below), that offline
 hides the account, that the choice is stored and the rest is not; § 6 names
 the friends among the recipients with what they see; § 7 how long the choice
 is kept; the terms' § 1 names the status and appearing
 offline. The website's privacy page says the same. The owner approved the
 German status sentences on 19.11.2026 through the PM ("Ja, passt"); the
 English texts and the website's other languages follow them.
+
+**Awaiting the owner's review: the shared table.** Later on 19.11.2026 the
+owner decided that a friend sees which table a friend sits at through
+Central ([push socket](../docs/push-socket.md) §"Tables"). That made § 5a's
+"nicht aber wo oder was du spielst" untrue for a player who shares the
+table, so the implementing agent changed the privacy policy in the same pull
+request: § 5a's first paragraph now says that friends see where only if the
+table is shared, a new paragraph after the status says what the app tells
+Central then (the gateway's address, the game's identifier, the table's
+name, its seats and how many are taken; never for a table with a password),
+to whom Central passes it and that it is kept only in memory, and § 6 adds
+"und an welchem Tisch, wenn du ihn teilst". § 7 needs no change (what you are
+doing exists only while connected). The terms are unchanged: § 1 says
+nothing of where. The version stays 2026-11-19, which is not published yet;
+should it be published before the owner reads these sentences, they make a
+new version of the privacy policy (shown, not accepted). The English follows
+the German; the website's privacy page (`privacy-chat`, eleven languages,
+the nine beside German and English machine translations) says the same.

@@ -8598,3 +8598,40 @@ Each fix's test is red without it: `offline` taken before its write, a write wit
 letting the turn go, a step that panics still counted as settled. Tests the review missed were
 added: two dials around a choice both admit with what the store holds, and a dial whose second
 reading fails is not admitted and leaves no entry.
+
+## A shared table through presence, 19 November 2026
+
+The owner decided on 19.11.2026 that a friend sees which table a friend sits at through Central,
+since the game gateways no longer know friendships: the client names the table with its report
+(the gateway's origin, the game's id, the table's name, its seats and how many are taken) while its
+player shares it and it has no password, and Central passes it to the friends that are shown the
+account. The PM's brief set the bounds (an `https` or numeric-loopback `http` origin of about 200
+bytes, a short id from a strict alphabet, a plain name bounded in characters, 2 to 8 seats, no
+more taken than seats), the rule that anything else is dropped while the activity goes through,
+and compatibility both ways. The design is [push socket](push-socket.md) §"Tables".
+
+Design pass. Assets: what a player shares of its table (new, in memory), the friends' frames, the
+reports' budget and the registry's lock. Callers: the sharing account's client, its friends'
+sockets, a stranger, a blocked account, the account's own sockets, a client before tables, a
+Central before tables, a hostile client sending any bytes it likes. Invariants: a table reaches
+exactly whom the account's letter reaches and nobody while it chose `offline`; a table outside its
+bounds or without an activity is never kept or passed on, and never costs the report; nothing in
+a frame can close its string or add an event; no frame exceeds the client's 4,096 bytes whatever
+the number of friends at tables; a report without a table is the bytes it was; no client sends a
+table to a Central that would refuse the report for it; a friend's client never dials a gateway a
+friend named.
+
+Implementation pass. `central_api::presence::Table` holds the five fields and `Table::valid`, which
+reuses the directory's origin policy (`gateway::validate_origin`, live and development) and its
+`shown_char` for the name; `Table::lenient` reads an optional table so that `null` or any shape
+that is no table is none (an untagged enum of the table and `IgnoredAny`), and the type has no
+`deny_unknown_fields`, so a later field is read past. `ReportPresence` gains `table`, left out when
+none (`skip_serializing_if`), read leniently. The registry keeps the table on the report only with
+an activity and within its bounds, after the budget; what friends are shown is `Showing`, the
+letter and the table, and a change of either wakes the followers, so a table rides on every rule
+the letter already had (offline, blocks, the account's own sockets, a device going). `Presence`
+carries the shown friends' tables by tag. The socket says a `table` frame per friend whose table
+changed, and a clearing one for a friend that no longer shares one, before the `presence` frame,
+with the same one-second gap; `table_frame` serializes with `serde_json`. `ready` says
+`"tables":true`; the client sends a table only after it. The longest frame for a table within its
+bounds is 796 bytes, a const assertion against `frame::TEXT`.
