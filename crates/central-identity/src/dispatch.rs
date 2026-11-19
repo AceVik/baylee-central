@@ -184,15 +184,7 @@ impl IdentityService {
         bearer: Option<&Token>,
         surface: Surface,
     ) -> Result<Response, Error> {
-        // Pictures are the website's until the native client has a route
-        // of its own (M6, `docs/profile-pictures.md`).
-        if surface == Surface::Native
-            && matches!(
-                request,
-                central_api::social::SocialRequest::Pictures { .. }
-                    | central_api::social::SocialRequest::ReportPicture { .. }
-            )
-        {
+        if surface == Surface::Native && native_refuses(&request) {
             return Err(Error::Rejected);
         }
         let (response, concerns) = self
@@ -545,5 +537,39 @@ impl IdentityService {
             )
             .await
             .map(|()| Response::Done)
+    }
+}
+
+/// Social requests the native listener refuses. A picture's report is the
+/// website's: the game client reads keys, not reports. The keys of tags
+/// (`Pictures`) are served on both listeners by the same rules since M6
+/// (19.11.2026, `docs/profile-pictures.md`), so the game client can show
+/// the pictures of the people it lists.
+fn native_refuses(request: &central_api::social::SocialRequest) -> bool {
+    matches!(
+        request,
+        central_api::social::SocialRequest::ReportPicture { .. }
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::native_refuses;
+    use central_api::picture::{MAX_PICTURE_TAGS, PictureReason};
+    use central_api::social::SocialRequest;
+
+    #[test]
+    fn the_native_listener_reads_picture_keys_and_files_no_report() {
+        for tags in [vec![], vec![0x1a2b], vec![7; MAX_PICTURE_TAGS]] {
+            assert!(!native_refuses(&SocialRequest::Pictures { tags }));
+        }
+        assert!(native_refuses(&SocialRequest::ReportPicture {
+            tag: 0x1a2b,
+            key: [1; 16],
+            reason: PictureReason::Hate,
+            note: None,
+        }));
+        assert!(!native_refuses(&SocialRequest::Contacts));
+        assert!(!native_refuses(&SocialRequest::Lookup { tag: 0x1a2b }));
     }
 }
