@@ -51,6 +51,18 @@ performance policy. Do not import its permission to write unsafe or assembly.
   Keep platform integration behind adapters; verify the shared libraries in CI.
 - Implement small milestones with tests and a commit per working milestone.
   Use `codex/` branches and rebase feature branches. Never bypass required checks.
+- Work does not lie around (owner, 19.11.2026; all agents). After each finished
+  milestone, at least once a day, and before a session ends or its quota runs
+  low: commit, rebase onto `origin/main` and push the branch, half-done work
+  included (as a draft pull request once it is worth reading). A finished
+  milestone gets its pull request soon and stays small, and it is merged as
+  the rule on merging below allows, not held back for the rest of a stack.
+  This runs in the background beside the actual work; a cheaper model may do
+  a conflict-free rebase, the check runs and the push, but resolves no
+  conflict in code and writes none. A state that lay for long is compared
+  with `main` first (`git cherry origin/main <branch>`) and what is missing is
+  named to the owner. Parallel work left unpushed or unmerged has been lost
+  and has gone stale enough to break `main` before.
 - No real users, production credentials or data in tests. Bind local test
   services to loopback; use isolated databases/configuration and synthetic data.
 - Always stop agent-started test clients/services after testing, including
