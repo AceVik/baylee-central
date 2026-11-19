@@ -1,9 +1,10 @@
 //! Profile pictures (`docs/profile-pictures.md`) for a client: the keys of
 //! the pictures of public tags, a report of one, and the path a picture is
-//! read at. Central serves picture requests on the website's listener; the
-//! native listener refuses them until the client has a route of its own
-//! (M6), so today these answer `Rejected` there. The bytes are never on this
-//! wire: a client reads a picture at its path, by its random key.
+//! read at. Both listeners answer [`Session::picture_keys`] by the same
+//! rules (on the native one since M6, 19.11.2026); a report is the
+//! website's, and the native listener answers it `Rejected`. The bytes are
+//! never on this wire: a client reads a picture at its path on Central's
+//! website, by its random key, with a plain `GET` that carries no bearer.
 use super::{Error, Session, Transport};
 use central_api::picture::{PictureKey, PictureReason, TaggedPicture, key_hex};
 use central_api::social::{SocialRequest, SocialResponse};
@@ -23,8 +24,14 @@ pub enum PictureFile {
     Sequence,
 }
 
-/// The path a picture is read at, relative to Central's site: anyone may
-/// read it, signed in or not, until it is replaced or removed.
+/// The path a picture is read at, relative to Central's website (its
+/// origin, as `https://baylee.app`; not the native listener's): anyone may
+/// read it, signed in or not, until it is replaced or removed. Send no
+/// `Authorization` and no cookie: a read with either is the same `404` as
+/// an unknown key. Answers carry `Cache-Control: private, max-age=3600`
+/// and the digest as `ETag` (`If-None-Match` gives `304`); every refused or
+/// unknown read is `404` with `no-store`. Each address may read 600 a
+/// minute and 16 at once (`429` beyond).
 #[must_use]
 pub fn picture_path(key: &PictureKey, file: PictureFile) -> String {
     let extension = match file {
@@ -38,13 +45,14 @@ pub fn picture_path(key: &PictureKey, file: PictureFile) -> String {
 impl Session {
     /// The current picture keys of `tags`, in their order; tags without a
     /// picture, unknown ones and accounts with a block between them and
-    /// this one are absent. Tags outside the account's contacts and groups
-    /// spend its lookup budget.
+    /// this one are absent. Its own tag, its contacts' and its groups'
+    /// members' are free; every other tag spends a unit of its lookup
+    /// budget (120 an hour), all of them or none.
     ///
     /// # Errors
-    /// `Rejected` on a listener that does not serve it, for more than
-    /// [`central_api::picture::MAX_PICTURE_TAGS`] tags and for an
-    /// unexpected answer; `Busy` once the lookup budget is spent.
+    /// `Rejected` for more than [`central_api::picture::MAX_PICTURE_TAGS`]
+    /// tags, without a session, and for an unexpected answer; `Busy` once
+    /// the lookup budget is spent.
     pub fn picture_keys(
         &self,
         transport: &impl Transport,
@@ -64,8 +72,9 @@ impl Session {
     /// person is never told who reported it.
     ///
     /// # Errors
-    /// `Rejected` for one's own picture, one that is not the account's
-    /// current one or not visible, and a note out of bounds; `Conflict` for
+    /// `Rejected` on the native listener, which takes no reports, for one's
+    /// own picture, one that is not the account's current one or not
+    /// visible, and a note out of bounds; `Conflict` for
     /// a second open report of the same picture; `Busy` past the reporting
     /// rate.
     pub fn report_picture(

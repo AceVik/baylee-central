@@ -268,12 +268,25 @@ animation in the moderation list, and a link to open it alone.
 
 **Who learns a key.** A key is learned only from answers that name an
 account already:
-- one's own (`Request::Picture { Mine }`);
-- `SocialRequest::Pictures { tags }`, at most 300 tags. A tag outside the
-  caller's contacts and groups spends a unit of the existing lookup budget
-  (120 an hour), all or none. Unknown tags, accounts without a picture and
-  pairs with a block either way between them are absent.
+- one's own (`Request::Picture { Mine }`, the website's);
+- `SocialRequest::Pictures { tags }`, at most 300 tags, on both listeners
+  (on the native one since M6, 19.11.2026, so the game client can show the
+  people it lists; the same rules for its bearer). Its own tag, its
+  contacts' and its groups' members' are free; a tag outside them spends
+  a unit of the existing lookup budget (120 an hour), all or none. Unknown
+  tags, accounts without a picture and pairs with a block either way
+  between them are absent.
 - the administration.
+
+**The game client** asks `SocialRequest::Pictures` on the native listener
+(`central_client::Session::picture_keys`) and reads the files from the
+website's origin, where the page reads them
+(`central_client::picture_path`): `GET {website}/api/v1/pictures/{key}.png`,
+`.avif` and, when `moving`, `.sequence.avif`, with no bearer, no cookie
+and no fetch metadata, which the route takes as a direct read (test
+`a_native_client_s_plain_get_reads_every_file_and_an_unknown_key_is_the_same_404`).
+The native listener serves no files and files no report
+(`ReportPicture` there is `Rejected`).
 
 The bytes themselves are public: a block withholds the key, not the
 picture.
@@ -437,8 +450,10 @@ browser but Chromium.
 
 ## Not done here
 
-- The native client's own route and conversion (M6): the native listener
-  refuses picture requests.
+- The native client's own upload and conversion: a picture is set on the
+  website only. Since M6 (19.11.2026) the native listener answers the keys
+  of tags (`SocialRequest::Pictures`); it refuses reports, one's own
+  picture's request and uploads.
 - Gateways: they receive no picture.
 - Translations: the nine languages besides English and German show the
   English words.

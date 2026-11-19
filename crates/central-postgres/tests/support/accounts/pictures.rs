@@ -70,13 +70,29 @@ async fn keys(
     cookie: &Token,
     tags: Vec<u32>,
 ) -> Result<Vec<TaggedPicture>, Error> {
-    match store
-        .social(Session::Browser(cookie), Request::Pictures { tags })
-        .await?
-    {
+    keys_as(store, Session::Browser(cookie), tags).await
+}
+
+async fn keys_as(
+    store: &AccountStore,
+    session: Session<'_>,
+    tags: Vec<u32>,
+) -> Result<Vec<TaggedPicture>, Error> {
+    match store.social(session, Request::Pictures { tags }).await? {
         Response::Pictures { pictures } => Ok(pictures),
         _ => panic!("pictures expected"),
     }
+}
+
+/// A native session of `identity`, as the game client holds one.
+async fn native(store: &AccountStore, identity: Identity) -> Token {
+    let credential = store.credential(identity).await.unwrap().unwrap();
+    let token = Token::generate().unwrap();
+    store
+        .issue_session(&credential, Session::Native(&token))
+        .await
+        .unwrap();
+    token
 }
 
 async fn report(
@@ -134,6 +150,7 @@ pub(super) async fn run(store: &AccountStore, operator: &DatabaseConnection, key
     pictures(store, &people).await;
     budget(store, operator, &people).await;
     visibility(store, operator, &people).await;
+    native_visibility(store, operator, &people).await;
     reports(store, operator, &people).await;
     decisions(store, operator, &people).await;
     grants(store, operator).await;
@@ -381,6 +398,87 @@ async fn visibility(store: &AccountStore, operator: &DatabaseConnection, people:
         ))
         .await
         .unwrap();
+}
+
+/// The game client's native session learns keys by the same rules (M6,
+/// 19.11.2026): its own and a contact's free, a stranger's on the lookup
+/// budget, none across a block. `visibility` left the viewer a contact of
+/// the owner, and the owner blocking the shunned.
+async fn native_visibility(store: &AccountStore, operator: &DatabaseConnection, people: &People) {
+    let lookups = |id: Identity| {
+        format!(
+            "SELECT COALESCE((SELECT lookups::bigint FROM central_identity.social_budgets WHERE account_id = '{}'), 0) AS value",
+            uuid(id)
+        )
+    };
+    let owned = TaggedPicture {
+        tag: OWNER,
+        key: [4; 16],
+        moving: false,
+    };
+    let (owner_id, viewer_id, shunned_id, moderator_id) = (
+        people.owner.0,
+        people.viewer.0,
+        people.shunned.0,
+        people.moderator.0,
+    );
+    // one's own and a contact's, free
+    let owner = native(store, owner_id).await;
+    let before = count(operator, &lookups(owner_id)).await;
+    assert_eq!(
+        keys_as(store, Session::Native(&owner), vec![OWNER])
+            .await
+            .unwrap(),
+        [owned.clone()]
+    );
+    assert_eq!(count(operator, &lookups(owner_id)).await, before);
+    let viewer = native(store, viewer_id).await;
+    let before = count(operator, &lookups(viewer_id)).await;
+    assert_eq!(
+        keys_as(store, Session::Native(&viewer), vec![OWNER, VIEWER])
+            .await
+            .unwrap(),
+        [owned.clone()]
+    );
+    assert_eq!(count(operator, &lookups(viewer_id)).await, before);
+    // a stranger's, on the lookup budget; an unknown tag too
+    let moderator = native(store, moderator_id).await;
+    let before = count(operator, &lookups(moderator_id)).await;
+    assert_eq!(
+        keys_as(store, Session::Native(&moderator), vec![999_999, OWNER])
+            .await
+            .unwrap(),
+        [owned]
+    );
+    assert_eq!(count(operator, &lookups(moderator_id)).await, before + 2);
+    // across a block, either way, nothing
+    let shunned = native(store, shunned_id).await;
+    assert_eq!(
+        keys_as(store, Session::Native(&shunned), vec![OWNER])
+            .await
+            .unwrap(),
+        []
+    );
+    assert_eq!(
+        keys_as(store, Session::Native(&owner), vec![SHUNNED])
+            .await
+            .unwrap(),
+        []
+    );
+    // the same bound on tags; a session that is no session is refused
+    assert_eq!(
+        keys_as(store, Session::Native(&viewer), vec![1; 301]).await,
+        Err(Error::Rejected)
+    );
+    assert_eq!(
+        keys_as(
+            store,
+            Session::Native(&Token::generate().unwrap()),
+            vec![OWNER]
+        )
+        .await,
+        Err(Error::Rejected)
+    );
 }
 
 /// A report holds the digest; refusals look alike; duplicates and rates.
