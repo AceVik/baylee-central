@@ -287,7 +287,7 @@ and the client says what it is doing (`central_api::presence`).
   error. A frame's `online` stays the list of friends to show.
 
 The Baylee client needs the Central of the pull request that brings this
-(after `main` 7ce700e1 and the push socket's pull request).
+(on `main` after f9d797f6, the push socket's merge).
 
 ## The switch, and its legal basis
 
