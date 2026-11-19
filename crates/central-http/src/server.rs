@@ -123,13 +123,15 @@ impl DevelopmentServer {
         // The push sockets (`ws.rs`), and the periodic check of their sessions.
         let sockets = Sockets::new();
         sockets.check(identity);
-        // a report part may take its upload's time
-        self.serve(
+        // A report part may take its upload's time. On the heap: with the
+        // sockets' set the serving future is large, and its callers' futures
+        // hold it whole.
+        Box::pin(self.serve(
             app,
             super::boundary::UPLOAD_TIME + CONNECTION,
             Some(sockets),
             shutdown,
-        )
+        ))
         .await
     }
 
