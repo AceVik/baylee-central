@@ -350,6 +350,26 @@ id. Nothing names the giver.
 - **The day the count began** is the one row of `donation_count`, written
   by the migration in UTC; the runtime cannot change it.
 
+## A status choice (migration 000033)
+
+How an account chose to be shown to its friends ([push socket](push-socket.md#status)):
+`central_identity.accounts.presence`, `text NOT NULL DEFAULT 'online'` with
+`CHECK (presence IN ('online', 'afk', 'offline'))`.
+
+- **Only the choice.** Whether an account is online, since when, and what
+  its client says it is doing stay in the service's memory while a push
+  socket stands; no column, table or log holds them.
+- **Read and written.** A session's status (and so every dial) reads it;
+  `SetPresence` writes it with one `UPDATE … RETURNING` that names the account
+  through its standing session. The runtime's existing `UPDATE` on `accounts`
+  covers it; the grants check is unchanged. The account's export carries it.
+- **Additive.** A default and no rewrite of the table's rows (PostgreSQL 11
+  and later store a constant default in the catalogue), so the previous
+  binary, which never reads the column, runs on unchanged. The way back, after
+  that binary is in place again: `ALTER TABLE central_identity.accounts DROP
+  COLUMN presence;` by hand (the migration names it). Production runs it only
+  through its own gate.
+
 ## The migration runner, 18.11.2026
 
 `sea-orm-migration` 2.0.4 depends on SeaORM with all its default features,

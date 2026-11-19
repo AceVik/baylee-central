@@ -102,13 +102,21 @@ Solange die Baylee-App angemeldet ist, hält sie eine Verbindung zu Central
 offen, über die Central ihr sagt, dass sich etwas an deinen eigenen Chats,
 Kontakten oder Gruppen geändert hat; der Inhalt selbst geht nicht darüber.
 Solange diese Verbindung besteht, sehen deine Freunde (Kontakte, die ihr beide
-angenommen habt), dass du online bist: nur das, erkennbar an deinem Tag (dem
-Kürzel hinter deinem Anzeigenamen), nicht wo oder was du spielst. Niemand
-sonst sieht es, auch keine offenen Anfragen und keine Blockierten (Art. 6
-Abs. 1 lit. b DSGVO). Central hält diesen Status nur im
-Arbeitsspeicher, solange die Verbindung offen ist; er wird nicht gespeichert
-und nicht protokolliert. Der Status, den ein Gateway beim Spielen zeigt, ist
-dessen eigener.
+angenommen habt), dass du online bist, erkennbar an deinem Tag (dem Kürzel
+hinter deinem Anzeigenamen), und ob du abwesend bist, spielst oder an einem
+Tisch sitzt, nicht aber wo oder was du spielst. Niemand sonst sieht es, auch
+keine offenen Anfragen und keine Blockierten (Art. 6 Abs. 1 lit. b DSGVO). Ob
+du online bist und was du tust, hält Central nur im Arbeitsspeicher, solange
+die Verbindung offen ist; das wird nicht gespeichert und nicht protokolliert.
+Der Status, den ein Gateway beim Spielen zeigt, ist dessen eigener.
+
+In der Baylee-App wählst du, ob deine Freunde dich als online, abwesend oder
+offline sehen. Wählst du „offline“, sehen sie dich nie online, und auch sonst
+erreicht sie nichts davon, dass du verbunden bist. Diese Wahl speichert
+Central mit deinem Konto. „Spielt“ heißt: Du sitzt in einer laufenden Partie,
+online oder gegen die Haus-KI; „am Tisch“: Du sitzt an einem Tisch, dessen
+Partie noch nicht begonnen hat; abwesend erscheinst du auch nach zehn Minuten
+ohne Eingabe. Das meldet die App an Central (Art. 6 Abs. 1 lit. b DSGVO).
 
 Wenn du Benachrichtigungen aktivierst (Art. 6 Abs. 1 lit. a DSGVO, § 25 Abs. 1
 TDDDG: deine Einwilligung, im Profil jederzeit für die Zukunft widerrufbar),
@@ -176,8 +184,10 @@ du dich dort anmeldest, entscheidest du.
   für alle Konten, sobald der Umzug vom offiziellen Gateway endet.
 - Sitzungen enden 30 Minuten nach ihrer letzten Nutzung und spätestens
   12 Stunden nach der Anmeldung, Anmeldetickets nach Sekunden.
-- Dein Online-Status besteht nur, solange die Baylee-App mit Central
-  verbunden ist, und nur im Arbeitsspeicher.
+- Ob du online bist und was du tust, besteht nur, solange die Baylee-App mit
+  Central verbunden ist, und nur im Arbeitsspeicher. Deine Wahl, wie deine
+  Freunde dich sehen (online, abwesend, offline), speichern wir, bis du sie
+  änderst oder dein Konto löschst.
 - Den Zeitpunkt deiner letzten Anmeldung speichern wir für die Dauer deines
   Kontos.
 - Das Protokoll dessen, was unsere Administratoren getan haben, bewahren wir

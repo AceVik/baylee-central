@@ -21,9 +21,10 @@ servers ("gateways") and Baylee Central. Baylee Central gives you:
 - encrypted storage for your settings, your list of gateways, deck backups
   and your chat history;
 - a public directory of gateways, where you can list and manage your own;
-- personal chats, contacts and groups with other Baylee accounts. Your
-  friends (contacts you both accepted) see that you are online while your
-  Baylee client is connected to Baylee Central;
+- personal chats, contacts and groups with other Baylee accounts. While your
+  Baylee client is connected to Baylee Central, your friends (contacts you
+  both accepted) see that you are online and whether you are away, playing or
+  sitting at a table; you can choose to appear offline instead;
 - a profile picture beside your display name, if you set one;
 - daily and weekly challenges and Tower expeditions, with leaderboards you
   appear on only if you enable them;

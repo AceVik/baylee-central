@@ -24,8 +24,10 @@ Central bietet dir:
 - ein öffentliches Verzeichnis von Gateways und die Möglichkeit, eigene
   Gateways einzutragen und zu verwalten;
 - persönliche Chats, Kontakte und Gruppen mit anderen Baylee-Konten. Deine
-  Freunde (Kontakte, die ihr beide angenommen habt) sehen, dass du online
-  bist, solange dein Baylee-Client mit Baylee Central verbunden ist;
+  Freunde (Kontakte, die ihr beide angenommen habt) sehen, solange dein
+  Baylee-Client mit Baylee Central verbunden ist, dass du online bist und ob
+  du abwesend bist, spielst oder an einem Tisch sitzt; du kannst stattdessen
+  offline erscheinen;
 - ein Profilbild neben deinem Anzeigenamen, wenn du eines setzt;
 - Daily- und Weekly-Aufgaben und Tower-Expeditionen, mit Ranglisten, in
   denen du nur erscheinst, wenn du sie freigibst;
