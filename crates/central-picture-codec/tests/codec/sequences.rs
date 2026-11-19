@@ -73,6 +73,7 @@ fn apng(delays: &[u16]) -> Vec<u8> {
 }
 
 /// What a stand-in answers when asked for `libaom-av1`, as ffmpeg does.
+#[cfg(unix)]
 const AOM_HELP: &str =
     "Encoder libaom-av1 [libaom AV1]:\\n    Supported pixel formats: yuv420p yuv444p gray\\n";
 
@@ -248,6 +249,7 @@ fn every_failure_of_the_encoder_keeps_the_still_and_says_why() {
 /// A real sequence of one track for an opaque GIF of 100, 300 and 1500 ms,
 /// made by `libsvtav1` (`tests/fixtures/README.md`), written where a
 /// stand-in can copy it.
+#[cfg(unix)]
 fn opaque_fixture() -> std::path::PathBuf {
     let path = std::env::temp_dir().join(format!(
         "central-picture-test-{}-opaque.avif",
