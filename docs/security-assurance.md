@@ -8323,3 +8323,85 @@ done: no source audit of the new packages, and no run on a Mac of what only buil
 the workspace's own tests.
 
 These passes are by the implementing agent and are not an independent audit.
+
+## The native push socket, `GET /v1/ws`, with presence, 19 November 2026
+
+The Baylee client has dialled `/v1/ws` since 10.11.2026 and polls without it; the owner decided on
+19.11.2026 that Central serves it, with presence, rebuilt on `main` rather than ported from an
+earlier uncommitted attempt, whose review named six faults: every event went to every socket, each
+event cost a query per open socket, one global limit of 256 and none per account or address,
+hand-written SHA-1, Base64 and framing that lost bytes when a push came mid-frame, `keep_alive`
+dropped for every route, and no tests of the socket. The design is [push socket](push-socket.md).
+
+Design pass. Assets: what one account's changes say about it (that it wrote, that a contact or a
+group changed, when), presence (that an account is online now, a new disclosure), the sessions a
+socket stands on, and the listener's connections, descriptors and database pool. Callers: a
+signed-in client, a client whose session ended or was replaced, a gateway with its credential, a
+page in a browser, anyone without a session, a friend, a blocked account, an invitee, an
+unrelated account that watches its own socket's timing. Invariants: a socket is woken only by news
+that names its own account, and the news names exactly the accounts whose own view changed
+(a blocker and a full inbox take no delivery and are not named); presence is accepted friends with
+a socket and nothing else, never stored, and never shows an ended friendship; `revoked` only on the
+store's word that the session ended, never for a store that cannot answer, a limit or a stop; the
+database work of an event is bounded by the accounts it concerns, and the periodic check is one
+statement for all sockets; every socket is bounded by the listener, its address, its account and
+its session, and its connection by an idle limit, a write limit, a lifetime and the listener's
+stop; every connection that is not an upgrade keeps one request and no keep-alive; no first-party
+cryptography, and no package or feature outside the approved inventory. The contract is the
+client's as it stands; nothing in it had to bend.
+
+Implementation pass. The store says whom an operation concerns from the rows it locked in its own
+transaction (`Concerns`): a send its takers, a contact change each side whose view changed
+(`Changed`), a group change who sees it in the snapshot (`Seen`); no statement is added for it. The
+registry (`live.rs`) holds sockets by account with a doorbell and bits per socket, so nothing is
+queued and nothing overflows; friends are read when an account's first socket opens and for the
+two accounts of a contact change, the newest reading winning, a failed one closing the sockets;
+followers are found in memory. A native sign-out ends exactly its digest's sockets; a native
+sign-in, a new password, a reset, a deletion, a pairing and the website's end of the client's
+session ask the account's sockets to check (the existing `changed` hook covers the three credential
+paths in one place). The route stands below the protocol layer (the client sends no protocol
+header) and inside the boundary (Host, Origin, the request's time). The server peeks at a
+connection's first line; only `GET /v1/ws HTTP/1.1` gets keep-alive and upgrades, every other answer
+on it says `Connection: close`, and the peek's time counts against the head's three seconds, so a
+silent connection is held no longer than before. hyper's own behaviour was read first: with
+keep-alive off it adds `Connection: close` to a 101 as well, which is why the setting is chosen
+per connection instead of dropped. Sockets run in a set of the listener's own, outside its 128
+connections and their time, with a stop that closes them and an abort after the drain. Framing is
+first-party (the HTTP stack's approved features do not include axum's `ws`, and no WebSocket crate
+is approved): the reader keeps its bytes in its own 131-byte buffer and awaits one `read`, refuses
+data frames, reserved bits and opcodes, unmasked and long frames at the header; writes are never
+in a `select!` and each has ten seconds. The handshake uses `sha1` 0.11.0 (no features) and
+`base64` 0.22.1 (`alloc`), both approved; `sha1` and its `cpufeatures` 0.3.1 enter the compiled
+graph for the first time (they were in the lock through `sqlx-mysql` only) and contain
+dependency-internal `unsafe` for SIMD; first-party `unsafe` stays forbidden. Limits: 512 sockets (the
+unit's 1,024 descriptors), 32 an address, 4 an account, 60 dials a minute an address, 12 a session.
+
+Adversarial pass, what it found and what changed. A first draft's per-connection `keep_alive`
+choice let a silent connection hold its place a second longer (the peek's wait before hyper's three
+seconds); the head's timer now takes what is left of them, and a test holds it to the old bound.
+An account's first friend reading woke the sockets of up to 300 friends although its own socket had
+not said `ready` and nothing they report could change; only a later reading wakes them now.
+Tested: the registry's addressing (an
+account's news never wakes another's socket, from both listeners), merging (100,000 raises, one
+frame each kind), presence with several sockets per account, racing readings and a failed one,
+deletion and retag, the limits and their tables; every handshake refusal and the RFC 6455 vectors;
+frames cut in half by news (no byte lost), refused frames, a flood of frames, idle, write and
+lifetime ends, the stop; the server's upgrade over real TCP (the 101 says `upgrade` and no `close`,
+a refusal and an ordinary connection close and answer no pipelined request, a stubborn socket is
+aborted after the drain); the store's `Concerns` for contacts, sends (a blocker in a group is not
+named), retries, device keys and every group change, `live_sessions` (replaced, signed out,
+expired, a browser token) and `live_friends` on PostgreSQL 18; and over real TCP against the
+fixture's listener and PostgreSQL, with a raw masked client of the test's own: every refusal
+(no or two bearers, a gateway credential, an Origin, a body, version 8, a short key, no upgrade, a
+query, unaccepted terms, an ended session), an account's fifth socket, an address's 61st dial, A's
+socket silent while B and C change, a website change reaching the native socket, presence as B
+opens and closes two sockets, and `revoked` after a sign-out, a replacing sign-in, the website's end
+of the client's session, a new password, and an expiry found by the periodic check.
+
+What was not done: the real Baylee client was not run against the socket (its contract was read and
+the frames and handshake match it; the test client is independent); Caddy's pass of the upgrade was
+not tried (`docs/operations.md`, a check after the first deploy); no administrator action on `main`
+ends a native session, so none was tested; the 75-second idle limit and the minute's check were
+tested with short times and a direct call, not waited for. The privacy policy's version 2026-11-19
+awaits the owner's review, and whether presence wants a switch is the owner's question. These passes
+are by the implementing agent and are not an independent audit.

@@ -20,6 +20,7 @@ and assembly are forbidden. See [AGENTS.md](AGENTS.md) for binding development r
 - [Architecture and decisions](docs/architecture.md)
 - [Cryptographic integration](docs/crypto-protocol.md)
 - [Native login, migration and development account service](docs/native-login.md)
+- [The native push socket, `GET /v1/ws`, and presence](docs/push-socket.md)
 - [PostgreSQL and UUID policy](docs/postgresql.md)
 - [SeaORM adapter and migration tests](docs/database-development.md)
 - [Threat model](docs/threat-model.md)

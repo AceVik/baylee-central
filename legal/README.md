@@ -1,7 +1,7 @@
 # Legal texts of Baylee Central
 
 **Status: the terms are at version 2026-11-11 and the privacy policy at
-2026-11-18** (the
+2026-11-19, a proposal that awaits the owner's review** (the
 owner asked for the texts to be corrected on 11.11.2026: an administrator's
 reset code, deleting the account in its settings on the website, the Fan
 Content notice in its given words, the chat's and the notifications' legal
@@ -34,6 +34,15 @@ policy, 2026-11-18: § 3 names what a donation leaves behind and why, § 7
 how long a single record is kept (40 days, then one total per platform).
 The terms are unchanged and stay at 2026-11-11, so nobody is asked to
 accept anything again; a new privacy policy is shown, not accepted.
+
+On 19.11.2026 the owner decided that Central serves the Baylee client's
+push socket with presence ([push socket](../docs/push-socket.md)). That
+makes the privacy policy's version 2026-11-19: § 5a says what the socket
+carries and that accepted friends see when an account is online, held in
+memory only, § 7 how long (while the client is connected). Written by the
+implementing agent as a proposal in the same pull request, it awaits the
+owner's review before it is merged; the website's own privacy page
+(`crates/central-web`) does not say it yet.
 
 | file | what |
 | --- | --- |

@@ -1,5 +1,5 @@
-<!-- version: 2026-11-18 -->
-<!-- updated: 2026-11-18 -->
+<!-- version: 2026-11-19 -->
+<!-- updated: 2026-11-19 -->
 
 # Baylee Central privacy policy
 
@@ -91,6 +91,15 @@ Central stores at most 5,000 messages per sender and per device; after that,
 new ones are refused. History is not deleted automatically; it stays until you
 delete your account.
 
+While the Baylee app is signed in, it keeps a connection to Central open, on
+which Central tells it that something about your own chats, contacts or groups
+changed; the content itself does not travel on it. While that connection is
+open, your friends (contacts you both accepted) see that you are online: only
+that, by your tag, not where or what you play. Nobody else sees it, neither
+pending requests nor blocked accounts (Art. 6(1)(b) GDPR). Central keeps this
+status only in memory while the connection is open; it is neither stored nor
+logged. The status a gateway shows while you play is that gateway's own.
+
 If you enable notifications (Art. 6(1)(a) GDPR, section 25(1) TDDDG: your
 consent, which you can withdraw for the future at any time in your profile),
 Central stores this browser's push endpoint, public key,
@@ -142,6 +151,8 @@ whether you sign in there is your decision.
   official gateway ends.
 - Sessions end 30 minutes after their last use and at most 12 hours after
   signing in, sign-in tickets after seconds.
+- Your online status exists only while the Baylee app is connected to
+  Central, and only in memory.
 - The time of your last sign-in is kept while your account exists.
 - The record of what our administrators did is kept for three years, then
   deleted automatically.

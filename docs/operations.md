@@ -134,6 +134,30 @@ central.baylee.app {
 }
 ```
 
+### The push socket
+
+`GET /v1/ws` on the account listener is a WebSocket for signed-in Baylee
+clients ([push socket](push-socket.md)). Caddy's `reverse_proxy` passes a
+WebSocket upgrade on as it is, with no directive of its own; that the
+deployed Caddy does so for this route has not been tried here, and is the
+operator's check after the first deploy that serves it (a signed-in client
+shows its friends online, or `curl` against the public name with the
+handshake's headers and a bearer is answered `101`). Nothing about it is
+logged.
+
+- **File descriptors.** Each socket is a connection of its own besides the
+  listener's 128, up to 512 at once. The unit sets no `LimitNOFILE`, so the
+  service has systemd's 1,024: the sockets, both listeners' connections and the
+  database's fit below that. A unit that lowers it, or a change that raises
+  the sockets' limit, needs `LimitNOFILE` raised with it; at the limit an
+  `accept` that fails stops the listener.
+- **The firewall** (`ops/central-limits.nft`, next section) counts a
+  socket's connection to Caddy among the 512 an address holds.
+- **Its sessions** are checked once a minute in one statement for all
+  sockets; one that cannot be checked twice in a row closes them all, and
+  their clients poll and dial again. A stop closes every socket (1001), waits
+  three seconds, then ends the rest.
+
 ### Connection limits in front of the proxy
 
 `ops/central-limits.nft` is an nftables file for the host Caddy runs on. It
