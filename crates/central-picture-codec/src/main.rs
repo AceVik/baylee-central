@@ -12,21 +12,40 @@
 //! central-picture-worker [--ffmpeg PATH | --no-ffmpeg] [--probe]
 //! ```
 //!
-//! `--ffmpeg` names the ffmpeg for animations (default `/usr/bin/ffmpeg`,
-//! Ubuntu's); `--no-ffmpeg` keeps every animation as its still; `--probe`
-//! only says whether that ffmpeg has `libaom-av1`, for the operator, and
-//! exits 0 when it has.
+//! `--ffmpeg` names the ffmpeg for animations (default: the first of
+//! [`FFMPEGS`] that is a file, else `/usr/bin/ffmpeg`, Ubuntu's, which the
+//! production unit names itself); `--no-ffmpeg` keeps every animation as
+//! its still; `--probe` only says which AV1 encoder that ffmpeg has
+//! (`libaom-av1`, else `libsvtav1`, which keeps transparent animations as
+//! stills), for the operator, and exits 0 when it has one.
 #![forbid(unsafe_code)]
 
-use central_picture_codec::{Ffmpeg, Refusal, convert_with};
+use central_picture_codec::{Encoder, Ffmpeg, Found, Refusal, convert_with};
 use std::io::Write;
 use std::process::ExitCode;
 use std::time::{Duration, Instant};
 
 /// The conversion's own stack: generous, since a decoder may recurse.
 const STACK: usize = 64 * 1024 * 1024;
-/// Ubuntu's ffmpeg, which the production server installs.
-const FFMPEG: &str = "/usr/bin/ffmpeg";
+/// Where the worker looks for ffmpeg without `--ffmpeg`: Ubuntu's, which
+/// the production server installs (and its unit names anyway), then
+/// Homebrew's on Apple Silicon and on Intel, for a development Central on
+/// a Mac, whose service starts the worker without `--ffmpeg` unless told
+/// one. Fixed absolute paths only: the worker has no environment to search.
+const FFMPEGS: [&str; 3] = [
+    "/usr/bin/ffmpeg",
+    "/opt/homebrew/bin/ffmpeg",
+    "/usr/local/bin/ffmpeg",
+];
+
+/// The first of [`FFMPEGS`] that is a file, else Ubuntu's.
+fn default_ffmpeg() -> Ffmpeg {
+    let found = FFMPEGS
+        .into_iter()
+        .find(|path| std::path::Path::new(path).is_file())
+        .unwrap_or(FFMPEGS[0]);
+    Ffmpeg::at(found)
+}
 /// The latest ffmpeg may end, from the worker's start: inside the
 /// service's `central_picture::TIME` (20 s) with room to answer, so an
 /// animation that runs late loses only its sequence, never its still.
@@ -43,16 +62,27 @@ struct Options {
 }
 
 fn options() -> Option<Options> {
-    let mut ffmpeg = Some(Ffmpeg::at(FFMPEG));
+    let mut ffmpeg = None;
+    let mut chosen = false;
     let mut probe = false;
     let mut args = std::env::args_os().skip(1);
     while let Some(arg) = args.next() {
         match arg.to_str()? {
-            "--ffmpeg" => ffmpeg = Some(Ffmpeg::at(args.next()?)),
-            "--no-ffmpeg" => ffmpeg = None,
+            "--ffmpeg" => {
+                ffmpeg = Some(Ffmpeg::at(args.next()?));
+                chosen = true;
+            }
+            "--no-ffmpeg" => {
+                ffmpeg = None;
+                chosen = true;
+            }
             "--probe" => probe = true,
             _ => return None,
         }
+    }
+    // Looked for only when the command line named none.
+    if !chosen {
+        ffmpeg = Some(default_ffmpeg());
     }
     Some(Options { ffmpeg, probe })
 }
@@ -64,16 +94,9 @@ fn main() -> ExitCode {
         return ExitCode::FAILURE;
     };
     if options.probe {
-        let found = options.ffmpeg.as_ref().is_some_and(Ffmpeg::probe);
-        println!(
-            "animations: {}",
-            if found {
-                "ffmpeg with libaom-av1 found"
-            } else {
-                "no ffmpeg with libaom-av1; animations are kept as stills"
-            }
-        );
-        return if found {
+        let found = options.ffmpeg.as_ref().and_then(Ffmpeg::probe);
+        println!("animations: {}", said(found));
+        return if found.is_some() {
             ExitCode::SUCCESS
         } else {
             ExitCode::FAILURE
@@ -106,4 +129,24 @@ fn main() -> ExitCode {
         return ExitCode::FAILURE;
     }
     ExitCode::SUCCESS
+}
+
+/// What `--probe` found, for the operator (`docs/operations.md`).
+fn said(found: Option<Found>) -> String {
+    let names = Encoder::ALL.map(Encoder::name).join(", ");
+    match found {
+        Some(Found {
+            encoder,
+            alpha: true,
+        }) => format!("ffmpeg with {} found", encoder.name()),
+        Some(Found {
+            encoder,
+            alpha: false,
+        }) => format!(
+            "ffmpeg with {} found; transparent animations are kept as stills (no {})",
+            encoder.name(),
+            Encoder::Aom.name()
+        ),
+        None => format!("no ffmpeg with an AV1 encoder ({names}); animations are kept as stills"),
+    }
 }

@@ -114,7 +114,8 @@ pub enum Motion {
     Still,
     /// An animation, and its AVIF image sequence.
     Sequence(Vec<u8>),
-    /// An animation kept as its still: no ffmpeg with `libaom-av1` here.
+    /// An animation kept as its still: no ffmpeg here with an AV1 encoder
+    /// that writes it (`libaom-av1`; for an opaque one `libsvtav1` too).
     NoEncoder,
     /// An animation kept as its still: the encoder failed, ran out of
     /// time, or made what the checks refuse.

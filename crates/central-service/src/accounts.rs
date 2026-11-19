@@ -52,8 +52,11 @@ struct Settings {
     #[serde(default)]
     picture_worker: Option<String>,
     /// The ffmpeg the worker encodes animations with, an absolute path;
-    /// absent means the worker's own default, `/usr/bin/ffmpeg`. Without
-    /// one that has `libaom-av1`, animations are kept as their stills.
+    /// absent means the worker's own default, the first of
+    /// `/usr/bin/ffmpeg`, `/opt/homebrew/bin/ffmpeg` and
+    /// `/usr/local/bin/ffmpeg` there is. With `libaom-av1` every animation
+    /// moves, with only `libsvtav1` the opaque ones; without either,
+    /// animations are kept as their stills.
     #[serde(default)]
     picture_ffmpeg: Option<String>,
 }
