@@ -98,7 +98,8 @@ which Central tells it that something about your own chats, contacts or groups
 changed; the content itself does not travel on it. While that connection is
 open, your friends (contacts you both accepted) see that you are online,
 recognisable by your tag (the code after your display name), and whether you
-are away, playing or sitting at a table, but not where or what you play.
+are away, playing or sitting at a table; they do not see what you play, and
+where only if you share your table (see below).
 Nobody else sees it, neither pending requests nor blocked accounts
 (Art. 6(1)(b) GDPR). Whether you are online and what you are doing, Central
 keeps only in memory while the connection is open; it is neither stored nor
@@ -111,6 +112,15 @@ your account. "Playing" means you sit in a game that is running, online or
 against the house AI; "at a table", that you sit at a table whose game has
 not begun; you also appear away after ten minutes without input. The app
 tells Central so (Art. 6(1)(b) GDPR).
+
+If you share your table (a setting of the gateway you play on; it is on until
+you turn it off), the app also tells Central which table you sit at while you
+play or sit at one: the gateway's address, the game's identifier there, the
+table's name, how many seats it has and how many are taken; never for a table
+with a password. Central passes this to your friends as it does your status,
+to nobody else and not while you chose "offline", likewise keeps it only in
+memory while the connection is open, and neither stores nor logs it
+(Art. 6(1)(b) GDPR).
 
 If you enable notifications (Art. 6(1)(a) GDPR, section 25(1) TDDDG: your
 consent, which you can withdraw for the future at any time in your profile),
@@ -147,7 +157,8 @@ only after you choose to enable notifications; OS/browser settings can block del
 - **Other players:** your contacts and the members of your groups see your
   display name and tag and the messages you send them; your friends also see
   that you are online, and whether you are away, playing or sitting at a
-  table, while the Baylee app is connected to Central and you did not choose
+  table, and at which table if you share it, while the Baylee app is
+  connected to Central and you did not choose
   "offline" (section 5a). Anyone can see your profile picture, signed in or not, and
   your entry on a leaderboard you enable.
 - **Authorities** receive data only where we are legally obliged.

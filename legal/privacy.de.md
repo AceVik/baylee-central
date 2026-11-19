@@ -104,7 +104,8 @@ Kontakten oder Gruppen geändert hat; der Inhalt selbst geht nicht darüber.
 Solange diese Verbindung besteht, sehen deine Freunde (Kontakte, die ihr beide
 angenommen habt), dass du online bist, erkennbar an deinem Tag (dem Kürzel
 hinter deinem Anzeigenamen), und ob du abwesend bist, spielst oder an einem
-Tisch sitzt, nicht aber wo oder was du spielst. Niemand sonst sieht es, auch
+Tisch sitzt; was du spielst, sehen sie nicht, und wo nur, wenn du deinen Tisch
+teilst (siehe unten). Niemand sonst sieht es, auch
 keine offenen Anfragen und keine Blockierten (Art. 6 Abs. 1 lit. b DSGVO). Ob
 du online bist und was du tust, hält Central nur im Arbeitsspeicher, solange
 die Verbindung offen ist; das wird nicht gespeichert und nicht protokolliert.
@@ -117,6 +118,16 @@ Central mit deinem Konto. „Spielt“ heißt: Du sitzt in einer laufenden Parti
 online oder gegen die Haus-KI; „am Tisch“: Du sitzt an einem Tisch, dessen
 Partie noch nicht begonnen hat; abwesend erscheinst du auch nach zehn Minuten
 ohne Eingabe. Das meldet die App an Central (Art. 6 Abs. 1 lit. b DSGVO).
+
+Teilst du deinen Tisch (eine Einstellung des Gateways, auf dem du spielst; sie
+ist an, bis du sie ausschaltest), sagt die App Central außerdem, an welchem
+Tisch du sitzt, solange du spielst oder an einem Tisch sitzt: die Adresse des
+Gateways, die Kennung der Partie dort, den Namen des Tisches, wie viele Plätze
+er hat und wie viele besetzt sind; bei einem Tisch mit Passwort nie. Central
+gibt das an deine Freunde weiter wie deinen Status, an niemanden sonst und
+nicht, solange du „offline“ gewählt hast, hält es ebenso nur im
+Arbeitsspeicher, solange die Verbindung offen ist, und speichert und
+protokolliert es nicht (Art. 6 Abs. 1 lit. b DSGVO).
 
 Wenn du Benachrichtigungen aktivierst (Art. 6 Abs. 1 lit. a DSGVO, § 25 Abs. 1
 TDDDG: deine Einwilligung, im Profil jederzeit für die Zukunft widerrufbar),
@@ -161,7 +172,8 @@ Zustellung verhindern.
   deinen Anzeigenamen mit Tag und die Nachrichten, die du ihnen schickst;
   deine Freunde außerdem, solange die Baylee-App mit Central verbunden ist
   und du nicht „offline“ gewählt hast, dass du online bist und ob du
-  abwesend bist, spielst oder an einem Tisch sitzt (Abschnitt 5a). Dein Profilbild kann jeder sehen, auch
+  abwesend bist, spielst oder an einem Tisch sitzt, und an welchem Tisch,
+  wenn du ihn teilst (Abschnitt 5a). Dein Profilbild kann jeder sehen, auch
   ohne Anmeldung, ebenso deinen Eintrag in einer Rangliste, die du freigibst.
 - **Behörden** erhalten Daten nur, wenn wir gesetzlich dazu verpflichtet sind.
 

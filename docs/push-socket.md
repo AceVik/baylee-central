@@ -26,7 +26,8 @@ no more):
 
 | frame | when |
 | --- | --- |
-| `{"event":"ready"}` | first, once the socket is registered; the client then reads everything once |
+| `{"event":"ready","tables":true}` | first, once the socket is registered; the client then reads everything once. `tables` says that this Central takes a table with a report (§"Tables"); a Central before them sends `{"event":"ready"}` |
+| `{"event":"table","tag":"002a","table":{…}}` | before the `presence` frame it goes with: a friend shown at a table it shares, or `{"event":"table","tag":"002a"}` once it shares none (§"Tables") |
 | `{"event":"presence","online":["002a",…],"states":"o…","me":"online"}` | right after `ready`, and whenever it changes, at most once a second: the tags (lower-case hex, at least four digits, as the client writes them) of the account's friends that are shown online, in order; a letter of `states` for each (§"Status"); the account's own choice |
 | `{"event":"social"}` | the account's contacts, requests, blocks, groups, invitations or own devices changed |
 | `{"event":"chat"}` | a delivery reached one of the account's devices (its own sends included) |
@@ -152,7 +153,7 @@ to hide it.
 | chat send, group change, new device | none beyond the operation's own | bits for the named accounts' sockets (at most 51 accounts × 4 sockets for a group) |
 | a choice (`SetPresence`) | the session's status and the write: two statements, in the account's turn | bits for the account's sockets, and its followers' if how it is shown changed |
 | a reading of it (`Presence`) | the session's status: one statement | — |
-| a report (`ReportPresence`) | none | bits for its followers, only if how it is shown changed |
+| a report (`ReportPresence`) | none | bits for its followers, only if how it is shown or the table it shares changed; a table's check (`Table::valid`, one origin parsed) after the budget |
 | contact change | for a friendship that began or ended only, one read of each of the two accounts' friends that holds a socket (≤ 2 statements of ≤ 300 rows), in a task the request does not wait for; a request or a block of a stranger reads nothing | presence bits for the two and whom their lists gained or lost |
 | sign-out | none | bits for that session's sockets |
 | sign-in, password, reset, deletion, pairing, client session ended | none at the event; each of the account's sockets checks its session: ≤ 4 statements | bits |
@@ -179,8 +180,8 @@ minute between checks, ten seconds for one).
 | dials a minute, session | 12 | the client redials after 2 s at the earliest, doubling while it fails; counted for 4,096 sessions at once, a newcomer to a full table taking the oldest's place (tokens of ended sessions still verify until their `exp`, so they could fill it, but never lock a session out) |
 | frames from a client | 16 in 10 s | a pong a ping, and pings of its own |
 | a frame from a client | 131 bytes | a control frame's longest; a data frame is refused at its header |
-| a frame to a client | 4,096 bytes | the client's limit; the longest presence (300 friends, eight-digit tags, a state each, the longest choice) fits |
-| presence frames | one a second a socket | news within the second waits; the next frame says the latest |
+| a frame to a client | 4,096 bytes | the client's limit; the longest presence (300 friends, eight-digit tags, a state each, the longest choice) fits, and so does the longest `table` frame (796 bytes, one friend's) |
+| presence frames | one a second a socket | news within the second waits; the next frame says the latest. The `table` frames said with a presence count as it: they come together, at most once a second |
 | choices, reports | 10 and 30 a minute a session | a choice is a statement, a report none |
 | a write | 10 s | a client that does not read loses its socket |
 | idle | 75 s | two pings unanswered |
@@ -252,8 +253,9 @@ and the client says what it is doing (`central_api::presence`).
   in a game that is running, online or against the house AI), `table` (it sits
   at a table whose game has not begun), or neither; and `idle` (no input for
   ten minutes, which shows the account away). Watching a game and building a
-  deck are neither: online. Only these fixed values exist: no game, table,
-  room or gateway is named. Heard only from a session that holds a push
+  deck are neither: online. Only these fixed values exist, and beside them
+  the table the player shares, if it does (§"Tables"): no other game, room
+  or gateway is named. Heard only from a session that holds a push
   socket, and kept in memory on that session's sockets, going with them; a
   report without a socket changes and keeps nothing, and is answered alike.
   The newest report of the account's sockets stands, so a device that went
@@ -321,13 +323,99 @@ and the client says what it is doing (`central_api::presence`).
   (an older Central), not exactly as long as `online`, or holds a letter not
   known, every friend it does not describe is read as online, never as an
   error. A frame's `online` stays the list of friends to show.
+- Send a table with a report only after this socket's `ready` said
+  `"tables":true`, and read `table` frames as §"Tables" says.
 
 The Baylee client needs the Central of the pull request that brings this
 (on `main` after f9d797f6, the push socket's merge).
+
+## Tables
+
+The owner's decision of 19.11.2026: a friend sees which table a friend sits
+at through Central, since the game gateways no longer know who is whose
+friend. The client names the table with its report, Central checks it and
+passes it to the friends that are shown the account, and nobody else.
+
+- **What a client says** (`central_api::presence::Table`, `ReportPresence`'s
+  `table`): the game gateway's origin, the game's id there, the table's name,
+  its seats and how many are taken. The Baylee client says it only while its
+  player shares the table (the gateway's `share_table` setting), the table has
+  no password, and it reports `playing` or `table`. A report without a table
+  is the bytes it always was (the field is left out).
+- **Only to a Central that said so.** `Request` refuses unknown fields
+  (`deny_unknown_fields`), so a Central before tables refuses a report that
+  carries one, whole, activity and all. A client therefore sends a table only
+  after its socket's `ready` said `"tables":true`, and learns it anew with
+  each `ready`; an older Central's `ready` says nothing of tables, so the
+  client sends none there and its friends read "at a table" as before.
+- **What Central keeps**: the table with the report, on the session's
+  sockets, in memory, and gone with them, as the activity is
+  (`live.rs`, `Report`). Only a table within every bound below and with an
+  activity; any other is dropped and the rest of the report heard, answered
+  `Done` either way. A table that does not even decode (a number past a byte,
+  a string where a number belongs, `null`, a missing field) is read as none
+  (`Table::lenient`) rather than costing the report. The check runs after the
+  report's budget is spent, under the registry's lock: one origin parsed.
+
+| field | bound |
+| --- | --- |
+| `origin` | an `https` origin in its canonical spelling, or `http` with a numeric loopback address and its port (`gateway::validate_origin`, as the directory checks a gateway's); at most 200 bytes |
+| `game` | 1 to 40 bytes of `A-Z a-z 0-9 - _` |
+| `name` | at most 64 characters, possibly none, each a `gateway::shown_char`: no control character, line or paragraph separator, direction control or invisible character |
+| `seats` | 2 to 8 |
+| `taken` | at most `seats` |
+
+- **Who is told**: exactly the friends the account's letter reaches. Never
+  while it chose `offline` (its reports, tables included, wake nobody), never
+  a pending request, a stranger or an account on the other side of a block (a
+  block ends the friendship, and both lists are read again), never the
+  account's own sockets. A change of the table, a seat taken, a rename,
+  another table or sharing it no more, is news to its friends as a change of
+  its letter is (`Showing` in `live.rs`); nothing else is.
+- **The frame**: `{"event":"table","tag":"002a","table":{"origin":"https://gateway.example","game":"…","name":"Friday","seats":4,"taken":2}}`
+  for a friend shown at a table it shares, `{"event":"table","tag":"002a"}`
+  once it shares none (it got up, went, chose `offline`, the friendship
+  ended). One frame a friend, serialized by `central_api::presence::table_frame`
+  and never formatted by hand, since a name may hold quotes; the longest, for
+  a table within its bounds, is 796 bytes (`LONGEST_TABLE_FRAME`, a const
+  assertion against the client's 4,096), so no number of friends at tables
+  makes a frame longer than a client reads. When a socket says presence it
+  first says a `table` frame for each friend whose table is not the one it
+  said last, and a clearing one for each that shares none any more, then the
+  `presence` frame if the friends, their letters or the choice changed, all
+  of it at most once a second; so a client holds a friend's table before the
+  frame that shows the friend at a table. A socket opens with a `table`
+  frame for each friend shown at a shared table.
+- **For the client**: keep a friend's table until a `table` frame clears it,
+  a `presence` frame no longer lists the friend, or the socket ends, and use
+  it only while the friend is shown playing or at a table. Read the table
+  with `Table::lenient` and show it only if `Table::valid`
+  (`central_client::read_table`). Nothing in it is a link to follow: offer to
+  join only a table at the gateway this client is signed in to itself (the
+  origins equal, both canonical), and never dial a gateway because a friend
+  named it. Draw the name as plain text.
+- **Both ways compatible.** A client before tables reads `ready` and passes
+  over its `tables`, and passes over `table` frames: the Baylee client's frame
+  struct has no `deny_unknown_fields`, and an event it does not know matches
+  nothing. A client of tables reads a Central before them as before: no
+  `tables` in `ready`, so no table is sent, and no `table` frame comes. The
+  table itself has no `deny_unknown_fields` either, so a field a later
+  version adds is read past on both sides instead of costing the table.
+- **Not prevented**: Central cannot check that the table exists, that the
+  client sits at it, that its name is the gateway's or that the origin is a
+  Baylee gateway at all: it is the client's claim, bounded, and passed only
+  to the friends that see the account anyway. A friend's client shows it as
+  that friend's claim. The official gateway's former origin
+  (`OFFICIAL_ALIASES`) is a second spelling of the same gateway; a client
+  signed in there and a friend's table at the canonical origin do not match,
+  and the table is shown without a way to join.
 
 ## The switch, and its legal basis
 
 Asked on 19.11.2026, the owner chose the contract as presence's legal basis,
 with the terms describing it, and then wanted the status above, with
 `offline` as the way to appear offline. Whether an account is online, and what
-it is doing, is never stored; only its choice is.
+it is doing, is never stored; only its choice is. The same day he chose that
+friends see a shared table through Central (§"Tables"): the privacy policy's
+§ 5a and § 6 say so, in a sentence that awaits his review
+(`legal/README.md`).
