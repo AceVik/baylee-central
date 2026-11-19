@@ -103,10 +103,12 @@ basis, with the terms describing it. So both documents are at 2026-11-19:
 Each gateway has terms of its own, edited in its admin area. The Baylee
 repository ships a default text and privacy notice any operator may adapt.
 
-The status (owner, 19.11.2026: "online, AFK and offline" to choose, "busy/in
-game" set by itself, "and at the table"; [push socket](../docs/push-socket.md)
-§"Status") is in the same unpublished version 2026-11-19: § 5a says what
+The status (the owner's decision of 19.11.2026, relayed by the PM; in short:
+a person sets itself online, AFK or offline, a busy or in-game status is set
+by itself, and at a table; [push socket](../docs/push-socket.md) §"Status")
+is in the same unpublished version 2026-11-19: § 5a says what
 friends see (away, playing, at a table; never where or what), that offline
-hides the account, that the choice is stored and the rest is not; § 7 how
-long the choice is kept; the terms' § 1 names the status and appearing
+hides the account, that the choice is stored and the rest is not; § 6 names
+the friends among the recipients with what they see; § 7 how long the choice
+is kept; the terms' § 1 names the status and appearing
 offline. The website's privacy page says the same.
