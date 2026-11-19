@@ -28,8 +28,9 @@ Central cannot read the encrypted data, so an export has two halves:
   the same reason that choice is not in this answer either: the Baylee client
   reads the export for the lobby's name after every sign-in, and a field it
   does not know would fail that read. A test in `central-api` holds the
-  released fields. The account's own push sockets say the choice as `me`,
-  `SetPresence` answers it; the website has no read of it yet.
+  released fields (a frozen copy of the released types decodes it).
+  `Request::Presence` reads the choice, and the website's download adds it
+  as `presence`.
 - **The encrypted half** is read and decrypted by the client: the account
   document and every private object, through the existing `ReadDocument`,
   `ListObjects` and `ReadObject`. `central-client` gains `Session::export`

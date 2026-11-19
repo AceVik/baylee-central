@@ -535,7 +535,11 @@ at a table ([push socket](push-socket.md#status)):
   a second;
 - `central-postgres`: migration 000033, `accounts.presence`, online by
   default;
-- `central-client`: `set_presence`, `report_presence` and `read_presence`.
+- `central-client`: `set_presence`, `presence_choice`, `report_presence` and
+  `read_presence`;
+- the account's export stays as released (a frozen copy of the released
+  types decodes it); `Presence` reads the choice, and the website's download
+  adds it.
 
 The privacy policy and the terms (still version 2026-11-19, unpublished) and
 the website's privacy page say what friends see. Open: the owner's look at the
