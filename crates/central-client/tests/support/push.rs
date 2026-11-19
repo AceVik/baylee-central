@@ -10,8 +10,8 @@ use super::{
 };
 use central_api::{
     Bearer, Error, SignedToken, Token,
-    presence::{Activity, Choice},
     owner::OwnerRequest,
+    presence::{Activity, Choice},
     social::{ContactAction, SocialRequest},
     terms::TermsSubject,
     wire::{Identity, Request, Response},
@@ -30,8 +30,10 @@ use tokio::runtime::Runtime;
 /// RFC 6455 § 1.3's example key, and the accept value it must come back with.
 const KEY: &str = "dGhlIHNhbXBsZSBub25jZQ==";
 const ACCEPT: &str = "s3pPLMBiTxaQ9kYGzzhZRbK+xOo=";
-/// How long a socket is watched to show it hears nothing.
-const QUIET: Duration = Duration::from_millis(400);
+/// How long a socket is watched to show it hears nothing: longer than the
+/// second a socket waits between two presence frames, so a frame it holds
+/// back is heard here rather than merged into the next one a test expects.
+const QUIET: Duration = Duration::from_millis(1_250);
 
 const READY: &str = r#"{"event":"ready"}"#;
 const SOCIAL: &str = r#"{"event":"social"}"#;

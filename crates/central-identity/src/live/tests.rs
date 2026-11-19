@@ -1,5 +1,6 @@
 use super::*;
 use central_api::presence::Activity;
+use tokio::sync::Notify;
 
 const A: [u8; 16] = [1; 16];
 const B: [u8; 16] = [2; 16];
@@ -594,4 +595,139 @@ fn the_last_report_of_an_account_s_devices_stands() {
     let again = choosing(&live, A, Choice::Online, &[B]);
     again.ready();
     assert_eq!(live.presence(&B).states, vec![ONLINE]);
+}
+
+/// A store that holds one account's choice, in the tests of the order in
+/// which choices are taken.
+type Stored = Arc<Mutex<Choice>>;
+
+fn stored(stored: &Stored) -> Choice {
+    *stored.lock().unwrap()
+}
+
+/// A write of `choice` for A as the store does it: committed as soon as it
+/// runs, its answer then held until `answer` is notified.
+fn write(
+    store: &Stored,
+    choice: Choice,
+    answer: &Arc<Notify>,
+) -> impl Future<Output = Result<[u8; 16], Error>> + Send + 'static {
+    let store = Arc::clone(store);
+    let answer = Arc::clone(answer);
+    async move {
+        *store.lock().unwrap() = choice;
+        answer.notified().await;
+        Ok(A)
+    }
+}
+
+fn runtime() -> tokio::runtime::Runtime {
+    tokio::runtime::Builder::new_current_thread()
+        .enable_time()
+        .build()
+        .unwrap()
+}
+
+/// Let the runtime's other tasks run as far as they can.
+async fn others() {
+    for _ in 0..64 {
+        tokio::task::yield_now().await;
+    }
+}
+
+#[test]
+fn a_choice_whose_request_went_away_is_still_taken() {
+    let live = Arc::new(Live::default());
+    let _a = choosing(&live, A, Choice::Online, &[]);
+    let store: Stored = Arc::new(Mutex::new(Choice::Online));
+    let answer = Arc::new(Notify::new());
+    runtime().block_on(async {
+        // the request is dropped while the store answers (its time is up,
+        // its client gone); the store has the choice by then
+        let request = live.settle(Choice::Offline, write(&store, Choice::Offline, &answer));
+        assert!(
+            tokio::time::timeout(Duration::from_millis(20), request)
+                .await
+                .is_err()
+        );
+        answer.notify_one();
+        others().await;
+    });
+    assert_eq!(stored(&store), Choice::Offline);
+    assert_eq!(
+        live.presence(&A).me,
+        Choice::Offline,
+        "the registry takes what the store holds"
+    );
+}
+
+#[test]
+fn choices_at_once_are_taken_in_the_order_the_store_wrote_them() {
+    let live = Arc::new(Live::default());
+    let _a = choosing(&live, A, Choice::Online, &[]);
+    let store: Stored = Arc::new(Mutex::new(Choice::Online));
+    let (first, second) = (Arc::new(Notify::new()), Arc::new(Notify::new()));
+    runtime().block_on(async {
+        // the client chooses offline, and while the store answers it the
+        // website chooses online; the website's answer comes first
+        let client = tokio::spawn({
+            let (live, write) = (Arc::clone(&live), write(&store, Choice::Offline, &first));
+            async move { live.settle(Choice::Offline, write).await }
+        });
+        others().await;
+        let website = tokio::spawn({
+            let (live, write) = (Arc::clone(&live), write(&store, Choice::Online, &second));
+            async move { live.settle(Choice::Online, write).await }
+        });
+        others().await;
+        second.notify_one();
+        others().await;
+        first.notify_one();
+        client.await.unwrap().unwrap();
+        website.await.unwrap().unwrap();
+    });
+    assert_eq!(
+        live.presence(&A).me,
+        stored(&store),
+        "the registry ends where the store does"
+    );
+}
+
+#[test]
+fn a_dial_s_second_reading_never_takes_a_choice_the_store_no_longer_holds() {
+    let live = Arc::new(Live::default());
+    let _a = choosing(&live, A, Choice::Online, &[]);
+    let store: Stored = Arc::new(Mutex::new(Choice::Online));
+    let (read, written) = (Arc::new(Notify::new()), Arc::new(Notify::new()));
+    written.notify_one();
+    runtime().block_on(async {
+        // a dial reads the choice again (online) and the answer is slow
+        let dial = tokio::spawn({
+            let (live, store, read) = (Arc::clone(&live), Arc::clone(&store), Arc::clone(&read));
+            async move {
+                live.recheck(&A, async {
+                    let found = stored(&store);
+                    read.notified().await;
+                    Ok(found)
+                })
+                .await
+            }
+        });
+        others().await;
+        // meanwhile the account chooses offline
+        let chosen = tokio::spawn({
+            let (live, write) = (Arc::clone(&live), write(&store, Choice::Offline, &written));
+            async move { live.settle(Choice::Offline, write).await }
+        });
+        others().await;
+        read.notify_one();
+        dial.await.unwrap().unwrap();
+        chosen.await.unwrap().unwrap();
+    });
+    assert_eq!(stored(&store), Choice::Offline);
+    assert_eq!(
+        live.presence(&A).me,
+        Choice::Offline,
+        "never shown after it chose offline"
+    );
 }

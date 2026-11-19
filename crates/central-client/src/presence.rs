@@ -20,7 +20,11 @@ impl Session {
     /// # Errors
     /// `TermsRequired` until Central's terms are accepted, `Busy` past ten
     /// changes a minute, `Rejected` for an ended session, transport failures.
-    pub fn set_presence(&self, transport: &impl Transport, choice: Choice) -> Result<Choice, Error> {
+    pub fn set_presence(
+        &self,
+        transport: &impl Transport,
+        choice: Choice,
+    ) -> Result<Choice, Error> {
         self.same_endpoint(transport)?;
         match transport.exchange(&Request::SetPresence { choice }, Some((&self.token).into()))? {
             Response::Presence { choice } => Ok(choice),
