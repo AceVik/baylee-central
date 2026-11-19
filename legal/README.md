@@ -3,9 +3,12 @@
 **Status: the terms and the privacy policy are at version 2026-11-19.** The
 privacy policy's presence text (§ 5a's new paragraph, § 7's new point) was
 reviewed by the owner on 19.11.2026; the status his later decision of the same
-day added changed that paragraph and point again ("nur das" no longer holds:
-friends also see away, playing, at a table), so they await his look once more,
-as do the version's other changes (see the last paragraphs below; before
+day added changed that paragraph and point again, and he approved the German
+status sentences too, the same day, through the PM ("Ja, passt"; § 5a's
+changed sentence and new paragraph, § 7's retention, the terms' § 1, § 6 named
+as saying the same in one sentence; told that the website's nine other
+languages are machine translations no speaker has read). The version's other
+changes await his review (see the last paragraphs below; before
 it, the terms at 2026-11-11 and the privacy policy at 2026-11-18. On 11.11.2026
 the owner asked for the texts to be corrected: an administrator's
 reset code, deleting the account in its settings on the website, the Fan
@@ -111,4 +114,6 @@ friends see (away, playing, at a table; never where or what), that offline
 hides the account, that the choice is stored and the rest is not; § 6 names
 the friends among the recipients with what they see; § 7 how long the choice
 is kept; the terms' § 1 names the status and appearing
-offline. The website's privacy page says the same.
+offline. The website's privacy page says the same. The owner approved the
+German status sentences on 19.11.2026 through the PM ("Ja, passt"); the
+English texts and the website's other languages follow them.
