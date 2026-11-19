@@ -780,7 +780,7 @@ async fn a_presence_said_at_once_takes_one_held_back_with_it() {
 
 /// The `table` frame for friend `tag` sharing `table`, or none.
 fn table_text(tag: u32, table: Option<&Arc<Table>>) -> Heard {
-    Heard::Text(table_frame(tag, table.map(|table| &**table)))
+    Heard::Text(table_frame(tag, table.map(|table| &**table)).unwrap())
 }
 
 #[tokio::test]

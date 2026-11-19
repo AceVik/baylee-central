@@ -100,13 +100,12 @@ impl Table {
     pub const SEATS: std::ops::RangeInclusive<u8> = 2..=8;
 
     /// Whether every field is within its bounds; Central passes on no other
-    /// table, and a client shows none.
+    /// table, and a client shows none. The cheap checks come first and the
+    /// origin last, parsed once, by its scheme: Central asks this under its
+    /// registry's lock.
     #[must_use]
     pub fn valid(&self) -> bool {
-        self.origin.len() <= Self::MAX_ORIGIN
-            && (validate_origin(&self.origin, false).is_ok()
-                || validate_origin(&self.origin, true).is_ok())
-            && (1..=Self::MAX_GAME).contains(&self.game.len())
+        (1..=Self::MAX_GAME).contains(&self.game.len())
             && self
                 .game
                 .bytes()
@@ -118,13 +117,19 @@ impl Table {
             && self.name.chars().all(shown_char)
             && Self::SEATS.contains(&self.seats)
             && self.taken <= self.seats
+            && self.origin.len() <= Self::MAX_ORIGIN
+            // `http` only on a numeric loopback address (development), every
+            // other origin as a live `https` one
+            && validate_origin(&self.origin, self.origin.starts_with("http://")).is_ok()
     }
 
     /// An optional table read leniently, for `#[serde(deserialize_with)]`:
     /// `null`, or anything that is no table (a field missing, a number past
     /// `u8`, a string where a number belongs), reads as none, so that it costs
     /// the request or frame around it nothing. [`Self::valid`] is still to be
-    /// asked of what it reads.
+    /// asked of what it reads. What no reader takes refuses the request
+    /// around it as before, the table's or not: JSON nested deeper than the
+    /// parser's limit, or a field given twice.
     ///
     /// # Errors
     /// Only what the deserializer itself fails with, never the table's shape.
@@ -150,9 +155,11 @@ impl Table {
 /// `{"event":"table","tag":"002a","table":{…}}` for the friend `tag` (written
 /// as a `presence` frame's `online` writes it) and the table it shares, or
 /// `{"event":"table","tag":"002a"}` once it shares none. Serialized, never
-/// formatted by hand: a name may hold quotes and backslashes.
+/// formatted by hand: a name may hold quotes and backslashes. `None` only if
+/// it could not be serialized, which a struct of strings and small numbers
+/// always can be; a caller says nothing rather than an empty frame.
 #[must_use]
-pub fn table_frame(tag: u32, table: Option<&Table>) -> String {
+pub fn table_frame(tag: u32, table: Option<&Table>) -> Option<String> {
     #[derive(Serialize)]
     struct Frame<'a> {
         event: &'static str,
@@ -165,8 +172,7 @@ pub fn table_frame(tag: u32, table: Option<&Table>) -> String {
         tag: format!("{tag:04x}"),
         table,
     })
-    // a struct of strings and small numbers always serializes
-    .unwrap_or_default()
+    .ok()
 }
 
 /// The longest `table` frame [`table_frame`] writes for a table within its
@@ -447,7 +453,7 @@ mod tests {
     fn a_table_frame_reads_back_and_quotes_its_name() {
         let shared = with(|t| t.name = "\"},\"event\":\"revoked\\".into());
         assert!(shared.valid());
-        let frame = table_frame(0x2a, Some(&shared));
+        let frame = table_frame(0x2a, Some(&shared)).unwrap();
         let heard: Heard = serde_json::from_str(&frame).unwrap();
         assert_eq!(
             (heard.event.as_str(), heard.tag.as_str()),
@@ -455,11 +461,21 @@ mod tests {
         );
         assert_eq!(heard.table, Some(shared));
         assert_eq!(
-            table_frame(0x7fff_ffff, None),
-            r#"{"event":"table","tag":"7fffffff"}"#
+            table_frame(0x7fff_ffff, None).as_deref(),
+            Some(r#"{"event":"table","tag":"7fffffff"}"#)
         );
-        let cleared: Heard = serde_json::from_str(&table_frame(0x1000, None)).unwrap();
+        let cleared: Heard = serde_json::from_str(&table_frame(0x1000, None).unwrap()).unwrap();
         assert_eq!((cleared.tag.as_str(), cleared.table), ("1000", None));
+    }
+
+    #[test]
+    fn an_origin_is_parsed_once_by_its_scheme() {
+        // the development check takes only `http`, the live one only `https`
+        assert!(with(|t| t.origin = "http://127.0.0.1:28766".into()).valid());
+        assert!(!with(|t| t.origin = "https://127.0.0.1:28766/x".into()).valid());
+        assert!(!with(|t| t.origin = "http://[::1]".into()).valid());
+        // the cheap checks refuse before any origin is looked at
+        assert!(!with(|t| (t.origin, t.seats) = ("not a url".into(), 1)).valid());
     }
 
     #[test]
@@ -477,8 +493,17 @@ mod tests {
         let widest = with(|t| t.name = "𝔅".repeat(Table::MAX_NAME_CHARS));
         assert_eq!(longest.origin.len(), 198);
         assert!(longest.valid() && widest.valid());
-        for table in [longest, widest] {
-            assert!(table_frame(0x7fff_ffff, Some(&table)).len() <= LONGEST_TABLE_FRAME);
+        // the URL standard lets a quote stand in a host; whatever the parser
+        // takes, its frame stays within the bound, which counts every byte
+        // of the origin twice
+        let quoted = format!("https://{}.example", "\"".repeat(60));
+        let quoted = with(|t| t.origin = quoted);
+        for table in [longest, widest, quoted] {
+            if table.valid() {
+                let frame = table_frame(0x7fff_ffff, Some(&table)).unwrap();
+                assert!(frame.len() <= LONGEST_TABLE_FRAME, "{}", frame.len());
+                assert!(serde_json::from_str::<Heard>(&frame).is_ok());
+            }
         }
     }
 }
