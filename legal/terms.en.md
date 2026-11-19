@@ -1,5 +1,5 @@
-<!-- version: 2026-11-11 -->
-<!-- updated: 2026-11-12 -->
+<!-- version: 2026-11-19 -->
+<!-- updated: 2026-11-19 -->
 
 # Terms of use for Baylee accounts
 
@@ -20,7 +20,14 @@ servers ("gateways") and Baylee Central. Baylee Central gives you:
   on gateways that accept Baylee accounts;
 - encrypted storage for your settings, your list of gateways, deck backups
   and your chat history;
-- a public directory of gateways, where you can list and manage your own.
+- a public directory of gateways, where you can list and manage your own;
+- personal chats, contacts and groups with other Baylee accounts. Your
+  friends (contacts you both accepted) see that you are online while your
+  Baylee client is connected to Baylee Central;
+- a profile picture beside your display name, if you set one;
+- daily and weekly challenges and Tower expeditions, with leaderboards you
+  appear on only if you enable them;
+- notifications in your browser, if you turn them on.
 
 The service is free. There are no paid features, no ads and no sale of data.
 Baylee is in a test phase; features may change, fail or be removed. There is
@@ -92,8 +99,10 @@ all rights to it.
 
 **Reports.** You can report unlawful content or breaches of these terms with
 the report function in the client or on the website, or through the contact
-details in the legal notice. We review reports promptly. If we remove or
-restrict content or an account, we tell you why and how you can object.
+details in the legal notice. We review reports promptly. People decide on
+reports and moderation, our administrators; no decision is automated. If we
+remove or restrict content or an account, we tell you why and how you can
+object, and we decide again on your objection.
 
 ## 7. Suspension and deletion
 

@@ -1,8 +1,9 @@
 # Legal texts of Baylee Central
 
-**Status: the terms are at version 2026-11-11 and the privacy policy at
-2026-11-19, a proposal that awaits the owner's review** (the
-owner asked for the texts to be corrected on 11.11.2026: an administrator's
+**Status: the terms and the privacy policy are at version 2026-11-19, a
+proposal that awaits the owner's review** (see the last paragraph below; before
+it, the terms at 2026-11-11 and the privacy policy at 2026-11-18. On 11.11.2026
+the owner asked for the texts to be corrected: an administrator's
 reset code, deleting the account in its settings on the website, the Fan
 Content notice in its given words, the chat's and the notifications' legal
 bases, and the push services as recipients outside the EEA; before that the
@@ -41,8 +42,28 @@ makes the privacy policy's version 2026-11-19: § 5a says what the socket
 carries and that accepted friends see when an account is online, held in
 memory only, § 7 how long (while the client is connected). Written by the
 implementing agent as a proposal in the same pull request, it awaits the
-owner's review before it is merged; the website's own privacy page
-(`crates/central-web`) does not say it yet.
+owner's review before it is merged.
+
+The same day the owner asked for all of Central's legal texts to be brought
+in line, and chose the contract (Art. 6(1)(b) GDPR) as presence's legal
+basis, with the terms describing it. So both documents are at 2026-11-19:
+
+- **Terms:** § 1 names what Central offers today beside the account, the
+  storage and the directory: personal chats, contacts and groups, friends
+  seeing that one is online, a profile picture, the daily and weekly
+  challenges and Tower expeditions with opt-in leaderboards, notifications;
+  § 6 says that people, not machines, decide on reports and moderation, and
+  that an objection is decided again (Art. 14 and 17 DSA). Being a new
+  version of the terms, every account is asked to accept it again.
+- **Privacy policy:** besides presence (§ 5a, § 7), the profile picture
+  (it said "will follow"), the challenges and expeditions, pairing a device,
+  the other players as recipients, the legal basis of the push providers'
+  transfer to the USA (the EU-US Data Privacy Framework, as far as a provider
+  is certified; whether each is, is the owner's to confirm), withdrawing a
+  consent, and the right to object in a part of its own (Art. 21(4) GDPR).
+- **The website's privacy page** (`crates/central-web/locales/*/site.ftl`)
+  says the same about presence, the other players and the transfer, in its
+  eleven languages.
 
 | file | what |
 | --- | --- |

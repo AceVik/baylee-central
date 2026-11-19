@@ -1,5 +1,5 @@
-<!-- version: 2026-11-11 -->
-<!-- updated: 2026-11-12 -->
+<!-- version: 2026-11-19 -->
+<!-- updated: 2026-11-19 -->
 
 # Nutzungsbedingungen für Baylee-Konten
 
@@ -22,7 +22,14 @@ Central bietet dir:
 - eine verschlüsselte Ablage für deine Einstellungen, deine Gateway-Liste,
   Deck-Sicherungen und deinen Chat-Verlauf;
 - ein öffentliches Verzeichnis von Gateways und die Möglichkeit, eigene
-  Gateways einzutragen und zu verwalten.
+  Gateways einzutragen und zu verwalten;
+- persönliche Chats, Kontakte und Gruppen mit anderen Baylee-Konten. Deine
+  Freunde (Kontakte, die ihr beide angenommen habt) sehen, dass du online
+  bist, solange dein Baylee-Client mit Baylee Central verbunden ist;
+- ein Profilbild neben deinem Anzeigenamen, wenn du eines setzt;
+- Daily- und Weekly-Aufgaben und Tower-Expeditionen, mit Ranglisten, in
+  denen du nur erscheinst, wenn du sie freigibst;
+- Benachrichtigungen im Browser, wenn du sie einschaltest.
 
 Der Dienst ist kostenlos. Es gibt keine kostenpflichtigen Funktionen,
 keine Werbung und keinen Verkauf von Daten. Baylee befindet sich in einer
@@ -108,8 +115,11 @@ behältst alle Rechte daran.
 **Meldungen.** Hinweise auf rechtswidrige Inhalte oder Verstöße gegen diese
 Bedingungen kannst du über die Meldefunktion im Client oder auf der Website
 oder über die im Impressum genannten Kontaktdaten schicken. Wir prüfen sie
-zeitnah. Entfernen oder beschränken wir einen Inhalt oder ein Konto, teilen
-wir dir die Gründe mit und sagen dir, wie du widersprechen kannst.
+zeitnah. Über Meldungen und Moderation entscheiden Menschen, unsere
+Administratoren; automatisierte Entscheidungen gibt es dabei nicht.
+Entfernen oder beschränken wir einen Inhalt oder ein Konto, teilen wir dir
+die Gründe mit und sagen dir, wie du widersprechen kannst; über einen
+Widerspruch entscheiden wir erneut.
 
 ## 7. Sperrung und Löschung
 

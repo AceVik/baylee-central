@@ -1120,10 +1120,32 @@ async fn the_privacy_notice_has_a_part_for_the_e_mail_address() {
     let (_, _, english) = get(&app, "/en/privacy", &[]).await;
     assert!(english.contains("An e-mail address is optional; an account needs none."));
     assert!(english.contains("you need no e-mail address"));
-    assert!(english.contains("As of 18 November 2026"));
+    assert!(english.contains("As of 19 November 2026"));
     let (_, _, german) = get(&app, "/de/privacy", &[]).await;
     assert!(german.contains("Eine E-Mail-Adresse ist freiwillig; ein Account braucht keine."));
     assert!(german.contains("eine E-Mail-Adresse brauchst du nicht"));
+}
+
+/// The privacy notice says who sees that an account is online (its friends,
+/// while the Baylee app is connected, `docs/push-socket.md`) and that Central
+/// keeps it in memory only; and, in every language, on what basis the push
+/// providers carry notifications to the USA.
+#[tokio::test]
+async fn the_privacy_notice_says_who_sees_an_account_online() {
+    let app = app(true);
+    for lang in Lang::ALL {
+        let (_, _, html) = get(&app, &format!("/{}/privacy", lang.code()), &[]).await;
+        assert!(html.contains("Data Privacy Framework"), "{lang:?}");
+    }
+    let (_, _, english) = get(&app, "/en/privacy", &[]).await;
+    assert!(english.contains("your friends (contacts you both accepted) see that you are online"));
+    assert!(english.contains("Central keeps this online status only in memory"));
+    let (_, _, german) = get(&app, "/de/privacy", &[]).await;
+    assert!(german.contains(
+        "sehen deine Freunde (Kontakte, die ihr beide angenommen habt), dass du online bist"
+    ));
+    assert!(german.contains("Diesen Online-Status hält Central nur im Arbeitsspeicher"));
+    assert!(german.contains("Stand: 19. November 2026"));
 }
 
 /// Central's figures (the accounts, and what a gateway says is happening

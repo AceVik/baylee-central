@@ -31,15 +31,17 @@ data protection officer, as none is required.
 
 ## 3. What we process, why, and on what basis
 
-- **Username, account ID, creation time, display name and tag** (a profile picture will follow) – running and showing your account. Other players see your display name and tag, never your username; an account moved from the official gateway keeps the name and tag it had there. *Art. 6(1)(b) GDPR (contract)*
+- **Username, account ID, creation time, display name and tag** – running and showing your account. Other players see your display name and tag, never your username; an account moved from the official gateway keeps the name and tag it had there. *Art. 6(1)(b) GDPR (contract)*
 - **Roles (administrator)** – administering Baylee Central. *Art. 6(1)(b) GDPR*
 - **The time of your last sign-in with your password** (no address) – administering accounts and noticing misuse. *Art. 6(1)(f) GDPR (our interest in secure operation)*
 - **OPAQUE sign-in record, encrypted key container, credential state** – sign-in, protecting your encrypted data. *Art. 6(1)(b) GDPR*
 - **A reset code's fingerprint, if an administrator made one for you or one was sent to your e-mail address** (we keep only its SHA-256 digest, never the code) – letting you set a new password when you have forgotten yours. *Art. 6(1)(b) GDPR*
 - **E-mail address (optional)**, the language its mails are written in and when you confirmed it; an address you named that waits for its code, with the code's digest; the times reset codes were mailed to you in the last 24 hours – confirming the address, sending a reset code when you or anyone who knows your sign-in name asks for one (three a day at most), telling the old address when it is replaced or removed, telling the confirmed address when a reset code set a new password, when your password was changed or when an administrator made a reset code for your account. *Art. 6(1)(b) GDPR*
 - **Your key container, encrypted under your recovery code** (we never learn the code); a second sign-in factor (optional) will follow – protecting your account and your encrypted data. *Art. 6(1)(b) GDPR*
-- **Sessions, sign-in tickets for gateways, gateway access** – keeping you signed in and signing you in to gateways. *Art. 6(1)(b) GDPR*
+- **Sessions, sign-in tickets for gateways, gateway access**; when you pair the Baylee app with the signed-in website, for five minutes at most, the app's public key and your master key encrypted for it – keeping you signed in, pairing devices and signing you in to gateways. *Art. 6(1)(b) GDPR*
 - **Encrypted objects (settings, gateway list, deck backups, chat history) with size, revision and time** – backup across devices. *Art. 6(1)(b) GDPR*
+- **Profile picture (optional):** a square picture of 256 × 256 pixels (AVIF and PNG, and for a moving picture an animation of at most 100 frames) without the photo's details (such as place, camera or time), its fingerprint (SHA-256) and when you set it, under a random key – showing it beside your display name; anyone can see it at its address, signed in or not. *Art. 6(1)(b) GDPR.* Reports about a picture (the reporting account, the picture's fingerprint, the reason, an optional note, the time; the person whose picture it is never learns who reported it) and the count of your uploads (ten an hour, thirty a day) – removing unlawful and abusive pictures. *Art. 6(1)(f) GDPR (our interest in a service free of such content)*
+- **Daily and weekly challenges and Tower expeditions:** attempts, results, hints used, chosen upgrades, remaining lives and badge progress; from the official gateway, a game's result and measured time – offering and scoring the challenges. Your display name, tag and result appear on a leaderboard only if you enable it for that challenge or season. *Art. 6(1)(b) GDPR*
 - **The versions of our terms and of the terms of the gateways you play on that you accepted, with the time** – proof of acceptance, showing new versions. *Art. 6(1)(b) and (c) GDPR*
 - **Listed gateways, their addresses, description and administrators** – gateway directory and management. *Art. 6(1)(b) GDPR*
 - **Bug reports you send, with the attachments you leave ticked** (directly or through a gateway) – finding and fixing bugs. *Art. 6(1)(f) GDPR (our interest in a game without bugs)*
@@ -95,8 +97,9 @@ While the Baylee app is signed in, it keeps a connection to Central open, on
 which Central tells it that something about your own chats, contacts or groups
 changed; the content itself does not travel on it. While that connection is
 open, your friends (contacts you both accepted) see that you are online: only
-that, by your tag, not where or what you play. Nobody else sees it, neither
-pending requests nor blocked accounts (Art. 6(1)(b) GDPR). Central keeps this
+that, recognisable by your tag (the code after your display name), not where
+or what you play. Nobody else sees it, neither pending requests nor blocked
+accounts (Art. 6(1)(b) GDPR). Central keeps this
 status only in memory while the connection is open; it is neither stored nor
 logged. The status a gateway shows while you play is that gateway's own.
 
@@ -132,12 +135,19 @@ only after you choose to enable notifications; OS/browser settings can block del
 - **Gateways:** when you sign in to a gateway, it receives your account ID,
   your display name and tag, and the confirmation that you are signed in, but
   not your password or your encrypted data.
+- **Other players:** your contacts and the members of your groups see your
+  display name and tag and the messages you send them; your friends also see
+  that you are online while the Baylee app is connected to Central
+  (section 5a). Anyone can see your profile picture, signed in or not, and
+  your entry on a leaderboard you enable.
 - **Authorities** receive data only where we are legally obliged.
 
 Data is transferred to countries outside the European Economic Area only if
 you enable notifications: your browser's push provider (Google, Mozilla or
-Apple, USA) then carries them. Gateways run by others can be in any country;
-whether you sign in there is your decision.
+Apple, USA) then carries them, on the basis of the European Commission's
+adequacy decision on the EU-US Data Privacy Framework, as far as the provider
+is certified under it. Gateways run by others can be in any country; whether
+you sign in there is your decision.
 
 ## 7. How long we keep data
 
@@ -165,7 +175,15 @@ whether you sign in there is your decision.
   and at most a day after its code expired (15 minutes after it was sent).
 - Server logs are deleted after 14 days at the latest.
 - Reports and moderation decisions are kept as long as needed to keep them
-  traceable, at most three years.
+  traceable, at most three years; decided reports about profile pictures,
+  one year.
+- A profile picture stays until you replace or remove it, an administrator
+  removes it or you delete your account; it is then deleted at once. A
+  browser that showed it may keep a copy for up to an hour.
+- Challenges, expeditions and leaderboard entries stay until you delete your
+  account; you withdraw a leaderboard entry at any time by switching it off.
+- What pairing a device leaves is deleted once the pairing is redeemed, at
+  the latest after five minutes.
 - Bug and crash reports are deleted once the bug is dealt with, after three
   years at the latest.
 - Contact form messages are deleted 90 days after they are dealt with, a
@@ -181,15 +199,27 @@ whether you sign in there is your decision.
 ## 8. Your rights
 
 You have the right of access (Art. 15), rectification (Art. 16), erasure
-(Art. 17), restriction (Art. 18), data portability (Art. 20) and to object to
-processing based on legitimate interests (Art. 21 GDPR). You can exercise
-many of them yourself: deleting your account, exporting your data and
-changing details is in the settings; deleting asks for your password again,
-and a deleted account cannot be restored. Otherwise a message to the contact
-details in the legal notice is enough.
+(Art. 17), restriction (Art. 18) and data portability (Art. 20 GDPR). You can
+withdraw a consent (crash reports, notifications) at any time for the
+future; what happened until then remains lawful (Art. 7(3) GDPR). You can
+exercise many of your rights yourself: deleting your account, exporting your
+data and changing details is in the settings; deleting asks for your
+password again, and a deleted account cannot be restored. Otherwise a message
+to the contact details in the legal notice is enough.
 
 You may lodge a complaint with a data protection supervisory authority, for
 example the one where you live or the one responsible for us.
+
+## 8a. Your right to object
+
+Where we process data on the basis of Art. 6(1)(f) GDPR (the time of your last
+sign-in, bug reports, the contact form, the anonymous usage count, reports
+and moderation, the record of administration, donation totals, technical
+access data), you may object at any time on grounds relating to your
+particular situation (Art. 21 GDPR). We then stop, unless we can show
+compelling legitimate grounds that override your interests, or the
+processing serves to establish, exercise or defend legal claims. An informal
+message to the contact details in the legal notice is enough.
 
 ## 9. Required data, automated decisions
 

@@ -126,10 +126,12 @@ and the two accounts' sockets keep the friends they had until their next
 reading or their end.
 
 Presence is kept in memory only, never stored or logged, and ends with the
-socket. It is a new disclosure: the privacy notice says so since its version
-2026-11-19 (`legal/privacy.*.md` § 5a and § 7), which awaits the owner's
-review. There is no switch to hide it; whether one is wanted is the owner's
-question (below).
+socket. It is a new disclosure. Its legal basis is the contract (Art. 6(1)(b)
+GDPR; the owner's choice of 19.11.2026): the terms of use name it since their
+version 2026-11-19 (§ 1), which every account accepts anew, and the privacy
+policy (`legal/privacy.*.md` § 5a, § 6 and § 7) and the website's privacy page
+say what it shows to whom. Both await the owner's review. There is no switch
+to hide it.
 
 ## Cost
 
@@ -215,10 +217,11 @@ half). Writes are never inside a `select!` and each has its time.
 - No administrator action ends a native session on `main`: an administrator's
   reset code does only once the person uses it.
 
-## Open question for the owner
+## No switch, by the owner's choice
 
-Presence has no per-account switch. It is shown only to accounts both sides
-accepted, is not stored, and the gateway already shows its own players'
-presence, which is why it was built without one. A switch ("appear offline":
-the account's sockets would stay but never count as online) would cost one
-column and one setting; it is not built, as the owner did not ask for it.
+Presence has no per-account switch. Asked on 19.11.2026, the owner chose the
+contract as its legal basis, with the terms describing it, over a legitimate
+interest with a switch to object by. It is shown only to accounts both sides
+accepted and is not stored. A switch ("appear offline": the account's sockets
+would stay but never count as online) would need a stored setting, a
+migration, if it is ever wanted.

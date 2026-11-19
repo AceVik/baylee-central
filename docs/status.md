@@ -509,8 +509,12 @@ ported from the earlier attempt:
 - `central-postgres`: `Concerns` from every social operation, `live_sessions`
   and `live_friends`, the tag in a session's status; no migration.
 
-Open: the privacy policy's version 2026-11-19 (§§ 5a and 7) for the owner to
-read, and the website's own privacy page, which does not mention presence yet;
-whether presence wants a switch (the owner's question); Caddy's pass of the
-upgrade, checked after the first deploy; the real Baylee client was not run
-against it.
+The legal texts follow (owner, 19.11.2026: presence rests on the contract,
+the terms describe it): terms and privacy policy at version 2026-11-19, so
+every account accepts the terms anew, and the website's privacy page in its
+eleven languages (`legal/README.md`).
+
+Open: both texts for the owner to read, and whether each push provider is
+certified under the EU-US Data Privacy Framework, which the privacy texts now
+name as the transfer's basis; Caddy's pass of the upgrade, checked after the
+first deploy; the real Baylee client was not run against it.
