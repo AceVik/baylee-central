@@ -434,7 +434,9 @@ Reports about one's own picture are not exported with their reporters.
     transparent APNG's still, and its sequence passes the service's checks
     through the worker binary. That test says SKIPPED where the ffmpeg has
     no `libsvtav1` (Homebrew's has it:
-    `PICTURE_FFMPEG=/opt/homebrew/bin/ffmpeg`);
+    `PICTURE_FFMPEG=/opt/homebrew/bin/ffmpeg`), except where
+    `PICTURE_REQUIRE_SVT=1`, which CI sets: Ubuntu 24.04's ffmpeg 6.1
+    links SVT-AV1 1.7, so CI runs it on x86-64 too;
   - an uploaded AVIF image sequence refused as `unsupported`;
   - seeded mutations of every format;
   - the worker binary behind the real client.

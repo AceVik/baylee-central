@@ -11,8 +11,10 @@
 //!   unless `PICTURE_REQUIRE_FFMPEG=1`, which CI sets: then they fail.
 //! - **The fallback** runs the same ffmpeg behind a stand-in that hides its
 //!   `libaom-av1`, so the worker takes `libsvtav1`; it says SKIPPED where
-//!   that ffmpeg has no `libsvtav1` either. Homebrew's ffmpeg has only
-//!   `libsvtav1` (`PICTURE_FFMPEG=/opt/homebrew/bin/ffmpeg`).
+//!   that ffmpeg has no `libsvtav1` either, unless `PICTURE_REQUIRE_SVT=1`,
+//!   which CI sets (Ubuntu 24.04's ffmpeg links SVT-AV1 1.7): then it
+//!   fails. Homebrew's ffmpeg has only `libsvtav1`
+//!   (`PICTURE_FFMPEG=/opt/homebrew/bin/ffmpeg`).
 use crate::support::{fixture, valid};
 use central_picture::{Format, Motion, Refusal, sequence_tracks};
 use central_picture_codec::{Encoder, Ffmpeg, Found, convert_with};
@@ -353,6 +355,10 @@ fn without_libaom() -> Option<(Ffmpeg, std::path::PathBuf)> {
             alpha: false,
         }) => Some((ffmpeg, path)),
         other => {
+            assert!(
+                std::env::var_os("PICTURE_REQUIRE_SVT").is_none_or(|v| v != "1"),
+                "PICTURE_REQUIRE_SVT=1, but {real} has no libsvtav1 ({other:?})"
+            );
             eprintln!("SKIPPED: {real} has no libsvtav1 ({other:?}); set PICTURE_FFMPEG");
             None
         }
