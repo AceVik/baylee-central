@@ -411,7 +411,7 @@ async fn native_visibility(store: &AccountStore, operator: &DatabaseConnection, 
             uuid(id)
         )
     };
-    let owned = TaggedPicture {
+    let expected = TaggedPicture {
         tag: OWNER,
         key: [4; 16],
         moving: false,
@@ -429,7 +429,7 @@ async fn native_visibility(store: &AccountStore, operator: &DatabaseConnection, 
         keys_as(store, Session::Native(&owner), vec![OWNER])
             .await
             .unwrap(),
-        [owned.clone()]
+        std::slice::from_ref(&expected)
     );
     assert_eq!(count(operator, &lookups(owner_id)).await, before);
     let viewer = native(store, viewer_id).await;
@@ -438,7 +438,7 @@ async fn native_visibility(store: &AccountStore, operator: &DatabaseConnection, 
         keys_as(store, Session::Native(&viewer), vec![OWNER, VIEWER])
             .await
             .unwrap(),
-        [owned.clone()]
+        std::slice::from_ref(&expected)
     );
     assert_eq!(count(operator, &lookups(viewer_id)).await, before);
     // a stranger's, on the lookup budget; an unknown tag too
@@ -448,7 +448,7 @@ async fn native_visibility(store: &AccountStore, operator: &DatabaseConnection, 
         keys_as(store, Session::Native(&moderator), vec![999_999, OWNER])
             .await
             .unwrap(),
-        [owned]
+        [expected]
     );
     assert_eq!(count(operator, &lookups(moderator_id)).await, before + 2);
     // across a block, either way, nothing
