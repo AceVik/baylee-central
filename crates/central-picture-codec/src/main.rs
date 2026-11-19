@@ -40,12 +40,19 @@ const FFMPEGS: [&str; 3] = [
 
 /// The first of [`FFMPEGS`] that is a file, else Ubuntu's.
 fn default_ffmpeg() -> Ffmpeg {
-    let found = FFMPEGS
-        .into_iter()
-        .find(|path| std::path::Path::new(path).is_file())
-        .unwrap_or(FFMPEGS[0]);
-    Ffmpeg::at(found)
+    Ffmpeg::at(first_file(&FFMPEGS))
 }
+
+/// The first of `paths` that is a file, else the first of them.
+fn first_file<'a>(paths: &[&'a str]) -> &'a str {
+    paths
+        .iter()
+        .copied()
+        .find(|path| std::path::Path::new(path).is_file())
+        .or_else(|| paths.first().copied())
+        .unwrap_or_default()
+}
+
 /// The latest ffmpeg may end, from the worker's start: inside the
 /// service's `central_picture::TIME` (20 s) with room to answer, so an
 /// animation that runs late loses only its sequence, never its still.
@@ -148,5 +155,56 @@ fn said(found: Option<Found>) -> String {
             Encoder::Aom.name()
         ),
         None => format!("no ffmpeg with an AV1 encoder ({names}); animations are kept as stills"),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn without_a_command_line_ffmpeg_the_first_that_is_a_file_is_taken() {
+        let dir =
+            std::env::temp_dir().join(format!("central-picture-first-{}", std::process::id()));
+        std::fs::create_dir_all(dir.join("folder")).unwrap();
+        let file = dir.join("ffmpeg");
+        std::fs::write(&file, b"").unwrap();
+        let (missing, folder) = (dir.join("missing"), dir.join("folder"));
+        let (missing, folder, file) = (
+            missing.to_str().unwrap(),
+            folder.to_str().unwrap(),
+            file.to_str().unwrap(),
+        );
+        // a missing path and a directory are passed over
+        assert_eq!(first_file(&[missing, folder, file]), file);
+        // none there: the first, Ubuntu's, as before
+        assert_eq!(first_file(&[missing, folder]), missing);
+        assert_eq!(first_file(&[]), "");
+        std::fs::remove_dir_all(&dir).unwrap();
+        // the list is Ubuntu's first, then Homebrew's, all absolute
+        assert_eq!(FFMPEGS[0], "/usr/bin/ffmpeg");
+        assert!(FFMPEGS.iter().all(|path| path.starts_with('/')));
+    }
+
+    #[test]
+    fn the_probe_names_the_encoder_and_what_it_cannot_do() {
+        let aom = Found {
+            encoder: Encoder::Aom,
+            alpha: true,
+        };
+        let svt = Found {
+            encoder: Encoder::Svt,
+            alpha: false,
+        };
+        // the operator's check after a deploy reads this line as it is
+        assert_eq!(said(Some(aom)), "ffmpeg with libaom-av1 found");
+        assert_eq!(
+            said(Some(svt)),
+            "ffmpeg with libsvtav1 found; transparent animations are kept as stills (no libaom-av1)"
+        );
+        assert_eq!(
+            said(None),
+            "no ffmpeg with an AV1 encoder (libaom-av1, libsvtav1); animations are kept as stills"
+        );
     }
 }

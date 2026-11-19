@@ -11,8 +11,9 @@ use super::{
 use central_api::{
     Bearer, Error, SignedToken, Token,
     owner::OwnerRequest,
+    picture::{MAX_PICTURE_TAGS, PictureReason, TaggedPicture},
     presence::{Activity, Choice, Table, table_frame},
-    social::{ContactAction, SocialRequest},
+    social::{ContactAction, SocialRequest, SocialResponse},
     terms::TermsSubject,
     wire::{Identity, Request, Response},
 };
@@ -410,6 +411,7 @@ pub(crate) fn run(
     }
     refusals(http, &players[0]);
     limits(http, &players[0]);
+    pictures(runtime, operator, http, [&players[0], &players[1]]);
     let [a, b, c] = &mut players[..] else {
         unreachable!()
     };
@@ -517,6 +519,62 @@ fn refusals(http: &Http, a: &Player) {
 }
 
 /// Four sockets an account; sixty dials a minute an address.
+/// Picture keys over the native listener with a native bearer, as the game
+/// client asks them (M6, `docs/profile-pictures.md`): answered by the
+/// website's rules, and no report filed here. B's picture is written as the
+/// service would store one that moves; A and B are strangers yet, so A's
+/// asking for B's tag spends one lookup.
+fn pictures(runtime: &Runtime, operator: &DatabaseConnection, http: &Http, [a, b]: [&Player; 2]) {
+    let account = sea_orm::prelude::Uuid::from_bytes(b.identity.account);
+    let key = [0x7c_u8; 16];
+    runtime
+        .block_on(operator.execute_unprepared(&format!(
+            "INSERT INTO central_identity.pictures (account_id, key, avif, png, sequence, sha256, side) \
+             VALUES ('{account}', decode(repeat('7c', 16), 'hex'), decode(repeat('01', 64), 'hex'), \
+             decode(repeat('02', 100), 'hex'), decode(repeat('03', 64), 'hex'), \
+             decode(repeat('04', 32), 'hex'), 256)"
+        )))
+        .unwrap();
+    let keys = |tags: Vec<u32>| match a.ask(
+        http,
+        &Request::Social {
+            request: SocialRequest::Pictures { tags },
+        },
+    ) {
+        Ok(Response::Social {
+            response: SocialResponse::Pictures { pictures },
+        }) => Ok(pictures),
+        Ok(other) => panic!("pictures expected: {other:?}"),
+        Err(error) => Err(error),
+    };
+    // one's own tag, free and without a picture; a stranger's that moves
+    assert_eq!(keys(vec![a.tag]), Ok(vec![]));
+    assert_eq!(
+        keys(vec![b.tag, a.tag]),
+        Ok(vec![TaggedPicture {
+            tag: b.tag,
+            key,
+            moving: true,
+        }])
+    );
+    // the bound on tags; and a report is the website's
+    assert_eq!(keys(vec![1; MAX_PICTURE_TAGS + 1]), Err(Error::Rejected));
+    let report = Request::Social {
+        request: SocialRequest::ReportPicture {
+            tag: b.tag,
+            key,
+            reason: PictureReason::Hate,
+            note: None,
+        },
+    };
+    assert_eq!(a.ask(http, &report).err(), Some(Error::Rejected));
+    runtime
+        .block_on(operator.execute_unprepared(&format!(
+            "DELETE FROM central_identity.pictures WHERE account_id = '{account}'"
+        )))
+        .unwrap();
+}
+
 fn limits(http: &Http, a: &Player) {
     let held: Vec<Socket> = (0..4)
         .map(|_| dial(http, &a.bearer()).unwrap().opened(&[]))
