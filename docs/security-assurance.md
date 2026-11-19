@@ -8507,7 +8507,13 @@ hold it, each red without its part of the fix (taken back one at a time): a choi
 went away is still taken; two choices whose answers come in the other order end where the store
 does; a dial's slow second reading never takes a choice the store no longer holds. The end-to-end
 test watched a quiet socket for 400 ms, less than the second a socket holds presence back, so a
-frame that leaked could have merged into the next one the test expected; it now watches 1,250 ms.
+frame that leaked could have merged into the next one the test expected; it now watches 1,250 ms. The
+first draft also put the choice into the account's export, which the released Baylee client reads
+for the lobby's name after every sign-in and decodes strictly: that read would have failed for
+every account. The export is as released again, and a test holds its fields; the deletion design
+already kept the e-mail address out of it for this reason. The migration's way back was given as
+dropping the column alone, which would leave a history the new binary trusts and never adds the
+column again; the way back is both the column and the history row, as the replay test runs it.
 Considered and not a finding: a report cannot tell anybody whether another account holds a socket
 (it is keyed by the caller's own session and always answered `Done`); a session out of choices is
 told `Busy`, which says nothing of anyone else; the website's choice is an ordinary browser
@@ -8516,8 +8522,7 @@ fallbacks; in the registry, `offline` never shown from a fresh registry with the
 second device, while it reports and idles and as a device goes, away and activity and only their
 changes reaching friends, a report without a socket, the budgets, the last report winning, the
 three ordering tests above, and a socket's gap between presence frames; the stored choice on
-PostgreSQL 18 from both listeners' sessions, refused for nobody's and an ended session, and in the
-export; over real TCP and PostgreSQL, an account that chose `offline` before connecting, two of its
+PostgreSQL 18 from both listeners' sessions, refused for nobody's and an ended session; over real TCP and PostgreSQL, an account that chose `offline` before connecting, two of its
 devices and a report unseen by a friend, a report from a session without a socket, and each change
 of choice and activity as the friend's socket and the account's own see it.
 
@@ -8525,8 +8530,7 @@ What was not done: no real restart of the service (a fresh registry with the sto
 store's test and the end-to-end scenario that chooses before connecting stand for it); no real
 Baylee client reports or chooses yet; an answer the store loses after it wrote a choice still leaves
 the registry at the one before until the account's sockets close (its own sockets say which, as
-`me`); a page of the website opened before a deploy fails to read the export, whose decoder refuses
-the new field, until it is reloaded; the migration has not run on production, which has its own
-gate. The privacy policy's § 5a paragraph and § 7 point changed after the owner read them, so his
+`me`); the website has no read of the stored choice yet (it is not in the export); the migration
+has not run on production, which has its own gate. The privacy policy's § 5a paragraph and § 7 point changed after the owner read them, so his
 review does not cover the status sentences. These passes are by the implementing agent and are not
 an independent audit.

@@ -1168,7 +1168,6 @@ mod tests {
             display_name: Some("Erika".into()),
             display_name_at: Some(1),
             tag: Some(0x1a2b),
-            presence: central_api::presence::Choice::Online,
             source: central_api::wire::AccountSource::Registered,
             legacy_id: None,
             created_at: 1,

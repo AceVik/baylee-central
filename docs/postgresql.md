@@ -362,13 +362,23 @@ How an account chose to be shown to its friends ([push socket](push-socket.md#st
 - **Read and written.** A session's status (and so every dial) reads it;
   `SetPresence` writes it with one `UPDATE … RETURNING` that names the account
   through its standing session. The runtime's existing `UPDATE` on `accounts`
-  covers it; the grants check is unchanged. The account's export carries it.
+  covers it; the grants check is unchanged. The account's export does not
+  carry it (`docs/account-deletion.md`: released clients decode the export
+  strictly).
 - **Additive.** A default and no rewrite of the table's rows (PostgreSQL 11
   and later store a constant default in the catalogue), so the previous
-  binary, which never reads the column, runs on unchanged. The way back, after
-  that binary is in place again: `ALTER TABLE central_identity.accounts DROP
-  COLUMN presence;` by hand (the migration names it). Production runs it only
-  through its own gate.
+  binary, which never names the column, starts and serves on the migrated
+  schema; the deploy hook's way back starts it without migrating. Its own
+  migration run, though, refuses a history that names 000033 (the runner
+  accepts only its list's beginning).
+- **The way back, entirely,** by hand with the previous binary in place, both
+  statements together (the migration names them; the store test's replay runs
+  them and migrates again):
+  `ALTER TABLE central_identity.accounts DROP COLUMN presence;` and
+  `DELETE FROM public.seaql_migrations WHERE version = 'm20261119_000033_presence';`.
+  The column dropped alone leaves a history the new binary trusts, and it
+  would not add the column again. Production runs the migration only through
+  its own gate.
 
 ## The migration runner, 18.11.2026
 

@@ -241,7 +241,9 @@ and the client says what it is doing (`central_api::presence`).
 - **The choice** (`SetPresence`, on either listener, under Central's terms):
   `online`, `afk` (away) or `offline`. Stored with the account
   (`accounts.presence`, migration 000033, online by default), so it holds on
-  every device and after a restart; it is read with the dial's status. An
+  every device and after a restart; it is read with the dial's status. It is
+  not in the account's export, which released clients decode strictly
+  (`docs/account-deletion.md`). An
   account that chose `offline` is never shown: its friends see it offline,
   and its own news still reaches its sockets.
 - **What the client does** (`ReportPresence`, native only): `playing` (it sits

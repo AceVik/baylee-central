@@ -23,7 +23,13 @@ Central cannot read the encrypted data, so an export has two halves:
   account's data. Since 12.11.2026 an account may hold an e-mail address
   ([e-mail](email.md)). It is **not** in this answer, which the released
   client decodes strictly and which therefore did not change; the account
-  reads its address with `EmailRequest::Status`.
+  reads its address with `EmailRequest::Status`. Since 19.11.2026 an account
+  stores how its friends see it ([push socket](push-socket.md#status)); for
+  the same reason that choice is not in this answer either: the Baylee client
+  reads the export for the lobby's name after every sign-in, and a field it
+  does not know would fail that read. A test in `central-api` holds the
+  released fields. The account's own push sockets say the choice as `me`,
+  `SetPresence` answers it; the website has no read of it yet.
 - **The encrypted half** is read and decrypted by the client: the account
   document and every private object, through the existing `ReadDocument`,
   `ListObjects` and `ReadObject`. `central-client` gains `Session::export`

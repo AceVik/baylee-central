@@ -159,7 +159,7 @@ async fn chosen(store: &AccountStore, token: &Token) -> Choice {
 }
 
 /// The chosen status: online until chosen, stored for the session's own
-/// account, read with the session's status and in the export.
+/// account, read with the session's status.
 async fn choices(
     store: &AccountStore,
     operator: &DatabaseConnection,
@@ -195,14 +195,6 @@ async fn choices(
         Ok(bi.account)
     );
     assert_eq!(chosen(store, b).await, Choice::Afk);
-    assert_eq!(
-        store
-            .account_export(Session::Browser(&browser))
-            .await
-            .unwrap()
-            .presence,
-        Choice::Afk
-    );
     // nobody's session, and a session that ended
     let nobody = Token::generate().unwrap();
     assert_eq!(
