@@ -12,10 +12,13 @@ use std::collections::BTreeSet;
 pub const LIVE_CHECK: usize = 1_024;
 
 impl AccountStore {
-    /// Of `digests`, the native sessions that stand now: not ended or replaced,
-    /// not expired, and of an account whose credential is the one they were
-    /// issued under. One statement however many are named; a digest that is
-    /// no native session (a browser session's, or nobody's) is simply absent.
+    /// Of `digests`, the sessions that stand now: not ended or replaced, not
+    /// expired, and of an account whose credential is the one they were issued
+    /// under. Exactly what `SessionStatus` asks ([`Self::session_status`]),
+    /// which the client's own check reads, so a socket is never told its
+    /// session ended while that check would still find it. One statement
+    /// however many are named; a digest that is nobody's is simply absent (a
+    /// browser session is stored under a digest of its own domain).
     ///
     /// # Errors
     /// `Rejected` for more than [`LIVE_CHECK`] digests; storage failure, which
@@ -31,11 +34,10 @@ impl AccountStore {
         let rows = self
             .db
             .query_all_raw(statement(
-                "SELECT s.digest FROM central_identity.sessions s
-                 JOIN central_identity.accounts a
-                 ON a.id = s.account_id AND a.credential_revision = s.credential_revision
-                 WHERE s.digest = ANY($1) AND s.kind = 'native' AND a.credential IS NOT NULL
-                 AND s.expires_at > pg_catalog.clock_timestamp()",
+                "SELECT s.digest FROM central_identity.accounts a
+                 JOIN central_identity.sessions s
+                 ON s.account_id = a.id AND s.credential_revision = a.credential_revision
+                 WHERE s.digest = ANY($1) AND s.expires_at > pg_catalog.clock_timestamp()",
                 vec![named.into()],
             ))
             .await

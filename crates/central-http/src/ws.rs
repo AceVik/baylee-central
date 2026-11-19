@@ -650,13 +650,11 @@ impl<A: Account, R: AsyncRead + Unpin, W: AsyncWrite + Unpin> Socket<A, R, W> {
                     }
                 }
                 _ = ping.tick() => {
-                    if heard.elapsed() >= self.times.idle {
-                        return End::Drop;
-                    }
                     if self.write(&frame::PING).await.is_err() {
                         return End::Drop;
                     }
                 }
+                () = tokio::time::sleep_until(heard + self.times.idle) => return End::Drop,
                 () = tokio::time::sleep_until(started + self.times.lifetime) => {
                     return End::Close(Code::GOING_AWAY);
                 }

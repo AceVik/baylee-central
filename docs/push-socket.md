@@ -117,6 +117,14 @@ with what it reports. A newer reading always wins over an older one that ends
 later. A reading that fails closes the account's sockets (1011) rather than
 keep reporting a friendship that may have ended; their clients dial again.
 
+A reading is decided before its request awaits anything: if the request's
+future is dropped while it reads (its time ran out, its client went away),
+the reading ends as failed and the sockets close, so a list that was to be
+read again is never left as it was. What remains is the instant between the
+store's commit and its answer: a request dropped exactly there tells nobody,
+and the two accounts' sockets keep the friends they had until their next
+reading or their end.
+
 Presence is kept in memory only, never stored or logged, and ends with the
 socket. It is a new disclosure: the privacy notice says so since its version
 2026-11-19 (`legal/privacy.*.md` § 5a and § 7), which awaits the owner's
@@ -181,7 +189,11 @@ There is no approved WebSocket library: the HTTP stack's approved features
 do not include axum's `ws` (which needs `tokio-tungstenite`), so the framing is
 first-party and small. The handshake's accept value uses the approved `sha1`
 and `base64` crates; SHA-1 there is the protocol's checksum of the client's
-key, not a security property. The reader keeps what it has read in its own
+key, not a security property. `sha1` 0.11.0 is new in the build (it was in the
+lock through `sqlx-mysql` only); it chooses x86 SHA-NI or AArch64 SHA2
+intrinsics at run time, in `unsafe` of its own, and has inline assembly only
+for LoongArch, which nothing here targets. `cpufeatures` and `digest` under it
+were in the build already, through `sha2`. The reader keeps what it has read in its own
 buffer and awaits nothing but one `read`, so the `select!` that also waits for
 news and timers loses no byte when news wins (tested with a frame cut in
 half). Writes are never inside a `select!` and each has its time.
@@ -190,8 +202,10 @@ half). Writes are never inside a `select!` and each has its time.
 
 - It does not deliver content, and a missed frame loses nothing: the client
   reads the inbox and its contacts once a minute while the socket is live.
-- Changes that do not pass this service (the operator's tools, an expiry) are
-  told within a minute, by the periodic check, not at once.
+- Changes that do not pass this service are told within a minute, by the
+  periodic check, not at once: a session's expiry, the operator's tools, and
+  the bridge's own invalidation of a legacy account, which this service
+  passes without knowing whose sessions it ended.
 - A group member that is no friend of a deleted account is not told by the
   socket that the deletion changed its group; its client reads its groups
   within the minute.

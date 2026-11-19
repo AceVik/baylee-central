@@ -8371,17 +8371,30 @@ first-party (the HTTP stack's approved features do not include axum's `ws`, and 
 is approved): the reader keeps its bytes in its own 131-byte buffer and awaits one `read`, refuses
 data frames, reserved bits and opcodes, unmasked and long frames at the header; writes are never
 in a `select!` and each has ten seconds. The handshake uses `sha1` 0.11.0 (no features) and
-`base64` 0.22.1 (`alloc`), both approved; `sha1` and its `cpufeatures` 0.3.1 enter the compiled
-graph for the first time (they were in the lock through `sqlx-mysql` only) and contain
-dependency-internal `unsafe` for SIMD; first-party `unsafe` stays forbidden. Limits: 512 sockets (the
+`base64` 0.22.1 (`alloc`), both approved; `sha1` enters the compiled graph for the first time (it
+was in the lock through `sqlx-mysql` only; `cpufeatures` 0.3.1 and `digest` 0.11.3 under it were
+compiled already, through `sha2` 0.11.1) and holds dependency-internal `unsafe`: x86 SHA-NI and
+AArch64 SHA2 intrinsics chosen at run time, inline assembly for LoongArch only, which no build here
+targets. Its adoption into the build is disclosed for the owner's acceptance; first-party `unsafe`
+stays forbidden. Limits: 512 sockets (the
 unit's 1,024 descriptors), 32 an address, 4 an account, 60 dials a minute an address, 12 a session.
 
 Adversarial pass, what it found and what changed. A first draft's per-connection `keep_alive`
 choice let a silent connection hold its place a second longer (the peek's wait before hyper's three
 seconds); the head's timer now takes what is left of them, and a test holds it to the old bound.
 An account's first friend reading woke the sockets of up to 300 friends although its own socket had
-not said `ready` and nothing they report could change; only a later reading wakes them now.
-Tested: the registry's addressing (an
+not said `ready` and nothing they report could change; only a later reading wakes them now. A
+review of the finished code found three more. A request whose future was dropped while it read a
+changed friendship's lists again (its five seconds over, its client gone) left them as they were,
+with nothing to correct them for the socket's life: an ended friendship's presence could stay
+shown. The bits are now raised and the readings begun before anything is awaited, each reading a
+guard that ends as failed when dropped, and a failed reading forgets the list, so a socket opening
+meanwhile reads it anew; what remains is a request dropped between the store's commit and its
+answer, named in the design. The sessions' check required more than the client's own
+`SessionStatus` does (a credential, the session's kind), so a socket could have been told
+`revoked`, which signs the client out, while that check still found the session; both now ask
+exactly the same. The idle limit was looked at only when a ping was due, so a dead socket lived up
+to 90 seconds instead of 75; it has its own timer now. Tested: the registry's addressing (an
 account's news never wakes another's socket, from both listeners), merging (100,000 raises, one
 frame each kind), presence with several sockets per account, racing readings and a failed one,
 deletion and retag, the limits and their tables; every handshake refusal and the RFC 6455 vectors;

@@ -137,18 +137,52 @@ pub(super) struct Live {
     state: Mutex<State>,
 }
 
+/// A reading begun, which ends as read or, however else it ends (an error,
+/// or its future dropped because its request was), as unread
+/// ([`Live::friends_unread`]): a list that was to be read again is never
+/// left as it was.
+pub(super) struct Pending<'a> {
+    live: &'a Live,
+    account: [u8; 16],
+    reading: Option<Reading>,
+}
+
+impl<'a> Pending<'a> {
+    pub(super) const fn new(live: &'a Live, reading: Reading) -> Self {
+        Self {
+            live,
+            account: reading.account,
+            reading: Some(reading),
+        }
+    }
+
+    /// The account whose friends are to be read.
+    pub(super) const fn account(&self) -> [u8; 16] {
+        self.account
+    }
+
+    /// What the reading found.
+    pub(super) fn read(mut self, friends: Vec<[u8; 16]>) {
+        if let Some(reading) = self.reading.take() {
+            self.live.friends_read(reading, friends);
+        }
+    }
+}
+
+impl Drop for Pending<'_> {
+    fn drop(&mut self) {
+        if let Some(reading) = self.reading.take() {
+            self.live.friends_unread(reading);
+        }
+    }
+}
+
 /// A friend list to read for an account, numbered so that only the newest
 /// reading is kept ([`Live::friends_read`]).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) struct Reading {
     account: [u8; 16],
     number: u64,
-}
-
-impl Reading {
-    pub(super) const fn account(self) -> [u8; 16] {
-        self.account
-    }
 }
 
 impl Live {
@@ -284,18 +318,21 @@ impl Live {
         }
     }
 
-    /// A reading that failed: what the account's sockets would say of their
-    /// friends may be wrong, an ended friendship's presence included, so they
-    /// close and their clients dial again, which reads it anew.
+    /// A reading that failed or was given up: what the account's sockets
+    /// would say of their friends may be wrong, an ended friendship's
+    /// presence included, so they close and their clients dial again. The
+    /// list is forgotten, so that a socket that opens meanwhile reads it anew.
     pub(super) fn friends_unread(&self, reading: Reading) {
-        let state = self.state();
-        if state
-            .accounts
-            .get(&reading.account)
-            .is_some_and(|entry| entry.reading == reading.number)
-        {
-            state.raise(&reading.account, news::STALE);
+        let mut state = self.state();
+        let Some(entry) = state.accounts.get_mut(&reading.account) else {
+            return;
+        };
+        if entry.reading != reading.number {
+            return;
         }
+        entry.read = false;
+        entry.friends.clear();
+        state.raise(&reading.account, news::STALE);
     }
 
     /// Wake `account`'s sockets with `bits`.
@@ -543,11 +580,12 @@ impl super::IdentityService {
         let (listener, reading) =
             self.live
                 .admit(status.identity.account, status.tag, token.digest())?;
-        if let Some(reading) = reading {
+        if let Some(reading) = reading.map(|reading| Pending::new(&self.live, reading)) {
             // The dial fails rather than report friends it could not read;
-            // dropping the listener takes the socket back out.
+            // dropping the listener takes the socket back out, and the
+            // reading's end closes any other socket that waited for it.
             let friends = self.store.live_friends(reading.account()).await?;
-            self.live.friends_read(reading, friends);
+            reading.read(friends);
         }
         Ok(listener)
     }
@@ -602,22 +640,30 @@ impl super::IdentityService {
     /// of exactly those accounts. A friendship that may have begun or ended is
     /// read again for each of the two that holds a socket, before anyone is
     /// told, so presence never shows an ended friendship's.
+    ///
+    /// Everything is decided before anything is awaited: the bits are raised
+    /// and the readings begun at once, so a request whose future is dropped
+    /// while it reads (its time ran out, its client went away) still closes
+    /// the sockets whose lists it did not read ([`Pending`]).
     pub(super) async fn tell(&self, concerns: &central_postgres::Concerns) {
-        if let Some((one, other)) = concerns.pair {
-            for account in [one, other] {
-                if let Some(reading) = self.live.reread(account) {
-                    match self.store.live_friends(account).await {
-                        Ok(friends) => self.live.friends_read(reading, friends),
-                        Err(_) => self.live.friends_unread(reading),
-                    }
-                }
-            }
-        }
         for account in &concerns.chat {
             self.live.raise(account, news::CHAT);
         }
         for account in &concerns.social {
             self.live.raise(account, news::SOCIAL);
+        }
+        let readings: Vec<Pending<'_>> = concerns
+            .pair
+            .into_iter()
+            .flat_map(|(one, other)| [one, other])
+            .filter_map(|account| self.live.reread(account))
+            .map(|reading| Pending::new(&self.live, reading))
+            .collect();
+        for reading in readings {
+            // An error drops the reading, which ends it as unread.
+            if let Ok(friends) = self.store.live_friends(reading.account()).await {
+                reading.read(friends);
+            }
         }
     }
 

@@ -448,6 +448,20 @@ async fn a_silent_client_is_dropped_and_an_answering_one_is_kept() {
     }
     assert!((1..=3).contains(&pings), "{pings}");
     assert_eq!(silent.task.await.unwrap(), End::Drop);
+    // dropped at the idle limit itself, not at the next ping after it
+    let times = Times {
+        ping_every: Duration::from_millis(200),
+        idle: Duration::from_millis(250),
+        ..SHORT
+    };
+    let mut silent = opened(times).await;
+    let started = Instant::now();
+    while hear(&mut silent.client).await != Heard::End {}
+    let held = started.elapsed();
+    assert!(
+        held >= times.idle && held < times.ping_every * 2,
+        "{held:?}"
+    );
 }
 
 #[tokio::test]

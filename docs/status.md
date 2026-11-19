@@ -501,8 +501,8 @@ Central serves the Baylee client's `GET /v1/ws` ([push socket](push-socket.md)),
 with presence, by the owner's decision of the same day; rebuilt on `main`, not
 ported from the earlier attempt:
 
-- `central-http`: the route, the handshake (the approved `sha1` and `base64`,
-  newly in the build), first-party framing of control frames, the sockets' own
+- `central-http`: the route, the handshake (the approved `sha1`, newly in the
+  build, and `base64`), first-party framing of control frames, the sockets' own
   set with a shutdown; `keep_alive(false)` stays for every other connection;
 - `central-identity`: the registry, which tells exactly the accounts a change
   concerns, presence in memory, the socket and dial limits;
