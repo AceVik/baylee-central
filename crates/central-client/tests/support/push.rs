@@ -543,7 +543,7 @@ fn pictures(runtime: &Runtime, operator: &DatabaseConnection, http: &Http, [a, b
         Ok(Response::Social {
             response: SocialResponse::Pictures { pictures },
         }) => Ok(pictures),
-        Ok(other) => panic!("pictures expected: {other:?}"),
+        Ok(_) => panic!("pictures expected"),
         Err(error) => Err(error),
     };
     // one's own tag, free and without a picture; a stranger's that moves
