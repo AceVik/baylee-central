@@ -1,5 +1,5 @@
-<!-- version: 2026-11-18 -->
-<!-- updated: 2026-11-18 -->
+<!-- version: 2026-11-19 -->
+<!-- updated: 2026-11-19 -->
 
 # Datenschutzerklärung von Baylee Central
 
@@ -96,6 +96,17 @@ je Gerät speichert Central höchstens 5.000 Nachrichten; danach werden neue
 abgelehnt. Der Verlauf wird nicht automatisch gelöscht; er bleibt, bis du
 dein Konto löschst.
 
+Solange die Baylee-App angemeldet ist, hält sie eine Verbindung zu Central
+offen, über die Central ihr sagt, dass sich etwas an deinen eigenen Chats,
+Kontakten oder Gruppen geändert hat; der Inhalt selbst geht nicht darüber.
+Solange diese Verbindung besteht, sehen deine Freunde (Kontakte, die ihr beide
+angenommen habt), dass du online bist: nur das, an deinem Tag, nicht wo oder
+was du spielst. Niemand sonst sieht es, auch keine offenen Anfragen und keine
+Blockierten (Art. 6 Abs. 1 lit. b DSGVO). Central hält diesen Status nur im
+Arbeitsspeicher, solange die Verbindung offen ist; er wird nicht gespeichert
+und nicht protokolliert. Der Status, den ein Gateway beim Spielen zeigt, ist
+dessen eigener.
+
 Wenn du Benachrichtigungen aktivierst (Art. 6 Abs. 1 lit. a DSGVO, § 25 Abs. 1
 TDDDG: deine Einwilligung, im Profil jederzeit für die Zukunft widerrufbar),
 speichert Central den Push-Endpunkt dieses
@@ -155,6 +166,8 @@ anmeldest, entscheidest du.
   für alle Konten, sobald der Umzug vom offiziellen Gateway endet.
 - Sitzungen enden 30 Minuten nach ihrer letzten Nutzung und spätestens
   12 Stunden nach der Anmeldung, Anmeldetickets nach Sekunden.
+- Dein Online-Status besteht nur, solange die Baylee-App mit Central
+  verbunden ist, und nur im Arbeitsspeicher.
 - Den Zeitpunkt deiner letzten Anmeldung speichern wir für die Dauer deines
   Kontos.
 - Das Protokoll dessen, was unsere Administratoren getan haben, bewahren wir

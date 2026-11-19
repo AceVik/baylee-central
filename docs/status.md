@@ -494,3 +494,23 @@ confirmed only by its test delivery with `kofi.record` off; whether Ko-fi
 reports a cancelled membership; the privacy policy's new version 2026-11-18
 (§§ 3 and 7) for the owner to read; the nine languages besides English and
 German.
+
+## The push socket, 19 November 2026
+
+Central serves the Baylee client's `GET /v1/ws` ([push socket](push-socket.md)),
+with presence, by the owner's decision of the same day; rebuilt on `main`, not
+ported from the earlier attempt:
+
+- `central-http`: the route, the handshake (the approved `sha1` and `base64`,
+  newly in the build), first-party framing of control frames, the sockets' own
+  set with a shutdown; `keep_alive(false)` stays for every other connection;
+- `central-identity`: the registry, which tells exactly the accounts a change
+  concerns, presence in memory, the socket and dial limits;
+- `central-postgres`: `Concerns` from every social operation, `live_sessions`
+  and `live_friends`, the tag in a session's status; no migration.
+
+Open: the privacy policy's version 2026-11-19 (§§ 5a and 7) for the owner to
+read, and the website's own privacy page, which does not mention presence yet;
+whether presence wants a switch (the owner's question); Caddy's pass of the
+upgrade, checked after the first deploy; the real Baylee client was not run
+against it.
