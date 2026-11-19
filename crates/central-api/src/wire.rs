@@ -550,6 +550,24 @@ pub enum Request {
         /// The 32-byte check derived from the master key.
         check: Vec<u8>,
     },
+    /// Choose how the session's account is shown to its friends
+    /// (`docs/push-socket.md` §"Status"), on either listener. Stored with the
+    /// account; its sockets and its friends' learn it at once. Answered with
+    /// [`Response::Presence`].
+    SetPresence {
+        /// Online, away, or offline (never shown).
+        choice: crate::presence::Choice,
+    },
+    /// What the native client is doing (native listener only, a session with
+    /// an open push socket): its activity and whether it has been idle for
+    /// ten minutes. Kept in memory while the socket stands; without one it
+    /// changes nothing and keeps nothing. Always `Done`.
+    ReportPresence {
+        /// Playing, at a table, or neither.
+        activity: Option<crate::presence::Activity>,
+        /// No input for ten minutes.
+        idle: bool,
+    },
     /// Start a pairing for the browser session's account (browser listener
     /// only). Answered with [`Response::PairStarted`].
     PairStart,
@@ -1056,6 +1074,11 @@ pub enum Response {
     KeyCheck {
         /// One is stored.
         set: bool,
+    },
+    /// The account's chosen status as it is stored now ([`Request::SetPresence`]).
+    Presence {
+        /// What friends are shown.
+        choice: crate::presence::Choice,
     },
     /// A pairing started ([`Request::PairStart`]).
     PairStarted {

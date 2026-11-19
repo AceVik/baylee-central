@@ -1,4 +1,5 @@
 use super::*;
+use central_api::presence::{Activity, Choice, Shown};
 use std::sync::atomic::{AtomicU8, Ordering};
 use tokio::{
     io::{AsyncReadExt, DuplexStream},
@@ -113,17 +114,56 @@ fn every_other_handshake_is_refused() {
     }
 }
 
+/// A presence of `online` friends, each with its state, and `me`.
+fn said(online: &[(u32, Shown)], me: Choice) -> Presence {
+    Presence {
+        online: online.iter().map(|(tag, _)| *tag).collect(),
+        states: online.iter().map(|(_, state)| *state).collect(),
+        me,
+    }
+}
+
+const ONLINE: Shown = Shown::ONLINE;
+const AWAY_AT_TABLE: Shown = Shown {
+    away: true,
+    activity: Some(Activity::Table),
+};
+
 #[test]
-fn presence_names_tags_as_the_client_does() {
-    assert_eq!(presence(&[]), r#"{"event":"presence","online":[]}"#);
+fn presence_names_tags_as_the_client_does_and_a_state_for_each() {
     assert_eq!(
-        presence(&[0x2a, 0x1000, 0x7fff_ffff]),
-        r#"{"event":"presence","online":["002a","1000","7fffffff"]}"#
+        presence(&said(&[], Choice::Online)),
+        r#"{"event":"presence","online":[],"states":"","me":"online"}"#
+    );
+    let playing = Shown {
+        away: false,
+        activity: Some(Activity::Playing),
+    };
+    assert_eq!(
+        presence(&said(
+            &[
+                (0x2a, ONLINE),
+                (0x1000, AWAY_AT_TABLE),
+                (0x7fff_ffff, playing)
+            ],
+            Choice::Offline
+        )),
+        r#"{"event":"presence","online":["002a","1000","7fffffff"],"states":"oTg","me":"offline"}"#
     );
     // the widest presence an account can have fits the client's frames
-    let widest = vec![0x7fff_ffff; central_api::social::MAX_CONTACTS];
-    assert!(presence(&widest).len() <= frame::TEXT);
-    assert!(frame::text(&presence(&widest)).is_some());
+    let widest: Vec<(u32, Shown)> =
+        vec![(0x7fff_ffff, AWAY_AT_TABLE); central_api::social::MAX_CONTACTS];
+    let text = presence(&said(&widest, Choice::Offline));
+    assert!(text.len() <= frame::TEXT, "{}", text.len());
+    assert!(frame::text(&text).is_some());
+    // as many states as tags
+    let states = text
+        .split(r#""states":""#)
+        .nth(1)
+        .and_then(|rest| rest.split('"').next())
+        .unwrap();
+    assert_eq!(states.len(), central_api::social::MAX_CONTACTS);
+    assert_eq!(text.matches("7fffffff").count(), states.len());
 }
 
 #[test]
@@ -192,7 +232,7 @@ struct Fake {
     bits: AtomicU8,
     bell: Notify,
     ready: AtomicU8,
-    online: std::sync::Mutex<Vec<u32>>,
+    online: std::sync::Mutex<Vec<(u32, Shown)>>,
     /// What a check of the session answers.
     standing: std::sync::Mutex<Option<Result<bool, Error>>>,
 }
@@ -217,8 +257,8 @@ impl Account for Arc<Fake> {
         self.ready.fetch_add(1, Ordering::AcqRel);
     }
 
-    fn presence(&self) -> Vec<u32> {
-        self.online.lock().unwrap().clone()
+    fn presence(&self) -> Presence {
+        said(&self.online.lock().unwrap(), Choice::Online)
     }
 
     fn listening(&self) -> impl Future<Output = Result<bool, Error>> + Send {
@@ -236,6 +276,7 @@ const SHORT: Times = Times {
     check: Duration::from_millis(300),
     frames: 16,
     frame_window: Duration::from_secs(10),
+    presence_gap: Duration::from_millis(150),
 };
 
 /// A socket served over an in-memory connection: the fake account, the
@@ -297,6 +338,16 @@ async fn hear(client: &mut DuplexStream) -> Heard {
     }
 }
 
+/// The next frame that is not a ping; pings on the way are answered.
+async fn heard(client: &mut DuplexStream) -> Heard {
+    loop {
+        match hear(client).await {
+            Heard::Ping => client.write_all(&sent(0x8a, b"")).await.unwrap(),
+            other => return other,
+        }
+    }
+}
+
 /// A client's masked frame.
 fn sent(first: u8, payload: &[u8]) -> Vec<u8> {
     let mask = [0x11, 0x22, 0x33, 0x44];
@@ -315,7 +366,7 @@ async fn opened(times: Times) -> Harness {
     assert_eq!(hear(&mut socket.client).await, text(READY));
     assert_eq!(
         hear(&mut socket.client).await,
-        text(r#"{"event":"presence","online":[]}"#)
+        text(r#"{"event":"presence","online":[],"states":"","me":"online"}"#)
     );
     assert_eq!(socket.account.ready.load(Ordering::Acquire), 1);
     socket
@@ -331,16 +382,16 @@ async fn ready_then_presence_then_only_news_that_was_raised() {
     assert_eq!(hear(&mut socket.client).await, text(CHAT));
     // presence only when it changed
     socket.account.raise(news::PRESENCE);
-    *socket.account.online.lock().unwrap() = vec![0x2a];
+    *socket.account.online.lock().unwrap() = vec![(0x2a, ONLINE)];
     socket.account.raise(news::PRESENCE);
     assert_eq!(
-        hear(&mut socket.client).await,
-        text(r#"{"event":"presence","online":["002a"]}"#)
+        heard(&mut socket.client).await,
+        text(r#"{"event":"presence","online":["002a"],"states":"o","me":"online"}"#)
     );
     socket.account.raise(news::PRESENCE);
     socket.account.raise(news::CHAT);
     assert_eq!(
-        hear(&mut socket.client).await,
+        heard(&mut socket.client).await,
         text(CHAT),
         "no repeated presence"
     );
@@ -648,4 +699,43 @@ fn an_address_dials_sixty_times_a_minute() {
     assert!(!sockets.upgrades.dial(client));
     let other = Client::from(std::net::IpAddr::from([198, 51, 100, 10]));
     assert!(sockets.upgrades.dial(other));
+}
+
+#[tokio::test]
+async fn presence_is_said_at_most_once_a_gap_and_then_the_latest() {
+    let mut socket = opened(SHORT).await;
+    // past the gap that follows the presence said on opening
+    tokio::time::sleep(SHORT.presence_gap).await;
+    // five changes at once: one frame now, one when the gap is over, with the
+    // last of them
+    for (index, tag) in [0x11_u32, 0x12, 0x13, 0x14, 0x15].into_iter().enumerate() {
+        *socket.account.online.lock().unwrap() = vec![(tag, ONLINE)];
+        socket.account.raise(news::PRESENCE);
+        if index == 0 {
+            assert_eq!(
+                heard(&mut socket.client).await,
+                text(r#"{"event":"presence","online":["0011"],"states":"o","me":"online"}"#)
+            );
+        }
+    }
+    let started = Instant::now();
+    assert_eq!(
+        heard(&mut socket.client).await,
+        text(r#"{"event":"presence","online":["0015"],"states":"o","me":"online"}"#)
+    );
+    assert!(
+        started.elapsed() >= SHORT.presence_gap / 2,
+        "{:?}",
+        started.elapsed()
+    );
+    // other news is not held back by the gap
+    *socket.account.online.lock().unwrap() = vec![(0x16, AWAY_AT_TABLE)];
+    socket.account.raise(news::PRESENCE | news::CHAT);
+    assert_eq!(heard(&mut socket.client).await, text(CHAT));
+    assert_eq!(
+        heard(&mut socket.client).await,
+        text(r#"{"event":"presence","online":["0016"],"states":"T","me":"online"}"#)
+    );
+    socket.stop.send(true).unwrap();
+    let _ = socket.task.await;
 }

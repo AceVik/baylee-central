@@ -26,6 +26,10 @@ pub struct AccountExport {
     pub display_name_at: Option<i64>,
     /// The tag beside the display name.
     pub tag: Option<u32>,
+    /// How it chose to be shown to its friends (`docs/push-socket.md`
+    /// §"Status"). Absent in an export of a Central from before the choice.
+    #[serde(default)]
+    pub presence: crate::presence::Choice,
     /// Where the account came from.
     pub source: AccountSource,
     /// The official gateway's id of a moved account.
@@ -147,6 +151,7 @@ mod tests {
             display_name: Some("x".repeat(16)),
             display_name_at: Some(i64::MIN),
             tag: Some(u32::MAX),
+            presence: crate::presence::Choice::Offline,
             source: AccountSource::Legacy,
             legacy_id: Some("\u{1}".repeat(64)),
             created_at: i64::MIN,

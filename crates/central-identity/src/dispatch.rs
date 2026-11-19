@@ -39,6 +39,9 @@ impl IdentityService {
                 .change_password_finish(bearer, surface, &attempt, proof, &record, &wrapped_master)
                 .await;
         }
+        if super::terms::needs_acceptance(&request) {
+            self.require_terms(bearer, surface).await?;
+        }
         Ok(BrowserReply {
             response: self.respond(request, bearer, surface, seen, place).await?,
             session: None,
@@ -53,9 +56,6 @@ impl IdentityService {
         seen: Seen,
         place: Option<Place>,
     ) -> Result<Response, Error> {
-        if super::terms::needs_acceptance(&request) {
-            self.require_terms(bearer, surface).await?;
-        }
         match request {
             Request::TowerToken {} => self.tower_token(bearer).await,
             Request::TowerIdentity {} => self.tower_identity(bearer).await,
@@ -68,6 +68,9 @@ impl IdentityService {
             Request::ChallengeHost { request } => self.challenge_host(request, bearer).await,
             Request::Notifications { request } => self.notifications(request, bearer).await,
             Request::Social { request } => self.social(request, bearer, surface).await,
+            request @ (Request::SetPresence { .. } | Request::ReportPresence { .. }) => {
+                self.presence_request(request, bearer, surface).await
+            }
             Request::PublicFunding {} => self.public_funding(),
             request @ (Request::Terms
             | Request::GatewayTerms { .. }

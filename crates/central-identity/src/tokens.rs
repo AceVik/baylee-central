@@ -142,6 +142,8 @@ pub const fn credential_operation(request: &Request) -> bool {
         | Request::DeleteAccountFinish { .. }
         | Request::KeyCheckStatus
         | Request::SetKeyCheck { .. }
+        | Request::SetPresence { .. }
+        | Request::ReportPresence { .. }
         | Request::PairStart
         | Request::PairStatus { .. }
         | Request::PairApprove { .. }

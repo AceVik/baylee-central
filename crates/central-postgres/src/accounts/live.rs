@@ -1,9 +1,9 @@
 //! What the native push socket (`GET /v1/ws`, `docs/push-socket.md`) asks of the
 //! store: which of the sessions it serves still stand, and who an account's
 //! friends are. Nothing here writes; presence itself is never stored.
-use super::{AccountStore, Error, statement, uuid};
-use central_api::social::MAX_CONTACTS;
-use sea_orm::{ConnectionTrait, prelude::Uuid};
+use super::{AccountStore, Error, Session, statement, uuid};
+use central_api::{presence::Choice, social::MAX_CONTACTS};
+use sea_orm::{ConnectionTrait, QueryResult, prelude::Uuid};
 use std::collections::BTreeSet;
 
 /// The most session digests one check names: more than the push sockets one
@@ -77,6 +77,51 @@ impl AccountStore {
                 Ok(other.into_bytes())
             })
             .collect()
+    }
+}
+
+/// The row's stored `presence`: a value the column's check does not allow is
+/// a store that cannot be read, never a default.
+pub(super) fn choice(row: &QueryResult) -> Result<Choice, Error> {
+    let stored: String = row
+        .try_get("", "presence")
+        .map_err(|_| Error::Unavailable)?;
+    Choice::named(&stored).ok_or(Error::Unavailable)
+}
+
+impl AccountStore {
+    /// Store how the account behind `session` is shown to its friends, on
+    /// either listener. Returns the account, whose sockets and friends are
+    /// told. Needs a session that stands, as every account's own write does.
+    ///
+    /// # Errors
+    /// `Rejected` for a session that does not stand; storage failure.
+    pub async fn set_presence<'a>(
+        &self,
+        session: impl Into<Session<'a>>,
+        choice: Choice,
+    ) -> Result<[u8; 16], Error> {
+        let session = session.into();
+        let row = self
+            .db
+            .query_one_raw(statement(
+                "UPDATE central_identity.accounts a SET presence = $3
+                 FROM central_identity.sessions s
+                 WHERE s.digest = $1 AND s.kind = $2 AND s.account_id = a.id
+                 AND s.credential_revision = a.credential_revision AND a.credential IS NOT NULL
+                 AND s.expires_at > pg_catalog.clock_timestamp()
+                 RETURNING a.id",
+                vec![
+                    session.digest().to_vec().into(),
+                    session.kind().into(),
+                    choice.name().into(),
+                ],
+            ))
+            .await
+            .map_err(|_| Error::Unavailable)?
+            .ok_or(Error::Rejected)?;
+        let account: Uuid = row.try_get("", "id").map_err(|_| Error::Unavailable)?;
+        Ok(account.into_bytes())
     }
 }
 

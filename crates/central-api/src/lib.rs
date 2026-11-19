@@ -17,6 +17,7 @@ pub mod notifications;
 pub mod object;
 pub mod owner;
 pub mod picture;
+pub mod presence;
 pub mod profile;
 pub mod register;
 pub mod reports;
