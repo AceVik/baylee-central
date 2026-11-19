@@ -94,6 +94,7 @@ fn real_native_login_restore_migration_and_adversarial_paths() {
         support::reset::run(&http, &browser, &bridge, &runtime, &operator);
         support::deletion::run(&http, &browser, &bridge, &runtime, &operator);
         support::pairing::run(&http, &browser, &runtime, &operator);
+        support::push::run(&http, browser_address, &runtime, &operator);
         support::legacy::run(&http, &browser, &bridge, &store, &runtime, &operator);
         support::notifications::run(&http, &browser, &bridge, &store, &runtime);
         support::email::run(&support::email::Fixture {
