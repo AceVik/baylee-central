@@ -281,11 +281,26 @@ and the client says what it is doing (`central_api::presence`).
   status (one statement, with the choice), and only if a choice settled
   meanwhile reads it again in the turn, where no write is under way; its
   reading then replaces the entry's, whose sockets say it. Only a choice
-  counts as settled, never a reading, so no dial makes another read again. A
-  write that fails may still have been stored: a failed `offline` is taken
-  all the same (hidden is the side to err on); any other is left to the next
-  dial's reading. One account's turn never waits for another's; the turns
-  are kept only while held or awaited.
+  counts as settled, never a reading, so no dial makes another read again.
+  `offline` is taken before its write (hidden is the side to err on), so no
+  socket admitted earlier says `ready` under the older choice while the write
+  is under way, and a write that fails leaves it hidden; any other choice is
+  taken once stored, and one that fails is left to the next dial's reading. A
+  write has five seconds (a request's time), then counts as failed and lets
+  the turn go. However a choice's step ends, a panic included, it counts as
+  settled before the turn is let go. One account's turn never waits for
+  another's; the turns are kept only while held or awaited.
+- **Left as it is, on purpose**: every settled choice counts, one that
+  changed nothing and one that failed included, so each dial in flight then
+  reads the choice once more; counting only real changes would need the
+  stored value from before, and the cost is one statement a dial a choice,
+  without a cascade. A choice's budget is spent on the digest of the bearer
+  before the session is checked, so made-up cookies on the website's listener
+  can take the place of real sessions in the table of 4,096; a session pushed
+  out starts its minute anew. Checking the session first would bring back a
+  statement before the budget, and refusing newcomers to a full table would
+  let made-up cookies lock real sessions out (the table was built to avoid
+  that, `SESSION_DIALS`); the general request limits per address bound both.
 - **Budgets, before the work**: 10 choices and readings a minute a session,
   spent before the terms are read for a choice; 30 reports, spent before the
   registry looks for the session's sockets (found by the session, not by a
