@@ -8415,6 +8415,16 @@ What was not done: the real Baylee client was not run against the socket (its co
 the frames and handshake match it; the test client is independent); Caddy's pass of the upgrade was
 not tried (`docs/operations.md`, a check after the first deploy); no administrator action on `main`
 ends a native session, so none was tested; the 75-second idle limit and the minute's check were
-tested with short times and a direct call, not waited for. The privacy policy's version 2026-11-19
-awaits the owner's review, and whether presence wants a switch is the owner's question. These passes
-are by the implementing agent and are not an independent audit.
+tested with short times and a direct call, not waited for. These passes are by the implementing
+agent and are not an independent audit.
+
+Addendum, the same day: the legal texts. Asked, the owner chose the contract (Art. 6(1)(b) GDPR) as
+presence's legal basis, with the terms describing it, over a legitimate interest with a switch, and
+asked for all of Central's legal texts to be brought in line. Terms and privacy policy are at
+version 2026-11-19, so every account accepts the terms anew (`legal/README.md` lists what changed);
+the website's privacy page says the same in its eleven languages, the nine besides German and
+English translated by a cheaper agent as the owner set for `.ftl` files and not yet read by a
+speaker. What the texts now say that was not checked here: that each push provider is certified
+under the EU-US Data Privacy Framework, which they name as the transfer's basis "as far as the
+provider is certified". Both texts await the owner's review; this is no legal advice and no claim
+of compliance.

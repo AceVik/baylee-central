@@ -32,15 +32,17 @@ Datenschutzbeauftragten gibt es nicht, weil keine Pflicht dazu besteht.
 
 ## 3. Was wir verarbeiten, wozu und auf welcher Grundlage
 
-- **Benutzername, Konto-ID, Erstellungszeitpunkt, Anzeigename und Tag** (ein Profilbild folgt) – dein Konto führen und anzeigen. Andere Spieler sehen deinen Anzeigenamen und Tag, nie deinen Benutzernamen; ein vom offiziellen Gateway umgezogenes Konto behält den Namen und Tag, die es dort hatte. *Art. 6 Abs. 1 lit. b DSGVO (Vertrag)*
+- **Benutzername, Konto-ID, Erstellungszeitpunkt, Anzeigename und Tag** – dein Konto führen und anzeigen. Andere Spieler sehen deinen Anzeigenamen und Tag, nie deinen Benutzernamen; ein vom offiziellen Gateway umgezogenes Konto behält den Namen und Tag, die es dort hatte. *Art. 6 Abs. 1 lit. b DSGVO (Vertrag)*
 - **Rollen (Administrator)** – Verwaltung von Baylee Central. *Art. 6 Abs. 1 lit. b DSGVO*
 - **Zeitpunkt deiner letzten Anmeldung mit Passwort** (keine Adresse) – Konten verwalten und Missbrauch bemerken. *Art. 6 Abs. 1 lit. f DSGVO (unser Interesse an einem sicheren Betrieb)*
 - **OPAQUE-Anmeldedatensatz, verschlüsselter Schlüsselcontainer, Stand der Zugangsdaten** – Anmeldung, Schutz deiner verschlüsselten Daten. *Art. 6 Abs. 1 lit. b DSGVO*
 - **Fingerabdruck eines Rücksetzcodes, wenn ein Administrator dir einen erstellt hat oder einer an deine E-Mail-Adresse geschickt wurde** (wir speichern nur seinen SHA-256-Hash, nie den Code) – damit du ein neues Passwort setzen kannst, wenn du deines vergessen hast. *Art. 6 Abs. 1 lit. b DSGVO*
 - **E-Mail-Adresse (freiwillig)**, die Sprache ihrer E-Mails und wann du sie bestätigt hast; eine angegebene Adresse, die auf ihren Code wartet, mit dem Hash des Codes; die Zeitpunkte, zu denen dir in den letzten 24 Stunden Rücksetzcodes geschickt wurden – die Adresse bestätigen, einen Rücksetzcode schicken, wenn du oder jemand, der deinen Anmeldenamen kennt, einen anfordert (höchstens drei am Tag), der alten Adresse Bescheid sagen, wenn sie ersetzt oder entfernt wird, der bestätigten Adresse Bescheid sagen, wenn mit einem Rücksetzcode ein neues Passwort gesetzt, dein Passwort geändert oder von einem Administrator ein Rücksetzcode für deinen Account ausgestellt wurde. *Art. 6 Abs. 1 lit. b DSGVO*
 - **dein Schlüsselcontainer, mit deinem Wiederherstellungscode verschlüsselt** (den Code selbst kennen wir nicht); eine zweite Anmeldestufe (freiwillig) folgt – Schutz deines Kontos und deiner verschlüsselten Daten. *Art. 6 Abs. 1 lit. b DSGVO*
-- **Sitzungen, Anmeldetickets für Gateways, Gateway-Zugänge** – dich angemeldet halten und an Gateways anmelden. *Art. 6 Abs. 1 lit. b DSGVO*
+- **Sitzungen, Anmeldetickets für Gateways, Gateway-Zugänge**; beim Koppeln der Baylee-App mit der angemeldeten Website für höchstens fünf Minuten der öffentliche Schlüssel der App und dein für sie verschlüsselter Hauptschlüssel – dich angemeldet halten, Geräte koppeln und dich an Gateways anmelden. *Art. 6 Abs. 1 lit. b DSGVO*
 - **verschlüsselte Objekte (Einstellungen, Gateway-Liste, Deck-Sicherungen, Chat-Verlauf) mit Größe, Stand und Zeitpunkt** – geräteübergreifende Sicherung. *Art. 6 Abs. 1 lit. b DSGVO*
+- **Profilbild (freiwillig):** ein quadratisches Bild mit 256 × 256 Pixeln (AVIF und PNG, bei einem bewegten Bild eine Animation aus höchstens 100 Einzelbildern) ohne die Angaben des Fotos (etwa Ort, Kamera oder Zeit), sein Fingerabdruck (SHA-256) und wann du es gesetzt hast, unter einem zufälligen Schlüssel – es neben deinem Anzeigenamen zeigen; jeder kann es unter seiner Adresse sehen, auch ohne Anmeldung. *Art. 6 Abs. 1 lit. b DSGVO.* Meldungen über ein Bild (meldender Account, Fingerabdruck des Bilds, Grund, freiwilliger Hinweis, Zeitpunkt; die Person, deren Bild es ist, erfährt nie, wer gemeldet hat) und die Zahl deiner hochgeladenen Bilder (zehn in der Stunde, dreißig am Tag) – rechtswidrige und missbräuchliche Bilder entfernen. *Art. 6 Abs. 1 lit. f DSGVO (unser Interesse an einem Dienst ohne solche Inhalte)*
+- **Daily- und Weekly-Aufgaben und Tower-Expeditionen:** Versuche, Ergebnisse, genutzte Hinweise, gewählte Verbesserungen, verbleibende Leben und Abzeichen-Fortschritt; vom offiziellen Gateway Ergebnis und gemessene Zeit einer Partie – die Aufgaben anbieten und auswerten. In einer Rangliste erscheinen dein Anzeigename, Tag und Ergebnis nur, wenn du sie für diese Aufgabe oder Saison freigibst. *Art. 6 Abs. 1 lit. b DSGVO*
 - **angenommene Fassungen unserer Bedingungen und der Bedingungen der Gateways, auf denen du spielst, mit Zeitpunkt** – Nachweis der Annahme, Anzeige neuer Fassungen. *Art. 6 Abs. 1 lit. b und c DSGVO*
 - **eingetragene Gateways, ihre Adressen, Beschreibung und Administratoren** – Gateway-Verzeichnis und Verwaltung. *Art. 6 Abs. 1 lit. b DSGVO*
 - **Fehlerberichte, die du sendest, mit den Anhängen, die du angehakt lässt** (direkt oder über ein Gateway) – Fehler finden und beheben. *Art. 6 Abs. 1 lit. f DSGVO (unser Interesse an einem fehlerfreien Spiel)*
@@ -100,9 +102,10 @@ Solange die Baylee-App angemeldet ist, hält sie eine Verbindung zu Central
 offen, über die Central ihr sagt, dass sich etwas an deinen eigenen Chats,
 Kontakten oder Gruppen geändert hat; der Inhalt selbst geht nicht darüber.
 Solange diese Verbindung besteht, sehen deine Freunde (Kontakte, die ihr beide
-angenommen habt), dass du online bist: nur das, an deinem Tag, nicht wo oder
-was du spielst. Niemand sonst sieht es, auch keine offenen Anfragen und keine
-Blockierten (Art. 6 Abs. 1 lit. b DSGVO). Central hält diesen Status nur im
+angenommen habt), dass du online bist: nur das, erkennbar an deinem Tag (dem
+Kürzel hinter deinem Anzeigenamen), nicht wo oder was du spielst. Niemand
+sonst sieht es, auch keine offenen Anfragen und keine Blockierten (Art. 6
+Abs. 1 lit. b DSGVO). Central hält diesen Status nur im
 Arbeitsspeicher, solange die Verbindung offen ist; er wird nicht gespeichert
 und nicht protokolliert. Der Status, den ein Gateway beim Spielen zeigt, ist
 dessen eigener.
@@ -146,13 +149,20 @@ Zustellung verhindern.
 - **Gateways:** Meldest du dich an einem Gateway an, erhält es deine Konto-ID,
   deinen Anzeigenamen und Tag sowie die Bestätigung, dass du angemeldet bist,
   nicht aber dein Passwort oder deine verschlüsselten Daten.
+- **Andere Spieler:** Deine Kontakte und die Mitglieder deiner Gruppen sehen
+  deinen Anzeigenamen mit Tag und die Nachrichten, die du ihnen schickst;
+  deine Freunde außerdem, solange die Baylee-App mit Central verbunden ist,
+  dass du online bist (Abschnitt 5a). Dein Profilbild kann jeder sehen, auch
+  ohne Anmeldung, ebenso deinen Eintrag in einer Rangliste, die du freigibst.
 - **Behörden** erhalten Daten nur, wenn wir gesetzlich dazu verpflichtet sind.
 
 Eine Übermittlung in Länder außerhalb des Europäischen Wirtschaftsraums
 findet nur statt, wenn du Benachrichtigungen aktivierst: Dann überbringt
 sie der Push-Anbieter deines Browsers (Google, Mozilla oder Apple, USA).
-Gateways anderer Betreiber können in jedem Land stehen; ob du dich dort
-anmeldest, entscheidest du.
+Grundlage ist der Angemessenheitsbeschluss der EU-Kommission zum
+EU-US-Datenschutzrahmen (Data Privacy Framework), soweit der Anbieter danach
+zertifiziert ist. Gateways anderer Betreiber können in jedem Land stehen; ob
+du dich dort anmeldest, entscheidest du.
 
 ## 7. Wie lange wir Daten speichern
 
@@ -182,7 +192,16 @@ anmeldest, entscheidest du.
   (15 Minuten nach dem Versand).
 - Server-Protokolle löschen wir nach höchstens 14 Tagen.
 - Meldungen und Moderationsentscheidungen bewahren wir so lange auf, wie es
-  zur Nachvollziehbarkeit nötig ist, höchstens drei Jahre.
+  zur Nachvollziehbarkeit nötig ist, höchstens drei Jahre; entschiedene
+  Meldungen über Profilbilder ein Jahr.
+- Ein Profilbild bleibt, bis du es ersetzt oder entfernst, ein Administrator
+  es entfernt oder du dein Konto löschst; dann wird es sofort gelöscht. Ein
+  Browser, der es gezeigt hat, kann eine Kopie bis zu einer Stunde behalten.
+- Aufgaben, Expeditionen und Ranglisteneinträge bleiben bis zur Löschung
+  deines Kontos; einen Ranglisteneintrag nimmst du jederzeit zurück, indem
+  du die Freigabe ausschaltest.
+- Was beim Koppeln eines Geräts anfällt, löschen wir, sobald die Kopplung
+  eingelöst ist, spätestens nach fünf Minuten.
 - Fehler- und Absturzberichte löschen wir, wenn der Fehler erledigt ist,
   spätestens nach drei Jahren.
 - Nachrichten über das Kontaktformular löschen wir 90 Tage, nachdem sie
@@ -198,16 +217,30 @@ anmeldest, entscheidest du.
 ## 8. Deine Rechte
 
 Du hast das Recht auf Auskunft (Art. 15), Berichtigung (Art. 16), Löschung
-(Art. 17), Einschränkung (Art. 18), Datenübertragbarkeit (Art. 20) und
-Widerspruch gegen Verarbeitungen auf Grundlage berechtigter Interessen
-(Art. 21 DSGVO). Viele davon kannst du selbst ausüben: Konto löschen,
-Daten exportieren und Angaben ändern geht in den Einstellungen; das Löschen
-fragt dein Passwort erneut ab, und ein gelöschtes Konto lässt sich nicht
-wiederherstellen. Sonst genügt eine Nachricht an die Kontaktdaten im
+(Art. 17), Einschränkung (Art. 18) und Datenübertragbarkeit (Art. 20 DSGVO).
+Eine Einwilligung (Absturzberichte, Benachrichtigungen) kannst du jederzeit
+für die Zukunft widerrufen; was bis dahin geschah, bleibt rechtmäßig
+(Art. 7 Abs. 3 DSGVO). Viele deiner Rechte kannst du selbst ausüben: Konto
+löschen, Daten exportieren und Angaben ändern geht in den Einstellungen; das
+Löschen fragt dein Passwort erneut ab, und ein gelöschtes Konto lässt sich
+nicht wiederherstellen. Sonst genügt eine Nachricht an die Kontaktdaten im
 Impressum.
 
 Du kannst dich bei einer Datenschutz-Aufsichtsbehörde beschweren, etwa bei
 der deines Wohnorts oder der für uns zuständigen.
+
+## 8a. Dein Widerspruchsrecht
+
+Soweit wir Daten auf Grundlage von Art. 6 Abs. 1 lit. f DSGVO verarbeiten
+(Zeitpunkt der letzten Anmeldung, Fehlerberichte, Kontaktformular, anonyme
+Nutzungszählung, Meldungen und Moderation, Protokoll der Administration,
+Spendensummen, technische Zugriffsdaten), kannst du dem jederzeit aus
+Gründen widersprechen, die sich aus deiner besonderen Situation ergeben
+(Art. 21 DSGVO). Wir verarbeiten die Daten dann nicht weiter, es sei denn, wir
+können zwingende schutzwürdige Gründe nachweisen, die deine Interessen
+überwiegen, oder die Verarbeitung dient der Geltendmachung, Ausübung oder
+Verteidigung von Rechtsansprüchen. Eine formlose Nachricht an die
+Kontaktdaten im Impressum genügt.
 
 ## 9. Pflicht zur Bereitstellung, automatisierte Entscheidungen
 
