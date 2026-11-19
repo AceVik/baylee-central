@@ -518,3 +518,26 @@ Open: both texts for the owner to read, and whether each push provider is
 certified under the EU-US Data Privacy Framework, which the privacy texts now
 name as the transfer's basis; Caddy's pass of the upgrade, checked after the
 first deploy; the real Baylee client was not run against it.
+
+## A status for presence, 19 November 2026
+
+By the owner's decision of the same day, a person chooses whether its friends
+see it online, away or offline, and the client says whether it is playing or
+at a table ([push socket](push-socket.md#status)):
+
+- `central-api`: `presence` (`Choice`, `Activity`, `Shown` and the frame's
+  letters with a reader that falls back to online), `SetPresence` (either
+  listener) and `ReportPresence` (native only);
+- `central-identity`: the choice and what the client reports in the registry,
+  friends told only when how an account is shown changes, never of one that
+  chose offline; budgets of 10 choices and 30 reports a minute a session;
+- `central-http`: the presence frame's `states` and `me`, at most one presence
+  a second;
+- `central-postgres`: migration 000033, `accounts.presence`, online by
+  default;
+- `central-client`: `set_presence`, `report_presence` and `read_presence`.
+
+The privacy policy and the terms (still version 2026-11-19, unpublished) and
+the website's privacy page say what friends see. Open: the owner's look at the
+changed paragraph; the migration's production run through its own gate; the
+Baylee client, which has yet to report and choose.

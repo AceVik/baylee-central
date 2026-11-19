@@ -10,6 +10,7 @@ use super::{
 };
 use central_api::{
     Bearer, Error, SignedToken, Token,
+    presence::{Activity, Choice},
     owner::OwnerRequest,
     social::{ContactAction, SocialRequest},
     terms::TermsSubject,
@@ -36,9 +37,24 @@ const READY: &str = r#"{"event":"ready"}"#;
 const SOCIAL: &str = r#"{"event":"social"}"#;
 const REVOKED: &str = r#"{"event":"revoked"}"#;
 
+/// A presence frame of friends shown online with nothing to say of them,
+/// for an account that chose to be online.
 fn presence(tags: &[u32]) -> String {
-    let named: Vec<String> = tags.iter().map(|tag| format!(r#""{tag:04x}""#)).collect();
-    format!(r#"{{"event":"presence","online":[{}]}}"#, named.join(","))
+    let friends: Vec<(u32, char)> = tags.iter().map(|tag| (*tag, 'o')).collect();
+    presence_of(&friends, "online")
+}
+
+/// A presence frame: each friend's tag and state letter, and the own choice.
+fn presence_of(friends: &[(u32, char)], me: &str) -> String {
+    let named: Vec<String> = friends
+        .iter()
+        .map(|(tag, _)| format!(r#""{tag:04x}""#))
+        .collect();
+    let states: String = friends.iter().map(|(_, state)| *state).collect();
+    format!(
+        r#"{{"event":"presence","online":[{}],"states":"{states}","me":"{me}"}}"#,
+        named.join(",")
+    )
 }
 
 /// What the server sent.
@@ -239,9 +255,14 @@ impl Socket {
     }
 
     /// Opened: `ready`, then the presence it reports.
-    fn opened(mut self, online: &[u32]) -> Self {
+    fn opened(self, online: &[u32]) -> Self {
+        self.opened_as(&presence(online))
+    }
+
+    /// Opened: `ready`, then exactly `presence`.
+    fn opened_as(mut self, presence: &str) -> Self {
         assert_eq!(self.text(), READY);
-        assert_eq!(self.text(), presence(online));
+        assert_eq!(self.text(), presence);
         self
     }
 
@@ -369,6 +390,7 @@ pub(crate) fn run(
         unreachable!()
     };
     let cookie = addressing(http, &home, [a, b, c]);
+    status(http, [a, b, c]);
     revocation(http, &home, runtime, operator, [a, b, c], &cookie);
 }
 
@@ -586,6 +608,60 @@ fn addressing(http: &Http, home: &Browser, [a, b, c]: [&mut Player; 3]) -> Token
         socket.close();
     }
     cookie
+}
+
+/// The chosen status and what a client says it is doing: an account that
+/// chose offline is never seen, not as it connects, on a second device or
+/// while it reports, and its friends see only how it is shown changing.
+fn status(http: &Http, [a, b, c]: [&mut Player; 3]) {
+    let choose = |player: &Player, choice: Choice| {
+        assert!(matches!(
+            player.ask(http, &Request::SetPresence { choice }),
+            Ok(Response::Presence { choice: stored }) if stored == choice
+        ));
+    };
+    let report = |player: &Player, activity: Option<Activity>, idle: bool| {
+        assert!(matches!(
+            player.ask(http, &Request::ReportPresence { activity, idle }),
+            Ok(Response::Done)
+        ));
+    };
+    // A and C become friends; A is online
+    a.contact(http, c, ContactAction::Request);
+    c.contact(http, a, ContactAction::Accept);
+    let mut alice = dial(http, &a.bearer()).unwrap().opened(&[]);
+    // C chooses offline before it connects, then connects twice and reports
+    choose(c, Choice::Offline);
+    let carol = dial(http, &c.bearer()).unwrap();
+    let mut carol = carol.opened_as(&presence_of(&[(a.tag, 'o')], "offline"));
+    let second = dial(http, &c.bearer()).unwrap();
+    let second = second.opened_as(&presence_of(&[(a.tag, 'o')], "offline"));
+    report(c, Some(Activity::Playing), false);
+    second.close();
+    alice.quiet();
+    // a report from a session without a socket: answered alike, nothing kept
+    report(b, Some(Activity::Table), true);
+    // what C chooses reaches A only as it changes how C is shown
+    choose(c, Choice::Online);
+    assert_eq!(alice.text(), presence_of(&[(c.tag, 'g')], "online"));
+    assert_eq!(carol.text(), presence_of(&[(a.tag, 'o')], "online"));
+    report(c, Some(Activity::Table), false);
+    assert_eq!(alice.text(), presence_of(&[(c.tag, 't')], "online"));
+    choose(c, Choice::Afk);
+    assert_eq!(alice.text(), presence_of(&[(c.tag, 'T')], "online"));
+    assert_eq!(carol.text(), presence_of(&[(a.tag, 'o')], "afk"));
+    choose(c, Choice::Offline);
+    assert_eq!(alice.text(), presence_of(&[], "online"));
+    // its own sockets still hear its choice, and its friends as before
+    assert_eq!(carol.text(), presence_of(&[(a.tag, 'o')], "offline"));
+    carol.close();
+    alice.quiet();
+    // back to what the other scenarios expect
+    choose(c, Choice::Online);
+    alice.quiet();
+    a.contact(http, c, ContactAction::Remove);
+    assert_eq!(alice.text(), SOCIAL);
+    alice.close();
 }
 
 /// A sign-in on the website, for its cookie.

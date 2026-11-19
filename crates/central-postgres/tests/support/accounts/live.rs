@@ -9,6 +9,7 @@ use central_api::{
     wire::Identity,
 };
 use central_crypto::chat::{DeviceSecrets, Entropy, Recipient, b64::url};
+use central_api::presence::Choice;
 use central_postgres::{Concerns, LIVE_CHECK, Session};
 use sea_orm::{ConnectionTrait, DatabaseConnection, DbBackend, Statement};
 use std::collections::BTreeSet;
@@ -145,6 +146,79 @@ pub(super) async fn run(store: &AccountStore, operator: &DatabaseConnection, key
     contacts(store, [ai, bi, ci], [&a, &b, &c]).await;
     let keys = messages(store, [ai, bi, ci], [&a, &b, &c]).await;
     groups(store, [ai, bi, ci], [&a, &b, &c], &keys).await;
+    choices(store, operator, [ai, bi], [&a, &b]).await;
+}
+
+/// What the native session's status says the account chose.
+async fn chosen(store: &AccountStore, token: &Token) -> Choice {
+    store
+        .session_status(Session::Native(token))
+        .await
+        .unwrap()
+        .presence
+}
+
+/// The chosen status: online until chosen, stored for the session's own
+/// account, read with the session's status and in the export.
+async fn choices(
+    store: &AccountStore,
+    operator: &DatabaseConnection,
+    [ai, bi]: [Identity; 2],
+    [a, b]: [&Token; 2],
+) {
+    assert_eq!(chosen(store, a).await, Choice::Online, "online until chosen");
+    assert_eq!(
+        store.set_presence(Session::Native(a), Choice::Offline).await,
+        Ok(ai.account)
+    );
+    assert_eq!(chosen(store, a).await, Choice::Offline);
+    assert_eq!(chosen(store, b).await, Choice::Online, "nobody else's");
+    // from the website's session too
+    let browser = Token::generate().unwrap();
+    store
+        .issue_session(
+            &store.credential(bi).await.unwrap().unwrap(),
+            Session::Browser(&browser),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        store.set_presence(Session::Browser(&browser), Choice::Afk).await,
+        Ok(bi.account)
+    );
+    assert_eq!(chosen(store, b).await, Choice::Afk);
+    assert_eq!(
+        store
+            .account_export(Session::Browser(&browser))
+            .await
+            .unwrap()
+            .presence,
+        Choice::Afk
+    );
+    // nobody's session, and a session that ended
+    let nobody = Token::generate().unwrap();
+    assert_eq!(
+        store.set_presence(Session::Native(&nobody), Choice::Online).await,
+        Err(Error::Rejected)
+    );
+    store.logout(Session::Browser(&browser)).await.unwrap();
+    assert_eq!(
+        store
+            .set_presence(Session::Browser(&browser), Choice::Online)
+            .await,
+        Err(Error::Rejected)
+    );
+    // the column takes nothing else
+    assert!(
+        operator
+            .execute_raw(Statement::from_sql_and_values(
+                DbBackend::Postgres,
+                "UPDATE central_identity.accounts SET presence = 'invisible' WHERE id = $1",
+                vec![sea_orm::prelude::Uuid::from_bytes(ai.account).into()],
+            ))
+            .await
+            .is_err()
+    );
 }
 
 /// Which sessions stand, in one statement for many.

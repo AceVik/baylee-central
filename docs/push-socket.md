@@ -27,7 +27,7 @@ no more):
 | frame | when |
 | --- | --- |
 | `{"event":"ready"}` | first, once the socket is registered; the client then reads everything once |
-| `{"event":"presence","online":["002a",…]}` | right after `ready`, and whenever the list changes: the tags (lower-case hex, at least four digits, as the client writes them) of the account's friends that hold a socket, in order |
+| `{"event":"presence","online":["002a",…],"states":"o…","me":"online"}` | right after `ready`, and whenever it changes, at most once a second: the tags (lower-case hex, at least four digits, as the client writes them) of the account's friends that are shown online, in order; a letter of `states` for each (§"Status"); the account's own choice |
 | `{"event":"social"}` | the account's contacts, requests, blocks, groups, invitations or own devices changed |
 | `{"event":"chat"}` | a delivery reached one of the account's devices (its own sends included) |
 | `{"event":"revoked"}` | the socket's session ended; a close (1008) follows. The client signs out on it |
@@ -148,8 +148,10 @@ to hide it.
 
 | event | database | in memory |
 | --- | --- | --- |
-| dial | the session's status, the terms' acceptance, the account's friends if no socket of it is open, and the session again if news of an ended session came meanwhile: 2–4 statements | bounded registry entries |
+| dial | the session's status, the terms' acceptance, the account's friends if no socket of it is open, and the session and its choice again if news of an ended session or a changed choice came meanwhile: 2–4 statements | bounded registry entries |
 | chat send, group change, new device | none beyond the operation's own | bits for the named accounts' sockets (at most 51 accounts × 4 sockets for a group) |
+| a choice (`SetPresence`) | one statement | bits for the account's sockets, and its followers' if how it is shown changed |
+| a report (`ReportPresence`) | none | bits for its followers, only if how it is shown changed |
 | contact change | for a friendship that began or ended only, one read of each of the two accounts' friends that holds a socket (≤ 2 statements of ≤ 300 rows), in a task the request does not wait for; a request or a block of a stranger reads nothing | presence bits for the two and whom their lists gained or lost |
 | sign-out | none | bits for that session's sockets |
 | sign-in, password, reset, deletion, pairing, client session ended | none at the event; each of the account's sockets checks its session: ≤ 4 statements | bits |
@@ -176,7 +178,9 @@ minute between checks, ten seconds for one).
 | dials a minute, session | 12 | the client redials after 2 s at the earliest, doubling while it fails; counted for 4,096 sessions at once, a newcomer to a full table taking the oldest's place (tokens of ended sessions still verify until their `exp`, so they could fill it, but never lock a session out) |
 | frames from a client | 16 in 10 s | a pong a ping, and pings of its own |
 | a frame from a client | 131 bytes | a control frame's longest; a data frame is refused at its header |
-| a frame to a client | 4,096 bytes | the client's limit; the longest presence (300 friends, eight-digit tags) fits |
+| a frame to a client | 4,096 bytes | the client's limit; the longest presence (300 friends, eight-digit tags, a state each, the longest choice) fits |
+| presence frames | one a second a socket | news within the second waits; the next frame says the latest |
+| choices, reports | 10 and 30 a minute a session | a choice is a statement, a report none |
 | a write | 10 s | a client that does not read loses its socket |
 | idle | 75 s | two pings unanswered |
 | lifetime | 12 h | no session lives longer |
@@ -229,11 +233,65 @@ half). Writes are never inside a `select!` and each has its time.
 - No administrator action ends a native session on `main`: an administrator's
   reset code does only once the person uses it.
 
-## No switch, by the owner's choice
+## Status
 
-Presence has no per-account switch. Asked on 19.11.2026, the owner chose the
-contract as its legal basis, with the terms describing it, over a legitimate
-interest with a switch to object by. It is shown only to accounts both sides
-accepted and is not stored. A switch ("appear offline": the account's sockets
-would stay but never count as online) would need a stored setting, a
-migration, if it is ever wanted.
+The owner's decision of 19.11.2026: a person chooses how its friends see it,
+and the client says what it is doing (`central_api::presence`).
+
+- **The choice** (`SetPresence`, on either listener, under Central's terms):
+  `online`, `afk` (away) or `offline`. Stored with the account
+  (`accounts.presence`, migration 000033, online by default), so it holds on
+  every device and after a restart; it is read with the dial's status. An
+  account that chose `offline` is never shown: its friends see it offline,
+  and its own news still reaches its sockets.
+- **What the client does** (`ReportPresence`, native only): `playing` (it sits
+  in a game that is running, online or against the house AI), `table` (it sits
+  at a table whose game has not begun), or neither; and `idle` (no input for
+  ten minutes, which shows the account away). Watching a game and building a
+  deck are neither: online. Only these fixed values exist: no game, table,
+  room or gateway is named. Heard only from a session that holds a push
+  socket, and kept in memory while the account holds one; a report without a
+  socket changes and keeps nothing, and is answered alike. The last report of
+  any of the account's sockets stands.
+- **What friends see**: an account is shown while one of its sockets said
+  `ready` and it did not choose `offline`; then away if it chose `afk` or is
+  idle, and its activity. Friends are told only when that changes: connecting,
+  disconnecting, reporting or idling while `offline` tells nobody anything;
+  choosing `offline` and back is the one change they see of it.
+- **The frame**: `online` lists the friends shown, as before, so a client that
+  reads only `online` sees each of them online. `states` has one letter per
+  tag, in the same order: `o` online, `a` away, `g` playing, `t` at a table,
+  `G` and `T` playing or at a table while away. `me` is the account's own
+  choice. At 300 friends with eight-digit tags the frame is 3,659 bytes, below
+  the 4,096 the client reads (a const assertion holds it). A socket says
+  presence at most once a second; news within that second waits, and the
+  frame that follows says the latest.
+- **Budgets**: 10 choices a minute a session (each is a statement) and 30
+  reports (none is); the registry's tables hold at most 4,096 sessions, a
+  newcomer taking the oldest's place, and a report is counted only for a
+  session with a socket.
+
+### For the client
+
+- After each dial, once the socket said `ready`, report what the client is
+  doing (`report_presence` in `central-client`), even if nothing: the
+  registry starts every account at "online, doing nothing".
+- Report again when it sits down at a table or gets up, when a game begins or
+  ends (online or against the house AI), and when ten minutes without input
+  begin or end. Nothing else, and not more than 30 times a minute.
+- Set the choice with `set_presence`; the answer is the stored choice, and
+  every socket of the account says it as `me`.
+- Read a frame with `central_client::read_presence`: when `states` is missing
+  (an older Central), not exactly as long as `online`, or holds a letter not
+  known, every friend it does not describe is read as online, never as an
+  error. A frame's `online` stays the list of friends to show.
+
+The Baylee client needs the Central of the pull request that brings this
+(after `main` 7ce700e1 and the push socket's pull request).
+
+## The switch, and its legal basis
+
+Asked on 19.11.2026, the owner chose the contract as presence's legal basis,
+with the terms describing it, and then wanted the status above, with
+`offline` as the way to appear offline. Whether an account is online, and what
+it is doing, is never stored; only its choice is.

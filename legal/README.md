@@ -2,8 +2,10 @@
 
 **Status: the terms and the privacy policy are at version 2026-11-19.** The
 privacy policy's presence text (§ 5a's new paragraph, § 7's new point) was
-reviewed by the owner on 19.11.2026; the version's other changes await his
-review (see the last paragraph below; before
+reviewed by the owner on 19.11.2026; the status his later decision of the same
+day added changed that paragraph and point again ("nur das" no longer holds:
+friends also see away, playing, at a table), so they await his look once more,
+as do the version's other changes (see the last paragraphs below; before
 it, the terms at 2026-11-11 and the privacy policy at 2026-11-18. On 11.11.2026
 the owner asked for the texts to be corrected: an administrator's
 reset code, deleting the account in its settings on the website, the Fan
@@ -100,3 +102,11 @@ basis, with the terms describing it. So both documents are at 2026-11-19:
 
 Each gateway has terms of its own, edited in its admin area. The Baylee
 repository ships a default text and privacy notice any operator may adapt.
+
+The status (owner, 19.11.2026: "online, AFK and offline" to choose, "busy/in
+game" set by itself, "and at the table"; [push socket](../docs/push-socket.md)
+§"Status") is in the same unpublished version 2026-11-19: § 5a says what
+friends see (away, playing, at a table; never where or what), that offline
+hides the account, that the choice is stored and the rest is not; § 7 how
+long the choice is kept; the terms' § 1 names the status and appearing
+offline. The website's privacy page says the same.

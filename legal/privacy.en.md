@@ -96,12 +96,21 @@ delete your account.
 While the Baylee app is signed in, it keeps a connection to Central open, on
 which Central tells it that something about your own chats, contacts or groups
 changed; the content itself does not travel on it. While that connection is
-open, your friends (contacts you both accepted) see that you are online: only
-that, recognisable by your tag (the code after your display name), not where
-or what you play. Nobody else sees it, neither pending requests nor blocked
-accounts (Art. 6(1)(b) GDPR). Central keeps this
-status only in memory while the connection is open; it is neither stored nor
+open, your friends (contacts you both accepted) see that you are online,
+recognisable by your tag (the code after your display name), and whether you
+are away, playing or sitting at a table, but not where or what you play.
+Nobody else sees it, neither pending requests nor blocked accounts
+(Art. 6(1)(b) GDPR). Whether you are online and what you are doing, Central
+keeps only in memory while the connection is open; it is neither stored nor
 logged. The status a gateway shows while you play is that gateway's own.
+
+In the Baylee app you choose whether your friends see you online, away or
+offline. If you choose "offline", they never see you online, and nothing else
+of your being connected reaches them either. Central stores this choice with
+your account. "Playing" means you sit in a game that is running, online or
+against the house AI; "at a table", that you sit at a table whose game has
+not begun; you also appear away after ten minutes without input. The app
+tells Central so (Art. 6(1)(b) GDPR).
 
 If you enable notifications (Art. 6(1)(a) GDPR, section 25(1) TDDDG: your
 consent, which you can withdraw for the future at any time in your profile),
@@ -161,8 +170,10 @@ you sign in there is your decision.
   official gateway ends.
 - Sessions end 30 minutes after their last use and at most 12 hours after
   signing in, sign-in tickets after seconds.
-- Your online status exists only while the Baylee app is connected to
-  Central, and only in memory.
+- Whether you are online and what you are doing exists only while the Baylee
+  app is connected to Central, and only in memory. Your choice of how your
+  friends see you (online, away, offline) is kept until you change it or
+  delete your account.
 - The time of your last sign-in is kept while your account exists.
 - The record of what our administrators did is kept for three years, then
   deleted automatically.
