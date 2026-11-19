@@ -121,17 +121,26 @@ struct Socket {
     signal: Arc<Signal>,
     /// It has said `ready`, so its account is online.
     live: bool,
+    /// What its session last said the client is doing; gone with the socket.
+    report: Option<Report>,
+}
+
+/// What a client said it is doing ([`Live::report`]).
+#[derive(Clone, Copy)]
+struct Report {
+    activity: Option<Activity>,
+    idle: bool,
+    /// Numbered over all reports, so the newest of an account's sockets
+    /// stands.
+    at: u64,
 }
 
 struct Account {
     /// Its public tag, as its friends' presence names it.
     tag: Option<u32>,
-    /// How it chose to be shown (stored; read when its first socket opened).
+    /// How it chose to be shown: the store's choice as the newest dial read
+    /// it or a choice settled it, in the account's turn ([`Live::turn`]).
     choice: Choice,
-    /// What its client says it is doing, and whether it is idle: memory only,
-    /// gone with its last socket.
-    activity: Option<Activity>,
-    idle: bool,
     sockets: BTreeSet<u64>,
     /// Its sockets that said `ready`.
     live: usize,
@@ -155,18 +164,26 @@ struct State {
     /// Each session's reports and changes of its choice, in their minute.
     reports: BTreeMap<[u8; 32], (Instant, u32)>,
     choices: BTreeMap<[u8; 32], (Instant, u32)>,
+    /// The sockets of each session, for its reports.
+    by_digest: BTreeMap<[u8; 32], BTreeSet<u64>>,
     /// The last reading's number, over all accounts.
     readings: u64,
-    /// News that a session may have ended, or that a choice changed, counted:
-    /// a dial compares it before and after its socket is registered
-    /// ([`Live::changes`]).
-    changes: u64,
+    /// The last report's number, over all accounts.
+    reported: u64,
+    /// News that a session may have ended, counted: a dial compares it before
+    /// and after its socket is registered ([`Live::ends`]).
+    ends: u64,
+    /// Choices settled, whether their write succeeded or not: a dial that
+    /// sees this change while it read its status reads the choice again
+    /// ([`Live::admit_in_turn`]). Only a choice counts, never a reading, so
+    /// no dial makes another read again.
+    settled: u64,
 }
 
 impl State {
     fn raise(&mut self, account: &[u8; 16], bits: u8) {
         if bits & (news::CHECK | news::REVOKED) != 0 {
-            self.changes += 1;
+            self.ends += 1;
         }
         if let Some(entry) = self.accounts.get(account) {
             for id in &entry.sockets {
@@ -195,9 +212,25 @@ impl State {
         }
     }
 
-    /// How `account` is shown to its friends now; `None` while it is not.
+    /// How `account` is shown to its friends now; `None` while it is not:
+    /// only while a socket of it said `ready` and it did not choose to be
+    /// offline. Away if it chose so or the newest report of its sockets says
+    /// it is idle; doing what that report says. A socket's report goes with
+    /// it, so a device that went says nothing more.
     fn shown(&self, account: &[u8; 16]) -> Option<Shown> {
-        self.accounts.get(account).and_then(Account::shown)
+        let entry = self.accounts.get(account)?;
+        if entry.live == 0 || entry.choice == Choice::Offline {
+            return None;
+        }
+        let report = entry
+            .sockets
+            .iter()
+            .filter_map(|id| self.sockets.get(id)?.report)
+            .max_by_key(|report| report.at);
+        Some(Shown {
+            away: entry.choice == Choice::Afk || report.is_some_and(|report| report.idle),
+            activity: report.and_then(|report| report.activity),
+        })
     }
 
     /// The followers of `account` look at their presence again, if how it is
@@ -208,17 +241,6 @@ impl State {
         if self.shown(account) != before {
             self.raise_followers(account, news::PRESENCE);
         }
-    }
-}
-
-impl Account {
-    /// How the account is shown: only while a socket of it said `ready` and
-    /// it did not choose to be offline.
-    fn shown(&self) -> Option<Shown> {
-        (self.live > 0 && self.choice != Choice::Offline).then_some(Shown {
-            away: self.choice == Choice::Afk || self.idle,
-            activity: self.activity,
-        })
     }
 }
 
@@ -238,11 +260,35 @@ pub struct Presence {
 #[derive(Default)]
 pub(super) struct Live {
     state: Mutex<State>,
-    /// Held from a choice's write, or a dial's second reading of it, until
-    /// the registry has what it found ([`Live::settle`], [`Live::recheck`]):
-    /// so the registry takes choices in the order the store did, and never
-    /// ends at one the store no longer holds.
-    choosing: tokio::sync::Mutex<()>,
+    /// Each account's turn while one is held or awaited ([`Live::turn`]).
+    turns: Mutex<BTreeMap<[u8; 16], Arc<tokio::sync::Mutex<()>>>>,
+}
+
+/// Accounts whose turns are kept at once; past it, the turns nobody holds or
+/// awaits are let go (a dial dropped while it waited leaves one behind).
+const TURNS: usize = 4_096;
+
+/// One account's turn ([`Live::turn`]): while it is held no other choice of
+/// the account is written and no other socket of it admitted, so the
+/// registry takes the account's choices in the order the store wrote them,
+/// and a dial admits with the store's choice, never an older one.
+pub(super) struct Turn {
+    live: Arc<Live>,
+    account: [u8; 16],
+    held: Option<tokio::sync::OwnedMutexGuard<()>>,
+}
+
+impl Drop for Turn {
+    fn drop(&mut self) {
+        drop(self.held.take());
+        let mut turns = self.live.turns();
+        if turns
+            .get(&self.account)
+            .is_some_and(|turn| Arc::strong_count(turn) == 1)
+        {
+            turns.remove(&self.account);
+        }
+    }
 }
 
 /// A reading begun, which ends as read or, however else it ends (an error,
@@ -298,6 +344,28 @@ impl Live {
         self.state.lock().unwrap_or_else(PoisonError::into_inner)
     }
 
+    fn turns(&self) -> std::sync::MutexGuard<'_, BTreeMap<[u8; 16], Arc<tokio::sync::Mutex<()>>>> {
+        self.turns.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+
+    /// Wait for `account`'s turn and hold it until the [`Turn`] drops. One
+    /// account's turn never waits for another's.
+    pub(super) async fn turn(self: &Arc<Self>, account: [u8; 16]) -> Turn {
+        let turn = {
+            let mut turns = self.turns();
+            if turns.len() >= TURNS {
+                turns.retain(|_, turn| Arc::strong_count(turn) > 1);
+            }
+            Arc::clone(turns.entry(account).or_default())
+        };
+        let held = turn.lock_owned().await;
+        Turn {
+            live: Arc::clone(self),
+            account,
+            held: Some(held),
+        }
+    }
+
     /// Spend one of the session's dials in its minute; `Busy` when none is
     /// left. A newcomer to a full table takes the oldest entry's place.
     pub(super) fn dial(&self, digest: [u8; 32], now: Instant) -> Result<(), Error> {
@@ -327,7 +395,6 @@ impl Live {
     /// its friends see the change if it changes how it is shown.
     pub(super) fn chose(&self, account: &[u8; 16], choice: Choice) {
         let mut state = self.state();
-        state.changes += 1;
         let before = state.shown(account);
         let Some(entry) = state.accounts.get_mut(account) else {
             return;
@@ -337,23 +404,31 @@ impl Live {
         state.shown_changed(account, before);
     }
 
-    /// Store a choice with `write` and then take it: one step that a dropped
-    /// request does not cut short (it runs in a task of its own), and that no
-    /// other choice of the store's overtakes. Without it a request dropped
-    /// while the store wrote would leave the registry at the old choice, and
-    /// two choices at once (the website and the client) could be taken in
-    /// the order other than the store's: an account could be shown after it
-    /// chose `offline`.
-    pub(super) async fn settle<W>(self: &Arc<Self>, choice: Choice, write: W) -> Result<(), Error>
+    /// Store `account`'s choice with `write` and then take it, in the
+    /// account's turn: one step that a dropped request does not cut short (it
+    /// runs in a task of its own), and that no other choice of the account
+    /// overtakes. A write that fails may still have been stored; a failed
+    /// `offline` is taken all the same, since hidden is the side to err on,
+    /// and any other is left to the next dial's reading. Either way the
+    /// choice counts as settled, so a dial that read meanwhile reads again.
+    pub(super) async fn settle<W>(
+        self: &Arc<Self>,
+        account: [u8; 16],
+        choice: Choice,
+        write: W,
+    ) -> Result<(), Error>
     where
         W: Future<Output = Result<[u8; 16], Error>> + Send + 'static,
     {
         let live = Arc::clone(self);
         let step = async move {
-            let _turn = live.choosing.lock().await;
-            let account = write.await?;
-            live.chose(&account, choice);
-            Ok(())
+            let _turn = live.turn(account).await;
+            let written = write.await;
+            if written.is_ok() || choice == Choice::Offline {
+                live.chose(&account, choice);
+            }
+            live.state().settled += 1;
+            written.map(|_| ())
         };
         match tokio::runtime::Handle::try_current() {
             Ok(runtime) => runtime.spawn(step).await.unwrap_or(Err(Error::Unavailable)),
@@ -361,24 +436,43 @@ impl Live {
         }
     }
 
-    /// Take the choice `read` finds for `account`, a dial's second reading of
-    /// it, in turn with every [`Self::settle`]: a write the reading did not
-    /// see is taken after it, never before. A dial dropped meanwhile takes
-    /// nothing, and its socket is gone with it.
-    pub(super) async fn recheck<R>(&self, account: &[u8; 16], read: R) -> Result<(), Error>
+    /// Admit a socket of `account` in the account's turn ([`Self::admit`]),
+    /// with the choice the dial `read` with its status, unless a choice
+    /// settled since `since` (the count before that status was read): then
+    /// `again` reads it anew, now that no write of the account is under way.
+    /// So a socket is admitted with the store's choice and never an older one,
+    /// whichever came first.
+    pub(super) async fn admit_in_turn<R>(
+        self: &Arc<Self>,
+        account: [u8; 16],
+        tag: Option<u32>,
+        read: Choice,
+        since: u64,
+        digest: [u8; 32],
+        again: R,
+    ) -> Result<(Listener, Option<Reading>), Error>
     where
         R: Future<Output = Result<Choice, Error>>,
     {
-        let _turn = self.choosing.lock().await;
-        let choice = read.await?;
-        self.chose(account, choice);
-        Ok(())
+        let _turn = self.turn(account).await;
+        let choice = if self.settled() == since {
+            read
+        } else {
+            again.await?
+        };
+        self.admit(account, tag, choice, digest)
     }
 
-    /// What the client of the session `digest` says it is doing. Only a
-    /// session with a socket is heard, within [`SESSION_REPORTS`] a minute;
-    /// anything else changes nothing and keeps nothing. The last report of
-    /// any of the account's sockets stands.
+    /// How many choices have settled ([`State::settled`]).
+    pub(super) fn settled(&self) -> u64 {
+        self.state().settled
+    }
+
+    /// What the client of the session `digest` says it is doing, within
+    /// [`SESSION_REPORTS`] a minute, charged before anything is looked at.
+    /// Kept on that session's sockets and gone with them; a session without
+    /// one changes nothing and keeps nothing. The newest report of the
+    /// account's sockets stands.
     pub(super) fn report(
         &self,
         digest: [u8; 32],
@@ -388,23 +482,31 @@ impl Live {
     ) {
         let mut guard = self.state();
         let state = &mut *guard;
-        let Some(account) = state
-            .sockets
-            .values()
-            .find(|socket| socket.digest == digest)
+        if !spend(&mut state.reports, digest, now, SESSION_REPORTS, DIALERS) {
+            return;
+        }
+        let Some(ids) = state.by_digest.get(&digest) else {
+            return;
+        };
+        let ids: Vec<u64> = ids.iter().copied().collect();
+        let Some(account) = ids
+            .first()
+            .and_then(|id| state.sockets.get(id))
             .map(|socket| socket.account)
         else {
             return;
         };
-        // Charged only for a session with a socket, so the table holds no
-        // more sessions than there are sockets.
-        if !spend(&mut state.reports, digest, now, SESSION_REPORTS, DIALERS) {
-            return;
-        }
         let before = state.shown(&account);
-        if let Some(entry) = state.accounts.get_mut(&account) {
-            entry.activity = activity;
-            entry.idle = idle;
+        state.reported += 1;
+        let report = Report {
+            activity,
+            idle,
+            at: state.reported,
+        };
+        for id in ids {
+            if let Some(socket) = state.sockets.get_mut(&id) {
+                socket.report = Some(report);
+            }
         }
         state.shown_changed(&account, before);
     }
@@ -414,7 +516,9 @@ impl Live {
     /// before it says `ready`, so no news from then on is missed; it counts as
     /// online only once it said so ([`Listener::ready`]). The reading is the
     /// friend list to read before the socket is used, while the account's has
-    /// not been read.
+    /// not been read. `choice` is the store's as the dial read it in the
+    /// account's turn ([`Self::admit_in_turn`]), at least as new as the
+    /// entry's: it replaces a standing one, whose sockets then say it.
     pub(super) fn admit(
         self: &Arc<Self>,
         account: [u8; 16],
@@ -424,23 +528,31 @@ impl Live {
     ) -> Result<(Listener, Option<Reading>), Error> {
         let mut guard = self.state();
         let state = &mut *guard;
+        if state
+            .accounts
+            .get(&account)
+            .is_some_and(|entry| entry.sockets.len() >= ACCOUNT_SOCKETS)
+        {
+            return Err(Error::Busy);
+        }
+        let before = state.shown(&account);
+        if let Some(entry) = state.accounts.get_mut(&account)
+            && entry.choice != choice
+        {
+            entry.choice = choice;
+            state.raise(&account, news::PRESENCE);
+            state.shown_changed(&account, before);
+        }
         let id = state.next;
-        // A new entry takes the stored choice; one that stands has followed
-        // every change since ([`Self::chose`]).
         let entry = state.accounts.entry(account).or_insert_with(|| Account {
             tag,
             choice,
-            activity: None,
-            idle: false,
             sockets: BTreeSet::new(),
             live: 0,
             friends: BTreeSet::new(),
             read: false,
             reading: 0,
         });
-        if entry.sockets.len() >= ACCOUNT_SOCKETS {
-            return Err(Error::Busy);
-        }
         entry.tag = tag;
         entry.sockets.insert(id);
         let reading = (!entry.read).then(|| {
@@ -462,8 +574,10 @@ impl Live {
                 digest,
                 signal: Arc::clone(&signal),
                 live: false,
+                report: None,
             },
         );
+        state.by_digest.entry(digest).or_default().insert(id);
         state.next += 1;
         Ok((
             Listener {
@@ -548,7 +662,7 @@ impl Live {
     /// exactly the session that asked, so nothing need be read.
     pub(super) fn ended(&self, digest: &[u8; 32]) {
         let mut state = self.state();
-        state.changes += 1;
+        state.ends += 1;
         for socket in state.sockets.values() {
             if &socket.digest == digest {
                 socket.signal.raise(news::REVOKED);
@@ -582,12 +696,11 @@ impl Live {
         state.raise_followers(account, news::SOCIAL | news::PRESENCE);
     }
 
-    /// How much news that a session may have ended, or that a choice changed,
-    /// there has been: a dial whose count changed between its status and its
-    /// registration asks the store again, since that news found no socket of
-    /// it to tell.
-    pub(super) fn changes(&self) -> u64 {
-        self.state().changes
+    /// How much news that a session may have ended there has been: a dial
+    /// whose count changed between its status and its registration asks the
+    /// store again, since that news found no socket of it to tell.
+    pub(super) fn ends(&self) -> u64 {
+        self.state().ends
     }
 
     /// The session digests of every socket, each once: what the periodic
@@ -635,8 +748,10 @@ impl Live {
         let mut shown: Vec<(u32, Shown)> = entry
             .friends
             .iter()
-            .filter_map(|friend| state.accounts.get(friend))
-            .filter_map(|friend| Some((friend.tag?, friend.shown()?)))
+            .filter_map(|friend| {
+                let tag = state.accounts.get(friend)?.tag?;
+                Some((tag, state.shown(friend)?))
+            })
             .collect();
         shown.sort_unstable_by_key(|(tag, _)| *tag);
         shown.dedup_by_key(|(tag, _)| *tag);
@@ -668,11 +783,20 @@ impl Live {
 
     fn remove(&self, id: u64) {
         let mut state = self.state();
+        let Some(account) = state.sockets.get(&id).map(|socket| socket.account) else {
+            return;
+        };
+        // How it was shown with this socket and its report, before both go.
+        let before = state.shown(&account);
         let Some(socket) = state.sockets.remove(&id) else {
             return;
         };
-        let account = socket.account;
-        let before = state.shown(&account);
+        if let Some(ids) = state.by_digest.get_mut(&socket.digest) {
+            ids.remove(&id);
+            if ids.is_empty() {
+                state.by_digest.remove(&socket.digest);
+            }
+        }
         let Some(entry) = state.accounts.get_mut(&account) else {
             return;
         };
@@ -772,8 +896,10 @@ impl super::IdentityService {
         };
         self.live.dial(token.digest(), Instant::now())?;
         // Counted before the status is read: news that a session ended which
-        // comes between it and the socket's registration finds no socket.
-        let changes = self.live.changes();
+        // comes between it and the socket's registration finds no socket, and
+        // a choice settled meanwhile may not be in the status.
+        let ends = self.live.ends();
+        let settled = self.live.settled();
         let request = central_api::wire::Request::SessionStatus;
         let told = super::limits::told(&request, Some(token));
         self.limits
@@ -797,9 +923,22 @@ impl super::IdentityService {
         self.require_terms(Some(token), super::Surface::Native)
             .await?;
         let account = status.identity.account;
-        let (listener, reading) =
-            self.live
-                .admit(account, status.tag, status.presence, token.digest())?;
+        let (listener, reading) = self
+            .live
+            .admit_in_turn(
+                account,
+                status.tag,
+                status.presence,
+                settled,
+                token.digest(),
+                async {
+                    self.store
+                        .session_status(central_postgres::Session::Native(token))
+                        .await
+                        .map(|again| again.presence)
+                },
+            )
+            .await?;
         if let Some(reading) = reading.map(|reading| Pending::new(Arc::clone(&self.live), reading))
         {
             // The dial fails rather than report friends it could not read;
@@ -808,24 +947,38 @@ impl super::IdentityService {
             let friends = self.store.live_friends(reading.account()).await?;
             reading.read(friends);
         }
-        // Such news came in between: the session and the choice are asked
-        // about again, now that the socket is registered and any later news
-        // reaches it. The socket has not said `ready`, so a choice corrected
-        // here was never shown.
-        if self.live.changes() != changes {
-            self.live
-                .recheck(&account, async {
-                    self.store
-                        .session_status(central_postgres::Session::Native(token))
-                        .await
-                        .map(|again| again.presence)
-                })
+        // Such news came in between: the session is asked about again, now that
+        // the socket is registered and any later news reaches it. Its choice
+        // needs no second look: it was admitted with the store's, and any
+        // choice from here on finds the entry ([`Live::settle`]).
+        if self.live.ends() != ends {
+            self.store
+                .session_status(central_postgres::Session::Native(token))
                 .await?;
         }
         Ok(listener)
     }
 
-    /// A status request: a choice, or what the native client is doing.
+    /// The session's budget for a choice or a reading of it
+    /// ([`SESSION_CHOICES`] a minute), spent before anything else is asked of
+    /// the store, the terms included; nothing for any other request.
+    pub(super) fn presence_budget(
+        &self,
+        request: &central_api::wire::Request,
+        bearer: Option<&super::Token>,
+    ) -> Result<(), Error> {
+        match request {
+            central_api::wire::Request::SetPresence { .. }
+            | central_api::wire::Request::Presence => self
+                .live
+                .choose(bearer.ok_or(Error::Rejected)?.digest(), Instant::now()),
+            _ => Ok(()),
+        }
+    }
+
+    /// A status request: a choice, a reading of it, or what the native client
+    /// is doing. The budget of the first two was spent in `dispatch`
+    /// ([`Self::presence_budget`]).
     pub(super) async fn presence_request(
         &self,
         request: central_api::wire::Request,
@@ -836,6 +989,12 @@ impl super::IdentityService {
             central_api::wire::Request::SetPresence { choice } => {
                 self.set_presence(choice, bearer, surface).await
             }
+            central_api::wire::Request::Presence => {
+                let status = self.store.session_status(surface.session(bearer)?).await?;
+                Ok(central_api::wire::Response::Presence {
+                    choice: status.presence,
+                })
+            }
             central_api::wire::Request::ReportPresence { activity, idle } => {
                 self.report_presence(activity, idle, bearer, surface)
             }
@@ -844,18 +1003,26 @@ impl super::IdentityService {
     }
 
     /// Choose how the session's account is shown to its friends (on either
-    /// listener): stored, then its sockets and its friends' are told.
+    /// listener): stored, then its sockets and its friends' are told, in the
+    /// account's turn ([`Live::settle`]), which the session's status names.
     async fn set_presence(
         &self,
         choice: Choice,
         bearer: Option<&super::Token>,
         surface: super::Surface,
     ) -> Result<central_api::wire::Response, Error> {
-        let session = surface.session(bearer)?;
+        let account = self
+            .store
+            .session_status(surface.session(bearer)?)
+            .await?
+            .identity
+            .account;
         self.live
-            .choose(bearer.ok_or(Error::Rejected)?.digest(), Instant::now())?;
-        self.live
-            .settle(choice, self.store.set_presence(session, choice))
+            .settle(
+                account,
+                choice,
+                self.store.set_presence(surface.session(bearer)?, choice),
+            )
             .await?;
         Ok(central_api::wire::Response::Presence { choice })
     }

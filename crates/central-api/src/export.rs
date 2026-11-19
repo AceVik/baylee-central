@@ -134,6 +134,9 @@ pub struct AdministeredGateway {
 }
 
 #[cfg(test)]
+mod released;
+
+#[cfg(test)]
 mod tests {
     use super::*;
 
@@ -212,76 +215,5 @@ mod tests {
         .unwrap();
         assert!(bytes.len() <= crate::MAX_WIRE_BYTES, "{}", bytes.len());
         assert!(crate::decode::<crate::wire::Response>(&bytes).is_ok());
-    }
-
-    /// Released clients decode the export strictly (`deny_unknown_fields`):
-    /// the Baylee client reads it for the lobby's name after every sign-in.
-    /// A field added here would fail that read, so new data goes elsewhere
-    /// (`docs/account-deletion.md`), as the e-mail address and the status did.
-    #[test]
-    fn the_export_keeps_the_fields_released_clients_decode() {
-        let export = AccountExport {
-            account: [0; 16],
-            username: String::new(),
-            display_name: None,
-            display_name_at: None,
-            tag: None,
-            source: AccountSource::Legacy,
-            legacy_id: None,
-            created_at: 0,
-            last_sign_in_at: None,
-            vault_epoch: 0,
-            document_revision: 0,
-            state: AccountState::Restored,
-            admin: false,
-            recovery: false,
-            reset_until: None,
-            objects: 0,
-            object_bytes: 0,
-            archives: 0,
-            sessions: Vec::new(),
-            terms: Vec::new(),
-            gateways: Vec::new(),
-            administers: Vec::new(),
-            audit: Vec::new(),
-            complete: true,
-        };
-        let value = serde_json::to_value(&export).unwrap();
-        let mut keys: Vec<&str> = value
-            .as_object()
-            .unwrap()
-            .keys()
-            .map(String::as_str)
-            .collect();
-        keys.sort_unstable();
-        assert_eq!(
-            keys,
-            [
-                "account",
-                "admin",
-                "administers",
-                "archives",
-                "audit",
-                "complete",
-                "created_at",
-                "display_name",
-                "display_name_at",
-                "document_revision",
-                "gateways",
-                "last_sign_in_at",
-                "legacy_id",
-                "object_bytes",
-                "objects",
-                "recovery",
-                "reset_until",
-                "sessions",
-                "source",
-                "state",
-                "tag",
-                "terms",
-                "username",
-                "vault_epoch",
-            ]
-        );
     }
 }

@@ -380,9 +380,31 @@ pub(crate) fn run(
             }
         })
         .collect();
-    // C has not accepted the terms yet: no socket.
+    // C has not accepted the terms yet: no socket, and no choice; its
+    // choice can be read, and a choice's budget is spent before the terms are
+    // looked at, so it cannot be turned into statements.
     let refused = dial(http, &players[2].bearer()).err().unwrap();
     assert_eq!(refused.status, 403, "{}", refused.head);
+    assert!(matches!(
+        players[2].ask(http, &Request::Presence),
+        Ok(Response::Presence {
+            choice: Choice::Online
+        })
+    ));
+    for _ in 1..central_identity::SESSION_CHOICES {
+        let choice = Choice::Offline;
+        assert_eq!(
+            players[2].ask(http, &Request::SetPresence { choice }).err(),
+            Some(Error::TermsRequired)
+        );
+    }
+    let choice = Choice::Offline;
+    assert_eq!(
+        players[2].ask(http, &Request::SetPresence { choice }).err(),
+        Some(Error::Busy)
+    );
+    // a new session, with a budget of its own
+    players[2].again(http);
     for player in &players {
         accept(http, &player.token);
     }
@@ -392,7 +414,7 @@ pub(crate) fn run(
         unreachable!()
     };
     let cookie = addressing(http, &home, [a, b, c]);
-    status(http, [a, b, c]);
+    status(http, &home, &cookie, [a, b, c]);
     revocation(http, &home, runtime, operator, [a, b, c], &cookie);
 }
 
@@ -615,7 +637,7 @@ fn addressing(http: &Http, home: &Browser, [a, b, c]: [&mut Player; 3]) -> Token
 /// The chosen status and what a client says it is doing: an account that
 /// chose offline is never seen, not as it connects, on a second device or
 /// while it reports, and its friends see only how it is shown changing.
-fn status(http: &Http, [a, b, c]: [&mut Player; 3]) {
+fn status(http: &Http, home: &Browser, cookie: &Token, [a, b, c]: [&mut Player; 3]) {
     let choose = |player: &Player, choice: Choice| {
         assert!(matches!(
             player.ask(http, &Request::SetPresence { choice }),
@@ -638,20 +660,34 @@ fn status(http: &Http, [a, b, c]: [&mut Player; 3]) {
     let mut carol = carol.opened_as(&presence_of(&[(a.tag, 'o')], "offline"));
     let second = dial(http, &c.bearer()).unwrap();
     let second = second.opened_as(&presence_of(&[(a.tag, 'o')], "offline"));
-    report(c, Some(Activity::Playing), false);
+    // playing and idle while offline: still nothing
+    report(c, Some(Activity::Playing), true);
     second.close();
     alice.quiet();
     // a report from a session without a socket: answered alike, nothing kept
     report(b, Some(Activity::Table), true);
     // what C chooses reaches A only as it changes how C is shown
     choose(c, Choice::Online);
-    assert_eq!(alice.text(), presence_of(&[(c.tag, 'g')], "online"));
+    assert_eq!(alice.text(), presence_of(&[(c.tag, 'G')], "online"));
     assert_eq!(carol.text(), presence_of(&[(a.tag, 'o')], "online"));
     report(c, Some(Activity::Table), false);
     assert_eq!(alice.text(), presence_of(&[(c.tag, 't')], "online"));
     choose(c, Choice::Afk);
     assert_eq!(alice.text(), presence_of(&[(c.tag, 'T')], "online"));
     assert_eq!(carol.text(), presence_of(&[(a.tag, 'o')], "afk"));
+    // the choice read back, natively and on the website (B's)
+    assert!(matches!(
+        c.ask(http, &Request::Presence),
+        Ok(Response::Presence {
+            choice: Choice::Afk
+        })
+    ));
+    assert!(matches!(
+        home.answer(&Request::Presence, Some(cookie)),
+        Ok(Response::Presence {
+            choice: Choice::Online
+        })
+    ));
     choose(c, Choice::Offline);
     assert_eq!(alice.text(), presence_of(&[], "online"));
     // its own sockets still hear its choice, and its friends as before

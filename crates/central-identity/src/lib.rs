@@ -168,6 +168,7 @@ pub fn browser_operation(request: &Request) -> bool {
         | Request::KeyCheckStatus
         | Request::SetKeyCheck { .. }
         | Request::SetPresence { .. }
+        | Request::Presence
         | Request::PairStart
         | Request::PairStatus { .. }
         | Request::PairApprove { .. }
@@ -265,6 +266,7 @@ fn uses_session(request: &Request) -> bool {
             | Request::KeyCheckStatus
             | Request::SetKeyCheck { .. }
             | Request::SetPresence { .. }
+            | Request::Presence
             | Request::PairStart
             | Request::PairStatus { .. }
             | Request::PairApprove { .. }
@@ -965,6 +967,7 @@ mod tests {
             Request::SetPresence {
                 choice: central_api::presence::Choice::Offline,
             },
+            Request::Presence,
             Request::PairStart,
             Request::PairStatus { handle: token() },
             Request::PairApprove {
@@ -1145,7 +1148,7 @@ mod tests {
                 text[start..].split('"').next().unwrap().to_owned()
             })
             .collect();
-        assert_eq!(named.len(), 69, "every operation is in one of the lists");
+        assert_eq!(named.len(), 70, "every operation is in one of the lists");
     }
 
     #[test]

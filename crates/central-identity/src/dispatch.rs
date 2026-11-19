@@ -39,6 +39,8 @@ impl IdentityService {
                 .change_password_finish(bearer, surface, &attempt, proof, &record, &wrapped_master)
                 .await;
         }
+        // A choice's budget is spent before the terms are read for it.
+        self.presence_budget(&request, bearer)?;
         if super::terms::needs_acceptance(&request) {
             self.require_terms(bearer, surface).await?;
         }
@@ -71,6 +73,7 @@ impl IdentityService {
             request @ (Request::SetPresence { .. } | Request::ReportPresence { .. }) => {
                 self.presence_request(request, bearer, surface).await
             }
+            request @ Request::Presence => self.presence_request(request, bearer, surface).await,
             Request::PublicFunding {} => self.public_funding(),
             request @ (Request::Terms
             | Request::GatewayTerms { .. }
