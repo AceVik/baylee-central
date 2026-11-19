@@ -32,6 +32,20 @@ impl Session {
         }
     }
 
+    /// The account's stored choice, without Central's terms: the account's
+    /// own data, as the website's export carries it.
+    ///
+    /// # Errors
+    /// `Busy` past ten choices and readings a minute, `Rejected` for an ended
+    /// session, transport failures.
+    pub fn presence_choice(&self, transport: &impl Transport) -> Result<Choice, Error> {
+        self.same_endpoint(transport)?;
+        match transport.exchange(&Request::Presence, Some((&self.token).into()))? {
+            Response::Presence { choice } => Ok(choice),
+            _ => Err(Error::Rejected),
+        }
+    }
+
     /// Say what the client is doing now: playing, at a table, or neither,
     /// and whether it has been idle for ten minutes. Heard only while this
     /// session's push socket is open; send it again after each dial. Central

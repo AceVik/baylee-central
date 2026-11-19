@@ -715,8 +715,11 @@ impl<A: Account, R: AsyncRead + Unpin, W: AsyncWrite + Unpin> Socket<A, R, W> {
         Ok(None)
     }
 
-    /// Say the account's presence, unless it is what was said last.
+    /// Say the account's presence, unless it is what was said last. Whatever
+    /// was held back is said with it: the gap begins anew, and a deadline
+    /// from before would otherwise send the next change at once.
     async fn presence(&mut self) -> Result<(), ()> {
+        self.due = None;
         let now = self.account.presence();
         if self.sent.as_ref() == Some(&now) {
             return Ok(());

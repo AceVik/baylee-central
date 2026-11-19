@@ -739,3 +739,24 @@ async fn presence_is_said_at_most_once_a_gap_and_then_the_latest() {
     socket.stop.send(true).unwrap();
     let _ = socket.task.await;
 }
+
+#[tokio::test]
+async fn a_presence_said_at_once_takes_one_held_back_with_it() {
+    let account = Arc::new(Fake::default());
+    let (_client, server) = tokio::io::duplex(4096);
+    let (reader, writer) = tokio::io::split(server);
+    let (_stop, stopped) = watch::channel(false);
+    let mut socket = Socket::new(Arc::clone(&account), reader, writer, stopped, SHORT);
+    // a presence was held back, and its gap is over before its deadline is
+    // looked at: news that comes first is said at once
+    let gap = SHORT.presence_gap;
+    socket.said_at = Some(Instant::now().checked_sub(gap * 2).unwrap());
+    socket.due = Some(Instant::now().checked_sub(gap).unwrap());
+    *account.online.lock().unwrap() = vec![(0x11, ONLINE)];
+    assert_eq!(socket.act(news::PRESENCE).await, Ok(None));
+    assert_eq!(socket.due, None, "nothing is held back any more");
+    // so the next change waits a whole gap, not the old deadline
+    *account.online.lock().unwrap() = vec![(0x12, ONLINE)];
+    assert_eq!(socket.act(news::PRESENCE).await, Ok(None));
+    assert!(socket.due.is_some_and(|due| due > Instant::now()));
+}

@@ -558,6 +558,12 @@ pub enum Request {
         /// Online, away, or offline (never shown).
         choice: crate::presence::Choice,
     },
+    /// The session's account's stored choice ([`Request::SetPresence`]), on
+    /// either listener and without Central's terms, as the account's own data
+    /// (the website's export carries it; [`Response::AccountExport`] does
+    /// not, since released clients decode it strictly). Answered with
+    /// [`Response::Presence`].
+    Presence,
     /// What the native client is doing (native listener only, a session with
     /// an open push socket): its activity and whether it has been idle for
     /// ten minutes. Kept in memory while the socket stands; without one it
@@ -1075,7 +1081,8 @@ pub enum Response {
         /// One is stored.
         set: bool,
     },
-    /// The account's chosen status as it is stored now ([`Request::SetPresence`]).
+    /// The account's chosen status as it is stored now ([`Request::SetPresence`],
+    /// [`Request::Presence`]).
     Presence {
         /// What friends are shown.
         choice: crate::presence::Choice,

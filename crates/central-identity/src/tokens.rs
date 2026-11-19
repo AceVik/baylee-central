@@ -143,6 +143,7 @@ pub const fn credential_operation(request: &Request) -> bool {
         | Request::KeyCheckStatus
         | Request::SetKeyCheck { .. }
         | Request::SetPresence { .. }
+        | Request::Presence
         | Request::ReportPresence { .. }
         | Request::PairStart
         | Request::PairStatus { .. }

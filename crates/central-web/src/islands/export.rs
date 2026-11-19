@@ -1,7 +1,9 @@
 //! Merge the separately paginated records of play (Daily and Weekly tasks,
 //! the Tower's runs, the Echoes receipts) into the account's downloadable
 //! file. No page of the site shows them, the game client does; the download
-//! carries what Central keeps of them.
+//! carries what Central keeps of them. So it does the account's chosen
+//! status (`docs/push-socket.md` §"Status"), which Central's export leaves
+//! out for the released clients that decode it strictly.
 use super::{
     central::{Failure, call},
     session,
@@ -59,6 +61,12 @@ pub(crate) async fn merged(file: &str) -> Result<String, Failure> {
     file.as_object_mut()
         .ok_or(Failure::Malformed)?
         .insert("tower_echoes".into(), echoes::receipts().await?);
+    let wire::Response::Presence { choice } = call(&wire::Request::Presence).await? else {
+        return Err(Failure::Malformed);
+    };
+    file.as_object_mut()
+        .ok_or(Failure::Malformed)?
+        .insert("presence".into(), choice.name().into());
     if session::marker().as_ref() != Some(&stamp) {
         return Err(Failure::Rejected);
     }
