@@ -134,6 +134,7 @@ impl Table {
     {
         #[derive(Deserialize)]
         #[serde(untagged)]
+        #[allow(dead_code)] // the other shape is only read past
         enum Read {
             Table(Table),
             Other(serde::de::IgnoredAny),
