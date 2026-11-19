@@ -175,7 +175,7 @@ impl AccountStore {
             .map_err(|_| Error::Unavailable)?;
         let row = tx
             .query_one_raw(statement(
-                "SELECT a.id, a.vault_epoch, a.username_key, a.display_name, a.tag,
+                "SELECT a.id, a.vault_epoch, a.username_key, a.display_name, a.tag, a.presence,
                      floor(extract(epoch FROM a.display_name_at))::bigint AS display_name_at,
                      a.source, a.legacy_id,
                      floor(extract(epoch FROM a.created_at))::bigint AS created_at,
@@ -211,6 +211,7 @@ impl AccountStore {
             display_name,
             display_name_at: get(&row, "display_name_at")?,
             tag,
+            presence: super::live::choice(&row)?,
             source: recovery::source(&get::<String>(&row, "source")?)?,
             legacy_id: get(&row, "legacy_id")?,
             created_at: get(&row, "created_at")?,

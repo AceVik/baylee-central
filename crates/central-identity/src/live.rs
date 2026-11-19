@@ -14,7 +14,11 @@
 //! account's friends that are online. Each account's friends are read once,
 //! when its first socket opens, and again when a contact of its changes;
 //! going online or offline reads nothing.
-use central_api::{Error, social::MAX_CONTACTS};
+use central_api::{
+    Error,
+    presence::{Activity, Choice, Shown},
+    social::MAX_CONTACTS,
+};
 use std::{
     collections::{BTreeMap, BTreeSet},
     sync::{
@@ -38,7 +42,46 @@ pub const SESSION_DIALS: u32 = 12;
 /// oldest, so tokens of ended sessions (which still verify until their
 /// `exp`) can wear down others' counts but never lock a session out.
 const DIALERS: usize = 4_096;
+/// Reports of what a client is doing a minute, per session: a table entered
+/// and left, a game begun and ended, idle and back, with room to spare.
+pub const SESSION_REPORTS: u32 = 30;
+/// Changes of the chosen status a minute, per session: each is a statement.
+pub const SESSION_CHOICES: u32 = 10;
 const MINUTE: Duration = Duration::from_secs(60);
+
+/// Spend one of `key`'s units in its minute, `limit` a minute, in a table of
+/// at most `cap` keys where a newcomer to a full table of live minutes takes
+/// the oldest's place; `false` when none is left.
+fn spend(
+    book: &mut BTreeMap<[u8; 32], (Instant, u32)>,
+    key: [u8; 32],
+    now: Instant,
+    limit: u32,
+    cap: usize,
+) -> bool {
+    if !book.contains_key(&key) && book.len() >= cap {
+        book.retain(|_, (start, _)| now.saturating_duration_since(*start) < MINUTE);
+        if book.len() >= cap {
+            let oldest = book
+                .iter()
+                .min_by_key(|(_, (start, _))| *start)
+                .map(|(key, _)| *key);
+            if let Some(oldest) = oldest {
+                book.remove(&oldest);
+            }
+        }
+    }
+    let (start, used) = book.entry(key).or_insert((now, 0));
+    if now.saturating_duration_since(*start) >= MINUTE {
+        *start = now;
+        *used = 0;
+    }
+    if *used >= limit {
+        return false;
+    }
+    *used += 1;
+    true
+}
 
 /// What a socket is to do, as bits of [`Listener::take`].
 pub mod news {
@@ -83,6 +126,12 @@ struct Socket {
 struct Account {
     /// Its public tag, as its friends' presence names it.
     tag: Option<u32>,
+    /// How it chose to be shown (stored; read when its first socket opened).
+    choice: Choice,
+    /// What its client says it is doing, and whether it is idle: memory only,
+    /// gone with its last socket.
+    activity: Option<Activity>,
+    idle: bool,
     sockets: BTreeSet<u64>,
     /// Its sockets that said `ready`.
     live: usize,
@@ -103,17 +152,21 @@ struct State {
     accounts: BTreeMap<[u8; 16], Account>,
     /// Each session's dials in its minute.
     dials: BTreeMap<[u8; 32], (Instant, u32)>,
+    /// Each session's reports and changes of its choice, in their minute.
+    reports: BTreeMap<[u8; 32], (Instant, u32)>,
+    choices: BTreeMap<[u8; 32], (Instant, u32)>,
     /// The last reading's number, over all accounts.
     readings: u64,
-    /// News that a session may have ended, counted: a dial compares it before
-    /// and after its socket is registered ([`Live::ends`]).
-    ends: u64,
+    /// News that a session may have ended, or that a choice changed, counted:
+    /// a dial compares it before and after its socket is registered
+    /// ([`Live::changes`]).
+    changes: u64,
 }
 
 impl State {
     fn raise(&mut self, account: &[u8; 16], bits: u8) {
         if bits & (news::CHECK | news::REVOKED) != 0 {
-            self.ends += 1;
+            self.changes += 1;
         }
         if let Some(entry) = self.accounts.get(account) {
             for id in &entry.sockets {
@@ -141,6 +194,44 @@ impl State {
             self.raise(&follower, bits);
         }
     }
+
+    /// How `account` is shown to its friends now; `None` while it is not.
+    fn shown(&self, account: &[u8; 16]) -> Option<Shown> {
+        self.accounts.get(account).and_then(Account::shown)
+    }
+
+    /// The followers of `account` look at their presence again, if how it is
+    /// shown is not what it was: so going online, offline, away or to a table
+    /// is the only news of an account its friends get, and nothing of one
+    /// that chose to be offline ever reaches them.
+    fn shown_changed(&mut self, account: &[u8; 16], before: Option<Shown>) {
+        if self.shown(account) != before {
+            self.raise_followers(account, news::PRESENCE);
+        }
+    }
+}
+
+impl Account {
+    /// How the account is shown: only while a socket of it said `ready` and
+    /// it did not choose to be offline.
+    fn shown(&self) -> Option<Shown> {
+        (self.live > 0 && self.choice != Choice::Offline).then_some(Shown {
+            away: self.choice == Choice::Afk || self.idle,
+            activity: self.activity,
+        })
+    }
+}
+
+/// What a socket reports: its account's friends that are shown online, by
+/// tag, each with its state, and the account's own choice.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Presence {
+    /// The friends' tags, in order.
+    pub online: Vec<u32>,
+    /// For each of them, its state ([`Shown::letter`]).
+    pub states: Vec<Shown>,
+    /// What the account itself chose.
+    pub me: Choice,
 }
 
 /// The registry; one per service, shared by both listeners' changes.
@@ -205,32 +296,74 @@ impl Live {
     /// Spend one of the session's dials in its minute; `Busy` when none is
     /// left. A newcomer to a full table takes the oldest entry's place.
     pub(super) fn dial(&self, digest: [u8; 32], now: Instant) -> Result<(), Error> {
+        if spend(&mut self.state().dials, digest, now, SESSION_DIALS, DIALERS) {
+            Ok(())
+        } else {
+            Err(Error::Busy)
+        }
+    }
+
+    /// Spend one of the session's changes of its choice in its minute.
+    pub(super) fn choose(&self, digest: [u8; 32], now: Instant) -> Result<(), Error> {
+        if spend(
+            &mut self.state().choices,
+            digest,
+            now,
+            SESSION_CHOICES,
+            DIALERS,
+        ) {
+            Ok(())
+        } else {
+            Err(Error::Busy)
+        }
+    }
+
+    /// The account chose `choice` (it is stored): its sockets report it, and
+    /// its friends see the change if it changes how it is shown.
+    pub(super) fn chose(&self, account: &[u8; 16], choice: Choice) {
         let mut state = self.state();
-        if !state.dials.contains_key(&digest) && state.dials.len() >= DIALERS {
-            state
-                .dials
-                .retain(|_, (start, _)| now.saturating_duration_since(*start) < MINUTE);
-            if state.dials.len() >= DIALERS {
-                let oldest = state
-                    .dials
-                    .iter()
-                    .min_by_key(|(_, (start, _))| *start)
-                    .map(|(session, _)| *session);
-                if let Some(oldest) = oldest {
-                    state.dials.remove(&oldest);
-                }
-            }
+        state.changes += 1;
+        let before = state.shown(account);
+        let Some(entry) = state.accounts.get_mut(account) else {
+            return;
+        };
+        entry.choice = choice;
+        state.raise(account, news::PRESENCE);
+        state.shown_changed(account, before);
+    }
+
+    /// What the client of the session `digest` says it is doing. Only a
+    /// session with a socket is heard, within [`SESSION_REPORTS`] a minute;
+    /// anything else changes nothing and keeps nothing. The last report of
+    /// any of the account's sockets stands.
+    pub(super) fn report(
+        &self,
+        digest: [u8; 32],
+        activity: Option<Activity>,
+        idle: bool,
+        now: Instant,
+    ) {
+        let mut guard = self.state();
+        let state = &mut *guard;
+        let Some(account) = state
+            .sockets
+            .values()
+            .find(|socket| socket.digest == digest)
+            .map(|socket| socket.account)
+        else {
+            return;
+        };
+        // Charged only for a session with a socket, so the table holds no
+        // more sessions than there are sockets.
+        if !spend(&mut state.reports, digest, now, SESSION_REPORTS, DIALERS) {
+            return;
         }
-        let (start, used) = state.dials.entry(digest).or_insert((now, 0));
-        if now.saturating_duration_since(*start) >= MINUTE {
-            *start = now;
-            *used = 0;
+        let before = state.shown(&account);
+        if let Some(entry) = state.accounts.get_mut(&account) {
+            entry.activity = activity;
+            entry.idle = idle;
         }
-        if *used >= SESSION_DIALS {
-            return Err(Error::Busy);
-        }
-        *used += 1;
-        Ok(())
+        state.shown_changed(&account, before);
     }
 
     /// Admit a socket of `account` with the session `digest`, unless the
@@ -243,13 +376,19 @@ impl Live {
         self: &Arc<Self>,
         account: [u8; 16],
         tag: Option<u32>,
+        choice: Choice,
         digest: [u8; 32],
     ) -> Result<(Listener, Option<Reading>), Error> {
         let mut guard = self.state();
         let state = &mut *guard;
         let id = state.next;
+        // A new entry takes the stored choice; one that stands has followed
+        // every change since ([`Self::chose`]).
         let entry = state.accounts.entry(account).or_insert_with(|| Account {
             tag,
+            choice,
+            activity: None,
+            idle: false,
             sockets: BTreeSet::new(),
             live: 0,
             friends: BTreeSet::new(),
@@ -366,7 +505,7 @@ impl Live {
     /// exactly the session that asked, so nothing need be read.
     pub(super) fn ended(&self, digest: &[u8; 32]) {
         let mut state = self.state();
-        state.ends += 1;
+        state.changes += 1;
         for socket in state.sockets.values() {
             if &socket.digest == digest {
                 socket.signal.raise(news::REVOKED);
@@ -400,11 +539,12 @@ impl Live {
         state.raise_followers(account, news::SOCIAL | news::PRESENCE);
     }
 
-    /// How much news that a session may have ended there has been: a dial
-    /// whose count changed between its status and its registration asks the
-    /// store again, since that news found no socket of it to tell.
-    pub(super) fn ends(&self) -> u64 {
-        self.state().ends
+    /// How much news that a session may have ended, or that a choice changed,
+    /// there has been: a dial whose count changed between its status and its
+    /// registration asks the store again, since that news found no socket of
+    /// it to tell.
+    pub(super) fn changes(&self) -> u64 {
+        self.state().changes
     }
 
     /// The session digests of every socket, each once: what the periodic
@@ -437,24 +577,32 @@ impl Live {
         }
     }
 
-    /// The tags of `account`'s friends that are online now, in order: what
-    /// its sockets report. At most [`MAX_CONTACTS`], as many as it may have.
-    fn presence(&self, account: &[u8; 16]) -> Vec<u32> {
+    /// What `account`'s sockets report: its friends that are shown online
+    /// now, in the order of their tags, each with its state, and its own
+    /// choice. At most [`MAX_CONTACTS`] friends, as many as it may have.
+    fn presence(&self, account: &[u8; 16]) -> Presence {
         let state = self.state();
         let Some(entry) = state.accounts.get(account) else {
-            return Vec::new();
+            return Presence {
+                online: Vec::new(),
+                states: Vec::new(),
+                me: Choice::Online,
+            };
         };
-        let mut tags: Vec<u32> = entry
+        let mut shown: Vec<(u32, Shown)> = entry
             .friends
             .iter()
             .filter_map(|friend| state.accounts.get(friend))
-            .filter(|friend| friend.live > 0)
-            .filter_map(|friend| friend.tag)
+            .filter_map(|friend| Some((friend.tag?, friend.shown()?)))
             .collect();
-        tags.sort_unstable();
-        tags.dedup();
-        tags.truncate(MAX_CONTACTS);
-        tags
+        shown.sort_unstable_by_key(|(tag, _)| *tag);
+        shown.dedup_by_key(|(tag, _)| *tag);
+        shown.truncate(MAX_CONTACTS);
+        Presence {
+            online: shown.iter().map(|(tag, _)| *tag).collect(),
+            states: shown.into_iter().map(|(_, state)| state).collect(),
+            me: entry.choice,
+        }
     }
 
     fn ready(&self, id: u64) {
@@ -467,13 +615,12 @@ impl Live {
         }
         socket.live = true;
         let account = socket.account;
+        let before = state.shown(&account);
         let Some(entry) = state.accounts.get_mut(&account) else {
             return;
         };
         entry.live += 1;
-        if entry.live == 1 {
-            state.raise_followers(&account, news::PRESENCE);
-        }
+        state.shown_changed(&account, before);
     }
 
     fn remove(&self, id: u64) {
@@ -482,22 +629,18 @@ impl Live {
             return;
         };
         let account = socket.account;
+        let before = state.shown(&account);
         let Some(entry) = state.accounts.get_mut(&account) else {
             return;
         };
         entry.sockets.remove(&id);
-        let offline = if socket.live {
+        if socket.live {
             entry.live = entry.live.saturating_sub(1);
-            entry.live == 0
-        } else {
-            false
-        };
+        }
         if entry.sockets.is_empty() {
             state.accounts.remove(&account);
         }
-        if offline {
-            state.raise_followers(&account, news::PRESENCE);
-        }
+        state.shown_changed(&account, before);
     }
 
     #[cfg(test)]
@@ -587,7 +730,7 @@ impl super::IdentityService {
         self.live.dial(token.digest(), Instant::now())?;
         // Counted before the status is read: news that a session ended which
         // comes between it and the socket's registration finds no socket.
-        let ends = self.live.ends();
+        let changes = self.live.changes();
         let request = central_api::wire::Request::SessionStatus;
         let told = super::limits::told(&request, Some(token));
         self.limits
@@ -610,9 +753,10 @@ impl super::IdentityService {
         let status = status?;
         self.require_terms(Some(token), super::Surface::Native)
             .await?;
+        let account = status.identity.account;
         let (listener, reading) =
             self.live
-                .admit(status.identity.account, status.tag, token.digest())?;
+                .admit(account, status.tag, status.presence, token.digest())?;
         if let Some(reading) = reading.map(|reading| Pending::new(Arc::clone(&self.live), reading))
         {
             // The dial fails rather than report friends it could not read;
@@ -621,14 +765,71 @@ impl super::IdentityService {
             let friends = self.store.live_friends(reading.account()).await?;
             reading.read(friends);
         }
-        // Such news came in between: the session is asked about again, now
-        // that the socket is registered and any later news reaches it.
-        let digest = *listener.digest();
-        if self.live.ends() != ends && !self.store.live_sessions(&[digest]).await?.contains(&digest)
-        {
-            return Err(Error::Rejected);
+        // Such news came in between: the session and the choice are asked
+        // about again, now that the socket is registered and any later news
+        // reaches it. The socket has not said `ready`, so a choice corrected
+        // here was never shown.
+        if self.live.changes() != changes {
+            let again = self
+                .store
+                .session_status(central_postgres::Session::Native(token))
+                .await?;
+            self.live.chose(&account, again.presence);
         }
         Ok(listener)
+    }
+
+    /// A status request: a choice, or what the native client is doing.
+    pub(super) async fn presence_request(
+        &self,
+        request: central_api::wire::Request,
+        bearer: Option<&super::Token>,
+        surface: super::Surface,
+    ) -> Result<central_api::wire::Response, Error> {
+        match request {
+            central_api::wire::Request::SetPresence { choice } => {
+                self.set_presence(choice, bearer, surface).await
+            }
+            central_api::wire::Request::ReportPresence { activity, idle } => {
+                self.report_presence(activity, idle, bearer, surface)
+            }
+            _ => Err(Error::Rejected),
+        }
+    }
+
+    /// Choose how the session's account is shown to its friends (on either
+    /// listener): stored, then its sockets and its friends' are told.
+    async fn set_presence(
+        &self,
+        choice: Choice,
+        bearer: Option<&super::Token>,
+        surface: super::Surface,
+    ) -> Result<central_api::wire::Response, Error> {
+        let session = surface.session(bearer)?;
+        self.live
+            .choose(bearer.ok_or(Error::Rejected)?.digest(), Instant::now())?;
+        let account = self.store.set_presence(session, choice).await?;
+        self.live.chose(&account, choice);
+        Ok(central_api::wire::Response::Presence { choice })
+    }
+
+    /// What the native client says it is doing: heard only from a session
+    /// with a push socket, and always answered alike, so the answer says
+    /// nothing of whether anything was kept.
+    fn report_presence(
+        &self,
+        activity: Option<Activity>,
+        idle: bool,
+        bearer: Option<&super::Token>,
+        surface: super::Surface,
+    ) -> Result<central_api::wire::Response, Error> {
+        if surface != super::Surface::Native {
+            return Err(Error::Rejected);
+        }
+        let token = bearer.ok_or(Error::Rejected)?;
+        self.live
+            .report(token.digest(), activity, idle, Instant::now());
+        Ok(central_api::wire::Response::Done)
     }
 
     /// Whether `listener`'s session still stands: one statement.
@@ -640,13 +841,18 @@ impl super::IdentityService {
         Ok(self.store.live_sessions(&[digest]).await?.contains(&digest))
     }
 
-    /// What `listener` reports as its account's online friends.
+    /// What `listener` reports: its account's friends that are shown online,
+    /// their states, and its own choice.
     #[must_use]
-    pub fn presence(&self, listener: &Listener) -> Vec<u32> {
-        listener
-            .account()
-            .map(|account| self.live.presence(&account))
-            .unwrap_or_default()
+    pub fn presence(&self, listener: &Listener) -> Presence {
+        listener.account().map_or(
+            Presence {
+                online: Vec::new(),
+                states: Vec::new(),
+                me: Choice::Online,
+            },
+            |account| self.live.presence(&account),
+        )
     }
 
     /// The periodic check of every socket's session: one statement for all of

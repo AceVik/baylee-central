@@ -181,7 +181,7 @@ async fn verify_migrations(operator: &sea_orm::DatabaseConnection) {
             "SELECT count(*)::bigint AS value FROM seaql_migrations"
         )
         .await,
-        31
+        32
     );
 
     history_as_sea_orm_left_it(operator).await;
@@ -296,13 +296,14 @@ async fn history_as_sea_orm_left_it(operator: &sea_orm::DatabaseConnection) {
         .await,
         1
     );
-    // A database at the 30 migrations before donations runs the one after them
-    // alone: every other file would fail if it ran twice.
+    // A database at the 31 migrations before presence runs the one after them
+    // alone: every other file would fail if it ran twice. Its accounts take the
+    // default, and the previous binary's statements, which never name the
+    // column, run on.
     operator
         .execute_unprepared(
-            "DROP TABLE central_identity.donations, central_identity.donation_sums,
-                central_identity.donation_count;
-             DELETE FROM public.seaql_migrations WHERE version = 'm20261118_000032_donations'",
+            "ALTER TABLE central_identity.accounts DROP COLUMN presence;
+             DELETE FROM public.seaql_migrations WHERE version = 'm20261119_000033_presence'",
         )
         .await
         .unwrap();
@@ -313,7 +314,16 @@ async fn history_as_sea_orm_left_it(operator: &sea_orm::DatabaseConnection) {
             "SELECT count(*)::bigint AS value FROM public.seaql_migrations"
         )
         .await,
-        31
+        32
+    );
+    assert_eq!(
+        scalar(
+            operator,
+            "SELECT count(*)::bigint AS value FROM central_identity.accounts
+             WHERE presence <> 'online'"
+        )
+        .await,
+        0
     );
     assert_eq!(
         scalar(

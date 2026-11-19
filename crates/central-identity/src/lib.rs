@@ -39,7 +39,9 @@ pub use guesses::Place;
 mod legacy;
 mod limits;
 mod live;
-pub use live::{ACCOUNT_SOCKETS, Listener, SESSION_DIALS, news};
+pub use live::{
+    ACCOUNT_SOCKETS, Listener, Presence, SESSION_CHOICES, SESSION_DIALS, SESSION_REPORTS, news,
+};
 mod objects;
 mod owner;
 mod pairing;
@@ -165,6 +167,7 @@ pub fn browser_operation(request: &Request) -> bool {
         | Request::DeleteAccountFinish { .. }
         | Request::KeyCheckStatus
         | Request::SetKeyCheck { .. }
+        | Request::SetPresence { .. }
         | Request::PairStart
         | Request::PairStatus { .. }
         | Request::PairApprove { .. }
@@ -203,7 +206,9 @@ pub fn browser_operation(request: &Request) -> bool {
         | Request::LegacyLink { .. }
         | Request::PairClaim { .. }
         | Request::PairPoll { .. }
-        | Request::PairRedeem { .. } => false,
+        | Request::PairRedeem { .. }
+        // what a native client is doing, heard only with its push socket
+        | Request::ReportPresence { .. } => false,
     }
 }
 
@@ -259,6 +264,7 @@ fn uses_session(request: &Request) -> bool {
             | Request::DeleteAccountFinish { .. }
             | Request::KeyCheckStatus
             | Request::SetKeyCheck { .. }
+            | Request::SetPresence { .. }
             | Request::PairStart
             | Request::PairStatus { .. }
             | Request::PairApprove { .. }
@@ -956,6 +962,9 @@ mod tests {
             },
             Request::KeyCheckStatus,
             Request::SetKeyCheck { check: vec![] },
+            Request::SetPresence {
+                choice: central_api::presence::Choice::Offline,
+            },
             Request::PairStart,
             Request::PairStatus { handle: token() },
             Request::PairApprove {
@@ -1047,6 +1056,11 @@ mod tests {
             },
             // a gateway's token is no website's business
             Request::GatewayStatus,
+            // what a native client is doing, heard only with its push socket
+            Request::ReportPresence {
+                activity: None,
+                idle: false,
+            },
         ]
         .into_iter()
         .chain(objects())
@@ -1131,7 +1145,7 @@ mod tests {
                 text[start..].split('"').next().unwrap().to_owned()
             })
             .collect();
-        assert_eq!(named.len(), 67, "every operation is in one of the lists");
+        assert_eq!(named.len(), 69, "every operation is in one of the lists");
     }
 
     #[test]

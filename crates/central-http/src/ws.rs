@@ -25,7 +25,7 @@ use axum::{
 };
 use base64::Engine as _;
 use central_api::Error;
-use central_identity::{IdentityService, Listener, Place, news};
+use central_identity::{IdentityService, Listener, Place, Presence, news};
 use frame::{Code, Ended, Frame, Reader};
 use hyper_util::rt::TokioIo;
 use sha1::Digest as _;
@@ -80,6 +80,9 @@ const LINGER: Duration = Duration::from_secs(2);
 /// The longest a socket lives: no session lives longer (12 hours after its
 /// sign-in), so a socket this old is closed and its client may dial again.
 const LIFETIME: Duration = Duration::from_hours(12);
+/// The least time between two `presence` frames on one socket: news faster
+/// than this waits, and the frame that follows says the latest.
+const PRESENCE_GAP: Duration = Duration::from_secs(1);
 /// Frames a client may send in [`FRAME_WINDOW`]: a pong for each ping, and
 /// pings of its own if it likes, far fewer than this.
 const FRAMES: u32 = 16;
@@ -103,11 +106,11 @@ const REVOKED: &str = r#"{"event":"revoked"}"#;
 const GUID: &[u8] = b"258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 
 /// The longest `presence` frame: every friend an account may have, each
-/// with the widest tag (eight hex digits, a positive `i32`), fits a frame
-/// the client reads.
+/// with the widest tag (eight hex digits, a positive `i32`) and its state's
+/// letter, and the longest choice, fits a frame the client reads.
 const _: () = assert!(
-    r#"{"event":"presence","online":[]}"#.len()
-        + central_api::social::MAX_CONTACTS * r#""7fffffff","#.len()
+    r#"{"event":"presence","online":[],"states":"","me":"offline"}"#.len()
+        + central_api::social::MAX_CONTACTS * (r#""7fffffff","#.len() + 1)
         <= frame::TEXT
 );
 
@@ -478,8 +481,8 @@ trait Account {
     fn rung(&self) -> impl Future<Output = ()> + Send;
     /// The socket said `ready`.
     fn ready(&self);
-    /// The account's online friends' tags, in order.
-    fn presence(&self) -> Vec<u32>;
+    /// The account's friends shown online, their states, its own choice.
+    fn presence(&self) -> Presence;
     /// Whether the session stands; an error is no answer.
     fn listening(&self) -> impl Future<Output = Result<bool, Error>> + Send;
 }
@@ -503,7 +506,7 @@ impl Account for Served {
         self.listener.ready();
     }
 
-    fn presence(&self) -> Vec<u32> {
+    fn presence(&self) -> Presence {
         self.identity.presence(&self.listener)
     }
 
@@ -524,6 +527,7 @@ struct Times {
     check: Duration,
     frames: u32,
     frame_window: Duration,
+    presence_gap: Duration,
 }
 
 impl Times {
@@ -536,6 +540,7 @@ impl Times {
         check: CHECK_TIME,
         frames: FRAMES,
         frame_window: FRAME_WINDOW,
+        presence_gap: PRESENCE_GAP,
     };
 }
 
@@ -559,8 +564,11 @@ struct Socket<A, R, W> {
     frames: Reader,
     stop: watch::Receiver<bool>,
     times: Times,
-    /// The presence last said.
-    sent: Option<Vec<u32>>,
+    /// The presence last said, and when.
+    sent: Option<Presence>,
+    said_at: Option<Instant>,
+    /// When a presence held back by [`Times::presence_gap`] is said.
+    due: Option<Instant>,
 }
 
 impl<A: Account, R: AsyncRead + Unpin, W: AsyncWrite + Unpin> Socket<A, R, W> {
@@ -579,6 +587,8 @@ impl<A: Account, R: AsyncRead + Unpin, W: AsyncWrite + Unpin> Socket<A, R, W> {
             stop,
             times,
             sent: None,
+            said_at: None,
+            due: None,
         }
     }
 
@@ -620,12 +630,19 @@ impl<A: Account, R: AsyncRead + Unpin, W: AsyncWrite + Unpin> Socket<A, R, W> {
                     Err(()) => return End::Drop,
                 }
             }
+            let due = self.due;
             // Each branch but its body is cancel-safe: the doorbell keeps its
             // bits, the reader its bytes, the timers their deadlines.
             tokio::select! {
                 biased;
                 _ = self.stop.changed() => return End::Close(Code::GOING_AWAY),
                 () = self.account.rung() => {}
+                () = tokio::time::sleep_until(due.unwrap_or(started)), if due.is_some() => {
+                    self.due = None;
+                    if self.presence().await.is_err() {
+                        return End::Drop;
+                    }
+                }
                 read = self.frames.next(&mut self.reader) => {
                     let now = Instant::now();
                     if now.duration_since(window.0) >= self.times.frame_window {
@@ -686,20 +703,28 @@ impl<A: Account, R: AsyncRead + Unpin, W: AsyncWrite + Unpin> Socket<A, R, W> {
             self.write(&frame::text(CHAT).unwrap_or_default()).await?;
         }
         if bits & news::PRESENCE != 0 {
-            self.presence().await?;
+            // At most one presence a gap: news within it waits, and what is
+            // said then is the latest.
+            match self.said_at {
+                Some(at) if at.elapsed() < self.times.presence_gap => {
+                    self.due.get_or_insert(at + self.times.presence_gap);
+                }
+                _ => self.presence().await?,
+            }
         }
         Ok(None)
     }
 
-    /// Say the account's online friends, unless they are what was said last.
+    /// Say the account's presence, unless it is what was said last.
     async fn presence(&mut self) -> Result<(), ()> {
-        let online = self.account.presence();
-        if self.sent.as_ref() == Some(&online) {
+        let now = self.account.presence();
+        if self.sent.as_ref() == Some(&now) {
             return Ok(());
         }
-        let text = presence(&online);
+        let text = presence(&now);
         self.write(&frame::text(&text).ok_or(())?).await?;
-        self.sent = Some(online);
+        self.sent = Some(now);
+        self.said_at = Some(Instant::now());
         Ok(())
     }
 
@@ -753,18 +778,23 @@ impl<A: Account, R: AsyncRead + Unpin, W: AsyncWrite + Unpin> Socket<A, R, W> {
     }
 }
 
-/// `{"event":"presence","online":[…]}` with each tag as the client writes
-/// it: lower-case hexadecimal, at least four digits.
-fn presence(online: &[u32]) -> String {
+/// `{"event":"presence","online":[…],"states":"…","me":"…"}`: each tag as the
+/// client writes it (lower-case hexadecimal, at least four digits), then one
+/// letter per tag for its state (`central_api::presence::Shown`), then the
+/// account's own choice. A client that reads only `online` sees every friend
+/// shown, away or busy, as online.
+fn presence(now: &Presence) -> String {
     use std::fmt::Write as _;
     let mut text = String::from(r#"{"event":"presence","online":["#);
-    for (index, tag) in online.iter().enumerate() {
+    for (index, tag) in now.online.iter().enumerate() {
         if index > 0 {
             text.push(',');
         }
         let _ = write!(text, r#""{tag:04x}""#);
     }
-    text.push_str("]}");
+    text.push_str(r#"],"states":""#);
+    text.extend(now.states.iter().map(|state| state.letter()));
+    let _ = write!(text, r#"","me":"{}"}}"#, now.me.name());
     text
 }
 

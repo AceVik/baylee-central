@@ -9,6 +9,8 @@ pub struct Status {
     pub username: String,
     /// The account's public tag, once it has one (`docs/web-accounts.md`).
     pub tag: Option<u32>,
+    /// How the account chose to be shown to its friends (migration 000033).
+    pub presence: central_api::presence::Choice,
     /// Absolute Unix-seconds expiry; never renewed.
     pub expires_at: i64,
     /// No legacy reset authority exists any more: a closed legacy migration,
@@ -27,7 +29,7 @@ impl AccountStore {
         session: impl Into<Session<'a>>,
     ) -> Result<Status, Error> {
         let row = self.db.query_one_raw(statement(
-            "SELECT a.id, a.vault_epoch, a.username_key, a.tag, a.legacy_closed OR a.source = 'registered' AS migration_closed,
+            "SELECT a.id, a.vault_epoch, a.username_key, a.tag, a.presence, a.legacy_closed OR a.source = 'registered' AS migration_closed,
              floor(extract(epoch FROM s.expires_at))::bigint AS expires_at
              FROM central_identity.accounts a JOIN central_identity.sessions s
              ON s.account_id = a.id AND s.credential_revision = a.credential_revision
@@ -43,6 +45,7 @@ impl AccountStore {
             tag: tag
                 .map(|tag| u32::try_from(tag).map_err(|_| Error::Unavailable))
                 .transpose()?,
+            presence: super::live::choice(&row)?,
             expires_at: row
                 .try_get("", "expires_at")
                 .map_err(|_| Error::Unavailable)?,

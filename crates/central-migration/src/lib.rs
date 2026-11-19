@@ -35,7 +35,7 @@ macro_rules! migrations {
 
 /// Every migration, in the order they are applied. Append only: a database records
 /// the names it ran, and one it ran is never run again or removed.
-const MIGRATIONS: [Migration; 31] = migrations![
+const MIGRATIONS: [Migration; 32] = migrations![
     "m20261019_000001_pending_accounts",
     "m20261019_000002_native_accounts",
     "m20261019_000003_ticket_purpose",
@@ -67,6 +67,7 @@ const MIGRATIONS: [Migration; 31] = migrations![
     "m20261114_000030_tower_access",
     "m20261115_000031_tower_awards",
     "m20261118_000032_donations",
+    "m20261119_000033_presence",
 ];
 
 /// The history table exactly as `sea-orm-migration` 2.0.4 created it
@@ -190,7 +191,7 @@ mod tests {
 
     #[test]
     fn the_list_is_ordered_unique_and_shaped() {
-        assert_eq!(MIGRATIONS.len(), 31);
+        assert_eq!(MIGRATIONS.len(), 32);
         for pair in MIGRATIONS.windows(2) {
             // the history is read in this order, so the list must be in it too
             assert!(pair[0].name < pair[1].name, "{}", pair[1].name);
@@ -222,10 +223,10 @@ mod tests {
     #[test]
     fn only_the_list_s_beginning_is_a_history() {
         let all: Vec<&str> = MIGRATIONS.iter().map(|m| m.name).collect();
-        assert_eq!(pending(&[], &MIGRATIONS).map(<[_]>::len), Some(31));
+        assert_eq!(pending(&[], &MIGRATIONS).map(<[_]>::len), Some(32));
         assert_eq!(
-            pending(&recorded(&all[..30]), &MIGRATIONS).map(|rest| rest[0].name),
-            Some("m20261118_000032_donations")
+            pending(&recorded(&all[..31]), &MIGRATIONS).map(|rest| rest[0].name),
+            Some("m20261119_000033_presence")
         );
         assert_eq!(
             pending(&recorded(&all), &MIGRATIONS).map(<[_]>::len),

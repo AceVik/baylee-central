@@ -1,4 +1,5 @@
 use super::*;
+use central_api::presence::Activity;
 
 const A: [u8; 16] = [1; 16];
 const B: [u8; 16] = [2; 16];
@@ -12,7 +13,12 @@ fn digest(seed: u8) -> [u8; 32] {
 /// if it is the account's first.
 fn socket(live: &Arc<Live>, account: [u8; 16], session: u8, friends: &[[u8; 16]]) -> Listener {
     let (listener, reading) = live
-        .admit(account, Some(u32::from(account[0])), digest(session))
+        .admit(
+            account,
+            Some(u32::from(account[0])),
+            Choice::Online,
+            digest(session),
+        )
         .unwrap();
     if let Some(reading) = reading {
         live.friends_read(reading, friends.to_vec());
@@ -75,7 +81,7 @@ fn presence_is_friends_with_a_socket_that_said_ready() {
     let live = Arc::new(Live::default());
     let a = socket(&live, A, 1, &[B]);
     let c = socket(&live, C, 3, &[]);
-    let presence = |listener: &Listener| live.presence(&listener.account().unwrap());
+    let presence = |listener: &Listener| live.presence(&listener.account().unwrap()).online;
     // B admitted but not ready: not online, nobody woken
     let b1 = socket(&live, B, 2, &[A]);
     assert_eq!(presence(&a), Vec::<u32>::new());
@@ -117,11 +123,11 @@ fn an_ended_friendship_leaves_both_presences_when_read_again() {
     a.ready();
     b.ready();
     let _ = (a.take(), b.take());
-    assert_eq!(live.presence(&A), vec![2]);
+    assert_eq!(live.presence(&A).online, vec![2]);
     // the friendship ended: both lists are read again
     let (for_a, for_b) = (live.reread(A).unwrap(), live.reread(B).unwrap());
     live.friends_read(for_a, vec![]);
-    assert_eq!(live.presence(&A), Vec::<u32>::new());
+    assert_eq!(live.presence(&A).online, Vec::<u32>::new());
     assert_eq!(a.take(), news::PRESENCE);
     assert_eq!(
         b.take(),
@@ -129,7 +135,7 @@ fn an_ended_friendship_leaves_both_presences_when_read_again() {
         "B left A's list, so B looks again"
     );
     live.friends_read(for_b, vec![]);
-    assert_eq!(live.presence(&B), Vec::<u32>::new());
+    assert_eq!(live.presence(&B).online, Vec::<u32>::new());
     // nobody without a socket is read
     assert!(live.reread(C).is_none());
 }
@@ -144,7 +150,11 @@ fn an_older_reading_never_undoes_a_newer_one() {
     let newer = live.reread(A).unwrap();
     live.friends_read(newer, vec![B]);
     live.friends_read(older, vec![]);
-    assert_eq!(live.presence(&A), vec![2], "the newer reading stands");
+    assert_eq!(
+        live.presence(&A).online,
+        vec![2],
+        "the newer reading stands"
+    );
     // a failed reading only counts when it is the newest
     live.friends_unread(older);
     assert_eq!(a.take() & news::STALE, 0);
@@ -161,13 +171,13 @@ fn an_account_holds_four_sockets_and_a_session_dials_twelve_times_a_minute() {
         .map(|_| socket(&live, A, 1, &[]))
         .collect();
     assert!(matches!(
-        live.admit(A, Some(1), digest(1)),
+        live.admit(A, Some(1), Choice::Online, digest(1)),
         Err(Error::Busy)
     ));
     // another account is not held to A's
     let b = socket(&live, B, 2, &[]);
     held.pop();
-    assert!(live.admit(A, Some(1), digest(1)).is_ok());
+    assert!(live.admit(A, Some(1), Choice::Online, digest(1)).is_ok());
     drop(b);
     let now = Instant::now();
     for _ in 0..SESSION_DIALS {
@@ -256,12 +266,16 @@ fn a_deleted_account_leaves_its_friends_and_a_new_tag_reaches_them() {
     assert_eq!(a.take(), news::SOCIAL);
     assert_eq!(b.take(), news::SOCIAL | news::PRESENCE);
     assert_eq!(c.take(), 0);
-    assert_eq!(live.presence(&B), vec![0x1234]);
+    assert_eq!(live.presence(&B).online, vec![0x1234]);
     live.deleted(&A);
     assert_eq!(a.take(), news::CHECK, "its own sockets check their session");
     assert_eq!(b.take(), news::SOCIAL | news::PRESENCE);
     assert_eq!(c.take(), 0);
-    assert_eq!(live.presence(&B), Vec::<u32>::new(), "forgotten at once");
+    assert_eq!(
+        live.presence(&B).online,
+        Vec::<u32>::new(),
+        "forgotten at once"
+    );
 }
 
 #[test]
@@ -290,6 +304,7 @@ fn presence_reports_at_most_an_account_s_contacts() {
             .admit(
                 *friend,
                 Some(u32::try_from(index).unwrap() + 0x1000),
+                Choice::Online,
                 digest(9),
             )
             .unwrap();
@@ -299,7 +314,7 @@ fn presence_reports_at_most_an_account_s_contacts() {
         listener.ready();
         online.push(listener);
     }
-    let shown = live.presence(&a.account().unwrap());
+    let shown = live.presence(&a.account().unwrap()).online;
     assert_eq!(shown.len(), MAX_CONTACTS);
     assert!(shown.windows(2).all(|pair| pair[0] < pair[1]));
 }
@@ -311,7 +326,7 @@ fn a_reading_given_up_closes_the_sockets_and_the_next_one_reads_anew() {
     let b = socket(&live, B, 2, &[A]);
     b.ready();
     let _ = a.take();
-    assert_eq!(live.presence(&A), vec![2]);
+    assert_eq!(live.presence(&A).online, vec![2]);
     // A request's future is dropped while it reads A's friends again (its
     // time ran out, its client went away): the reading ends as unread.
     let reading = Pending::new(Arc::clone(&live), live.reread(A).unwrap());
@@ -319,16 +334,16 @@ fn a_reading_given_up_closes_the_sockets_and_the_next_one_reads_anew() {
     assert_eq!(a.take() & news::STALE, news::STALE, "A's sockets close");
     assert_eq!(b.take() & news::STALE, 0);
     assert_eq!(
-        live.presence(&A),
+        live.presence(&A).online,
         Vec::<u32>::new(),
         "nothing is shown of a list that may be wrong"
     );
     // a socket of A's that opens while the old one is still closing reads
     // the list anew instead of taking it as read
-    let (again, reading) = live.admit(A, Some(1), digest(1)).unwrap();
+    let (again, reading) = live.admit(A, Some(1), Choice::Online, digest(1)).unwrap();
     let reading = Pending::new(Arc::clone(&live), reading.expect("a new reading"));
     reading.read(vec![B]);
-    assert_eq!(live.presence(&A), vec![2]);
+    assert_eq!(live.presence(&A).online, vec![2]);
     let _ = again.take();
     drop((a, again));
     // a reading that was read is not undone by its guard
@@ -347,16 +362,20 @@ fn a_reading_from_before_a_reconnect_never_takes_a_later_one_s_place() {
     let slow = live.reread(A).unwrap();
     // A's sockets close and open again: a new entry, new readings
     drop(a);
-    let (again, first) = live.admit(A, Some(1), digest(1)).unwrap();
+    let (again, first) = live.admit(A, Some(1), Choice::Online, digest(1)).unwrap();
     live.friends_read(first.unwrap(), vec![B]);
     let newer = live.reread(A).unwrap();
     live.friends_read(newer, vec![B]);
-    assert_eq!(live.presence(&A), vec![2]);
+    assert_eq!(live.presence(&A).online, vec![2]);
     // The reading begun before the reconnect ends now, with what was true
     // then; numbered over all accounts, it is older than every later one.
     assert_ne!(slow, newer);
     live.friends_read(slow, vec![]);
-    assert_eq!(live.presence(&A), vec![2], "the newer reading stands");
+    assert_eq!(
+        live.presence(&A).online,
+        vec![2],
+        "the newer reading stands"
+    );
     live.friends_unread(slow);
     assert_eq!(
         again.take() & news::STALE,
@@ -375,17 +394,204 @@ fn a_new_tag_reaches_friends_of_an_account_without_a_socket() {
 }
 
 #[test]
-fn news_that_a_session_ended_is_counted_for_a_dial_in_flight() {
+fn news_that_a_session_ended_or_a_choice_changed_is_counted_for_a_dial_in_flight() {
     let live = Arc::new(Live::default());
-    let start = live.ends();
+    let start = live.changes();
     // nobody holds a socket yet: such news reaches no socket, but is counted
     live.ended(&digest(1));
-    assert_eq!(live.ends(), start + 1);
+    assert_eq!(live.changes(), start + 1);
     live.raise(&A, news::CHECK);
-    assert_eq!(live.ends(), start + 2);
+    assert_eq!(live.changes(), start + 2);
     live.deleted(&B);
-    assert_eq!(live.ends(), start + 3);
+    assert_eq!(live.changes(), start + 3);
     // other news is not
     live.raise(&A, news::CHAT | news::SOCIAL | news::PRESENCE);
-    assert_eq!(live.ends(), start + 3);
+    assert_eq!(live.changes(), start + 3);
+}
+
+/// A socket of `account` whose stored choice is `choice`.
+fn choosing(live: &Arc<Live>, account: [u8; 16], choice: Choice, friends: &[[u8; 16]]) -> Listener {
+    let (listener, reading) = live
+        .admit(
+            account,
+            Some(u32::from(account[0])),
+            choice,
+            digest(account[0]),
+        )
+        .unwrap();
+    if let Some(reading) = reading {
+        live.friends_read(reading, friends.to_vec());
+    }
+    let _ = listener.take();
+    listener
+}
+
+const ONLINE: Shown = Shown::ONLINE;
+
+#[test]
+fn an_account_that_chose_offline_is_never_seen_and_only_its_choice_changes_that() {
+    // after a restart: an empty registry, the choice as the store has it
+    let live = Arc::new(Live::default());
+    let b = socket(&live, B, 2, &[A]);
+    b.ready();
+    let a = choosing(&live, A, Choice::Offline, &[B]);
+    a.ready();
+    assert_eq!(
+        b.take(),
+        0,
+        "no frame, not even a wake-up, when it connects"
+    );
+    assert_eq!(live.presence(&B).online, Vec::<u32>::new());
+    // its own sockets know what it chose
+    assert_eq!(live.presence(&A).me, Choice::Offline);
+    assert_eq!(live.presence(&A).online, vec![2], "and see its friends");
+    // a second device, what it does, its idling, a device going: nothing
+    let second = choosing(&live, A, Choice::Online, &[B]);
+    second.ready();
+    assert_eq!(
+        live.presence(&A).me,
+        Choice::Offline,
+        "the standing entry's choice holds"
+    );
+    live.report(digest(1), Some(Activity::Playing), true, Instant::now());
+    drop(second);
+    assert_eq!(b.take(), 0);
+    assert_eq!(live.presence(&B).online, Vec::<u32>::new());
+    // the choice is the one change friends see: online, then offline again
+    live.chose(&A, Choice::Online);
+    assert_eq!(b.take(), news::PRESENCE);
+    assert_eq!(live.presence(&B).online, vec![1]);
+    assert_eq!(
+        a.take(),
+        news::PRESENCE,
+        "its own sockets report the choice"
+    );
+    live.chose(&A, Choice::Offline);
+    assert_eq!(b.take(), news::PRESENCE);
+    assert_eq!(live.presence(&B).online, Vec::<u32>::new());
+    // and going while offline is nothing either
+    drop(a);
+    assert_eq!(b.take(), 0);
+}
+
+#[test]
+fn away_and_activity_are_shown_and_only_changes_reach_friends() {
+    let live = Arc::new(Live::default());
+    let b = socket(&live, B, 2, &[A]);
+    b.ready();
+    let a = choosing(&live, A, Choice::Online, &[B]);
+    a.ready();
+    let _ = b.take();
+    let shown = |live: &Live| live.presence(&B).states;
+    assert_eq!(shown(&live), vec![ONLINE]);
+    live.report(digest(1), Some(Activity::Table), false, Instant::now());
+    assert_eq!(b.take(), news::PRESENCE);
+    assert_eq!(
+        shown(&live),
+        vec![Shown {
+            away: false,
+            activity: Some(Activity::Table)
+        }]
+    );
+    // the same again changes nothing, and wakes nobody
+    live.report(digest(1), Some(Activity::Table), false, Instant::now());
+    assert_eq!(b.take(), 0);
+    // idle, or a chosen afk, is away
+    live.report(digest(1), Some(Activity::Playing), true, Instant::now());
+    assert_eq!(
+        shown(&live),
+        vec![Shown {
+            away: true,
+            activity: Some(Activity::Playing)
+        }]
+    );
+    live.report(digest(1), None, false, Instant::now());
+    live.chose(&A, Choice::Afk);
+    assert_eq!(
+        shown(&live),
+        vec![Shown {
+            away: true,
+            activity: None
+        }]
+    );
+    // what A does is no news to A's own sockets
+    let _ = b.take();
+    assert_eq!(a.take() & news::PRESENCE, news::PRESENCE, "the choice is");
+    live.report(digest(1), Some(Activity::Table), false, Instant::now());
+    assert_eq!(a.take(), 0);
+}
+
+#[test]
+fn a_report_without_a_socket_changes_nothing_and_keeps_nothing() {
+    let live = Arc::new(Live::default());
+    let b = socket(&live, B, 2, &[A]);
+    b.ready();
+    live.report(digest(1), Some(Activity::Playing), true, Instant::now());
+    assert_eq!(live.state().reports.len(), 0);
+    assert!(!live.state().accounts.contains_key(&A));
+    assert_eq!(b.take(), 0);
+    // a choice of an account without a socket keeps nothing either, but a
+    // dial in flight learns it changed
+    let before = live.changes();
+    live.chose(&A, Choice::Offline);
+    assert!(!live.state().accounts.contains_key(&A));
+    assert_eq!(live.changes(), before + 1);
+}
+
+#[test]
+fn a_session_s_reports_and_choices_are_budgeted() {
+    let live = Arc::new(Live::default());
+    let a = choosing(&live, A, Choice::Online, &[]);
+    a.ready();
+    let now = Instant::now();
+    for _ in 0..SESSION_REPORTS {
+        live.report(digest(1), None, false, now);
+    }
+    // past the budget a report is not heard
+    let b = socket(&live, B, 2, &[A]);
+    b.ready();
+    let _ = b.take();
+    live.report(digest(1), Some(Activity::Playing), false, now);
+    assert_eq!(live.presence(&B).states, vec![ONLINE]);
+    // a new minute
+    live.report(digest(1), Some(Activity::Playing), false, now + MINUTE);
+    assert_eq!(
+        live.presence(&B).states,
+        vec![Shown {
+            away: false,
+            activity: Some(Activity::Playing)
+        }]
+    );
+    for _ in 0..SESSION_CHOICES {
+        live.choose(digest(1), now).unwrap();
+    }
+    assert_eq!(live.choose(digest(1), now), Err(Error::Busy));
+    assert_eq!(live.choose(digest(2), now), Ok(()), "per session");
+}
+
+#[test]
+fn the_last_report_of_an_account_s_devices_stands() {
+    let live = Arc::new(Live::default());
+    let b = socket(&live, B, 2, &[A]);
+    b.ready();
+    let first = choosing(&live, A, Choice::Online, &[B]);
+    first.ready();
+    // a second device with a session of its own
+    let (second, _) = live.admit(A, Some(1), Choice::Online, digest(77)).unwrap();
+    second.ready();
+    live.report(digest(1), Some(Activity::Table), false, Instant::now());
+    live.report(digest(77), Some(Activity::Playing), false, Instant::now());
+    assert_eq!(
+        live.presence(&B).states,
+        vec![Shown {
+            away: false,
+            activity: Some(Activity::Playing)
+        }]
+    );
+    // the account's last socket gone, what it did is gone with it
+    drop((first, second));
+    assert!(!live.state().accounts.contains_key(&A));
+    let again = choosing(&live, A, Choice::Online, &[B]);
+    again.ready();
+    assert_eq!(live.presence(&B).states, vec![ONLINE]);
 }
